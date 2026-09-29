@@ -100,7 +100,7 @@ Order inside the wave is free; these are independent.
 
 | # | Item | Eng-wk | Notes |
 |---|---|---|---|
-| 4.1 | **WS-21 remainder** — push ingest `POST /streams/{id}/records` (NDJSON / CSV, capped, idempotency-keyed); a real-broker Kafka test; the continuous lane once a latency target is named | 4–6 | needs D-P7 |
+| 4.1 | ✅ **SHIPPED 2026-09-29** (`ASSURE-PUSH-INGEST-1`; residual `ASSURE-STREAM-LANE-BACKOFF-1`) — **WS-21 remainder** — push ingest `POST /streams/{id}/records` (NDJSON / CSV, capped, idempotency-keyed); a real-broker Kafka test; the continuous lane once a latency target is named | 4–6 | needs D-P7 |
 | 4.2 | **WS-17 BI publication** — a publication **Job** writing curated Datasets into a Postgres schema with Catalog column comments | 3–5 | Job form (hold) |
 | 4.3 | **WS-27 Excel export + e-mail attachments** — xlsx server-side, size-capped attachments | 2–3 | needs D-P6 |
 | 4.4 | **WS-23 Workflow editor, SLA per priority, Escalation Rules** | 4–6 | needs D-P4 — it reverses a 2026-09-14 deletion |

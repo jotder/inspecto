@@ -13,8 +13,9 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **52<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 32<!--count:backlog-p3--> × P3** —
+> **52<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 19<!--count:backlog-p2--> × P2 · 33<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ↔ **52 on 2026-09-29**: closed P2 `ASSURE-PUSH-INGEST-1` — `POST /streams/{id}/records` (NDJSON / CSV, 1 MiB cap, idempotency on the caller-scoped W5 key, 409 when paused, BOM stripped) and the continuous `trigger: stream` Kafka lane (dead-lane replacement) shipped after two adversarial rounds; filed P3 `ASSURE-STREAM-LANE-BACKOFF-1` for the restart backoff.
 > ↔ **52 on 2026-09-29**: closed P1 `SEC-IDEMPOTENCY-REPLAY-1` — an `Idempotency-Key` replay now runs after authenticate / rate limit / authorize, keyed on the canonical route path + Space + issuer-namespaced principal + key, with the body and query hash bound (a mismatch is 422) and only 2xx/400/409/422 cached (`fix(security): scope Idempotency-Key replays to the authenticated caller` + `fix(security): namespace idempotency principals by issuer; canonicalise the key path`); filed its residual P3 `SEC-IDEMPOTENCY-GLOBAL-EVICTION-1`.
 > ⬆ **50 → 51 on 2026-09-29** (counted on the rebased board): filed P2 `LEASE-TAKEOVER-INFLIGHT-1` — a run whose lease was taken over is not aborted (found grounding the `ASSURE-OPERABILITY-1` HA/DR runbook).
 > ⬇ **47 → 45 on 2026-09-29**: closed P2 `FINDINGS-EDITOR-CHOICE-BINDING-1` — the choice rows tracked by `$index` over a `FormArray` rebuilt on every choice edit, so a row that stayed on screen stayed bound to a removed control; rows now track their control and choice edits change the array in place (as-built in `okf/frontend/features/objects.md`, *Authoring UI*). Closed P3 `FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1` — *Add choice* focuses the new box. The design plan was archived the same day.
@@ -77,8 +78,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 32<!--count:backlog-p3--> P3 rows are mostly a list of things
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 19<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 33<!--count:backlog-p3--> P3 rows are mostly a list of things
 > deliberately NOT being built, and reading all 52<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
@@ -227,7 +228,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 ### 3.3 Acquisition, Collectors & Parsing
 
-- **P2** · `ASSURE-PUSH-INGEST-1` — **push ingest and a continuous Kafka lane (WS-21, wave 4.1 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** `POST /streams/{id}/records` (NDJSON / CSV, size-capped, idempotency-keyed, writes an inbox file the normal Collector path picks up), a real-broker Kafka test, and the continuous lane (`trigger: stream`) now that a latency target is named (D-P7: p95 ≤ 30 s event-to-Incident, measured). ↔ **2026-09-29 — built, NOT closed**: the push route, the continuous lane and both harnesses shipped (as-built `okf/capabilities/acquisition/acquisition.md` §3.9, §3.13). Still open: (a) the **Incident hop is unmeasured** — the lane's event → committed slice is p95 1030 ms (MockConsumer), real ingest arrival → commit 1.6 s, but no harness drives commit → Alert → Incident, so D-P7 is not proven end to end; (b) `KafkaRealBrokerTest` SKIPS on every build (no broker in CI) — it needs one run against a broker. (The pre-auth, caller-unscoped W5 replay this row found is fixed platform-wide by SEC-IDEMPOTENCY-REPLAY-1; the push route now reuses its caller-scoped key.)
+- **P3** · `ASSURE-STREAM-LANE-BACKOFF-1` — **a stream lane restarts with no backoff (residual of `ASSURE-PUSH-INGEST-1`, wave 4.1 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** A lane whose probe always throws an Error dies and is replaced on every acquire tick (an ERROR + stack trace, a `inspecto_stream_lane_deaths_total` bump and a fresh connector each tick); an unreachable broker's ordinary probe failure retries every 200 ms (`STREAM_PROBE_MS`) with a WARN each time. Bounded, not a hot loop; wants exponential backoff or a consecutive-death cap. `KafkaRealBrokerTest` has still never run against a real broker.
 
 #### Unpack & codecs
 
