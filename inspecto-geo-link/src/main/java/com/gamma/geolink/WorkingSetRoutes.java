@@ -2,6 +2,7 @@ package com.gamma.geolink;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
@@ -104,12 +105,12 @@ public final class WorkingSetRoutes implements RouteModule {
         String of = ApiContext.query(ex, "of");
         if (of == null || of.isBlank()) of = "entities";
         if (!COLUMNS.containsKey(of))
-            throw new ApiException(422, "'of' must be one of entities, links, excluded — got '" + of + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'of' must be one of entities, links, excluded — got '" + of + "'");
         int limit = Math.min(Math.max(intParam(ex, "limit", DEFAULT_LIMIT), 1), MAX_LIMIT);
         int offset = intParam(ex, "offset", 0);
-        if (offset < 0) throw new ApiException(422, "offset must be >= 0");
+        if (offset < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "offset must be >= 0");
         int at = intParam(ex, "at", -1);
-        if (ApiContext.query(ex, "at") != null && at < 0) throw new ApiException(422, "at must be >= 0");
+        if (ApiContext.query(ex, "at") != null && at < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at must be >= 0");
 
         boolean[] cached = {false};
         Relation rel = relation(inv, at, cached);
@@ -175,7 +176,7 @@ public final class WorkingSetRoutes implements RouteModule {
         }
         int lastStep = log.isEmpty() ? 0 : ((Number) log.get(log.size() - 1).get("step")).intValue();
         if (at > lastStep)
-            throw new ApiException(422, "at " + at + " is past the Investigation's head (step " + lastStep + ")");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at " + at + " is past the Investigation's head (step " + lastStep + ")");
         InvestigationEvaluator.State s = InvestigationEvaluator.evaluate(log, at, null);
         int headStep = 0;   // the last log entry at or before `at` — the head the answer is the relation OF
         for (Map<String, Object> e : log) {
@@ -230,7 +231,7 @@ public final class WorkingSetRoutes implements RouteModule {
         try {
             return Integer.parseInt(raw.trim());
         } catch (NumberFormatException e) {
-            throw new ApiException(422, name + " must be an integer, got '" + raw + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, name + " must be an integer, got '" + raw + "'");
         }
     }
 

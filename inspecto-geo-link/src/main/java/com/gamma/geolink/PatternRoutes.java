@@ -2,6 +2,7 @@ package com.gamma.geolink;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.control.WriteGates;
 import com.gamma.event.Event;
@@ -62,7 +63,7 @@ public final class PatternRoutes implements RouteModule {
     private Object branching(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "branching pattern");
         String datasetId = ApiContext.str(body, "dataset");
-        if (datasetId == null) throw new ApiException(422, "body must include 'dataset'");
+        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
         String sourceCol = ident(body, "sourceCol", true);
         String targetCol = ident(body, "targetCol", true);
         String kindCol = ident(body, "linkKindCol", false);
@@ -76,7 +77,7 @@ public final class PatternRoutes implements RouteModule {
         named.addAll(PatternQueryCompiler.thresholdAttrs(stages));
         for (String col : named) {
             if (col != null && !InvRoutes.containsIgnoreCase(columns, col))
-                throw new ApiException(422, "unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
         }
         String filterSql = body.get("filter") == null ? "TRUE" : InvRoutes.checkedFilterSql(body.get("filter"), columns, datasetId);
 
@@ -140,7 +141,7 @@ public final class PatternRoutes implements RouteModule {
             audit(ex, datasetId, matches.size(), truncated, null);
             return out;
         } catch (SQLException e) {
-            throw new ApiException(422, "pattern query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pattern query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 
@@ -229,11 +230,11 @@ public final class PatternRoutes implements RouteModule {
     private static String ident(Map<String, Object> body, String key, boolean required) {
         String v = ApiContext.str(body, key);
         if (v == null) {
-            if (required) throw new ApiException(422, "body must include '" + key + "'");
+            if (required) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include '" + key + "'");
             return null;
         }
         if (!SAFE_IDENT.matcher(v).matches())
-            throw new ApiException(422, "unsafe column identifier '" + v + "' for " + key);
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsafe column identifier '" + v + "' for " + key);
         return v;
     }
 }

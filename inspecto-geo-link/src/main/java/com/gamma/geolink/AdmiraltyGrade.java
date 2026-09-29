@@ -1,6 +1,7 @@
 package com.gamma.geolink;
 
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 
 import java.util.List;
 import java.util.Locale;
@@ -35,7 +36,7 @@ final class AdmiraltyGrade {
     static String validate(Object raw) {
         String v = raw instanceof String s ? s.trim().toUpperCase(Locale.ROOT) : null;
         if (v == null || !GRADE.matcher(v).matches())
-            throw new ApiException(422, "'confidence' must be an Admiralty grade — source reliability A-F then "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'confidence' must be an Admiralty grade — source reliability A-F then "
                     + "information credibility 1-6, e.g. \"B2\" — got " + (raw instanceof String ? "'" + raw + "'" : raw));
         return v;
     }

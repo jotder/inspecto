@@ -2,6 +2,7 @@ package com.gamma.geolink;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
@@ -59,7 +60,7 @@ public final class InvestigationCoverageRoutes implements RouteModule {
         InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
         Map<String, Object> h = inv.header();
         if (h.get("timeCol") == null)
-            throw new ApiException(422, "this Investigation has no time column — create it with 'timeCol' to assess coverage");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "this Investigation has no time column — create it with 'timeCol' to assess coverage");
 
         Map<String, Object> window;
         String qFrom = ApiContext.query(ex, "from"), qTo = ApiContext.query(ex, "to"), qZone = ApiContext.query(ex, "timezone");
@@ -75,7 +76,7 @@ public final class InvestigationCoverageRoutes implements RouteModule {
             window = InvestigationEvaluator.evaluate(log, -1, null).window;
         }
         if (window == null || window.get("from") == null || window.get("to") == null)
-            throw new ApiException(422, "coverage needs a bounded window — pass 'from' and 'to', or set a window "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "coverage needs a bounded window — pass 'from' and 'to', or set a window "
                     + "with both on the Investigation");
 
         String zone = InvestigationTime.localZone(window);
@@ -87,7 +88,7 @@ public final class InvestigationCoverageRoutes implements RouteModule {
         List<LocalDate> expected = new ArrayList<>();
         for (LocalDate day = first; !day.isAfter(last); day = day.plusDays(1)) {
             if (expected.size() >= MAX_DAYS)
-                throw new ApiException(422, "coverage is capped at " + MAX_DAYS + " days; narrow the window");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "coverage is capped at " + MAX_DAYS + " days; narrow the window");
             if (mask == null || mask.contains(InvestigationTime.DAYS.get(day.getDayOfWeek().getValue() - 1)))
                 expected.add(day);
         }
@@ -111,7 +112,7 @@ public final class InvestigationCoverageRoutes implements RouteModule {
                     dataset, relationSql, sql, MAX_DAYS + 2, 0, List.of(), List.of(), binds));
             for (Map<String, Object> row : r.rows()) rows.put(String.valueOf(row.get("d")), ((Number) row.get("n")).longValue());
         } catch (SQLException e) {
-            throw new ApiException(422, "coverage over dataset '" + dataset + "' failed: " + e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "coverage over dataset '" + dataset + "' failed: " + e.getMessage());
         }
 
         List<Map<String, Object>> perDay = new ArrayList<>();
