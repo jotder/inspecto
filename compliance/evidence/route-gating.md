@@ -310,6 +310,7 @@ system: the evidence cannot say something the code does not.
 | PUT | `/settings/egress` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/EgressRoutes.java:49` |
 | PUT | `/settings/geo` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:56` |
 | PUT | `/settings/link-analysis` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:59` |
+| PUT | `/settings/mail-attachments` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/MailAttachmentRoutes.java:34` |
 | PUT | `/settings/pipeline-history` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:62` |
 | PUT | `/settings/publication-destinations` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/PublicationDestinationRoutes.java:34` |
 | PUT | `/settings/scheduler` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java:77` |

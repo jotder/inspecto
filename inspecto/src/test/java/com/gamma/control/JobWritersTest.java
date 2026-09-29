@@ -47,6 +47,7 @@ class JobWritersTest {
             Map.entry("POST /inv/investigations/([^/]+)/alert-rules", FIXED + " (alert-rule, inspecto-geo-link)"),
             Map.entry("PUT /settings/egress", FIXED + " (egress.toon)"),
             Map.entry("PUT /settings/mail-attachments", FIXED + " (mail-attachments.toon)"),
+            Map.entry("PUT /settings/publication-destinations", FIXED + " (publication-destinations.toon)"),
             Map.entry("POST /pipelines/rename/resume", "finishes an already-admitted rename; rewrites only on_pipeline "
                     + "references in existing jobs, never their params")
     ));
