@@ -429,6 +429,26 @@ class ControlApiImportReservedPathsTest {
         }
     }
 
+    /**
+     * Operator 2026-09-29 (IMPORT-RESIDUALS-1 item 1, decided): a whole-Space export fed back into an existing Space
+     * is not a supported flow — the 403 says so and names the two flows that ARE supported, and writes nothing.
+     */
+    @Test
+    void aWholeSpaceExportIsRefusedWithAMessageThatNamesTheSupportedFlows(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, true)) {
+            HttpResponse<byte[]> whole = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port
+                    + "/api/v1/spaces/alpha/export")).header("Authorization", BUILDER).GET().build(),
+                    HttpResponse.BodyHandlers.ofByteArray());
+            assertEquals(200, whole.statusCode());
+            Map<String, String> before = tree(c.config);
+            HttpResponse<String> r = send(c, "POST", "/import?on_conflict=overwrite", whole.body(), ONBOARDER);
+            assertEquals(403, r.statusCode(), r.body());
+            assertTrue(r.body().contains("a whole-Space export cannot be imported into an existing Space; "
+                    + "import data sources one at a time, or create a new Space from it"), r.body());
+            assertEquals(before, tree(c.config), "a refused whole-Space import writes nothing");
+        }
+    }
+
     // ── all-or-nothing ───────────────────────────────────────────────────────────────────────────
 
     /**

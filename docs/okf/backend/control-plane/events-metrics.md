@@ -499,6 +499,10 @@ adapter was later built — next section.)
 
 ### SES via SNS (`D8-SES-SNS-1`, built 2026-09-28 on recorded fixtures)
 
+⚠ **Fixtures-verified; live checks deferred until a customer names SES (operator 2026-09-29)** — whether SES
+echoes our `Message-ID` (D5) and the real signing-certificate path grammar and chain are tracked as P3
+`SES-SNS-LIVE-CHECKS-1`.
+
 Adapter id `ses` (`SesSnsDeliveryStatusAdapter`, `inspecto-connectors`), so the SNS HTTPS subscription URL is
 `/api/v1/public/delivery-status/ses`. Operator decisions D1–D11 of
 [`ses-sns-adapter-design.md`](../../../superpower/ses-sns-adapter-design.md) §9 accepted 2026-09-28; the design's

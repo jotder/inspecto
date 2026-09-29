@@ -182,8 +182,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/expectations/evaluate` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/ExpectationRoutes.java:60` |
 | POST | `/geo/projection` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/GeoRoutes.java:68` |
 | POST | `/geo/routes` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/GeoRoutes.java:69` |
-| POST | `/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:66` |
-| POST | `/import/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:67` |
+| POST | `/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:74` |
+| POST | `/import/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:75` |
 | POST | `/inv/entity-identities` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityIdentityRoutes.java:69` |
 | POST | `/inv/entity-identities/([^/]+)/retract` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityIdentityRoutes.java:71` |
 | POST | `/inv/entity-lists` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java:81` |

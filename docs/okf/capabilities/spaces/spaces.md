@@ -154,6 +154,11 @@ Space stays allowed. The eight paths the SPA never prefixes are `SERVER_GLOBAL`:
 
 ### 3.4 Whole-Space zip export / import (SPC-2)
 
+⚠ **The whole-Space zip does not import into an existing Space** (operator 2026-09-29): `POST
+/spaces/{id}/import` answers a `kind: space` bundle 403 — *a whole-Space export cannot be imported into an
+existing Space; import data sources one at a time, or create a new Space from it*. It seeds a NEW Space through
+Space creation. See [auth-security.md](../../backend/editions/auth-security.md) (import section).
+
 `DataSourceRoutes` (`inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:38-41`): `GET
 /spaces/{id}/export` (the whole config tree + `space.toon`, manifest `bundle.toon` — `BundleExporter`),
 `POST /spaces/{id}/import/preview` (the **dry run**: contents, `hasSpaceToon`, per-item conflicts, findings,

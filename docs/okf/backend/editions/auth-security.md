@@ -677,6 +677,15 @@ sub-millisecond gap is still overwritten. Tests: `ImportJournalTest` (interleave
 `ControlApiImportConcurrentRollbackTest` (real HTTP; the `ImportJournal.beforeRollback` test seam saves the file
 between the write and the rollback).
 
+**A whole-Space export is not importable into an existing Space** (operator 2026-09-29, `IMPORT-RESIDUALS-1`
+(1) decided). The zip `GET /spaces/{id}/export` produces (manifest `kind: space`) carries the suffix-scanned ops
+configs no import may write, so `POST /spaces/{id}/import` refuses it up front with **403** and one message: *a
+whole-Space export cannot be imported into an existing Space; import data sources one at a time, or create a new
+Space from it* (`DataSourceRoutes.WHOLE_SPACE_IMPORT_REFUSED`, pinned by `ControlApiImportReservedPathsTest`).
+The two supported flows are per-data-source export → import, and seeding a NEW Space from the zip through Space
+creation (`SpaceManager.createFromBundle`, a separate path this check does not touch). Splitting a whole-Space
+zip into its kinds' own validated routes is filed, not built (P3 `IMPORT-WHOLE-SPACE-SPLIT-1`).
+
 **The loader guard.** `ImportLoaderInventoryTest` scans every reactor module's `src/main/java` for fixed
 names: literal `.resolve("a").resolve("b")` chains, `AgentWriteRoot.resolve("x")` (as `agent/x`), and any
 string literal naming a `.toon` / `.json` / `.jsonl` / `.tsv` / `.journal` / `.key` file. Each must be

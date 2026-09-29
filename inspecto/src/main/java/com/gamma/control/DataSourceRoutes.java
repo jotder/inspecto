@@ -51,8 +51,16 @@ import java.util.stream.Collectors;
  * immediately by re-registering pipelines + connections; it {@code 409}s on data-source id clashes unless
  * {@code ?on_conflict=overwrite}. Edited (overwritten) configs reload on the next poll cycle, as with
  * {@code /config/write}; imported jobs/metadata take effect on the next restart.
+ *
+ * <p>⚠ The zip {@code GET /export} produces is NOT importable into an existing Space (operator 2026-09-29):
+ * {@code POST /import} answers it {@code 403} with {@link #WHOLE_SPACE_IMPORT_REFUSED}. It seeds a NEW Space
+ * through Space creation; into an existing Space, import data sources one at a time.
  */
 final class DataSourceRoutes implements RouteModule {
+
+    /** The 403 a whole-Space export gets from {@code POST /import} — pinned by {@code ControlApiImportReservedPathsTest}. */
+    static final String WHOLE_SPACE_IMPORT_REFUSED = "a whole-Space export cannot be imported into an existing Space; "
+            + "import data sources one at a time, or create a new Space from it";
 
     @Override
     public void register(ApiContext api) {
@@ -227,6 +235,11 @@ final class DataSourceRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
         }
+        // Operator 2026-09-29 (IMPORT-RESIDUALS-1 item 1): a whole-Space export into an existing Space is NOT a
+        // supported flow — it would carry the suffix-scanned ops configs no import may write. Said plainly here,
+        // before the path rules would refuse it file by file. Space creation from the zip is a separate path.
+        if ("space".equals(bundle.kind()))
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, WHOLE_SPACE_IMPORT_REFUSED);
         // SEC-IMPORT-ROLES-ESCALATION-1: an import may never write the files a narrower gate owns — the role
         // table, the Demo User table, the access config, the assist agent's policy, the settings documents.
         // Before this, a zip carrying roles.toon rewrote the role table with only canAuthorWorkbench. Judged by
