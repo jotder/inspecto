@@ -10006,6 +10006,32 @@
         "x-generated" : true
       }
     },
+    "/settings/publication-destinations" : {
+      "get" : {
+        "tags" : [ "settings" ],
+        "summary" : "GET /settings/publication-destinations (generated skeleton)",
+        "operationId" : "getSettingsPublicationDestinations",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      },
+      "put" : {
+        "tags" : [ "settings" ],
+        "summary" : "PUT /settings/publication-destinations (generated skeleton)",
+        "operationId" : "putSettingsPublicationDestinations",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
     "/action-requests/{actionrequestId}/mark-failed" : {
       "post" : {
         "tags" : [ "action-requests" ],

@@ -46,6 +46,7 @@ class PostgresPublishJobTest {
         cfg = dir.resolve("config");
         data = dir.resolve("data");
         Files.createDirectories(cfg.resolve("registry"));
+        destinations("bi.example.test");
         System.setProperty("assist.write.root", cfg.toString());
         target = (DuckDBConnection) DriverManager.getConnection("jdbc:duckdb:" + dir.resolve("target.duckdb").toString().replace('\\', '/'));
         PostgresPublishJobType.resolver = h -> new InetAddress[] {InetAddress.getByName("203.0.113.10")};
@@ -64,6 +65,10 @@ class PostgresPublishJobTest {
         PostgresPublishJobType.installAuthority(null);
         ConnectionRegistry.remove("BI");
         target.close();
+    }
+
+    void destinations(String... hosts) throws Exception {
+        Files.writeString(cfg.resolve(PublicationDestinations.FILE), dev.toonformat.jtoon.JToon.encode(Map.of("hosts", List.of(hosts))));
     }
 
     static void register(String id, String url) {
@@ -87,6 +92,10 @@ class PostgresPublishJobTest {
     }
 
     JobRun run(Map<String, String> params) throws Exception {
+        return run(params, null);
+    }
+
+    JobRun run(Map<String, String> params, Map<String, String> triggerArgs) throws Exception {
         Map<String, String> p = new HashMap<>(Map.of("connection", "BI", "datasets", "subs", "schema", "bi", "retries", "0"));
         p.putAll(params);
         JobConfig job = new JobConfig("pub", "publish.postgres", null, null, true, false, p, null, null);
@@ -94,7 +103,7 @@ class PostgresPublishJobTest {
              JobService js = new JobService(List.of(job), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, null, data.toString())) {
             js.start();
-            assertTrue(js.triggerRun("pub", null).isPresent());
+            assertTrue((triggerArgs == null ? js.triggerRun("pub", null) : js.triggerRun("pub", null, triggerArgs)).isPresent());
             long deadline = System.nanoTime() + 30_000_000_000L;
             while (System.nanoTime() < deadline) {
                 JobRun r = js.lastRunOf("pub").orElse(null);
@@ -194,6 +203,7 @@ class PostgresPublishJobTest {
     void aLoopbackHostIsRefusedByTheEgressPolicy() throws Exception {
         PostgresPublishJobType.resolver = com.gamma.pipeline.exec.EgressPolicy.SYSTEM;
         register("BI", "jdbc:postgresql://127.0.0.1:5432/bi");
+        destinations("127.0.0.1");   // listed, so the EGRESS policy is what refuses it
         JobRun r = run(Map.of());
         assertEquals("FAILED", r.status());
         assertTrue(r.message().contains("loopback"), r.message());
@@ -312,5 +322,27 @@ class PostgresPublishJobTest {
         assertEquals("SUCCESS", run(Map.of()).status());
         assertEquals("${SYS:pub.ca}", dialedProps.get().getProperty(PublishSslFactory.ROOT_CERT_REF));
         assertNull(dialedProps.get().getProperty("sslrootcert"), "pgjdbc never sees a root-cert path");
+    }
+
+    @Test
+    void aHostThatIsNotAPublicationDestinationIsRefusedEvenWhenEgressWouldAllowIt() throws Exception {
+        destinations();
+        JobRun r = run(Map.of());
+        assertEquals("FAILED", r.status());
+        assertTrue(r.message().contains("not a publication destination"), r.message());
+        assertNull(dialed.get());
+        destinations("other.example.test");
+        assertEquals("FAILED", run(Map.of()).status(), "exact host only");
+    }
+
+    @Test
+    void aTriggerMayNotOverrideTheApprovedConnectionDatasetsOrSensitiveColumns() throws Exception {
+        for (String k : List.of("connection", "datasets", "include_sensitive", "schema", "columns")) {
+            JobRun r = run(Map.of(), Map.of(k, "evil"));
+            assertEquals("FAILED", r.status(), k);
+            assertTrue(r.message().contains("saved (approved) Job only"), r.message());
+        }
+        assertNull(dialed.get());
+        assertEquals("SUCCESS", run(Map.of(), Map.of("retries", "0")).status(), "an unlocked parameter may still be given");
     }
 }

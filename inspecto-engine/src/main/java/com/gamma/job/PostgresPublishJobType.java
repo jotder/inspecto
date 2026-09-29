@@ -74,6 +74,10 @@ public final class PostgresPublishJobType implements JobTypeProvider {
             P_PARTITION = "partition_column", P_COLUMNS = "columns", P_SENSITIVE = "include_sensitive",
             P_TIMEOUT = "timeout_seconds", P_RETRIES = "retries";
     static final String FULL = "full-refresh", INCREMENTAL = "partition-incremental";
+    /** The parameters a run takes from the saved Job only — the four-eyes-approved destination and data. */
+    public static final List<String> LOCKED = List.of(P_CONNECTION, P_DATASETS, P_SENSITIVE, P_SCHEMA, P_COLUMNS);
+    /** The parameters whose change (or a create) holds a {@code publish.postgres} Job for four-eyes approval. */
+    public static final List<String> FOUR_EYES = List.of(P_CONNECTION, P_DATASETS, P_SENSITIVE);
     static final int BATCH = 1000;
 
     /** Who a run acts as. {@code open} = no authenticator (Personal / an open dev server): sharing envelopes are
@@ -155,7 +159,16 @@ public final class PostgresPublishJobType implements JobTypeProvider {
         @Override
         public JobResult run(JobContext ctx) {
             long t0 = System.nanoTime();
-            Map<String, String> p = ctx.params().isEmpty() ? ctx.config() : ctx.params();
+            Map<String, String> p = new LinkedHashMap<>(ctx.params().isEmpty() ? ctx.config() : ctx.params());
+            // The approved destination and data (four-eyes) come from the SAVED Job only: a trigger's args, a
+            // Signal binding or a run-time override may not change them.
+            for (String k : LOCKED) {
+                String saved = cfg.params().get(k), given = p.get(k);
+                if (given != null && !given.isBlank() && !given.equals(saved))
+                    return JobResult.failed(TYPE_ID + " refused: '" + k + "' comes from the saved (approved) Job only, "
+                            + "a run may not override it", ms(t0));
+                if (saved == null) p.remove(k); else p.put(k, saved);
+            }
             Map<String, Long> rows = new LinkedHashMap<>();
             String schema = p.get(P_SCHEMA);
             try {
@@ -226,7 +239,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                                     + c.duckType() + "; partition on a text, integer, boolean or date column");
                     }
 
-                Target target = target(required(p, P_CONNECTION), timeout, author);
+                Target target = target(required(p, P_CONNECTION), timeout, author, writeRoot);
                 if (target.insecureTls() && !ctx.dryRun()) auditInsecureTls(target, cfg);
                 if (ctx.dryRun())
                     return "dry run: would publish " + plans.size() + " dataset(s) " + mode + " to " + target.display()
@@ -381,7 +394,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
      * {@code sslmode} defaults to {@code verify-full}; anything weaker needs the Connection's {@code insecure_tls: true}
      * AND an author holding {@code canAdminister} now.
      */
-    static Target target(String connectionId, int timeoutSeconds, Author author) throws EgressPolicy.Refused {
+    static Target target(String connectionId, int timeoutSeconds, Author author, Path configRoot) throws EgressPolicy.Refused {
         ConnectionProfile profile = ConnectionRegistry.find(connectionId).orElseThrow(() ->
                 new IllegalStateException("Connection '" + connectionId + "' is not registered in this space"));
         if (!"db".equalsIgnoreCase(profile.connector()))
@@ -425,6 +438,10 @@ public final class PostgresPublishJobType implements JobTypeProvider {
 
         String bare = host.startsWith("[") ? host.substring(1, host.length() - 1) : host;
         EgressPolicy.checkHost(bare);
+        if (!PublicationDestinations.permits(configRoot, bare))
+            throw new SecurityException("'" + bare + "' is not a publication destination of this Space — an administrator "
+                    + "adds it with PUT /settings/publication-destinations (the egress policy alone does not allow a "
+                    + "destination) — refused");
         InetAddress to = EgressPolicy.resolve(bare, EgressAllowlist.forCurrentSpace(), resolver);
         Properties props = new Properties();
         props.setProperty("sslmode", sslmode);

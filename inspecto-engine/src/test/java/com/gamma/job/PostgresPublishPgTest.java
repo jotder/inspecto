@@ -49,6 +49,7 @@ class PostgresPublishPgTest {
         new ComponentStore(cfg.resolve("registry")).write("dataset", "subs", Map.of("physicalRef", "subs",
                 "columns", List.of(Map.of("name", "plan", "description", "Tariff plan"))));
         System.setProperty("assist.write.root", cfg.toString());
+        Files.writeString(cfg.resolve(PublicationDestinations.FILE), "hosts[1]: bi.example.test");
         ConnectionRegistry.register(ConnectionProfile.fromMap(Map.of("id", "PG", "connector", "db",
                 "options", Map.of("jdbc_url", "jdbc:postgresql://bi.example.test:5432/postgres"))));
         // the egress check runs on the authored host; the test then dials the configured server
@@ -114,6 +115,7 @@ class PostgresPublishPgTest {
         }
         new ComponentStore(cfg.resolve("registry")).write("dataset", "subs", Map.of("physicalRef", "subs"));
         System.setProperty("assist.write.root", cfg.toString());
+        Files.writeString(cfg.resolve(PublicationDestinations.FILE), "hosts[2]: " + certHost + ",not-" + certHost);
         System.setProperty("pg.tls.ca", Files.readString(Path.of(caFile)));
         System.setProperty("pg.tls.pw", pw);
         PostgresPublishJobType.resolver = h -> new InetAddress[] {InetAddress.getByName("203.0.113.10")};

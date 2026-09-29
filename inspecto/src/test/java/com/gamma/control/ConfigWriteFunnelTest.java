@@ -67,6 +67,10 @@ class ConfigWriteFunnelTest {
     private static final String EGRESS = "the Space egress allowlist (egress.toon, ASSURE-ACTION-REQUESTS-1): a Space "
             + "setting validated by EgressPolicy (canAdminister) — SaveGate has no arm for it and ApprovalPolicy.GOVERNABLE "
             + "excludes Space settings, as it excludes approval.toon";
+    private static final String PUBLICATION_DESTINATIONS = "the Space publication destination allowlist "
+            + "(publication-destinations.toon, ASSURE-BI-PUBLICATION-1): a Space setting validated by "
+            + "PublicationDestinations (canAdminister) — like egress.toon, SaveGate has no arm for it and "
+            + "ApprovalPolicy.GOVERNABLE excludes Space settings";
     private static final String JOBS = "JobRoutes runs its own job gate (the job spec + ConfigSafetyValidator.checkJob, "
             + "the two checks SaveGate's job arm runs) rather than the whole SaveGate list";
 
@@ -84,7 +88,8 @@ class ConfigWriteFunnelTest {
             Map.entry("POST /jobs", JOBS), Map.entry("PUT /jobs/([^/]+)", JOBS),
             Map.entry("POST /jobs/([^/]+)/enable", JOBS), Map.entry("POST /jobs/([^/]+)/disable", JOBS),
             Map.entry("POST /jobs/([^/]+)/reschedule", JOBS),
-            Map.entry("PUT /settings/egress", EGRESS)
+            Map.entry("PUT /settings/egress", EGRESS),
+            Map.entry("PUT /settings/publication-destinations", PUBLICATION_DESTINATIONS)
     ));
 
     private static final String NOT_GOVERNABLE = "writes a kind ApprovalPolicy.GOVERNABLE excludes, so no policy can "
@@ -115,6 +120,7 @@ class ConfigWriteFunnelTest {
             Map.entry("POST /expectations/evaluate", RESULT_STAMP),
             Map.entry("POST /expectations/([^/]+)/evaluate", RESULT_STAMP),
             Map.entry("PUT /settings/egress", EGRESS),
+            Map.entry("PUT /settings/publication-destinations", PUBLICATION_DESTINATIONS),
             Map.entry("POST /pipelines/rename/resume",
                     "finishes a rename that was already let through (held and approved, or ungoverned) — holding "
                             + "the recovery would strand a half-moved identity")

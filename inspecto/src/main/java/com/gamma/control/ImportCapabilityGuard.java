@@ -177,6 +177,11 @@ final class ImportCapabilityGuard {
      *  refused as {@code job (<task>)}, the task lower-cased as {@code MaintenanceJob} dispatches it. */
     @SuppressWarnings("unchecked")
     private static void requireIfAdministerOnly(HttpExchange ex, Map<?, ?> job) {
+        // ASSURE-BI-PUBLICATION-1: a publish.postgres Job always needs four-eyes approval, which a bulk import
+        // cannot give — so no import (bundle, zip, Space, template) may carry one, whoever asks.
+        if (PendingChanges.isPublication(job))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "an import carrying a publish.postgres Job is refused — "
+                    + "create it with POST /jobs so it can be approved (four-eyes); nothing was written");
         Map<String, Object> j = new LinkedHashMap<>((Map<String, Object>) job);
         j.putIfAbsent("name", "import");
         try {

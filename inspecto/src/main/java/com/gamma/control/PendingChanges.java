@@ -106,6 +106,7 @@ public final class PendingChanges {
         Path root = api.writeRoot();
         ApprovalPolicy policy = ApprovalPolicy.forRoot(root);
         ApprovalPolicy.Rule rule = policy.ruleFor(kind);
+        if (rule == null) rule = mandatoryRule(kind, proposed, current);
         if (rule == null) return;
 
         String reason = ex.getRequestHeaders().getFirst(HEADER_REASON);
@@ -233,6 +234,37 @@ public final class PendingChanges {
         }
         caps.removeAll(AccessGrants.deniedCapabilities(configRoot, roles));
         return new Subject(String.valueOf(rec.get("author")), caps, unscoped ? null : scopes);
+    }
+
+    /**
+     * A hold NO approval policy can turn off (ASSURE-BI-PUBLICATION-1, operator 2026-09-29): creating a
+     * {@code publish.postgres} Job, or changing its {@code connection}, {@code datasets} or {@code include_sensitive},
+     * always needs four-eyes approval by a {@code canApproveChanges} holder — it decides which data leaves the
+     * platform and where. A delete, and any other change, is not held by this rule.
+     */
+    static ApprovalPolicy.Rule mandatoryRule(String kind, Map<String, Object> proposed, Map<String, Object> current) {
+        if (!JobRoutes.KIND.equals(kind) || proposed == null) return null;
+        Map<?, ?> p = jobSection(proposed), c = current == null ? null : jobSection(current);
+        if (!isPublication(p)) return null;
+        ApprovalPolicy.Rule always = new ApprovalPolicy.Rule(true, ApprovalPolicy.DEFAULT_APPROVER, true);
+        if (c == null || !isPublication(c)) return always;
+        for (String k : com.gamma.job.PostgresPublishJobType.FOUR_EYES)
+            if (!java.util.Objects.equals(trimmed(p.get(k)), trimmed(c.get(k)))) return always;
+        return null;
+    }
+
+    /** Whether a decoded Job section is a {@code publish.postgres} Job. */
+    static boolean isPublication(Map<?, ?> job) {
+        return job != null && com.gamma.job.PostgresPublishJobType.TYPE_ID.equalsIgnoreCase(String.valueOf(trimmed(job.get("type"))));
+    }
+
+    /** The {@code job:} section of a decoded Job doc, or the doc itself when it is the bare section. */
+    static Map<?, ?> jobSection(Map<?, ?> doc) {
+        return doc.get("job") instanceof Map<?, ?> j ? j : doc;
+    }
+
+    private static Object trimmed(Object v) {
+        return v == null ? null : String.valueOf(v).trim();
     }
 
     /**
