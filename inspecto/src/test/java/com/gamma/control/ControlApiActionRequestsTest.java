@@ -641,6 +641,27 @@ class ControlApiActionRequestsTest {
         }
     }
 
+    /**
+     * Round-2 verification 2026-09-29: the model endpoint allowlist rides egress.toon as {@code models}. It is
+     * administrator-only, validated fail closed, and a PUT of one list keeps the other.
+     */
+    @Test
+    void theModelEndpointAllowlistIsAdministratorOnlyValidatedAndKeptApartFromAllow(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            assertEquals(403, send(c, "PUT", "/settings/egress", "{\"models\":[\"localhost\"]}", ANALYST2).statusCode());
+            assertEquals(422, send(c, "PUT", "/settings/egress", "{\"models\":[\"169.254.169.254\"]}", CHECKER).statusCode());
+            assertEquals(422, send(c, "PUT", "/settings/egress", "{\"models\":\"localhost\"}", CHECKER).statusCode());
+            data(send(c, "PUT", "/settings/egress", "{\"allow\":[\"pcrf.internal\"]}", CHECKER), 200);
+            data(send(c, "PUT", "/settings/egress", "{\"models\":[\"localhost\",\"ollama.lan\"]}", CHECKER), 200);
+            JsonNode both = data(send(c, "GET", "/settings/egress", null, AUTHOR), 200);
+            assertEquals(2, both.get("models").size(), both.toString());
+            assertEquals(1, both.get("allow").size(), "a models-only PUT must keep allow: " + both);
+            data(send(c, "PUT", "/settings/egress", "{\"allow\":[]}", CHECKER), 200);
+            assertEquals(2, data(send(c, "GET", "/settings/egress", null, AUTHOR), 200).get("models").size(),
+                    "an allow-only PUT must keep models");
+        }
+    }
+
     /** WEBHOOK-EGRESS-POLICY-1: BOOT seeds a pre-existing Space from its webhook Step targets; a removal sticks. */
     @Test
     void bootSeedsTheAllowlistFromWebhookTargetsAndARemovalIsNeverReSeeded(@TempDir Path cfg, @TempDir Path tmp)

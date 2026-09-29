@@ -2,6 +2,8 @@ package com.gamma.intelligence;
 
 import com.eoiagent.model.LlmGateway;
 import com.eoiagent.model.OllamaChatAdapter;
+import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.pipeline.exec.ModelEgress;
 import com.eoiagent.model.OpenAiCompatibleChatAdapter;
 import com.eoiagent.model.StubLlmGateway;
 import com.gamma.model.ModelSettings;
@@ -38,18 +40,34 @@ final class GatewayFactory {
     record Gateway(LlmGateway llm, boolean configured) {}
 
     static Gateway build() {
-        ModelSettings settings = ModelSettingsStore.load().orElseGet(() -> ModelSettings.defaults("ollama"));
+        return build(ModelSettingsStore.load().orElseGet(() -> ModelSettings.defaults("ollama")),
+                ModelEgress.forCurrentSpace(), EgressPolicy.SYSTEM);
+    }
+
+    /**
+     * Round-2 verification 2026-09-29: the baseUrl is checked against the Space's model endpoint allowlist and the
+     * adapter dials the CHECKED address ({@link ModelEgress#pin}). A refused endpoint degrades to the offline
+     * stub, logged; it never fails the start.
+     */
+    static Gateway build(ModelSettings settings, ModelEgress.Policy egress, EgressPolicy.Resolver resolver) {
         String modelId = settings.model("medium");
-        if (settings.local() && settings.baseUrl() != null && modelId != null) {
-            return switch (settings.provider()) {
-                case "ollama" -> new Gateway(new OllamaChatAdapter(settings.baseUrl(), modelId), true);
-                case "llamacpp" ->
-                        new Gateway(new OpenAiCompatibleChatAdapter(settings.baseUrl(), modelId, null), true);
-                default -> new Gateway(offlineStub(settings), false);
-            };
+        if (settings.local() && settings.baseUrl() != null && modelId != null
+                && (settings.provider().equals("ollama") || settings.provider().equals("llamacpp"))) {
+            String pinned;
+            try {
+                pinned = ModelEgress.pin(settings.baseUrl(), egress, resolver);
+            } catch (EgressPolicy.Refused refused) {
+                log.warn("[EGRESS] model endpoint refused, the intelligence agent runs without a model: {}", refused.getMessage());
+                return new Gateway(offlineStub(settings), false);
+            }
+            return settings.provider().equals("ollama")
+                    ? new Gateway(new OllamaChatAdapter(pinned, modelId), true)
+                    : new Gateway(new OpenAiCompatibleChatAdapter(pinned, modelId, null), true);
         }
         return new Gateway(offlineStub(settings), false);
     }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GatewayFactory.class);
 
     private static LlmGateway offlineStub(ModelSettings settings) {
         return StubLlmGateway.builder()

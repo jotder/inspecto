@@ -87,7 +87,7 @@ final class CapabilityManifest {
             // are server-wide and /test makes a real outbound call to whatever baseUrl was last saved, so
             // gating either alone leaves the other as the injection point or the trigger. Live in every
             // Standard/Enterprise bundle — inspecto-agent IS staged, unlike inspecto-intelligence.
-            new Entry("POST", "/assist/settings", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/assist/settings", Roles.CAN_ADMINISTER),
             new Entry("POST", "/assist/settings/test", Roles.CAN_AUTHOR_WORKBENCH),
             // AuditLogRoutes (ASSURE-AUDIT-CHAIN-1) — the tamper-evidence reads are gated like the anchor write: a
             // verify walks the whole trail and the anchors are what an auditor carries off the box.

@@ -50,7 +50,10 @@ final class AssistRoutes implements RouteModule {
         // whether or not the optional module is present.
         api.post("/assist/settings/test", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> assistAgentOr503(api).testSettings()));
-        api.post("/assist/settings", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> {
+        // Round-2 verification 2026-09-29: the WRITE carries provider + baseUrl, i.e. where the server will call
+        // out, so it is canAdminister. /test only dials what an administrator saved, and the intelligence
+        // gateway additionally refuses any baseUrl outside the Space's model endpoint allowlist (ModelEgress).
+        api.post("/assist/settings", ApiContext.withCapability("canAdminister", (e, m) -> {
             try {
                 return assistAgentOr503(api).updateSettings(api.body(e));
             } catch (IllegalArgumentException ex) {

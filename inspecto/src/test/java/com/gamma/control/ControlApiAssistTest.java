@@ -104,6 +104,8 @@ class ControlApiAssistTest {
     private static void armAuthenticator() {
         Authenticators.forTest(ex -> "Bearer valid".equals(ex.getRequestHeaders().getFirst("Authorization"))
                 ? Optional.of(new Subject("jdoe", Set.of("canAuthorWorkbench")))
+                : "Bearer admin".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? Optional.of(new Subject("root", Set.of("canAuthorWorkbench", "canAdminister")))
                 : "Bearer plain".equals(ex.getRequestHeaders().getFirst("Authorization"))
                 ? Optional.of(new Subject("nobody", Set.of()))
                 : Optional.empty());
@@ -125,14 +127,17 @@ class ControlApiAssistTest {
 
             HttpResponse<String> write = postAs(c.port, "/assist/settings", "{\"provider\":\"x\"}", "Bearer plain");
             assertEquals(403, write.statusCode(), "the WRITE is the injection point: " + write.body());
-            assertTrue(write.body().contains("canAuthorWorkbench"), "the refusal names the capability");
+            assertTrue(write.body().contains("canAdminister"), "the refusal names the capability");
+            // Round-2 verification 2026-09-29: an author may no longer choose where the server calls out.
+            assertEquals(403, postAs(c.port, "/assist/settings", "{\"provider\":\"x\"}", "Bearer valid").statusCode(),
+                    "the baseUrl/provider write is canAdminister, not canAuthorWorkbench");
             assertEquals(403, postAs(c.port, "/assist/settings/test", "{}", "Bearer plain").statusCode(),
                     "the TEST is the trigger — gated with the write, never apart from it");
 
             assertEquals(200, getAs(c.port, "/assist/settings", "Bearer plain").statusCode(),
                     "reads stay open by policy: the masked settings view needs no capability");
 
-            assertEquals(200, postAs(c.port, "/assist/settings", "{\"provider\":\"x\"}", "Bearer valid").statusCode());
+            assertEquals(200, postAs(c.port, "/assist/settings", "{\"provider\":\"x\"}", "Bearer admin").statusCode());
             assertEquals(200, postAs(c.port, "/assist/settings/test", "{}", "Bearer valid").statusCode());
         } finally {
             Authenticators.forTest(null);
@@ -151,7 +156,7 @@ class ControlApiAssistTest {
         try (Ctx c = open(dir, false)) {
             assertEquals(403, postAs(c.port, "/assist/settings", "{}", "Bearer plain").statusCode(),
                     "capability refused before the module lookup");
-            assertEquals(503, postAs(c.port, "/assist/settings", "{}", "Bearer valid").statusCode(),
+            assertEquals(503, postAs(c.port, "/assist/settings", "{}", "Bearer admin").statusCode(),
                     "with the capability, the absent module is the only remaining refusal");
         } finally {
             Authenticators.forTest(null);
