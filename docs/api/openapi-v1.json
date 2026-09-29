@@ -9271,6 +9271,21 @@
         "x-optional-module" : true
       }
     },
+    "/inv/entity-identities/import" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "POST /inv/entity-identities/import (generated skeleton)",
+        "operationId" : "postInvEntityIdentitiesImport",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
     "/inv/entity-identities/{entityidentityId}/retract" : {
       "post" : {
         "tags" : [ "inv" ],

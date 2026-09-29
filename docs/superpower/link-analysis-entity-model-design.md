@@ -346,5 +346,28 @@ append time and replay never re-reads the list:
   (`ControlApiEntityIdentityTest.identityReadsNeedCanManageIncidentsSoARawKeyCannotBeProbed`). **Entity List reads
   stay Space-open**: they take no key input, and masked members are keyed-HMAC tokens a caller cannot compute, so with
   the group read gated there is no guess-and-check path.
+- **Mapping-Dataset import (2026-09-30)** — `POST /inv/entity-identities/import` `{dataset, aCol, bCol, aType?, bType?,
+  reason, limit?}` → 201 `{imported, skipped{alreadyAsserted, duplicate, empty, self}, rowsRead, truncated, dataset,
+  columns, types, fingerprint, via, fences{limit, timeoutMs}, fromSeq, atSeq, headHash}` (200 when nothing is new;
+  counts only, no key echoed). Gates: `canManageIncidents` → 503 → 422 (reason, dataset, safe distinct identifiers,
+  `limit` 1..10 000) → `InvRoutes.relationFor` (unknown or not viewable: the same 404, R3) → both columns against the
+  relation's real columns 422 → Entity Type per column: the in-force type claiming its registry classification (D-M6);
+  a stated `aType`/`bType` may only agree (422), an unclassified column needs one → D-U7 `refuseIfSensitive` 403 (no
+  Investigation holds a request here) → one read `SELECT DISTINCT` non-NULL pairs `ORDER BY 1, 2`, `limit` (default
+  1 000) + `truncated`, 10 s statement timeout → one `identity.asserted` per new key pair under the log lock, keys
+  normalised with the type's rule exactly as an analyst assertion.
+  - **Provenance**: `fingerprint` = SHA-256 of the JSON `[dataset, aCol, bCol, rows as read]`; each fact carries
+    `via: "dataset:<id>@<fingerprint>"` (§8.1's reserved form) and `import {dataset, aCol, bCol, aType, bType,
+    fingerprint, rowsRead, truncated}`.
+  - **Idempotent**: a key pair (either order) already asserted by an import of the same Dataset + column pair —
+    live OR retracted — is skipped, so the same Dataset state adds no fact, and ⚠ a re-import never undoes an
+    analyst's retraction (a reading, recorded here). A pair gone from the Dataset is **not** retracted by a later
+    import (not built). Analyst assertions of the same pair do not suppress an import (redundant evidence, as above).
+  - Four-eyes: grounded on D-U7 (thresholds `four_eyes_budget_above` / `…fan_out_above`, compared with `limit`); the
+    Entity List Pending-Change hold (`entity-list` approval kind) does not apply — identity facts are not a governable
+    kind, as the analyst assertion route. One `ENTITY_IDENTITY_CHANGED` per fact.
+  - ⚠ The writer inventories (`ConfigWriteFunnelTest.WRITERS`, `DecisionRuleWritersTest`) go red on
+    `EntityIdentityRoutes#importDataset` until an operator approves its row (as c1854b6bc did for the analyst routes).
+  - Tests: `ControlApiEntityIdentityImportTest` (7, real HTTP; idempotency and the view gate mutation-checked).
 - **Owed**: applying resolution in Investigations (pinned `atSeq`, merged nodes showing members + joining assertions,
   §8.1 last bullet) waits on the parallel SPA lane; D-M11's `typedEntityKey` projection step; SPA client methods.

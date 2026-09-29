@@ -75,6 +75,7 @@ final class AbsentGeoLinkRoutes implements RouteModule {
             {"GET",  "/inv/entity-identities"},
             {"GET",  "/inv/entity-identities/group"},
             {"POST", "/inv/entity-identities"},
+            {"POST", "/inv/entity-identities/import"},
             {"POST", "/inv/entity-identities/([^/]+)/retract"},
     };
 

@@ -196,8 +196,9 @@ system: the evidence cannot say something the code does not.
 | POST | `/geo/routes` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/GeoRoutes.java:69` |
 | POST | `/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:74` |
 | POST | `/import/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:75` |
-| POST | `/inv/entity-identities` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityIdentityRoutes.java:69` |
-| POST | `/inv/entity-identities/([^/]+)/retract` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityIdentityRoutes.java:71` |
+| POST | `/inv/entity-identities` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityIdentityRoutes.java:84` |
+| POST | `/inv/entity-identities/([^/]+)/retract` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityIdentityRoutes.java:88` |
+| POST | `/inv/entity-identities/import` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityIdentityRoutes.java:86` |
 | POST | `/inv/entity-lists` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java:81` |
 | POST | `/inv/entity-lists/([^/]+)/match` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java:87` |
 | POST | `/inv/entity-lists/([^/]+)/members` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java:83` |

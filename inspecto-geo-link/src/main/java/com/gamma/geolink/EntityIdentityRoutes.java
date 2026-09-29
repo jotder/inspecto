@@ -10,16 +10,25 @@ import com.gamma.control.WriteGates;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
+import com.gamma.query.QueryExecutor;
+import com.gamma.sql.SqlGuard;
+import com.gamma.sql.SqlSandboxPolicy;
+import com.gamma.util.DuckDbUtil;
+import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
 
 /**
  * <b>Analyst identity resolution</b> (LA-17 slice 2, {@code docs/superpower/link-analysis-entity-model-design.md}
@@ -32,6 +41,8 @@ import java.util.TreeSet;
  *   <li>{@code GET /inv/entity-identities/group?key=<typed key>&at=<seq>} → {@code {group, atSeq, headHash}}; a key in
  *       no live assertion resolves to itself (a one-member group with no assertions).</li>
  *   <li>{@code POST /inv/entity-identities} {@code {a, b, reason}} → 201 {@code {assertion, group, atSeq, headHash}}.</li>
+ *   <li>{@code POST /inv/entity-identities/import} {@code {dataset, aCol, bCol, aType?, bType?, reason, limit?}} → 201
+ *       (200 when nothing new) — bulk assertions from a mapping Dataset; see {@link #importDataset}.</li>
  *   <li>{@code POST /inv/entity-identities/{seq}/retract} {@code {reason}} → 200 {@code {retracted, groups, atSeq, headHash}}
  *       — {@code groups} are the groups of the assertion's two keys afterwards (one, or two when it split).</li>
  * </ul>
@@ -58,6 +69,10 @@ public final class EntityIdentityRoutes implements RouteModule {
     static final String ASSERTED = "identity.asserted";
     static final String RETRACTED = "identity.retracted";
     private static final int MAX_KEY_LENGTH = 512;
+    static final int IMPORT_DEFAULT_LIMIT = 1_000;
+    static final int IMPORT_MAX_LIMIT = 10_000;
+    static final int IMPORT_TIMEOUT_SECONDS = 10;
+    private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
     @Override
     public void register(ApiContext api) {
@@ -68,6 +83,8 @@ public final class EntityIdentityRoutes implements RouteModule {
         api.get("/inv/entity-identities/group", ApiContext.withCapability("canManageIncidents", (e, m) -> group(api, e)));
         api.post("/inv/entity-identities", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> assertIdentity(api, e, api.body(e))));
+        api.post("/inv/entity-identities/import", ApiContext.withCapability("canManageIncidents",
+                (e, m) -> importDataset(api, e, api.body(e))));
         api.post("/inv/entity-identities/([^/]+)/retract", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> retract(api, e, m.group(1), api.body(e))));
     }
@@ -136,6 +153,184 @@ public final class EntityIdentityRoutes implements RouteModule {
             out.put("headHash", head.headHash());
         }
         return ApiContext.respondJson(ex, 201, out);   // outside the lock: a slow client must not stall writers
+    }
+
+    /**
+     * {@code POST /inv/entity-identities/import} {@code {dataset, aCol, bCol, aType?, bType?, reason, limit?}} — the
+     * mapping-Dataset import cut (design §8.2): every distinct non-NULL {@code (aCol, bCol)} row of the Dataset becomes
+     * one {@code identity.asserted} fact, both values normalised with the SAME rule an analyst assertion uses.
+     *
+     * <p>Gates: capability → write root 503 → body 422 → {@link InvRoutes#relationFor} (unknown or not viewable: the same
+     * 404, R3) → both columns against the relation's REAL columns 422 → types 422 (a column's registry classification
+     * decides it; a stated type may only agree) → D-U7 four-eyes 403 ({@link InvRoutes#refuseIfSensitive}: there is no
+     * Investigation to hold a request) → one bounded read ({@code limit}, default {@value #IMPORT_DEFAULT_LIMIT}, max
+     * {@value #IMPORT_MAX_LIMIT}; a {@value #IMPORT_TIMEOUT_SECONDS} s statement timeout; {@code ORDER BY}, so a
+     * truncated read is the same rows every time) → append under the log lock.
+     *
+     * <p><b>Provenance.</b> {@code fingerprint} = SHA-256 of the JSON {@code [dataset, aCol, bCol, rows]} exactly as read
+     * (raw values, in order). Every fact carries {@code via: "dataset:<id>@<fingerprint>"} (the form §8.1 reserved) and
+     * {@code import: {dataset, aCol, bCol, aType, bType, fingerprint, rowsRead, truncated}}.
+     *
+     * <p><b>Idempotent.</b> A key pair already asserted — live OR retracted — by an import of the same Dataset and column
+     * pair is skipped: the same Dataset state adds nothing (200, {@code imported: 0}), and a re-import never undoes an
+     * analyst's retraction. A pair gone from the Dataset is NOT retracted by a later import.
+     */
+    private Object importDataset(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "entity identity import");
+        String reason = EntityListRoutes.reason(body);
+        String datasetId = ApiContext.str(body, "dataset");
+        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
+        String aCol = ident(body, "aCol"), bCol = ident(body, "bCol");
+        if (aCol.equalsIgnoreCase(bCol))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'aCol' and 'bCol' must be two different columns");
+        int limit = IMPORT_DEFAULT_LIMIT;
+        if (body.get("limit") != null) {
+            if (!(body.get("limit") instanceof Number n) || n.intValue() < 1 || n.intValue() > IMPORT_MAX_LIMIT)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'limit' must be an integer 1.." + IMPORT_MAX_LIMIT);
+            limit = n.intValue();
+        }
+
+        String relationSql = InvRoutes.relationFor(api, ex, root, datasetId);
+        List<String> columns = InvRoutes.relationColumns(datasetId, relationSql);
+        aCol = realColumn(columns, aCol, datasetId);
+        bCol = realColumn(columns, bCol, datasetId);
+        Map<String, Map<String, Object>> classified = InvRoutes.columnTypes(root, datasetId, List.of(aCol, bCol));
+        EntityTypes.EntityType aType = columnType(root, body, "aType", aCol, classified);
+        EntityTypes.EntityType bType = columnType(root, body, "bType", bCol, classified);
+        InvRoutes.refuseIfSensitive(root, "an identity import (limit " + limit + ")", limit, limit);
+
+        String qa = SqlIdent.q(aCol), qb = SqlIdent.q(bCol);
+        String sql = "SELECT DISTINCT CAST(" + qa + " AS VARCHAR) AS a, CAST(" + qb + " AS VARCHAR) AS b FROM "
+                + SqlIdent.q(datasetId) + " WHERE " + qa + " IS NOT NULL AND " + qb + " IS NOT NULL ORDER BY 1, 2";
+        if (!SqlGuard.check(sql, datasetId).isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import of dataset '" + datasetId
+                    + "' failed the SQL safety check");
+        QueryExecutor.Result read;
+        try {
+            read = QueryExecutor.run(new QueryExecutor.Request(datasetId, relationSql, sql, limit, 0, List.of(), List.of()),
+                    SqlSandboxPolicy.withCaps(null, 0, IMPORT_TIMEOUT_SECONDS));
+        } catch (SQLException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import read failed: "
+                    + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+        }
+        List<List<String>> rows = new ArrayList<>(read.rows().size());
+        for (Map<String, Object> row : read.rows())
+            rows.add(List.of(String.valueOf(row.get("a")), String.valueOf(row.get("b"))));
+        String fingerprint = EntityFactLog.sha256(ApiContext.JSON.writeValueAsBytes(List.of(datasetId, aCol, bCol, rows)));
+        String via = "dataset:" + datasetId + "@" + fingerprint;
+
+        // Normalise with the types' rules; one key pair (in either order) counts once.
+        int empty = 0, self = 0, duplicate = 0;
+        Map<String, String[]> pairs = new LinkedHashMap<>();
+        for (List<String> row : rows) {
+            String ka = EntityTypes.normalise(aType.normaliser(), row.get(0));
+            String kb = EntityTypes.normalise(bType.normaliser(), row.get(1));
+            if (ka.isEmpty() || kb.isEmpty()) { empty++; continue; }
+            ka = aType.id() + ":" + ka;
+            kb = bType.id() + ":" + kb;
+            if (ka.equals(kb)) { self++; continue; }
+            if (pairs.putIfAbsent(pairKey(ka, kb), new String[]{ka, kb}) != null) duplicate++;
+        }
+
+        Map<String, Object> provenance = new LinkedHashMap<>();
+        provenance.put("dataset", datasetId);
+        provenance.put("aCol", aCol);
+        provenance.put("bCol", bCol);
+        provenance.put("aType", aType.id());
+        provenance.put("bType", bType.id());
+        provenance.put("fingerprint", fingerprint);
+        provenance.put("rowsRead", rows.size());
+        provenance.put("truncated", read.truncated());
+
+        EntityFactLog log = new EntityFactLog(root);
+        Map<String, Object> out = new LinkedHashMap<>();
+        int imported = 0, already = 0;
+        synchronized (log.lock()) {
+            EntityFactLog.Log head = EntityListRoutes.read(log);
+            long fromSeq = head.headSeq() + 1;
+            Set<String> seen = new HashSet<>();   // live OR retracted: a retraction sticks
+            for (EntityFactLog.Fact f : head.facts())
+                if (ASSERTED.equals(f.body().get("kind")) && f.body().get("import") instanceof Map<?, ?> imp
+                        && datasetId.equals(imp.get("dataset")) && aCol.equals(imp.get("aCol")) && bCol.equals(imp.get("bCol")))
+                    seen.add(pairKey(String.valueOf(f.body().get("a")), String.valueOf(f.body().get("b"))));
+            List<Long> seqs = new ArrayList<>();
+            for (Map.Entry<String, String[]> p : pairs.entrySet()) {
+                if (seen.contains(p.getKey())) { already++; continue; }
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("a", p.getValue()[0]);
+                payload.put("b", p.getValue()[1]);
+                payload.put("via", via);
+                payload.put("import", provenance);
+                head = EntityListRoutes.append(log, head, ex, reason, ASSERTED, null, payload);
+                seqs.add(head.headSeq());
+                imported++;
+            }
+            if (!seqs.isEmpty()) {
+                Map<String, EntityRegistry.Group> groups = EntityRegistry.resolve(head.facts(), head.headSeq());
+                for (long seq : seqs) {
+                    int size = 2;
+                    for (EntityRegistry.Group g : groups.values()) if (g.assertions().contains(seq)) size = g.members().size();
+                    emit(ex, ASSERTED, seq, seq, size);
+                }
+            }
+            Map<String, Object> skipped = new LinkedHashMap<>();
+            skipped.put("alreadyAsserted", already);
+            skipped.put("duplicate", duplicate);
+            skipped.put("empty", empty);
+            skipped.put("self", self);
+            out.put("imported", imported);
+            out.put("skipped", skipped);
+            out.put("rowsRead", rows.size());
+            out.put("truncated", read.truncated());
+            out.put("dataset", datasetId);
+            out.put("columns", Map.of("a", aCol, "b", bCol));
+            out.put("types", Map.of("a", aType.id(), "b", bType.id()));
+            out.put("fingerprint", fingerprint);
+            out.put("via", via);
+            out.put("fences", Map.of("limit", limit, "timeoutMs", IMPORT_TIMEOUT_SECONDS * 1000));
+            out.put("fromSeq", imported == 0 ? null : fromSeq);
+            out.put("atSeq", head.headSeq());
+            out.put("headHash", head.headHash());
+        }
+        return ApiContext.respondJson(ex, imported == 0 ? 200 : 201, out);   // counts only: no key is echoed
+    }
+
+    private static String pairKey(String x, String y) {
+        return x.compareTo(y) <= 0 ? x + "\n" + y : y + "\n" + x;
+    }
+
+    private static String ident(Map<String, Object> body, String key) {
+        String v = ApiContext.str(body, key);
+        if (v == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include '" + key + "'");
+        if (!SAFE_IDENT.matcher(v).matches())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsafe column identifier '" + v + "' for " + key);
+        return v;
+    }
+
+    /** The relation's own spelling of {@code col}, or 422 when the relation has no such column. */
+    private static String realColumn(List<String> columns, String col, String datasetId) {
+        for (String c : columns) if (c.equalsIgnoreCase(col)) return c;
+        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + col + "' is not a column of dataset '"
+                + datasetId + "' " + columns);
+    }
+
+    /**
+     * An import column's Entity Type: the in-force type claiming its registry classification (D-M6, as the projections
+     * type it); a stated {@code field} must agree. An unclassified column needs a stated, in-force type.
+     */
+    private static EntityTypes.EntityType columnType(Path root, Map<String, Object> body, String field, String col,
+                                                     Map<String, Map<String, Object>> classified) {
+        String stated = ApiContext.str(body, field);
+        String byColumn = classified.containsKey(col) ? String.valueOf(classified.get(col).get("id")) : null;
+        if (byColumn != null && stated != null && !stated.equals(byColumn))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + field + "' is '" + stated + "' but column '"
+                    + col + "' is classified as Entity Type '" + byColumn + "'");
+        String id = byColumn != null ? byColumn : stated;
+        if (id == null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "column '" + col + "' has no classification an "
+                    + "Entity Type claims — state '" + field + "'");
+        return EntityListRoutes.type(root, id).orElseThrow(() -> new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                "'" + field + "' names Entity Type '" + id + "', which is not in force"));
     }
 
     private Object retract(ApiContext api, HttpExchange ex, String rawSeq, Map<String, Object> body) throws IOException {
