@@ -25,6 +25,7 @@ import { MapSettingsComponent } from 'app/modules/admin/map-settings/map-setting
 import { ModelSettingsComponent } from 'app/modules/admin/model-settings/model-settings.component';
 import { NotificationCenterComponent } from 'app/modules/admin/notification-center/notification-center.component';
 import { EgressSettingsComponent } from './egress.component';
+import { IncidentGovernanceComponent } from './incident-governance.component';
 import { OperationalDbComponent } from './operational-db.component';
 import { SchedulerSettingsComponent } from './scheduler.component';
 import { SpacesComponent } from 'app/modules/admin/spaces/spaces.component';
@@ -102,6 +103,13 @@ export class SettingsComponent {
             icon: 'heroicons_outline:globe-alt',
             description: 'Private hosts and ranges that outbound calls may reach.',
             component: EgressSettingsComponent,
+        },
+        {
+            id: 'incident-governance',
+            title: 'Incident governance',
+            icon: 'heroicons_outline:scale',
+            description: 'Workflows, SLA policies and Escalation Rules for Incidents and Cases.',
+            component: IncidentGovernanceComponent,
         },
         {
             id: 'spaces',

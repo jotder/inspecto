@@ -33,7 +33,12 @@ export type ComponentType =
     // The Case desk's Findings fields (one per ObjectType, id = the lowercased type). Authored ONLY from the
     // Cases pane's Findings-fields dialog, never the Components pane (D8) — and its writes are gated on
     // `canManageIncidents`, not `canAuthorWorkbench` (D1).
-    | 'findings-spec';
+    | 'findings-spec'
+    // Incident governance (ASSURE-WORKFLOW-SLA-1): written only through their canAdminister literal routes, from
+    // Settings ▸ Incident governance — never the Components pane.
+    | 'workflow'
+    | 'sla-policy'
+    | 'escalation-rule';
 
 /** The component kinds, in palette order, for the list/editor. `schema`/`mapping` open the S5 grid
  *  editors. ⚠ A schema EDIT saves through this service's {@link ComponentsService.update} like every
