@@ -172,9 +172,11 @@ against the OpenAPI `ErrorCode` enum by `ApiContractTest`: `MALFORMED_REQUEST` �
 `UNAUTHENTICATED` · `PERMISSION_DENIED` · `RATE_LIMITED` (429) · `NOT_SUPPORTED` (501) ·
 `PAYLOAD_TOO_LARGE` (413) · `INTEGRITY_VIOLATION` (500) · `STORE_BUSY` (503, a store lock's bounded wait timed
 out — the Pending Change store). `defaultFor(status)` maps a bare status to a code.
-**15 of 1078** `new ApiException(` sites under `*/src/main` still take that default — all in
-`inspecto-geo-link` (2026-09-28; the derive below reports 16 because `PendingChangeRoutes` passes a *computed*
-code, not a default) — after the `BiRoutes` / `DatasetRoutes` / `PipelineListRoutes` / `BiTemplates` /
+**0 of 1155** `new ApiException(` sites under `*/src/main` still take that default (2026-09-30: the last 15 —
+all 422s in `inspecto-geo-link` `AdmiraltyGrade` / `InvestigationCoverageRoutes` / `PatternRoutes` /
+`WorkingSetRoutes` — now pass `CONFIG_VALIDATION_FAILED`, the status default, so no wire change; the derive below
+still prints 4 lines because `ImportRollback` / `PendingChangeRoutes` / `ServerFaults` / `TemplateSeedGate` pass a
+*computed* code, not a default) — after the `BiRoutes` / `DatasetRoutes` / `PipelineListRoutes` / `BiTemplates` /
 `AuditLogRoutes` / `AssistRoutes` / `ViewRoutes` / `SignalRoutes` / `DeliveryStatusRoutes` / the five `Absent*Routes`
 and 13 smaller files (incl. `inspecto-ops` `NoteRoutes`/`OpsEngine`, `inspecto-events` `EventRoutes`,
 `inspecto-exchange` `ExchangeRoutes`) slice — 82 sites, every one the status default, so no wire change (the
