@@ -5,6 +5,7 @@ import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.acquire.CollectorConnectors;
 import com.gamma.acquire.IntakeGovernor;
+import com.gamma.acquire.StreamLane;
 import com.gamma.inspector.CollectorProcessor;
 import com.gamma.inspector.MultiCollectorProcessor;
 import com.gamma.pipeline.PipelineTrigger;
@@ -630,6 +631,8 @@ final class PipelineScheduler {
      */
     void forget(String id) {
         eventCoalescers.remove(id);
+        StreamLane lane = streamLanes.remove(id);
+        if (lane != null) lane.close();
         acquireGuard.forget(id);              // per-pipeline acquire lock (B3b) — same leak-under-churn reason
         IntakeGovernor.shared().forget(id);   // same leak-under-churn reason, one map further down
     }
@@ -646,6 +649,7 @@ final class PipelineScheduler {
      * cron-gated pipeline still wants its files staged and ready before the cron fires.
      */
     List<Future<?>> dispatchAcquireCycle() {
+        reconcileStreamLanes();
         return dispatchAcquire(selectDueForAcquire());   // futures ignored by the timer; tests await them
     }
 
@@ -730,5 +734,82 @@ final class PipelineScheduler {
         } finally {
             MDC.clear();
         }
+    }
+
+    // ── Continuous lane (ASSURE-PUSH-INGEST-1, option B) ──────────────────────────
+    // One StreamLane per active, remote `trigger: {type: stream}` Pipeline. Reconciled on every acquisition tick
+    // (so it follows hot-reloads, pauses and activation), closed on forget and on service close. The lane's
+    // drain is this Pipeline's ordinary acquire-then-ingest: acquire under the same acquireGuard claim the tick
+    // takes (a tick already fetching ⇒ skip — the fence would make a second fetch a no-op anyway), then ingest
+    // through runPipeline, which claims the run lease like every other trigger.
+
+    /** Probe cadence of every lane. Well under any sane max_wait; one broker metadata call per probe. */
+    static final long STREAM_PROBE_MS = 200;
+
+    private final Map<String, StreamLane> streamLanes = new ConcurrentHashMap<>();
+
+    /** Start a lane for every eligible Pipeline that lacks one; close the lanes of those no longer eligible. */
+    void reconcileStreamLanes() {
+        Map<String, PipelineTrigger> want = new java.util.HashMap<>();
+        registryLock.lock();
+        try {
+            for (Path p : registry) {
+                PipelineConfig cfg = configRegistry.configForPath(p).orElse(null);
+                if (cfg == null) continue;
+                String id = cfg.identity().pipelineName();
+                if (paused.contains(id) || !cfg.active() || cfg.template()) continue;
+                if (!CollectorConnectors.isRemote(cfg)) continue;
+                PipelineTrigger t;
+                try {
+                    t = PipelineTrigger.of(cfg.triggerConfig());
+                } catch (IllegalArgumentException bad) {
+                    continue;
+                }
+                if (t.kind() == PipelineTrigger.Kind.STREAM) want.put(id, t);
+            }
+        } finally {
+            registryLock.unlock();
+        }
+        streamLanes.entrySet().removeIf(e -> {
+            if (want.containsKey(e.getKey())) return false;
+            e.getValue().close();
+            return true;
+        });
+        Map<String, String> mdc = MDC.getCopyOfContextMap();
+        want.forEach((id, t) -> streamLanes.computeIfAbsent(id, k -> {
+            StreamLane lane = new StreamLane(id, t.streamRecords(), t.everyMs(), STREAM_PROBE_MS,
+                    () -> CollectorConnectors.forConfig(configRegistry.get(id).orElseThrow()),
+                    () -> drainNow(id), System::currentTimeMillis);
+            lane.start(mdc);
+            log.info("Stream lane started for '{}' (drain at {} record(s) or {} ms)", id, t.streamRecords(), t.everyMs());
+            return lane;
+        }));
+    }
+
+    /** The lane's drain: fetch-and-land under the acquire claim, then ingest via the ordinary trigger path. */
+    private void drainNow(String id) {
+        PipelineConfig cfg = configRegistry.get(id).orElse(null);
+        if (cfg == null) return;
+        RunLease.Claim claim = acquireGuard.tryAcquire(id);
+        if (claim != null) {
+            try (claim) {
+                CollectorProcessor.acquire(cfg.forNewRun());
+            } catch (Exception e) {
+                log.error("Stream lane acquisition failed for '{}'", id, e);
+                return;
+            }
+        }
+        runPipeline.accept(id);
+    }
+
+    /** Stop every lane (service close). */
+    void closeStreamLanes() {
+        streamLanes.values().forEach(StreamLane::close);
+        streamLanes.clear();
+    }
+
+    /** Test view: the Pipelines that currently have a lane. */
+    Set<String> streamLaneIds() {
+        return Set.copyOf(streamLanes.keySet());
     }
 }

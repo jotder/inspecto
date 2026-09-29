@@ -71,6 +71,14 @@ public interface CollectorConnector extends AutoCloseable {
     /** <b>Finalize.</b> Apply a post-processing action to the source-side file (retain/delete/move/rename/tag). */
     void post(RemoteFile file, PostAction action) throws AcquisitionException;
 
+    /**
+     * Records waiting at the source that a {@link #discover} would slice right now — the continuous lane's
+     * backlog probe (ASSURE-PUSH-INGEST-1). A partition held by the in-flight fence does not count: it cannot
+     * be drained until its slice commits. {@code -1} = this connector cannot tell (the lane then drains on its
+     * max wait alone). Only an offset-tail source (Kafka) answers.
+     */
+    default long pendingRecords() throws AcquisitionException { return -1; }
+
     /** Release any held connection/session. The local connector holds nothing; default is a no-op. */
     @Override
     default void close() throws AcquisitionException {}

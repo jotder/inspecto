@@ -170,6 +170,35 @@ public final class KafkaConnector implements CollectorConnector {
         }
     }
 
+    /**
+     * The continuous lane's probe: records on the broker past each partition's committed frontier, over the
+     * partitions the in-flight fence does NOT hold. Uses the same kept-open consumer as {@link #discover}, so a
+     * lane probing every few hundred milliseconds re-uses one client rather than dialling the broker each time.
+     */
+    @Override
+    public long pendingRecords() throws AcquisitionException {
+        try {
+            Consumer<byte[], byte[]> c = ensureConsumer();
+            List<PartitionInfo> parts = c.partitionsFor(topic);
+            if (parts == null || parts.isEmpty()) return 0;
+            List<TopicPartition> tps = parts.stream().map(p -> new TopicPartition(topic, p.partition())).toList();
+            Map<TopicPartition, Long> begin = c.beginningOffsets(tps);
+            Map<TopicPartition, Long> end = c.endOffsets(tps);
+            long pending = 0;
+            for (TopicPartition tp : tps) {
+                if (AcquisitionLedgers.hasPendingDbWatermark(watermarkKey(tp.partition()))) continue;
+                long from = AcquisitionLedgers.shared().dbWatermark(watermarkKey(tp.partition()))
+                        .map(Long::parseLong)
+                        .orElse(startLatest ? end.get(tp) : begin.get(tp));
+                pending += Math.max(0, end.get(tp) - Math.max(from, begin.get(tp)));
+            }
+            return pending;
+        } catch (RuntimeException e) {
+            throw new AcquisitionException("Kafka backlog probe failed for '" + profile.id() + "' topic '" + topic
+                    + "': " + e.getMessage(), e);
+        }
+    }
+
     @Override
     public Readiness readiness(RemoteFile file) {
         return Readiness.READY;   // listed records already exist on the broker

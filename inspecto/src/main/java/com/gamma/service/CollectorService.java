@@ -2055,6 +2055,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // triggerWorkers, a tick firing during the drain would submit into a closing executor. The
         // dispatch path handles that rejection, but not generating the work is the correct order.
         scheduler.close();
+        pipelineScheduler.closeStreamLanes();          // the continuous lanes are timers too (ASSURE-PUSH-INGEST-1)
         triggerWorkers.close();                        // drain in-flight cycle + event-triggered runs (T13)
         enrichment.close();   // drain in-flight recomputes first
         this.eventLog.removeSubscriber(eventObjectBridge);   // de-register the D2 gap→ALERT bridge

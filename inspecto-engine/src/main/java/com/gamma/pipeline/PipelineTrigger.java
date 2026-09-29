@@ -20,6 +20,11 @@ import java.util.Map;
  *       {@code coalesce: 30s} ⇒ {@link Scheduler#EVENT} (admitted under the non-overlapping lock, storms
  *       coalesced — see {@code TriggerCoalescer}).</li>
  *   <li>{@code {type: manual}} ⇒ {@link Scheduler#MANUAL} ({@code POST /pipelines/{id}/trigger}).</li>
+ *   <li>{@code {type: stream, records: 500, max_wait: 5s}} — the continuous lane (ASSURE-PUSH-INGEST-1,
+ *       option B of STREAM-CONSUMER-1): a lane per Pipeline holds its Collector's connector open and drains a
+ *       slice once the backlog reaches {@code records} (default 1000) or has waited {@code max_wait} (default
+ *       5 s). Still {@link Scheduler#LOOP}: the ordinary ticks keep running as the floor, and the lane only adds
+ *       earlier drains through the same acquire + ingest path (the in-flight fence and slice frontier hold).</li>
  *   <li><b>absent</b> ⇒ {@link Kind#DEFAULT_POLL} — the service poll interval, so a lifted legacy
  *       pipeline behaves exactly as today.</li>
  * </ul>
@@ -29,10 +34,15 @@ import java.util.Map;
  * {@code CronExpression} when it arms the schedule.
  */
 @PublicApi(since = "4.0.0")
-public record PipelineTrigger(Kind kind, long everyMs, String cron, String on, String from, long coalesceMs) {
+public record PipelineTrigger(Kind kind, long everyMs, String cron, String on, String from, long coalesceMs,
+                              long streamRecords) {
 
     /** The literal trigger shape declared on the entry node. */
-    public enum Kind { SCHEDULE_INTERVAL, SCHEDULE_CRON, EVENT, MANUAL, DEFAULT_POLL }
+    public enum Kind { SCHEDULE_INTERVAL, SCHEDULE_CRON, EVENT, MANUAL, DEFAULT_POLL, STREAM }
+
+    /** {@code trigger: {type: stream}} defaults: drain at 1000 records or after 5 s of waiting. */
+    public static final long DEFAULT_STREAM_RECORDS = 1000;
+    public static final long DEFAULT_STREAM_MAX_WAIT_MS = 5_000;
 
     /** Which scheduler (§3.8 two-scheduler split) drives a pipeline carrying this trigger. */
     public enum Scheduler { LOOP, EVENT, MANUAL }
@@ -42,7 +52,7 @@ public record PipelineTrigger(Kind kind, long everyMs, String cron, String on, S
         return switch (kind) {
             case EVENT -> Scheduler.EVENT;
             case MANUAL -> Scheduler.MANUAL;
-            case SCHEDULE_INTERVAL, SCHEDULE_CRON, DEFAULT_POLL -> Scheduler.LOOP;
+            case SCHEDULE_INTERVAL, SCHEDULE_CRON, DEFAULT_POLL, STREAM -> Scheduler.LOOP;
         };
     }
 
@@ -84,21 +94,30 @@ public record PipelineTrigger(Kind kind, long everyMs, String cron, String on, S
         if (type == null || type.isBlank() || "schedule".equalsIgnoreCase(type)) {
             String cron = Values.str(m.get("cron"));
             if (cron != null && !cron.isBlank())
-                return new PipelineTrigger(Kind.SCHEDULE_CRON, 0, cron, null, null, coalesce);
+                return new PipelineTrigger(Kind.SCHEDULE_CRON, 0, cron, null, null, coalesce, 0);
             Object every = m.get("every");
             if (every != null)
-                return new PipelineTrigger(Kind.SCHEDULE_INTERVAL, millis(every), null, null, null, coalesce);
-            return new PipelineTrigger(Kind.DEFAULT_POLL, 0, null, null, null, coalesce);
+                return new PipelineTrigger(Kind.SCHEDULE_INTERVAL, millis(every), null, null, null, coalesce, 0);
+            return new PipelineTrigger(Kind.DEFAULT_POLL, 0, null, null, null, coalesce, 0);
         }
         if ("event".equalsIgnoreCase(type))
-            return new PipelineTrigger(Kind.EVENT, 0, null, Values.str(m.get("on")), Values.str(m.get("from")), coalesce);
+            return new PipelineTrigger(Kind.EVENT, 0, null, Values.str(m.get("on")), Values.str(m.get("from")), coalesce, 0);
         if ("manual".equalsIgnoreCase(type))
-            return new PipelineTrigger(Kind.MANUAL, 0, null, null, null, coalesce);
+            return new PipelineTrigger(Kind.MANUAL, 0, null, null, null, coalesce, 0);
+        if ("stream".equalsIgnoreCase(type)) {
+            // everyMs carries the lane's max wait (T); streamRecords its backlog threshold (N).
+            long wait = m.get("max_wait") == null ? DEFAULT_STREAM_MAX_WAIT_MS : millis(m.get("max_wait"));
+            long records = m.get("records") == null ? DEFAULT_STREAM_RECORDS
+                    : Long.parseLong(m.get("records").toString().trim());
+            if (wait <= 0 || records <= 0)
+                throw new IllegalArgumentException("trigger type 'stream' needs a positive records and max_wait");
+            return new PipelineTrigger(Kind.STREAM, wait, null, null, null, 0, records);
+        }
         throw new IllegalArgumentException("unknown trigger type '" + type + "'");
     }
 
     private static PipelineTrigger defaultPoll() {
-        return new PipelineTrigger(Kind.DEFAULT_POLL, 0, null, null, null, 0);
+        return new PipelineTrigger(Kind.DEFAULT_POLL, 0, null, null, null, 0, 0);
     }
 
     /** Parse a duration ({@code 60s}/{@code 5m}/{@code 2h}/{@code 1d}; a bare number is seconds) to millis; null ⇒ 0. */

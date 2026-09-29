@@ -79,4 +79,18 @@ class PipelineTriggerTest {
         assertThrows(IllegalArgumentException.class,
                 () -> PipelineTrigger.of(entry(Map.of("type", "telepathy"))));
     }
+
+    @Test
+    void streamIsTheContinuousLaneCarryingNAndT() {
+        PipelineTrigger t = PipelineTrigger.of(entry(Map.of("type", "stream", "records", "500", "max_wait", "3s")));
+        assertEquals(PipelineTrigger.Kind.STREAM, t.kind());
+        assertEquals(500L, t.streamRecords());
+        assertEquals(3_000L, t.everyMs());
+        assertEquals(PipelineTrigger.Scheduler.LOOP, t.scheduler(), "the ticks stay the floor; the lane only adds drains");
+        PipelineTrigger d = PipelineTrigger.of(entry(Map.of("type", "stream")));
+        assertEquals(PipelineTrigger.DEFAULT_STREAM_RECORDS, d.streamRecords());
+        assertEquals(PipelineTrigger.DEFAULT_STREAM_MAX_WAIT_MS, d.everyMs());
+        assertThrows(IllegalArgumentException.class,
+                () -> PipelineTrigger.of(entry(Map.of("type", "stream", "records", "0"))));
+    }
 }
