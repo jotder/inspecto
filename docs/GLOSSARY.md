@@ -70,8 +70,8 @@ its **Component Type** decides the Config's shape. Think of a Component as a man
 **Space Template** — A reusable blueprint bundle of Components (Collectors, Pipelines, Schemas, Datasets, Widgets,
 Dashboards, Rules, optional seed data) that instantiates a new **Space**. Type→Instance: the Template is the
 Type; the Space created from it is the Instance. Templates are a **server-global catalog**
-(`spaces/_templates/<id>/template.toon`, `GET /spaces/templates`), not a Component kind. ⚠ **One template ships
-(`orders-starter`).** The four verticals this entry used to call "shipped" (Telecom Revenue Assurance, Fraud
+(`spaces/_templates/<id>/template.toon`, `GET /spaces/templates`), not a Component kind. ⚠ **Two templates ship
+(`orders-starter`, and the telecom fraud pack `telco-fraud`, 2026-09-30).** The four verticals this entry used to call "shipped" (Telecom Revenue Assurance, Fraud
 Management, Financial Auditing, Link Analysis) were mock-only seed packs deleted with the mock backend on
 2026-08-31 — `okf/capabilities/spaces/spaces.md` §5 (corrected 2026-09-08). *(Added Wave 0, 2026-07-02.)*
 

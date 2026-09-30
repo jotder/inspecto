@@ -59,7 +59,7 @@ matrix is authoritative for the Edition column**; this table mirrors it.
 |---|---|---|---|---|
 | `SPC-1` | Isolated **Spaces** (config / data / audit / duckdb per Space), CRUD without restart, one-time migrator | Must | ✅ SHIPPED — ⚠ "isolated" is a **layout** on Personal/Standard and an **enforced boundary** only on Enterprise (CP-07, SEC-06; §3.9) | All |
 | `SPC-2` | Whole-Space zip export / import with dry-run preview | Must | ✅ SHIPPED | All |
-| `SPC-3` | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | 🟡 **MECHANISM SHIPPED, CONTENT ABSENT** — the server-side catalog exists; two templates ship (`orders-starter`, and the `business-assurance` content pack since 2026-09-30); **none of the four named verticals exists** in any shipped artifact (§2 corrections) | All |
+| `SPC-3` | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | 🟡 **MECHANISM SHIPPED, ONE VERTICAL BUILT** — the server-side catalog exists; three templates ship (`orders-starter`, the `business-assurance` content pack since 2026-09-30, and the Fraud vertical `telco-fraud`, BUILT 2026-09-30 under `ASSURE-PACK-TELCO-FRAUD-1`, §3.5); Telecom RA, Financial Audit and Link Analysis still exist in no shipped artifact (§2 corrections) | All |
 | `SPC-4` | **Metadata Bundle v2**: selective config-only transfer with refs, provenance / `contentHash`, `requires`, drift fit-check | Should | ✅ SHIPPED 2026-07-07 (+ `authored-pipeline`, `job`, `saved-view` 2026-07-18; `connection` 2026-07-25; `enrichment` 2026-08-31) | All |
 | `SPC-5` | Per-tenant ABAC | Could | ✅ SHIPPED 2026-07-24 (two seeded policies; engage only when a `space` claim is mapped) ⚠ **Named for grep:** the decision seam those policies enforce through is `AccessDecider` (`inspecto-policy/.../PolicyEngine.java`, exercised by `ControlApiAccessDeciderTest`) — until 2026-09-09 that name appeared only in `REQUIREMENTS.md`. | E |
 
@@ -189,9 +189,9 @@ contents[]}` — the UI's `SpaceTemplateInfo`) beside a `config/` tree and an op
 **rewriting `${SPACE}` tokens** in every `.toon` (template configs address their own Space as
 `spaces/${SPACE}/…` — the portable bare-form the product writes, W3) and copies `data/` verbatim. An
 unreadable template is warned and skipped, never fatal. The SPA's gallery (`SpaceTemplateGalleryDialog`) is
-two-step ask-the-minimum and renders whatever the server publishes. **What is published:** `orders-starter`
-— a pipeline, a quality rule, a dataset and a live dashboard — and, since 2026-09-30, `business-assurance`
-(below). Nothing named Telecom, Fraud, Financial Audit or Link Analysis exists yet (§2, §5).
+two-step ask-the-minimum and renders whatever the server publishes. **What is published: three templates** —
+`orders-starter` (a pipeline, a quality rule, a dataset and a live dashboard), and, since 2026-09-30,
+`business-assurance` and `telco-fraud` (below). Nothing named Telecom RA, Financial Audit or Link Analysis exists (§2, §5).
 
 **A template may carry a KPI pack** (`config/registry/kpis/`, `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1),
 2026-09-28). `SpaceRoutes.createSpace` hands `createFromTemplate` a seed gate
@@ -260,6 +260,28 @@ Measure shorthand is `count | agg(field)`, so a forecast inside a KPI or Alert R
 the Dataset form was taken instead. A hand-authored view cannot read another view, so each view inlines its
 corpus CTE. A template has no runbook home: `createFromTemplate` copies only `config/` and `data/`, so
 `RUNBOOK.md` stays in the catalog, not in the created Space.
+
+**The telecom fraud pack — `spaces/_templates/telco-fraud/`** (`ASSURE-PACK-TELCO-FRAUD-1`, wave 5.1 of
+`superpower/assurance-capability-plan.md`, BUILT 2026-09-30, not closed). Three feed Pipelines + schemas (`cdr`,
+`subscriber_events`, `payments`); ten detection windows as `sql.template` Jobs (`config/jobs/fraud_<typology>_job.toon`:
+IRSF, Wangiri, SIM-box, premium-rate, roaming high usage, SIM-swap, subscription / identity, dealer activations,
+voucher / EVD, payment reversal), each writing one row per candidate entity to its own sink Dataset `fraud_<typology>`;
+and one per-entity Alert Rule per typology (`by` = the offender: `msisdn`, the calling number, `id_doc`, `dealer_id` or
+`voucher_serial`, `stormCap: 50`). No new Step Processor. **Thresholds are configuration in two places**: the Job's
+parameters say what counts (`irsf_prefixes`, `premium_prefixes`, `max_ring_seconds`, `max_cells`, `window_hours`,
+`window_start` / `window_end`) and the Alert Rule's `threshold` says how much is too much. Also: four KPIs + tiles, one
+dashboard (`telco_fraud_overview`), and `config/runbooks/telco-fraud-runbooks.md` (plain Markdown: there is no runbook
+component kind). ⚠ **Seeds, and why.** The per-entity Alert Rule save gate (`AlertRoutes.requireGroupingColumns`, run by
+the template seed gate) and the KPI gate both read the Dataset's Schema and fail closed on a Dataset with no data — and a
+Job's sink has none until the Job first runs. So the template ships a **zero-row seed snapshot** per sink
+(`data/fraud_<typology>/seed.parquet`); the first run's stage-and-swap replaces it. A test regenerates them from each
+Job's own SQL and fails when a seed's Schema drifts from it. ⚠ The Alert Rules are Professional+: a Personal build
+refuses the whole template at `POST /spaces`, though the gallery still lists it. **Golden corpus**: synthetic, from a
+fixed-seed generator (`inspecto/src/test/java/com/gamma/control/TelcoFraudCorpus.java`, seed `20260930`) committed under
+`data/samples/`. `TelcoFraudTemplateGoldenTest` boots the template through `POST /spaces`, lands the corpus as Parquet
+(DuckDB `read_csv`, standing in for the Pipelines' ingest), runs the ten Jobs, and asserts each Alert Rule raises
+EXACTLY its planted offenders (4/3/3/4/3/3/2/2/3/3 = 30 Alerts) and no planted look-alike. It was mutation-checked: a
+premium-rate threshold of 40 goes red on the three look-alikes.
 
 **Every registry kind a template seeds is gated, not only `kpi`** (`ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) ⚠,
 2026-09-28). The seed gate is `TemplateSeedGate.require`, one table-driven pass over the staged tree before boot:
@@ -457,7 +479,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 
 | Item | Evidence | Why it matters |
 |---|---|---|
-| **The four vertical Space Templates** (Telecom RA, Fraud, Financial Audit, Link Analysis) | `ls spaces/_templates` → `orders-starter` only; the packs died with the mock backend `f1553136` | A Should the register, the binding glossary, the user guide and the stakeholder capabilities page all call shipped. Product call: rebuild as `_templates/` entries or drop the promise |
+| **The four vertical Space Templates** (Telecom RA, Fraud, Financial Audit, Link Analysis) | `ls spaces/_templates` → `orders-starter` + `telco-fraud` (Fraud rebuilt 2026-09-30, §3.5; the other three still absent); the packs died with the mock backend `f1553136` | A Should the register, the binding glossary, the user guide and the stakeholder capabilities page all call shipped. Product call: rebuild as `_templates/` entries or drop the promise |
 | **Nothing validates a bundle against `metadata-bundle.schema.json`** | zero Java references to the schema file | The documented contract for the promotion artifact is unenforced; the two samples can drift silently |
 | **Ingested-data cloning between Spaces** | the design lock said "roadmap (future)"; no row | The zip and the bundle move config only; a Space clone with data is manual |
 | **A multi-tenant user-visibility model** ("users see only the Spaces they may access") + a superuser console | the design lock's open item; nearest live surface is SEC-06 | On Standard every authenticated subject can address every Space |
@@ -600,7 +622,7 @@ Fifteen: `space.interceptor.spec.ts`, `spaces.service.spec.ts`, `space-switcher.
 ### 8.4 Committed artifacts
 
 `spaces/default`, `spaces/demo`, `spaces/ucc` (complete; mirrored under `inspecto-deploy/spaces/`);
-`spaces/_templates/orders-starter/` (the one template; mirrored); `spaces/uat/` (a `data/` stub).
+`spaces/_templates/orders-starter/` and `spaces/_templates/telco-fraud/` (the two templates); `spaces/uat/` (a `data/` stub).
 `docs/api/schemas/metadata-bundle.schema.json` + `docs/api/schemas/samples/{dashboard-closure,single-widget}.bundle.json`.
 
 ### 8.5 Guards

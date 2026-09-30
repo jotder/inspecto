@@ -566,8 +566,8 @@ the header notifications bell.
 
 **Spaces** — Multi-space administration — the one genuinely space-aware admin screen. List all
 Spaces; create them blank or from a **Space Template** — a shipped blueprint that seeds the new Space with
-ready-made Pipelines, Datasets, and Dashboards (the catalog is `spaces/_templates/`; the build ships one,
-**Orders starter**); edit and delete them (with an option to purge
+ready-made Pipelines, Datasets, and Dashboards (the catalog is `spaces/_templates/`; the build ships two,
+**Orders starter** and **Telecom fraud**); edit and delete them (with an option to purge
 data), and export or import a Space
 (or a single data source) as a zip, with a **dry-run preview** before importing. This is distinct
 from the header **Space switcher**, which only selects and reloads.
