@@ -392,6 +392,13 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   blank = wildcard / no bound, and ANY unusable row drops the whole pack. No TOON copy is seeded — the
   built-in reaches every Space through the PACK-1 merge — so that shape has not yet been through
   `ConfigCodec`'s round-trip.
+* **Value Measures over the whole Dataset** (LA-18, backend, 2026-09-30): `GET /inv/value-measures`
+  (`inspecto-geo-link` `ValueMeasures`) answers the entities breaching a named Measure's visible thresholds —
+  `passThrough` (retention as a derived column), `velocity`, `timeToCashOut`, `cashOutConcentration`,
+  `structuring`, `benefitTransfer`, plus the non-alertable `valueWeightedLinks` — in a `[from, to)` window of at
+  most 31 days. No view filter is accepted, so a `≥ 5 000` view cannot hide structuring. An Alert Rule binds one
+  through `POST /inv/investigations/{id}/alert-rules` with `valueMeasure:{…}` and fires when at least one entity
+  breaches (one Alert per rule). Definitions, defaults and deviations: plan §2.6.1. No SPA yet.
 * **The server half runs the SAME motif over the whole Dataset** (LA-14b, 2026-09-23):
   `POST /inv/pattern/branching` (`inspecto-geo-link` `PatternRoutes` → `PatternQueryCompiler` →
   `BranchingPatternEngine`). 🔴 **Why:** the projection is capped (2 000 links, `cnt DESC`; and 500 nodes in the

@@ -124,6 +124,25 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
         return out;
     }
 
+    /**
+     * LA-18: the COUNT of entities breaching the rule's value Measure over the WHOLE Dataset the Investigation is
+     * bound to — read now, not from the sealed log. ⚠ The R3 gate was applied at binding (a sweep has no caller).
+     */
+    private static OptionalDouble valueMeasure(Path writeRoot, Path dataRoot, Map<String, Object> header,
+                                               AlertRule rule) throws java.sql.SQLException, java.io.IOException {
+        String ds = String.valueOf(header.get("dataset"));
+        Map<String, Object> dataset = new com.gamma.pipeline.ComponentStore(writeRoot.resolve("registry"))
+                .get("dataset", ds).map(com.gamma.pipeline.ComponentRegistry.Component::content).orElse(null);
+        if (dataset == null) {
+            log.warn("alert rule '{}': no dataset '{}' — not evaluated", rule.name(), ds);
+            return OptionalDouble.empty();
+        }
+        String relationSql = com.gamma.query.DatasetRelation.relationSql(dataset, dataRoot,
+                new com.gamma.pipeline.ViewStore(writeRoot.resolve("views")));
+        ValueMeasures.Spec spec = ValueMeasures.parse(rule.valueMeasure(), true);
+        return OptionalDouble.of(ValueMeasures.forInvestigation(ds, relationSql, header, spec).entities().size());
+    }
+
     /** The hash a binding records: SHA-256 of the rule's canonical JSON — any edit to the rule breaks the match. */
     static String ruleHash(AlertRule rule) {
         return InvestigationEvaluator.sha256(InvestigationEvaluator.canonical(rule.toMap()));
@@ -131,7 +150,7 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
 
     @Override
     @SuppressWarnings("unchecked")
-    public OptionalDouble value(Path writeRoot, AlertRule rule) {
+    public OptionalDouble value(Path writeRoot, Path dataRoot, AlertRule rule) {
         String id = rule.investigation();
         try {
             if (id == null || !SnapshotStore.SAFE_ID.matcher(id).matches()
@@ -152,6 +171,7 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
                         rule.name(), id, id);
                 return OptionalDouble.empty();
             }
+            if (rule.isValueMeasureRule()) return valueMeasure(writeRoot, dataRoot, header, rule);
             InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(store, writeRoot, id, header);
             WorkingSetRoutes.Relation rel = WorkingSetRoutes.relation(inv, new boolean[1]);
             return compute(rel.tables().get(rule.relation()), rule.relation(), rule.measure());

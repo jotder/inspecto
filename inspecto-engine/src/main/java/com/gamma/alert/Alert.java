@@ -56,10 +56,14 @@ public record Alert(String rule, String severity, String pipeline, String metric
         // A measure rule (BI-5) has no ledger metric/window: label it by its measure over its dataset.
         // An Investigation rule (LA-23) is labelled by relation + measure, over the SEALED Working Set — it never
         // reads current data, and saying so keeps the alert from over-claiming.
+        // An LA-18 value-measure rule counts the entities breaching a named value Measure over the WHOLE Dataset.
         String metricLabel = r.metric() != null ? r.metric()
+                : r.isValueMeasureRule() ? "entities breaching " + r.valueMeasure().get("name")
                 : r.isInvestigationRule() ? r.relation() + " " + r.measure() : r.measure();
         String windowLabel = r.window() != null
                 ? (r.batchWindow() ? "the last " + r.windowBatches() + " batches" : "the last " + r.window())
+                : r.isValueMeasureRule() ? "the whole Dataset, " + r.valueMeasure().get("from") + " to "
+                        + r.valueMeasure().get("to")
                 : r.isInvestigationRule() ? "the sealed Working Set" : "current data";
         String against = switch (r.comparator()) {
             case "gt" -> "above";
@@ -113,6 +117,7 @@ public record Alert(String rule, String severity, String pipeline, String metric
     /** What was measured, where: {@code Sum of exposure_sar on fraud_cases_open}, {@code Error rate on EVENTS}. */
     private static String subject(AlertRule r, String scope) {
         if (r.metric() != null) return metricLabel(r.metric()) + " on " + scope;
+        if (r.isValueMeasureRule()) return "Entities breaching " + r.valueMeasure().get("name") + " in " + scope;
         if (r.isInvestigationRule()) return measureLabel(r.measure()) + " of " + r.relation() + " in " + scope;
         return measureLabel(r.measure()) + " on " + scope;
     }

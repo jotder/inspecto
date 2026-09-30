@@ -111,7 +111,7 @@ public record AlertRule(String name, String metric, String comparator, double th
                         String window, String severity, String onPipeline,
                         String dataset, String measure, Object when, String maximumAge,
                         String investigation, String relation, String description,
-                        List<String> by, int stormCap, String owner) {
+                        List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure) {
 
     /** The {@code stormCap} a {@code by} rule takes when it declares none. */
     public static final int DEFAULT_STORM_CAP = 100;
@@ -136,6 +136,23 @@ public record AlertRule(String name, String metric, String comparator, double th
      * {@code WorkingSetMeasuresTest} there pins the two equal.
      */
     public static final Set<String> INVESTIGATION_RELATIONS = Set.of("entities", "links", "excluded");
+    /**
+     * The LA-18 value Measures an Investigation rule may watch over the WHOLE Dataset ({@code valueMeasure.name}).
+     * ⚠ A mirror of {@code ValueMeasures.ALERTABLE} in the optional module — {@code ValueMeasuresTest} there pins
+     * the two equal. The module validates the rest of the block when the rule is bound.
+     */
+    public static final Set<String> VALUE_MEASURES = Set.of("passThrough", "velocity", "timeToCashOut",
+            "cashOutConcentration", "structuring", "benefitTransfer");
+
+    /** Every pre-{@code valueMeasure} (pre-LA-18) caller of the full shape. */
+    public AlertRule(String name, String metric, String comparator, double threshold,
+                     String window, String severity, String onPipeline,
+                     String dataset, String measure, Object when, String maximumAge,
+                     String investigation, String relation, String description,
+                     List<String> by, int stormCap, String owner) {
+        this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, maximumAge,
+                investigation, relation, description, by, stormCap, owner, null);
+    }
 
     /** The historic ledger-metric rule shape (every pre-BI-5 caller). */
     public AlertRule(String name, String metric, String comparator, double threshold,
@@ -206,7 +223,23 @@ public record AlertRule(String name, String metric, String comparator, double th
         maximumAge = (maximumAge == null || maximumAge.isBlank()) ? null : maximumAge.trim().toLowerCase(Locale.ROOT);
         investigation = (investigation == null || investigation.isBlank()) ? null : investigation.trim();
         relation = (relation == null || relation.isBlank()) ? null : relation.trim().toLowerCase(Locale.ROOT);
-        if (investigation != null) {
+        valueMeasure = (valueMeasure == null || valueMeasure.isEmpty()) ? null
+                : java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(valueMeasure));
+        if (valueMeasure != null) {
+            // LA-18 value-measure rule: an Investigation rule whose Measure is a named value Measure over the WHOLE
+            // Dataset the Investigation is bound to. It watches the COUNT of entities breaching the Measure's own
+            // thresholds (inside the block) and fires when that count is above 0 — one Alert per rule, never per
+            // entity (G-42) — so the comparator and threshold are fixed here, as a freshness rule's are.
+            require(investigation != null, "alert.valueMeasure requires alert.investigation");
+            require(measure == null && relation == null,
+                    "an alert.valueMeasure rule takes no alert.measure or alert.relation (the block names the Measure)");
+            require(metric == null && dataset == null && maximumAge == null && window == null && when == null,
+                    "an alert.valueMeasure rule takes no metric, dataset, maximumAge, window or when");
+            require(VALUE_MEASURES.contains(String.valueOf(valueMeasure.get("name"))),
+                    "alert.valueMeasure.name must be one of " + VALUE_MEASURES);
+            comparator = "gte";
+            threshold = 1;
+        } else if (investigation != null) {
             // Investigation rule (LA-23): a scalar Measure over one relation of an Investigation's Working Set.
             // It reads the sealed log — never a Dataset, a ledger or a clock — so none of those shapes apply.
             require(dataset == null, "an investigation alert (investigation:) must not also declare a dataset");
@@ -215,7 +248,7 @@ public record AlertRule(String name, String metric, String comparator, double th
             require(window == null, "an investigation alert (investigation:) takes no window (it reads the "
                     + "Working Set)");
             require(when == null, "alert.when scopes ledger rows; an investigation alert has none");
-            if (relation == null) relation = "entities";
+            if (relation == null) relation = "entities";   // (a valueMeasure rule never reaches here)
             require(INVESTIGATION_RELATIONS.contains(relation),
                     "alert.relation must be one of " + INVESTIGATION_RELATIONS);
             require(com.gamma.query.DatasetMeasureProbe.validMeasure(measure),
@@ -287,6 +320,11 @@ public record AlertRule(String name, String metric, String comparator, double th
         return dataset != null && maximumAge == null;
     }
 
+    /** Whether this is an LA-18 value-measure rule: an Investigation rule over the whole Dataset it is bound to. */
+    public boolean isValueMeasureRule() {
+        return valueMeasure != null;
+    }
+
     /** Whether this is an LA-23 rule over an Investigation's Working Set — disjoint from the other three kinds. */
     public boolean isInvestigationRule() {
         return investigation != null;
@@ -335,7 +373,8 @@ public record AlertRule(String name, String metric, String comparator, double th
                 str(alert.get("description")),
                 columns(alert.get("by")),
                 alert.get("stormCap") == null ? 0 : wholeNumber(alert.get("stormCap"), "alert.stormCap"),
-                str(alert.get("owner")));
+                str(alert.get("owner")),
+                valueMeasureBlock(alert.get("valueMeasure")));
     }
 
     /**
@@ -395,6 +434,7 @@ public record AlertRule(String name, String metric, String comparator, double th
         if (investigation != null) m.put("investigation", investigation);
         if (relation != null) m.put("relation", relation);
         if (measure != null) m.put("measure", measure);
+        if (valueMeasure != null) m.put("valueMeasure", valueMeasure);
         if (maximumAge != null) m.put("maximumAge", maximumAge);
         m.put("comparator", comparator);
         m.put("threshold", threshold);
@@ -411,6 +451,13 @@ public record AlertRule(String name, String metric, String comparator, double th
         // claimed, and R3 lets only an owner or an access admin change a claimed envelope.
         if (isOwned()) m.put("owner", owner);
         return m;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> valueMeasureBlock(Object v) {
+        if (v == null) return null;
+        require(v instanceof Map<?, ?>, "alert.valueMeasure must be a block {name, …}");
+        return (Map<String, Object>) v;
     }
 
     private static void require(boolean ok, String message) {

@@ -768,6 +768,12 @@ public final class ConfigSpecs {
                 FieldSpec.enumField("alert.relation", "Working Set relation",
                         List.of("entities", "links", "excluded"), null,
                         "Which relation of the Investigation's Working Set the Measure is computed over."),
+                // LA-18 value-measure rule: an Investigation rule over the WHOLE Dataset the Investigation is bound
+                // to. Authored only through POST /inv/investigations/{id}/alert-rules, like alert.investigation.
+                FieldSpec.of("alert.valueMeasure", "Value Measure", FieldType.MAP,
+                        "A named value Measure over the whole Dataset {name, valueCol, timeCol, from, to, and the "
+                                + "Measure's own visible thresholds}. The rule fires when at least one entity "
+                                + "breaches them; requires alert.investigation, takes no alert.measure."),
                 // ASSURE-PER-ENTITY-ALERTS-1: a Dataset measure rule evaluated per key instead of as one aggregate.
                 FieldSpec.of("alert.by", "Group by", FieldType.LIST,
                         "Key columns of the Dataset (a Dataset measure rule only): the Measure is evaluated per "

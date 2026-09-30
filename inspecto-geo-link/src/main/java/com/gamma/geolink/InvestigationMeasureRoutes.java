@@ -50,6 +50,8 @@ public final class InvestigationMeasureRoutes implements RouteModule {
 
     private static final Set<String> RULE_FIELDS = Set.of("name", "relation", "measure", "comparator", "threshold",
             "severity");
+    /** LA-18: a value-measure rule's body — the comparator and threshold are fixed (count of breaching entities ≥ 1). */
+    private static final Set<String> VALUE_RULE_FIELDS = Set.of("name", "valueMeasure", "severity");
 
     @Override
     public void register(ApiContext api) {
@@ -98,12 +100,28 @@ public final class InvestigationMeasureRoutes implements RouteModule {
      */
     private Object bind(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
         InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
+        boolean valueRule = body.containsKey("valueMeasure");
         for (String k : body.keySet())
-            if (!RULE_FIELDS.contains(k))
+            if (valueRule && !VALUE_RULE_FIELDS.contains(k))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + k + "' is not a field of a value-measure Alert Rule "
+                        + VALUE_RULE_FIELDS + " — it fires when at least one entity breaches the Measure's own thresholds");
+            else if (!valueRule && !RULE_FIELDS.contains(k))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + k + "' is not a field of an Investigation Alert Rule " + RULE_FIELDS
                         + " — the Investigation is the path's, and its owner is recorded, not given");
         Map<String, Object> content = new LinkedHashMap<>(body);
         content.put("investigation", id);
+        ValueMeasures.Spec spec = null;
+        if (valueRule) {
+            try {
+                spec = ValueMeasures.parse(body.get("valueMeasure") instanceof Map<?, ?> vm
+                        ? castMap(vm) : Map.of(), true);
+            } catch (IllegalArgumentException e) {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+            }
+            content.put("valueMeasure", spec.toMap());   // every threshold spelled out: visible, and hashed
+            content.put("comparator", "gte");
+            content.put("threshold", 1);
+        }
         AlertRule rule;
         try {
             rule = AlertRule.fromMap(content);
@@ -112,8 +130,17 @@ public final class InvestigationMeasureRoutes implements RouteModule {
         }
         if (!SnapshotStore.SAFE_ID.matcher(rule.name()).matches())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "alert rule name must match " + SnapshotStore.SAFE_ID.pattern());
-        WorkingSetRoutes.Relation rel = WorkingSetRoutes.relation(inv, new boolean[1]);
-        OptionalDouble current = compute(rel, rule.relation(), rule.measure());   // 422 if the relation cannot
+        OptionalDouble current;
+        ValueMeasures.Result valued = null;
+        if (spec != null) {
+            // The WHOLE Dataset the Investigation is bound to, R3-gated for this caller now (a sweep has none).
+            String ds = inv.dataset();
+            valued = evaluate(ds, InvRoutes.relationFor(api, ex, inv.writeRoot(), ds), inv.header(), spec);
+            current = OptionalDouble.of(valued.entities().size());
+        } else {
+            WorkingSetRoutes.Relation rel = WorkingSetRoutes.relation(inv, new boolean[1]);
+            current = compute(rel, rule.relation(), rule.measure());   // 422 if the relation cannot
+        }
 
         AlertService alerts = api.service().alertService()
                 .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "alert engine unavailable"));
@@ -143,14 +170,34 @@ public final class InvestigationMeasureRoutes implements RouteModule {
         emit(ex, EventType.LINK_INVESTIGATION_ALERT_RULE_BOUND, "link.investigation.alert_rule.bound",
                 "link.investigation.alert_rule.bound — " + rule.name() + " on " + id,
                 b -> b.attr("rule", rule.name()).attr("investigationId", id).attr("relation", rule.relation())
-                        .attr("measure", rule.measure()).attr("threshold", rule.threshold()));
+                        .attr("measure", rule.measure()).attr("threshold", rule.threshold())
+                        .attr("valueMeasure", rule.isValueMeasureRule() ? rule.valueMeasure().get("name") : null));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("rule", written);
         out.put("current", current.isPresent() ? current.getAsDouble() : null);
         out.put("wouldFire", current.isPresent() && rule.breached(current.getAsDouble()));
+        if (valued != null) out.putAll(ValueMeasureRoutes.answer(spec, valued));   // the entities it would name
         out.put("disclosure", "when it fires, the Alert (and at CRITICAL the Incident) shows this Investigation's id, "
                 + "the measure, its value and the threshold to everyone who can read Alerts and Incidents");
         return out;
+    }
+
+    /** A value Measure over the whole Dataset, its failures as 422s. */
+    static ValueMeasures.Result evaluate(String dataset, String relationSql, Map<String, Object> header,
+                                         ValueMeasures.Spec spec) {
+        try {
+            return ValueMeasures.forInvestigation(dataset, relationSql, header, spec);
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+        } catch (java.sql.SQLException | IOException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "value measure failed: "
+                    + com.gamma.util.DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> castMap(Map<?, ?> m) {
+        return (Map<String, Object>) m;
     }
 
     private static OptionalDouble compute(WorkingSetRoutes.Relation rel, String relation, String measure) {

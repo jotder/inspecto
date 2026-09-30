@@ -3,7 +3,8 @@
 
 Writes:
   roaming_tap/TAP_2026090{1,2,3}.csv          — inter-operator roaming (TAP) charge records
-  mule_transfers/TRANSFERS_2026090{1,2,3}.csv — account-to-account transfers with a planted mule ring
+  mule_transfers/TRANSFERS_2026090{1,2,3}.csv — account-to-account transfers with a planted mule ring,
+                                                 plus the LA-18 cash-out and benefit-skim stories
 
 Every value is invented: operators are named after minerals/weather, PLMNs use the 001 test MCC,
 IMSIs are 001-prefixed and sequential, accounts are ACC-1xxx. Nothing here is trimmed from a capture.
@@ -173,6 +174,55 @@ for di, day in enumerate(DAYS):
             amt = round(amt * 0.975, 2)
             tx(rows, day, SHELLS[i], SHELLS[(i + 1) % 4], "wire", amt, ts(day, 10 + lap * 5, 12 + lap * 5))
     tx_rows[f"TRANSFERS_{day:%Y%m%d}.csv"] = rows
+
+# ── Story (f)+(g), LA-18 value Measures (2026-09-30) — APPENDED after every earlier row, from its OWN RNG and its
+# own id sequence (TXV-…), so every row above is byte-identical to the pre-LA-18 corpus (as story (e) did for D-S4).
+#  (f) cash-out through one till: 8 CASHER accounts each take a ~4 000 wire from MULE-HUB-02 every morning and cash
+#      out ~95 % at TILL-06 within 1–4 h; ordinary accounts cash out small sums across TILL-01…05. Exercises
+#      timeToCashOut, cashOutConcentration (TILL-06 ≈ 80 % of all cash-out, from 8 payers) and passThrough.
+#  (g) benefit skim: GOV-BENEFITS pays 6 BENEFICIARY accounts (and 20 ordinary ones) ~450 a day; each BENEFICIARY
+#      forwards 60 % to SKIMMER-01 within 2–24 h. Exercises benefitTransfer (6 recipients → one counterparty).
+vrng = random.Random(20260930)
+TILLS = [f"TILL-{i:02d}" for i in range(1, 7)]
+CASHERS = [f"CASHER-{i:02d}" for i in range(1, 9)]
+BENEFICIARIES = [f"BENEFICIARY-{i:02d}" for i in range(1, 7)]
+HUB2, GOV, SKIMMER = "MULE-HUB-02", "GOV-BENEFITS", "SKIMMER-01"
+for acct in TILLS + CASHERS + BENEFICIARIES + [HUB2, GOV, SKIMMER]:
+    COUNTRY[acct] = vrng.choice(["DE", "NL", "FR", "ES", "IT", "PL"])
+vseq = 0
+
+
+def vts(day, lo_h=0, hi_h=24):
+    return day + timedelta(seconds=vrng.randint(lo_h * 3600, hi_h * 3600 - 1))
+
+
+def vtx(rows, day, payer, payee, channel, amount, when):
+    global vseq
+    vseq += 1
+    rows.append([
+        f"TXV-{vseq:05d}", payer, payee, channel, f"{amount:.2f}", "EUR", COUNTRY[payer], COUNTRY[payee],
+        when.strftime("%Y-%m-%d"), fmt(when),
+    ])
+
+
+for day in DAYS:
+    rows = tx_rows[f"TRANSFERS_{day:%Y%m%d}.csv"]
+    for _ in range(60):                                        # ordinary cash-out: small sums, five tills
+        vtx(rows, day, vrng.choice(NORMAL), vrng.choice(TILLS[:5]), "cash_out",
+            round(vrng.lognormvariate(4.5, 0.6), 2), vts(day, 8, 20))
+    for c in CASHERS:                                          # (f) wire in each morning, cash out at TILL-06
+        amount = round(vrng.uniform(3800, 4200), 2)
+        when = vts(day, 8, 11)
+        vtx(rows, day, HUB2, c, "wire", amount, when)
+        vtx(rows, day, c, TILLS[5], "cash_out", round(amount * vrng.uniform(0.94, 0.97), 2),
+            when + timedelta(hours=vrng.randint(1, 4)))
+    for b in BENEFICIARIES:                                    # (g) benefit paid, 60 % skimmed on
+        amount = round(vrng.uniform(420, 480), 2)
+        when = vts(day, 6, 8)
+        vtx(rows, day, GOV, b, "benefit", amount, when)
+        vtx(rows, day, b, SKIMMER, "wire", round(amount * 0.60, 2), when + timedelta(hours=vrng.randint(2, 24)))
+    for n in vrng.sample(NORMAL, 20):                          # benefit to ordinary accounts: not skimmed
+        vtx(rows, day, GOV, n, "benefit", round(vrng.uniform(420, 480), 2), vts(day, 6, 8))
 
 TX_HEADER = ["TRANSFER_ID", "PAYER_ACCOUNT", "PAYEE_ACCOUNT", "CHANNEL", "AMOUNT", "CURRENCY", "PAYER_COUNTRY",
              "PAYEE_COUNTRY", "BOOKED_DATE", "BOOKED_AT"]

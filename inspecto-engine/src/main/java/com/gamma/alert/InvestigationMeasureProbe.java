@@ -21,7 +21,8 @@ public interface InvestigationMeasureProbe {
     /**
      * The rule's current value over the sealed Working Set of {@code rule.investigation()}, resolved under
      * {@code writeRoot} (the Space's config root — where the Investigation routes write); empty when it cannot be
-     * computed or the rule has no matching owner binding. Never throws.
+     * computed or the rule has no matching owner binding. Never throws. {@code dataRoot} (may be null) is the
+     * Space's data root, which an LA-18 value-measure rule needs to read the WHOLE Dataset.
      */
-    OptionalDouble value(Path writeRoot, AlertRule rule);
+    OptionalDouble value(Path writeRoot, Path dataRoot, AlertRule rule);
 }

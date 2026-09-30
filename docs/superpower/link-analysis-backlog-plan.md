@@ -300,12 +300,12 @@ periodicity detection.
   comments only) · **coverage indicator** — which days and Collectors are missing for the window. 🔴 A gap
   in the data is visually identical to innocence; coverage is the highest-value control on this list.
 
-#### 2.6.1 LA-18 value measures — definitions — ⚠ DRAFT — AWAITING OPERATOR REVIEW (2026-09-30)
+#### 2.6.1 LA-18 value measures — definitions — ✅ DECIDED 2026-09-30 (operator sign-off) · backend BUILT 2026-09-30
 
 Operator decision 2026-09-30: each value measure is a **named Measure**; its threshold is an **Alert Rule**
 (the LA-23 path); both computed over the **whole Dataset**, never the analyst's view filter, so a view narrowed
 to `AMOUNT ≥ 5 000` cannot remove what a measure looks for (as `PatternRoutes` does). Backend only, first slice.
-Nothing below is built. Proposed thresholds are starting points to be shown on screen and edited, not tuned.
+The table below is the signed-off draft; the as-built record and its two recorded deviations follow it.
 
 **Common column roles** (all bound per call, checked against real columns, values bound, never interpolated):
 `sourceCol` (payer) · `targetCol` (payee) · `valueCol` (numeric; `TRY_CAST … AS DOUBLE`, non-numeric/NULL rows
@@ -330,13 +330,42 @@ no qualifying activity are absent, not zero.
 
 `postmed_xdr` carries no money transfers (`RATED_AMOUNT` is a charge), so it exercises none of these.
 
-**Open for the operator:**
-1. Alert grain — Alerts fire per rule, never per entity (G-42). Proposed: the Alert Rule watches the COUNT of
-   entities breaching the Measure's threshold (`> 0`), and the answer lists them. Confirm.
-2. Pass-through vs retention — ship one (proposed: pass-through only) or both.
-3. Planted stories — one generator addition (a `cash_out` channel, ~6 agent tills, one till concentrated, a
-   benefit-skim ring) with byte-identical existing stories, as D-S4's dirty fixture did. Approve.
-4. Window cap and the defaults above.
+**Operator decisions (2026-09-30), replacing the four open questions:** (1) the Alert Rule watches the COUNT of
+entities breaching the Measure's thresholds and fires when it is > 0; the answer lists the entities (G-42 kept);
+(2) pass-through only — retention is a derived column (`1 − ratio`), not a Measure; (3) the planted stories are
+added; (4) the 31-day window cap and the defaults above, editable per Alert Rule.
+
+✅ **As built (backend, 2026-09-30):**
+* `ValueMeasures` (`inspecto-geo-link`) — one SQL statement per Measure over the Dataset's OWN relation
+  (`InvRoutes.relationFor`, R3); no filter is accepted, so the ≥ 5 000 view trap cannot apply. Identifiers checked
+  against real columns and quoted; every value bound; 10 s timeout; ≤ 10 000 entities (`truncated`); rows with a
+  non-numeric value are skipped and counted (`unvalued`). The answer carries the block with every default spelled
+  out (`measure`) and the thresholds in words (`threshold`).
+* `GET /inv/value-measures` (`ValueMeasureRoutes`) — `dataset, sourceCol, targetCol, linkKindCol?, name, valueCol,
+  timeCol, from, to` + thresholds; read-only (a GET needs no capability-manifest entry), audited
+  `LINK_VALUE_MEASURED`. `valueWeightedLinks` is readable here, never alertable.
+* Alert Rule — the LA-23 route `POST /inv/investigations/{id}/alert-rules` also takes `{name, severity,
+  valueMeasure:{…}}`: the Investigation supplies the Dataset and column roles; comparator/threshold are fixed
+  (`gte 1`); the stored rule carries every threshold (`alert.valueMeasure`, declared in `ConfigSpecs`). The sweep
+  reads the WHOLE Dataset now (not the sealed log) through the same owner binding; the `InvestigationMeasureProbe`
+  SPI gained a `dataRoot`. One Alert per rule (`entities breaching <name>`), never per entity.
+* Demo corpus — stories (f) cash-out through `TILL-06` and (g) benefit skim to `SKIMMER-01`, appended to
+  `mule_transfers` from their own RNG and id sequence (`TXV-…`); every earlier row byte-identical (checked as a
+  prefix of each file); `check-split-identity-fixture.mjs` still passes. On it: structuring → `MULE-HUB-01`;
+  time-to-cash-out → the 8 CASHERs only; concentration → `TILL-06`; benefit-transfer → `SKIMMER-01` first.
+* Tests: `ValueMeasuresTest` 9, `ControlApiValueMeasureTest` 6. Mutation-checked: narrowing the evaluated rows to
+  `≥ 5 000` turns 7 tests red (structuring loses `HUB`); a count off by one, or a `gt 1` comparator, stops
+  the firing tests.
+
+⚠ **Recorded deviations (decided in-lane, for the operator to confirm):**
+* **velocity and time-to-cash-out also take `minInbound` (default 10 000)**, like pass-through. Without a floor
+  every busy ordinary account forwards within a day, so velocity would name most of the corpus.
+* **benefit-transfer at the signed `≥ 3` recipients also names 8 ordinary accounts** on the demo corpus (random
+  traffic from 60 benefit recipients); at `≥ 5` only `SKIMMER-01`. The default is kept as signed; raising it is
+  the operator's call.
+
+**Deferred:** restricting cash-out concentration to an `agent` Entity List (LA-17); the SPA; any rolling window
+(the window is a fixed `[from, to)`, so an armed rule watches that window's current data).
 
 ### 2.7 Reporting — one log, three renderings, and negative space
 
@@ -491,7 +520,7 @@ caller-shaped SQL would not.
 | Id | Item | State | Size | Blocked on | Detail |
 |---|---|---|---|---|---|
 | **LA-17** | Entity model + resolution + reference lists | ⬜ **UN-DEFERRED 2026-09-24 (operator)** — reverses D-S4's "stay value-projected"; design first — 🟡 **SLICE 1 SHIPPED 2026-09-26** (`887b5215b`, `0bf8bc71c`, `0d74028cb`) — design (D-M1..D-M8) in [`link-analysis-entity-model-design.md`](link-analysis-entity-model-design.md): Entity Types, the Identity Fact log, Entity Lists, `excludeBy`/`seedBy`, the SPA panel, typed masking by Entity Type. 🟡 **SLICE 2 BACKEND (analyst resolution) SHIPPED 2026-09-27** — D-M9 (sealed normaliser) + `identity.asserted`/`identity.retracted`, union-find fold, `/inv/entity-identities*` (design §8.2). ✅ Projection ids through `typedEntityKey` (D-M11) — SHIPPED in the SPA (`0d5843768`, empty-key fix `21a81dd45`; grounded 2026-09-30 in `entity-projection.ts` `typedOrEntityId`/`endpointId`), not `2723e6001` as a handoff said (that commit only regenerated route-gating evidence). 🟡 **SLICE 2 PART 2 BACKEND (resolution in Investigations) BUILT 2026-09-30** — the `resolve {atSeq?}` op seals the Space's groups at a pinned fact seq; merged nodes with every member key + joining assertions; masking per member key (design §8.2 "Resolution in Investigations"). ✅ **SLICE 2 COMPLETE 2026-09-30** — SPA identity panel + client, `POST /inv/entity-identities/import` (mapping-Dataset import cut), and the writer-inventory rows (operator-approved 2026-09-30). Resolution is **display-only** by operator decision 2026-09-30: traversal, exclusion and counts stay on raw identifiers by default. ✅ **MERGED TRAVERSAL BUILT 2026-09-30** (operator decisions the same day): opt-in PER OP — `expand`/`exclude` take `merged: true`; a merged expand fans out from every member (sealed in the rung), a merged exclude removes every admitted member and blocks the group's keys with ONE log line; `budget`/`maxFanOut`/four-eyes count the combined fan-out; a template carries the flag inside the op (design §8.3). Follow-up the same day: a fork moving a merged exclude before its resolve is a 422 (as a merged expand), and the member-value scan cap is the per-Space setting `merged_distinct_cap` (default 20 000, refused above it, never sampled). | L | — (D-E8 decided) | Typed Entities, cross-identifier resolution, enrichment attributes; named reference lists that persist across Enquiries. |
-| **LA-18** | Value measures as Measures + Alert Rules | 🟡 **DEFINITIONS DRAFTED 2026-09-30 — awaiting operator review (§2.6.1)**; operator chose named Measures with thresholds as Alert Rules over the WHOLE Dataset, backend first. Already built: structuring pack + ≥ 5 000 trap refusal (LA-14b), Working Set count Measures + Alert Rules (LA-23), `weightCol` on shortest path. | M | LA-17 | §2.6 list; visible thresholds; structuring must survive the ≥ 5 000 filter trap. |
+| **LA-18** | Value measures as Measures + Alert Rules | ✅ **BACKEND SHIPPED 2026-09-30** (definitions DECIDED the same day, §2.6.1): `ValueMeasures` + `GET /inv/value-measures` over the WHOLE Dataset (six alertable Measures + value-weighted links, thresholds visible and editable); value-measure Alert Rules through the LA-23 route (`alert.valueMeasure`, fires when ≥ 1 entity breaches); demo stories (f)/(g). ⚠ Two in-lane deviations to confirm (§2.6.1). SPA and the agent Entity List restriction deferred. | M | LA-17 | §2.6 list; visible thresholds; structuring must survive the ≥ 5 000 filter trap. |
 | ~~**LA17-NORMALISER-CHANGE-1**~~ | ~~Changing an Entity Type's normaliser strands existing Entity List members~~ | ✅ **FIXED 2026-09-27 (D-M9)** — `list.created` seals `normaliser`; every later member write normalises with the sealed rule; a fact without the field reads as `default`; the list summary shows it; `excludeBy`/`seedBy` seal the list's rule too. Pinned by `ControlApiEntityListTest` (mutation-checked). | S | LA-17 | Design §8.2. |
 | **LA-19** | Evidential controls | 🟡 **5 of 6 SHIPPED 2026-09-24 (retention/purge DECLINED by D-U8 — no purge, append-only kept)** — ✅ **operator decisions 2026-09-24 built the same day (§4 D-U5…D-U9)**: required `purpose` (D-U5) · per-Space entity masking `typed`/`all`/`none` + per-entity reveal under `canRevealLinkEntities` (D-U6) · four-eyes `pending` expands above a per-Space threshold, approved by a DIFFERENT holder of `canApproveLinkExpansions` (D-U7) · Admiralty-grade `confidence` (D-U9). `ControlApiInvestigationOversightTest` 7/7. ⏳ Still undecided: link annotation ids, per-Collector coverage. — **first slice, 2 of 6 (backend)** — **per-entity annotation**: the §2.2 `annotate` op (`{ids, note}`, ≤ 2 000 chars; ids must be in the Working Set) folds into the sealed state as `annotations` (absent when empty, so older hashes are unchanged), survives a later `exclude` (history, not membership), undoes like any op, renders in the log and Dossier steps, and a template DROPS it (D-E8 — it names one graph's entity; count only). `confidence` was REFUSED 422 until D-U9 chose the Admiralty grade (now accepted, see above). **Coverage indicator**: `GET /inv/investigations/{id}/coverage?from&to&timezone` (open read, owner/R3/PDP via `open`, audited `LINK_INVESTIGATION_COVERAGE`) in a new `InvestigationCoverageRoutes` — local days of a bounded window (query, or the Investigation's own window incl. its day mask) with ZERO rows in the Dataset, in the window's zone per the §2.5 contract; the slot is deliberately NOT applied (coverage asks whether data arrived); `collectors:{assessed:false}` — per-Collector coverage is not assessed (a Dataset row carries no Collector attribution). `ControlApiInvestigationEvidentialControlsTest` 5/5. ✅ **SPA half SHIPPED 2026-09-24** — the Investigation panel annotates the selected entity (note only, no `confidence`), renders the sealed `annotations` (list + on the selected entity; undo via the generic replay re-read) and a *Check coverage* notice naming the zero-row days over the Investigation's own window, stating per-Collector coverage is not assessed; ⚠ an Investigation started from the panel has no `timeCol`, so its coverage answers 422 (surfaced). As-built: `okf/frontend/features/link-analysis.md`. ⚠ The SPA sends `purpose` (create + template instantiate) and shows a grade; it has NO reveal, approve/deny or pending-expand UI yet — a pending answer to an expand from the panel is not rendered as such. | L | — (LA-10 shipped 2026-09-23) | Scope binding, minimisation, four-eyes, retention/purge, per-entity annotation, **coverage indicator**. |
 | **LA-20** | Working Set as a log-defined derived relation + cache | ✅ **BACKEND SHIPPED 2026-09-23** — `GET /inv/investigations/{id}/working-set` in a new `WorkingSetRoutes`: three relations (`entities` · `links` · `excluded`) with the §2.7 provenance columns, bounded + `truncated`; a cache keyed by the sealed log's hash (stale read impossible after op / undo / fork, mutation-checked); the D-E7 gate — owner-only below Enterprise, owner AND `PolicyEngine` row verdict on Enterprise (`ControlApiInvestigationWorkingSetTest` 5/5, `ControlApiInvestigationPolicyTest` 1/1). As-built + deferrals in §5.7. Not yet a BI relation (LA-21). Also FIXED here: replay after an undo (§5.5). ✅ **SPA SHIPPED 2026-09-23** — *Working Set rows* in the Investigation panel (`link-analysis-working-set-rows.component`): relation picker, `<inspecto-data-table>` with true-offset `serverPage` paging (200/page, `stateKey` per relation), `truncated` + head step + `cached` shown; re-reads when the log moves | L | — (D-E3, D-E7 decided) | §2.7; the cache is a functional requirement (six tiles = six re-runs per view). |

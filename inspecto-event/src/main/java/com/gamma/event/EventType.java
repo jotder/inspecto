@@ -156,6 +156,9 @@ public final class EventType {
      *  LA-14b). {@code matches}, {@code truncated} and — when the pattern could not be evaluated —
      *  {@code refusal} carry what the analyst was told. */
     public static final String LINK_PATTERN_MATCHED = "LINK_PATTERN_MATCHED";
+    /** A named LA-18 value Measure was read over a whole Dataset ({@code GET /inv/value-measures}). {@code measure},
+     *  {@code entities} (how many breach its thresholds) and {@code truncated} carry what the analyst was told. */
+    public static final String LINK_VALUE_MEASURED = "LINK_VALUE_MEASURED";
     /** The cross-Dataset schema-relationship model was read ({@code GET /inv/schema/relationships}).
      *  {@code datasetsScanned}/{@code datasetsSkipped}/{@code relationships} carry the sweep's reach;
      *  it spans every Dataset, so it names no single one and cannot truncate. */
