@@ -305,6 +305,11 @@ public final class PipelineJobRunner implements Job {
                 + "-" + System.currentTimeMillis());
         List<Seed> seeds = seedsOf(g);
         String incCol = cfg.opt("incremental_column", "").trim();   // T32 Phase C — opt-in incremental re-run
+        // Spliced as a quoted identifier into the view predicate and max() query, on a connection that is not yet
+        // sealed: a `"` would end the identifier and run authored SQL before the seal.
+        if (incCol.indexOf('"') >= 0)
+            throw new IllegalArgumentException("pipeline job '" + cfg.name() + "' incremental_column must not"
+                    + " contain a double quote: " + incCol);
         boolean incremental = !incCol.isBlank();
         // T32 follow-up — incremental is per-source: each source_store carries its own watermark (keyed by
         // store) and is filtered + advanced independently below, so multi-source incremental works. It requires
@@ -323,6 +328,14 @@ public final class PipelineJobRunner implements Job {
             throw e;
         }
         File dryRunBranchLog = null;
+        final List<Path> storeDirs;
+        try {
+            storeDirs = storeDirs(g, seeds, dir);
+        } catch (RuntimeException e) {
+            DuckDbUtil.deleteTempDb(db);
+            PipelineDryRun.removeScratch(scratch);
+            throw e;
+        }
         try (Connection conn = DuckDbUtil.openConnection(db)) {
             // Flow-jobs have no per-pipeline processing.duckdb config; honour the global -D caps so this
             // scratch connection isn't uncapped (defaults ≈ 80% RAM) while the batch path is capped.
@@ -339,7 +352,7 @@ public final class PipelineJobRunner implements Job {
                 seedViews.put(seed.node(), view);
             }
             RowShaper.ReferenceResolver refs = references();
-            seal(conn, g, seeds, dir, refs, scratch);
+            seal(conn, g, storeDirs, refs, scratch);
 
             // Every run gets a batch-unique base name (addressing step 6). Incremental runs always did — each
             // increment is its own file — and a full recompute now does too, so it writes a new revision beside
@@ -437,25 +450,15 @@ public final class PipelineJobRunner implements Job {
      * store dir must stay under {@code dir}; either failing refuses the run, closed. {@code registerInLakehouse}
      * opens its own connection, so the seal does not touch it.
      */
-    private static void seal(Connection conn, PipelineGraph g, List<Seed> seeds, String dir,
+    private static void seal(Connection conn, PipelineGraph g, List<Path> storeDirs,
                              RowShaper.ReferenceResolver refs, Path scratch) throws Exception {
         LinkedHashSet<Path> allowed = new LinkedHashSet<>();
         LinkedHashSet<Path> homes = new LinkedHashSet<>();
         LinkedHashSet<Path> files = new LinkedHashSet<>();
-        Path root = Path.of(dir.trim()).toAbsolutePath().normalize();
         allowed.add(scratch.toAbsolutePath().normalize());
         String spill = System.getProperty(DuckDbUtil.PROP_TEMP_DIRECTORY);
         if (spill != null && !spill.isBlank()) allowed.add(Path.of(spill).toAbsolutePath().normalize());
-        List<String> stores = new ArrayList<>();
-        for (Seed s : seeds) stores.add(s.store());
-        for (PipelineStores.Produced p : PipelineStores.producedStores(g)) if (p.restsOnDisk()) stores.add(p.store());
-        for (String store : stores) {
-            Path storeDir = root.resolve(store).normalize();
-            if (!storeDir.startsWith(root) || storeDir.equals(root))
-                throw new IllegalArgumentException("pipeline job refused: store '" + store + "' resolves to "
-                        + storeDir + ", outside the data directory " + root + " (SEC-ATREST-PIPELINE-UNSEALED-1)");
-            allowed.add(storeDir);
-        }
+        allowed.addAll(storeDirs);
         for (PipelineNode n : g.nodes()) {
             Object ref = BuiltinNodeType.TRANSFORM_JOIN.type().equals(n.type()) ? n.cfg("reference") : null;
             if (ref == null || ref.toString().isBlank()) continue;
@@ -476,6 +479,29 @@ public final class PipelineJobRunner implements Job {
                         + d + ", which " + why + " (SEC-ATREST-PIPELINE-UNSEALED-1)");
         }
         SqlSandbox.sealAllowing(conn, List.copyOf(allowed), List.copyOf(files));
+    }
+
+    /**
+     * The canonical dir of every store this run reads (seeds) or writes (on-disk sinks), each required to sit
+     * strictly under {@code dir}. Run BEFORE any view is created, so a refused store reads nothing. Canonical on
+     * BOTH sides (real path, trailing dots/spaces, case): a link or junction store pointing out of data_dir, or a
+     * Windows {@code ...} store that Win32 strips to data_dir itself, is not a lexical child.
+     */
+    private static List<Path> storeDirs(PipelineGraph g, List<Seed> seeds, String dir) {
+        Path root = Path.of(dir.trim()).toAbsolutePath().normalize();
+        Path canonRoot = PathJail.canonical(root);
+        List<String> stores = new ArrayList<>();
+        for (Seed s : seeds) stores.add(s.store());
+        for (PipelineStores.Produced p : PipelineStores.producedStores(g)) if (p.restsOnDisk()) stores.add(p.store());
+        List<Path> out = new ArrayList<>();
+        for (String store : stores) {
+            Path storeDir = PathJail.canonical(root.resolve(store));
+            if (!storeDir.startsWith(canonRoot) || storeDir.equals(canonRoot))
+                throw new IllegalArgumentException("pipeline job refused: store '" + store + "' resolves to "
+                        + storeDir + ", outside the data directory " + canonRoot + " (SEC-ATREST-PIPELINE-UNSEALED-1)");
+            out.add(storeDir);
+        }
+        return out;
     }
 
     /** View-name prefix for a resolved Reference Dataset (distinct from the {@code source_store} seeds). */

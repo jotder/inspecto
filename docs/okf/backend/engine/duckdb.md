@@ -329,6 +329,17 @@ views on a scratch DuckDB. The same authored SQL as the dry run runs there (`fn:
 - **Fail closed.** Every entry, and a reference file's parent, goes through `PathJail.readAllowlistRefusal`. A store
   that resolves outside `data_dir` (or to `data_dir` itself) refuses the run, because `readAllowlistRefusal` alone
   would not stop a `../../etc` store name.
+- **Containment is canonical and runs before any view is created** (`PipelineJobRunner.storeDirs`): each store dir
+  is `PathJail.canonical` (real path, trailing dots/spaces, case) and must sit strictly under the canonical
+  `data_dir`, so `../x`, an absolute store, `.`, `a/..`, a link or junction store pointing out, and a Windows `...`
+  store are refused ("outside the data directory") before anything is read. The allowlist entry is the canonical path.
+  `incremental_column` containing a `"` is refused up front (it is spliced as a quoted identifier before the seal).
+  `PipelineDryRun.removeScratch` deletes recursively, so it only acts on a `dryrun_*` / `flowjob_*` direct child of
+  the canonical `java.io.tmpdir`.
+- ⚠ **What the seal does not bound.** Pipelines sharing a `data_dir` can already read each other's stores: the seal
+  bounds hosts, secrets and URLs, not cross-Pipeline reads. Known gap: a glob outside `data_dir` is bound (a Parquet
+  footer read) before the store refusal fires on the seal path; the early containment check closes it for stores, and
+  what remains is metadata only.
 - **DuckLake is unaffected.** `registerInLakehouse` → `DuckLakeRegistrar.registerInto` opens its own connection.
 - **Pinned by** `PipelineJobRunnerTest`: `read_text` of a host file and of `config.secrets/…` → `Permission Error`; a
   sealed run still joins its `path:` reference but not a sibling of it. All three go red with the `seal(...)` call

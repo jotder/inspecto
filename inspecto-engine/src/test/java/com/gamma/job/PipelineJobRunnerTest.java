@@ -1352,6 +1352,104 @@ class PipelineJobRunnerTest {
         assertTrue(all.toString().contains("Permission Error"), "expected a DuckDB permission refusal: " + all);
     }
 
+    /** src(source_store = {@code store}) --data--> sink {@code leaked}, run with the given {@code data_dir}. */
+    private JobResult runSourceStore(String dataDir, String store, Map<String, String> extra) throws Exception {
+        PipelineStore ps = new PipelineStore(tmp.resolve("flows_src"));
+        ps.write("src_flow", new PipelineGraph("src_flow", true,
+                List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", store)),
+                        new PipelineNode("out", "sink.persistent", "Leaked", null, Map.of("store", "leaked"), null)),
+                List.of(PipelineEdge.data("src", "out"))));
+        Map<String, String> params = new java.util.HashMap<>(Map.of("flow", "src_flow", "data_dir", dataDir));
+        params.putAll(extra);
+        JobConfig cfg = new JobConfig("srcjob", JobType.PIPELINE, null, null, true, false, params);
+        return new PipelineJobRunner(cfg, new ConsignmentEventBus(), ps, dataDir,
+                tmp.resolve("audit").toString()).run();
+    }
+
+    private static void assertRefusedWith(String fragment, Throwable t) {
+        StringBuilder all = new StringBuilder();
+        for (Throwable c = t; c != null; c = c.getCause()) all.append(c.getMessage()).append(" | ");
+        assertTrue(all.toString().contains(fragment), "expected '" + fragment + "' in: " + all);
+    }
+
+    /** A store the seal would have to allowlist OUTSIDE {@code data_dir} refuses the run. */
+    private void assertStoreRefusedAsOutside(String dataDir, String store) {
+        Exception e = assertThrows(Exception.class, () -> runSourceStore(dataDir, store, Map.of()), store);
+        assertRefusedWith("outside the data directory", e);
+    }
+
+    @Test
+    void aSourceStoreThatResolvesOutsideDataDirRefusesTheRun() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        seedParquet(dataDir, "events", "(1,150)");                           // makes data/ ; the glob `.` and `a/..` match it
+        seedParquet(tmp.toString(), "x", "(2,50)");                          // <tmp>/x  = data/../x
+        Path abs = tmp.resolve("abs_store");
+        seedParquet(tmp.toString(), "abs_store", "(3,60)");
+        assertStoreRefusedAsOutside(dataDir, "../x");
+        assertStoreRefusedAsOutside(dataDir, abs.toString().replace('\\', '/'));
+        assertStoreRefusedAsOutside(dataDir, ".");
+        assertStoreRefusedAsOutside(dataDir, "a/..");
+    }
+
+    @Test
+    void aWindowsTrailingDotStoreThatWin32StripsToDataDirIsRefused() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                System.getProperty("os.name", "").toLowerCase().startsWith("windows"),
+                "Win32 strips trailing dots only on Windows");
+        String dataDir = tmp.resolve("data").toString();
+        seedParquet(dataDir, "events", "(1,150)");
+        assertStoreRefusedAsOutside(dataDir, "...");
+    }
+
+    @Test
+    void aLinkedSourceStorePointingOutsideDataDirIsRefused() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        seedParquet(dataDir, "events", "(1,150)");
+        seedParquet(tmp.resolve("outside").toString(), "real", "(2,50)");
+        Path target = tmp.resolve("outside").resolve("real");
+        Path link = tmp.resolve("data").resolve("linked");
+        boolean made;
+        try {
+            if (System.getProperty("os.name", "").toLowerCase().startsWith("windows")) {
+                made = new ProcessBuilder("cmd", "/c", "mklink", "/J", link.toString(), target.toString())
+                        .redirectErrorStream(true).start().waitFor() == 0;
+            } else {
+                Files.createSymbolicLink(link, target);
+                made = true;
+            }
+        } catch (java.io.IOException | UnsupportedOperationException | InterruptedException e) {
+            made = false;
+        }
+        org.junit.jupiter.api.Assumptions.assumeTrue(made && Files.exists(link),
+                "this platform/user cannot create a junction or symlink");
+        assertStoreRefusedAsOutside(dataDir, "linked");
+    }
+
+    @Test
+    void aSourceStoreInsideASpaceConfigOrSecretsTreeOrRestrictedStoreIsRefused() throws Exception {
+        Path space = tmp.resolve("space");
+        Files.createDirectories(space.resolve("config"));
+        String dataDir = space.resolve("data").toString();
+        seedParquet(dataDir, "events", "(1,150)");
+        seedParquet(dataDir, "config", "(2,50)");
+        seedParquet(dataDir, "config.secrets", "(3,60)");
+        seedParquet(dataDir, "rs", "(4,70)");
+        Files.createDirectories(Path.of(dataDir, "rs", ".restricted"));
+        for (String store : List.of("config", "config.secrets", "config.", "CONFIG", "rs")) {
+            Exception e = assertThrows(Exception.class, () -> runSourceStore(dataDir, store, Map.of()), store);
+            assertRefusedWith("would be allowed to read", e);
+        }
+    }
+
+    @Test
+    void anIncrementalColumnWithAQuoteIsRefusedBeforeAnySql() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        seedParquet(dataDir, "events", "(1,150)");
+        Exception e = assertThrows(Exception.class, () -> runSourceStore(dataDir, "events",
+                Map.of("incremental_column", "id\" = id OR \"id")));
+        assertRefusedWith("must not contain a double quote", e);
+    }
+
     @Test
     void anAtRestMappingExpressionCannotReadAHostFile() throws Exception {
         Path host = Files.writeString(Files.createDirectories(tmp.resolve("elsewhere")).resolve("host.txt"), "host-secret");

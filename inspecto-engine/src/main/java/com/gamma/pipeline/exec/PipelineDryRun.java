@@ -190,16 +190,18 @@ public final class PipelineDryRun {
     }
 
     /**
-     * <b>SEC-DRYRUN-EXPR-UNSEALED-1</b> — seal the scratch connection after seeding and before the walk runs any
-     * authored SQL ({@code fn: custom} mapping expressions, {@code transform.sql}, filters, contributed Steps).
-     * {@code allowed_directories} = the run's own scratch dir, the global {@code -Dprocessing.duckdb.temp_directory}
-     * when set, and each {@code transform.join} reference's read dirs as the caller's resolver declares them
-     * ({@link RowShaper.ReferenceResolver#readDirs}). Every entry is filtered through
-     * {@link com.gamma.config.safety.PathJail#readAllowlistRefusal} and the run refuses, fail closed, if one is
-     * refused; everything else (host files, {@code config.secrets}, URLs) DuckDB itself then refuses.
+     * Delete the scratch dir with whatever DuckDB left in it (the {@code <db>.tmp} spill dir). Best effort.
+     * Public for {@code PipelineJobRunner}, so it deletes recursively and therefore only ever a directory this
+     * package's callers created: a direct child of the canonical {@code java.io.tmpdir} named {@code dryrun_*}
+     * or {@code flowjob_*} (the {@code Files.createTempDirectory} prefixes). Anything else is left alone.
      */
-    /** Delete the scratch dir with whatever DuckDB left in it (the {@code <db>.tmp} spill dir). Best effort. */
     public static void removeScratch(java.nio.file.Path scratch) {
+        java.nio.file.Path canon = com.gamma.config.safety.PathJail.canonical(scratch);
+        java.nio.file.Path tmp = com.gamma.config.safety.PathJail.canonical(
+                java.nio.file.Paths.get(System.getProperty("java.io.tmpdir")));
+        java.nio.file.Path name = canon.getFileName();
+        if (name == null || !tmp.equals(canon.getParent())
+                || !(name.toString().startsWith("dryrun_") || name.toString().startsWith("flowjob_"))) return;
         try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(scratch)) {
             for (java.nio.file.Path p : walk.sorted(java.util.Comparator.reverseOrder()).toList())
                 java.nio.file.Files.deleteIfExists(p);
@@ -208,6 +210,15 @@ public final class PipelineDryRun {
         }
     }
 
+    /**
+     * <b>SEC-DRYRUN-EXPR-UNSEALED-1</b> — seal the scratch connection after seeding and before the walk runs any
+     * authored SQL ({@code fn: custom} mapping expressions, {@code transform.sql}, filters, contributed Steps).
+     * {@code allowed_directories} = the run's own scratch dir, the global {@code -Dprocessing.duckdb.temp_directory}
+     * when set, and each {@code transform.join} reference's read dirs as the caller's resolver declares them
+     * ({@link RowShaper.ReferenceResolver#readDirs}). Every entry is filtered through
+     * {@link com.gamma.config.safety.PathJail#readAllowlistRefusal} and the run refuses, fail closed, if one is
+     * refused; everything else (host files, {@code config.secrets}, URLs) DuckDB itself then refuses.
+     */
     private static void seal(Connection conn, PipelineGraph g, RowShaper.ReferenceResolver references,
                              java.nio.file.Path scratch) throws Exception {
         LinkedHashSet<java.nio.file.Path> allowed = new LinkedHashSet<>();

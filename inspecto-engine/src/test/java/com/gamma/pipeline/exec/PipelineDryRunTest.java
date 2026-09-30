@@ -457,12 +457,32 @@ class PipelineDryRunTest {
     }
 
     @Test
-    void theScratchDirIsRemovedWithTheSpillDirDuckDbLeavesInIt(@TempDir Path base) throws Exception {
-        Path scratch = Files.createDirectories(base.resolve("dryrun_x"));
+    void theScratchDirIsRemovedWithTheSpillDirDuckDbLeavesInIt() throws Exception {
+        Path scratch = Files.createTempDirectory("dryrun_");
         Files.writeString(Files.createDirectories(scratch.resolve("x.db.tmp")).resolve("spill.tmp"), "s");
         Files.writeString(scratch.resolve("x.db"), "d");
         PipelineDryRun.removeScratch(scratch);
         assertFalse(Files.exists(scratch), "a non-empty scratch dir must be removed recursively");
+    }
+
+    /** removeScratch is public and recursive, so it must refuse anything that is not one of our own scratch dirs. */
+    @Test
+    void removeScratchLeavesANonScratchDirAlone(@TempDir Path base) throws Exception {
+        // right prefix, wrong parent (not a direct child of java.io.tmpdir)
+        Path nested = Files.createDirectories(base.resolve("dryrun_x"));
+        Path keep1 = Files.writeString(nested.resolve("keep.txt"), "k");
+        // direct child of tmpdir, wrong prefix
+        Path other = Files.createTempDirectory("keepme_");
+        Path keep2 = Files.writeString(other.resolve("keep.txt"), "k");
+        try {
+            PipelineDryRun.removeScratch(nested);
+            PipelineDryRun.removeScratch(other);
+            assertTrue(Files.exists(keep1), "wrong parent must be refused");
+            assertTrue(Files.exists(keep2), "wrong prefix must be refused");
+        } finally {
+            Files.deleteIfExists(keep2);
+            Files.deleteIfExists(other);
+        }
     }
 
     private static java.util.Set<String> dryRunScratchDirs() throws java.io.IOException {
