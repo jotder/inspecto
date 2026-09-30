@@ -269,9 +269,10 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
     - 8 canonical Pipelines + Schemas, with DECIMAL money and a tariff table carrying effective dates.
     - Reconciliations `ra_xdr_completeness` (3-way) and `ra_rated_vs_billed`.
     - `sql.template` Jobs `ra_xdr_lost`, `ra_rerating` (tariff at the call start; an ambiguous tariff is data
-      quality), `ra_rollforward` (movement + continuity + NULL rules), `ra_settlement` (mismatch, unknown
-      partner, no traffic, missing statement) and `ra_leakage`.
-    - 3 Alert Rules and 2 Expectations; a latest-snapshot `ra_recovery` over the impact ledger; a dashboard;
+      quality), `ra_rollforward` (movement + continuity + NULL rules), `ra_settlement` (duplicate statement,
+      mismatch, unknown partner, no traffic, missing statement), then `ra_leakage` (leakage rows only) and
+      `ra_data_quality`.
+    - 2 Alert Rules (leakage CRITICAL, data quality WARNING) and 2 Expectations; a latest-snapshot `ra_recovery` over the impact ledger; a dashboard;
       `RUNBOOKS.md`.
   - **Golden test:** `TelcoRaGoldenTest`, with exact `key|reason` sets:
 
@@ -281,10 +282,11 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
     | Rated vs billed | 4 |
     | Re-rating | 5 rate mismatches + 12 ambiguous-tariff |
     | Roll-forward | 6 |
-    | Settlement | 4 |
+    | Settlement | 5 |
 
     - The boundary look-alikes stay silent.
-    - Twelve separate mutations each go red (okf `capabilities/spaces/spaces.md` §3.5).
+    - 14 leakage rows and 14 data-quality rows land in separate Datasets.
+    - Fourteen separate mutations each go red (okf `capabilities/spaces/spaces.md` §3.5).
   - **Same lane, platform-wide:** the template gallery reports `creatable` / `missingFeatures` per edition,
     and `recon.run` counts the Breaks of every pair.
   - 🔴 **Open:**
@@ -296,7 +298,8 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
       never evaluates the Alert Rules or Expectations.
     - (4) `RUNBOOKS.md` is not copied into the created Space.
     - (5) The Jobs are cron-staggered, not chained with `on_signal`.
-    - (6) The widgets cannot filter on `FINDING`, so there is no widget for the count of data-quality rows.
+    - (6) The Alert Rules raise one Alert per rule, not per control: `by: CONTROL` would fail the seed
+      gate's Schema check over an empty Dataset.
     - (7) Vendor-specific halves stay parked (plan §4).
 - **P2** · `ASSURE-PACK-PAYMENT-FRAUD-1` — **payment fraud content pack (WS-40…44 generic half, wave 5.3 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** Synthetic attempt / dispute / SIM-change corpus with a fail-closed card-number tripwire, feature Datasets via `sql.template`, payment typologies, a payment Risk Score with a default factor table as configuration, disputes, labels with a maturity flag and payment KPIs — as a Space Template with a golden test.
 - **P2** · `ASSURE-PACK-BUSINESS-ASSURANCE-1` — **business assurance content pack (WS-28 generic half, wave 5.4 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** A seasonal forecast (Holt-Winters in SQL) as a Measure function and a margin model by product / channel / partner, as a Space Template with a golden test. ⚠ **BUILT 2026-09-30, not closed (awaiting verification).** `spaces/_templates/business-assurance/`: a Holt-Winters additive forecast with a ±4σ̂ band as a view-backed Dataset (`ba_revenue_forecast`, a `WITH RECURSIVE` over a SQL-generated deterministic corpus), a margin model (`ba_margin_lines`, `ba_margin_erosion`), two per-entity Alert Rules (outside-band CRITICAL, erosion > 5 points WARNING), three KPI definitions, a dashboard, two disabled `sql.template` Jobs running the same SQL over the user's own stores, and `RUNBOOK.md`. `BusinessAssurancePackGoldenTest`: 2 detections, 0 false positives against 4 planted look-alikes; forecast RMSE 10.3 vs the noise-free signal (σ 20), MAPE 1.7 %. Still open: (a) **the forecast is not a Measure function** — the Measure shorthand is `count | agg(field)`, so a forecast inside a KPI or Alert Rule needs an engine change (the Dataset form was taken, as allowed); (b) a hand-authored view cannot read another view, so each view inlines its corpus CTE; (c) `createFromTemplate` copies only `config/` and `data/`, so the runbook stays in the catalog and never reaches the Space — templates have no runbook home; (d) the Jobs' sinks are not wired to Datasets automatically (the user re-points `physicalRef` by hand); (e) never applied and driven in a live server/UI (only the template seed gate test applies it). ⬆ **Verification FAIL fixed 2026-09-30:** clipping never re-based (a level shift flagged every later day) and a trend ramp was never detected — now a regime rule (K = 3 consecutive out-of-band days → one `regime_change`, level re-based) and a residual CUSUM drift detector (`drift_change`), each with its own Alert Rule; the margin model no longer mis-reads null / negative input (a `data_quality` status + Alert), a no-baseline group (`new`) or a tiny group (`insufficient`, min 10 lines / 1000 revenue per window). Still open: (f) the regime / drift constants and the ramp re-base slope are tuned on this corpus only; (g) on a live tail a real shift raises up to K − 1 spike Alerts (they heal) before its one regime Incident. → `okf/capabilities/spaces/spaces.md` §3.5 · `inspecto-engine/src/test/java/com/gamma/alert/BusinessAssurancePackGoldenTest.java`

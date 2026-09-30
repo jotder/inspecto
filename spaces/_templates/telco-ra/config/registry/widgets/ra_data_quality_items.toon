@@ -1,0 +1,7 @@
+vizType: kpi
+datasetId: ra_data_quality_dataset
+controls:
+  value[1]{field,agg}:
+    ITEM_KEY,count
+options:
+  title: Data-quality findings

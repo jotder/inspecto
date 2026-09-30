@@ -6,13 +6,15 @@ synthetic. Called numbers use the fictional `+1-555-01xx` range.
 - **Tolerances are configuration.** Each control's tolerance is a key in the file named for it; the SQL
   never hard-codes one.
 - **Money is `DECIMAL(18,4)` end to end,** so a tolerance compares exact amounts, not float noise.
+- **Timestamps are naive.** `EVENT_TS`, `EFFECTIVE_FROM` and `EFFECTIVE_TO` carry no zone, so every feed must be
+  delivered in one agreed timezone. A feed in another zone moves calls across tariff changes and days.
 - **Edition:** the template needs **Professional or Enterprise**, because it ships Alert Rules
   (`alert.dispatch`). A Personal build lists it in the gallery as not available. The confirmed and recovered
   KPIs also need the ops module (`objects.analytics`).
 
 ## Findings: leakage vs data quality
 
-Every control Job writes one row per finding, with these columns:
+Every control Job writes one row per finding to its `<control>_findings` Dataset, with these columns:
 
 - `ITEM_KEY`: what is wrong.
 - `REASON`: why, with the values listed per control below.
@@ -22,9 +24,12 @@ Every control Job writes one row per finding, with these columns:
 Rules for the two kinds:
 
 - **A `leakage` finding always carries its amount.** A sum never drops one.
-- **A `data_quality` finding** means the control could not judge the record: an ambiguous tariff, a NULL
-  balance field, or a missing partner statement. Its amount is NULL, because none can be computed. Fix the
+- **A `data_quality` finding** means the control could not judge the record: a missing or ambiguous tariff,
+  a NULL balance field, or a missing partner statement. Its amount is NULL, because none can be computed. Fix the
   data, and the next run judges the record.
+- **The two kinds are split into separate Datasets, each with its own Alert Rule:**
+  - `ra_leakage` holds only leakage rows, all with an amount. Alert Rule `ra_leakage_found` is **CRITICAL**.
+  - `ra_data_quality` holds only data-quality rows. Alert Rule `ra_data_quality` is **WARNING**.
 
 ## KPI definitions
 
@@ -72,7 +77,7 @@ and A↔C. On the golden corpus, **15 Breaks are 9 distinct lost or short xDRs**
 
 ## Re-rating
 
-- **Control:** Job `ra_rerating`, with `tolerance` 0.02. Alert Rule `ra_rerating_leakage`.
+- **Control:** Job `ra_rerating`, with `tolerance` 0.02.
 - **Which tariff row applies:** the one in force at the **call start**, meaning
   `EFFECTIVE_FROM <= EVENT_TS < EFFECTIVE_TO`, where a blank `EFFECTIVE_TO` means the row is still open.
 - **A call that spans a tariff change** is priced entirely at the rate in force when it started. The rate is
@@ -89,7 +94,7 @@ and A↔C. On the golden corpus, **15 Breaks are 9 distinct lost or short xDRs**
 
 ## Roll-forward
 
-- **Control:** Job `ra_rollforward`, with `tolerance` 0.05. Alert Rule `ra_rollforward_break`.
+- **Control:** Job `ra_rollforward`, with `tolerance` 0.05.
 - **Reasons** (one finding per subscriber-day, first match wins):
   - `null_value` (data quality): opening, closing or a movement is blank, so the day cannot be judged.
   - `movement` (leakage): opening + top-ups + adjustments − debits ≠ closing. Value moved outside the ledger.
@@ -100,12 +105,14 @@ and A↔C. On the golden corpus, **15 Breaks are 9 distinct lost or short xDRs**
 
 ## Settlement
 
-- **Control:** Job `ra_settlement`, with `tolerance_pct` 1.0. Alert Rule `ra_settlement_overbilling`.
-- **How it compares:** each partner statement line is matched against our own switch minutes (counted per
-  started minute), multiplied by the agreed `ic_rates`.
+- **Control:** Job `ra_settlement`, with `tolerance_pct` 1.0.
+- **How it compares:** the statement lines are first summed per partner and day. That total is then matched
+  against our own switch minutes (counted per started minute), multiplied by the agreed `ic_rates`.
 - **Reasons:**
   - `amount_mismatch` (leakage): the difference is more than the tolerance. A positive amount is an
     overcharge by the partner. Dispute it, with our minute count attached.
+  - `duplicate_statement` (leakage): the partner sent more than one line for the same day. The amount is
+    the excess over the first line. Reject the duplicate.
   - `unknown_partner` (leakage): the statement comes from a partner with no agreed rate. **The whole
     statement amount is the leakage.** Refuse it until an agreement exists.
   - `no_traffic` (leakage): a known partner billed a day on which our switch carried nothing to them. The

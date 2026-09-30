@@ -57,6 +57,8 @@ final class TelcoRaCorpus {
     final Map<String, Set<String>> benign = new LinkedHashMap<>();
     /** The distinct xDRs lost or short between switch and rating, next to the Break count that double-counts them. */
     final Set<String> lostOrShortXdrs = new LinkedHashSet<>();
+    /** The amount of the one statement line the partner billed twice: the duplicate finding's leakage. */
+    String duplicateAmount;
 
     private record Xdr(String id, String sub, String service, String date, String ts, String bNumber, String partner,
                        long units) {}
@@ -257,12 +259,13 @@ final class TelcoRaCorpus {
         List<String> partnerDays = new ArrayList<>(minutes.keySet());
         Collections.shuffle(partnerDays, rnd);
         Set<String> overBilled = new LinkedHashSet<>(), missingStatement = new LinkedHashSet<>(),
-                justUnder = new LinkedHashSet<>();
+                justUnder = new LinkedHashSet<>(), duplicated = new LinkedHashSet<>();
         for (String pd : partnerDays) {
             long expected = cents(minutes.get(pd), PARTNER_RATE.get(pd.split("\\|")[0]));
             if (overBilled.size() < 2) overBilled.add(pd);
             else if (missingStatement.isEmpty()) missingStatement.add(pd);
             else if (justUnder.size() < 2 && expected >= 1000) justUnder.add(pd);   // 0.9 % of ≥ 10.00
+            else if (duplicated.isEmpty()) duplicated.add(pd);                    // the partner bills one line twice
         }
         if (justUnder.size() < 2) throw new IllegalStateException("corpus too small for the settlement boundary cases");
         String unknownKey = UNKNOWN_PARTNER + "|" + DAYS[1];
@@ -270,6 +273,7 @@ final class TelcoRaCorpus {
         overBilled.forEach(k -> st.add(k + "|amount_mismatch"));
         missingStatement.forEach(k -> st.add(k + "|missing_statement"));
         st.add(unknownKey + "|unknown_partner");
+        duplicated.forEach(k -> st.add(k + "|duplicate_statement"));
         planted.put("ra_settlement", st);
         benign.put("ra_settlement", justUnder);
         StringBuilder ir = new StringBuilder("PARTNER,RATE_PER_MIN\n");
@@ -287,6 +291,11 @@ final class TelcoRaCorpus {
             if (justUnder.contains(e.getKey())) amount = expected + expected * 9 / 1000;
             sb.append(String.format("ST%04d", line++)).append(',').append(pd[0]).append(',').append(pd[1]).append(',')
                     .append(mins).append(',').append(money(amount)).append('\n');
+            if (duplicated.contains(e.getKey())) {
+                duplicateAmount = money(amount);
+                sb.append(String.format("STDUP%04d", line - 1)).append(',').append(pd[0]).append(',').append(pd[1])
+                        .append(',').append(mins).append(',').append(money(amount)).append('\n');
+            }
         }
         sb.append(String.format("ST%04d", line)).append(',').append(UNKNOWN_PARTNER).append(',').append(DAYS[1])
                 .append(",90,45.00\n");

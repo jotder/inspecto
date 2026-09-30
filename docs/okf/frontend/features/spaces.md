@@ -33,7 +33,10 @@ each gallery entry carries `creatable` and `missingFeatures[{feature, message}]`
   `alert.dispatch`.
 - **Pipeline features:** a Pipeline's archive or DuckLake use, through `EditionFeatures.pipelineRefusals`.
 
-A template this build cannot create renders as a **disabled** card that names the missing feature, so the
-gallery never offers a create that `POST /spaces` would refuse with a 422. This is pinned in two places:
+A template this build cannot create renders as an **`aria-disabled`** card that names the missing feature,
+so the gallery never offers a create that `POST /spaces` would refuse with a 422.
+- It is not native `disabled`, so the card stays focusable.
+- `aria-describedby` points at the reason, and no `aria-label` overrides the card's own text.
+- `choose()` still refuses the card. This is pinned in two places:
 `ControlApiSpaceTemplatesTest.galleryMarksATemplateThisEditionCannotCreate` (a Personal context over real HTTP)
 and the gallery spec.

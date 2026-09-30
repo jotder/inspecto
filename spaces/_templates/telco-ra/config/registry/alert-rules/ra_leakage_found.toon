@@ -1,0 +1,7 @@
+name: ra_leakage_found
+dataset: ra_leakage_dataset
+measure: count
+comparator: gte
+threshold: 1
+severity: CRITICAL
+description: "A revenue-assurance control found leakage (re-rating, roll-forward or settlement), one Alert per control. Runbook: RUNBOOKS.md, the control's section."

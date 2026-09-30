@@ -1,7 +1,0 @@
-name: ra_rerating_leakage
-dataset: ra_rerating_exceptions_dataset
-measure: count
-comparator: gte
-threshold: 1
-severity: WARNING
-description: "Rated charges disagree with the tariff table beyond the tolerance. Runbook: RUNBOOKS.md section Re-rating."

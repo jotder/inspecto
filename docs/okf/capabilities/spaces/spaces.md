@@ -218,18 +218,25 @@ exists (§2, §5).
   - `ra_rerating`: the tariff row in force at the call **start**. It emits one row per call, and a
     duplicate or overlapping row becomes an `ambiguous_tariff` data-quality finding, never a fan-out.
   - `ra_rollforward`: checks the movement rule, day-to-day continuity, and a NULL field (data quality).
-  - `ra_settlement`: a FULL OUTER JOIN of the statement against our switch minutes × rate. It flags
-    `amount_mismatch`, `unknown_partner` (the whole statement is the leakage), `no_traffic`, and
-    `missing_statement` (data quality).
-  - `ra_leakage`: the union of the three money controls.
-  - Every row carries `REASON`, and `FINDING` is `leakage` or `data_quality`. A leakage row always has a
-    non-NULL amount.
+  - `ra_settlement`: sums the statement per partner/day first, then FULL OUTER JOINs it against our switch
+    minutes × rate. It flags `duplicate_statement` (the excess over the first line), `amount_mismatch`,
+    `unknown_partner` (the whole statement is the leakage), `no_traffic`, and `missing_statement` (data
+    quality).
+  - Each control writes every finding to `<control>_findings`. Every row carries `REASON`, and `FINDING` is
+    `leakage` or `data_quality`. A leakage row always has a non-NULL amount.
+  - `ra_leakage` takes only the leakage rows, and its Alert Rule `ra_leakage_found` is CRITICAL.
+  - `ra_data_quality` takes only the data-quality rows, and its Alert Rule is WARNING.
+  - ⚠ A dataset Alert Rule has no row filter (`when` scopes only ledger-metric rules), so the split has to be
+    two Datasets.
+  - ⚠ The rules are not keyed `by: CONTROL`: the seed gate checks a `by` column against the Dataset's
+    Schema, and that Dataset is empty at apply.
+  - Timestamps are naive, so every feed must arrive in one agreed timezone.
   - Tolerances are Job keys. A `$param` arrives as a string literal, so the SQL `CAST`s it to
     `DECIMAL(18,4)`.
   - ⚠ `CEIL` returns a DOUBLE: a settlement minute count must be cast back to `BIGINT`, or every downstream
     amount silently turns into a float. The golden test caught this.
-- **Alert Rules.** One per money control, using `gte 1`. ⚠ An Alert Rule threshold must be positive, so "any
-  row" cannot be written `gt 0`.
+- **Alert Rules.** Both use `gte 1`. ⚠ An Alert Rule threshold must be positive, so "any row" cannot be
+  written `gt 0`.
 - **KPIs.** They ship as `kpi` Widgets plus the `RUNBOOKS.md` table, not as `registry/kpis/`. The seed gate
   reads a KPI's Dataset Schema, and every pack Dataset is empty at apply.
   - ⚠ **Breaks are not xDRs.** On the golden corpus, 15 completeness Breaks are **9** distinct lost or short
@@ -245,7 +252,9 @@ exists (§2, §5).
   | Rated vs billed | 4 |
   | Re-rating | 5 `rate_mismatch` (2 half-rate + 3 still on the pre-change rate) and 12 `ambiguous_tariff` |
   | Roll-forward | 6 (3 movement, 2 continuity, 1 NULL opening) |
-  | Settlement | 4 (2 over-billed, 1 missing statement, 1 unknown partner) |
+  | Settlement | 5 (2 over-billed, 1 missing statement, 1 unknown partner, 1 duplicate statement) |
+
+  - Split by Dataset: **14 leakage rows** in `ra_leakage` and **14 data-quality rows** in `ra_data_quality`.
 
   - It also checks that leakage amounts are never NULL, that they are DECIMAL, and that the committed samples
     are byte-identical to the generator (`-Dtelcora.regenerate=true`).
@@ -269,7 +278,9 @@ exists (§2, §5).
     - re-rating at the call's end;
     - roll-forward without adjustments, without continuity, or without the NULL rule;
     - settlement with a LEFT JOIN instead of the FULL OUTER JOIN;
-    - an unknown partner's amount set to NULL.
+    - an unknown partner's amount set to NULL;
+    - no duplicate-statement rule;
+    - `ra_leakage` keeping data-quality rows.
   - ⚠ The golden test loads the corpus straight into the stores. It does not ingest through the eight
     Pipelines.
 - `ControlApiSpaceTemplateSeedGateTest` applies the template through the real seed gate.

@@ -99,7 +99,7 @@ class TelcoRaGoldenTest {
 
         // ── sql.template controls, through the template's own Jobs and tolerances ──
         List<JobConfig> jobs = new ArrayList<>();
-        for (String j : List.of("ra_xdr_lost", "ra_rerating", "ra_rollforward", "ra_settlement", "ra_leakage"))
+        for (String j : List.of("ra_xdr_lost", "ra_rerating", "ra_rollforward", "ra_settlement", "ra_leakage", "ra_data_quality"))
             jobs.add(JobConfig.load(templateJob(j).toString()));
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(jobs, new ConsignmentEventBus(), s, null,
@@ -113,7 +113,7 @@ class TelcoRaGoldenTest {
         }
         long plantedTotal = 0;
         for (String control : List.of("ra_xdr_lost", "ra_rerating", "ra_rollforward", "ra_settlement")) {
-            String store = "ra_xdr_lost".equals(control) ? control : control + "_exceptions";
+            String store = "ra_xdr_lost".equals(control) ? control : control + "_findings";
             List<String> rows = rows(dataDir, store, "ITEM_KEY || '|' || REASON");
             Set<String> flagged = new TreeSet<>(rows);
             assertEquals(flagged.size(), rows.size(), control + ": one row per finding, never a fan-out");
@@ -123,17 +123,28 @@ class TelcoRaGoldenTest {
                         control + " flagged benign look-alike " + benign);
             if (!"ra_xdr_lost".equals(control)) plantedTotal += CORPUS.planted.get(control).size();
         }
-        assertEquals(plantedTotal, rows(dataDir, "ra_leakage", "CONTROL").size(),
-                "the leakage Dataset carries every control's findings");
+        // leakage and data quality are separate Datasets, with separate Alert Rules
+        Set<String> dq = Set.of("ambiguous_tariff", "no_tariff", "null_value", "missing_statement");
+        long plantedDq = 0;
+        for (String control : List.of("ra_rerating", "ra_rollforward", "ra_settlement"))
+            plantedDq += CORPUS.planted.get(control).stream()
+                    .filter(k -> dq.contains(k.substring(k.lastIndexOf('|') + 1))).count();
+        assertEquals(plantedTotal - plantedDq, rows(dataDir, "ra_leakage", "CONTROL").size(), "leakage rows only");
+        assertEquals(List.of(), rows(dataDir, "ra_leakage", "ITEM_KEY WHERE LEAKAGE_AMOUNT IS NULL OR FINDING <> 'leakage'"));
+        assertEquals(plantedDq, rows(dataDir, "ra_data_quality", "CONTROL").size(), "data-quality rows only");
+        assertEquals(List.of(), rows(dataDir, "ra_data_quality", "ITEM_KEY WHERE FINDING <> 'data_quality'"));
+        assertEquals(List.of(new java.math.BigDecimal(CORPUS.duplicateAmount).setScale(4).toPlainString()),
+                rows(dataDir, "ra_settlement_findings", "CAST(LEAKAGE_AMOUNT AS VARCHAR) WHERE REASON = 'duplicate_statement'"),
+                "a duplicated statement line carries its excess amount");
         // a leakage finding always carries its amount, so a sum never silently drops one
         for (String control : List.of("ra_rerating", "ra_rollforward", "ra_settlement"))
-            assertEquals(List.of(), rows(dataDir, control + "_exceptions",
+            assertEquals(List.of(), rows(dataDir, control + "_findings",
                     "ITEM_KEY WHERE FINDING = 'leakage' AND LEAKAGE_AMOUNT IS NULL"), control);
         // money stays DECIMAL end to end, so a tolerance compares exact cents, never float noise
         for (String control : List.of("ra_rerating", "ra_rollforward", "ra_settlement"))
-            for (String t : rows(dataDir, control + "_exceptions", "DISTINCT typeof(LEAKAGE_AMOUNT)"))
+            for (String t : rows(dataDir, control + "_findings", "DISTINCT typeof(LEAKAGE_AMOUNT)"))
                 assertTrue(t.startsWith("DECIMAL"), control + " LEAKAGE_AMOUNT is " + t);
-        assertEquals(List.of("45.0000"), rows(dataDir, "ra_settlement_exceptions",
+        assertEquals(List.of("45.0000"), rows(dataDir, "ra_settlement_findings",
                 "CAST(LEAKAGE_AMOUNT AS VARCHAR) WHERE REASON = 'unknown_partner'"),
                 "an unknown partner's whole statement is the leakage");
         // Breaks double-count: 15 Breaks are 9 distinct lost or short xDRs
@@ -155,7 +166,8 @@ class TelcoRaGoldenTest {
         assertEquals(AMBIGUOUS, CORPUS.planted.get("ra_rerating").stream().filter(k -> k.endsWith("|ambiguous_tariff")).count(),
                 "calls under the duplicate tariff row: data quality, one row each");
         assertEquals(6, CORPUS.planted.get("ra_rollforward").size(), "3 movement, 2 continuity, 1 null opening");
-        assertEquals(4, CORPUS.planted.get("ra_settlement").size(), "2 over-billed, 1 missing statement, 1 unknown partner");
+        assertEquals(5, CORPUS.planted.get("ra_settlement").size(),
+                "2 over-billed, 1 missing statement, 1 unknown partner, 1 duplicate statement");
         assertEquals(Map.of("ra_xdr_completeness", 4, "ra_xdr_lost", 4, "ra_rerating", 6, "ra_rated_vs_billed", 3,
                         "ra_rollforward", 5, "ra_settlement", 2),
                 CORPUS.benign.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size())),

@@ -1,0 +1,7 @@
+name: ra_data_quality
+dataset: ra_data_quality_dataset
+measure: count
+comparator: gte
+threshold: 1
+severity: WARNING
+description: "A control could not judge some records (ambiguous or missing tariff, a NULL balance field, a missing partner statement). Fix the data; the next run re-judges them. Runbook: RUNBOOKS.md, Findings."

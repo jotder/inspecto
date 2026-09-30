@@ -1,8 +1,9 @@
 name: ra_overview
-tiles[6]{widgetId,span}:
+tiles[7]{widgetId,span}:
   ra_leakage_found,1
   ra_leakage_items,1
   ra_leakage_confirmed,1
   ra_leakage_recovered,1
   ra_xdr_lost,1
-  ra_leakage_by_control,3
+  ra_data_quality_items,1
+  ra_leakage_by_control,2

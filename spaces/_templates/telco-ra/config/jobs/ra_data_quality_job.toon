@@ -1,0 +1,8 @@
+job:
+  name: ra_data_quality
+  type: sql.template
+  sql: "SELECT CONTROL, EVENT_DATE, ITEM_KEY, REASON, FINDING, LEAKAGE_AMOUNT FROM ra_rerating_findings WHERE FINDING = 'data_quality' UNION ALL SELECT CONTROL, EVENT_DATE, ITEM_KEY, REASON, FINDING, LEAKAGE_AMOUNT FROM ra_rollforward_findings WHERE FINDING = 'data_quality' UNION ALL SELECT CONTROL, EVENT_DATE, ITEM_KEY, REASON, FINDING, LEAKAGE_AMOUNT FROM ra_settlement_findings WHERE FINDING = 'data_quality'"
+  sources: "ra_rerating_findings,ra_rollforward_findings,ra_settlement_findings"
+  sink_dataset: ra_data_quality
+  cron: "30 5 * * *"
+  enabled: true
