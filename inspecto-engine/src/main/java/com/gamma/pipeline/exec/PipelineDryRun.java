@@ -128,7 +128,13 @@ public final class PipelineDryRun {
 
         // A fresh scratch dir per run: the seal allowlists it, and allowlisting java.io.tmpdir itself would admit all of it.
         java.nio.file.Path scratch = java.nio.file.Files.createTempDirectory("dryrun_");
-        File db = DuckDbUtil.tempDbFile("dryrun_", scratch);
+        File db;
+        try {
+            db = DuckDbUtil.tempDbFile("dryrun_", scratch);
+        } catch (java.io.IOException | RuntimeException e) {
+            removeScratch(scratch);   // nothing below owns the dir yet
+            throw e;
+        }
         try (Connection conn = DuckDbUtil.openConnection(db)) {
             Map<String, String> seeds = new LinkedHashMap<>();
             int i = 0;

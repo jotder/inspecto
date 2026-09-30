@@ -173,6 +173,31 @@ class ControlApiDryRunBlindSpotsTest {
         assertSealed(dryRunSealFlow(dir, exprThenJoin(fwd(sibling), fwd(ref))));
     }
 
+    /**
+     * A {@code path:} reference is admitted as a LITERAL file, so a glob names no file and fails closed: the
+     * expression (which runs first) still cannot read a sibling the glob would have matched.
+     */
+    @Test
+    @DisplayName("SEC-DRYRUN: a glob path: reference admits no sibling (fails closed)")
+    void aGlobPathReferenceAdmitsNoSibling(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("ref.csv"), "id,label\n1,Alpha\n");
+        Path sibling = Files.writeString(dir.resolve("other.csv"), "host-secret");
+        HttpResponse<String> r = dryRunSealFlow(dir, exprThenJoin(fwd(sibling), fwd(dir) + "/*.csv"));
+        assertTrue(r.statusCode() >= 400, "a glob reference must not run: " + r.body());
+        assertFalse(r.body().contains("host-secret"), "no sibling is read: " + r.body());
+    }
+
+    /** The same file spelled natively (backslashes on Windows) is the same allowlist entry, and still only that file. */
+    @Test
+    @DisplayName("SEC-DRYRUN: a natively spelled path: reference admits that file only, not a sibling")
+    void aNativelySpelledPathReferenceAdmitsNoSibling(@TempDir Path dir) throws Exception {
+        Path ref = Files.writeString(dir.resolve("ref.csv"), "id,label\n1,Alpha\n");
+        Path sibling = Files.writeString(dir.resolve("other.csv"), "host-secret");
+        HttpResponse<String> r = dryRunSealFlow(dir,
+                exprThenJoin(fwd(sibling), ref.toString().replace("\\", "\\\\")));
+        assertSealed(r);
+    }
+
     @Test
     @DisplayName("SEC-DRYRUN: an expression cannot read a host file outside the roots, whatever the join reads")
     void anExpressionCannotReadAHostFileThroughTheRoute(@TempDir Path dir, @TempDir Path elsewhere) throws Exception {

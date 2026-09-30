@@ -49,8 +49,24 @@ class ControlApiPreviewReferenceJailTest {
 
     /** Boot with the safety roots = {@code roots} and the write root = {@code roots/wr}. */
     private Ctx open(Path roots) throws Exception {
+        return open(roots, false);
+    }
+
+    /**
+     * As {@link #open(Path)}; {@code withReferencePipeline} also loads {@code region_dim}, a
+     * {@code produces: reference} Pipeline (inactive, as {@code ControlApiBundleImportTest} loads one) whose
+     * PARQUET store is {@code roots/region/db}.
+     */
+    private Ctx open(Path roots, boolean withReferencePipeline) throws Exception {
         Path toon = TestConfigs.csv(roots, PipelineConfigBatchTest.miniSchema()).write();
-        CollectorService svc = new CollectorService(List.of(toon), 3600, 1);
+        List<Path> toons = new java.util.ArrayList<>(List.of(toon));
+        if (withReferencePipeline) {
+            Path region = TestConfigs.csv(roots.resolve("region"), PipelineConfigBatchTest.miniSchema())
+                    .name("REGION_DIM").format("PARQUET").write();
+            Files.writeString(region, "produces: reference\n" + Files.readString(region).replace("active: true", "active: false"));
+            toons.add(region);
+        }
+        CollectorService svc = new CollectorService(toons, 3600, 1);
         String prior = System.getProperty("assist.write.root");
         String priorRoots = System.getProperty("assist.safety.roots");
         System.setProperty("assist.safety.roots", roots.toString());
@@ -126,11 +142,37 @@ class ControlApiPreviewReferenceJailTest {
         new PipelineStore(roots.resolve("wr").resolve("flows")).write("join_flow",
                 PipelineCodec.fromMap(JSON.readValue(flow, Map.class)));
         try (Ctx c = open(roots)) {
+            // Precondition: the file the expression reads IS inside the loaded Pipeline's database dir, so
+            // only the produces:-reference filter stands between it and the allowlist.
+            var loaded = c.svc.loadedPipelines().stream()
+                    .filter(p -> p.identity().pipelineName().equals("test_etl")).findFirst().orElseThrow();
+            assertEquals(store.toRealPath(), Path.of(loaded.dirs().database()).toRealPath());
+            assertFalse(loaded.producesReference());
             HttpResponse<String> r = post(c.port, "/pipelines/authored/join_flow/dry-run",
                     "{\"sampleRows\":[{\"id\":\"1\"}]}");
             assertTrue(r.statusCode() >= 400, r.body());
             assertTrue(r.body().contains("Permission Error"), "the store is sealed, not merely refused later: " + r.body());
             assertFalse(r.body().contains("host-secret"), r.body());
+        }
+    }
+
+    /** The legitimate by-name read: a {@code produces: reference} Pipeline's PARQUET store, through the sealed route. */
+    @Test
+    void aByNameJoinToAReferencePipelineStillReadsItsStore(@TempDir Path roots) throws Exception {
+        Path store = Files.createDirectories(roots.resolve("region").resolve("db"));
+        try (java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+             java.sql.Statement st = conn.createStatement()) {
+            st.execute("COPY (SELECT '1' AS id, 'Alpha' AS label) TO '" + fwd(store.resolve("part1.parquet"))
+                    + "' (FORMAT PARQUET)");
+        }
+        seedJoinFlow(roots.resolve("wr"), "reference/region_dim");
+        try (Ctx c = open(roots, true)) {
+            HttpResponse<String> r = post(c.port, "/pipelines/authored/join_flow/dry-run",
+                    "{\"sampleRows\":[{\"id\":\"1\"},{\"id\":\"2\"}]}");
+            assertEquals(200, r.statusCode(), r.body());
+            var sink = V1Body.of(r.body()).get("sinks").get(0);
+            assertEquals(2, sink.get("rowCount").asInt(), r.body());   // LEFT JOIN keeps the unmatched row
+            assertTrue(r.body().contains("Alpha"), "the reference row was joined: " + r.body());
         }
     }
 

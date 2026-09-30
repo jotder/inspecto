@@ -298,14 +298,21 @@ expression could `read_text` any host file.
   directory too, so a file directly in the Space data root, a `config/` or a `*.secrets` tree is refused. A refused entry, such as a Space root, a
   `config/` tree, a `*.secrets` dir, tmpdir or a restricted store, refuses the whole run with
   `IllegalArgumentException`. The route maps that to 400.
+- ⚠ **A glob `path:` reference fails closed.** The allowlist takes literal files, so `dir/*.csv` names no
+  file: the join's view creation is refused (422 `JOIN_REFERENCE_MISSING`, or a 4xx from the path check) and no
+  sibling is ever read. Point the reference at one file, or make the files a Pipeline that declares
+  `produces: reference` and join it by name (its whole `dirs.database` is admitted). A native (Windows
+  backslash) spelling of the same file is the same entry, since the path is normalised first.
 - **The scratch dir is removed recursively** (`PipelineDryRun.removeScratch`): DuckDB leaves a `<db>.tmp` spill
-  dir in it when it spills, and `deleteIfExists` on a non-empty dir fails silently.
+  dir in it when it spills, and `deleteIfExists` on a non-empty dir fails silently. It is removed on every exit: a mid-walk
+  exception, a seal refusal, and a failure creating the scratch DB.
 - **Pinned by** `PipelineDryRunTest` (engine): `read_text` of a host file and of `config.secrets/…` → DuckDB
   `Permission Error`; a sealed join still reads its declared dir; a `path:` file's sibling is refused; a refused
   dir fails closed; the scratch dir is removed with its spill. Over real HTTP: `ControlApiDryRunBlindSpotsTest`
   (a sibling of a `path:` reference, a host file, a reference file in the data root → 400) and
-  `ControlApiPreviewReferenceJailTest.aByNameJoinToANonReferencePipelineDoesNotOpenItsStore`. Each goes red
-  with its fix reverted.
+  `ControlApiPreviewReferenceJailTest` (a non-reference by-name join opens nothing; a `produces: reference`
+  Parquet store still joins, 200). Each goes red with its fix reverted (the glob test pins the fail-closed
+  outcome rather than a single line of code).
 
 ## The source time zone for temporal data
 

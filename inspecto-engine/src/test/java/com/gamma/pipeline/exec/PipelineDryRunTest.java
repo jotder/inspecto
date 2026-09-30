@@ -465,6 +465,37 @@ class PipelineDryRunTest {
         assertFalse(Files.exists(scratch), "a non-empty scratch dir must be removed recursively");
     }
 
+    private static java.util.Set<String> dryRunScratchDirs() throws java.io.IOException {
+        try (java.util.stream.Stream<Path> s = Files.list(Path.of(System.getProperty("java.io.tmpdir")))) {
+            return s.filter(Files::isDirectory).map(p -> p.getFileName().toString())
+                    .filter(n -> n.startsWith("dryrun_")).collect(java.util.stream.Collectors.toSet());
+        }
+    }
+
+    @Test
+    void aMidWalkExceptionLeavesNoScratchDir(@TempDir Path dir) throws Exception {
+        java.util.Set<String> before = dryRunScratchDirs();
+        Path host = Files.writeString(dir.resolve("host.txt"), "host-secret");
+        assertThrows(Exception.class, () -> PipelineDryRun.run(graphWithExpr(readTextOf(host)), SAMPLE));
+        java.util.Set<String> leaked = dryRunScratchDirs();
+        leaked.removeAll(before);
+        assertTrue(leaked.isEmpty(), "a failed dry run must remove its scratch dir: " + leaked);
+    }
+
+    @Test
+    void aSealRefusalLeavesNoScratchDir(@TempDir Path space) throws Exception {
+        Files.createDirectories(space.resolve("config"));
+        java.util.Set<String> before = dryRunScratchDirs();
+        RowShaper.ReferenceResolver resolver = new RowShaper.ReferenceResolver() {
+            @Override public List<Path> readDirs(String reference) { return List.of(space); }
+            @Override public String resolve(java.sql.Connection conn, String reference) { return "never"; }
+        };
+        assertThrows(IllegalArgumentException.class, () -> PipelineDryRun.run(graphWithJoin(), SAMPLE, resolver));
+        java.util.Set<String> leaked = dryRunScratchDirs();
+        leaked.removeAll(before);
+        assertTrue(leaked.isEmpty(), "a refused seal must remove the scratch dir: " + leaked);
+    }
+
     @Test
     void aReferenceDirTheAllowlistRefusesFailsTheRunClosed(@TempDir Path space) throws Exception {
         Files.createDirectories(space.resolve("config"));
