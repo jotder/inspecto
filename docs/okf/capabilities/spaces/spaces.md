@@ -114,8 +114,9 @@ A `SpaceId` is `[a-z0-9][a-z0-9-]{0,62}` (`SpaceIdTest`); `default` is the defau
 (`EventLog.DEFAULT_SPACE_ID`) and is not editable. `_`-prefixed directories are **sentinels, never Spaces**:
 `_templates/` (the catalog) and `_shared/` (the Exchange ledger). Runtime CRUD — `create`, `createFromBundle`,
 `createFromTemplate`, `update`, `delete(id, purge)` — is serialised on a `lifecycleLock`; reads are
-lock-free. Committed Spaces: `default`, `demo`, `ucc` (complete, mirrored into `inspecto-deploy/spaces/`) and
-`uat` (a `data/` stub with no `config/` — not bootable, not mirrored).
+lock-free. Committed Spaces: `default`, `demo`, `ucc` (complete) and
+`uat` (a `data/` stub with no `config/` — not bootable). None of them is bundled: a bundle ships only
+`spaces/_templates/`, staged from committed content by `inspecto/package-spaces.ps1`.
 
 ### 3.2 The one-time migrator
 
@@ -263,25 +264,47 @@ corpus CTE. A template has no runbook home: `createFromTemplate` copies only `co
 
 **The telecom fraud pack — `spaces/_templates/telco-fraud/`** (`ASSURE-PACK-TELCO-FRAUD-1`, wave 5.1 of
 `superpower/assurance-capability-plan.md`, BUILT 2026-09-30, not closed). Three feed Pipelines + schemas (`cdr`,
-`subscriber_events`, `payments`); ten detection windows as `sql.template` Jobs (`config/jobs/fraud_<typology>_job.toon`:
-IRSF, Wangiri, SIM-box, premium-rate, roaming high usage, SIM-swap, subscription / identity, dealer activations,
-voucher / EVD, payment reversal), each writing one row per candidate entity to its own sink Dataset `fraud_<typology>`;
-and one per-entity Alert Rule per typology (`by` = the offender: `msisdn`, the calling number, `id_doc`, `dealer_id` or
-`voucher_serial`, `stormCap: 50`). No new Step Processor. **Thresholds are configuration in two places**: the Job's
-parameters say what counts (`irsf_prefixes`, `premium_prefixes`, `max_ring_seconds`, `max_cells`, `window_hours`,
-`window_start` / `window_end`) and the Alert Rule's `threshold` says how much is too much. Also: four KPIs + tiles, one
-dashboard (`telco_fraud_overview`), and `config/runbooks/telco-fraud-runbooks.md` (plain Markdown: there is no runbook
-component kind). ⚠ **Seeds, and why.** The per-entity Alert Rule save gate (`AlertRoutes.requireGroupingColumns`, run by
-the template seed gate) and the KPI gate both read the Dataset's Schema and fail closed on a Dataset with no data — and a
-Job's sink has none until the Job first runs. So the template ships a **zero-row seed snapshot** per sink
-(`data/fraud_<typology>/seed.parquet`); the first run's stage-and-swap replaces it. A test regenerates them from each
-Job's own SQL and fails when a seed's Schema drifts from it. ⚠ The Alert Rules are Professional+: a Personal build
-refuses the whole template at `POST /spaces`, though the gallery still lists it. **Golden corpus**: synthetic, from a
-fixed-seed generator (`inspecto/src/test/java/com/gamma/control/TelcoFraudCorpus.java`, seed `20260930`) committed under
-`data/samples/`. `TelcoFraudTemplateGoldenTest` boots the template through `POST /spaces`, lands the corpus as Parquet
-(DuckDB `read_csv`, standing in for the Pipelines' ingest), runs the ten Jobs, and asserts each Alert Rule raises
-EXACTLY its planted offenders (4/3/3/4/3/3/2/2/3/3 = 30 Alerts) and no planted look-alike. It was mutation-checked: a
-premium-rate threshold of 40 goes red on the three look-alikes.
+`subscriber_events`, `payments`; each schema needs a `mapping:` — a `raw:`-only schema fails every file on the
+Consignment path with "a mapping with neither fields[] nor rules[]"); ten detection windows as `sql.template` Jobs
+(`config/jobs/fraud_<typology>_job.toon`: IRSF, Wangiri, SIM-box, premium-rate, roaming high usage, SIM-swap,
+subscription / identity, dealer activations, voucher / EVD, payment reversal), each writing one row per candidate
+entity per `window_date` to its sink Dataset `fraud_<typology>`; and one per-entity Alert Rule per typology, `by` =
+the offender (`msisdn`, the ringing number, `id_doc`, `dealer_id` or `voucher_serial`) **plus `window_date`**,
+`stormCap: 50`. No new Step Processor. **Thresholds are configuration in two places**: the Job's parameters say what
+counts (`irsf_prefixes`, `premium_prefixes`, `home_cc`, `max_ring_seconds`, `callback_hours`, `max_cells`,
+`exempt_msisdns`, `exempt_doc_prefixes`, `window_hours`, `traffic_grace_hours`, `window_start` / `window_end`,
+`retention_days`) and the Alert Rule's `threshold` (`gt`) says how much is too much. Also: four KPIs + tiles, one
+dashboard (`telco_fraud_overview`), and `config/runbooks/telco-fraud-runbooks.md` (plain Markdown: there is no
+runbook component kind), which names the known false-positive sources that have no defence.
+
+Detection semantics worth knowing: dialled numbers are normalised to one E.164-digit format (`+` / `00` stripped,
+national `0…` → `home_cc` + NSN) before a prefix list is matched with `starts_with`, entries of any length; a prefix
+list entry that is not 1–15 digits fails the run (DuckDB `error()`), never matches silently. Wangiri counts ring
+targets that call the ringing number back within `callback_hours` AFTER the ring, so a flash-call OTP sender stays
+silent. SIM-swap anchors each payment to the latest swap before it, so a payment counts once however many swaps
+precede it. Dealer activations look for traffic up to `traffic_grace_hours` past the window, so late-day activations
+are not idle.
+
+⚠ **A `sql.template` run replaces its whole sink** (stage-and-swap; the Job Type has no partition-incremental
+output). So each Job reads its own sink (`sources: …,fraud_<typology>`) and re-emits the rows of every OTHER
+`window_date` within `retention_days` beside the current window's — partition-incremental by `window_date`, done in
+the SQL. With `window_date` in the Alert Rule's `by`, a later window's run neither raises nor heals an earlier
+window's Alert; a key heals only when retention drops its row (its Incident stays open — D-P11). ⚠ **Seeds, and
+why.** The per-entity Alert Rule save gate (`AlertRoutes.requireGroupingColumns`, run by the template seed gate) and
+the KPI gate both read the Dataset's Schema and fail closed on a Dataset with no data, and the Jobs read their own
+sink; so the template ships a **zero-row seed snapshot** per sink (`data/fraud_<typology>/seed.parquet`), replaced by
+the first run. A test regenerates them from each Job's SQL and fails when a seed's Schema drifts. ⚠ The Alert Rules
+are Professional+: a Personal build refuses the whole template at `POST /spaces`, though the gallery still lists it.
+
+**Golden corpus**: synthetic, from a fixed-seed generator (`inspecto/src/test/java/com/gamma/control/TelcoFraudCorpus.java`,
+seed `20260930`; fictional numbering — home country code `999`, foreign callers `287` / `289`) committed under
+`data/samples/`, with planted offenders (one JUST above each threshold) and planted look-alikes (one exactly AT each
+threshold, plus flash-call OTP, a registered PBX line, a business traveller, a corporate multi-line document,
+late-day activations, a two-swap / one-payment line). `TelcoFraudTemplateGoldenTest` boots the template through
+`POST /spaces`, ingests the corpus through the three Pipelines on the production Consignment path
+(`CollectorProcessor.run`; every CSV row must land), runs the ten Jobs, asserts each Alert Rule raises EXACTLY its
+planted offenders (5/4/4/5/4/4/3/3/4/4 = 40 Alerts) and no look-alike, then runs the next window and asserts nothing
+is raised or dropped. Each defence was mutation-checked red.
 
 **Every registry kind a template seeds is gated, not only `kpi`** (`ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) ⚠,
 2026-09-28). The seed gate is `TemplateSeedGate.require`, one table-driven pass over the staged tree before boot:
@@ -621,8 +644,9 @@ Fifteen: `space.interceptor.spec.ts`, `spaces.service.spec.ts`, `space-switcher.
 
 ### 8.4 Committed artifacts
 
-`spaces/default`, `spaces/demo`, `spaces/ucc` (complete; mirrored under `inspecto-deploy/spaces/`);
-`spaces/_templates/orders-starter/` and `spaces/_templates/telco-fraud/` (the two templates); `spaces/uat/` (a `data/` stub).
+`spaces/default`, `spaces/demo`, `spaces/ucc` (complete; not bundled);
+`spaces/_templates/orders-starter/` and `spaces/_templates/telco-fraud/` (the two templates — the only part of `spaces/`
+a bundle ships, via `inspecto/package-spaces.ps1`); `spaces/uat/` (a `data/` stub).
 `docs/api/schemas/metadata-bundle.schema.json` + `docs/api/schemas/samples/{dashboard-closure,single-widget}.bundle.json`.
 
 ### 8.5 Guards
