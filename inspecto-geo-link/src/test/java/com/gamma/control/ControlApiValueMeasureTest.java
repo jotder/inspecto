@@ -175,6 +175,8 @@ class ControlApiValueMeasureTest {
             assertEquals("smurfs", fired.at("/0/rule").asText());
             assertEquals("case-v", fired.at("/0/pipeline").asText());
             assertEquals("entities breaching structuring", fired.at("/0/metric").asText());
+            assertTrue(fired.at("/0/message").asText().contains("over the whole Dataset, window: 2026-09-01T00:00 to 2026-09-08T00:00"),
+                    fired.at("/0/message").asText());
             assertEquals(1, fired.at("/0/value").asDouble());
         }
     }
@@ -284,6 +286,13 @@ class ControlApiValueMeasureTest {
             assertEquals(1, bound.get("current").asDouble());
             JsonNode fired = ok(c, "POST", "/alerts/evaluate", "");
             assertEquals(1, fired.size(), fired.toString());
+            String text = fired.at("/0/message").asText();   // plan §5.10: one scope, one window - never a contradiction
+            assertTrue(text.contains("over the whole Dataset, window: last 24h"), text);
+            assertFalse(text.contains("the whole Dataset, the last"), text);
+            // plan §5.10: a from/to with Z is normalised to UTC, not refused
+            assertEquals(ok(c, "GET", Q + "&name=structuring", null).get("count").asInt(),
+                    ok(c, "GET", Q.replace("from=2026-09-01&to=2026-09-08",
+                            "from=2026-09-01T00:00:00Z&to=2026-09-08T00:00:00Z") + "&name=structuring", null).get("count").asInt());
             assertEquals(422, status(c, "POST", "/inv/investigations/case-v/alert-rules",
                     rule.replace("\"last\":\"24h\"", "\"last\":\"24h\",\"from\":\"2026-09-01\"")), "exactly one window");
         }

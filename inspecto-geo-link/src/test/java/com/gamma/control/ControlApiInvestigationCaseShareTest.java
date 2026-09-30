@@ -223,6 +223,7 @@ class ControlApiInvestigationCaseShareTest {
             investigation(c, CREATE);
             ok(c, "PUT", INV + "/case", "{\"caseRef\":\"CASE-1\"}", OWNER);
             assertReads(c, MEMBER, 200);
+            assertTrue(ok(c, "GET", INV + "/case", null, OWNER).get("sharing").asBoolean(), "the twin: an open Case shares");
 
             cases.put("CASE-1", CaseTeamObjectEngine.caseOf("CASE-1", "lead-1", "analyst-9", false));
             assertReads(c, MEMBER, 404);   // reassigned away
@@ -231,9 +232,13 @@ class ControlApiInvestigationCaseShareTest {
             cases.put("CASE-1", CaseTeamObjectEngine.caseOf("CASE-1", "lead-1", "analyst-2", true));
             assertReads(c, MEMBER, 404);   // closed
             assertReads(c, LEAD, 404);
+            JsonNode shut = ok(c, "GET", INV + "/case", null, OWNER);   // plan §5.10: the answer agrees with the gate
+            assertFalse(shut.get("sharing").asBoolean(), "a closed Case shares nothing: " + shut);
+            assertTrue(shut.get("reason").asText().contains("closed"), shut.toString());
 
             cases.remove("CASE-1");
             assertReads(c, LEAD, 404);     // deleted
+            assertFalse(ok(c, "GET", INV + "/case", null, OWNER).get("sharing").asBoolean(), "a vanished Case shares nothing");
             assertEquals(200, status(c, "GET", INV + "/log", null, OWNER), "the owner keeps access throughout");
         }
     }

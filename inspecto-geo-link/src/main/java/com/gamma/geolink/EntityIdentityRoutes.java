@@ -157,8 +157,9 @@ public final class EntityIdentityRoutes implements RouteModule {
 
     /**
      * {@code POST /inv/entity-identities/import} {@code {dataset, aCol, bCol, aType?, bType?, reason, limit?}} — the
-     * mapping-Dataset import cut (design §8.2): every distinct non-NULL {@code (aCol, bCol)} row of the Dataset becomes
-     * one {@code identity.asserted} fact, both values normalised with the SAME rule an analyst assertion uses.
+     * mapping-Dataset import cut (design §8.2): every distinct {@code (aCol, bCol)} row of the Dataset with both values
+     * non-empty after normalisation becomes one {@code identity.asserted} fact (a NULL or blank value is read, and
+     * counted under {@code skipped.empty}, so {@code rowsRead} accounts for every row; plan §5.10), both values normalised with the SAME rule an analyst assertion uses.
      *
      * <p>Gates: capability → write root 503 → body 422 → {@link InvRoutes#relationFor} (unknown or not viewable: the same
      * 404, R3) → both columns against the relation's REAL columns 422 → types 422 (a column's registry classification
@@ -201,7 +202,7 @@ public final class EntityIdentityRoutes implements RouteModule {
 
         String qa = SqlIdent.q(aCol), qb = SqlIdent.q(bCol);
         String sql = "SELECT DISTINCT CAST(" + qa + " AS VARCHAR) AS a, CAST(" + qb + " AS VARCHAR) AS b FROM "
-                + SqlIdent.q(datasetId) + " WHERE " + qa + " IS NOT NULL AND " + qb + " IS NOT NULL ORDER BY 1, 2";
+                + SqlIdent.q(datasetId) + " ORDER BY 1 NULLS LAST, 2 NULLS LAST";   // a NULL row is read and counted as empty
         if (!SqlGuard.check(sql, datasetId).isEmpty())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import of dataset '" + datasetId
                     + "' failed the SQL safety check");
@@ -215,7 +216,8 @@ public final class EntityIdentityRoutes implements RouteModule {
         }
         List<List<String>> rows = new ArrayList<>(read.rows().size());
         for (Map<String, Object> row : read.rows())
-            rows.add(List.of(String.valueOf(row.get("a")), String.valueOf(row.get("b"))));
+            rows.add(java.util.Arrays.asList(row.get("a") == null ? null : String.valueOf(row.get("a")),
+                    row.get("b") == null ? null : String.valueOf(row.get("b"))));
         String fingerprint = EntityFactLog.sha256(ApiContext.JSON.writeValueAsBytes(List.of(datasetId, aCol, bCol, rows)));
         String via = "dataset:" + datasetId + "@" + fingerprint;
 
@@ -223,8 +225,8 @@ public final class EntityIdentityRoutes implements RouteModule {
         int empty = 0, self = 0, duplicate = 0;
         Map<String, String[]> pairs = new LinkedHashMap<>();
         for (List<String> row : rows) {
-            String ka = EntityTypes.normalise(aType.normaliser(), row.get(0));
-            String kb = EntityTypes.normalise(bType.normaliser(), row.get(1));
+            String ka = row.get(0) == null ? "" : EntityTypes.normalise(aType.normaliser(), row.get(0));
+            String kb = row.get(1) == null ? "" : EntityTypes.normalise(bType.normaliser(), row.get(1));
             if (ka.isEmpty() || kb.isEmpty()) { empty++; continue; }
             ka = aType.id() + ":" + ka;
             kb = bType.id() + ":" + kb;

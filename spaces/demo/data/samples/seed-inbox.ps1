@@ -13,11 +13,13 @@ foreach ($d in 'inbox/orders','orders/database','orders/backup','orders/temp','o
                'roaming_tap/quarantine','roaming_tap/markers','roaming_tap/status','roaming_tap/logs',
                'inbox/mule_transfers','mule_transfers/database','mule_transfers/backup','mule_transfers/temp','mule_transfers/errors',
                'mule_transfers/quarantine','mule_transfers/markers','mule_transfers/status','mule_transfers/logs',
+               'inbox/account_links','account_links/database','account_links/backup','account_links/temp','account_links/errors',
+               'account_links/quarantine','account_links/markers','account_links/status','account_links/logs',
                'reports/orders_daily','ref') {
   New-Item -ItemType Directory -Force -Path (Join-Path $data $d) | Out-Null
 }
-foreach ($f in 'orders','payments','shipments','roaming_tap','mule_transfers') {
+foreach ($f in 'orders','payments','shipments','roaming_tap','mule_transfers','account_links') {
   Copy-Item -Path (Join-Path $PSScriptRoot "$f/*") -Destination (Join-Path $data "inbox/$f") -Force
 }
 Copy-Item -Path (Join-Path $PSScriptRoot 'ref/*') -Destination (Join-Path $data 'ref') -Force
-Write-Host "Seeded orders + payments + shipments + roaming_tap + mule_transfers inboxes + ref/ - restart the server or wait for the next poll cycle."
+Write-Host "Seeded orders + payments + shipments + roaming_tap + mule_transfers + account_links inboxes + ref/ - restart the server or wait for the next poll cycle."

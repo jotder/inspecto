@@ -1,0 +1,29 @@
+partitionKey: LINKED_DATE
+raw:
+  name: ACCOUNT_LINKS
+  format: CSV
+  fields[5]{name,selector,type}:
+    LINK_ID,"0",VARCHAR
+    ACCOUNT_A,"1",VARCHAR
+    ACCOUNT_B,"2",VARCHAR
+    LINK_BASIS,"3",VARCHAR
+    LINKED_DATE,"4",DATE
+mapping:
+  canonicalName: account_links
+  rawName: ACCOUNT_LINKS
+  fields[5]:
+    - name: LINK_ID
+      from: LINK_ID
+      fn: keep
+    - name: ACCOUNT_A
+      from: ACCOUNT_A
+      fn: keep
+    - name: ACCOUNT_B
+      from: ACCOUNT_B
+      fn: keep
+    - name: LINK_BASIS
+      from: LINK_BASIS
+      fn: keep
+    - name: LINKED_DATE
+      from: LINKED_DATE
+      fn: keep

@@ -404,7 +404,12 @@ final class ValueMeasures {
         String v = str(block.get(key));
         if (v == null) throw new IllegalArgumentException("value measure needs '" + key + "' (the window is required)");
         try {
-            return v.length() == 10 ? LocalDate.parse(v).atStartOfDay() : LocalDateTime.parse(v.replace(' ', 'T'));
+            if (v.length() == 10) return LocalDate.parse(v).atStartOfDay();
+            String t = v.replace(' ', 'T');
+            // a Z or an offset is normalised to UTC, the zone every window is read in (plan §5.10)
+            return t.endsWith("Z") || t.matches(".*T.*[+-]\\d{2}:\\d{2}$")
+                    ? java.time.OffsetDateTime.parse(t).withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime()
+                    : LocalDateTime.parse(t);
         } catch (DateTimeParseException e) {
             throw new IllegalArgumentException("'" + key + "' must be an ISO date or date-time, got '" + v + "'");
         }

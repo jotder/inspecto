@@ -1470,13 +1470,14 @@ public final class ObjectService {
      * <p>{@code synchronized} so two concurrent mints of one Entity cannot both miss the lookup and open two.
      *
      * @param visible the caller's data-scope predicate — an object it cannot see is neither reused nor linked
+     * @param owner   the Case's owner — the creating Subject when known (plan §5.10), else null
      * @throws IllegalArgumentException blank title, no members, an existing member that is not an INCIDENT
      * @throws NoSuchElementException   an existing member that is absent or not visible (existence-hiding)
      */
     public synchronized EntityCase openCaseFromEntities(String title, String description, List<EntityMember> entities,
                                                         List<String> existingMembers,
                                                         java.util.function.Predicate<OperationalObject> visible,
-                                                        String actor) {
+                                                        String actor, String owner) {
         if (title == null || title.isBlank()) throw new IllegalArgumentException("a Case needs a 'title'");
         if (entities.isEmpty() && existingMembers.isEmpty())
             throw new IllegalArgumentException("a Case CONTAINS its members — name at least one entity");
@@ -1514,7 +1515,7 @@ public final class ObjectService {
                 created.add(minted.id());
                 members.put(minted.id(), minted);
             }
-            OperationalObject kase = open(ObjectType.CASE, title.trim(), description, null, null, null, null, null, Map.of());
+            OperationalObject kase = open(ObjectType.CASE, title.trim(), description, null, null, owner, null, null, Map.of());
             created.add(kase.id());
             for (String member : members.keySet()) link(kase.id(), member, LinkRelationship.CONTAINS, actor);
             return new EntityCase(require(kase.id()), List.copyOf(members.values()),

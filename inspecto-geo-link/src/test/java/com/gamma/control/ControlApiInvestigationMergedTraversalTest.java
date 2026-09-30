@@ -71,6 +71,8 @@ class ControlApiInvestigationMergedTraversalTest {
             new ComponentStore(writeRoot.resolve("registry")).write("dataset", "calls_ds", Map.of("view", "calls_view",
                     "columns", List.of(Map.of("name", "caller", "classification", "MSISDN"),
                             Map.of("name", "callee", "classification", "MSISDN"))));
+            // The same rows with NO column classification (live check 2026-09-30, plan §5.10): expanded ids are untyped.
+            new ComponentStore(writeRoot.resolve("registry")).write("dataset", "calls_raw", Map.of("view", "calls_view"));
             return new Ctx(svc, api, api.port(), writeRoot);
         } finally {
             System.clearProperty("assist.write.root");
@@ -222,6 +224,49 @@ class ControlApiInvestigationMergedTraversalTest {
             String line = logView.at("/entries/6/text").asText();
             assertTrue(line.contains("Excluded identity group " + KEY_A) && line.contains(KEY_A + ", " + KEY_C), line);
             assertTrue(data(post(c, "/inv/investigations/case-a/replay", "{}"), 200).get("equivalent").asBoolean());
+        }
+    }
+
+    /**
+     * Live check 2026-09-30 (plan §5.10): over a Dataset whose columns carry no Entity Type, an expanded member is
+     * UNTYPED. A merged exclude must still take it out - matched by the sealed member normalisers, the rule that
+     * already blocks it from re-admission - and its line must list exactly what left and what it found no entity for.
+     */
+    @Test
+    void aMergedExcludeOverAnUntypedDatasetRemovesTheUntypedMemberAndItsLineSaysWhatLeft(@TempDir Path cfg,
+                                                                                         @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            settings(c, "masking_mode: none\n");
+            data(post(c, "/inv/entity-identities", "{\"a\":\"" + KEY_A + "\",\"b\":\"" + KEY_C + "\",\"reason\":\"same SIM swap\"}"), 201);
+            data(post(c, "/inv/investigations", CREATE.replace("calls_ds", "calls_raw")), 200);
+            op(c, "{\"op\":\"seed\",\"ids\":[\"" + A + "\"],\"entityType\":\"msisdn\"}");
+            op(c, "{\"op\":\"seed\",\"ids\":[\"" + D + "\"]}");
+            op(c, "{\"op\":\"expand\"}");   // A->B, D->C, D->E: C arrives untyped
+            op(c, "{\"op\":\"resolve\"}");
+            JsonNode x = op(c, "{\"op\":\"exclude\",\"ids\":[\"" + A + "\"],\"reason\":\"test SIM\",\"merged\":true}");
+            assertEquals(Set.of(A, C), texts(x.at("/delta/removed")), "the untyped member C leaves with A: " + x);
+            assertEquals(Set.of(B, D, E), hops(c).keySet(), "non-members stay, typed or not");
+            String line = data(send(c, "GET", "/inv/investigations/case-a/log", null), 200).at("/entries/4/text").asText();
+            assertTrue(line.contains("left the Working Set: " + A + ", " + C + ";"), line);
+            assertFalse(line.contains("every member entity left"), "never claims more than happened: " + line);
+            assertTrue(data(post(c, "/inv/investigations/case-a/replay", "{}"), 200).get("equivalent").asBoolean());
+        }
+    }
+
+    /** The twin: a member with no entity in the Working Set is named as not matched - blocked, never "left". */
+    @Test
+    void aMergedExcludeLineNamesTheMembersItFoundNoEntityFor(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            settings(c, "masking_mode: none\n");
+            data(post(c, "/inv/entity-identities", "{\"a\":\"" + KEY_A + "\",\"b\":\"" + KEY_C + "\",\"reason\":\"same SIM swap\"}"), 201);
+            data(post(c, "/inv/investigations", CREATE.replace("calls_ds", "calls_raw")), 200);
+            op(c, "{\"op\":\"seed\",\"ids\":[\"" + A + "\"],\"entityType\":\"msisdn\"}");
+            op(c, "{\"op\":\"resolve\"}");
+            JsonNode x = op(c, "{\"op\":\"exclude\",\"ids\":[\"" + A + "\"],\"reason\":\"test SIM\",\"merged\":true}");
+            assertEquals(Set.of(A), texts(x.at("/delta/removed")));
+            String line = data(send(c, "GET", "/inv/investigations/case-a/log", null), 200).at("/entries/2/text").asText();
+            assertTrue(line.contains("left the Working Set: " + A + ";"), line);
+            assertTrue(line.contains("no entity in the Working Set for " + KEY_C), line);
         }
     }
 

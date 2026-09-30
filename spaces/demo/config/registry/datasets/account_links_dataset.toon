@@ -1,0 +1,5 @@
+physicalRef: account_links/database
+description: "Identity mapping for the mule demo — pairs of accounts held by one party (same KYC document, device or director), for Link Analysis identity import (POST /inv/entity-identities/import, aCol ACCOUNT_A, bCol ACCOUNT_B). Synthetic."
+columns[2]{name,classification}:
+  ACCOUNT_A,ACCOUNT
+  ACCOUNT_B,ACCOUNT

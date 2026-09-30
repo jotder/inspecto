@@ -241,3 +241,17 @@ def write(folder: str, header: list[str], files: dict[str, list[list[str]]]) -> 
 
 write("roaming_tap", TAP_HEADER, tap_rows)
 write("mule_transfers", TX_HEADER, tx_rows)
+
+# ── Story (h), identity import (2026-09-30, plan §5.10) — a tiny FIXED mapping of accounts one party holds, no RNG, so
+# every file above is unchanged. account_links_dataset classifies both columns ACCOUNT, so
+# POST /inv/entity-identities/import {dataset: account_links_dataset, aCol: ACCOUNT_A, bCol: ACCOUNT_B} asserts them.
+# `acc-1121 ` is spelled lower-case with a trailing blank (the ACCOUNT upper-trim rule still keys it ACC-1121), and
+# AL-005 has no second account: the import counts it under skipped.empty.
+LINK_HEADER = ["LINK_ID", "ACCOUNT_A", "ACCOUNT_B", "LINK_BASIS", "LINKED_DATE"]
+write("account_links", LINK_HEADER, {"ACCOUNT_LINKS_20260901.csv": [
+    ["AL-001", HUB, "ACC-1106", "same KYC document", "2026-09-01"],
+    ["AL-002", HUB2, "ACC-1106", "same device", "2026-09-01"],
+    ["AL-003", RELAYS[0], "acc-1121 ", "same device", "2026-09-01"],
+    ["AL-004", SHELLS[0], "ACC-1133", "shared director", "2026-09-01"],
+    ["AL-005", "ACC-1149", "", "unresolved referral", "2026-09-01"],
+]})

@@ -167,7 +167,7 @@ public final class ObjectRoutes implements RouteModule {
             }
             ObjectService.EntityCase made = OpsEngine.of(api).openCaseFromEntities(title,
                     ApiContext.str(body, "description"), entities, existing, o -> visibleTo(ex, o),
-                    ApiContext.str(body, "actor"));
+                    ApiContext.str(body, "actor"), ApiContext.subject(ex).map(Subject::id).orElse(null));
             List<Map<String, Object>> members = made.members().stream().map(o -> {
                 Map<String, Object> row = new LinkedHashMap<>(o.toMap());
                 row.put("minted", made.minted().contains(o.id()));

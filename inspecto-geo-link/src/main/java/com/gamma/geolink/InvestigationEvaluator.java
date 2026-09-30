@@ -117,6 +117,12 @@ final class InvestigationEvaluator {
         int resolvedBy;
         /** Groups a merged {@code exclude} excluded (LA-17 merged traversal): group id -> {id, members, normalisers, step, reason}. */
         final TreeMap<String, Map<String, Object>> excludedGroups = new TreeMap<>();
+        /**
+         * What the LAST merged {@code exclude} applied actually did, for its log line (plan §5.10): {@code left} - the
+         * entities that left the Working Set; {@code kept} - members {@code keep} protected; {@code unmatched} - member
+         * keys no admitted entity carried (blocked from later admission only). Derived, never hashed.
+         */
+        Map<String, List<String>> lastMerged;
 
         /**
          * The sealed groups (id -> {@code {id, members[], normalisers{type -> normaliser}}}) that any typed key of the
@@ -131,18 +137,18 @@ final class InvestigationEvaluator {
             for (Object o : (List<Object>) resolution.get("groups")) {
                 Map<String, Object> g = (Map<String, Object>) o;
                 Set<String> members = new TreeSet<>(strings(g.get("members")));
+                Map<String, Object> norm = new TreeMap<>();
+                for (String m : members) {
+                    String t = m.substring(0, m.indexOf(':'));
+                    if (types.get(t) instanceof Map<?, ?> def) norm.put(t, String.valueOf(def.get("normaliser")));
+                }
+                Map<String, Object> sealed = new LinkedHashMap<>();
+                sealed.put("id", String.valueOf(g.get("id")));
+                sealed.put("members", new ArrayList<>(members));
+                sealed.put("normalisers", norm);
                 for (String id : ids) {
                     Entity e = entities.get(id);
-                    if (e == null || java.util.Collections.disjoint(keysOf(e, sides), members)) continue;
-                    Map<String, Object> norm = new TreeMap<>();
-                    for (String m : members) {
-                        String t = m.substring(0, m.indexOf(':'));
-                        if (types.get(t) instanceof Map<?, ?> def) norm.put(t, String.valueOf(def.get("normaliser")));
-                    }
-                    Map<String, Object> sealed = new LinkedHashMap<>();
-                    sealed.put("id", String.valueOf(g.get("id")));
-                    sealed.put("members", new ArrayList<>(members));
-                    sealed.put("normalisers", norm);
+                    if (e == null || memberKeysOf(e, sides, sealed).isEmpty()) continue;
                     out.put(String.valueOf(g.get("id")), sealed);
                     break;
                 }
@@ -150,17 +156,25 @@ final class InvestigationEvaluator {
             return out;
         }
 
+        /**
+         * The member keys of sealed group {@code g} ({@code {members[], normalisers{}}}) that admitted entity {@code e}
+         * carries: its typed keys ({@link #keysOf}) that are members; or - when no type can be told for it at all (an
+         * UNTYPED id: no own type, no typed bound column; live check 2026-09-30, plan §5.10) - the member keys its raw
+         * id makes under each member type's SEALED normaliser, the same rule {@link #blockedByGroup} and a merged
+         * expand's member-value scan already apply to a raw id. An entity typed as something else is not a member.
+         */
+        SortedSet<String> memberKeysOf(Entity e, Map<String, SortedSet<String>> sides, Map<String, Object> g) {
+            Set<String> members = new HashSet<>(strings(g.get("members")));
+            SortedSet<String> own = keysOf(e, sides);
+            if (own.isEmpty()) return rawMemberKeys(g, e.id());
+            own.retainAll(members);
+            return own;
+        }
+
         /** Whether {@code id} is NOT in the Working Set and its key under a member type's sealed rule is a member of an excluded group. */
-        @SuppressWarnings("unchecked")
         boolean blockedByGroup(String id) {
             if (excludedGroups.isEmpty() || entities.containsKey(id)) return false;
-            for (Map<String, Object> g : excludedGroups.values()) {
-                Set<String> members = new HashSet<>(strings(g.get("members")));
-                for (var n : ((Map<String, Object>) g.get("normalisers")).entrySet()) {
-                    String v = EntityTypes.normalise(String.valueOf(n.getValue()), id);
-                    if (!v.isEmpty() && members.contains(n.getKey() + ":" + v)) return true;
-                }
-            }
+            for (Map<String, Object> g : excludedGroups.values()) if (!rawMemberKeys(g, id).isEmpty()) return true;
             return false;
         }
 
@@ -458,19 +472,8 @@ final class InvestigationEvaluator {
             }
             case "exclude" -> {
                 String reason = String.valueOf(p.get("reason"));
-                for (String id : ids) exclude(s, id, reason, step);
-                if (Boolean.TRUE.equals(p.get("merged"))) {   // LA-17 merged traversal: the SEALED groups, as a whole
-                    Map<String, SortedSet<String>> sides = s.sides();
-                    for (Object o : entry.get("groups") instanceof List<?> l ? l : List.of()) {
-                        Map<String, Object> g = new LinkedHashMap<>((Map<String, Object>) o);
-                        Set<String> members = new HashSet<>(strings(g.get("members")));
-                        for (Entity e : new ArrayList<>(s.entities.values()))
-                            if (!java.util.Collections.disjoint(s.keysOf(e, sides), members)) exclude(s, e.id(), reason, step);
-                        g.put("step", step);
-                        g.put("reason", reason);
-                        s.excludedGroups.putIfAbsent(String.valueOf(g.get("id")), g);
-                    }
-                }
+                if (Boolean.TRUE.equals(p.get("merged"))) mergedExclude(s, entry, ids, reason, step);
+                else for (String id : ids) exclude(s, id, reason, step);
             }
             case "excludeBy" -> {
                 Map<String, Object> list = (Map<String, Object>) entry.get("list");
@@ -512,6 +515,71 @@ final class InvestigationEvaluator {
         if (!frontier.contains(id)) return false;
         if (s.entities.containsKey(id)) return true;
         return anchorOf.containsKey(id) && s.entities.containsKey(String.valueOf(anchorOf.get(id)));
+    }
+
+    /**
+     * LA-17 merged traversal: exclude the named ids and the SEALED groups as a whole - every admitted entity carrying
+     * a member key ({@link State#memberKeysOf}, typed or, when untyped, under the sealed normalisers), matched on the
+     * state BEFORE anything leaves - remember the groups, and record in {@link State#lastMerged} exactly what happened.
+     */
+    @SuppressWarnings("unchecked")
+    private static void mergedExclude(State s, Map<String, Object> entry, List<String> ids, String reason, int step) {
+        Map<String, SortedSet<String>> sides = s.sides();
+        List<Entity> had = new ArrayList<>(s.entities.values());
+        TreeSet<String> unmatched = new TreeSet<>(), hit = new TreeSet<>();
+        for (Object o : entry.get("groups") instanceof List<?> l ? l : List.of()) {
+            Map<String, Object> g = new LinkedHashMap<>((Map<String, Object>) o);
+            TreeSet<String> notCarried = new TreeSet<>(strings(g.get("members")));
+            for (Entity e : had) {
+                SortedSet<String> k = s.memberKeysOf(e, sides, g);
+                if (k.isEmpty()) continue;
+                notCarried.removeAll(k);
+                hit.add(e.id());
+            }
+            unmatched.addAll(notCarried);
+            g.put("step", step);
+            g.put("reason", reason);
+            s.excludedGroups.putIfAbsent(String.valueOf(g.get("id")), g);
+        }
+        for (String id : ids) exclude(s, id, reason, step);
+        for (String id : hit) exclude(s, id, reason, step);
+        TreeSet<String> left = new TreeSet<>(), kept = new TreeSet<>();
+        for (Entity e : had)
+            if (!s.entities.containsKey(e.id())) left.add(e.id());
+            else if (hit.contains(e.id())) kept.add(e.id());   // still here: keep protected it
+        s.lastMerged = Map.of("left", new ArrayList<>(left), "kept", new ArrayList<>(kept),
+                "unmatched", new ArrayList<>(unmatched));
+    }
+
+    /** The member keys of sealed group {@code g} that raw id {@code raw} makes under each member type's sealed normaliser. */
+    @SuppressWarnings("unchecked")
+    static SortedSet<String> rawMemberKeys(Map<String, Object> g, String raw) {
+        Set<String> members = new HashSet<>(strings(g.get("members")));
+        SortedSet<String> out = new TreeSet<>();
+        for (var n : ((Map<String, Object>) g.get("normalisers")).entrySet()) {
+            String v = EntityTypes.normalise(String.valueOf(n.getValue()), raw);
+            if (!v.isEmpty() && members.contains(n.getKey() + ":" + v)) out.add(n.getKey() + ":" + v);
+        }
+        return out;
+    }
+
+    /**
+     * What each merged {@code exclude} did, at the state it ran on (PREFIX semantics, as {@link #entityCounts}):
+     * step -> {@link State#lastMerged}. So its line says what left and what was not matched, never more (plan §5.10).
+     */
+    static Map<Integer, Map<String, List<String>>> mergedExcludeOutcomes(List<Map<String, Object>> log) {
+        Map<Integer, Map<String, List<String>>> out = new TreeMap<>();
+        State s = new State();
+        for (int k = 0; k < log.size(); k++) {
+            Map<String, Object> e = log.get(k);
+            if ("undo".equals(e.get("kind"))) s = fold(log.subList(0, k + 1));
+            else if ("op".equals(e.get("kind"))) {
+                apply(s, e);
+                if ("exclude".equals(e.get("op")) && e.get("params") instanceof Map<?, ?> p && Boolean.TRUE.equals(p.get("merged")))
+                    out.put(((Number) e.get("step")).intValue(), s.lastMerged);
+            }
+        }
+        return out;
     }
 
     private static void seed(State s, List<String> ids, String type, int step) {

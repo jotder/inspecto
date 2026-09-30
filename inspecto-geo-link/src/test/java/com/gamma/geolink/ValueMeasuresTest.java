@@ -183,6 +183,22 @@ public class ValueMeasuresTest {
         return java.time.Clock.fixed(java.time.Instant.parse(utcInstant), java.time.ZoneOffset.UTC);
     }
 
+    /** Live check 2026-09-30 (plan §5.10): a from/to with Z or an offset is normalised to UTC, not refused. */
+    @Test
+    void aFixedWindowWithZOrAnOffsetIsNormalisedToUtc() {
+        ValueMeasures.Spec z = ValueMeasures.parse(block("structuring", "from", "2026-09-01T00:00:00Z",
+                "to", "2026-09-08T00:00:00Z"), true);
+        assertEquals("2026-09-01T00:00", z.from());
+        assertEquals("2026-09-08T00:00", z.to());
+        ValueMeasures.Spec off = ValueMeasures.parse(block("structuring", "from", "2026-09-01T02:00:00+02:00",
+                "to", "2026-09-07T19:30:00-04:30"), true);
+        assertEquals("2026-09-01T00:00", off.from(), "shifted to UTC");
+        assertEquals("2026-09-08T00:00", off.to(), "shifted to UTC");
+        // the twin: a zone-less value stays as written (already read as UTC)
+        assertEquals("2026-09-01T02:00", ValueMeasures.parse(block("structuring", "from", "2026-09-01T02:00:00",
+                "to", "2026-09-02T00:00:00"), true).from());
+    }
+
     @Test
     void aRollingWindowResolvesAgainstTheClockInUtcAndIsStoredRelative() {
         ValueMeasures.Spec s = ValueMeasures.parse(rolling("structuring", "24h"), true, at("2026-09-02T00:00:00.750Z"));

@@ -76,6 +76,7 @@ class ControlApiCaseFromEntitiesTest {
             JsonNode kase = body.get("case");
             assertEquals("CASE", kase.get("objectType").asText());
             assertEquals("Layering ring", kase.get("title").asText());
+            assertEquals("mia", kase.path("owner").asText(), "the creating Subject owns the Case (plan §5.10)");
 
             JsonNode members = body.get("members");
             assertEquals(2, members.size());

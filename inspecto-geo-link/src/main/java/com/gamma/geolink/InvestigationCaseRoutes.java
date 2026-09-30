@@ -170,9 +170,15 @@ public final class InvestigationCaseRoutes implements RouteModule {
         out.put("access", owner ? "owner" : "case-member");
         out.put("readOnly", !owner);
         boolean ops = api.service().objects().isPresent();
-        out.put("sharing", link != null && ops);
+        // plan §5.10: say what grants() will do — a closed, vanished or non-Case link shares nothing (fail closed).
+        Map<String, Object> c = link == null || !ops ? null
+                : api.service().objects().get().summary(String.valueOf(link.get("caseRef"))).orElse(null);
+        boolean open = c != null && "case".equals(c.get("kind")) && Boolean.FALSE.equals(c.get("closed"));
+        out.put("sharing", open);
         out.put("reason", link == null ? "not linked to a Case — owner-only"
                 : !ops ? "Case management (inspecto-ops) is not installed — the link is stored but grants nothing; owner-only"
+                : c == null || !"case".equals(c.get("kind")) ? "the linked Case no longer exists (or is not a Case) — it grants nothing; owner-only"
+                : !open ? "the linked Case is closed — a closed Case shares nothing; owner-only"
                 : "members (owner or assignee) of an open Case they can see get READ-ONLY access; writes stay owner-only");
         return out;
     }

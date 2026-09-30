@@ -572,6 +572,8 @@ public final class InvestigationRoutes implements RouteModule {
         // How many entities each excludeBy removed is a property of the state it ran on, not of its log line.
         List<Integer> counts = log.stream().anyMatch(e -> "excludeBy".equals(e.get("op")))
                 ? InvestigationEvaluator.entityCounts(log) : List.of();
+        // ...and so is what each merged exclude actually removed (plan §5.10: the line never claims more).
+        Map<Integer, Map<String, List<String>>> merged = InvestigationEvaluator.mergedExcludeOutcomes(log);
         for (Map<String, Object> e : log.subList(0, Math.min(limit, log.size()))) {
             int step = ((Number) e.get("step")).intValue();
             Map<String, Object> out = new LinkedHashMap<>(e);
@@ -586,7 +588,7 @@ public final class InvestigationRoutes implements RouteModule {
             Integer removed = "excludeBy".equals(e.get("op"))
                     ? (step == 1 ? 0 : counts.get(step - 2)) - counts.get(step - 1) : null;
             out.put("undoneBy", undoneBy.get(step));
-            out.put("text", step + ". " + render(e, removed) + (undoneBy.containsKey(step)
+            out.put("text", step + ". " + render(e, removed, merged.get(step)) + (undoneBy.containsKey(step)
                     ? " (undone by step " + undoneBy.get(step) + ")" : ""));
             entries.add(out);
         }
@@ -1329,10 +1331,11 @@ public final class InvestigationRoutes implements RouteModule {
 
     /**
      * The plain-language line for one step (plan §2.7: every op, including exclusions, with its reason). {@code removed}
-     * is how many entities an {@code excludeBy} removed — a property of the state it ran on — and null otherwise.
+     * is how many entities an {@code excludeBy} removed — a property of the state it ran on — and null otherwise;
+     * {@code merged} is what a merged {@code exclude} did ({@link InvestigationEvaluator.State#lastMerged}), else null.
      */
     @SuppressWarnings("unchecked")
-    private static String render(Map<String, Object> e, Integer removed) {
+    private static String render(Map<String, Object> e, Integer removed, Map<String, List<String>> merged) {
         if ("undo".equals(e.get("kind"))) return "Undid step " + e.get("undoes") + ".";
         Map<String, Object> p = (Map<String, Object>) e.get("params");
         List<String> ids = strings(p.get("ids"));
@@ -1354,7 +1357,7 @@ public final class InvestigationRoutes implements RouteModule {
                     ? "Cleared the time window: later expansions read the full time range."
                     : "Set the time window to " + InvestigationTime.describe((Map<String, Object>) p.get("window"))
                             + "; later expansions read inside it (earlier steps are unchanged).";
-            case "exclude" -> Boolean.TRUE.equals(p.get("merged")) ? mergedExcludeLine(e)
+            case "exclude" -> Boolean.TRUE.equals(p.get("merged")) ? mergedExcludeLine(e, merged)
                     : "Excluded " + ids.size() + " entit" + (ids.size() == 1 ? "y" : "ies")
                     + " (reason: " + p.get("reason") + "): " + list(ids) + ".";
             case "hide" -> "Hid " + list(ids) + " from display (still traversed and counted).";
@@ -1374,14 +1377,31 @@ public final class InvestigationRoutes implements RouteModule {
         };
     }
 
-    /** One line per merged exclude: each group it excluded as a whole, with its members (masked per key, D-U6). */
-    static String mergedExcludeLine(Map<String, Object> e) {
+    /**
+     * One line per merged exclude: each group it excluded as a whole, with its members (masked per key, D-U6), and -
+     * from {@code outcome} ({@link InvestigationEvaluator.State#lastMerged}) - exactly which entities left, which
+     * members {@code keep} protected, and which member keys no entity in the Working Set carried (plan §5.10: the line
+     * never claims more than happened).
+     */
+    static String mergedExcludeLine(Map<String, Object> e, Map<String, List<String>> outcome) {
         List<String> parts = new ArrayList<>();
         for (Object o : e.get("groups") instanceof List<?> l ? l : List.of())
             if (o instanceof Map<?, ?> g) parts.add(g.get("id") + " (members: " + String.join(", ", strings(g.get("members"))) + ")");
         return "Excluded identity group" + (parts.size() == 1 ? " " : "s ") + String.join("; ", parts) + " as a whole (reason: "
-                + ((Map<?, ?>) e.get("params")).get("reason") + "): every member entity left the Working Set and no member "
-                + "is admitted again.";
+                + ((Map<?, ?>) e.get("params")).get("reason") + "): " + mergedOutcomeClause(outcome);
+    }
+
+    /** {@code "left the Working Set: a, b; kept (protected): c; no entity in the Working Set for k — ..."}. */
+    static String mergedOutcomeClause(Map<String, List<String>> outcome) {
+        Map<String, List<String>> o = outcome == null ? Map.of() : outcome;
+        List<String> left = o.getOrDefault("left", List.of()), kept = o.getOrDefault("kept", List.of()),
+                unmatched = o.getOrDefault("unmatched", List.of());
+        StringBuilder b = new StringBuilder(left.isEmpty() ? "no entity left the Working Set;"
+                : "left the Working Set: " + String.join(", ", left) + ";");
+        if (!kept.isEmpty()) b.append(" kept (protected), still in the Working Set: ").append(String.join(", ", kept)).append(";");
+        if (!unmatched.isEmpty()) b.append(" no entity in the Working Set for ").append(String.join(", ", unmatched))
+                .append(" (not removed, only blocked);");
+        return b.append(" no member is admitted again.").toString();
     }
 
     /** {@code "Entity List `known-mules` (exclusion, 40 members, as of fact 17)"} — the sealed list a list op names. */

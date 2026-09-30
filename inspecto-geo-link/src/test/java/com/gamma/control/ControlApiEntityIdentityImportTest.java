@@ -201,9 +201,10 @@ class ControlApiEntityIdentityImportTest {
             seedRegister(c, ",('+447700900002','234103')", CLASSIFIED);   // 900002 has two IMSIs → one group of 3
             JsonNode out = data(post(c, IMPORT, body("")), 201);
             assertEquals(3, out.get("imported").asInt(), out.toString());
-            assertEquals(5, out.get("rowsRead").asInt(), "the NULL row is never read: " + out);
+            // plan §5.10: the NULL row IS read and counted - rowsRead and skipped account for every row
+            assertEquals(6, out.get("rowsRead").asInt(), "the NULL row is read too: " + out);
             assertEquals(1, out.at("/skipped/duplicate").asInt(), "two spellings of one pair: " + out);
-            assertEquals(1, out.at("/skipped/empty").asInt(), "'--' is empty under digits: " + out);
+            assertEquals(2, out.at("/skipped/empty").asInt(), "the NULL and '--' (empty under digits): " + out);
             assertEquals(0, out.at("/skipped/alreadyAsserted").asInt());
             assertFalse(out.get("truncated").asBoolean());
             String fp = out.get("fingerprint").asText();

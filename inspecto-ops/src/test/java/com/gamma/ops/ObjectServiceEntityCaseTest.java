@@ -55,7 +55,7 @@ class ObjectServiceEntityCaseTest {
                 Map.of(ObjectService.ATTR_ENTITY_KEY, BOB.entityKey(), ObjectService.ATTR_ENTITY_DATASET, BOB.dataset()));
 
         IllegalStateException failure = assertThrows(IllegalStateException.class, () -> svc.openCaseFromEntities(
-                "ring", null, List.of(ACME, BOB), List.of(), o -> true, "mia"));
+                "ring", null, List.of(ACME, BOB), List.of(), o -> true, "mia", "mia"));
         assertEquals("disk full", failure.getMessage(), "the ORIGINAL failure propagates");
 
         assertEquals(List.of(bob.id()), store.inner.query(ObjectQuery.recent(10)).stream()
@@ -71,9 +71,14 @@ class ObjectServiceEntityCaseTest {
                         "caseType", "billing"));
 
         ObjectService.EntityCase made = svc.openCaseFromEntities("ring", null, List.of(ACME), List.of(),
-                o -> !"billing".equals(o.attributes().get("caseType")), "mia");
+                o -> !"billing".equals(o.attributes().get("caseType")), "mia", "mia");
 
         assertEquals(1, made.members().size());
+        assertEquals("mia", made.caseObject().owner(), "the owner passed in owns the Case (plan §5.10)");
+        assertNull(made.members().get(0).owner(), "a minted Incident is not owned by the Case's creator");
+        // the twin: no known Subject - the owner stays unset, never invented
+        assertNull(svc.openCaseFromEntities("ring 2", null, List.of(ACME), List.of(), o -> true, null, null)
+                .caseObject().owner());
         assertNotEquals(hidden.id(), made.members().get(0).id(), "existence-hiding: an invisible match is not reused");
         assertEquals(List.of(made.members().get(0).id()), svc.linksOf(made.caseObject().id()).stream()
                 .filter(l -> LinkRelationship.CONTAINS.equalsIgnoreCase(l.relationship())).map(l -> l.toId()).toList());

@@ -76,7 +76,8 @@ final class GraphDossierBuilder {
             List<String> had = new ArrayList<>(state.entities.keySet());
             if ("undo".equals(e.get("kind"))) state = InvestigationEvaluator.evaluate(log.subList(0, step), -1, null);
             else InvestigationEvaluator.apply(state, e);
-            if ("excludeBy".equals(e.get("op"))) {
+            if ("excludeBy".equals(e.get("op")) || "exclude".equals(e.get("op")) && e.get("params") instanceof Map<?, ?> mp
+                    && Boolean.TRUE.equals(mp.get("merged"))) {   // ...and each merged exclude (plan §5.10)
                 List<String> gone = new ArrayList<>();
                 for (String id : had) if (!state.entities.containsKey(id)) gone.add(id);
                 removedBy.put(step, gone);
@@ -605,7 +606,9 @@ final class GraphDossierBuilder {
                     ? "Cleared the time window: later expansions read the full time range."
                     : "Set the time window to " + InvestigationTime.describe(castMap((Map<?, ?>) p.get("window")))
                             + "; later expansions read inside it (earlier steps are unchanged).";
-            case "exclude" -> "Excluded " + ids.size() + " entit" + (ids.size() == 1 ? "y" : "ies")
+            case "exclude" -> Boolean.TRUE.equals(p.get("merged"))
+                    ? InvestigationRoutes.mergedExcludeLine(e, Map.of("left", removed == null ? List.of() : removed))
+                    : "Excluded " + ids.size() + " entit" + (ids.size() == 1 ? "y" : "ies")
                     + " (reason: " + p.get("reason") + "): " + String.join(", ", ids) + ".";
             case "hide" -> "Hid " + head(ids) + " from display (still traversed and counted).";
             case "keep" -> "Kept " + head(ids) + " (protected from later exclusion).";

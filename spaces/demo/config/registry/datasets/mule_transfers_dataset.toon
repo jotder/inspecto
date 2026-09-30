@@ -1,2 +1,5 @@
 physicalRef: mule_transfers/database
 description: "Account-to-account transfers carrying a planted money-mule layering ring — the Link Analysis fraud demo. Synthetic."
+columns[2]{name,classification}:
+  PAYER_ACCOUNT,ACCOUNT
+  PAYEE_ACCOUNT,ACCOUNT
