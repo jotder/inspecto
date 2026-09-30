@@ -38,13 +38,25 @@ The write-back routes are governed by the `-Dassist.write.root` gate (`503` when
 
 ### Model endpoint allowlist (2026-10-01)
 
-Every provider this module builds goes through `ModelProviderFactory.create`, which checks the settings'
-`baseUrl` (or the Ollama default `http://localhost:11434`) against the Space's `models` list in `egress.toon`
-(`ModelEgress`, the same check the intelligence module's `GatewayFactory` makes) and builds the client on the
-CHECKED address (`ModelEgress.pin`). A refused endpoint yields an unavailable provider whose name carries the
-reason, so nothing dials it. `POST /assist/settings/test` rebuilds from the saved settings on each call, so the
-CURRENT allowlist decides. Consequences: an empty allowlist (the default) refuses even the local Ollama
-default, so a local model needs `localhost` / `127.0.0.1` named; an `https` endpoint named by DNS host is
-refused (it cannot be pinned). A hosted provider with no `baseUrl` keeps its SDK's fixed vendor endpoint,
-which is not checked. `inspecto-agent-hosted` now carries `inspecto-processor` as `provided` for this. Test:
-`AssistModelEgressTest` (real HTTP; `169.254.169.254` refused, unlisted loopback never dialled, listed loopback ok).
+Every route by which this module builds a model client checks the endpoint against the Space's `models` list in
+`egress.toon` (`ModelEgress`, the check the intelligence module's `GatewayFactory` makes) and builds the client on
+the CHECKED address (`ModelEgress.pin`), resolving once. The routes, all in `ModelProviderFactory`:
+`create` (a settings entry), `fromPersisted`, and `fromEnvironment` (`-Dagentkernel.ollama.baseUrl` /
+`AGENTKERNEL_OLLAMA_BASEURL`, only when `agentkernel.ollama.enabled` is on). `AiDescriptionProvider`'s no-arg
+constructor and `UccAssistAgent.testSettings()` (`POST /assist/settings/test`, rebuilt per call so the CURRENT
+allowlist decides) go through them. A refused endpoint is an unavailable provider whose name carries the reason;
+nothing dials it.
+
+A missing `baseUrl` is checked against the provider's default: ollama `http://localhost:11434` and llamacpp
+`http://localhost:8080/v1` (loopback, and inspecto's own port). Only Grok's `https://api.x.ai/v1` default is treated
+as a fixed vendor host, and the anthropic / openai / gemini builders use hardcoded vendor hosts. Verified in the
+langchain4j 1.16.3 sources: none of those SDK jars reads an environment variable or system property for its base URL
+(no `OPENAI_BASE_URL`), and `langchain4j-http-client-jdk` never sets `followRedirects`, so the JDK client's default
+of NEVER applies and a 3xx cannot bounce a checked call to another host. An explicit `baseUrl` on a hosted provider
+is checked and pinned like any other.
+
+Consequences: an empty allowlist (the default) refuses even the local Ollama default, so a local model needs
+`localhost` / `127.0.0.1` named; an `https` endpoint named by DNS host is refused (it cannot be pinned).
+`inspecto-agent-hosted` carries `inspecto-processor` as `provided` for this. Tests: `AssistModelEgressTest` (real
+HTTP; metadata address refused, unlisted loopback never dialled, env-var router and `AiDescriptionProvider` never
+dial, the client dials the first-resolved address) and `LangChain4jProviderPluginTest` (llamacpp default).

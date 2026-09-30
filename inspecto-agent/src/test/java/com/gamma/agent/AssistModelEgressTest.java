@@ -45,6 +45,63 @@ class AssistModelEgressTest {
         if (model != null) model.stop(0);
         System.clearProperty("assist.settings.file");
         System.clearProperty("assist.write.root");
+        System.clearProperty("agentkernel.ollama.enabled");
+        System.clearProperty("agentkernel.ollama.baseUrl");
+    }
+
+    private void enableEnvOllama(int port) {
+        System.setProperty("agentkernel.ollama.enabled", "true");
+        System.setProperty("agentkernel.ollama.baseUrl", "http://127.0.0.1:" + port);
+    }
+
+    @Test
+    void envVarFallbackRouterIsRefusedAndNeverDialled() throws Exception {
+        int port = startModel();
+        enableEnvOllama(port);
+        var r = com.gamma.agent.model.ModelProviderFactory.fromEnvironment(
+                com.gamma.pipeline.exec.ModelEgress.Policy.EMPTY, com.gamma.pipeline.exec.EgressPolicy.SYSTEM);
+        assertFalse(r.providerFor(ModelTier.MEDIUM).available());
+        assertTrue(r.providerFor(ModelTier.MEDIUM).name().contains("model endpoint refused"));
+        assertEquals(0, hits.get());
+    }
+
+    @Test
+    void settingsTestRouteWithNoSettingsFileUsesTheCheckedEnvironmentRouter() throws Exception {
+        int port = startModel();
+        enableEnvOllama(port);
+        System.setProperty("assist.settings.file", dir.resolve("absent.properties").toString());
+        var agent = new UccAssistAgent(ModelProviderFactory.fromPersisted());
+        var out = agent.testSettings();
+        assertEquals(0, hits.get(), out.toString());
+        assertFalse((Boolean) ((java.util.Map<?, ?>) out.get("medium")).get("ok"), out.toString());
+    }
+
+    @Test
+    void aiDescriptionProviderFromEnvironmentNeverDialsAnUnlistedEndpoint() throws Exception {
+        int port = startModel();
+        enableEnvOllama(port);
+        var d = new com.gamma.agent.catalog.AiDescriptionProvider().describeColumn(
+                new com.gamma.catalog.spi.DescriptionProvider.ColumnContext("p", "t", "c", "INT", null));
+        assertEquals(com.gamma.catalog.Description.EMPTY, d);
+        assertEquals(0, hits.get());
+    }
+
+    @Test
+    void theClientDialsTheCheckedAddressNotASecondResolution() throws Exception {
+        int port = startModel();
+        var calls = new AtomicInteger();
+        com.gamma.pipeline.exec.EgressPolicy.Resolver flipping = host -> new InetAddress[]{
+                calls.getAndIncrement() == 0 ? InetAddress.getByAddress(new byte[]{127, 0, 0, 1})
+                        : InetAddress.getByAddress(new byte[]{10, 9, 9, 9})};
+        EnumMap<ModelTier, String> m = new EnumMap<>(ModelTier.class);
+        for (ModelTier t : ModelTier.values()) m.put(t, "m");
+        var r = ModelProviderFactory.create(
+                new ProviderSettings("ollama", "http://model.test:" + port, null, m, 15),
+                com.gamma.pipeline.exec.ModelEgress.parse(List.of("model.test", "127.0.0.1")), flipping);
+        r.providerFor(ModelTier.MEDIUM).generate(
+                com.gamma.agent.kernel.model.ModelRequest.text(ModelTier.MEDIUM, null, "hi"));
+        assertTrue(hits.get() > 0, "the stub on the FIRST (checked) address got the call");
+        assertEquals(1, calls.get(), "resolved once");
     }
 
     private int startModel() throws Exception {

@@ -34,7 +34,41 @@ public final class ModelProviderFactory {
     public static ModelRouter fromPersisted() {
         return AssistModelSettings.load()
                 .map(ModelProviderFactory::create)
-                .orElseGet(OllamaModelProvider::fromEnvironment);
+                .orElseGet(ModelProviderFactory::fromEnvironment);
+    }
+
+    /** The environment-resolved Ollama router, its endpoint checked like every other (see {@link #create}). */
+    public static ModelRouter fromEnvironment() {
+        return fromEnvironment(ModelEgress.forCurrentSpace(), EgressPolicy.SYSTEM);
+    }
+
+    /**
+     * {@code -Dagentkernel.ollama.baseUrl} / {@code AGENTKERNEL_OLLAMA_BASEURL} name a host too, so an ENABLED
+     * environment profile is pinned or refused exactly like a settings entry. A disabled profile dials nothing.
+     */
+    public static ModelRouter fromEnvironment(ModelEgress.Policy egress, EgressPolicy.Resolver resolver) {
+        ModelProfile env = ModelProfile.fromEnvironment();
+        if (!env.enabled()) return OllamaModelProvider.routerFor(env);
+        try {
+            String pinned = ModelEgress.pin(env.baseUrl(), egress, resolver);
+            return OllamaModelProvider.routerFor(new ModelProfile(env.name(), pinned, true, env.models()));
+        } catch (EgressPolicy.Refused refused) {
+            return refusedRouter(refused);
+        }
+    }
+
+    private static ModelRouter refusedRouter(EgressPolicy.Refused refused) {
+        String why = "model endpoint refused: " + refused.getMessage();
+        log.warn("[EGRESS] {}", why);
+        ModelProvider refusedProvider = new ModelProvider() {
+            @Override public String name() { return why; }
+            @Override public boolean available() { return false; }
+            @Override public com.gamma.agent.kernel.model.ModelResponse generate(
+                    com.gamma.agent.kernel.model.ModelRequest request) {
+                throw new com.gamma.agent.kernel.error.ModelError(why);
+            }
+        };
+        return tier -> refusedProvider;
     }
 
     /** Build a router for explicit settings. Unknown/unbacked hosted ids yield an unavailable router. */
@@ -50,27 +84,19 @@ public final class ModelProviderFactory {
      * its SDK's fixed vendor endpoint.
      */
     public static ModelRouter create(ProviderSettings settings, ModelEgress.Policy egress, EgressPolicy.Resolver resolver) {
-        if (settings == null) return OllamaModelProvider.fromEnvironment();
+        if (settings == null) return fromEnvironment(egress, resolver);
         String id = settings.provider();
+        // A missing baseUrl falls back to the provider's default; every default that is not a fixed vendor host
+        // (ollama, llamacpp: loopback) is checked too. Grok's api.x.ai default is a fixed vendor host.
         String effective = settings.baseUrl() != null ? settings.baseUrl()
-                : "ollama".equals(id) ? ProviderSettings.defaultBaseUrl("ollama") : null;
+                : "grok".equals(id) ? null : ProviderSettings.defaultBaseUrl(id);
         if (effective != null) {
             try {
                 String pinned = ModelEgress.pin(effective, egress, resolver);
                 settings = new ProviderSettings(settings.provider(), pinned, settings.apiKeyRef(),
                         settings.models(), settings.timeoutSeconds());
             } catch (EgressPolicy.Refused refused) {
-                String why = "model endpoint refused: " + refused.getMessage();
-                log.warn("[EGRESS] {}", why);
-                ModelProvider refusedProvider = new ModelProvider() {
-                    @Override public String name() { return why; }
-                    @Override public boolean available() { return false; }
-                    @Override public com.gamma.agent.kernel.model.ModelResponse generate(
-                            com.gamma.agent.kernel.model.ModelRequest request) {
-                        throw new com.gamma.agent.kernel.error.ModelError(why);
-                    }
-                };
-                return tier -> refusedProvider;
+                return refusedRouter(refused);
             }
         }
         if ("ollama".equals(id)) {

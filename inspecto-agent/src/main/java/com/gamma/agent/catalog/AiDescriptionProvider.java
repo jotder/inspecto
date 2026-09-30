@@ -3,7 +3,6 @@ package com.gamma.agent.catalog;
 import com.gamma.agent.kernel.model.ModelProvider;
 import com.gamma.agent.kernel.model.ModelRequest;
 import com.gamma.agent.kernel.model.ModelTier;
-import com.gamma.agent.model.OllamaModelProvider;
 import com.gamma.catalog.Description;
 import com.gamma.catalog.Provenance;
 import com.gamma.catalog.spi.DescriptionProvider;
@@ -42,7 +41,7 @@ public final class AiDescriptionProvider implements DescriptionProvider {
 
     /** {@code ServiceLoader} entry point: small-tier provider from the environment (abstain-safe). */
     public AiDescriptionProvider() {
-        this(OllamaModelProvider.fromEnvironment().providerFor(ModelTier.SMALL));
+        this(com.gamma.agent.model.ModelProviderFactory.fromEnvironment().providerFor(ModelTier.SMALL));
     }
 
     /** Test/embedder entry point: inject the model provider (e.g. a deterministic fake). */

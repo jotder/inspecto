@@ -57,4 +57,19 @@ class LangChain4jProviderPluginTest {
         assertFalse(plugin.createRouter(noModel, null).providerFor(ModelTier.MEDIUM).available(),
                 "unmapped tier stays unavailable");
     }
+
+    @Test
+    void llamacppWithNoBaseUrlIsCheckedAgainstItsLoopbackDefault() {
+        ProviderSettings s = new ProviderSettings("llamacpp", null, null,
+                Map.of(ModelTier.MEDIUM, "m"), 5);
+        ModelRouter r = ModelProviderFactory.create(s,
+                com.gamma.pipeline.exec.ModelEgress.Policy.EMPTY, com.gamma.pipeline.exec.EgressPolicy.SYSTEM);
+        assertFalse(r.providerFor(ModelTier.MEDIUM).available());
+        assertTrue(r.providerFor(ModelTier.MEDIUM).name().contains("model endpoint refused"),
+                r.providerFor(ModelTier.MEDIUM).name());
+        ModelRouter listed = ModelProviderFactory.create(s,
+                com.gamma.pipeline.exec.ModelEgress.parse(java.util.List.of("localhost")),
+                com.gamma.pipeline.exec.EgressPolicy.SYSTEM);
+        assertTrue(listed.providerFor(ModelTier.MEDIUM).available(), "named loopback default is allowed");
+    }
 }
