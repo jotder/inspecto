@@ -521,6 +521,15 @@ are the values four-eyes approved (below).
   - `gssEncMode=disable` and `jaasLogin=false`.
 
 **Approval: a content fingerprint (decision 2026-09-29)**
+- **One mechanism (`APPROVAL-FINGERPRINT-UNIFY-1`, closed 2026-10-01).** `ApprovalFingerprint`
+  (`inspecto-engine/src/main/java/com/gamma/job/ApprovalFingerprint.java`) owns what `PublicationApproval` and `AttachApprovals` used to
+  duplicate: the key-sorted SHA-256 (`hash`), the nonce and the common record fields (`newNonce`, `baseRecord`), and
+  the fail-closed verifier `Gate` (no verifier installed, a `false`, or an exception all mean not honoured). A
+  data-egress Job type supplies ONLY what to hash and where its record lives; the next one uses the same three calls
+  and its own `Verifier`. Storage stays per Job type (`publication-approvals/<job>.json` versus one
+  `attach-approvals.json`), as does the control plane's Pending Change check
+  (`PendingChangeRoutes.verifyPublicationApproval` / `verifyAttachApproval`, unchanged). Pinned by
+  `ApprovalFingerprintTest` plus the two adversarial suites (`PostgresPublishJobTest`, `ControlApiPendingChangesTest`).
 - Four-eyes approval pins a SHA-256 **content fingerprint** (`PublicationApproval`), not names. It covers:
   - `job`: every key of the Job except its schedule (`cron`, `on_pipeline`, `on_signal`, `when`, `catch_up`,
     `enabled`) and the server-stamped author keys;

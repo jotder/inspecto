@@ -665,8 +665,8 @@ faster than notifications. Test: `MaintenanceLibraryTest` (`receiptPrune…`).
   With no verifier installed, i.e. no control plane, nothing attaches (fail closed). A copied record, a forged
   nonce, a fingerprint edited to match, an edited Pending Change (its MAC fails) and a withdrawn one all
   refuse (`ControlApiPendingChangesTest.aCopiedForgedOrUnbackedApprovalRecordIsNeverHonoured`).
-  🔴 **Round 4: the approval is pinned to content fixed at HOLD time** (the `publish.postgres` lane's
-  `PublicationApproval` shape; a P2 row will merge the two into one mechanism once both lanes land).
+  🔴 **Round 4: the approval is pinned to content fixed at HOLD time** (the same shape as `PublicationApproval`; both now
+  sit on ONE mechanism, `ApprovalFingerprint`, see [studio](../../capabilities/studio/studio.md)).
   `AttachApprovals.fingerprint` hashes ONLY what decides what is sent and to whom:
   - the `SENSITIVE` keys (`type attach recipients dataset scope measures group_by format out_dir limit
     connection use`), template-EXPANDED against the Space's `*_job_template.toon`;

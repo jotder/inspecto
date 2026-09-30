@@ -100,15 +100,20 @@ public final class PostgresPublishJobType implements JobTypeProvider {
      * control plane. None installed ⇒ every run is refused: an approval nobody can verify is not one.
      */
     @FunctionalInterface
-    public interface ApprovalVerifier {
+    public interface ApprovalVerifier extends ApprovalFingerprint.Verifier {
         boolean verify(Path configRoot, Map<String, Object> approvalRecord);
+
+        @Override
+        default boolean verify(Path configRoot, String job, Map<String, Object> approvalRecord) {
+            return verify(configRoot, approvalRecord);
+        }
     }
 
-    private static volatile ApprovalVerifier approvalVerifier;
+    private static final ApprovalFingerprint.Gate<ApprovalVerifier> APPROVAL_GATE = new ApprovalFingerprint.Gate<>();
 
-    public static void installApprovalVerifier(ApprovalVerifier v) { approvalVerifier = v; }
+    public static void installApprovalVerifier(ApprovalVerifier v) { APPROVAL_GATE.install(v); }
 
-    public static ApprovalVerifier approvalVerifier() { return approvalVerifier; }
+    public static ApprovalVerifier approvalVerifier() { return APPROVAL_GATE.installed(); }
 
     /** Test seams: the DNS resolver the egress check uses, and how a checked JDBC URL is opened. */
     interface Opener { Connection open(String url, Properties props) throws SQLException; }
@@ -185,9 +190,8 @@ public final class PostgresPublishJobType implements JobTypeProvider {
             java.util.Optional<Map<String, String>> approved = PublicationApproval.approved(approvalRoot, cfg.name());
             if (approved.isEmpty())
                 return refuse(ctx, "this publication was never approved (four-eyes) — re-approve", t0);
-            ApprovalVerifier verifier = approvalVerifier;
             Map<String, Object> record = PublicationApproval.recordOf(approvalRoot, cfg.name()).orElse(Map.of());
-            if (verifier == null || !verifier.verify(approvalRoot, record))
+            if (!APPROVAL_GATE.honours(approvalRoot, cfg.name(), record))
                 return refuse(ctx, "the approval record is not bound to an approved Pending Change (id + nonce) — re-approve", t0);
             List<String> changed = PublicationApproval.changed(approved.get(), now);
             if (!changed.isEmpty())

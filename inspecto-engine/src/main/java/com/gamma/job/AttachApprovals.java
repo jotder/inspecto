@@ -9,14 +9,8 @@ import com.gamma.query.DatasetRelation;
 import com.gamma.util.AtomicFiles;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.time.Instant;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,8 +18,8 @@ import java.util.Optional;
 import java.util.TreeMap;
 
 /**
- * The approval of a report Job's ATTACHMENTS, pinned to CONTENT (ASSURE-XLSX-ATTACHMENTS-1 rounds 3–4; the same
- * shape the {@code publish.postgres} lane's {@code PublicationApproval} uses — one P2 row merges the two).
+ * The approval of a report Job's ATTACHMENTS, pinned to CONTENT (ASSURE-XLSX-ATTACHMENTS-1 rounds 3–4; built on the
+ * shared {@link ApprovalFingerprint}, as is {@code PublicationApproval}).
  *
  * <ul>
  *   <li><b>What is hashed</b> — {@link #fingerprint}: ONLY what decides what is sent and to whom — the Job's
@@ -50,7 +44,6 @@ public final class AttachApprovals {
     public static final List<String> SENSITIVE = List.of("type", "attach", "recipients", "dataset", "scope",
             "measures", "group_by", "format", "out_dir", "limit", "connection", "use");
     private static final ObjectMapper JSON = new ObjectMapper().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
-    private static final SecureRandom RANDOM = new SecureRandom();
     private static final Object LOCK = new Object();
 
     /** THE predicate for "this Job attaches data", shared by the write-time guards and {@code ReportJob}. */
@@ -124,12 +117,7 @@ public final class AttachApprovals {
             }
             canon.put("datasetSql", sql);
         }
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(JSON.writeValueAsString(canon).getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException | IOException impossible) {
-            throw new IllegalStateException(impossible);
-        }
+        return ApprovalFingerprint.hash(canon);
     }
 
     /** {@link #fingerprint(Map, Path, String)} of a loaded (already expanded) Job. */
@@ -142,12 +130,8 @@ public final class AttachApprovals {
                               String nonce) throws IOException {
         synchronized (LOCK) {
             Map<String, Object> all = read(root);
-            Map<String, Object> entry = new LinkedHashMap<>();
+            Map<String, Object> entry = ApprovalFingerprint.baseRecord(pendingChangeId, nonce, approvedBy);
             entry.put("fingerprint", fingerprint);
-            entry.put("pendingChange", pendingChangeId);
-            entry.put("nonce", nonce);
-            entry.put("approvedBy", approvedBy);
-            entry.put("approvedAt", Instant.now().toString());
             all.put(name, entry);
             write(root, all);
         }
@@ -175,18 +159,15 @@ public final class AttachApprovals {
 
     /** Whether {@code fingerprint} is Job {@code name}'s approved attachment version. */
     public static boolean approved(Path root, String name, String fingerprint) {
-        Verifier v = verifier;
         return approval(root, name)
                 .filter(a -> fingerprint.equals(a.get("fingerprint")))
-                .filter(a -> v != null && v.verify(root, name, a))   // no verifier installed: fail closed
+                .filter(a -> GATE.honours(root, name, a))   // no verifier installed: fail closed
                 .isPresent();
     }
 
     /** A fresh approval nonce (hex), written into BOTH the MAC'd Pending Change and the approval record. */
     public static String newNonce() {
-        byte[] b = new byte[16];
-        RANDOM.nextBytes(b);
-        return HexFormat.of().formatHex(b);
+        return ApprovalFingerprint.newNonce();
     }
 
     /**
@@ -196,15 +177,13 @@ public final class AttachApprovals {
      * same fingerprint. With none installed (an engine with no control plane) nothing attaches.
      */
     @FunctionalInterface
-    public interface Verifier {
-        boolean verify(Path root, String job, Map<String, Object> record);
-    }
+    public interface Verifier extends ApprovalFingerprint.Verifier {}
 
-    private static volatile Verifier verifier;
+    private static final ApprovalFingerprint.Gate<Verifier> GATE = new ApprovalFingerprint.Gate<>();
 
-    public static void installVerifier(Verifier v) { verifier = v; }
+    public static void installVerifier(Verifier v) { GATE.install(v); }
 
-    public static Verifier verifier() { return verifier; }
+    public static Verifier verifier() { return GATE.installed(); }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(Path root) throws IOException {

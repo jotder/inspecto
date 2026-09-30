@@ -12,10 +12,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.HexFormat;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -59,9 +56,9 @@ public final class PublicationApproval {
         Map<String, String> out = new TreeMap<>();
         Map<String, Object> content = new TreeMap<>();
         job.forEach((k, v) -> { if (!NOT_CONTENT.contains(String.valueOf(k))) content.put(String.valueOf(k), canonical(v)); });
-        out.put("job", sha(content));
+        out.put("job", ApprovalFingerprint.hash(content));
         String conn = job.get(PostgresPublishJobType.P_CONNECTION) == null ? "" : String.valueOf(job.get(PostgresPublishJobType.P_CONNECTION)).trim();
-        out.put("connection", sha(connection(connections.apply(conn).orElse(null))));
+        out.put("connection", ApprovalFingerprint.hash(connection(connections.apply(conn).orElse(null))));
         ComponentStore store = new ComponentStore(configRoot.resolve("registry"));
         ViewStore views = new ViewStore(configRoot.resolve("views"));
         for (String id : PostgresPublishJobType.csv(job.get(PostgresPublishJobType.P_DATASETS) == null ? null
@@ -79,7 +76,7 @@ public final class PublicationApproval {
             } else {
                 def.put("absent", true);
             }
-            out.put("dataset:" + id, sha(def));
+            out.put("dataset:" + id, ApprovalFingerprint.hash(def));
         }
         return out;
     }
@@ -98,21 +95,17 @@ public final class PublicationApproval {
         m.put("proxy", p.proxy() == null ? null : p.proxy().endpoint());
         String pw = p.password();
         m.put("password", pw == null ? null : SecretResolver.isReference(pw) ? "ref:" + pw
-                : "literal-sha256:" + HexFormat.of().formatHex(digest(pw.getBytes(StandardCharsets.UTF_8))));
+                : "literal-sha256:" + ApprovalFingerprint.sha256(pw.getBytes(StandardCharsets.UTF_8)));
         return m;
     }
 
     /** Record the approval of {@code job}'s fingerprints ({@code approvedBy} is the approving Subject). */
     public static void record(Path configRoot, String job, Map<String, String> fingerprints, String approvedBy,
                               Set<String> approverCapabilities, String nonce, String pendingChange) throws IOException {
-        Map<String, Object> doc = new LinkedHashMap<>();
+        Map<String, Object> doc = ApprovalFingerprint.baseRecord(pendingChange, nonce, approvedBy);
         doc.put("job", job);
-        doc.put("nonce", nonce);
-        doc.put("pendingChange", pendingChange);
         doc.put("fingerprints", new TreeMap<>(fingerprints));
-        doc.put("approvedBy", approvedBy);
         doc.put("approverCapabilities", new java.util.TreeSet<>(approverCapabilities));
-        doc.put("approvedAt", java.time.Instant.now().toString());
         Path f = file(configRoot, job);
         Files.createDirectories(f.getParent());
         AtomicFiles.write(f, JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(doc), ".approval-");
@@ -196,21 +189,5 @@ public final class PublicationApproval {
         }
         if (v instanceof List<?> l) return l.stream().map(PublicationApproval::canonical).toList();
         return v == null ? null : String.valueOf(v).trim();
-    }
-
-    private static String sha(Object canonical) {
-        try {
-            return HexFormat.of().formatHex(digest(JSON.writeValueAsBytes(canonical)));
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    private static byte[] digest(byte[] b) {
-        try {
-            return MessageDigest.getInstance("SHA-256").digest(b);
-        } catch (java.security.NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
     }
 }
