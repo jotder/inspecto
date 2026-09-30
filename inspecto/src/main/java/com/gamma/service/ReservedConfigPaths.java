@@ -43,7 +43,8 @@ public final class ReservedConfigPaths {
             "roles.toon", "demo-users.toon", "access-policies.toon", "approval.toon", "egress.toon", "publication-destinations.toon", "mail-attachments.toon", "attach-approvals.json", "offers.toon", "grants.toon",
             "branding.toon", "geo.toon", "link-analysis.toon", "pipeline-history.toon", "timezone.toon", "icon-map.toon",
             "scheduler.toon", "nav-menus.toon", "notification-preferences.toon", "partition.toon", "space.toon",
-            "rename.journal", "dataset-publications.tsv");
+            "rename.journal", "dataset-publications.tsv",
+            "case-link.json");   // LA-24: an imported copy would grant a Case team access (operator 2026-09-30)
 
     /** Reserved directories (a prefix of the config-relative path). */
     static final List<String> DIRS = List.of(

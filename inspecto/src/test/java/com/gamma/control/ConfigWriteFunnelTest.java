@@ -270,6 +270,9 @@ class ConfigWriteFunnelTest {
             Map.entry("EntityIdentityRoutes#retract", ENTITY_FACTS),
             Map.entry("EntityIdentityRoutes#importDataset", ENTITY_FACTS),   // operator-approved 2026-09-30
             Map.entry("EntityIdentityRoutes#groups", ENTITY_FACTS), Map.entry("EntityIdentityRoutes#group", ENTITY_FACTS),
+            Map.entry("ValueMeasures#agents", "READS the Identity Fact log to resolve an agent Entity List for "
+                    + "cash-out concentration (LA-18) — opening the log, not a write; operator-approved 2026-09-30; "
+                    + ENTITY_FACTS),
             Map.entry("InvestigationRoutes#sealResolution", "READS the Identity Fact log to seal a resolution into an "
                     + "Investigation op (LA-17 slice 2) — opening the log, not a write; operator-approved 2026-09-30; "
                     + ENTITY_FACTS),
