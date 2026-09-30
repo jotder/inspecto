@@ -7,7 +7,14 @@
         </inspecto-alert>
     </div>
 } @else {
-    <div class="flex h-full min-h-0 min-w-0 flex-auto overflow-hidden">
+    <!-- The admin shell scrolls at document level, so `h-full` alone lets a tall detail panel grow the
+         page (CASE-DETAIL-DOCUMENT-SCROLL-1). Bound the mail shell to the viewport minus the classic
+         layout's chrome (64px header + 56px footer), as the Pipelines shell does; the folder nav, list
+         and detail panel then each scroll inside their own area. -->
+    <div
+        class="inspecto-mail-shell flex min-h-0 min-w-0 flex-auto overflow-hidden"
+        style="height: calc(100dvh - 120px)"
+    >
         <!-- Left: folder nav (collapsible + drag-resizable) -->
         <aside
             class="flex h-full min-h-0 shrink-0 flex-col border-r"

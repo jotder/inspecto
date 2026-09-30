@@ -323,7 +323,7 @@ lead would not find). Conditional Notes: **PASS**. Preview: **PASS**. Open a Cas
 | 3 | One Findings form for every Case, so a "SIM-box" form has no home; loss can only be a plain Number and is separate from *Impact* | P3 (concept / wording) | `FINDINGS-PER-CASE-TYPE-1` |
 | 4 | *Add choice* leaves focus in *Name*, so the next keystrokes rename the field | P3 | `FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1` |
 | 5 | Radios are announced as "required"/"optional"; the condition word is truncated to "i."; *Technical details* (regex) stays open across fields | P3 (wording / a11y) | `FINDINGS-EDITOR-WORDING-1` — closed 2026-09-30 |
-| 6 | The Case detail panel does not scroll by itself; the whole document scrolls (blank band) and the list is squeezed to about 130 px | P3 | `CASE-DETAIL-DOCUMENT-SCROLL-1` |
+| 6 | The Case detail panel does not scroll by itself; the whole document scrolls (blank band) and the list is squeezed to about 130 px | P3 | `CASE-DETAIL-DOCUMENT-SCROLL-1` — **fixed 2026-09-30**: the admin shell scrolls at document level, so the mail shell (`object-mail.component.html`) is now bounded to `calc(100dvh - 120px)` (64 px header + 56 px footer, as the Pipelines shell); folder nav, list and detail panel each scroll in their own area |
 | 7 | The create toast shows the raw id `CASE-<uuid>`; the built-in *Records affected* is Short text, not Number | cosmetic, not filed | — |
 
 Screenshots (session scratchpad, not committed): `d6-01` … `d6-12`. The Case-panel steps were checked

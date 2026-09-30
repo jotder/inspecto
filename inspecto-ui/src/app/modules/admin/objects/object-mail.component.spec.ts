@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { Observable, of, Subject, throwError } from 'rxjs';
+import { NEVER, Observable, of, Subject, throwError } from 'rxjs';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { ObjectsService, OperationalObject, SessionService, WorkflowDef } from 'app/inspecto/api';
@@ -310,6 +310,25 @@ describe('ObjectMailComponent', () => {
         const { fixture } = await create();
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    // CASE-DETAIL-DOCUMENT-SCROLL-1: the admin shell scrolls at document level, so the mail shell must be
+    // viewport-bounded or an open Case's detail panel grows the whole page instead of scrolling itself.
+    it('bounds the shell to the viewport so the open detail panel is its own scroll container', async () => {
+        const { fixture, c, api } = await create({ type: 'CASE', list: of([kase('c1', 'OPEN')]) });
+        (api as unknown as { graph: Mock }).graph = vi.fn(() => NEVER); // the panel's Case contents fetch
+        c.detail.set(kase('c1', 'OPEN'));
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const shell = el.querySelector('.inspecto-mail-shell') as HTMLElement;
+        expect(shell.style.height).toBe('calc(100dvh - 120px)');
+        expect(shell.classList).toContain('overflow-hidden');
+        expect(shell.classList).toContain('min-h-0');
+        const panel = shell.querySelector('app-postmortem-panel') as HTMLElement;
+        expect(panel.classList).toContain('h-full');
+        const scroller = panel.querySelector(':scope > div > .overflow-y-auto') as HTMLElement;
+        expect(scroller.classList).toContain('min-h-0');
+        expect(scroller.classList).toContain('flex-auto');
     });
 
     // ── folder vocabulary: Incident and Case are distinct concepts (GLOSSARY §9) ─────────────────
