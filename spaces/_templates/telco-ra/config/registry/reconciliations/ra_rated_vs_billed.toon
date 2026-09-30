@@ -1,0 +1,7 @@
+name: ra_rated_vs_billed
+leftDataset: rated_usage_dataset
+rightDataset: billed_invoice_dataset
+keyColumns[1]: SUBSCRIBER_ID
+includeRecordCount: false
+compareColumns[1]{column,agg,toleranceType,tolerance}:
+  CHARGE,sum,absolute,0.05

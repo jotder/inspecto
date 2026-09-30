@@ -1,0 +1,30 @@
+name: ic_rates
+active: true
+
+dirs:
+  poll:       data/inbox/ic_rates
+  database:   data/ic_rates/database
+  backup:     data/ic_rates/backup
+  temp:       data/ic_rates/temp
+  errors:     data/ic_rates/errors
+  quarantine: data/ic_rates/quarantine
+  markers:    data/ic_rates/markers
+  status_dir: data/ic_rates/status
+  log_dir:    data/ic_rates/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: ic_rates_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

@@ -1,0 +1,30 @@
+name: mediated_xdr
+active: true
+
+dirs:
+  poll:       data/inbox/mediated_xdr
+  database:   data/mediated_xdr/database
+  backup:     data/mediated_xdr/backup
+  temp:       data/mediated_xdr/temp
+  errors:     data/mediated_xdr/errors
+  quarantine: data/mediated_xdr/quarantine
+  markers:    data/mediated_xdr/markers
+  status_dir: data/mediated_xdr/status
+  log_dir:    data/mediated_xdr/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: mediated_xdr_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

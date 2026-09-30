@@ -1,0 +1,7 @@
+name: ra_settlement_overbilling
+dataset: ra_settlement_exceptions_dataset
+measure: count
+comparator: gte
+threshold: 1
+severity: WARNING
+description: "A partner statement differs from our switch minutes x agreed rate beyond the tolerance. Runbook: RUNBOOKS.md section Settlement."

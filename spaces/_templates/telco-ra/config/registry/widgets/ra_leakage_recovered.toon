@@ -1,0 +1,7 @@
+vizType: kpi
+datasetId: ra_recovery_dataset
+controls:
+  value[1]{field,agg}:
+    recovered,sum
+options:
+  title: Leakage recovered (impact ledger)

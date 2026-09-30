@@ -1,0 +1,9 @@
+job:
+  name: ra_rerating
+  type: sql.template
+  sql: "SELECT r.XDR_ID AS ITEM_KEY, r.EVENT_DATE, r.SUBSCRIBER_ID, r.PLAN, r.SERVICE, r.USAGE_UNITS, r.CHARGE AS ACTUAL_CHARGE, ROUND(r.USAGE_UNITS * t.RATE_PER_UNIT, 2) AS EXPECTED_CHARGE, ROUND(ROUND(r.USAGE_UNITS * t.RATE_PER_UNIT, 2) - r.CHARGE, 2) AS LEAKAGE_AMOUNT, 'ra_rerating' AS CONTROL FROM rated_usage r LEFT JOIN tariff t ON t.PLAN = r.PLAN AND t.SERVICE = r.SERVICE WHERE t.RATE_PER_UNIT IS NULL OR ABS(ROUND(r.USAGE_UNITS * t.RATE_PER_UNIT, 2) - r.CHARGE) > CAST($tolerance AS DOUBLE)"
+  sources: "rated_usage,tariff"
+  sink_dataset: ra_rerating_exceptions
+  tolerance: "0.02"
+  cron: "10 5 * * *"
+  enabled: true

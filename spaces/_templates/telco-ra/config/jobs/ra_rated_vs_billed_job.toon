@@ -1,0 +1,6 @@
+job:
+  name: ra_rated_vs_billed
+  type: recon.run
+  reconciliation: ra_rated_vs_billed
+  cron: "5 5 * * *"
+  enabled: true

@@ -1,0 +1,24 @@
+raw:
+  name: BILLED_INVOICE
+  format: CSV
+  fields[4]{name,selector,type,description,unit,classification}:
+    INVOICE_ID,"0",VARCHAR,"Invoice line identifier","","INTERNAL"
+    BILL_PERIOD,"1",VARCHAR,"Bill period (yyyy-MM)","","INTERNAL"
+    SUBSCRIBER_ID,"2",VARCHAR,"Subscriber (synthetic)","","INTERNAL"
+    CHARGE,"3",DOUBLE,"Billed usage charge","USD","INTERNAL"
+mapping:
+  canonicalName: billed_invoice
+  rawName: BILLED_INVOICE
+  fields[4]:
+    - name: INVOICE_ID
+      from: INVOICE_ID
+      fn: keep
+    - name: BILL_PERIOD
+      from: BILL_PERIOD
+      fn: keep
+    - name: SUBSCRIBER_ID
+      from: SUBSCRIBER_ID
+      fn: keep
+    - name: CHARGE
+      from: CHARGE
+      fn: keep

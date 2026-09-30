@@ -59,7 +59,7 @@ matrix is authoritative for the Edition column**; this table mirrors it.
 |---|---|---|---|---|
 | `SPC-1` | Isolated **Spaces** (config / data / audit / duckdb per Space), CRUD without restart, one-time migrator | Must | ✅ SHIPPED — ⚠ "isolated" is a **layout** on Personal/Standard and an **enforced boundary** only on Enterprise (CP-07, SEC-06; §3.9) | All |
 | `SPC-2` | Whole-Space zip export / import with dry-run preview | Must | ✅ SHIPPED | All |
-| `SPC-3` | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | 🟡 **MECHANISM SHIPPED, ONE VERTICAL BUILT** — the server-side catalog exists; three templates ship (`orders-starter`, the `business-assurance` content pack since 2026-09-30, and the Fraud vertical `telco-fraud`, BUILT 2026-09-30 under `ASSURE-PACK-TELCO-FRAUD-1`, §3.5); Telecom RA, Financial Audit and Link Analysis still exist in no shipped artifact (§2 corrections) | All |
+| `SPC-3` | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | 🟡 **MECHANISM SHIPPED, CONTENT PARTIAL** — the server-side catalog exists; **four** templates ship (`orders-starter`; since 2026-09-30 the `business-assurance`, `telco-fraud` and `telco-ra` content packs — `telco-ra` is the generic half of Telecom RA, §3.5); Financial Audit and Link Analysis do not exist in any shipped artifact (§2 corrections) | All |
 | `SPC-4` | **Metadata Bundle v2**: selective config-only transfer with refs, provenance / `contentHash`, `requires`, drift fit-check | Should | ✅ SHIPPED 2026-07-07 (+ `authored-pipeline`, `job`, `saved-view` 2026-07-18; `connection` 2026-07-25; `enrichment` 2026-08-31) | All |
 | `SPC-5` | Per-tenant ABAC | Could | ✅ SHIPPED 2026-07-24 (two seeded policies; engage only when a `space` claim is mapped) ⚠ **Named for grep:** the decision seam those policies enforce through is `AccessDecider` (`inspecto-policy/.../PolicyEngine.java`, exercised by `ControlApiAccessDeciderTest`) — until 2026-09-09 that name appeared only in `REQUIREMENTS.md`. | E |
 
@@ -190,9 +190,56 @@ contents[]}` — the UI's `SpaceTemplateInfo`) beside a `config/` tree and an op
 **rewriting `${SPACE}` tokens** in every `.toon` (template configs address their own Space as
 `spaces/${SPACE}/…` — the portable bare-form the product writes, W3) and copies `data/` verbatim. An
 unreadable template is warned and skipped, never fatal. The SPA's gallery (`SpaceTemplateGalleryDialog`) is
-two-step ask-the-minimum and renders whatever the server publishes. **What is published: three templates** —
+two-step ask-the-minimum and renders whatever the server publishes. **What is published: four templates** —
 `orders-starter` (a pipeline, a quality rule, a dataset and a live dashboard), and, since 2026-09-30,
-`business-assurance` and `telco-fraud` (below). Nothing named Telecom RA, Financial Audit or Link Analysis exists (§2, §5).
+`business-assurance`, `telco-fraud` and `telco-ra` (below). Nothing named Financial Audit or Link Analysis
+exists (§2, §5).
+
+**`telco-ra` — the telecom revenue-assurance pack** (`ASSURE-PACK-TELCO-RA-1`, wave 5.2 of the assurance plan,
+2026-09-30; the vendor feed mapping stays parked). The pack is all configuration. There is no new Step Processor
+and no new Java in `main`.
+
+- **Feeds.** Eight canonical synthetic feeds, one Pipeline and Schema each: `switch_xdr`, `mediated_xdr`,
+  `rated_usage`, `billed_invoice`, `tariff`, `balance_ledger`, `ic_rates` and `ic_statement`.
+- **Reconciliations.**
+  - `ra_xdr_completeness` is a 3-way switch → mediation → rating Reconciliation on `XDR_ID`. `USAGE_UNITS`
+    has an absolute tolerance of 1.
+  - `ra_rated_vs_billed` is keyed on `SUBSCRIBER_ID`, with `CHARGE` at an absolute tolerance of 0.05 and
+    `includeRecordCount: false`. That flag is needed: many rated rows face one invoice row, so a count would
+    break every key.
+  - Both run from `recon.run` Jobs. A breach opens one Incident per Reconciliation.
+- **`sql.template` control Jobs.**
+  - `ra_rerating` checks each rated record against the tariff table.
+  - `ra_rollforward` checks opening + top-ups + adjustments − debits = closing.
+  - `ra_settlement` checks the partner statement against our switch minutes (per started minute) × `ic_rates`.
+  - Each writes an exceptions Dataset with a common `ITEM_KEY` / `EVENT_DATE` / `LEAKAGE_AMOUNT` / `CONTROL`
+    tail. `ra_leakage` unions them.
+  - The tolerances are Job keys (`tolerance`, `tolerance_pct`) that land in the SQL as `$params`. A `$param`
+    arrives as a string literal, so the SQL `CAST`s it.
+- **Alert Rules.** One per exceptions Dataset, `measure: count`, `comparator: gte`, `threshold: 1`. ⚠ An Alert
+  Rule threshold must be positive, so "any row" is spelled `gte 1` and not `gt 0`.
+- **Impact ledger.**
+  - Money reaches it through the objects: the analyst records impact and Disposition on the Incident or Case.
+  - `ra_objects_analytics` (`objects.analytics`) snapshots that into `impact_ledger`.
+  - `ra_recovery` keeps only the latest snapshot, `sampled_at = max(sampled_at)`. Summing every snapshot would
+    overcount.
+  - The "confirmed" and "recovered" widgets read `ra_recovery`.
+- **KPI definitions.** They ship as `kpi` Widgets plus the definition table in the template's `RUNBOOKS.md`,
+  not as `registry/kpis/`. The seed gate reads a KPI's Dataset Schema, and every pack Dataset is empty at apply,
+  so a KPI pack would refuse the whole template (the `orders-starter` precedent above).
+- **Golden test.**
+  - `inspecto-engine/src/test/java/com/gamma/job/TelcoRaGoldenTest.java` runs the template's OWN Jobs and
+    Reconciliations over the fixed-seed corpus of `TelcoRaCorpus` (seed `20260930`). That corpus is 600 xDRs
+    and 40 subscribers.
+  - It asserts the exact flagged key set per control. The counts are: completeness 15 Breaks, rated-vs-billed 4,
+    re-rating 5, roll-forward 3 and settlement 2.
+  - 19 benign look-alikes stay silent: rounding by one unit, a one-cent rating difference, a two-cent billing
+    difference, goodwill adjustments, and 0.4 % statement noise.
+  - It also pins that the committed `data/samples` are byte-identical to the generator's output. Regenerate
+    them with `-Dtelcora.regenerate=true`.
+  - Zeroing each tolerance turns the test red on the look-alikes (mutation-checked).
+  - ⚠ The corpus is loaded straight into the stores, not ingested through the eight Pipelines.
+- `ControlApiSpaceTemplateSeedGateTest` applies the template through the real seed gate.
 
 **A template may carry a KPI pack** (`config/registry/kpis/`, `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1),
 2026-09-28). `SpaceRoutes.createSpace` hands `createFromTemplate` a seed gate

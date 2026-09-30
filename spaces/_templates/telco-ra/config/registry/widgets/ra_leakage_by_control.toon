@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: ra_leakage_dataset
+controls:
+  x[1]{field}:
+    CONTROL
+  y[1]{field,agg}:
+    LEAKAGE_AMOUNT,sum
+options:
+  title: Leakage found by control

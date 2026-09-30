@@ -1,0 +1,8 @@
+job:
+  name: ra_recovery
+  type: sql.template
+  sql: "SELECT object_id, object_type, status, disposition, category, currency, suspected, confirmed, recovered, prevented, outstanding, sampled_at FROM impact_ledger WHERE sampled_at = (SELECT max(sampled_at) FROM impact_ledger)"
+  sources: impact_ledger
+  sink_dataset: ra_recovery
+  cron: "10 * * * *"
+  enabled: true

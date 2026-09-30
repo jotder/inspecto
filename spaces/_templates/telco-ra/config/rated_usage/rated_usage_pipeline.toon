@@ -1,0 +1,30 @@
+name: rated_usage
+active: true
+
+dirs:
+  poll:       data/inbox/rated_usage
+  database:   data/rated_usage/database
+  backup:     data/rated_usage/backup
+  temp:       data/rated_usage/temp
+  errors:     data/rated_usage/errors
+  quarantine: data/rated_usage/quarantine
+  markers:    data/rated_usage/markers
+  status_dir: data/rated_usage/status
+  log_dir:    data/rated_usage/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: rated_usage_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

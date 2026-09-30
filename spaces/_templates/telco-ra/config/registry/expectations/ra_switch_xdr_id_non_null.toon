@@ -1,0 +1,6 @@
+name: ra_switch_xdr_id_non_null
+targetType: pipeline
+target: switch_xdr
+column: XDR_ID
+kind: non_null
+severity: CRITICAL

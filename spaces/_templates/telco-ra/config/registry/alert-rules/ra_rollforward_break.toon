@@ -1,0 +1,7 @@
+name: ra_rollforward_break
+dataset: ra_rollforward_exceptions_dataset
+measure: count
+comparator: gte
+threshold: 1
+severity: CRITICAL
+description: "Balance roll-forward does not close: opening + top-ups + adjustments - debits differs from closing. Runbook: RUNBOOKS.md section Roll-forward."

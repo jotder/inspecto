@@ -1,0 +1,20 @@
+raw:
+  name: TARIFF
+  format: CSV
+  fields[3]{name,selector,type,description,unit,classification}:
+    PLAN,"0",VARCHAR,"Tariff plan","","INTERNAL"
+    SERVICE,"1",VARCHAR,"VOICE, SMS or DATA","","INTERNAL"
+    RATE_PER_UNIT,"2",DOUBLE,"Rate per second, event or MB","USD","INTERNAL"
+mapping:
+  canonicalName: tariff
+  rawName: TARIFF
+  fields[3]:
+    - name: PLAN
+      from: PLAN
+      fn: keep
+    - name: SERVICE
+      from: SERVICE
+      fn: keep
+    - name: RATE_PER_UNIT
+      from: RATE_PER_UNIT
+      fn: keep

@@ -1,0 +1,30 @@
+name: switch_xdr
+active: true
+
+dirs:
+  poll:       data/inbox/switch_xdr
+  database:   data/switch_xdr/database
+  backup:     data/switch_xdr/backup
+  temp:       data/switch_xdr/temp
+  errors:     data/switch_xdr/errors
+  quarantine: data/switch_xdr/quarantine
+  markers:    data/switch_xdr/markers
+  status_dir: data/switch_xdr/status
+  log_dir:    data/switch_xdr/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: switch_xdr_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

@@ -1,0 +1,30 @@
+name: balance_ledger
+active: true
+
+dirs:
+  poll:       data/inbox/balance_ledger
+  database:   data/balance_ledger/database
+  backup:     data/balance_ledger/backup
+  temp:       data/balance_ledger/temp
+  errors:     data/balance_ledger/errors
+  quarantine: data/balance_ledger/quarantine
+  markers:    data/balance_ledger/markers
+  status_dir: data/balance_ledger/status
+  log_dir:    data/balance_ledger/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: balance_ledger_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

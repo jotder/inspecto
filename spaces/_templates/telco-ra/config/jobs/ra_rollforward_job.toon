@@ -1,0 +1,9 @@
+job:
+  name: ra_rollforward
+  type: sql.template
+  sql: "SELECT SUBSCRIBER_ID || '|' || CAST(BALANCE_DATE AS VARCHAR) AS ITEM_KEY, BALANCE_DATE AS EVENT_DATE, SUBSCRIBER_ID, OPENING, TOPUPS, ADJUSTMENTS, USAGE_DEBITS, CLOSING, ROUND(OPENING + TOPUPS + ADJUSTMENTS - USAGE_DEBITS, 2) AS EXPECTED_CLOSING, ROUND(OPENING + TOPUPS + ADJUSTMENTS - USAGE_DEBITS - CLOSING, 2) AS LEAKAGE_AMOUNT, 'ra_rollforward' AS CONTROL FROM balance_ledger WHERE ABS(OPENING + TOPUPS + ADJUSTMENTS - USAGE_DEBITS - CLOSING) > CAST($tolerance AS DOUBLE)"
+  sources: balance_ledger
+  sink_dataset: ra_rollforward_exceptions
+  tolerance: "0.01"
+  cron: "15 5 * * *"
+  enabled: true

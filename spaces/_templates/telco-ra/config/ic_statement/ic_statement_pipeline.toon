@@ -1,0 +1,30 @@
+name: ic_statement
+active: true
+
+dirs:
+  poll:       data/inbox/ic_statement
+  database:   data/ic_statement/database
+  backup:     data/ic_statement/backup
+  temp:       data/ic_statement/temp
+  errors:     data/ic_statement/errors
+  quarantine: data/ic_statement/quarantine
+  markers:    data/ic_statement/markers
+  status_dir: data/ic_statement/status
+  log_dir:    data/ic_statement/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: ic_statement_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

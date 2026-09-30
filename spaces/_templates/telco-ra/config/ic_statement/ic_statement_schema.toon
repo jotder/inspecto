@@ -1,0 +1,29 @@
+partitionKey: EVENT_DATE
+raw:
+  name: IC_STATEMENT
+  format: CSV
+  fields[5]{name,selector,type,description,unit,classification}:
+    STATEMENT_ID,"0",VARCHAR,"Statement line identifier","","INTERNAL"
+    PARTNER,"1",VARCHAR,"Interconnect partner","","INTERNAL"
+    EVENT_DATE,"2",DATE,"Traffic date","","INTERNAL"
+    MINUTES,"3",BIGINT,"Minutes the partner bills","count","INTERNAL"
+    AMOUNT,"4",DOUBLE,"Amount the partner bills","USD","INTERNAL"
+mapping:
+  canonicalName: ic_statement
+  rawName: IC_STATEMENT
+  fields[5]:
+    - name: STATEMENT_ID
+      from: STATEMENT_ID
+      fn: keep
+    - name: PARTNER
+      from: PARTNER
+      fn: keep
+    - name: EVENT_DATE
+      from: EVENT_DATE
+      fn: keep
+    - name: MINUTES
+      from: MINUTES
+      fn: keep
+    - name: AMOUNT
+      from: AMOUNT
+      fn: keep

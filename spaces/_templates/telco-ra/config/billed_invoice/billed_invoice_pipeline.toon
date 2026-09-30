@@ -1,0 +1,30 @@
+name: billed_invoice
+active: true
+
+dirs:
+  poll:       data/inbox/billed_invoice
+  database:   data/billed_invoice/database
+  backup:     data/billed_invoice/backup
+  temp:       data/billed_invoice/temp
+  errors:     data/billed_invoice/errors
+  quarantine: data/billed_invoice/quarantine
+  markers:    data/billed_invoice/markers
+  status_dir: data/billed_invoice/status
+  log_dir:    data/billed_invoice/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: billed_invoice_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

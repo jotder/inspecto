@@ -1,0 +1,16 @@
+raw:
+  name: IC_RATES
+  format: CSV
+  fields[2]{name,selector,type,description,unit,classification}:
+    PARTNER,"0",VARCHAR,"Interconnect partner","","INTERNAL"
+    RATE_PER_MIN,"1",DOUBLE,"Agreed rate per started minute","USD","INTERNAL"
+mapping:
+  canonicalName: ic_rates
+  rawName: IC_RATES
+  fields[2]:
+    - name: PARTNER
+      from: PARTNER
+      fn: keep
+    - name: RATE_PER_MIN
+      from: RATE_PER_MIN
+      fn: keep

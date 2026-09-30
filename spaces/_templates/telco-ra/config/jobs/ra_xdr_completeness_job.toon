@@ -1,0 +1,6 @@
+job:
+  name: ra_xdr_completeness
+  type: recon.run
+  reconciliation: ra_xdr_completeness
+  cron: "0 5 * * *"
+  enabled: true

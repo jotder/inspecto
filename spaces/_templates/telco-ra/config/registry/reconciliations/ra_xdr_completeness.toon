@@ -1,0 +1,7 @@
+name: ra_xdr_completeness
+leftDataset: switch_xdr_dataset
+rightDataset: mediated_xdr_dataset
+thirdDataset: rated_usage_dataset
+keyColumns[1]: XDR_ID
+compareColumns[1]{column,agg,toleranceType,tolerance}:
+  USAGE_UNITS,sum,absolute,1

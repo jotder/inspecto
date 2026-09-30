@@ -1,0 +1,37 @@
+partitionKey: BALANCE_DATE
+raw:
+  name: BALANCE_LEDGER
+  format: CSV
+  fields[7]{name,selector,type,description,unit,classification}:
+    SUBSCRIBER_ID,"0",VARCHAR,"Subscriber (synthetic)","","INTERNAL"
+    BALANCE_DATE,"1",DATE,"Balance day","","INTERNAL"
+    OPENING,"2",DOUBLE,"Opening balance","USD","INTERNAL"
+    TOPUPS,"3",DOUBLE,"Top-ups in","USD","INTERNAL"
+    ADJUSTMENTS,"4",DOUBLE,"Signed adjustments (goodwill credits, corrections)","USD","INTERNAL"
+    USAGE_DEBITS,"5",DOUBLE,"Usage debited out","USD","INTERNAL"
+    CLOSING,"6",DOUBLE,"Closing balance","USD","INTERNAL"
+mapping:
+  canonicalName: balance_ledger
+  rawName: BALANCE_LEDGER
+  fields[7]:
+    - name: SUBSCRIBER_ID
+      from: SUBSCRIBER_ID
+      fn: keep
+    - name: BALANCE_DATE
+      from: BALANCE_DATE
+      fn: keep
+    - name: OPENING
+      from: OPENING
+      fn: keep
+    - name: TOPUPS
+      from: TOPUPS
+      fn: keep
+    - name: ADJUSTMENTS
+      from: ADJUSTMENTS
+      fn: keep
+    - name: USAGE_DEBITS
+      from: USAGE_DEBITS
+      fn: keep
+    - name: CLOSING
+      from: CLOSING
+      fn: keep

@@ -1,0 +1,7 @@
+name: ra_rated_charge_non_negative
+targetType: pipeline
+target: rated_usage
+column: CHARGE
+kind: range
+min: 0
+severity: MAJOR

@@ -1,0 +1,7 @@
+name: ra_overview
+tiles[5]{widgetId,span}:
+  ra_leakage_found,1
+  ra_leakage_items,1
+  ra_leakage_confirmed,1
+  ra_leakage_recovered,1
+  ra_leakage_by_control,2

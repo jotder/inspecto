@@ -1,0 +1,7 @@
+vizType: kpi
+datasetId: ra_leakage_dataset
+controls:
+  value[1]{field,agg}:
+    LEAKAGE_AMOUNT,sum
+options:
+  title: Leakage found (USD)
