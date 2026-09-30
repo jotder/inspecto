@@ -328,6 +328,29 @@ class ControlApiDossierTest {
         }
     }
 
+    /** D-U9 remainder: a link annotation in the dossier's log rendering carries the same wire id the Working Set serves. */
+    @Test
+    void aLinkAnnotationInTheDossierCarriesItsLinkId(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            Files.writeString(c.root().resolve("link-analysis.toon"), "masking_mode: none\n");
+            data(post(c, "/inv/investigations", CREATE));
+            data(post(c, "/inv/investigations/case-a/ops", "{\"op\":\"seed\",\"ids\":[\"alice\"],\"entityType\":\"subscriber\"}"));
+            data(post(c, "/inv/investigations/case-a/ops", "{\"op\":\"expand\"}"));
+            JsonNode ws = data(get(c, "/inv/investigations/case-a/working-set?of=links"));
+            String id = null;
+            for (JsonNode r : ws.get("rows"))
+                if (r.get("source").asText().equals("alice") && r.get("target").asText().equals("carol")) id = r.get("linkId").asText();
+            assertTrue(id != null && id.startsWith("lk."), ws.toString());
+            data(post(c, "/inv/investigations/case-a/ops", "{\"op\":\"annotate\",\"links\":[\"" + id + "\"],\"note\":\"n\"}"));
+
+            JsonNode entries = data(get(c, "/inv/investigations/case-a/dossier")).at("/renderings/json/log");
+            JsonNode last = entries.get(entries.size() - 1);
+            JsonNode links = last.has("params") ? last.get("params").get("links") : last.get("links");
+            assertEquals(1, links.size(), entries.toString());
+            assertEquals(id, links.get(0).get("linkId").asText());
+        }
+    }
+
     /** Owner-only with an ARMED Authenticator — with no Subject ownership is unenforced, so this is the only proof. */
     @Test
     void onlyTheOwnerGetsTheDossier(@TempDir Path cfg, @TempDir Path root) throws Exception {

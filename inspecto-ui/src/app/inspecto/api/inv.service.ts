@@ -271,6 +271,8 @@ export type InvestigationOpRequest =
     /** LA-19: `note` ≤ 2000 chars; every id must be in the Working Set. ⛔ Never send `confidence` — its scale is
      *  undecided (D-U9) and the server refuses it with 422. */
     | { op: 'annotate'; ids: string[]; note: string }
+    /** D-U9: a note on LINKS, each named by the `linkId` a Working Set serves (`lk.…`); an annotate names ids OR links. */
+    | { op: 'annotate'; links: string[]; note: string }
     /** LA-17 (§4.4.1): resolved at the Entity List's HEAD and sealed in the log — replay never re-reads the list.
      *  Refused at append: unknown list 404 · retired list / its Entity Type not in force 409 · over 5 000 members 422. */
     | { op: 'excludeBy'; listId: string; reason: string }
@@ -369,6 +371,8 @@ export interface WorkingSetLink {
     kind: string | null;
     count: number;
     admittedBy: number;
+    /** D-U9: the wire id (`lk.` + base64url of source NUL target NUL kind) — what `annotate` names a link by. */
+    linkId?: string;
 }
 
 export interface WorkingSetExclusion {
@@ -386,6 +390,17 @@ export interface WorkingSetAnnotation {
     confidence?: string;
 }
 
+/** D-U9: one note on one link, from the `annotate` step that wrote it. */
+export interface WorkingSetLinkAnnotation {
+    source: string;
+    target: string;
+    kind: string | null;
+    linkId?: string;
+    step: number;
+    note: string;
+    confidence?: string;
+}
+
 /** The full Working Set — only `/replay` returns it. */
 export interface WorkingSet {
     entities: WorkingSetEntity[];
@@ -393,7 +408,30 @@ export interface WorkingSet {
     excluded: WorkingSetExclusion[];
     /** LA-19: ABSENT when no entity is annotated (an unannotated state hashes as it did before). */
     annotations?: WorkingSetAnnotation[];
+    /** D-U9: ABSENT when no link is annotated. */
+    linkAnnotations?: WorkingSetLinkAnnotation[];
     hash: string;
+}
+
+/** One row of `GET /inv/investigations` — what the caller may read: their own and those shared through an open Case. */
+export interface InvestigationListItem {
+    id: string;
+    title: string | null;
+    dataset: string;
+    owner: string | null;
+    createdAt: string;
+    headStep: number;
+    caseRef?: string;
+    access: 'owner' | 'case-member';
+    readOnly: boolean;
+}
+
+export interface InvestigationList {
+    items: InvestigationListItem[];
+    total: number;
+    limit: number;
+    offset: number;
+    truncated: boolean;
 }
 
 export interface InvestigationReplayRequest {
@@ -913,7 +951,11 @@ export class InvService {
         return this.http.post<BranchingPatternResult>(apiUrl('/inv/pattern/branching'), req);
     }
 
-    // ── LA-10 Investigation. There is NO list or get-one route: the caller remembers the ids it created. ──
+    // ── LA-10 Investigation. `GET /inv/investigations` lists what the caller may read; there is no get-one route. ──
+
+    listInvestigations(limit?: number, offset?: number): Observable<InvestigationList> {
+        return this.http.get<InvestigationList>(apiUrl('/inv/investigations'), { params: toParams({ limit, offset }) });
+    }
 
     createInvestigation(req: InvestigationCreateRequest): Observable<InvestigationHeader> {
         return this.http.post<InvestigationHeader>(apiUrl('/inv/investigations'), req);

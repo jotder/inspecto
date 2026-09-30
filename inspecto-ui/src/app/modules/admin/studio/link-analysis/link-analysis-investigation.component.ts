@@ -20,6 +20,7 @@ import {
     InstantiateTemplateResult,
     InvService,
     InvestigationCoverage,
+    InvestigationListItem,
     InvestigationLogEntry,
     WorkingSetRelationName,
     apiErrorMessage,
@@ -99,6 +100,20 @@ export class LinkAnalysisInvestigationComponent {
         nonNullable: true,
         validators: [Validators.required, Validators.maxLength(2000)],
     });
+    /** D-U9: a note on one LINK — its own field, because the entity note is only shown while an entity is selected. */
+    readonly linkNote = new FormControl('', {
+        nonNullable: true,
+        validators: [Validators.required, Validators.maxLength(2000)],
+    });
+    /** The `linkId` of the link picked for a note. */
+    readonly linkPick = signal<string | null>(null);
+    /** `GET /inv/investigations`: what the caller may read (own + shared through an open Case); null until asked. */
+    readonly listed = signal<InvestigationListItem[] | null>(null);
+    readonly listedTruncated = signal(false);
+    readonly listBusy = signal(false);
+    readonly listError = signal('');
+    /** Open an Investigation by its id (there is no get-one route, so a bad id surfaces as the open's own error). */
+    readonly openId = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] });
     readonly reread = signal(false);
     /** LA-19: the last coverage read and the Investigation it is FOR — rendered only while that one is open. */
     readonly coverage = signal<InvestigationCoverage | null>(null);
@@ -133,6 +148,13 @@ export class LinkAnalysisInvestigationComponent {
             label: r.title ? `${r.title} (${r.id})` : r.id,
             hint: r.parentId ? `Fork of ${r.parentId}` : undefined,
         })),
+    );
+
+    /** D-U9: the Working Set's links that carry a wire id — what a link note may name. */
+    readonly linkOptions = computed<PickerOption[]>(() =>
+        (this.store.workingSet()?.links ?? [])
+            .filter((l) => !!l.linkId)
+            .map((l) => ({ value: l.linkId!, label: `${l.source} → ${l.target}${l.kind ? ` (${l.kind})` : ''}` })),
     );
 
     /** The selected entity's raw ids that are in the Working Set — what expand/keep/hide/exclude may name. */
@@ -219,6 +241,48 @@ export class LinkAnalysisInvestigationComponent {
         }
         const ok = await this.store.apply({ op: 'annotate', ids: this.selectedInSet(), note: this.note.value.trim() });
         if (ok) this.note.reset('');
+    }
+
+    /** D-U9: a note on the picked link, named by its `linkId`. */
+    async annotateLink(): Promise<void> {
+        const linkId = this.linkPick();
+        if (!linkId) return;
+        if (this.linkNote.invalid) {
+            this.linkNote.markAsTouched();
+            return;
+        }
+        const ok = await this.store.apply({ op: 'annotate', links: [linkId], note: this.linkNote.value.trim() });
+        if (ok) this.linkNote.reset('');
+    }
+
+    /** Ask the server which Investigations the caller may read. */
+    async listInvestigations(): Promise<void> {
+        if (this.listBusy()) return;
+        this.listBusy.set(true);
+        this.listError.set('');
+        try {
+            const res = await firstValueFrom(this.inv.listInvestigations());
+            this.listed.set(res.items);
+            this.listedTruncated.set(res.truncated);
+        } catch (err) {
+            this.listError.set(apiErrorMessage(err, 'Could not list the Investigations.'));
+        } finally {
+            this.listBusy.set(false);
+        }
+    }
+
+    /** Open a listed Investigation — remembered in the saved view like any other. */
+    openListed(item: InvestigationListItem): void {
+        this.order.set(null);
+        this.store.adopt(item.id, item.title ?? undefined, this.store.activeRef() ?? undefined);
+    }
+
+    openById(): void {
+        const id = this.openId.value.trim();
+        if (!id || this.openId.invalid) return;
+        this.order.set(null);
+        this.store.adopt(id, undefined, this.store.activeRef() ?? undefined);
+        this.openId.reset('');
     }
 
     /** LA-19: which days of the Investigation's own window have no rows at all (a gap is not innocence). */

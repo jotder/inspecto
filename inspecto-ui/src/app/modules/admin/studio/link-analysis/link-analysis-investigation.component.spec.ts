@@ -77,7 +77,7 @@ const LOG: InvestigationLog = {
 
 const WS: WorkingSet = {
     entities: [{ id: 'a', type: null, hop: 0, seed: 'a', admittedBy: 1, hidden: false, kept: false }],
-    links: [],
+    links: [{ source: 'a', target: 'b', kind: 'voice', count: 2, admittedBy: 2, linkId: 'lk.YQBiAHZvaWNl' }],
     excluded: [],
     hash: '',
 };
@@ -120,6 +120,27 @@ function create() {
             of({ head: { step: 2, workingSetHash: 'sha256:h2' }, rows: [], total: 0, truncated: false, cached: false }),
         ),
         investigationCoverage: vi.fn(() => of(COVERAGE)),
+        listInvestigations: vi.fn(() =>
+            of({
+                items: [
+                    {
+                        id: 'inv-9',
+                        title: 'Shared',
+                        dataset: 'calls',
+                        owner: 'bob',
+                        createdAt: '',
+                        headStep: 3,
+                        caseRef: 'case-1',
+                        access: 'case-member',
+                        readOnly: true,
+                    },
+                ],
+                total: 1,
+                limit: 100,
+                offset: 0,
+                truncated: false,
+            }),
+        ),
         investigationMeasures: vi.fn(() => of({ head: { step: 2, workingSetHash: 'sha256:h2' }, measures: [] })),
         // LA-17: the hosted Entity Lists section reads the Space's lists on creation.
         listEntityLists: vi.fn(() => of({ lists: [], headSeq: 0, headHash: null })),
@@ -160,7 +181,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', () => {
     it('start state: explains the binding, starts from the projection, and passes axe', async () => {
         const { fixture, el, inv, button } = create();
         expect(el.textContent).toContain("the query's filter is not applied");
-        expect(el.textContent).toContain('no server-side list');
+        expect(el.textContent).toContain('List Investigations asks the server');
         await expectNoA11yViolations(el);
 
         // D-U5: no purpose, no start — the server would answer 422.
@@ -304,6 +325,52 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', () => {
         );
         expect(el.querySelector('[aria-label="Annotations"]')).toBeNull();
         expect(comp.note.value).toBe('burner pattern'); // kept for a retry
+    });
+
+    it('D-U9: a link note is sent by its linkId and sealed link notes render', async () => {
+        const { fixture, store, el, inv, button } = create();
+        await openInv(store);
+        fixture.detectChanges();
+        const comp = fixture.debugElement.children[0].componentInstance as LinkAnalysisInvestigationComponent;
+        comp.linkPick.set('lk.YQBiAHZvaWNl');
+        comp.linkNote.setValue('shared SIM box');
+        fixture.detectChanges();
+        button('Annotate link').click();
+        await fixture.whenStable();
+        expect(inv.appendInvestigationOp).toHaveBeenCalledWith('inv-1', {
+            op: 'annotate',
+            links: ['lk.YQBiAHZvaWNl'],
+            note: 'shared SIM box',
+        });
+
+        inv.replayInvestigation.mockReturnValue(
+            of({
+                workingSet: {
+                    ...WS,
+                    linkAnnotations: [
+                        { source: 'a', target: 'b', kind: 'voice', linkId: 'lk.YQBiAHZvaWNl', step: 3, note: 'shared SIM box' },
+                    ],
+                },
+            }),
+        );
+        await store.open('inv-1');
+        fixture.detectChanges();
+        expect(el.querySelector('[aria-label="Link annotations"]')?.textContent).toContain('a → b (voice)');
+    });
+
+    it('lists the Investigations the caller may read and opens one', async () => {
+        const { fixture, store, el, inv, button } = create();
+        button('List Investigations').click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const section = el.querySelector('[aria-label="Investigations"]') as HTMLElement;
+        expect(section.textContent).toContain('Shared');
+        expect(section.textContent).toContain('shared through Case case-1 (read-only)');
+
+        (section.querySelector('ul button') as HTMLButtonElement).click();
+        await fixture.whenStable();
+        expect(store.activeId()).toBe('inv-9');
+        expect(inv.investigationLog).toHaveBeenCalledWith('inv-9');
     });
 
     it('LA-19: coverage names the zero-row days and says per-Collector coverage is not assessed; a 422 is shown', async () => {

@@ -13,6 +13,48 @@
         ></inspecto-option-picker>
     }
 
+    <!-- ── open an Investigation the caller may read (own + shared through an open Case) ── -->
+    <section class="flex flex-col gap-1" aria-label="Investigations">
+        <div class="flex flex-wrap items-center gap-2">
+            <button mat-stroked-button [disabled]="listBusy()" (click)="listInvestigations()">
+                List Investigations
+            </button>
+            <mat-form-field class="min-w-0 flex-1" subscriptSizing="dynamic">
+                <mat-label>Open by id</mat-label>
+                <input matInput [formControl]="openId" (keydown.enter)="openById()" />
+            </mat-form-field>
+            <button mat-button [disabled]="!openId.value.trim() || store.busy()" (click)="openById()">Open</button>
+        </div>
+        @if (listError()) {
+            <inspecto-alert variant="error" title="Investigations">{{ listError() }}</inspecto-alert>
+        }
+        @if (listed(); as items) {
+            @if (!items.length) {
+                <p class="text-secondary m-0 text-xs">No Investigation you may read.</p>
+            } @else {
+                <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs">
+                    @for (i of items; track i.id) {
+                        <li class="flex items-center gap-2">
+                            <span class="min-w-0 flex-1 truncate">
+                                <strong>{{ i.title || i.id }}</strong>
+                                @if (i.title) {
+                                    <span class="text-secondary">({{ i.id }})</span>
+                                }
+                                — {{ i.dataset }}, {{ i.headStep }} steps{{
+                                    i.access === 'case-member' ? ', shared through Case ' + i.caseRef + ' (read-only)' : ''
+                                }}
+                            </span>
+                            <button mat-button [disabled]="store.busy()" (click)="openListed(i)">Open</button>
+                        </li>
+                    }
+                </ul>
+                @if (listedTruncated()) {
+                    <p class="text-secondary m-0 text-xs">More Investigations exist than are listed.</p>
+                }
+            }
+        }
+    </section>
+
     @if (!store.active()) {
         <!-- ── start ── -->
         @if (projection(); as p) {
@@ -50,8 +92,8 @@
             <inspecto-alert variant="info" title="Nothing to investigate yet">{{ projectionIssue() }}</inspecto-alert>
         }
         <p class="text-secondary m-0 text-xs">
-            There is no server-side list of Investigations: this screen remembers the ones it created, and saving the
-            view keeps them with it.
+            List Investigations asks the server for the ones you may read; this screen also remembers the ones it
+            opened, and saving the view keeps them with it.
         </p>
     } @else {
         <!-- ── the open Investigation ── -->
@@ -261,6 +303,44 @@
                         </li>
                     }
                 </ul>
+            </section>
+        }
+
+        @if (store.workingSet()?.linkAnnotations?.length) {
+            <section aria-label="Link annotations">
+                <h3 class="text-secondary m-0 mb-1 text-xs font-semibold uppercase tracking-wide">Link annotations</h3>
+                <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs">
+                    @for (a of store.workingSet()!.linkAnnotations; track a.step + ':' + (a.linkId ?? a.source + a.target)) {
+                        <li [attr.title]="a.linkId">
+                            <strong>{{ a.source }} → {{ a.target }}{{ a.kind ? ' (' + a.kind + ')' : '' }}</strong> —
+                            {{ a.note }}{{ a.confidence ? ' [' + a.confidence + ']' : '' }} (step {{ a.step }})
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+
+        @if (linkOptions().length) {
+            <section class="flex flex-col gap-1" aria-label="Annotate a link">
+                <inspecto-option-picker
+                    label="Link"
+                    [options]="linkOptions()"
+                    [ngModel]="linkPick()"
+                    (ngModelChange)="linkPick.set($event)"
+                    placeholder="Pick a link to annotate"
+                ></inspecto-option-picker>
+                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                    <mat-label>Link note</mat-label>
+                    <textarea matInput rows="2" [formControl]="linkNote"></textarea>
+                    @if (linkNote.hasError('required')) {
+                        <mat-error>Write the note first.</mat-error>
+                    } @else if (linkNote.hasError('maxlength')) {
+                        <mat-error>At most 2000 characters.</mat-error>
+                    }
+                </mat-form-field>
+                <button mat-stroked-button [disabled]="store.busy() || !linkPick()" (click)="annotateLink()">
+                    Annotate link
+                </button>
             </section>
         }
 

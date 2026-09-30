@@ -96,7 +96,7 @@ public final class DossierRoutes implements RouteModule {
         // D-U6: the dossier is masked as it leaves — the manifest (hashes only) is unaffected, and custody is
         // verified against the store by /dossier/verify, which never sees a pseudonym.
         EntityMasking mask = EntityMasking.of(inv.inv(), snapshotEntityIds(in.snapshots()));
-        @SuppressWarnings("unchecked") Map<String, Object> dossier = (Map<String, Object>) mask.apply(built);
+        @SuppressWarnings("unchecked") Map<String, Object> dossier = (Map<String, Object>) LinkIds.stamp(mask.apply(built));   // D-U9: link ids minted from what the caller sees
         @SuppressWarnings("unchecked") Map<String, Object> manifest = (Map<String, Object>) dossier.get("manifest");
         @SuppressWarnings("unchecked") Map<String, Object> integrity = (Map<String, Object>) dossier.get("integrity");
         int stepsAt = at;
