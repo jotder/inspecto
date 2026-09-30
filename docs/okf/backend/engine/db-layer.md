@@ -252,10 +252,21 @@ transaction against `_inspecto_registered_consignments` (`target_table`, `consig
 holder's re-registration of the same `consignment_id` is skipped, and a crash between insert and record rolls both
 back (no double, no record-less registration). The table is created on demand (`CREATE TABLE IF NOT EXISTS`), so an
 existing lake needs no migration; rows registered before it have no record and are not deduplicated retroactively.
-`finalizeSource` passes the batch id; the job lane (`registerInLakehouse`, unchanged) has none, so the key is a
-SHA-256 of its sorted file paths. ⚠ Same paths rewritten with new content are skipped on that lane. ⚠ Two truly
-concurrent registrars could both pass the check (DuckLake has no constraints); the lease excludes that. ⚠ Tested
-on a native attached DuckDB (same SQL and transactions), NOT a real DuckLake ATTACH.
+`finalizeSource` passes the batch id, suffixed per sink (`<id>|<sink.database>`, `sinkKey`) so two sinks that
+resolve to one lake and table never skip each other. The job lane passes its run's `batchId` (unique per run:
+`currentTimeMillis`, unless the operator pins `batch_id`, in which case a re-run with that id is skipped), so a
+full recompute over the same stable paths registers again while a retry inside one run dedupes. A caller with no
+id (none remain in main code) gets a key over each file's path, size and mtime, never paths alone.
+⚠ `RecordReplay.replay` reaches `finalizeSource` through `CollectorProcessor.ingestCandidates` and registers
+under the replay input's own consignment id (a different file, so a different id); verified by reading, not tested.
+⚠ Residual (`CONSIGNMENT-ID-DETERMINISTIC-1`): `ConsignmentId` digests path plus BYTE SIZE, so an in-place edit
+of the same length keeps its id and is now SKIPPED in the lake (the old rows stay; before, it duplicated).
+Pinned by `DuckLakeRegistrarIdempotentTest.aSameIdEditOfDifferentContentIsSkippedByDesign`.
+⚠ Side effect: `_inspecto_registered_consignments` lives in the target schema, so anything that enumerates
+lake tables sees it. ⚠ Two truly concurrent registrars could both pass the check (DuckLake has no
+constraints); the lease excludes that. Identifiers and paths are quote-escaped. Verified on a native attached
+DuckDB, and by `realDuckLakeRegistersOnce` against a REAL DuckLake catalog when the `ducklake` extension is
+already cached in the machine's DuckDB extension directory (LOAD only; it skips elsewhere, so CI may not run it).
 ⚠ A long lease-table outage makes every run refuse each cycle ("lease unverifiable"), with no attempt spent and
 nothing quarantined; nothing raises a Signal for it, so the symptom is files not draining and the log line.
 Job / authored-Pipeline runs hold `SCOPE_JOB` / `SCOPE_AUTHORED` claims through `RunClaims`, which has no validity

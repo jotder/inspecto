@@ -81,7 +81,9 @@ public final class DuckLakeRegistrar {
         boolean multi = cfg.sinks().size() > 1;
         for (Registration r : plan)
             requireRegistrationConfigured(r.duckLake(), multi ? r.sink().database() : null);
-        for (Registration r : plan) registerOne(r.files(), tableName, r.duckLake(), consignmentId);
+        for (Registration r : plan)   // per-sink key: sinks sharing a lake and table must not skip each other
+            registerOne(r.files(), tableName, r.duckLake(),
+                    sinkKey(consignmentId, r.sink().database()));
     }
 
     /** One destination's share of a batch: the sink, its effective lake ({@code null} if none), its files. */
@@ -234,17 +236,19 @@ public final class DuckLakeRegistrar {
                              String consignmentId) throws java.sql.SQLException {
         String key = (consignmentId == null || consignmentId.isBlank()) ? derivedKey(outputPaths) : consignmentId;
         String target = schema + "." + table;
-        String rec = "lake.\"" + schema + "\".\"" + RECORD_TABLE + '"';
+        String schemaQ = ident(schema);
+        String rec = "lake." + schemaQ + "." + ident(RECORD_TABLE);
+        String tbl = "lake." + schemaQ + "." + ident(table);
         try (Statement stmt = conn.createStatement()) {
-            stmt.execute("CREATE SCHEMA IF NOT EXISTS lake.\"" + schema + '"');
-            stmt.execute(String.format(
-                    "CREATE TABLE IF NOT EXISTS lake.\"%s\".\"%s\" AS SELECT * FROM read_parquet('%s') LIMIT 0",
-                    schema, table, outputPaths.get(0).replace("\\", "/")));
+            stmt.execute("CREATE SCHEMA IF NOT EXISTS lake." + schemaQ);
+            stmt.execute("CREATE TABLE IF NOT EXISTS " + tbl + " AS SELECT * FROM read_parquet("
+                    + lit(outputPaths.get(0)) + ") LIMIT 0");
             stmt.execute("CREATE TABLE IF NOT EXISTS " + rec
                     + " (target_table VARCHAR, consignment_id VARCHAR, registered_at TIMESTAMP)");
-            String pathList = outputPaths.stream().map(p -> '\'' + p.replace("\\", "/") + '\'')
+            String pathList = outputPaths.stream().map(DuckLakeRegistrar::lit)
                     .collect(Collectors.joining(", ", "[", "]"));
             stmt.execute("BEGIN");
+            boolean committed = false;
             try {
                 try (java.sql.PreparedStatement q = conn.prepareStatement(
                         "SELECT count(*) FROM " + rec + " WHERE target_table = ? AND consignment_id = ?")) {
@@ -253,14 +257,12 @@ public final class DuckLakeRegistrar {
                     try (java.sql.ResultSet rs = q.executeQuery()) {
                         rs.next();
                         if (rs.getLong(1) > 0) {
-                            stmt.execute("ROLLBACK");
                             log.info("DuckLake: {} already registered into {} -- skipped", key, target);
-                            return;
+                            return;   // the finally rolls the (read-only) transaction back
                         }
                     }
                 }
-                stmt.execute(String.format("INSERT INTO lake.\"%s\".\"%s\" SELECT * FROM read_parquet(%s)",
-                        schema, table, pathList));
+                stmt.execute("INSERT INTO " + tbl + " SELECT * FROM read_parquet(" + pathList + ")");
                 try (java.sql.PreparedStatement ins = conn.prepareStatement(
                         "INSERT INTO " + rec + " VALUES (?, ?, now())")) {
                     ins.setString(1, target);
@@ -268,19 +270,43 @@ public final class DuckLakeRegistrar {
                     ins.executeUpdate();
                 }
                 stmt.execute("COMMIT");
-            } catch (java.sql.SQLException | RuntimeException e) {
-                try { stmt.execute("ROLLBACK"); } catch (java.sql.SQLException ignored) { /* already ended */ }
-                throw e;
+                committed = true;
+            } finally {
+                // finally, not catch: an Error must not leave a caller-owned connection in an open transaction.
+                if (!committed) {
+                    try { stmt.execute("ROLLBACK"); } catch (java.sql.SQLException ignored) { /* already ended */ }
+                }
             }
         }
     }
 
-    /** Key for callers with no consignment id: SHA-256 of the sorted, slash-normalised file paths. */
+    /** Per-sink key, so sinks that resolve to one lake and table never skip each other. Stable across retries. */
+    static String sinkKey(String consignmentId, String sinkDatabase) {
+        return consignmentId == null ? null : consignmentId + "|" + sinkDatabase;
+    }
+
+    /** A double-quoted SQL identifier, embedded quotes doubled. */
+    static String ident(String name) {
+        return '"' + name.replace("\"", "\"\"") + '"';
+    }
+
+    /** A single-quoted SQL string literal of a path (slash-normalised), embedded quotes doubled. */
+    static String lit(String path) {
+        return '\'' + path.replace("\\", "/").replace("'", "''") + '\'';
+    }
+
+    /**
+     * Key for a caller with no consignment id: SHA-256 of each sorted file's path, size and mtime, so the
+     * same paths REWRITTEN with new content get a new key. Callers with a run id must pass it instead.
+     */
     static String derivedKey(List<String> outputPaths) {
         try {
             var md = java.security.MessageDigest.getInstance("SHA-256");
-            outputPaths.stream().map(p -> p.replace("\\", "/")).sorted()
-                    .forEach(p -> md.update((p + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            outputPaths.stream().map(p -> p.replace("\\", "/")).sorted().forEach(p -> {
+                java.io.File f = new java.io.File(p);
+                md.update((p + '|' + f.length() + '|' + f.lastModified() + "\n")
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            });
             return "files:" + java.util.HexFormat.of().formatHex(md.digest());
         } catch (java.security.NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);

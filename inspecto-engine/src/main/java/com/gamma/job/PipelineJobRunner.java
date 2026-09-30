@@ -425,7 +425,7 @@ public final class PipelineJobRunner implements Job {
             List<String> parts = realWriter.outputs().stream().map(PartitionOutput::partition).distinct().toList();
             registerViews(g, pipelineId, srcStores, dir);              // T32 Phase C — sink.view → durable definition
             recordStoreArtifacts(artifacts, g, realWriter.rowsByStore());
-            registerInLakehouse(realWriter);                           // DUCKLAKE-GRAPH-LANE-1 (scale-out §5.4)
+            registerInLakehouse(realWriter, batchId);                         // DUCKLAKE-GRAPH-LANE-1 (scale-out §5.4)
             bus.publish(new ConsignmentEvent(cfg.name(), batchId, "SUCCESS", parts, realWriter.totalRows(), ms, 0));
             log.info("[PIPELINEJOB] {} ran pipeline '{}' (source_store(s) {}): {} file(s), {} row(s) → {}",
                     cfg.name(), pipelineId, srcStores, realWriter.outputs().size(), realWriter.totalRows(),
@@ -613,7 +613,7 @@ public final class PipelineJobRunner implements Job {
      * path's rule — otherwise this lane would stay the one way to produce invisible output on a deployment
      * that has forbidden it.
      */
-    private static void registerInLakehouse(PartitionSinkWriter writer) {
+    private static void registerInLakehouse(PartitionSinkWriter writer, String batchId) {
         LakehouseCatalog.Catalog cat = LakehouseCatalog.configured();
         if (cat == null) {
             if (Topology.partitioned())
@@ -629,7 +629,7 @@ public final class PipelineJobRunner implements Job {
         writer.outputsByStore().forEach((store, outs) ->
                 DuckLakeRegistrar.registerInto(
                         outs.stream().map(PartitionOutput::outputFile).toList(),
-                        store, cat.url(), cat.dataPath(), null));
+                        store, cat.url(), cat.dataPath(), null, batchId));
     }
 
     private static void recordStoreArtifacts(ArtifactRecorder artifacts, PipelineGraph g,
