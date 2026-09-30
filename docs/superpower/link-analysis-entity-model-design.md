@@ -418,7 +418,31 @@ append time and replay never re-reads the list:
 - **Pinned by** `ControlApiInvestigationResolveTest` (8), mutation-checked: dropping the resolution from the hash, a fork
   that re-seals, a template that carries the pin, no per-member masking, group-level masking and ignoring `atSeq` each
   turn a test red on the expected value.
-- ⛔ **Awaiting operator approval**: `ConfigWriteFunnelTest` and `DecisionRuleWritersTest` flag
-  `InvestigationRoutes#sealResolution` — their signal is `new EntityFactLog(`, which here READS the log, exactly as the
-  already-listed `InvestigationRoutes#sealList`. No inventory entry was added (the entry needs operator approval); both
-  tests stay red until one is.
+- ✅ **Writer inventories — operator-approved 2026-09-30** (`e11d04d89`): `ConfigWriteFunnelTest` and
+  `DecisionRuleWritersTest` list `InvestigationRoutes#sealResolution` as an Identity Fact log READER (their signal is
+  `new EntityFactLog(`, which here reads the log, as the already-listed `InvestigationRoutes#sealList` does).
+- **Merged traversal — opt-in per op (operator decisions 2026-09-30).** The display-only view above stays the default;
+  `expand` and `exclude` take `merged: true` (a boolean, set in the params only when true, so every older hash and
+  replay is unchanged), 422 when no resolve is in force at that point.
+  - **Merged expand**: the route widens the frontier to every member of each group a frontier entity resolves to —
+    the admitted entities resolving to it, and every value of the bound columns whose key under a member type's
+    SEALED normaliser is a member (a DISTINCT read through `InvRoutes.relationFor`, capped at 20 000 per column, never a
+    sample) — and seals it in the rung as `query.merged {groupOf{value → group}, anchorOf{non-admitted member value →
+    the admitted entity it stands for}}`. The evaluator admits a reached member value at its anchor's hop and seed
+    (the same identity), the far end at `hop+1`. `reread` re-runs the sealed widened query; nothing re-reads the fact log.
+  - **Fences count the COMBINED fan-out**: `maxFanOut` partitions per GROUP (`fr(id, g)`; a plain expand's `g` is its
+    own id, so its SQL answer is unchanged), `budget` caps the whole widened read, and four-eyes (D-U7) compares those
+    same numbers — an unbounded merged fan-out goes pending and the approver runs it merged. `refuseIfSensitive` is
+    not on the expand path (expand has four-eyes pending instead); the widened frontier is also capped at 1 000.
+  - **Merged exclude**: seals `groups[{id, members[], normalisers{type → rule}}]` from the state it ran on (422 when
+    no named id resolves to a group); every admitted entity whose typed key is a member leaves (keep still protects)
+    and the members are remembered (`excludedGroups` in the Working Set, hashed only when present), so a later expand
+    never admits a raw id keying to one. The log shows ONE line for the group, listing its members — masked per
+    member key (D-U6), as the line is free text over the masking universe.
+  - **Readers**: `?at` / replay / Dossier read the sealed rung and groups; measures (`entities`, `identities`) count
+    the admitted members as usual; coverage reads only the window. **Fork** re-reads a merged expand against the new
+    order (a merged expand re-ordered before its resolve is a 422) and re-seals a merged exclude's groups against the
+    fork's state. **Template (D-E8)**: the flag is method and travels inside the expand's rung with no special rule;
+    `exclude` stays a dropped case op.
+  - Pinned by `ControlApiInvestigationMergedTraversalTest` (6), mutation-checked: a merged expand that fans out from
+    the named entity only, and a fan-out cap per member instead of per group, each turn it red on the expected value.

@@ -62,6 +62,14 @@ import java.util.TreeSet;
  *       position: each admitted entity's typed keys ({@link State#keysOf}), and every sealed group one of them is in,
  *       shown as a merged node with ALL its member keys, the assertions that joined it, and the raw entity ids it
  *       covers. So an entity admitted AFTER the resolve is resolved too, under the rule as sealed.</li>
+ *   <li>{@code expand {..., merged: true}} / {@code exclude {..., merged: true}} (LA-17 merged traversal, operator
+ *       2026-09-30) - OPT-IN per op, only while a resolve is in force. A merged expand's frontier was widened by the
+ *       route to every member of each group it touches and SEALED into {@code read.query.merged.anchorOf} (member
+ *       value -> the admitted entity it stands for): a row reaching a member value that is not yet admitted admits it
+ *       at its anchor's hop and seed, then the far end at {@code hop+1}. A merged exclude carries its SEALED
+ *       {@code groups[{id, members[], normalisers{}}]}: every admitted entity whose typed key is a member is
+ *       excluded (keep still protects), and the members are remembered, so a later expand never admits a raw id
+ *       whose key under the member type's sealed normaliser is one of them.</li>
  * </ul>
  * An {@code undo} log entry is NOT a vocabulary op — it is a log edit, recorded append-only, naming the step it
  * reverts. Undo always targets the latest effective op, so skipping undone steps is exactly equivalent to
@@ -107,6 +115,54 @@ final class InvestigationEvaluator {
         /** The identity resolution the latest {@code resolve} sealed (LA-17 slice 2), and its step; null = none. */
         Map<String, Object> resolution;
         int resolvedBy;
+        /** Groups a merged {@code exclude} excluded (LA-17 merged traversal): group id -> {id, members, normalisers, step, reason}. */
+        final TreeMap<String, Map<String, Object>> excludedGroups = new TreeMap<>();
+
+        /**
+         * The sealed groups (id -> {@code {id, members[], normalisers{type -> normaliser}}}) that any typed key of the
+         * admitted entities {@code ids} is a member of, under the resolution in force. Empty when none is in force.
+         */
+        @SuppressWarnings("unchecked")
+        TreeMap<String, Map<String, Object>> groupsHit(java.util.Collection<String> ids) {
+            TreeMap<String, Map<String, Object>> out = new TreeMap<>();
+            if (resolution == null) return out;
+            Map<String, SortedSet<String>> sides = sides();
+            Map<String, Object> types = (Map<String, Object>) resolution.get("types");
+            for (Object o : (List<Object>) resolution.get("groups")) {
+                Map<String, Object> g = (Map<String, Object>) o;
+                Set<String> members = new TreeSet<>(strings(g.get("members")));
+                for (String id : ids) {
+                    Entity e = entities.get(id);
+                    if (e == null || java.util.Collections.disjoint(keysOf(e, sides), members)) continue;
+                    Map<String, Object> norm = new TreeMap<>();
+                    for (String m : members) {
+                        String t = m.substring(0, m.indexOf(':'));
+                        if (types.get(t) instanceof Map<?, ?> def) norm.put(t, String.valueOf(def.get("normaliser")));
+                    }
+                    Map<String, Object> sealed = new LinkedHashMap<>();
+                    sealed.put("id", String.valueOf(g.get("id")));
+                    sealed.put("members", new ArrayList<>(members));
+                    sealed.put("normalisers", norm);
+                    out.put(String.valueOf(g.get("id")), sealed);
+                    break;
+                }
+            }
+            return out;
+        }
+
+        /** Whether {@code id} is NOT in the Working Set and its key under a member type's sealed rule is a member of an excluded group. */
+        @SuppressWarnings("unchecked")
+        boolean blockedByGroup(String id) {
+            if (excludedGroups.isEmpty() || entities.containsKey(id)) return false;
+            for (Map<String, Object> g : excludedGroups.values()) {
+                Set<String> members = new HashSet<>(strings(g.get("members")));
+                for (var n : ((Map<String, Object>) g.get("normalisers")).entrySet()) {
+                    String v = EntityTypes.normalise(String.valueOf(n.getValue()), id);
+                    if (!v.isEmpty() && members.contains(n.getKey() + ":" + v)) return true;
+                }
+            }
+            return false;
+        }
 
         /**
          * Every typed key {@code <type>:<normalised value>} entity {@code e} carries under the sealed resolution,
@@ -277,6 +333,8 @@ final class InvestigationEvaluator {
             }
             // Only when a resolve is in force (LA-17 slice 2), for the same reason.
             if (view != null) out.put("resolution", view);
+            // Only when a merged exclude ran (LA-17 merged traversal), for the same reason.
+            if (!excludedGroups.isEmpty()) out.put("excludedGroups", new ArrayList<>(excludedGroups.values()));
             return out;
         }
 
@@ -372,14 +430,24 @@ final class InvestigationEvaluator {
                     String.valueOf(((Map<String, Object>) entry.get("list")).get("entityType")), step);
             case "expand" -> {
                 Map<String, Object> read = (Map<String, Object>) entry.get("read");
-                Set<String> frontier = new HashSet<>(strings(((Map<String, Object>) read.get("query")).get("frontier")));
+                Map<String, Object> query = (Map<String, Object>) read.get("query");
+                Set<String> frontier = new HashSet<>(strings(query.get("frontier")));
+                // LA-17 merged traversal: a member value not admitted yet -> the admitted entity it stands for.
+                Map<String, Object> anchorOf = query.get("merged") instanceof Map<?, ?> mg
+                        && mg.get("anchorOf") instanceof Map<?, ?> a ? (Map<String, Object>) a : Map.of();
                 for (Object o : (List<Object>) read.get("rows")) {
                     Map<String, Object> r = (Map<String, Object>) o;
                     String src = String.valueOf(r.get("source")), tgt = String.valueOf(r.get("target"));
                     if (s.excluded.containsKey(src) || s.excluded.containsKey(tgt)) continue;
                     if (s.blockedByKey(src) || s.blockedByKey(tgt)) continue;   // excludeBy remembers keys
-                    Entity from = frontier.contains(src) ? s.entities.get(src)
-                            : frontier.contains(tgt) ? s.entities.get(tgt) : null;
+                    if (s.blockedByGroup(src) || s.blockedByGroup(tgt)) continue;   // a merged exclude remembers members
+                    String end = reachable(s, frontier, anchorOf, src) ? src : reachable(s, frontier, anchorOf, tgt) ? tgt : null;
+                    Entity from = end == null ? null : s.entities.get(end);
+                    if (from == null && end != null) {   // a member value: the same identity as its anchor
+                        Entity an = s.entities.get(String.valueOf(anchorOf.get(end)));
+                        from = new Entity(end, null, an.hop(), an.seed(), step);
+                        s.entities.put(end, from);
+                    }
                     if (from == null) continue;   // the frontier entity left the Working Set (fork re-order)
                     String other = from.id().equals(src) ? tgt : src;
                     s.entities.putIfAbsent(other, new Entity(other, null, from.hop() + 1, from.seed(), step));
@@ -391,6 +459,18 @@ final class InvestigationEvaluator {
             case "exclude" -> {
                 String reason = String.valueOf(p.get("reason"));
                 for (String id : ids) exclude(s, id, reason, step);
+                if (Boolean.TRUE.equals(p.get("merged"))) {   // LA-17 merged traversal: the SEALED groups, as a whole
+                    Map<String, SortedSet<String>> sides = s.sides();
+                    for (Object o : entry.get("groups") instanceof List<?> l ? l : List.of()) {
+                        Map<String, Object> g = new LinkedHashMap<>((Map<String, Object>) o);
+                        Set<String> members = new HashSet<>(strings(g.get("members")));
+                        for (Entity e : new ArrayList<>(s.entities.values()))
+                            if (!java.util.Collections.disjoint(s.keysOf(e, sides), members)) exclude(s, e.id(), reason, step);
+                        g.put("step", step);
+                        g.put("reason", reason);
+                        s.excludedGroups.putIfAbsent(String.valueOf(g.get("id")), g);
+                    }
+                }
             }
             case "excludeBy" -> {
                 Map<String, Object> list = (Map<String, Object>) entry.get("list");
@@ -425,6 +505,13 @@ final class InvestigationEvaluator {
             }
             default -> throw new IllegalStateException("op '" + entry.get("op") + "' in a sealed log is not evaluable");
         }
+    }
+
+    /** A frontier end an expand can hang a row off: admitted, or a sealed member value whose anchor is admitted. */
+    private static boolean reachable(State s, Set<String> frontier, Map<String, Object> anchorOf, String id) {
+        if (!frontier.contains(id)) return false;
+        if (s.entities.containsKey(id)) return true;
+        return anchorOf.containsKey(id) && s.entities.containsKey(String.valueOf(anchorOf.get(id)));
     }
 
     private static void seed(State s, List<String> ids, String type, int step) {

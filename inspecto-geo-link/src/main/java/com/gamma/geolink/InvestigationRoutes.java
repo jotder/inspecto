@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -250,6 +251,14 @@ public final class InvestigationRoutes implements RouteModule {
                 if (op.equals("seedBy")) entry.put("read", seedRead(api, ex, inv, list));
             }
             if (op.equals("resolve")) entry.put("resolution", sealResolution(inv.writeRoot(), inv.header(), params.get("atSeq"), ""));
+            if (op.equals("exclude") && Boolean.TRUE.equals(params.get("merged"))) {
+                requireResolution(before, "");
+                List<Object> groups = new ArrayList<>(before.groupsHit(ids).values());
+                if (groups.isEmpty())
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a merged exclude needs an id that resolves to an identity "
+                            + "group under the resolution in force; none of " + ids + " does - exclude them without 'merged'");
+                entry.put("groups", groups);
+            }
             if (op.equals("expand")) {
                 List<String> frontier = ids.isEmpty() ? new ArrayList<>(before.entities.keySet()) : sorted(ids);
                 if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "nothing to expand — the Working Set is empty");
@@ -258,7 +267,7 @@ public final class InvestigationRoutes implements RouteModule {
                             + " entities; name them with 'ids'");
                 Map<String, Object> sensitive = sensitivity(inv, params);
                 if (sensitive != null) return masked(inv, requestExpansion(ex, inv, params, sensitive, before));
-                entry.put("read", read(api, ex, inv, rung(params, frontier, before)));
+                entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, frontier, before, "")));
             }
             return masked(inv, commit(ex, inv, log, entry, before));
         }
@@ -341,13 +350,17 @@ public final class InvestigationRoutes implements RouteModule {
             // LA-17 slice 2: a resolve keeps the resolution it sealed, for the same reason — a fork re-orders the
             // method, it does not re-read the identity facts.
             if (orig.get("resolution") != null) e.put("resolution", orig.get("resolution"));
+            // LA-17 merged traversal: a merged exclude re-seals its groups against the NEW order's state (a group is
+            // judged from the entities admitted at that point), under the resolution the fork kept verbatim.
+            if ("exclude".equals(orig.get("op")) && orig.get("groups") != null)
+                e.put("groups", new ArrayList<Object>(state.groupsHit(strings(((Map<?, ?>) orig.get("params")).get("ids"))).values()));
             if ("expand".equals(orig.get("op"))) {
                 @SuppressWarnings("unchecked") Map<String, Object> p = (Map<String, Object>) orig.get("params");
                 List<String> named = strings(p.get("ids"));
                 List<String> frontier = new ArrayList<>();
                 for (String n : named.isEmpty() ? state.entities.keySet() : sorted(named))
                     if (state.entities.containsKey(n)) frontier.add(n);
-                e.put("read", read(api, ex, parent, rung(p, frontier, state)));
+                e.put("read", read(api, ex, parent, expandRung(api, ex, parent, p, frontier, state, "fork step " + step + ": ")));
             }
             e = roundTrip(e);
             InvestigationEvaluator.apply(state, e);
@@ -452,7 +465,7 @@ public final class InvestigationRoutes implements RouteModule {
                             + " — four-eyes applies and a template names no frontier to approve; save the template "
                             + "with a smaller budget/fan-out and expand further from the Investigation, where the "
                             + "step can be approved");
-                e.put("read", read(api, ex, inv, rung(params, frontier, state)));
+                e.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, frontier, state, "template step " + step + ": ")));
             }
             e = roundTrip(e);
             InvestigationEvaluator.apply(state, e);
@@ -650,6 +663,84 @@ public final class InvestigationRoutes implements RouteModule {
      * {@code window} op set. This resolved map is recorded as {@code read.query}, so {@code reread} re-runs exactly
      * the statement that was sealed, whatever window ops come later.
      */
+    /**
+     * The rung an {@code expand} reads with - {@link #rung} - and, for {@code merged: true} (LA-17 merged traversal,
+     * operator 2026-09-30), the frontier WIDENED to every member of each identity group a frontier entity resolves to
+     * under the resolution in force: the admitted entities resolving to the group, and every value of the bound
+     * columns whose key under a member's sealed type normaliser is a member (a DISTINCT read through
+     * {@link InvRoutes#relationFor}, capped at {@link #SEED_BY_DISTINCT_CAP}, never a sample). Sealed as
+     * {@code query.merged {groupOf{value -> group}, anchorOf{member value not admitted -> the admitted entity it stands
+     * for}}}; the read's fan-out cap then counts per GROUP, and the budget over the whole widened read - one combined
+     * fan-out, never one per member (the four-eyes thresholds are compared with those same numbers, D-U7).
+     */
+    private Map<String, Object> expandRung(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> p,
+                                           List<String> frontier, InvestigationEvaluator.State s, String where) {
+        Map<String, Object> q = rung(p, frontier, s);
+        if (!Boolean.TRUE.equals(p.get("merged"))) return q;
+        requireResolution(s, where);
+        TreeMap<String, String> groupOf = new TreeMap<>(), anchorOf = new TreeMap<>();
+        TreeMap<String, Map<String, Object>> groups = new TreeMap<>();
+        for (String f : frontier) {
+            for (var g : s.groupsHit(List.of(f)).entrySet()) {
+                groups.putIfAbsent(g.getKey(), g.getValue());
+                groupOf.putIfAbsent(f, g.getKey());
+            }
+        }
+        // admitted entities resolving to a touched group join the frontier (themselves their own anchor)
+        for (String id : s.entities.keySet())
+            if (!groupOf.containsKey(id))
+                for (String gid : s.groupsHit(List.of(id)).keySet())
+                    if (groups.containsKey(gid)) { groupOf.put(id, gid); break; }
+        if (!groups.isEmpty()) {
+            String relationSql = InvRoutes.relationFor(api, ex, inv.writeRoot(), inv.dataset());   // R3 gate on EVERY read
+            Set<String> excluded = s.excluded.keySet();
+            for (String col : new LinkedHashSet<>(List.of(String.valueOf(inv.header().get("sourceCol")),
+                    String.valueOf(inv.header().get("targetCol")))))
+                for (String v : distinctValues(inv.dataset(), relationSql, col, SEED_BY_DISTINCT_CAP)) {
+                    if (groupOf.containsKey(v) || excluded.contains(v)) continue;
+                    for (var g : groups.entrySet()) {
+                        if (!memberValue(g.getValue(), v)) continue;
+                        groupOf.put(v, g.getKey());
+                        break;
+                    }
+                }
+        }
+        // the anchor of a group: the smallest admitted frontier entity resolving to it
+        TreeMap<String, String> anchor = new TreeMap<>();
+        for (String f : frontier) if (groupOf.containsKey(f)) anchor.putIfAbsent(groupOf.get(f), f);
+        for (var e : groupOf.entrySet())
+            if (!s.entities.containsKey(e.getKey())) anchorOf.put(e.getKey(), anchor.get(e.getValue()));
+        TreeSet<String> widened = new TreeSet<>(frontier);
+        widened.addAll(groupOf.keySet());
+        if (widened.size() > MAX_FRONTIER)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + "a merged expand widens its frontier to " + widened.size()
+                    + " member values; an expand frontier is capped at " + MAX_FRONTIER);
+        q.put("frontier", new ArrayList<>(widened));
+        Map<String, Object> merged = new LinkedHashMap<>();
+        merged.put("groupOf", groupOf);
+        merged.put("anchorOf", anchorOf);
+        q.put("merged", merged);
+        return q;
+    }
+
+    /** Whether raw value {@code v} keys, under a member type's sealed normaliser, to a member of sealed group {@code g}. */
+    @SuppressWarnings("unchecked")
+    private static boolean memberValue(Map<String, Object> g, String v) {
+        Set<String> members = new HashSet<>(strings(g.get("members")));
+        for (var n : ((Map<String, Object>) g.get("normalisers")).entrySet()) {
+            String k = EntityTypes.normalise(String.valueOf(n.getValue()), v);
+            if (!k.isEmpty() && members.contains(n.getKey() + ":" + k)) return true;
+        }
+        return false;
+    }
+
+    /** {@code merged: true} is opt-in traversal OVER a resolution - without one in force it has nothing to merge. */
+    private static void requireResolution(InvestigationEvaluator.State s, String where) {
+        if (s.resolution == null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + "'merged' traverses identity groups, and no resolve is in "
+                    + "force at this point - append a resolve first");
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> rung(Map<String, Object> p, List<String> frontier,
                                             InvestigationEvaluator.State s) {
@@ -692,6 +783,9 @@ public final class InvestigationRoutes implements RouteModule {
         String dataset = inv.dataset();
         String relationSql = InvRoutes.relationFor(api, ex, inv.writeRoot(), dataset);   // R3 gate on EVERY read
         List<String> frontier = strings(query.get("frontier"));
+        // LA-17 merged traversal: a member value fans out as its GROUP, so maxFanOut counts per group, not per member.
+        Map<?, ?> groupOf = query.get("merged") instanceof Map<?, ?> mg && mg.get("groupOf") instanceof Map<?, ?> g
+                ? g : Map.of();
         List<String> excluded = strings(query.get("excluded"));
         Map<String, Object> window = query.get("window") instanceof Map<?, ?> w ? (Map<String, Object>) w : null;
         Integer minDays = query.get("minDistinctDays") instanceof Number n ? n.intValue() : null;
@@ -712,9 +806,12 @@ public final class InvestigationRoutes implements RouteModule {
             String tgt = SqlIdent.q(String.valueOf(h.get("targetCol")));
             String kind = h.get("linkKindCol") == null ? null : SqlIdent.q(String.valueOf(h.get("linkKindCol")));
             List<String> binds = new ArrayList<>();
-            StringBuilder sql = new StringBuilder("WITH fr(id) AS (VALUES ")
-                    .append(String.join(",", Collections.nCopies(frontier.size(), "(?)"))).append(")");
-            binds.addAll(frontier);
+            StringBuilder sql = new StringBuilder("WITH fr(id, g) AS (VALUES ")
+                    .append(String.join(",", Collections.nCopies(frontier.size(), "(?, ?)"))).append(")");
+            for (String f : frontier) {
+                binds.add(f);
+                binds.add(groupOf.get(f) == null ? f : String.valueOf(groupOf.get(f)));
+            }
             sql.append(", ev0 AS (SELECT CAST(").append(src).append(" AS VARCHAR) AS s, CAST(").append(tgt)
                .append(" AS VARCHAR) AS t, ").append(kind == null ? "CAST(NULL AS VARCHAR)" : "CAST(" + kind + " AS VARCHAR)")
                .append(" AS k");
@@ -760,7 +857,7 @@ public final class InvestigationRoutes implements RouteModule {
                            + "WHERE r.s = p.t AND r.t = p.s)";
                    default -> "(p.s" + inF + " OR p.t" + inF + ")";
                }).append(")");
-            sql.append(", elig AS (SELECT c.*, ROW_NUMBER() OVER (PARTITION BY c.anchor ORDER BY c.cnt DESC, c.s, c.t, "
+            sql.append(", elig AS (SELECT c.*, ROW_NUMBER() OVER (PARTITION BY (SELECT fr.g FROM fr WHERE fr.id = c.anchor) ORDER BY c.cnt DESC, c.s, c.t, "
                     + "c.k NULLS FIRST) AS rn FROM cand c");
             if (degree) sql.append(" JOIN deg ON deg.id = c.other");
             sql.append(" WHERE c.cnt >= CAST(? AS BIGINT)");
@@ -1096,8 +1193,14 @@ public final class InvestigationRoutes implements RouteModule {
                 if (type != null && type.length() > 64) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'entityType' is at most 64 chars");
                 p.put("entityType", type);
             }
-            case "expand" -> expandParams(body, p);
-            case "exclude" -> p.put("reason", exclusionReason(body, op));
+            case "expand" -> {
+                expandParams(body, p);
+                merged(body, p);
+            }
+            case "exclude" -> {
+                p.put("reason", exclusionReason(body, op));
+                merged(body, p);
+            }
             case "annotate" -> {
                 String note = ApiContext.str(body, "note");
                 if (note == null || note.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'annotate' requires a 'note'");
@@ -1111,6 +1214,17 @@ public final class InvestigationRoutes implements RouteModule {
             default -> { }
         }
         return p;
+    }
+
+    /**
+     * LA-17 merged traversal (operator 2026-09-30): {@code merged} is an OPT-IN boolean on {@code expand} and
+     * {@code exclude}; set only when true, so every op without it seals - and hashes - exactly as before.
+     */
+    private static void merged(Map<String, Object> body, Map<String, Object> p) {
+        Object m = body.get("merged");
+        if (m == null || Boolean.FALSE.equals(m)) return;
+        if (!Boolean.TRUE.equals(m)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'merged' must be a boolean, got " + m);
+        p.put("merged", true);
     }
 
     /** An exclusion's required reason ({@code exclude}, {@code excludeBy}): one without it cannot be challenged. */
@@ -1227,7 +1341,8 @@ public final class InvestigationRoutes implements RouteModule {
                     ? "Cleared the time window: later expansions read the full time range."
                     : "Set the time window to " + InvestigationTime.describe((Map<String, Object>) p.get("window"))
                             + "; later expansions read inside it (earlier steps are unchanged).";
-            case "exclude" -> "Excluded " + ids.size() + " entit" + (ids.size() == 1 ? "y" : "ies")
+            case "exclude" -> Boolean.TRUE.equals(p.get("merged")) ? mergedExcludeLine(e)
+                    : "Excluded " + ids.size() + " entit" + (ids.size() == 1 ? "y" : "ies")
                     + " (reason: " + p.get("reason") + "): " + list(ids) + ".";
             case "hide" -> "Hid " + list(ids) + " from display (still traversed and counted).";
             case "keep" -> "Kept " + list(ids) + " (protected from later exclusion).";
@@ -1244,6 +1359,16 @@ public final class InvestigationRoutes implements RouteModule {
             }
             default -> "Applied " + e.get("op") + ".";
         };
+    }
+
+    /** One line per merged exclude: each group it excluded as a whole, with its members (masked per key, D-U6). */
+    static String mergedExcludeLine(Map<String, Object> e) {
+        List<String> parts = new ArrayList<>();
+        for (Object o : e.get("groups") instanceof List<?> l ? l : List.of())
+            if (o instanceof Map<?, ?> g) parts.add(g.get("id") + " (members: " + String.join(", ", strings(g.get("members"))) + ")");
+        return "Excluded identity group" + (parts.size() == 1 ? " " : "s ") + String.join("; ", parts) + " as a whole (reason: "
+                + ((Map<?, ?>) e.get("params")).get("reason") + "): every member entity left the Working Set and no member "
+                + "is admitted again.";
     }
 
     /** {@code "Entity List `known-mules` (exclusion, 40 members, as of fact 17)"} — the sealed list a list op names. */
@@ -1488,7 +1613,7 @@ public final class InvestigationRoutes implements RouteModule {
             entry.put("op", "expand");
             entry.put("params", params);
             entry.put("approval", approval);
-            entry.put("read", read(api, ex, inv, rung(params, frontier, before)));
+            entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, frontier, before, "")));
             Map<String, Object> out = (Map<String, Object>) commit(ex, inv, log, entry, before);
             rec.put("status", "approved");
             rec.put("step", out.get("step"));
