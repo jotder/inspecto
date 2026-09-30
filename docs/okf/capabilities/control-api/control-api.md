@@ -326,7 +326,7 @@ is bounded with a `truncated` flag that reports the *true* total.
   different request"`**. Only **2xx, 400, 409, 422** are cached — deterministic outcomes of the request's own
   content; 401/403/404/429 depend on who asks and when, 5xx may be transient. Bounds: **50 keys per
   principal** in its own LRU partition (its oldest evicted — one caller cannot flush another), at most **20
-  principals** held (the least recently used principal's partition is evicted whole, so 1000 entries stay the bound), **256 KiB** per cached response, **1 MiB**
+  principals** held (the least recently used principal's partition is evicted whole, so 1000 entries stay the bound). **Limits, stated plainly:** 20 distinct authenticated principals each doing one keyed write can flush another principal's partition (20 writes, not 1000); every anonymous caller shares ONE partition (one slot, 50 entries — anonymous floods cannot displace an authenticated principal, but anonymous callers can evict each other), while each entry key stays scoped to `anon@<client IP>` so they never share a replay; and a retry after eviction **re-executes the write** rather than replaying. **256 KiB** per cached response, **1 MiB**
   request body hashed; past either size cap the request runs un-keyed and answers `Idempotency-Cached: false`.
   Every write route honours the header generically (it is captured in `ApiContext.respondJson`); the SPA never
   sends it. Pinned by `ControlApiIdempotencyScopeTest`. Per-instance by design (no cross-instance store; no test

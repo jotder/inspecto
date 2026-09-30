@@ -266,17 +266,49 @@ class ControlApiIdempotencyScopeTest {
         // Callers (or one caller rotating client IPs) flood well past the old global 1000-entry LRU, which evicted
         // bob's entry as the oldest insert; bob stays active, so only idle partitions are evicted.
         for (int i = 0; i < Idempotency.MAX_PRINCIPALS + 10; i++) {
-            for (int k = 0; k < Idempotency.PER_CALLER_CAP + 5; k++) store.put("k" + k, "anon@10.0.0." + i, "h", 200, new byte[0]);
+            for (int k = 0; k < Idempotency.PER_CALLER_CAP + 5; k++) store.put("k" + k, "sub:p" + i, "h", 200, new byte[0]);
             assertNotNull(store.get("sub:bob", "bob-1"), "bob's replay survives flood round " + i);
+        }
+    }
+
+    @Test
+    void manyAnonymousClientsShareOnePartitionAndNeverDisplaceAnAuthenticatedOne() {
+        Idempotency.Store store = new Idempotency.Store();
+        store.put("bob-1", "sub:bob", "h", 200, new byte[0]);
+        for (int i = 0; i < 25; i++)
+            for (int k = 0; k < 5; k++) store.put("k" + i + "-" + k, "anon@10.0.0." + i, "h", 200, new byte[0]);
+        assertNotNull(store.get("sub:bob", "bob-1"), "25 anonymous IPs cost one slot, not 25");
+        assertEquals(2, store.principals());
+        assertEquals(Idempotency.PER_CALLER_CAP, store.sizeFor("anon@10.0.0.1"), "anonymous partition holds at most the per-caller cap");
+    }
+
+    @Test
+    void anonymousCallersSharingAPartitionNeverShareAReplay() throws Exception {
+        Idempotency.Store store = new Idempotency.Store();
+        ExchangeAttributeScopeTest.FakeExchange a = new ExchangeAttributeScopeTest.FakeExchange("/x");
+        ExchangeAttributeScopeTest.FakeExchange b = new ExchangeAttributeScopeTest.FakeExchange("/x");
+        ApiContext.attr(a, ApiContext.ATTR_CLIENT_IP, "10.0.0.1");
+        ApiContext.attr(b, ApiContext.ATTR_CLIENT_IP, "10.0.0.2");
+        try {
+            String pa = Idempotency.principal(a), pb = Idempotency.principal(b);
+            assertNotEquals(pa, pb, "the anonymous principal carries the client IP");
+            String ka = Idempotency.keyFor("POST", "/jobs/run", "s", pa, "K");
+            String kb = Idempotency.keyFor("POST", "/jobs/run", "s", pb, "K");
+            store.put(ka, pa, "h", 200, "A".getBytes());
+            assertNotNull(store.get(pa, ka));
+            assertNull(store.get(pb, kb), "B never gets A's cached response for the same key");
+        } finally {
+            ApiContext.attr(a, ApiContext.ATTR_CLIENT_IP, null);
+            ApiContext.attr(b, ApiContext.ATTR_CLIENT_IP, null);
         }
     }
 
     @Test
     void memoryStaysBoundedAsDistinctPrincipalsGrow() {
         Idempotency.Store store = new Idempotency.Store();
-        for (int i = 0; i < 5000; i++) store.put("k", "anon@10.0." + (i / 256) + "." + (i % 256), "h", 200, new byte[0]);
+        for (int i = 0; i < 5000; i++) store.put("k", "sub:p" + i, "h", 200, new byte[0]);
         assertEquals(Idempotency.MAX_PRINCIPALS, store.principals());
-        assertNull(store.get("anon@10.0.0.0", "k"), "the least recently used principal was evicted");
-        assertNotNull(store.get("anon@10.0.19.135", "k"), "the most recent principal is kept");
+        assertNull(store.get("sub:p0", "k"), "the least recently used principal was evicted");
+        assertNotNull(store.get("sub:p4999", "k"), "the most recent principal is kept");
     }
 }

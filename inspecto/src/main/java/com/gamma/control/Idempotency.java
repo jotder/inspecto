@@ -72,6 +72,14 @@ final class Idempotency {
     /** Principals holding entries at once; the least recently used principal's whole partition is evicted past
      *  this. {@code MAX_PRINCIPALS * PER_CALLER_CAP} = 1000 entries keeps the old global memory bound. */
     static final int MAX_PRINCIPALS = 20;
+    /** The one partition every anonymous caller shares, so an anonymous flood (many client IPs behind a proxy or
+     *  NAT) costs ONE slot and can never displace an authenticated principal. Entry KEYS stay scoped to
+     *  {@code anon@<ip>} (see {@link #keyFor}), so callers sharing the partition never share a replay. */
+    static final String ANON_PARTITION = "anon";
+
+    private static String partitionOf(String principal) {
+        return principal.startsWith("anon@") ? ANON_PARTITION : principal;   // authenticated ids start "sub:"
+    }
 
     /**
      * A per-{@link ControlApi}-instance bounded, TTL cache (not shared across instances, so no test leakage),
@@ -83,6 +91,7 @@ final class Idempotency {
         private final LinkedHashMap<String, LinkedHashMap<String, Entry>> byPrincipal = new LinkedHashMap<>(32, 0.75f, true);
 
         synchronized Entry get(String principal, String key) {
+            principal = partitionOf(principal);
             LinkedHashMap<String, Entry> part = byPrincipal.get(principal);
             if (part == null) return null;
             Entry e = part.get(key);
@@ -96,7 +105,7 @@ final class Idempotency {
         }
 
         synchronized void put(String key, String principal, String bodyHash, int status, byte[] body) {
-            LinkedHashMap<String, Entry> part = byPrincipal.computeIfAbsent(principal, p -> new LinkedHashMap<>(16, 0.75f, true));
+            LinkedHashMap<String, Entry> part = byPrincipal.computeIfAbsent(partitionOf(principal), p -> new LinkedHashMap<>(16, 0.75f, true));
             part.remove(key);
             part.put(key, new Entry(principal, bodyHash, status, body.clone(), System.currentTimeMillis() + TTL_MS));
             while (part.size() > PER_CALLER_CAP) part.remove(part.keySet().iterator().next());
@@ -104,7 +113,7 @@ final class Idempotency {
         }
 
         synchronized int sizeFor(String principal) {
-            LinkedHashMap<String, Entry> part = byPrincipal.get(principal);
+            LinkedHashMap<String, Entry> part = byPrincipal.get(partitionOf(principal));
             return part == null ? 0 : part.size();
         }
 
