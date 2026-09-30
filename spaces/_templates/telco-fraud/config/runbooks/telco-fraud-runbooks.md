@@ -7,6 +7,13 @@ evidence ages out of retention; that resolves its Alert but never its Incident. 
 Disposition. `stormCap` is 500 per rule: above that many retained offenders one storm Alert stands for them
 all, so keep `stormCap` above `retention_days` x the expected daily offenders.
 
+**Relapse.** The Measure is the `max` over retained windows, so a line that sits under the threshold every day
+stays silent however many days it recurs (a `sum` would add the days up and false-alert). An offender who
+offends again while still breached raises nothing new: the open Alert already covers it. Once the key has
+healed (all its evidence aged out, the Alert resolved), a fresh offence raises a NEW Alert. Its Incident
+dedupes against the offender's still-open Incident (D-P11: only a person closes an Incident), so the relapse
+lands on the same case file instead of opening a second one.
+
 **Running the windows.** Each detection is a `sql.template` Job (`config/jobs/fraud_<typology>_job.toon`)
 with `window_start` / `window_end` parameters. Run a Job for another window by passing those parameters on
 the run. A run keeps the rows of every other window within `retention_days` (default 30), so the next day's

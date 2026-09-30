@@ -300,7 +300,16 @@ class TelcoFraudTemplateGoldenTest {
         }
     }
 
-    /** Days 2..n: a copy of the ingested day-1 feeds with every identifier suffixed {@code -d}, shifted d-1 days. */
+    /**
+     * The at-threshold look-alikes that RECUR: their identifiers are never suffixed, so each of them sits exactly at
+     * its rule's threshold on all 16 retained days. Silent under {@code max}; a {@code sum} over the retained windows
+     * would raise every one (the voucher rule has none: a serial redeemed again on another day IS the fraud).
+     */
+    private static final String RECURRING = "'99970001011', '+28900000005', '0028900000005', '99970001114', "
+            + "'99970001211', '99970001311', '99970001412', 'DOC-F0002', 'D90', '99970001811'";
+
+    /** Days 2..n: a copy of the ingested day-1 feeds with every identifier (bar {@link #RECURRING}) suffixed
+     *  {@code -d}, shifted d-1 days. */
     private static void simulateDays(Path data, int days) throws Exception {
         Map<String, String[]> ids = Map.of(
                 "cdr", new String[] {"start_ts", "record_id", "a_number", "b_number"},
@@ -317,7 +326,7 @@ class TelcoFraudTemplateGoldenTest {
                     StringBuilder repl = new StringBuilder(cols[0] + " + INTERVAL " + (d - 1) + " DAY AS " + cols[0]);
                     for (int i = 1; i < cols.length; i++)
                         repl.append(", CASE WHEN ").append(cols[i]).append(" IS NULL OR ").append(cols[i])
-                                .append(" = '' THEN ").append(cols[i]).append(" ELSE ").append(cols[i])
+                                .append(" = '' OR ").append(cols[i]).append(" IN (").append(RECURRING).append(") THEN ").append(cols[i]).append(" ELSE ").append(cols[i])
                                 .append(" || '-").append(d).append("' END AS ").append(cols[i]);
                     st.execute("COPY (SELECT * REPLACE (" + repl + ") FROM day1_" + feed.getKey() + ") TO '"
                             + sim.resolve("day-" + d + ".parquet").toString().replace('\\', '/') + "' (FORMAT PARQUET)");
