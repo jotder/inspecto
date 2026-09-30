@@ -269,8 +269,8 @@ Consignment path with "a mapping with neither fields[] nor rules[]"); ten detect
 (`config/jobs/fraud_<typology>_job.toon`: IRSF, Wangiri, SIM-box, premium-rate, roaming high usage, SIM-swap,
 subscription / identity, dealer activations, voucher / EVD, payment reversal), each writing one row per candidate
 entity per `window_date` to its sink Dataset `fraud_<typology>`; and one per-entity Alert Rule per typology, `by` =
-the offender (`msisdn`, the ringing number, `id_doc`, `dealer_id` or `voucher_serial`) **plus `window_date`**,
-`stormCap: 50`. No new Step Processor. **Thresholds are configuration in two places**: the Job's parameters say what
+the offender alone (`msisdn`, the ringing number, `id_doc`, `dealer_id` or `voucher_serial`), Measure `max(<feature>)`
+over every retained window, `stormCap: 500`. No new Step Processor. **Thresholds are configuration in two places**: the Job's parameters say what
 counts (`irsf_prefixes`, `premium_prefixes`, `home_cc`, `max_ring_seconds`, `callback_hours`, `max_cells`,
 `exempt_msisdns`, `exempt_doc_prefixes`, `window_hours`, `traffic_grace_hours`, `window_start` / `window_end`,
 `retention_days`) and the Alert Rule's `threshold` (`gt`) says how much is too much. Also: four KPIs + tiles, one
@@ -288,8 +288,18 @@ are not idle.
 ⚠ **A `sql.template` run replaces its whole sink** (stage-and-swap; the Job Type has no partition-incremental
 output). So each Job reads its own sink (`sources: …,fraud_<typology>`) and re-emits the rows of every OTHER
 `window_date` within `retention_days` beside the current window's — partition-incremental by `window_date`, done in
-the SQL. With `window_date` in the Alert Rule's `by`, a later window's run neither raises nor heals an earlier
-window's Alert; a key heals only when retention drops its row (its Incident stays open — D-P11). ⚠ **Seeds, and
+the SQL; a same-window re-run replaces that window, never duplicates it. A later window's run neither raises nor
+heals an earlier offender's Alert; a key heals only when all its evidence ages out (its Incident stays open —
+D-P11). ⚠ **The storm cap counts every retained breaching key**: `AlertService.evaluateGrouped` collapses a rule
+into ONE storm Alert once the total exceeds `stormCap`, and no new offender gets its own Alert until it drops back.
+A first cut keyed on offender + `window_date` with `stormCap: 50` hit that around day 11 at the corpus rate; keying
+on the offender bounds the count by distinct offenders, and `stormCap` must stay above `retention_days` x daily
+offenders. ⚠ **Scaling**: each run reads and rewrites the whole retained sink (≈ `retention_days` x daily
+candidates); `fraud_simbox` keeps only lines with ≥ `min_candidate_targets` targets, the identity / dealer / voucher /
+reversal sinks still keep every entity. ⚠ **The exemption lists are a trust assumption**: `exempt_doc_prefixes`
+matches a prefix of `id_doc`, which the dealer enters, so a made-up `CORP-FAKE` document is exempted (pinned in the
+corpus as a known risk). The lists must come from a verified register, never from a field the monitored party
+controls; matching a registered-document Reference Dataset instead is open. ⚠ **Seeds, and
 why.** The per-entity Alert Rule save gate (`AlertRoutes.requireGroupingColumns`, run by the template seed gate) and
 the KPI gate both read the Dataset's Schema and fail closed on a Dataset with no data, and the Jobs read their own
 sink; so the template ships a **zero-row seed snapshot** per sink (`data/fraud_<typology>/seed.parquet`), replaced by
@@ -303,8 +313,9 @@ threshold, plus flash-call OTP, a registered PBX line, a business traveller, a c
 late-day activations, a two-swap / one-payment line). `TelcoFraudTemplateGoldenTest` boots the template through
 `POST /spaces`, ingests the corpus through the three Pipelines on the production Consignment path
 (`CollectorProcessor.run`; every CSV row must land), runs the ten Jobs, asserts each Alert Rule raises EXACTLY its
-planted offenders (5/4/4/5/4/4/3/3/4/4 = 40 Alerts) and no look-alike, then runs the next window and asserts nothing
-is raised or dropped. Each defence was mutation-checked red.
+planted offenders (5/4/4/5/4/4/3/3/4/4 = 40 Alerts) and no look-alike, re-runs the same window (no duplicate row, no
+Alert change), then runs the next window (nothing raised or dropped); a second case runs 16 retained days of
+fresh offenders at the corpus rate — 640 Alerts, every offender its own, no storm. Each defence was mutation-checked red.
 
 **Every registry kind a template seeds is gated, not only `kpi`** (`ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) ⚠,
 2026-09-28). The seed gate is `TemplateSeedGate.require`, one table-driven pass over the staged tree before boot:
