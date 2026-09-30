@@ -70,9 +70,14 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                         @for (t of templates(); track t.id) {
                             <button
                                 type="button"
-                                class="bg-card flex flex-col items-start gap-2 rounded-2xl p-5 text-left shadow transition-shadow hover:shadow-md"
+                                class="bg-card flex flex-col items-start gap-2 rounded-2xl p-5 text-left shadow transition-shadow hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+                                [disabled]="t.creatable === false"
                                 (click)="choose(t)"
-                                [attr.aria-label]="'Use the ' + t.name + ' template'"
+                                [attr.aria-label]="
+                                    t.creatable === false
+                                        ? t.name + ' template — not available in this edition'
+                                        : 'Use the ' + t.name + ' template'
+                                "
                             >
                                 <div class="flex items-center gap-2">
                                     <mat-icon class="text-primary icon-size-5" [svgIcon]="t.icon"></mat-icon>
@@ -84,6 +89,13 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                                         <inspecto-chip>{{ c }}</inspecto-chip>
                                     }
                                 </div>
+                                @if (t.creatable === false) {
+                                    <span class="text-secondary text-xs" data-testid="template-unavailable">
+                                        @for (m of t.missingFeatures ?? []; track m.feature) {
+                                            {{ m.message }}
+                                        }
+                                    </span>
+                                }
                             </button>
                         }
                     </div>
@@ -173,6 +185,7 @@ export class SpaceTemplateGalleryDialog {
     }
 
     choose(t: SpaceTemplateInfo): void {
+        if (t.creatable === false) return;
         this.selected.set(t);
         this.form.reset({ id: t.id, display_name: t.name, description: t.tagline });
     }

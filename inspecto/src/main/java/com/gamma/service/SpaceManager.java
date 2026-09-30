@@ -391,7 +391,8 @@ public final class SpaceManager implements AutoCloseable {
 
     /**
      * The space templates this server ships: one gallery entry per {@code _templates/<id>/template.toon}
-     * ({@code {id, name, tagline, description, icon, contents[]}} — the UI's {@code SpaceTemplateInfo} shape).
+     * ({@code {id, name, tagline, description, icon, contents[], creatable, missingFeatures[]}} — the UI's
+     * {@code SpaceTemplateInfo} shape; {@link #missingFeatures}).
      * Empty in single-tenant mode or when no templates directory exists; an unreadable template is warned
      * and skipped (the rest still list).
      */
@@ -412,12 +413,51 @@ public final class SpaceManager implements AutoCloseable {
                     info.put("description", com.gamma.util.ToonHelper.opt(m, "description", ""));
                     info.put("icon", com.gamma.util.ToonHelper.opt(m, "icon", "heroicons_outline:cube"));
                     info.put("contents", m.get("contents") instanceof List<?> l ? l : List.of());
+                    List<Map<String, String>> missing = missingFeatures(dir.resolve("config"));
+                    info.put("creatable", missing.isEmpty());
+                    info.put("missingFeatures", missing);
                     out.add(info);
                 } catch (Exception bad) {
                     log.warn("Skipping unreadable space template {}: {}", dir, bad.toString());
                 }
             }
         }
+        return out;
+    }
+
+    /**
+     * The edition features a template's {@code config/} uses that THIS build lacks — the same refusals the seed
+     * gate answers with a 422 on {@code POST /spaces}, so the gallery can say so before the operator names a
+     * Space: a registry Alert Rule, a legacy {@code *_alert.toon} or a Decision Rule {@code create-alert}
+     * consequence ({@code alert.dispatch}), and a pipeline's archive / DuckLake use
+     * ({@link com.gamma.etl.EditionFeatures#pipelineRefusals(Map)}). One entry per feature,
+     * {@code {feature, message}}; empty when this build can create the template.
+     */
+    static List<Map<String, String>> missingFeatures(Path config) throws IOException {
+        java.util.TreeMap<String, String> missing = new java.util.TreeMap<>();
+        if (!Files.isDirectory(config)) return List.of();
+        String alert = com.gamma.etl.EditionFeatures.ALERT_DISPATCH;
+        try (Stream<Path> s = Files.walk(config)) {
+            for (Path p : s.filter(Files::isRegularFile).filter(f -> f.toString().endsWith(".toon")).toList()) {
+                String name = p.getFileName().toString();
+                String parent = p.getParent().getFileName().toString();
+                if (!com.gamma.etl.EditionFeatures.present(alert)
+                        && ("alert-rules".equals(parent) || name.endsWith("_alert.toon")
+                            || ("decision-rules".equals(parent) && Files.readString(p).contains("create-alert"))))
+                    missing.putIfAbsent(alert, com.gamma.etl.EditionFeatures.refusal(alert));
+                if (name.endsWith("_pipeline.toon")) {
+                    try {
+                        for (com.gamma.etl.EditionFeatures.Refusal r
+                                : com.gamma.etl.EditionFeatures.pipelineRefusals(com.gamma.util.ToonHelper.load(p.toString())))
+                            missing.putIfAbsent(r.feature(), r.message());
+                    } catch (Exception unreadable) {
+                        log.warn("Space template pipeline {} is unreadable: {}", p, unreadable.toString());
+                    }
+                }
+            }
+        }
+        List<Map<String, String>> out = new ArrayList<>();
+        missing.forEach((f, msg) -> out.add(Map.of("feature", f, "message", msg)));
         return out;
     }
 

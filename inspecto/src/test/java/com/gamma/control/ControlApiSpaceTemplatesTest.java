@@ -101,6 +101,44 @@ class ControlApiSpaceTemplatesTest {
         }
     }
 
+    /**
+     * A Personal build (no {@code alert.dispatch}) lists a template that ships Alert Rules as NOT creatable, naming
+     * the missing feature — the same verdict {@code POST /spaces} answers with its 422 — so the gallery never
+     * offers a create that is certain to fail. With the feature present the same template is creatable.
+     */
+    @Test
+    void galleryMarksATemplateThisEditionCannotCreate(@TempDir Path root) throws Exception {
+        seedTemplate(root);
+        Path rules = root.resolve("_templates/starter/config/registry/alert-rules");
+        Files.createDirectories(rules);
+        Files.writeString(rules.resolve("low_volume.toon"), """
+                name: low_volume
+                dataset: orders_dataset
+                measure: count
+                comparator: lt
+                threshold: 10
+                """);
+        try {
+            com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of());   // Personal
+            try (Ctx c = open(root)) {
+                JsonNode t = json(send(c.port, "GET", "/spaces/templates", null)).get(0);
+                assertFalse(t.get("creatable").asBoolean(), t.toString());
+                assertEquals("alert.dispatch", t.get("missingFeatures").get(0).get("feature").asText(), t.toString());
+                assertTrue(t.get("missingFeatures").get(0).get("message").asText().contains("Professional+"));
+                HttpResponse<String> refused = send(c.port, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"starter\"}");
+                assertEquals(422, refused.statusCode(), "the create the gallery marked uncreatable is refused: " + refused.body());
+            }
+            com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
+            try (Ctx c = open(root)) {
+                JsonNode t = json(send(c.port, "GET", "/spaces/templates", null)).get(0);
+                assertTrue(t.get("creatable").asBoolean(), t.toString());
+                assertEquals(0, t.get("missingFeatures").size());
+            }
+        } finally {
+            com.gamma.etl.EditionFeatures.overrideForTest(null);
+        }
+    }
+
     @Test
     void createFromTemplateRewritesSpaceTokensAndBoots(@TempDir Path root) throws Exception {
         seedTemplate(root);

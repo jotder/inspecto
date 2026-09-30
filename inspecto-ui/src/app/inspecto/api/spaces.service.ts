@@ -39,6 +39,10 @@ export interface SpaceTemplateInfo {
     icon: string;
     /** Human summary of the blueprint's contents, rendered as card chips. */
     contents: string[];
+    /** Whether THIS server's edition can create a Space from it (`POST /spaces` would otherwise 422). */
+    creatable?: boolean;
+    /** The edition features the template uses that this build lacks — why it is not creatable. */
+    missingFeatures?: { feature: string; message: string }[];
 }
 
 /** DELETE /spaces/{id} response. */

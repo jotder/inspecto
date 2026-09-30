@@ -27,7 +27,7 @@ const TEMPLATES: SpaceTemplateInfo[] = [
     },
 ];
 
-function create(existingIds: string[] = ['default']) {
+function create(existingIds: string[] = ['default'], templates: SpaceTemplateInfo[] = TEMPLATES) {
     const created = vi.fn((req: CreateSpaceRequest) =>
         of({
             id: req.id,
@@ -43,7 +43,7 @@ function create(existingIds: string[] = ['default']) {
             provideNoopAnimations(),
             { provide: MatDialogRef, useValue: { close: closed } },
             { provide: MAT_DIALOG_DATA, useValue: { existingIds } },
-            { provide: SpacesService, useValue: { templates: () => of(TEMPLATES), create: created } },
+            { provide: SpacesService, useValue: { templates: () => of(templates), create: created } },
             { provide: ToastrService, useValue: { success: () => {}, error: () => {} } },
         ],
     });
@@ -73,6 +73,26 @@ describe('SpaceTemplateGalleryDialog', () => {
             description: 'Find leakage.',
         });
         expect(c.form.valid).toBe(true);
+    });
+
+    it('disables a template this edition cannot create and says which feature it lacks', async () => {
+        const locked: SpaceTemplateInfo = {
+            ...TEMPLATES[0],
+            creatable: false,
+            missingFeatures: [{ feature: 'alert.dispatch', message: 'Alert Rules is a Professional+ feature' }],
+        };
+        const { fixture } = create(['default'], [locked, TEMPLATES[1]]);
+        const cards = Array.from(
+            fixture.nativeElement.querySelectorAll('mat-dialog-content button'),
+        ) as HTMLButtonElement[];
+        expect(cards[0].disabled).toBe(true);
+        expect(cards[1].disabled).toBe(false);
+        expect(cards[0].querySelector('[data-testid="template-unavailable"]')!.textContent).toContain(
+            'Professional+',
+        );
+        fixture.componentInstance.choose(locked);
+        expect(fixture.componentInstance.selected()).toBeNull();
+        await expectNoA11yViolations(fixture.nativeElement);
     });
 
     it('blocks a duplicate space id inline (create-only product rule)', () => {
