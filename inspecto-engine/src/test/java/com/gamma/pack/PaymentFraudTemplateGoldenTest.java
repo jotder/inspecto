@@ -79,6 +79,7 @@ class PaymentFraudTemplateGoldenTest {
         for (String feed : FEEDS) {
             PipelineConfig pc = ingest(space, feed, true);
             assertEquals(0, count(Path.of(pc.dirs().quarantine())), feed + ": nothing in the corpus is quarantined");
+            assertEquals(0, count(restricted(pc)), feed + ": no realistic reference (order id, epoch ms, IMEI, phone) trips");
         }
         // The tripwire look-alikes (a Luhn-INVALID 16-digit, a 12-digit and a 20-digit value) all landed.
         assertEquals(3L, scalar(data, "payment_attempts/database",
@@ -139,46 +140,96 @@ class PaymentFraudTemplateGoldenTest {
             new String[]{"INSTRUMENT_TOKEN", "4111/1111/1111/1111"},
             new String[]{"INSTRUMENT_TOKEN", "4111_1111_1111_1111"},
             new String[]{"INSTRUMENT_TOKEN", "4111\t1111\t1111\t1111"},
+            new String[]{"INSTRUMENT_TOKEN", "4111  1111  1111  1111"},                           // 2 separators
+            new String[]{"INSTRUMENT_TOKEN", "4111 - 1111 - 1111 - 1111"},                        // 3 separators
             new String[]{"INSTRUMENT_TOKEN", "4111 1111 1111 1111"},              // NBSP
             new String[]{"INSTRUMENT_TOKEN", "4111–1111–1111–1111"},              // en-dash
-            new String[]{"INSTRUMENT_TOKEN", fold(TEST_PAN, '０')},                          // full-width
-            new String[]{"INSTRUMENT_TOKEN", fold(TEST_PAN, '٠')},                          // Arabic-Indic
+            new String[]{"INSTRUMENT_TOKEN", "41​11111111111111"},                          // zero-width space
+            new String[]{"INSTRUMENT_TOKEN", "4́" + "111111111111111"},                           // combining mark
+            new String[]{"INSTRUMENT_TOKEN", fold(TEST_PAN, 0xFF10)},                            // full-width
+            new String[]{"INSTRUMENT_TOKEN", fold(TEST_PAN, 0x0660)},                            // Arabic-Indic
+            new String[]{"INSTRUMENT_TOKEN", fold(TEST_PAN, 0x0E50)},                            // Thai
+            new String[]{"INSTRUMENT_TOKEN", fold(TEST_PAN, 0x09E6)},                            // Bengali
             new String[]{"INSTRUMENT_TOKEN", "+" + TEST_PAN},
             new String[]{"MERCHANT_ID", "card " + TEST_PAN + " exp"},
+            new String[]{"MERCHANT_ID", "4111 1111 1111 1111 123"},                               // PAN + CVV
+            new String[]{"MERCHANT_ID", "12/28 4111 1111 1111 1111"},                             // expiry + PAN
             new String[]{"MERCHANT_ID", "card " + TEST_PAN + " 12/27"},
+            new String[]{"MERCHANT_ID", "3782 822463 10005"},                                     // 4-6-5 (published Amex test)
             new String[]{"AMOUNT", TEST_PAN});                                                    // the numeric leak path
-    /** True negatives: digit strings that are NOT Luhn-valid 13–19 digit numbers — each must ingest. */
+    /** True negatives: digit strings that are NOT card numbers — each must ingest. */
     private static final List<String[]> PASSES = List.of(
             new String[]{"INSTRUMENT_TOKEN", "tok_y"},
             new String[]{"MERCHANT_ID", "4111111111111112"},
             new String[]{"MERCHANT_ID", "4111 1111 1111 1112"},
             new String[]{"MERCHANT_ID", "411111111111"},
             new String[]{"MERCHANT_ID", "41111111111111111111"},
+            new String[]{"MERCHANT_ID", "ORD-2026-482913-0071"},
+            new String[]{"MERCHANT_ID", "1751328000123"},                                         // epoch ms
+            new String[]{"MERCHANT_ID", "356938035643809"},                                       // a Luhn-valid IMEI
             new String[]{"AMOUNT", "1234567.89"});
 
-    private static String fold(String ascii, char zero) {
+    private static String fold(String ascii, int zero) {
         StringBuilder sb = new StringBuilder();
-        for (char c : ascii.toCharArray()) sb.append((char) (zero + (c - '0')));
+        for (char c : ascii.toCharArray()) sb.appendCodePoint(zero + (c - '0'));
         return sb.toString();
     }
 
-    /** One planted file: a clean row plus a row whose {@code column} carries {@code value}; returns the config. */
-    private static PipelineConfig plant(Path dir, String column, String value) throws Exception {
-        Path space = copyTemplate(dir);
-        PipelineConfig pc = PipelineConfig.load(space.resolve("config/payment_attempts/payment_attempts_pipeline.toon").toString());
-        Path inbox = Files.createDirectories(Path.of(pc.dirs().poll()));
+    private static final String HEADER =
+            "ATTEMPT_ID,ATTEMPT_TS,ATTEMPT_DATE,ACCOUNT_ID,INSTRUMENT_TOKEN,BIN,DEVICE_ID,MERCHANT_ID,AMOUNT,CURRENCY,OUTCOME";
+    private static final String CLEAN_ROW = "pa_x1,2026-07-04 10:00:00,2026-07-04,acc_x,tok_x,402400,dev_x,m_01,10.00,EUR,APPROVED";
+
+    private static String row(String column, String value) {
         Map<String, String> row = new java.util.LinkedHashMap<>();
-        for (String[] kv : new String[][]{{"ATTEMPT_ID", "pa_x2"}, {"ATTEMPT_TS", "2026-07-04 10:05:00"},
-                {"ATTEMPT_DATE", "2026-07-04"}, {"ACCOUNT_ID", "acc_x"}, {"INSTRUMENT_TOKEN", "tok_x"}, {"BIN", "402400"},
-                {"DEVICE_ID", "dev_x"}, {"MERCHANT_ID", "m_01"}, {"AMOUNT", "10.00"}, {"CURRENCY", "EUR"}, {"OUTCOME", "APPROVED"}})
-            row.put(kv[0], kv[1]);
+        String[] names = HEADER.split(",");
+        String[] vals = "pa_x2,2026-07-04 10:05:00,2026-07-04,acc_x,tok_x,402400,dev_x,m_01,10.00,EUR,APPROVED".split(",");
+        for (int i = 0; i < names.length; i++) row.put(names[i], vals[i]);
         row.put(column, value);
-        Files.writeString(inbox.resolve("PAYMENT_ATTEMPTS_20260704.csv"), String.join(",", row.keySet()) + "\n"
-                + "pa_x1,2026-07-04 10:00:00,2026-07-04,acc_x,tok_x,402400,dev_x,m_01,10.00,EUR,APPROVED\n"
-                + String.join(",", row.values()) + "\n", java.nio.charset.StandardCharsets.UTF_8);
+        return String.join(",", row.values());
+    }
+
+    /** Copy the template, apply {@code edit} to the payment_attempts Pipeline TOON, write {@code files}, run one poll. */
+    private static PipelineConfig run(Path dir, java.util.function.UnaryOperator<String> edit, Map<String, String> files)
+            throws Exception {
+        Path space = copyTemplate(dir);
+        Path toon = space.resolve("config/payment_attempts/payment_attempts_pipeline.toon");
+        Files.writeString(toon, edit.apply(Files.readString(toon)));
+        PipelineConfig pc = PipelineConfig.load(toon.toString());
+        Path inbox = Files.createDirectories(Path.of(pc.dirs().poll()));
+        for (Map.Entry<String, String> f : files.entrySet())
+            Files.writeString(inbox.resolve(f.getKey()), f.getValue(), java.nio.charset.StandardCharsets.UTF_8);
         CollectorProcessor.run(pc);
-        assertTrue(Files.exists(Path.of(pc.dirs().statusFilePath())), value + ": the poll picked the file up");
+        assertTrue(Files.exists(Path.of(pc.dirs().statusFilePath())), "the poll picked the file(s) up");
         return pc;
+    }
+
+    private static PipelineConfig plant(Path dir, String column, String value) throws Exception {
+        return run(dir, t -> t, Map.of("PAYMENT_ATTEMPTS_20260704.csv", HEADER + "\n" + CLEAN_ROW + "\n" + row(column, value) + "\n"));
+    }
+
+    private static Path restricted(PipelineConfig pc) {
+        return Path.of(pc.dirs().quarantine()).toAbsolutePath().normalize().resolveSibling("restricted-quarantine");
+    }
+
+    /** The refused file sits ONLY in the restricted quarantine, and nothing anywhere names the value. */
+    private static void assertRestricted(PipelineConfig pc, String what, int files) throws Exception {
+        assertEquals(files, count(restricted(pc)), what + ": the file is in the restricted quarantine");
+        for (String kept : new String[]{pc.dirs().quarantine(), pc.dirs().errors(), pc.dirs().temp()})
+            assertEquals(0, count(Path.of(kept)), what + ": no copy of the file is kept in " + kept);
+        if (Files.isDirectory(Path.of(pc.dirs().backup())))   // a clean batch-mate is backed up; the refused file never
+            try (Stream<Path> b = Files.walk(Path.of(pc.dirs().backup()))) {
+                for (Path f : b.filter(Files::isRegularFile).toList())
+                    assertFalse(Files.readString(f, java.nio.charset.StandardCharsets.UTF_8).contains("pa_x2")
+                            || f.getFileName().toString().contains("4111"), what + ": the refused file is not in backup/");
+            }
+        try (Stream<Path> in = Files.list(Path.of(pc.dirs().poll()))) {
+            assertEquals(0, in.filter(p -> p.getFileName().toString().startsWith("PAYMENT_ATTEMPTS_20260704")
+                    || p.getFileName().toString().contains("4111")).count(), what + ": the refused file left the inbox");
+        }
+        String status = Files.readString(Path.of(pc.dirs().statusFilePath()));
+        assertTrue(status.contains("QUARANTINED_RESTRICTED") && status.contains("INGEST_REFUSE:"), what + ": " + status);
+        assertFalse(status.contains("1111") || status.contains("Invalid Input") || status.contains("4111"),
+                what + ": the status holds the reason code alone: " + status);
     }
 
     @Test
@@ -188,32 +239,80 @@ class PaymentFraudTemplateGoldenTest {
             PipelineConfig pc = plant(tmp.resolve("p" + i++), p[0], p[1]);
             assertEquals(2L, scalar(Path.of(pc.dirs().database()).getParent().getParent(), "payment_attempts/database",
                     "SELECT count(*) FROM \"s\""), p[0] + "='" + p[1] + "' is not a card number: both rows land");
+            assertEquals(0, count(restricted(pc)));
         }
     }
 
     @Test
-    void aCardNumberInAnySpellingOrColumnPurgesTheFileAndLandsNothing(@TempDir Path tmp) throws Exception {
+    void aCardNumberInAnySpellingOrColumnIsRestrictedAndLandsNothing(@TempDir Path tmp) throws Exception {
         int i = 0;
         for (String[] p : TRIPS) {
             String what = p[0] + "='" + p[1] + "'";
             PipelineConfig pc = plant(tmp.resolve("t" + i++), p[0], p[1]);
             assertEquals(0, count(Path.of(pc.dirs().database())), what + ": not one row of the file landed");
-            assertFalse(Files.exists(Path.of(pc.dirs().poll(), "PAYMENT_ATTEMPTS_20260704.csv")),
-                    what + ": the file left the inbox (it is never re-polled)");
-            for (String kept : new String[]{pc.dirs().quarantine(), pc.dirs().errors(), pc.dirs().backup(), pc.dirs().temp()})
-                assertEquals(0, count(Path.of(kept)), what + ": no copy of the file is kept in " + kept);
-            assertFalse(Files.exists(Path.of(pc.dirs().markers(), "PAYMENT_ATTEMPTS_20260704.csv.processed")), what);
-            String status = Files.readString(Path.of(pc.dirs().statusFilePath()));
-            assertTrue(status.contains("PURGED_REFUSED"), what + ": the purge is audited: " + status);
-            assertFalse(status.contains("1111"), what + ": the audit never quotes the value: " + status);
+            assertRestricted(pc, what, 1);
+            assertTrue(Files.readString(Path.of(pc.dirs().statusFilePath())).contains("INGEST_REFUSE:CARD_NUMBER"), what);
         }
+    }
+
+    @Test
+    void aCardNumberInTheFileNameOrHeaderIsRestricted(@TempDir Path tmp) throws Exception {
+        PipelineConfig named = run(tmp.resolve("n"), t -> t,
+                Map.of("PAYMENT_ATTEMPTS_" + TEST_PAN + ".csv", HEADER + "\n" + CLEAN_ROW + "\n"));
+        assertRestricted(named, "file name", 1);
+        assertTrue(Files.readString(Path.of(named.dirs().statusFilePath())).contains("CARD_NUMBER_IN_FILE_NAME"));
+        PipelineConfig header = run(tmp.resolve("h"), t -> t,
+                Map.of("PAYMENT_ATTEMPTS_20260704.csv", HEADER.replace("OUTCOME", "OUTCOME " + TEST_PAN) + "\n" + CLEAN_ROW + "\n"));
+        assertRestricted(header, "header", 1);
+        assertTrue(Files.readString(Path.of(header.dirs().statusFilePath())).contains("CARD_NUMBER_IN_HEADER"));
+    }
+
+    @Test
+    void inAMultiMemberBatchOnlyTheRefusedFileIsRestricted(@TempDir Path tmp) throws Exception {
+        PipelineConfig pc = run(tmp, t -> t.replace("collector:\n", "collector:\n  consignment:\n    max_files: 3\n"),
+                Map.of("PAYMENT_ATTEMPTS_20260704.csv", HEADER + "\n" + CLEAN_ROW + "\n" + row("INSTRUMENT_TOKEN", TEST_PAN) + "\n",
+                        "PAYMENT_ATTEMPTS_20260705.csv", HEADER + "\n" + CLEAN_ROW.replace("pa_x1", "pa_y1") + "\n"));
+        assertRestricted(pc, "multi-member", 1);
+        assertEquals(1L, scalar(Path.of(pc.dirs().database()).getParent().getParent(), "payment_attempts/database",
+                "SELECT count(*) FROM \"s\" WHERE ATTEMPT_ID = 'pa_y1'"), "the clean batch-mate still lands");
+        assertEquals(1L, scalar(Path.of(pc.dirs().database()).getParent().getParent(), "payment_attempts/database",
+                "SELECT count(*) FROM \"s\""), "and nothing of the refused file");
+    }
+
+    @Test
+    void aChunkedFileIsRolledBackAndRestricted(@TempDir Path tmp) throws Exception {
+        StringBuilder body = new StringBuilder(HEADER).append('\n');
+        for (int k = 0; k < 40; k++) body.append(CLEAN_ROW.replace("pa_x1", "pa_c" + k)).append('\n');
+        body.append(row("INSTRUMENT_TOKEN", TEST_PAN)).append('\n');
+        PipelineConfig pc = run(tmp, t -> t.replace("  reject_mode: all_or_nothing\n",
+                        "  chunking:\n    max_file_bytes: 1000\n    target_chunk_bytes: 1000\n"),
+                Map.of("PAYMENT_ATTEMPTS_20260704.csv", body.toString()));
+        assertTrue(pc.chunking().appliesTo(body.length()), "the premise: this file is chunked");
+        assertEquals(0, count(Path.of(pc.dirs().database())), "the chunks written before the refusal are rolled back");
+        assertRestricted(pc, "chunked", 1);
+    }
+
+    @Test
+    void aOneMegabyteDigitCellIsScannedQuickly(@TempDir Path tmp) throws Exception {
+        String huge = "9".repeat(1_000_000);
+        long t0 = System.nanoTime();
+        PipelineConfig pc = plant(tmp, "MERCHANT_ID", huge);
+        long ms = (System.nanoTime() - t0) / 1_000_000;
+        assertEquals(2L, scalar(Path.of(pc.dirs().database()).getParent().getParent(), "payment_attempts/database",
+                "SELECT count(*) FROM \"s\""), "a 1 MB digit run is no card number");
+        assertTrue(ms < 10_000, "the whole poll of a 1 MB digit cell took " + ms + " ms");
+        // The scan itself, apart from the poll's fixed cost: the same file, clean, as the baseline.
+        long b0 = System.nanoTime();
+        plant(tmp.resolve("base"), "MERCHANT_ID", "m_01");
+        long base = (System.nanoTime() - b0) / 1_000_000;
+        assertTrue(ms - base < 2_000, "the 1 MB cell cost " + (ms - base) + " ms over a clean file");
     }
 
     /**
      * 🔴 KNOWN GAP, pinned as evidence for {@code INGEST-REJECT-SIDECAR-RAW-PAN-1}: a card number inside a MALFORMED
      * row (a field-count reject) never reaches the mapping, so the tripwire cannot see it — {@code all_or_nothing}
      * quarantines the raw file and writes a rejects sidecar holding the row verbatim. When the platform fixes it,
-     * this test goes red: flip it to the purge assertions above.
+     * this test goes red: flip it to the restricted-quarantine assertions above.
      */
     @Test
     void knownGapACardNumberInAMalformedRowIsKeptInQuarantine(@TempDir Path tmp) throws Exception {

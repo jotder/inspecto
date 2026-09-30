@@ -158,6 +158,37 @@ public final class PaymentFraudCorpus {
         //    values — a 16-digit Luhn-INVALID number, a 12-digit number and a 20-digit number. All must ingest.
         for (String merchant : new String[]{"4111111111111112", "411111111111", "41111111111111111111"})
             add(at(1, 20, 30), "acc_la_pan", "tok_la_pan", "402400", "dev_la_pan", merchant, 12.50, "APPROVED");
+        // Realistic digit-bearing references that must never read as a card number (item: 0 false refusals):
+        // 200 order ids, 50 epoch-millisecond stamps, 50 raw Luhn-VALID IMEIs, 50 phone numbers — one attempt each,
+        // on its own account / instrument / device, spread over the three days.
+        List<String> refs = new ArrayList<>();
+        for (int k = 0; k < 200; k++)
+            refs.add(String.format(Locale.ROOT, "ORD-2026-%06d-%04d", rng.nextInt(1_000_000), rng.nextInt(10_000)));
+        for (int k = 0; k < 50; k++) refs.add(String.valueOf(1_751_328_000_000L + (long) (rng.nextDouble() * 259_200_000L)));
+        for (int k = 0; k < 50; k++) refs.add(imei(k % 2 == 0 ? "35" : "86"));
+        for (int k = 0; k < 50; k++)
+            refs.add(k % 2 == 0 ? String.format(Locale.ROOT, "+44 7700 9%05d", rng.nextInt(100_000))
+                    : String.format(Locale.ROOT, "+1 415-555-%04d", rng.nextInt(10_000)));
+        for (int k = 0; k < refs.size(); k++)
+            add(DAY1.atStartOfDay().plusMinutes(7L + 12L * k), "acc_la_ref_" + k, "tok_la_ref_" + k,
+                    BG_BINS[k % BG_BINS.length], "dev_la_ref_" + k, refs.get(k), money(20, 60), "APPROVED");
+    }
+
+    /** A synthetic 15-digit IMEI with a valid Luhn check digit (IMEIs are Luhn-valid by design). */
+    private String imei(String prefix) {
+        StringBuilder sb = new StringBuilder(prefix);
+        while (sb.length() < 14) sb.append(rng.nextInt(10));
+        for (int check = 0; check < 10; check++) {
+            String c = sb.toString() + check;
+            int sum = 0;
+            for (int k = 0; k < c.length(); k++) {
+                int v = c.charAt(c.length() - 1 - k) - '0';
+                if (k % 2 == 1) { v *= 2; if (v > 9) v -= 9; }
+                sum += v;
+            }
+            if (sum % 10 == 0) return c;
+        }
+        throw new IllegalStateException();
     }
 
     /** Three ordinary approved attempts on the account's usual device on {@code day}. */
