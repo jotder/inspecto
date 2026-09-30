@@ -214,6 +214,9 @@ the real ControlApi.
     third, kept-as-saved choice); *Must be filled in* separate from where it appears. Keys and choice values are
     **derived from the label on first save and frozen after**; ID-style text / List of values / Suggested
     values, `pattern`, and the stored key/values sit under a collapsed **Technical details** (D6).
+    The disclosure collapses again whenever another field is selected, the *Where it appears* radios carry an
+    explicit `aria-label` (so a reader never announces the stored `required`/`optional`), and the *Condition*
+    picker is `min-w-40` (at `w-28` its label squeezed the value *is* to "i.") — `FINDINGS-EDITOR-WORDING-1`, 2026-09-30.
   * **"Show only when"** points at fields **above** only (the server accepts forward references — the picker
     does not offer them), by local uid so a rename never breaks it; ⚠ **Number and List targets are not
     offered**: the renderer compares with `===` and the server as text, so a numeric condition cannot be
@@ -319,7 +322,7 @@ lead would not find). Conditional Notes: **PASS**. Preview: **PASS**. Open a Cas
 | 2 | Neither New case nor New incident can be created in a Space with no objects (mandatory link); the only guidance is "one must exist" | P3 (product decision; blocked the proxy) | `CASE-FIRST-OBJECT-DEAD-END-1` |
 | 3 | One Findings form for every Case, so a "SIM-box" form has no home; loss can only be a plain Number and is separate from *Impact* | P3 (concept / wording) | `FINDINGS-PER-CASE-TYPE-1` |
 | 4 | *Add choice* leaves focus in *Name*, so the next keystrokes rename the field | P3 | `FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1` |
-| 5 | Radios are announced as "required"/"optional"; the condition word is truncated to "i."; *Technical details* (regex) stays open across fields | P3 (wording / a11y) | `FINDINGS-EDITOR-WORDING-1` |
+| 5 | Radios are announced as "required"/"optional"; the condition word is truncated to "i."; *Technical details* (regex) stays open across fields | P3 (wording / a11y) | `FINDINGS-EDITOR-WORDING-1` — closed 2026-09-30 |
 | 6 | The Case detail panel does not scroll by itself; the whole document scrolls (blank band) and the list is squeezed to about 130 px | P3 | `CASE-DETAIL-DOCUMENT-SCROLL-1` |
 | 7 | The create toast shows the raw id `CASE-<uuid>`; the built-in *Records affected* is Short text, not Number | cosmetic, not filed | — |
 

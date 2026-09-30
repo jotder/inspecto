@@ -291,8 +291,7 @@ describe('FindingsSpecEditorDialog', () => {
         await render();
         const addChoice = (): HTMLButtonElement =>
             Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Add choice')!;
-        const boxes = (): HTMLInputElement[] =>
-            Array.from(el.querySelectorAll('fieldset input')) as HTMLInputElement[];
+        const boxes = (): HTMLInputElement[] => Array.from(el.querySelectorAll('fieldset input')) as HTMLInputElement[];
         const type = async (box: HTMLInputElement, text: string): Promise<void> => {
             box.value = text;
             box.dispatchEvent(new Event('input'));
@@ -328,5 +327,49 @@ describe('FindingsSpecEditorDialog', () => {
         c.fieldForm.controls.label.setValue('Outcome');
         await render();
         expect(preview.value()['summary']).toBe('ring of 4 cards');
+    });
+    it('names the "Where it appears" radios by what they mean, not by their stored values', async () => {
+        const { el } = await create();
+        const radios = Array.from(el.querySelectorAll<HTMLInputElement>('mat-radio-group input[type="radio"]'));
+        // An explicit name on the input itself, so no reader falls back to the stored value.
+        const names = radios.map((r) => r.getAttribute('aria-label'));
+        expect(names).toEqual(['Always shown', 'Under “More”']);
+        expect(names).not.toContain('required');
+        expect(names).not.toContain('optional');
+        await expectNoA11yViolations(el);
+    });
+
+    it('the "Show only when" condition picker shows "is" in full, with room for it', async () => {
+        const { c, el, render } = await create();
+        c.select(c.fields()[2].uid);
+        c.fieldForm.controls.showWhenOn.setValue(true);
+        await render();
+        const picker = Array.from(el.querySelectorAll('inspecto-option-picker')).find((p) =>
+            p.textContent?.includes('Condition'),
+        ) as HTMLElement;
+        expect(picker.querySelector('button span')?.textContent?.trim()).toBe('is');
+        // `w-28` squeezed the value beside its label into "i.".
+        expect(picker.classList).not.toContain('w-28');
+        expect(picker.classList).toContain('min-w-40');
+    });
+
+    it('collapses "Technical details" again when another field is selected', async () => {
+        const { c, el, render } = await create();
+        c.select(c.fields()[0].uid);
+        await render();
+        const toggle = (): HTMLButtonElement =>
+            Array.from(el.querySelectorAll('button')).find((b) =>
+                b.textContent?.includes('Technical details'),
+            ) as HTMLButtonElement;
+        toggle().click();
+        await render();
+        expect(toggle().getAttribute('aria-expanded')).toBe('true');
+        c.select(c.fields()[0].uid);
+        await render();
+        expect(toggle().getAttribute('aria-expanded')).toBe('true');
+        c.select(c.fields()[1].uid);
+        await render();
+        expect(toggle().getAttribute('aria-expanded')).toBe('false');
+        expect(el.querySelector('#ff-technical')).toBeNull();
     });
 });

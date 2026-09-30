@@ -141,10 +141,10 @@
                         class="flex flex-wrap gap-4"
                         aria-labelledby="ff-appears-label"
                     >
-                        <mat-radio-button value="required">Always shown</mat-radio-button>
-                        <mat-radio-button value="optional">Under “More”</mat-radio-button>
+                        <mat-radio-button value="required" aria-label="Always shown">Always shown</mat-radio-button>
+                        <mat-radio-button value="optional" aria-label="Under “More”">Under “More”</mat-radio-button>
                         @if (f.tier === 'advanced') {
-                        <mat-radio-button value="advanced">Behind the settings gear (kept as saved)</mat-radio-button>
+                        <mat-radio-button value="advanced" aria-label="Behind the settings gear (kept as saved)">Behind the settings gear (kept as saved)</mat-radio-button>
                         }
                     </mat-radio-group>
                 </div>
@@ -232,7 +232,7 @@
                             [readOnly]="!canEdit()"
                         />
                         <inspecto-option-picker
-                            class="w-28"
+                            class="min-w-40"
                             label="Condition"
                             formControlName="showWhenSense"
                             [options]="senseOptions"

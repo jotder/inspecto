@@ -219,6 +219,8 @@ export class FindingsSpecEditorDialog {
     // ── selection + the field form ───────────────────────────────────────────────
 
     select(uid: string | null): void {
+        // D6: the disclosure is per field — moving to another field collapses it again.
+        if (uid !== this.selectedUid()) this.showTechnical.set(false);
         this.selectedUid.set(uid);
         const f = this.fields().find((x) => x.uid === uid);
         if (!f) return;
