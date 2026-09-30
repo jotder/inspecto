@@ -1,6 +1,6 @@
 name: ba_margin_data_quality
 dataset: ba_margin_erosion
-measure: max(data_quality_issue)
+measure: max(data_quality_flag)
 by[3]: product, channel, partner
 comparator: gte
 threshold: 1

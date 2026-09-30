@@ -34,8 +34,13 @@ The trend is changing even though no single day left the band. The model re-base
 fires.
 
 1. Plot `actual` against `forecast` for the last few weeks. A steady gap that keeps growing is a trend change.
-2. A slow decline is the typical silent leak: churn, a tariff change or a slowly failing feed. Check before
-   you accept it.
+2. A steady decline can be churn, a tariff change or a slowly failing feed. Check before you accept it.
+
+**Known limits.** The detector catches a trend change of roughly 0.2σ a day or more (about 4 a day on the
+synthetic corpus, whose noise σ is 20; +4 a day was caught on day 43 of the ramp). A slower change is absorbed
+into the forecast's trend term and is **never flagged**. A +2 a day ramp raises nothing. Watch slow leaks with
+a KPI comparison (for example `ba_revenue` against last year), not with this Alert Rule. A shift or ramp
+inside the first 28 days (the warm-up) is absorbed silently, or reported late as drift.
 
 ## Alert Rule `ba_margin_data_quality` (WARNING, one Alert per product / channel / partner)
 

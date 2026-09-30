@@ -106,6 +106,12 @@ class BusinessAssurancePackGoldenTest {
      * {@code rewrite} (a SELECT over {@code __base}, the shipped corpus relation).
      */
     private static Path variant(Path dir, String store, String src, String rewrite) throws Exception {
+        return variant(dir, store, src, rewrite, m -> m);
+    }
+
+    /** As above, with the model SQL also rewritten by {@code model} (a parameter change in its {@code p} CTE). */
+    private static Path variant(Path dir, String store, String src, String rewrite,
+                                java.util.function.UnaryOperator<String> modelEdit) throws Exception {
         try (var walk = Files.walk(CFG)) {
             for (Path p : walk.toList()) {
                 Path t = dir.resolve(CFG.relativize(p).toString());
@@ -117,7 +123,7 @@ class BusinessAssurancePackGoldenTest {
         String sep = ") SELECT * FROM (";
         int cut = v.derivedSql().indexOf(sep);
         String corpus = v.derivedSql().substring(("WITH " + src + " AS (").length(), cut);
-        String model = v.derivedSql().substring(cut + sep.length());
+        String model = modelEdit.apply(v.derivedSql().substring(cut + sep.length()));
         views.write(new ViewDefinition(store, v.pipeline(), v.sourceStores(),
                 "WITH __base AS (" + corpus + "), " + src + " AS (" + rewrite + ") SELECT * FROM (" + model,
                 v.definedAt()));
@@ -197,6 +203,33 @@ class BusinessAssurancePackGoldenTest {
             assertTrue(t > 100 && t <= 121, slope + ": detected on day " + t);
             assertEquals(1, sweep(cfg).count("ba_revenue_drift"));
         }
+    }
+
+    /**
+     * KNOWN LIMIT: a ramp slower than roughly 0.2 sigma/day is absorbed by the trend term and never flagged. +2/day
+     * (0.1 sigma) raises nothing but the planted spike; +4/day is the slowest that trips drift (day 143).
+     */
+    @Test
+    void aSlowRampIsAbsorbedAsTrendAndNotFlagged(@TempDir Path dir) throws Exception {
+        Path slow = variant(dir.resolve("slow"), "ba_revenue_forecast", "daily_revenue",
+                revenue("CASE WHEN t >= 100 THEN 2 * (t - 100) ELSE 0 END"));
+        assertEquals(List.of("150:band"), flags(slow), "a known limit, documented in RUNBOOK.md and the OKF");
+        Path four = variant(dir.resolve("four"), "ba_revenue_forecast", "daily_revenue",
+                revenue("CASE WHEN t >= 100 THEN 4 * (t - 100) ELSE 0 END"));
+        assertEquals(List.of("143:drift", "150:band"), flags(four));
+    }
+
+    /**
+     * The CUSUM state is typed DOUBLE in the recursion's anchor: a {@code 0.0} literal types it DECIMAL(2,1), which
+     * the default {@code cusum_h} 8 never overflows (the sum resets first) but a raised limit does.
+     */
+    @Test
+    void aRaisedCusumLimitStillRuns(@TempDir Path dir) throws Exception {
+        Path cfg = variant(dir, "ba_revenue_forecast", "daily_revenue",
+                revenue("CASE WHEN t >= 100 THEN 8 * (t - 100) ELSE 0 END"),
+                m -> m.replace("8.0 AS cusum_h", "12.0 AS cusum_h"));
+        List<String> f = flags(cfg);
+        assertTrue(f.stream().anyMatch(x -> x.endsWith(":drift")), "a CUSUM sum past 9.9 must not overflow: " + f);
     }
 
     /**

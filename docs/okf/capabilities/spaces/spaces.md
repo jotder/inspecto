@@ -230,10 +230,14 @@ earlier days are NOT reported as `outside_band` (only a run shorter than K is a 
 days do not feed it, so a spike or a shift never trips it. Consequence for a live tail: a run that is still
 shorter than K reads as `outside_band` and becomes a regime change (its spike Alerts heal) if it reaches K, so
 a real shift can raise up to K − 1 spike Alerts before its one regime Incident. The anchor row must type the
-CUSUM state `DOUBLE` — a `0.0` literal is `DECIMAL(2,1)` and the recursion fails once the sum passes 9.9. All
+CUSUM state `DOUBLE`: a `0.0` literal is `DECIMAL(2,1)`. At the default `cusum_h` 8 the sum resets before it
+reaches 10, so this matters only when `cusum_h` is raised; the golden test raises it to 12 and fails without the
+cast. ⚠ **Drift bound:** the CUSUM catches a trend change of roughly ≥ 0.2σ/day (+4/day on this corpus, caught on
+day 143); anything slower is absorbed by the trend term and never flagged (a +2/day ramp is a golden
+known-limit case), and a change inside the 28-day warm-up is absorbed silently or reported late as drift. All
 constants live in the SQL's `p` CTE (view and Job alike); `outside_band`, `regime_change` and `drift_change` are
 0 through a 28-day warm-up. The margin model assesses erosion only for a group with `status = assessed`: a
-group with a null or negative revenue / cost line in the windows is `data_quality` (flag `data_quality_issue`,
+group with a null or negative revenue / cost line in the windows is `data_quality` (flag `data_quality_flag`,
 its own Alert Rule) instead of reading as a margin change; no baseline lines is `new`; fewer than `min_lines`
 (10) lines or `min_revenue` (1000) in either window is `insufficient`; `erosion_pp` is NULL for all three. `ba_margin_lines` / `ba_margin_erosion`
 — revenue − cost by product / channel / partner, margin %, and `erosion_pp` = baseline (prior 28 days) margin %
