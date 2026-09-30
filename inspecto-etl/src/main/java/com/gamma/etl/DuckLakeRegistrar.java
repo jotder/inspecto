@@ -257,7 +257,7 @@ public final class DuckLakeRegistrar {
                     try (java.sql.ResultSet rs = q.executeQuery()) {
                         rs.next();
                         if (rs.getLong(1) > 0) {
-                            log.info("DuckLake: {} already registered into {} -- skipped", key, target);
+                            log.warn("DuckLake: {} already registered into {} -- skipped (a pinned batch_id re-run is skipped even if the data changed)", key, target);
                             return;   // the finally rolls the (read-only) transaction back
                         }
                     }

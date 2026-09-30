@@ -188,7 +188,7 @@ class DuckLakeRegistrarIdempotentTest {
             try (Statement s = c.createStatement()) {
                 s.execute("LOAD ducklake");
             } catch (SQLException e) {
-                org.junit.jupiter.api.Assumptions.assumeTrue(false, "ducklake extension not cached: " + e.getMessage());
+                org.junit.jupiter.api.Assumptions.assumeTrue(false, "ducklake extension not cached (" + e.getMessage() + "): UNVERIFIED here -- BEGIN/COMMIT with a data INSERT and a catalog INSERT, and CREATE TABLE IF NOT EXISTS, against a real DuckLake");
             }
             String d = dir.toString().replace("\\", "/");
             try (Statement s = c.createStatement()) {

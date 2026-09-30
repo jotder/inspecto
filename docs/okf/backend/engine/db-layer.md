@@ -266,7 +266,13 @@ Pinned by `DuckLakeRegistrarIdempotentTest.aSameIdEditOfDifferentContentIsSkippe
 lake tables sees it. ⚠ Two truly concurrent registrars could both pass the check (DuckLake has no
 constraints); the lease excludes that. Identifiers and paths are quote-escaped. Verified on a native attached
 DuckDB, and by `realDuckLakeRegistersOnce` against a REAL DuckLake catalog when the `ducklake` extension is
-already cached in the machine's DuckDB extension directory (LOAD only; it skips elsewhere, so CI may not run it).
+already cached in the machine's DuckDB extension directory (LOAD only). ⚠ Those real-lake tests
+(`realDuckLakeRegistersOnce`, and `DuckLakeRegistrarRegisterWiringTest`, which drives `register()` with two sinks
+sharing one lake and `registerInto` with a pinned id) skip QUIETLY through `assumeTrue` where the extension is not
+cached, so a plain CI run leaves the real-lake transaction and the per-sink key unverified; the skip message says so.
+⚠ A pinned `batch_id` on the job lane is the same skip made opt-in: re-running an overwriting Pipeline with it is
+skipped in the lake and keeps the first run's rows (logged at WARN); pinned by
+`registerInto_skipsARerunWithTheSamePinnedIdEvenWhenTheDataChanged`.
 ⚠ A long lease-table outage makes every run refuse each cycle ("lease unverifiable"), with no attempt spent and
 nothing quarantined; nothing raises a Signal for it, so the symptom is files not draining and the log line.
 Job / authored-Pipeline runs hold `SCOPE_JOB` / `SCOPE_AUTHORED` claims through `RunClaims`, which has no validity
