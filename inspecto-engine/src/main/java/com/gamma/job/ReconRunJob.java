@@ -15,6 +15,7 @@ import com.gamma.signal.Severity;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -92,9 +93,20 @@ final class ReconRunJob implements Job {
 
         ReconService.RunResult r = ReconService.run(spec, GRAIN_LIMIT);
         Map<String, Object> byType = r.summary().get("byType") instanceof Map<?, ?> bt ? cast(bt) : Map.of();
-        long missingLeft = num(byType.get("missing_left"));
-        long missingRight = num(byType.get("missing_right"));
-        long valueBreak = num(byType.get("value_break"));
+        // The counts cover EVERY pair (A<->B and, on a 3-way Reconciliation, A<->C): the same Breaks the run
+        // records. The run summary's byType is the A<->B pair alone, so it is only the fallback when the Breaks
+        // cannot be computed (the run is then also not recorded, and says so).
+        List<ReconBreaks.Break> fresh = null;
+        String computeError = null;
+        try {
+            fresh = ReconBreaks.compute(spec, ReconStateStore.MAX_BREAKS);
+        } catch (Exception e) {
+            computeError = e.getMessage();
+            ctx.log().warn("could not compute the reconciliation Breaks", "reconciliation", reconId, "error", computeError);
+        }
+        long missingLeft = fresh == null ? num(byType.get("missing_left")) : count(fresh, "missing_left");
+        long missingRight = fresh == null ? num(byType.get("missing_right")) : count(fresh, "missing_right");
+        long valueBreak = fresh == null ? num(byType.get("value_break")) : count(fresh, "value_break");
         long breaks = missingLeft + missingRight + valueBreak;
 
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -107,7 +119,7 @@ final class ReconRunJob implements Job {
         ctx.signals().emit("recon.run.completed", breaks > 0 ? Severity.WARN : Severity.INFO, payload);
         ctx.log().info("reconciliation complete", "reconciliation", reconId, "breaks", breaks);
         if (breaks > 0) openIncident(ctx, reconId, missingLeft, missingRight, valueBreak, breaks);
-        String notRecorded = recordRun(ctx, writeRoot, reconId, spec);
+        String notRecorded = fresh == null ? computeError : recordRun(ctx, writeRoot, reconId, fresh);
 
         return JobResult.ok("recon.run '" + reconId + "': " + breaks + " break(s) ("
                 + missingLeft + " missing-left, " + missingRight + " missing-right, " + valueBreak + " value-break)"
@@ -115,14 +127,17 @@ final class ReconRunJob implements Job {
                 (System.nanoTime() - t0) / 1_000_000L);
     }
 
+    private static long count(List<ReconBreaks.Break> breaks, String type) {
+        return breaks.stream().filter(b -> type.equals(b.type())).count();
+    }
+
     /**
      * Record this run into the Reconciliation's state (R2-03). Returns {@code null} when recorded, else the
      * reason it was not — best-effort, like {@link #openIncident}, but never silent.
      */
-    private static String recordRun(JobContext ctx, Path writeRoot, String reconId, ReconService.Spec spec) {
+    private static String recordRun(JobContext ctx, Path writeRoot, String reconId, List<ReconBreaks.Break> fresh) {
         try {
-            new ReconStateStore(writeRoot).record(reconId,
-                    ReconBreaks.compute(spec, ReconStateStore.MAX_BREAKS), ReconStateStore.now());
+            new ReconStateStore(writeRoot).record(reconId, fresh, ReconStateStore.now());
             return null;
         } catch (Exception e) {
             ctx.log().warn("could not record the reconciliation run", "reconciliation", reconId, "error", e.getMessage());
