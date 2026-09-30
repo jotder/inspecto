@@ -806,6 +806,45 @@ describe('LinkAnalysisComponent', () => {
         const data = (open.mock.calls[0] as unknown as [unknown, { data: { investigationId?: string } }])[1].data;
         expect(data.investigationId).toBe('inv-7');
     });
+    it('evidence A1: a snapshot captures what the canvas shows — the Working Set, else the query graph', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const open = vi
+            .spyOn(fixture.debugElement.injector.get(MatDialog), 'open')
+            .mockReturnValue({ afterClosed: () => of(undefined) } as never);
+        type Data = { graph: G6GraphData; investigationId?: string; origin: { sourceId: string; dataset?: string } };
+        const dataAt = (i: number) => (open.mock.calls[i] as unknown as [unknown, { data: Data }])[1].data;
+
+        await c.openSnapshot(); // no Investigation: the query graph is on screen
+        expect(dataAt(0).graph).toBe(c.canvasData());
+        expect(dataAt(0).graph.nodes).toHaveLength(5);
+
+        c.investigation.activeId.set('inv-9');
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [],
+        } as never);
+        c.investigation.workingSet.set({
+            entities: [{ id: 'ws-a' }, { id: 'ws-b' }],
+            links: [{ source: 'ws-a', target: 'ws-b', kind: 'k', count: 1 }],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        expect(c.investigation.canvas()).not.toBeNull();
+        await c.openSnapshot();
+        const ws = dataAt(1);
+        expect(ws.graph).toBe(c.canvasData());
+        expect(ws.graph.nodes.map((n) => n.data.label).sort()).toEqual(['ws-a', 'ws-b']);
+        expect(ws.investigationId).toBe('inv-9');
+        expect(ws.origin).toMatchObject({ sourceId: 'investigation', dataset: 'links-ds' });
+
+        c.investigation.showWorkingSet.set(false); // the query graph is drawn again while it stays open
+        await c.openSnapshot();
+        expect(dataAt(2).graph).toBe(c.canvasData());
+        expect(dataAt(2).graph.nodes).toHaveLength(5);
+    });
     it('level of detail: drops labels above the cap while on, and the footer states the published caps', async () => {
         const big: G6GraphData = {
             nodes: Array.from({ length: 301 }, (_, i) => ({ id: `n${i}`, data: { label: `N${i}`, kind: 'entity' } })),

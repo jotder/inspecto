@@ -1006,24 +1006,42 @@ export class LinkAnalysisComponent implements OnInit {
 
     // ── evidence: snapshot the answer, attach it to a Case (spec §3.6 / plan S1.3, UI first) ──
 
+    /**
+     * A1 (operator 2026-09-30): the snapshot captures what is ON SCREEN — `canvasData()`, i.e. the Working Set
+     * while an Investigation draws it, the query graph otherwise. The dialog hashes this same graph, so the
+     * SHA-256 manifest covers exactly the drawn nodes/edges.
+     */
     private snapshotData(): SnapshotDialogData | null {
-        const g = this.displayed();
+        const g = this.canvasData();
+        const ws = this.investigation.canvas() !== null;
         const run = this.lastRun();
-        if (!g || !run) return null;
-        const p = run.query.projection;
+        const investigationId = this.investigation.activeId() ?? undefined;
+        let origin: SnapshotDialogData['origin'];
+        let predicate: SnapshotDialogData['predicate'] = null;
+        if (ws) {
+            origin = {
+                sourceId: 'investigation',
+                dataset: this.investigation.binding()?.datasetId,
+                query: { investigationId },
+            };
+        } else if (run) {
+            origin = { sourceId: run.sourceId, dataset: run.query.projection?.datasetId, query: run.query };
+            predicate = run.query.filter ?? this.localFilter() ?? null;
+        } else return null;
+        if (!g) return null;
         return {
             graph: g,
-            predicate: run.query.filter ?? this.localFilter() ?? null,
-            origin: { sourceId: run.sourceId, dataset: p?.datasetId, query: run.query },
+            predicate,
+            origin,
             layout: this.layoutId(),
             suggestedTitle: `${this.sourceLabel()} — ${g.nodes.filter((n) => !n.data.missing).length} nodes`,
             caseId: this.deepLinkedCaseId(),
             selectedNodeIds: this.emphasis()?.nodeIds ?? [],
-            investigationId: this.investigation.activeId() ?? undefined,
+            investigationId,
         };
     }
 
-    /** Freeze the displayed graph as a snapshot; resolves with it (or undefined when cancelled). */
+    /** Freeze the on-screen graph as a snapshot; resolves with it (or undefined when cancelled). */
     openSnapshot(): Promise<GraphSnapshot | undefined> {
         const data = this.snapshotData();
         if (!data) return Promise.resolve(undefined);

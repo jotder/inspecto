@@ -720,7 +720,12 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   or it is refused (422), so a dossier cannot be used to read another analyst's snapshot. The SPA writes that
   anchor (2026-09-28): a snapshot sealed while an Investigation is open carries its id (the open
   `InvestigationSessionStore.activeId`); one sealed with none open has no `investigationId` key and so cannot be
-  included in any Dossier. The anchor is outside `manifestHash`. Access matches the
+  included in any Dossier. The anchor is outside `manifestHash`. **A snapshot captures what is on screen**
+  (decision A1, operator 2026-09-30): *Save this analysis* seals `canvasData()` — the Working Set while an
+  Investigation draws it, the query graph otherwise (including while one is open with *show Working Set* off) —
+  so the node picker, the hashed nodes/edges and the origin all describe the drawn graph. A Working Set
+  snapshot's origin is `{sourceId: 'investigation', dataset: <bound Dataset>, query: {investigationId}}` with a
+  null predicate; `manifestHash` is computed in the dialog (`snapshotGraph`) over that same graph. Access matches the
   Investigation: owner-only, plus the R3 Dataset check. Neither route persists anything; both are audited
   (`LINK_DOSSIER_BUILT` / `LINK_DOSSIER_VERIFIED`). The SPA's snapshot `manifestHash` is SHA-256 too
   (2026-09-28): Web Crypto over the UTF-8 bytes of the canonical JSON, written `sha256:<hex>` — the server's
