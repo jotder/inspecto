@@ -213,6 +213,33 @@ class ControlApiInvestigationCaseShareTest {
         }
     }
 
+    /** A9 (operator 2026-09-30): Case members may read {@code /coverage}; a stranger and a closed Case still 404. */
+    @Test
+    void aCaseMemberReadsCoverageAndAStrangerOrAClosedCaseStill404(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        Map<String, Map<String, Object>> cases = CaseTeamObjectEngine.arm();
+        cases.put("CASE-1", CaseTeamObjectEngine.caseOf("CASE-1", "lead-1", "analyst-2", false));
+        try (Ctx c = open(cfg, root)) {
+            new ViewStore(root.resolve("views")).write(new ViewDefinition("timed_view", "flow-x", List.of(),
+                    "SELECT caller, callee, TIMESTAMP '2026-09-01 10:00:00' AS ts FROM (VALUES ('a','b'),('b','d'))"
+                            + " AS t(caller,callee)", "2026-09-30T00:00:00Z"));
+            new ComponentStore(root.resolve("registry")).write("dataset", "timed_ds", Map.of("view", "timed_view"));
+            ok(c, "POST", "/inv/investigations", "{\"id\":\"inv-a\",\"purpose\":\"Fraud referral FR-9\","
+                    + "\"dataset\":\"timed_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"timeCol\":\"ts\"}", OWNER);
+            String cov = INV + "/coverage?from=2026-09-01T00:00:00Z&to=2026-09-03T00:00:00Z";
+            assertEquals(200, status(c, "GET", cov, null, OWNER), "the owner reads coverage");
+            assertEquals(404, status(c, "GET", cov, null, MEMBER), "not linked yet: owner-only");
+
+            ok(c, "PUT", INV + "/case", "{\"caseRef\":\"CASE-1\"}", OWNER);
+            assertEquals(200, status(c, "GET", cov, null, MEMBER), "a Case member reads coverage");
+            assertEquals(404, status(c, "GET", cov, null, STRANGER), "a stranger still sees nothing");
+
+            cases.put("CASE-1", CaseTeamObjectEngine.caseOf("CASE-1", "lead-1", "analyst-2", true));
+            assertEquals(404, status(c, "GET", cov, null, MEMBER), "a closed Case grants nothing");
+            assertEquals(200, status(c, "GET", cov, null, OWNER), "the owner keeps access");
+        }
+    }
+
     /** Fail closed (assumption for operator review): access ends when the Case closes, vanishes, or the member leaves. */
     @Test
     void accessEndsWhenTheCaseClosesIsDeletedOrTheMemberLeaves(@TempDir Path cfg, @TempDir Path root) throws Exception {

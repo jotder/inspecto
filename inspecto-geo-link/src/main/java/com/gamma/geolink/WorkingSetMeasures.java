@@ -128,21 +128,26 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
      * LA-18: the COUNT of entities breaching the rule's value Measure over the WHOLE Dataset the Investigation is
      * bound to — read now, not from the sealed log. ⚠ The R3 gate was applied at binding (a sweep has no caller).
      */
-    private static OptionalDouble valueMeasure(Path writeRoot, Path dataRoot, Map<String, Object> header,
-                                               AlertRule rule) throws java.sql.SQLException, java.io.IOException {
+    private static Reading valueMeasure(Path writeRoot, Path dataRoot, Map<String, Object> header,
+                                        AlertRule rule) throws java.sql.SQLException, java.io.IOException {
         String ds = String.valueOf(header.get("dataset"));
         Map<String, Object> dataset = new com.gamma.pipeline.ComponentStore(writeRoot.resolve("registry"))
                 .get("dataset", ds).map(com.gamma.pipeline.ComponentRegistry.Component::content).orElse(null);
         if (dataset == null) {
             log.warn("alert rule '{}': no dataset '{}' — not evaluated", rule.name(), ds);
-            return OptionalDouble.empty();
+            return Reading.of(OptionalDouble.empty());
         }
         String relationSql = com.gamma.query.DatasetRelation.relationSql(dataset, dataRoot,
                 new com.gamma.pipeline.ViewStore(writeRoot.resolve("views")));
         // parsed NOW: a rolling `last` window resolves against the sweep's clock (UTC), never the binding's
         ValueMeasures.Spec spec = ValueMeasures.parse(rule.valueMeasure(), true);
-        return OptionalDouble.of(ValueMeasures.forInvestigation(ds, relationSql, header, spec,
-                ValueMeasures.agents(writeRoot, spec)).entities().size());
+        ValueMeasures.Agents agents = ValueMeasures.agents(writeRoot, spec);   // read LIVE at this sweep
+        OptionalDouble value = OptionalDouble.of(ValueMeasures.forInvestigation(ds, relationSql, header, spec, agents)
+                .entities().size());
+        if (agents == null) return Reading.of(value);
+        // A3 (operator 2026-09-30): the list version in force when THIS sweep evaluated, recorded on the firing
+        return new Reading(value, Map.of("agentList", spec.agentList(), "agentListSeq", String.valueOf(agents.atSeq()),
+                "agentListHash", String.valueOf(agents.atHash())));
     }
 
     /** The hash a binding records: SHA-256 of the rule's canonical JSON — any edit to the rule breaks the match. */
@@ -152,16 +157,16 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
 
     @Override
     @SuppressWarnings("unchecked")
-    public OptionalDouble value(Path writeRoot, Path dataRoot, AlertRule rule) {
+    public Reading read(Path writeRoot, Path dataRoot, AlertRule rule) {
         String id = rule.investigation();
         try {
             if (id == null || !SnapshotStore.SAFE_ID.matcher(id).matches()
-                    || !SnapshotStore.SAFE_ID.matcher(rule.name()).matches()) return OptionalDouble.empty();
+                    || !SnapshotStore.SAFE_ID.matcher(rule.name()).matches()) return Reading.of(OptionalDouble.empty());
             SnapshotStore store = new SnapshotStore(writeRoot);
             String rawHeader = store.readInvestigation(id);
             if (rawHeader == null) {
                 log.warn("alert rule '{}': no investigation '{}' — not evaluated", rule.name(), id);
-                return OptionalDouble.empty();
+                return Reading.of(OptionalDouble.empty());
             }
             String rawBinding = store.readAlertRuleBinding(id, rule.name());
             Map<String, Object> header = ApiContext.JSON.readValue(rawHeader, Map.class);
@@ -171,16 +176,16 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
                 log.warn("alert rule '{}' has no binding by the owner of investigation '{}' matching its current "
                         + "content — not evaluated (bind it through POST /inv/investigations/{}/alert-rules)",
                         rule.name(), id, id);
-                return OptionalDouble.empty();
+                return Reading.of(OptionalDouble.empty());
             }
             if (rule.isValueMeasureRule()) return valueMeasure(writeRoot, dataRoot, header, rule);
             InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(store, writeRoot, id, header);
             WorkingSetRoutes.Relation rel = WorkingSetRoutes.relation(inv, new boolean[1]);
-            return compute(rel.tables().get(rule.relation()), rule.relation(), rule.measure());
+            return Reading.of(compute(rel.tables().get(rule.relation()), rule.relation(), rule.measure()));
         } catch (Exception e) {
             log.warn("alert rule '{}' over investigation '{}' could not be evaluated: {}", rule.name(), id,
                     e.getMessage());
-            return OptionalDouble.empty();
+            return Reading.of(OptionalDouble.empty());
         }
     }
 }

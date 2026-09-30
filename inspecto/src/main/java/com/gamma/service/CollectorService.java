@@ -539,8 +539,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                             : (bootWriteRoot == null || bootWriteRoot.isBlank()) ? null
                             : java.nio.file.Path.of(bootWriteRoot.trim()).toAbsolutePath().normalize();
                     String dd = System.getProperty("data.dir", root.dataDir());   // LA-18: whole-Dataset reads
-                    return wr == null ? java.util.OptionalDouble.empty()
-                            : probe.value(wr, (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd), rule);
+                    return wr == null ? com.gamma.alert.InvestigationMeasureProbe.Reading.of(java.util.OptionalDouble.empty())
+                            : probe.read(wr, (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd), rule);
                 }));
         bus.subscribe(alerting::onEvent);
         alerting.onRulesChanged(this::syncFreshnessSweep);   // DUCKLE-C1 (1): re-derive the freshness sweep

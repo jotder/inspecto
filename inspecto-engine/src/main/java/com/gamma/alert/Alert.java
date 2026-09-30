@@ -22,7 +22,25 @@ import java.util.regex.Pattern;
  */
 public record Alert(String rule, String severity, String pipeline, String metric, double value,
                     String comparator, double threshold, String window, long epochMillis,
-                    String message) {
+                    String message, Map<String, String> evidence) {
+
+    /**
+     * {@code evidence}: what the rule's probe recorded at THIS firing (A3, operator 2026-09-30 - e.g. a value-measure
+     * rule's {@code agentList}, {@code agentListSeq}, {@code agentListHash}); empty for every other rule.
+     */
+    public Alert {
+        evidence = evidence == null ? Map.of() : Map.copyOf(evidence);
+    }
+
+    public Alert(String rule, String severity, String pipeline, String metric, double value, String comparator,
+                 double threshold, String window, long epochMillis, String message) {
+        this(rule, severity, pipeline, metric, value, comparator, threshold, window, epochMillis, message, Map.of());
+    }
+
+    /** This Alert carrying {@code evidence}. */
+    Alert withEvidence(Map<String, String> ev) {
+        return new Alert(rule, severity, pipeline, metric, value, comparator, threshold, window, epochMillis, message, ev);
+    }
 
     /** Ledger metric id → the words an operator reads; anything else goes through {@link #metricLabel}'s fallback. */
     private static final Map<String, String> METRIC_LABELS = Map.of(
@@ -184,6 +202,7 @@ public record Alert(String rule, String severity, String pipeline, String metric
         m.put("window", window);
         m.put("epochMillis", epochMillis);
         m.put("message", message);
+        if (!evidence.isEmpty()) m.put("evidence", new java.util.TreeMap<>(evidence));   // only when recorded (A3)
         return m;
     }
 

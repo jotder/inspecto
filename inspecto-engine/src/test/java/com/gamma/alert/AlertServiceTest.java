@@ -266,7 +266,7 @@ class AlertServiceTest {
         List<AlertRule> probed = new ArrayList<>();
         svc.investigationProbe(r -> {
             probed.add(r);
-            return java.util.OptionalDouble.of(5);
+            return new InvestigationMeasureProbe.Reading(java.util.OptionalDouble.of(5), Map.of("agentListSeq", "7"));
         });
         long now = System.currentTimeMillis();
         List<Alert> fired = svc.evaluate(null, now);
@@ -283,6 +283,10 @@ class AlertServiceTest {
         assertEquals("inv-42", incident.scope(), "the Incident's correlation scope is the Investigation");
         assertEquals("inv-42", incident.attributes().get("investigation"));
         assertEquals("entities", incident.attributes().get("relation"));
+        // A3: the probe's evidence is recorded on the Alert and its ALERT object
+        assertEquals(Map.of("agentListSeq", "7"), fired.get(0).evidence());
+        assertEquals("7", objects.opened.stream().filter(o -> o.kind() == ObjectType.ALERT).findFirst().orElseThrow()
+                .attributes().get("agentListSeq"));
 
         String alertId = objects.opened.stream().filter(o -> o.kind() == ObjectType.ALERT).findFirst().orElseThrow().id();
         objects.close(alertId);
@@ -291,7 +295,7 @@ class AlertServiceTest {
         assertEquals(2, count(objects, ObjectType.ALERT), "a fresh ALERT, since the first was resolved");
         assertEquals(1, count(objects, ObjectType.INCIDENT), "…but the active Incident dedupes the second promotion");
 
-        svc.investigationProbe(r -> java.util.OptionalDouble.empty());
+        svc.investigationProbe(r -> InvestigationMeasureProbe.Reading.of(java.util.OptionalDouble.empty()));
         assertEquals(0, svc.evaluate(null, now + java.time.Duration.ofMinutes(30).toMillis()).size(),
                 "a probe that cannot vouch for the rule (no owner binding) never fires");
     }

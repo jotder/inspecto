@@ -133,6 +133,22 @@ final class InvestigationEvaluator {
             TreeMap<String, Map<String, Object>> out = new TreeMap<>();
             if (resolution == null) return out;
             Map<String, SortedSet<String>> sides = sides();
+            for (Map<String, Object> sealed : sealedGroups().values()) {
+                for (String id : ids) {
+                    Entity e = entities.get(id);
+                    if (e == null || memberKeysOf(e, sides, sealed).isEmpty()) continue;
+                    out.put(String.valueOf(sealed.get("id")), sealed);
+                    break;
+                }
+            }
+            return out;
+        }
+
+        /** Every group of the resolution in force as {@code {id, members[], normalisers{type -> normaliser}}}, by id. */
+        @SuppressWarnings("unchecked")
+        TreeMap<String, Map<String, Object>> sealedGroups() {
+            TreeMap<String, Map<String, Object>> out = new TreeMap<>();
+            if (resolution == null) return out;
             Map<String, Object> types = (Map<String, Object>) resolution.get("types");
             for (Object o : (List<Object>) resolution.get("groups")) {
                 Map<String, Object> g = (Map<String, Object>) o;
@@ -146,12 +162,7 @@ final class InvestigationEvaluator {
                 sealed.put("id", String.valueOf(g.get("id")));
                 sealed.put("members", new ArrayList<>(members));
                 sealed.put("normalisers", norm);
-                for (String id : ids) {
-                    Entity e = entities.get(id);
-                    if (e == null || memberKeysOf(e, sides, sealed).isEmpty()) continue;
-                    out.put(String.valueOf(g.get("id")), sealed);
-                    break;
-                }
+                out.put(String.valueOf(g.get("id")), sealed);
             }
             return out;
         }
@@ -161,7 +172,8 @@ final class InvestigationEvaluator {
          * carries: its typed keys ({@link #keysOf}) that are members; or - when no type can be told for it at all (an
          * UNTYPED id: no own type, no typed bound column; live check 2026-09-30, plan §5.10) - the member keys its raw
          * id makes under each member type's SEALED normaliser, the same rule {@link #blockedByGroup} and a merged
-         * expand's member-value scan already apply to a raw id. An entity typed as something else is not a member.
+         * expand's member-value scan already apply to a raw id - and only when UNAMBIGUOUS ({@link #rawMemberKeys}:
+         * exactly one member type maps it to a member; D-U11). An entity typed as something else is not a member.
          */
         SortedSet<String> memberKeysOf(Entity e, Map<String, SortedSet<String>> sides, Map<String, Object> g) {
             Set<String> members = new HashSet<>(strings(g.get("members")));
@@ -241,10 +253,15 @@ final class InvestigationEvaluator {
                 sealed.put(gid, g);
                 for (String m : strings(g.get("members"))) groupOfKey.put(m, gid);
             }
+            TreeMap<String, Map<String, Object>> withNormalisers = sealedGroups();
             TreeMap<String, TreeSet<String>> entitiesOf = new TreeMap<>();
             for (Entity e : entities.values()) {
                 TreeSet<String> hit = new TreeSet<>();
-                for (String k : keysOf(e, sides)) if (groupOfKey.containsKey(k)) hit.add(groupOfKey.get(k));
+                SortedSet<String> own = keysOf(e, sides);
+                for (String k : own) if (groupOfKey.containsKey(k)) hit.add(groupOfKey.get(k));
+                // D-U11: an UNTYPED entity joins its group by the same unambiguous rule exclude/expand apply
+                if (own.isEmpty())
+                    for (var g : withNormalisers.entrySet()) if (!rawMemberKeys(g.getValue(), e.id()).isEmpty()) hit.add(g.getKey());
                 if (hit.isEmpty()) continue;
                 resolvedToOut.put(e.id(), hit.first());
                 for (String gid : hit) entitiesOf.computeIfAbsent(gid, k -> new TreeSet<>()).add(e.id());
@@ -526,12 +543,13 @@ final class InvestigationEvaluator {
     private static void mergedExclude(State s, Map<String, Object> entry, List<String> ids, String reason, int step) {
         Map<String, SortedSet<String>> sides = s.sides();
         List<Entity> had = new ArrayList<>(s.entities.values());
-        TreeSet<String> unmatched = new TreeSet<>(), hit = new TreeSet<>();
+        TreeSet<String> unmatched = new TreeSet<>(), hit = new TreeSet<>(), ambiguous = new TreeSet<>();
         for (Object o : entry.get("groups") instanceof List<?> l ? l : List.of()) {
             Map<String, Object> g = new LinkedHashMap<>((Map<String, Object>) o);
             TreeSet<String> notCarried = new TreeSet<>(strings(g.get("members")));
             for (Entity e : had) {
                 SortedSet<String> k = s.memberKeysOf(e, sides, g);
+                if (k.isEmpty() && s.keysOf(e, sides).isEmpty() && rawMatches(g, e.id()).size() > 1) ambiguous.add(e.id());
                 if (k.isEmpty()) continue;
                 notCarried.removeAll(k);
                 hit.add(e.id());
@@ -548,12 +566,23 @@ final class InvestigationEvaluator {
             if (!s.entities.containsKey(e.id())) left.add(e.id());
             else if (hit.contains(e.id())) kept.add(e.id());   // still here: keep protected it
         s.lastMerged = Map.of("left", new ArrayList<>(left), "kept", new ArrayList<>(kept),
-                "unmatched", new ArrayList<>(unmatched));
+                "unmatched", new ArrayList<>(unmatched), "ambiguous", new ArrayList<>(ambiguous));
     }
 
-    /** The member keys of sealed group {@code g} that raw id {@code raw} makes under each member type's sealed normaliser. */
-    @SuppressWarnings("unchecked")
+    /**
+     * The member key of sealed group {@code g} that UNTYPED raw id {@code raw} makes - only when it is UNAMBIGUOUS:
+     * exactly one member type's sealed normaliser maps it to a member (operator 2026-09-30, D-U11). Two or more -> empty:
+     * the value stays unmatched (a merged exclude's line says so). Applied identically by a merged exclude, a merged
+     * expand's member scan, {@link State#blockedByGroup} and the resolution view.
+     */
     static SortedSet<String> rawMemberKeys(Map<String, Object> g, String raw) {
+        SortedSet<String> all = rawMatches(g, raw);
+        return all.size() == 1 ? all : new TreeSet<>();
+    }
+
+    /** Every member key of sealed group {@code g} that raw id {@code raw} makes under each member type's sealed normaliser. */
+    @SuppressWarnings("unchecked")
+    static SortedSet<String> rawMatches(Map<String, Object> g, String raw) {
         Set<String> members = new HashSet<>(strings(g.get("members")));
         SortedSet<String> out = new TreeSet<>();
         for (var n : ((Map<String, Object>) g.get("normalisers")).entrySet()) {

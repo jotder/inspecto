@@ -96,7 +96,7 @@ public final class AlertService {
     static final String STORM_KEY = "*";
     /** LA-23: an Investigation rule → its Measure over the Working Set ({@link InvestigationMeasureProbe});
      *  {@code null} (no {@code inspecto-geo-link} module) disables Investigation rules. */
-    private volatile java.util.function.Function<AlertRule, java.util.OptionalDouble> investigationProbe;
+    private volatile java.util.function.Function<AlertRule, InvestigationMeasureProbe.Reading> investigationProbe;
     /** DUCKLE-C1: {@code dataset id} → epoch millis of its last publication; {@code null} disables
      *  freshness rules (which is NOT the same as reporting them fresh — see {@link #evaluateFreshness}). */
     private volatile java.util.function.Function<String, java.util.OptionalLong> freshnessProbe;
@@ -160,7 +160,7 @@ public final class AlertService {
     }
 
     /** Wire the LA-23 Investigation-rule evaluator (a Function so this engine never names the optional module). */
-    public void investigationProbe(java.util.function.Function<AlertRule, java.util.OptionalDouble> probe) {
+    public void investigationProbe(java.util.function.Function<AlertRule, InvestigationMeasureProbe.Reading> probe) {
         this.investigationProbe = probe;
     }
 
@@ -416,9 +416,10 @@ public final class AlertService {
             if (!rule.isInvestigationRule()) continue;
             var probe = investigationProbe;
             if (probe == null) continue;
-            java.util.OptionalDouble value = probe.apply(rule);
+            InvestigationMeasureProbe.Reading reading = probe.apply(rule);
+            java.util.OptionalDouble value = reading.value();
             if (value.isEmpty() || !rule.breached(value.getAsDouble())) continue;
-            fire(rule, rule.investigation(), rule.investigation(), value.getAsDouble(), nowMs, out);
+            fire(rule, rule.investigation(), rule.investigation(), value.getAsDouble(), nowMs, out, reading.evidence());
         }
 
         for (PipelineConfig cfg : configs.pipelines()) {
@@ -855,11 +856,17 @@ public final class AlertService {
      *  {@code false} when the cooldown held it. */
     private boolean fire(AlertRule rule, String display, String cooldownScope, double value, long nowMs,
                       List<Alert> out) {
+        return fire(rule, display, cooldownScope, value, nowMs, out, Map.of());
+    }
+
+    /** As above, recording the probe's {@code evidence} (A3) on the Alert, its ALERT object and its event. */
+    private boolean fire(AlertRule rule, String display, String cooldownScope, double value, long nowMs,
+                      List<Alert> out, Map<String, String> evidence) {
         String key = rule.name() + "|" + cooldownScope;
         Long last = lastFired.get(key);
         if (last != null && nowMs - last < cooldownMs(rule)) return false;   // still in cooldown
         lastFired.put(key, nowMs);
-        Alert alert = Alert.of(rule, display, textScope(rule, display), value, nowMs);
+        Alert alert = Alert.of(rule, display, textScope(rule, display), value, nowMs).withEvidence(evidence);
         fired.addFirst(alert);
         while (fired.size() > capacity) fired.removeLast();
         out.add(alert);
@@ -867,7 +874,7 @@ public final class AlertService {
         // Phase-1↔2 tie: a fired alert is also a structured operational event, so the Event
         // Viewer shows it inline with the batch facts that triggered it (correlate via pipeline).
         // Built explicitly so the persisted alert object (Phase 2) can link back to its id.
-        Event firedEvent = Event.builder(EventType.ALERT_FIRED)
+        Event.Builder eb = Event.builder(EventType.ALERT_FIRED)
                 .level(EventLevel.WARN)
                 .source(AlertService.class.getName())
                 .pipeline(display)
@@ -876,8 +883,9 @@ public final class AlertService {
                 .attr("metric", alert.metric())
                 .attr("value", value)
                 .attr("severity", rule.severity())
-                .attr(com.gamma.notify.Notification.RECIPIENT_ATTR, recipient(rule))
-                .build();
+                .attr(com.gamma.notify.Notification.RECIPIENT_ATTR, recipient(rule));
+        evidence.forEach(eb::attr);
+        Event firedEvent = eb.build();
         EventLog.current().emit(firedEvent);
         emitFiredSignal(rule, display, cooldownScope, alert, value, nowMs);
         persistAlertObject(rule, alert, display, value, firedEvent.eventId());
@@ -949,6 +957,7 @@ public final class AlertService {
             attrs.put("threshold", String.valueOf(rule.threshold()));
             if (rule.window() != null) attrs.put("window", rule.window());
             attrs.put("value", String.valueOf(value));
+            attrs.putAll(alert.evidence());   // A3: e.g. the agent list version the sweep read
             if (eventId != null) attrs.put("causedByEvent", eventId);
             String title = Alert.title(rule, textScope(rule, pipeline));
             String alertObjectId = objects.open(ObjectType.ALERT,

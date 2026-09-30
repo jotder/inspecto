@@ -240,6 +240,50 @@ class ControlApiValueMeasureTest {
         }
     }
 
+    /**
+     * A3 (operator 2026-09-30): the rule reads its agent list LIVE, and each firing records the list VERSION in force
+     * when that sweep evaluated - the identity fact log's head seq/hash - on the Alert and its ALERT object.
+     */
+    @Test
+    void eachFiringRecordsTheAgentListVersionTheSweepRead(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            java.nio.file.Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: none\n");
+            entityList(c, "tills", "agent", "TILL6");
+            ok(c, "POST", "/inv/investigations", CREATE);
+            ok(c, "POST", "/inv/investigations/case-v/alert-rules", "{\"name\":\"tills-rule\",\"severity\":\"WARNING\","
+                    + "\"valueMeasure\":{\"name\":\"cashOutConcentration\",\"valueCol\":\"amt\",\"timeCol\":\"booked\","
+                    + "\"from\":\"2026-09-01\",\"to\":\"2026-09-08\",\"cashOutKinds\":[\"cash_out\"],\"agentList\":\"tills\"}}");
+            JsonNode head = ok(c, "GET", "/inv/entity-lists", null);
+            JsonNode fired = ok(c, "POST", "/alerts/evaluate", "");
+            assertEquals(1, fired.size(), fired.toString());
+            assertEquals("tills", fired.at("/0/evidence/agentList").asText(), fired.toString());
+            assertEquals(head.get("headSeq").asText(), fired.at("/0/evidence/agentListSeq").asText(), fired.toString());
+            assertEquals(head.get("headHash").asText(), fired.at("/0/evidence/agentListHash").asText(), fired.toString());
+
+            // live, not pinned: after the list changes, the next reading carries the NEW version
+            ok(c, "POST", "/inv/entity-lists/tills/members", "{\"add\":[\"TILL1\"],\"reason\":\"r\"}");
+            JsonNode after = ok(c, "GET", "/inv/entity-lists", null);
+            AlertRule rule = AlertRule.fromMap(c.alerts().rules().stream()   // the armed rule, as the sweep holds it
+                    .filter(r -> "tills-rule".equals(r.get("name"))).findFirst().orElseThrow());
+            var reading = new com.gamma.geolink.WorkingSetMeasures().read(root, null, rule);
+            assertTrue(reading.value().isPresent(), "still evaluated");
+            assertEquals(after.get("headSeq").asText(), reading.evidence().get("agentListSeq"));
+            assertFalse(head.get("headSeq").asText().equals(reading.evidence().get("agentListSeq")), "the version moved");
+        }
+    }
+
+    /** The twin: a value-measure rule with NO agent list records no list version. */
+    @Test
+    void aRuleWithoutAnAgentListRecordsNoListVersion(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            ok(c, "POST", "/inv/investigations", CREATE);
+            ok(c, "POST", "/inv/investigations/case-v/alert-rules", STRUCTURING_RULE);
+            JsonNode fired = ok(c, "POST", "/alerts/evaluate", "");
+            assertEquals(1, fired.size(), fired.toString());
+            assertTrue(fired.at("/0/evidence/agentListSeq").isMissingNode(), fired.toString());
+        }
+    }
+
     @Test
     void aMaskedAgentListNeverLeaksItsMembers(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

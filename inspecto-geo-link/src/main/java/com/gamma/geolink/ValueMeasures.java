@@ -122,8 +122,13 @@ final class ValueMeasures {
     private ValueMeasures() {}
 
     /** An {@code agentList} resolved: the list's live exact members (normalised keys), its normaliser, its mask key
-     *  ({@code null} = the list renders raw). */
-    record Agents(String normaliser, Set<String> members, byte[] maskKey) {}
+     *  ({@code null} = the list renders raw), and the identity fact log's head {@code atSeq}/{@code atHash} it was read
+     *  at - the list VERSION an Alert firing records (A3, operator 2026-09-30); the rule itself keeps reading live. */
+    record Agents(String normaliser, Set<String> members, byte[] maskKey, long atSeq, String atHash) {
+        Agents(String normaliser, Set<String> members, byte[] maskKey) {
+            this(normaliser, members, maskKey, 0, null);
+        }
+    }
 
     /** {@link #parse(Map, boolean, Clock)} against the server clock (UTC). */
     static Spec parse(Map<String, Object> block, boolean alertable) {
@@ -363,7 +368,8 @@ final class ValueMeasures {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + AGENT_LIST + "' must name an Entity "
                     + "List of Entity Type '" + AGENT_TYPE + "'; '" + s.agentList() + "' is '" + l.entityType() + "'");
         byte[] key = EntityListRoutes.masked(writeRoot, l) ? EntityMasking.key(log.directory()) : null;
-        return new Agents(l.normaliser(), Set.copyOf(l.liveMembers(java.time.Instant.now())), key);
+        return new Agents(l.normaliser(), Set.copyOf(l.liveMembers(java.time.Instant.now())), key,
+                head.headSeq(), head.headHash());
     }
 
     /**

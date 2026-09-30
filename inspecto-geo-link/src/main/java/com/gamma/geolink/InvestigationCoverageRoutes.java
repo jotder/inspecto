@@ -42,7 +42,7 @@ import java.util.TreeMap;
  * <p>⏳ Per-Collector coverage (which Collectors are missing) is NOT assessed: a Dataset row carries no Collector
  * attribution this route could read, and the response says so explicitly under {@code collectors}.
  *
- * <p>Access: {@link InvestigationRoutes#open} (owner-only, R3 Dataset gate, Enterprise PDP) and the R3 gate again on
+ * <p>Access: {@link InvestigationRoutes#openForRead} (owner or a linked-Case member — LA-24/A9 —, R3 Dataset gate, Enterprise PDP) and the R3 gate again on
  * the Dataset read. An open read — it persists nothing — audited best-effort as {@code LINK_INVESTIGATION_COVERAGE}.
  */
 public final class InvestigationCoverageRoutes implements RouteModule {
@@ -57,7 +57,7 @@ public final class InvestigationCoverageRoutes implements RouteModule {
 
     @SuppressWarnings("unchecked")
     private Object coverage(ApiContext api, HttpExchange ex, String id) throws IOException {
-        InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
+        InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, id);
         Map<String, Object> h = inv.header();
         if (h.get("timeCol") == null)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "this Investigation has no time column — create it with 'timeCol' to assess coverage");

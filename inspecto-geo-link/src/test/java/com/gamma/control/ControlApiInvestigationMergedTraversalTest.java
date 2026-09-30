@@ -267,6 +267,62 @@ class ControlApiInvestigationMergedTraversalTest {
             String line = data(send(c, "GET", "/inv/investigations/case-a/log", null), 200).at("/entries/2/text").asText();
             assertTrue(line.contains("left the Working Set: " + A + ";"), line);
             assertTrue(line.contains("no entity in the Working Set for " + KEY_C), line);
+            // D-U11 (operator 2026-09-30): the Dossier states the FULL outcome, exactly as the /log line
+            JsonNode d = data(send(c, "GET", "/inv/investigations/case-a/dossier", null), 200);
+            String ledger = d.at("/ledger/2/text").asText();
+            assertTrue(ledger.contains("no entity in the Working Set for " + KEY_C), ledger);
+            assertTrue(line.contains(ledger), "the Dossier line is the /log line: " + ledger + " vs " + line);
+        }
+    }
+
+    private Map<String, String> resolvedTo(Ctx c) throws Exception {
+        JsonNode ws = data(post(c, "/inv/investigations/case-a/replay", "{}"), 200);
+        Map<String, String> out = new TreeMap<>();
+        for (JsonNode e : ws.at("/workingSet/entities")) if (e.has("resolvedTo")) out.put(e.get("id").asText(), e.get("resolvedTo").asText());
+        return out;
+    }
+
+    /** The untyped fixture of the live check: A typed, D seeded untyped, C arrives untyped by the expand. */
+    private void untypedBase(Ctx c, String... extraAssertions) throws Exception {
+        settings(c, "masking_mode: none\n");
+        data(post(c, "/inv/entity-identities", "{\"a\":\"" + KEY_A + "\",\"b\":\"" + KEY_C + "\",\"reason\":\"same SIM swap\"}"), 201);
+        for (String b : extraAssertions)
+            data(post(c, "/inv/entity-identities", "{\"a\":\"" + KEY_A + "\",\"b\":\"" + b + "\",\"reason\":\"same holder\"}"), 201);
+        data(post(c, "/inv/investigations", CREATE.replace("calls_ds", "calls_raw")), 200);
+        op(c, "{\"op\":\"seed\",\"ids\":[\"" + A + "\"],\"entityType\":\"msisdn\"}");
+        op(c, "{\"op\":\"seed\",\"ids\":[\"" + D + "\"]}");
+        op(c, "{\"op\":\"expand\"}");   // A->B, D->C, D->E: C arrives untyped
+        op(c, "{\"op\":\"resolve\"}");
+    }
+
+    /** D-U11 (a): the resolution view is WIDENED - an untyped member joins its group, so `identities` counts it once. */
+    @Test
+    void anUntypedMemberJoinsItsGroupInTheResolutionView(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            untypedBase(c);
+            Map<String, String> to = resolvedTo(c);
+            assertTrue(to.containsKey(A), "the typed member resolves: " + to);
+            assertEquals(to.get(A), to.get(C), "the untyped member C joins A's group: " + to);
+            assertFalse(to.containsKey(B) || to.containsKey(D) || to.containsKey(E), "non-members stay unresolved: " + to);
+        }
+    }
+
+    /**
+     * D-U11 (b): an untyped value two member types both map to a member is AMBIGUOUS - not a member: it stays in the
+     * Working Set, out of the group in the view, and the merged exclude's line says so.
+     */
+    @Test
+    void anAmbiguousUntypedValueStaysUnmatchedAndTheLineSaysSo(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            untypedBase(c, "imsi:00447700900003");   // C's digits: now msisdn AND imsi map C to a member
+            assertFalse(resolvedTo(c).containsKey(C), "an ambiguous untyped value joins no group");
+            JsonNode x = op(c, "{\"op\":\"exclude\",\"ids\":[\"" + A + "\"],\"reason\":\"test SIM\",\"merged\":true}");
+            assertEquals(Set.of(A), texts(x.at("/delta/removed")), "the ambiguous C stays: " + x);
+            String line = data(send(c, "GET", "/inv/investigations/case-a/log", null), 200).at("/entries/4/text").asText();
+            assertTrue(line.contains("not matched (ambiguous") && line.contains("still in the Working Set: " + C + ";"), line);
+            String ledger = data(send(c, "GET", "/inv/investigations/case-a/dossier", null), 200).at("/ledger/4/text").asText();
+            assertTrue(ledger.contains("ambiguous"), "the Dossier says it too: " + ledger);
+            assertTrue(data(post(c, "/inv/investigations/case-a/replay", "{}"), 200).get("equivalent").asBoolean());
         }
     }
 

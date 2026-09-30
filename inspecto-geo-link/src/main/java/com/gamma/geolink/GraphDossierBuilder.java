@@ -69,6 +69,7 @@ final class GraphDossierBuilder {
         List<Map<String, Object>> failures = new ArrayList<>();
         List<Integer> entityCounts = new ArrayList<>();
         Map<Integer, List<String>> removedBy = new TreeMap<>();   // what each excludeBy removed (LA-17), for G-E10
+        Map<Integer, Map<String, List<String>>> mergedBy = new TreeMap<>();   // what each merged exclude did (D-U11)
         InvestigationEvaluator.State state = new InvestigationEvaluator.State();
         for (int i = 0; i < log.size(); i++) {
             Map<String, Object> e = log.get(i);
@@ -81,6 +82,7 @@ final class GraphDossierBuilder {
                 List<String> gone = new ArrayList<>();
                 for (String id : had) if (!state.entities.containsKey(id)) gone.add(id);
                 removedBy.put(step, gone);
+                if ("exclude".equals(e.get("op")) && state.lastMerged != null) mergedBy.put(step, state.lastMerged);
             }
             entityCounts.add(state.entities.size());
             String now = state.hash();
@@ -117,9 +119,9 @@ final class GraphDossierBuilder {
         dossier.put("summary", summary(in, header, state));
         dossier.put("topology", topology(state));
         dossier.put("scores", scores(in.snapshots(), snapshots));
-        List<Map<String, Object>> ledger = ledger(log, entityCounts, removedBy);
+        List<Map<String, Object>> ledger = ledger(log, entityCounts, removedBy, mergedBy);
         dossier.put("ledger", ledger);
-        Map<String, Object> negative = negativeSpace(log, state, in.snapshots(), snapshots, removedBy);
+        Map<String, Object> negative = negativeSpace(log, state, in.snapshots(), snapshots, removedBy, mergedBy);
         dossier.put("negativeSpace", negative);
         Map<String, Object> integrity = new LinkedHashMap<>();
         integrity.put("intact", failures.isEmpty());
@@ -132,7 +134,7 @@ final class GraphDossierBuilder {
         Map<String, Object> renderings = new LinkedHashMap<>();
         renderings.put("json", jsonRendering(header, log, negative));
         renderings.put("steps", stepsRendering(ledger, negative));
-        renderings.put("method", methodStatement(in, header, state, log, negative, integrity, manifest, removedBy));
+        renderings.put("method", methodStatement(in, header, state, log, negative, integrity, manifest, removedBy, mergedBy));
         dossier.put("renderings", renderings);
 
         List<Map<String, Object>> entities = castList(ws.get("entities"));
@@ -357,7 +359,8 @@ final class GraphDossierBuilder {
     }
 
     private static List<Map<String, Object>> ledger(List<Map<String, Object>> log, List<Integer> entityCounts,
-                                                    Map<Integer, List<String>> removedBy) {
+                                                    Map<Integer, List<String>> removedBy,
+            Map<Integer, Map<String, List<String>>> mergedBy) {
         Map<Integer, Integer> undoneBy = undoneBy(log);
         List<Map<String, Object>> out = new ArrayList<>();
         for (int i = 0; i < log.size(); i++) {
@@ -369,7 +372,7 @@ final class GraphDossierBuilder {
             row.put("author", e.get("author"));
             row.put("kind", e.get("kind"));
             row.put("op", "undo".equals(e.get("kind")) ? "undo" : e.get("op"));
-            row.put("text", render(e, removedBy.get(step)));
+            row.put("text", render(e, removedBy.get(step), mergedBy.get(step)));
             row.put("undoneBy", undoneBy.get(step));
             row.put("entitiesAfter", entityCounts.get(i));
             row.put("workingSetHash", e.get("workingSetHash"));
@@ -390,7 +393,8 @@ final class GraphDossierBuilder {
      */
     private static Map<String, Object> negativeSpace(List<Map<String, Object>> log, InvestigationEvaluator.State s,
                                                      List<Snapshot> ids, List<Map<String, Object>> snaps,
-                                                     Map<Integer, List<String>> removedBy) {
+                                                     Map<Integer, List<String>> removedBy,
+            Map<Integer, Map<String, List<String>>> mergedBy) {
         List<Map<String, Object>> excluded = new ArrayList<>();
         for (var x : s.excluded.entrySet()) {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -408,7 +412,7 @@ final class GraphDossierBuilder {
         Map<Integer, Integer> undoneBy = undoneBy(log);
         List<Map<String, Object>> undone = new ArrayList<>();
         undoneBy.forEach((step, by) -> undone.add(Map.of("step", step, "undoneBy", by,
-                "text", render(log.get(step - 1), removedBy.get(step)))));
+                "text", render(log.get(step - 1), removedBy.get(step), mergedBy.get(step)))));
         List<Map<String, Object>> truncated = new ArrayList<>();
         for (Map<String, Object> e : log)
             if (e.get("read") instanceof Map<?, ?> r && Boolean.TRUE.equals(r.get("truncated"))) {
@@ -491,7 +495,8 @@ final class GraphDossierBuilder {
     private static String methodStatement(Input in, Map<String, Object> header, InvestigationEvaluator.State s,
                                           List<Map<String, Object>> log, Map<String, Object> negative,
                                           Map<String, Object> integrity, Map<String, Object> manifest,
-                                          Map<Integer, List<String>> removedBy) {
+                                          Map<Integer, List<String>> removedBy,
+            Map<Integer, Map<String, List<String>>> mergedBy) {
         StringBuilder b = new StringBuilder();
         b.append("Method statement — Investigation ").append(in.id());
         if (header.get("title") != null) b.append(" (").append(header.get("title")).append(")");
@@ -517,7 +522,7 @@ final class GraphDossierBuilder {
         Map<Integer, Integer> undoneBy = undoneBy(log);
         for (int i = 0; i < log.size(); i++) {
             Map<String, Object> e = log.get(i);
-            b.append("  ").append(i + 1).append(". ").append(render(e, removedBy.get(i + 1)));
+            b.append("  ").append(i + 1).append(". ").append(render(e, removedBy.get(i + 1), mergedBy.get(i + 1)));
             if (undoneBy.containsKey(i + 1)) b.append(" (undone by step ").append(undoneBy.get(i + 1)).append(")");
             b.append(" — ").append(e.get("author")).append(", ").append(e.get("at")).append("\n");
         }
@@ -583,7 +588,7 @@ final class GraphDossierBuilder {
      * "and N more". Duplicated rather than shared to leave that class untouched under a parallel lane.
      * {@code removed} is what an {@code excludeBy} removed (LA-17) — the state's, not the log line's — else null.
      */
-    static String render(Map<String, Object> e, List<String> removed) {
+    static String render(Map<String, Object> e, List<String> removed, Map<String, List<String>> merged) {
         if ("undo".equals(e.get("kind"))) return "Undid step " + e.get("undoes") + ".";
         Map<String, Object> p = e.get("params") instanceof Map<?, ?> m ? castMap(m) : Map.of();
         List<String> ids = strings(p.get("ids"));
@@ -607,7 +612,7 @@ final class GraphDossierBuilder {
                     : "Set the time window to " + InvestigationTime.describe(castMap((Map<?, ?>) p.get("window")))
                             + "; later expansions read inside it (earlier steps are unchanged).";
             case "exclude" -> Boolean.TRUE.equals(p.get("merged"))
-                    ? InvestigationRoutes.mergedExcludeLine(e, Map.of("left", removed == null ? List.of() : removed))
+                    ? InvestigationRoutes.mergedExcludeLine(e, merged)   // the FULL outcome, exactly as /log (D-U11)
                     : "Excluded " + ids.size() + " entit" + (ids.size() == 1 ? "y" : "ies")
                     + " (reason: " + p.get("reason") + "): " + String.join(", ", ids) + ".";
             case "hide" -> "Hid " + head(ids) + " from display (still traversed and counted).";

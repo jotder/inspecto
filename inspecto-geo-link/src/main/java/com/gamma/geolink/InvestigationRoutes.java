@@ -732,14 +732,8 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     /** Whether raw value {@code v} keys, under a member type's sealed normaliser, to a member of sealed group {@code g}. */
-    @SuppressWarnings("unchecked")
     private static boolean memberValue(Map<String, Object> g, String v) {
-        Set<String> members = new HashSet<>(strings(g.get("members")));
-        for (var n : ((Map<String, Object>) g.get("normalisers")).entrySet()) {
-            String k = EntityTypes.normalise(String.valueOf(n.getValue()), v);
-            if (!k.isEmpty() && members.contains(n.getKey() + ":" + k)) return true;
-        }
-        return false;
+        return !InvestigationEvaluator.rawMemberKeys(g, v).isEmpty();   // unambiguous only (D-U11)
     }
 
     /** {@code merged: true} is opt-in traversal OVER a resolution - without one in force it has nothing to merge. */
@@ -1395,12 +1389,14 @@ public final class InvestigationRoutes implements RouteModule {
     static String mergedOutcomeClause(Map<String, List<String>> outcome) {
         Map<String, List<String>> o = outcome == null ? Map.of() : outcome;
         List<String> left = o.getOrDefault("left", List.of()), kept = o.getOrDefault("kept", List.of()),
-                unmatched = o.getOrDefault("unmatched", List.of());
+                unmatched = o.getOrDefault("unmatched", List.of()), ambiguous = o.getOrDefault("ambiguous", List.of());
         StringBuilder b = new StringBuilder(left.isEmpty() ? "no entity left the Working Set;"
                 : "left the Working Set: " + String.join(", ", left) + ";");
         if (!kept.isEmpty()) b.append(" kept (protected), still in the Working Set: ").append(String.join(", ", kept)).append(";");
         if (!unmatched.isEmpty()) b.append(" no entity in the Working Set for ").append(String.join(", ", unmatched))
                 .append(" (not removed, only blocked);");
+        if (!ambiguous.isEmpty()) b.append(" not matched (ambiguous - more than one member type maps it to a member), still in "
+                + "the Working Set: ").append(String.join(", ", ambiguous)).append(";");
         return b.append(" no member is admitted again.").toString();
     }
 
@@ -1458,7 +1454,7 @@ public final class InvestigationRoutes implements RouteModule {
     /**
      * LA-24: the READ gate — the owner, OR a member of the Investigation's linked Case
      * ({@link InvestigationCaseRoutes#grants}, decided live on every read). Only the read routes (log, Working Set,
-     * Dossier, measures, the Case link itself) open through this; every write stays on {@link #open}, owner-only.
+     * Dossier, measures, coverage (A9), the Case link itself) open through this; every write stays on {@link #open}, owner-only.
      * R3 and the Enterprise PDP below still judge a member, so they can only narrow the grant.
      */
     static Inv openForRead(ApiContext api, HttpExchange ex, String id) throws IOException {
