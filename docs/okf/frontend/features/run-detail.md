@@ -92,7 +92,7 @@ own `loadTab()` skips it. Rules it follows:
 **Files tab: real field names + the live step gauge (2026-08-13).** The Files tab's `GET /runs/{name}/files`
 rows are the `_status_` ledger header **verbatim** (`ConsignmentAuditWriter`): `start_time, end_time, filename,
 status, parsed_rows, error_rows, output_paths, output_sizes_bytes, duration_ms, error, consignment_id`. Status
-is `SUCCESS` or one of `QUARANTINED_UNREADABLE|QUARANTINED_MISMATCH|QUARANTINED_EMPTY` — there is no per-file
+is `SUCCESS` or one of `QUARANTINED_UNREADABLE|QUARANTINED_MISMATCH|QUARANTINED_EMPTY|PURGED_REFUSED` (the last: a mapping expression refused the file by content and it was deleted — `okf/capabilities/spaces/spaces.md` §3.5.1) — there is no per-file
 `FAILED` (that only exists at the batch-summary level). Alongside the file-history grid, the tab now renders
 the **live step gauge**: `GET /runs/{name}/pending`'s `InboxStatus.step` (`{consignmentId, step, index, total,
 startedAt}`) is shown as "‹step› · Step N of M · in step for ‹age›" — the age of `startedAt`, computed **once

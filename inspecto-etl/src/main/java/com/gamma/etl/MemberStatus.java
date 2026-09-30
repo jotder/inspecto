@@ -50,6 +50,13 @@ public enum MemberStatus {
     SKIPPED_UNREADABLE,
 
     /**
+     * An authored mapping expression refused the file by its content ({@code error('INGEST_PURGE_FILE: …')}) and
+     * the raw file was DELETED — never quarantined, backed up or marked — so the refused value is kept nowhere.
+     * Single-member native batches only; elsewhere the same refusal fails the batch.
+     */
+    PURGED_REFUSED,
+
+    /**
      * Phase 4 S4b (park/drain, D-13): the member ingested cleanly but its Consignment PARKED at a
      * disabled Step, so it is <b>uncommitted</b> — no marker, no ledger stash; its file was moved to
      * the park home ({@code MemberEntry.backupPath}) so the next poll does not re-ingest it. The
