@@ -57,7 +57,7 @@ from the `/apply` body's `record`) and offer the Signal to ONE other Space (`par
 `canOfferSignals` in the rule's Space and an ACTIVE Exchange signal grant to that Space, and is delivered by the
 Exchange forwarder under that grant's allowlist and chain-depth cut. Malformed config is 422 on save and on apply.
 `targetSpace`/`space` stay refused (only Signals cross). Design: cross-Space consequence slice 5, D14
-(`superpower/cross-space-consequence-design.md`).
+(`archived-documents/plans-archive/cross-space-consequence-design.md`).
 
 ## Record-routing consequences run during live pipeline execution
 

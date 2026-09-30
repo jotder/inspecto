@@ -30,7 +30,7 @@ virtual-thread `workers` executor. Four trigger modes:
   `incident.open` defaults to `coalesce: false` (one Incident per case — cross-Space D10); every other type
   defaults to `true`. The key lives in `params` and round-trips. Bound: at most 1000 queued Runs per Job
   (`JobService.DEFAULT_MAX_PENDING_SIGNAL_RUNS`); past it a Signal is refused — a `SKIPPED` Run plus a
-  `job.signal.refused` WARN Signal. Design: [`cross-space-consequence-design.md`](../../../superpower/cross-space-consequence-design.md) §8 D13.
+  `job.signal.refused` WARN Signal. Design: [`cross-space-consequence-design.md`](../../../archived-documents/plans-archive/cross-space-consequence-design.md) §8 D13.
 * **Manual** — `POST /jobs/{name}/trigger`. The legacy unversioned call stays **synchronous and unchanged**;
   the same route under `/api/v1` is **async** (W5): it returns `202` + `{runId, …}` + a `Location` header,
   the caller polls `GET /jobs/runs/{runId}`, and an `Idempotency-Key` header replays the cached response on

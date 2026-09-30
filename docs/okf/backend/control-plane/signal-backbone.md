@@ -173,11 +173,15 @@ the origin: the grant is not ACTIVE, the consumer is not hosted in this Pod, the
 the delivered depth would exceed `jobs.signal.maxChainDepth`. Nothing is queued. The depth is the chain's:
 a Run always stamps its system `chainDepth` (payload values are overwritten), and Jobs and Decision Rules
 cannot emit `exchange.*`. Many Signals that share a correlation id are independent deliveries.
-⚠ A burst still reaches a hub Job as FEWER Runs: that is the per-Job `TriggerCoalescer` (open decision in the
-design's §6 as-built gaps). The consumer acts with its own Job, e.g. the
-`incident.open` Job type, which reads `JobContext.signalPayload()`.
+A Job may declare `coalesce: false` (D13, 2026-09-28): one Run per matching Signal instead of the per-Job
+`TriggerCoalescer` folding a burst into one follow-up Run. The consumer acts with its own Job, e.g. the
+`incident.open` Job type (defaults to `coalesce: false`), which reads `JobContext.signalPayload()`. The D10
+acceptance test asserts 20 cases open 20 Incidents, no MSISDN. The emitter is a Decision Rule `emit-signal`
+payload (D14; see `decision-rules.md`); a Collector connector emitting typed Signals is no longer planned.
+D11 amended GLOSSARY §Space; D12 keeps a missing Space and a missing grant indistinguishable (one 422 message);
+the SPA access catalog lists `canOfferSignals`.
 ⚠ `exchange.*` types are never re-forwarded or offerable. A Job on `fraud.*` does not match a delivered
-`exchange.opco.fraud.alert`. Design and open gaps: `superpower/cross-space-consequence-design.md` §6.
+`exchange.opco.fraud.alert`. Design, threat model and decisions D1-D14 (archived, shipped): `archived-documents/plans-archive/cross-space-consequence-design.md`.
 
 ## Gotchas
 
