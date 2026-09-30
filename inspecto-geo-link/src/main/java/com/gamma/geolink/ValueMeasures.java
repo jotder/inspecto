@@ -51,7 +51,7 @@ final class ValueMeasures {
             "timeToCashOut", Map.of("minInbound", 10_000d, "maxHours", 48d),
             "cashOutConcentration", Map.of("minShare", 0.20, "minPayers", 5d),
             "structuring", Map.of("min", 900d, "max", 1_000d, "minLegs", 10d, "minPayers", 5d),
-            "benefitTransfer", Map.of("maxHours", 72d, "minShare", 0.50, "minRecipients", 3d),
+            "benefitTransfer", Map.of("maxHours", 72d, "minShare", 0.50, "minRecipients", 5d),
             VALUE_WEIGHTED_LINKS, Map.of());
     /** The Measures that read a list of link kinds from {@code kindCol}. */
     private static final Map<String, String> KIND_LIST = Map.of("timeToCashOut", "cashOutKinds",

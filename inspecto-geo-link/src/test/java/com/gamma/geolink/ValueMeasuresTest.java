@@ -98,7 +98,11 @@ public class ValueMeasuresTest {
         ValueMeasures.Result c = run(block("cashOutConcentration", "cashOutKinds", "cash_out"));
         assertEquals(List.of("TILL6"), entities(c));
         assertEquals(5L, ((Number) c.entities().get(0).get("payers")).longValue());
-        assertEquals(List.of("SK"), entities(run(block("benefitTransfer", "benefitKinds", List.of("benefit")))));
+        // the fixture holds exactly 3 recipients, so its threshold is stated (the default is ≥ 5 since 2026-09-30)
+        assertEquals(List.of("SK"), entities(run(block("benefitTransfer", "benefitKinds", List.of("benefit"),
+                "minRecipients", 3))));
+        assertEquals(List.of(), entities(run(block("benefitTransfer", "benefitKinds", List.of("benefit")))),
+                "3 recipients stay under the ≥ 5 default");
         assertEquals(List.of(), entities(run(block("benefitTransfer", "benefitKinds", "benefit", "minRecipients", 4))));
     }
 
@@ -156,11 +160,11 @@ public class ValueMeasuresTest {
         assertEquals(List.of("TILL-06"),
                 on.apply(new HashMap<>(Map.of("name", "cashOutConcentration", "cashOutKinds", "cash_out"))));
         List<Object> benefit = on.apply(new HashMap<>(Map.of("name", "benefitTransfer", "benefitKinds", "benefit")));
-        assertEquals("SKIMMER-01", benefit.get(0), "story (g) ranks first: " + benefit);
-        // ⚠ At the signed default (≥ 3 recipients) ordinary accounts also qualify on this corpus — reported to the
-        // operator (plan §2.6.1); at ≥ 5 only the planted skimmer does.
-        assertEquals(List.of("SKIMMER-01"), on.apply(new HashMap<>(Map.of("name", "benefitTransfer",
-                "benefitKinds", "benefit", "minRecipients", 5))));
+        // Operator 2026-09-30: the default is ≥ 5 recipients — at ≥ 3 eight ordinary accounts also qualified on
+        // this corpus; at the default only the planted skimmer does (plan §2.6.1).
+        assertEquals(List.of("SKIMMER-01"), benefit, "story (g) alone at the default: " + benefit);
+        assertTrue(on.apply(new HashMap<>(Map.of("name", "benefitTransfer", "benefitKinds", "benefit",
+                "minRecipients", 3))).size() > 1, "the looser ≥ 3 twin still flags ordinary accounts");
     }
 
     @Test
