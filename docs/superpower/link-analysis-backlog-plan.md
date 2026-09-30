@@ -1130,6 +1130,26 @@ changed and no registration line moved.
 * 🔴 **Plan vs code.** D-E6 implies a Frozen Widget may leave; D-E7 (owner-only) means nothing can render it elsewhere, so the Exchange refuses it too. The Exchange already 422'd such widgets before LA-21 — with the misleading "no dataset binding"; the refusal is now explicit.
 * ⏳ **Deferred:** the bundle UI does not surface `converted` yet; Case-scoped sharing (needs a sharing model); Measures/Alert Rules over the relation (LA-23); the openapi entry stays a skeleton (no query params documented, as before).
 
+### 5.10 Live check 2026-09-30 — Enterprise `-DemoAuth` bundle, 33/33 steps PASS
+
+Driven over HTTP against a packaged bundle at `f62026ca5` with three Demo Users (analyst / case owner / outsider).
+Passed: identity assert + group + mapping import (idempotent re-import), `resolve`, merged expand (61 vs 36
+entities) and exclude, replay `equivalent:true`; value Measures on the planted stories (MULE-HUB-01 structuring,
+TILL-06 cash-out concentration, SKIMMER-01 benefit-transfer at ≥ 5), the 31-day cap, a firing count-over-threshold
+Alert Rule; LA-24 member read-only / writes 404 / stranger 404 / access ends on unlink and on Case close; settings.
+
+**Open, found live (not yet fixed):**
+* 🔴 **A merged exclude can over-claim.** With a Dataset whose columns carry no Entity Type, expanded entities
+  never join their identity group; `exclude {merged:true}` then removes only the named id while its log line says
+  every member left (member `ACC-1106` stayed in the Working Set). Fix: match untyped members, or refuse/warn.
+* Demo data: `spaces/demo/config/registry/datasets/mule_transfers_dataset.toon` has no `columns:` classification
+  (`PAYER_ACCOUNT`/`PAYEE_ACCOUNT` → `ACCOUNT`), so merged traversal only sees seeded typed ids; and the demo Space
+  has no mapping Dataset for identity import.
+* Small: `/inv/value-measures` refuses a `from` with `Z`/offset; `/cases/from-entities` leaves the Case `owner`
+  null (nobody is a member until assigned); import drops a NULL row without counting it in `empty`; `GET …/case`
+  still says `sharing:true` after the Case closes; the alert text "over the whole Dataset, the last 31d" reads as a
+  contradiction; no `GET /inv/investigations` list route (405); one unexplained 401 + 503 in the SPA console.
+
 ## 6. Acceptance gates — falsifiable, house style
 
 ### 6.1 Baseline (hold today; re-check on every change)

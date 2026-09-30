@@ -139,12 +139,13 @@ Then drop a Space folder that has a `config/demo-users.toon` into `inspecto-demo
 inbox if needed (below), run `serve-demo.bat` (or `./serve-demo.sh`), open `http://127.0.0.1:8080`
 and pick a Demo User.
 
-> ⚠ **The `-DemoAuth` package run has NOT been verified end to end** (as of 2026-09-25). Run 1
-> reached the SBOM step (the jar swap worked; an ordering bug was fixed); run 2 stopped at `npm ci`
-> on a locked `esbuild.exe`. Nobody has yet booted a packaged demo build and signed in. What *is*
-> verified is the module itself: `DemoAuthHttpTest` (real HTTP) covers the picker, exchange, a
-> per-user Subject and audit actor, a capability 403, a forged token, the loopback refusal and
-> token kinds/expiry.
+> ✅ **The `-DemoAuth` package run IS verified end to end (2026-09-30).** `package.ps1 -Edition Enterprise -DemoAuth`
+> built and the bundle booted (`authentication enforced via …DemoAuthenticator`); `/bootstrap` reported
+> `authMode: demo` with the Space's Demo Users; the SPA picker signed three users in with their real roles, and a
+> Link Analysis live check (identity resolution, value Measures, Case-team sharing, settings) ran 33/33 over it.
+> ⚠ `POST /api/v1/auth/exchange` needs `codeVerifier` and `redirectUri` besides `code=demo:<id>`, and routes are
+> Space-scoped (`/api/v1/spaces/<id>/…`). The module's own `DemoAuthHttpTest` (real HTTP) still covers the picker,
+> exchange, per-user Subject and audit actor, capability 403, forged token, loopback refusal and token kinds/expiry.
 
 ### Seed a space's pipeline inbox (first run only)
 
