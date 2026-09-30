@@ -1040,10 +1040,11 @@ public final class InvRoutes implements RouteModule {
      * The JVM-wide sandbox caps ({@code assist.sql.memory_limit} / {@code assist.sql.threads}) with the route's
      * own statement timeout. It used to be {@code withCaps(null, 0, timeout)}, which silently replaced the
      * operator's memory and thread caps with the hard-coded 1 GB / 2 threads (G-R4 profiling, 2026-09-30).
+     * Threads come from the traversal-only {@code assist.sql.traversal_threads} (default 4, operator 2026-09-30).
      */
     static SqlSandboxPolicy traversalPolicy() {
         SqlSandboxPolicy configured = SqlSandboxPolicy.defaultPolicy();
-        return SqlSandboxPolicy.withCaps(configured.memoryLimit(), configured.maxThreads(), TRAVERSAL_TIMEOUT_SECONDS);
+        return SqlSandboxPolicy.withCaps(configured.memoryLimit(), SqlSandboxPolicy.traversalThreads(), TRAVERSAL_TIMEOUT_SECONDS);
     }
 
     /** An optional positive integer body field, defaulted when absent and clamped to {@code max}. */

@@ -23,6 +23,7 @@ public record SqlSandboxPolicy(String memoryLimit, int maxThreads, int queryTime
     private static final String DEFAULT_MEMORY = "1GB";
     private static final int DEFAULT_THREADS = 2;
     private static final int DEFAULT_TIMEOUT_SECONDS = 30;
+    private static final int DEFAULT_TRAVERSAL_THREADS = 4;
 
     public SqlSandboxPolicy {
         memoryLimit = (memoryLimit == null || memoryLimit.isBlank()) ? DEFAULT_MEMORY : memoryLimit.trim();
@@ -39,6 +40,16 @@ public record SqlSandboxPolicy(String memoryLimit, int maxThreads, int queryTime
                 System.getProperty("assist.sql.memory_limit", DEFAULT_MEMORY),
                 intProp("assist.sql.threads", DEFAULT_THREADS),
                 intProp("assist.sql.timeout_seconds", DEFAULT_TIMEOUT_SECONDS));
+    }
+
+    /**
+     * The thread cap for the Link Analysis recursive-paths walk only: {@code -Dassist.sql.traversal_threads}
+     * (default 4; non-numeric or non-positive falls back to the default, like {@code assist.sql.threads}).
+     * Every other sandboxed query keeps {@code assist.sql.threads}. Operator decision 2026-09-30 (G-R4).
+     */
+    public static int traversalThreads() {
+        int t = intProp("assist.sql.traversal_threads", DEFAULT_TRAVERSAL_THREADS);
+        return t > 0 ? t : DEFAULT_TRAVERSAL_THREADS;
     }
 
     /** A policy with explicit caps (the skill's workspace, or a test). */
