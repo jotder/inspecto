@@ -87,6 +87,7 @@ final class PipelineRunGuard implements RunLease {
                 released = true;
                 permit.release();
             }
+            @Override public boolean isValid() { return !released; }   // a heap permit is never taken over
             @Override public String toString() { return "Claim[" + pipeline + "]"; }
         };
     }

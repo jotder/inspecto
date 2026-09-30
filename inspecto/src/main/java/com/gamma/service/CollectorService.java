@@ -1832,7 +1832,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             Optional<MultiCollectorProcessor.RunResult> result = pathFor(pipelineName).map(p -> {
                 // Block until THIS pipeline is free (a cycle run of it, or another trigger, may be in flight);
                 // unrelated pipelines are unaffected. See PipelineRunGuard for why blocking is right here.
-                try (RunLease.Claim claim = runGuard.acquire(pipelineName)) {
+                try (RunLease.Claim claim = runGuard.acquire(pipelineName);
+                     // LEASE-TAKEOVER-INFLIGHT-1: the engine asks this before it commits a Consignment
+                     com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
+                             com.gamma.inspector.CommitFence.Scope.RUN, pipelineName, claim::isValid)) {
                     running.add(pipelineName);
                     try {
                         // T13: any run resets the cadence — but a simulated one must not, or a dry run
@@ -1934,7 +1937,9 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         refuseIfTemplate(pipelineName);
         try {
             return Optional.of(triggerWorkers.submit(() -> underSpace(() -> {
-                try (RunLease.Claim claim = runGuard.acquire(pipelineName)) {
+                try (RunLease.Claim claim = runGuard.acquire(pipelineName);
+                     com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
+                             com.gamma.inspector.CommitFence.Scope.RUN, pipelineName, claim::isValid)) {
                     running.add(pipelineName);
                     try {
                         return com.gamma.inspector.RecordReplay.replay(

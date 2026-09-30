@@ -414,6 +414,10 @@ public final class ConsignmentIngestor {
         // OVERWRITE_OR_IGNORE, the manifest is rewritten, and absent markers mean
         // the (still-present-in-inbox) files are picked up again.
 
+        // LEASE-TAKEOVER-INFLIGHT-1: before the first durable side effect — a run whose lease another node
+        // took over must not commit; its files stay in the inbox for the new holder.
+        CommitFence.check(CommitFence.Scope.RUN, cfg.identity().pipelineName());
+
         DuckLakeRegistrar.register(outputs.stream().map(PartitionOutput::outputFile).toList(),
                 batch.table(), cfg);
 

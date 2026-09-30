@@ -278,6 +278,78 @@ class DbRunLeaseTest {
         }
     }
 
+    /**
+     * LEASE-TAKEOVER-INFLIGHT-1: owner A's lease is taken over mid-run by B. A's claim must read as lost, so
+     * the engine's commit point refuses A's commit, while B's claim is valid and its commit proceeds.
+     */
+    @Test
+    void aClaimTakenOverMidRunIsInvalidSoItsOwnerCannotCommit(@TempDir Path dir) throws Exception {
+        String url = urlIn(dir);
+        try (DbRunLease podA = lease(url, "s1", "pod-a"); DbRunLease podB = lease(url, "s1", "pod-b")) {
+            RunLease.Claim a = podA.tryAcquire("orders");
+            assertNotNull(a);
+            assertTrue(a.isValid(), "held and not taken over");
+
+            expire(url, "s1", "orders");                          // A is paused past its TTL mid-run
+            RunLease.Claim b = podB.tryAcquire("orders");         // ... and B takes the lease over
+            assertNotNull(b);
+
+            assertFalse(a.isValid(), "A's claim was taken over — it must read as lost");
+            try (com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
+                    com.gamma.inspector.CommitFence.Scope.RUN, "orders", a::isValid)) {
+                assertThrows(com.gamma.inspector.CommitFence.LeaseLostException.class,
+                        () -> com.gamma.inspector.CommitFence.check(com.gamma.inspector.CommitFence.Scope.RUN, "orders"),
+                        "A must not commit");
+            }
+            assertTrue(b.isValid(), "B holds the lease");
+            try (com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
+                    com.gamma.inspector.CommitFence.Scope.RUN, "orders", b::isValid)) {
+                assertDoesNotThrow(() -> com.gamma.inspector.CommitFence.check(
+                        com.gamma.inspector.CommitFence.Scope.RUN, "orders"), "B proceeds");
+            }
+            a.close();
+            assertTrue(b.isValid(), "A's late release does not disturb B");
+            b.close();
+            assertFalse(b.isValid(), "a released claim is not valid");
+        }
+    }
+
+    /**
+     * The renewer marks a stolen claim lost on its own. Proven by putting A's owner + epoch BACK on the row
+     * after the renewer ran: the re-read alone would then answer "held", so only the renewer's mark refuses.
+     */
+    @Test
+    void theRenewerMarksAStolenClaimLost(@TempDir Path dir) throws Exception {
+        String url = urlIn(dir);
+        try (DbRunLease podA = lease(url, "s1", "pod-a"); DbRunLease podB = lease(url, "s1", "pod-b")) {
+            RunLease.Claim a = podA.tryAcquire("orders");
+            long epochA = epochOf(url, "s1", "orders");
+            expire(url, "s1", "orders");
+            RunLease.Claim b = podB.tryAcquire("orders");
+            assertNotNull(b);
+            Thread.sleep(TTL.toMillis());                         // A's renewer (every TTL/3) sees the steal
+            b.close();
+            try (Connection c = JdbcDrivers.connect(url, null, null);
+                 PreparedStatement ps = c.prepareStatement("UPDATE " + DbRunLease.TABLE
+                         + " SET owner = 'pod-a', epoch = ?, expires_at = ? WHERE space = 's1' AND pipeline = 'orders'")) {
+                ps.setLong(1, epochA);
+                ps.setLong(2, System.currentTimeMillis() + 60_000);
+                ps.executeUpdate();
+            }
+            assertFalse(a.isValid(), "the renewer marked A's claim lost; a row that looks like A's again does not revive it");
+            a.close();
+        }
+    }
+
+    /** The in-memory guard behaves the same way: valid while held, invalid once released. */
+    @Test
+    void theHeapGuardClaimIsValidUntilReleased() {
+        RunLease.Claim c = new PipelineRunGuard().tryAcquire("orders");
+        assertTrue(c.isValid());
+        c.close();
+        assertFalse(c.isValid());
+    }
+
     /** The epoch must move on every takeover, or the fencing predicate has nothing to discriminate on. */
     @Test
     void theEpochAdvancesOnEveryAcquisition(@TempDir Path dir) throws Exception {

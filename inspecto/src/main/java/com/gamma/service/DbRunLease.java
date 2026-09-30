@@ -103,6 +103,13 @@ final class DbRunLease implements RunLease, AutoCloseable {
     private final long ttlMs;
     /** Pipelines this process currently holds → the epoch it holds them at (its fencing token). */
     private final Map<String, Long> held = new ConcurrentHashMap<>();
+
+    /**
+     * Pipelines whose claim this process has learned it LOST -> the epoch it lost (LEASE-TAKEOVER-INFLIGHT-1).
+     * Written by {@link #renewAll} when a fenced renew matches no row, and by {@link Claim#isValid} when its
+     * re-read finds another owner/epoch. Keyed by epoch too, so a later claim at a new epoch never reads as lost.
+     */
+    private final Map<String, Long> lost = new ConcurrentHashMap<>();
     private final ScheduledExecutorService heartbeat;
 
     DbRunLease(Connection conn, String space, String scope, String owner, Duration ttl) {
@@ -222,7 +229,20 @@ final class DbRunLease implements RunLease, AutoCloseable {
                 if (released) return;
                 released = true;
                 held.remove(pipeline);
+                lost.remove(pipeline, epoch);
                 release(pipeline, epoch);
+            }
+
+            @Override
+            public boolean isValid() {
+                if (released) return false;
+                Long gone = lost.get(pipeline);
+                if (gone != null && gone == epoch) return false;
+                if (!stillOurs(pipeline, epoch)) {
+                    lost.put(pipeline, epoch);
+                    return false;
+                }
+                return true;
             }
 
             @Override
@@ -283,6 +303,7 @@ final class DbRunLease implements RunLease, AutoCloseable {
                         ps.setString(5, owner);
                         ps.setLong(6, e.getValue());
                         if (ps.executeUpdate() == 0) {
+                            lost.put(e.getKey(), e.getValue());   // the run's next commit check refuses
                             log.warn("Run lease for '{}' was stolen while we still believed we held it (epoch {}) "
                                     + "— this process was paused or partitioned for longer than the {}ms TTL",
                                     e.getKey(), e.getValue(), ttlMs);
@@ -292,6 +313,30 @@ final class DbRunLease implements RunLease, AutoCloseable {
             } catch (SQLException ex) {
                 log.warn("Could not renew the run lease for '{}': {}", e.getKey(), ex.getMessage());
             }
+        }
+    }
+
+    /**
+     * Whether the row still names this process at {@code epoch} — one read, so owner and epoch are compared
+     * together. ⛔ Fails CLOSED: an unreadable lease table is not proof we still hold it; refusing a commit
+     * leaves the file in the inbox for a retry, whereas a wrong "yes" is a double commit.
+     */
+    private boolean stillOurs(String pipeline, long epoch) {
+        String sql = "SELECT owner, epoch FROM " + TABLE + " WHERE space = ? AND scope = ? AND pipeline = ?";
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, space);
+                    ps.setString(2, scope);
+                    ps.setString(3, pipeline);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        return rs.next() && owner.equals(rs.getString("owner")) && rs.getLong("epoch") == epoch;
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            log.warn("Could not verify the run lease for '{}': {} — treating it as lost", pipeline, e.getMessage());
+            return false;
         }
     }
 

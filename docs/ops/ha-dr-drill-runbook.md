@@ -58,8 +58,10 @@ INSPECTO_JAVA_OPTS=-Drun.lease.backend=postgres -Drun.lease.db.url=jdbc:postgres
 - A dead holder's Pipelines stay frozen for **up to 60 s**, then another owner may take them. So the
   lease-only part of RTO is at most ~60 s plus the next schedule tick.
 - Every takeover bumps `epoch`; every write the lease makes is conditional on `owner = me AND epoch = mine`.
-  A paused node that wakes after its TTL finds its epoch stale and loses. ⚠ This fences the lease, not the
-  writes a run performs (see the `DbRunLease` class note on D15).
+  A paused node that wakes after its TTL finds its epoch stale and loses. A run re-checks its claim
+  before it commits a Consignment or lands fetched files, and a lost claim aborts the commit
+  (`LEASE-TAKEOVER-INFLIGHT-1`). ⚠ The check is at the commit point, not on every write: Parquet
+  outputs the lost run already wrote stay on disk until the new holder's run overwrites them.
 - ⛔ Active/passive here means node B's **service is stopped**. The lease is the safety net if both run by
   mistake, not the failover mechanism.
 
@@ -74,7 +76,7 @@ and start a clock.
 | D1 | Process kill | on A: `kill -9 $(systemctl show -p MainPID --value inspecto)` | systemd restarts it (`Restart=on-failure`, 5 s); `/ready` 200 again; no file processed twice (provenance) |
 | D2 | Host reboot | on A: `systemctl reboot` | A comes back, service starts (`WantedBy=multi-user.target`), resumes the inbox |
 | D3 | Node loss (promote B) | power off A. Then the T4 order: stop A if alive → `pg_ctl promote` (or `SELECT pg_promote()`) on the standby → restore the last `spaces/` sync on B → `systemctl start inspecto` on B → repoint LB/DNS → run the acceptance block | B serves `/ready` 200, Pipelines run under `owner=node-b` with a higher `epoch` |
-| D4 | Network partition | on A: `iptables -A OUTPUT -d <pg-host> -j DROP` for > 60 s, then remove it | A logs `Could not renew the run lease`; B (if started) takes the lease after 60 s with a higher epoch; after heal A logs `was stolen while we still believed we held it`. ⚠ Expected gap, record it: a run already in flight on A is **not** aborted by the steal (the renewer only logs), so check provenance for a double-processed file |
+| D4 | Network partition | on A: `iptables -A OUTPUT -d <pg-host> -j DROP` for > 60 s, then remove it | A logs `Could not renew the run lease`; B (if started) takes the lease after 60 s with a higher epoch; after heal A logs `was stolen while we still believed we held it`. A run already in flight on A must **not** commit after the steal (`LEASE-TAKEOVER-INFLIGHT-1`, fixed 2026-09-30): expect `Run lease lost for '<pipeline>'` on A and its Consignment audited FAILED with `commit failed: lease lost`, its files left in the inbox for B; check provenance shows each file committed once |
 | D5 | Split brain guard | start B while A is healthy | B acquires nothing A holds (rows keep `owner=node-a`) |
 | D6 | Fail back | reverse D3 once A is rebuilt as the new standby | same pass criteria, roles swapped |
 

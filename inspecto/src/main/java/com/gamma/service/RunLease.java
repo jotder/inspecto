@@ -41,6 +41,15 @@ interface RunLease {
     /** A held claim. Released exactly once, in a {@code finally} — by whichever thread ran the work. */
     interface Claim extends AutoCloseable {
         @Override void close();
+
+        /**
+         * Whether this claim is still held — asked before each commit point of a run
+         * (LEASE-TAKEOVER-INFLIGHT-1). {@code false} once released, or once another owner has taken the lease
+         * over (a shared implementation re-reads its row; its renewer marks a lost claim so the answer is
+         * cheap). A run whose claim is no longer valid aborts without committing, leaving its files for the
+         * new holder. ⚠ An in-process implementation cannot lose a claim it has not released.
+         */
+        boolean isValid();
     }
 
     /**

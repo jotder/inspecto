@@ -449,6 +449,8 @@ public class CollectorProcessor {
 
             // Fetch the bytes into the staging tree and land them atomically in the poll root (B3a), so the rest
             // of the engine — dedup, markers, ledger, backup — treats them exactly like local files.
+            // LEASE-TAKEOVER-INFLIGHT-1: a fetch whose acquisition lease was taken over lands nothing.
+            CommitFence.check(CommitFence.Scope.ACQUIRE, cfg.identity().pipelineName());
             return RemoteAcquisitionHandler.materializeRemote(cfg, connector, ready, retry, skipPostAction).size();
         }
     }

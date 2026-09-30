@@ -387,7 +387,10 @@ final class PipelineScheduler {
     private int runOne(Due due, Map<String, String> mdc, AtomicInteger pending, boolean acquireFirst) {
         if (mdc != null) MDC.setContextMap(mdc);
         com.gamma.metrics.MetricRegistry reg = com.gamma.metrics.MetricRegistry.global();
-        try (RunLease.Claim claim = due.claim()) {
+        try (RunLease.Claim claim = due.claim();
+             // LEASE-TAKEOVER-INFLIGHT-1: the engine asks this before it commits a Consignment
+             com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
+                     com.gamma.inspector.CommitFence.Scope.RUN, due.id(), claim::isValid)) {
             runPermits.acquire();
             // Clock starts AFTER the permit: time spent queued for the budget is not this pipeline's run
             // duration, and admitting fewer of its files could not shorten it.
@@ -711,7 +714,10 @@ final class PipelineScheduler {
      *  budget, then release both. Runs on a {@link #triggerWorkers} virtual thread. */
     private void acquireOne(Due due, Map<String, String> mdc) {
         if (mdc != null) MDC.setContextMap(mdc);
-        try (RunLease.Claim claim = due.claim()) {
+        try (RunLease.Claim claim = due.claim();
+             // LEASE-TAKEOVER-INFLIGHT-1: the engine asks this before it lands fetched files
+             com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
+                     com.gamma.inspector.CommitFence.Scope.ACQUIRE, due.id(), claim::isValid)) {
             acquirePermits.acquire();
             try {
                 int landed = CollectorProcessor.acquire(due.cfg());
@@ -803,7 +809,8 @@ final class PipelineScheduler {
         if (cfg == null || paused.contains(id) || !cfg.active()) return;   // paused since the last reconcile
         RunLease.Claim claim = acquireGuard.tryAcquire(id);
         if (claim != null) {
-            try (claim) {
+            try (claim; com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
+                    com.gamma.inspector.CommitFence.Scope.ACQUIRE, id, claim::isValid)) {
                 CollectorProcessor.acquire(cfg.forNewRun());
             } catch (Exception e) {
                 log.error("Stream lane acquisition failed for '{}'", id, e);

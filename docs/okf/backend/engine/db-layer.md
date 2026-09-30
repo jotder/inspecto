@@ -221,6 +221,17 @@ on `owner = ? AND epoch = ?`, so a process paused past its TTL can neither free 
 another process has taken over. ⛔ Not a Postgres advisory lock (D5): those die with the connection, and
 the connection pool recycles connections.
 
+🔴 **A taken-over run does not commit** (`LEASE-TAKEOVER-INFLIGHT-1`, 2026-09-30). `RunLease.Claim.isValid()`
+re-reads `owner` + `epoch` in one query (fail-closed on a read error); the renewer marks a claim lost when
+its fenced renew matches no row. The run holds `com.gamma.inspector.CommitFence` (keyed scope + Space MDC +
+pipeline) around each claim — `PipelineScheduler.runOne`/`acquireOne`/`drainNow`, `CollectorService.runPipeline`/
+`replayRejects` — and the engine checks it before the first durable side effect of
+`ConsignmentIngestor.finalizeSource` (run) and before `materializeRemote` lands fetched files (acquire). A lost
+claim throws `LeaseLostException` ("lease lost"), so the Consignment is audited FAILED, nothing is registered,
+backed up or marked, and its files stay in the inbox for the new holder. The heap guard's claim is valid until
+released. ⚠ Parquet outputs already written by the lost run stay on disk (the rerun overwrites them —
+`OVERWRITE_OR_IGNORE`), and the refused batch counts one X1 commit-retry attempt.
+
 **Selected by `-Drun.lease.backend`** (`heap` default · `db` · `postgres` · a raw `jdbc:` URL), with
 `-Drun.lease.db.url` / `.user` / `.password` and `-Drun.lease.owner`. ⛔ The default is `heap`, never a
 database: a lease is exclusion *across processes*, and on one node the in-heap guard is both correct and
