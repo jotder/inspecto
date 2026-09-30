@@ -162,6 +162,82 @@ class EnrichmentTransformSandboxTest {
         }
     }
 
+    /**
+     * The SEAL alone, through the engine: with the guard bypassed, a {@code read_text} of a file outside the
+     * allowlist is refused by DuckDB itself on both paths. Red with the seal removed.
+     */
+    @Test
+    void theSealAloneRefusesAnOutsideReadThroughTheEngine(@TempDir Path dir) throws Exception {
+        Path secret = Files.writeString(Files.createDirectories(dir.resolve("elsewhere")).resolve("secret.txt"),
+                "TOP-SECRET");
+        seedInput(dir.resolve("in"));
+        EnrichmentConfig c = cfg(dir, "SELECT '2020' AS day, content FROM read_text('" + fwd(secret) + "')");
+        EnrichmentEngine.bypassGuardForTest = true;
+        try {
+            java.sql.SQLException run = assertThrows(java.sql.SQLException.class,
+                    () -> EnrichmentEngine.runResult(c, null, List.of()));
+            assertTrue(run.getMessage().contains("Permission Error"), run.getMessage());
+            java.sql.SQLException prev = assertThrows(java.sql.SQLException.class,
+                    () -> EnrichmentEngine.preview(c, SAMPLE, List.of(), 10));
+            assertTrue(prev.getMessage().contains("Permission Error"), prev.getMessage());
+        } finally {
+            EnrichmentEngine.bypassGuardForTest = false;
+        }
+    }
+
+    /** The seal precedes every authored read: at the first CREATE VIEW the configuration is already locked. */
+    @Test
+    void theConnectionIsSealedBeforeTheFirstView(@TempDir Path dir) throws Exception {
+        seedInput(dir.resolve("in"));
+        EnrichmentConfig c = cfg(dir, "SELECT day, id FROM input");
+        List<String> seen = new java.util.ArrayList<>();
+        EnrichmentEngine.beforeFirstViewForTest = conn -> {
+            try (Statement st = conn.createStatement();
+                 java.sql.ResultSet rs = st.executeQuery(
+                         "SELECT current_setting('lock_configuration'), current_setting('enable_external_access')")) {
+                rs.next();
+                seen.add(rs.getString(1) + "/" + rs.getString(2));
+            } catch (java.sql.SQLException e) {
+                throw new IllegalStateException(e);
+            }
+        };
+        try {
+            EnrichmentEngine.runResult(c, null, List.of());
+            EnrichmentEngine.preview(c, SAMPLE, List.of(), 10);
+        } finally {
+            EnrichmentEngine.beforeFirstViewForTest = null;
+        }
+        assertEquals(List.of("true/false", "true/false"), seen, "run then preview: locked, external access off");
+    }
+
+    /** SqlGuard refuses every non-SELECT shape on the transform, before anything executes. */
+    @Test
+    void guardRefusesEveryNonSelectShape(@TempDir Path dir) throws Exception {
+        Path leak = Files.createDirectories(dir.resolve("elsewhere")).resolve("leak.csv");
+        for (String t : List.of(
+                "PRAGMA database_list",
+                "SET enable_external_access=true",
+                "EXPORT DATABASE '" + fwd(dir.resolve("elsewhere")) + "'",
+                "CALL pragma_version()",
+                "SELECT '2020' AS day, file FROM glob('" + fwd(dir) + "/*')",
+                "SELECT '2020' AS day, content FROM read_blob('" + fwd(leak) + "')",
+                "SELECT '2020' AS day, 1 AS n /*;*/; COPY (SELECT 1) TO '" + fwd(leak) + "'")) {
+            EnrichmentConfig c = cfg(dir, t);
+            List<String> ran = new java.util.ArrayList<>();
+            EnrichmentEngine.beforeFirstViewForTest = conn -> ran.add(t);
+            try {
+                IllegalArgumentException run = assertThrows(IllegalArgumentException.class,
+                        () -> EnrichmentEngine.runResult(c, null, List.of()), t);
+                assertTrue(run.getMessage().contains("transform refused"), t + ": " + run.getMessage());
+                assertThrows(IllegalArgumentException.class, () -> EnrichmentEngine.preview(c, SAMPLE, List.of(), 10), t);
+            } finally {
+                EnrichmentEngine.beforeFirstViewForTest = null;
+            }
+            assertTrue(ran.isEmpty(), "refused before any view was created: " + t);
+            assertFalse(Files.exists(leak), t);
+        }
+    }
+
     /** Every shipped Space enrichment config's transform clears the guard (the only one: the demo Space's). */
     @Test
     void shippedSpaceEnrichmentTransformsPassTheGuard() throws Exception {

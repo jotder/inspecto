@@ -57,6 +57,20 @@ public final class EnrichmentEngine {
 
     private static final Logger log = LoggerFactory.getLogger(EnrichmentEngine.class);
 
+    /**
+     * Test seams for SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1, package-private and never set in production:
+     * {@code bypassGuardForTest} skips {@link SqlGuard} so a test can prove the SEAL alone refuses a file read;
+     * {@code beforeFirstViewForTest} observes the connection at the point the first view is created, so a
+     * test can pin that the seal precedes every authored read.
+     */
+    static volatile boolean bypassGuardForTest;
+    static volatile java.util.function.Consumer<Connection> beforeFirstViewForTest;
+
+    private static void beforeFirstView(Connection conn) {
+        java.util.function.Consumer<Connection> hook = beforeFirstViewForTest;
+        if (hook != null) hook.accept(conn);
+    }
+
     private EnrichmentEngine() {}
 
     /**
@@ -167,6 +181,7 @@ public final class EnrichmentEngine {
             DuckDbUtil.applyGlobalDuckDbSettings(conn);
             String transform = guardedTransform(cfg);
             seal(conn, cfg, pipelines, db);
+            beforeFirstView(conn);
 
             // 1. reference views
             for (EnrichmentConfig.Reference r : cfg.references()) {
@@ -273,6 +288,7 @@ public final class EnrichmentEngine {
         try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
             String transform = guardedTransform(cfg);
             seal(conn, cfg, pipelines, db);
+            beforeFirstView(conn);
             // 1. reference views — resolved exactly as a run (real data, bounded by the transform's own join)
             for (EnrichmentConfig.Reference r : cfg.references())
                 st.execute("CREATE VIEW \"" + r.name() + "\" AS SELECT * FROM " + referenceReader(r, pipelines));
@@ -306,6 +322,7 @@ public final class EnrichmentEngine {
      */
     static String guardedTransform(EnrichmentConfig cfg) {
         String sql = cfg.transformSql();
+        if (bypassGuardForTest) return sql;
         List<Finding> findings = SqlGuard.check(sql);
         if (!findings.isEmpty())
             throw new IllegalArgumentException("enrichment '" + cfg.name() + "' transform refused: "
