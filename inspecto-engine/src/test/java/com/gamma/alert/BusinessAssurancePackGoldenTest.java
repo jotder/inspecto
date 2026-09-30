@@ -213,7 +213,7 @@ class BusinessAssurancePackGoldenTest {
     void aSlowRampIsAbsorbedAsTrendAndNotFlagged(@TempDir Path dir) throws Exception {
         Path slow = variant(dir.resolve("slow"), "ba_revenue_forecast", "daily_revenue",
                 revenue("CASE WHEN t >= 100 THEN 2 * (t - 100) ELSE 0 END"));
-        assertEquals(List.of("150:band"), flags(slow), "a known limit, documented in RUNBOOK.md and the OKF");
+        assertEquals(List.of("150:band"), flags(slow), "a known limit, documented in the business-assurance runbooks and the OKF");
         Path four = variant(dir.resolve("four"), "ba_revenue_forecast", "daily_revenue",
                 revenue("CASE WHEN t >= 100 THEN 4 * (t - 100) ELSE 0 END"));
         assertEquals(List.of("143:drift", "150:band"), flags(four));

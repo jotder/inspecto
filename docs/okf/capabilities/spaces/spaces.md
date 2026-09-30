@@ -244,7 +244,7 @@ exists (§2, §5).
     amount silently turns into a float. The golden test caught this.
 - **Alert Rules.** Both use `gte 1`. ⚠ An Alert Rule threshold must be positive, so "any row" cannot be
   written `gt 0`.
-- **KPIs.** They ship as `kpi` Widgets plus the `RUNBOOKS.md` table, not as `registry/kpis/`. The seed gate
+- **KPIs.** They ship as `kpi` Widgets plus the runbook table, not as `registry/kpis/`. The seed gate
   reads a KPI's Dataset Schema, and every pack Dataset is empty at apply.
   - ⚠ **Breaks are not xDRs.** On the golden corpus, 15 completeness Breaks are **9** distinct lost or short
     xDRs, because a record lost at mediation breaks both pairs. The dashboard shows the xDR count
@@ -362,13 +362,14 @@ false positives against 4 planted look-alikes; forecast RMSE 10.3 against the no
 MAPE 1.7 %. Variant corpora (the test rewrites the corpus under the view's own model SQL): a ±level shift from
 day 100 → exactly 1 regime change (day 102), then silence; a ±8/day ramp → exactly 1 drift detection within 21
 days (measured 19 / 13); bad margin input → 2 data-quality Alerts, `new` and `insufficient` groups silent. The
-forecast Dataset's description is kept under 60 characters so Alert text names it (`DatasetMeasureProbe.label`). Runbooks: `spaces/_templates/business-assurance/RUNBOOK.md`.
+forecast Dataset's description is kept under 60 characters so Alert text names it (`DatasetMeasureProbe.label`). Runbooks: `config/runbooks/business-assurance-runbooks.md`.
 
 **Product gaps the pack recorded** (open on the BACKLOG row): the forecast is NOT a Measure function — the
 Measure shorthand is `count | agg(field)`, so a forecast inside a KPI or Alert Rule would need an engine change;
 the Dataset form was taken instead. A hand-authored view cannot read another view, so each view inlines its
-corpus CTE. A template has no runbook home: `createFromTemplate` copies only `config/` and `data/`, so
-`RUNBOOK.md` stays in the catalog, not in the created Space.
+corpus CTE. A template's runbooks live at `config/runbooks/<pack>-runbooks.md` (`createFromTemplate` copies only `config/` and
+`data/`, and rewrites `${SPACE}` in `.toon` files only); all three assurance packs follow this, and the seed-gate test
+pins it. There is still no runbook component kind.
 
 **The telecom fraud pack — `spaces/_templates/telco-fraud/`** (`ASSURE-PACK-TELCO-FRAUD-1`, wave 5.1 of
 `superpower/assurance-capability-plan.md`, BUILT 2026-09-30, not closed). Three feed Pipelines + schemas (`cdr`,

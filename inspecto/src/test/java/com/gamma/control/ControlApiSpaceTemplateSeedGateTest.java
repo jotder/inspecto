@@ -99,9 +99,18 @@ class ControlApiSpaceTemplateSeedGateTest {
                 HttpResponse<String> r = send(c, "POST", "/spaces",
                         "{\"id\":\"" + space + "\",\"template\":\"" + id + "\"}", ADMIN);
                 assertEquals(200, r.statusCode(), "shipped template '" + id + "': " + r.body());
+                // a template's runbooks live in config/runbooks/ (createFromTemplate copies only config/ + data/)
+                if (RUNBOOK_PACKS.containsKey(id))
+                    assertTrue(Files.isRegularFile(root.resolve(space).resolve("config/runbooks").resolve(RUNBOOK_PACKS.get(id))),
+                            "template '" + id + "' must deliver its runbook file to the created Space");
             }
         }
     }
+
+    private static final java.util.Map<String, String> RUNBOOK_PACKS = java.util.Map.of(
+            "telco-ra", "telco-ra-runbooks.md",
+            "business-assurance", "business-assurance-runbooks.md",
+            "telco-fraud", "telco-fraud-runbooks.md");
 
     private static void seedAlertTemplate(Path root, String alertToon) throws Exception {
         Path cfg = root.resolve("_templates").resolve("alerting").resolve("config");
