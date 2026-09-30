@@ -265,6 +265,11 @@ default (added 2026-09-30, `RefusalQuarantine`). With it on, a file can be refus
 - **The platform card scan.** `processing.refusal_scan: card_number` scans every raw cell except the
   `processing.refusal_scan_exempt` columns (default: none), before anything is written. The exact candidate
   shapes, the brand/length list and the measured false-trip rates are in [Spaces §3.5.1](../spaces/spaces.md).
+  - The scan **fails closed**: an error while scanning restricts the file as `INGEST_REFUSE:SCAN_FAILED`.
+  - An exempt list covering every raw field is refused at load, and an unknown exempt name is warned.
+  - `RefusalConfigAudit` wraps every control-plane Pipeline write (`/config/write`, `/config/patch`, graph save,
+    settings, history restore, rename). A write that changes `refusal`, `refusal_scan`, `refusal_scan_exempt` or
+    `refusal_retention_days` emits AUDIT `pipeline.refusal.changed` with before / after.
   - ⚠ A false trip moves a whole file. An operator who knows a column carries no card data (an order id, an IBAN,
     a phone number) exempts it, and that column is then not scanned at all.
 - **What happens to the file.** It is **moved, never deleted**, to `<dirs.quarantine>/.restricted/` — INSIDE the
@@ -273,7 +278,10 @@ default (added 2026-09-30, `RefusalQuarantine`). With it on, a file can be refus
   be the refused value.
   - The directory is not the inbox, so it is never re-polled.
   - `BackupTask.secret` skips `.restricted`, so no backup carries it.
-  - The quarantine listing (`FileStatusStore.quarantine`) and the errors-file route skip it.
+  - The quarantine listing (`FileStatusStore.quarantine`), the errors-file route and `RecordReplay` skip it.
+  - `DataRef.requireUnder` refuses any data reference that addresses a `.restricted` segment, or whose read root
+    contains one (DuckDB's `**` glob descends into dot-directories). That covers Datasets, Expectations and
+    `collector.dataset`. The table browser and `/db/query` apply the same rule.
   - `processing.refusal_retention_days` (optional, ≥ 1) deletes restricted files older than that at the next
     refusal. Each deletion is audited as `ingest.refused.retention`, carrying the file's code only.
 - **What is recorded.** Only the reason code:

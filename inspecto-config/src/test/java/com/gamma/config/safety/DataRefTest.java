@@ -117,4 +117,16 @@ class DataRefTest {
                 .getMessage().contains("no data root"),
                 "a view-backed space with no data dir is a different failure from a bad ref");
     }
+
+    /** processing.refusal: no data reference reaches the restricted quarantine, by its path or through an ancestor. */
+    @Test
+    void theRestrictedQuarantineIsUnreachable(@org.junit.jupiter.api.io.TempDir Path root) throws Exception {
+        java.nio.file.Files.createDirectories(root.resolve("pay/quarantine/.restricted"));
+        java.nio.file.Files.createDirectories(root.resolve("pay/database/dt=1"));
+        for (String ref : new String[]{"pay/quarantine/.restricted", "pay/quarantine/.restricted/x.csv", "pay/quarantine"})
+            assertThrows(IllegalArgumentException.class, () -> DataRef.requireUnder(root, ref, "ref"), ref);
+        // A pipeline-shaped store is read at database/ only, so its quarantine sibling does not taint it.
+        assertEquals(root.resolve("pay").normalize(), DataRef.requireUnder(root, "pay", "ref"));
+        assertEquals(root.resolve("pay/database").normalize(), DataRef.requireUnder(root, "pay/database", "ref"));
+    }
 }
