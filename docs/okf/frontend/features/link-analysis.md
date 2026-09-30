@@ -231,7 +231,7 @@ operator still presses Run and Save, so the human stays the actor.
 ## Dense-graph link labels (as-built 2026-09-28)
 
 A dense canvas drew every link-type label, so the telco demo ring (18 nodes / 42 links) was unreadable.
-The shared `GraphViewComponent` (`inspecto-ui/src/app/modules/admin/catalog/graph-view.component.ts`) now
+The shared `GraphViewComponent` (`inspecto-ui/src/app/inspecto/graph/graph-view.component.ts`) now
 applies a **density rule**: above `DENSE_EDGE_LABEL_CAP = 20` links (`edgeLabelsHiddenByDensity`), link
 labels are hidden and revealed by a custom G6 `labelled` edge state — on hover of the link or of an
 endpoint node (every link touching it), and pinned by a click until the next click. It uses its own pointer

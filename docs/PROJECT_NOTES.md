@@ -1811,7 +1811,7 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   needs `FindingsSpec.TYPES` widened, which `NodeAttribute` now delegates to.
 - **Optimistic mutations** — `optimisticMutate({apply,commit,reconcile,rollback,onError})` (`inspecto/api/
   optimistic.ts`); reassign arrays (`rows=[...]`) so the grid re-renders.
-- **G6 graph** — reuse `modules/admin/catalog/graph-view.component.ts` (`@Input data`, `@Output nodeClick`);
+- **G6 graph** — reuse `inspecto/graph/graph-view.component.ts` (`@Input data`, `@Output nodeClick`);
   nodes are canvas-drawn (not DOM) → verify inspector logic via unit test, not preview clicks. Pipeline graph data
   via `flow-graph.ts#toFlowG6Data`.
 - **Viz plugins register by side effect** — `import 'app/inspecto/viz/plugins'` runs `registerBuiltinViz()`.
