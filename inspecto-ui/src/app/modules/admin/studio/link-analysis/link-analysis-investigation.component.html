@@ -473,6 +473,9 @@
             <inspecto-link-analysis-dossier [investigationId]="activeId"></inspecto-link-analysis-dossier>
         }
 
+        <!-- ── LA-18 value Measures over the whole Dataset; Watch binds to the open Investigation ── -->
+        <inspecto-link-analysis-value-measures [investigation]="store.header()"></inspecto-link-analysis-value-measures>
+
         @if (store.workingSet()?.excluded?.length) {
             <section aria-label="Excluded entities">
                 <h3 class="text-secondary m-0 mb-1 text-xs font-semibold uppercase tracking-wide">Excluded</h3>

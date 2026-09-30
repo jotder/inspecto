@@ -398,7 +398,11 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   `structuring`, `benefitTransfer`, plus the non-alertable `valueWeightedLinks` — in a `[from, to)` window of at
   most 31 days. No view filter is accepted, so a `≥ 5 000` view cannot hide structuring. An Alert Rule binds one
   through `POST /inv/investigations/{id}/alert-rules` with `valueMeasure:{…}` and fires when at least one entity
-  breaches (one Alert per rule). Definitions, defaults and deviations: plan §2.6.1. No SPA yet.
+  breaches (one Alert per rule). Definitions, defaults and deviations: plan §2.6.1. **SPA** (2026-09-30): the
+  Investigation side pane's *Value Measures* panel (`link-analysis-value-measures.component`, `value-measures.ts`)
+  — Dataset + role autocomplete, threshold fields left blank for the server default and re-filled with the values
+  in force after a run, `truncated` / `unvalued` shown as counts, *Watch* only over the open Investigation's own
+  Dataset and roles, sending the answered `measure` block verbatim. ⛔ `valueMeasureQuery` never sends a `filter`.
   Since 2026-09-30 the window may instead be ROLLING — `last: <N>h|<N>d` (exactly one of it or `from`/`to`, same
   31-day cap), stored relative and resolved at every read, bind and sweep against the server clock in **UTC**
   (statements run with DuckDB `TimeZone=UTC`; a naive `timeCol` is assumed UTC); the answer's `window` states the
@@ -406,6 +410,11 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   `agent` (other type 422, unknown 404, retired 409) — restricting the answered agents to its live exact members
   under the list's sealed normaliser (the share's denominator stays all cash-out); a masked list answers its own
   tokens, never raw values.
+
+* **Settings ▸ Link Analysis** (2026-09-30, `settings/link-analysis-settings.component`): the four-eyes thresholds
+  (`fourEyesBudgetAbove`, `fourEyesFanOutAbove`), `mergedDistinctCap` with `mergedDistinctCapInForce`, and
+  `seedByDistinctCap` only when the server reports that key. ⚠ `PUT /settings/link-analysis` REPLACES the
+  document, so the save sends every other stated key back as read (node caps, masking mode, Entity Types).
 * **The server half runs the SAME motif over the whole Dataset** (LA-14b, 2026-09-23):
   `POST /inv/pattern/branching` (`inspecto-geo-link` `PatternRoutes` → `PatternQueryCompiler` →
   `BranchingPatternEngine`). 🔴 **Why:** the projection is capped (2 000 links, `cnt DESC`; and 500 nodes in the

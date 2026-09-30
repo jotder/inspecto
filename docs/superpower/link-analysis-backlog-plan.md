@@ -300,7 +300,7 @@ periodicity detection.
   comments only) · **coverage indicator** — which days and Collectors are missing for the window. 🔴 A gap
   in the data is visually identical to innocence; coverage is the highest-value control on this list.
 
-#### 2.6.1 LA-18 value measures — definitions — ✅ DECIDED 2026-09-30 (operator sign-off) · backend BUILT 2026-09-30
+#### 2.6.1 LA-18 value measures — definitions — ✅ DECIDED 2026-09-30 (operator sign-off) · backend BUILT 2026-09-30 · SPA BUILT 2026-09-30
 
 Operator decision 2026-09-30: each value measure is a **named Measure**; its threshold is an **Alert Rule**
 (the LA-23 path); both computed over the **whole Dataset**, never the analyst's view filter, so a view narrowed
@@ -371,6 +371,19 @@ added; (4) the 31-day window cap and the defaults above, editable per Alert Rule
   so do dropping the agent restriction, comparing raw instead of normalised payees, and skipping the mask. Earlier: narrowing the evaluated rows to
   `≥ 5 000` turns 7 tests red (structuring loses `HUB`); a count off by one, or a `gt 1` comparator, stops
   the firing tests.
+
+✅ **As built (SPA, 2026-09-30):** a **Value Measures** panel in the Link Analysis Investigation side pane
+(`link-analysis-value-measures.component`, form + query in `value-measures.ts`). The analyst picks the Dataset and
+the column roles (autocomplete: Datasets, then that Dataset's columns), the Measure, the window and the chosen
+Measure's own thresholds — a blank threshold is sent as nothing, so the server's default applies. The answer shows
+the thresholds in force in words and writes their values back into the fields (edit, run again); `truncated` and
+`unvalued` are shown as counts, never hidden; passThrough's `retention` column is labelled *derived: 1 − ratio*. No
+view filter is ever sent (pinned by a mutation-checked test). **Watch** posts `{name, valueMeasure, severity}` to the
+open Investigation, sending the block exactly as the server answered it, and says it fires ONE Alert on the COUNT of
+breaching entities. It is offered only when the result was computed over the Investigation's own Dataset and roles
+(the bind uses those), and never for `valueWeightedLinks`. ⚠ The rolling `last` window and `agentList` from the
+parallel backend lane are typed as optional on `ValueMeasureBlock` only; the form does not offer them yet. The
+four-eyes thresholds and `mergedDistinctCap` got their first surface the same day: Settings ▸ Link Analysis.
 
 ⚠ **Recorded deviations (decided in-lane, for the operator to confirm):**
 * ✅ **CONFIRMED 2026-09-30 (operator):** **velocity and time-to-cash-out also take `minInbound` (default 10 000)**, like pass-through. Without a floor

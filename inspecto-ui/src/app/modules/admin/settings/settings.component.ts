@@ -26,6 +26,7 @@ import { ModelSettingsComponent } from 'app/modules/admin/model-settings/model-s
 import { NotificationCenterComponent } from 'app/modules/admin/notification-center/notification-center.component';
 import { EgressSettingsComponent } from './egress.component';
 import { IncidentGovernanceComponent } from './incident-governance.component';
+import { LinkAnalysisSettingsComponent } from './link-analysis-settings.component';
 import { OperationalDbComponent } from './operational-db.component';
 import { SchedulerSettingsComponent } from './scheduler.component';
 import { SpacesComponent } from 'app/modules/admin/spaces/spaces.component';
@@ -145,6 +146,13 @@ export class SettingsComponent {
             icon: 'heroicons_outline:map',
             description: 'Basemap and geo-analysis defaults.',
             component: MapSettingsComponent,
+        },
+        {
+            id: 'link-analysis',
+            title: 'Link Analysis',
+            icon: 'heroicons_outline:share',
+            description: 'Four-eyes thresholds and traversal caps for Investigations.',
+            component: LinkAnalysisSettingsComponent,
         },
         {
             id: 'transfer',

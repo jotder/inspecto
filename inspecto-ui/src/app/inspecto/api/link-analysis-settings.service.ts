@@ -38,6 +38,19 @@ export interface LinkAnalysisLimits {
     entityTypes: EntityTypeConfig[] | null;
     /** LA-17: the Entity Types actually in force (stated, else the defaults) — server-computed, read-only. */
     entityTypesInForce: EntityTypeConfig[];
+    /** LA-19 (D-U7): the masking mode stated; `null` = the default (`typed`). Round-tripped by a save. */
+    maskingMode?: string | null;
+    /** LA-19 (D-U7): an expand whose budget is above this needs a second pair of eyes; `null` = no threshold. */
+    fourEyesBudgetAbove?: number | null;
+    /** LA-19 (D-U7): an expand whose fan-out is above this needs a second pair of eyes; `null` = no threshold. */
+    fourEyesFanOutAbove?: number | null;
+    /** LA-17: distinct values per bound column a merged `expand` may scan; `null` = the shipped default. */
+    mergedDistinctCap?: number | null;
+    /** LA-17: the merged-expand cap actually in force — server-computed, read-only. */
+    mergedDistinctCapInForce?: number;
+    /** Parallel backend lane (may be absent): the `seedBy` distinct cap stated, and the one in force. */
+    seedByDistinctCap?: number | null;
+    seedByDistinctCapInForce?: number;
 }
 
 /** LA-17: one Entity Type (entity-model design §4.1) — `classifications` are the Dataset column classifications it claims. */

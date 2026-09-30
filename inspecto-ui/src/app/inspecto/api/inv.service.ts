@@ -675,6 +675,68 @@ export interface InvestigationAlertRuleResult {
     disclosure: string;
 }
 
+// ── LA-18: value Measures over the WHOLE Dataset (`ValueMeasureRoutes`, `ValueMeasures`) ─────────────────
+
+/** The six a value-measure Alert Rule may watch; `valueWeightedLinks` is read-only (the GET answers it, a bind refuses it). */
+export type AlertableValueMeasureName =
+    | 'passThrough'
+    | 'velocity'
+    | 'timeToCashOut'
+    | 'cashOutConcentration'
+    | 'structuring'
+    | 'benefitTransfer';
+export type ValueMeasureName = AlertableValueMeasureName | 'valueWeightedLinks';
+
+/**
+ * The Measure block: its name, the value/time columns, the `[from, to)` window, and any thresholds / kind list
+ * (`cashOutKinds` | `benefitKinds`). An omitted threshold is the server's default. ⛔ There is no `filter` — the
+ * Measure reads the Dataset, never an analyst's view (the §2.6 ≥ 5 000 trap); the server refuses one.
+ */
+export interface ValueMeasureBlock {
+    name: ValueMeasureName;
+    valueCol: string;
+    timeCol: string;
+    from?: string;
+    to?: string;
+    /** Parallel backend lane (not yet shipped): a rolling window `<N>h` | `<N>d` in place of `from`/`to`. */
+    last?: string;
+    /** Parallel backend lane (not yet shipped): restrict the Measure to the members of an Entity List. */
+    agentList?: string;
+    [threshold: string]: string | number | string[] | undefined;
+}
+
+/** `GET /inv/value-measures` — the block plus the Dataset and its link roles. */
+export interface ValueMeasureQuery extends ValueMeasureBlock {
+    dataset: string;
+    sourceCol: string;
+    targetCol: string;
+    linkKindCol?: string;
+}
+
+export interface ValueMeasureResult {
+    /** The block with every default filled in — exactly what an Alert Rule bound with it would store. */
+    measure: ValueMeasureBlock;
+    /** The thresholds in force, in words. */
+    threshold: string;
+    entities: Record<string, unknown>[];
+    count: number;
+    /** The answer was capped at `fences.maxEntities` — more entities breach than are listed. */
+    truncated: boolean;
+    rowsInWindow: number;
+    /** Rows in the window whose value did not parse as a number — skipped, and counted. */
+    unvalued: number;
+    fences?: { maxEntities: number; timeoutSeconds: number; maxWindowDays: number };
+}
+
+/** `POST …/alert-rules` for a value Measure: fires when ≥ 1 entity breaches (comparator/threshold are the server's). */
+export interface ValueMeasureAlertRuleRequest {
+    name: string;
+    valueMeasure: ValueMeasureBlock;
+    severity: AlertSeverity;
+}
+
+export type ValueMeasureAlertRuleResult = InvestigationAlertRuleResult & Partial<ValueMeasureResult>;
+
 // ── LA-17: Entity Lists (`EntityListRoutes`, wire contract: entity-model design §4.3.1) ─────────────────
 
 export type EntityListPurpose = 'allow' | 'block' | 'watch' | 'exclusion';
@@ -929,6 +991,16 @@ export class InvService {
         req: InvestigationAlertRuleRequest,
     ): Observable<InvestigationAlertRuleResult> {
         return this.http.post<InvestigationAlertRuleResult>(invPath(id, 'alert-rules'), req);
+    }
+
+    /** LA-18: bind an Alert Rule to a value Measure over the Investigation's whole Dataset (one Alert per rule). */
+    bindValueMeasureAlertRule(id: string, req: ValueMeasureAlertRuleRequest): Observable<ValueMeasureAlertRuleResult> {
+        return this.http.post<ValueMeasureAlertRuleResult>(invPath(id, 'alert-rules'), req);
+    }
+
+    /** LA-18: one value Measure over a whole Dataset. Read-only; 503 no write root · 422 · 404 unknown Dataset. */
+    valueMeasures(q: ValueMeasureQuery): Observable<ValueMeasureResult> {
+        return this.http.get<ValueMeasureResult>(apiUrl('/inv/value-measures'), { params: toParams({ ...q }) });
     }
 
     // ── LA-17 Entity Lists. Writes need `canManageIncidents`; no write root → 503; unknown list → 404. ──
