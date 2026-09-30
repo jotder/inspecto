@@ -272,10 +272,23 @@ default (added 2026-09-30, `RefusalQuarantine`). With it on, a file can be refus
     `refusal_retention_days` emits AUDIT `pipeline.refusal.changed` with before / after.
   - ⚠ A false trip moves a whole file. An operator who knows a column carries no card data (an order id, an IBAN,
     a phone number) exempts it, and that column is then not scanned at all.
-- **What happens to the file.** It is **moved, never deleted**, to `<dirs.quarantine>/.restricted/` — INSIDE the
-  Pipeline's own quarantine directory, so it is as jailed as that directory is, even when `dirs.quarantine` is the
-  Space root. The file gets a generated `refused-<CODE>-<ms>-<n>.<ext>` name, because the original name may itself
-  be the refused value.
+- **What happens to the file.** It is **moved, never deleted**, to the restricted store
+  `<data root>/.restricted/<pipeline>/` (`RefusalQuarantine.dir`; the data root is the Space's registered one, else
+  the nearest `data/` ancestor of `dirs.quarantine`; with neither, the refusal fails closed). The file gets a generated
+  `refused-<CODE>-<ms>-<n>.<ext>` name, because the original name may itself be the refused value.
+  - 🔴 **Why it is outside every `dirs:` entry (round 5, 2026-09-30).** The sealed ingest connection
+    (`SEC-INGEST-EXPR-EXTERNAL-ACCESS-1`) allowlists the Pipeline's `dirs:` for DuckDB `allowed_directories`, which
+    matches by **prefix**. So a store under `dirs.quarantine` — its first home, `<quarantine>/.restricted/` — was
+    readable by any `fn: custom` expression (`read_text('<quarantine>/.restricted/*')`).
+  - Three checks keep it out:
+    - The store sits beside the Pipeline dirs, never under them.
+    - `PathJail.readAllowlistRefusal` refuses an allowlisted dir that is inside, or directly holds, a `.restricted`
+      store, for the ingest and the enrichment seal alike.
+    - The ingest seal and `restrict` both refuse (fail closed) when the store would fall under an allowlisted dir,
+      for example `dirs.quarantine` = the data root. The enrichment seal also refuses an allowlist covering
+      `<data root>/.restricted`.
+  - `RefusalQuarantineTest.aMappingExpressionCannotReadTheRestrictedStore` proves it: after one file is restricted,
+    a mapping that `read_text`s the store fails its batch with a permission error, and no row carries the content.
   - The directory is not the inbox, so it is never re-polled.
   - `BackupTask.secret` skips `.restricted`, so no backup carries it.
   - The quarantine listing (`FileStatusStore.quarantine`), the errors-file route and `RecordReplay` skip it.

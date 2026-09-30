@@ -347,6 +347,16 @@ public final class EnrichmentEngine {
                         + "input/output.database and path: references at data directories "
                         + "(SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1)");
         }
+        // processing.refusal: the Space's restricted store (<data root>/.restricted) is never reachable either.
+        java.nio.file.Path dataRoot = com.gamma.pipeline.SpaceConfigRoot.currentDataRoot();
+        if (dataRoot != null) {
+            java.nio.file.Path restricted = dataRoot.toAbsolutePath().normalize()
+                    .resolve(com.gamma.config.safety.DataRef.RESTRICTED_SEGMENT);
+            for (java.nio.file.Path dir : allowed)
+                if (restricted.startsWith(dir.toAbsolutePath().normalize()))
+                    throw new IllegalArgumentException("enrichment '" + cfg.name() + "' refused: its sealed connection "
+                            + "would be allowed to read the restricted store under " + dir);
+        }
         SqlSandbox.sealAllowing(conn, allowed);
     }
 

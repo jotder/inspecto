@@ -220,15 +220,16 @@ class PaymentFraudTemplateGoldenTest {
     }
 
     private static Path restricted(PipelineConfig pc) {
-        return Path.of(pc.dirs().quarantine()).toAbsolutePath().normalize().resolve(".restricted");
+        // <data root>/.restricted/<pipeline> — outside every sealed-ingest allowlist (round 5).
+        return Path.of(pc.dirs().quarantine()).toAbsolutePath().normalize().getParent().getParent()
+                .resolve(".restricted").resolve(pc.identity().pipelineName());
     }
 
     /** The refused file sits ONLY in the restricted quarantine, and nothing anywhere names the value. */
     private static void assertRestricted(PipelineConfig pc, String what, int files) throws Exception {
         assertEquals(files, count(restricted(pc)), what + ": the file is in the restricted quarantine");
         for (String kept : new String[]{pc.dirs().quarantine(), pc.dirs().errors(), pc.dirs().temp()})
-            assertEquals(0, count(Path.of(kept)) - (kept.equals(pc.dirs().quarantine()) ? count(restricted(pc)) : 0),
-                    what + ": no copy of the file is kept in " + kept + " (outside .restricted)");
+            assertEquals(0, count(Path.of(kept)), what + ": no copy of the file is kept in " + kept);
         if (Files.isDirectory(Path.of(pc.dirs().backup())))   // a clean batch-mate is backed up; the refused file never
             try (Stream<Path> b = Files.walk(Path.of(pc.dirs().backup()))) {
                 for (Path f : b.filter(Files::isRegularFile).toList())

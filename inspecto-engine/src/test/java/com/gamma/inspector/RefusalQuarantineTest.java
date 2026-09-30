@@ -29,7 +29,7 @@ class RefusalQuarantineTest {
         Path toon = Files.createDirectories(dir).resolve("p.toon");
         StringBuilder dirs = new StringBuilder();
         for (String d : new String[]{"poll", "database", "backup", "temp", "errors", "quarantine", "markers", "status_dir", "log_dir"})
-            dirs.append("  ").append(d).append(": ").append(dir.resolve(d).toString().replace('\\', '/')).append('\n');
+            dirs.append("  ").append(d).append(": ").append(dir.resolve("data").resolve(d).toString().replace('\\', '/')).append('\n');
         Files.writeString(toon, "name: p\nactive: true\ndirs:\n" + dirs
                 + "processing:\n  schema_file: s.toon\n" + (on ? "  refusal: restricted_quarantine\n" : ""));
         Files.writeString(dir.resolve("s.toon"), "raw:\n  name: R\n  format: CSV\n  fields[1]{name,selector,type}:\n    A,\"0\",VARCHAR\n");
@@ -92,7 +92,7 @@ class RefusalQuarantineTest {
     @Test
     void aRefusalIsAuditedWithTheCodeAloneAndTheFileMovedUnderAGeneratedName(@TempDir Path dir) throws Exception {
         PipelineConfig on = cfg(dir, true);
-        Path in = Files.createDirectories(dir.resolve("poll"));
+        Path in = Files.createDirectories(dir.resolve("data").resolve("poll"));
         Path f = Files.writeString(in.resolve("secret_4111111111111111.csv"), "A\nx\n");
         List<Event> seen = new ArrayList<>();
         BiConsumer<EventLog, Event> tap = (log, e) -> seen.add(e);
@@ -126,19 +126,98 @@ class RefusalQuarantineTest {
         assertFalse(RefusalQuarantine.CardNumbers.containsCandidate("x_1751328000123.csv"), "no card IIN");
     }
 
-    /** The round-3 repro: {@code dirs.quarantine} IS the jail root — the restricted dir stays inside it. */
+    /**
+     * Round 5: the restricted store is {@code <data root>/.restricted/<pipeline>/}, OUTSIDE every allowlisted ingest dir.
+     * The round-3 repro ({@code dirs.quarantine} = the data root) cannot place it outside the allowlist, so the refusal
+     * fails closed instead of moving the file where a mapping could read it; the store stays jailed either way.
+     */
     @Test
-    void theRestrictedDirStaysInsideTheQuarantineDirEvenWhenThatIsTheRoot(@TempDir Path tmp) throws Exception {
+    void theRestrictedStoreSitsOutsideTheSealAllowlistOrRefuses(@TempDir Path tmp) throws Exception {
         Path root = tmp.resolve("space");
         PipelineConfig on = cfg(root, true);
+        Path data = root.resolve("data").toAbsolutePath().normalize();
+        assertEquals(data.resolve(".restricted").resolve("p"), RefusalQuarantine.dir(on));
+        assertNull(RefusalQuarantine.readableBySeal(on), "outside every allowlisted dir");
+        for (Path allowed : ConsignmentIngestStrategy.ingestAllowedDirs(on, null))
+            assertFalse(RefusalQuarantine.dir(on).startsWith(allowed), allowed.toString());
         Path toon = root.resolve("p.toon");
         Files.writeString(toon, Files.readString(toon).replaceAll("  quarantine: .*\n",
-                "  quarantine: " + root.toString().replace('\\', '/') + "\n"));
+                "  quarantine: " + data.toString().replace('\\', '/') + "\n"));
         PipelineConfig atRoot = PipelineConfig.load(toon.toString());
-        Path d = RefusalQuarantine.dir(atRoot);
-        assertTrue(d.startsWith(root.toAbsolutePath().normalize()), d + " is inside the jail root " + root);
-        assertEquals(root.toAbsolutePath().normalize().resolve(".restricted"), d);
-        assertTrue(RefusalQuarantine.dir(on).startsWith(Path.of(on.dirs().quarantine()).toAbsolutePath().normalize()));
+        assertTrue(RefusalQuarantine.dir(atRoot).startsWith(data), "jailed");
+        assertNotNull(RefusalQuarantine.readableBySeal(atRoot), "an allowlisted data root would expose it");
+        Path f = Files.writeString(Files.createDirectories(data.resolve("poll")).resolve("x.csv"), "A\nx\n");
+        var sel = new com.gamma.etl.SchemaSelector.Selection(atRoot.schemas().single(), null);
+        assertThrows(java.io.IOException.class, () -> RefusalQuarantine.restrict(
+                new com.gamma.etl.Consignment.Member(f.toFile(), 0, 4, sel), atRoot, RefusalQuarantine.CARD, "b", java.time.LocalDateTime.now()));
+        assertTrue(Files.exists(f), "fail closed: the file was not moved where the seal could read it");
+        assertNotNull(com.gamma.config.safety.PathJail.readAllowlistRefusal(data.resolve(".restricted").resolve("p")));
+        Files.createDirectories(data.resolve(".restricted"));
+        assertNotNull(com.gamma.config.safety.PathJail.readAllowlistRefusal(data), "a dir holding a restricted store");
+    }
+
+    /**
+     * Round 5 repro: a Pipeline whose mapping expression READS the restricted store. The sealed ingest connection
+     * refuses it — the batch fails, and no landed row carries the restricted file's content.
+     */
+    @Test
+    void aMappingExpressionCannotReadTheRestrictedStore(@TempDir Path tmp) throws Exception {
+        Path space = tmp.resolve("spaces").resolve("pay");
+        copy(PAY, space);
+        Path toonP = space.resolve("config/payment_attempts/payment_attempts_pipeline.toon");
+        PipelineConfig pc = PipelineConfig.load(toonP.toString());
+        Path inbox = Files.createDirectories(Path.of(pc.dirs().poll()));
+        String header = "ATTEMPT_ID,ATTEMPT_TS,ATTEMPT_DATE,ACCOUNT_ID,INSTRUMENT_TOKEN,BIN,DEVICE_ID,MERCHANT_ID,AMOUNT,CURRENCY,OUTCOME\n";
+        Files.writeString(inbox.resolve("PAYMENT_ATTEMPTS_20260704.csv"), header
+                + "pa_x1,2026-07-04 10:00:00,2026-07-04,acc_x,4111111111111111,402400,dev_x,m_01,10.00,EUR,APPROVED\n");
+        CollectorProcessor.run(pc);
+        Path store = RefusalQuarantine.dir(pc);
+        try (Stream<Path> r = Files.list(store)) { assertEquals(1, r.count(), "the premise: one file is restricted"); }
+
+        Path schema = space.resolve("config/payment_attempts/payment_attempts_schema.toon");
+        String glob = store.toString().replace('\\', '/') + "/*";
+        Files.writeString(schema, Files.readString(schema).replace("    - name: MERCHANT_ID\n      from: MERCHANT_ID\n      fn: keep",
+                "    - name: MERCHANT_ID\n      from: \"\"\n      fn: custom\n      args:\n        expression: \"(SELECT string_agg(content, '') FROM read_text('"
+                        + glob + "'))\""));
+        PipelineConfig reader = PipelineConfig.load(toonP.toString());
+        Files.writeString(inbox.resolve("PAYMENT_ATTEMPTS_20260705.csv"), header
+                + "pa_y1,2026-07-05 10:00:00,2026-07-05,acc_y,tok_y,402400,dev_y,m_01,10.00,EUR,APPROVED\n");
+        CollectorProcessor.run(reader);
+        assertTrue(Files.exists(inbox.resolve("PAYMENT_ATTEMPTS_20260705.csv")), "the batch failed: the file stays");
+        String batches = Files.readString(Path.of(reader.dirs().batchesFilePath()));
+        assertTrue(batches.contains("FAILED"), batches);
+        assertTrue(batches.toLowerCase(java.util.Locale.ROOT).contains("permission")
+                || batches.toLowerCase(java.util.Locale.ROOT).contains("disabled"), "a permission error: " + batches);
+        Path db = Path.of(reader.dirs().database());
+        if (Files.exists(db)) try (Stream<Path> w = Files.walk(db)) {
+            for (Path f : w.filter(Files::isRegularFile).toList())
+                assertFalse(new String(Files.readAllBytes(f), java.nio.charset.StandardCharsets.ISO_8859_1).contains("4111111111111111"), f.toString());
+        }
+    }
+
+    /** Round 5: the fail-closed branch of {@code scanFile} — the raw view cannot even be built. */
+    @Test
+    void aScanWhoseRawViewCannotBeBuiltRestrictsTheFile(@TempDir Path tmp) throws Exception {
+        Path space = tmp.resolve("spaces").resolve("pay");
+        copy(PAY, space);
+        PipelineConfig pc = PipelineConfig.load(space.resolve("config/payment_attempts/payment_attempts_pipeline.toon").toString());
+        Path inbox = Files.createDirectories(Path.of(pc.dirs().poll()));
+        Path f = Files.writeString(inbox.resolve("PAYMENT_ATTEMPTS_20260704.csv"),
+                "ATTEMPT_ID,ATTEMPT_TS,ATTEMPT_DATE,ACCOUNT_ID,INSTRUMENT_TOKEN,BIN,DEVICE_ID,MERCHANT_ID,AMOUNT,CURRENCY,OUTCOME\n"
+                        + "pa_x1,2026-07-04 10:00:00,2026-07-04,acc_x,tok_x,402400,dev_x,m_01,10.00,EUR,APPROVED\n");
+        var sel = new com.gamma.etl.SchemaSelector.Selection(pc.schemas().single(), null);
+        com.gamma.util.DuckDbUtil.loadDriver();
+        try (var conn = java.sql.DriverManager.getConnection("jdbc:duckdb:")) {
+            // The view cannot be built over a file that does not exist: the scan cannot prove it clean.
+            assertEquals(RefusalQuarantine.SCAN_FAILED, RefusalQuarantine.scanFile(conn,
+                    inbox.resolve("gone.csv").toFile(), pc.schemas().single(), pc, 0));
+            assertNull(RefusalQuarantine.scanFile(conn, f.toFile(), pc.schemas().single(), pc, 0), "a clean file scans clean");
+        }
+        MemberAudit a = RefusalQuarantine.restrict(new com.gamma.etl.Consignment.Member(f.toFile(), 0, 4, sel), pc,
+                RefusalQuarantine.SCAN_FAILED, "b", java.time.LocalDateTime.now());
+        assertEquals(com.gamma.etl.MemberStatus.QUARANTINED_RESTRICTED, a.status());
+        assertEquals(RefusalQuarantine.SCAN_FAILED, a.error());
+        try (Stream<Path> r = Files.list(RefusalQuarantine.dir(pc))) { assertEquals(1, r.count()); }
     }
 
     /** Luhn-valid numbers of every covered brand range and length; each must be found in a name. */
@@ -222,7 +301,7 @@ class RefusalQuarantineTest {
         Path restricted = Files.createDirectories(RefusalQuarantine.dir(on));
         Path old = Files.writeString(restricted.resolve("refused-CARD_NUMBER-1-1.csv"), "x");
         Files.setLastModifiedTime(old, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() - 3L * 86_400_000));
-        Path f = Files.writeString(Files.createDirectories(dir.resolve("poll")).resolve("b.csv"), "A\nx\n");
+        Path f = Files.writeString(Files.createDirectories(dir.resolve("data").resolve("poll")).resolve("b.csv"), "A\nx\n");
         List<Event> seen = new ArrayList<>();
         BiConsumer<EventLog, Event> tap = (log, e) -> seen.add(e);
         EventLog.addTap(tap);

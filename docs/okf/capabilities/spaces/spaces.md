@@ -584,6 +584,9 @@ Step Processor and no new route.
     - an ignored exempt list;
     - no retention audit;
     - `.restricted` not excluded from backup, from the quarantine listing or from the errors-file route;
+    - the store back under `dirs.quarantine`, where a mapping expression could read it (round 5);
+    - an import door not auditing a dropped `refusal_scan` (round 5);
+    - the `scanFile` fail-closed branch returning null (round 5);
     - `>=` on the velocity bound;
     - calendar-day grouping for card testing and BIN attack;
     - an instrument partition for the account velocity;

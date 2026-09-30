@@ -20,15 +20,26 @@ import java.util.Objects;
  * the change (before / after of those keys only). Turning the card scan off, or widening its exempt list, can then
  * never happen silently. A config that does not parse on either side is judged by the write's own gates, not here.
  */
-final class RefusalConfigAudit {
+public final class RefusalConfigAudit {
 
     static final List<String> KEYS = List.of("refusal", "refusal_retention_days", "refusal_scan", "refusal_scan_exempt");
 
     private RefusalConfigAudit() {}
 
     static void write(Path target, byte[] bytes, String tempPrefix) throws IOException {
-        Map<String, Object> before = Files.isRegularFile(target) ? keys(Files.readAllBytes(target)) : Map.of();
+        byte[] prior = Files.isRegularFile(target) ? Files.readAllBytes(target) : null;
         AtomicFiles.write(target, bytes, tempPrefix);
+        audit(target, prior, bytes);
+    }
+
+    /**
+     * Emit {@code pipeline.refusal.changed} when {@code before} → {@code after} (the file's bytes around one write;
+     * {@code before} {@code null} for a new file) changes a refusal key. Every writer that does not go through
+     * {@link #write} — the import journal ({@code POST /import}, the pipeline bundle import, {@code importSpace}) —
+     * calls this after its own atomic write.
+     */
+    public static void audit(Path target, byte[] priorBytes, byte[] bytes) {
+        Map<String, Object> before = priorBytes == null ? Map.of() : keys(priorBytes);
         Map<String, Object> after = keys(bytes);
         if (Objects.equals(before, after)) return;
         try {

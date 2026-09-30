@@ -54,8 +54,12 @@ public final class ImportJournal {
         List<Path> missing = new ArrayList<>();
         for (Path d = t.getParent(); d != null && !Files.exists(d); d = d.getParent()) missing.add(d);
         createdDirs.addAll(missing);   // deepest first
+        byte[] before = Files.isRegularFile(t) ? Files.readAllBytes(t) : null;
         AtomicFiles.write(t, bytes, tempPrefix);
         wrote.put(t, sha256(bytes));
+        // Every import path writes through here: a Pipeline whose content-refusal keys change is audited.
+        if (t.getFileName().toString().endsWith(".toon"))
+            com.gamma.control.RefusalConfigAudit.audit(t, before, bytes);
     }
 
     /** Whether nothing has been written through this journal yet. */

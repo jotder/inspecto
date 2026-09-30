@@ -378,6 +378,10 @@ public final class PathJail {
         for (Path base : DiscoveredRoots.all())
             if (canonical(base).startsWith(d)) return "is or contains the Space root " + base;
         if (Files.isDirectory(d.resolve("config"))) return "is a Space root (it holds config/)";
+        // processing.refusal: a restricted store holds files refused FOR their content; DuckDB's allowed_directories
+        // matches by prefix, so an allowlisted dir that is, is under, or directly holds one would expose it.
+        for (Path seg : d) if (seg.toString().equals(DataRef.RESTRICTED_SEGMENT)) return "is inside a restricted store";
+        if (Files.isDirectory(d.resolve(DataRef.RESTRICTED_SEGMENT))) return "contains a restricted store";
         Path tmp = canonical(Paths.get(System.getProperty("java.io.tmpdir")));
         if (tmp.startsWith(d)) return "is or contains the system temp directory " + tmp;
         return null;

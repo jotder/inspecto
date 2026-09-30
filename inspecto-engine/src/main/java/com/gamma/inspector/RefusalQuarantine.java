@@ -42,8 +42,8 @@ import java.util.regex.Pattern;
  * (3) With the mode on, a file NAME or HEADER line carrying a card-shaped number ({@link #CARD_IN_NAME} /
  * {@link #CARD_IN_HEADER}).
  *
- * <p><b>Effect.</b> The file moves to {@code <quarantine>/.restricted/} — INSIDE the Pipeline's own quarantine
- * directory, so it is as jailed as that is — under a generated name carrying the reason code. It is never polled,
+ * <p><b>Effect.</b> The file moves to {@code <data root>/.restricted/<pipeline>/} ({@link #dir}) — outside every
+ * directory the sealed ingest/enrichment connections allowlist — under a generated name carrying the reason code. It is never polled,
  * {@code BackupTask} skips {@code .restricted}, and the quarantine listing and errors-file routes skip it. Only the
  * reason code is recorded — the member's status row, one WARN line, one AUDIT event {@code ingest.refused} — and
  * each file the optional retention window deletes is audited ({@code ingest.refused.retention}, code only).
@@ -234,6 +234,9 @@ final class RefusalQuarantine {
     static MemberAudit restrict(Consignment.Member m, PipelineConfig cfg, String code, String batchId, LocalDateTime start)
             throws IOException {
         Path dir = dir(cfg);
+        String exposed = readableBySeal(cfg);
+        if (exposed != null)   // fail closed: never move a refused file where a mapping expression could read it
+            throw new IOException("refusing to restrict: " + exposed + " — give the Pipeline data dirs below the data root");
         Files.createDirectories(dir);
         String name = storedName(m.file().getName(), code);
         Path target = dir.resolve(name).normalize();
@@ -248,7 +251,41 @@ final class RefusalQuarantine {
 
     /** {@code <dirs.quarantine>/.restricted} — inside the Pipeline's own (jailed) quarantine directory. */
     static Path dir(PipelineConfig cfg) {
-        return Path.of(cfg.dirs().quarantine()).toAbsolutePath().normalize().resolve(DIR);
+        Path q = Path.of(cfg.dirs().quarantine()).toAbsolutePath().normalize();
+        Path root = dataRoot(q);
+        String name = cfg.identity().pipelineName();
+        if (name == null || !name.matches("[A-Za-z0-9_-]{1,120}")) name = "p" + Integer.toHexString(String.valueOf(name).hashCode());
+        Path d = root.resolve(DIR).resolve(name).normalize();
+        if (!d.startsWith(root)) throw new IllegalStateException("restricted store escapes the data root");
+        return d;
+    }
+
+    /**
+     * The data root the restricted store lives directly under: the Space's registered data root when the Pipeline's
+     * quarantine is inside it, else the nearest ancestor named {@code data} (the Space layout); with neither it FAILS
+     * CLOSED. The store is {@code <root>/.restricted/<pipeline>/} — deliberately OUTSIDE every {@code dirs:} entry,
+     * because the sealed ingest and enrichment connections allowlist those by PREFIX (DuckDB
+     * {@code allowed_directories}), so a store under {@code dirs.quarantine} was readable by a mapping expression.
+     */
+    static Path dataRoot(Path quarantine) {
+        Path reg = com.gamma.pipeline.SpaceConfigRoot.currentDataRoot();
+        if (reg != null) {
+            Path r = reg.toAbsolutePath().normalize();
+            if (quarantine.startsWith(r)) return r;
+        }
+        for (Path p = quarantine; p != null; p = p.getParent())
+            if (p.getFileName() != null && p.getFileName().toString().equals("data")) return p;
+        // No data root is known: fail closed rather than guess a directory the jail may not cover.
+        throw new IllegalStateException("no data root for the restricted store (the quarantine " + quarantine
+                + " is under no registered Space data root and no data/ directory)");
+    }
+
+    /** Why the restricted store would be readable by this Pipeline's sealed ingest connection, or {@code null}. */
+    static String readableBySeal(PipelineConfig cfg) {
+        Path d = dir(cfg);
+        for (Path allowed : ConsignmentIngestStrategy.ingestAllowedDirs(cfg, null))
+            if (d.startsWith(allowed)) return "the restricted store " + d + " lies under the allowlisted " + allowed;
+        return null;
     }
 
     /** {@code refused-<CODE suffix>-<ms>-<n><ext>} — the code, never the original name (it may be the value). */

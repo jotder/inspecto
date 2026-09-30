@@ -861,6 +861,11 @@ interface ConsignmentIngestStrategy {
                         + ", which " + why + " — point dirs.* / sinks[].database at a data directory "
                         + "(SEC-INGEST-EXPR-EXTERNAL-ACCESS-1)");
         }
+        if (cfg.refusal().restricted()) {
+            String exposed = RefusalQuarantine.readableBySeal(cfg);
+            if (exposed != null)
+                throw new SQLException("refusing to ingest: " + exposed + " (processing.refusal)");
+        }
         com.gamma.sql.SqlSandbox.sealAllowing(conn, allowed);
     }
 
