@@ -106,4 +106,24 @@ class ImportJournalTest {
         assertEquals(List.of(shared.toAbsolutePath().normalize()), j.notRolledBack(), "kept across the throw");
         assertEquals("a legitimate concurrent save", Files.readString(shared));
     }
+
+    /** Round 6: undoing an import that changed a Pipeline's refusal keys is audited as pipeline.refusal.reverted. */
+    @Test
+    void rollingBackARefusalChangeIsAudited(@TempDir Path dir) throws Exception {
+        Path f = dir.resolve("p_pipeline.toon");
+        Files.writeString(f, "name: p\nprocessing:\n  refusal: restricted_quarantine\n  refusal_scan: card_number\n");
+        List<com.gamma.event.Event> seen = new java.util.ArrayList<>();
+        java.util.function.BiConsumer<com.gamma.event.EventLog, com.gamma.event.Event> tap = (l, e) -> seen.add(e);
+        com.gamma.event.EventLog.addTap(tap);
+        try {
+            ImportJournal j = new ImportJournal();
+            j.write(f, "name: p\nprocessing:\n  refusal: restricted_quarantine\n".getBytes(StandardCharsets.UTF_8), ".t-");
+            j.rollback();
+        } finally {
+            com.gamma.event.EventLog.removeTap(tap);
+        }
+        assertEquals(1, seen.stream().filter(e -> e.toString().contains("pipeline.refusal.changed")).count(), seen.toString());
+        assertEquals(1, seen.stream().filter(e -> e.toString().contains("pipeline.refusal.reverted")).count(), seen.toString());
+        assertTrue(Files.readString(f).contains("card_number"), "rolled back");
+    }
 }

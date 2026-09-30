@@ -352,6 +352,9 @@ public final class PathJail {
             if (base.startsWith(r))
                 throw new Escape(field, value, "is the Space directory " + base + " (or contains it); a data "
                         + "directory must be a subdirectory such as data/<pipeline>/…, never the Space root");
+            if (r.equals(base.resolve("data")))
+                throw new Escape(field, value, "is the Space data root " + r + "; a data directory must be a "
+                        + "subdirectory such as data/<pipeline>/…, never the data root itself");
             if (r.startsWith(base.resolve("config")))
                 throw new Escape(field, value, "is under the Space's config/ tree (" + base.resolve("config")
                         + "); a data directory may never be a config directory");
@@ -367,6 +370,30 @@ public final class PathJail {
      * Space shape, for entry points that register none); and {@code java.io.tmpdir} itself or an ancestor of it
      * (every other process's scratch). Callers fail closed on a non-null answer.
      */
+    /** Registered Space data roots (the engine registers each Space's) and restricted stores this process created. */
+    private static final java.util.Set<Path> DATA_ROOTS = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final java.util.Set<Path> RESTRICTED_STORES = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** A Space's data root: no allowlist and no data home may ever BE it (a prefix match would cover every store). */
+    public static void registerDataRoot(Path dataRoot) {
+        if (dataRoot != null) DATA_ROOTS.add(canonical(dataRoot));
+    }
+
+    /** A restricted store ({@code processing.refusal}) that now exists: no allowlist may contain it. */
+    public static void registerRestrictedStore(Path store) {
+        if (store != null) RESTRICTED_STORES.add(canonical(store));
+    }
+
+    /** Whether {@code d} IS a data root: a registered one, {@code -Ddata.dir}, or a hosted Space's {@code data/}. */
+    static boolean isDataRoot(Path d) {
+        Path c = canonical(d);
+        if (DATA_ROOTS.contains(c)) return true;
+        String dd = System.getProperty("data.dir");
+        if (dd != null && !dd.isBlank() && canonical(Paths.get(dd.trim())).equals(c)) return true;
+        for (Path base : DiscoveredRoots.all()) if (canonical(base).resolve("data").equals(c)) return true;
+        return false;
+    }
+
     public static String readAllowlistRefusal(Path dir) {
         Path d = canonical(dir);
         try {
@@ -382,6 +409,18 @@ public final class PathJail {
         // matches by prefix, so an allowlisted dir that is, is under, or directly holds one would expose it.
         for (Path seg : d) if (seg.toString().equals(DataRef.RESTRICTED_SEGMENT)) return "is inside a restricted store";
         if (Files.isDirectory(d.resolve(DataRef.RESTRICTED_SEGMENT))) return "contains a restricted store";
+        // The data root itself is refused whether or not a restricted store exists YET: a connection sealed before
+        // another Pipeline's first refusal would otherwise read the file that refusal restricts.
+        if (isDataRoot(d)) return "is the Space data root";
+        for (Path store : RESTRICTED_STORES) if (store.startsWith(d)) return "contains a restricted store";
+        // A nested data/ fallback puts a store at <d>/<x>/.restricted (e.g. data/p/data/.restricted from data/p).
+        try (java.util.stream.Stream<Path> kids = Files.list(d)) {
+            for (Path k : kids.toList())
+                if (Files.isDirectory(k) && Files.isDirectory(k.resolve(DataRef.RESTRICTED_SEGMENT)))
+                    return "contains a restricted store";
+        } catch (java.io.IOException | RuntimeException ignored) {
+            // an unlistable dir holds nothing we can see; the seal still applies
+        }
         Path tmp = canonical(Paths.get(System.getProperty("java.io.tmpdir")));
         if (tmp.startsWith(d)) return "is or contains the system temp directory " + tmp;
         return null;

@@ -357,4 +357,26 @@ class PathJailTest {
         assertEquals(null, PathJail.spaceDirOf(s.resolve("data/orders")));
     }
 
+
+    /** processing.refusal round 6: the data root itself is never allowlistable, even before any restricted store exists. */
+    @Test
+    void readAllowlistRefusalRefusesTheDataRootAndRestrictedStores(@TempDir Path tmp) throws Exception {
+        Path data = Files.createDirectories(tmp.resolve("space/data"));
+        Path pipe = Files.createDirectories(data.resolve("p/database"));
+        assertEquals(null, PathJail.readAllowlistRefusal(pipe), "the premise: an ordinary data dir is allowed");
+        PathJail.registerDataRoot(data);
+        assertFalse(Files.exists(data.resolve(".restricted")), "no restricted store yet");
+        assertEquals("is the Space data root", PathJail.readAllowlistRefusal(data));
+        Path d = Files.createDirectories(tmp.resolve("other"));
+        Files.createDirectories(d.resolve(".restricted/x"));
+        assertEquals("contains a restricted store", PathJail.readAllowlistRefusal(d));
+        assertEquals("is inside a restricted store", PathJail.readAllowlistRefusal(d.resolve(".restricted/x")));
+        // A nested data/ fallback: <d2>/data/.restricted is refused from <d2>, one level up.
+        Path d2 = Files.createDirectories(tmp.resolve("nested/p"));
+        Files.createDirectories(d2.resolve("data/.restricted/q"));
+        assertEquals("contains a restricted store", PathJail.readAllowlistRefusal(d2));
+        // And the write gate refuses a data home that IS a Space's data root.
+        Path space = tmp.resolve("space");
+        assertThrows(PathJail.Escape.class, () -> PathJail.refuseDataHome(data, space, java.util.List.of(space), "data", "dirs.database"));
+    }
 }

@@ -44,6 +44,7 @@ public final class ImportJournal {
 
     private final Map<Path, byte[]> prior = new LinkedHashMap<>();   // null value ⇒ the file did not exist
     private final Map<Path, byte[]> wrote = new LinkedHashMap<>();   // SHA-256 of what this import last wrote
+    private final Map<Path, byte[]> wroteToon = new LinkedHashMap<>();   // the .toon bytes, for the rollback audit
     private final List<Path> createdDirs = new ArrayList<>();
     private final List<Path> notRolledBack = new ArrayList<>();   // every rollback's, kept even when one throws
 
@@ -58,8 +59,10 @@ public final class ImportJournal {
         AtomicFiles.write(t, bytes, tempPrefix);
         wrote.put(t, sha256(bytes));
         // Every import path writes through here: a Pipeline whose content-refusal keys change is audited.
-        if (t.getFileName().toString().endsWith(".toon"))
+        if (t.getFileName().toString().endsWith(".toon")) {
+            wroteToon.put(t, bytes);
             com.gamma.control.RefusalConfigAudit.audit(t, before, bytes);
+        }
     }
 
     /** Whether nothing has been written through this journal yet. */
@@ -94,6 +97,10 @@ public final class ImportJournal {
                 }
                 if (e.getValue() == null) Files.deleteIfExists(e.getKey());
                 else AtomicFiles.write(e.getKey(), e.getValue(), ".rollback-");
+                // The undo of an audited refusal change is audited too.
+                byte[] ourToon = wroteToon.get(e.getKey());
+                if (ourToon != null)
+                    com.gamma.control.RefusalConfigAudit.audit(e.getKey(), ourToon, e.getValue(), "pipeline.refusal.reverted");
             } catch (IOException ex) {
                 if (first == null) first = ex;
             }
@@ -111,6 +118,7 @@ public final class ImportJournal {
         }
         prior.clear();
         wrote.clear();
+        wroteToon.clear();
         createdDirs.clear();
         if (first != null) throw first;
         return changedConcurrently;

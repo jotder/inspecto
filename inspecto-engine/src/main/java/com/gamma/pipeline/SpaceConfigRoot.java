@@ -62,7 +62,10 @@ public final class SpaceConfigRoot {
 
     /** Publish (or replace) a Space's data root — the sibling of {@link #register}; see its note. */
     public static void registerDataRoot(String spaceId, Path dataRoot) {
-        if (spaceId != null && dataRoot != null) DATA_ROOTS.put(spaceId, dataRoot);
+        if (spaceId != null && dataRoot != null) {
+            DATA_ROOTS.put(spaceId, dataRoot);
+            com.gamma.config.safety.PathJail.registerDataRoot(dataRoot);
+        }
     }
 
     /** Drop a Space's registration (on Space deletion) — both roots, so neither can outlive the other. */

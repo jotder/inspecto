@@ -375,4 +375,21 @@ class RefusalQuarantineTest {
             }
         }
     }
+
+    /**
+     * Round 6: a nested data/ fallback. Pipeline A's quarantine is under {@code data/p/data/}, so its store is
+     * {@code data/p/data/.restricted/a}; a second Pipeline B allowlisting {@code data/p} (the grandparent) is refused.
+     */
+    @Test
+    void aSecondPipelineAllowlistingTheGrandparentOfANestedStoreIsRefused(@TempDir Path tmp) throws Exception {
+        Path outer = tmp.resolve("space/data/p");
+        PipelineConfig a = cfg(outer, true);   // dirs under <outer>/data/...
+        Path poll = Files.createDirectories(Path.of(a.dirs().poll()));
+        Path f = Files.writeString(poll.resolve("x.csv"), "A\nx\n");
+        var sel = new com.gamma.etl.SchemaSelector.Selection(a.schemas().single(), null);
+        RefusalQuarantine.restrict(new com.gamma.etl.Consignment.Member(f.toFile(), 0, 4, sel), a, RefusalQuarantine.CARD, "b",
+                java.time.LocalDateTime.now());
+        assertTrue(RefusalQuarantine.dir(a).startsWith(outer.toAbsolutePath().normalize().resolve("data").resolve(".restricted")));
+        assertNotNull(com.gamma.config.safety.PathJail.readAllowlistRefusal(outer), "B's allowlisted grandparent holds it");
+    }
 }

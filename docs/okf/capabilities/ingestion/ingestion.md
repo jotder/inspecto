@@ -287,6 +287,14 @@ default (added 2026-09-30, `RefusalQuarantine`). With it on, a file can be refus
     - The ingest seal and `restrict` both refuse (fail closed) when the store would fall under an allowlisted dir,
       for example `dirs.quarantine` = the data root. The enrichment seal also refuses an allowlist covering
       `<data root>/.restricted`.
+  - Round 6 closed two gaps:
+    - **The Space data root itself is refused.** This applies to every seal allowlist and to the write/import
+      data-home gate (`refuseDataHome`), whether or not a store exists yet. Otherwise a connection sealed before
+      another Pipeline's first refusal could read the file that refusal then restricts. The engine registers each
+      Space's data root (`PathJail.registerDataRoot`), and `-Ddata.dir` and hosted `<space>/data` count too.
+    - **Nested stores are refused.** Stores this process created are registered (`registerRestrictedStore`), and
+      a `.restricted` one level down (a nested `data/` fallback) is refused too.
+  - Undoing an audited import change is audited as `pipeline.refusal.reverted`.
   - `RefusalQuarantineTest.aMappingExpressionCannotReadTheRestrictedStore` proves it: after one file is restricted,
     a mapping that `read_text`s the store fails its batch with a permission error, and no row carries the content.
   - The directory is not the inbox, so it is never re-polled.

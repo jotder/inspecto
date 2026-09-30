@@ -39,6 +39,11 @@ public final class RefusalConfigAudit {
      * calls this after its own atomic write.
      */
     public static void audit(Path target, byte[] priorBytes, byte[] bytes) {
+        audit(target, priorBytes, bytes, "pipeline.refusal.changed");
+    }
+
+    /** As {@link #audit(Path, byte[], byte[])} under {@code action} (the import rollback uses {@code pipeline.refusal.reverted}). */
+    public static void audit(Path target, byte[] priorBytes, byte[] bytes, String action) {
         Map<String, Object> before = priorBytes == null ? Map.of() : keys(priorBytes);
         Map<String, Object> after = keys(bytes);
         if (Objects.equals(before, after)) return;
@@ -46,7 +51,7 @@ public final class RefusalConfigAudit {
             EventLog.current().emit(Event.builder(EventType.AUDIT).source("audit")
                     .message("Pipeline config '" + target.getFileName() + "' changed its content refusal: "
                             + before + " -> " + after)
-                    .action("pipeline.refusal.changed").actionCategory("security")
+                    .action(action).actionCategory("security")
                     .attr("file", target.getFileName().toString())
                     .attr("before", ApiContext.JSON.writeValueAsString(before))
                     .attr("after", ApiContext.JSON.writeValueAsString(after)));

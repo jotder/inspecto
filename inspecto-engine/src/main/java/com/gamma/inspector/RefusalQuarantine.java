@@ -238,6 +238,7 @@ final class RefusalQuarantine {
         if (exposed != null)   // fail closed: never move a refused file where a mapping expression could read it
             throw new IOException("refusing to restrict: " + exposed + " — give the Pipeline data dirs below the data root");
         Files.createDirectories(dir);
+        com.gamma.config.safety.PathJail.registerRestrictedStore(dir.getParent());
         String name = storedName(m.file().getName(), code);
         Path target = dir.resolve(name).normalize();
         if (!target.getParent().equals(dir)) throw new IOException("restricted quarantine target escapes its directory");
