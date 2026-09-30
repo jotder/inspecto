@@ -530,6 +530,11 @@ are the values four-eyes approved (below).
   `attach-approvals.json`), as does the control plane's Pending Change check
   (`PendingChangeRoutes.verifyPublicationApproval` / `verifyAttachApproval`, unchanged). Pinned by
   `ApprovalFingerprintTest` plus the two adversarial suites (`PostgresPublishJobTest`, `ControlApiPendingChangesTest`).
+  `ApprovalGoldenVectorTest` pins the canonical form to fingerprints recorded from the pre-unification code.
+  🔴 **Still copied per type, not shared:** the store code (`approval` / `recordOf` / `record`, the atomic write and
+  the delete revocation) and the `approved(fingerprint)` filter chain. A third egress Job type copies those until a
+  shared `Store` helper exists; that helper is a possible follow-up, deliberately not built. `Gate` screens only "no
+  verifier" and "no record": a blank nonce or pending change still reaches the type's verifier, which decides.
 - Four-eyes approval pins a SHA-256 **content fingerprint** (`PublicationApproval`), not names. It covers:
   - `job`: every key of the Job except its schedule (`cron`, `on_pipeline`, `on_signal`, `when`, `catch_up`,
     `enabled`) and the server-stamped author keys;

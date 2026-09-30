@@ -3,6 +3,9 @@ package com.gamma.job;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -30,6 +33,7 @@ public final class ApprovalFingerprint {
     private ApprovalFingerprint() {}
 
     private static final ObjectMapper JSON = new ObjectMapper().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+    private static final Logger LOG = LoggerFactory.getLogger(ApprovalFingerprint.class);
     private static final SecureRandom RANDOM = new SecureRandom();
 
     /** SHA-256 (hex) of {@code canonical} serialised as key-sorted JSON. */
@@ -90,6 +94,9 @@ public final class ApprovalFingerprint {
             try {
                 return v.verify(root, job, record);
             } catch (RuntimeException unverifiable) {
+                // the class only: a message could quote approval content
+                LOG.warn("approval verifier threw {} for Job '{}'; the approval is not honoured",
+                        unverifiable.getClass().getName(), job);
                 return false;
             }
         }

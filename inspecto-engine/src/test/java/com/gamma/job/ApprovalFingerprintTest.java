@@ -99,4 +99,42 @@ class ApprovalFingerprintTest {
         assertTrue(gate.honours(ROOT, "job", Map.of("nonce", "n")));
         assertFalse(gate.honours(ROOT, "job", Map.of("nonce", "forged")));
     }
+
+    @Test
+    void aThrowingVerifierIsLoggedByClassNeverByMessage() {
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ApprovalFingerprint.class);
+        var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            var gate = new ApprovalFingerprint.Gate<ApprovalFingerprint.Verifier>();
+            gate.install((r, j, rec) -> { throw new IllegalStateException("SECRET-MSISDN-0712345678"); });
+            assertFalse(gate.honours(ROOT, "job", Map.of("nonce", "n")));
+            assertEquals(1, appender.list.size());
+            var e = appender.list.get(0);
+            assertEquals(ch.qos.logback.classic.Level.WARN, e.getLevel());
+            assertTrue(e.getFormattedMessage().contains("java.lang.IllegalStateException"), e.getFormattedMessage());
+            assertFalse(e.getFormattedMessage().contains("SECRET-MSISDN"), "the exception message is never logged");
+            assertNull(e.getThrowableProxy(), "no stack trace either: it carries the message");
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
+    /** The Gate screens only "no verifier" and "no record"; a blank nonce or pending change is the TYPE's verifier's call. */
+    @Test
+    void aBlankOrMissingNonceOrPendingChangeStillReachesTheVerifier() {
+        var gate = new ApprovalFingerprint.Gate<ApprovalFingerprint.Verifier>();
+        AtomicInteger asked = new AtomicInteger();
+        gate.install((r, j, rec) -> { asked.incrementAndGet(); return false; });
+        Map<String, Object> blank = new LinkedHashMap<>();
+        blank.put("nonce", "");
+        blank.put("pendingChange", "  ");
+        assertFalse(gate.honours(ROOT, "job", blank), "the verifier's false is honoured");
+        assertFalse(gate.honours(ROOT, "job", Map.of()), "a record with neither field");
+        assertFalse(gate.honours(ROOT, "job", Map.of("nonce", "n")), "no pendingChange");
+        assertEquals(3, asked.get(), "the Gate asked the verifier every time; the verifier decides");
+        gate.install((r, j, rec) -> true);
+        assertTrue(gate.honours(ROOT, "job", Map.of()), "and a verifier that says yes is not second-guessed");
+    }
 }
