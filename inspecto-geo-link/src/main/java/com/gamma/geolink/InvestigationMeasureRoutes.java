@@ -63,7 +63,7 @@ public final class InvestigationMeasureRoutes implements RouteModule {
 
     /** {@code GET …/measures} — gates: {@link InvestigationRoutes#open} (503 · 422 · 403 · 404) → a bad measure 422. */
     private Object measures(ApiContext api, HttpExchange ex, String id) throws IOException {
-        InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
+        InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, id);
         String relation = ApiContext.query(ex, "relation");
         String measure = ApiContext.query(ex, "measure");
         boolean[] cached = {false};

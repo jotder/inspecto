@@ -118,8 +118,8 @@ public interface ObjectAccess {
 
     /**
      * A flat view of one object for core's visibility gate: {@code kind} (the lower-cased object type),
-     * {@code id}, {@code correlationId}, {@code owner}, {@code assignee} and {@code attributes}. Empty
-     * when no such object exists.
+     * {@code id}, {@code correlationId}, {@code owner}, {@code assignee}, {@code attributes} and {@code closed}
+     * (whether it sits in a terminal state — LA-24 ends Case-team sharing there). Empty when no such object exists.
      *
      * <p>⚠ {@code kind} is in here because the SEC-7d row-scope check needs the object's type, and core
      * performs that check itself — see this interface's note on why the decision does not cross the

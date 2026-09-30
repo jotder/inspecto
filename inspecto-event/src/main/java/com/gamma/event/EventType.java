@@ -228,6 +228,13 @@ public final class EventType {
      *  /inv/investigations/{id}/alert-rules}, LA-23) by the Investigation's owner. {@code rule},
      *  {@code investigationId}, {@code relation}, {@code measure}, {@code threshold}. */
     public static final String LINK_INVESTIGATION_ALERT_RULE_BOUND = "LINK_INVESTIGATION_ALERT_RULE_BOUND";
+    /** An Investigation was linked to a Case ({@code PUT /inv/investigations/{id}/case}, or {@code caseRef} at create,
+     *  LA-24) by its owner. {@code investigationId}, {@code caseId} and {@code verified} (false when Case management
+     *  is not installed, so the Case could not be checked and the link grants nothing). */
+    public static final String LINK_INVESTIGATION_CASE_LINKED = "LINK_INVESTIGATION_CASE_LINKED";
+    /** An Investigation's Case link was removed ({@code DELETE /inv/investigations/{id}/case}, LA-24) by its owner.
+     *  {@code investigationId} and the former {@code caseId}. */
+    public static final String LINK_INVESTIGATION_CASE_UNLINKED = "LINK_INVESTIGATION_CASE_UNLINKED";
     /** Masked entity ids of an Investigation were revealed ({@code POST /inv/investigations/{id}/reveal}, LA-19 /
      *  D-U6) — per entity, by a holder of {@code canRevealLinkEntities}. {@code investigationId}, {@code tokens}
      *  (the pseudonyms revealed — never the raw values, so the trail does not re-leak them) and {@code count}. */

@@ -651,6 +651,19 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   Working Sets live in the snapshot store (D-E2, `audit/snapshots/investigations/<id>/`). Access is
   **owner-only** (a non-owner reads 404), writes need `canManageIncidents`, and a bound Dataset shared away
   from the caller makes the Investigation read as absent.
+* **Case-team sharing** (LA-24, decision D-U10, shipped 2026-09-30; `InvestigationCaseRoutes`). An
+  Investigation may carry an OPTIONAL `caseRef` — `caseRef` on create, `PUT`/`DELETE /inv/investigations/{id}/case`
+  (owner-only, `canManageIncidents`; linking also needs a Case the caller can see, and refuses a closed one 409).
+  It lives in `case-link.json`, OUTSIDE the sealed header, so it moves neither the header nor the Dossier manifest.
+  The linked Case's owner or assignee gets **READ-ONLY** access — log, Working Set, Dossier (+ verify), measures,
+  `GET …/case` (`access: case-member`, `readOnly: true`) — decided live on every read through
+  `InvestigationRoutes.openForRead`; every write stays on the owner-only `open`, and a non-member still reads 404.
+  ⛔ Membership is a separate explicit grant, **not a policy ALLOW**: the R3 Dataset check and the Enterprise PDP
+  still run after it and can only narrow (a DENY hides it from members too). ⛔ **Independence:** geo-link names
+  no `inspecto-ops` type — it reads the Case through core's `ObjectAccess.summary` (owner, assignee, `closed`),
+  empty without the module; then the link is stored `verified:false`, grants nothing, and `GET …/case` says why.
+  Fail closed (for operator review): a closed/deleted Case or a member who leaves ends access; a fork or template
+  instance does not inherit the link.
 * **An `expand` is one hop-ladder rung, and a `window` op sets the time window** (LA-13, backend shipped
   2026-09-23; `InvestigationRoutes`, `InvestigationTime`). Rung fields: `direction` (either · out · in ·
   reciprocal) · `linkKinds` · `window` (`inherit` — the default — · `full` · an override) · `minEvents` ·

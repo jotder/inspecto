@@ -85,6 +85,9 @@
                     }
                 </div>
             }
+            <inspecto-link-analysis-investigation-case
+                [investigationId]="h.id"
+            ></inspecto-link-analysis-investigation-case>
         } @else if (!store.busy()) {
             <button mat-stroked-button (click)="store.forget(store.activeId()!)">Forget this Investigation</button>
         }

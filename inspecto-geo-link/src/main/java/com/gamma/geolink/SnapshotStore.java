@@ -342,6 +342,31 @@ final class SnapshotStore {
         return out;
     }
 
+    // ── Case link (LA-24) — the OPTIONAL Investigation ↔ Case relationship, OUTSIDE the sealed header ─────────
+    //   investigations/<id>/case-link.json   {caseRef, linkedBy, linkedAt}. A relationship, not evidence: set at
+    // create or later, removable, so rewritten atomically (like the Alert Rule binding) and never hashed into the
+    // header or the Dossier manifest.
+
+    /** Write (or replace) the Investigation's Case link. */
+    void writeCaseLink(String investigationId, String json) throws IOException {
+        Path d = investigationDir(investigationId);
+        Path tmp = Files.createTempFile(d, ".case-", ".tmp");
+        Files.writeString(tmp, json, StandardCharsets.UTF_8);
+        Files.move(tmp, d.resolve("case-link.json"), java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    /** The Investigation's Case link, raw, or null when it has none. */
+    String readCaseLink(String investigationId) throws IOException {
+        Path f = investigationDir(investigationId).resolve("case-link.json");
+        return Files.isRegularFile(f) ? Files.readString(f, StandardCharsets.UTF_8) : null;
+    }
+
+    /** Remove the Investigation's Case link; false when it had none. */
+    boolean deleteCaseLink(String investigationId) throws IOException {
+        return Files.deleteIfExists(investigationDir(investigationId).resolve("case-link.json"));
+    }
+
     private static void deleteTree(Path p) throws IOException {
         try (var s = Files.walk(p)) {
             for (Path q : s.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(q);

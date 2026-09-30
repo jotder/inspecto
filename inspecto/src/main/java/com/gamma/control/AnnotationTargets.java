@@ -98,9 +98,10 @@ public final class AnnotationTargets {
         return corr == null ? "" : String.valueOf(corr);
     }
 
-    /** {@code caseType} scoping + the row-scope policy check, over {@link com.gamma.objects.ObjectAccess#summary}'s map. */
+    /** {@code caseType} scoping + the row-scope policy check, over {@link com.gamma.objects.ObjectAccess#summary}'s map.
+     *  Public for LA-24 (inspecto-geo-link), which decides whether a Case is visible to the caller the same way. */
     @SuppressWarnings("unchecked")
-    static boolean objectVisibleTo(HttpExchange ex, Map<String, Object> o) {
+    public static boolean objectVisibleTo(HttpExchange ex, Map<String, Object> o) {
         Map<String, String> attrs = (Map<String, String>) o.getOrDefault("attributes", Map.of());
         Subject s = ApiContext.subject(ex).orElse(null);
         if (s != null && s.scoped()) {

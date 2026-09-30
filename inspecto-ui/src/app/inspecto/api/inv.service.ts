@@ -503,6 +503,22 @@ export interface InvestigationCoverage {
     collectors: { assessed: false; note: string };
 }
 
+// ── LA-24: the optional Case link (`InvestigationCaseRoutes`) ─────────────────────────────────────────
+
+/** `GET|PUT|DELETE /inv/investigations/{id}/case` — the link, and what it grants the caller. */
+export interface InvestigationCaseLink {
+    investigationId: string;
+    caseRef: string | null;
+    linkedBy: string | null;
+    linkedAt: string | null;
+    /** `case-member` = reading someone else's Investigation as a member of its linked Case. */
+    access: 'owner' | 'case-member';
+    readOnly: boolean;
+    /** Whether the link grants the Case's members anything right now (false without Case management). */
+    sharing: boolean;
+    reason: string;
+}
+
 // ── LA-12: the Dossier (`DossierRoutes`) ──────────────────────────────────────────────────────────────
 
 export interface DossierQuery {
@@ -941,6 +957,21 @@ export class InvService {
         return this.http.get<InvestigationCoverage>(invPath(id, 'coverage'), {
             params: toParams({ from: w.from, to: w.to, timezone: w.timezone }),
         });
+    }
+
+    /** LA-24: the Investigation's Case link. The owner, or a member of the linked Case (read-only). */
+    investigationCase(id: string): Observable<InvestigationCaseLink> {
+        return this.http.get<InvestigationCaseLink>(invPath(id, 'case'));
+    }
+
+    /** LA-24: link to a Case the caller can see — owner-only (`canManageIncidents`). */
+    linkInvestigationCase(id: string, caseRef: string): Observable<InvestigationCaseLink> {
+        return this.http.put<InvestigationCaseLink>(invPath(id, 'case'), { caseRef });
+    }
+
+    /** LA-24: remove the Case link — owner-only. */
+    unlinkInvestigationCase(id: string): Observable<InvestigationCaseLink> {
+        return this.http.delete<InvestigationCaseLink>(invPath(id, 'case'));
     }
 
     /** LA-12: the dossier as JSON (all three renderings included). Owner-only; audited server-side. */

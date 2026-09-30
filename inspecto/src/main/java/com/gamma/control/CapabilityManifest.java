@@ -43,6 +43,8 @@ final class CapabilityManifest {
             // InvestigationMeasureRoutes (LA-23) — binding an Alert Rule arms it, so it is alert authoring, as
             // POST /alerts/rules is; the Investigation's owner-only / PDP gate applies on top.
             new Entry("POST", "/inv/investigations/([^/]+)/alert-rules", Roles.CAN_AUTHOR_ALERT_RULES),
+            new Entry("PUT", "/inv/investigations/([^/]+)/case", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("DELETE", "/inv/investigations/([^/]+)/case", Roles.CAN_MANAGE_INCIDENTS),
             // EntityListRoutes (LA-17) — an Entity List is appended to the Space's identity fact log, evidence
             // like the op log, so changing one is Case work. The two GETs are reads (Space access only).
             new Entry("POST", "/inv/entity-lists", Roles.CAN_MANAGE_INCIDENTS),

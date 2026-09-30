@@ -206,6 +206,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/investigation-templates/([^/]+)/instantiate` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationTemplateRoutes.java:90` |
 | POST | `/inv/investigations` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:136` |
 | POST | `/inv/investigations/([^/]+)/alert-rules` | gated | `canAuthorAlertRules` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java:60` |
+| DELETE | `/inv/investigations/([^/]+)/case` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationCaseRoutes.java:59` |
+| PUT | `/inv/investigations/([^/]+)/case` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationCaseRoutes.java:57` |
 | POST | `/inv/investigations/([^/]+)/dossier/verify` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/DossierRoutes.java:64` |
 | POST | `/inv/investigations/([^/]+)/ops` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:138` |
 | POST | `/inv/investigations/([^/]+)/pending/([^/]+)/approve` | gated | `canApproveLinkExpansions` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:148` |

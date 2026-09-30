@@ -143,6 +143,7 @@ public final class ObjectServiceAccess implements ObjectAccess {
         m.put("owner", o.owner());
         m.put("assignee", o.assignee());
         m.put("attributes", o.attributes());
+        m.put("closed", o.closedAt() > 0);   // LA-24: a closed Case shares nothing (fail closed)
         return m;
     }
 

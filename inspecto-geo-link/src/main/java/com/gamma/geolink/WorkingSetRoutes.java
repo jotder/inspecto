@@ -100,7 +100,7 @@ public final class WorkingSetRoutes implements RouteModule {
     }
 
     private Object workingSet(ApiContext api, HttpExchange ex, String id) throws IOException {
-        InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);   // 503 · 422 · 403 · 404 owner/R3/PDP
+        InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, id);   // 503 · 422 · 403 · 404 owner-or-Case-member/R3/PDP
 
         String of = ApiContext.query(ex, "of");
         if (of == null || of.isBlank()) of = "entities";

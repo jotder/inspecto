@@ -187,6 +187,8 @@ public final class InvestigationRoutes implements RouteModule {
             if (col != null && columns.stream().noneMatch(col::equalsIgnoreCase))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + dataset + "'");
         String timeColZone = timeColZone(dataset, relationSql, timeCol, ApiContext.str(body, "timeColZone"));
+        // LA-24: an optional Case link, checked BEFORE anything is written; stored outside the sealed header.
+        Map<String, Object> caseLink = InvestigationCaseRoutes.linkRecord(api, ex, ApiContext.str(body, "caseRef"));
 
         SnapshotStore store = new SnapshotStore(writeRoot);
         jail(store, id);
@@ -211,6 +213,7 @@ public final class InvestigationRoutes implements RouteModule {
             if (!store.createInvestigation(id, canonical(header)))
                 throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
         }
+        if (caseLink != null) InvestigationCaseRoutes.write(ex, store, id, caseLink);
         emit(ex, EventType.LINK_INVESTIGATION_CREATED, "link.investigation.created",
                 "link.investigation.created — " + id + " over " + dataset,
                 b -> b.attr("investigationId", id).attr("dataset", dataset));
@@ -549,7 +552,7 @@ public final class InvestigationRoutes implements RouteModule {
 
     /** {@code GET /inv/investigations/{id}/log?limit=n} — bounded; the TRUE total ships beside it. */
     private Object log(ApiContext api, HttpExchange ex, String id) throws IOException {
-        Inv inv = open(api, ex, id);
+        Inv inv = openForRead(api, ex, id);
         int limit = LOG_DEFAULT;
         String raw = ApiContext.query(ex, "limit");
         if (raw != null && !raw.isBlank()) {
@@ -1429,6 +1432,21 @@ public final class InvestigationRoutes implements RouteModule {
      * and the Enterprise PDP judge the approver exactly as they would the owner.
      */
     private static Inv open(ApiContext api, HttpExchange ex, String id, boolean ownerOnly) throws IOException {
+        return open(api, ex, id, ownerOnly, false);
+    }
+
+    /**
+     * LA-24: the READ gate — the owner, OR a member of the Investigation's linked Case
+     * ({@link InvestigationCaseRoutes#grants}, decided live on every read). Only the read routes (log, Working Set,
+     * Dossier, measures, the Case link itself) open through this; every write stays on {@link #open}, owner-only.
+     * R3 and the Enterprise PDP below still judge a member, so they can only narrow the grant.
+     */
+    static Inv openForRead(ApiContext api, HttpExchange ex, String id) throws IOException {
+        return open(api, ex, id, true, true);
+    }
+
+    private static Inv open(ApiContext api, HttpExchange ex, String id, boolean ownerOnly, boolean caseRead)
+            throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis investigation");
         requireSafeId(id);
         SnapshotStore store = new SnapshotStore(writeRoot);
@@ -1437,7 +1455,8 @@ public final class InvestigationRoutes implements RouteModule {
         if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
         @SuppressWarnings("unchecked") Map<String, Object> header = ApiContext.JSON.readValue(raw, Map.class);
         Optional<Subject> subject = ApiContext.subject(ex);
-        if (ownerOnly && subject.isPresent() && !subject.get().id().equals(header.get("owner")))
+        if (ownerOnly && subject.isPresent() && !subject.get().id().equals(header.get("owner"))
+                && !(caseRead && InvestigationCaseRoutes.grants(api, ex, store, id, subject.get())))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
         String dataset = String.valueOf(header.get("dataset"));
         Optional<Map<String, Object>> ds = new ComponentStore(writeRoot.resolve("registry")).get("dataset", dataset)

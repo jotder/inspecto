@@ -206,7 +206,7 @@ public final class DossierRoutes implements RouteModule {
     /** Through the ONE Investigation gate ({@link InvestigationRoutes#open}: 503 → 422 unsafe id → 403 → 404 absent,
      *  not the owner, R3 or an Enterprise policy DENY), keeping the header's raw bytes for the manifest. */
     private static Opened open(ApiContext api, HttpExchange ex, String id) throws IOException {
-        InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
+        InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, id);
         String raw = inv.store().readInvestigation(id);
         if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
         return new Opened(inv, inv.store(), inv.writeRoot(), id, raw);
