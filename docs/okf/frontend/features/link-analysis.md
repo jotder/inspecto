@@ -396,7 +396,7 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   (`inspecto-geo-link` `ValueMeasures`) answers the entities breaching a named Measure's visible thresholds —
   `passThrough` (retention as a derived column), `velocity`, `timeToCashOut`, `cashOutConcentration`,
   `structuring`, `benefitTransfer`, plus the non-alertable `valueWeightedLinks` — in a `[from, to)` window of at
-  most 31 days. No view filter is accepted, so a `≥ 5 000` view cannot hide structuring. An Alert Rule binds one
+  most 31 days (a `from`/`to` with `Z` or an offset is normalised to UTC). No view filter is accepted, so a `≥ 5 000` view cannot hide structuring. An Alert Rule binds one
   through `POST /inv/investigations/{id}/alert-rules` with `valueMeasure:{…}` and fires when at least one entity
   breaches (one Alert per rule). Definitions, defaults and deviations: plan §2.6.1. **SPA** (2026-09-30): the
   Investigation side pane's *Value Measures* panel (`link-analysis-value-measures.component`, `value-measures.ts`)

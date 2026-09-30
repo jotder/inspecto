@@ -1138,17 +1138,28 @@ entities) and exclude, replay `equivalent:true`; value Measures on the planted s
 TILL-06 cash-out concentration, SKIMMER-01 benefit-transfer at ≥ 5), the 31-day cap, a firing count-over-threshold
 Alert Rule; LA-24 member read-only / writes 404 / stranger 404 / access ends on unlink and on Case close; settings.
 
-**Open, found live (not yet fixed):**
-* 🔴 **A merged exclude can over-claim.** With a Dataset whose columns carry no Entity Type, expanded entities
-  never join their identity group; `exclude {merged:true}` then removes only the named id while its log line says
-  every member left (member `ACC-1106` stayed in the Working Set). Fix: match untyped members, or refuse/warn.
-* Demo data: `spaces/demo/config/registry/datasets/mule_transfers_dataset.toon` has no `columns:` classification
-  (`PAYER_ACCOUNT`/`PAYEE_ACCOUNT` → `ACCOUNT`), so merged traversal only sees seeded typed ids; and the demo Space
-  has no mapping Dataset for identity import.
-* Small: `/inv/value-measures` refuses a `from` with `Z`/offset; `/cases/from-entities` leaves the Case `owner`
-  null (nobody is a member until assigned); import drops a NULL row without counting it in `empty`; `GET …/case`
-  still says `sharing:true` after the Case closes; the alert text "over the whole Dataset, the last 31d" reads as a
-  contradiction; no `GET /inv/investigations` list route (405); one unexplained 401 + 503 in the SPA console.
+**Found live — fixed 2026-09-30 (`a8ac53a00`) unless marked open:**
+* ✅ **FIXED — a merged exclude over-claimed.** With a Dataset whose columns carry no Entity Type, expanded entities
+  never joined their identity group; `exclude {merged:true}` removed only the named id while its log line said every
+  member left (member `ACC-1106` stayed). Now an UNTYPED admitted entity (no own type, no typed bound column) matches
+  a group by the member keys its raw id makes under the SEALED member normalisers — the rule that already blocked it
+  from re-admission and widens a merged expand — matched on the state before anything leaves; a typed entity still
+  matches only by its typed keys. The line lists exactly what left, what `keep` protected and which member keys no
+  entity carried ("not removed, only blocked"); the Dossier lists every id it removed. Pinned by
+  `ControlApiInvestigationMergedTraversalTest` (untyped member leaves + line; twin: an unmatched member is named),
+  mutation-checked (dropping the untyped match turns the first red). ⚠ The display-only resolution VIEW (`resolvedTo`,
+  merged nodes) still types by own type / typed column only — widening it would change every sealed resolve's hash;
+  operator question in the report.
+* ✅ **FIXED — demo data.** `mule_transfers_dataset.toon` classifies `PAYER_ACCOUNT`/`PAYEE_ACCOUNT` as `ACCOUNT`; the
+  demo Space ships `account_links_dataset` (Pipeline `account_links`, 5 synthetic rows, story (h) in
+  `gen-link-analysis-demos.py`, one spelled `acc-1121 `, one blank) for identity import (`aCol ACCOUNT_A`, `bCol ACCOUNT_B`).
+* ✅ **FIXED — small:** `/inv/value-measures` normalises a `from`/`to` with `Z` or an offset to UTC (`ValueMeasuresTest`,
+  `ControlApiValueMeasureTest`); `/cases/from-entities` makes the creating Subject the Case `owner`
+  (`ControlApiCaseFromEntitiesTest`, `ObjectServiceEntityCaseTest`); import reads a NULL row and counts it under
+  `skipped.empty`, so `rowsRead` accounts for every row (`ControlApiEntityIdentityImportTest`); `GET …/case` says
+  `sharing:false` with the reason once the Case is closed or gone (`ControlApiInvestigationCaseShareTest`); the alert
+  text reads "over the whole Dataset, window: last 24h, UTC" (`Alert.java`).
+* Open: no `GET /inv/investigations` list route (405); one unexplained 401 + 503 in the SPA console.
 
 ## 6. Acceptance gates — falsifiable, house style
 

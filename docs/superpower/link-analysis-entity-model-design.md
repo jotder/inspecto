@@ -441,6 +441,11 @@ append time and replay never re-reads the list:
     and the members are remembered (`excludedGroups` in the Working Set, hashed only when present), so a later expand
     never admits a raw id keying to one. The log shows ONE line for the group, listing its members — masked per
     member key (D-U6), as the line is free text over the masking universe.
+    ✅ **Honest outcome (live check, `a8ac53a00`):** an UNTYPED admitted entity (no own type, no typed bound column)
+    is a member when its raw id keys to one under a member type's SEALED normaliser — the same rule the block and the
+    merged expand apply; matching runs on the state before anything leaves. The line states what actually happened
+    (`State.lastMerged`): the entities that left, the members `keep` protected, and the member keys no entity carried
+    ("not removed, only blocked") — never "every member left".
   - **Readers**: `?at` / replay / Dossier read the sealed rung and groups; measures (`entities`, `identities`) count
     the admitted members as usual; coverage reads only the window. **Fork** re-reads a merged expand against the new
     order (a merged expand re-ordered before its resolve is a 422) and re-seals a merged exclude's groups against the
