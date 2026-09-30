@@ -8,7 +8,7 @@ timestamp: 2026-09-26T00:00:00Z
 
 # Assurance capability plan — build the product before the project
 
-> **Status: ACTIVE — waves 1–3 SHIPPED 2026-09-27 (`origin/master` `d5bf89ad1`) except 2.2 ⏸ (Link Analysis leads the Entity List); wave 4 SHIPPED 2026-09-29/30 (all six items, `origin/master` `2844ba34a`); wave 5 not started. Decisions D-P1 … D-P14 answered (§5).**
+> **Status: ACTIVE — waves 1–3 SHIPPED 2026-09-27 (`origin/master` `d5bf89ad1`) except 2.2 ⏸ (Link Analysis leads the Entity List); wave 4 SHIPPED 2026-09-29/30 (all six items, `origin/master` `2844ba34a`); wave 5 STARTED 2026-09-30. Decisions D-P1 … D-P14 answered (§5).**
 > **Why this exists.** An assurance bid was planned workstream by workstream (`WS-01 … WS-46`) in a
 > local, git-excluded working set (`superpower/rfp-mvno-assurance/build-plan.md`, listed in
 > [`../INDEX.md`](../INDEX.md)). That project is **not confirmed**. The operator's call (2026-09-26):
@@ -108,6 +108,8 @@ Order inside the wave is free; these are independent.
 | 4.6 | ✅ **SHIPPED 2026-09-29** (`ASSURE-INTELLIGENCE-BUNDLE-1`; residuals `ASSIST-MODEL-EGRESS-1`, `NATIVE-LICENCE-TEXTS-1`) — **WS-32 Bundle the intelligence module** | 1–2 | needs D-P2 |
 
 ### Wave 5 — content on the platform (Space Templates) · ≈ 33–51 eng-wk
+
+*Started 2026-09-30; on the board as `ASSURE-PACK-TELCO-FRAUD-1`, `ASSURE-PACK-TELCO-RA-1`, `ASSURE-PACK-PAYMENT-FRAUD-1`, `ASSURE-PACK-BUSINESS-ASSURANCE-1` (P2).*
 
 Content is what a buyer sees. It comes last because it stands on waves 1–3. Each pack ships as a Space
 Template (`spaces/_templates/<id>/`) with a **synthetic golden corpus** (planted cases + planted

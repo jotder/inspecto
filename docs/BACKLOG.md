@@ -13,11 +13,12 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **56<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
+> **60<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 24<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
 > ⬇ **56 on 2026-09-30**: closed P3 `ERRORCODE-DEFAULTED-1` (`2f6d5e52a`) — the last 15 bare `ApiException` sites (all 422s in `inspecto-geo-link`: `AdmiraltyGrade` 1 · `InvestigationCoverageRoutes` 4 · `PatternRoutes` 5 · `WorkingSetRoutes` 5) now pass `CONFIG_VALIDATION_FAILED`, the status default, so no wire change; 0 of 1155 sites take `defaultFor` (the derive's 4 remaining lines pass computed codes). Truth in `okf/capabilities/control-api/control-api.md`.
 > ⬆ **52 → 53 on 2026-09-29**: filed P3 `TEMPLATE-RECOVERY-IMPORT-GATE-1` (the zero-Space recovery create skips the import gate) from the `publish.postgres` review.
 > ⬆ **50 → 51 on 2026-09-29**: filed P3 `ASSURE-CLASSIFICATION-PROPAGATION-1` (carry column classification through lineage) from the `publish.postgres` security review.
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ⬆ **56 → 60 on 2026-09-30**: filed assurance wave 5 — P2 `ASSURE-PACK-TELCO-FRAUD-1`, `ASSURE-PACK-TELCO-RA-1`, `ASSURE-PACK-PAYMENT-FRAUD-1`, `ASSURE-PACK-BUSINESS-ASSURANCE-1`.
 > ↔ **57 on 2026-09-30**: closed P2 `ASSURE-XLSX-ATTACHMENTS-1` — `ReportJob` renders `format: xlsx` through the staged DuckDB `excel` extension (sealed connection, formula neutraliser shared with CSV); mail carries size-capped attachments only from the Job's own Run Artifact, to an admin-set recipient-domain allowlist, and an attaching Job needs four-eyes approval pinned to a content fingerprint (template-expanded Job + resolved Dataset relation) bound by nonce to the MAC'd Pending Change and re-checked every run. Five adversarial rounds; residual `SCHEDULE-EXPORT-DIALOG-DEAD-1` (P3) stays open; filed P2 `APPROVAL-FINGERPRINT-UNIFY-1` (net ↔).
 > ⬇ **56 on 2026-09-29**: closed P2 `ASSURE-INTELLIGENCE-BUNDLE-1` — the intelligence module ships in Enterprise via `OptionalSpi` (a Java-floor mismatch skips it) and now starts at boot; per-tool capability enforced inside our own tools on the session path, sessions bound to their owner, the kill switch halts the act tier, and model endpoints need an admin-set `models` allowlist in `egress.toon` with a pinned connect. Three adversarial rounds; residuals `ASSIST-MODEL-EGRESS-1` (P2) and `NATIVE-LICENCE-TEXTS-1` (P3) stay open.
 > ⬇ **53 on 2026-09-29**: closed P2 `ASSURE-BI-PUBLICATION-1` — the `publish.postgres` Job (a Job, not a Step) writes curated Datasets full-refresh or partition-incremental to an allowlisted JDBC destination with Catalog column comments, verify-full TLS on a pinned connect; four-eyes approval pins a content fingerprint (Datasets incl. inherited classification) bound by nonce to the MAC'd Pending Change and re-checked at run time. Five adversarial rounds; residuals filed as P3.
@@ -88,9 +89,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 24<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 56<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 60<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -259,6 +260,11 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 - **P3** · **D-11 hand-authored `relations` component** — deferred until a business relation exists that no Pipeline exercises; ⬜ re-confirmed not fired 2026-09-15. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §3.4
 
 ### 3.5 Data quality, Observability, Signals & Alerting
+
+- **P2** · `ASSURE-PACK-TELCO-FRAUD-1` — **telecom fraud content pack (WS-15 generic half, wave 5.1 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** A Space Template under `spaces/_templates/` for the top ten typologies (IRSF, Wangiri, SIM-box, premium-rate, roaming high usage, SIM-swap, subscription / identity, dealer activations, voucher / EVD, payment reversal): windows in `sql.template`, per-entity Alert Rules keyed on the offender, a synthetic golden corpus with planted cases and planted look-alikes, a golden test counting detections and false positives, dashboards, KPI definitions, runbooks; thresholds are configuration.
+- **P2** · `ASSURE-PACK-TELCO-RA-1` — **telecom revenue-assurance content pack (WS-16 generic half, wave 5.2 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** Reconciliation, re-rating, roll-forward and settlement controls on canonical synthetic schemas as a Space Template with a golden corpus and golden test; vendor feed mapping stays parked (plan §4).
+- **P2** · `ASSURE-PACK-PAYMENT-FRAUD-1` — **payment fraud content pack (WS-40…44 generic half, wave 5.3 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** Synthetic attempt / dispute / SIM-change corpus with a fail-closed card-number tripwire, feature Datasets via `sql.template`, payment typologies, a payment Risk Score with a default factor table as configuration, disputes, labels with a maturity flag and payment KPIs — as a Space Template with a golden test.
+- **P2** · `ASSURE-PACK-BUSINESS-ASSURANCE-1` — **business assurance content pack (WS-28 generic half, wave 5.4 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** A seasonal forecast (Holt-Winters in SQL) as a Measure function and a margin model by product / channel / partner, as a Space Template with a golden test.
 
 #### Alerting & freshness
 
