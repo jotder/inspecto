@@ -1,0 +1,8 @@
+name: premium_rate_exposure
+title: Premium-rate exposure
+dataset: fraud_premium_rate
+measure: sum(premium_charge)
+timeField: window_date
+grain: day
+comparison: previous
+direction: down

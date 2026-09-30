@@ -1,0 +1,5 @@
+vizType: kpi
+options:
+  title: Premium-rate exposure
+  kpi:
+    kpiId: premium_rate_exposure

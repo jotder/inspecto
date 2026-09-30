@@ -1,0 +1,35 @@
+name: subscriber_events
+active: true
+
+dirs:
+  poll:       data/inbox/subscriber_events
+  database:   data/subscriber_events/database
+  backup:     data/subscriber_events/backup
+  temp:       data/subscriber_events/temp
+  errors:     data/subscriber_events/errors
+  quarantine: data/subscriber_events/quarantine
+  markers:    data/subscriber_events/markers
+  status_dir: data/subscriber_events/status
+  log_dir:    data/subscriber_events/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 2
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: subscriber_events_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  gap_detection:
+    enabled: true
+    sequence: "SUBSCRIBER_EVENTS_{yyyyMMdd}"

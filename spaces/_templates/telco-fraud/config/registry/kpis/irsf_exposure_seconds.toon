@@ -1,0 +1,8 @@
+name: irsf_exposure_seconds
+title: IRSF exposure (s)
+dataset: fraud_irsf
+measure: sum(irsf_seconds)
+timeField: window_date
+grain: day
+comparison: previous
+direction: down

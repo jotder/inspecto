@@ -1,0 +1,8 @@
+name: roaming_exposure
+title: Roaming charge
+dataset: fraud_roaming
+measure: sum(roaming_charge)
+timeField: window_date
+grain: day
+comparison: previous
+direction: down

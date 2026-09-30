@@ -1,0 +1,9 @@
+name: fraud_roaming
+dataset: fraud_roaming
+measure: sum(roaming_charge)
+by[1]: msisdn
+comparator: gt
+threshold: 500
+stormCap: 50
+severity: WARNING
+description: "Roaming high usage"

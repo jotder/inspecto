@@ -1,0 +1,35 @@
+name: cdr
+active: true
+
+dirs:
+  poll:       data/inbox/cdr
+  database:   data/cdr/database
+  backup:     data/cdr/backup
+  temp:       data/cdr/temp
+  errors:     data/cdr/errors
+  quarantine: data/cdr/quarantine
+  markers:    data/cdr/markers
+  status_dir: data/cdr/status
+  log_dir:    data/cdr/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 2
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: cdr_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  gap_detection:
+    enabled: true
+    sequence: "CDR_{yyyyMMdd}"

@@ -1,0 +1,11 @@
+job:
+  name: fraud_simbox
+  type: sql.template
+  description: "SIM-box - distinct voice targets of a line that never receives a call, never sends SMS and never moves"
+  sql: "WITH w AS (SELECT * FROM cdr WHERE start_ts >= CAST($window_start AS TIMESTAMP) AND start_ts < CAST($window_end AS TIMESTAMP)), mo AS (SELECT a_number AS msisdn, count(DISTINCT b_number) FILTER (WHERE service = 'VOICE') AS voice_targets, count(*) FILTER (WHERE service = 'SMS') AS sms_sent, count(DISTINCT cell_id) AS cells FROM w WHERE direction = 'MO' GROUP BY a_number), mt AS (SELECT b_number AS msisdn, count(*) AS calls_received FROM w WHERE direction = 'MT' GROUP BY b_number) SELECT mo.msisdn, CAST($window_start AS DATE) AS window_date, voice_targets, sms_sent, cells, coalesce(mt.calls_received, 0) AS calls_received, CASE WHEN coalesce(mt.calls_received, 0) = 0 AND sms_sent = 0 AND cells <= CAST($max_cells AS INTEGER) THEN voice_targets ELSE 0 END AS simbox_targets FROM mo LEFT JOIN mt ON mt.msisdn = mo.msisdn"
+  sources: cdr
+  sink_dataset: fraud_simbox
+  window_start: "2026-07-01 00:00:00"
+  window_end: "2026-07-02 00:00:00"
+  max_cells: "1"
+  enabled: true

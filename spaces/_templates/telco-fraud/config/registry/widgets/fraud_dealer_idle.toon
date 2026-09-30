@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: fraud_dealer
+controls:
+  x[1]{field}:
+    dealer_id
+  y[1]{field,agg}:
+    idle_activations,sum
+options:
+  title: Idle activations by dealer

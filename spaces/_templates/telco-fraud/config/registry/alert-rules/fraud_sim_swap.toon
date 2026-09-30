@@ -1,0 +1,9 @@
+name: fraud_sim_swap
+dataset: fraud_sim_swap
+measure: sum(post_swap_payments)
+by[1]: msisdn
+comparator: gt
+threshold: 200
+stormCap: 50
+severity: CRITICAL
+description: "SIM-swap"

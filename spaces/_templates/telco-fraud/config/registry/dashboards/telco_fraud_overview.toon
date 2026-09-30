@@ -1,0 +1,10 @@
+name: telco_fraud_overview
+tiles[8]{widgetId,span}:
+  irsf_exposure_seconds_tile,1
+  premium_rate_exposure_tile,1
+  roaming_exposure_tile,1
+  reversed_amount_tile,1
+  fraud_irsf_by_caller,2
+  fraud_wangiri_by_caller,2
+  fraud_simbox_by_line,2
+  fraud_dealer_idle,2

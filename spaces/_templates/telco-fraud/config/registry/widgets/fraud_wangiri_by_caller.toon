@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: fraud_wangiri
+controls:
+  x[1]{field}:
+    caller
+  y[1]{field,agg}:
+    short_call_targets,sum
+options:
+  title: Wangiri targets by calling number

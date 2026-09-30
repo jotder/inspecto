@@ -1,0 +1,11 @@
+raw:
+  name: PAYMENTS
+  format: CSV
+  fields[7]{name,selector,type,description,unit,classification}:
+    txn_id,"0",VARCHAR,"Transaction identifier","","INTERNAL"
+    txn_ts,"1",TIMESTAMP,"Transaction time","","INTERNAL"
+    txn_type,"2",VARCHAR,"VOUCHER (EVD / voucher redemption), PAYMENT or REVERSAL","","INTERNAL"
+    msisdn,"3",VARCHAR,"Subscriber number","","CONFIDENTIAL"
+    amount,"4",DOUBLE,"Transaction amount","USD","INTERNAL"
+    voucher_serial,"5",VARCHAR,"Voucher serial (VOUCHER only)","","INTERNAL"
+    ref_txn_id,"6",VARCHAR,"The PAYMENT a REVERSAL reverses","","INTERNAL"

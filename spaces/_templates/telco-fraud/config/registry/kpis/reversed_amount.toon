@@ -1,0 +1,8 @@
+name: reversed_amount
+title: Reversed amount
+dataset: fraud_reversal
+measure: sum(reversed_amount)
+timeField: window_date
+grain: day
+comparison: previous
+direction: down

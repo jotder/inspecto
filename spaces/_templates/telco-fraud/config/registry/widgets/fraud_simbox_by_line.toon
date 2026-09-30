@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: fraud_simbox
+controls:
+  x[1]{field}:
+    msisdn
+  y[1]{field,agg}:
+    simbox_targets,sum
+options:
+  title: SIM-box targets by line

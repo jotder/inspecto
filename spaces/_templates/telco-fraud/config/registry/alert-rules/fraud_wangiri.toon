@@ -1,0 +1,9 @@
+name: fraud_wangiri
+dataset: fraud_wangiri
+measure: sum(short_call_targets)
+by[1]: caller
+comparator: gt
+threshold: 20
+stormCap: 50
+severity: WARNING
+description: "Wangiri"

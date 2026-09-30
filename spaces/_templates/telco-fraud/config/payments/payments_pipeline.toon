@@ -1,0 +1,35 @@
+name: payments
+active: true
+
+dirs:
+  poll:       data/inbox/payments
+  database:   data/payments/database
+  backup:     data/payments/backup
+  temp:       data/payments/temp
+  errors:     data/payments/errors
+  quarantine: data/payments/quarantine
+  markers:    data/payments/markers
+  status_dir: data/payments/status
+  log_dir:    data/payments/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 2
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: payments_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  gap_detection:
+    enabled: true
+    sequence: "PAYMENTS_{yyyyMMdd}"

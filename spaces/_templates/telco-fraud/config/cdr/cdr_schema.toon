@@ -1,0 +1,14 @@
+raw:
+  name: CDR
+  format: CSV
+  fields[10]{name,selector,type,description,unit,classification}:
+    record_id,"0",VARCHAR,"Call detail record identifier","","INTERNAL"
+    start_ts,"1",TIMESTAMP,"Call or SMS start time","","INTERNAL"
+    direction,"2",VARCHAR,"MO (originated by a_number) or MT (terminated on b_number)","","INTERNAL"
+    service,"3",VARCHAR,"VOICE or SMS","","INTERNAL"
+    a_number,"4",VARCHAR,"Calling number","","CONFIDENTIAL"
+    b_number,"5",VARCHAR,"Called number","","CONFIDENTIAL"
+    duration_s,"6",INTEGER,"Answered duration","s","INTERNAL"
+    charge,"7",DOUBLE,"Rated charge","USD","INTERNAL"
+    roaming,"8",VARCHAR,"Y when the a_number was roaming","","INTERNAL"
+    cell_id,"9",VARCHAR,"Serving cell","","CONFIDENTIAL"

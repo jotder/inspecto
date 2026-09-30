@@ -1,0 +1,11 @@
+job:
+  name: fraud_wangiri
+  type: sql.template
+  description: "Wangiri - distinct subscribers hit by very short terminated calls, per calling number"
+  sql: "SELECT a_number AS caller, CAST($window_start AS DATE) AS window_date, count(*) AS short_calls, count(DISTINCT b_number) AS short_call_targets FROM cdr WHERE direction = 'MT' AND service = 'VOICE' AND duration_s <= CAST($max_ring_seconds AS INTEGER) AND start_ts >= CAST($window_start AS TIMESTAMP) AND start_ts < CAST($window_end AS TIMESTAMP) GROUP BY a_number"
+  sources: cdr
+  sink_dataset: fraud_wangiri
+  window_start: "2026-07-01 00:00:00"
+  window_end: "2026-07-02 00:00:00"
+  max_ring_seconds: "3"
+  enabled: true

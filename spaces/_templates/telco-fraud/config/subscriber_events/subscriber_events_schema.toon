@@ -1,0 +1,10 @@
+raw:
+  name: SUBSCRIBER_EVENTS
+  format: CSV
+  fields[6]{name,selector,type,description,unit,classification}:
+    event_id,"0",VARCHAR,"Event identifier","","INTERNAL"
+    event_ts,"1",TIMESTAMP,"Event time","","INTERNAL"
+    event_type,"2",VARCHAR,"ACTIVATION or SIM_SWAP","","INTERNAL"
+    msisdn,"3",VARCHAR,"Subscriber number","","CONFIDENTIAL"
+    dealer_id,"4",VARCHAR,"Dealer that performed the activation","","INTERNAL"
+    id_doc,"5",VARCHAR,"Identity document presented","","CONFIDENTIAL"

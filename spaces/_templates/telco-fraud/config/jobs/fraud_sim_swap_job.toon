@@ -1,0 +1,11 @@
+job:
+  name: fraud_sim_swap
+  type: sql.template
+  description: "SIM-swap - payments out of a line within window_hours after its SIM swap"
+  sql: "SELECT s.msisdn, CAST($window_start AS DATE) AS window_date, count(p.txn_id) AS post_swap_payment_count, sum(p.amount) AS post_swap_payments FROM subscriber_events s JOIN payments p ON p.msisdn = s.msisdn AND p.txn_type = 'PAYMENT' AND p.txn_ts > s.event_ts AND p.txn_ts <= s.event_ts + to_hours(CAST($window_hours AS INTEGER)) WHERE s.event_type = 'SIM_SWAP' AND s.event_ts >= CAST($window_start AS TIMESTAMP) AND s.event_ts < CAST($window_end AS TIMESTAMP) GROUP BY s.msisdn"
+  sources: subscriber_events,payments
+  sink_dataset: fraud_sim_swap
+  window_start: "2026-07-01 00:00:00"
+  window_end: "2026-07-02 00:00:00"
+  window_hours: "24"
+  enabled: true

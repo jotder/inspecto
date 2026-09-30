@@ -1,0 +1,9 @@
+name: fraud_voucher
+dataset: fraud_voucher
+measure: sum(redemptions)
+by[1]: voucher_serial
+comparator: gt
+threshold: 1
+stormCap: 50
+severity: CRITICAL
+description: "Voucher / EVD"

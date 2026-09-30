@@ -1,0 +1,10 @@
+job:
+  name: fraud_voucher
+  type: sql.template
+  description: "Voucher / EVD - redemptions per voucher serial (a serial redeems once)"
+  sql: "SELECT voucher_serial, CAST($window_start AS DATE) AS window_date, count(*) AS redemptions, count(DISTINCT msisdn) AS redeemers FROM payments WHERE txn_type = 'VOUCHER' AND txn_ts >= CAST($window_start AS TIMESTAMP) AND txn_ts < CAST($window_end AS TIMESTAMP) GROUP BY voucher_serial"
+  sources: payments
+  sink_dataset: fraud_voucher
+  window_start: "2026-07-01 00:00:00"
+  window_end: "2026-07-02 00:00:00"
+  enabled: true

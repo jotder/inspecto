@@ -1,0 +1,11 @@
+job:
+  name: fraud_irsf
+  type: sql.template
+  description: "IRSF - seconds of originated voice to high-risk international ranges, per caller"
+  sql: "SELECT a_number AS msisdn, CAST($window_start AS DATE) AS window_date, count(*) AS irsf_calls, CAST(sum(duration_s) AS BIGINT) AS irsf_seconds FROM cdr WHERE direction = 'MO' AND service = 'VOICE' AND start_ts >= CAST($window_start AS TIMESTAMP) AND start_ts < CAST($window_end AS TIMESTAMP) AND list_contains(string_split($irsf_prefixes, ','), substr(b_number, 1, 3)) GROUP BY a_number"
+  sources: cdr
+  sink_dataset: fraud_irsf
+  window_start: "2026-07-01 00:00:00"
+  window_end: "2026-07-02 00:00:00"
+  irsf_prefixes: "881,882,883"
+  enabled: true
