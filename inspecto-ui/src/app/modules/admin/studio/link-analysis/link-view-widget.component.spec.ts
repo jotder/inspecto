@@ -7,7 +7,7 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ComponentsDataProvider } from 'app/modules/admin/catalog/components-data-provider';
 import { DatasetsService } from '../datasets/datasets.service';
 import { G6GraphData, SUPER_NODE_KIND } from 'app/inspecto/graph';
-import { nodeColor } from 'app/modules/admin/catalog/catalog-graph';
+import { nodeColor } from 'app/inspecto/graph/catalog-graph';
 import { LinkViewWidgetComponent } from './link-view-widget.component';
 import { legendItemsFor } from './link-analysis-overlays.component';
 

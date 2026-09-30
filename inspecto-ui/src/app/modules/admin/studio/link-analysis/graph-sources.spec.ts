@@ -3,7 +3,7 @@ import { of } from 'rxjs';
 import { MetadataEdge, MetadataNode, PipelineGraph, ProvenanceBatch, ProvenanceCount } from 'app/inspecto/api';
 import { Component } from 'app/inspecto/component-model';
 import { deriveComponentGraph } from 'app/inspecto/component-model';
-import { toG6Data } from 'app/modules/admin/catalog/catalog-graph';
+import { toG6Data } from 'app/inspecto/graph/catalog-graph';
 import { provenanceCounts, toPipelineG6Data } from 'app/modules/admin/pipelines/pipeline-graph';
 import { REGISTRY_KINDS } from 'app/modules/admin/catalog/registry.component';
 import { mergeGraphs } from 'app/inspecto/graph';

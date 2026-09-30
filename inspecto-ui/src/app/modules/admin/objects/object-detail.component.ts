@@ -41,8 +41,8 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { fmtDateTime } from 'app/inspecto/grid';
-import { G6GraphData } from 'app/modules/admin/catalog/catalog-graph';
-import { GraphViewComponent } from 'app/modules/admin/catalog/graph-view.component';
+import { G6GraphData } from 'app/inspecto/graph/catalog-graph';
+import { GraphViewComponent } from 'app/inspecto/graph/graph-view.component';
 import { ObjectLinkDialog } from './object-link.dialog';
 import { ActionRequestsPanelComponent } from './action-requests-panel.component';
 import { ImpactPanelComponent } from './impact-panel.component';

@@ -12,6 +12,8 @@ import { errorInterceptor as inspectoErrorInterceptor } from './inspecto/api/err
 import { spaceInterceptor } from './inspecto/api/space.interceptor';
 import { authInterceptor } from './inspecto/api/auth.interceptor';
 import { v1Interceptor } from './inspecto/api/v1.interceptor';
+import { registerGeoMapViz } from './modules/admin/studio/geo-map/geo-map.viz';
+import { registerLinkAnalysisViz } from './modules/admin/studio/link-analysis/link-analysis.viz';
 import { SessionService } from './inspecto/api/session.service';
 
 export const appConfig: ApplicationConfig = {
@@ -63,6 +65,11 @@ export const appConfig: ApplicationConfig = {
         // from the refresh cookie, before routing runs. Never rejects — a Personal/offline backend just
         // reports authMode:'none' and this is a no-op, so the auth-free boot path is unchanged (W6d).
         provideAppInitializer(() => inject(SessionService).init()),
+        // SEP-06: optional features register their own viz-embed render hosts.
+        provideAppInitializer(() => {
+            registerGeoMapViz();
+            registerLinkAnalysisViz();
+        }),
 
         // Gamma
         // provideAuth(),

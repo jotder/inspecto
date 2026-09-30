@@ -11,11 +11,11 @@ import { ToastrService } from 'ngx-toastr';
 import { G6GraphData, GraphSource } from 'app/inspecto/graph';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ImportDraft, TransferMenuComponent } from 'app/inspecto/transfer';
-import { environment } from '../../../../../environments/environment';
+import { apiUrl } from 'app/inspecto/api/api-base';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisComponent } from './link-analysis.component';
 
-const base = environment.apiBaseUrl + '/v1';
+const base = apiUrl('');
 const QUERY = { projection: { datasetId: 'links-ds', sourceCol: 'a_party', targetCol: 'b_party' } };
 const INCOMING = {
     name: 'Fraud ring',

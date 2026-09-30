@@ -67,7 +67,7 @@ import { DefinitionStateService } from 'app/inspecto/definition/definition-state
 import { grammarContentAsParsingBlock, nonDelimitedGrammarBlock } from 'app/inspecto/grammar';
 import { ImportDraft, ImportDraftBannerComponent, TransferMenuComponent } from 'app/inspecto/transfer';
 import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
-import { G6GraphData } from 'app/modules/admin/catalog/catalog-graph';
+import { G6GraphData } from 'app/inspecto/graph/catalog-graph';
 import { PipelineDryRunPanelComponent } from './pipeline-dry-run-panel.component';
 import { PipelineEditorGraphComponent } from './pipeline-editor-graph.component';
 import { PipelineInspectorComponent } from './pipeline-inspector.component';

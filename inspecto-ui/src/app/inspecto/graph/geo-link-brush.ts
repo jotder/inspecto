@@ -1,7 +1,7 @@
 import { Injectable, signal } from '@angular/core';
-import { GeoPoint } from 'app/inspecto/geo';
-import type { EntityIdMapping } from 'app/inspecto/graph';
-import { entityIdCandidates } from './entity-projection';
+import type { GeoPoint } from 'app/inspecto/geo';
+import type { EntityIdMapping } from './graph-source';
+import { entityIdCandidates } from './entity-key';
 
 /**
  * LA-22 — synchronised Geo ↔ Link brushing. A selection on one canvas is published here and the other

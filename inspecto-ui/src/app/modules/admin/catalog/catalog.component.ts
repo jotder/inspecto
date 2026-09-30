@@ -27,8 +27,8 @@ import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component'
 import { InspectoRowAction, fmtDateTime } from 'app/inspecto/grid';
 import { OnboardingCreateDialog, OnboardingCreateResult } from './onboarding/onboarding-create.dialog';
 import { RegistryComponent } from './registry.component';
-import { G6GraphData, legendFor, toG6Data } from './catalog-graph';
-import { GraphViewComponent } from './graph-view.component';
+import { G6GraphData, legendFor, toG6Data } from 'app/inspecto/graph/catalog-graph';
+import { GraphViewComponent } from 'app/inspecto/graph/graph-view.component';
 import { NodeDetailDialog } from './node-detail.dialog';
 import { SharingComponent } from './sharing.component';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';

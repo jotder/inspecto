@@ -11,12 +11,12 @@ import {
     projectTriples,
     PROJECTION_NODE_CAP_DEFAULT,
     configureProjectionLimits,
-    endpointId,
     projectionNodeCapValue,
     resetProjectionLimits,
     resolveRunQuery,
     withColumnTypes,
 } from './entity-projection';
+import { endpointId } from 'app/inspecto/graph';
 
 const rows = [
     { source: 'sub-01', target: 'dev-01', link_type: 'shared_device', weight: 5 },

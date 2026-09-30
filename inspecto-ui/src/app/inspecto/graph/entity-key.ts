@@ -1,3 +1,5 @@
+import type { EntityIdMapping } from './graph-source';
+
 /**
  * The ONE entity-identity key (decision D-S4, 2026-09-23): case-folded, internal whitespace collapsed,
  * trailing punctuation stripped, trimmed (`' Acme  Ltd.'` -> `acme ltd`). Every entity node id minted by
@@ -57,4 +59,67 @@ export interface EntityTypeRef {
 /** A typed entity id (D-M6): `<type>:<normalised key>`. */
 export function typedEntityKey(type: string, value: string, normaliser: EntityNormaliser): string {
     return `${type}:${normalizeTypedKey(value, normaliser)}`;
+}
+
+/**
+ * The UNTYPED Entity node id for a projected value. Type-scoped (`entity:<entityType>:<key>`) when a
+ * multi-mapping merge supplies an `entityType`, so a `person` "Bob" stays distinct from an `account`
+ * "Bob" (Phase C). Unscoped `entity:<key>` otherwise. The key is {@link normalizeEntityKey} of the raw
+ * value (D-S4, 2026-09-23), so `ACME Ltd` and ` acme  ltd.` are ONE node; the raw spelling stays the label.
+ * A column typed by an Entity Type mints through {@link endpointId} instead (D-M6).
+ */
+export function entityId(entityType: string | undefined, value: string): string {
+    const key = normalizeEntityKey(value);
+    return entityType ? `entity:${entityType}:${key}` : `entity:${key}`;
+}
+
+/**
+ * The node id for a value under an optional column type: typed `<type>:<key>` (D-M6), else {@link entityId}.
+ * `null` when the type's normaliser leaves an EMPTY key (`N/A` under `digits`): the value is treated like a blank
+ * one -- no node, no edge -- exactly as the server refuses an empty key, so it never becomes one `msisdn:` super-node.
+ */
+export function typedOrEntityId(
+    type: EntityTypeRef | undefined,
+    entityType: string | undefined,
+    value: string,
+): string | null {
+    if (!type) return entityId(entityType, value);
+    return normalizeTypedKey(value, type.normaliser) ? typedEntityKey(type.id, value, type.normaliser) : null;
+}
+
+/**
+ * THE mint for a value read from one endpoint column of a mapping (LA-17 D-M6): a typed column
+ * (`sourceType` / `targetType`, server-resolved from the Dataset's classification) mints `<type>:<key>`
+ * with that type's normaliser; an untyped column keeps {@link entityId}. Every projection path mints here.
+ */
+export function endpointId(p: EntityIdMapping | undefined, end: 'source' | 'target', value: string): string | null {
+    return typedOrEntityId(end === 'source' ? p?.sourceType : p?.targetType, p?.entityType, value);
+}
+
+/**
+ * Every id `value` could have under the given mappings, preferred end first. Used where a raw value arrives
+ * WITHOUT its column (a path hop, a Working Set seed, a Geo key): the caller picks the candidate already drawn.
+ */
+export function entityIdCandidates(
+    mappings: readonly (EntityIdMapping | undefined)[],
+    value: string,
+    prefer: 'source' | 'target' = 'source',
+): string[] {
+    const other = prefer === 'source' ? 'target' : 'source';
+    const out = new Set<string>();
+    for (const m of mappings.length ? mappings : [undefined]) {
+        for (const id of [endpointId(m, prefer, value), endpointId(m, other, value)]) if (id) out.add(id);
+    }
+    return [...out];
+}
+
+/** The candidate id already in `has`, else the first (preferred) one. */
+export function resolveEntityId(
+    mappings: readonly (EntityIdMapping | undefined)[],
+    value: string,
+    has: (id: string) => boolean,
+    prefer: 'source' | 'target' = 'source',
+): string | null {
+    const c = entityIdCandidates(mappings, value, prefer);
+    return c.find(has) ?? c[0] ?? null;
 }

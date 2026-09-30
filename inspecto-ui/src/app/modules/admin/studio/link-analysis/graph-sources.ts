@@ -3,7 +3,7 @@ import { firstValueFrom } from 'rxjs';
 import { CatalogService, InvService, PipelinesService } from 'app/inspecto/api';
 import { G6GraphData, GraphSource, GraphSourceQuery, mergeGraphs } from 'app/inspecto/graph';
 import { deriveComponentGraph } from 'app/inspecto/component-model';
-import { toG6Data } from 'app/modules/admin/catalog/catalog-graph';
+import { toG6Data } from 'app/inspecto/graph/catalog-graph';
 import { ComponentsDataProvider } from 'app/modules/admin/catalog/components-data-provider';
 import { REGISTRY_KINDS } from 'app/modules/admin/catalog/registry.component';
 import { provenanceCounts, toPipelineG6Data } from 'app/modules/admin/pipelines/pipeline-graph';

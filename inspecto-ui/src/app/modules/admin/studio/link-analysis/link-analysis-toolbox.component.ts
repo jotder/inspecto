@@ -51,7 +51,7 @@ import {
     patternNeedsTime,
     weightedShortestPath,
 } from 'app/inspecto/graph';
-import { GraphEmphasis } from 'app/modules/admin/catalog/graph-view.component';
+import { GraphEmphasis } from 'app/inspecto/graph/graph-view.component';
 import { PATTERN_PACKS, PatternPack, patternPackFromContent } from './pattern-packs';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { FormsModule } from '@angular/forms';

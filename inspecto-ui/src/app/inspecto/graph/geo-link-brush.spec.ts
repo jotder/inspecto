@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GeoPoint } from 'app/inspecto/geo';
-import { entityId } from './entity-projection';
+import { entityId } from './entity-key';
 import { GeoLinkBrushService, nodeIdsForKeys, pointIdsForNodes } from './geo-link-brush';
 
 /**

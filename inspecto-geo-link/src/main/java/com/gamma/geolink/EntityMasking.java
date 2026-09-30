@@ -3,7 +3,7 @@ package com.gamma.geolink;
 import com.gamma.control.EntityTypes;
 import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.pipeline.ComponentRegistry;
-import com.gamma.pipeline.ComponentStore;
+import com.gamma.query.DatasetRead;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -235,8 +235,7 @@ final class EntityMasking {
     /** The Investigation's bound source/target columns whose registry {@code columns[]} {@code classification} is
      *  claimed by a MASKED in-force Entity Type — column name → type id. A classification no type claims is untyped. */
     private static Map<String, String> maskedColumns(InvestigationRoutes.Inv inv, List<EntityTypes.EntityType> types) {
-        Map<String, Object> ds = new ComponentStore(inv.writeRoot().resolve("registry")).get("dataset", inv.dataset())
-                .map(ComponentRegistry.Component::content).orElse(Map.of());
+        Map<String, Object> ds = DatasetRead.dataset(inv.writeRoot(), inv.dataset()).orElse(Map.of());
         Map<String, String> out = new LinkedHashMap<>();
         if (!(ds.get("columns") instanceof List<?> cols)) return out;
         for (String bound : List.of("sourceCol", "targetCol")) {

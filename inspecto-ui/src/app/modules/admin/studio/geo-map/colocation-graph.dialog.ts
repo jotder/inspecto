@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { G6GraphData } from 'app/inspecto/graph';
-import { GraphViewComponent } from 'app/modules/admin/catalog/graph-view.component';
+import { GraphViewComponent } from 'app/inspecto/graph/graph-view.component';
 
 /**
  * **Co-location graph popup** — the geo → link-analysis bridge: entities that met render as an

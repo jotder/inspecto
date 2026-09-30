@@ -26,7 +26,7 @@ import 'app/modules/admin/decision-rules/decision-rule.kind';
 import { G6GraphData } from 'app/inspecto/graph';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
-import { GraphViewComponent } from 'app/modules/admin/catalog/graph-view.component';
+import { GraphViewComponent } from 'app/inspecto/graph/graph-view.component';
 import { ComponentsDataProvider } from './components-data-provider';
 import { registerPlatformKinds } from './platform-kinds';
 

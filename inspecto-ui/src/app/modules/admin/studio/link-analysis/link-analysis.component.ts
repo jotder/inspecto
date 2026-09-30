@@ -100,7 +100,7 @@ import {
     SnapshotDialogData,
 } from './link-analysis-evidence.dialogs';
 import { LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
-import { EntityIdMapping, GraphSnapshot } from 'app/inspecto/graph';
+import { EntityIdMapping, GeoLinkBrushService, GraphSnapshot, nodeIdsForKeys } from 'app/inspecto/graph';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import {
@@ -126,7 +126,7 @@ import {
     baseEdgeKind,
     edgeLabelsHiddenByDensity,
     stableKey,
-} from 'app/modules/admin/catalog/graph-view.component';
+} from 'app/inspecto/graph/graph-view.component';
 import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
 import { ElementDetailDialog, ElementDetailResult, ElementObjectRef, PivotService } from 'app/inspecto/investigation';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
@@ -143,7 +143,6 @@ import {
     resolveRunQuery,
     splitIdentityGroups,
 } from './entity-projection';
-import { GeoLinkBrushService, nodeIdsForKeys } from './geo-link-brush';
 import { GraphSourcesService } from './graph-sources';
 import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';

@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { InvService, InvestigationHeader, InvestigationLog, InvestigationLogEntry, WorkingSet } from 'app/inspecto/api';
 import { EntityProjection } from 'app/inspecto/graph';
-import { entityId } from './entity-projection';
+import { entityId } from 'app/inspecto/graph';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 
 const P: EntityProjection = { datasetId: 'calls', sourceCol: 'A', targetCol: 'B', entityType: 'msisdn' };

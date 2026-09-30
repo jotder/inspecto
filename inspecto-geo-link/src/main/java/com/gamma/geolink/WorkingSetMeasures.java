@@ -131,14 +131,12 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
     private static Reading valueMeasure(Path writeRoot, Path dataRoot, Map<String, Object> header,
                                         AlertRule rule) throws java.sql.SQLException, java.io.IOException {
         String ds = String.valueOf(header.get("dataset"));
-        Map<String, Object> dataset = new com.gamma.pipeline.ComponentStore(writeRoot.resolve("registry"))
-                .get("dataset", ds).map(com.gamma.pipeline.ComponentRegistry.Component::content).orElse(null);
+        Map<String, Object> dataset = com.gamma.query.DatasetRead.dataset(writeRoot, ds).orElse(null);
         if (dataset == null) {
             log.warn("alert rule '{}': no dataset '{}' — not evaluated", rule.name(), ds);
             return Reading.of(OptionalDouble.empty());
         }
-        String relationSql = com.gamma.query.DatasetRelation.relationSql(dataset, dataRoot,
-                new com.gamma.pipeline.ViewStore(writeRoot.resolve("views")));
+        String relationSql = com.gamma.query.DatasetRead.relationSql(dataset, dataRoot, writeRoot);
         // parsed NOW: a rolling `last` window resolves against the sweep's clock (UTC), never the binding's
         ValueMeasures.Spec spec = ValueMeasures.parse(rule.valueMeasure(), true);
         ValueMeasures.Agents agents = ValueMeasures.agents(writeRoot, spec);   // read LIVE at this sweep

@@ -54,7 +54,7 @@ import {
     withinBBox,
 } from 'app/inspecto/geo';
 import type { Feature, FeatureCollection } from 'geojson';
-import { GeoLinkBrushService, pointIdsForNodes } from '../link-analysis/geo-link-brush';
+import { GeoLinkBrushService, pointIdsForNodes } from 'app/inspecto/graph';
 import {
     ElementDetailDialog,
     ElementDetailResult,

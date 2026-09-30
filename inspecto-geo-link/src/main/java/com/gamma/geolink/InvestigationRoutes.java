@@ -14,9 +14,7 @@ import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentRegistry;
-import com.gamma.pipeline.ComponentStore;
-import com.gamma.pipeline.ViewStore;
-import com.gamma.query.DatasetRelation;
+import com.gamma.query.DatasetRead;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
 import com.gamma.util.SqlIdent;
@@ -1598,8 +1596,7 @@ public final class InvestigationRoutes implements RouteModule {
                 && !(caseRead && InvestigationCaseRoutes.grants(api, ex, store, id, subject.get())))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
         String dataset = String.valueOf(header.get("dataset"));
-        Optional<Map<String, Object>> ds = new ComponentStore(writeRoot.resolve("registry")).get("dataset", dataset)
-                .map(ComponentRegistry.Component::content);
+        Optional<Map<String, Object>> ds = DatasetRead.dataset(writeRoot, dataset);
         if (ds.isPresent() && !ComponentAccess.canView(ex, ds.get()))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + dataset + "'");
         Inv inv = new Inv(store, writeRoot, id, header);

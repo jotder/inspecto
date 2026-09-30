@@ -6,7 +6,7 @@ import { of } from 'rxjs';
 import { ComponentDef, ComponentsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { G6GraphData } from 'app/inspecto/graph';
-import { GraphEmphasis } from 'app/modules/admin/catalog/graph-view.component';
+import { GraphEmphasis } from 'app/inspecto/graph/graph-view.component';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 
 /** A tiny two-cluster graph: a–b–c plus d–e (mirrors the studio spec fixture). */

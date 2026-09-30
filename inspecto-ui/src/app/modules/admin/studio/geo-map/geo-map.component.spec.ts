@@ -16,7 +16,7 @@ import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { GeoMapComponent } from './geo-map.component';
 import { GeoSourcesService, ProjectedGeo } from './geo-projection';
 import { GeoMapService, GeoMapView } from './geo-map.service';
-import { GeoLinkBrushService } from '../link-analysis/geo-link-brush';
+import { GeoLinkBrushService } from 'app/inspecto/graph';
 
 const DS: Dataset = {
     id: 'towers-ds',

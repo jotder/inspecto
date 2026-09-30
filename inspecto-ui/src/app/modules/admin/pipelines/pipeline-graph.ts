@@ -13,7 +13,7 @@ import {
 } from 'app/inspecto/api';
 import { pipelineHome, storeDirs } from 'app/inspecto/component-model/pipeline-scaffold';
 import { isProjectionSlot } from './pipeline-editable';
-import { GLYPH_LIBRARY, G6GraphData, iconDataUri, nodeColor, nodeIcon } from 'app/modules/admin/catalog/catalog-graph';
+import { GLYPH_LIBRARY, G6GraphData, iconDataUri, nodeColor, nodeIcon } from 'app/inspecto/graph/catalog-graph';
 import { FAMILY_CODE_COLORS } from 'app/inspecto/theme/chart-tokens';
 
 /**

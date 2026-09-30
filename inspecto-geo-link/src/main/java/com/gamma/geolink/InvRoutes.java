@@ -13,10 +13,8 @@ import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentRegistry;
-import com.gamma.pipeline.ComponentStore;
-import com.gamma.pipeline.ViewStore;
+import com.gamma.query.DatasetRead;
 import com.gamma.query.ConditionSql;
-import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
 import com.gamma.sql.SqlGuard;
@@ -263,15 +261,13 @@ public final class InvRoutes implements RouteModule {
      */
     private Object schemaRelationships(ApiContext api, HttpExchange ex) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "schema relationship inference");
-        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        ViewStore views = new ViewStore(writeRoot.resolve("views"));
 
         Map<String, List<String>> columnsByDataset = new LinkedHashMap<>();
         int skipped = 0;
-        for (ComponentRegistry.Component c : store.list("dataset")) {
+        for (ComponentRegistry.Component c : DatasetRead.datasets(writeRoot)) {
             if (!ComponentAccess.canView(ex, c.content())) continue;   // R3: not counted as skipped — that would leak it
             try {
-                String relationSql = DatasetRelation.relationSql(c.content(), api.dataRoot(), views);
+                String relationSql = DatasetRead.relationSql(c.content(), api.dataRoot(), writeRoot);
                 QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
                         c.name(), relationSql, "SELECT * FROM " + q(c.name()), 0, 0, List.of(), List.of()));
                 columnsByDataset.put(c.name(),
@@ -396,8 +392,6 @@ public final class InvRoutes implements RouteModule {
      */
     private Object overlapProfile(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "column overlap profiling");
-        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        ViewStore views = new ViewStore(writeRoot.resolve("views"));
         List<String> wantDatasets = nameList(body, "datasets", false);
         List<String> wantColumns = nameList(body, "columns", true);
         int maxPairs = body.get("limit") instanceof Number n
@@ -407,12 +401,12 @@ public final class InvRoutes implements RouteModule {
         List<String> seenColumns = new ArrayList<>();
         List<String> seenDatasets = new ArrayList<>();
         int scanned = 0, skipped = 0;
-        for (ComponentRegistry.Component c : store.list("dataset")) {
+        for (ComponentRegistry.Component c : DatasetRead.datasets(writeRoot)) {
             if (!wantDatasets.isEmpty() && !containsIgnoreCase(wantDatasets, c.name())) continue;
             if (!ComponentAccess.canView(ex, c.content())) continue;   // R3: shared-away reads as absent (404 below)
             seenDatasets.add(c.name());
             try {
-                String relationSql = DatasetRelation.relationSql(c.content(), api.dataRoot(), views);
+                String relationSql = DatasetRead.relationSql(c.content(), api.dataRoot(), writeRoot);
                 List<String> inScope = new ArrayList<>();
                 for (String col : relationColumns(c.name(), relationSql)) {
                     seenColumns.add(col);
@@ -744,8 +738,7 @@ public final class InvRoutes implements RouteModule {
      * so every mint site agrees on which columns are typed; {@code EntityMasking} reads the same classification.
      */
     static Map<String, Map<String, Object>> columnTypes(Path writeRoot, String datasetId, List<String> columns) {
-        Map<String, Object> ds = new ComponentStore(writeRoot.resolve("registry")).get("dataset", datasetId)
-                .map(ComponentRegistry.Component::content).orElse(Map.of());
+        Map<String, Object> ds = DatasetRead.dataset(writeRoot, datasetId).orElse(Map.of());
         Map<String, Map<String, Object>> out = new LinkedHashMap<>();
         if (!(ds.get("columns") instanceof List<?> cols)) return out;
         List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
@@ -838,13 +831,12 @@ public final class InvRoutes implements RouteModule {
      * absence, exactly as {@code BiRoutes} answers); an unusable Dataset → 422.
      */
     static String relationFor(ApiContext api, HttpExchange ex, Path writeRoot, String datasetId) {
-        Map<String, Object> dataset = new ComponentStore(writeRoot.resolve("registry")).get("dataset", datasetId)
-                .map(ComponentRegistry.Component::content)
+        Map<String, Object> dataset = DatasetRead.dataset(writeRoot, datasetId)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + datasetId + "'"));
         if (!ComponentAccess.canView(ex, dataset))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + datasetId + "'");
         try {
-            return DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
+            return DatasetRead.relationSql(dataset, api.dataRoot(), writeRoot);
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }

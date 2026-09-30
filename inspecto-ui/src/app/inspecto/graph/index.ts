@@ -9,3 +9,4 @@ export * from './graph-filter';
 export * from './graph-snapshot';
 export * from './entity-key';
 export * from './branching-pattern-engine';
+export * from './geo-link-brush';

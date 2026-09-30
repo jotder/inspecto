@@ -7,7 +7,7 @@ import { CatalogService, MetadataNode, NodeDetail } from 'app/inspecto/api';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { AssistPanelComponent } from 'app/inspecto/components/assist-panel.component';
 import { StoreLineageComponent } from './store-lineage.component';
-import { nodeKindLabel } from './catalog-graph';
+import { nodeKindLabel } from 'app/inspecto/graph/catalog-graph';
 
 /**
  * Catalog node inspector: node facts + attrs, neighbour grid (click to walk the graph

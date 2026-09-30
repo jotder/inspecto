@@ -7,7 +7,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { ToastrService } from 'ngx-toastr';
 import { PipelineNodeType, PipelinesService, IconMap, IconMapService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
-import { GLYPH_LIBRARY, ICON_COLOR_SWATCHES, iconDataUri } from 'app/modules/admin/catalog/catalog-graph';
+import { GLYPH_LIBRARY, ICON_COLOR_SWATCHES, iconDataUri } from 'app/inspecto/graph/catalog-graph';
 import {
     NodeTypeGroup,
     categoryLabel,

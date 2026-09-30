@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, si
 import { G6GraphData } from 'app/inspecto/graph';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
-import { GraphViewComponent } from 'app/modules/admin/catalog/graph-view.component';
+import { GraphViewComponent } from 'app/inspecto/graph/graph-view.component';
 import { LinkAnalysisService, LinkAnalysisView, SAVED_VIEW_NOT_EVIDENCE } from './link-analysis.service';
 import { GraphSourcesService } from './graph-sources';
 import { legendEdgeKindsFor, legendItemsFor, LinkAnalysisLegendComponent } from './link-analysis-overlays.component';

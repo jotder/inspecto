@@ -2,10 +2,9 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { describe, expect, it } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { InvService, MultiProjectionResult, RecursivePathsResult } from 'app/inspecto/api';
-import { G6GraphData } from 'app/inspecto/graph';
+import { G6GraphData, entityId } from 'app/inspecto/graph';
 import {
     MultiProjectionGraphSource,
-    entityId,
     invErrorMessage,
     projectMultiResult,
     recursivePathsToGraph,

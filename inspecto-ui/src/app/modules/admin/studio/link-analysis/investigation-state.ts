@@ -1,7 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { EntityProjection, EntityTypeRef, G6Node, typedEntityKey } from 'app/inspecto/graph';
 import { InvestigationLogEntry, WorkingSet, apiErrorMessage } from 'app/inspecto/api';
-import { ProjectedGraph, projectTriples, resolveEntityId } from './entity-projection';
+import { resolveEntityId } from 'app/inspecto/graph';
+import { ProjectedGraph, projectTriples } from './entity-projection';
 
 /**
  * LA-10 — the pure half of the Investigation panel: how a server Working Set becomes the canvas graph, which

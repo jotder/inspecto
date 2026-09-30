@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { describe, expect, it } from 'vitest';
 import { InvestigationLogEntry, WorkingSet } from 'app/inspecto/api';
 import { EntityProjection } from 'app/inspecto/graph';
-import { entityId } from './entity-projection';
+import { entityId } from 'app/inspecto/graph';
 import {
     effectiveOpSteps,
     idsInWorkingSet,

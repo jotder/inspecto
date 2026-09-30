@@ -9,7 +9,7 @@ import com.gamma.control.RouteModule;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
-import com.gamma.pipeline.ComponentStore;
+import com.gamma.query.DatasetRead;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -145,7 +145,7 @@ public final class InvestigationMeasureRoutes implements RouteModule {
 
         AlertService alerts = api.service().alertService()
                 .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "alert engine unavailable"));
-        ComponentStore store = new ComponentStore(inv.writeRoot().resolve("registry"));
+        var store = DatasetRead.registry(inv.writeRoot());
         if (store.get("alert-rule", rule.name()).isPresent())
             throw new ApiException(409, ErrorCodes.CONFLICT, "alert rule '" + rule.name() + "' already exists");
         // Maker-checker (ASSURE-MAKER-CHECKER-1): an approver could not replay this bind — the Investigation is

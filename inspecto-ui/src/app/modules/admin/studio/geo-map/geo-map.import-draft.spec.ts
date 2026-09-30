@@ -12,11 +12,11 @@ import { GeoSource } from 'app/inspecto/geo';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ImportDraft, TransferMenuComponent } from 'app/inspecto/transfer';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
-import { environment } from '../../../../../environments/environment';
+import { apiUrl } from 'app/inspecto/api/api-base';
 import { GeoMapComponent } from './geo-map.component';
 import { GeoSourcesService, ProjectedGeo } from './geo-projection';
 
-const base = environment.apiBaseUrl + '/v1';
+const base = apiUrl('');
 const QUERY = { projection: { datasetId: 'towers-ds', latCol: 'lat', lonCol: 'lon', kindCol: 'type' } };
 const INCOMING = { name: 'Dhaka towers', sourceId: 'dataset', query: QUERY, display: 'heatmap' };
 const STORED = { name: 'Dhaka towers', sourceId: 'dataset', query: QUERY, display: 'markers' };

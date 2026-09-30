@@ -16,7 +16,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { GammaConfigService } from '@gamma/services/config';
 import { CanvasEvent, Graph, GraphData, NodeData, NodeEvent } from '@antv/g6';
-import { G6GraphData, nodeColor, nodeIcon } from 'app/modules/admin/catalog/catalog-graph';
+import { G6GraphData, nodeColor, nodeIcon } from 'app/inspecto/graph/catalog-graph';
 import { NodeKind } from 'app/inspecto/api';
 import { canvasTheme, nodeStatusStroke } from 'app/inspecto/theme/chart-tokens';
 import { isDerivedEdge, NodeStatus, statusGlyph } from './pipeline-graph';

@@ -3,7 +3,7 @@ import { Observable } from 'rxjs';
 import { ComponentsService } from 'app/inspecto/api';
 import { GraphSourceId, GraphSourceQuery, DomainProfileId } from 'app/inspecto/graph';
 import { SavedViewStore } from 'app/inspecto/investigation';
-import { GraphDisplayOptions, GraphLayoutId, GraphViewPlugins } from 'app/modules/admin/catalog/graph-view.component';
+import { GraphDisplayOptions, GraphLayoutId, GraphViewPlugins } from 'app/inspecto/graph/graph-view.component';
 import type { InvestigationRef } from './investigation-state';
 
 /**

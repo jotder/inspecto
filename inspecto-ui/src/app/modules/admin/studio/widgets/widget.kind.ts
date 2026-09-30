@@ -17,23 +17,8 @@ import { WidgetConfig } from './widget-types';
 
 registerBuiltinViz();
 
-// The view-bound plugins' render hosts, registered as ASYNC loaders so MapLibre/G6 stay out of every
-// eager bundle that pulls this module in (explore, dashboards, the gallery). Guarded like registerBuiltinViz.
-if (!getVizComponentLoader('geo-map-view')) {
-    registerVizComponent('geo-map-view', () =>
-        import('../geo-map/geo-view-widget.component').then((m) => m.GeoViewWidgetComponent),
-    );
-}
-if (!getVizComponentLoader('link-analysis-view')) {
-    registerVizComponent('link-analysis-view', () =>
-        import('../link-analysis/link-view-widget.component').then((m) => m.LinkViewWidgetComponent),
-    );
-}
-if (!getVizComponentLoader('working-set')) {
-    registerVizComponent('working-set', () =>
-        import('../link-analysis/working-set-widget.component').then((m) => m.WorkingSetWidgetComponent),
-    );
-}
+// Geo and Link Analysis register their OWN render hosts (SEP-06: geo-map.viz.ts / link-analysis.viz.ts, called
+// from app.config). Reconciliation's is still here. Async loaders keep heavy libs out of eager bundles.
 if (!getVizComponentLoader('reconciliation')) {
     registerVizComponent('reconciliation', () =>
         import('../../reconciliation/recon-view-widget.component').then((m) => m.ReconViewWidgetComponent),

@@ -4,8 +4,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { NodeKind } from 'app/inspecto/api';
 import { G6GraphData, SUPER_NODE_KIND, WorkingSetStat } from 'app/inspecto/graph';
-import { nodeColor } from 'app/modules/admin/catalog/catalog-graph';
-import { baseEdgeKind } from 'app/modules/admin/catalog/graph-view.component';
+import { nodeColor } from 'app/inspecto/graph/catalog-graph';
+import { baseEdgeKind } from 'app/inspecto/graph/graph-view.component';
 
 /** One swatch row of the legend. */
 export interface LegendItem {

@@ -10,9 +10,7 @@ import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentRegistry;
-import com.gamma.pipeline.ComponentStore;
-import com.gamma.pipeline.ViewStore;
-import com.gamma.query.DatasetRelation;
+import com.gamma.query.DatasetRead;
 import com.gamma.query.QueryExecutor;
 
 import com.gamma.util.DuckDbUtil;
@@ -235,12 +233,11 @@ public final class GeoRoutes implements RouteModule {
         Path writeRoot = WriteGates.requireWriteRoot(api, "geo projection");
         String datasetId = ApiContext.str(body, "dataset");
         if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
-        Map<String, Object> dataset = new ComponentStore(writeRoot.resolve("registry")).get("dataset", datasetId)
-                .map(ComponentRegistry.Component::content)
+        Map<String, Object> dataset = DatasetRead.dataset(writeRoot, datasetId)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + datasetId + "'"));
         try {
             return new Ctx(datasetId,
-                    DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views"))));
+                    DatasetRead.relationSql(dataset, api.dataRoot(), writeRoot));
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }

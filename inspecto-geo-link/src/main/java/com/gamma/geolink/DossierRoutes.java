@@ -9,7 +9,7 @@ import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentRegistry;
-import com.gamma.pipeline.ComponentStore;
+import com.gamma.query.DatasetRead;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -193,8 +193,7 @@ public final class DossierRoutes implements RouteModule {
                         + "' (its investigationId is " + snap.get("investigationId") + ")");
             if (snap.get("origin") instanceof Map<?, ?> origin && origin.get("dataset") != null) {
                 String ds = String.valueOf(origin.get("dataset"));
-                Optional<Map<String, Object>> content = new ComponentStore(inv.writeRoot().resolve("registry"))
-                        .get("dataset", ds).map(ComponentRegistry.Component::content);
+                Optional<Map<String, Object>> content = DatasetRead.dataset(inv.writeRoot(), ds);
                 if (content.isPresent() && !ComponentAccess.canView(ex, content.get()))
                     throw new ApiException(404, ErrorCodes.NOT_FOUND, "no sealed snapshot '" + sid + "'");
             }
