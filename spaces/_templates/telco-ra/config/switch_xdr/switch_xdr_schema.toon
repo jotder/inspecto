@@ -3,14 +3,14 @@ raw:
   name: SWITCH_XDR
   format: CSV
   fields[8]{name,selector,type,description,unit,classification}:
-    XDR_ID,"0",VARCHAR,"Usage record identifier, stable across switch, mediation and rating","","INTERNAL"
-    EVENT_TS,"1",TIMESTAMP,"Event start time","","INTERNAL"
-    EVENT_DATE,"2",DATE,"Business date of the event","","INTERNAL"
-    SUBSCRIBER_ID,"3",VARCHAR,"Subscriber (synthetic)","","INTERNAL"
-    B_NUMBER,"4",VARCHAR,"Called party (synthetic)","","INTERNAL"
-    SERVICE,"5",VARCHAR,"VOICE, SMS or DATA","","INTERNAL"
-    PARTNER,"6",VARCHAR,"Terminating interconnect partner (blank = on-net)","","INTERNAL"
-    USAGE_UNITS,"7",BIGINT,"Seconds (VOICE), events (SMS) or MB (DATA)","count","INTERNAL"
+    XDR_ID,"0","VARCHAR","Usage record identifier, stable across switch, mediation and rating","","INTERNAL"
+    EVENT_TS,"1","TIMESTAMP","Event start time","","INTERNAL"
+    EVENT_DATE,"2","DATE","Business date of the event","","INTERNAL"
+    SUBSCRIBER_ID,"3","VARCHAR","Subscriber (synthetic)","","INTERNAL"
+    B_NUMBER,"4","VARCHAR","Called party (fictional +1-555-01xx range)","","INTERNAL"
+    SERVICE,"5","VARCHAR","VOICE, SMS or DATA","","INTERNAL"
+    PARTNER,"6","VARCHAR","Terminating interconnect partner (blank = on-net)","","INTERNAL"
+    USAGE_UNITS,"7","BIGINT","Seconds (VOICE), events (SMS) or MB (DATA)","count","INTERNAL"
 mapping:
   canonicalName: switch_xdr
   rawName: SWITCH_XDR

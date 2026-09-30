@@ -1,0 +1,7 @@
+vizType: kpi
+datasetId: ra_xdr_lost_dataset
+controls:
+  value[1]{field,agg}:
+    ITEM_KEY,count
+options:
+  title: Lost or short xDRs (distinct)

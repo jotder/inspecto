@@ -1,70 +1,114 @@
 # Telecom revenue assurance — runbooks
 
-Runbooks for the controls of the `telco-ra` Space Template. All data in this template is synthetic.
-Tolerances and thresholds are configuration: change them in the file named for each control, never in SQL.
+These are the runbooks for the controls of the `telco-ra` Space Template. All data in this template is
+synthetic. Called numbers use the fictional `+1-555-01xx` range.
+
+- **Tolerances are configuration.** Each control's tolerance is a key in the file named for it; the SQL
+  never hard-codes one.
+- **Money is `DECIMAL(18,4)` end to end,** so a tolerance compares exact amounts, not float noise.
+- **Edition:** the template needs **Professional or Enterprise**, because it ships Alert Rules
+  (`alert.dispatch`). A Personal build lists it in the gallery as not available. The confirmed and recovered
+  KPIs also need the ops module (`objects.analytics`).
+
+## Findings: leakage vs data quality
+
+Every control Job writes one row per finding, with these columns:
+
+- `ITEM_KEY`: what is wrong.
+- `REASON`: why, with the values listed per control below.
+- `FINDING`: either `leakage` or `data_quality`.
+- `LEAKAGE_AMOUNT`: the money.
+
+Rules for the two kinds:
+
+- **A `leakage` finding always carries its amount.** A sum never drops one.
+- **A `data_quality` finding** means the control could not judge the record: an ambiguous tariff, a NULL
+  balance field, or a missing partner statement. Its amount is NULL, because none can be computed. Fix the
+  data, and the next run judges the record.
 
 ## KPI definitions
 
 | KPI | Definition | Widget |
 |---|---|---|
-| Leakage found | `sum(LEAKAGE_AMOUNT)` over the `ra_leakage` Dataset (every finding of the re-rating, roll-forward and settlement controls) | `ra_leakage_found`, `ra_leakage_by_control`, `ra_leakage_items` |
-| Leakage confirmed | `sum(confirmed)` over the latest impact-ledger snapshot (`ra_recovery` Dataset) | `ra_leakage_confirmed` |
-| Leakage recovered | `sum(recovered)` over the latest impact-ledger snapshot (`ra_recovery` Dataset) | `ra_leakage_recovered` |
+| Leakage found | `sum(LEAKAGE_AMOUNT)` over `ra_leakage` (every finding of the re-rating, roll-forward and settlement controls; data-quality rows add nothing) | `ra_leakage_found`, `ra_leakage_by_control`, `ra_leakage_items` |
+| Lost or short xDRs | distinct xDRs in `ra_xdr_lost` (lost at mediation, lost at rating, or short by more than the tolerance) | `ra_xdr_lost` |
+| Leakage confirmed | `sum(confirmed)` over the latest impact-ledger snapshot (`ra_recovery`) | `ra_leakage_confirmed` |
+| Leakage recovered | `sum(recovered)` over the latest impact-ledger snapshot (`ra_recovery`) | `ra_leakage_recovered` |
 
-Reconciliation Breaks are not in `ra_leakage`: a breach opens one Incident per Reconciliation, and its money
-reaches the KPIs once the analyst records the Incident's impact and Disposition (below).
+⚠ **Breaks are not xDRs.** The completeness Reconciliation counts a record lost at mediation twice: A↔B
+and A↔C. On the golden corpus, **15 Breaks are 9 distinct lost or short xDRs**. Report xDRs from
+`ra_xdr_lost`, and use Breaks to show where in the chain a record went missing.
 
 ## Working a finding (every control)
 
-1. Open the Incident (Reconciliation) or the Alert (sql.template control) and read the items.
-2. Record the money on the Incident or Case: `PUT /objects/{id}/impact` — suspected, confirmed, and later
+1. Open the item:
+   - For a Reconciliation, open its Incident. The title counts the Breaks of every pair.
+   - For a control Job, open its Alert.
+2. Record the money on the Incident or Case with `PUT /objects/{id}/impact`: suspected, confirmed, and later
    recovered.
 3. Set the Disposition: CONFIRMED, RECOVERED, WRITTEN_OFF, FALSE_POSITIVE, and so on.
-4. The `ra_objects_analytics` Job snapshots every impacted object into the `impact_ledger` Dataset. The
-   `ra_recovery` Job then keeps the latest snapshot for the confirmed and recovered KPIs.
+4. The `ra_objects_analytics` Job snapshots every impacted object into `impact_ledger`. `ra_recovery` then
+   keeps the latest snapshot for the confirmed and recovered KPIs.
 
 ## Completeness — switch → mediation → rating
 
-- **Control:** Reconciliation `ra_xdr_completeness`, run by the `ra_xdr_completeness` Job (`recon.run`).
-  Key `XDR_ID`. `USAGE_UNITS` is compared with an absolute tolerance of 1 unit.
-- **A↔B `missing_right`:** mediation lost the record. Check the mediation reject and error folders for that
-  window. Re-feed the record, then re-rate it.
-- **A↔C `missing_right` only:** mediation passed the record, but rating never saw it. Check the rating
-  suspense queue.
-- **`value_break`:** usage was changed between network and rating, for example by truncation. Compare the
-  raw switch record.
+- **Controls:**
+  - Reconciliation `ra_xdr_completeness`, with key `XDR_ID` and a `USAGE_UNITS` tolerance of 1 unit.
+  - Job `ra_xdr_lost`, which gives the distinct-xDR view.
+- **A↔B `missing_right` / `lost_at_mediation`:** mediation lost the record. Check the mediation reject and
+  error folders, re-feed the record, then re-rate it.
+- **A↔C `missing_right` only / `lost_at_rating`:** mediation passed the record, but rating never saw it.
+  Check the rating suspense queue.
+- **`value_break` / `short`:** usage changed between the network and rating, for example by truncation.
+  Compare against the raw switch record.
 
 ## Rated vs billed
 
-- **Control:** Reconciliation `ra_rated_vs_billed`. Key `SUBSCRIBER_ID`. The summed `CHARGE` is compared with
-  an absolute tolerance of 0.05.
-- **`missing_right`:** a subscriber was rated but never invoiced. Check the bill run's exclusions.
-- **`value_break`:** the invoice is lower than the rated usage. Look for a discount or cap that should not
-  apply, or for usage that reached the bill run late.
+- **Control:** Reconciliation `ra_rated_vs_billed`, with key `SUBSCRIBER_ID` and an absolute tolerance of
+  0.05 on the summed `CHARGE`.
+- **`missing_right`:** rated but never invoiced. Check the bill run's exclusions.
+- **`value_break`:** the invoice is lower than the rated usage. Look for a wrong discount or cap, or for
+  usage that reached the bill run late.
 
 ## Re-rating
 
-- **Control:** Job `ra_rerating` (`sql.template`), with `tolerance` of 0.02 in the Job's file.
-- **Alert Rule:** `ra_rerating_leakage`.
-- **How it works:** every rated record is re-priced against the `tariff` Dataset. A record is flagged when the
-  difference exceeds the tolerance, or when its plan and service have no tariff at all.
-- **What to do:** a positive `LEAKAGE_AMOUNT` is under-charging. Check the rating engine's tariff version
-  against the reference table.
+- **Control:** Job `ra_rerating`, with `tolerance` 0.02. Alert Rule `ra_rerating_leakage`.
+- **Which tariff row applies:** the one in force at the **call start**, meaning
+  `EFFECTIVE_FROM <= EVENT_TS < EFFECTIVE_TO`, where a blank `EFFECTIVE_TO` means the row is still open.
+- **A call that spans a tariff change** is priced entirely at the rate in force when it started. The rate is
+  never split, and never taken at the call's end.
+- **Reasons:**
+  - `rate_mismatch` (leakage): the charge differs from the re-rated amount by more than the tolerance. A
+    positive `LEAKAGE_AMOUNT` is under-charging. Check the rating engine's tariff version, especially after a
+    tariff change.
+  - `no_tariff` (data quality): no tariff row covers the call. The reference table has a gap.
+  - `ambiguous_tariff` (data quality): two or more tariff rows cover the call, from an overlapping or
+    duplicate row.
+    - The control emits **one row per call**. It never fans out, and it never guesses a rate.
+    - Fix the tariff table, and the call is re-judged on the next run.
 
 ## Roll-forward
 
-- **Control:** Job `ra_rollforward`, with `tolerance` of 0.01.
-- **Alert Rule:** `ra_rollforward_break`.
-- **How it works:** each subscriber-day must satisfy opening + top-ups + adjustments − debits = closing.
+- **Control:** Job `ra_rollforward`, with `tolerance` 0.05. Alert Rule `ra_rollforward_break`.
+- **Reasons** (one finding per subscriber-day, first match wins):
+  - `null_value` (data quality): opening, closing or a movement is blank, so the day cannot be judged.
+  - `movement` (leakage): opening + top-ups + adjustments − debits ≠ closing. Value moved outside the ledger.
+    Trace the charging system's balance events for that day.
+  - `continuity` (leakage): day N's opening ≠ day N−1's closing. A negative `LEAKAGE_AMOUNT` is money minted
+    between days. Check the end-of-day balance extract.
 - **Adjustments are not leakage.** A goodwill credit is an explained move, and it balances.
-- **What to do:** an unexplained difference means value moved outside the ledger. Trace the charging
-  system's balance events for that day.
 
 ## Settlement
 
-- **Control:** Job `ra_settlement`, with `tolerance_pct` of 1.0.
-- **Alert Rule:** `ra_settlement_overbilling`.
-- **How it works:** each partner statement line is compared against our own switch minutes, counted per
-  started minute, multiplied by the agreed `ic_rates`.
-- **What to do:** a positive `LEAKAGE_AMOUNT` is an overcharge by the partner. Raise a dispute that carries
-  our minute count. A statement line with no agreed rate is flagged as well.
+- **Control:** Job `ra_settlement`, with `tolerance_pct` 1.0. Alert Rule `ra_settlement_overbilling`.
+- **How it compares:** each partner statement line is matched against our own switch minutes (counted per
+  started minute), multiplied by the agreed `ic_rates`.
+- **Reasons:**
+  - `amount_mismatch` (leakage): the difference is more than the tolerance. A positive amount is an
+    overcharge by the partner. Dispute it, with our minute count attached.
+  - `unknown_partner` (leakage): the statement comes from a partner with no agreed rate. **The whole
+    statement amount is the leakage.** Refuse it until an agreement exists.
+  - `no_traffic` (leakage): a known partner billed a day on which our switch carried nothing to them. The
+    whole amount is the leakage.
+  - `missing_statement` (data quality): our switch carried traffic to a partner that sent no statement for
+    that day. Chase the statement, and accrue the expected amount.

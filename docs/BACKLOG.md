@@ -263,26 +263,40 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 - **P2** · `ASSURE-PACK-TELCO-FRAUD-1` — **telecom fraud content pack (WS-15 generic half, wave 5.1 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** A Space Template under `spaces/_templates/` for the top ten typologies (IRSF, Wangiri, SIM-box, premium-rate, roaming high usage, SIM-swap, subscription / identity, dealer activations, voucher / EVD, payment reversal): windows in `sql.template`, per-entity Alert Rules keyed on the offender, a synthetic golden corpus with planted cases and planted look-alikes, a golden test counting detections and false positives, dashboards, KPI definitions, runbooks; thresholds are configuration. ⚠ **BUILT 2026-09-30, not closed (awaiting verification).** All ten typologies ship in `spaces/_templates/telco-fraud/`: three feed Pipelines, ten `sql.template` detection Jobs, ten per-entity Alert Rules keyed on the offender and `window_date`, four KPIs, a dashboard and a runbook file; no new Step Processor. `TelcoFraudTemplateGoldenTest` boots the template through `POST /spaces`, ingests the fixed-seed synthetic corpus (`TelcoFraudCorpus`, seed `20260930`) through the three Pipelines on the production Consignment path, and asserts exactly 5/4/4/5/4/4/3/3/4/4 = 40 Alerts (IRSF … payment reversal) with zero planted look-alikes raised — including one at each threshold and the benign patterns in the runbook — that a same-window re-run duplicates nothing, and that the next window's run neither raises nor drops anything; 16 retained days of fresh offenders give 640 Alerts and no storm. Round 1 of adversarial verification found the Pipelines ingesting nothing (no `mapping:`) and five detection defects; round 2 found the storm cap swallowing per-window keys (rules now key on the offender, `max` over retained windows, `stormCap: 500`); all fixed and mutation-checked. **Still open:** (a) product gap — the per-entity Alert Rule and KPI save gates fail closed on a Dataset with no data, and a Job's sink has none until it runs, so the template ships zero-row seed snapshots (`data/fraud_*/seed.parquet`); a Dataset whose Schema comes from its producing Job would remove them; (b) product gap — a `sql.template` run replaces its whole sink; the Jobs emulate partition-incremental output by `window_date` in their SQL (read own sink, keep other windows within `retention_days`) — a real incremental mode on the Job Type would be simpler; (c) product gap — a Personal build lists the template in the gallery but refuses it at create (its Alert Rules are Professional+); (d) runbooks are plain Markdown — there is no runbook component kind to link from an Alert Rule or Incident; (e) detection windows are literal `window_start` / `window_end` parameters and the Jobs have no `cron`, so a rolling schedule is not configured; (f) the dashboard and KPI tiles were not driven in the UI; (g) thresholds are generic defaults; the vendor-specific half stays parked (plan §4); (h) the exemption lists (`exempt_msisdns`, `exempt_doc_prefixes`) are static parameters trusted as given — `exempt_doc_prefixes` matches a prefix of the dealer-entered `id_doc`, so a fake `CORP-` document is exempted (pinned as a known risk); matching a verified register as a Reference Dataset is not built; (i) each run reads and rewrites the whole retained sink, and the identity / dealer / voucher / reversal sinks keep every entity, so they grow with the subscriber base. → `okf/capabilities/spaces/spaces.md` §3.5
 - **P2** · `ASSURE-PACK-TELCO-RA-1` — **telecom revenue-assurance content pack (WS-16 generic half, wave 5.2 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** Reconciliation, re-rating, roll-forward and settlement controls on canonical synthetic schemas as a Space Template with a golden corpus and golden test; vendor feed mapping stays parked (plan §4). ⬆ **BUILT 2026-09-30 (first slice end to end, not closed):**
-  - **Template:** `spaces/_templates/telco-ra/` — 8 canonical Pipelines + Schemas; Reconciliations
-    `ra_xdr_completeness` (3-way switch → mediation → rating) and `ra_rated_vs_billed` on `recon.run` Jobs;
-    `sql.template` Jobs `ra_rerating` (tariff), `ra_rollforward` and `ra_settlement`; 3 Alert Rules;
-    2 Expectations; a `ra_leakage` union Dataset; `ra_objects_analytics` + `ra_recovery` (latest impact-ledger
-    snapshot); a dashboard; `RUNBOOKS.md`. Tolerances are configuration.
-  - **Golden test:** `TelcoRaGoldenTest` runs the template's own configs over the fixed-seed `TelcoRaCorpus`.
-    Exact keys: completeness 15 Breaks, rated-vs-billed 4, re-rating 5, roll-forward 3, settlement 2. The 19 benign
-    look-alikes stay silent, and zeroing the tolerances goes red.
-  - **Seed gate:** the template applies through `ControlApiSpaceTemplateSeedGateTest`.
+  - **Template:** `spaces/_templates/telco-ra/`.
+    - **Needs Professional or Enterprise** (it ships Alert Rules); on Personal the gallery marks it not creatable.
+      The confirmed and recovered widgets also need the ops module.
+    - 8 canonical Pipelines + Schemas, with DECIMAL money and a tariff table carrying effective dates.
+    - Reconciliations `ra_xdr_completeness` (3-way) and `ra_rated_vs_billed`.
+    - `sql.template` Jobs `ra_xdr_lost`, `ra_rerating` (tariff at the call start; an ambiguous tariff is data
+      quality), `ra_rollforward` (movement + continuity + NULL rules), `ra_settlement` (mismatch, unknown
+      partner, no traffic, missing statement) and `ra_leakage`.
+    - 3 Alert Rules and 2 Expectations; a latest-snapshot `ra_recovery` over the impact ledger; a dashboard;
+      `RUNBOOKS.md`.
+  - **Golden test:** `TelcoRaGoldenTest`, with exact `key|reason` sets:
+
+    | Control | Findings |
+    |---|---|
+    | Completeness | 15 Breaks = 9 distinct xDRs |
+    | Rated vs billed | 4 |
+    | Re-rating | 5 rate mismatches + 12 ambiguous-tariff |
+    | Roll-forward | 6 |
+    | Settlement | 4 |
+
+    - The boundary look-alikes stay silent.
+    - Twelve separate mutations each go red (okf `capabilities/spaces/spaces.md` §3.5).
+  - **Same lane, platform-wide:** the template gallery reports `creatable` / `missingFeatures` per edition,
+    and `recon.run` counts the Breaks of every pair.
   - 🔴 **Open:**
-    - (1) KPI definitions ship as Widgets + a `RUNBOOKS.md` table, not `registry/kpis/`. The seed gate refuses a
-      KPI over an empty Dataset, and every pack Dataset is empty at apply.
-    - (2) A Break's amount does not reach the impact ledger on its own. `recon.run` opens an Incident with Break
-      counts and no impact, so the analyst types the money (`PUT /objects/{id}/impact`).
-    - (3) The golden test loads CSVs straight into the stores. It never ingests them through the 8 Pipelines, and
-      it never evaluates the Alert Rules or Expectations.
-    - (4) `RUNBOOKS.md` is not copied into the created Space; `createFromTemplate` copies `config/` + `data/`
-      only.
-    - (5) There is no job ordering. The controls → `ra_leakage` chain is cron-staggered, not `on_signal`.
-    - (6) `ra_objects_analytics` needs the ops module (the `objects.analytics` type).
+    - (1) The KPI definitions ship as Widgets + a `RUNBOOKS.md` table, not as `registry/kpis/`. The seed gate
+      refuses a KPI over an empty Dataset.
+    - (2) A Break's amount does not reach the impact ledger by itself. The analyst types it
+      (`PUT /objects/{id}/impact`).
+    - (3) The golden test loads the CSVs straight into the stores, never through the 8 Pipelines. It also
+      never evaluates the Alert Rules or Expectations.
+    - (4) `RUNBOOKS.md` is not copied into the created Space.
+    - (5) The Jobs are cron-staggered, not chained with `on_signal`.
+    - (6) The widgets cannot filter on `FINDING`, so there is no widget for the count of data-quality rows.
     - (7) Vendor-specific halves stay parked (plan §4).
 - **P2** · `ASSURE-PACK-PAYMENT-FRAUD-1` — **payment fraud content pack (WS-40…44 generic half, wave 5.3 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** Synthetic attempt / dispute / SIM-change corpus with a fail-closed card-number tripwire, feature Datasets via `sql.template`, payment typologies, a payment Risk Score with a default factor table as configuration, disputes, labels with a maturity flag and payment KPIs — as a Space Template with a golden test.
 - **P2** · `ASSURE-PACK-BUSINESS-ASSURANCE-1` — **business assurance content pack (WS-28 generic half, wave 5.4 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** A seasonal forecast (Holt-Winters in SQL) as a Measure function and a margin model by product / channel / partner, as a Space Template with a golden test. ⚠ **BUILT 2026-09-30, not closed (awaiting verification).** `spaces/_templates/business-assurance/`: a Holt-Winters additive forecast with a ±4σ̂ band as a view-backed Dataset (`ba_revenue_forecast`, a `WITH RECURSIVE` over a SQL-generated deterministic corpus), a margin model (`ba_margin_lines`, `ba_margin_erosion`), two per-entity Alert Rules (outside-band CRITICAL, erosion > 5 points WARNING), three KPI definitions, a dashboard, two disabled `sql.template` Jobs running the same SQL over the user's own stores, and `RUNBOOK.md`. `BusinessAssurancePackGoldenTest`: 2 detections, 0 false positives against 4 planted look-alikes; forecast RMSE 10.3 vs the noise-free signal (σ 20), MAPE 1.7 %. Still open: (a) **the forecast is not a Measure function** — the Measure shorthand is `count | agg(field)`, so a forecast inside a KPI or Alert Rule needs an engine change (the Dataset form was taken, as allowed); (b) a hand-authored view cannot read another view, so each view inlines its corpus CTE; (c) `createFromTemplate` copies only `config/` and `data/`, so the runbook stays in the catalog and never reaches the Space — templates have no runbook home; (d) the Jobs' sinks are not wired to Datasets automatically (the user re-points `physicalRef` by hand); (e) never applied and driven in a live server/UI (only the template seed gate test applies it). ⬆ **Verification FAIL fixed 2026-09-30:** clipping never re-based (a level shift flagged every later day) and a trend ramp was never detected — now a regime rule (K = 3 consecutive out-of-band days → one `regime_change`, level re-based) and a residual CUSUM drift detector (`drift_change`), each with its own Alert Rule; the margin model no longer mis-reads null / negative input (a `data_quality` status + Alert), a no-baseline group (`new`) or a tiny group (`insufficient`, min 10 lines / 1000 revenue per window). Still open: (f) the regime / drift constants and the ramp re-base slope are tuned on this corpus only; (g) on a live tail a real shift raises up to K − 1 spike Alerts (they heal) before its one regime Incident. → `okf/capabilities/spaces/spaces.md` §3.5 · `inspecto-engine/src/test/java/com/gamma/alert/BusinessAssurancePackGoldenTest.java`

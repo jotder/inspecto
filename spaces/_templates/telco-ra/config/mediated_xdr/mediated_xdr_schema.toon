@@ -3,11 +3,11 @@ raw:
   name: MEDIATED_XDR
   format: CSV
   fields[5]{name,selector,type,description,unit,classification}:
-    XDR_ID,"0",VARCHAR,"Usage record identifier","","INTERNAL"
-    EVENT_DATE,"1",DATE,"Business date of the event","","INTERNAL"
-    SUBSCRIBER_ID,"2",VARCHAR,"Subscriber (synthetic)","","INTERNAL"
-    SERVICE,"3",VARCHAR,"VOICE, SMS or DATA","","INTERNAL"
-    USAGE_UNITS,"4",BIGINT,"Units after mediation","count","INTERNAL"
+    XDR_ID,"0","VARCHAR","Usage record identifier","","INTERNAL"
+    EVENT_DATE,"1","DATE","Business date of the event","","INTERNAL"
+    SUBSCRIBER_ID,"2","VARCHAR","Subscriber (synthetic)","","INTERNAL"
+    SERVICE,"3","VARCHAR","VOICE, SMS or DATA","","INTERNAL"
+    USAGE_UNITS,"4","BIGINT","Units after mediation","count","INTERNAL"
 mapping:
   canonicalName: mediated_xdr
   rawName: MEDIATED_XDR

@@ -196,49 +196,82 @@ two-step ask-the-minimum and renders whatever the server publishes. **What is pu
 exists (§2, §5).
 
 **`telco-ra` — the telecom revenue-assurance pack** (`ASSURE-PACK-TELCO-RA-1`, wave 5.2 of the assurance plan,
-2026-09-30; the vendor feed mapping stays parked). The pack is all configuration. There is no new Step Processor
-and no new Java in `main`.
+2026-09-30).
 
-- **Feeds.** Eight canonical synthetic feeds, one Pipeline and Schema each: `switch_xdr`, `mediated_xdr`,
-  `rated_usage`, `billed_invoice`, `tariff`, `balance_ledger`, `ic_rates` and `ic_statement`.
+- **What it is.** Configuration only: no new Step Processor.
+  - The vendor feed mapping stays parked.
+  - The pack needs **Professional or Enterprise**, because it ships Alert Rules (`alert.dispatch`). The gallery
+    marks it `creatable: false` on Personal.
+  - `ra_objects_analytics` needs the ops module.
+- **Feeds.** Eight canonical synthetic feeds, each with a Pipeline and a Schema.
+  - Money is `DECIMAL(18,4)`.
+  - `tariff` carries `EFFECTIVE_FROM` / `EFFECTIVE_TO`.
+  - Called numbers are in the fictional `+1-555-01xx` range.
 - **Reconciliations.**
-  - `ra_xdr_completeness` is a 3-way switch → mediation → rating Reconciliation on `XDR_ID`. `USAGE_UNITS`
-    has an absolute tolerance of 1.
-  - `ra_rated_vs_billed` is keyed on `SUBSCRIBER_ID`, with `CHARGE` at an absolute tolerance of 0.05 and
-    `includeRecordCount: false`. That flag is needed: many rated rows face one invoice row, so a count would
-    break every key.
-  - Both run from `recon.run` Jobs. A breach opens one Incident per Reconciliation.
+  - `ra_xdr_completeness`: 3-way, switch → mediation → rating.
+  - `ra_rated_vs_billed`: needs `includeRecordCount: false`, because many rated rows face one invoice row.
+  - Both run as `recon.run` Jobs.
+  - Since `fix(recon)` in the same lane, the run message, Signal and Incident count the Breaks of **every**
+    pair. Before that they counted A↔B only, from the run summary's `byType`.
 - **`sql.template` control Jobs.**
-  - `ra_rerating` checks each rated record against the tariff table.
-  - `ra_rollforward` checks opening + top-ups + adjustments − debits = closing.
-  - `ra_settlement` checks the partner statement against our switch minutes (per started minute) × `ic_rates`.
-  - Each writes an exceptions Dataset with a common `ITEM_KEY` / `EVENT_DATE` / `LEAKAGE_AMOUNT` / `CONTROL`
-    tail. `ra_leakage` unions them.
-  - The tolerances are Job keys (`tolerance`, `tolerance_pct`) that land in the SQL as `$params`. A `$param`
-    arrives as a string literal, so the SQL `CAST`s it.
-- **Alert Rules.** One per exceptions Dataset, `measure: count`, `comparator: gte`, `threshold: 1`. ⚠ An Alert
-  Rule threshold must be positive, so "any row" is spelled `gte 1` and not `gt 0`.
-- **Impact ledger.**
-  - Money reaches it through the objects: the analyst records impact and Disposition on the Incident or Case.
-  - `ra_objects_analytics` (`objects.analytics`) snapshots that into `impact_ledger`.
-  - `ra_recovery` keeps only the latest snapshot, `sampled_at = max(sampled_at)`. Summing every snapshot would
-    overcount.
-  - The "confirmed" and "recovered" widgets read `ra_recovery`.
-- **KPI definitions.** They ship as `kpi` Widgets plus the definition table in the template's `RUNBOOKS.md`,
-  not as `registry/kpis/`. The seed gate reads a KPI's Dataset Schema, and every pack Dataset is empty at apply,
-  so a KPI pack would refuse the whole template (the `orders-starter` precedent above).
-- **Golden test.**
-  - `inspecto-engine/src/test/java/com/gamma/job/TelcoRaGoldenTest.java` runs the template's OWN Jobs and
-    Reconciliations over the fixed-seed corpus of `TelcoRaCorpus` (seed `20260930`). That corpus is 600 xDRs
-    and 40 subscribers.
-  - It asserts the exact flagged key set per control. The counts are: completeness 15 Breaks, rated-vs-billed 4,
-    re-rating 5, roll-forward 3 and settlement 2.
-  - 19 benign look-alikes stay silent: rounding by one unit, a one-cent rating difference, a two-cent billing
-    difference, goodwill adjustments, and 0.4 % statement noise.
-  - It also pins that the committed `data/samples` are byte-identical to the generator's output. Regenerate
-    them with `-Dtelcora.regenerate=true`.
-  - Zeroing each tolerance turns the test red on the look-alikes (mutation-checked).
-  - ⚠ The corpus is loaded straight into the stores, not ingested through the eight Pipelines.
+  - `ra_xdr_lost`: distinct lost or short xDRs.
+  - `ra_rerating`: the tariff row in force at the call **start**. It emits one row per call, and a
+    duplicate or overlapping row becomes an `ambiguous_tariff` data-quality finding, never a fan-out.
+  - `ra_rollforward`: checks the movement rule, day-to-day continuity, and a NULL field (data quality).
+  - `ra_settlement`: a FULL OUTER JOIN of the statement against our switch minutes × rate. It flags
+    `amount_mismatch`, `unknown_partner` (the whole statement is the leakage), `no_traffic`, and
+    `missing_statement` (data quality).
+  - `ra_leakage`: the union of the three money controls.
+  - Every row carries `REASON`, and `FINDING` is `leakage` or `data_quality`. A leakage row always has a
+    non-NULL amount.
+  - Tolerances are Job keys. A `$param` arrives as a string literal, so the SQL `CAST`s it to
+    `DECIMAL(18,4)`.
+  - ⚠ `CEIL` returns a DOUBLE: a settlement minute count must be cast back to `BIGINT`, or every downstream
+    amount silently turns into a float. The golden test caught this.
+- **Alert Rules.** One per money control, using `gte 1`. ⚠ An Alert Rule threshold must be positive, so "any
+  row" cannot be written `gt 0`.
+- **KPIs.** They ship as `kpi` Widgets plus the `RUNBOOKS.md` table, not as `registry/kpis/`. The seed gate
+  reads a KPI's Dataset Schema, and every pack Dataset is empty at apply.
+  - ⚠ **Breaks are not xDRs.** On the golden corpus, 15 completeness Breaks are **9** distinct lost or short
+    xDRs, because a record lost at mediation breaks both pairs. The dashboard shows the xDR count
+    (`ra_xdr_lost`).
+- **Golden test.** `inspecto-engine/src/test/java/com/gamma/job/TelcoRaGoldenTest.java` runs the template's
+  own Jobs and Reconciliations over `TelcoRaCorpus` (seed `20260930`, 600 xDRs). It asserts the exact
+  `key|reason` set per control, and one row per finding:
+
+  | Control | Findings |
+  |---|---|
+  | Completeness | 15 Breaks / 9 xDRs |
+  | Rated vs billed | 4 |
+  | Re-rating | 5 `rate_mismatch` (2 half-rate + 3 still on the pre-change rate) and 12 `ambiguous_tariff` |
+  | Roll-forward | 6 (3 movement, 2 continuity, 1 NULL opening) |
+  | Settlement | 4 (2 over-billed, 1 missing statement, 1 unknown partner) |
+
+  - It also checks that leakage amounts are never NULL, that they are DECIMAL, and that the committed samples
+    are byte-identical to the generator (`-Dtelcora.regenerate=true`).
+  - The benign look-alikes are real **boundary** cases:
+    - a call spanning the tariff change;
+    - one cent under the re-rating tolerance;
+    - 0.04 against the 0.05 billing and roll-forward tolerances;
+    - 0.9 % against the 1 % settlement tolerance;
+    - goodwill adjustments;
+    - rounding by one usage unit.
+  - **Mutation-checked, each one run separately and red.** Mutations that tighten a tolerance under its
+    look-alikes:
+    - completeness 1 → 0;
+    - rated-vs-billed 0.05 → 0.03;
+    - re-rating 0.02 → 0.005;
+    - roll-forward 0.05 → 0.03;
+    - settlement 1.0 → 0.8.
+
+    Mutations that remove or change a rule:
+    - a re-rating join without effective dates;
+    - re-rating at the call's end;
+    - roll-forward without adjustments, without continuity, or without the NULL rule;
+    - settlement with a LEFT JOIN instead of the FULL OUTER JOIN;
+    - an unknown partner's amount set to NULL.
+  - ⚠ The golden test loads the corpus straight into the stores. It does not ingest through the eight
+    Pipelines.
 - `ControlApiSpaceTemplateSeedGateTest` applies the template through the real seed gate.
 
 **A template may carry a KPI pack** (`config/registry/kpis/`, `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1),

@@ -1,14 +1,16 @@
 raw:
   name: TARIFF
   format: CSV
-  fields[3]{name,selector,type,description,unit,classification}:
-    PLAN,"0",VARCHAR,"Tariff plan","","INTERNAL"
-    SERVICE,"1",VARCHAR,"VOICE, SMS or DATA","","INTERNAL"
-    RATE_PER_UNIT,"2",DOUBLE,"Rate per second, event or MB","USD","INTERNAL"
+  fields[5]{name,selector,type,description,unit,classification}:
+    PLAN,"0","VARCHAR","Tariff plan","","INTERNAL"
+    SERVICE,"1","VARCHAR","VOICE, SMS or DATA","","INTERNAL"
+    RATE_PER_UNIT,"2","DECIMAL(18,4)","Rate per second, event or MB","USD","INTERNAL"
+    EFFECTIVE_FROM,"3","TIMESTAMP","The rate applies to calls starting at or after this instant","","INTERNAL"
+    EFFECTIVE_TO,"4","TIMESTAMP","The rate applies to calls starting before this instant (blank = open)","","INTERNAL"
 mapping:
   canonicalName: tariff
   rawName: TARIFF
-  fields[3]:
+  fields[5]:
     - name: PLAN
       from: PLAN
       fn: keep
@@ -17,4 +19,10 @@ mapping:
       fn: keep
     - name: RATE_PER_UNIT
       from: RATE_PER_UNIT
+      fn: keep
+    - name: EFFECTIVE_FROM
+      from: EFFECTIVE_FROM
+      fn: keep
+    - name: EFFECTIVE_TO
+      from: EFFECTIVE_TO
       fn: keep

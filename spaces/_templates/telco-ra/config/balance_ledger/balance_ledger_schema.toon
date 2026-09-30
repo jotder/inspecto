@@ -3,13 +3,13 @@ raw:
   name: BALANCE_LEDGER
   format: CSV
   fields[7]{name,selector,type,description,unit,classification}:
-    SUBSCRIBER_ID,"0",VARCHAR,"Subscriber (synthetic)","","INTERNAL"
-    BALANCE_DATE,"1",DATE,"Balance day","","INTERNAL"
-    OPENING,"2",DOUBLE,"Opening balance","USD","INTERNAL"
-    TOPUPS,"3",DOUBLE,"Top-ups in","USD","INTERNAL"
-    ADJUSTMENTS,"4",DOUBLE,"Signed adjustments (goodwill credits, corrections)","USD","INTERNAL"
-    USAGE_DEBITS,"5",DOUBLE,"Usage debited out","USD","INTERNAL"
-    CLOSING,"6",DOUBLE,"Closing balance","USD","INTERNAL"
+    SUBSCRIBER_ID,"0","VARCHAR","Subscriber (synthetic)","","INTERNAL"
+    BALANCE_DATE,"1","DATE","Balance day","","INTERNAL"
+    OPENING,"2","DECIMAL(18,4)","Opening balance","USD","INTERNAL"
+    TOPUPS,"3","DECIMAL(18,4)","Top-ups in","USD","INTERNAL"
+    ADJUSTMENTS,"4","DECIMAL(18,4)","Signed adjustments (goodwill credits, corrections)","USD","INTERNAL"
+    USAGE_DEBITS,"5","DECIMAL(18,4)","Usage debited out","USD","INTERNAL"
+    CLOSING,"6","DECIMAL(18,4)","Closing balance","USD","INTERNAL"
 mapping:
   canonicalName: balance_ledger
   rawName: BALANCE_LEDGER

@@ -2,10 +2,10 @@ raw:
   name: BILLED_INVOICE
   format: CSV
   fields[4]{name,selector,type,description,unit,classification}:
-    INVOICE_ID,"0",VARCHAR,"Invoice line identifier","","INTERNAL"
-    BILL_PERIOD,"1",VARCHAR,"Bill period (yyyy-MM)","","INTERNAL"
-    SUBSCRIBER_ID,"2",VARCHAR,"Subscriber (synthetic)","","INTERNAL"
-    CHARGE,"3",DOUBLE,"Billed usage charge","USD","INTERNAL"
+    INVOICE_ID,"0","VARCHAR","Invoice line identifier","","INTERNAL"
+    BILL_PERIOD,"1","VARCHAR","Bill period (yyyy-MM)","","INTERNAL"
+    SUBSCRIBER_ID,"2","VARCHAR","Subscriber (synthetic)","","INTERNAL"
+    CHARGE,"3","DECIMAL(18,4)","Billed usage charge","USD","INTERNAL"
 mapping:
   canonicalName: billed_invoice
   rawName: BILLED_INVOICE

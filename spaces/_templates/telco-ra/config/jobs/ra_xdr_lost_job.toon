@@ -1,0 +1,9 @@
+job:
+  name: ra_xdr_lost
+  type: sql.template
+  sql: "SELECT s.XDR_ID AS ITEM_KEY, s.EVENT_DATE, s.SUBSCRIBER_ID, s.SERVICE, s.USAGE_UNITS AS SWITCH_UNITS, m.USAGE_UNITS AS MEDIATED_UNITS, r.USAGE_UNITS AS RATED_UNITS, CASE WHEN m.XDR_ID IS NULL THEN 'lost_at_mediation' WHEN r.XDR_ID IS NULL THEN 'lost_at_rating' ELSE 'short' END AS REASON, 'ra_xdr_lost' AS CONTROL FROM switch_xdr s LEFT JOIN mediated_xdr m ON m.XDR_ID = s.XDR_ID LEFT JOIN rated_usage r ON r.XDR_ID = s.XDR_ID WHERE m.XDR_ID IS NULL OR r.XDR_ID IS NULL OR ABS(s.USAGE_UNITS - m.USAGE_UNITS) > CAST($tolerance AS BIGINT) OR ABS(s.USAGE_UNITS - r.USAGE_UNITS) > CAST($tolerance AS BIGINT)"
+  sources: "switch_xdr,mediated_xdr,rated_usage"
+  sink_dataset: ra_xdr_lost
+  tolerance: "1"
+  cron: "2 5 * * *"
+  enabled: true

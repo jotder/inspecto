@@ -45,6 +45,8 @@ class TelcoRaGoldenTest {
 
     private static final Path TEMPLATE = Path.of("..", "spaces", "_templates", "telco-ra").toAbsolutePath().normalize();
     private static final TelcoRaCorpus CORPUS = TelcoRaCorpus.generate();
+    /** Rated calls under the duplicate PLAN_B DATA tariff row: a property of the fixed seed, pinned. */
+    private static final long AMBIGUOUS = 12;
 
     @BeforeAll
     static void regenerateOnAsk() throws Exception {
@@ -85,6 +87,8 @@ class TelcoRaGoldenTest {
             assertEquals("recon.run", cfg.type());
             JobResult r = new ReconRunJob(cfg, dataDir.toString(), () -> null).run(new Ctx(cfg.params()));
             assertEquals("SUCCESS", r.status(), r.message());
+            assertTrue(r.message().contains(": " + CORPUS.planted.get(recon).size() + " break(s)"),
+                    recon + ": the run reports every pair's Breaks: " + r.message());
             Set<String> flagged = new TreeSet<>();
             for (ReconBreaks.Break b : new ReconStateStore(writeRoot).read(recon).breaks())
                 flagged.add(b.pair() + "|" + b.type() + "|" + b.key());
@@ -95,7 +99,7 @@ class TelcoRaGoldenTest {
 
         // ── sql.template controls, through the template's own Jobs and tolerances ──
         List<JobConfig> jobs = new ArrayList<>();
-        for (String j : List.of("ra_rerating", "ra_rollforward", "ra_settlement", "ra_leakage"))
+        for (String j : List.of("ra_xdr_lost", "ra_rerating", "ra_rollforward", "ra_settlement", "ra_leakage"))
             jobs.add(JobConfig.load(templateJob(j).toString()));
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(jobs, new ConsignmentEventBus(), s, null,
@@ -108,26 +112,54 @@ class TelcoRaGoldenTest {
             }
         }
         long plantedTotal = 0;
-        for (String control : List.of("ra_rerating", "ra_rollforward", "ra_settlement")) {
-            Set<String> flagged = column(dataDir, control + "_exceptions", "ITEM_KEY");
-            assertEquals(new TreeSet<>(CORPUS.planted.get(control)), flagged, control + ": exactly the planted leakages");
+        for (String control : List.of("ra_xdr_lost", "ra_rerating", "ra_rollforward", "ra_settlement")) {
+            String store = "ra_xdr_lost".equals(control) ? control : control + "_exceptions";
+            List<String> rows = rows(dataDir, store, "ITEM_KEY || '|' || REASON");
+            Set<String> flagged = new TreeSet<>(rows);
+            assertEquals(flagged.size(), rows.size(), control + ": one row per finding, never a fan-out");
+            assertEquals(new TreeSet<>(CORPUS.planted.get(control)), flagged, control + ": exactly the planted findings");
             for (String benign : CORPUS.benign.get(control))
-                assertFalse(flagged.contains(benign), control + " flagged benign look-alike " + benign);
-            plantedTotal += CORPUS.planted.get(control).size();
+                assertTrue(flagged.stream().noneMatch(k -> k.startsWith(benign + "|")),
+                        control + " flagged benign look-alike " + benign);
+            if (!"ra_xdr_lost".equals(control)) plantedTotal += CORPUS.planted.get(control).size();
         }
-        assertEquals(plantedTotal, column(dataDir, "ra_leakage", "CONTROL || ':' || ITEM_KEY").size(),
+        assertEquals(plantedTotal, rows(dataDir, "ra_leakage", "CONTROL").size(),
                 "the leakage Dataset carries every control's findings");
+        // a leakage finding always carries its amount, so a sum never silently drops one
+        for (String control : List.of("ra_rerating", "ra_rollforward", "ra_settlement"))
+            assertEquals(List.of(), rows(dataDir, control + "_exceptions",
+                    "ITEM_KEY WHERE FINDING = 'leakage' AND LEAKAGE_AMOUNT IS NULL"), control);
+        // money stays DECIMAL end to end, so a tolerance compares exact cents, never float noise
+        for (String control : List.of("ra_rerating", "ra_rollforward", "ra_settlement"))
+            for (String t : rows(dataDir, control + "_exceptions", "DISTINCT typeof(LEAKAGE_AMOUNT)"))
+                assertTrue(t.startsWith("DECIMAL"), control + " LEAKAGE_AMOUNT is " + t);
+        assertEquals(List.of("45.0000"), rows(dataDir, "ra_settlement_exceptions",
+                "CAST(LEAKAGE_AMOUNT AS VARCHAR) WHERE REASON = 'unknown_partner'"),
+                "an unknown partner's whole statement is the leakage");
+        // Breaks double-count: 15 Breaks are 9 distinct lost or short xDRs
+        Set<String> brokenXdrs = new TreeSet<>();
+        for (ReconBreaks.Break b : new ReconStateStore(writeRoot).read("ra_xdr_completeness").breaks()) brokenXdrs.add(b.key());
+        assertEquals(new TreeSet<>(CORPUS.lostOrShortXdrs), brokenXdrs);
+        assertEquals(brokenXdrs, column(dataDir, "ra_xdr_lost", "ITEM_KEY"), "the lost-xDR Dataset counts xDRs, not Breaks");
     }
 
     /** The golden counts, pinned: a corpus change that moves them must be deliberate. */
     @Test
     void theGoldenCountsArePinned() {
         assertEquals(15, CORPUS.planted.get("ra_xdr_completeness").size(), "4 dropped at mediation (AB+AC), 3 at rating (AC), 2 truncated (AB+AC)");
+        assertEquals(9, CORPUS.lostOrShortXdrs.size(), "the 15 Breaks are 9 distinct xDRs");
+        assertEquals(9, CORPUS.planted.get("ra_xdr_lost").size());
         assertEquals(4, CORPUS.planted.get("ra_rated_vs_billed").size(), "1 unbilled, 3 under-billed");
-        assertEquals(5, CORPUS.planted.get("ra_rerating").size());
-        assertEquals(3, CORPUS.planted.get("ra_rollforward").size());
-        assertEquals(2, CORPUS.planted.get("ra_settlement").size());
-        assertEquals(4 + 3 + 5 + 3 + 2, CORPUS.benign.values().stream().mapToInt(Set::size).sum(), "benign look-alikes");
+        assertEquals(5, CORPUS.planted.get("ra_rerating").stream().filter(k -> k.endsWith("|rate_mismatch")).count(),
+                "2 half-rated + 3 still on the pre-change rate");
+        assertEquals(AMBIGUOUS, CORPUS.planted.get("ra_rerating").stream().filter(k -> k.endsWith("|ambiguous_tariff")).count(),
+                "calls under the duplicate tariff row: data quality, one row each");
+        assertEquals(6, CORPUS.planted.get("ra_rollforward").size(), "3 movement, 2 continuity, 1 null opening");
+        assertEquals(4, CORPUS.planted.get("ra_settlement").size(), "2 over-billed, 1 missing statement, 1 unknown partner");
+        assertEquals(Map.of("ra_xdr_completeness", 4, "ra_xdr_lost", 4, "ra_rerating", 6, "ra_rated_vs_billed", 3,
+                        "ra_rollforward", 5, "ra_settlement", 2),
+                CORPUS.benign.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size())),
+                "benign look-alikes per control");
     }
 
     /** The recovery view reads the impact ledger's LATEST snapshot only — summing every snapshot would overcount. */
@@ -190,12 +222,26 @@ class TelcoRaGoldenTest {
             if (l.trim().startsWith("fields[") && l.contains("{name,")) { in = true; continue; }
             if (in && !l.startsWith("    ")) break;
             if (in) {
-                String[] parts = l.trim().split(",");
+                String[] parts = l.trim().split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
+                for (int i = 0; i < parts.length; i++) parts[i] = parts[i].replace("\"", "");
                 if (sb.length() > 1) sb.append(", ");
                 sb.append('\'').append(parts[0]).append("': '").append(parts[2]).append('\'');
             }
         }
         return sb.append('}').toString();
+    }
+
+    /** Every value of {@code expr} over the store, duplicates kept; {@code expr} may carry a trailing WHERE. */
+    private static List<String> rows(Path dataDir, String store, String expr) throws Exception {
+        String select = expr.contains(" WHERE ") ? expr.substring(0, expr.indexOf(" WHERE ")) : expr;
+        String where = expr.contains(" WHERE ") ? expr.substring(expr.indexOf(" WHERE ")) : "";
+        List<String> out = new ArrayList<>();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery("SELECT " + select + " FROM read_parquet('"
+                     + dataDir.resolve(store).toString().replace('\\', '/') + "/*.parquet')" + where)) {
+            while (rs.next()) out.add(rs.getString(1));
+        }
+        return out;
     }
 
     private static Set<String> column(Path dataDir, String store, String expr) throws Exception {

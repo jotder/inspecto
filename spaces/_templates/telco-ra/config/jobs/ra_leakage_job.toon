@@ -1,7 +1,7 @@
 job:
   name: ra_leakage
   type: sql.template
-  sql: "SELECT CONTROL, EVENT_DATE, ITEM_KEY, LEAKAGE_AMOUNT FROM ra_rerating_exceptions UNION ALL SELECT CONTROL, EVENT_DATE, ITEM_KEY, LEAKAGE_AMOUNT FROM ra_rollforward_exceptions UNION ALL SELECT CONTROL, EVENT_DATE, ITEM_KEY, LEAKAGE_AMOUNT FROM ra_settlement_exceptions"
+  sql: "SELECT CONTROL, EVENT_DATE, ITEM_KEY, REASON, FINDING, LEAKAGE_AMOUNT FROM ra_rerating_exceptions UNION ALL SELECT CONTROL, EVENT_DATE, ITEM_KEY, REASON, FINDING, LEAKAGE_AMOUNT FROM ra_rollforward_exceptions UNION ALL SELECT CONTROL, EVENT_DATE, ITEM_KEY, REASON, FINDING, LEAKAGE_AMOUNT FROM ra_settlement_exceptions"
   sources: "ra_rerating_exceptions,ra_rollforward_exceptions,ra_settlement_exceptions"
   sink_dataset: ra_leakage
   cron: "30 5 * * *"
