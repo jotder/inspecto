@@ -23,6 +23,19 @@ class FileStatusStoreTest {
      * ("C:\\db\\out.csv" -> "C:dbout.csv"); the RFC4180 parser reads it literally. This writes a
      * real audit row via ConsignmentAuditWriter and reads it back through FileStatusStore end-to-end.
      */
+    /** {@code processing.refusal}: the restricted quarantine ({@code <quarantine>/.restricted}) is never listed. */
+    @Test
+    void theRestrictedQuarantineIsNotListed(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        Path q = Path.of(cfg.dirs().quarantine());
+        Files.createDirectories(q.resolve("field_mismatch"));
+        Files.writeString(q.resolve("field_mismatch/a.csv"), "x");
+        Files.createDirectories(q.resolve(".restricted"));
+        Files.writeString(q.resolve(".restricted/refused-CARD_NUMBER-1-1.csv"), "x");
+        List<Map<String, String>> rows = new FileStatusStore().quarantine(cfg);
+        assertEquals(List.of("a.csv"), rows.stream().map(r -> r.get("file")).toList());
+    }
+
     @Test
     void preservesBackslashesInWindowsOutputPaths(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = PipelineConfig.load(

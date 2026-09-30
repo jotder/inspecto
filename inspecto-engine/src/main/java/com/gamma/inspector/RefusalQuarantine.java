@@ -18,10 +18,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
@@ -30,31 +35,35 @@ import java.util.regex.Pattern;
 /**
  * Opt-in content refusal ({@code processing.refusal: restricted_quarantine}, default off).
  *
- * <p><b>Trigger.</b> Only an AUTHOR-raised refusal: a DuckDB {@code error()} whose whole message is a reason code
- * matching {@link #CODE} — the exception is a {@link SQLException} whose message is EXACTLY
- * {@code "Invalid Input Error: INGEST_REFUSE:<CODE>"}. A conversion/cast error, or a code appearing anywhere else in
- * a message or cause chain, never triggers it, so data content cannot (a cast error quotes the value but is a
- * {@code Conversion Error}). Opt-in pipelines may also refuse a file whose NAME or HEADER line carries a card-number
- * candidate ({@link #CARD_IN_NAME} / {@link #CARD_IN_HEADER}).
+ * <p><b>Triggers.</b> (1) An AUTHOR-raised refusal: the FIRST {@link SQLException} of a transform failure whose
+ * message is EXACTLY {@code "Invalid Input Error: INGEST_REFUSE:<CODE>"} ({@link #CODE}) — a conversion/cast error or
+ * a code anywhere else never triggers it, so data content cannot. (2) {@code processing.refusal_scan: card_number}:
+ * the platform scans every raw cell except {@code refusal_scan_exempt} for a card-shaped number ({@link #cardScanSql}).
+ * (3) With the mode on, a file NAME or HEADER line carrying a card-shaped number ({@link #CARD_IN_NAME} /
+ * {@link #CARD_IN_HEADER}).
  *
- * <p><b>Effect.</b> The file moves to {@code <quarantine>/../restricted-quarantine/} under a GENERATED name (the
- * original name may itself be the sensitive value). That directory is never polled (it is not the inbox), is skipped
- * by {@code BackupTask}, and is not the quarantine tree the run routes list. Nothing of the file is written; only the
- * reason code is recorded — in the member's status row, the WARN log and one AUDIT event — never exception text, a
- * value or the original name. An optional {@code refusal_retention_days} ages restricted files out.
+ * <p><b>Effect.</b> The file moves to {@code <quarantine>/.restricted/} — INSIDE the Pipeline's own quarantine
+ * directory, so it is as jailed as that is — under a generated name carrying the reason code. It is never polled,
+ * {@code BackupTask} skips {@code .restricted}, and the quarantine listing and errors-file routes skip it. Only the
+ * reason code is recorded — the member's status row, one WARN line, one AUDIT event {@code ingest.refused} — and
+ * each file the optional retention window deletes is audited ({@code ingest.refused.retention}, code only).
  */
 final class RefusalQuarantine {
 
     private static final Logger log = LoggerFactory.getLogger(RefusalQuarantine.class);
 
     static final Pattern CODE = Pattern.compile("INGEST_REFUSE:[A-Z][A-Z_]{0,63}");
-    static final String DIR = "restricted-quarantine";
+    /** The restricted directory's name inside {@code dirs.quarantine}; restated by {@code BackupTask} and the routes. */
+    static final String DIR = ".restricted";
+    static final String CARD = "INGEST_REFUSE:CARD_NUMBER";
     static final String CARD_IN_NAME = "INGEST_REFUSE:CARD_NUMBER_IN_FILE_NAME";
     static final String CARD_IN_HEADER = "INGEST_REFUSE:CARD_NUMBER_IN_HEADER";
     private static final String DUCKDB_PREFIX = "Invalid Input Error: ";
     private static final AtomicLong SEQ = new AtomicLong();
 
     private RefusalQuarantine() {}
+
+    // ── triggers ───────────────────────────────────────────────────────────────────────────────────────────────
 
     /** The reason code iff {@code cfg} opts in and the FIRST {@link SQLException} in {@code e}'s chain is exactly one. */
     static String reasonCode(PipelineConfig cfg, Throwable e) {
@@ -71,19 +80,44 @@ final class RefusalQuarantine {
     }
 
     /**
-     * Probe ONE member's transform in isolation (multi-member and Java lanes): materialise {@code source} into a
-     * throwaway table and report the reason code if the author's mapping refused it; any other failure returns
-     * {@code null} and is left to the real pass, which fails exactly as before.
+     * Judge one relation (a member's raw view or table) before its rows are used: the platform card scan first, then
+     * the author's mapping in isolation. {@code null} = not refused (any other failure is left to the real pass).
      */
-    static String probe(Connection conn, Map<String, Object> schema, PipelineConfig cfg, String source) {
+    static String judge(Connection conn, Map<String, Object> schema, PipelineConfig cfg, String relation) {
         if (!cfg.refusal().restricted()) return null;
+        String scanned = scan(conn, schema, cfg, relation);
+        if (scanned != null) return scanned;
         try {
-            com.gamma.etl.DataTransformer.materialize(conn, schema, cfg, source, "__refusal_probe");
+            com.gamma.etl.DataTransformer.materialize(conn, schema, cfg, relation, "__refusal_probe");
             return null;
         } catch (Exception e) {
             return reasonCode(cfg, e);
         } finally {
             ConsignmentIngestStrategy.dropTable(conn, "__refusal_probe");
+        }
+    }
+
+    /** The platform card scan of one FILE (single-member and chunked lanes): a raw view over it, scanned, dropped. */
+    static String scanFile(Connection conn, File f, Map<String, Object> schema, PipelineConfig cfg, int srcId) {
+        if (!cfg.refusal().restricted() || !cfg.refusal().cardScan()) return null;
+        try {
+            com.gamma.etl.DuckDbCsvIngester.createRawInputView(f, conn, schema, cfg, "__refusal_scan", srcId);
+            return scan(conn, schema, cfg, "__refusal_scan");
+        } catch (Exception unreadable) {
+            return null;   // an unreadable file is the lane's to classify
+        } finally {
+            ConsignmentIngestStrategy.dropView(conn, "__refusal_scan");
+        }
+    }
+
+    private static String scan(Connection conn, Map<String, Object> schema, PipelineConfig cfg, String relation) {
+        if (!cfg.refusal().cardScan()) return null;
+        String sql = cardScanSql(columns(schema, cfg.refusal().scanExempt()), relation);
+        if (sql == null) return null;
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            return rs.next() ? CARD : null;
+        } catch (SQLException e) {
+            return null;   // the real pass reports it
         }
     }
 
@@ -99,65 +133,168 @@ final class RefusalQuarantine {
             int nl = head.indexOf('\n');
             if (CardNumbers.containsCandidate(nl < 0 ? head : head.substring(0, nl))) return CARD_IN_HEADER;
         } catch (IOException | RuntimeException unreadable) {
-            return null;   // an unreadable file is the ingest's to classify, not this check's
+            return null;
         }
         return null;
     }
+
+    // ── the card scan (SQL) ────────────────────────────────────────────────────────────────────────────────────
+
+    /** A raw column the scan reads: its name and whether it is a DATE/TIMESTAMP (a well-formed value is skipped). */
+    record Column(String name, boolean temporal) {}
+
+    /** The schema's raw fields minus the exempt ones (case-insensitive); a name that is not a plain identifier is skipped. */
+    static List<Column> columns(Map<String, Object> schema, List<String> exempt) {
+        List<Column> out = new ArrayList<>();
+        if (!(schema.get("raw") instanceof Map<?, ?> raw) || !(raw.get("fields") instanceof List<?> fields)) return out;
+        java.util.Set<String> skip = new java.util.HashSet<>();
+        for (String x : exempt) skip.add(x.toUpperCase(Locale.ROOT));
+        for (Object f : fields)
+            if (f instanceof Map<?, ?> m && m.get("name") != null) {
+                String name = String.valueOf(m.get("name"));
+                if (!name.matches("[A-Za-z_][A-Za-z0-9_]*") || skip.contains(name.toUpperCase(Locale.ROOT))) continue;
+                String type = String.valueOf(m.get("type")).toUpperCase(Locale.ROOT);
+                out.add(new Column(name, type.startsWith("DATE") || type.startsWith("TIMESTAMP")));
+            }
+        return out;
+    }
+
+    /** Unicode Nd digit blocks (zero code point of each run of ten) folded to ASCII before the scan. */
+    static final int[] DIGIT_ZEROS = {0x0660, 0x06F0, 0x07C0, 0x0966, 0x09E6, 0x0A66, 0x0AE6, 0x0B66, 0x0BE6, 0x0C66,
+            0x0CE6, 0x0D66, 0x0DE6, 0x0E50, 0x0ED0, 0x0F20, 0x1040, 0x1090, 0x17E0, 0x1810, 0x1946, 0x19D0, 0x1A80,
+            0x1A90, 0x1B50, 0x1BB0, 0x1C40, 0x1C50, 0xA620, 0xA8D0, 0xA900, 0xA9D0, 0xA9F0, 0xAA50, 0xABF0, 0xFF10,
+            0x1D7CE, 0x1D7D8, 0x1D7E2, 0x1D7EC, 0x1D7F6};
+
+    /**
+     * {@code SELECT 1 FROM relation WHERE <some cell carries a card-shaped number> LIMIT 1}, or {@code null} with no
+     * column to scan. Per cell: marks (Mn, Me) and format characters (Cf) stripped, Nd digits folded, an IBAN-shaped
+     * cell skipped, a well-formed date/timestamp skipped; then runs of digit groups joined by 1–5 non-alphanumerics,
+     * split into groups; a candidate is one group of 13–19 digits or a 4-4-4-4 / 4-4-4-4-3 / 4-6-5 / 4-6-4 window —
+     * accepted when {@link CardNumbers#IIN_REGEX} matches it (brand prefix AND length) and it is Luhn-valid. Linear:
+     * RE2 regexes, windows of at most 5 groups, a group longer than 19 digits is no candidate.
+     */
+    static String cardScanSql(List<Column> cols, String relation) {
+        if (cols.isEmpty()) return null;
+        StringBuilder uni = new StringBuilder(), asc = new StringBuilder();
+        for (int z : DIGIT_ZEROS) for (int i = 0; i < 10; i++) { uni.appendCodePoint(z + i); asc.append((char) ('0' + i)); }
+        List<String> cells = new ArrayList<>();
+        for (Column c : cols) {
+            String n = "translate(regexp_replace(CAST(\"" + c.name() + "\" AS VARCHAR), '[\\p{Mn}\\p{Me}\\p{Cf}]', '', 'g'), '"
+                    + uni + "', '" + asc + "')";
+            String guard = "regexp_full_match(" + n + ", '[A-Z]{2}[0-9]{2}( ?[0-9A-Z]{1,4}){3,8}')"   // IBAN-shaped
+                    + (c.temporal() ? " OR regexp_full_match(" + n
+                    + ", '[0-9]{4}-[0-9]{2}-[0-9]{2}( [0-9]{2}:[0-9]{2}:[0-9]{2})?')" : "");
+            cells.add("CASE WHEN " + guard + " THEN NULL ELSE " + n + " END");
+        }
+        String row = "concat_ws('X', " + String.join(", ", cells) + ")";
+        String runs = "list_transform(regexp_extract_all(" + row + ", '[0-9]+(?:[^0-9A-Za-z]{1,5}[0-9]+)*'), "
+                + "lambda r: regexp_split_to_array(r, '[^0-9]+'))";
+        String shapes = String.join(", ",
+                "CASE WHEN " + len(0) + " BETWEEN 13 AND 19 THEN g[i] END",
+                "CASE WHEN " + lens(4, 4, 4, 4) + " THEN " + cat(4) + " END",
+                "CASE WHEN " + lens(4, 4, 4, 4, 3) + " THEN " + cat(5) + " END",
+                "CASE WHEN " + lens(4, 6, 5) + " THEN " + cat(3) + " END",
+                "CASE WHEN " + lens(4, 6, 4) + " THEN " + cat(3) + " END");
+        String cands = "flatten(list_transform(" + runs + ", lambda g: flatten(list_transform(range(1, len(g) + 1), "
+                + "lambda i: [" + shapes + "]))))";
+        String d = "CAST(substr(reverse(d), k, 1) AS INTEGER)";
+        String luhn = "list_sum(list_transform(range(1, length(d) + 1), lambda k: CASE WHEN k % 2 = 0 THEN " + d
+                + " * 2 - CASE WHEN " + d + " > 4 THEN 9 ELSE 0 END ELSE " + d + " END)) % 10 = 0";
+        String card = "d IS NOT NULL AND regexp_full_match(d, '" + CardNumbers.IIN_REGEX + "') AND " + luhn;
+        return "SELECT 1 FROM \"" + relation + "\" WHERE len(list_filter(" + cands + ", lambda d: " + card + ")) > 0 LIMIT 1";
+    }
+
+    private static String len(int k) { return "length(g[i + " + k + "])"; }
+
+    private static String lens(int... sizes) {
+        List<String> p = new ArrayList<>();
+        for (int k = 0; k < sizes.length; k++) p.add(len(k) + " = " + sizes[k]);
+        return String.join(" AND ", p);
+    }
+
+    private static String cat(int n) {
+        List<String> p = new ArrayList<>();
+        for (int k = 0; k < n; k++) p.add("g[i + " + k + "]");
+        return String.join(" || ", p);
+    }
+
+    // ── effect ─────────────────────────────────────────────────────────────────────────────────────────────────
 
     /** Move {@code m}'s file to the restricted quarantine, audit it, and return its member audit row. */
     static MemberAudit restrict(Consignment.Member m, PipelineConfig cfg, String code, String batchId, LocalDateTime start)
             throws IOException {
         Path dir = dir(cfg);
         Files.createDirectories(dir);
-        String name = f(m.file().getName());
+        String name = storedName(m.file().getName(), code);
         Path target = dir.resolve(name).normalize();
-        if (!target.startsWith(dir)) throw new IOException("restricted quarantine target escapes its directory");
+        if (!target.getParent().equals(dir)) throw new IOException("restricted quarantine target escapes its directory");
         Files.move(m.file().toPath(), target);
-        age(dir, cfg.refusal().retentionDays());
+        age(dir, cfg);
         log.warn("[INGEST] [{}] refused {} → restricted quarantine as {}", cfg.identity().pipelineName(), code, name);
-        try {
-            EventLog.current().emit(Event.builder(EventType.AUDIT).source("audit")
-                    .message("Pipeline '" + cfg.identity().pipelineName() + "' refused a file: " + code)
-                    .action("ingest.refused").actionCategory("security")
-                    .attr("pipeline", cfg.identity().pipelineName()).attr("reason", code)
-                    .attr("consignment", batchId).attr("stored_as", name));
-        } catch (RuntimeException auditDown) {
-            log.warn("[INGEST] refusal audit event not recorded: {}", auditDown.getClass().getSimpleName());
-        }
+        audit(cfg, "ingest.refused", "Pipeline '" + cfg.identity().pipelineName() + "' refused a file: " + code,
+                code, name, batchId);
         return MemberAudit.refused(m, name, code, start);
     }
 
-    /** {@code <quarantine dir>/../restricted-quarantine}. */
+    /** {@code <dirs.quarantine>/.restricted} — inside the Pipeline's own (jailed) quarantine directory. */
     static Path dir(PipelineConfig cfg) {
-        return Path.of(cfg.dirs().quarantine()).toAbsolutePath().normalize().resolveSibling(DIR);
+        return Path.of(cfg.dirs().quarantine()).toAbsolutePath().normalize().resolve(DIR);
     }
 
-    /** A generated name keeping only the extension — the original name may be the sensitive value. */
-    private static String f(String original) {
+    /** {@code refused-<CODE suffix>-<ms>-<n><ext>} — the code, never the original name (it may be the value). */
+    private static String storedName(String original, String code) {
         int dot = original.lastIndexOf('.');
         String ext = dot > 0 && original.length() - dot <= 8 && original.substring(dot).matches("\\.[A-Za-z0-9]+")
                 ? original.substring(dot) : "";
-        return "refused-" + System.currentTimeMillis() + "-" + SEQ.incrementAndGet() + ext;
+        return "refused-" + code.substring("INGEST_REFUSE:".length()) + "-" + System.currentTimeMillis() + "-"
+                + SEQ.incrementAndGet() + ext;
     }
 
-    private static void age(Path dir, Integer days) {
+    private static final Pattern STORED = Pattern.compile("refused-([A-Z][A-Z_]{0,63})-\\d+-\\d+.*");
+
+    private static void age(Path dir, PipelineConfig cfg) {
+        Integer days = cfg.refusal().retentionDays();
         if (days == null) return;
         FileTime cutoff = FileTime.from(Instant.now().minus(days, ChronoUnit.DAYS));
         try (DirectoryStream<Path> files = Files.newDirectoryStream(dir)) {
-            for (Path p : files)
-                if (Files.isRegularFile(p) && Files.getLastModifiedTime(p).compareTo(cutoff) < 0) Files.deleteIfExists(p);
+            for (Path p : files) {
+                if (!Files.isRegularFile(p) || Files.getLastModifiedTime(p).compareTo(cutoff) >= 0) continue;
+                if (!Files.deleteIfExists(p)) continue;
+                Matcher mm = STORED.matcher(p.getFileName().toString());
+                String code = mm.matches() ? "INGEST_REFUSE:" + mm.group(1) : "INGEST_REFUSE:UNKNOWN";
+                audit(cfg, "ingest.refused.retention", "Pipeline '" + cfg.identity().pipelineName()
+                        + "' deleted a restricted file past its retention: " + code, code, p.getFileName().toString(), null);
+            }
         } catch (IOException e) {
             log.warn("[INGEST] restricted quarantine retention sweep failed: {}", e.getClass().getSimpleName());
         }
     }
 
-    /**
-     * The platform's card-number candidate test for NAMES and HEADERS: a Luhn-valid 13–19 digit run (separators
-     * between digits allowed) that starts with a card IIN prefix. Content is judged by the Pipeline's own mapping.
-     */
+    private static void audit(PipelineConfig cfg, String action, String message, String code, String stored, String batchId) {
+        try {
+            Event.Builder b = Event.builder(EventType.AUDIT).source("audit").message(message)
+                    .action(action).actionCategory("security")
+                    .attr("pipeline", cfg.identity().pipelineName()).attr("reason", code).attr("stored_as", stored);
+            if (batchId != null) b.attr("consignment", batchId);
+            EventLog.current().emit(b);
+        } catch (RuntimeException auditDown) {
+            log.warn("[INGEST] refusal audit event not recorded: {}", auditDown.getClass().getSimpleName());
+        }
+    }
+
+    // ── names and headers (Java) ───────────────────────────────────────────────────────────────────────────────
+
+    /** The card test for NAMES and HEADERS — the same brand/length list as the SQL scan ({@link #IIN_REGEX}). */
     static final class CardNumbers {
-        private static final Pattern RUN = Pattern.compile("[0-9](?:[^0-9A-Za-z]{0,3}[0-9]){12,40}");
-        private static final Pattern IIN = Pattern.compile("^(?:4|5[1-5]|2[2-7]|3[47]|6)");
+        /**
+         * Brand prefix AND length, over the digits alone: Amex 34/37 (15); Diners 30/36/38/39 (14–19); JCB 35
+         * (16–19); Visa 4 (13, 16, 19); 50–59 incl. Maestro (13–19); Mastercard 2-series 22–27 (16); 6 — Discover,
+         * UnionPay, Maestro (13–19). Shared verbatim with the SQL scan.
+         */
+        static final String IIN_REGEX = "(3[47][0-9]{13}|3[0689][0-9]{12,17}|35[0-9]{14,17}|4[0-9]{12}|4[0-9]{15}"
+                + "|4[0-9]{18}|5[0-9]{12,18}|2[2-7][0-9]{14}|6[0-9]{12,18})";
+        private static final Pattern IIN = Pattern.compile(IIN_REGEX);
+        private static final Pattern RUN = Pattern.compile("[0-9](?:[^0-9A-Za-z]{0,5}[0-9]){12,60}");
 
         private CardNumbers() {}
 
@@ -168,7 +305,7 @@ final class RefusalQuarantine {
                 for (int i = 0; i + 13 <= d.length(); i++)
                     for (int len = 13; len <= 19 && i + len <= d.length(); len++) {
                         String c = d.substring(i, i + len);
-                        if (IIN.matcher(c).find() && luhn(c)) return true;
+                        if (IIN.matcher(c).matches() && luhn(c)) return true;
                     }
             }
             return false;

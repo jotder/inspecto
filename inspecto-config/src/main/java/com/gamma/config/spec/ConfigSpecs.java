@@ -364,6 +364,14 @@ public final class ConfigSpecs {
                                 + "mapping refuses with error('INGEST_REFUSE:<CODE>') moves to the restricted quarantine "
                                 + "(never re-polled, backed up or served) and only the reason code is recorded.",
                         FieldType.ENUM, false, null, List.of("off", "restricted_quarantine"), null, "select", null),
+                new FieldSpec("processing.refusal_scan", "Content refusal scan",
+                        "off (unset): only the mapping's own error('INGEST_REFUSE:<CODE>') refuses. card_number: every raw "
+                                + "cell (except refusal_scan_exempt) is scanned for a card-shaped Luhn-valid number; a hit "
+                                + "moves the file to the restricted quarantine. Needs refusal: restricted_quarantine.",
+                        FieldType.ENUM, false, null, List.of("off", "card_number"), null, "select", null),
+                FieldSpec.of("processing.refusal_scan_exempt", "Columns exempt from the scan", FieldType.STRING,
+                        "Raw column names (list or comma-separated) the operator knows carry no card data, e.g. ORDER_ID. "
+                                + "Unset = none: every column is scanned."),
                 FieldSpec.of("processing.refusal_retention_days", "Restricted quarantine retention (days)", FieldType.INT,
                         "Optional: restricted-quarantine files older than this are deleted at the next refusal. Unset = kept."),
                 FieldSpec.withDefault("processing.streaming.large_file_bytes", "Streaming generation-mode threshold (bytes)",

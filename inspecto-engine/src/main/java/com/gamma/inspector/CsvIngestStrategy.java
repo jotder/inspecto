@@ -190,7 +190,7 @@ final class CsvIngestStrategy implements ConsignmentIngestStrategy {
                             st.execute("CREATE OR REPLACE TEMP VIEW \"__refusal_src\" AS SELECT *, CAST(" + m.srcId()
                                     + " AS INTEGER) AS __src_id FROM \"" + tempTable + "\"");
                         }
-                        String code = RefusalQuarantine.probe(conn, m.selection().schema(), cfg, "__refusal_src");
+                        String code = RefusalQuarantine.judge(conn, m.selection().schema(), cfg, "__refusal_src");
                         ConsignmentIngestStrategy.dropView(conn, "__refusal_src");
                         if (code != null) {
                             memberAudits.add(RefusalQuarantine.restrict(m, cfg, code, batch.batchId(), mStart));

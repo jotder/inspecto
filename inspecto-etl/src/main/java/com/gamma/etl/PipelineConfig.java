@@ -454,21 +454,37 @@ public final class PipelineConfig {
      * restricted files. See {@code com.gamma.inspector.RefusalQuarantine}.
      */
     @PublicApi(since = "4.0.0")
-    public record Refusal(boolean restricted, Integer retentionDays) {
-        public static final Refusal OFF = new Refusal(false, null);
+    public record Refusal(boolean restricted, Integer retentionDays, boolean cardScan, List<String> scanExempt) {
+        public static final Refusal OFF = new Refusal(false, null, false, List.of());
 
-        /** The authored spelling: {@code off} (or absent) | {@code restricted_quarantine}. */
-        public static Refusal parse(Object mode, Integer retentionDays) {
+        public Refusal {
+            scanExempt = scanExempt == null ? List.of() : List.copyOf(scanExempt);
+        }
+
+        /**
+         * The authored spelling: {@code refusal: off} (or absent) | {@code restricted_quarantine};
+         * {@code refusal_scan: off} (or absent) | {@code card_number} — the platform's card-number scan of every raw
+         * cell except the {@code refusal_scan_exempt} columns. Both extras need the restricted mode.
+         */
+        public static Refusal parse(Object mode, Integer retentionDays, Object scan, List<String> exempt) {
             String v = mode == null ? "" : String.valueOf(mode).trim();
+            String sc = scan == null ? "" : String.valueOf(scan).trim();
             if (retentionDays != null && retentionDays < 1)
                 throw new IllegalArgumentException("processing.refusal_retention_days must be >= 1 (got " + retentionDays + ")");
+            if (!sc.isEmpty() && !sc.equalsIgnoreCase("off") && !sc.equalsIgnoreCase("card_number"))
+                throw new IllegalArgumentException("processing.refusal_scan must be one of off, card_number (got '" + sc + "')");
+            boolean card = sc.equalsIgnoreCase("card_number");
             if (v.isEmpty() || v.equalsIgnoreCase("off")) {
-                if (retentionDays != null)
-                    throw new IllegalArgumentException("processing.refusal_retention_days needs processing.refusal: restricted_quarantine");
+                if (retentionDays != null || card || (exempt != null && !exempt.isEmpty()))
+                    throw new IllegalArgumentException("processing.refusal_retention_days / refusal_scan / "
+                            + "refusal_scan_exempt need processing.refusal: restricted_quarantine");
                 return OFF;
             }
-            if (v.equalsIgnoreCase("restricted_quarantine")) return new Refusal(true, retentionDays);
-            throw new IllegalArgumentException("processing.refusal must be one of off, restricted_quarantine (got '" + v + "')");
+            if (!v.equalsIgnoreCase("restricted_quarantine"))
+                throw new IllegalArgumentException("processing.refusal must be one of off, restricted_quarantine (got '" + v + "')");
+            if (exempt != null && !exempt.isEmpty() && !card)
+                throw new IllegalArgumentException("processing.refusal_scan_exempt needs processing.refusal_scan: card_number");
+            return new Refusal(true, retentionDays, card, exempt);
         }
     }
 

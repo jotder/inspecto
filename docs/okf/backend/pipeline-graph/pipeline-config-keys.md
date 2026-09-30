@@ -279,6 +279,8 @@ against, round-tripped untouched.
 | `processing.profile` | spec |
 | `processing.refusal` | spec |
 | `processing.refusal_retention_days` | spec |
+| `processing.refusal_scan` | spec |
+| `processing.refusal_scan_exempt` | spec |
 | `processing.reject_mode` | spec |
 | `processing.retry` | spec |
 | `processing.schema_file` | spec |

@@ -177,6 +177,17 @@ class ControlApiRejectedRowsTest {
         }
     }
 
+    /** {@code processing.refusal}: nothing under {@code <quarantine>/.restricted} is ever served. */
+    @Test
+    void neverServesTheRestrictedQuarantine(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            Path restricted = dir.resolve("quarantine/.restricted");
+            Files.createDirectories(restricted);
+            Files.writeString(restricted.resolve("bad_errors.csv"), errorsCsv());
+            assertEquals(404, errorsFor(c.port, "bad.csv").statusCode());
+        }
+    }
+
     /** A diagnostic sample, not an export: a huge reject file is capped and says so. */
     @Test
     void aHugeRejectFileIsCappedAndFlagged(@TempDir Path dir) throws Exception {

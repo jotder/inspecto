@@ -267,6 +267,11 @@ public final class ConfigSafetyValidator {
                 && !List.of("off", "restricted_quarantine").contains(refusal.trim().toLowerCase(java.util.Locale.ROOT)))
             out.add(Finding.error("processing.refusal", "refusal must be one of off, restricted_quarantine (got '"
                     + refusal + "')"));
+        String refusalScan = RawConfig.str(raw, "processing.refusal_scan");
+        if (refusalScan != null && !refusalScan.isBlank()
+                && !List.of("off", "card_number").contains(refusalScan.trim().toLowerCase(java.util.Locale.ROOT)))
+            out.add(Finding.error("processing.refusal_scan", "refusal_scan must be one of off, card_number (got '"
+                    + refusalScan + "')"));
         String rejectMode = RawConfig.str(raw, "processing.reject_mode");
         if (rejectMode != null && !rejectMode.isBlank()
                 && !List.of("eject", "all_or_nothing").contains(rejectMode.trim().toLowerCase(java.util.Locale.ROOT)))

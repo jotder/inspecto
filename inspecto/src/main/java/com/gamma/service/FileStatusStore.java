@@ -68,7 +68,10 @@ public final class FileStatusStore implements StatusStore {
         Path root = Path.of(qd);
         if (!Files.isDirectory(root)) return out;
         try (Stream<Path> w = Files.walk(root)) {
-            w.filter(Files::isRegularFile).sorted().forEach(p -> {
+            w.filter(Files::isRegularFile)
+                    // processing.refusal: the restricted quarantine is never listed (RefusalQuarantine.DIR, restated)
+                    .filter(p -> !root.relativize(p).startsWith(".restricted"))
+                    .sorted().forEach(p -> {
                 Path rel = root.relativize(p);
                 // layout: <quarantine>/<relParent>/<reason>/<filename>
                 String reason = rel.getNameCount() >= 2

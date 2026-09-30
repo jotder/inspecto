@@ -124,7 +124,7 @@ final class NativeCsvStreamingEngine {
 
             // processing.refusal: judge this member's transform ALONE before it joins the union, so one refused
             // file is restricted and its batch-mates still land (the union would otherwise fail them all).
-            String refusedCode = RefusalQuarantine.probe(conn, schema, cfg, view);
+            String refusedCode = RefusalQuarantine.judge(conn, schema, cfg, view);
             if (refusedCode != null) {
                 dropView(conn, view);
                 memberAudits.add(RefusalQuarantine.restrict(m, cfg, refusedCode, batch.batchId(), mStart));
@@ -194,6 +194,10 @@ final class NativeCsvStreamingEngine {
         IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                 m.file().getName(), 1, 1);
 
+        // processing.refusal_scan: the platform card scan reads the file once, before anything is written.
+        String scanned = RefusalQuarantine.scanFile(conn, m.file(), schema, cfg, m.srcId());
+        if (scanned != null)
+            return empty(batch, batchStart, RefusalQuarantine.restrict(m, cfg, scanned, batch.batchId(), mStart));
         Streamed s;
         try {
             s = streamUnit(conn, m.file(), m.file().getName(), schema, cfg,
@@ -253,6 +257,10 @@ final class NativeCsvStreamingEngine {
         // the batch) or the raw read error (unreadable); a sink write is a SinkFlushException (fail the batch).
         // The chunker's own read of the source (a corrupt or truncated .gz) is UnreadableSourceException;
         // its scratch writes stay plain IOExceptions and fail the batch — the host's fault, not the file's.
+        // processing.refusal_scan: scan the WHOLE file (one streaming read) before any chunk is written.
+        String scanned = RefusalQuarantine.scanFile(conn, m.file(), schema, cfg, m.srcId());
+        if (scanned != null)
+            return empty(batch, batchStart, RefusalQuarantine.restrict(m, cfg, scanned, batch.batchId(), mStart));
         try (FileChunker chunker = new FileChunker(m.file(), cfg, chunkDir)) {
             int seq = 0;
             while (unreadable == null && refused == null && chunker.hasNext()) {

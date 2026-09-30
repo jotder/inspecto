@@ -430,6 +430,8 @@ final class RunRoutes implements RouteModule {
         if (!Files.isDirectory(qRoot)) return null;
         try (var walk = Files.walk(qRoot, 6)) {          // <poll-subpath>/<reason>/<file> plus headroom
             return walk.filter(Files::isRegularFile)
+                    // processing.refusal: never serve the restricted quarantine (RefusalQuarantine.DIR, restated)
+                    .filter(p -> !qRoot.relativize(p).startsWith(".restricted"))
                     .filter(p -> p.getFileName().toString().equals(wanted))
                     .map(p -> WriteGates.jail(qRoot, p, "errors file"))
                     .findFirst().orElse(null);
