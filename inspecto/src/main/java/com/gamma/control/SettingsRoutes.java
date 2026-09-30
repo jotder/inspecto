@@ -14,7 +14,8 @@ import java.util.Map;
  *   GET /settings/geo        the space's {tileServerUrl} (null = no self-hosted tile server)
  *   PUT /settings/geo        replace the space's geo/tile-server config (same gates as branding)
  *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap, suspicionNodeCap,
- *                                 maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove} (nulls = shipped defaults)
+ *                                 maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove, entityTypes,
+ *                                 mergedDistinctCap} (nulls = shipped defaults)
  *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding)
  *   GET /settings/pipeline-history   the space's {keep, effectiveKeep, defaultKeep, maxKeep} — Pipeline config
  *                                    versions kept per Pipeline (keep null = the shipped default)
@@ -148,7 +149,8 @@ final class SettingsRoutes implements RouteModule {
         Path root = WriteGates.requireWriteRoot(api, "link-analysis settings write");
         LinkAnalysisSettings s = new LinkAnalysisSettings(nodeCap(body, "projectionNodeCap"),
                 nodeCap(body, "analysisNodeCap"), nodeCap(body, "suspicionNodeCap"), maskingMode(body),
-                nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"), entityTypes(body));
+                nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"), entityTypes(body),
+                nodeCap(body, "mergedDistinctCap"));
         s.write(root.resolve(LinkAnalysisSettings.FILE));
         return linkAnalysisShape(s);
     }
@@ -164,6 +166,8 @@ final class SettingsRoutes implements RouteModule {
         m.put("fourEyesFanOutAbove", s.fourEyesFanOutAbove());
         m.put("entityTypes", s.entityTypes() == null ? null : EntityTypes.shape(s.entityTypes()));
         m.put("entityTypesInForce", EntityTypes.shape(s.effectiveEntityTypes()));
+        m.put("mergedDistinctCap", s.mergedDistinctCap());
+        m.put("mergedDistinctCapInForce", s.effectiveMergedDistinctCap());
         return m;
     }
 

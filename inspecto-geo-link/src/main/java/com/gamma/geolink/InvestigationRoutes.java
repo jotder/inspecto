@@ -352,8 +352,10 @@ public final class InvestigationRoutes implements RouteModule {
             if (orig.get("resolution") != null) e.put("resolution", orig.get("resolution"));
             // LA-17 merged traversal: a merged exclude re-seals its groups against the NEW order's state (a group is
             // judged from the entities admitted at that point), under the resolution the fork kept verbatim.
-            if ("exclude".equals(orig.get("op")) && orig.get("groups") != null)
+            if ("exclude".equals(orig.get("op")) && orig.get("groups") != null) {
+                requireResolution(state, "fork step " + step + ": ");   // operator 2026-09-30: refused, as a merged expand
                 e.put("groups", new ArrayList<Object>(state.groupsHit(strings(((Map<?, ?>) orig.get("params")).get("ids"))).values()));
+            }
             if ("expand".equals(orig.get("op"))) {
                 @SuppressWarnings("unchecked") Map<String, Object> p = (Map<String, Object>) orig.get("params");
                 List<String> named = strings(p.get("ids"));
@@ -668,7 +670,8 @@ public final class InvestigationRoutes implements RouteModule {
      * operator 2026-09-30), the frontier WIDENED to every member of each identity group a frontier entity resolves to
      * under the resolution in force: the admitted entities resolving to the group, and every value of the bound
      * columns whose key under a member's sealed type normaliser is a member (a DISTINCT read through
-     * {@link InvRoutes#relationFor}, capped at {@link #SEED_BY_DISTINCT_CAP}, never a sample). Sealed as
+     * {@link InvRoutes#relationFor}, capped per column at the Space's {@code merged_distinct_cap} - default 20 000,
+     * {@link LinkAnalysisSettings#effectiveMergedDistinctCap} - refused above it, never a sample). Sealed as
      * {@code query.merged {groupOf{value -> group}, anchorOf{member value not admitted -> the admitted entity it stands
      * for}}}; the read's fan-out cap then counts per GROUP, and the budget over the whole widened read - one combined
      * fan-out, never one per member (the four-eyes thresholds are compared with those same numbers, D-U7).
@@ -694,9 +697,11 @@ public final class InvestigationRoutes implements RouteModule {
         if (!groups.isEmpty()) {
             String relationSql = InvRoutes.relationFor(api, ex, inv.writeRoot(), inv.dataset());   // R3 gate on EVERY read
             Set<String> excluded = s.excluded.keySet();
+            int cap = LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveMergedDistinctCap();
             for (String col : new LinkedHashSet<>(List.of(String.valueOf(inv.header().get("sourceCol")),
                     String.valueOf(inv.header().get("targetCol")))))
-                for (String v : distinctValues(inv.dataset(), relationSql, col, SEED_BY_DISTINCT_CAP)) {
+                for (String v : distinctValues(inv.dataset(), relationSql, col, cap, where + "a merged expand",
+                        "the Space's merged_distinct_cap")) {
                     if (groupOf.containsKey(v) || excluded.contains(v)) continue;
                     for (var g : groups.entrySet()) {
                         if (!memberValue(g.getValue(), v)) continue;
@@ -1067,18 +1072,23 @@ public final class InvestigationRoutes implements RouteModule {
      * more is a 422 naming the cap. No value is ever inlined: the statement carries identifiers only.
      */
     static List<String> distinctValues(String dataset, String relationSql, String col, int cap) {
+        return distinctValues(dataset, relationSql, col, cap, "seedBy", "the cap");
+    }
+
+    /** {@link #distinctValues(String, String, String, int)}, its refusals naming {@code what} and the cap's {@code source}. */
+    static List<String> distinctValues(String dataset, String relationSql, String col, int cap, String what, String source) {
         String c = SqlIdent.q(col);
         String sql = "SELECT DISTINCT CAST(" + c + " AS VARCHAR) AS v FROM " + SqlIdent.q(dataset) + " WHERE " + c + " IS NOT NULL";
         QueryExecutor.Result r;
         try {
             r = QueryExecutor.run(new QueryExecutor.Request(dataset, relationSql, sql, cap, 0, List.of(), List.of()));
         } catch (SQLException | IOException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "seedBy over dataset '" + dataset + "' failed: " + e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, what + " over dataset '" + dataset + "' failed: " + e.getMessage());
         }
         if (r.truncated())
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "seedBy reads at most " + cap + " distinct values per "
-                    + "column, and column '" + col + "' of dataset '" + dataset + "' has more — never a silent sample; "
-                    + "narrow the Dataset or seed the ids explicitly");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, what + " reads at most " + cap + " distinct values per "
+                    + "column (" + source + "), and column '" + col + "' of dataset '" + dataset + "' has more — never a "
+                    + "silent sample; narrow the Dataset" + ("seedBy".equals(what) ? " or seed the ids explicitly" : ""));
         List<String> out = new ArrayList<>(r.rows().size());
         for (Map<String, Object> row : r.rows()) out.add(String.valueOf(row.get("v")));
         return out;

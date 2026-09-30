@@ -240,6 +240,40 @@ class ControlApiInvestigationMergedTraversalTest {
         }
     }
 
+    /** The Space's merged_distinct_cap bounds the member-value scan: above it the merged expand is refused, never sampled. */
+    @Test
+    void theSpacesMergedDistinctCapTakesEffectAndIsRefusedNotSampled(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            settings(c, "masking_mode: none\nmerged_distinct_cap: 3\n");   // caller has 3 distinct values: A, C, D
+            base(c);
+            op(c, "{\"op\":\"resolve\"}");
+            assertEquals(Set.of(B, C, D), texts(op(c, "{\"op\":\"expand\",\"merged\":true}").at("/delta/admitted")),
+                    "exactly at the cap is fine");
+            data(post(c, "/inv/investigations/case-a/undo", "{}"), 200);
+            settings(c, "masking_mode: none\nmerged_distinct_cap: 2\n");
+            HttpResponse<String> r = post(c, OPS, "{\"op\":\"expand\",\"merged\":true}");
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("reads at most 2 distinct values") && r.body().contains("merged_distinct_cap"), r.body());
+            assertEquals(4, Files.readAllLines(logFile(root, "case-a")).size(), "seed, resolve, expand, undo: nothing more");
+        }
+    }
+
+    /** Operator 2026-09-30: a fork that moves a merged exclude before its resolve is refused, as a merged expand is. */
+    @Test
+    void aForkMovingAMergedExcludeBeforeItsResolveIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            settings(c, "masking_mode: none\n");
+            base(c);
+            op(c, "{\"op\":\"resolve\"}");
+            op(c, "{\"op\":\"exclude\",\"ids\":[\"" + A + "\"],\"reason\":\"test SIM\",\"merged\":true}");
+            HttpResponse<String> early = post(c, "/inv/investigations/case-a/reorder", "{\"id\":\"case-g\",\"order\":[1,3,2]}");
+            assertEquals(422, early.statusCode(), early.body());
+            assertTrue(early.body().contains("fork step 2: 'merged'"), early.body());
+            assertEquals(404, send(c, "GET", "/inv/investigations/case-g/log", null).statusCode(), "no fork was created");
+            data(post(c, "/inv/investigations/case-a/reorder", "{\"id\":\"case-f\",\"order\":[1,2,3]}"), 200);
+        }
+    }
+
     /** D-E8: the flag is method - a template carries it inside the expand; a fork re-reads the widened frontier. */
     @Test
     void aTemplateCarriesTheFlagInsideTheOpAndAForkReReadsIt(@TempDir Path cfg, @TempDir Path root) throws Exception {

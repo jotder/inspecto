@@ -1209,7 +1209,11 @@ public final class ConfigSpecs {
                                 + "approval (D-U7); absent = no fan-out threshold."),
                 FieldSpec.of("entity_types", "Entity types", FieldType.LIST,
                         "The space's Entity Types {id, label, normaliser, masked, classifications} (LA-17); "
-                                + "a stated list replaces the seeded defaults; absent = the defaults.")
+                                + "a stated list replaces the seeded defaults; absent = the defaults."),
+                FieldSpec.of("merged_distinct_cap", "Merged expand distinct-value cap", FieldType.INT,
+                        "Distinct values per bound column a merged expand (LA-17) may scan to find an identity "
+                                + "group's member values; above it the expand is refused, never sampled; "
+                                + "absent = 20000.")
         );
         return new ConfigSpec("link-analysis-settings", fields, List.of());
     }

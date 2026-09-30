@@ -20,7 +20,9 @@ import java.util.Map;
  * score, which carries its OWN lower ceiling because its cost is quadratic while the other 26
  * algorithms are trivial at the shared cap (decision D-S3); plus the Investigation controls of LA-19:
  * the entity {@code maskingMode} (D-U6) and the two four-eyes thresholds (D-U7); plus the space's
- * {@link EntityTypes Entity Types} (LA-17, design §4.1). Persisted as
+ * {@link EntityTypes Entity Types} (LA-17, design §4.1); plus {@code mergedDistinctCap}, the distinct values per bound
+ * column a merged {@code expand} may scan to find a group's member values (LA-17 merged traversal, operator
+ * 2026-09-30; default {@link #DEFAULT_MERGED_DISTINCT_CAP}, refused above it, never sampled). Persisted as
  * {@code link-analysis.toon} in the space's config tree (crash-safe TOON, mirroring {@link GeoSettings}
  * and {@link SchedulerSettings}); the keys are declared in {@link ConfigSpecs#linkAnalysisSettings()}.
  *
@@ -41,10 +43,18 @@ import java.util.Map;
  */
 public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNodeCap, Integer suspicionNodeCap,
                                    String maskingMode, Integer fourEyesBudgetAbove, Integer fourEyesFanOutAbove,
-                                   List<EntityTypes.EntityType> entityTypes) {
+                                   List<EntityTypes.EntityType> entityTypes, Integer mergedDistinctCap) {
 
     public static final String FILE = "link-analysis.toon";
-    static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null);
+    static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null);
+
+    /** The shipped default of {@code merged_distinct_cap}. */
+    public static final int DEFAULT_MERGED_DISTINCT_CAP = 20_000;
+
+    /** The merged-expand distinct-value cap in force: the stated one, else {@link #DEFAULT_MERGED_DISTINCT_CAP}. */
+    public int effectiveMergedDistinctCap() {
+        return mergedDistinctCap != null ? mergedDistinctCap : DEFAULT_MERGED_DISTINCT_CAP;
+    }
 
     /** The masking mode in force: the stated one, else the declared default ({@code typed}). */
     public String effectiveMaskingMode() {
@@ -66,6 +76,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         if (fourEyesBudgetAbove != null) m.put("four_eyes_budget_above", fourEyesBudgetAbove);
         if (fourEyesFanOutAbove != null) m.put("four_eyes_fan_out_above", fourEyesFanOutAbove);
         if (entityTypes != null) m.put("entity_types", EntityTypes.shape(entityTypes));
+        if (mergedDistinctCap != null) m.put("merged_distinct_cap", mergedDistinctCap);
         AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".link-analysis-");
     }
 
@@ -82,7 +93,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             return new LinkAnalysisSettings(optInt(m, "projection_node_cap"), optInt(m, "analysis_node_cap"),
                     optInt(m, "suspicion_node_cap"), maskingMode(ToonHelper.opt(m, "masking_mode", "")),
                     optInt(m, "four_eyes_budget_above"), optInt(m, "four_eyes_fan_out_above"),
-                    entityTypes(m.get("entity_types")));
+                    entityTypes(m.get("entity_types")), optInt(m, "merged_distinct_cap"));
         } catch (Exception e) {
             return EMPTY;
         }

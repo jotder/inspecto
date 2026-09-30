@@ -282,6 +282,25 @@ class ControlApiSettingsTest {
         }
     }
 
+    /** LA-17 merged traversal (operator 2026-09-30): the merged-expand distinct-value cap is a per-Space setting. */
+    @Test
+    void linkAnalysisMergedDistinctCapRoundTripsAndDefaults(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            JsonNode def = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null));
+            assertTrue(def.get("mergedDistinctCap").isNull(), "absent => inherit");
+            assertEquals(20_000, def.get("mergedDistinctCapInForce").asInt(), "the shipped default");
+            HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"mergedDistinctCap\":500}");
+            assertEquals(200, put.statusCode(), put.body());
+            String toon = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
+            assertTrue(toon.contains("merged_distinct_cap: 500"), toon);
+            JsonNode got = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null));
+            assertEquals(500, got.get("mergedDistinctCapInForce").asInt());
+            assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"mergedDistinctCap\":0}").statusCode(), "a cap is >= 1");
+        }
+    }
+
     /** LA-17 step 2: per-Space Entity Types — inherit the seeded nine, a stated list replaces them, 422 on bad. */
     @Test
     void linkAnalysisEntityTypesRoundTripAndRefuseBadLists(@TempDir Path root) throws Exception {
