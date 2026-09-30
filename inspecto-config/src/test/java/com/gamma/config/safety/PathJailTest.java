@@ -299,4 +299,62 @@ class PathJailTest {
                 java.util.List.of(), ".", "dirs.poll"));
     }
 
+    // ── round 4: the remaining spellings, at the run-time filter ────────────────────────
+
+    private static final boolean WINDOWS = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows");
+
+    /** Refused, or not even a constructible path (the JDK refuses it before any filesystem call). */
+    private static void refusedOrUnconstructible(String spelled) {
+        Path p;
+        try {
+            p = Path.of(spelled);
+        } catch (java.nio.file.InvalidPathException unconstructible) {
+            return;
+        }
+        assertTrue(PathJail.readAllowlistRefusal(p) != null, spelled + " (" + PathJail.canonical(p) + ")");
+    }
+
+    @Test
+    void everyRemainingSpellingOfConfigIsRefusedByTheFilter(@TempDir Path root) throws IOException {
+        Path s = space(root);
+        String abs = s.toString();
+        for (String v : new String[]{"config..", "config. .", "config/new/child", "config/orders/not-yet/there"})
+            refusedOrUnconstructible(abs + "/" + v);
+        refusedOrUnconstructible(abs.replace('\\', '/') + "\\config/orders");   // mixed separators
+        refusedOrUnconstructible(abs + "/config\\orders");
+        if (WINDOWS) {
+            refusedOrUnconstructible(abs + "\\config::$DATA");
+            refusedOrUnconstructible(abs + "\\config:x");
+            refusedOrUnconstructible("\\\\?\\" + abs + "\\config");
+            refusedOrUnconstructible("\\\\?\\" + abs + "\\config\\orders");
+        }
+    }
+
+    /** A Cyrillic 'с' is a DIFFERENT name: its own directory, never the real config/ tree. */
+    @Test
+    void aUnicodeLookalikeIsItsOwnDirectoryAndCannotReachConfig(@TempDir Path root) throws IOException {
+        Path s = space(root);
+        Path look = s.resolve("\u0441onfig/orders");
+        Files.createDirectories(look);
+        assertEquals(null, PathJail.readAllowlistRefusal(look), "a lookalike is not config/");
+        assertFalse(PathJail.canonical(look).startsWith(PathJail.canonical(s.resolve("config"))),
+                "the lookalike resolves to its own directory");
+        assertEquals(null, PathJail.spaceDirOf(look), "and is not a Space's config dir");
+    }
+
+    /** The behaviour change of round 3: spaceDirOf reads a segment as the filesystem does. */
+    @Test
+    void spaceDirOfReadsConfigAsTheFilesystemDoes(@TempDir Path root) throws IOException {
+        Path s = space(root);
+        Path cs = PathJail.canonical(s);
+        assertEquals(cs, PathJail.canonical(PathJail.spaceDirOf(s.resolve("config/orders"))));
+        assertEquals(cs, PathJail.canonical(PathJail.spaceDirOf(Path.of(s + "/config./orders"))), "config. IS config");
+        assertEquals(cs, PathJail.canonical(PathJail.spaceDirOf(Path.of(s + "/config../orders"))));
+        if (WINDOWS)
+            assertEquals(cs, PathJail.canonical(PathJail.spaceDirOf(s.resolve("Config/orders"))), "case-insensitive");
+        else
+            assertEquals(null, PathJail.spaceDirOf(s.resolve("Config/orders")), "case-sensitive filesystem");
+        assertEquals(null, PathJail.spaceDirOf(s.resolve("data/orders")));
+    }
+
 }

@@ -178,7 +178,8 @@ class IngestExpressionSandboxTest {
      *  case would have been allowlisted, and read_text of a Pipeline file under it then succeeded. */
     @Test
     void configureRefusesAConfigDirHoweverItIsSpelled(@TempDir Path dir) throws Exception {
-        List<String> spellings = new java.util.ArrayList<>(List.of("config", "config.", "config./orders"));
+        List<String> spellings = new java.util.ArrayList<>(List.of("config", "config.", "config./orders",
+                "config..", "config. .", "config/new/child", "config\\orders"));
         if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows")) spellings.addAll(List.of("CONFIG", "Config/orders"));
         for (String v : spellings) {
             PipelineConfig cfg = pipeline(dir.resolve(v.replaceAll("[^a-zA-Z]", "_")), "upper(CUSTOMER)",
@@ -193,6 +194,37 @@ class IngestExpressionSandboxTest {
             } finally {
                 DuckDbUtil.deleteTempDb(tempDb);
             }
+        }
+    }
+
+    @Test
+    void configureRefusesALongPathPrefixedConfigAndAcceptsAUnicodeLookalike(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = pipeline(dir, "upper(CUSTOMER)");
+        Path space = dir.resolve("space");
+        if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows")) {
+            PipelineConfig bad = pipeline(dir.resolve("lp"), "upper(CUSTOMER)",
+                    "\\\\?\\" + dir.resolve("space") + "\\config");
+            File tempDb = ConsignmentIngestStrategy.openTempDb(bad, "sec_lp_");
+            try (Connection conn = DuckDbUtil.openConnection(tempDb)) {
+                assertThrows(Exception.class, () -> ConsignmentIngestStrategy.configure(conn, bad, tempDb, List.of()));
+            } finally {
+                DuckDbUtil.deleteTempDb(tempDb);
+            }
+        }
+        // a Cyrillic lookalike is its own directory: allowed, and it cannot read the real config/ tree
+        PipelineConfig look = pipeline(dir.resolve("uc"), "upper(CUSTOMER)",
+                sql(dir.resolve("uc/space")) + "/\u0441onfig");
+        Path pipelineFile = dir.resolve("uc/space/config/orders/orders_pipeline.toon");
+        File tempDb = ConsignmentIngestStrategy.openTempDb(look, "sec_uc_");
+        try (Connection conn = DuckDbUtil.openConnection(tempDb)) {
+            ConsignmentIngestStrategy.configure(conn, look, tempDb, List.of());
+            assertThrows(SQLException.class, () -> {
+                try (Statement st = conn.createStatement()) {
+                    st.executeQuery("SELECT content FROM read_text('" + sql(pipelineFile) + "')");
+                }
+            });
+        } finally {
+            DuckDbUtil.deleteTempDb(tempDb);
         }
     }
 

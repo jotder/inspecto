@@ -767,4 +767,28 @@ class ConfigSafetyValidatorTest {
                 SafetyPolicy.withRoots(s), configDir).isEmpty());
     }
 
+    // ── round 4: the remaining spellings, at the gate ────────────────────────────────────
+
+    @Test
+    void everyRemainingSpellingOfConfigIsRefusedAtTheGate(@TempDir Path s) throws IOException {
+        Path configDir = java.nio.file.Files.createDirectories(s.resolve("config/orders"));
+        String abs = s.toString();
+        List<String> spellings = new java.util.ArrayList<>(List.of("config..", "config. .", "config/new/child",
+                abs + "/config..", abs + "/config/orders/not-yet/there", "config\\orders",
+                abs.replace('\\', '/') + "\\config/orders"));
+        if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows"))
+            spellings.addAll(List.of("config::$DATA", "config:x", abs + "\\config::$DATA",
+                    "\\\\?\\" + abs + "\\config", "\\\\?\\" + abs + "\\config\\orders"));
+        for (String v : spellings)
+            assertTrue(refuses(ConfigSafetyValidator.check("pipeline", pipelineWithDir("poll", v),
+                    SafetyPolicy.withRoots(s), configDir), "dirs.poll"), v);
+    }
+
+    @Test
+    void aUnicodeLookalikeOfConfigIsAnOrdinaryDataDirAtTheGate(@TempDir Path s) throws IOException {
+        Path configDir = java.nio.file.Files.createDirectories(s.resolve("config"));
+        assertTrue(ConfigSafetyValidator.check("pipeline", pipelineWithDir("poll", "\u0441onfig/orders"),
+                SafetyPolicy.withRoots(s), configDir).isEmpty(), "a Cyrillic lookalike is its own directory");
+    }
+
 }

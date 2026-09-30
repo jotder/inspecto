@@ -147,4 +147,40 @@ class ImportCapabilityGuardTest {
             assertEquals(403, assertThrows(ApiException.class, () -> ImportCapabilityGuard.requireKind(null, k[0])).status, k[0]);
         }
     }
+
+    // ── SEC-INGEST-EXPR-EXTERNAL-ACCESS-1: every spelling of a forbidden data home, at the import guard ──
+
+    private static Map<String, byte[]> pipelineFile(String key, String value) {
+        String toon = "name: leak\ndirs:\n  poll: data/inbox/leak\n  " + key + ": \""
+                + value.replace("\\", "\\\\") + "\"\n";
+        return Map.of("leak/leak_pipeline.toon", toon.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void everySpellingOfAForbiddenDataHomeIsRefusedAtTheImportGuard(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root)
+            throws Exception {
+        java.nio.file.Path s = java.nio.file.Files.createDirectories(root.resolve("space/config/orders")).getParent().getParent();
+        com.gamma.config.safety.DiscoveredRoots.register("guard-test", s);
+        try {
+            String abs = s.toString();
+            List<String> spellings = new ArrayList<>(List.of(".", "config", "config.", "config..", "config. .",
+                    "config./orders", "config/new/child", "config\\orders", "config.secrets", "x.secrets/y",
+                    abs, abs + "/config..", abs + "/config/orders/not-yet/there",
+                    abs.replace('\\', '/') + "\\config/orders"));
+            if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows"))
+                spellings.addAll(List.of("CONFIG", "Config/orders", "config::$DATA", "config:x",
+                        abs + "\\config::$DATA", "\\\\?\\" + abs + "\\config"));
+            for (String v : spellings) {
+                ApiException e = assertThrows(ApiException.class,
+                        () -> ImportCapabilityGuard.checkFiles(null, pipelineFile("errors", v)), v);
+                assertEquals(403, e.status, v);
+            }
+            // a Cyrillic lookalike and an ordinary data dir are NOT refused
+            ImportCapabilityGuard.checkFiles(null, pipelineFile("errors", "\u0441onfig/orders"));
+            ImportCapabilityGuard.checkFiles(null, pipelineFile("errors", "data/orders/errors"));
+        } finally {
+            com.gamma.config.safety.DiscoveredRoots.unregister("guard-test");
+        }
+    }
+
 }
