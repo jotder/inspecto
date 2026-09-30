@@ -40,7 +40,7 @@ class EgressGuardTest {
     @Test
     void defaultEnvironmentContactsNoModel() {
         // No -Dassist.* configured (the CI/vanilla case) -> nothing is available, so nothing is called.
-        assertFalse(OllamaModelProvider.fromEnvironment().anyAvailable(),
+        assertFalse(com.gamma.agent.model.ModelProviderFactory.fromEnvironment().anyAvailable(),
                 "assist is off by default — local-first, opt-in");
     }
 }

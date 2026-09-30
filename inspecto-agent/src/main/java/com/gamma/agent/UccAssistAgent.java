@@ -249,6 +249,11 @@ public final class UccAssistAgent implements AssistAgent {
         if (!ProviderSettings.knownProviders().contains(provider))
             throw new IllegalArgumentException("unknown provider '" + provider + "'; known: "
                     + ProviderSettings.knownProviders());
+        // The hosted anthropic / gemini clients always dial their vendor host and ignore a baseUrl, so accepting
+        // one would only be checked, possibly refused, and never used.
+        if (str(body.get("baseUrl")) != null && (provider.equals("anthropic") || provider.equals("gemini")))
+            throw new IllegalArgumentException("provider '" + provider + "' always uses its vendor endpoint; "
+                    + "'baseUrl' is not accepted for it");
         if (!ModelProviderFactory.availableProviders().contains(provider))
             throw new IllegalArgumentException("provider '" + provider + "' requires the "
                     + "inspecto-agent-hosted jar on the classpath");

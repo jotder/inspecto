@@ -175,4 +175,49 @@ class AssistModelEgressTest {
         assertTrue(hits.get() > 0, out.toString());
         assertTrue(out.get("small").get("ok").asBoolean(), out.toString());
     }
+
+    @Test
+    void theEnvironmentRouterDialsTheCheckedAddressNotASecondResolution() throws Exception {
+        int port = startModel();
+        System.setProperty("agentkernel.ollama.enabled", "true");
+        System.setProperty("agentkernel.ollama.baseUrl", "http://model.test:" + port);
+        var calls = new AtomicInteger();
+        com.gamma.pipeline.exec.EgressPolicy.Resolver flipping = host -> new InetAddress[]{
+                calls.getAndIncrement() == 0 ? InetAddress.getByAddress(new byte[]{127, 0, 0, 1})
+                        : InetAddress.getByAddress(new byte[]{10, 9, 9, 9})};
+        var r = ModelProviderFactory.fromEnvironment(
+                com.gamma.pipeline.exec.ModelEgress.parse(List.of("model.test", "127.0.0.1")), flipping);
+        r.providerFor(ModelTier.MEDIUM).generate(
+                com.gamma.agent.kernel.model.ModelRequest.text(ModelTier.MEDIUM, null, "hi"));
+        assertTrue(hits.get() > 0, "the stub on the FIRST (checked) address got the call");
+        assertEquals(1, calls.get(), "resolved once");
+    }
+
+    @Test
+    void disabledEnvironmentProfileDialsNothingFromTheSettingsTestRoute() throws Exception {
+        startModel();
+        System.setProperty("agentkernel.ollama.baseUrl", "http://127.0.0.1:" + model.getAddress().getPort());
+        System.setProperty("assist.settings.file", dir.resolve("absent.properties").toString());
+        var out = new UccAssistAgent(ModelProviderFactory.fromPersisted()).testSettings();
+        assertEquals(0, hits.get(), out.toString());
+        assertFalse((Boolean) ((java.util.Map<?, ?>) out.get("medium")).get("ok"), out.toString());
+    }
+
+    @Test
+    void anthropicAndGeminiRefuseABaseUrlAtSettingsValidation() {
+        System.setProperty("assist.settings.file", dir.resolve("s.properties").toString());
+        var agent = new UccAssistAgent(ModelProviderFactory.fromPersisted());
+        for (String p : List.of("anthropic", "gemini")) {
+            var e = assertThrows(IllegalArgumentException.class, () ->
+                    agent.updateSettings(java.util.Map.of("provider", p, "baseUrl", "http://169.254.169.254")));
+            assertTrue(e.getMessage().contains("vendor endpoint"), e.getMessage());
+        }
+    }
+
+    @Test
+    void onlyTheFactoryReachesTheUncheckedEnvironmentRouter() throws Exception {
+        var m = com.gamma.agent.model.OllamaModelProvider.class.getDeclaredMethod("fromEnvironment");
+        assertFalse(java.lang.reflect.Modifier.isPublic(m.getModifiers()),
+                "OllamaModelProvider.fromEnvironment is unchecked; it must stay package-private");
+    }
 }

@@ -55,6 +55,10 @@ langchain4j 1.16.3 sources: none of those SDK jars reads an environment variable
 of NEVER applies and a 3xx cannot bounce a checked call to another host. An explicit `baseUrl` on a hosted provider
 is checked and pinned like any other.
 
+`POST /assist/settings` refuses a `baseUrl` for `anthropic` and `gemini` (400, "always uses its vendor endpoint"):
+their clients ignore it, so accepting one would only be checked and never used. `OllamaModelProvider.fromEnvironment`
+(unchecked) is package-private; only `ModelProviderFactory.fromEnvironment` reaches it.
+
 Consequences: an empty allowlist (the default) refuses even the local Ollama default, so a local model needs
 `localhost` / `127.0.0.1` named; an `https` endpoint named by DNS host is refused (it cannot be pinned).
 `inspecto-agent-hosted` carries `inspecto-processor` as `provided` for this. Tests: `AssistModelEgressTest` (real

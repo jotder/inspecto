@@ -51,8 +51,11 @@ public final class OllamaModelProvider implements ModelProvider {
         return ModelRouter.of(m);
     }
 
-    /** A router from the environment-resolved profile. */
-    public static ModelRouter fromEnvironment() {
+    /**
+     * A router from the environment-resolved profile, UNCHECKED. Package-private on purpose: only
+     * {@code ModelProviderFactory.fromEnvironment} may reach it, since it applies the model endpoint allowlist.
+     */
+    static ModelRouter fromEnvironment() {
         return routerFor(ModelProfile.fromEnvironment());
     }
 
