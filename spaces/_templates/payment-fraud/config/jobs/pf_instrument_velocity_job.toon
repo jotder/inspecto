@@ -1,7 +1,7 @@
 job:
   name: pf_instrument_velocity
   type: sql.template
-  sql: "WITH w AS (SELECT INSTRUMENT_TOKEN, ACCOUNT_ID, count(*) OVER (PARTITION BY INSTRUMENT_TOKEN ORDER BY ATTEMPT_TS RANGE BETWEEN to_minutes(CAST($window_minutes AS INTEGER)) PRECEDING AND CURRENT ROW) AS n FROM payment_attempts) SELECT INSTRUMENT_TOKEN AS instrument_token, ACCOUNT_ID AS account_id, max(n) AS max_attempts_in_window FROM w GROUP BY INSTRUMENT_TOKEN, ACCOUNT_ID"
+  sql: "WITH w AS (SELECT a.INSTRUMENT_TOKEN, a.ATTEMPT_TS AS window_end, count(*) AS n FROM payment_attempts a JOIN payment_attempts b ON b.INSTRUMENT_TOKEN = a.INSTRUMENT_TOKEN AND b.ATTEMPT_TS > a.ATTEMPT_TS - to_minutes(CAST($window_minutes AS INTEGER)) AND b.ATTEMPT_TS <= a.ATTEMPT_TS GROUP BY a.INSTRUMENT_TOKEN, a.ATTEMPT_ID, a.ATTEMPT_TS) SELECT INSTRUMENT_TOKEN AS instrument_token, max(n) AS max_attempts_in_window, arg_max(window_end, n) AS window_end FROM w GROUP BY INSTRUMENT_TOKEN"
   sources: payment_attempts
   sink_dataset: pf_instrument_velocity
   window_minutes: "60"

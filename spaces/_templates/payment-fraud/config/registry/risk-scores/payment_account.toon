@@ -9,8 +9,8 @@ factors[4]:
     weight: 60
     cap: 60
   - id: velocity
-    label: "Most attempts by one instrument inside 60 minutes"
-    dataset: pf_instrument_velocity
+    label: "Most attempts by the account inside 60 minutes"
+    dataset: pf_account_activity
     key: account_id
     measure: "max(max_attempts_in_window)"
     weight: 5

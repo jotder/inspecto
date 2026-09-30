@@ -1,8 +1,9 @@
 job:
   name: pf_bin_declines
   type: sql.template
-  sql: "SELECT BIN AS bin, ATTEMPT_DATE AS attempt_date, count(*) AS attempts, count(DISTINCT INSTRUMENT_TOKEN) FILTER (WHERE OUTCOME = 'DECLINED') AS declined_distinct_instruments FROM payment_attempts GROUP BY BIN, ATTEMPT_DATE"
+  sql: "WITH s AS (SELECT BIN, INSTRUMENT_TOKEN, ATTEMPT_TS FROM payment_attempts WHERE OUTCOME = 'DECLINED'), w AS (SELECT a.BIN, a.ATTEMPT_TS AS window_end, count(DISTINCT b.INSTRUMENT_TOKEN) AS n FROM s a JOIN s b ON b.BIN = a.BIN AND b.ATTEMPT_TS > a.ATTEMPT_TS - to_hours(CAST($window_hours AS INTEGER)) AND b.ATTEMPT_TS <= a.ATTEMPT_TS GROUP BY a.BIN, a.ATTEMPT_TS) SELECT BIN AS bin, max(n) AS declined_distinct_instruments, arg_max(window_end, n) AS window_end FROM w GROUP BY BIN"
   sources: payment_attempts
   sink_dataset: pf_bin_declines
+  window_hours: "24"
   cron: "0 * * * *"
   enabled: true

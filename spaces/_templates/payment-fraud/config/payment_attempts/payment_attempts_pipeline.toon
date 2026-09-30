@@ -31,6 +31,8 @@ processing:
     timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
 
 collector:
+  consignment:
+    max_files: 1
   gap_detection:
     enabled: true
     sequence: "PAYMENT_ATTEMPTS_{yyyyMMdd}"

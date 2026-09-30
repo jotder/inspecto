@@ -88,6 +88,9 @@ public final class PaymentFraudCorpus {
         for (int k = 0; k < 7; k++)        // LOOK-ALIKE dev_la_cta: 7 distinct tiny instruments — below 8
             add(at(1, 4, 5 + 4 * k), "acc_la_cta", "tok_lacta_" + k, "499002", "dev_la_cta", "m_ct2",
                     money(0.5, 1.99), "DECLINED");
+        for (int k = 0; k < 8; k++)        // PLANTED dev_ct_02: 4 + 4 tiny instruments STRADDLING midnight day 1 → 2
+            add(k < 4 ? at(1, 23, 50 + 2 * k) : at(2, 0, 4 + 2 * (k - 4)), "acc_ct02_" + k, "tok_ct02_" + k, "499003",
+                    "dev_ct_02", "m_ct3", money(0.5, 1.99), "DECLINED");
         for (int k = 0; k < 12; k++)       // LOOK-ALIKE dev_la_ctb: a shared kiosk, 12 instruments, normal amounts
             add(at(3, 9, 0).plusMinutes(20L * k), "acc_la_ctb_" + k, "tok_lactb_" + k, BG_BINS[k % 5], "dev_la_ctb",
                     "m_kiosk", money(20, 60), "APPROVED");
@@ -96,6 +99,9 @@ public final class PaymentFraudCorpus {
         for (int k = 0; k < 25; k++)       // PLANTED BIN 498765: 25 instruments, 22 declined, on day 3
             add(at(3, 1, 0).plusMinutes(2L * k), "acc_ba_" + k, "tok_ba_" + k, "498765", "dev_ba_" + k, "m_ba",
                     money(10, 30), k < 22 ? "DECLINED" : "APPROVED");
+        for (int k = 0; k < 16; k++)       // PLANTED BIN 498700: 8 + 8 declined instruments STRADDLING midnight day 2 → 3
+            add(k < 8 ? at(2, 23, 30 + 2 * k) : at(3, 0, 2 * (k - 8)), "acc_bs_" + k, "tok_bs_" + k, "498700",
+                    "dev_bs_" + k, "m_bs", money(10, 30), "DECLINED");
         for (int k = 0; k < 30; k++)       // LOOK-ALIKE BIN 477777: a payroll-card run, 30 instruments, 3 declined
             add(at(2, 6, 0).plusMinutes(5L * k), "acc_la_ba_" + k, "tok_la_ba_" + k, "477777", "dev_la_ba_" + k,
                     "m_payroll", money(100, 300), k < 3 ? "DECLINED" : "APPROVED");
@@ -115,6 +121,13 @@ public final class PaymentFraudCorpus {
         for (int m : new int[]{0, 12, 24, 36, 48, 61})   // LOOK-ALIKE tok_la_vb2: 6 attempts spanning 61 minutes
             add(at(2, 16, 0).plusMinutes(m), "acc_la_vb2", "tok_la_vb2", "523400", "dev_la_vb2", "m_06",
                     money(20, 80), "APPROVED");
+        for (int s : new int[]{0, 720, 1440, 2160, 2880, 3599})   // PLANTED tok_vb_03: 6 attempts spanning 59:59
+            add(at(1, 18, 0).plusSeconds(s), "acc_vb03", "tok_vb_03", "491700", "dev_vb03", "m_13", money(20, 80), "APPROVED");
+        for (int m : new int[]{0, 12, 24, 36, 48, 60})   // LOOK-ALIKE tok_la_vb3: 6 attempts spanning EXACTLY 60:00
+            add(at(3, 6, 0).plusMinutes(m), "acc_la_vb3", "tok_la_vb3", "491700", "dev_la_vb3", "m_14", money(20, 80), "APPROVED");
+        for (int k = 0; k < 6; k++)        // PLANTED tok_shared: one instrument, TWO accounts, 6 attempts in 30 minutes
+            add(at(2, 19, 5 * k), k % 2 == 0 ? "acc_sh1" : "acc_sh2", "tok_shared", "455600",
+                    k % 2 == 0 ? "dev_sh1" : "dev_sh2", "m_15", money(20, 80), "APPROVED");
         // Two disputes on the burst instrument's approved attempts.
         disputes.add(new Object[]{vb01.get(0), 3, "R_FRAUD_CNP"});
         disputes.add(new Object[]{vb01.get(2), 3, "R_FRAUD_CNP"});

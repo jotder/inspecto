@@ -1,9 +1,10 @@
 job:
   name: pf_device_small_amounts
   type: sql.template
-  sql: "SELECT DEVICE_ID AS device_id, ATTEMPT_DATE AS attempt_date, count(DISTINCT INSTRUMENT_TOKEN) AS small_distinct_instruments, count(*) AS small_attempts FROM payment_attempts WHERE AMOUNT <= CAST($small_amount AS DOUBLE) GROUP BY DEVICE_ID, ATTEMPT_DATE"
+  sql: "WITH s AS (SELECT DEVICE_ID, INSTRUMENT_TOKEN, ATTEMPT_TS FROM payment_attempts WHERE AMOUNT <= CAST($small_amount AS DOUBLE)), w AS (SELECT a.DEVICE_ID, a.ATTEMPT_TS AS window_end, count(DISTINCT b.INSTRUMENT_TOKEN) AS n FROM s a JOIN s b ON b.DEVICE_ID = a.DEVICE_ID AND b.ATTEMPT_TS > a.ATTEMPT_TS - to_hours(CAST($window_hours AS INTEGER)) AND b.ATTEMPT_TS <= a.ATTEMPT_TS GROUP BY a.DEVICE_ID, a.ATTEMPT_TS) SELECT DEVICE_ID AS device_id, max(n) AS small_distinct_instruments, arg_max(window_end, n) AS window_end FROM w GROUP BY DEVICE_ID"
   sources: payment_attempts
   sink_dataset: pf_device_small_amounts
   small_amount: "2.00"
+  window_hours: "24"
   cron: "0 * * * *"
   enabled: true

@@ -1,8 +1,9 @@
 job:
   name: pf_account_activity
   type: sql.template
-  sql: "WITH a AS (SELECT ACCOUNT_ID, count(*) AS attempts, count(*) FILTER (WHERE OUTCOME = 'DECLINED') AS declined_attempts FROM payment_attempts GROUP BY ACCOUNT_ID), d AS (SELECT ACCOUNT_ID, count(*) AS disputes FROM disputes GROUP BY ACCOUNT_ID) SELECT COALESCE(a.ACCOUNT_ID, d.ACCOUNT_ID) AS account_id, COALESCE(a.attempts, 0) AS attempts, COALESCE(a.declined_attempts, 0) AS declined_attempts, COALESCE(d.disputes, 0) AS disputes FROM a FULL OUTER JOIN d ON a.ACCOUNT_ID = d.ACCOUNT_ID"
+  sql: "WITH a AS (SELECT ACCOUNT_ID, count(*) AS attempts, count(*) FILTER (WHERE OUTCOME = 'DECLINED') AS declined_attempts FROM payment_attempts GROUP BY ACCOUNT_ID), v AS (SELECT x.ACCOUNT_ID, x.ATTEMPT_ID, count(*) AS n FROM payment_attempts x JOIN payment_attempts y ON y.ACCOUNT_ID = x.ACCOUNT_ID AND y.ATTEMPT_TS > x.ATTEMPT_TS - to_minutes(CAST($window_minutes AS INTEGER)) AND y.ATTEMPT_TS <= x.ATTEMPT_TS GROUP BY x.ACCOUNT_ID, x.ATTEMPT_ID), vm AS (SELECT ACCOUNT_ID, max(n) AS max_attempts_in_window FROM v GROUP BY ACCOUNT_ID), d AS (SELECT ACCOUNT_ID, count(*) AS disputes FROM disputes GROUP BY ACCOUNT_ID) SELECT COALESCE(a.ACCOUNT_ID, d.ACCOUNT_ID) AS account_id, COALESCE(a.attempts, 0) AS attempts, COALESCE(a.declined_attempts, 0) AS declined_attempts, COALESCE(d.disputes, 0) AS disputes, COALESCE(vm.max_attempts_in_window, 0) AS max_attempts_in_window FROM a FULL OUTER JOIN d ON a.ACCOUNT_ID = d.ACCOUNT_ID LEFT JOIN vm ON vm.ACCOUNT_ID = COALESCE(a.ACCOUNT_ID, d.ACCOUNT_ID)"
   sources: payment_attempts,disputes
   sink_dataset: pf_account_activity
+  window_minutes: "60"
   cron: "0 * * * *"
   enabled: true

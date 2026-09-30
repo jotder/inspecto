@@ -22,7 +22,7 @@ mapping:
       from: ""
       fn: custom
       args:
-        expression: "CASE WHEN regexp_full_match(regexp_replace(ATTEMPT_ID, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(ATTEMPT_ID, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(ATTEMPT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(ATTEMPT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(ATTEMPT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached ATTEMPT_ID; only tokenised instruments may be ingested') ELSE ATTEMPT_ID END"
+        expression: "CASE WHEN len(list_filter(list_transform(list_concat(regexp_extract_all(concat_ws('X', translate(ATTEMPT_ID, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), CASE WHEN regexp_full_match(translate(ATTEMPT_TS, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), '[0-9]{4}-[0-9]{2}-[0-9]{2}( [0-9]{2}:[0-9]{2}:[0-9]{2})?') THEN NULL ELSE translate(ATTEMPT_TS, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789') END, CASE WHEN regexp_full_match(translate(ATTEMPT_DATE, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), '[0-9]{4}-[0-9]{2}-[0-9]{2}( [0-9]{2}:[0-9]{2}:[0-9]{2})?') THEN NULL ELSE translate(ATTEMPT_DATE, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789') END, translate(ACCOUNT_ID, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), translate(INSTRUMENT_TOKEN, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), translate(BIN, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), translate(DEVICE_ID, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), translate(MERCHANT_ID, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), translate(AMOUNT, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), translate(CURRENCY, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), translate(OUTCOME, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789')), '[0-9](?:[^0-9A-Za-z]{0,3}[0-9])*'), regexp_extract_all(concat_ws('X', translate(ATTEMPT_ID, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), CASE WHEN regexp_full_match(translate(ATTEMPT_TS, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), '[0-9]{4}-[0-9]{2}-[0-9]{2}( [0-9]{2}:[0-9]{2}:[0-9]{2})?') THEN NULL ELSE translate(ATTEMPT_TS, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789') END, CASE WHEN regexp_full_match(translate(ATTEMPT_DATE, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), '[0-9]{4}-[0-9]{2}-[0-9]{2}( [0-9]{2}:[0-9]{2}:[0-9]{2})?') THEN NULL ELSE translate(ATTEMPT_DATE, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789') END, translate(ACCOUNT_ID, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), translate(INSTRUMENT_TOKEN, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), translate(BIN, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), translate(DEVICE_ID, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), translate(MERCHANT_ID, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), translate(AMOUNT, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), translate(CURRENCY, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789'), translate(OUTCOME, '０１２３４５６７８９٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹०१२३४५६७८९', '0123456789012345678901234567890123456789')), '[0-9]+')), lambda c: regexp_replace(c, '[^0-9]', '', 'g')), lambda d: length(d) BETWEEN 13 AND 19 AND list_sum(list_transform(range(1, length(d) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(d), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(d), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(d), k, 1) AS INTEGER) END)) % 10 = 0)) > 0 THEN error('INGEST_PURGE_FILE: card-number tripwire: a Luhn-valid 13-19 digit number in a PAYMENT_ATTEMPTS row; only tokenised instruments may be ingested') ELSE ATTEMPT_ID END"
     - name: ATTEMPT_TS
       from: ATTEMPT_TS
       fn: keep
@@ -30,40 +30,26 @@ mapping:
       from: ATTEMPT_DATE
       fn: keep
     - name: ACCOUNT_ID
-      from: ""
-      fn: custom
-      args:
-        expression: "CASE WHEN regexp_full_match(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached ACCOUNT_ID; only tokenised instruments may be ingested') ELSE ACCOUNT_ID END"
+      from: ACCOUNT_ID
+      fn: keep
     - name: INSTRUMENT_TOKEN
-      from: ""
-      fn: custom
-      args:
-        expression: "CASE WHEN regexp_full_match(regexp_replace(INSTRUMENT_TOKEN, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(INSTRUMENT_TOKEN, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(INSTRUMENT_TOKEN, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(INSTRUMENT_TOKEN, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(INSTRUMENT_TOKEN, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached INSTRUMENT_TOKEN; only tokenised instruments may be ingested') ELSE INSTRUMENT_TOKEN END"
+      from: INSTRUMENT_TOKEN
+      fn: keep
     - name: BIN
-      from: ""
-      fn: custom
-      args:
-        expression: "CASE WHEN regexp_full_match(regexp_replace(BIN, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(BIN, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(BIN, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(BIN, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(BIN, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached BIN; only tokenised instruments may be ingested') ELSE BIN END"
+      from: BIN
+      fn: keep
     - name: DEVICE_ID
-      from: ""
-      fn: custom
-      args:
-        expression: "CASE WHEN regexp_full_match(regexp_replace(DEVICE_ID, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(DEVICE_ID, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(DEVICE_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(DEVICE_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(DEVICE_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached DEVICE_ID; only tokenised instruments may be ingested') ELSE DEVICE_ID END"
+      from: DEVICE_ID
+      fn: keep
     - name: MERCHANT_ID
-      from: ""
-      fn: custom
-      args:
-        expression: "CASE WHEN regexp_full_match(regexp_replace(MERCHANT_ID, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(MERCHANT_ID, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(MERCHANT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(MERCHANT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(MERCHANT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached MERCHANT_ID; only tokenised instruments may be ingested') ELSE MERCHANT_ID END"
+      from: MERCHANT_ID
+      fn: keep
     - name: AMOUNT
       from: AMOUNT
       fn: keep
     - name: CURRENCY
-      from: ""
-      fn: custom
-      args:
-        expression: "CASE WHEN regexp_full_match(regexp_replace(CURRENCY, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(CURRENCY, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(CURRENCY, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(CURRENCY, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(CURRENCY, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached CURRENCY; only tokenised instruments may be ingested') ELSE CURRENCY END"
+      from: CURRENCY
+      fn: keep
     - name: OUTCOME
-      from: ""
-      fn: custom
-      args:
-        expression: "CASE WHEN regexp_full_match(regexp_replace(OUTCOME, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(OUTCOME, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(OUTCOME, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(OUTCOME, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(OUTCOME, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached OUTCOME; only tokenised instruments may be ingested') ELSE OUTCOME END"
+      from: OUTCOME
+      fn: keep

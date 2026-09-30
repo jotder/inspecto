@@ -5,4 +5,4 @@ by[1]: instrument_token
 comparator: gte
 threshold: 6
 severity: CRITICAL
-description: "Velocity burst: one instrument made 6 or more attempts inside 60 minutes"
+description: "Velocity burst: one instrument made 6 or more attempts inside any window shorter than 60 minutes"

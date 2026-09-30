@@ -109,50 +109,123 @@ class PaymentFraudTemplateGoldenTest {
                 "severity", "CRITICAL", "description", "High payment Risk Score"));
         Map<String, Set<String>> detections = sweep(store, cfg, data);
         assertEquals(Map.of(
-                "pf_card_testing", Set.of("dev_ct_01"),
-                "pf_bin_attack", Set.of("498765"),
-                "pf_velocity_burst", Set.of("tok_vb_01", "tok_vb_02"),
+                "pf_card_testing", Set.of("dev_ct_01", "dev_ct_02"),
+                "pf_bin_attack", Set.of("498765", "498700"),
+                "pf_velocity_burst", Set.of("tok_shared", "tok_vb_01", "tok_vb_02", "tok_vb_03"),
                 "pf_sim_swap_takeover", Set.of("acc_ss01", "acc_ss02"),
-                "pf_high_risk_account", Set.of("acc_ss01", "acc_ss02", "acc_vb01")), detections,
+                "pf_high_risk_account", Set.of("acc_ct_guest", "acc_ss01", "acc_ss02", "acc_vb01")), detections,
                 "exactly the planted offenders per typology — every look-alike stays silent");
 
-        // The exact scores of the three high accounts, recomputed by hand from the default factor table.
+        // One instrument shared by two accounts: the velocity Alert Rule sees all 6 attempts on the INSTRUMENT, while
+        // each account's velocity factor counts only its own 3 — the partition and the grouping agree on one key.
+        Map<String, Double> shared = new TreeMap<>();
+        run.scored().stream().filter(x -> x.entityKey().startsWith("acc_sh")).forEach(x -> shared.put(x.entityKey(), x.score()));
+        assertEquals(Map.of("acc_sh1", 15.0, "acc_sh2", 15.0), shared, "3 own attempts x 5 each, not the instrument's 6");
+
+        // The exact scores of the high accounts, recomputed by hand from the default factor table.
         Map<String, Double> scores = new TreeMap<>();
         run.scored().stream().filter(s -> s.score() >= model.highThreshold()).forEach(s -> scores.put(s.entityKey(), s.score()));
-        assertEquals(Map.of("acc_ss01", 65.0, "acc_ss02", 65.0, "acc_vb01", 87.0), scores,
-                "ss: 60 (SIM swap) + 5 (velocity 1); vb01: 35 (velocity 7) + 12 (3 declines) + 40 (2 disputes)");
+        assertEquals(Map.of("acc_ct_guest", 60.0, "acc_ss01", 65.0, "acc_ss02", 65.0, "acc_vb01", 87.0), scores,
+                "ss: 60 (SIM swap) + 5 (velocity 1); vb01: 35 (velocity 7) + 12 (3 declines) + 40 (2 disputes); "
+                        + "ct_guest: 40 (velocity 10, capped) + 20 (8 declines, capped)");
+    }
+
+    /** Trip probes: each hides the published test PAN in one cell, spelled as an adversary would. */
+    private static final List<String[]> TRIPS = List.of(
+            new String[]{"INSTRUMENT_TOKEN", TEST_PAN},
+            new String[]{"INSTRUMENT_TOKEN", "4111 1111 1111 1111"},
+            new String[]{"INSTRUMENT_TOKEN", "4111-1111-1111-1111"},
+            new String[]{"INSTRUMENT_TOKEN", "4111.1111.1111.1111"},
+            new String[]{"INSTRUMENT_TOKEN", "4111/1111/1111/1111"},
+            new String[]{"INSTRUMENT_TOKEN", "4111_1111_1111_1111"},
+            new String[]{"INSTRUMENT_TOKEN", "4111\t1111\t1111\t1111"},
+            new String[]{"INSTRUMENT_TOKEN", "4111 1111 1111 1111"},              // NBSP
+            new String[]{"INSTRUMENT_TOKEN", "4111–1111–1111–1111"},              // en-dash
+            new String[]{"INSTRUMENT_TOKEN", fold(TEST_PAN, '０')},                          // full-width
+            new String[]{"INSTRUMENT_TOKEN", fold(TEST_PAN, '٠')},                          // Arabic-Indic
+            new String[]{"INSTRUMENT_TOKEN", "+" + TEST_PAN},
+            new String[]{"MERCHANT_ID", "card " + TEST_PAN + " exp"},
+            new String[]{"MERCHANT_ID", "card " + TEST_PAN + " 12/27"},
+            new String[]{"AMOUNT", TEST_PAN});                                                    // the numeric leak path
+    /** True negatives: digit strings that are NOT Luhn-valid 13–19 digit numbers — each must ingest. */
+    private static final List<String[]> PASSES = List.of(
+            new String[]{"INSTRUMENT_TOKEN", "tok_y"},
+            new String[]{"MERCHANT_ID", "4111111111111112"},
+            new String[]{"MERCHANT_ID", "4111 1111 1111 1112"},
+            new String[]{"MERCHANT_ID", "411111111111"},
+            new String[]{"MERCHANT_ID", "41111111111111111111"},
+            new String[]{"AMOUNT", "1234567.89"});
+
+    private static String fold(String ascii, char zero) {
+        StringBuilder sb = new StringBuilder();
+        for (char c : ascii.toCharArray()) sb.append((char) (zero + (c - '0')));
+        return sb.toString();
+    }
+
+    /** One planted file: a clean row plus a row whose {@code column} carries {@code value}; returns the config. */
+    private static PipelineConfig plant(Path dir, String column, String value) throws Exception {
+        Path space = copyTemplate(dir);
+        PipelineConfig pc = PipelineConfig.load(space.resolve("config/payment_attempts/payment_attempts_pipeline.toon").toString());
+        Path inbox = Files.createDirectories(Path.of(pc.dirs().poll()));
+        Map<String, String> row = new java.util.LinkedHashMap<>();
+        for (String[] kv : new String[][]{{"ATTEMPT_ID", "pa_x2"}, {"ATTEMPT_TS", "2026-07-04 10:05:00"},
+                {"ATTEMPT_DATE", "2026-07-04"}, {"ACCOUNT_ID", "acc_x"}, {"INSTRUMENT_TOKEN", "tok_x"}, {"BIN", "402400"},
+                {"DEVICE_ID", "dev_x"}, {"MERCHANT_ID", "m_01"}, {"AMOUNT", "10.00"}, {"CURRENCY", "EUR"}, {"OUTCOME", "APPROVED"}})
+            row.put(kv[0], kv[1]);
+        row.put(column, value);
+        Files.writeString(inbox.resolve("PAYMENT_ATTEMPTS_20260704.csv"), String.join(",", row.keySet()) + "\n"
+                + "pa_x1,2026-07-04 10:00:00,2026-07-04,acc_x,tok_x,402400,dev_x,m_01,10.00,EUR,APPROVED\n"
+                + String.join(",", row.values()) + "\n", java.nio.charset.StandardCharsets.UTF_8);
+        CollectorProcessor.run(pc);
+        assertTrue(Files.exists(Path.of(pc.dirs().statusFilePath())), value + ": the poll picked the file up");
+        return pc;
     }
 
     @Test
-    void aLuhnValidCardNumberFailsTheBatchClosedAndLandsNothing(@TempDir Path tmp) throws Exception {
-        // Positive control first: the SAME file with a token in that cell ingests both rows — so a zero below is the
-        // tripwire's refusal, not a file the poll never picked up.
-        for (String planted : List.of("tok_y", TEST_PAN, "4111 1111 1111 1111", "4111-1111-1111-1111")) {
-            boolean control = planted.startsWith("tok_");
-            Path space = copyTemplate(tmp.resolve("t" + Math.abs(planted.hashCode())));
-            PipelineConfig pc = PipelineConfig.load(space.resolve("config/payment_attempts/payment_attempts_pipeline.toon").toString());
-            Path inbox = Files.createDirectories(Path.of(pc.dirs().poll()));
-            Files.writeString(inbox.resolve("PAYMENT_ATTEMPTS_20260704.csv"),
-                    "ATTEMPT_ID,ATTEMPT_TS,ATTEMPT_DATE,ACCOUNT_ID,INSTRUMENT_TOKEN,BIN,DEVICE_ID,MERCHANT_ID,AMOUNT,CURRENCY,OUTCOME\n"
-                            + "pa_x1,2026-07-04 10:00:00,2026-07-04,acc_x,tok_x,402400,dev_x,m_01,10.00,EUR,APPROVED\n"
-                            + "pa_x2,2026-07-04 10:05:00,2026-07-04,acc_x," + planted + ",411111,dev_x,m_01,10.00,EUR,APPROVED\n");
-            CollectorProcessor.run(pc);
-            assertTrue(Files.exists(Path.of(pc.dirs().statusFilePath())), "'" + planted + "': the poll picked the file up");
-            if (control) {
-                assertEquals(2L, scalar(space.resolve("data"), "payment_attempts/database", "SELECT count(*) FROM \"s\""),
-                        "the control file lands both rows");
-                assertTrue(Files.exists(Path.of(pc.dirs().markers(), "PAYMENT_ATTEMPTS_20260704.csv.processed")));
-                continue;
-            }
-            assertEquals(0, count(Path.of(pc.dirs().database())), "'" + planted + "': not one row of the batch landed");
-            assertTrue(Files.exists(inbox.resolve("PAYMENT_ATTEMPTS_20260704.csv"))
-                            || count(Path.of(pc.dirs().quarantine())) + count(Path.of(pc.dirs().errors())) > 0,
-                    "'" + planted + "': the file is held (inbox / quarantine / errors), never backed up as processed");
-            assertFalse(Files.exists(Path.of(pc.dirs().markers(), "PAYMENT_ATTEMPTS_20260704.csv.processed")),
-                    "'" + planted + "': the file is not marked processed");
-            String status = Files.exists(Path.of(pc.dirs().statusFilePath())) ? Files.readString(Path.of(pc.dirs().statusFilePath())) : "";
-            assertFalse(status.contains("4111"), "the refusal never quotes the value: " + status);
+    void digitStringsThatAreNotCardNumbersIngest(@TempDir Path tmp) throws Exception {
+        int i = 0;
+        for (String[] p : PASSES) {
+            PipelineConfig pc = plant(tmp.resolve("p" + i++), p[0], p[1]);
+            assertEquals(2L, scalar(Path.of(pc.dirs().database()).getParent().getParent(), "payment_attempts/database",
+                    "SELECT count(*) FROM \"s\""), p[0] + "='" + p[1] + "' is not a card number: both rows land");
         }
+    }
+
+    @Test
+    void aCardNumberInAnySpellingOrColumnPurgesTheFileAndLandsNothing(@TempDir Path tmp) throws Exception {
+        int i = 0;
+        for (String[] p : TRIPS) {
+            String what = p[0] + "='" + p[1] + "'";
+            PipelineConfig pc = plant(tmp.resolve("t" + i++), p[0], p[1]);
+            assertEquals(0, count(Path.of(pc.dirs().database())), what + ": not one row of the file landed");
+            assertFalse(Files.exists(Path.of(pc.dirs().poll(), "PAYMENT_ATTEMPTS_20260704.csv")),
+                    what + ": the file left the inbox (it is never re-polled)");
+            for (String kept : new String[]{pc.dirs().quarantine(), pc.dirs().errors(), pc.dirs().backup(), pc.dirs().temp()})
+                assertEquals(0, count(Path.of(kept)), what + ": no copy of the file is kept in " + kept);
+            assertFalse(Files.exists(Path.of(pc.dirs().markers(), "PAYMENT_ATTEMPTS_20260704.csv.processed")), what);
+            String status = Files.readString(Path.of(pc.dirs().statusFilePath()));
+            assertTrue(status.contains("PURGED_REFUSED"), what + ": the purge is audited: " + status);
+            assertFalse(status.contains("1111"), what + ": the audit never quotes the value: " + status);
+        }
+    }
+
+    /**
+     * 🔴 KNOWN GAP, pinned as evidence for {@code INGEST-REJECT-SIDECAR-RAW-PAN-1}: a card number inside a MALFORMED
+     * row (a field-count reject) never reaches the mapping, so the tripwire cannot see it — {@code all_or_nothing}
+     * quarantines the raw file and writes a rejects sidecar holding the row verbatim. When the platform fixes it,
+     * this test goes red: flip it to the purge assertions above.
+     */
+    @Test
+    void knownGapACardNumberInAMalformedRowIsKeptInQuarantine(@TempDir Path tmp) throws Exception {
+        PipelineConfig pc = plant(tmp, "OUTCOME", "APPROVED," + TEST_PAN);   // one extra field → a parse reject
+        assertEquals(0, count(Path.of(pc.dirs().database())));
+        StringBuilder kept = new StringBuilder();
+        for (String dir : new String[]{pc.dirs().quarantine(), pc.dirs().errors()})
+            if (Files.isDirectory(Path.of(dir)))
+                try (Stream<Path> w = Files.walk(Path.of(dir))) {
+                    for (Path f : w.filter(Files::isRegularFile).toList()) kept.append(Files.readString(f));
+                }
+        assertTrue(kept.toString().contains(TEST_PAN), "the gap is real: the raw value is kept at rest");
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────────────────────────────────────

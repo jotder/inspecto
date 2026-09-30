@@ -5,4 +5,4 @@ by[1]: bin
 comparator: gte
 threshold: 15
 severity: CRITICAL
-description: "BIN attack: 15 or more distinct instruments of one BIN declined in a day"
+description: "BIN attack: 15 or more distinct instruments of one BIN declined inside any 24 hours"
