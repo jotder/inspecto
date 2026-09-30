@@ -16,10 +16,15 @@ class ModelProviderFactoryTest {
     void ollamaSettingsBuildAnAvailableRouter() {
         ProviderSettings s = new ProviderSettings("ollama", "http://localhost:11434", null,
                 Map.of(ModelTier.MEDIUM, "qwen2.5:7b"), 0);
-        ModelRouter r = ModelProviderFactory.create(s);
+        // The Space's model endpoint allowlist must name the loopback host (ASSIST-MODEL-EGRESS-1).
+        ModelRouter r = ModelProviderFactory.create(s,
+                com.gamma.pipeline.exec.ModelEgress.parse(java.util.List.of("localhost")),
+                com.gamma.pipeline.exec.EgressPolicy.SYSTEM);
         // available() is a pure config check: enabled + model + baseUrl. No network involved.
         assertTrue(r.providerFor(ModelTier.MEDIUM).available());
         assertFalse(r.providerFor(ModelTier.LARGE).available(), "unmapped tier stays unavailable");
+        assertFalse(ModelProviderFactory.create(s).providerFor(ModelTier.MEDIUM).available(),
+                "no allowlist entry: the endpoint is refused");
     }
 
     @Test

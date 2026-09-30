@@ -4,6 +4,8 @@ import com.gamma.agent.kernel.model.ModelProvider;
 import com.gamma.agent.kernel.model.ModelRouter;
 import com.gamma.agent.model.ModelProfile;
 import com.gamma.agent.model.OllamaModelProvider;
+import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.pipeline.exec.ModelEgress;
 
 import java.time.Duration;
 import java.util.LinkedHashSet;
@@ -21,6 +23,8 @@ import java.util.Set;
  */
 public final class ModelProviderFactory {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ModelProviderFactory.class);
+
     private ModelProviderFactory() {}
 
     /**
@@ -35,11 +39,42 @@ public final class ModelProviderFactory {
 
     /** Build a router for explicit settings. Unknown/unbacked hosted ids yield an unavailable router. */
     public static ModelRouter create(ProviderSettings settings) {
+        return create(settings, ModelEgress.forCurrentSpace(), EgressPolicy.SYSTEM);
+    }
+
+    /**
+     * ASSIST-MODEL-EGRESS-1 (2026-10-01): the settings' endpoint is checked against the Space's model endpoint
+     * allowlist ({@link ModelEgress}, the {@code models} key of {@code egress.toon}) and the client is built on the
+     * CHECKED address ({@link ModelEgress#pin}), as the intelligence module's {@code GatewayFactory} does. A refused
+     * endpoint yields an unavailable router, so nothing dials it. A hosted provider with no {@code baseUrl} keeps
+     * its SDK's fixed vendor endpoint.
+     */
+    public static ModelRouter create(ProviderSettings settings, ModelEgress.Policy egress, EgressPolicy.Resolver resolver) {
         if (settings == null) return OllamaModelProvider.fromEnvironment();
         String id = settings.provider();
+        String effective = settings.baseUrl() != null ? settings.baseUrl()
+                : "ollama".equals(id) ? ProviderSettings.defaultBaseUrl("ollama") : null;
+        if (effective != null) {
+            try {
+                String pinned = ModelEgress.pin(effective, egress, resolver);
+                settings = new ProviderSettings(settings.provider(), pinned, settings.apiKeyRef(),
+                        settings.models(), settings.timeoutSeconds());
+            } catch (EgressPolicy.Refused refused) {
+                String why = "model endpoint refused: " + refused.getMessage();
+                log.warn("[EGRESS] {}", why);
+                ModelProvider refusedProvider = new ModelProvider() {
+                    @Override public String name() { return why; }
+                    @Override public boolean available() { return false; }
+                    @Override public com.gamma.agent.kernel.model.ModelResponse generate(
+                            com.gamma.agent.kernel.model.ModelRequest request) {
+                        throw new com.gamma.agent.kernel.error.ModelError(why);
+                    }
+                };
+                return tier -> refusedProvider;
+            }
+        }
         if ("ollama".equals(id)) {
-            String baseUrl = settings.baseUrl() != null
-                    ? settings.baseUrl() : ProviderSettings.defaultBaseUrl("ollama");
+            String baseUrl = settings.baseUrl();
             var models = settings.models().isEmpty()
                     ? ProviderSettings.defaultModels("ollama") : settings.models();
             // enabled=true: choosing ollama in the settings IS the explicit opt-in.

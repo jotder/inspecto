@@ -38,6 +38,15 @@
             <artifactId>inspecto-agent</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- `provided`, as inspecto-agent scopes it (provided is not transitive): the agent's provider
+             factory checks endpoints with the core's ModelEgress (ASSIST-MODEL-EGRESS-1). The core is
+             always on a bundle's classpath as inspecto.jar, so this only feeds compile and test. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
 
         <!-- Hosted SDK adapters (LangChain4j). Grok and llama.cpp ride the OpenAI-compatible
              client, so three artifacts cover all five hosted/local-server providers. -->

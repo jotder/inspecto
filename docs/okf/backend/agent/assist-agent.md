@@ -35,3 +35,16 @@ The assist surface is an SPI in the core, implemented by the optional [agent mod
 The write-back routes are governed by the `-Dassist.write.root` gate (`503` when unset — see
 [auth & security](../editions/auth-security.md)). Hosted model backends come from
 [agent-hosted](hosted-providers.md).
+
+### Model endpoint allowlist (2026-10-01)
+
+Every provider this module builds goes through `ModelProviderFactory.create`, which checks the settings'
+`baseUrl` (or the Ollama default `http://localhost:11434`) against the Space's `models` list in `egress.toon`
+(`ModelEgress`, the same check the intelligence module's `GatewayFactory` makes) and builds the client on the
+CHECKED address (`ModelEgress.pin`). A refused endpoint yields an unavailable provider whose name carries the
+reason, so nothing dials it. `POST /assist/settings/test` rebuilds from the saved settings on each call, so the
+CURRENT allowlist decides. Consequences: an empty allowlist (the default) refuses even the local Ollama
+default, so a local model needs `localhost` / `127.0.0.1` named; an `https` endpoint named by DNS host is
+refused (it cannot be pinned). A hosted provider with no `baseUrl` keeps its SDK's fixed vendor endpoint,
+which is not checked. `inspecto-agent-hosted` now carries `inspecto-processor` as `provided` for this. Test:
+`AssistModelEgressTest` (real HTTP; `169.254.169.254` refused, unlisted loopback never dialled, listed loopback ok).

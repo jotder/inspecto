@@ -295,9 +295,12 @@ public final class UccAssistAgent implements AssistAgent {
     public java.util.Map<String, Object> testSettings() {
         java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
         out.put("supported", true);
+        // ASSIST-MODEL-EGRESS-1: rebuild from the saved settings so the CURRENT model endpoint allowlist decides
+        // (ModelProviderFactory pins or refuses); a refused endpoint reports unavailable and is never dialled.
+        ModelRouter tested = AssistModelSettings.load().map(ModelProviderFactory::create).orElse(router);
         for (ModelTier t : ModelTier.values()) {
             java.util.Map<String, Object> r = new java.util.LinkedHashMap<>();
-            ModelProvider p = router.providerFor(t);
+            ModelProvider p = tested.providerFor(t);
             r.put("provider", p.name());
             if (!p.available()) {
                 r.put("ok", false);
