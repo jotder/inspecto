@@ -174,6 +174,28 @@ class IngestExpressionSandboxTest {
         assertNotNull(com.gamma.config.safety.PathJail.readAllowlistRefusal(tmp), "the filter refuses tmpdir");
     }
 
+    /** Round 3, at the run-time layer (the loader does not jail): a config/ dir spelled `config.` or in another
+     *  case would have been allowlisted, and read_text of a Pipeline file under it then succeeded. */
+    @Test
+    void configureRefusesAConfigDirHoweverItIsSpelled(@TempDir Path dir) throws Exception {
+        List<String> spellings = new java.util.ArrayList<>(List.of("config", "config.", "config./orders"));
+        if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows")) spellings.addAll(List.of("CONFIG", "Config/orders"));
+        for (String v : spellings) {
+            PipelineConfig cfg = pipeline(dir.resolve(v.replaceAll("[^a-zA-Z]", "_")), "upper(CUSTOMER)",
+                    null);
+            Path space = Path.of(cfg.dirs().poll()).getParent().getParent().getParent();
+            PipelineConfig bad = pipeline(space.getParent(), "upper(CUSTOMER)", sql(space) + "/" + v);
+            File tempDb = ConsignmentIngestStrategy.openTempDb(bad, "sec_cfg_");
+            try (Connection conn = DuckDbUtil.openConnection(tempDb)) {
+                SQLException e = assertThrows(SQLException.class,
+                        () -> ConsignmentIngestStrategy.configure(conn, bad, tempDb, List.of()), v);
+                assertTrue(e.getMessage().contains("refusing to ingest"), e.getMessage());
+            } finally {
+                DuckDbUtil.deleteTempDb(tempDb);
+            }
+        }
+    }
+
     // ── fixture ─────────────────────────────────────────────────────────────
 
     private static void runQuietly(PipelineConfig cfg) {

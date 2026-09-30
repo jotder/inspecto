@@ -278,7 +278,7 @@ public final class PathJail {
         if (configDir == null) return null;
         for (Path p = configDir.toAbsolutePath().normalize(); p != null; p = p.getParent()) {
             Path name = p.getFileName();
-            if (name != null && "config".equals(name.toString())) return p.getParent();
+            if (name != null && "config".equals(canonicalSegment(name.toString()))) return p.getParent();
         }
         return null;
     }
@@ -342,12 +342,12 @@ public final class PathJail {
      */
     public static void refuseDataHome(Path resolved, Path spaceDir, List<Path> roots, String value, String field) {
         refuseSecrets(resolved, value, field);
-        Path r = resolved.toAbsolutePath().normalize();
+        Path r = canonical(resolved);
         // The owning Space when known; else every allowed root stands in for it (a root IS a Space base,
         // except operator-declared extra roots, which a Space-owned config never needs to equal).
         List<Path> bases = new java.util.ArrayList<>();
-        if (spaceDir != null) bases.add(spaceDir.toAbsolutePath().normalize());
-        else if (roots != null) for (Path root : roots) bases.add(root.toAbsolutePath().normalize());
+        if (spaceDir != null) bases.add(canonical(spaceDir));
+        else if (roots != null) for (Path root : roots) bases.add(canonical(root));
         for (Path base : bases) {
             if (base.startsWith(r))
                 throw new Escape(field, value, "is the Space directory " + base + " (or contains it); a data "
@@ -368,7 +368,7 @@ public final class PathJail {
      * (every other process's scratch). Callers fail closed on a non-null answer.
      */
     public static String readAllowlistRefusal(Path dir) {
-        Path d = dir.toAbsolutePath().normalize();
+        Path d = canonical(dir);
         try {
             refuseSecrets(d, d.toString(), "allowlist");
         } catch (Escape secrets) {
@@ -376,11 +376,43 @@ public final class PathJail {
         }
         if (spaceDirOf(d) != null) return "is under a config/ directory";
         for (Path base : DiscoveredRoots.all())
-            if (base.startsWith(d)) return "is or contains the Space root " + base;
+            if (canonical(base).startsWith(d)) return "is or contains the Space root " + base;
         if (Files.isDirectory(d.resolve("config"))) return "is a Space root (it holds config/)";
-        Path tmp = Paths.get(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize();
+        Path tmp = canonical(Paths.get(System.getProperty("java.io.tmpdir")));
         if (tmp.startsWith(d)) return "is or contains the system temp directory " + tmp;
         return null;
+    }
+
+    private static final boolean CASE_INSENSITIVE_FS =
+            System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows");
+
+    /**
+     * One path segment as the filesystem resolves it: trailing dots and spaces stripped (Windows drops them, so
+     * {@code config.} IS {@code config}) and lower-cased on a case-insensitive filesystem ({@code CONFIG} is too).
+     */
+    static String canonicalSegment(String seg) {
+        String s = seg.replaceAll("[. ]+$", "");
+        if (s.isEmpty()) s = seg;   // "." / ".." stay themselves (normalize() already removed them)
+        return CASE_INSENSITIVE_FS ? s.toLowerCase(java.util.Locale.ROOT) : s;
+    }
+
+    /**
+     * {@code p} in the form every containment decision about a Space root, {@code config/}, {@code *.secrets} or
+     * tmpdir compares (SEC-INGEST-EXPR-EXTERNAL-ACCESS-1 round 3): absolute + normalised, then the REAL path of
+     * its nearest existing ancestor (links, 8.3 aliases and a Windows trailing dot resolve), then every segment
+     * {@link #canonicalSegment canonicalised}. A lexical {@code startsWith} on anything less is bypassable by
+     * {@code config.} or {@code CONFIG}.
+     */
+    public static Path canonical(Path p) {
+        Path a = p.toAbsolutePath().normalize();
+        Path real = realPathOfNearestExisting(a);
+        if (real != null) a = real;
+        Path out = a.getRoot();
+        for (Path seg : a) {
+            String c = canonicalSegment(seg.toString());
+            out = out == null ? Paths.get(c) : out.resolve(c);
+        }
+        return out == null ? a : out.normalize();
     }
 
     public static Path require(Path root, String value, String field) {

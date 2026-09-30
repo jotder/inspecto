@@ -249,4 +249,54 @@ class PathJailTest {
         assertFalse(PathJail.isUri("relative/dir"), "an ordinary relative path is not a URI");
         assertTrue(PathJail.isUri("s3://bucket"), "s3:// is a URI");
     }
+
+    // ── SEC-INGEST-EXPR-EXTERNAL-ACCESS-1 round 3: canonical, not lexical ──────────────────
+
+    /** A Space dir with its config/ tree and a real Pipeline file in it. */
+    private static Path space(Path root) throws IOException {
+        Path s = root.resolve("space");
+        Files.createDirectories(s.resolve("config/orders"));
+        Files.writeString(s.resolve("config/orders/p.toon"), "name: p\n");
+        return s;
+    }
+
+    /** The run-time layer on its own — the gate is bypassed, so the filter is the only thing refusing. */
+    @Test
+    void theAllowlistFilterRefusesTheConfigTreeDirectly(@TempDir Path root) throws IOException {
+        Path s = space(root);
+        assertTrue(PathJail.readAllowlistRefusal(s.resolve("config")) != null, "config/ itself");
+        assertTrue(PathJail.readAllowlistRefusal(s.resolve("config/orders")) != null, "under config/");
+        assertTrue(PathJail.readAllowlistRefusal(s) != null, "the Space root (it holds config/)");
+        assertTrue(PathJail.readAllowlistRefusal(s.resolve("data/orders")) == null, "a data dir passes");
+    }
+
+    /** Windows strips a trailing dot or space, so `config.` IS `config`; refused on every platform (fail closed). */
+    @Test
+    void aTrailingDotOrSpaceDoesNotWalkAroundTheConfigCheck(@TempDir Path root) throws IOException {
+        Path s = space(root);
+        for (String v : new String[]{"config.", "config./orders", "config../orders"})
+            assertTrue(PathJail.readAllowlistRefusal(Path.of(s + "/" + v)) != null, v);
+        Path spaced = Path.of(s + "/data/x.secrets./y");
+        assertTrue(PathJail.readAllowlistRefusal(spaced) != null, "a trailing-dot .secrets segment");
+    }
+
+    @Test
+    void caseVariantsOfConfigAreRefusedOnACaseInsensitiveFilesystem(@TempDir Path root) throws IOException {
+        org.junit.jupiter.api.Assumptions.assumeTrue(System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows"), "case-insensitive filesystem only");
+        Path s = space(root);
+        for (String v : new String[]{"CONFIG", "Config/orders", "cOnFiG./orders"})
+            assertTrue(PathJail.readAllowlistRefusal(s.resolve(v)) != null, v);
+        assertTrue(PathJail.readAllowlistRefusal(Path.of(s.toString().toUpperCase(java.util.Locale.ROOT))) != null,
+                "the Space root, spelled in upper case");
+    }
+
+    @Test
+    void refuseDataHomeComparesCanonicalPaths(@TempDir Path root) throws IOException {
+        Path s = space(root);
+        assertThrows(PathJail.Escape.class, () -> PathJail.refuseDataHome(Path.of(s + "/config./orders"), s,
+                java.util.List.of(), "config./orders", "dirs.poll"));
+        assertThrows(PathJail.Escape.class, () -> PathJail.refuseDataHome(Path.of(s + "/."), s,
+                java.util.List.of(), ".", "dirs.poll"));
+    }
+
 }

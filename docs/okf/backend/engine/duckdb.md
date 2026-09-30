@@ -213,6 +213,13 @@ autoloaded httpfs (SSRF — verified: the unsealed connection dialled the addres
     is no longer allowlisted, so no per-run temp directory is needed; `IngestExpressionSandboxTest
     .theAllowlistNeverContainsTheSystemTempDirectory` pins it (with tmpdir allowlisted the three
     host/other-Space reads all landed).
+- **Every comparison is canonical, never lexical** (round 3: `dirs.poll: <S>/config.` and `CONFIG` walked
+  around a `startsWith(base.resolve("config"))` — Windows strips a trailing dot and ignores case, so the sealed
+  connection could `read_text('<S>/config./orders/p.toon')`). `PathJail.canonical(p)` = absolute + normalised
+  + the real path of its nearest existing ancestor + each segment through `canonicalSegment` (trailing dots and
+  spaces stripped on every platform — fail closed — and lower-cased on Windows). `refuseDataHome`,
+  `readAllowlistRefusal` (Space bases and tmpdir too) and `spaceDirOf` all compare that form.
+- **The restricted-quarantine sibling needs no rule of its own**: a refused file lands at `<quarantine>/../restricted-quarantine`, a CHILD of the quarantine's parent, so it is never the Space root, and it reaches `config/` or a `*.secrets` dir only when the quarantine sits directly in one — which is refused. Pinned as a property in `ConfigSafetyValidatorTest`.
 - ⚠ **Residual — links.** DuckDB's `allowed_directories` check is lexical: a symlink or junction INSIDE an
   allowed directory is followed. Config cannot plant one (no config key creates a link), so it is recorded,
   not fixed; an operator who links a data dir elsewhere extends the ingest connection's reach to that target.

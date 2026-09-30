@@ -730,4 +730,41 @@ class ConfigSafetyValidatorTest {
         assertNotNull(SafetyPolicy.defaultPolicy().allowedRoots());
         assertFalse(SafetyPolicy.defaultPolicy().allowedRoots().isEmpty(), "defaults to user.dir");
     }
+
+    /** Round 3: the gate compared lexically, so `config.` and a case variant walked around it. */
+    @Test
+    void aTrailingDotOrCaseVariantOfConfigIsRefusedAtTheGate(@TempDir Path s) throws IOException {
+        Path configDir = java.nio.file.Files.createDirectories(s.resolve("config/orders"));
+        String abs = s.toString().replace('\\', '/');
+        for (String v : List.of(abs + "/config.", abs + "/config./orders", "config./orders", "config /orders"))
+            assertTrue(refuses(ConfigSafetyValidator.check("pipeline", pipelineWithDir("poll", v),
+                    SafetyPolicy.withRoots(s), configDir), "dirs.poll"), v);
+        if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows"))
+            for (String v : List.of("CONFIG", "Config/orders", abs + "/CONFIG/orders"))
+                assertTrue(refuses(ConfigSafetyValidator.check("pipeline", pipelineWithDir("poll", v),
+                        SafetyPolicy.withRoots(s), configDir), "dirs.poll"), v);
+    }
+
+    /**
+     * 5.3 writes a refused file to {@code <quarantine>/../restricted-quarantine}. That sibling can only reach
+     * config/ or a secrets dir if the quarantine itself sits directly in one — which the gate refuses — and it is
+     * never the Space root (it is a CHILD of the quarantine's parent). Pinned as a property over spellings.
+     */
+    @Test
+    void theRestrictedQuarantineSiblingOfAnAcceptedQuarantineIsNeverAForbiddenDir(@TempDir Path s) throws IOException {
+        Path configDir = java.nio.file.Files.createDirectories(s.resolve("config/orders"));
+        for (String q : List.of("quarantine", "data", "data/orders/quarantine", "config/q", "config./q", "config",
+                "x.secrets/q", "config.secrets", ".", "q/..", "CONFIG/q")) {
+            boolean accepted = !refuses(ConfigSafetyValidator.check("pipeline", pipelineWithDir("quarantine", q),
+                    SafetyPolicy.withRoots(s), configDir), "dirs.quarantine");
+            Path sibling = s.resolve(q).normalize().getParent().resolve("restricted-quarantine");
+            if (accepted)
+                assertNull(PathJail.readAllowlistRefusal(sibling), q + " was accepted, so " + sibling + " must be clean");
+        }
+        assertTrue(refuses(ConfigSafetyValidator.check("pipeline", pipelineWithDir("quarantine", "config/q"),
+                SafetyPolicy.withRoots(s), configDir), "dirs.quarantine"));
+        assertTrue(ConfigSafetyValidator.check("pipeline", pipelineWithDir("quarantine", "data/orders/quarantine"),
+                SafetyPolicy.withRoots(s), configDir).isEmpty());
+    }
+
 }
