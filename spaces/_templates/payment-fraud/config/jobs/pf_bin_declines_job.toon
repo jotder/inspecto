@@ -1,0 +1,8 @@
+job:
+  name: pf_bin_declines
+  type: sql.template
+  sql: "SELECT BIN AS bin, ATTEMPT_DATE AS attempt_date, count(*) AS attempts, count(DISTINCT INSTRUMENT_TOKEN) FILTER (WHERE OUTCOME = 'DECLINED') AS declined_distinct_instruments FROM payment_attempts GROUP BY BIN, ATTEMPT_DATE"
+  sources: payment_attempts
+  sink_dataset: pf_bin_declines
+  cron: "0 * * * *"
+  enabled: true

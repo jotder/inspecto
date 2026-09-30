@@ -1,0 +1,36 @@
+name: disputes
+active: true
+
+dirs:
+  poll:       data/inbox/disputes
+  database:   data/disputes/database
+  backup:     data/disputes/backup
+  temp:       data/disputes/temp
+  errors:     data/disputes/errors
+  quarantine: data/disputes/quarantine
+  markers:    data/disputes/markers
+  status_dir: data/disputes/status
+  log_dir:    data/disputes/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 2
+  file_pattern: "glob:**/*.csv"
+  reject_mode: all_or_nothing
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: disputes_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  gap_detection:
+    enabled: true
+    sequence: "DISPUTES_{yyyyMMdd}"

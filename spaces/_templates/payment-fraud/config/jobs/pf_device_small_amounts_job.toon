@@ -1,0 +1,9 @@
+job:
+  name: pf_device_small_amounts
+  type: sql.template
+  sql: "SELECT DEVICE_ID AS device_id, ATTEMPT_DATE AS attempt_date, count(DISTINCT INSTRUMENT_TOKEN) AS small_distinct_instruments, count(*) AS small_attempts FROM payment_attempts WHERE AMOUNT <= CAST($small_amount AS DOUBLE) GROUP BY DEVICE_ID, ATTEMPT_DATE"
+  sources: payment_attempts
+  sink_dataset: pf_device_small_amounts
+  small_amount: "2.00"
+  cron: "0 * * * *"
+  enabled: true

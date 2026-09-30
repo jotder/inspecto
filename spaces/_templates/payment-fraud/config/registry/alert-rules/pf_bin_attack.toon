@@ -1,0 +1,8 @@
+name: pf_bin_attack
+dataset: pf_bin_declines
+measure: "max(declined_distinct_instruments)"
+by[1]: bin
+comparator: gte
+threshold: 15
+severity: CRITICAL
+description: "BIN attack: 15 or more distinct instruments of one BIN declined in a day"

@@ -1,0 +1,8 @@
+name: pf_card_testing
+dataset: pf_device_small_amounts
+measure: "max(small_distinct_instruments)"
+by[1]: device_id
+comparator: gte
+threshold: 8
+severity: CRITICAL
+description: "Card testing: one device tried 8 or more distinct instruments at tiny amounts in a day"

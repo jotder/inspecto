@@ -1,0 +1,6 @@
+job:
+  name: pf_risk_score
+  type: risk.score
+  model: payment_account
+  cron: "30 * * * *"
+  enabled: true

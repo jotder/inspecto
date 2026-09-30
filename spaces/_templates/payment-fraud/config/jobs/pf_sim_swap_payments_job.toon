@@ -1,0 +1,10 @@
+job:
+  name: pf_sim_swap_payments
+  type: sql.template
+  sql: "SELECT s.ACCOUNT_ID AS account_id, count(DISTINCT p.ATTEMPT_ID) AS risky_payments, max(p.AMOUNT) AS max_amount FROM sim_changes s JOIN payment_attempts p ON p.ACCOUNT_ID = s.ACCOUNT_ID AND p.ATTEMPT_TS > s.EVENT_TS AND p.ATTEMPT_TS <= s.EVENT_TS + to_hours(CAST($window_hours AS INTEGER)) AND p.OUTCOME = 'APPROVED' AND p.AMOUNT >= CAST($risky_amount AS DOUBLE) WHERE NOT EXISTS (SELECT 1 FROM payment_attempts q WHERE q.ACCOUNT_ID = s.ACCOUNT_ID AND q.DEVICE_ID = p.DEVICE_ID AND q.ATTEMPT_TS < s.EVENT_TS) GROUP BY s.ACCOUNT_ID"
+  sources: payment_attempts,sim_changes
+  sink_dataset: pf_sim_swap_payments
+  window_hours: "24"
+  risky_amount: "200"
+  cron: "0 * * * *"
+  enabled: true

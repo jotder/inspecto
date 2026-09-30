@@ -1,0 +1,8 @@
+name: pf_sim_swap_takeover
+dataset: pf_sim_swap_payments
+measure: "max(risky_payments)"
+by[1]: account_id
+comparator: gte
+threshold: 1
+severity: CRITICAL
+description: "SIM-swap takeover: a high-value approved payment on a new device within 24 h of a SIM change"

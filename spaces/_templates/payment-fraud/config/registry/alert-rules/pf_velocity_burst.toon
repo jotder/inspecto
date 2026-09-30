@@ -1,0 +1,8 @@
+name: pf_velocity_burst
+dataset: pf_instrument_velocity
+measure: "max(max_attempts_in_window)"
+by[1]: instrument_token
+comparator: gte
+threshold: 6
+severity: CRITICAL
+description: "Velocity burst: one instrument made 6 or more attempts inside 60 minutes"

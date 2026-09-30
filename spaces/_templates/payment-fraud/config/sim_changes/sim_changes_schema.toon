@@ -1,0 +1,41 @@
+partitionKey: EVENT_DATE
+raw:
+  name: SIM_CHANGES
+  format: CSV
+  fields[6]{name,selector,type,description,unit,classification}:
+    EVENT_ID,"0",VARCHAR,"SIM-change event identifier","","INTERNAL"
+    EVENT_TS,"1",TIMESTAMP,"When the SIM was changed","","INTERNAL"
+    EVENT_DATE,"2",DATE,"Business date of the change","","INTERNAL"
+    ACCOUNT_ID,"3",VARCHAR,"Customer account (synthetic)","","INTERNAL"
+    SUBSCRIBER_TOKEN,"4",VARCHAR,"Tokenised subscriber","","INTERNAL"
+    CHANNEL,"5",VARCHAR,"Where the SIM was changed (STORE/ONLINE/CALL_CENTRE)","","INTERNAL"
+mapping:
+  canonicalName: sim_changes
+  rawName: SIM_CHANGES
+  fields[6]:
+    - name: EVENT_ID
+      from: ""
+      fn: custom
+      args:
+        expression: "CASE WHEN regexp_full_match(regexp_replace(EVENT_ID, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(EVENT_ID, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(EVENT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(EVENT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(EVENT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached EVENT_ID; only tokenised instruments may be ingested') ELSE EVENT_ID END"
+    - name: EVENT_TS
+      from: EVENT_TS
+      fn: keep
+    - name: EVENT_DATE
+      from: EVENT_DATE
+      fn: keep
+    - name: ACCOUNT_ID
+      from: ""
+      fn: custom
+      args:
+        expression: "CASE WHEN regexp_full_match(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached ACCOUNT_ID; only tokenised instruments may be ingested') ELSE ACCOUNT_ID END"
+    - name: SUBSCRIBER_TOKEN
+      from: ""
+      fn: custom
+      args:
+        expression: "CASE WHEN regexp_full_match(regexp_replace(SUBSCRIBER_TOKEN, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(SUBSCRIBER_TOKEN, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(SUBSCRIBER_TOKEN, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(SUBSCRIBER_TOKEN, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(SUBSCRIBER_TOKEN, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached SUBSCRIBER_TOKEN; only tokenised instruments may be ingested') ELSE SUBSCRIBER_TOKEN END"
+    - name: CHANNEL
+      from: ""
+      fn: custom
+      args:
+        expression: "CASE WHEN regexp_full_match(regexp_replace(CHANNEL, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(CHANNEL, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(CHANNEL, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(CHANNEL, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(CHANNEL, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached CHANNEL; only tokenised instruments may be ingested') ELSE CHANNEL END"

@@ -1,0 +1,36 @@
+name: sim_changes
+active: true
+
+dirs:
+  poll:       data/inbox/sim_changes
+  database:   data/sim_changes/database
+  backup:     data/sim_changes/backup
+  temp:       data/sim_changes/temp
+  errors:     data/sim_changes/errors
+  quarantine: data/sim_changes/quarantine
+  markers:    data/sim_changes/markers
+  status_dir: data/sim_changes/status
+  log_dir:    data/sim_changes/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 2
+  file_pattern: "glob:**/*.csv"
+  reject_mode: all_or_nothing
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: sim_changes_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  gap_detection:
+    enabled: true
+    sequence: "SIM_CHANGES_{yyyyMMdd}"

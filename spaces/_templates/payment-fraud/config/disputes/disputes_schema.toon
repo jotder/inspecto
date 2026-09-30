@@ -1,0 +1,41 @@
+partitionKey: OPENED_DATE
+raw:
+  name: DISPUTES
+  format: CSV
+  fields[6]{name,selector,type,description,unit,classification}:
+    DISPUTE_ID,"0",VARCHAR,"Dispute identifier","","INTERNAL"
+    OPENED_DATE,"1",DATE,"Date the dispute was opened","","INTERNAL"
+    ATTEMPT_ID,"2",VARCHAR,"The disputed payment attempt","","INTERNAL"
+    ACCOUNT_ID,"3",VARCHAR,"Customer account (synthetic)","","INTERNAL"
+    REASON_CODE,"4",VARCHAR,"Dispute reason code","","INTERNAL"
+    AMOUNT,"5",DOUBLE,"Disputed amount","EUR","INTERNAL"
+mapping:
+  canonicalName: disputes
+  rawName: DISPUTES
+  fields[6]:
+    - name: DISPUTE_ID
+      from: ""
+      fn: custom
+      args:
+        expression: "CASE WHEN regexp_full_match(regexp_replace(DISPUTE_ID, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(DISPUTE_ID, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(DISPUTE_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(DISPUTE_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(DISPUTE_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached DISPUTE_ID; only tokenised instruments may be ingested') ELSE DISPUTE_ID END"
+    - name: OPENED_DATE
+      from: OPENED_DATE
+      fn: keep
+    - name: ATTEMPT_ID
+      from: ""
+      fn: custom
+      args:
+        expression: "CASE WHEN regexp_full_match(regexp_replace(ATTEMPT_ID, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(ATTEMPT_ID, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(ATTEMPT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(ATTEMPT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(ATTEMPT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached ATTEMPT_ID; only tokenised instruments may be ingested') ELSE ATTEMPT_ID END"
+    - name: ACCOUNT_ID
+      from: ""
+      fn: custom
+      args:
+        expression: "CASE WHEN regexp_full_match(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(ACCOUNT_ID, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached ACCOUNT_ID; only tokenised instruments may be ingested') ELSE ACCOUNT_ID END"
+    - name: REASON_CODE
+      from: ""
+      fn: custom
+      args:
+        expression: "CASE WHEN regexp_full_match(regexp_replace(REASON_CODE, '[ -]', '', 'g'), '[0-9]{13,19}') AND list_sum(list_transform(range(1, length(regexp_replace(REASON_CODE, '[ -]', '', 'g')) + 1), lambda k: CASE WHEN k % 2 = 0 THEN TRY_CAST(substr(reverse(regexp_replace(REASON_CODE, '[ -]', '', 'g')), k, 1) AS INTEGER) * 2 - CASE WHEN TRY_CAST(substr(reverse(regexp_replace(REASON_CODE, '[ -]', '', 'g')), k, 1) AS INTEGER) > 4 THEN 9 ELSE 0 END ELSE TRY_CAST(substr(reverse(regexp_replace(REASON_CODE, '[ -]', '', 'g')), k, 1) AS INTEGER) END)) % 10 = 0 THEN error('card-number tripwire: a Luhn-valid 13-19 digit value reached REASON_CODE; only tokenised instruments may be ingested') ELSE REASON_CODE END"
+    - name: AMOUNT
+      from: AMOUNT
+      fn: keep
