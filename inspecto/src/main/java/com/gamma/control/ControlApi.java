@@ -864,6 +864,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             return false;
         }
         String principal = Idempotency.principal(ex);
+        if (principal == null) return false;   // nobody to scope the entry to: run the write normally, uncached
         String space = MDC.get(EventLog.SPACE_MDC_KEY);
         String key = Idempotency.keyFor(method, path, space == null ? EventLog.DEFAULT_SPACE_ID : space, principal, header);
         Idempotency.Entry hit = idempotency.get(principal, key);

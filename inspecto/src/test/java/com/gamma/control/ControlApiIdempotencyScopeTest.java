@@ -304,6 +304,28 @@ class ControlApiIdempotencyScopeTest {
     }
 
     @Test
+    void aNullClientAddressHasNoPrincipalSoNothingIsCachedOrReplayed() throws Exception {
+        ExchangeAttributeScopeTest.FakeExchange ex = new ExchangeAttributeScopeTest.FakeExchange("/x");   // no Subject, null remote address
+        assertNull(Idempotency.principal(ex), "no Subject and no IP: no principal, never a shared 'anon@null' bucket");
+    }
+
+    @Test
+    void aWriteFromAnExchangeWithNoClientAddressRunsUncachedAndUnreplayed(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            java.lang.reflect.Method stage = ControlApi.class.getDeclaredMethod("idempotency",
+                    com.sun.net.httpserver.HttpExchange.class, String.class, String.class);
+            stage.setAccessible(true);
+            for (int caller = 0; caller < 2; caller++) {   // two callers, same key: neither is keyed, neither replays
+                ExchangeAttributeScopeTest.FakeExchange ex = new ExchangeAttributeScopeTest.FakeExchange("/jobs/run");
+                ex.getRequestHeaders().add("Idempotency-Key", "K");
+                assertEquals(false, stage.invoke(c.api, ex, "POST", "/jobs/run"), "the write runs normally");
+                assertNull(ApiContext.attr(ex, ApiContext.ATTR_IDEMPOTENCY_KEY), "no Pending marker: nothing is captured");
+                assertNull(ex.getResponseHeaders().getFirst("Idempotency-Replayed"));
+            }
+        }
+    }
+
+    @Test
     void memoryStaysBoundedAsDistinctPrincipalsGrow() {
         Idempotency.Store store = new Idempotency.Store();
         for (int i = 0; i < 5000; i++) store.put("k", "sub:p" + i, "h", 200, new byte[0]);

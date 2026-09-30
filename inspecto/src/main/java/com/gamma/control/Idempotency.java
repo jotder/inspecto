@@ -131,13 +131,15 @@ final class Idempotency {
 
     /** Who the cache entry belongs to: the authenticated Subject namespaced by its token's issuer (or, when the
      *  Authenticator stamps none, by the Authenticator itself), else a per-client anonymous principal. Two IdPs
-     *  that mint the same {@code sub} therefore never share entries. */
+     *  that mint the same {@code sub} therefore never share entries. {@code null} (fail closed: no caching, no
+     *  replay, no in-flight fence) when there is neither a Subject nor a client IP - a shared bucket would let
+     *  such callers replay each other's responses. */
     static String principal(HttpExchange ex) {
         return ApiContext.subject(ex).map(s -> {
             String iss = ApiContext.attr(ex, ApiContext.ATTR_SUBJECT_ISSUER) instanceof String i ? i
                     : Authenticators.active().map(a -> a.getClass().getName()).orElse("-");
             return "sub:" + iss.length() + ":" + iss + ":" + s.id();   // length-prefixed: no issuer/id ambiguity
-        }).orElseGet(() -> "anon@" + ApiContext.ip(ex));
+        }).orElseGet(() -> ApiContext.ip(ex) == null ? null : "anon@" + ApiContext.ip(ex));
     }
 
     /** The caller-scoped cache key. {@code routePath} is the path the router MATCHED - already percent-decoded,
