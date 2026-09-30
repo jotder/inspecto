@@ -111,10 +111,15 @@ and A↔C. On the golden corpus, **15 Breaks are 9 distinct lost or short xDRs**
 - **Reasons:**
   - `amount_mismatch` (leakage): the difference is more than the tolerance. A positive amount is an
     overcharge by the partner. Dispute it, with our minute count attached.
-  - `duplicate_statement` (leakage): the partner sent more than one line for the same day. The amount is
-    the excess over the first line. Reject the duplicate.
+  - `duplicate_statement` (leakage): the partner sent more than one line for the same day.
+    - The amount is the **billed total of all the lines, minus the expected amount**, so it counts both the
+      extra line and any over-billing on the lines themselves. It does not depend on which line came first.
+    - `LINES_DISAGREE` is true when any single line is also outside the tolerance of the expected amount; an
+      exact copy of a correct line is false.
+    - `STATEMENT_ID` names the lowest statement id of the day, for reference only.
+    - Reject the duplicate, and dispute any disagreeing line.
   - `unknown_partner` (leakage): the statement comes from a partner with no agreed rate. **The whole
-    statement amount is the leakage.** Refuse it until an agreement exists.
+    billed total is the leakage**, every line of it, including a duplicated line. Refuse it until an agreement exists.
   - `no_traffic` (leakage): a known partner billed a day on which our switch carried nothing to them. The
     whole amount is the leakage.
   - `missing_statement` (data quality): our switch carried traffic to a partner that sent no statement for

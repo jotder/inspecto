@@ -57,8 +57,14 @@ final class TelcoRaCorpus {
     final Map<String, Set<String>> benign = new LinkedHashMap<>();
     /** The distinct xDRs lost or short between switch and rating, next to the Break count that double-counts them. */
     final Set<String> lostOrShortXdrs = new LinkedHashSet<>();
-    /** The amount of the one statement line the partner billed twice: the duplicate finding's leakage. */
-    String duplicateAmount;
+    /** Settlement partner-day → its exact leakage (billed total − expected, or the whole total for an unknown partner). */
+    final Map<String, String> settlementLoss = new TreeMap<>();
+    /** Duplicated partner-day → the lowest STATEMENT_ID, the one line the finding reports. */
+    final Map<String, String> settlementLowestLine = new TreeMap<>();
+    /** Duplicated partner-day → whether any of its lines also disagrees with the expected amount. */
+    final Map<String, Boolean> settlementLinesDisagree = new TreeMap<>();
+    /** The rated call priced under a plan the tariff table does not have. */
+    String noTariffXdr;
 
     private record Xdr(String id, String sub, String service, String date, String ts, String bNumber, String partner,
                        long units) {}
@@ -113,6 +119,7 @@ final class TelcoRaCorpus {
         Set<String> staleRate = take(pool, 3, x -> "PLAN_A".equals(plan.get(x.sub)) && "VOICE".equals(x.service)
                 && x.ts.compareTo(CHANGE_TS) >= 0 && x.units >= 200);
         Set<String> centOff = take(pool, 5, unambiguous.and(x -> cents(x.units, rate(x)) >= 5));
+        noTariffXdr = take(pool, 1, unambiguous).iterator().next();
 
         Set<String> completeness = new LinkedHashSet<>();
         for (String id : droppedAtMediation) {
@@ -160,8 +167,9 @@ final class TelcoRaCorpus {
             if (staleRate.contains(x.id)) charge = cents(mediated, BASE_RATE.get("PLAN_A|VOICE"));   // pre-change rate
             if (centOff.contains(x.id)) charge = charge - 1;                                  // one cent: benign
             if (ambiguous(x)) rerating.add(x.id + "|ambiguous_tariff");
+            if (x.id.equals(noTariffXdr)) rerating.add(x.id + "|no_tariff");
             rt.append(x.id).append(',').append(x.ts).append(',').append(x.date).append(',').append(x.sub).append(',')
-                    .append(plan.get(x.sub)).append(',').append(x.service).append(',').append(mediated).append(',')
+                    .append(x.id.equals(noTariffXdr) ? "PLAN_LEGACY" : plan.get(x.sub)).append(',').append(x.service).append(',').append(mediated).append(',')
                     .append(money(charge)).append('\n');
             ratedCentsBySub.merge(x.sub, charge, Long::sum);
         }
@@ -259,21 +267,26 @@ final class TelcoRaCorpus {
         List<String> partnerDays = new ArrayList<>(minutes.keySet());
         Collections.shuffle(partnerDays, rnd);
         Set<String> overBilled = new LinkedHashSet<>(), missingStatement = new LinkedHashSet<>(),
-                justUnder = new LinkedHashSet<>(), duplicated = new LinkedHashSet<>();
+                justUnder = new LinkedHashSet<>();
+        String dupExact = null, dupOverCopy = null, dupDifferentFirst = null;
         for (String pd : partnerDays) {
             long expected = cents(minutes.get(pd), PARTNER_RATE.get(pd.split("\\|")[0]));
             if (overBilled.size() < 2) overBilled.add(pd);
             else if (missingStatement.isEmpty()) missingStatement.add(pd);
             else if (justUnder.size() < 2 && expected >= 1000) justUnder.add(pd);   // 0.9 % of ≥ 10.00
-            else if (duplicated.isEmpty()) duplicated.add(pd);                    // the partner bills one line twice
+            else if (dupExact == null) dupExact = pd;                  // a correct line billed twice
+            else if (dupOverCopy == null) dupOverCopy = pd;            // an over-billed line billed twice
+            else if (dupDifferentFirst == null && expected >= 100) dupDifferentFirst = pd;   // a second, different line sorts first
         }
-        if (justUnder.size() < 2) throw new IllegalStateException("corpus too small for the settlement boundary cases");
-        String unknownKey = UNKNOWN_PARTNER + "|" + DAYS[1];
+        if (justUnder.size() < 2 || dupDifferentFirst == null)
+            throw new IllegalStateException("corpus too small for the settlement cases");
         Set<String> st = new LinkedHashSet<>();
         overBilled.forEach(k -> st.add(k + "|amount_mismatch"));
         missingStatement.forEach(k -> st.add(k + "|missing_statement"));
-        st.add(unknownKey + "|unknown_partner");
-        duplicated.forEach(k -> st.add(k + "|duplicate_statement"));
+        String unknownSingle = UNKNOWN_PARTNER + "|" + DAYS[0], unknownDuplicated = UNKNOWN_PARTNER + "|" + DAYS[1];
+        st.add(unknownSingle + "|unknown_partner");
+        st.add(unknownDuplicated + "|unknown_partner");
+        for (String k : List.of(dupExact, dupOverCopy, dupDifferentFirst)) st.add(k + "|duplicate_statement");
         planted.put("ra_settlement", st);
         benign.put("ra_settlement", justUnder);
         StringBuilder ir = new StringBuilder("PARTNER,RATE_PER_MIN\n");
@@ -282,24 +295,42 @@ final class TelcoRaCorpus {
         StringBuilder sb = new StringBuilder("STATEMENT_ID,PARTNER,EVENT_DATE,MINUTES,AMOUNT\n");
         int line = 1;
         for (Map.Entry<String, Long> e : minutes.entrySet()) {
-            if (missingStatement.contains(e.getKey())) continue;
-            String[] pd = e.getKey().split("\\|");
+            String key = e.getKey();
+            if (missingStatement.contains(key)) continue;
+            String[] pd = key.split("\\|");
             long mins = e.getValue();
             long expected = cents(mins, PARTNER_RATE.get(pd[0]));
             long amount = expected;
-            if (overBilled.contains(e.getKey())) { mins = mins * 11 / 10 + 1; amount = expected * 11 / 10 + 1; }
-            if (justUnder.contains(e.getKey())) amount = expected + expected * 9 / 1000;
-            sb.append(String.format("ST%04d", line++)).append(',').append(pd[0]).append(',').append(pd[1]).append(',')
-                    .append(mins).append(',').append(money(amount)).append('\n');
-            if (duplicated.contains(e.getKey())) {
-                duplicateAmount = money(amount);
-                sb.append(String.format("STDUP%04d", line - 1)).append(',').append(pd[0]).append(',').append(pd[1])
-                        .append(',').append(mins).append(',').append(money(amount)).append('\n');
+            if (overBilled.contains(key) || key.equals(dupOverCopy)) amount = expected * 11 / 10 + 1;
+            if (justUnder.contains(key)) amount = expected + expected * 9 / 1000;
+            String id = String.format("ST%04d", line++);
+            statementLine(sb, id, pd, mins, amount);
+            if (key.equals(dupExact) || key.equals(dupOverCopy)) {
+                statementLine(sb, "STDUP" + id.substring(2), pd, mins, amount);      // an exact copy, sorting after
+                settlementLoss.put(key, money(2 * amount - expected));
+                settlementLowestLine.put(key, id);
+                settlementLinesDisagree.put(key, key.equals(dupOverCopy));
+            }
+            if (key.equals(dupDifferentFirst)) {
+                String first = "ST0000-" + id.substring(2);                          // sorts before every ST0001+
+                statementLine(sb, first, pd, mins / 2, expected / 2);
+                settlementLoss.put(key, money(amount + expected / 2 - expected));
+                settlementLowestLine.put(key, first);
+                settlementLinesDisagree.put(key, true);
             }
         }
-        sb.append(String.format("ST%04d", line)).append(',').append(UNKNOWN_PARTNER).append(',').append(DAYS[1])
-                .append(",90,45.00\n");
+        // an unknown partner: one day billed once, one day billed twice. The whole billed total is the leakage.
+        statementLine(sb, String.format("ST%04d", line++), unknownSingle.split("\\|"), 90, 4500);
+        statementLine(sb, String.format("ST%04d", line++), unknownDuplicated.split("\\|"), 90, 4500);
+        statementLine(sb, String.format("ST%04d", line), unknownDuplicated.split("\\|"), 90, 4500);
+        settlementLoss.put(unknownSingle, money(4500));
+        settlementLoss.put(unknownDuplicated, money(9000));
         files.put("ic_statement/IC_STATEMENT_20260703.csv", sb.toString());
+    }
+
+    private static void statementLine(StringBuilder sb, String id, String[] pd, long mins, long amountCents) {
+        sb.append(id).append(',').append(pd[0]).append(',').append(pd[1]).append(',').append(mins).append(',')
+                .append(money(amountCents)).append('\n');
     }
 
     /** A PLAN_B DATA call on or after the duplicate tariff row's start matches two tariff rows. */

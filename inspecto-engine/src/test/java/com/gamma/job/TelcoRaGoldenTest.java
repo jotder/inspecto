@@ -133,9 +133,20 @@ class TelcoRaGoldenTest {
         assertEquals(List.of(), rows(dataDir, "ra_leakage", "ITEM_KEY WHERE LEAKAGE_AMOUNT IS NULL OR FINDING <> 'leakage'"));
         assertEquals(plantedDq, rows(dataDir, "ra_data_quality", "CONTROL").size(), "data-quality rows only");
         assertEquals(List.of(), rows(dataDir, "ra_data_quality", "ITEM_KEY WHERE FINDING <> 'data_quality'"));
-        assertEquals(List.of(new java.math.BigDecimal(CORPUS.duplicateAmount).setScale(4).toPlainString()),
-                rows(dataDir, "ra_settlement_findings", "CAST(LEAKAGE_AMOUNT AS VARCHAR) WHERE REASON = 'duplicate_statement'"),
-                "a duplicated statement line carries its excess amount");
+        // every settlement finding carries its exact loss: billed total (all lines) − expected, or the whole total
+        for (Map.Entry<String, String> loss : CORPUS.settlementLoss.entrySet())
+            assertEquals(List.of(new java.math.BigDecimal(loss.getValue()).setScale(4).toPlainString()),
+                    rows(dataDir, "ra_settlement_findings", "CAST(LEAKAGE_AMOUNT AS VARCHAR) WHERE ITEM_KEY = '"
+                            + loss.getKey() + "'"), "settlement loss of " + loss.getKey());
+        // a duplicate reports its LOWEST statement line, and whether any line also disagrees with the expected amount
+        for (Map.Entry<String, String> low : CORPUS.settlementLowestLine.entrySet())
+            assertEquals(List.of(low.getValue()), rows(dataDir, "ra_settlement_findings",
+                    "STATEMENT_ID WHERE ITEM_KEY = '" + low.getKey() + "'"), "reported line of " + low.getKey());
+        for (Map.Entry<String, Boolean> d : CORPUS.settlementLinesDisagree.entrySet())
+            assertEquals(List.of(String.valueOf(d.getValue())), rows(dataDir, "ra_settlement_findings",
+                    "CAST(LINES_DISAGREE AS VARCHAR) WHERE ITEM_KEY = '" + d.getKey() + "'"),
+                    "lines-disagree flag of " + d.getKey() + " (an exact copy of a correct line is false)");
+        assertEquals(3, CORPUS.settlementLinesDisagree.size());
         // a leakage finding always carries its amount, so a sum never silently drops one
         for (String control : List.of("ra_rerating", "ra_rollforward", "ra_settlement"))
             assertEquals(List.of(), rows(dataDir, control + "_findings",
@@ -144,9 +155,9 @@ class TelcoRaGoldenTest {
         for (String control : List.of("ra_rerating", "ra_rollforward", "ra_settlement"))
             for (String t : rows(dataDir, control + "_findings", "DISTINCT typeof(LEAKAGE_AMOUNT)"))
                 assertTrue(t.startsWith("DECIMAL"), control + " LEAKAGE_AMOUNT is " + t);
-        assertEquals(List.of("45.0000"), rows(dataDir, "ra_settlement_findings",
-                "CAST(LEAKAGE_AMOUNT AS VARCHAR) WHERE REASON = 'unknown_partner'"),
-                "an unknown partner's whole statement is the leakage");
+        assertEquals(List.of("45.0000", "90.0000"), rows(dataDir, "ra_settlement_findings",
+                "CAST(LEAKAGE_AMOUNT AS VARCHAR) WHERE REASON = 'unknown_partner' ORDER BY LEAKAGE_AMOUNT"),
+                "an unknown partner's whole billed total is the leakage, every line of it");
         // Breaks double-count: 15 Breaks are 9 distinct lost or short xDRs
         Set<String> brokenXdrs = new TreeSet<>();
         for (ReconBreaks.Break b : new ReconStateStore(writeRoot).read("ra_xdr_completeness").breaks()) brokenXdrs.add(b.key());
@@ -166,8 +177,9 @@ class TelcoRaGoldenTest {
         assertEquals(AMBIGUOUS, CORPUS.planted.get("ra_rerating").stream().filter(k -> k.endsWith("|ambiguous_tariff")).count(),
                 "calls under the duplicate tariff row: data quality, one row each");
         assertEquals(6, CORPUS.planted.get("ra_rollforward").size(), "3 movement, 2 continuity, 1 null opening");
-        assertEquals(5, CORPUS.planted.get("ra_settlement").size(),
-                "2 over-billed, 1 missing statement, 1 unknown partner, 1 duplicate statement");
+        assertEquals(8, CORPUS.planted.get("ra_settlement").size(),
+                "2 over-billed, 1 missing statement, 2 unknown partner (one duplicated), 3 duplicate statements");
+        assertEquals(1, CORPUS.planted.get("ra_rerating").stream().filter(k -> k.endsWith("|no_tariff")).count());
         assertEquals(Map.of("ra_xdr_completeness", 4, "ra_xdr_lost", 4, "ra_rerating", 6, "ra_rated_vs_billed", 3,
                         "ra_rollforward", 5, "ra_settlement", 2),
                 CORPUS.benign.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size())),

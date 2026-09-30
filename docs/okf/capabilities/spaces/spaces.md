@@ -219,9 +219,14 @@ exists (§2, §5).
     duplicate or overlapping row becomes an `ambiguous_tariff` data-quality finding, never a fan-out.
   - `ra_rollforward`: checks the movement rule, day-to-day continuity, and a NULL field (data quality).
   - `ra_settlement`: sums the statement per partner/day first, then FULL OUTER JOINs it against our switch
-    minutes × rate. It flags `duplicate_statement` (the excess over the first line), `amount_mismatch`,
-    `unknown_partner` (the whole statement is the leakage), `no_traffic`, and `missing_statement` (data
-    quality).
+    minutes × rate. It flags these reasons, in priority order:
+    - `missing_statement` (data quality).
+    - `unknown_partner`: the whole billed total, every line, is the leakage.
+    - `no_traffic`.
+    - `duplicate_statement`: the amount is the billed total of ALL lines minus the expected amount. It never
+      depends on which line is "first". `LINES_DISAGREE` marks a line that is also off-tolerance, and
+      `STATEMENT_ID` reports the lowest id, for reference only.
+    - `amount_mismatch`.
   - Each control writes every finding to `<control>_findings`. Every row carries `REASON`, and `FINDING` is
     `leakage` or `data_quality`. A leakage row always has a non-NULL amount.
   - `ra_leakage` takes only the leakage rows, and its Alert Rule `ra_leakage_found` is CRITICAL.
@@ -250,11 +255,13 @@ exists (§2, §5).
   |---|---|
   | Completeness | 15 Breaks / 9 xDRs |
   | Rated vs billed | 4 |
-  | Re-rating | 5 `rate_mismatch` (2 half-rate + 3 still on the pre-change rate) and 12 `ambiguous_tariff` |
+  | Re-rating | 5 `rate_mismatch` (2 half-rate + 3 still on the pre-change rate), 12 `ambiguous_tariff` and 1 `no_tariff` |
   | Roll-forward | 6 (3 movement, 2 continuity, 1 NULL opening) |
-  | Settlement | 5 (2 over-billed, 1 missing statement, 1 unknown partner, 1 duplicate statement) |
+  | Settlement | 8 (2 over-billed, 1 missing statement, 2 unknown partner (one day duplicated: 90.00, not 45.00), 3 duplicates) |
 
-  - Split by Dataset: **14 leakage rows** in `ra_leakage` and **14 data-quality rows** in `ra_data_quality`.
+  - The three duplicates are an exact copy of a correct line, an over-billed line billed twice, and a
+    different line that sorts first. The test pins each one's exact loss.
+  - Split by Dataset: **17 leakage rows** in `ra_leakage` and **15 data-quality rows** in `ra_data_quality`.
 
   - It also checks that leakage amounts are never NULL, that they are DECIMAL, and that the committed samples
     are byte-identical to the generator (`-Dtelcora.regenerate=true`).
@@ -280,7 +287,12 @@ exists (§2, §5).
     - settlement with a LEFT JOIN instead of the FULL OUTER JOIN;
     - an unknown partner's amount set to NULL;
     - no duplicate-statement rule;
-    - `ra_leakage` keeping data-quality rows.
+    - `ra_leakage` keeping data-quality rows;
+    - a duplicate's loss taken as the total minus one line;
+    - the highest statement id reported;
+    - a duplicate outranking an unknown partner;
+    - `no_tariff` routed as leakage;
+    - lines-disagree ignoring the lowest line.
   - ⚠ The golden test loads the corpus straight into the stores. It does not ingest through the eight
     Pipelines.
 - `ControlApiSpaceTemplateSeedGateTest` applies the template through the real seed gate.

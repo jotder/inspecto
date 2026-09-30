@@ -4,4 +4,4 @@ measure: count
 comparator: gte
 threshold: 1
 severity: CRITICAL
-description: "A revenue-assurance control found leakage (re-rating, roll-forward or settlement), one Alert per control. Runbook: RUNBOOKS.md, the control's section."
+description: "A revenue-assurance control found leakage (re-rating, roll-forward or settlement). It fires once for the rule, not per control; the rows name the control. Runbook: RUNBOOKS.md, the control's section."
