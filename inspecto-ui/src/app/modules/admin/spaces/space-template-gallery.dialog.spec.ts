@@ -85,11 +85,23 @@ describe('SpaceTemplateGalleryDialog', () => {
         const cards = Array.from(
             fixture.nativeElement.querySelectorAll('mat-dialog-content button'),
         ) as HTMLButtonElement[];
-        expect(cards[0].disabled).toBe(true);
-        expect(cards[1].disabled).toBe(false);
-        expect(cards[0].querySelector('[data-testid="template-unavailable"]')!.textContent).toContain(
-            'Professional+',
-        );
+        // aria-disabled, not native disabled: the card stays focusable, so a keyboard / screen-reader user can
+        // reach it and hear WHY it is unavailable
+        expect(cards[0].disabled).toBe(false);
+        expect(cards[0].getAttribute('aria-disabled')).toBe('true');
+        expect(cards[1].getAttribute('aria-disabled')).toBeNull();
+        cards[0].focus();
+        expect(document.activeElement).toBe(cards[0]);
+        // the reason is the card's description; no aria-label overrides the card's own text as its name
+        const reason = cards[0].querySelector('[data-testid="template-unavailable"]') as HTMLElement;
+        expect(reason.textContent).toContain('Professional+');
+        expect(cards[0].getAttribute('aria-describedby')).toBe(reason.id);
+        expect(cards[0].hasAttribute('aria-label')).toBe(false);
+        expect(cards[0].textContent).toContain(locked.name);
+        // activating it (click or keyboard) still refuses
+        cards[0].click();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.selected()).toBeNull();
         fixture.componentInstance.choose(locked);
         expect(fixture.componentInstance.selected()).toBeNull();
         await expectNoA11yViolations(fixture.nativeElement);

@@ -70,14 +70,12 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                         @for (t of templates(); track t.id) {
                             <button
                                 type="button"
-                                class="bg-card flex flex-col items-start gap-2 rounded-2xl p-5 text-left shadow transition-shadow hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
-                                [disabled]="t.creatable === false"
+                                class="bg-card flex flex-col items-start gap-2 rounded-2xl p-5 text-left shadow transition-shadow hover:shadow-md"
+                                [class.cursor-not-allowed]="t.creatable === false"
+                                [class.opacity-60]="t.creatable === false"
+                                [attr.aria-disabled]="t.creatable === false ? 'true' : null"
+                                [attr.aria-describedby]="t.creatable === false ? 'template-unavailable-' + t.id : null"
                                 (click)="choose(t)"
-                                [attr.aria-label]="
-                                    t.creatable === false
-                                        ? t.name + ' template — not available in this edition'
-                                        : 'Use the ' + t.name + ' template'
-                                "
                             >
                                 <div class="flex items-center gap-2">
                                     <mat-icon class="text-primary icon-size-5" [svgIcon]="t.icon"></mat-icon>
@@ -90,7 +88,12 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                                     }
                                 </div>
                                 @if (t.creatable === false) {
-                                    <span class="text-secondary text-xs" data-testid="template-unavailable">
+                                    <span
+                                        class="text-secondary text-xs"
+                                        data-testid="template-unavailable"
+                                        [id]="'template-unavailable-' + t.id"
+                                    >
+                                        Not available in this edition:
                                         @for (m of t.missingFeatures ?? []; track m.feature) {
                                             {{ m.message }}
                                         }
