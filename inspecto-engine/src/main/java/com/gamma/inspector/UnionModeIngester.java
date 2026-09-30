@@ -58,7 +58,7 @@ final class UnionModeIngester {
         try {
             tempDb = openTempDb(cfg, "duckdb_stream_");
             try (var conn = DuckDbUtil.openConnection(tempDb)) {
-                configure(conn, cfg);
+                configure(conn, cfg, tempDb, memberFiles(batch));
 
                 // ── ingest every member into its own raw tables ──────────────────
                 int memberIdx = 0;

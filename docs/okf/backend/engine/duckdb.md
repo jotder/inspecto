@@ -174,6 +174,39 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   [`OperationsZone`](../control-plane/jobs.md) means changing the connection's zone as a **third** moving
   part, not just the two Java halves.
 
+## Every ingest connection is sealed (`SEC-INGEST-EXPR-EXTERNAL-ACCESS-1`, 2026-09-30)
+
+A schema mapping's `fn: custom` expression (and the legacy `EXPR`) is spliced verbatim into ingest SQL, and
+Pipeline/schema files are authorable by any `canAuthorWorkbench` holder, including through a Space import.
+Until 2026-09-30 the ingest connection ran at DuckDB defaults, so `(SELECT content FROM read_text('/etc/…'))`
+landed a host file in the store, `read_csv`/`read_parquet` read another Space's data, and an `http://` URL
+autoloaded httpfs (SSRF — verified: the unsealed connection dialled the address).
+
+- **One seam.** `ConsignmentIngestStrategy.configure(conn, cfg, tempDb, inputs)` is called by every ingest
+  lane — `CsvIngestStrategy` (native + Java parse), `UnionModeIngester`, `GenerationModeIngester` and
+  `DrainCommand` (inputs = the parked Parquet files). Push ingest (`POST /streams/{id}/records`) writes into
+  the inbox and rides the same lanes. After the resource settings it calls
+  `SqlSandbox.disableExtensionAutoload` and then `SqlSandbox.sealAllowing(conn, ingestAllowedDirs(...))`:
+  external access off, configuration locked.
+- **The allowlist** (`ingestAllowedDirs`): the temp DB's directory, the spill dir, this Pipeline's own
+  `dirs:` (poll, database, backup, temp, errors, quarantine, markers, manifests), every `sinks[]` database,
+  and each input file's directory. Everything else is refused by DuckDB itself ("file system operations are
+  disabled by configuration"), whatever a lexical check missed.
+- **Extensions load BEFORE the seal.** After the lock a `LOAD` is file access and is refused, and
+  `duckdb_extensions()` itself scans the extension directory, so it cannot be used as an "already loaded?"
+  probe. `configure` pre-loads `excel` for an `xlsx` Pipeline; `ExcelExtension.ensureLoaded` returns early
+  when `read_xlsx` is already in `duckdb_functions()`. ⚠ A future lane that needs another extension must
+  load it in `configure`, before the seal.
+- **Deliberately not allowed:** an object-store `dirs.database` (it would need httpfs plus URL prefixes; it
+  is refused at the write gate today, so it stays refused here — fail closed).
+- **Still works on a sealed connection:** scalar SQL the content packs use — `error()`, lambdas,
+  `list_transform`, `regexp_matches` (the payment-fraud PAN tripwire shape).
+- **Pinned by** `IngestExpressionSandboxTest` (real path, `CollectorProcessor.run`): `read_text` of a host
+  file, `read_csv` and `read_parquet` of another Space's data land nothing; an `http://` URL is refused by
+  the configuration (not by a failed fetch) and `SET enable_external_access=true` is refused after the lock;
+  a custom mapping with `regexp` + `error()` + a lambda still lands. All four refusal cases go red with the
+  seal removed.
+
 ## The source time zone for temporal data
 
 **SHIPPED 2026-08-29** (engine + config `44ecef76`, surfaces `dd02d377`). Plan + the full live-probe

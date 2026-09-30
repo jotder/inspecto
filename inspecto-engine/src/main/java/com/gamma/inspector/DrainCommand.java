@@ -159,7 +159,8 @@ public final class DrainCommand {
         BranchCommitCoordinator.Result committed;
         File tempDb = ConsignmentIngestStrategy.openTempDb(cfg, "drain_");
         try (Connection conn = DuckDbUtil.openConnection(tempDb)) {
-            ConsignmentIngestStrategy.configure(conn, cfg);
+            ConsignmentIngestStrategy.configure(conn, cfg, tempDb,
+                    parkTables.values().stream().map(java.nio.file.Path::toFile).toList());
 
             Map<String, String> seeded = new LinkedHashMap<>();
             try (Statement st = conn.createStatement()) {

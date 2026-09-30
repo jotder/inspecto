@@ -47,7 +47,7 @@ final class GenerationModeIngester {
         try {
             tempDb = openTempDb(cfg, "duckdb_stream_");
             try (var conn = DuckDbUtil.openConnection(tempDb)) {
-                configure(conn, cfg);
+                configure(conn, cfg, tempDb, memberFiles(batch));
 
                 int memberIdx = 0;
                 for (Consignment.Member m : batch.members()) {

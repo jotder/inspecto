@@ -795,6 +795,10 @@ interface ConsignmentIngestStrategy {
      * {@code null} ⇒ fall back to the JVM temp dir. Routing scratch here is what keeps a huge
      * file's multi-hundred-GB temp data off a small system {@code /tmp}.
      */
+    static List<File> memberFiles(Consignment batch) {
+        return batch.members().stream().map(Consignment.Member::file).toList();
+    }
+
     static String scratchDir(PipelineConfig cfg) {
         String explicit = cfg.duckdb().tempDirectory();
         if (explicit != null && !explicit.isBlank()) return explicit;
@@ -822,7 +826,10 @@ interface ConsignmentIngestStrategy {
      * batches ({@code processing.threads}) instead of letting every batch connection grab all cores
      * — the latter oversubscribes the CPU when more than one batch runs at a time.
      */
-    static void configure(Connection conn, PipelineConfig cfg) throws SQLException {
+    static void configure(Connection conn, PipelineConfig cfg, File tempDb, java.util.Collection<File> inputs)
+            throws SQLException {
+        // SEC-INGEST-EXPR-EXTERNAL-ACCESS-1: nothing is auto-installed/auto-loaded (no httpfs for a URL).
+        com.gamma.sql.SqlSandbox.disableExtensionAutoload(conn);
         int effectiveThreads = DuckDbUtil.effectiveWorkerThreads(
                 cfg.processing().duckdbThreads(),
                 cfg.processing().threads(),
@@ -842,5 +849,35 @@ interface ConsignmentIngestStrategy {
                 DuckDbUtil.memoryLimit(cfg.duckdb().memoryLimit()),
                 scratchDir(cfg),
                 DuckDbUtil.globalOr(cfg.duckdb().maxTempDirectorySize(), DuckDbUtil.PROP_MAX_TEMP_DIRECTORY_SIZE));
+        // The one extension an ingest lane loads explicitly must be loaded BEFORE the seal: after it, LOAD
+        // is refused like any other file access. (An object-store dirs.database needs httpfs + a URL
+        // allowlist; it is refused at the write gate today, so it stays refused here too — fail closed.)
+        if (cfg.xlsx() != null) com.gamma.etl.ExcelExtension.ensureLoaded(conn);
+        com.gamma.sql.SqlSandbox.sealAllowing(conn, ingestAllowedDirs(cfg, tempDb, inputs));
+    }
+
+    /**
+     * The directories an ingest connection legitimately reads or writes (SEC-INGEST-EXPR-EXTERNAL-ACCESS-1):
+     * the temp DB's directory and the spill dir, this Pipeline's own {@code dirs:} (inbox, database,
+     * backup, temp, errors, quarantine, markers, manifests), every {@code sinks[]} database, and the
+     * directory of each input file. Everything else — another Space's data, any host file, every URL — is
+     * refused by DuckDB itself once {@link com.gamma.sql.SqlSandbox#sealAllowing} has locked the
+     * configuration, so an authored {@code fn: custom} expression cannot read it.
+     */
+    static List<java.nio.file.Path> ingestAllowedDirs(PipelineConfig cfg, File tempDb, java.util.Collection<File> inputs) {
+        java.util.LinkedHashSet<java.nio.file.Path> dirs = new java.util.LinkedHashSet<>();
+        java.util.function.Consumer<String> add = d -> {
+            if (d != null && !d.isBlank()) dirs.add(Paths.get(d).toAbsolutePath().normalize());
+        };
+        if (tempDb != null) add.accept(tempDb.getAbsoluteFile().getParent());
+        add.accept(scratchDir(cfg));
+        PipelineConfig.Dirs d = cfg.dirs();
+        if (d != null) {
+            for (String s : new String[]{d.poll(), d.database(), d.backup(), d.temp(), d.errors(),
+                    d.quarantine(), d.markers(), d.manifestsDir()}) add.accept(s);
+        }
+        for (PipelineConfig.Sink sink : cfg.sinks()) add.accept(sink.database());
+        if (inputs != null) for (File f : inputs) add.accept(f.getAbsoluteFile().getParent());
+        return List.copyOf(dirs);
     }
 }

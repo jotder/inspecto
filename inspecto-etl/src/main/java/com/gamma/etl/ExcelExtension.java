@@ -29,6 +29,14 @@ public final class ExcelExtension {
 
     /** Load the extension on {@code conn} or throw with every remedy named. */
     public static void ensureLoaded(Connection conn) throws SQLException {
+        // Already loaded — e.g. before a sealed ingest connection locked its configuration
+        // (SEC-INGEST-EXPR-EXTERNAL-ACCESS-1), after which a second LOAD is refused as file access.
+        // duckdb_functions(), unlike duckdb_extensions(), does not scan the extension directory.
+        try (java.sql.Statement st = conn.createStatement();
+             java.sql.ResultSet rs = st.executeQuery(
+                     "SELECT 1 FROM duckdb_functions() WHERE function_name = 'read_xlsx' LIMIT 1")) {
+            if (rs.next()) return;
+        }
         DuckDbExtension.ensureLoaded(conn, NAME, "frontend 'xlsx'");
     }
 

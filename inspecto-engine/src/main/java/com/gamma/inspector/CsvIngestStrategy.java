@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.gamma.inspector.ConsignmentIngestStrategy.configure;
+import static com.gamma.inspector.ConsignmentIngestStrategy.memberFiles;
 import static com.gamma.inspector.ConsignmentIngestStrategy.consolidatedBaseName;
 import static com.gamma.inspector.ConsignmentIngestStrategy.databaseDir;
 import static com.gamma.inspector.ConsignmentIngestStrategy.dropTable;
@@ -68,7 +69,7 @@ final class CsvIngestStrategy implements ConsignmentIngestStrategy {
         try {
             tempDb = openTempDb(cfg, "duckdb_batch_");
             try (Connection conn = DuckDbUtil.openConnection(tempDb)) {
-                configure(conn, cfg);
+                configure(conn, cfg, tempDb, memberFiles(batch));
 
                 // SP-DQ-06 quality.schema.drift: read each header-bearing member's header ONCE, here,
                 // above the lane dispatch, so the native and the Java lane report the same drift.
