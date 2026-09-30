@@ -255,7 +255,28 @@ class ControlApiIdempotencyScopeTest {
         store.put("bob-1", "sub:bob", "h", 200, new byte[0]);
         for (int i = 0; i < Idempotency.PER_CALLER_CAP + 20; i++) store.put("a-" + i, "sub:alice", "h", 200, new byte[0]);
         assertEquals(Idempotency.PER_CALLER_CAP, store.sizeFor("sub:alice"));
-        assertNull(store.get("a-0"), "alice's oldest was evicted");
-        assertNotNull(store.get("bob-1"), "bob's entry survives alice's flood");
+        assertNull(store.get("sub:alice", "a-0"), "alice's oldest was evicted");
+        assertNotNull(store.get("sub:bob", "bob-1"), "bob's entry survives alice's flood");
+    }
+
+    @Test
+    void oneCallersFloodAcrossTheOldGlobalCapLeavesAnothersReplay() {
+        Idempotency.Store store = new Idempotency.Store();
+        store.put("bob-1", "sub:bob", "h", 200, new byte[0]);
+        // Callers (or one caller rotating client IPs) flood well past the old global 1000-entry LRU, which evicted
+        // bob's entry as the oldest insert; bob stays active, so only idle partitions are evicted.
+        for (int i = 0; i < Idempotency.MAX_PRINCIPALS + 10; i++) {
+            for (int k = 0; k < Idempotency.PER_CALLER_CAP + 5; k++) store.put("k" + k, "anon@10.0.0." + i, "h", 200, new byte[0]);
+            assertNotNull(store.get("sub:bob", "bob-1"), "bob's replay survives flood round " + i);
+        }
+    }
+
+    @Test
+    void memoryStaysBoundedAsDistinctPrincipalsGrow() {
+        Idempotency.Store store = new Idempotency.Store();
+        for (int i = 0; i < 5000; i++) store.put("k", "anon@10.0." + (i / 256) + "." + (i % 256), "h", 200, new byte[0]);
+        assertEquals(Idempotency.MAX_PRINCIPALS, store.principals());
+        assertNull(store.get("anon@10.0.0.0", "k"), "the least recently used principal was evicted");
+        assertNotNull(store.get("anon@10.0.19.135", "k"), "the most recent principal is kept");
     }
 }

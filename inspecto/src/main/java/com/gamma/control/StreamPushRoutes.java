@@ -133,7 +133,7 @@ final class StreamPushRoutes implements RouteModule {
             // The first request may have FINISHED while this one was reading its body — after the idempotency
             // stage looked and missed. Its captured result is authoritative: replay it rather than land again.
             if (pending != null) {
-                Idempotency.Entry done = pending.store().get(key);
+                Idempotency.Entry done = pending.store().get(pending.principal(), key);
                 if (done != null && done.bodyHash().equals(pending.bodyHash())) {
                     Idempotency.replay(ex, done);
                     return ApiContext.HANDLED;

@@ -866,7 +866,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         String principal = Idempotency.principal(ex);
         String space = MDC.get(EventLog.SPACE_MDC_KEY);
         String key = Idempotency.keyFor(method, path, space == null ? EventLog.DEFAULT_SPACE_ID : space, principal, header);
-        Idempotency.Entry hit = idempotency.get(key);
+        Idempotency.Entry hit = idempotency.get(principal, key);
         if (hit != null) {
             if (!hit.bodyHash().equals(bodyHash)) {
                 respond(ex, 422, Map.of("error", "Idempotency-Key reused with a different request"));

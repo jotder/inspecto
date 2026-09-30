@@ -325,10 +325,11 @@ is bounded with a `truncated` flag that reports the *true* total.
   SHA-256 of the request body: the same key with a different body is **`422 "Idempotency-Key reused with a
   different request"`**. Only **2xx, 400, 409, 422** are cached — deterministic outcomes of the request's own
   content; 401/403/404/429 depend on who asks and when, 5xx may be transient. Bounds: **50 keys per
-  principal** (its oldest evicted — one caller cannot flush another), **256 KiB** per cached response, **1 MiB**
+  principal** in its own LRU partition (its oldest evicted — one caller cannot flush another), at most **20
+  principals** held (the least recently used principal's partition is evicted whole, so 1000 entries stay the bound), **256 KiB** per cached response, **1 MiB**
   request body hashed; past either size cap the request runs un-keyed and answers `Idempotency-Cached: false`.
   Every write route honours the header generically (it is captured in `ApiContext.respondJson`); the SPA never
-  sends it. Pinned by `ControlApiIdempotencyScopeTest`. Open residual: the global cap still evicts across principals (`SEC-IDEMPOTENCY-GLOBAL-EVICTION-1`, P3). Per-instance by design (no cross-instance store; no test
+  sends it. Pinned by `ControlApiIdempotencyScopeTest`. Per-instance by design (no cross-instance store; no test
   leakage); a multi-instance deployment would need a shared store that does not exist (§5). Long-running
   triggers answer **`202` + `{runId, status…}` + `Location`** and are polled by id (`GET /jobs/runs/{runId}`,
   `GET /runs/runs/{runId}` — the second path's doubled segment is a **known quirk kept until an API v2**,

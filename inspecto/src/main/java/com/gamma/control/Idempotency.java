@@ -8,11 +8,8 @@ import java.io.InputStream;
 import java.io.SequenceInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.HashMap;
 import java.util.HexFormat;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * {@code Idempotency-Key} support for retryable writes (W5; guideline 29). A POST/PUT/DELETE carrying
@@ -35,7 +32,8 @@ import java.util.Map;
  *       {@code 422 "Idempotency-Key reused with a different request"}, never the cached answer;</li>
  *   <li>only {@link #cacheable} statuses are stored; a response over {@link #MAX_RESPONSE_BYTES}, or a
  *       request body over {@link #MAX_REQUEST_BYTES}, is not cached and says so with
- *       {@code Idempotency-Cached: false}; each principal holds at most {@link #PER_CALLER_CAP} keys.</li>
+ *       {@code Idempotency-Cached: false}; each principal holds at most {@link #PER_CALLER_CAP} keys in its own partition,
+ *       and at most {@link #MAX_PRINCIPALS} principals are held (the least recently used is evicted).</li>
  * </ul>
  *
  * <p><b>Scope:</b> covers retry-after-response. It does not dedupe two <em>simultaneously in-flight</em>
@@ -47,7 +45,6 @@ final class Idempotency {
     private Idempotency() {}
 
     private static final long TTL_MS = 10 * 60_000L;
-    private static final int CAP = 1000;
     /** Keys one principal may hold at once; its oldest is evicted past this (one caller cannot flush everyone). */
     static final int PER_CALLER_CAP = 50;
     /** Responses larger than this are answered but not cached ({@code Idempotency-Cached: false}). */
@@ -72,46 +69,47 @@ final class Idempotency {
         return (status >= 200 && status < 300) || status == 400 || status == 409 || status == 422;
     }
 
-    /** A per-{@link ControlApi}-instance bounded, TTL cache (not shared across instances → no test leakage). */
-    static final class Store {
-        private final LinkedHashMap<String, Entry> map = new LinkedHashMap<>(64, 0.75f, false);
-        private final Map<String, Integer> perCaller = new HashMap<>();
+    /** Principals holding entries at once; the least recently used principal's whole partition is evicted past
+     *  this. {@code MAX_PRINCIPALS * PER_CALLER_CAP} = 1000 entries keeps the old global memory bound. */
+    static final int MAX_PRINCIPALS = 20;
 
-        synchronized Entry get(String key) {
-            Entry e = map.get(key);
+    /**
+     * A per-{@link ControlApi}-instance bounded, TTL cache (not shared across instances, so no test leakage),
+     * partitioned by principal (SEC-IDEMPOTENCY-GLOBAL-EVICTION-1): each principal has its own LRU of at most
+     * {@link #PER_CALLER_CAP} keys, so a caller flooding keys only evicts its own entries. The partitions sit in
+     * an access-ordered map capped at {@link #MAX_PRINCIPALS}, so memory stays bounded as principals grow.
+     */
+    static final class Store {
+        private final LinkedHashMap<String, LinkedHashMap<String, Entry>> byPrincipal = new LinkedHashMap<>(32, 0.75f, true);
+
+        synchronized Entry get(String principal, String key) {
+            LinkedHashMap<String, Entry> part = byPrincipal.get(principal);
+            if (part == null) return null;
+            Entry e = part.get(key);
             if (e == null) return null;
             if (System.currentTimeMillis() > e.expiresAt()) {
-                remove(key);
+                part.remove(key);
+                if (part.isEmpty()) byPrincipal.remove(principal);
                 return null;
             }
             return e;
         }
 
         synchronized void put(String key, String principal, String bodyHash, int status, byte[] body) {
-            remove(key);
-            if (perCaller.getOrDefault(principal, 0) >= PER_CALLER_CAP) evictOldestOf(principal);
-            map.put(key, new Entry(principal, bodyHash, status, body.clone(), System.currentTimeMillis() + TTL_MS));
-            perCaller.merge(principal, 1, Integer::sum);
-            while (map.size() > CAP) remove(map.keySet().iterator().next());
+            LinkedHashMap<String, Entry> part = byPrincipal.computeIfAbsent(principal, p -> new LinkedHashMap<>(16, 0.75f, true));
+            part.remove(key);
+            part.put(key, new Entry(principal, bodyHash, status, body.clone(), System.currentTimeMillis() + TTL_MS));
+            while (part.size() > PER_CALLER_CAP) part.remove(part.keySet().iterator().next());
+            while (byPrincipal.size() > MAX_PRINCIPALS) byPrincipal.remove(byPrincipal.keySet().iterator().next());
         }
 
         synchronized int sizeFor(String principal) {
-            return perCaller.getOrDefault(principal, 0);
+            LinkedHashMap<String, Entry> part = byPrincipal.get(principal);
+            return part == null ? 0 : part.size();
         }
 
-        private void evictOldestOf(String principal) {
-            for (Iterator<Map.Entry<String, Entry>> it = map.entrySet().iterator(); it.hasNext(); ) {
-                if (it.next().getValue().principal().equals(principal)) {
-                    it.remove();
-                    perCaller.computeIfPresent(principal, (p, n) -> n <= 1 ? null : n - 1);
-                    return;
-                }
-            }
-        }
-
-        private void remove(String key) {
-            Entry old = map.remove(key);
-            if (old != null) perCaller.computeIfPresent(old.principal(), (p, n) -> n <= 1 ? null : n - 1);
+        synchronized int principals() {
+            return byPrincipal.size();
         }
     }
 
