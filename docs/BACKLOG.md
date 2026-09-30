@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **58<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 26<!--count:backlog-p2--> × P2 · 32<!--count:backlog-p3--> × P3** —
+> **57<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 25<!--count:backlog-p2--> × P2 · 32<!--count:backlog-p3--> × P3** —
 > ⬇ **56 on 2026-09-30**: closed P3 `ERRORCODE-DEFAULTED-1` (`2f6d5e52a`) — the last 15 bare `ApiException` sites (all 422s in `inspecto-geo-link`: `AdmiraltyGrade` 1 · `InvestigationCoverageRoutes` 4 · `PatternRoutes` 5 · `WorkingSetRoutes` 5) now pass `CONFIG_VALIDATION_FAILED`, the status default, so no wire change; 0 of 1155 sites take `defaultFor` (the derive's 4 remaining lines pass computed codes). Truth in `okf/capabilities/control-api/control-api.md`.
 > ⬆ **52 → 53 on 2026-09-29**: filed P3 `TEMPLATE-RECOVERY-IMPORT-GATE-1` (the zero-Space recovery create skips the import gate) from the `publish.postgres` review.
 > ⬆ **50 → 51 on 2026-09-29**: filed P3 `ASSURE-CLASSIFICATION-PROPAGATION-1` (carry column classification through lineage) from the `publish.postgres` security review.
@@ -26,6 +26,7 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ **61 → 60 on 2026-09-30**: closed P3 `FINDINGS-EDITOR-WORDING-1` — in the *Findings fields* dialog the *Where it appears* radios carry explicit aria-labels, the *Condition* picker is wide enough to show *is*, and *Technical details* collapses when another field is selected. Truth in `okf/frontend/features/objects.md`.
 > ⬇ **60 → 59 on 2026-09-30**: closed P3 `CASE-DETAIL-DOCUMENT-SCROLL-1` — the Case Manager / Incidents mail shell is bounded to the viewport (`calc(100dvh - 120px)`, as the Pipelines shell), so the open detail panel scrolls in its own area instead of growing the document (as-built `okf/frontend/features/objects.md`).
 > ⬇ **59 → 58 on 2026-10-01**: closed P2 `ASSIST-MODEL-EGRESS-1` — the assist agent's provider clients and `POST /assist/settings/test` go through `ModelEgress` (the Space's `models` allowlist) with a pinned connect in `ModelProviderFactory.create`; a refused endpoint is an unavailable provider and is never dialled (`AssistModelEgressTest`, real HTTP).
+> ⬇ **63 → 62 on 2026-09-30**: closed P2 `SEC-DRYRUN-EXPR-UNSEALED-1` — `PipelineDryRun.runSeeded` now seals its scratch connection after seeding (`SqlSandbox.sealAllowing`: a per-run scratch dir, the global spill dir, and each `transform.join` reference's dirs from the new `ReferenceResolver.readDirs`), every entry filtered through `PathJail.readAllowlistRefusal`, fail closed; covers `POST …/dry-run` and `POST …/run?to=` (as-built `okf/backend/engine/duckdb.md`).
 > ⬆ **63 → 64 on 2026-09-30**: filed P2 `INGEST-FAILURE-TEXT-QUOTES-VALUE-1` (round-3 verification of `ASSURE-PACK-PAYMENT-FRAUD-1`: a failing transform quotes the cell into the batch ledger and retry record).
 > ⬆ **62 → 63 on 2026-09-30**: filed P2 `INGEST-REJECT-SIDECAR-RAW-PAN-1` (adversarial verification of `ASSURE-PACK-PAYMENT-FRAUD-1` slice 1: a card number inside a malformed row is kept in quarantine).
 > ⬆ **56 → 60 on 2026-09-30**: filed assurance wave 5 — P2 `ASSURE-PACK-TELCO-FRAUD-1`, `ASSURE-PACK-TELCO-RA-1`, `ASSURE-PACK-PAYMENT-FRAUD-1`, `ASSURE-PACK-BUSINESS-ASSURANCE-1`.
@@ -99,9 +100,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 26<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 25<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 32<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 58<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 57<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -357,7 +358,6 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 ### 3.8 Security, Policy, Editions & Compliance
 
-- **P2** · `SEC-DRYRUN-EXPR-UNSEALED-1` — **the Pipeline dry run executes authored mapping/transform SQL on an unsealed connection.** `PipelineDryRun.runSeeded` (`PipelineDryRun.java:130`, reached from `PipelineGraphRoutes` `:604`/`:697`) opens `DuckDbUtil.openConnection` and runs the graph (incl. `fn: custom` expressions) over seeded sample rows; nothing seals it. Seeding is in-memory, so a seal after seeding looks near-trivial, but the caller's `ReferenceResolver` registers reference reads lazily — the allowlist must cover what it resolves. Grounded in code 2026-09-30, repro not run.
 - **P2** · `SEC-ATREST-PIPELINE-UNSEALED-1` — **the at-rest Pipeline Job runs its authored graph on an unsealed connection.** `PipelineJobRunner` (`PipelineJobRunner.java:312`) opens `DuckDbUtil.openConnection` and executes the authored transforms over `SourceStoreReader` views of `source_store`s; only resource caps are applied. Needs an allowlist of the source-store dirs, the output store and the reference resolver's reads before sealing. Grounded in code 2026-09-30, repro not run.
 - **P2** · `DB-QUERY-UNGATED-1` — **`POST /db/query` reads operational-store rows with no capability gate.** It is exempt in `CapabilityManifest` as "read-shaped" (read-only SQL behind `SqlGuard`). Since 2026-09-29 (`ASSURE-INTELLIGENCE-BUNDLE-1`, operator decision), the agent tools that read the same store rows, `anomaly_scan` and `suggest_expectations`, require `canAuthorWorkbench` through `POST /agent/tools/{name}`. So an Enterprise reader is refused the tool yet can still run the equivalent SQL directly. Decide the read capability for store rows, then gate both routes the same way and move `ToolCapabilities.ROW_READERS` onto that capability. → `inspecto/src/main/java/com/gamma/control/DbBrowserRoutes.java` · `inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/ToolCapabilities.java`
 - **P3** · `NATIVE-LICENCE-TEXTS-1` — **the GPL-3.0, GCC Runtime Library Exception 3.1 and mingw-w64 winpthreads licence texts must ship beside the DLLs the Enterprise intelligence sidecar carries** (`libstdc++-6.dll`, `libgcc_s_seh-1.dll`, `libwinpthread-1.dll`, inside the DJL tokenizers artifact). They are not in the offline cache, and downloading them was not approved (2026-09-29). Also merge colliding `META-INF/LICENSE*` files in the shade, so JNA's licence survives. evidence in root `compliance/evidence/third-party-natives.md` ("Open")

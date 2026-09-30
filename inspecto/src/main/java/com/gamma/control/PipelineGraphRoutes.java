@@ -831,7 +831,33 @@ final class PipelineGraphRoutes implements RouteModule {
      * jail through {@link WriteGates#jailToAllowedRoots}.
      */
     private static RowShaper.ReferenceResolver dryRunReferences(ApiContext api) {
-        return (conn, reference) -> {
+        return new RowShaper.ReferenceResolver() {
+          /**
+           * What the sealed dry-run connection may read for {@code reference} (SEC-DRYRUN-EXPR-UNSEALED-1):
+           * a {@code path:} file's directory (jailed first), or the producing Pipeline's {@code dirs.database}.
+           * An unparseable/unresolvable reference declares nothing; {@link #resolve} then names it.
+           */
+          @Override
+          public List<Path> readDirs(String reference) {
+            com.gamma.enrich.EnrichmentConfig.Reference parsed;
+            try {
+                parsed = ReferenceReader.parse(reference);
+            } catch (RuntimeException unresolvable) {
+                return List.of();
+            }
+            if (!parsed.byName()) {
+                WriteGates.jailToAllowedRoots(parsed.path(), "transform.join.reference");
+                Path parent = Path.of(parsed.path()).toAbsolutePath().normalize().getParent();
+                return parent == null ? List.of() : List.of(parent);
+            }
+            return api.service().loadedPipelines().stream()
+                    .filter(p -> p.identity().pipelineName().equals(parsed.ref()) && p.dirs() != null
+                            && p.dirs().database() != null && !p.dirs().database().isBlank())
+                    .findFirst().map(p -> List.of(Path.of(p.dirs().database()))).orElse(List.of());
+          }
+
+          @Override
+          public String resolve(java.sql.Connection conn, String reference) {
             String sql;
             com.gamma.enrich.EnrichmentConfig.Reference parsed;
             try {
@@ -863,6 +889,7 @@ final class PipelineGraphRoutes implements RouteModule {
                                 + ". Seed the reference file, or point the node at one that exists.");
             }
             return view;
+          }
         };
     }
 

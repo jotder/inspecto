@@ -365,4 +365,73 @@ class PipelineDryRunTest {
                 () -> PipelineDryRun.run(forkedGraph(), SAMPLE, RowShaper.ReferenceResolver.NONE, "nope"));
         assertTrue(e.getMessage().contains("nope"), e.getMessage());
     }
+
+    // ── SEC-DRYRUN-EXPR-UNSEALED-1: authored SQL runs on a SEALED connection ─────────────────────────
+
+    /** seed --data--> map(one authored expression) --data--> sink. */
+    private static PipelineGraph graphWithExpr(String expr) {
+        return new PipelineGraph("demo", true,
+                List.of(PipelineNode.of("acq", "acquisition"),
+                        PipelineNode.of("m", "transform.sql",
+                                Map.of("columns", List.of(Map.of("name", "id", "expr", "id"),
+                                        Map.of("name", "leak", "expr", expr)))),
+                        new PipelineNode("sink", "sink.persistent", "S", null, Map.of("store", "out"), null)),
+                List.of(PipelineEdge.data("acq", "m"), PipelineEdge.data("m", "sink")));
+    }
+
+    private static String readTextOf(Path file) {
+        return "(SELECT content FROM read_text('" + file.toAbsolutePath().toString().replace('\\', '/') + "'))";
+    }
+
+    private static void assertPermissionRefused(Throwable t) {
+        StringBuilder all = new StringBuilder();
+        for (Throwable c = t; c != null; c = c.getCause()) all.append(c.getMessage()).append(" | ");
+        assertTrue(all.toString().contains("Permission Error"), "expected a DuckDB permission refusal: " + all);
+    }
+
+    @Test
+    void aMappingExpressionCannotReadAHostFile(@TempDir Path dir) throws Exception {
+        Path host = Files.writeString(dir.resolve("host.txt"), "host-secret");
+        Exception e = assertThrows(Exception.class, () -> PipelineDryRun.run(graphWithExpr(readTextOf(host)), SAMPLE));
+        assertPermissionRefused(e);
+    }
+
+    @Test
+    void aMappingExpressionCannotReadTheSpaceSecrets(@TempDir Path space) throws Exception {
+        Path secrets = Files.createDirectories(space.resolve("config.secrets"));
+        Path creds = Files.writeString(secrets.resolve("db.toon"), "password: hunter2");
+        Exception e = assertThrows(Exception.class, () -> PipelineDryRun.run(graphWithExpr(readTextOf(creds)), SAMPLE));
+        assertPermissionRefused(e);
+    }
+
+    @Test
+    void aSealedJoinStillReadsTheReferenceDirTheResolverDeclares(@TempDir Path refDir) throws Exception {
+        Path ref = Files.writeString(refDir.resolve("groups.csv"), "id,label\n1,Alpha\n");
+        String path = ref.toAbsolutePath().toString().replace('\\', '/');
+        RowShaper.ReferenceResolver resolver = new RowShaper.ReferenceResolver() {
+            @Override public List<Path> readDirs(String reference) { return List.of(refDir); }
+            @Override public String resolve(java.sql.Connection conn, String reference) throws java.sql.SQLException {
+                try (java.sql.Statement st = conn.createStatement()) {
+                    st.execute("CREATE VIEW refdim AS SELECT * FROM read_csv('" + path + "', all_varchar=true)");
+                }
+                return "refdim";
+            }
+        };
+        PipelineDryRun.Result r = PipelineDryRun.run(graphWithJoin(), SAMPLE, resolver);
+        assertEquals(3, r.sinks().get(0).rowCount());
+        assertEquals("Alpha", r.sinks().get(0).rows().stream().filter(x -> "1".equals(String.valueOf(x.get("id"))))
+                .findFirst().orElseThrow().get("label"));
+    }
+
+    @Test
+    void aReferenceDirTheAllowlistRefusesFailsTheRunClosed(@TempDir Path space) throws Exception {
+        Files.createDirectories(space.resolve("config"));
+        RowShaper.ReferenceResolver resolver = new RowShaper.ReferenceResolver() {
+            @Override public List<Path> readDirs(String reference) { return List.of(space); }
+            @Override public String resolve(java.sql.Connection conn, String reference) { return "never"; }
+        };
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> PipelineDryRun.run(graphWithJoin(), SAMPLE, resolver));
+        assertTrue(e.getMessage().contains("SEC-DRYRUN-EXPR-UNSEALED-1"), e.getMessage());
+    }
 }

@@ -274,6 +274,28 @@ both the run and the preview path. Authoring an Enrichment needs `canAuthorWorkb
   `ControlApiEnrichmentPreviewTest.aTransformThatReadsAHostFileIsRefused` (real HTTP: red with both
   layers removed — 200 with the file's content).
 
+### The Pipeline dry run is sealed too (`SEC-DRYRUN-EXPR-UNSEALED-1`, 2026-09-30)
+
+`PipelineDryRun.runSeeded` — behind `POST /pipelines/authored/{id}/dry-run` and `POST …/run?to=` — runs the authored
+graph (`fn: custom` mapping expressions, `transform.sql` columns, filters, contributed Steps) over seeded sample
+rows. No Decision Rule runs in the walk. Until 2026-09-30 its connection used DuckDB defaults, so a mapping
+expression could `read_text` any host file.
+
+- **Sealed after seeding, before the walk.** The seed tables are trusted inserts. After them comes
+  `SqlSandbox.sealAllowing(conn, allowed)`.
+- **The allowlist:** the run's own scratch dir (`Files.createTempDirectory("dryrun_")`, never tmpdir itself), the
+  global `-Dprocessing.duckdb.temp_directory` when set, and, for each `transform.join` node, the dirs its
+  `reference` reads as declared by `RowShaper.ReferenceResolver.readDirs`. That method defaults to none.
+  The route's resolver (`PipelineGraphRoutes.dryRunReferences`) returns a `path:` file's directory, jailed first,
+  or a by-name producer's `dirs.database`. References still resolve lazily. Their views are created after the
+  seal, so the views' reads prove the allowlist.
+- **Fail closed.** Every entry passes `PathJail.readAllowlistRefusal`. A refused entry, such as a Space root, a
+  `config/` tree, a `*.secrets` dir, tmpdir or a restricted store, refuses the whole run with
+  `IllegalArgumentException`. The route maps that to 400.
+- **Pinned by** `PipelineDryRunTest`: `read_text` of a host file and of `config.secrets/…` → DuckDB
+  `Permission Error`; a sealed join still reads its declared dir; a refused dir fails closed. The first two
+  and the fail-closed test go red with the seal removed.
+
 ## The source time zone for temporal data
 
 **SHIPPED 2026-08-29** (engine + config `44ecef76`, surfaces `dd02d377`). Plan + the full live-probe

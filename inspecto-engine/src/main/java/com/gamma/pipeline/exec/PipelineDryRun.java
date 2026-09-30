@@ -126,7 +126,9 @@ public final class PipelineDryRun {
         g = withMappingContext(g);
         String seedNode = seedNodeOf(g);
 
-        File db = DuckDbUtil.tempDbFile("dryrun_");
+        // A fresh scratch dir per run: the seal allowlists it, and allowlisting java.io.tmpdir itself would admit all of it.
+        java.nio.file.Path scratch = java.nio.file.Files.createTempDirectory("dryrun_");
+        File db = DuckDbUtil.tempDbFile("dryrun_", scratch);
         try (Connection conn = DuckDbUtil.openConnection(db)) {
             Map<String, String> seeds = new LinkedHashMap<>();
             int i = 0;
@@ -139,6 +141,7 @@ public final class PipelineDryRun {
                 ScratchTables.seed(conn, table, ScratchTables.columnsOf(rows), rows);
                 seeds.put(e.getKey(), table);
             }
+            seal(conn, g, references, scratch);
             PipelineExecutor.DryRunResult dr =
                     PipelineExecutor.dryRun(conn, g, seedNode, seeds, references, stopAtNodeId);
             Map<String, PipelineNode> byId = g.byId();
@@ -176,7 +179,38 @@ public final class PipelineDryRun {
             return new Result(seedNode, nodes, sinks, List.copyOf(warnings));
         } finally {
             DuckDbUtil.deleteTempDb(db);
+            try { java.nio.file.Files.deleteIfExists(scratch); } catch (java.io.IOException ignored) { /* best effort */ }
         }
+    }
+
+    /**
+     * <b>SEC-DRYRUN-EXPR-UNSEALED-1</b> — seal the scratch connection after seeding and before the walk runs any
+     * authored SQL ({@code fn: custom} mapping expressions, {@code transform.sql}, filters, contributed Steps).
+     * {@code allowed_directories} = the run's own scratch dir, the global {@code -Dprocessing.duckdb.temp_directory}
+     * when set, and each {@code transform.join} reference's read dirs as the caller's resolver declares them
+     * ({@link RowShaper.ReferenceResolver#readDirs}). Every entry is filtered through
+     * {@link com.gamma.config.safety.PathJail#readAllowlistRefusal} and the run refuses, fail closed, if one is
+     * refused; everything else (host files, {@code config.secrets}, URLs) DuckDB itself then refuses.
+     */
+    private static void seal(Connection conn, PipelineGraph g, RowShaper.ReferenceResolver references,
+                             java.nio.file.Path scratch) throws Exception {
+        LinkedHashSet<java.nio.file.Path> allowed = new LinkedHashSet<>();
+        allowed.add(scratch.toAbsolutePath().normalize());
+        String spill = System.getProperty(DuckDbUtil.PROP_TEMP_DIRECTORY);
+        if (spill != null && !spill.isBlank()) allowed.add(java.nio.file.Paths.get(spill).toAbsolutePath().normalize());
+        for (PipelineNode n : g.nodes()) {
+            Object ref = BuiltinNodeType.TRANSFORM_JOIN.type().equals(n.type()) ? n.cfg("reference") : null;
+            if (ref != null && !ref.toString().isBlank())
+                for (java.nio.file.Path d : references.readDirs(ref.toString().trim()))
+                    allowed.add(d.toAbsolutePath().normalize());
+        }
+        for (java.nio.file.Path dir : allowed) {
+            String why = com.gamma.config.safety.PathJail.readAllowlistRefusal(dir);
+            if (why != null)
+                throw new IllegalArgumentException("dry run refused: its sealed connection would be allowed to read "
+                        + dir + ", which " + why + " (SEC-DRYRUN-EXPR-UNSEALED-1)");
+        }
+        com.gamma.sql.SqlSandbox.sealAllowing(conn, List.copyOf(allowed));
     }
 
     /**

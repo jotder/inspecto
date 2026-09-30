@@ -94,6 +94,13 @@ public final class RowShaper {
     public interface ReferenceResolver {
         String resolve(Connection conn, String reference) throws SQLException;
 
+        /**
+         * The directories {@code reference} reads, for a caller that seals its connection before the walk
+         * (the dry run, SEC-DRYRUN-EXPR-UNSEALED-1): each is added to {@code allowed_directories}. The default
+         * declares none, so a sealed run over a resolver that does not override this cannot read the file.
+         */
+        default List<java.nio.file.Path> readDirs(String reference) { return List.of(); }
+
         /** The no-context default: any resolution attempt refuses with the reference it could not reach. */
         ReferenceResolver NONE = (conn, reference) -> {
             throw new IllegalStateException("no ReferenceResolver supplied — cannot resolve reference '"
