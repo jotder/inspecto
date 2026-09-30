@@ -166,7 +166,7 @@ public final class EnrichmentEngine {
             // scratch connection isn't uncapped (defaults ≈ 80% RAM) while the batch path is capped.
             DuckDbUtil.applyGlobalDuckDbSettings(conn);
             String transform = guardedTransform(cfg);
-            SqlSandbox.sealAllowing(conn, allowedDirs(cfg, pipelines, db));
+            seal(conn, cfg, pipelines, db);
 
             // 1. reference views
             for (EnrichmentConfig.Reference r : cfg.references()) {
@@ -272,7 +272,7 @@ public final class EnrichmentEngine {
         File db = DuckDbUtil.tempDbFile("enrich_preview_", scratch);
         try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
             String transform = guardedTransform(cfg);
-            SqlSandbox.sealAllowing(conn, allowedDirs(cfg, pipelines, db));
+            seal(conn, cfg, pipelines, db);
             // 1. reference views — resolved exactly as a run (real data, bounded by the transform's own join)
             for (EnrichmentConfig.Reference r : cfg.references())
                 st.execute("CREATE VIEW \"" + r.name() + "\" AS SELECT * FROM " + referenceReader(r, pipelines));
@@ -312,6 +312,25 @@ public final class EnrichmentEngine {
                     + findings.get(0).message());
         String t = sql.strip();
         return t.endsWith(";") ? t.substring(0, t.length() - 1) : t;
+    }
+
+    /**
+     * Seal {@code conn} to {@link #allowedDirs}, failing closed first when any entry is one
+     * {@link com.gamma.config.safety.PathJail#readAllowlistRefusal} refuses (a Space root, a {@code config/}
+     * tree, a {@code *.secrets} dir, tmpdir) — every entry but the scratch dir comes from authored config.
+     */
+    private static void seal(Connection conn, EnrichmentConfig cfg, List<PipelineConfig> pipelines, File db)
+            throws SQLException {
+        List<java.nio.file.Path> allowed = allowedDirs(cfg, pipelines, db);
+        for (java.nio.file.Path dir : allowed) {
+            String why = com.gamma.config.safety.PathJail.readAllowlistRefusal(dir);
+            if (why != null)
+                throw new IllegalArgumentException("enrichment '" + cfg.name() + "' refused: its sealed "
+                        + "connection would be allowed to read " + dir + ", which " + why + " — point "
+                        + "input/output.database and path: references at data directories "
+                        + "(SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1)");
+        }
+        SqlSandbox.sealAllowing(conn, allowed);
     }
 
     /**

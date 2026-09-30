@@ -99,6 +99,42 @@ class EnrichmentTransformSandboxTest {
         assertEquals(1, EnrichmentEngine.preview(c, SAMPLE, List.of(), 10).rows().size());
     }
 
+    /**
+     * The allowlist filter: an enrichment whose {@code output.database} is the Space root, or whose {@code path:}
+     * reference is the Pending Change key itself, would hand the sealed connection {@code config.secrets/}. Both
+     * are refused before the seal, on the run and the preview path, and the key never reaches a result.
+     */
+    @Test
+    void theSpaceRootOrItsSecretsCanNeverBeAllowlisted(@TempDir Path dir) throws Exception {
+        Path space = Files.createDirectories(dir.resolve("space"));
+        Files.createDirectories(space.resolve("config"));
+        Path key = Files.writeString(Files.createDirectories(space.resolve("config.secrets"))
+                .resolve(".pending-changes.key"), "day,k\n2020,HMAC-KEY-BYTES\n");
+        seedInput(Files.createDirectories(space.resolve("data")).resolve("in"));
+        EnrichmentConfig rootOut = new EnrichmentConfig("LEAK",
+                new EnrichmentConfig.Input(fwd(space.resolve("data").resolve("in")), "PARQUET", List.of("day")),
+                List.of(), new EnrichmentConfig.Output(fwd(space), "PARQUET", "snappy", List.of("day")),
+                "SELECT '2020' AS day, content FROM read_text('" + fwd(key) + "')");
+        EnrichmentConfig keyRef = new EnrichmentConfig("LEAK",
+                new EnrichmentConfig.Input(fwd(space.resolve("data").resolve("in")), "PARQUET", List.of("day")),
+                List.of(new EnrichmentConfig.Reference("k", fwd(key), "CSV")),
+                new EnrichmentConfig.Output(fwd(space.resolve("data").resolve("out")), "PARQUET", "snappy", List.of("day")),
+                "SELECT day, k FROM k");
+        // The same output-at-root config with a transform the guard passes: the FILTER alone must refuse it.
+        EnrichmentConfig rootOutPlain = new EnrichmentConfig("LEAK", rootOut.input(), List.of(), rootOut.output(),
+                "SELECT day, id FROM input");
+        for (EnrichmentConfig c : List.of(rootOut, keyRef, rootOutPlain)) {
+            Exception run = assertThrows(Exception.class, () -> EnrichmentEngine.runResult(c, null, List.of()));
+            assertTrue(run.getMessage().contains("refused") && !run.getMessage().contains("HMAC-KEY-BYTES"), run.getMessage());
+            Exception prev = assertThrows(Exception.class, () -> EnrichmentEngine.preview(c, SAMPLE, List.of(), 10));
+            assertTrue(prev.getMessage().contains("refused") && !prev.getMessage().contains("HMAC-KEY-BYTES"), prev.getMessage());
+        }
+        assertTrue(assertThrows(Exception.class, () -> EnrichmentEngine.runResult(keyRef, null, List.of()))
+                .getMessage().contains("secrets"), "the key reference is refused by the filter, not by chance");
+        assertTrue(assertThrows(Exception.class, () -> EnrichmentEngine.runResult(rootOutPlain, null, List.of()))
+                .getMessage().contains("Space root"), "the root output is refused by the filter");
+    }
+
     /** Every shipped Space enrichment config's transform clears the guard (the only one: the demo Space's). */
     @Test
     void shippedSpaceEnrichmentTransformsPassTheGuard() throws Exception {

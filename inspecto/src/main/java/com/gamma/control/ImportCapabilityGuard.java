@@ -162,7 +162,7 @@ final class ImportCapabilityGuard {
         for (Map.Entry<String, byte[]> e : entries.entrySet()) {
             String rel = normalizedPath(e.getKey());
             String file = rel.substring(rel.lastIndexOf('/') + 1);
-            if (file.endsWith("_pipeline.toon")) refuseDataHomes(ex, e.getKey(), e.getValue());
+            if (file.endsWith("_pipeline.toon") || file.endsWith("_enrich.toon")) refuseDataHomes(ex, e.getKey(), e.getValue());
             if (file.endsWith("_connection.toon")) require(ex, "connection", Roles.CAN_ONBOARD_CONNECTIONS);
             else if (file.endsWith("_job.toon")) requireIfAdministerOnly(ex, jobSection(e.getValue()));
             else if (file.endsWith("_job_template.toon")) refuseAttachingTemplate(e.getKey(), e.getValue());
@@ -209,6 +209,24 @@ final class ImportCapabilityGuard {
         if (p.get("processing") instanceof Map<?, ?> proc && proc.get("duckdb") instanceof Map<?, ?> d
                 && d.get("temp_directory") != null)
             values.add(new String[]{"processing.duckdb.temp_directory", String.valueOf(d.get("temp_directory"))});
+        // An Enrichment (`_enrich.toon`): its sealed connection allowlists input/output.database and each path
+        // reference's directory (SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1).
+        for (String sec : new String[]{"input", "output"})
+            if (m.get(sec) instanceof Map<?, ?> s && s.get("database") != null)
+                values.add(new String[]{sec + ".database", String.valueOf(s.get("database"))});
+        if (m.get("references") instanceof Map<?, ?> refs)
+            for (Map.Entry<?, ?> r : refs.entrySet())
+                if (r.getValue() instanceof Map<?, ?> rv && rv.get("path") != null) {
+                    String raw = String.valueOf(rv.get("path")).trim();
+                    String dir;
+                    try {
+                        java.nio.file.Path parent = java.nio.file.Paths.get(raw).getParent();
+                        dir = parent == null ? "." : parent.toString();
+                    } catch (java.nio.file.InvalidPathException bad) {
+                        dir = raw;   // refused (403) by the loop below, which parses it again
+                    }
+                    values.add(new String[]{"references." + r.getKey() + ".path", dir});
+                }
         java.nio.file.Path configRoot = ex == null ? null : Roles.configRoot(ex);
         java.nio.file.Path stand = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"), "import-space-stand-in")
                 .toAbsolutePath().normalize();

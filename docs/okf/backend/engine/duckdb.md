@@ -245,7 +245,7 @@ An Enrichment's `transform` is spliced into `CREATE TABLE __enriched AS …`, so
 on a DuckDB-defaults connection. **Reproduced before the fix:** the capability-free
 `POST /enrichment/preview` returned a host file's content with a 200, and all five attack shapes ran on
 both the run and the preview path. Authoring an Enrichment needs `canAuthorWorkbench`
-(`POST /enrichment`, and `POST /bundle/import` carries the `enrichment` kind); the preview needs nothing.
+(`POST /enrichment`, and `POST /bundle/import` carries the `enrichment` kind); the preview needed nothing until it was gated the same day.
 
 - **Two layers, both in `EnrichmentEngine`, on both `runResult` and `preview`.** `guardedTransform`
   refuses any `SqlGuard` finding (one read-only `SELECT`/`WITH`, no file/extension functions, no path in a
@@ -256,6 +256,15 @@ both the run and the preview path. Authoring an Enrichment needs `canAuthorWorkb
   `-Dprocessing.duckdb.temp_directory` when set, `input.database`, `output.database` (routed destinations
   live under it) and its `_quarantine` sibling, each `path:` reference's directory, and each by-name
   reference's producing Pipeline's `dirs.database`.
+- **The allowlist is filtered, fail closed.** Every entry but the scratch dir comes from authored config, so
+  `EnrichmentEngine.seal` refuses the run/preview when `PathJail.readAllowlistRefusal` rejects any entry (a
+  Space root, a `config/` tree, a `*.secrets` dir, tmpdir) — otherwise `output.database: .` or a `path:`
+  reference at `config.secrets/.pending-changes.key` would hand the connection the Pending Change key. The
+  same dirs are **data homes** at the write gate (`ConfigSafetyValidator.checkEnrichment` → `checkDataHome`
+  for `input/output.database`, `refuseDataHome` on each `path:` reference's directory) and at import
+  (`ImportCapabilityGuard.refuseDataHomes` reads `*_enrich.toon` too — 403, nothing written). ⚠ A `path:`
+  reference file sitting directly in the Space root is therefore refused: its directory is the root.
+- **`POST /enrichment/preview` is gated `canAuthorWorkbench`** (it was un-gated until 2026-09-30).
 - ⚠ **The scratch DB gets its own fresh directory per call.** A DB made straight in `java.io.tmpdir`
   allows the WHOLE tmpdir — found by the seal test, which read a file from a `@TempDir` sibling until the
   scratch moved into `Files.createTempDirectory`. (The ingest seal allows its temp DB's directory the same

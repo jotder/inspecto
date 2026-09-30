@@ -398,8 +398,10 @@ public final class ConfigSafetyValidator {
     // ── enrichment ───────────────────────────────────────────────────────────────────
 
     private static void checkEnrichment(Map<String, Object> raw, SafetyPolicy p, Path configDir, List<Finding> out) {
-        checkDataPath(raw, "input.database", p, configDir, out);
-        checkDataPath(raw, "output.database", p, configDir, out);
+        // Data HOMES, not mere data paths: the sealed enrichment connection allowlists them
+        // (SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1), so neither may be the Space root, config/ or a *.secrets dir.
+        checkDataHome("input.database", RawConfig.str(raw, "input.database"), p, configDir, out);
+        checkDataHome("output.database", RawConfig.str(raw, "output.database"), p, configDir, out);
         // transform_file is NOT a data path, and EnrichmentConfig.load still reads it from the working
         // directory - so it is judged from there too (a gate must resolve the way its reader does).
         checkPathValue("transform_file", RawConfig.str(raw, "transform_file"), p, PathJail::resolveConfigRef,
@@ -440,8 +442,22 @@ public final class ConfigSafetyValidator {
         if (hasPath == hasRef) {
             out.add(Finding.error(prefix, prefix + " needs exactly one of 'path' or 'ref'"));
         }
-        if (hasPath)
+        if (hasPath) {
+            int before = out.size();
             checkPathValue(prefix + ".path", pathV.toString(), p, PathJail::resolveDataPath, configDir, out);
+            // The seal allowlists the reference file's DIRECTORY, so that directory is a data home.
+            String v = pathV.toString().trim();
+            if (out.size() == before && !PathJail.isUri(v)) {
+                try {
+                    Path parent = PathJail.resolveDataPath(configDir, v, prefix + ".path").getParent();
+                    if (parent != null)
+                        PathJail.refuseDataHome(parent, PathJail.spaceDirOf(configDir), p.allowedRoots(), v,
+                                prefix + ".path");
+                } catch (PathJail.Escape refused) {
+                    out.add(Finding.error(prefix + ".path", refused.getMessage()));
+                }
+            }
+        }
         if (hasRef && !SQL_IDENTIFIER.matcher(refV.toString().trim()).matches()) {
             out.add(Finding.error(prefix + ".ref", "reference id '" + refV.toString().trim()
                     + "' is not a valid SQL identifier ([A-Za-z_][A-Za-z0-9_]*)"));
@@ -544,12 +560,6 @@ public final class ConfigSafetyValidator {
         } catch (PathJail.Escape refused) {
             out.add(Finding.error(field, refused.getMessage()));
         }
-    }
-
-    /** A data path key, resolved as the loader resolves it - {@link PathJail#resolveDataPath}. */
-    private static void checkDataPath(Map<String, Object> raw, String field, SafetyPolicy p, Path configDir,
-                                      List<Finding> out) {
-        checkPathValue(field, RawConfig.str(raw, field), p, PathJail::resolveDataPath, configDir, out);
     }
 
     /** How a kind of path key resolves before it is jailed - the loader's own resolver, never a copy of it. */

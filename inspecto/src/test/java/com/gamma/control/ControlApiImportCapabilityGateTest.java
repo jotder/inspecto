@@ -217,6 +217,25 @@ class ControlApiImportCapabilityGateTest {
 
     /** SEC-INGEST-EXPR-EXTERNAL-ACCESS-1: a carried Pipeline whose data home is the Space root, config/ or a
      *  .secrets dir would hand its sealed ingest connection the Pending Change key — refused, nothing written. */
+    /** SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1: a carried Enrichment's data homes feed its seal the same way. */
+    @Test
+    void aRawImportEnrichmentWhoseDataHomeIsTheSpaceRootOrSecretsIsRefused(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            String[][] bad = {
+                    {"output.database", "input:\n  database: data/in\noutput:\n  database: .\n"},
+                    {"references.dim.path", "input:\n  database: data/in\noutput:\n  database: data/out\n"
+                            + "references:\n  dim:\n    path: config.secrets/.pending-changes.key\n"}};
+            for (String[] b : bad) {
+                Map<String, String> before = tree(c.config);
+                HttpResponse<String> r = send(c, "POST", "/import", dataSourceZip("leak/leak_enrich.toon",
+                        "name: LEAK\n" + b[1] + "transform: \"SELECT * FROM input\"\n"), BOTH);
+                assertEquals(403, r.statusCode(), b[0] + ": " + r.body());
+                assertTrue(r.body().contains(b[0]), r.body());
+                assertEquals(before, tree(c.config), "nothing written for " + b[0]);
+            }
+        }
+    }
+
     @Test
     void aRawImportPipelineWhoseDataHomeIsTheSpaceRootOrConfigIsRefused(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {

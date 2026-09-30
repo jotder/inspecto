@@ -61,6 +61,34 @@ class ConfigSafetyValidatorTest {
                 SafetyPolicy.withRoots(s), configDir).isEmpty(), "an ordinary data dir still passes");
     }
 
+    private static Map<String, Object> enrichment(String inDb, String outDb, String refPath) {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("name", "E");
+        raw.put("input", new LinkedHashMap<>(Map.of("database", inDb)));
+        raw.put("output", new LinkedHashMap<>(Map.of("database", outDb)));
+        if (refPath != null) raw.put("references", Map.of("dim", Map.of("path", refPath)));
+        raw.put("transform", "SELECT * FROM input");
+        return raw;
+    }
+
+    /** SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1: the enrichment seal allowlists these dirs, so they are data homes. */
+    @Test
+    void anEnrichmentDataHomeThatIsTheSpaceRootConfigOrSecretsIsRefused(@TempDir Path s) throws IOException {
+        Path configDir = java.nio.file.Files.createDirectories(s.resolve("config"));
+        SafetyPolicy p = SafetyPolicy.withRoots(s);
+        assertTrue(refuses(ConfigSafetyValidator.check("enrichment", enrichment("data/in", ".", null), p, configDir),
+                "output.database"));
+        assertTrue(refuses(ConfigSafetyValidator.check("enrichment", enrichment("config", "data/out", null), p, configDir),
+                "input.database"));
+        assertTrue(refuses(ConfigSafetyValidator.check("enrichment",
+                enrichment("data/in", "data/out", "config.secrets/.pending-changes.key"), p, configDir), "references.dim.path"));
+        assertTrue(refuses(ConfigSafetyValidator.check("enrichment",
+                enrichment("data/in", "data/out", "dim.csv"), p, configDir), "references.dim.path"),
+                "a reference file at the Space root allowlists the root");
+        assertTrue(ConfigSafetyValidator.check("enrichment", enrichment("data/in", "data/out", "data/ref/dim.csv"),
+                p, configDir).stream().noneMatch(x -> x.severity() == Severity.ERROR), "an ordinary enrichment still passes");
+    }
+
     // ── config refs resolve config-relative first (W1b) ──────────────────────
 
     /** A pipeline whose only path surface is a `processing.schema_file` ref. */
@@ -637,7 +665,9 @@ class ConfigSafetyValidatorTest {
         Map<String, Object> refs = new LinkedHashMap<>();
         refs.put("rates", Map.of("ref", "fx_rates", "as_of", "2026-07-24"));
         refs.put("plans", Map.of("ref", "plans", "as_of", "2026-07-24T10:00:00"));
-        refs.put("lut", Map.of("path", root.resolve("lut.parquet").toString(), "format", "PARQUET"));
+        // Under a data subdirectory: a reference file directly in the root would allowlist the root itself
+        // (SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1 — refused by anEnrichmentDataHomeThatIsTheSpaceRoot…).
+        refs.put("lut", Map.of("path", root.resolve("ref").resolve("lut.parquet").toString(), "format", "PARQUET"));
         List<Finding> f = ConfigSafetyValidator.check("enrichment", enrichment(root, refs),
                 SafetyPolicy.withRoots(root));
         assertTrue(f.isEmpty(), "by-name refs (with both as_of forms) and an under-root path are safe: " + f);
