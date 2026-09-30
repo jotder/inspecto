@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **64<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 28<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
+> **63<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
 > ⬇ **56 on 2026-09-30**: closed P3 `ERRORCODE-DEFAULTED-1` (`2f6d5e52a`) — the last 15 bare `ApiException` sites (all 422s in `inspecto-geo-link`: `AdmiraltyGrade` 1 · `InvestigationCoverageRoutes` 4 · `PatternRoutes` 5 · `WorkingSetRoutes` 5) now pass `CONFIG_VALIDATION_FAILED`, the status default, so no wire change; 0 of 1155 sites take `defaultFor` (the derive's 4 remaining lines pass computed codes). Truth in `okf/capabilities/control-api/control-api.md`.
 > ⬆ **52 → 53 on 2026-09-29**: filed P3 `TEMPLATE-RECOVERY-IMPORT-GATE-1` (the zero-Space recovery create skips the import gate) from the `publish.postgres` review.
 > ⬆ **50 → 51 on 2026-09-29**: filed P3 `ASSURE-CLASSIFICATION-PROPAGATION-1` (carry column classification through lineage) from the `publish.postgres` security review.
@@ -94,9 +94,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 28<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 27<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 64<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 63<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -111,7 +111,7 @@ number** — rows moved between sections in this consolidation, and older docs c
 | [3.7](#37-control-plane-api--jobs) | Control plane, API & Jobs | [job-path-compat-survey.md](superpower/job-path-compat-survey.md) | Release notes for the next MAJOR |
 | [3.8](#38-security-policy-editions--compliance) | Security, Policy, Editions & Compliance | [route-gating-audit.md](superpower/route-gating-audit.md) · [policy-narrowing-design.md](superpower/policy-narrowing-design.md) | X-Actor · NFR-7 · SOC 2 · SEC-INCIDENT-1 · DATA-GOV-1 |
 | [3.9](#39-cases-incidents--assistant) | Cases, Incidents & Assistant | [findings-spec-authoring-ui-design.md](archived-documents/plans-archive/findings-spec-authoring-ui-design.md) (archived) | AGT-6b |
-| [3.10](#310-deployment-packaging--scale-out) | Deployment, Packaging & Scale-out | [enterprise-scale-out-plan.md](superpower/enterprise-scale-out-plan.md) | Deployment topology live validation · E1 |
+| [3.10](#310-deployment-packaging--scale-out) | Deployment, Packaging & Scale-out | [enterprise-scale-out-plan.md](superpower/enterprise-scale-out-plan.md) | Deployment topology live validation · `SPACES-FROM-PARTITION-MAP-1` · E1 |
 | [3.11](#311-web-ui--spa-wide-hygiene) | Web UI — SPA-wide hygiene | — | — |
 | [3.12](#312-link-analysis--geo) | Link Analysis & Geo | [link-analysis-backlog-plan.md](superpower/link-analysis-backlog-plan.md) — the ONLY Link Analysis backlog | — |
 | [4](#4-engineering-platform--build-test-ci--tooling) | Engineering platform — build, test, CI & tooling | — | — |
@@ -130,7 +130,7 @@ rank.
 |---|---|
 | **Startable now** — no gate, no owed decision | Platform Services Stage 2 S2-4…S2-5 (§3.2; all calls decided 2026-09-28, S2-0 + S2-1 + S2-3 shipped, S2-2 measured 2026-09-28) · assurance wave 2 (wave 1 has shipped; `ASSURE-MAKER-CHECKER-1` ✅ shipped 2026-09-27): `ASSURE-ACTION-REQUESTS-1` ✅ shipped 2026-09-27; `ASSURE-ENTITY-LISTS-1` ✅ shipped 2026-09-28. Assurance wave 3: `ASSURE-KPI-DEFINITIONS-1` ✅ shipped 2026-09-27 · `ASSURE-RISK-SCORE-1` ✅ shipped 2026-09-27 · `ASSURE-AUDIT-CHAIN-1` ✅ shipped 2026-09-27 |
 | **Decisions owed (design written)** — each has a design doc in `superpower/` (2026-09-24); its calls are indexed in §1 | `findings-spec` acceptance session with a Case-desk lead (§3.9) · cross-Space consequence (§3.5, all decided 2026-09-28 — build slices 1–6) |
-| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · `SES-SNS-LIVE-CHECKS-1` (SES/SNS adapter fixtures-verified; live checks deferred until a customer names SES, operator 2026-09-29) · `AUTHORING-REDESIGN-1` (e) (an operator decision, §3.1) |
+| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (§2 gate — ingress routing absent) · AGT-5 dry-run seam (upstream) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · `SES-SNS-LIVE-CHECKS-1` (SES/SNS adapter fixtures-verified; live checks deferred until a customer names SES, operator 2026-09-29) · `AUTHORING-REDESIGN-1` (e) (an operator decision, §3.1) |
 
 **Standing rules for editing this board** (distilled from the shifts that grew the old page to 644 KB):
 
@@ -190,7 +190,7 @@ described in `superpower/` and not indexed here is how a three-day stall happene
 
 Nothing a shift can close from this checkout. Every gate names something a shift can CHECK from this repo;
 where the trigger is external it is phrased as "when X is recorded in \<file\>".
-**13 of the 14 gates were RUN here** (full sweep 2026-09-08, recounted 2026-09-15). The 1 not run, and why: **Completeness KPI hold**
+**14 of the 15 gates were RUN here** (full sweep 2026-09-08, recounted 2026-09-15). The 1 not run, and why: **Completeness KPI hold**
 has nothing to run — its gate is an engineering action, not a check.
 `tools/check-gate-tally.mjs` fails the build when this sentence disagrees with the table.
 ⚠ A gate you cannot run is not a gate that holds. **Re-run every gate with a probe that can succeed before
@@ -213,6 +213,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 | **AGT-6b multi-step agent graphs** | Assistant | First cut = generalize `RunbookActions`, never free-form ReAct over mutating tools. | Holds on one precondition (run 2026-09-08): the upstream approval gate is still synchronous per call (`ApprovalHandler.onApprovalRequested`), so nested gates deadlock. **Check: `gh api 'repos/jotder/inspect-agent/contents/eoiagent-core/src/main/java/com/eoiagent/host/ApprovalHandler.java' -q .content \| base64 -d`** — reopen when that signature stops being synchronous. → `archived-documents/plans-archive/agt-6-plan.md` §4 |
 | **Deployment topology live validation** | Deployment & scale-out | T2/T3/T4 reference deployments, the D8 IAM pair, GAP-7 blueprints, grammar-config live smoke. Owed at the **first HA deployment**: a live two-Pod test of deciding a Pending Change (`ASSURE-MAKER-CHECKER-MULTIPOD-1` stays closed, operator 2026-09-28; the in-repo proof is `PendingChangesMultiPodTest`). | A reference deployment. Repo-side half: close when `compliance/evidence/rto-rpo-statement.md` carries operator-stated targets (⛔ do **not** transcribe the signed §3.14 engineering numbers — the targets are owed in §1) and at least one drill row; the hosts to drill on exist. → `archived-documents/plans-archive/deployment-topology-plan.md` (§10 D1–D8 signed 2026-09-06) |
 | **E1 Enterprise distributed tier / Stage-2 streaming** | Deployment & scale-out | Design SIGNED 2026-09-10 — T5 partitioned scale-out by Space (`superpower/enterprise-scale-out-plan.md` §9 D1′–D13); phases A–B are also Standard's T4 DR. A0, A1 and A3 shipped (2026-09-11/12); A2 (the pool) is re-scoped Enterprise, deferrable. | External: phase A's acceptance is `PostgresStateStoreTest` 12/12, and this checkout has no Postgres, so the class skips — the coverage exists and has never executed. Stage-2 streaming stays unscoped beyond the Collector-scan stream consumer (`STREAM-CONSUMER-1`, closed 2026-09-24). |
+| **`SPACES-FROM-PARTITION-MAP-1` — answer `/spaces` from the partition map** (parked 2026-09-30 from §3.10 P2) | Deployment & scale-out | `SpaceRoutes` still answers from `api.spaces().all()` (this Pod's roster) and calls `ApiContext.podScoped(e)`; the remedy is the one the scale-out plan §5.5 sanctions (`partition.toon` already declares every Space and its owner). ⛔ Ingress rules must be GENERATED from the map. Once it lands, remove `podScoped: true` from `/spaces` and `/bootstrap`, keeping it only on `GET /system/scheduler`. → `superpower/enterprise-scale-out-plan.md` §5.3, §5.5 | **Blocked on ingress path-routing — none exists**, and building `/spaces` alone would offer Spaces the UI cannot open. **Check: `grep -rn "ingress" inspecto/src/main --include=*.java`** — run 2026-09-30: empty, so still gated. Unpark when it finds generated ingress rules. |
 
 ## 3. Open work by product area
 
@@ -395,7 +396,6 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 
 - **P2** · `DEPLOY-SERVICE-WRAPPER-1` — **the live acceptance is UNRUN.** The wrappers shipped 2026-09-11 (`SCR-3`): a systemd unit plus `install-service.sh`, and `install-service.ps1` (a Windows Scheduled Task at boot as SYSTEM, restart-on-failure; `sc.exe` was refused — `java.exe` never reaches the service dispatcher, error 1053). **This row needs a RUN, not a build:** `kill -9` → back on `/health`, plus the reboot leg, on both platforms; the installers print the exact commands. The hosts exist (confirmed 2026-09-15); access details are owed in §1. ⛔ `SCR-3`'s acceptance stays unmet until both are run. → `okf/capabilities/editions/editions.md` §3.14 · `inspecto/package.ps1`
 - **P2** · **Postgres multi-user** — trigger FIRED 2026-09-15 (a multi-operator install exists) and the §6 park is lifted. P1 (a HikariCP pool behind `JdbcDrivers`) and P2 (`browseConnection()` removed) **already shipped 2026-09-14** (`3844fc0f`, `OPS-03`) — ⛔ do not rebuild a live pool. Remaining: P3 **schema**-per-space URL wiring (⛔ NOT db-per-space); P4 a `CaseStore` interface plus a PG implementation (a JSONL ring today); `PostgresStateStoreTest` over the three uncovered stores plus a concurrency test. Keep events on Parquet. Not the same work as `OperationalDb`/PG-1 (shipped). ⚠ Acceptance needs a Postgres this checkout lacks — `PostgresStateStoreTest` skips here. → `archived-documents/plans-archive/postgres-multi-user-plan.md` §5–6
-- **P2** · `SPACES-FROM-PARTITION-MAP-1` — **answer `/spaces` from the partition map, not a disk scan.** `SpaceRoutes` still answers from `api.spaces().all()` (this Pod's roster) and calls `ApiContext.podScoped(e)`; the remedy is the one the scale-out plan §5.5 sanctions (`partition.toon` already declares every Space and its owner). **Not startable:** it needs ingress path-routing first, and `grep -rn "ingress" inspecto/src/main --include=*.java` is empty — building `/spaces` alone would offer Spaces the UI cannot open. ⛔ Ingress rules must be GENERATED from the map. Once it lands, remove `podScoped: true` from `/spaces` and `/bootstrap`, keeping it only on `GET /system/scheduler`. ⚠ Blocked by construction, so it is a candidate to move to §2. → `superpower/enterprise-scale-out-plan.md` §5.3, §5.5
 
 ### 3.11 Web UI — SPA-wide hygiene
 

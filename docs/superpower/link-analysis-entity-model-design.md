@@ -446,6 +446,15 @@ append time and replay never re-reads the list:
     merged expand apply; matching runs on the state before anything leaves. The line states what actually happened
     (`State.lastMerged`): the entities that left, the members `keep` protected, and the member keys no entity carried
     ("not removed, only blocked") — never "every member left".
+    ✅ **Follow-ups (operator decisions 2026-09-30, backlog plan D-U11):** (a) the resolution VIEW is widened — an
+    untyped entity joins its group in `resolvedTo`, the merged nodes and the `identities` Measure by the same rule
+    (`State.resolutionView` via `rawMemberKeys`), so dev hashes of resolved states with untyped members changed; (b) an
+    untyped value is a member only when UNAMBIGUOUS — exactly one member type's sealed normaliser maps it to a member
+    (`InvestigationEvaluator.rawMemberKeys`; `rawMatches` lists all) — applied identically by merged exclude, merged
+    expand's member scan (`InvestigationRoutes.memberValue`), `blockedByGroup` and the view; an ambiguous one stays,
+    and the line says "not matched (ambiguous …), still in the Working Set: …" (`lastMerged.ambiguous`); (c) old dev
+    logs may replay not-equivalent — no compat path; (d) the Dossier's line is built from the same `lastMerged` outcome
+    as `/log` (`GraphDossierBuilder` `mergedBy`), no longer from the removed ids alone.
   - **Readers**: `?at` / replay / Dossier read the sealed rung and groups; measures (`entities`, `identities`) count
     the admitted members as usual; coverage reads only the window. **Fork** re-reads a merged expand against the new
     order (a merged expand re-ordered before its resolve is a 422) and re-seals a merged exclude's groups against the

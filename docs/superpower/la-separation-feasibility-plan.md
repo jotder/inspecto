@@ -1,7 +1,7 @@
 <!--
   ACTIVE PLAN — docs/superpower/
   Created 2026-09-27 from a brainstorming session. FEASIBILITY + DECISIONS ONLY — nothing is built.
-  UNDER DISCUSSION — NOT APPROVED (operator, 2026-09-28).
+  DECISIONS SIGNED 2026-09-30 — option D is the target; no phase is started by this.
   Retire per the three-tier lifecycle in CLAUDE.md when the work ships (or is declined).
 -->
 
@@ -12,7 +12,7 @@ Inspecto — with a Case, and later fingerprinting and 360 analysis?**
 
 | | |
 |---|---|
-| Status | ⚠ **UNDER DISCUSSION — NOT APPROVED** (operator, 2026-09-28): nothing here is decided or authorised to build. **FEASIBILITY — near term (options A/B, §3–§5) and the LONG-TERM target, option D (§7, added 2026-09-27)**; 7 + 14 operator decisions owed (§5, §7.9); nothing built |
+| Status | ✅ **DECISIONS SIGNED 2026-09-30 — option D is the target; no phase is started by this** (operator; D1–D21 answered on each **Answer** line). **FEASIBILITY — near term (options A/B, §3–§5) and the LONG-TERM target, option D (§7, added 2026-09-27)**; 7 + 14 operator decisions answered (§5, §7.9); nothing built |
 | Trigger | A customer request to deliver LA (+ Geo) as a separate deployment |
 | Drivers | Licensing / editions · architecture hygiene · customer ask · team parallelism |
 | Scope asked for | Split the module (Geo vs LA) · LA as a standalone product · move LA leftovers out of core · separate LA UI |
@@ -194,40 +194,40 @@ remote Inspecto's** data (thin, query-through), or (c) **both**?
 *Recommendation:* (c), built (a) first — it is Phase 1 and needs no new contract; (b) is Phase 2.
 *Operator direction 2026-09-27 (confirm below):* long term, LA owns its storage — Parquet in an LA partitioning
 scheme (§7.4); integration with Inspecto is by reference (§7.6).
-**Answer:**
+**Answer:** (c), built (a) first — it is Phase 1 and needs no new contract; (b) is Phase 2. — operator 2026-09-30
 
 **D2 — Licensing.** Geo + LA as **one SKU**, or **two**?
 *Recommendation:* one SKU unless a buyer needs them apart — the SPA cycle (SEP-04) makes them one unit anyway;
 two SKUs adds SEP-07.
-**Answer:**
+**Answer:** one SKU unless a buyer needs them apart — the SPA cycle (SEP-04) makes them one unit anyway; two SKUs adds SEP-07. — operator 2026-09-30
 
 **D3 — UI shape.** Same SPA with a restricted nav profile + URL contract, **or** a micro-frontend (federation)?
 *Recommendation:* same SPA; revisit federation only if LA must embed in a host we do not build.
 *Operator direction 2026-09-27 (confirm below):* a **UI module** — an Angular library consumed by two shells
 (Inspecto SPA, LA App), still no federation (§7.5).
-**Answer:**
+**Answer:** same SPA; revisit federation only if LA must embed in a host we do not build. — operator 2026-09-30
 
 **D4 — Getting data in.** Pipeline templates only (file-drop Collector + import Pipeline in a Space Template),
 **or** a new upload / attach route that registers a Dataset?
 *Recommendation:* templates first (no new route, reuses the engine); upload as a follow-up if the buyer's
 analysts must self-serve.
-**Answer:**
+**Answer:** templates first (no new route, reuses the engine); upload as a follow-up if the buyer's analysts must self-serve. — operator 2026-09-30
 
 **D5 — Cases in standalone mode.** Local (ship `inspecto-ops` in the LA edition), remote (Cases live in
 Inspecto, via SEP-22), or both?
 *Recommendation:* both — local by default, remote when paired with an Inspecto installation.
-**Answer:**
+**Answer:** both — local by default, remote when paired with an Inspecto installation. — operator 2026-09-30
 
 **D6 — Timeline.** The customer's date. Does Phase 1 ship **before** Phase 0 completes (packaging over today's
 seams), or after?
 *Recommendation:* Phase 1 may ship over today's seams (they work in one JVM); Phase 0 must precede Phase 2.
-**Answer:**
+**Answer:** Phase 1 may ship over today's seams (they work in one JVM); Phase 0 must precede Phase 2. — operator 2026-09-30
 
 **D7 — Entity List home.** `assurance-capability-plan.md` D-P10 makes the assurance list and the LA Entity List
 **one kind**, but today its routes live in `inspecto-geo-link` (grounded 2026-09-27: no core or SPA code outside
 LA uses them yet). Move Entity Lists to core so assurance works without LA, or keep them LA-only?
 *Recommendation:* move to core before assurance WS-12 starts — cheaper now than after both sides depend on it.
-**Answer:**
+**Answer:** move to core before assurance WS-12 starts — cheaper now than after both sides depend on it. — operator 2026-09-30
 
 ---
 
@@ -458,72 +458,72 @@ This is **L–XL** on its own and depends on: versioned inputs (§7.4 index mani
 **D8 — Shared platform layer.** Extract `http-spi` / `auth-spi` / `audit-spi` as new modules, or widen existing
 light modules (`inspecto-api` holds one class today)?
 *Recommendation:* new, narrowly named modules — easier to police with a dependency guard.
-**Answer:**
+**Answer:** new, narrowly named modules — easier to police with a dependency guard. — operator 2026-09-30
 
 **D9 — Graph engine order.** DuckDB SQL + index first, DuckPGQ only after spike D-S2, external graph DB only
 after D-S3 measures a gap?
 *Recommendation:* yes, in that order.
-**Answer:**
+**Answer:** yes, in that order. — operator 2026-09-30
 
 **D10 — Partitioning scheme.** Hash bucket of the from-entity + mirrored to-entity copy (§7.4), or time-first
 partitions with entity bloom filters?
 *Recommendation:* decide from D-S1 on a realistic corpus; default to entity-hash.
-**Answer:**
+**Answer:** decide from D-S1 on a realistic corpus; default to entity-hash. — operator 2026-09-30
 
 **D11 — Index ownership.** The edge/node index is a second copy: incremental or rebuild; retention and legal hold
 inherited from the raw Dataset or LA's own?
 *Recommendation:* incremental append by partition; retention inherited, never longer than the raw data.
-**Answer:**
+**Answer:** incremental append by partition; retention inherited, never longer than the raw data. — operator 2026-09-30
 
 **D12 — Who owns sign-in in the LA product.** `la-app` with the moved OIDC authenticator, or an external IAM
 only (as Professional today)?
 *Recommendation:* external IAM through the moved OIDC authenticator; demo sign-in for demos only.
-**Answer:**
+**Answer:** external IAM through the moved OIDC authenticator; demo sign-in for demos only. — operator 2026-09-30
 
 **D13 — Vector index scope.** Only with fingerprinting / entity similarity, or earlier?
 *Recommendation:* only with the entity-context work (I4).
-**Answer:**
+**Answer:** only with the entity-context work (I4). — operator 2026-09-30
 
 **D14 — Product boundary of Geo.** Does the LA product always include Geo (they are one UI unit today)?
 *Recommendation:* yes — matches D2's one-SKU recommendation.
-**Answer:**
+**Answer:** yes — matches D2's one-SKU recommendation. — operator 2026-09-30
 
 **D15 — Order against the near term.** Does option A ship first (over today's seams), with D later, or does the
 customer wait for D?
 *Recommendation:* A first if the customer has a date; D-0 in parallel because it is no-regret.
-**Answer:**
+**Answer:** A first if the customer has a date; D-0 in parallel because it is no-regret. — operator 2026-09-30
 
 **D16 — Name of the per-analyst working copy.** "Sandbox" collides with the SQL sandbox. Candidates:
 *Analysis Workspace* · *Draft* · *Branch*. ⛔ Not *Workbench* — GLOSSARY already gives it to the Builder
 authoring surface.
 *Recommendation:* pick one and enter it in GLOSSARY §13 before any code; *Draft* reads naturally with
 *promote*.
-**Answer:**
+**Answer:** pick one and enter it in GLOSSARY §13 before any code; *Draft* reads naturally with *promote*. — operator 2026-09-30
 
 **D17 — Granularity.** One private sandbox per analyst per Investigation, a shared team sandbox (edit lease), or
 both?
 *Recommendation:* private per analyst by default; team sandboxes later if asked for.
-**Answer:**
+**Answer:** private per analyst by default; team sandboxes later if asked for. — operator 2026-09-30
 
 **D18 — Promotion model.** Rebase-and-promote into the main log (conflicts reported), or publish as a fork only?
 Reviewer approval required?
 *Recommendation:* rebase-and-promote; approval optional per Investigation, required when it is marked sensitive.
-**Answer:**
+**Answer:** rebase-and-promote; approval optional per Investigation, required when it is marked sensitive. — operator 2026-09-30
 
 **D19 — Membership replaces owner-only (revisits signed D-E7).** Investigation members with roles
 (lead · analyst · reviewer); the Enterprise policy verdict still applies (a DENY hides it from members too).
 *Recommendation:* yes — parallel work is impossible under owner-only.
-**Answer:**
+**Answer:** yes — parallel work is impossible under owner-only. — operator 2026-09-30
 
 **D20 — What is evidence.** Dossier from the promoted Investigation only, or sandboxes too?
 *Recommendation:* promoted only; sandboxes are exploration.
-**Answer:**
+**Answer:** promoted only; sandboxes are exploration. — operator 2026-09-30
 
 **D21 — Concurrency target.** How many analysts and concurrent sandboxes per installation, over what data
 size? This sizes memory, the admission controller and spike D-S5.
 *Recommendation:* the operator states a target (for example 20 analysts, 50 sandboxes, 10⁹ edges); spike D-S5
 measures against it.
-**Answer:**
+**Answer:** 20 analysts, 50 concurrent Drafts, 10⁹ edges — operator 2026-09-30
 
 ### 7.10 Spikes (measure before building — D-2)
 
