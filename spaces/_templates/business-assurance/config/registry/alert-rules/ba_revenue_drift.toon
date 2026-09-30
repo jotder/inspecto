@@ -1,0 +1,8 @@
+name: ba_revenue_drift
+dataset: ba_revenue_forecast
+measure: max(drift_change)
+by[1]: ds
+comparator: gte
+threshold: 1
+severity: CRITICAL
+description: "Daily revenue is drifting away from its trend"

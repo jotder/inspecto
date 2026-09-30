@@ -17,6 +17,7 @@ import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.sql.SqlGuard;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -67,11 +68,6 @@ class BusinessAssurancePackGoldenTest {
         };
     }
 
-    private static AlertRule rule(String name) {
-        return AlertRule.fromMap(new ComponentStore(CFG.resolve("registry")).get("alert-rule", name)
-                .map(ComponentRegistry.Component::content).orElseThrow());
-    }
-
     private static List<Map<String, Object>> rows(String dataset, String sql) throws Exception {
         Map<String, Object> ds = new ComponentStore(CFG.resolve("registry")).get("dataset", dataset)
                 .map(ComponentRegistry.Component::content).orElseThrow();
@@ -82,35 +78,157 @@ class BusinessAssurancePackGoldenTest {
 
     private static double num(Object o) { return ((Number) o).doubleValue(); }
 
+    private static final List<String> RULES = List.of("ba_revenue_outside_band", "ba_revenue_regime_change",
+            "ba_revenue_drift", "ba_margin_erosion", "ba_margin_data_quality");
+
+    /** Every pack Alert Rule through the production sweep. */
+    private record Sweep(List<Alert> fired, List<FakeObjectAccess.Opened> incidents) {
+        long count(String rule) { return fired.stream().filter(a -> a.rule().equals(rule)).count(); }
+        String of(String rule) { return fired.stream().filter(a -> a.rule().equals(rule)).toList().toString(); }
+    }
+
+    private static Sweep sweep(Path cfg) {
+        ComponentStore store = new ComponentStore(cfg.resolve("registry"));
+        List<AlertRule> rules = RULES.stream().map(n -> AlertRule.fromMap(store.get("alert-rule", n)
+                .map(ComponentRegistry.Component::content).orElseThrow())).toList();
+        DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> cfg, () -> null);
+        FakeObjectAccess objects = new FakeObjectAccess();
+        AlertService svc = new AlertService(rules, noPipelines(), emptyStore(), objects);
+        svc.groupedMeasureProbe(r -> probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(),
+                r.threshold(), r.stormCap()));
+        svc.datasetLabel(probe::label);
+        List<Alert> fired = svc.evaluateRules();
+        return new Sweep(fired, objects.opened.stream().filter(o -> o.kind() == ObjectType.INCIDENT).toList());
+    }
+
+    /**
+     * A copy of the pack whose view {@code store} runs its OWN model SQL over the shipped corpus rewritten by
+     * {@code rewrite} (a SELECT over {@code __base}, the shipped corpus relation).
+     */
+    private static Path variant(Path dir, String store, String src, String rewrite) throws Exception {
+        try (var walk = Files.walk(CFG)) {
+            for (Path p : walk.toList()) {
+                Path t = dir.resolve(CFG.relativize(p).toString());
+                if (Files.isDirectory(p)) Files.createDirectories(t); else Files.copy(p, t);
+            }
+        }
+        ViewStore views = new ViewStore(dir.resolve("views"));
+        ViewDefinition v = views.get(store).orElseThrow();
+        String sep = ") SELECT * FROM (";
+        int cut = v.derivedSql().indexOf(sep);
+        String corpus = v.derivedSql().substring(("WITH " + src + " AS (").length(), cut);
+        String model = v.derivedSql().substring(cut + sep.length());
+        views.write(new ViewDefinition(store, v.pipeline(), v.sourceStores(),
+                "WITH __base AS (" + corpus + "), " + src + " AS (" + rewrite + ") SELECT * FROM (" + model,
+                v.definedAt()));
+        return dir;
+    }
+
+    private static List<Map<String, Object>> query(Path cfg, String dataset, String sql) throws Exception {
+        Map<String, Object> ds = new ComponentStore(cfg.resolve("registry")).get("dataset", dataset)
+                .map(ComponentRegistry.Component::content).orElseThrow();
+        return QueryExecutor.run(new QueryExecutor.Request(dataset,
+                DatasetRelation.relationSql(ds, null, new ViewStore(cfg.resolve("views"))), sql, 1000, 0,
+                List.of(), List.of())).rows();
+    }
+
+    /** Every flagged day of the forecast, as "t:flag". */
+    private static List<String> flags(Path cfg) throws Exception {
+        return query(cfg, "ba_revenue_forecast", "SELECT CAST(ds - DATE '2026-01-05' AS INTEGER) || ':'"
+                + " || CASE WHEN outside_band = 1 THEN 'band' WHEN regime_change = 1 THEN 'regime' ELSE 'drift' END AS f"
+                + " FROM \"ba_revenue_forecast\" WHERE outside_band + regime_change + drift_change > 0 ORDER BY ds")
+                .stream().map(r -> (String) r.get("f")).toList();
+    }
+
+    private static String revenue(String plus) {
+        return "SELECT ds, revenue + (" + plus + ") AS revenue FROM (SELECT *, CAST(ds - DATE '2026-01-05' AS INTEGER)"
+                + " AS t FROM __base) q";
+    }
+
     @Test
     void thePackRaisesExactlyThePlantedDetectionsAndNoFalsePositive() {
         assertTrue(Files.isDirectory(CFG), "the pack ships at " + CFG);
-        AlertRule band = rule("ba_revenue_outside_band");
-        AlertRule erosion = rule("ba_margin_erosion");
-        DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> CFG, () -> null);
-
-        var forecastBreaches = probe.breaches(band.dataset(), band.measure(), band.by(), band.comparator(),
-                band.threshold(), band.stormCap()).orElseThrow();
-        assertEquals(1, forecastBreaches.total(), "exactly the planted anomaly: " + forecastBreaches);
-        assertEquals("2026-06-04", String.valueOf(forecastBreaches.keys().get(0).key().get("ds")));
-
-        var erosionBreaches = probe.breaches(erosion.dataset(), erosion.measure(), erosion.by(), erosion.comparator(),
-                erosion.threshold(), erosion.stormCap()).orElseThrow();
-        assertEquals(1, erosionBreaches.total(), "exactly the planted erosion: " + erosionBreaches);
-        assertEquals(Map.of("product", "P3", "channel", "online", "partner", "PB"), erosionBreaches.keys().get(0).key());
-
-        // The same two rules through the production sweep: one Alert each, one Incident each (CRITICAL / WARNING).
-        FakeObjectAccess objects = new FakeObjectAccess();
-        AlertService svc = new AlertService(List.of(band, erosion), noPipelines(), emptyStore(), objects);
-        svc.groupedMeasureProbe(r -> probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(),
-                r.threshold(), r.stormCap()));
-        var fired = svc.evaluateRules();
-        assertEquals(2, fired.size(), "2 detections, 0 false positives: " + fired);
-        assertTrue(fired.toString().contains("partner=PB"), fired.toString());
+        Sweep s = sweep(CFG);
+        assertEquals(2, s.fired().size(), "2 detections, 0 false positives: " + s.fired());
+        assertEquals(1, s.count("ba_revenue_outside_band"));
+        assertTrue(s.of("ba_margin_erosion").contains("partner=PB"), s.of("ba_margin_erosion"));
         // Only the CRITICAL forecast breach opens an Incident; the WARNING erosion stays an Alert.
-        var incidents = objects.opened.stream().filter(o -> o.kind() == ObjectType.INCIDENT).toList();
-        assertEquals(1, incidents.size(), incidents.toString());
-        assertEquals("2026-06-04", incidents.get(0).attributes().get("key.ds"));
+        assertEquals(1, s.incidents().size(), s.incidents().toString());
+        assertEquals("2026-06-04", s.incidents().get(0).attributes().get("key.ds"));
+        assertTrue(s.incidents().get(0).title().contains("Daily revenue with its forecast and prediction band"),
+                "the forecast Alert names its Dataset by description, as the erosion one does: " + s.incidents());
+    }
+
+    /**
+     * A level shift is absorbed: K = 3 consecutive out-of-band days are a regime change, raised ONCE on the K-th
+     * day, after which the model re-bases level on the actual and the shift raises nothing more. The spike
+     * still fires.
+     */
+    @Test
+    void aLevelShiftIsOneRegimeChangeThenSilence(@TempDir Path dir) throws Exception {
+        for (String shift : List.of("300", "-150")) {
+            Path cfg = variant(dir.resolve("shift" + shift.replace('-', 'm')), "ba_revenue_forecast", "daily_revenue",
+                    revenue("CASE WHEN t >= 100 THEN " + shift + " ELSE 0 END"));
+            assertEquals(List.of("102:regime", "150:band"), flags(cfg),
+                    shift + ": one regime change on day 3 of the shift, then only the planted spike");
+            Sweep s = sweep(cfg);
+            assertEquals(1, s.count("ba_revenue_regime_change"), shift + ": " + s.fired());
+            assertEquals(1, s.count("ba_revenue_outside_band"), shift + ": " + s.fired());
+            assertEquals(3, s.fired().size(), shift + ": shift + spike + the unchanged planted erosion: " + s.fired());
+            assertEquals(2, s.incidents().size(), "one Incident for the shift, one for the spike: " + s.incidents());
+        }
+    }
+
+    /**
+     * A trend change is caught by a two-sided CUSUM over the in-band residuals (k = 0.25 sigma, h = 8 sigma) ONCE,
+     * after which the trend is re-based. Bound: within 21 days of the ramp starting at +/-8 a day (measured 19 and
+     * 13). Out-of-band days do not feed the CUSUM, so a spike or a level shift never trips it.
+     */
+    @Test
+    void aTrendRampIsOneDriftDetectionWithinTheBound(@TempDir Path dir) throws Exception {
+        for (String slope : List.of("8", "-8")) {
+            Path cfg = variant(dir.resolve("ramp" + slope.replace('-', 'm')), "ba_revenue_forecast", "daily_revenue",
+                    revenue("CASE WHEN t >= 100 THEN " + slope + " * (t - 100) ELSE 0 END"));
+            List<String> f = flags(cfg);
+            assertEquals(2, f.size(), slope + ": the drift and the planted spike, nothing else: " + f);
+            assertTrue(f.contains("150:band"), slope + ": " + f);
+            String drift = f.stream().filter(x -> x.endsWith(":drift")).findFirst().orElseThrow();
+            int t = Integer.parseInt(drift.substring(0, drift.indexOf(':')));
+            assertTrue(t > 100 && t <= 121, slope + ": detected on day " + t);
+            assertEquals(1, sweep(cfg).count("ba_revenue_drift"));
+        }
+    }
+
+    /**
+     * Bad input is never read as a margin: a negative revenue line and a null cost line raise a data-quality Alert
+     * and suppress erosion; a group with no baseline is "new"; a 2-line group is "insufficient" (min 10 lines and
+     * 1000 revenue per window). None of them fires erosion; the planted erosion still fires, once.
+     */
+    @Test
+    void badMarginInputIsFlaggedNotMisRead(@TempDir Path dir) throws Exception {
+        Path cfg = variant(dir, "ba_margin_erosion", "margin_lines", ("SELECT ds, product, channel, partner, units,"
+                + " CASE WHEN product = 'P1' AND channel = 'retail' AND partner = 'PA' AND ds = DATE '2026-03-01'"
+                + " THEN -revenue ELSE revenue END AS revenue,"
+                + " CASE WHEN product = 'P2' AND channel = 'online' AND partner = 'PB' AND ds = DATE '2026-03-01'"
+                + " THEN NULL ELSE cost END AS cost, margin FROM __base"
+                + " UNION ALL SELECT ds, 'P5', channel, partner, units, revenue, cost, margin FROM __base"
+                + " WHERE product = 'P1' AND channel = 'online' AND partner = 'PA' AND ds >= DATE '2026-02-02'"
+                + " UNION ALL SELECT * FROM (VALUES (DATE '2026-01-20', 'P6', 'retail', 'PB', 10, 1000.0, 500.0, 500.0),"
+                + " (DATE '2026-02-20', 'P6', 'retail', 'PB', 10, 1000.0, 900.0, 100.0)) v"));
+        Map<String, String> status = new java.util.HashMap<>();
+        for (Map<String, Object> r : query(cfg, "ba_margin_erosion",
+                "SELECT product || '/' || channel || '/' || partner AS k, status FROM \"ba_margin_erosion\""))
+            status.put((String) r.get("k"), (String) r.get("status"));
+        assertEquals("data_quality", status.get("P1/retail/PA"), "negative revenue");
+        assertEquals("data_quality", status.get("P2/online/PB"), "null cost");
+        assertEquals("new", status.get("P5/online/PA"), "no baseline");
+        assertEquals("insufficient", status.get("P6/retail/PB"), "2 lines");
+        assertEquals("assessed", status.get("P3/online/PB"));
+
+        Sweep s = sweep(cfg);
+        assertEquals(1, s.count("ba_margin_erosion"), s.fired().toString());
+        assertTrue(s.of("ba_margin_erosion").contains("partner=PB"), s.of("ba_margin_erosion"));
+        assertEquals(2, s.count("ba_margin_data_quality"), s.fired().toString());
     }
 
     @Test

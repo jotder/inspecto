@@ -1,0 +1,8 @@
+name: ba_revenue_regime_change
+dataset: ba_revenue_forecast
+measure: max(regime_change)
+by[1]: ds
+comparator: gte
+threshold: 1
+severity: CRITICAL
+description: "Daily revenue shifted to a new level"

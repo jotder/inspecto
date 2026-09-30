@@ -2,4 +2,4 @@ name: Business assurance
 tagline: "Seasonal revenue forecast with a prediction band, and margin erosion by product, channel and partner"
 description: "A business assurance pack over a deterministic synthetic corpus (26 weeks of daily revenue; 8 weeks of sales lines across 4 products, 3 channels and 3 partners). A Holt-Winters additive forecast in DuckDB SQL raises an Alert per day that falls outside its band; a margin model raises an Alert per product, channel and partner whose margin eroded past the threshold. Two sql.template Jobs (disabled) run the same SQL over your own daily_revenue and margin_lines stores."
 icon: heroicons_outline:presentation-chart-line
-contents[5]: "Forecast Dataset + band", "Margin Datasets", "Alert Rules (2)", "KPI definitions (3)", "Dashboard"
+contents[5]: "Forecast Dataset + band", "Margin Datasets", "Alert Rules (5)", "KPI definitions (3)", "Dashboard"

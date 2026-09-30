@@ -219,18 +219,37 @@ ships: `ba_revenue_forecast` — a **Holt-Winters additive** forecast (season 7,
 a `WITH RECURSIVE` whose state row carries the seven seasonal terms as a DuckDB `LIST` (`list_transform` with an
 index lambda replaces one slot per step), with `lower_band` / `upper_band` = forecast ± 4σ̂, where σ̂ is a
 MAD estimate over week-on-week differences (independent of the recursion, so an anomaly cannot widen its own
-band); a point outside the band updates the state with the forecast instead of the actual, so one anomaly does
-not drag the next season; `outside_band` is 0 through a 28-day warm-up. `ba_margin_lines` / `ba_margin_erosion`
+band). A point outside the band updates the state with the forecast instead of the actual (clipping), so one
+spike does not drag the next season. ⚠ **Clipping alone can never re-base**: in the first build a +300 level
+shift flagged every one of the 82 following days and a +8/day trend ramp flagged none (verification FAIL,
+2026-09-30). So the recursion also carries (1) a **regime rule** — `regime_k` (3) consecutive out-of-band days
+are a regime change: the K-th day sets `regime_change = 1`, the level re-bases on the actual and the run's
+earlier days are NOT reported as `outside_band` (only a run shorter than K is a spike); (2) a two-sided
+**CUSUM drift detector** over the in-band residuals in σ̂ units (`cusum_k` 0.25, `cusum_h` 8): crossing `h` sets
+`drift_change = 1`, re-bases the level and adds a slope estimate from the CUSUM run to the trend; out-of-band
+days do not feed it, so a spike or a shift never trips it. Consequence for a live tail: a run that is still
+shorter than K reads as `outside_band` and becomes a regime change (its spike Alerts heal) if it reaches K, so
+a real shift can raise up to K − 1 spike Alerts before its one regime Incident. The anchor row must type the
+CUSUM state `DOUBLE` — a `0.0` literal is `DECIMAL(2,1)` and the recursion fails once the sum passes 9.9. All
+constants live in the SQL's `p` CTE (view and Job alike); `outside_band`, `regime_change` and `drift_change` are
+0 through a 28-day warm-up. The margin model assesses erosion only for a group with `status = assessed`: a
+group with a null or negative revenue / cost line in the windows is `data_quality` (flag `data_quality_issue`,
+its own Alert Rule) instead of reading as a margin change; no baseline lines is `new`; fewer than `min_lines`
+(10) lines or `min_revenue` (1000) in either window is `insufficient`; `erosion_pp` is NULL for all three. `ba_margin_lines` / `ba_margin_erosion`
 — revenue − cost by product / channel / partner, margin %, and `erosion_pp` = baseline (prior 28 days) margin %
-minus recent (last 28 days) margin %. Two per-entity Alert Rules (`ba_revenue_outside_band`: `max(outside_band)`
-`by [ds]` `gte 1`, CRITICAL; `ba_margin_erosion`: `max(erosion_pp)` `by [product, channel, partner]` `gt 5`,
-WARNING), three KPI definitions, one dashboard, and two **disabled** `sql.template` Jobs that run the SAME model
+minus recent (last 28 days) margin %. Five per-entity Alert Rules (`ba_revenue_outside_band`,
+`ba_revenue_regime_change`, `ba_revenue_drift`: `max(<flag>)` `by [ds]` `gte 1`, CRITICAL; `ba_margin_erosion`:
+`max(erosion_pp)` `by [product, channel, partner]` `gt 5`, WARNING; `ba_margin_data_quality`, WARNING), three KPI
+definitions, one dashboard, and two **disabled** `sql.template` Jobs that run the SAME model
 SQL over the user's own `daily_revenue` / `margin_lines` stores (`BusinessAssurancePackGoldenTest` pins each view
 to contain its Job's SQL verbatim, and the Job's SQL to pass `SqlGuard`). ⚠ An Alert Rule `threshold` must be
 positive, so a 0/1 flag is armed as `gte 1`, not `gt 0`. ⚠ A WARNING rule raises an Alert but no Incident.
 Golden result: 2 detections (the planted −400 day, 2026-06-04; the planted +15 % cost line, P3/online/PB), 0
 false positives against 4 planted look-alikes; forecast RMSE 10.3 against the noise-free signal (σ = 20),
-MAPE 1.7 %. Runbooks: `spaces/_templates/business-assurance/RUNBOOK.md`.
+MAPE 1.7 %. Variant corpora (the test rewrites the corpus under the view's own model SQL): a ±level shift from
+day 100 → exactly 1 regime change (day 102), then silence; a ±8/day ramp → exactly 1 drift detection within 21
+days (measured 19 / 13); bad margin input → 2 data-quality Alerts, `new` and `insufficient` groups silent. The
+forecast Dataset's description is kept under 60 characters so Alert text names it (`DatasetMeasureProbe.label`). Runbooks: `spaces/_templates/business-assurance/RUNBOOK.md`.
 
 **Product gaps the pack recorded** (open on the BACKLOG row): the forecast is NOT a Measure function — the
 Measure shorthand is `count | agg(field)`, so a forecast inside a KPI or Alert Rule would need an engine change;

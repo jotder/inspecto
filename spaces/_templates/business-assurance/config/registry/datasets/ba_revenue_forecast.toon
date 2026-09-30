@@ -1,2 +1,2 @@
 view: ba_revenue_forecast
-description: "Daily revenue with its Holt-Winters forecast and prediction band"
+description: "Daily revenue with its forecast and prediction band"
