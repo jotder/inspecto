@@ -85,6 +85,13 @@ class ConfigSafetyValidatorTest {
         assertTrue(refuses(ConfigSafetyValidator.check("enrichment",
                 enrichment("data/in", "data/out", "dim.csv"), p, configDir), "references.dim.path"),
                 "a reference file at the Space root allowlists the root");
+        // PathJail.canonical spellings: a trailing dot (Windows drops it) and case variants.
+        for (String v : List.of(s.toString().replace('\\', '/') + "/config.", "config./x", "CONFIG", "Config/orders"))
+            assertTrue(refuses(ConfigSafetyValidator.check("enrichment", enrichment("data/in", v, null), p, configDir),
+                    "output.database"), v);
+        assertTrue(refuses(ConfigSafetyValidator.check("enrichment",
+                enrichment("data/in", "data/out", "Config.Secrets/.pending-changes.key"), p, configDir),
+                "references.dim.path"), "Config.Secrets");
         assertTrue(ConfigSafetyValidator.check("enrichment", enrichment("data/in", "data/out", "data/ref/dim.csv"),
                 p, configDir).stream().noneMatch(x -> x.severity() == Severity.ERROR), "an ordinary enrichment still passes");
     }

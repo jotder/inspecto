@@ -135,6 +135,33 @@ class EnrichmentTransformSandboxTest {
                 .getMessage().contains("Space root"), "the root output is refused by the filter");
     }
 
+    /** The same refusal for the spellings PathJail.canonical folds: a trailing dot and case variants. */
+    @Test
+    void canonicalSpellingsOfConfigAndSecretsAreRefusedAtTheSeal(@TempDir Path dir) throws Exception {
+        Path space = Files.createDirectories(dir.resolve("space"));
+        Files.createDirectories(space.resolve("config"));
+        Path secrets = Files.createDirectories(space.resolve("config.secrets"));
+        Files.writeString(secrets.resolve(".pending-changes.key"), "day,k\n2020,HMAC-KEY-BYTES\n");
+        Path in = Files.createDirectories(space.resolve("data")).resolve("in");
+        seedInput(in);
+        List<EnrichmentConfig> bad = new java.util.ArrayList<>();
+        for (String out : List.of(fwd(space) + "/config.", fwd(space) + "/config./x", fwd(space) + "/CONFIG"))
+            bad.add(new EnrichmentConfig("LEAK", new EnrichmentConfig.Input(fwd(in), "PARQUET", List.of("day")),
+                    List.of(), new EnrichmentConfig.Output(out, "PARQUET", "snappy", List.of("day")),
+                    "SELECT day, id FROM input"));
+        bad.add(new EnrichmentConfig("LEAK", new EnrichmentConfig.Input(fwd(in), "PARQUET", List.of("day")),
+                List.of(new EnrichmentConfig.Reference("k", fwd(space) + "/Config.Secrets/.pending-changes.key", "CSV")),
+                new EnrichmentConfig.Output(fwd(space.resolve("data").resolve("out")), "PARQUET", "snappy", List.of("day")),
+                "SELECT day, k FROM k"));
+        for (EnrichmentConfig c : bad) {
+            Exception run = assertThrows(Exception.class, () -> EnrichmentEngine.runResult(c, null, List.of()));
+            assertTrue(run.getMessage().contains("its sealed connection would be allowed to read")
+                    && !run.getMessage().contains("HMAC-KEY-BYTES"), c.output().database() + ": " + run.getMessage());
+            Exception prev = assertThrows(Exception.class, () -> EnrichmentEngine.preview(c, SAMPLE, List.of(), 10));
+            assertTrue(prev.getMessage().contains("its sealed connection would be allowed to read"), prev.getMessage());
+        }
+    }
+
     /** Every shipped Space enrichment config's transform clears the guard (the only one: the demo Space's). */
     @Test
     void shippedSpaceEnrichmentTransformsPassTheGuard() throws Exception {

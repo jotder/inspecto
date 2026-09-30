@@ -221,8 +221,14 @@ class ControlApiImportCapabilityGateTest {
     @Test
     void aRawImportEnrichmentWhoseDataHomeIsTheSpaceRootOrSecretsIsRefused(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
+            String spaceRoot = c.config.getParent().toString().replace('\\', '/');
             String[][] bad = {
                     {"output.database", "input:\n  database: data/in\noutput:\n  database: .\n"},
+                    {"output.database", "input:\n  database: data/in\noutput:\n  database: \"" + spaceRoot + "/config.\"\n"},
+                    {"output.database", "input:\n  database: data/in\noutput:\n  database: config./x\n"},
+                    {"output.database", "input:\n  database: data/in\noutput:\n  database: CONFIG\n"},
+                    {"references.dim.path", "input:\n  database: data/in\noutput:\n  database: data/out\n"
+                            + "references:\n  dim:\n    path: Config.Secrets/.pending-changes.key\n"},
                     {"references.dim.path", "input:\n  database: data/in\noutput:\n  database: data/out\n"
                             + "references:\n  dim:\n    path: config.secrets/.pending-changes.key\n"}};
             for (String[] b : bad) {
