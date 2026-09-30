@@ -428,10 +428,12 @@ public final class SpaceManager implements AutoCloseable {
     /**
      * The edition features a template's {@code config/} uses that THIS build lacks — the same refusals the seed
      * gate answers with a 422 on {@code POST /spaces}, so the gallery can say so before the operator names a
-     * Space: a registry Alert Rule, a legacy {@code *_alert.toon} or a Decision Rule {@code create-alert}
-     * consequence ({@code alert.dispatch}), and a pipeline's archive / DuckLake use
-     * ({@link com.gamma.etl.EditionFeatures#pipelineRefusals(Map)}). One entry per feature,
-     * {@code {feature, message}}; empty when this build can create the template.
+     * Space: a registry Alert Rule or a Decision Rule {@code create-alert} consequence ({@code alert.dispatch}),
+     * and a pipeline's archive / DuckLake use ({@link com.gamma.etl.EditionFeatures#pipelineRefusals(Map)}, which
+     * the pipeline loader refuses on this build). One entry per feature, {@code {feature, message}}; empty when
+     * this build can create the template. ⚠ No legacy per-file alert config is read here: nothing loads one at
+     * runtime (only registry {@code alert-rules/} are armed) and the seed gate does not refuse one, so counting it
+     * would mark a creatable template uncreatable.
      */
     static List<Map<String, String>> missingFeatures(Path config) throws IOException {
         java.util.TreeMap<String, String> missing = new java.util.TreeMap<>();
@@ -442,7 +444,7 @@ public final class SpaceManager implements AutoCloseable {
                 String name = p.getFileName().toString();
                 String parent = p.getParent().getFileName().toString();
                 if (!com.gamma.etl.EditionFeatures.present(alert)
-                        && ("alert-rules".equals(parent) || name.endsWith("_alert.toon")
+                        && ("alert-rules".equals(parent)
                             || ("decision-rules".equals(parent) && Files.readString(p).contains("create-alert"))))
                     missing.putIfAbsent(alert, com.gamma.etl.EditionFeatures.refusal(alert));
                 if (name.endsWith("_pipeline.toon")) {

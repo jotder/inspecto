@@ -29,8 +29,9 @@ real-backend-only by design** (blob/zip round-trips). *(The mock backend this se
 deleted 2026-08-31; the template gallery renders whatever the server publishes.)* **Edition fit (2026-09-30):**
 each gallery entry carries `creatable` and `missingFeatures[{feature, message}]`. These come from
 `SpaceManager.missingFeatures`, which covers two cases:
-- **Alert Rules:** a registry Alert Rule, a legacy `*_alert.toon`, or a Decision Rule's `create-alert` all need
-  `alert.dispatch`.
+- **Alert Rules:** a registry Alert Rule or a Decision Rule's `create-alert` needs `alert.dispatch`. A legacy
+  per-file alert config is deliberately not counted: nothing loads one at runtime and the seed gate does not refuse
+  one.
 - **Pipeline features:** a Pipeline's archive or DuckLake use, through `EditionFeatures.pipelineRefusals`.
 
 A template this build cannot create renders as an **`aria-disabled`** card that names the missing feature,
