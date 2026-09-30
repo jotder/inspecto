@@ -1641,7 +1641,7 @@ if ($DemoAuth) {
     }
     $demoJars = @('inspecto.jar', 'inspecto-demo-auth.jar', 'inspecto-policy.jar', 'inspecto-connectors.jar', 'inspecto-notify-channels.jar',
                   'inspecto-backup.jar', 'inspecto-geo-link.jar', 'inspecto-exchange.jar', 'inspecto-metrics.jar', 'inspecto-events.jar',
-                  'inspecto-ops.jar', 'inspecto-agent.jar', 'postgresql.jar') | Where-Object { Test-Path (Join-Path $bundleDir $_) }
+                  'inspecto-ops.jar', 'inspecto-agent.jar', 'inspecto-intelligence.jar', 'postgresql.jar') | Where-Object { Test-Path (Join-Path $bundleDir $_) }
     $demoFlags = '--enable-native-access=ALL-UNNAMED -Dcontrol.bind=127.0.0.1 -Dauth.mode=demo -Dobjects.backend=db -Devents.backend=parquet -Djobs.backend=duckdb'
     $serveDemoBat = @"
 @echo off
@@ -1657,6 +1657,11 @@ if exist ui set "OPTS=%OPTS% -Dui.dir=./ui"
 if exist "duckdb-extensions\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=duckdb-extensions\windows_amd64"
 set "JAVA=java"
 if exist runtime\bin\java.exe set "JAVA=runtime\bin\java.exe"
+rem ASSURE-INTELLIGENCE-BUNDLE-1: the same owner-only, offline native dirs as serve.bat.
+if exist inspecto-intelligence.jar if not exist runtime-natives\tmp mkdir runtime-natives\tmp
+if exist inspecto-intelligence.jar if not exist runtime-natives\djl mkdir runtime-natives\djl
+if exist inspecto-intelligence.jar for /f "delims=" %%U in ('whoami') do icacls runtime-natives /inheritance:r /grant:r "%%U:(OI)(CI)F" >nul
+if exist inspecto-intelligence.jar set "OPTS=%OPTS% -Dai.djl.offline=true -Djava.io.tmpdir=%CD%\runtime-natives\tmp -Djna.tmpdir=%CD%\runtime-natives\tmp -DDJL_CACHE_DIR=%CD%\runtime-natives\djl -DENGINE_CACHE_DIR=%CD%\runtime-natives\djl"
 echo [serve-demo] DEMO BUILD on http://127.0.0.1:%PORT%  (spaces: .\%SPACES_ROOT%)
 "%JAVA%" %OPTS% -cp "$($demoJars -join ';')" com.gamma.control.ControlApi
 "@
@@ -1675,6 +1680,12 @@ OPTS="$demoFlags -Dcontrol.port=`${PORT} -Dspaces.root=`${SPACES_ROOT}"
 [ -d duckdb-extensions/linux_amd64 ] && OPTS="`${OPTS} -Dduckdb.extension.dir=duckdb-extensions/linux_amd64"
 JAVA=java
 [ -x runtime/bin/java ] && JAVA=runtime/bin/java
+# ASSURE-INTELLIGENCE-BUNDLE-1: the same owner-only (0700), offline native dirs as serve.sh.
+if [ -f inspecto-intelligence.jar ]; then
+    NATIVES="`$(pwd)/runtime-natives"
+    ( umask 077; mkdir -p "`${NATIVES}/tmp" "`${NATIVES}/djl" ) && chmod 700 "`${NATIVES}"
+    OPTS="`${OPTS} -Dai.djl.offline=true -Djava.io.tmpdir=`${NATIVES}/tmp -Djna.tmpdir=`${NATIVES}/tmp -DDJL_CACHE_DIR=`${NATIVES}/djl -DENGINE_CACHE_DIR=`${NATIVES}/djl"
+fi
 echo "[serve-demo] DEMO BUILD on http://127.0.0.1:`${PORT}  (spaces: ./`${SPACES_ROOT})"
 exec "`$JAVA" `$OPTS -cp "$($demoJars -join ':')" com.gamma.control.ControlApi
 "@

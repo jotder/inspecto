@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { environment } from '../../../environments/environment';
-import { SessionService } from './session.service';
+import { RESUMABLE_KEY, SessionService } from './session.service';
 
 const base = environment.apiBaseUrl + '/v1'; // W7: apiUrl() builds /api/v1 paths
 const tick = () => new Promise((r) => setTimeout(r, 0));
@@ -15,6 +15,7 @@ describe('SessionService (W6d edition switch)', () => {
 
     beforeEach(() => {
         sessionStorage.clear();
+        localStorage.setItem(RESUMABLE_KEY, '1'); // a browser that signed in before (the resume cases)
         TestBed.configureTestingModule({
             providers: [
                 SessionService,
@@ -42,6 +43,24 @@ describe('SessionService (W6d edition switch)', () => {
         expect(svc.authMode()).toBe('none');
         expect(svc.loginRequired()).toBe(false);
         httpMock.expectNone(`${base}/auth/refresh`); // never attempts a session under Personal
+    });
+
+    it('a browser with no resumable session ⇒ no /auth/refresh on load (no expected-401 console error)', async () => {
+        localStorage.removeItem(RESUMABLE_KEY);
+        const done = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({ features: { authMode: 'demo' } });
+        await done;
+        expect(svc.loginRequired()).toBe(true);
+        httpMock.expectNone(`${base}/auth/refresh`);
+    });
+
+    it('a refresh marks the browser resumable; losing the session clears the mark', async () => {
+        localStorage.removeItem(RESUMABLE_KEY);
+        svc.refresh().subscribe();
+        httpMock.expectOne(`${base}/auth/refresh`).flush({ accessToken: 't' });
+        expect(localStorage.getItem(RESUMABLE_KEY)).toBe('1');
+        svc.onAuthLost();
+        expect(localStorage.getItem(RESUMABLE_KEY)).toBeNull();
     });
 
     it('stores the actor only for an authenticated subject, and drops it when the session is lost', async () => {

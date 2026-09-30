@@ -135,4 +135,30 @@ class ObjectsBackendEditionBootTest {
                 "-Dauth.mode=demo", "-Dobjects.backend=db", "-Devents.backend=parquet", "-Djobs.backend=duckdb"})
             assertTrue(line.contains(flag), "serve-demo.* must pass " + flag + ": " + line);
     }
+
+    /**
+     * {@code serve-demo.*} carries its own hand-kept jar list. It must name every optional jar the
+     * regular boot-smoke classpath ({@code $cp}, the Enterprise set) names, bar the security jar the demo
+     * build removes: {@code inspecto-intelligence.jar} was missing, so the bundle shipped the jar and every
+     * {@code /agent/*} call answered 503 (the 2026-09-30 live check's console 503 on Home).
+     */
+    @Test
+    void demoLauncherJars_coverTheEnterpriseClasspath() throws Exception {
+        String ps1 = Files.readString(Path.of("..", "inspecto", "package.ps1"));
+        String cp = ps1.lines().filter(l -> l.trim().startsWith("$cp = @('inspecto.jar')"))
+                .findFirst().orElseThrow(() -> new AssertionError("no boot-smoke $cp in package.ps1"));
+        int start = ps1.indexOf("$demoJars = @(");
+        assertTrue(start >= 0, "no $demoJars in package.ps1");
+        String demo = ps1.substring(start, ps1.indexOf("Where-Object", start));
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("'([a-z-]+\\.jar)'").matcher(cp);
+        int seen = 0;
+        while (m.find()) {
+            String jar = m.group(1);
+            if (jar.equals("inspecto-security.jar") || jar.equals("inspecto.jar")) continue;
+            seen++;
+            assertTrue(demo.contains("'" + jar + "'"),
+                    "serve-demo.* must put " + jar + " on its classpath");
+        }
+        assertTrue(seen >= 10, "parsed too few jars from $cp: " + cp);
+    }
 }

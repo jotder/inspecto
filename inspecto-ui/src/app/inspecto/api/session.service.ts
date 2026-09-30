@@ -66,6 +66,12 @@ interface Bootstrap {
 
 const VERIFIER_KEY = 'inspecto.pkce.verifier';
 const STATE_KEY = 'inspecto.pkce.state';
+/**
+ * Set while this browser holds a session the refresh cookie can resume. The cookie is httpOnly, so the
+ * SPA cannot see it; without this hint every first load of a signed-out browser POSTed /auth/refresh
+ * and the browser logged its expected 401 as a console error (2026-09-30 live check). Holds no secret.
+ */
+export const RESUMABLE_KEY = 'inspecto.session.resumable';
 
 /**
  * The edition-aware session gate (W6d). It reads `GET /bootstrap` once at startup to learn the
@@ -236,6 +242,7 @@ export class SessionService {
         this.demoUsers.set(boot.auth?.demoUsers ?? []);
         // A returning user still holds the httpOnly refresh cookie — mint an access token from it. A 401
         // just means "not signed in yet"; the guard will route to sign-in.
+        if (!readResumable()) return; // never signed in here, or signed out: nothing to resume, no 401
         const token = await firstValueFrom(this.refresh().pipe(catchError(() => of(null))));
         // The bootstrap read above carried no bearer, so its session slice is the anonymous subject's.
         // Re-read with the fresh token so `capabilities` holds the subject's *effective* grants (R2)
@@ -296,6 +303,7 @@ export class SessionService {
                     // re-fetch below would bounce the user back to sign-in mid-redirect.
                     this.accessToken.set(r.accessToken);
                     this.authenticated.set(true);
+                    writeResumable(true);
                 }),
                 map(() => true),
                 // Enrich capabilities from the Subject the backend resolves off the new bearer (non-blocking).
@@ -313,6 +321,7 @@ export class SessionService {
             tap((t) => {
                 this.accessToken.set(t);
                 this.authenticated.set(true);
+                writeResumable(true);
             }),
         );
     }
@@ -358,6 +367,7 @@ export class SessionService {
      * activation, so nothing else could catch it.
      */
     onAuthLost(): void {
+        writeResumable(false);
         this.accessToken.set(null);
         this.authenticated.set(false);
         this.actor.set(null);
@@ -385,5 +395,22 @@ export class SessionService {
         this.actor.set(authenticated ? (boot.session?.actor ?? null) : null);
         this.subjectDisplayName.set(authenticated ? (boot.session?.displayName ?? null) : null);
         this.capabilities.set(boot.session?.capabilities ?? []);
+    }
+}
+
+function readResumable(): boolean {
+    try {
+        return localStorage.getItem(RESUMABLE_KEY) === '1';
+    } catch {
+        return true; // storage blocked: try the cookie, as before
+    }
+}
+
+function writeResumable(on: boolean): void {
+    try {
+        if (on) localStorage.setItem(RESUMABLE_KEY, '1');
+        else localStorage.removeItem(RESUMABLE_KEY);
+    } catch {
+        /* storage blocked: the hint is best-effort */
     }
 }

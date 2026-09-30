@@ -1168,7 +1168,13 @@ Alert Rule; LA-24 member read-only / writes 404 / stranger 404 / access ends on 
   `skipped.empty`, so `rowsRead` accounts for every row (`ControlApiEntityIdentityImportTest`); `GET …/case` says
   `sharing:false` with the reason once the Case is closed or gone (`ControlApiInvestigationCaseShareTest`); the alert
   text reads "over the whole Dataset, window: last 24h, UTC" (`Alert.java`).
-* Open: no `GET /inv/investigations` list route (405); one unexplained 401 + 503 in the SPA console.
+* Open: no `GET /inv/investigations` list route (405).
+* ✅ **FIXED 2026-09-30 — the 401 + 503 in the SPA console.** The 401 was the first-load `POST /auth/refresh` of a
+  signed-out browser (expected "no session", but the browser logs every non-2xx): `SessionService` now resumes only
+  when a `localStorage` hint says this browser signed in (set on exchange/refresh, cleared on session loss). The 503
+  was Home's `GET /agent/approvals`: `serve-demo.*` left `inspecto-intelligence.jar` off its classpath though the
+  bundle ships it; the demo launchers now carry it plus serve.*'s native-dir flags. Pinned by `session.service.spec.ts`
+  and `ObjectsBackendEditionBootTest.demoLauncherJars_coverTheEnterpriseClasspath` (both red before the fix).
 
 ## 6. Acceptance gates — falsifiable, house style
 

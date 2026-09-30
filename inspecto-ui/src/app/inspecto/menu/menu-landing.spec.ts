@@ -6,6 +6,7 @@ import { Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { SessionService } from 'app/inspecto/api';
 import { authInterceptor } from 'app/inspecto/api/auth.interceptor';
+import { RESUMABLE_KEY } from 'app/inspecto/api/session.service';
 import { environment } from '../../../environments/environment';
 import { NavMenusService } from './menu-api';
 import { landingGuard } from './menu-landing';
@@ -112,6 +113,7 @@ describe('landingGuard after a Demo User sign-in (real SessionService, real Menu
     /** Boot a signed-out demo session, sign in as ra.analyst and start the guard exactly where the callback does. */
     async function signInAndLand(): Promise<{ http: HttpTestingController; landing: () => Promise<string> }> {
         sessionStorage.clear();
+        localStorage.removeItem(RESUMABLE_KEY);
         TestBed.configureTestingModule({
             providers: [
                 provideHttpClient(withXhr(), withInterceptors([authInterceptor])),
@@ -130,9 +132,8 @@ describe('landingGuard after a Demo User sign-in (real SessionService, real Menu
                 demoUsers: [{ id: 'ra.analyst', displayName: 'Demo RA Analyst', title: 'RA', landing: 'recon' }],
             },
         });
-        await tick();
-        http.expectOne(`${base}/auth/refresh`).flush({ error: 'no session' }, { status: 401, statusText: 'x' });
-        await init;
+        await init; // a signed-out browser (no resumable mark) sends no /auth/refresh
+        http.expectNone(`${base}/auth/refresh`);
         expect(session.loginRequired()).toBe(true);
 
         sessionStorage.setItem('inspecto.pkce.state', 's1');
