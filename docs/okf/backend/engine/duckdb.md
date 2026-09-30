@@ -238,6 +238,33 @@ autoloaded httpfs (SSRF — verified: the unsealed connection dialled the addres
   a custom mapping with `regexp` + `error()` + a lambda still lands. All four refusal cases go red with the
   seal removed.
 
+### Enrichment connections are guarded and sealed too (`SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1`, 2026-09-30)
+
+An Enrichment's `transform` is spliced into `CREATE TABLE __enriched AS …`, so until 2026-09-30 a
+`;`-chained `COPY … TO`, `ATTACH`, `LOAD`/`INSTALL`, or a `read_text` / replacement-scan read ran verbatim
+on a DuckDB-defaults connection. **Reproduced before the fix:** the capability-free
+`POST /enrichment/preview` returned a host file's content with a 200, and all five attack shapes ran on
+both the run and the preview path. Authoring an Enrichment needs `canAuthorWorkbench`
+(`POST /enrichment`, and `POST /bundle/import` carries the `enrichment` kind); the preview needs nothing.
+
+- **Two layers, both in `EnrichmentEngine`, on both `runResult` and `preview`.** `guardedTransform`
+  refuses any `SqlGuard` finding (one read-only `SELECT`/`WITH`, no file/extension functions, no path in a
+  relation position) with `IllegalArgumentException("… transform refused: …")` before any view exists —
+  the preview route maps it to 422. Then `SqlSandbox.sealAllowing(conn, allowedDirs(...))`, before the
+  reference and `input` views are created, so the views' own reads prove the allowlist.
+- **The allowlist** (`allowedDirs`): the scratch DB's directory, the global
+  `-Dprocessing.duckdb.temp_directory` when set, `input.database`, `output.database` (routed destinations
+  live under it) and its `_quarantine` sibling, each `path:` reference's directory, and each by-name
+  reference's producing Pipeline's `dirs.database`.
+- ⚠ **The scratch DB gets its own fresh directory per call.** A DB made straight in `java.io.tmpdir`
+  allows the WHOLE tmpdir — found by the seal test, which read a file from a `@TempDir` sibling until the
+  scratch moved into `Files.createTempDirectory`. (The ingest seal allows its temp DB's directory the same
+  way; there it is the Pipeline's own temp dir, not the system tmpdir, unless none is configured.)
+- **Pinned by** `EnrichmentTransformSandboxTest` (engine: the five attacks on both paths, a legitimate
+  transform, the allowlist, and the seal refusing a file outside it) and
+  `ControlApiEnrichmentPreviewTest.aTransformThatReadsAHostFileIsRefused` (real HTTP: red with both
+  layers removed — 200 with the file's content).
+
 ## The source time zone for temporal data
 
 **SHIPPED 2026-08-29** (engine + config `44ecef76`, surfaces `dd02d377`). Plan + the full live-probe

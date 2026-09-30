@@ -106,4 +106,22 @@ class ControlApiEnrichmentPreviewTest {
             assertTrue(message.startsWith("enrichment preview failed on the sample: Binder Error: "), message);
         }
     }
+
+    /**
+     * SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1 — this route carries no capability, and before the fix a draft
+     * transform {@code read_text('<host file>')} returned the file's content in {@code rows}. It is refused
+     * (422) and the content never reaches the body.
+     */
+    @Test
+    void aTransformThatReadsAHostFileIsRefused(@TempDir Path dir) throws Exception {
+        Path secret = Files.writeString(dir.resolve("secret.txt"), "TOP-SECRET-HOST-FILE");
+        try (Ctx c = open(dir.resolve("cfg"))) {
+            HttpResponse<String> resp = post(c.port, "/enrichment/preview", draftBody(
+                    "SELECT content FROM read_text('" + secret.toString().replace('\\', '/') + "')",
+                    "[{\"id\":\"c1\"}]"));
+            assertEquals(422, resp.statusCode(), resp.body());
+            assertTrue(resp.body().contains("transform refused"), resp.body());
+            assertFalse(resp.body().contains("TOP-SECRET-HOST-FILE"), resp.body());
+        }
+    }
 }

@@ -7,6 +7,9 @@ import com.gamma.query.DecisionRuleApplier;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PartitionWriter;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.config.spec.Finding;
+import com.gamma.sql.SqlGuard;
+import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
 import com.gamma.util.JdbcRows;
@@ -155,11 +158,15 @@ public final class EnrichmentEngine {
     public static Result runResult(EnrichmentConfig cfg, List<Map<String, String>> partitionFilter,
                                    List<PipelineConfig> pipelines, List<String> ruleTargets,
                                    String consignmentId, String runId) throws Exception {
-        File db = DuckDbUtil.tempDbFile("enrich_");
+        // Own scratch dir: the seal allows the DB's directory, which must not be the whole java.io.tmpdir.
+        java.nio.file.Path scratch = java.nio.file.Files.createTempDirectory("enrich_");
+        File db = DuckDbUtil.tempDbFile("enrich_", scratch);
         try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
             // Enrichment has no per-config processing.duckdb section; honour the global -D caps so this
             // scratch connection isn't uncapped (defaults ≈ 80% RAM) while the batch path is capped.
             DuckDbUtil.applyGlobalDuckDbSettings(conn);
+            String transform = guardedTransform(cfg);
+            SqlSandbox.sealAllowing(conn, allowedDirs(cfg, pipelines, db));
 
             // 1. reference views
             for (EnrichmentConfig.Reference r : cfg.references()) {
@@ -176,7 +183,7 @@ public final class EnrichmentEngine {
             st.execute("CREATE VIEW input AS " + inputSql);
 
             // 3. transform → temp table
-            st.execute("CREATE TABLE __enriched AS " + cfg.transformSql());
+            st.execute("CREATE TABLE __enriched AS " + transform);
 
             // 3b. Decision Rules check the enriched output before it is written (tag/route/
             //     quarantine/drop): matched as targetType: job by the enrichment's own name or a
@@ -241,6 +248,7 @@ public final class EnrichmentEngine {
             return new Result(outputs, totalRows);
         } finally {
             DuckDbUtil.deleteTempDb(db);
+            com.gamma.util.TarUtil.deleteTree(scratch);
         }
     }
 
@@ -260,15 +268,18 @@ public final class EnrichmentEngine {
         List<Map<String, Object>> rows = (sample == null) ? List.of() : sample;
         if (rows.isEmpty()) throw new IllegalArgumentException("enrichment preview needs a non-empty sample");
         int cap = Math.max(1, limit);
-        File db = DuckDbUtil.tempDbFile("enrich_preview_");
+        java.nio.file.Path scratch = java.nio.file.Files.createTempDirectory("enrich_preview_");
+        File db = DuckDbUtil.tempDbFile("enrich_preview_", scratch);
         try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
+            String transform = guardedTransform(cfg);
+            SqlSandbox.sealAllowing(conn, allowedDirs(cfg, pipelines, db));
             // 1. reference views — resolved exactly as a run (real data, bounded by the transform's own join)
             for (EnrichmentConfig.Reference r : cfg.references())
                 st.execute("CREATE VIEW \"" + r.name() + "\" AS SELECT * FROM " + referenceReader(r, pipelines));
             // 2. input seeded from the caller's sample (not the Stage-1 glob)
             seedInput(conn, rows);
             // 3. transform → temp table
-            st.execute("CREATE TABLE __enriched AS " + cfg.transformSql());
+            st.execute("CREATE TABLE __enriched AS " + transform);
             // read back a bounded page (limit+1 detects truncation)
             List<String> columns;
             List<Map<String, Object>> out;
@@ -281,7 +292,60 @@ public final class EnrichmentEngine {
             return new Preview(columns, out, truncated);
         } finally {
             DuckDbUtil.deleteTempDb(db);
+            com.gamma.util.TarUtil.deleteTree(scratch);
         }
+    }
+
+    /**
+     * SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1 — the authored transform must be ONE read-only query over the
+     * enrichment's own views ({@code input} + the {@code references[]} names). It is spliced into
+     * {@code CREATE TABLE __enriched AS …}, so without this a {@code ;}-chained {@code COPY … TO},
+     * {@code ATTACH}, {@code INSTALL}/{@code LOAD}, or a {@code read_text}/replacement-scan file read ran
+     * verbatim. Fails closed: any {@link SqlGuard} finding refuses the run (and the preview) before a view
+     * is created. A single trailing {@code ;} is dropped, as {@link SqlGuard} permits it.
+     */
+    static String guardedTransform(EnrichmentConfig cfg) {
+        String sql = cfg.transformSql();
+        List<Finding> findings = SqlGuard.check(sql);
+        if (!findings.isEmpty())
+            throw new IllegalArgumentException("enrichment '" + cfg.name() + "' transform refused: "
+                    + findings.get(0).message());
+        String t = sql.strip();
+        return t.endsWith(";") ? t.substring(0, t.length() - 1) : t;
+    }
+
+    /**
+     * The directories an enrichment connection legitimately reads or writes, for
+     * {@link SqlSandbox#sealAllowing}: the scratch DB's directory (its {@code .tmp} spill sits beside it —
+     * each run gets a fresh one, because allowing a DB made straight in {@code java.io.tmpdir} would admit
+     * the whole of it),
+     * the global {@code -Dprocessing.duckdb.temp_directory} when set, {@code input.database},
+     * {@code output.database} (which also holds routed destinations) and its {@code _quarantine} sibling,
+     * the directory of each {@code path:} reference, and each by-name reference's producing Pipeline's
+     * {@code dirs.database}. Everything else — another Space's data, any host file, every URL — is refused
+     * by DuckDB itself once the configuration is locked, whatever {@link SqlGuard} missed. An unresolvable
+     * by-name reference contributes nothing; its view creation then fails with the usual error.
+     */
+    static List<java.nio.file.Path> allowedDirs(EnrichmentConfig cfg, List<PipelineConfig> pipelines, File db) {
+        LinkedHashSet<java.nio.file.Path> dirs = new LinkedHashSet<>();
+        java.util.function.Consumer<String> add = d -> {
+            if (d != null && !d.isBlank()) dirs.add(Paths.get(d).toAbsolutePath().normalize());
+        };
+        if (db != null) add.accept(db.getAbsoluteFile().getParent());
+        add.accept(System.getProperty(DuckDbUtil.PROP_TEMP_DIRECTORY));
+        add.accept(cfg.input().database());
+        add.accept(cfg.output().database());
+        add.accept(cfg.output().database() + "_quarantine");
+        for (EnrichmentConfig.Reference r : cfg.references()) {
+            if (!r.byName()) {
+                java.nio.file.Path parent = Paths.get(r.path()).toAbsolutePath().normalize().getParent();
+                if (parent != null) add.accept(parent.toString());
+            } else if (pipelines != null) {
+                pipelines.stream().filter(p -> p.identity().pipelineName().equals(r.ref())).findFirst()
+                        .ifPresent(p -> { if (p.dirs() != null) add.accept(p.dirs().database()); });
+            }
+        }
+        return List.copyOf(dirs);
     }
 
     /** Seed the {@code input} table (all VARCHAR over the union of the sample's keys) from an in-memory sample. */

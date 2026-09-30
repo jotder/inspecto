@@ -13,11 +13,12 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **63<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 26<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
+> **62<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 26<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
 > ⬇ **56 on 2026-09-30**: closed P3 `ERRORCODE-DEFAULTED-1` (`2f6d5e52a`) — the last 15 bare `ApiException` sites (all 422s in `inspecto-geo-link`: `AdmiraltyGrade` 1 · `InvestigationCoverageRoutes` 4 · `PatternRoutes` 5 · `WorkingSetRoutes` 5) now pass `CONFIG_VALIDATION_FAILED`, the status default, so no wire change; 0 of 1155 sites take `defaultFor` (the derive's 4 remaining lines pass computed codes). Truth in `okf/capabilities/control-api/control-api.md`.
 > ⬆ **52 → 53 on 2026-09-29**: filed P3 `TEMPLATE-RECOVERY-IMPORT-GATE-1` (the zero-Space recovery create skips the import gate) from the `publish.postgres` review.
 > ⬆ **50 → 51 on 2026-09-29**: filed P3 `ASSURE-CLASSIFICATION-PROPAGATION-1` (carry column classification through lineage) from the `publish.postgres` security review.
 > ⬆ **60 → 61 on 2026-09-30**: filed P1 `SEC-INGEST-EXPR-EXTERNAL-ACCESS-1` (§3.8) — a `fn: custom` mapping expression reads host files, other Spaces' data and URLs through the unsealed ingest connection.
+> ⬇ **63 → 62 on 2026-09-30**: closed P1 `SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1` — an Enrichment's `transformSql` now passes `SqlGuard` (one read-only statement) and runs on a connection sealed by `SqlSandbox.sealAllowing` to its own dirs (input, output + `_quarantine`, path-reference dirs, by-name reference producers' `dirs.database`, a per-run scratch dir), on both the run and the preview path; reproduced first — the capability-free `POST /enrichment/preview` returned a host file's content with a 200 (as-built `okf/backend/engine/duckdb.md`).
 > ↔ **63 on 2026-09-30**: closed P1 `SEC-INGEST-EXPR-EXTERNAL-ACCESS-1` — every ingest connection is sealed in `ConsignmentIngestStrategy.configure` (autoload off, `allowed_directories` = the Pipeline's own dirs + inputs, external access off, configuration locked; as-built `okf/backend/engine/duckdb.md`); its wider check filed P1 `SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1`, P2 `SEC-DRYRUN-EXPR-UNSEALED-1` and P2 `SEC-ATREST-PIPELINE-UNSEALED-1`.
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬆ **56 → 60 on 2026-09-30**: filed assurance wave 5 — P2 `ASSURE-PACK-TELCO-FRAUD-1`, `ASSURE-PACK-TELCO-RA-1`, `ASSURE-PACK-PAYMENT-FRAUD-1`, `ASSURE-PACK-BUSINESS-ASSURANCE-1`.
@@ -91,9 +92,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 1<!--count:backlog-p1--> P1 + 26<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 26<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 63<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 62<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -121,7 +122,7 @@ changes**; a row that cannot is a decision (§1) or a design (P2). **P2** = buil
 or decision lands. **P3** = demand-gated; build only when someone asks by name. Every §3–§5 row carries its
 rank.
 
-**P1: `SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1`** (§3.8, filed 2026-09-30). Assurance wave 1 (`superpower/assurance-capability-plan.md` §3) ✅ **shipped 2026-09-26** — `ASSURE-PER-ENTITY-ALERTS-1`, `ASSURE-BREAK-LIFECYCLE-1` and `ASSURE-IMPACT-LEDGER-1`. The P2 rows split three ways — pick from the first group:
+**P1: none** (the last, `SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1`, closed 2026-09-30). Assurance wave 1 (`superpower/assurance-capability-plan.md` §3) ✅ **shipped 2026-09-26** — `ASSURE-PER-ENTITY-ALERTS-1`, `ASSURE-BREAK-LIFECYCLE-1` and `ASSURE-IMPACT-LEDGER-1`. The P2 rows split three ways — pick from the first group:
 
 | State | P2 rows |
 |---|---|
@@ -347,7 +348,6 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 ### 3.8 Security, Policy, Editions & Compliance
 
-- **P1** · `SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1` — **an Enrichment's authored `transformSql` runs verbatim on an unsealed DuckDB connection.** `EnrichmentEngine.runResult` (`EnrichmentEngine.java:159`) and `preview` (`:264`) open `DuckDbUtil.openConnection` with DuckDB defaults (external access, autoload, no lock) and execute `cfg.transformSql()` with no `SqlGuard` pass — the same class as `SEC-INGEST-EXPR-EXTERNAL-ACCESS-1` but with a whole statement, so `read_text`, `COPY … TO` and `http://` all look reachable. Grounded in the code 2026-09-30; ⚠ repro NOT yet run. Not the trivial ingest pattern: the reference and Stage-1 input views are lazy globs over other Pipelines' database dirs, so the allowlist must be derived from `cfg.references()` + `cfg.input()` before `SqlSandbox.sealAllowing`. Fix in `EnrichmentEngine.java`.
 - **P2** · `SEC-DRYRUN-EXPR-UNSEALED-1` — **the Pipeline dry run executes authored mapping/transform SQL on an unsealed connection.** `PipelineDryRun.runSeeded` (`PipelineDryRun.java:130`, reached from `PipelineGraphRoutes` `:604`/`:697`) opens `DuckDbUtil.openConnection` and runs the graph (incl. `fn: custom` expressions) over seeded sample rows; nothing seals it. Seeding is in-memory, so a seal after seeding looks near-trivial, but the caller's `ReferenceResolver` registers reference reads lazily — the allowlist must cover what it resolves. Grounded in code 2026-09-30, repro not run.
 - **P2** · `SEC-ATREST-PIPELINE-UNSEALED-1` — **the at-rest Pipeline Job runs its authored graph on an unsealed connection.** `PipelineJobRunner` (`PipelineJobRunner.java:312`) opens `DuckDbUtil.openConnection` and executes the authored transforms over `SourceStoreReader` views of `source_store`s; only resource caps are applied. Needs an allowlist of the source-store dirs, the output store and the reference resolver's reads before sealing. Grounded in code 2026-09-30, repro not run.
 - **P2** · `DB-QUERY-UNGATED-1` — **`POST /db/query` reads operational-store rows with no capability gate.** It is exempt in `CapabilityManifest` as "read-shaped" (read-only SQL behind `SqlGuard`). Since 2026-09-29 (`ASSURE-INTELLIGENCE-BUNDLE-1`, operator decision), the agent tools that read the same store rows, `anomaly_scan` and `suggest_expectations`, require `canAuthorWorkbench` through `POST /agent/tools/{name}`. So an Enterprise reader is refused the tool yet can still run the equivalent SQL directly. Decide the read capability for store rows, then gate both routes the same way and move `ToolCapabilities.ROW_READERS` onto that capability. → `inspecto/src/main/java/com/gamma/control/DbBrowserRoutes.java` · `inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/ToolCapabilities.java`
