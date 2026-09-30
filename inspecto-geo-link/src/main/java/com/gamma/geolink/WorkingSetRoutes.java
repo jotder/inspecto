@@ -145,6 +145,18 @@ public final class WorkingSetRoutes implements RouteModule {
         EntityMasking mask = EntityMasking.of(inv, List.of());
         @SuppressWarnings("unchecked") Map<String, Object> masked = (Map<String, Object>) mask.apply(out);
         masked.put("masking", mask.describe());
+        if (of.equals("links")) {   // D-U9: each link's wire id, minted from the MASKED values — on copies, never the cache
+            List<Map<String, Object>> stamped = new ArrayList<>();
+            for (Object o : (List<?>) masked.get("rows")) {
+                @SuppressWarnings("unchecked") Map<String, Object> r = new LinkedHashMap<>((Map<String, Object>) o);
+                LinkIds.stampOne(r);
+                stamped.add(r);
+            }
+            masked.put("rows", stamped);
+            List<String> cols = new ArrayList<>(COLUMNS.get(of));
+            cols.add("linkId");
+            masked.put("columns", cols);
+        }
         return masked;
     }
 

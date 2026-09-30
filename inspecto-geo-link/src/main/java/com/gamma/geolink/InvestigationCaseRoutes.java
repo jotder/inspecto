@@ -147,7 +147,7 @@ public final class InvestigationCaseRoutes implements RouteModule {
         }
     }
 
-    private static String caseRef(SnapshotStore store, String id) throws IOException {
+    static String caseRef(SnapshotStore store, String id) throws IOException {
         String raw = store.readCaseLink(id);
         if (raw == null) return null;
         @SuppressWarnings("unchecked") Map<String, Object> m = ApiContext.JSON.readValue(raw, Map.class);

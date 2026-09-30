@@ -188,6 +188,24 @@ final class SnapshotStore {
         }
     }
 
+    /**
+     * Every Investigation id with a header, sorted — for {@code GET /inv/investigations}, which judges each one
+     * through the read gate. A directory whose name is not a safe id, or with no header yet, is skipped.
+     */
+    List<String> listInvestigations() throws IOException {
+        Path root = dir.resolve(INVESTIGATIONS);
+        if (!Files.isDirectory(root)) return List.of();
+        List<String> out = new ArrayList<>();
+        try (var ds = Files.newDirectoryStream(root)) {
+            for (Path d : ds) {
+                String id = d.getFileName().toString();
+                if (SAFE_ID.matcher(id).matches() && Files.isRegularFile(d.resolve("header.json"))) out.add(id);
+            }
+        }
+        out.sort(Comparator.naturalOrder());
+        return out;
+    }
+
     /** The header's raw JSON, or null when the Investigation was never created. */
     String readInvestigation(String id) throws IOException {
         Path f = investigationDir(id).resolve("header.json");

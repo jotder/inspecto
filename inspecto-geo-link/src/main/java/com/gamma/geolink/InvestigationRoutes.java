@@ -51,6 +51,8 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  * ordered, append-only op log over one Dataset + projection mapping, and the <b>Working Set</b> it evaluates to.
  *
  * <ul>
+ *   <li>{@code GET /inv/investigations} — the Investigations the caller may read (owned, or shared via an open
+ *       linked Case), paged; see {@link #list}.</li>
  *   <li>{@code POST /inv/investigations} — create, bound to {@code {dataset, sourceCol, targetCol, linkKindCol?,
  *       timeCol?, timeColZone?}}.</li>
  *   <li>{@code POST /inv/investigations/{id}/ops} — append one op ({@code seed · expand · exclude · hide · keep ·
@@ -126,6 +128,8 @@ public final class InvestigationRoutes implements RouteModule {
     private static final int MAX_EXPAND_BUDGET = 20_000;
     private static final int LOG_DEFAULT = 500;
     private static final int LOG_MAX = 5_000;
+    private static final int LIST_DEFAULT = 100;
+    private static final int LIST_MAX = 1_000;
 
     /** Writers to one Investigation (or to the investigations root) are serialised within this JVM. */
     private static final ConcurrentHashMap<Path, Object> LOCKS = new ConcurrentHashMap<>();
@@ -135,6 +139,7 @@ public final class InvestigationRoutes implements RouteModule {
         // ⚠ String LITERALS on purpose — CapabilityManifestTest's scanner matches only a literal argument.
         api.post("/inv/investigations", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> create(api, e, api.body(e))));
+        api.get("/inv/investigations", (e, m) -> list(api, e));
         api.post("/inv/investigations/([^/]+)/ops", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> appendOp(api, e, m.group(1), api.body(e))));
         api.post("/inv/investigations/([^/]+)/undo", ApiContext.withCapability("canManageIncidents",
@@ -220,6 +225,67 @@ public final class InvestigationRoutes implements RouteModule {
         return header;
     }
 
+    /**
+     * {@code GET /inv/investigations?limit&offset} — the Investigations the caller may READ, newest first: each one is
+     * judged by {@link #openForRead} itself, so the list can never show what a read would refuse — the owner's own,
+     * plus those shared READ-ONLY with a member of an open linked Case (LA-24), minus any whose bound Dataset the
+     * caller cannot view (R3) or the Enterprise PDP denies (D-E7). Gates: write root 503 → a bad limit/offset 422.
+     * Each item: {@code {id, title, dataset, owner, createdAt, headStep, caseRef?, access: owner|case-member}}; the
+     * title is masked per the Space's {@code maskingMode} as the log masks it (D-U6). Read-shaped: no capability.
+     */
+    private Object list(ApiContext api, HttpExchange ex) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis investigation list");
+        int limit = Math.min(Math.max(queryInt(ex, "limit", LIST_DEFAULT), 1), LIST_MAX);
+        int offset = queryInt(ex, "offset", 0);
+        if (offset < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "offset must be >= 0");
+        Optional<Subject> subject = ApiContext.subject(ex);
+        List<Map<String, Object>> readable = new ArrayList<>();
+        for (String id : new SnapshotStore(writeRoot).listInvestigations()) {
+            Inv inv;
+            try {
+                inv = openForRead(api, ex, id);
+            } catch (ApiException refused) {
+                continue;   // not readable by this caller — absent from the list exactly as from a read
+            }
+            Map<String, Object> h = inv.header();
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", id);
+            item.put("title", h.get("title") == null ? null : EntityMasking.of(inv, List.of()).inText(String.valueOf(h.get("title"))));
+            item.put("dataset", h.get("dataset"));
+            item.put("owner", h.get("owner"));
+            item.put("createdAt", h.get("createdAt"));
+            List<String> log = inv.store().readLog(id);
+            item.put("headStep", log.isEmpty() ? 0 : ((Number) parse(log.get(log.size() - 1)).get("step")).intValue());
+            String caseRef = InvestigationCaseRoutes.caseRef(inv.store(), id);
+            if (caseRef != null) item.put("caseRef", caseRef);
+            boolean owner = subject.isEmpty() || subject.get().id().equals(h.get("owner"));
+            item.put("access", owner ? "owner" : "case-member");
+            item.put("readOnly", !owner);
+            readable.add(item);
+        }
+        readable.sort(java.util.Comparator.comparing((Map<String, Object> m) -> String.valueOf(m.get("createdAt")))
+                .reversed().thenComparing(m -> String.valueOf(m.get("id"))));
+        List<Map<String, Object>> page = readable.subList(Math.min(offset, readable.size()),
+                (int) Math.min((long) offset + limit, readable.size()));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("items", new ArrayList<>(page));
+        out.put("total", readable.size());
+        out.put("offset", offset);
+        out.put("limit", limit);
+        out.put("truncated", (long) offset + page.size() < readable.size());
+        return out;
+    }
+
+    private static int queryInt(HttpExchange ex, String name, int dflt) {
+        String raw = ApiContext.query(ex, name);
+        if (raw == null || raw.isBlank()) return dflt;
+        try {
+            return Integer.parseInt(raw.trim());
+        } catch (NumberFormatException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, name + " must be an integer, got '" + raw + "'");
+        }
+    }
+
     /** {@code POST /inv/investigations/{id}/ops} — body {@code {op, ...params}}. See the class note for gates. */
     private Object appendOp(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
         Inv inv = open(api, ex, id);
@@ -231,6 +297,7 @@ public final class InvestigationRoutes implements RouteModule {
         if (!SHIPPED.contains(op))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is not in the closed op vocabulary");
         Map<String, Object> params = params(op, resolvePseudonyms(inv, body));
+        if (params.get("links") != null) resolveLinkPseudonyms(inv, params);
         requireBindings(inv.header(), op, params, "");
 
         synchronized (lock(inv.dir())) {
@@ -241,6 +308,13 @@ public final class InvestigationRoutes implements RouteModule {
                 for (String i : ids)
                     if (!before.entities.containsKey(i))
                         throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + i + "' is not in the Working Set");
+            if (params.get("links") instanceof List<?> ls)   // D-U9: a link note names a link the Working Set holds
+                for (Object o : ls) {
+                    Map<?, ?> l = (Map<?, ?>) o;
+                    if (!before.links.containsKey(LinkIds.key(String.valueOf(l.get("source")), String.valueOf(l.get("target")),
+                            String.valueOf(l.get("kind")))))
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a named link is not in the Working Set");
+                }
 
             int step = log.size() + 1;
             Map<String, Object> entry = entry(step, "op", ex);
@@ -1194,7 +1268,9 @@ public final class InvestigationRoutes implements RouteModule {
             ids.add(v);
         }
         if (ids.size() > MAX_IDS) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_IDS + " ids per op");
-        if (!op.equals("expand") && ids.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' requires 'ids'");
+        boolean linkNote = op.equals("annotate") && body.get("links") != null;   // D-U9: an annotate may name only links
+        if (!op.equals("expand") && ids.isEmpty() && !linkNote)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' requires 'ids'");
         p.put("ids", new ArrayList<>(ids));
         switch (op) {
             case "seed" -> {
@@ -1219,10 +1295,44 @@ public final class InvestigationRoutes implements RouteModule {
                 // D-U9: an Admiralty grade (A-F x 1-6). Absent when not given, so an ungraded annotate is sealed
                 // byte-for-byte as it was before the grade existed.
                 if (body.get("confidence") != null) p.put("confidence", AdmiraltyGrade.validate(body.get("confidence")));
+                // D-U9 remainder: links named by their wire id (LinkIds), sealed as the decoded {source, target, kind}
+                // (pseudonyms are resolved by the append, which has the Investigation). Absent when none, so an
+                // entity-only annotate seals exactly as before.
+                if (linkNote) p.put("links", linkParams(body.get("links")));
             }
             default -> { }
         }
         return p;
+    }
+
+    /** An annotate's {@code links}: a non-empty list of {@link LinkIds} wire ids, each decoded (duplicates dropped). */
+    private static List<Map<String, Object>> linkParams(Object raw) {
+        if (!(raw instanceof List<?> l) || l.isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'links' must be a non-empty list of link ids");
+        if (l.size() > MAX_IDS) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_IDS + " links per op");
+        Set<String> seen = new HashSet<>();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object o : l) {
+            List<String> parts = LinkIds.decode(o instanceof String v ? v : null);
+            if (!seen.add(LinkIds.key(parts.get(0), parts.get(1), parts.get(2)))) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("source", parts.get(0));
+            m.put("target", parts.get(1));
+            m.put("kind", parts.get(2));
+            out.add(m);
+        }
+        return out;
+    }
+
+    /** An annotate's decoded links with every pseudonym this Investigation issued resolved to its entity (D-U6). */
+    @SuppressWarnings("unchecked")
+    private static void resolveLinkPseudonyms(Inv inv, Map<String, Object> params) throws IOException {
+        List<Map<String, Object>> links = (List<Map<String, Object>>) params.get("links");
+        if (links.stream().noneMatch(m -> m.values().stream().anyMatch(v -> String.valueOf(v).startsWith(EntityMasking.TOKEN_PREFIX))))
+            return;
+        EntityMasking mask = EntityMasking.of(inv, List.of());
+        for (Map<String, Object> m : links)
+            for (String k : List.of("source", "target", "kind")) m.put(k, mask.resolve(List.of(String.valueOf(m.get(k)))).get(0));
     }
 
     /**
@@ -1356,7 +1466,7 @@ public final class InvestigationRoutes implements RouteModule {
                     + " (reason: " + p.get("reason") + "): " + list(ids) + ".";
             case "hide" -> "Hid " + list(ids) + " from display (still traversed and counted).";
             case "keep" -> "Kept " + list(ids) + " (protected from later exclusion).";
-            case "annotate" -> "Annotated " + list(ids) + gradeClause(p) + ": \"" + p.get("note") + "\"";
+            case "annotate" -> "Annotated " + annotated(ids, p) + gradeClause(p) + ": \"" + p.get("note") + "\"";
             case "excludeBy" -> "Excluded " + removed + " entit" + (removed != null && removed == 1 ? "y" : "ies")
                     + " on " + listClause(e) + " (reason: " + p.get("reason") + ").";
             case "resolve" -> resolveLine(e);
@@ -1424,6 +1534,19 @@ public final class InvestigationRoutes implements RouteModule {
         int shown = Math.min(10, ids.size());
         String head = String.join(", ", ids.subList(0, shown));
         return ids.size() > shown ? head + " and " + (ids.size() - shown) + " more" : head;
+    }
+
+    /** What an annotate named: its entities, then its links as {@code source → target (kind)} (D-U9). */
+    private static String annotated(List<String> ids, Map<String, Object> p) {
+        List<String> links = new ArrayList<>();
+        if (p.get("links") instanceof List<?> ls)
+            for (Object o : ls) {
+                Map<?, ?> l = (Map<?, ?>) o;
+                links.add(l.get("source") + " → " + l.get("target") + " (" + l.get("kind") + ")");
+            }
+        if (links.isEmpty()) return list(ids);
+        String named = "link" + (links.size() == 1 ? " " : "s ") + list(links);
+        return ids.isEmpty() ? named : list(ids) + " and " + named;
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────────────────────────────
@@ -1512,7 +1635,7 @@ public final class InvestigationRoutes implements RouteModule {
     @SuppressWarnings("unchecked")
     private static Object masked(Inv inv, Object out) throws IOException {
         EntityMasking mask = EntityMasking.of(inv, List.of());
-        Object masked = mask.apply(out);
+        Object masked = LinkIds.stamp(mask.apply(out));   // D-U9: link ids minted from what the caller sees
         if (!(masked instanceof Map<?, ?> m)) return masked;
         Map<String, Object> copy = new LinkedHashMap<>((Map<String, Object>) m);
         copy.put("masking", mask.describe());

@@ -108,6 +108,8 @@ final class InvestigationEvaluator {
         final TreeSet<String> kept = new TreeSet<>();
         /** Per-entity notes (LA-19), in step order per entity. They outlive a later exclusion: a note is history. */
         final TreeMap<String, List<Annotation>> annotations = new TreeMap<>();
+        /** Per-link notes (D-U9 remainder), keyed by the link key; like entity notes they outlive a later exclusion. */
+        final TreeMap<String, List<Annotation>> linkAnnotations = new TreeMap<>();
         /** The window the latest {@code window} op set (LA-13), inherited by later expands; null = the full range. */
         Map<String, Object> window;
         /** Entity List keys an {@code excludeBy} excluded (LA-17): normaliser → key → the step that excluded it. */
@@ -349,6 +351,25 @@ final class InvestigationEvaluator {
                     }
                 out.put("annotations", as);
             }
+            // Only when present (D-U9 remainder), for the same reason. The wire id is NOT stored here: it is minted at
+            // render time from the values the caller sees (LinkIds), so masking never leaks a raw key through it.
+            if (!linkAnnotations.isEmpty()) {
+                List<Map<String, Object>> as = new ArrayList<>();
+                for (var a : linkAnnotations.entrySet()) {
+                    String[] k = a.getKey().split("\u0000", -1);
+                    for (Annotation n : a.getValue()) {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("source", k[0]);
+                        m.put("target", k[1]);
+                        m.put("kind", k[2]);
+                        m.put("step", n.step());
+                        m.put("note", n.note());
+                        if (n.confidence() != null) m.put("confidence", n.confidence());
+                        as.add(m);
+                    }
+                }
+                out.put("linkAnnotations", as);
+            }
             // Only when present (LA-17): a state no excludeBy touched hashes exactly as it did before.
             if (!excludedKeys.isEmpty()) {
                 List<Map<String, Object>> ks = new ArrayList<>();
@@ -522,6 +543,15 @@ final class InvestigationEvaluator {
                     if (s.entities.containsKey(id))
                         s.annotations.computeIfAbsent(id, k -> new ArrayList<>())
                                 .add(new Annotation(step, note, confidence));
+                if (p.get("links") instanceof List<?> ls)   // D-U9 remainder: a note on a link, by its key
+                    for (Object o : ls) {
+                        Map<?, ?> l = (Map<?, ?>) o;
+                        String key = LinkIds.key(String.valueOf(l.get("source")), String.valueOf(l.get("target")),
+                                String.valueOf(l.get("kind")));
+                        if (s.links.containsKey(key))
+                            s.linkAnnotations.computeIfAbsent(key, k -> new ArrayList<>())
+                                    .add(new Annotation(step, note, confidence));
+                    }
             }
             default -> throw new IllegalStateException("op '" + entry.get("op") + "' in a sealed log is not evaluable");
         }
