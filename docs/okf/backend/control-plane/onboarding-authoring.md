@@ -48,7 +48,8 @@ indexed, catalog-visible, never executed; D3 of the design). Shipped P0–P3, 20
   `java.time` value), inconsistent with every other format's raw-string preview.
 - `POST /config/preview/schema {config:{raw:{fields}}, sampleRows}` → `ComponentPreview.schema`
   TRY_CAST split → `{columns, okCount, rejectedCount, rejectedRows}`.
-- `POST /enrichment/preview {config:{…enrichment draft…}, sampleRows}` → `EnrichmentEngine.preview` — seeds
+- `POST /enrichment/preview {config:{…enrichment draft…}, sampleRows}` (gated `canAuthorWorkbench` since
+  2026-09-30 — it executes the draft's SQL) → `EnrichmentEngine.preview` — seeds
   the `input` view from the sample (all VARCHAR), registers the real reference views (`ref:`-by-name resolve
   against the loaded pipelines, `path:` reads the file), runs the draft's `transform`, returns
   `{columns, rows, truncated}`. Persists nothing (throwaway DuckDB, `output.database` untouched); the enrichment

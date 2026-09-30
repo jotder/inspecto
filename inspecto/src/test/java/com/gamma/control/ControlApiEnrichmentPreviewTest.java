@@ -23,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * {@code POST /enrichment/preview} over real HTTP — the bounded, non-persisting enrichment preview that
  * gives the onboarding enrichment stage its "Validated" state. Runs the draft's transform over an inline
- * sample and returns {@code {columns, rows, truncated}}; stateless and un-gated like the parsing/schema
- * previews. Covers the happy path plus the 400 (missing config/sample) and 422 (bad transform) gates.
+ * sample and returns {@code {columns, rows, truncated}}; stateless, and gated canAuthorWorkbench (unlike the parsing/schema
+ * previews, it executes authored SQL). Covers the happy path plus the 400 (missing config/sample) and 422 (bad transform) gates.
  */
 class ControlApiEnrichmentPreviewTest {
 
@@ -112,6 +112,36 @@ class ControlApiEnrichmentPreviewTest {
      * transform {@code read_text('<host file>')} returned the file's content in {@code rows}. It is refused
      * (422) and the content never reaches the body.
      */
+    /**
+     * The preview EXECUTES the draft's transform, so it is gated {@code canAuthorWorkbench} like
+     * {@code POST /enrichment}. The 403 (a present Subject lacking the capability) is what proves a gate
+     * rather than a login; the author gets the preview.
+     */
+    @Test
+    void previewRequiresCanAuthorWorkbench(@TempDir Path dir) throws Exception {
+        Authenticators.forTest(ex -> "Bearer author".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? java.util.Optional.of(new Subject("author", java.util.Set.of("canAuthorWorkbench")))
+                : "Bearer plain".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? java.util.Optional.of(new Subject("nobody", java.util.Set.of()))
+                : java.util.Optional.empty());
+        try (Ctx c = open(dir.resolve("cfg"))) {
+            String body = draftBody("SELECT id FROM input", "[{\"id\":\"c1\"}]");
+            HttpResponse<String> plain = postAs(c.port, "/enrichment/preview", body, "Bearer plain");
+            assertEquals(403, plain.statusCode(), plain.body());
+            assertTrue(plain.body().contains("canAuthorWorkbench"), plain.body());
+            HttpResponse<String> author = postAs(c.port, "/enrichment/preview", body, "Bearer author");
+            assertEquals(200, author.statusCode(), author.body());
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
+    private HttpResponse<String> postAs(int port, String path, String body, String auth) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("Content-Type", "application/json").header("Authorization", auth)
+                .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
+    }
+
     @Test
     void aTransformThatReadsAHostFileIsRefused(@TempDir Path dir) throws Exception {
         Path secret = Files.writeString(dir.resolve("secret.txt"), "TOP-SECRET-HOST-FILE");

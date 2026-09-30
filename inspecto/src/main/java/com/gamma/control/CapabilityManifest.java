@@ -158,6 +158,8 @@ final class CapabilityManifest {
             new Entry("GET", "/risk-scores/([^/]+)/([^/]+)", Roles.CAN_WORK_INCIDENTS),
             // EnrichmentRoutes
             new Entry("POST", "/enrichment", Roles.CAN_AUTHOR_WORKBENCH),
+            // SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1: the preview executes the draft's transform — authoring, not a read.
+            new Entry("POST", "/enrichment/preview", Roles.CAN_AUTHOR_WORKBENCH),
             // EventRoutes (inspecto-events) — gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`, grounded). A saved
             // view is server-wide (SavedView carries no subject; one store per service), so writing or deleting
             // one is authoring, not a personal convenience. ⚠ The delete is a POST-shaped DELETE. This file had
@@ -416,7 +418,6 @@ final class CapabilityManifest {
             // demand canOnboardConnections, the capability that already guards the same credential's CRUD.
             new Exemption("POST", "/db/query", "read-shaped", "read-only SQL behind SqlGuard"),
             new Exemption("POST", "/bi/query", "read-shaped", "a Measure query; the body is the query spec"),
-            new Exemption("POST", "/enrichment/preview", "read-shaped", "previews an enrichment over sample rows"),
             // Operator D4 2026-09-25 (parser-plugins-trust-design.md slice P4): the gate depends on the PARSER, so
             // it lives IN the handler and the manifest (all-or-nothing per route) records it here, as /spaces does.
             new Exemption("POST", "/parsers/([^/]+)/preview", "provenance-gated",

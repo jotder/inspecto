@@ -40,8 +40,10 @@ final class EnrichmentRoutes implements RouteModule {
         api.get("/enrichment", (e, m) -> enrichment(api).views());
         api.post("/enrichment", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> registerEnrichment(api, e, api.body(e))));
-        // Un-gated, stateless preview — sibling of POST /config/preview/parsing|schema (read-only, inline config).
-        api.post("/enrichment/preview", (e, m) -> previewEnrichment(api, api.body(e)));
+        // Stateless preview over an inline config. Gated like POST /enrichment: it EXECUTES the draft's transform
+        // over the real reference views (SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1), so it is authoring, not a read.
+        api.post("/enrichment/preview", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> previewEnrichment(api, api.body(e))));
         api.get("/enrichment/([^/]+)/runs", (e, m) -> enrichment(api).runs(enrichJob(api, m)));
         api.get("/enrichment/([^/]+)/lineage", (e, m) ->
                 enrichment(api).lineage(enrichJob(api, m), ApiContext.query(e, "runId")));
@@ -130,8 +132,8 @@ final class EnrichmentRoutes implements RouteModule {
      * sample (the onboarding "Validated" state; sibling of {@code POST /config/preview/parsing|schema}).
      * Body {@code {config:{…enrichment draft…}, sampleRows:[…]}}: the {@code transform} runs over the
      * sample-seeded {@code input} plus the real reference views, and the first rows come back as
-     * {@code {columns, rows, truncated}}. Stateless (inline config, no write root) and un-gated like the
-     * other previews. 400 for a missing config/sample; 422 when the draft does not parse or its transform
+     * {@code {columns, rows, truncated}}. Stateless (inline config, no write root) and gated
+     * {@code canAuthorWorkbench} (403), because it executes the draft's SQL. 400 for a missing config/sample; 422 when the draft does not parse or its transform
      * fails on the sample (the preview surfaces exactly the error a run would hit).
      */
     private Object previewEnrichment(ApiContext api, Map<String, Object> body) {

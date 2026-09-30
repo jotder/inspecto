@@ -175,7 +175,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/decision-rules/([^/]+)/apply` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/DecisionRoutes.java:64` |
 | POST | `/decision-rules/([^/]+)/simulate` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DecisionRoutes.java:62` |
 | POST | `/enrichment` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/EnrichmentRoutes.java:41` |
-| POST | `/enrichment/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/EnrichmentRoutes.java:44` |
+| POST | `/enrichment/preview` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/EnrichmentRoutes.java:45` |
 | POST | `/events/views` | gated | `canAuthorWorkbench` | `inspecto-events/src/main/java/com/gamma/eventsapi/EventRoutes.java:60` |
 | POST | `/events/views/([^/]+)/delete` | gated | `canAuthorWorkbench` | `inspecto-events/src/main/java/com/gamma/eventsapi/EventRoutes.java:62` |
 | POST | `/exchange/grants/([^/]+)/(approve|deny|revoke)` | gated | `canApproveShares` | `inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java:105` |
