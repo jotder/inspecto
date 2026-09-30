@@ -300,4 +300,15 @@ class RecordReplayTest {
         assertThrows(IllegalArgumentException.class, () -> RecordReplay.replay(cfg, "../feed.csv", null));
         assertThrows(IllegalArgumentException.class, () -> RecordReplay.replay(cfg, "a/feed.csv", null));
     }
+
+    /** processing.refusal: a sidecar under the restricted quarantine is never read by a replay. */
+    @org.junit.jupiter.api.Test
+    void neverReadsTheRestrictedQuarantine(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(pipeline(dir, "native").toString());
+        Path restricted = Path.of(cfg.dirs().quarantine()).resolve(".restricted");
+        Files.createDirectories(restricted);
+        Files.writeString(restricted.resolve("bad_errors.csv"), "line_number,column,reason,raw_line\n1,,X,\"a,1\"\n");
+        org.junit.jupiter.api.Assertions.assertThrows(NoSuchFileException.class,
+                () -> RecordReplay.replay(cfg, "bad.csv", e -> {}));
+    }
 }

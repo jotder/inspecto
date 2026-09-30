@@ -164,6 +164,8 @@ class PaymentFraudTemplateGoldenTest {
             new String[]{"MERCHANT_ID", "6759649826438453"},                                      // Maestro 67
             new String[]{"MERCHANT_ID", "5018000000000009"},                                      // Maestro 50
             new String[]{"MERCHANT_ID", "5610591081018250"},                                      // Maestro 56
+            new String[]{"MERCHANT_ID", "DE00 4111 1111 1111 1111"},                              // a PAN dressed as an IBAN
+            new String[]{"MERCHANT_ID", "ID12 4111111111111111"},                                 // ditto, ungrouped
             new String[]{"AMOUNT", TEST_PAN});                                                    // the numeric leak path
     /** True negatives: digit strings that are NOT card numbers — each must ingest. */
     private static final List<String[]> PASSES = List.of(

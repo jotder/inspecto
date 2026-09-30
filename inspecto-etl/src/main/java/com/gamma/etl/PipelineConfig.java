@@ -488,6 +488,36 @@ public final class PipelineConfig {
         }
     }
 
+    /**
+     * {@code refusal_scan_exempt} may never switch the card scan off by exempting EVERY raw field of a schema — that
+     * is refused at load (the one gate every writer and the boot loader pass). An exempt name that is no raw field of
+     * any schema is warned: it exempts nothing, and is most likely a typo for a column the author meant to exempt.
+     */
+    private static void requireScanCoverage(Refusal r, Schemas s, String pipeline) {
+        if (r == null || !r.cardScan() || r.scanExempt().isEmpty() || s == null) return;
+        java.util.Set<String> exempt = new java.util.HashSet<>();
+        for (String x : r.scanExempt()) exempt.add(x.toUpperCase(java.util.Locale.ROOT));
+        List<Map<String, Object>> all = new ArrayList<>();
+        if (s.single() != null) all.add(s.single());
+        if (s.segments() != null) all.addAll(s.segments().values());
+        java.util.Set<String> known = new java.util.HashSet<>();
+        for (Map<String, Object> schema : all) {
+            java.util.Set<String> names = new java.util.HashSet<>();
+            if (schema.get("raw") instanceof Map<?, ?> raw && raw.get("fields") instanceof List<?> fields)
+                for (Object f : fields)
+                    if (f instanceof Map<?, ?> m && m.get("name") != null)
+                        names.add(String.valueOf(m.get("name")).toUpperCase(java.util.Locale.ROOT));
+            known.addAll(names);
+            if (!names.isEmpty() && exempt.containsAll(names))
+                throw new IllegalArgumentException("processing.refusal_scan_exempt exempts every raw field of pipeline '"
+                        + pipeline + "' — the card scan would read nothing; turn refusal_scan off instead, explicitly");
+        }
+        exempt.removeAll(known);
+        if (!known.isEmpty() && !exempt.isEmpty())
+            org.slf4j.LoggerFactory.getLogger(PipelineConfig.class).warn(
+                    "pipeline '{}': processing.refusal_scan_exempt names no raw field: {}", pipeline, exempt);
+    }
+
     @PublicApi(since = "4.0.0")
     public enum RejectMode {
         EJECT, ALL_OR_NOTHING;
@@ -1561,6 +1591,7 @@ public final class PipelineConfig {
         this.commitRetry = b.commitRetry;
         this.rejectMode = b.rejectMode == null ? RejectMode.EJECT : b.rejectMode;
         this.refusal = b.refusal == null ? Refusal.OFF : b.refusal;
+        requireScanCoverage(this.refusal, this.schemas, b.name);
         this.unpack = b.unpack;
         this.fixedWidth = b.fixedWidth;
         this.json = b.json;

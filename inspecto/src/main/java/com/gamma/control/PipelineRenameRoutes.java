@@ -423,7 +423,7 @@ final class PipelineRenameRoutes implements RouteModule {
                     "findings", introduced, "journal", journal)));
         }
         byte[] bytes = ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8);
-        AtomicFiles.write(newPath, bytes, ".cfg-");
+        RefusalConfigAudit.write(newPath, bytes, ".cfg-");
         // PIPELINE-CONFIG-HISTORY-1: the history follows the identity — moved only AFTER the renamed config
         // landed, so a refused rename (above) leaves it under the id the pipeline still has — and the rename
         // is itself a version, filed under newId.

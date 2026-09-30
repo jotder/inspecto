@@ -81,6 +81,34 @@ public final class DataRef {
      * @throws IllegalArgumentException if {@code dataRoot} is null, or the ref is unusable or escapes
      *                                  (structurally or through a symlink) (→ 422)
      */
+    /**
+     * The restricted quarantine ({@code <quarantine>/.restricted}, {@code processing.refusal}) holds files refused FOR
+     * their content (e.g. a card number): no data reference may address it or anything beneath it.
+     */
+    public static final String RESTRICTED_SEGMENT = ".restricted";
+
+    /**
+     * Refuse a resolved path that has a {@link #RESTRICTED_SEGMENT} segment below {@code dataRoot}, OR whose own tree
+     * contains one — DuckDB's {@code **} glob descends into dot-directories, so a reference to a restricted file's
+     * ancestor (e.g. {@code <pipeline>/quarantine}) would read it too. A tree that cannot be walked is refused.
+     */
+    public static void requireNotRestricted(Path dataRoot, Path resolved, String what, String ref) {
+        Path rel = dataRoot.normalize().relativize(resolved.normalize());
+        for (Path seg : rel)
+            if (seg.toString().equals(RESTRICTED_SEGMENT))
+                throw new IllegalArgumentException(what + " '" + ref + "' addresses the restricted quarantine");
+        if (!java.nio.file.Files.isDirectory(resolved)) return;
+        // The READ root, as SqlViews.storeReadRoot maps it: a pipeline-shaped store is read at database/ only.
+        Path readRoot = java.nio.file.Files.isDirectory(resolved.resolve("database")) ? resolved.resolve("database") : resolved;
+        try (java.util.stream.Stream<Path> w = java.nio.file.Files.walk(readRoot, 8)) {
+            if (w.anyMatch(p -> p.getFileName() != null && p.getFileName().toString().equals(RESTRICTED_SEGMENT)
+                    && java.nio.file.Files.isDirectory(p)))
+                throw new IllegalArgumentException(what + " '" + ref + "' contains the restricted quarantine");
+        } catch (java.io.IOException | java.io.UncheckedIOException e) {
+            throw new IllegalArgumentException(what + " '" + ref + "' could not be proven clear of the restricted quarantine");
+        }
+    }
+
     public static Path requireUnder(Path dataRoot, String ref, String what) {
         if (dataRoot == null)
             throw new IllegalArgumentException("no data root for this space; cannot resolve " + what);
@@ -88,6 +116,7 @@ public final class DataRef {
         Path resolved = dataRoot.normalize().resolve(ref).normalize();
         if (!PathJail.contains(dataRoot, resolved))
             throw new IllegalArgumentException(what + " '" + ref + "' escapes the data root");
+        requireNotRestricted(dataRoot, resolved, what, ref);
         return resolved;
     }
 }

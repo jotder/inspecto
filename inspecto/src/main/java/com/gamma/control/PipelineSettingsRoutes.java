@@ -113,7 +113,7 @@ final class PipelineSettingsRoutes implements RouteModule {
         PendingChanges.hold(api, e, "pipeline", id, out, src);   // maker-checker (ASSURE-MAKER-CHECKER-1)
 
         byte[] bytes = ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8);
-        AtomicFiles.write(srcPath, bytes, ".cfg-");
+        RefusalConfigAudit.write(srcPath, bytes, ".cfg-");
         PipelineHistory.record(writeRoot, srcPath);   // PIPELINE-CONFIG-HISTORY-1
         log.info("[PIPELINE-LABEL] pipeline '{}' relabelled to '{}'{}",
                 id, label, stampedId ? " (identity stamped as id: " + id + ")" : "");
@@ -185,7 +185,7 @@ final class PipelineSettingsRoutes implements RouteModule {
         PendingChanges.hold(api, e, "pipeline", name, out, src);   // maker-checker (ASSURE-MAKER-CHECKER-1)
 
         byte[] bytes = ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8);
-        AtomicFiles.write(srcPath, bytes, ".cfg-");
+        RefusalConfigAudit.write(srcPath, bytes, ".cfg-");
         PipelineHistory.record(writeRoot, srcPath);   // PIPELINE-CONFIG-HISTORY-1
         log.info("[PIPELINE-SETTINGS] pipeline '{}' produces/reference block updated", name);
 

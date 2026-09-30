@@ -183,6 +183,16 @@ final class DbBrowserRoutes implements RouteModule {
      */
     /** Same jail {@link #browseStore} enforces, checked early so a path-like-but-legitimate store id
      *  (e.g. {@code "mule_transfers/database"}) can be trusted by {@link SqlGuard} before it runs. */
+    /** A store at or under a {@code .restricted} segment, or whose tree contains one ({@code DataRef}'s rule). */
+    private static boolean restricted(Path root, Path storeDir) {
+        try {
+            com.gamma.config.safety.DataRef.requireNotRestricted(root, storeDir, "store", root.relativize(storeDir).toString());
+            return false;
+        } catch (IllegalArgumentException e) {
+            return true;
+        }
+    }
+
     private static boolean isJailedStore(ApiContext api, String storeName) {
         Path dataRoot = api.dataRoot();
         if (dataRoot == null) return false;
@@ -190,6 +200,7 @@ final class DbBrowserRoutes implements RouteModule {
         Path storeDir = root.resolve(storeName).normalize();
         if (!storeDir.startsWith(root)) return false;
         Path browseDir = pipelineDatabaseDir(api, storeName).orElse(storeDir);
+        if (restricted(root, browseDir)) return false;
         return Files.isDirectory(browseDir);
     }
 
@@ -201,6 +212,8 @@ final class DbBrowserRoutes implements RouteModule {
         Path storeDir = root.resolve(storeName).normalize();
         if (!storeDir.startsWith(root)) throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "store path escapes the data root");
         Path browseDir = pipelineDatabaseDir(api, storeName).orElse(storeDir);
+        // processing.refusal: the restricted quarantine is never browsable, by id or by any ancestor's glob.
+        if (restricted(root, browseDir)) throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "store path addresses the restricted quarantine");
         if (!Files.isDirectory(browseDir)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no store '" + storeName + "'");
 
         String format = detectFormat(browseDir);

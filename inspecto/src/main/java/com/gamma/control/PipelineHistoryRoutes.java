@@ -110,7 +110,7 @@ final class PipelineHistoryRoutes implements RouteModule {
         ETags.requireMatch(ex, ETags.of(ContentHash.of(current)));
         PendingChanges.hold(api, ex, "pipeline", p.id(), config, current);   // maker-checker: a restore is a save
 
-        AtomicFiles.write(target, bytes, ".cfg-");
+        RefusalConfigAudit.write(target, bytes, ".cfg-");
         PipelineHistory.record(writeRoot, target);
         api.service().refreshConfigs();   // the editor reloads GET …/graph/raw next, which lifts the REGISTERED config
         ETags.set(ex, ETags.of(ContentHash.of(ConfigLoader.filesystem().decode(target.toString()))));

@@ -203,7 +203,8 @@ class RefusalQuarantineTest {
             }
         }
         System.out.println("[refusal-scan false-trip rates] " + rates);
-        assertEquals(0.0, rates.get("DE IBANs in 4-digit groups"), "an IBAN-shaped value never trips");
+        // No IBAN skip since round 4 (a PAN dressed as an IBAN evaded it): IBAN columns are exempted by the operator.
+        assertTrue(rates.get("DE IBANs in 4-digit groups") < 0.06, "IBANs need refusal_scan_exempt: " + rates);
         assertTrue(rates.get("E.164 phone numbers") < 0.02, "phones collide with Diners 30/36/38/39 at 14 digits: " + rates);
         assertTrue(rates.get("16-digit numeric order ids") < 0.06, "order ids need refusal_scan_exempt: " + rates);
         assertNull(RefusalQuarantine.cardScanSql(RefusalQuarantine.columns(Map.of("raw", Map.of("fields",
@@ -235,6 +236,48 @@ class RefusalQuarantineTest {
         assertFalse(Files.exists(old), "past retention: deleted");
         Event gone = seen.stream().filter(e -> e.toString().contains("ingest.refused.retention")).findFirst().orElseThrow();
         assertTrue(gone.toString().contains("INGEST_REFUSE:CARD_NUMBER"), "the deleted file's code is audited: " + gone);
+    }
+
+    private static final Path PAY = Path.of("..", "spaces", "_templates", "payment-fraud").toAbsolutePath().normalize();
+
+    /** Round 4: an exempt list that covers EVERY raw field would switch the scan off silently — refused at load. */
+    @Test
+    void exemptingEveryRawFieldIsRefusedAtLoad(@TempDir Path tmp) throws Exception {
+        Path space = tmp.resolve("spaces").resolve("pay");
+        copy(PAY, space);
+        Path toon = space.resolve("config/payment_attempts/payment_attempts_pipeline.toon");
+        String all = "ATTEMPT_ID,ATTEMPT_TS,ATTEMPT_DATE,ACCOUNT_ID,INSTRUMENT_TOKEN,BIN,DEVICE_ID,MERCHANT_ID,AMOUNT,CURRENCY,OUTCOME";
+        Files.writeString(toon, Files.readString(toon).replace("  refusal_scan: card_number\n",
+                "  refusal_scan: card_number\n  refusal_scan_exempt[11]: " + all + "\n"));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> PipelineConfig.load(toon.toString()));
+        assertTrue(e.getMessage().contains("exempts every raw field"), e.getMessage());
+        // One field short of all is allowed (the operator's call), and still scans that one field.
+        Files.writeString(toon, Files.readString(toon).replace("refusal_scan_exempt[11]: " + all,
+                "refusal_scan_exempt[10]: " + all.replace(",OUTCOME", "")));
+        assertEquals(10, PipelineConfig.load(toon.toString()).refusal().scanExempt().size());
+    }
+
+    /** Round 4: the scan FAILS CLOSED — an error while scanning restricts the file; nothing lands. */
+    @Test
+    void aScanFailureRestrictsTheFileAndLandsNothing(@TempDir Path tmp) throws Exception {
+        Path space = tmp.resolve("spaces").resolve("pay");
+        copy(PAY, space);
+        PipelineConfig pc = PipelineConfig.load(space.resolve("config/payment_attempts/payment_attempts_pipeline.toon").toString());
+        Path inbox = Files.createDirectories(Path.of(pc.dirs().poll()));
+        Files.writeString(inbox.resolve("PAYMENT_ATTEMPTS_20260704.csv"),
+                "ATTEMPT_ID,ATTEMPT_TS,ATTEMPT_DATE,ACCOUNT_ID,INSTRUMENT_TOKEN,BIN,DEVICE_ID,MERCHANT_ID,AMOUNT,CURRENCY,OUTCOME\n"
+                        + "pa_x1,2026-07-04 10:00:00,2026-07-04,acc_x,tok_x,402400,dev_x,m_01,10.00,EUR,APPROVED\n");
+        RefusalQuarantine.scanSqlSeam = sql -> "SELECT * FROM no_such_relation_for_the_scan";
+        try {
+            CollectorProcessor.run(pc);
+        } finally {
+            RefusalQuarantine.scanSqlSeam = sql -> sql;
+        }
+        try (Stream<Path> db = Files.exists(Path.of(pc.dirs().database())) ? Files.walk(Path.of(pc.dirs().database())) : Stream.empty()) {
+            assertEquals(0, db.filter(Files::isRegularFile).count(), "no row of an unscanned file lands");
+        }
+        try (Stream<Path> r = Files.list(RefusalQuarantine.dir(pc))) { assertEquals(1, r.count()); }
+        assertTrue(Files.readString(Path.of(pc.dirs().statusFilePath())).contains(RefusalQuarantine.SCAN_FAILED));
     }
 
     private static String luhnComplete(String prefix, int len) {

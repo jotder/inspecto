@@ -236,6 +236,37 @@ class ControlApiDbBrowserTest {
      * pinned here. 403 specifically, not "some 4xx": an escaping name that fell through to the existence
      * check would answer 404 — indistinguishable from a typo, and it would mean the gate never ran.
      */
+    /**
+     * processing.refusal: a file restricted for its content ({@code <quarantine>/.restricted}) is never readable through
+     * the table browser, the ad-hoc query, or a Dataset — neither by its own path nor by an ancestor whose glob would
+     * descend into it (DuckDB's {@code **} includes dot-directories).
+     */
+    @Test
+    void theRestrictedQuarantineIsNeverReadable(@TempDir Path root) throws Exception {
+        String pan = "4111111111111111";
+        try (Ctx c = open(root)) {
+            Path q = root.resolve("s1/data/pay/quarantine");
+            Files.createDirectories(q.resolve(".restricted"));
+            Files.writeString(q.resolve(".restricted/refused-CARD_NUMBER-1-1.csv"), "A,B\nx," + pan + "\n");
+            Files.createDirectories(q.resolve("field_mismatch"));
+            Files.writeString(q.resolve("field_mismatch/ok.csv"), "A,B\nx,y\n");
+            for (String name : new String[]{"pay/quarantine/.restricted", "pay/quarantine", "pay"}) {
+                HttpResponse<String> t = get(c.port, "/spaces/s1/db/table?name=" + name);
+                assertNotEquals(200, t.statusCode(), name + ": " + t.body());
+                assertFalse(t.body().contains(pan), name + " leaked: " + t.body());
+                HttpResponse<String> qy = postJson(c.port, "/spaces/s1/db/query",
+                        "{\"table\":\"" + name + "\",\"sql\":\"SELECT * FROM \\\"" + name + "\\\"\"}");
+                assertNotEquals(200, qy.statusCode(), name + ": " + qy.body());
+                assertFalse(qy.body().contains(pan), name + " leaked: " + qy.body());
+            }
+            // A Dataset over the ancestor is refused where its reference resolves.
+            new ComponentStore(root.resolve("s1/config/registry")).write("dataset", "q_ds", Map.of("physicalRef", "pay/quarantine"));
+            HttpResponse<String> rows = get(c.port, "/spaces/s1/datasets/q_ds/rows");
+            assertNotEquals(200, rows.statusCode(), rows.body());
+            assertFalse(rows.body().contains(pan), rows.body());
+        }
+    }
+
     @Test
     void storeNameCannotEscapeTheDataRoot(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {

@@ -58,6 +58,10 @@ final class RefusalQuarantine {
     static final String CARD = "INGEST_REFUSE:CARD_NUMBER";
     static final String CARD_IN_NAME = "INGEST_REFUSE:CARD_NUMBER_IN_FILE_NAME";
     static final String CARD_IN_HEADER = "INGEST_REFUSE:CARD_NUMBER_IN_HEADER";
+    /** The scan could not run — FAIL CLOSED: the file is restricted, never landed (a scan that errors proves nothing). */
+    static final String SCAN_FAILED = "INGEST_REFUSE:SCAN_FAILED";
+    /** Test seam only: rewrites the scan SQL just before it runs (e.g. to inject a failure). Identity in production. */
+    static volatile java.util.function.UnaryOperator<String> scanSqlSeam = sql -> sql;
     private static final String DUCKDB_PREFIX = "Invalid Input Error: ";
     private static final AtomicLong SEQ = new AtomicLong();
 
@@ -103,8 +107,10 @@ final class RefusalQuarantine {
         try {
             com.gamma.etl.DuckDbCsvIngester.createRawInputView(f, conn, schema, cfg, "__refusal_scan", srcId);
             return scan(conn, schema, cfg, "__refusal_scan");
-        } catch (Exception unreadable) {
-            return null;   // an unreadable file is the lane's to classify
+        } catch (Exception cannotScan) {
+            // FAIL CLOSED: a file the scan cannot read is not proven clean. Restricting it (rather than letting the
+            // lane quarantine it as UNREADABLE) keeps any raw copy out of the ordinary quarantine tree too.
+            return SCAN_FAILED;
         } finally {
             ConsignmentIngestStrategy.dropView(conn, "__refusal_scan");
         }
@@ -114,10 +120,14 @@ final class RefusalQuarantine {
         if (!cfg.refusal().cardScan()) return null;
         String sql = cardScanSql(columns(schema, cfg.refusal().scanExempt()), relation);
         if (sql == null) return null;
-        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(scanSqlSeam.apply(sql))) {
             return rs.next() ? CARD : null;
-        } catch (SQLException e) {
-            return null;   // the real pass reports it
+        } catch (SQLException | RuntimeException e) {
+            // FAIL CLOSED (round-4 decision): restrict, do not fail the batch — a failed batch leaves the unscanned
+            // file in the inbox, re-polled every cycle, and its error text would quote cell values into the ledger.
+            log.warn("[INGEST] [{}] card scan failed ({}) — restricting the file", cfg.identity().pipelineName(),
+                    e.getClass().getSimpleName());
+            return SCAN_FAILED;
         }
     }
 
@@ -167,8 +177,8 @@ final class RefusalQuarantine {
 
     /**
      * {@code SELECT 1 FROM relation WHERE <some cell carries a card-shaped number> LIMIT 1}, or {@code null} with no
-     * column to scan. Per cell: marks (Mn, Me) and format characters (Cf) stripped, Nd digits folded, an IBAN-shaped
-     * cell skipped, a well-formed date/timestamp skipped; then runs of digit groups joined by 1–5 non-alphanumerics,
+     * column to scan. Per cell: marks (Mn, Me) and format characters (Cf) stripped, Nd digits folded, a well-formed
+     * date/timestamp skipped; then runs of digit groups joined by 1–5 non-alphanumerics,
      * split into groups; a candidate is one group of 13–19 digits or a 4-4-4-4 / 4-4-4-4-3 / 4-6-5 / 4-6-4 window —
      * accepted when {@link CardNumbers#IIN_REGEX} matches it (brand prefix AND length) and it is Luhn-valid. Linear:
      * RE2 regexes, windows of at most 5 groups, a group longer than 19 digits is no candidate.
@@ -181,10 +191,10 @@ final class RefusalQuarantine {
         for (Column c : cols) {
             String n = "translate(regexp_replace(CAST(\"" + c.name() + "\" AS VARCHAR), '[\\p{Mn}\\p{Me}\\p{Cf}]', '', 'g'), '"
                     + uni + "', '" + asc + "')";
-            String guard = "regexp_full_match(" + n + ", '[A-Z]{2}[0-9]{2}( ?[0-9A-Z]{1,4}){3,8}')"   // IBAN-shaped
-                    + (c.temporal() ? " OR regexp_full_match(" + n
-                    + ", '[0-9]{4}-[0-9]{2}-[0-9]{2}( [0-9]{2}:[0-9]{2}:[0-9]{2})?')" : "");
-            cells.add("CASE WHEN " + guard + " THEN NULL ELSE " + n + " END");
+            // No IBAN skip (round-4 decision): "DE00 4111 1111 1111 1111" is a card number dressed as an IBAN.
+            // An operator exempts a known IBAN column with refusal_scan_exempt instead.
+            cells.add(c.temporal() ? "CASE WHEN regexp_full_match(" + n
+                    + ", '[0-9]{4}-[0-9]{2}-[0-9]{2}( [0-9]{2}:[0-9]{2}:[0-9]{2})?') THEN NULL ELSE " + n + " END" : n);
         }
         String row = "concat_ws('X', " + String.join(", ", cells) + ")";
         String runs = "list_transform(regexp_extract_all(" + row + ", '[0-9]+(?:[^0-9A-Za-z]{1,5}[0-9]+)*'), "

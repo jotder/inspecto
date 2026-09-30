@@ -408,7 +408,7 @@ final class PipelineGraphRoutes implements RouteModule {
         PendingChanges.hold(api, e, "pipeline", name, lowered, existsOnDisk ? existing : null);   // maker-checker
 
         byte[] bytes = ConfigCodec.toToon(lowered).getBytes(StandardCharsets.UTF_8);
-        AtomicFiles.write(target, bytes, ".cfg-");
+        RefusalConfigAudit.write(target, bytes, ".cfg-");
         PipelineHistory.record(writeRoot, target);   // PIPELINE-CONFIG-HISTORY-1
         // GET …/graph/raw lifts the REGISTERED config, so without this a reopen straight after Save served
         // the pre-save graph until the next poll cycle (the history restore route does the same).

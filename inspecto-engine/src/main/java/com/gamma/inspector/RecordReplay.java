@@ -276,6 +276,8 @@ public final class RecordReplay {
         if (!Files.isDirectory(qRoot)) return null;
         try (Stream<Path> walk = Files.walk(qRoot, 6)) {
             return walk.filter(Files::isRegularFile)
+                    // processing.refusal: never read the restricted quarantine (RefusalQuarantine.DIR)
+                    .filter(p -> !qRoot.relativize(p.normalize()).startsWith(RefusalQuarantine.DIR))
                     .filter(p -> p.getFileName().toString().equals(wanted))
                     .filter(p -> p.normalize().startsWith(qRoot))
                     .findFirst().orElse(null);
