@@ -1168,7 +1168,7 @@ Alert Rule; LA-24 member read-only / writes 404 / stranger 404 / access ends on 
   `skipped.empty`, so `rowsRead` accounts for every row (`ControlApiEntityIdentityImportTest`); `GET …/case` says
   `sharing:false` with the reason once the Case is closed or gone (`ControlApiInvestigationCaseShareTest`); the alert
   text reads "over the whole Dataset, window: last 24h, UTC" (`Alert.java`).
-* Open: no `GET /inv/investigations` list route (405).
+* ✅ **FIXED 2026-09-30:** `GET /inv/investigations` lists what the caller may read (own + shared through an open Case, PDP DENY hides; `ControlApiInvestigationListTest`, `17a28563f`).
 * ✅ **FIXED 2026-09-30 — the 401 + 503 in the SPA console.** The 401 was the first-load `POST /auth/refresh` of a
   signed-out browser (expected "no session", but the browser logs every non-2xx): `SessionService` now resumes only
   when a `localStorage` hint says this browser signed in (set on exchange/refresh, cleared on session loss). The 503
