@@ -1,0 +1,8 @@
+name: ba_margin_erosion
+dataset: ba_margin_erosion
+measure: max(erosion_pp)
+by[3]: product, channel, partner
+comparator: gt
+threshold: 5
+severity: WARNING
+description: "Margin eroded by more than 5 points"

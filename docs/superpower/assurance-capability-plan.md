@@ -121,7 +121,7 @@ KPI definitions and runbooks. Thresholds are configuration.
 | 5.1 | **Telecom fraud (WS-15, generic half)** | 6–9 | top ten typologies first: IRSF, Wangiri, SIM-box, premium-rate, roaming high usage, SIM-swap, subscription / identity, dealer activations, voucher / EVD, payment reversal — windows in `sql.template`, Alert Rules keyed on the offender (1.1) |
 | 5.2 | **Telecom revenue assurance (WS-16, generic half)** | 6–9 | Reconciliation, re-rating, roll-forward and settlement controls on **canonical** synthetic schemas; the vendor-specific feed mapping is parked (§4) |
 | 5.3 | **Payment fraud (WS-40…44, generic half)** | 18–28 | synthetic attempt / dispute / SIM-change corpus and a fail-closed card-number tripwire (WS-40); feature Datasets via `sql.template` (WS-41); payment typologies (WS-42); payment Risk Score with a **default** factor table as configuration (WS-43); disputes, labels with a maturity flag, payment KPIs (WS-44) |
-| 5.4 | **Business assurance (WS-28, generic half)** | 3–5 | seasonal forecast (Holt-Winters in SQL) as a Measure function; margin model by product / channel / partner |
+| 5.4 | 🟡 **BUILT 2026-09-30, not closed** (`ASSURE-PACK-BUSINESS-ASSURANCE-1`; forecast shipped as a Dataset, not a Measure function — gap on the row) — **Business assurance (WS-28, generic half)** | 3–5 | seasonal forecast (Holt-Winters in SQL) as a Measure function; margin model by product / channel / partner |
 
 5.1 wave 1 can start as soon as 1.1 lands; it need not wait for all of waves 2–4.
 

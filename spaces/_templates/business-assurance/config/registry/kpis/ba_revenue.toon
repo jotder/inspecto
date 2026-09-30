@@ -1,0 +1,8 @@
+name: ba_revenue
+title: Revenue
+dataset: ba_revenue_forecast
+measure: sum(actual)
+timeField: ds
+grain: week
+comparison: previous
+direction: up

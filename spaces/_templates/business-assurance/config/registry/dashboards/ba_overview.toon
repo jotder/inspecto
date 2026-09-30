@@ -1,0 +1,7 @@
+name: ba_overview
+tiles[5]{widgetId,span}:
+  ba_revenue_tile,1
+  ba_days_outside_band_tile,1
+  ba_margin_tile,1
+  ba_revenue_vs_forecast,2
+  ba_margin_erosion_by_partner,2

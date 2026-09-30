@@ -1,0 +1,12 @@
+vizType: line
+datasetId: ba_revenue_forecast
+controls:
+  x[1]{field}:
+    ds
+  y[4]{field,agg}:
+    actual,sum
+    forecast,sum
+    lower_band,sum
+    upper_band,sum
+options:
+  title: Revenue against forecast and band

@@ -1,0 +1,8 @@
+job:
+  name: ba_margin_erosion
+  type: sql.template
+  sql: "WITH w AS (SELECT max(ds) AS last_ds FROM margin_lines), a AS (SELECT m.product, m.channel, m.partner, sum(m.revenue) AS revenue, sum(m.cost) AS cost, sum(m.revenue) FILTER (WHERE m.ds <= w.last_ds - 28) AS base_revenue, sum(m.cost) FILTER (WHERE m.ds <= w.last_ds - 28) AS base_cost, sum(m.revenue) FILTER (WHERE m.ds > w.last_ds - 28) AS recent_revenue, sum(m.cost) FILTER (WHERE m.ds > w.last_ds - 28) AS recent_cost FROM margin_lines m CROSS JOIN w WHERE m.ds > w.last_ds - 56 GROUP BY m.product, m.channel, m.partner), p AS (SELECT *, 100.0 * (base_revenue - base_cost) / NULLIF(base_revenue, 0) AS base_pct, 100.0 * (recent_revenue - recent_cost) / NULLIF(recent_revenue, 0) AS recent_pct FROM a) SELECT product, channel, partner, ROUND(revenue, 2) AS revenue, ROUND(cost, 2) AS cost, ROUND(revenue - cost, 2) AS margin, ROUND(100.0 * (revenue - cost) / NULLIF(revenue, 0), 2) AS margin_pct, ROUND(base_pct, 2) AS baseline_margin_pct, ROUND(recent_pct, 2) AS recent_margin_pct, ROUND(base_pct - recent_pct, 2) AS erosion_pp FROM p ORDER BY product, channel, partner"
+  sources: margin_lines
+  sink_dataset: margin_erosion
+  cron: "0 6 * * *"
+  enabled: false

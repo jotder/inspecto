@@ -1,0 +1,9 @@
+name: ba_days_outside_band
+title: Days outside the forecast band
+dataset: ba_revenue_forecast
+measure: sum(outside_band)
+timeField: ds
+grain: month
+comparison: previous
+direction: down
+target: 0

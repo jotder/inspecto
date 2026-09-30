@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: ba_margin_erosion
+controls:
+  x[1]{field}:
+    partner
+  y[1]{field,agg}:
+    erosion_pp,max
+options:
+  title: Worst margin erosion by partner (points)

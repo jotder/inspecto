@@ -1,0 +1,8 @@
+name: ba_revenue_outside_band
+dataset: ba_revenue_forecast
+measure: max(outside_band)
+by[1]: ds
+comparator: gte
+threshold: 1
+severity: CRITICAL
+description: "Daily revenue outside its forecast band"

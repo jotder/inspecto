@@ -1,0 +1,8 @@
+name: ba_margin
+title: Margin
+dataset: ba_margin_lines
+measure: sum(margin)
+timeField: ds
+grain: week
+comparison: previous
+direction: up

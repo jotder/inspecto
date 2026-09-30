@@ -59,7 +59,7 @@ matrix is authoritative for the Edition column**; this table mirrors it.
 |---|---|---|---|---|
 | `SPC-1` | Isolated **Spaces** (config / data / audit / duckdb per Space), CRUD without restart, one-time migrator | Must | ✅ SHIPPED — ⚠ "isolated" is a **layout** on Personal/Standard and an **enforced boundary** only on Enterprise (CP-07, SEC-06; §3.9) | All |
 | `SPC-2` | Whole-Space zip export / import with dry-run preview | Must | ✅ SHIPPED | All |
-| `SPC-3` | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | 🟡 **MECHANISM SHIPPED, CONTENT ABSENT** — the server-side catalog exists; **one** template ships (`orders-starter`); **none of the four named verticals exists** in any shipped artifact (§2 corrections) | All |
+| `SPC-3` | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | 🟡 **MECHANISM SHIPPED, CONTENT ABSENT** — the server-side catalog exists; two templates ship (`orders-starter`, and the `business-assurance` content pack since 2026-09-30); **none of the four named verticals exists** in any shipped artifact (§2 corrections) | All |
 | `SPC-4` | **Metadata Bundle v2**: selective config-only transfer with refs, provenance / `contentHash`, `requires`, drift fit-check | Should | ✅ SHIPPED 2026-07-07 (+ `authored-pipeline`, `job`, `saved-view` 2026-07-18; `connection` 2026-07-25; `enrichment` 2026-08-31) | All |
 | `SPC-5` | Per-tenant ABAC | Could | ✅ SHIPPED 2026-07-24 (two seeded policies; engage only when a `space` claim is mapped) ⚠ **Named for grep:** the decision seam those policies enforce through is `AccessDecider` (`inspecto-policy/.../PolicyEngine.java`, exercised by `ControlApiAccessDeciderTest`) — until 2026-09-09 that name appeared only in `REQUIREMENTS.md`. | E |
 
@@ -189,9 +189,9 @@ contents[]}` — the UI's `SpaceTemplateInfo`) beside a `config/` tree and an op
 **rewriting `${SPACE}` tokens** in every `.toon` (template configs address their own Space as
 `spaces/${SPACE}/…` — the portable bare-form the product writes, W3) and copies `data/` verbatim. An
 unreadable template is warned and skipped, never fatal. The SPA's gallery (`SpaceTemplateGalleryDialog`) is
-two-step ask-the-minimum and renders whatever the server publishes. **What is published: one template,
-`orders-starter`** — a pipeline, a quality rule, a dataset and a live dashboard. Nothing named Telecom,
-Fraud, Financial Audit or Link Analysis exists (§2, §5).
+two-step ask-the-minimum and renders whatever the server publishes. **What is published:** `orders-starter`
+— a pipeline, a quality rule, a dataset and a live dashboard — and, since 2026-09-30, `business-assurance`
+(below). Nothing named Telecom, Fraud, Financial Audit or Link Analysis exists yet (§2, §5).
 
 **A template may carry a KPI pack** (`config/registry/kpis/`, `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1),
 2026-09-28). `SpaceRoutes.createSpace` hands `createFromTemplate` a seed gate
@@ -208,6 +208,35 @@ recovery create) Dataset access is fail-open; a template Dataset shared away fro
 reads the Dataset's Schema, so a KPI over a Dataset that the template's own pipeline has not filled yet (a
 `physicalRef` store with no Parquet — every fresh `orders-starter` store) is REFUSED at apply; that is why
 `orders-starter` ships no KPI pack.
+
+**The business assurance pack** (`spaces/_templates/business-assurance/`, `ASSURE-PACK-BUSINESS-ASSURANCE-1`,
+wave 5.4, 2026-09-30) is the first content pack, and it dodges that trap by **generating its corpus in SQL**:
+three hand-authored views (`config/views/ba_*_view.toon`, plain `derived_sql`) each open with a CTE that builds
+a deterministic synthetic corpus from `range()` (a fixed-offset Weyl sequence into Box-Muller — no RNG state, so
+every DuckDB and every run gives the same rows), then run the model over it. The Datasets are `view:`-backed, so
+their Schema exists the moment the template is copied and the KPI / Alert Rule `by` gates pass at apply. What it
+ships: `ba_revenue_forecast` — a **Holt-Winters additive** forecast (season 7, α 0.25 β 0.02 γ 0.15) written as
+a `WITH RECURSIVE` whose state row carries the seven seasonal terms as a DuckDB `LIST` (`list_transform` with an
+index lambda replaces one slot per step), with `lower_band` / `upper_band` = forecast ± 4σ̂, where σ̂ is a
+MAD estimate over week-on-week differences (independent of the recursion, so an anomaly cannot widen its own
+band); a point outside the band updates the state with the forecast instead of the actual, so one anomaly does
+not drag the next season; `outside_band` is 0 through a 28-day warm-up. `ba_margin_lines` / `ba_margin_erosion`
+— revenue − cost by product / channel / partner, margin %, and `erosion_pp` = baseline (prior 28 days) margin %
+minus recent (last 28 days) margin %. Two per-entity Alert Rules (`ba_revenue_outside_band`: `max(outside_band)`
+`by [ds]` `gte 1`, CRITICAL; `ba_margin_erosion`: `max(erosion_pp)` `by [product, channel, partner]` `gt 5`,
+WARNING), three KPI definitions, one dashboard, and two **disabled** `sql.template` Jobs that run the SAME model
+SQL over the user's own `daily_revenue` / `margin_lines` stores (`BusinessAssurancePackGoldenTest` pins each view
+to contain its Job's SQL verbatim, and the Job's SQL to pass `SqlGuard`). ⚠ An Alert Rule `threshold` must be
+positive, so a 0/1 flag is armed as `gte 1`, not `gt 0`. ⚠ A WARNING rule raises an Alert but no Incident.
+Golden result: 2 detections (the planted −400 day, 2026-06-04; the planted +15 % cost line, P3/online/PB), 0
+false positives against 4 planted look-alikes; forecast RMSE 10.3 against the noise-free signal (σ = 20),
+MAPE 1.7 %. Runbooks: `spaces/_templates/business-assurance/RUNBOOK.md`.
+
+**Product gaps the pack recorded** (open on the BACKLOG row): the forecast is NOT a Measure function — the
+Measure shorthand is `count | agg(field)`, so a forecast inside a KPI or Alert Rule would need an engine change;
+the Dataset form was taken instead. A hand-authored view cannot read another view, so each view inlines its
+corpus CTE. A template has no runbook home: `createFromTemplate` copies only `config/` and `data/`, so
+`RUNBOOK.md` stays in the catalog, not in the created Space.
 
 **Every registry kind a template seeds is gated, not only `kpi`** (`ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) ⚠,
 2026-09-28). The seed gate is `TemplateSeedGate.require`, one table-driven pass over the staged tree before boot:
