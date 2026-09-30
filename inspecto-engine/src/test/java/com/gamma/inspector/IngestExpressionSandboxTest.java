@@ -90,6 +90,90 @@ class IngestExpressionSandboxTest {
                 "max(LEAK) FILTER (WHERE ORDER_ID = 1001)"));
     }
 
+    // ── the data-home variant (adversarial verification of 68a1896f8) ──────────────────
+
+    /** A Space with its Pending Change key where the real layout keeps it. */
+    private static Path plantKey(Path dir) throws Exception {
+        Path key = Files.createDirectories(dir.resolve("space/config.secrets")).resolve(".pending-changes.key");
+        Files.writeString(key, MARKER);
+        return key;
+    }
+
+    @Test
+    void configureRefusesAnAllowlistThatIsTheSpaceRoot(@TempDir Path dir) throws Exception {
+        plantKey(dir);
+        PipelineConfig cfg = pipeline(dir, "upper(CUSTOMER)", sql(dir.resolve("space")));
+        File tempDb = ConsignmentIngestStrategy.openTempDb(cfg, "sec_root_");
+        try (Connection conn = DuckDbUtil.openConnection(tempDb)) {
+            SQLException e = assertThrows(SQLException.class,
+                    () -> ConsignmentIngestStrategy.configure(conn, cfg, tempDb, List.of()));
+            assertTrue(e.getMessage().contains("Space root"), e.getMessage());
+        } finally {
+            DuckDbUtil.deleteTempDb(tempDb);
+        }
+    }
+
+    @Test
+    void anErrorsDirAtTheSpaceRootCannotReadThePendingChangeKey(@TempDir Path dir) throws Exception {
+        Path key = plantKey(dir);
+        PipelineConfig cfg = pipeline(dir, "(SELECT content FROM read_text('" + sql(key) + "'))",
+                sql(dir.resolve("space")));
+        runQuietly(cfg);
+        assertNothingLanded(cfg);
+    }
+
+    @Test
+    void theSealedConnectionRefusesTheKeyGlobAttachAndAnyReconfiguration(@TempDir Path dir) throws Exception {
+        Path key = plantKey(dir);
+        PipelineConfig cfg = pipeline(dir, "upper(CUSTOMER)");
+        File tempDb = ConsignmentIngestStrategy.openTempDb(cfg, "sec_lock_");
+        try (Connection conn = DuckDbUtil.openConnection(tempDb)) {
+            ConsignmentIngestStrategy.configure(conn, cfg, tempDb, List.of());
+            String space = sql(dir.resolve("space"));
+            for (String q : List.of("SELECT content FROM read_text('" + sql(key) + "')",
+                    "SELECT * FROM glob('" + space + "/**')",
+                    "ATTACH '" + space + "/stolen.db' AS stolen",
+                    // lock-only refusals: nothing but lock_configuration stops these
+                    "SET threads=3",
+                    "SET memory_limit='3GB'",
+                    "SET allowed_directories=['" + space + "/']")) {
+                assertThrows(SQLException.class, () -> {
+                    try (Statement st = conn.createStatement()) { st.execute(q); }
+                }, q);
+            }
+        } finally {
+            DuckDbUtil.deleteTempDb(tempDb);
+        }
+    }
+
+    /** Round 3: with no dirs.temp the temp DB lands in java.io.tmpdir — which must never join the allowlist. */
+    @Test
+    void theAllowlistNeverContainsTheSystemTempDirectory(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = pipeline(dir, "upper(CUSTOMER)");
+        Path toon = Path.of(cfg.dirs().poll()).getParent().getParent().getParent().resolve("config/orders/orders_pipeline.toon");
+        Files.writeString(toon, Files.readString(toon).replaceAll("(?m)^\\s*temp:.*\\R", ""));
+        PipelineConfig noTemp = PipelineConfig.load(toon.toString());
+        assertNull(noTemp.dirs().temp(), "fixture: no dirs.temp");
+        File tempDb = ConsignmentIngestStrategy.openTempDb(noTemp, "sec_tmp_");
+        Path tmp = Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize();
+        try (Connection conn = DuckDbUtil.openConnection(tempDb)) {
+            ConsignmentIngestStrategy.configure(conn, noTemp, tempDb, List.of());
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT unnest(string_split(current_setting('allowed_directories')::VARCHAR, ','))")) {
+                while (rs.next()) {
+                    String entry = rs.getString(1).replaceAll("[\\[\\]' ]", "").replace('\\', '/');
+                    assertFalse(tmp.toString().replace('\\', '/').equalsIgnoreCase(entry.replaceAll("/$", "")),
+                            "java.io.tmpdir itself is on the allowlist: " + entry);
+                }
+            }
+        } finally {
+            DuckDbUtil.deleteTempDb(tempDb);
+        }
+        for (Path p : ConsignmentIngestStrategy.ingestAllowedDirs(noTemp, List.of()))
+            assertNull(com.gamma.config.safety.PathJail.readAllowlistRefusal(p), p.toString());
+        assertNotNull(com.gamma.config.safety.PathJail.readAllowlistRefusal(tmp), "the filter refuses tmpdir");
+    }
+
     // ── fixture ─────────────────────────────────────────────────────────────
 
     private static void runQuietly(PipelineConfig cfg) {
@@ -117,6 +201,10 @@ class IngestExpressionSandboxTest {
     }
 
     private static PipelineConfig pipeline(Path dir, String expression) throws Exception {
+        return pipeline(dir, expression, null);
+    }
+
+    private static PipelineConfig pipeline(Path dir, String expression, String errorsDir) throws Exception {
         Path conf = Files.createDirectories(dir.resolve("space/config/orders"));
         Files.writeString(conf.resolve("orders_schema.toon"), """
                 raw:
@@ -145,11 +233,11 @@ class IngestExpressionSandboxTest {
                 name: orders
                 active: false
                 dirs:
-                  poll:       %1$s/data/inbox/orders
+                  poll:       %3$s
                   database:   %1$s/data/orders/database
                   backup:     %1$s/data/orders/backup
                   temp:       %1$s/data/orders/temp
-                  errors:     %1$s/data/orders/errors
+                  errors:     %2$s
                   quarantine: %1$s/data/orders/quarantine
                   status_dir: %1$s/data/orders/status
                 processing:
@@ -157,7 +245,9 @@ class IngestExpressionSandboxTest {
                   schema_file: orders_schema.toon
                   csv_settings:
                     delimiter: ","
-                """.formatted(d), StandardCharsets.UTF_8);
+                """.formatted(d, errorsDir != null ? errorsDir : d + "/data/orders/errors",
+                // an errors dir that holds the inbox would hide the batch from discovery
+                errorsDir != null ? dir.toString().replace(File.separatorChar, '/') + "/outside-inbox/orders" : d + "/data/inbox/orders"), StandardCharsets.UTF_8);
         PipelineConfig cfg = PipelineConfig.load(toon.toString());
         Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
         Files.writeString(inbox.resolve("orders_1.csv"), "ORDER_ID,CUSTOMER\n1001,acme\n1002,globex\n",

@@ -188,10 +188,34 @@ autoloaded httpfs (SSRF — verified: the unsealed connection dialled the addres
   the inbox and rides the same lanes. After the resource settings it calls
   `SqlSandbox.disableExtensionAutoload` and then `SqlSandbox.sealAllowing(conn, ingestAllowedDirs(...))`:
   external access off, configuration locked.
-- **The allowlist** (`ingestAllowedDirs`): the temp DB's directory, the spill dir, this Pipeline's own
-  `dirs:` (poll, database, backup, temp, errors, quarantine, markers, manifests), every `sinks[]` database,
-  and each input file's directory. Everything else is refused by DuckDB itself ("file system operations are
-  disabled by configuration"), whatever a lexical check missed.
+- **The allowlist** (`ingestAllowedDirs`): the spill dir, this Pipeline's own `dirs:` (poll, database,
+  backup, temp, errors, quarantine, markers, manifests), every `sinks[]` database, and each input file's
+  directory. NOT the temp DB's own directory — the open database needs no file permission, and with no
+  `dirs.temp` it would be `java.io.tmpdir`. Everything else is refused by DuckDB itself ("file system
+  operations are disabled by configuration"), whatever a lexical check missed.
+- **The allowlist is author-controlled, so its entries are judged too** (adversarial verification of the
+  first fix: `dirs.errors: <Space root>` passed the jail, which only contains a path to the Space base, and
+  then `read_text('<S>/config.secrets/.pending-changes.key')`, `glob('<S>/**')` and `ATTACH` all worked).
+  Two layers now:
+  - **write gate / import** — `PathJail.refuseDataHome` refuses a Pipeline `dirs.*`, `sinks[].database`,
+    `output.ducklake.data_path` or `processing.duckdb.temp_directory` that is (or contains) the Space root,
+    is under its `config/` tree, or names a `*.secrets` directory (`refuseSecrets`, now public).
+    `ConfigSafetyValidator.checkDataHome` applies it on every save; `ImportCapabilityGuard.checkFiles` applies
+    it to every carried `*_pipeline.toon` at every import door (403, nothing written) — relative values
+    against a stand-in Space base, absolute ones against every hosted Space (`DiscoveredRoots.all()`).
+  - **run time** — `PathJail.readAllowlistRefusal(dir)` (public, in `inspecto-config`, so every sealed
+    connection built from authored config reuses it — the enrichment seal included) names why a dir may not be
+    allowlisted: a `*.secrets` directory, anything under a directory named `config`, a dir that is or contains
+    a registered Space base or holds a `config/` subdirectory (the Space shape, for CLI entry points that
+    register none), or `java.io.tmpdir` itself / an ancestor of it. The ingest seal refuses the run
+    (`SQLException`, batch fails) on any non-null answer. Fail closed.
+  - **the temp DB** stays where `openTempDb` puts it (`dirs.temp`, else `java.io.tmpdir`), but its directory
+    is no longer allowlisted, so no per-run temp directory is needed; `IngestExpressionSandboxTest
+    .theAllowlistNeverContainsTheSystemTempDirectory` pins it (with tmpdir allowlisted the three
+    host/other-Space reads all landed).
+- ⚠ **Residual — links.** DuckDB's `allowed_directories` check is lexical: a symlink or junction INSIDE an
+  allowed directory is followed. Config cannot plant one (no config key creates a link), so it is recorded,
+  not fixed; an operator who links a data dir elsewhere extends the ingest connection's reach to that target.
 - **Extensions load BEFORE the seal.** After the lock a `LOAD` is file access and is refused, and
   `duckdb_extensions()` itself scans the extension directory, so it cannot be used as an "already loaded?"
   probe. `configure` pre-loads `excel` for an `xlsx` Pipeline; `ExcelExtension.ensureLoaded` returns early
@@ -201,7 +225,7 @@ autoloaded httpfs (SSRF — verified: the unsealed connection dialled the addres
   is refused at the write gate today, so it stays refused here — fail closed).
 - **Still works on a sealed connection:** scalar SQL the content packs use — `error()`, lambdas,
   `list_transform`, `regexp_matches` (the payment-fraud PAN tripwire shape).
-- **Pinned by** `IngestExpressionSandboxTest` (real path, `CollectorProcessor.run`): `read_text` of a host
+- **Pinned by** `IngestExpressionSandboxTest` (real path, `CollectorProcessor.run`; plus `configure` refusing a Space-root allowlist, an `errors` dir at the Space root landing nothing, and the key / `glob` / `ATTACH` / `SET threads` / `SET allowed_directories` all refused after the seal — so dropping `lock_configuration` goes red), `ConfigSafetyValidatorTest.aPipelineDataHome*` and `ControlApiImportCapabilityGateTest.aRawImportPipelineWhoseDataHomeIsTheSpaceRootOrConfigIsRefused`. First-fix cases: `read_text` of a host
   file, `read_csv` and `read_parquet` of another Space's data land nothing; an `http://` URL is refused by
   the configuration (not by a failed fetch) and `SET enable_external_access=true` is refused after the lock;
   a custom mapping with `regexp` + `error()` + a lambda still lands. All four refusal cases go red with the

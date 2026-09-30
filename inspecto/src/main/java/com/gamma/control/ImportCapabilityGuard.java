@@ -162,6 +162,7 @@ final class ImportCapabilityGuard {
         for (Map.Entry<String, byte[]> e : entries.entrySet()) {
             String rel = normalizedPath(e.getKey());
             String file = rel.substring(rel.lastIndexOf('/') + 1);
+            if (file.endsWith("_pipeline.toon")) refuseDataHomes(ex, e.getKey(), e.getValue());
             if (file.endsWith("_connection.toon")) require(ex, "connection", Roles.CAN_ONBOARD_CONNECTIONS);
             else if (file.endsWith("_job.toon")) requireIfAdministerOnly(ex, jobSection(e.getValue()));
             else if (file.endsWith("_job_template.toon")) refuseAttachingTemplate(e.getKey(), e.getValue());
@@ -175,6 +176,58 @@ final class ImportCapabilityGuard {
                 if (!newSpace) refuseDedicated(kind, "an import carrying a '" + kind + "' item");
                 refuseGovernance(kind, "an import carrying a '" + kind + "' item");   // a new Space's too
                 if (KIND_CAPABILITY.containsKey(kind)) require(ex, kind, KIND_CAPABILITY.get(kind));
+            }
+        }
+    }
+
+    /** The Pipeline keys whose values become directories its sealed ingest connection may read. */
+    private static final String[] DATA_HOME_KEYS = {"poll", "database", "backup", "temp", "errors", "quarantine",
+            "markers", "status_dir", "log_dir"};
+
+    /**
+     * SEC-INGEST-EXPR-EXTERNAL-ACCESS-1: a carried Pipeline whose {@code dirs.*}, {@code sinks[].database} or
+     * spill dir is a Space root, a {@code config/} tree or a {@code *.secrets} directory is refused (403) before
+     * anything is written — the ingest seal allowlists those dirs, so an authored {@code fn: custom} expression
+     * could read the Space's configs and its Pending Change key. A relative value is judged against the Space it
+     * lands in (a stand-in base for a new Space); an absolute one against every hosted Space.
+     */
+    private static void refuseDataHomes(HttpExchange ex, String path, byte[] bytes) {
+        Map<String, Object> m;
+        try {
+            m = ConfigCodec.toMap(new String(bytes, StandardCharsets.UTF_8));
+        } catch (RuntimeException unparseable) {
+            return;   // the loader refuses a malformed file
+        }
+        Map<?, ?> p = m.get("pipeline") instanceof Map<?, ?> nested ? nested : m;
+        List<String[]> values = new ArrayList<>();
+        if (p.get("dirs") instanceof Map<?, ?> dirs)
+            for (String k : DATA_HOME_KEYS) if (dirs.get(k) != null) values.add(new String[]{"dirs." + k, String.valueOf(dirs.get(k))});
+        if (p.get("sinks") instanceof List<?> sinks)
+            for (int i = 0; i < sinks.size(); i++)
+                if (sinks.get(i) instanceof Map<?, ?> s && s.get("database") != null)
+                    values.add(new String[]{"sinks[" + i + "].database", String.valueOf(s.get("database"))});
+        if (p.get("processing") instanceof Map<?, ?> proc && proc.get("duckdb") instanceof Map<?, ?> d
+                && d.get("temp_directory") != null)
+            values.add(new String[]{"processing.duckdb.temp_directory", String.valueOf(d.get("temp_directory"))});
+        java.nio.file.Path configRoot = ex == null ? null : Roles.configRoot(ex);
+        java.nio.file.Path stand = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"), "import-space-stand-in")
+                .toAbsolutePath().normalize();
+        for (String[] kv : values) {
+            String v = kv[1].trim();
+            if (v.isEmpty() || com.gamma.config.safety.PathJail.isUri(v)) continue;
+            try {
+                java.nio.file.Path authored = java.nio.file.Paths.get(v);
+                if (authored.isAbsolute()) {
+                    List<java.nio.file.Path> spaces = new ArrayList<>(com.gamma.config.safety.DiscoveredRoots.all());
+                    if (configRoot != null && configRoot.getParent() != null) spaces.add(configRoot.getParent());
+                    com.gamma.config.safety.PathJail.refuseDataHome(authored.normalize(), null, spaces, v, kv[0]);
+                } else {
+                    com.gamma.config.safety.PathJail.refuseDataHome(stand.resolve(authored).normalize(), stand,
+                            null, v, kv[0]);
+                }
+            } catch (com.gamma.config.safety.PathJail.Escape | java.nio.file.InvalidPathException refused) {
+                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "an import carrying '" + path + "': "
+                        + refused.getMessage() + " — nothing was written");
             }
         }
     }

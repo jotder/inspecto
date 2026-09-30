@@ -215,6 +215,29 @@ class ControlApiImportCapabilityGateTest {
         }
     }
 
+    /** SEC-INGEST-EXPR-EXTERNAL-ACCESS-1: a carried Pipeline whose data home is the Space root, config/ or a
+     *  .secrets dir would hand its sealed ingest connection the Pending Change key — refused, nothing written. */
+    @Test
+    void aRawImportPipelineWhoseDataHomeIsTheSpaceRootOrConfigIsRefused(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            String spaceRoot = c.config.getParent().toString().replace('\\', '/');
+            for (String[] bad : new String[][]{{"errors", "."}, {"errors", spaceRoot}, {"backup", "config/x"},
+                    {"temp", "config.secrets"}}) {
+                Map<String, String> before = tree(c.config);
+                Map<String, Object> leak = new LinkedHashMap<>(ConfigCodec.toMap(Files.readString(c.config.resolve("etl_pipeline.toon"))));
+                leak.put("name", "leak");
+                @SuppressWarnings("unchecked") Map<String, Object> dirs = new LinkedHashMap<>((Map<String, Object>) leak.get("dirs"));
+                dirs.put(bad[0], bad[1]);
+                leak.put("dirs", dirs);
+                HttpResponse<String> r = send(c, "POST", "/import",
+                        dataSourceZip("leak/leak_pipeline.toon", ConfigCodec.toToon(leak)), BOTH);
+                assertEquals(403, r.statusCode(), bad[1] + ": " + r.body());
+                assertTrue(r.body().contains("dirs." + bad[0]), r.body());
+                assertEquals(before, tree(c.config), "nothing written for " + bad[1]);
+            }
+        }
+    }
+
     @Test
     void aRawImportFindingsSpecNeedsCanManageIncidents(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {

@@ -44,10 +44,21 @@ class ControlApiBundleImportTest {
      *                        hosts the {@code REGION_DIM} Reference producer, and a second empty target
      *                        space {@code gamma} exists
      */
+    /** SEC-INGEST-EXPR-EXTERNAL-ACCESS-1: a Pipeline's data dirs may not sit under config/ — TestConfigs writes them
+     *  beside its toon, so re-point them at {@code <space>/data/...} (the schema file stays beside the config). */
+    static Path dataDirsOutOfConfig(Path toon, Path dir, Path data) throws java.io.IOException {
+        String s = Files.readString(toon);
+        for (String k : new String[]{"inbox", "db", "backup", "temp", "errors", "quarantine", "markers", "status", "logs"})
+            s = s.replace(dir + "/" + k + "\n", data.toString().replace('\\', '/') + "/" + k + "\n");
+        Files.writeString(toon, s);
+        return toon;
+    }
+
     private Ctx open(Path root, boolean readsAReference) throws Exception {
         Path config = root.resolve("alpha").resolve("config");
         Files.createDirectories(config);
-        Path tmp = TestConfigs.csv(config, PipelineConfigBatchTest.miniSchema()).write();
+        Path tmp = dataDirsOutOfConfig(TestConfigs.csv(config, PipelineConfigBatchTest.miniSchema()).write(),
+                config, config.getParent().resolve("data"));
         Files.move(tmp, config.resolve("etl_pipeline.toon"));
         Files.createDirectories(root.resolve("beta").resolve("config"));   // empty target space
         if (readsAReference) {
@@ -55,8 +66,9 @@ class ControlApiBundleImportTest {
             Path etl = config.resolve("etl_pipeline.toon");
             Files.writeString(etl, Files.readString(etl).replace("active: true", "active: false")
                     .replace("processing:\n", "processing:\n  join:\n    reference: reference/region_dim\n    on: ID\n"));
-            Path region = TestConfigs.csv(config.resolve("region"), PipelineConfigBatchTest.miniSchema())
-                    .name("REGION_DIM").write();
+            Path region = dataDirsOutOfConfig(TestConfigs.csv(config.resolve("region"),
+                    PipelineConfigBatchTest.miniSchema()).name("REGION_DIM").write(),
+                    config.resolve("region"), config.getParent().resolve("data").resolve("region"));
             Files.writeString(config.resolve("region").resolve("region_pipeline.toon"),
                     "produces: reference\n" + Files.readString(region).replace("active: true", "active: false"));
             Files.delete(region);

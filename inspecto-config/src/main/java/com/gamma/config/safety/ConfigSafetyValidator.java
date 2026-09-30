@@ -193,13 +193,14 @@ public final class ConfigSafetyValidator {
     // ── pipeline ─────────────────────────────────────────────────────────────────────
 
     private static void checkPipeline(Map<String, Object> raw, SafetyPolicy p, Path configDir, List<Finding> out) {
-        for (String f : PIPELINE_DIRS) checkDataPath(raw, f, p, configDir, out);
-        checkDataPath(raw, "output.ducklake.data_path", p, configDir, out);
+        for (String f : PIPELINE_DIRS) checkDataHome(f, RawConfig.str(raw, f), p, configDir, out);
+        checkDataHome("output.ducklake.data_path", RawConfig.str(raw, "output.ducklake.data_path"), p, configDir, out);
         // ROADMAP §3.5 "jail the database temp directory". The fallback `dirs.temp` is in PIPELINE_DIRS,
         // but `ConsignmentIngestStrategy.scratchDir` PREFERS this explicit spill dir and returned it raw,
         // and neither the loader nor the run path contains it — so the one knob that can point
         // multi-hundred-GB spill data anywhere was the one path this gate never looked at.
-        checkDataPath(raw, "processing.duckdb.temp_directory", p, configDir, out);
+        checkDataHome("processing.duckdb.temp_directory", RawConfig.str(raw, "processing.duckdb.temp_directory"),
+                p, configDir, out);
         // S5: the refs the parser resolves and jails at LOAD time (PipelineConfigParser's
         // resolveSchemaRef / resolveGrammarRef). Without these the 422 write gate would accept a
         // config that the loader then refuses — the operator learns at run time what authoring
@@ -362,7 +363,7 @@ public final class ConfigSafetyValidator {
         String prefix = "sinks[" + i + "]";
         Object db = sink.get("database");
         if (db != null && !db.toString().isBlank())
-            checkPathValue(prefix + ".database", db.toString(), p, PathJail::resolveDataPath, configDir, out);
+            checkDataHome(prefix + ".database", db.toString(), p, configDir, out);
 
         Object fmt = sink.get("format");
         if (fmt != null && !fmt.toString().isBlank()
@@ -526,6 +527,23 @@ public final class ConfigSafetyValidator {
     private static String registryRefPrefix(String value) {
         String s = value.trim();
         return REGISTRY_REF_PREFIXES.stream().filter(s::startsWith).findFirst().orElse(null);
+    }
+
+    /**
+     * A Pipeline data HOME (a directory its sealed ingest connection may read): jailed like any data path, and
+     * then {@link PathJail#refuseDataHome} — never the Space root, its {@code config/} tree or a
+     * {@code *.secrets} directory (SEC-INGEST-EXPR-EXTERNAL-ACCESS-1).
+     */
+    static void checkDataHome(String field, String value, SafetyPolicy p, Path configDir, List<Finding> out) {
+        int before = out.size();
+        checkPathValue(field, value, p, PathJail::resolveDataPath, configDir, out);
+        if (out.size() > before || value == null || value.isBlank() || PathJail.isUri(value.trim())) return;
+        try {
+            PathJail.refuseDataHome(PathJail.resolveDataPath(configDir, value.trim(), field),
+                    PathJail.spaceDirOf(configDir), p.allowedRoots(), value.trim(), field);
+        } catch (PathJail.Escape refused) {
+            out.add(Finding.error(field, refused.getMessage()));
+        }
     }
 
     /** A data path key, resolved as the loader resolves it - {@link PathJail#resolveDataPath}. */

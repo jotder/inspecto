@@ -56,16 +56,27 @@ class ControlApiMultiSpaceTest {
         return new Ctx(spaces, api, api.port());
     }
 
+    /** SEC-INGEST-EXPR-EXTERNAL-ACCESS-1: a Pipeline's data dirs may not sit under config/ — TestConfigs writes them
+     *  beside its toon, so re-point them at {@code <space>/data/...} (the schema file stays beside the config). */
+    static Path dataDirsOutOfConfig(Path toon, Path dir, Path data) throws java.io.IOException {
+        String s = Files.readString(toon);
+        for (String k : new String[]{"inbox", "db", "backup", "temp", "errors", "quarantine", "markers", "status", "logs"})
+            s = s.replace(dir + "/" + k + "\n", data.toString().replace('\\', '/') + "/" + k + "\n");
+        Files.writeString(toon, s);
+        return toon;
+    }
+
     /** A space dir with a {@code config/} subtree holding one TEST_ETL pipeline (renamed to the *_pipeline.toon suffix). */
     private void seedSpace(Path root, String id) throws Exception {
         Path config = root.resolve(id).resolve("config");
         Files.createDirectories(config);
-        Path tmp = TestConfigs.csv(config, PipelineConfigBatchTest.miniSchema()).write();
+        Path tmp = dataDirsOutOfConfig(TestConfigs.csv(config, PipelineConfigBatchTest.miniSchema()).write(),
+                config, config.getParent().resolve("data"));
         Files.move(tmp, config.resolve("etl_pipeline.toon"));   // dir-scan discovers *_pipeline.toon
-        Files.createDirectories(config.resolve("inbox"));        // empty at boot; data dropped per assertion
+        Files.createDirectories(config.getParent().resolve("data").resolve("inbox"));        // empty at boot; data dropped per assertion
     }
 
-    private Path inbox(Path root, String id) { return root.resolve(id).resolve("config").resolve("inbox"); }
+    private Path inbox(Path root, String id) { return root.resolve(id).resolve("data").resolve("inbox"); }
 
     @Test
     void seamRoutesToTheRightSpaceAndIsolatesAuditAndMetrics(@TempDir Path root) throws Exception {

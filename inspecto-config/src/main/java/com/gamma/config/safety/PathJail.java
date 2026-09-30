@@ -322,7 +322,7 @@ public final class PathJail {
      * on the authored path AND its real path (a link, or a Windows 8.3 alias, walks around the spelling); a trailing
      * dot or space is stripped first, because Windows drops it.
      */
-    private static void refuseSecrets(Path resolved, String value, String field) {
+    public static void refuseSecrets(Path resolved, String value, String field) {
         for (Path p : new Path[]{resolved, realPathOfNearestExisting(resolved)})
             if (p != null)
                 for (Path seg : p) {
@@ -330,6 +330,57 @@ public final class PathJail {
                     if (s.endsWith(".secrets"))
                         throw new Escape(field, value, "names a secrets directory ('" + seg + "'), which no job may read or write");
                 }
+    }
+
+    /**
+     * SEC-INGEST-EXPR-EXTERNAL-ACCESS-1: a Pipeline DATA home ({@code dirs.*}, {@code sinks[].database}, the
+     * spill dir) is also what its sealed ingest connection may read, so it may never be a Space root itself,
+     * that Space's {@code config/} tree, or a {@code *.secrets} directory — each would hand an authored
+     * {@code fn: custom} expression the Space's configs and its Pending Change key. {@code resolved} is the
+     * value as {@link #resolveDataPath} resolved it; {@code spaceDir} is the owning Space ({@code null} when
+     * none), {@code roots} the allowed roots (a data home equal to one is the root itself).
+     */
+    public static void refuseDataHome(Path resolved, Path spaceDir, List<Path> roots, String value, String field) {
+        refuseSecrets(resolved, value, field);
+        Path r = resolved.toAbsolutePath().normalize();
+        // The owning Space when known; else every allowed root stands in for it (a root IS a Space base,
+        // except operator-declared extra roots, which a Space-owned config never needs to equal).
+        List<Path> bases = new java.util.ArrayList<>();
+        if (spaceDir != null) bases.add(spaceDir.toAbsolutePath().normalize());
+        else if (roots != null) for (Path root : roots) bases.add(root.toAbsolutePath().normalize());
+        for (Path base : bases) {
+            if (base.startsWith(r))
+                throw new Escape(field, value, "is the Space directory " + base + " (or contains it); a data "
+                        + "directory must be a subdirectory such as data/<pipeline>/…, never the Space root");
+            if (r.startsWith(base.resolve("config")))
+                throw new Escape(field, value, "is under the Space's config/ tree (" + base.resolve("config")
+                        + "); a data directory may never be a config directory");
+        }
+    }
+
+    /**
+     * The run-time half of {@link #refuseDataHome}, for any caller about to hand a sealed DuckDB connection an
+     * {@code allowed_directories} list built from authored config (the ingest seal, the enrichment seal): why
+     * {@code dir} may never be on it, or {@code null} when it may. Refused: a {@code *.secrets} directory;
+     * anything under a directory named {@code config}; a directory that IS or CONTAINS a Space root — a hosted
+     * Space's base ({@link DiscoveredRoots#all()}) or any directory holding a {@code config/} subdirectory (the
+     * Space shape, for entry points that register none); and {@code java.io.tmpdir} itself or an ancestor of it
+     * (every other process's scratch). Callers fail closed on a non-null answer.
+     */
+    public static String readAllowlistRefusal(Path dir) {
+        Path d = dir.toAbsolutePath().normalize();
+        try {
+            refuseSecrets(d, d.toString(), "allowlist");
+        } catch (Escape secrets) {
+            return "is a secrets directory";
+        }
+        if (spaceDirOf(d) != null) return "is under a config/ directory";
+        for (Path base : DiscoveredRoots.all())
+            if (base.startsWith(d)) return "is or contains the Space root " + base;
+        if (Files.isDirectory(d.resolve("config"))) return "is a Space root (it holds config/)";
+        Path tmp = Paths.get(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize();
+        if (tmp.startsWith(d)) return "is or contains the system temp directory " + tmp;
+        return null;
     }
 
     public static Path require(Path root, String value, String field) {

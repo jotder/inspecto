@@ -20,6 +20,47 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ConfigSafetyValidatorTest {
 
+    // ── SEC-INGEST-EXPR-EXTERNAL-ACCESS-1: a data home is never the Space root, config/ or *.secrets ──
+
+    private static Map<String, Object> pipelineWithDir(String key, String value) {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("name", "TEST");
+        raw.put("dirs", new LinkedHashMap<>(Map.of(key, value)));
+        return raw;
+    }
+
+    private static boolean refuses(List<Finding> f, String field) {
+        return f.stream().anyMatch(x -> x.severity() == Severity.ERROR && x.fieldPath().equals(field));
+    }
+
+    /** The verifier's repro: `dirs.errors` = the Space base passed the jail (it IS the allowed root). */
+    @Test
+    void aPipelineDataHomeThatIsTheSpaceRootIsRefused(@TempDir Path s) throws IOException {
+        Path configDir = java.nio.file.Files.createDirectories(s.resolve("config"));
+        String abs = s.toString().replace('\\', '/');
+        assertTrue(refuses(ConfigSafetyValidator.check("pipeline", pipelineWithDir("errors", abs),
+                SafetyPolicy.withRoots(s), configDir), "dirs.errors"));
+        assertTrue(refuses(ConfigSafetyValidator.check("pipeline", pipelineWithDir("errors", abs),
+                SafetyPolicy.withRoots(s)), "dirs.errors"), "no config dir: the allowed root stands in for the Space");
+        assertTrue(refuses(ConfigSafetyValidator.check("pipeline", pipelineWithDir("database", "."),
+                SafetyPolicy.withRoots(s), configDir), "dirs.database"));
+    }
+
+    @Test
+    void aPipelineDataHomeUnderConfigOrASecretsDirIsRefused(@TempDir Path s) throws IOException {
+        Path configDir = java.nio.file.Files.createDirectories(s.resolve("config"));
+        for (String v : List.of("config", "config/orders", "config.secrets", "data/x.secrets/y")) {
+            assertTrue(refuses(ConfigSafetyValidator.check("pipeline", pipelineWithDir("temp", v),
+                    SafetyPolicy.withRoots(s), configDir), "dirs.temp"), v);
+        }
+        Map<String, Object> sink = pipelineWithDir("poll", "data/inbox/x");
+        sink.put("sinks", List.of(Map.of("database", "config")));
+        assertTrue(refuses(ConfigSafetyValidator.check("pipeline", sink, SafetyPolicy.withRoots(s), configDir),
+                "sinks[0].database"));
+        assertTrue(ConfigSafetyValidator.check("pipeline", pipelineWithDir("errors", "data/orders/errors"),
+                SafetyPolicy.withRoots(s), configDir).isEmpty(), "an ordinary data dir still passes");
+    }
+
     // ── config refs resolve config-relative first (W1b) ──────────────────────
 
     /** A pipeline whose only path surface is a `processing.schema_file` ref. */

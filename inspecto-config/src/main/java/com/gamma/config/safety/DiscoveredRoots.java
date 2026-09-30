@@ -60,6 +60,11 @@ public final class DiscoveredRoots {
         return spaceId == null ? Optional.empty() : Optional.ofNullable(ROOTS.get(spaceId));
     }
 
+    /** Every registered Space base (a snapshot) — for a guard that must know where ANY Space lives. */
+    public static java.util.Collection<Path> all() {
+        return java.util.List.copyOf(ROOTS.values());
+    }
+
     /** Test hygiene only: the map is process-wide static, and a test that registers must not leak roots
      *  into the next test's containment verdicts. Production never calls this. */
     public static void clear() {

@@ -853,23 +853,43 @@ interface ConsignmentIngestStrategy {
         // is refused like any other file access. (An object-store dirs.database needs httpfs + a URL
         // allowlist; it is refused at the write gate today, so it stays refused here too — fail closed.)
         if (cfg.xlsx() != null) com.gamma.etl.ExcelExtension.ensureLoaded(conn);
-        com.gamma.sql.SqlSandbox.sealAllowing(conn, ingestAllowedDirs(cfg, tempDb, inputs));
+        List<java.nio.file.Path> allowed = ingestAllowedDirs(cfg, inputs);
+        for (java.nio.file.Path dir : allowed) {
+            String why = forbiddenIngestDir(dir);
+            if (why != null)
+                throw new SQLException("refusing to ingest: the sealed connection would be allowed to read " + dir
+                        + ", which " + why + " — point dirs.* / sinks[].database at a data directory "
+                        + "(SEC-INGEST-EXPR-EXTERNAL-ACCESS-1)");
+        }
+        com.gamma.sql.SqlSandbox.sealAllowing(conn, allowed);
     }
 
     /**
      * The directories an ingest connection legitimately reads or writes (SEC-INGEST-EXPR-EXTERNAL-ACCESS-1):
-     * the temp DB's directory and the spill dir, this Pipeline's own {@code dirs:} (inbox, database,
+     * the spill dir, this Pipeline's own {@code dirs:} (inbox, database,
      * backup, temp, errors, quarantine, markers, manifests), every {@code sinks[]} database, and the
      * directory of each input file. Everything else — another Space's data, any host file, every URL — is
      * refused by DuckDB itself once {@link com.gamma.sql.SqlSandbox#sealAllowing} has locked the
      * configuration, so an authored {@code fn: custom} expression cannot read it.
      */
-    static List<java.nio.file.Path> ingestAllowedDirs(PipelineConfig cfg, File tempDb, java.util.Collection<File> inputs) {
+    /**
+     * Defence in depth behind the write gate ({@code PathJail.refuseDataHome}): why {@code dir} may never be on
+     * an ingest allowlist, or {@code null} when it may. Refused: a {@code *.secrets} directory; anything under a
+     * directory named {@code config}; a directory that IS or CONTAINS a Space root — a hosted Space's base
+     * ({@code DiscoveredRoots}), or any directory holding a {@code config/} subdirectory (the Space shape, for the
+     * CLI entry points that never register one).
+     */
+    static String forbiddenIngestDir(java.nio.file.Path dir) {
+        return com.gamma.config.safety.PathJail.readAllowlistRefusal(dir);
+    }
+
+    static List<java.nio.file.Path> ingestAllowedDirs(PipelineConfig cfg, java.util.Collection<File> inputs) {
         java.util.LinkedHashSet<java.nio.file.Path> dirs = new java.util.LinkedHashSet<>();
         java.util.function.Consumer<String> add = d -> {
             if (d != null && !d.isBlank()) dirs.add(Paths.get(d).toAbsolutePath().normalize());
         };
-        if (tempDb != null) add.accept(tempDb.getAbsoluteFile().getParent());
+        // Not the temp DB's own directory: the open database needs no file permission, and with no
+        // dirs.temp it is java.io.tmpdir — every other process's scratch. The spill dir is scratchDir below.
         add.accept(scratchDir(cfg));
         PipelineConfig.Dirs d = cfg.dirs();
         if (d != null) {
