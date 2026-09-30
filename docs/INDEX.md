@@ -98,6 +98,7 @@ paid for violating them.
 - [`ops/`](ops/) — operational runbooks: backup/restore, UAT seeding, maintenance, secret rotation, and the T4 [HA/DR drill runbook](ops/ha-dr-drill-runbook.md) (runbook; drill NOT yet run).
 - [`ui/accessibility-audit.md`](ui/accessibility-audit.md) — the **living** inspecto-ui WCAG/a11y findings
   register (referenced by `okf/frontend/conventions/accessibility.md`).
+- [`ui/link-analysis-user-manual.md`](ui/link-analysis-user-manual.md) — the **Link Analysis user manual** (2026-09-30): what the studio is, the screen, building and exploring a graph, the analysis and pattern tools, Investigations (op log, Working Set, identity resolution, value Measures, Dossier, templates, Widgets, Case link), who can do what, worked examples on the demo data
 - [`../compliance/`](../compliance/) — the NFR-7 compliance tree (repo root, shipped in the deploy bundle's
   docs). [`controls-matrix.md`](../compliance/controls-matrix.md) is the **C2 single mapping table** (SOC 2 TSC
   ↔ ISO 27001 Annex A ↔ NIST 800-53 → implementing file/route/gate → evidence → responsibility); the ISO SoA

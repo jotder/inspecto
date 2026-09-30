@@ -387,6 +387,8 @@ projection built from a Dataset), run a query, and the graph renders as interact
 edges you can pan, zoom, and select. A toolbox provides layouts and analysis algorithms — shortest
 paths, neighborhoods, centrality, and community detection. A saved investigation is a **Link
 Analysis View** you can return to (and, for entity-projection sources, surface as a graph Widget).
+For the full walkthrough — building a graph, the analysis and pattern tools, Investigations and evidence — see the
+[Link Analysis user manual](ui/link-analysis-user-manual.md).
 
 <a id="menus"></a>**Menus (Menu Builder)** — Where you customize the sidebar for your team. It's a
 two-pane authoring page: an editable menu tree on the left and a **live preview** on the right. The
