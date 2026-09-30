@@ -1,8 +1,11 @@
 # Telecom fraud runbooks
 
 One runbook per typology in this Space Template. Each Alert Rule `fraud_<typology>` is per-entity: it
-raises one Alert and one Incident per offender and window (`by` = the offender key + `window_date`). A
-healed key resolves its Alert but never its Incident. A person records the Disposition.
+raises one Alert and one Incident per offender (`by` = the offender key), with the Measure taken as the
+`max` over every retained window. An offender seen on several days is one Alert. A key heals only when all its
+evidence ages out of retention; that resolves its Alert but never its Incident. A person records the
+Disposition. `stormCap` is 500 per rule: above that many retained offenders one storm Alert stands for them
+all, so keep `stormCap` above `retention_days` x the expected daily offenders.
 
 **Running the windows.** Each detection is a `sql.template` Job (`config/jobs/fraud_<typology>_job.toon`)
 with `window_start` / `window_end` parameters. Run a Job for another window by passing those parameters on
@@ -13,6 +16,20 @@ window ages out of retention.
 **Thresholds are configuration** in two places: the Job's parameters (what counts, e.g. `irsf_prefixes`,
 `max_ring_seconds`) and the Alert Rule's `threshold` (how much is too much; `gt`, so a value exactly AT the
 threshold stays silent). A parameter may not be empty: set an exemption list to `none` to exempt nothing.
+
+**Exemption lists are a trust decision.** `exempt_msisdns` (SIM-box) and `exempt_doc_prefixes` (identity)
+silence whatever they match. Fill them only from a verified register (the business-line register, the
+corporate-account register), never from a value the monitored party controls. `exempt_doc_prefixes` matches a
+PREFIX of `id_doc`, and `id_doc` is entered by the dealer, the party the dealer typology watches: a dealer who
+types `CORP-FAKE` is exempted. The shipped default `CORP-` carries that risk, and the golden corpus pins it (a
+`CORP-FAKE` document with 12 lines raises nothing). Replace it with a list of registered document prefixes, or
+empty it (`none`), before relying on this typology.
+
+**Scaling.** A `sql.template` run reads and rewrites its whole sink: every retained window, about
+`retention_days` x the daily candidate rows. Keep the candidates few: `fraud_simbox` keeps only lines with at
+least `min_candidate_targets` voice targets (default 10). `fraud_identity`, `fraud_dealer`, `fraud_voucher` and
+`fraud_reversal` still keep one row per document, dealer, serial or paying line, so their sinks grow with the
+subscriber base.
 
 **Number formats.** Subscriber numbers are E.164 digits with no `+`. Dialled numbers may be `+<E.164>`,
 `00<E.164>`, national `0<NSN>` or bare E.164. The Jobs normalise all four (`home_cc` supplies the country

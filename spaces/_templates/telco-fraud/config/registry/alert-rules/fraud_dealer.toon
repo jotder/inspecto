@@ -1,9 +1,9 @@
 name: fraud_dealer
 dataset: fraud_dealer
-measure: sum(idle_activations)
-by[2]: dealer_id, window_date
+measure: max(idle_activations)
+by[1]: dealer_id
 comparator: gt
 threshold: 20
-stormCap: 50
+stormCap: 500
 severity: WARNING
 description: "Dealer activations"

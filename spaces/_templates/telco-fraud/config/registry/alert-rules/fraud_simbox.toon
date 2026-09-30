@@ -1,9 +1,9 @@
 name: fraud_simbox
 dataset: fraud_simbox
-measure: sum(simbox_targets)
-by[2]: msisdn, window_date
+measure: max(simbox_targets)
+by[1]: msisdn
 comparator: gt
 threshold: 50
-stormCap: 50
+stormCap: 500
 severity: CRITICAL
 description: "SIM-box"

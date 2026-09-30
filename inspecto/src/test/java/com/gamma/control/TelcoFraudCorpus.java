@@ -48,6 +48,8 @@ final class TelcoFraudCorpus {
     final Map<String, Set<String>> offenders = new LinkedHashMap<>();
     /** Alert Rule name → planted look-alike keys that must NOT be raised by any rule. */
     final Map<String, Set<String>> lookAlikes = new LinkedHashMap<>();
+    /** Alert Rule name → keys that SHOULD alert but are exempted by a trust assumption — pinned, not endorsed. */
+    final Map<String, Set<String>> knownRiskExempted = new LinkedHashMap<>();
 
     static String home(int i) { return f("99970%06d", i); }
 
@@ -194,7 +196,11 @@ final class TelcoFraudCorpus {
         line = document("DOC-X0003", 6, line);      // JUST above: 6
         line = document("DOC-F0001", 4, line);      // a family
         line = document("DOC-F0002", 5, line);      // AT the threshold: 5
-        document("CORP-000001", 20, line);           // a corporate account: many lines, one registration
+        line = document("CORP-000001", 20, line);    // a corporate account: many lines, one registration
+        // ⚠ KNOWN RISK, pinned: the exemption is a PREFIX on a field the dealer enters, so a made-up CORP- document
+        // is exempted too. Any change to that is deliberate (runbook, OKF).
+        document("CORP-FAKE", 12, line);
+        knownRiskExempted.put("fraud_identity", keys("CORP-FAKE"));
         plant("fraud_identity", keys("DOC-X0001", "DOC-X0002", "DOC-X0003"), keys("DOC-F0001", "DOC-F0002", "CORP-000001"));
 
         // ---- 8 Dealer activations (gt 20 activations with no originated traffic up to 48 h after the window)

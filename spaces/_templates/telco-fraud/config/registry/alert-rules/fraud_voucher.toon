@@ -1,9 +1,9 @@
 name: fraud_voucher
 dataset: fraud_voucher
-measure: sum(redemptions)
-by[2]: voucher_serial, window_date
+measure: max(redemptions)
+by[1]: voucher_serial
 comparator: gt
 threshold: 1
-stormCap: 50
+stormCap: 500
 severity: CRITICAL
 description: "Voucher / EVD"

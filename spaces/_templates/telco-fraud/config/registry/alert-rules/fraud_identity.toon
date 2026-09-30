@@ -1,9 +1,9 @@
 name: fraud_identity
 dataset: fraud_identity
-measure: sum(lines_on_document)
-by[2]: id_doc, window_date
+measure: max(lines_on_document)
+by[1]: id_doc
 comparator: gt
 threshold: 5
-stormCap: 50
+stormCap: 500
 severity: WARNING
 description: "Subscription / identity"

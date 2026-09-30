@@ -182,6 +182,13 @@ class TelcoFraudTemplateGoldenTest {
             assertEquals(TOTAL, fired.values().stream().mapToInt(Integer::intValue).sum());
             assertEquals(List.of(), svc.evaluateRules(), "a re-evaluation raises nothing new");
 
+            // Re-running the SAME window replaces that window's rows: no duplicates, no Alert change.
+            Map<String, Long> rows = sinkRows(data, jobs);
+            for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), Map.of()).status(), j.name() + " re-run");
+            assertEquals(rows, sinkRows(data, jobs), "a same-window re-run duplicates no row");
+            assertRaisesExactlyThePlanted(rules, probe, corpus);
+            assertEquals(List.of(), svc.evaluateRules(), "a same-window re-run changes no Alert");
+
             // The NEXT window's run keeps the earlier window's rows: its offenders do not vanish from the Dataset
             // (which would auto-resolve their Alerts with nobody acting), and nothing new is raised.
             Map<String, String> day2 = Map.of("window_start", "2026-07-02 00:00:00", "window_end", "2026-07-03 00:00:00");
@@ -220,14 +227,11 @@ class TelcoFraudTemplateGoldenTest {
                                                       TelcoFraudCorpus corpus) {
         Set<String> everyRaisedKey = new HashSet<>();
         for (AlertRule r : rules) {
-            assertEquals(List.of(r.by().get(0), "window_date"), r.by(), r.name() + " is keyed on offender + window");
+            assertEquals(1, r.by().size(), r.name() + " is keyed on the offender alone");
             DatasetMeasureProbe.Breaches b = probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(),
                     r.threshold(), r.stormCap()).orElseThrow(() -> new AssertionError(r.name() + ": probe failed"));
             Set<String> raised = new TreeSet<>();
-            for (DatasetMeasureProbe.Breach br : b.keys()) {
-                raised.add(String.valueOf(br.key().get(r.by().get(0))));
-                assertEquals("2026-07-01", String.valueOf(br.key().get("window_date")), r.name());
-            }
+            for (DatasetMeasureProbe.Breach br : b.keys()) raised.add(String.valueOf(br.key().get(r.by().get(0))));
             assertEquals(new TreeSet<>(corpus.offenders.get(r.name())), raised,
                     r.name() + " must raise exactly its planted offenders");
             everyRaisedKey.addAll(raised);
@@ -235,6 +239,106 @@ class TelcoFraudTemplateGoldenTest {
         for (Map.Entry<String, Set<String>> alike : corpus.lookAlikes.entrySet())
             for (String k : alike.getValue())
                 assertFalse(everyRaisedKey.contains(k), "look-alike " + k + " (" + alike.getKey() + ") raised an Alert");
+        // the known-risk pin: a made-up CORP- document is exempted. Changing that must be deliberate.
+        for (Map.Entry<String, Set<String>> risk : corpus.knownRiskExempted.entrySet())
+            for (String k : risk.getValue())
+                assertFalse(everyRaisedKey.contains(k), "known-risk pin moved: " + k + " (" + risk.getKey() + ") now raises");
+    }
+
+    /**
+     * Sixteen days of offenders at the corpus rate (each day a fresh copy of the corpus with every identifier
+     * suffixed {@code -<day>} and every timestamp shifted), all retained. Every distinct offender gets its own
+     * Alert on its day, and no rule collapses into a storm Alert: the retained offender count stays under
+     * {@code stormCap}.
+     */
+    @Test
+    void sixteenRetainedDaysOfOffendersEachRaiseTheirOwnAlertAndNoStorm(@TempDir Path root) throws Exception {
+        Path space = createSpace(root);
+        Path data = space.resolve("data"), config = space.resolve("config");
+        ingest(space);
+        int days = 16;
+        simulateDays(data, days);
+        List<JobConfig> jobs = jobs(config);
+        List<AlertRule> rules = rules(config);
+        DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> config, () -> data);
+        AlertService svc = new AlertService(rules, noPipelines(), emptyStore());
+        svc.groupedMeasureProbe(r -> probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(),
+                r.threshold(), r.stormCap()));
+        TelcoFraudCorpus corpus = new TelcoFraudCorpus().generate();
+        StringBuilder pbx = new StringBuilder("99970001119");
+        for (int d = 2; d <= days; d++) pbx.append(",99970001119-").append(d);   // the register lists each day's PBX line
+
+        Map<String, Set<String>> raised = new TreeMap<>();
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(jobs, new ConsignmentEventBus(), s, null,
+                     root.resolve("audit").toString(), null, null, data.toString())) {
+            js.start();
+            for (int d = 1; d <= days; d++) {
+                java.time.LocalDate day = java.time.LocalDate.of(2026, 7, 1).plusDays(d - 1);
+                for (JobConfig j : jobs) {
+                    Map<String, String> a = new java.util.HashMap<>(Map.of("window_start", day + " 00:00:00",
+                            "window_end", day.plusDays(1) + " 00:00:00"));
+                    if (j.name().equals("fraud_simbox")) a.put("exempt_msisdns", pbx.toString());
+                    assertEquals("SUCCESS", runJob(js, j.name(), a).status(), j.name() + " day " + d);
+                }
+                for (Alert a : svc.evaluateRules()) {
+                    assertFalse(a.message().contains("storm"), "day " + d + ": " + a.message());
+                    raised.computeIfAbsent(a.rule(), k -> new TreeSet<>()).add(a.message());
+                }
+            }
+        }
+        for (Map.Entry<String, Integer> e : EXPECTED.entrySet()) {
+            Set<String> expected = new TreeSet<>();
+            for (int d = 1; d <= days; d++)
+                for (String k : corpus.offenders.get(e.getKey())) expected.add(d == 1 ? k : k + "-" + d);
+            assertEquals(e.getValue() * days, raised.getOrDefault(e.getKey(), Set.of()).size(), e.getKey());
+            AlertRule r = rules.stream().filter(x -> x.name().equals(e.getKey())).findFirst().orElseThrow();
+            Set<String> keys = new TreeSet<>();
+            for (DatasetMeasureProbe.Breach br : probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(),
+                    r.threshold(), r.stormCap()).orElseThrow().keys()) keys.add(String.valueOf(br.key().get(r.by().get(0))));
+            assertEquals(expected, keys, e.getKey() + ": every retained day's offenders, each once");
+        }
+    }
+
+    /** Days 2..n: a copy of the ingested day-1 feeds with every identifier suffixed {@code -d}, shifted d-1 days. */
+    private static void simulateDays(Path data, int days) throws Exception {
+        Map<String, String[]> ids = Map.of(
+                "cdr", new String[] {"start_ts", "record_id", "a_number", "b_number"},
+                "subscriber_events", new String[] {"event_ts", "event_id", "msisdn", "dealer_id", "id_doc"},
+                "payments", new String[] {"txn_ts", "txn_id", "msisdn", "voucher_serial", "ref_txn_id"});
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            for (Map.Entry<String, String[]> feed : ids.entrySet()) {
+                Path db = data.resolve(feed.getKey()).resolve("database");
+                st.execute("CREATE TABLE day1_" + feed.getKey() + " AS SELECT * FROM read_parquet('"
+                        + db.toString().replace('\\', '/') + "/**/*.parquet')");
+                Path sim = Files.createDirectories(db.resolve("simulated"));
+                for (int d = 2; d <= days; d++) {
+                    String[] cols = feed.getValue();
+                    StringBuilder repl = new StringBuilder(cols[0] + " + INTERVAL " + (d - 1) + " DAY AS " + cols[0]);
+                    for (int i = 1; i < cols.length; i++)
+                        repl.append(", CASE WHEN ").append(cols[i]).append(" IS NULL OR ").append(cols[i])
+                                .append(" = '' THEN ").append(cols[i]).append(" ELSE ").append(cols[i])
+                                .append(" || '-").append(d).append("' END AS ").append(cols[i]);
+                    st.execute("COPY (SELECT * REPLACE (" + repl + ") FROM day1_" + feed.getKey() + ") TO '"
+                            + sim.resolve("day-" + d + ".parquet").toString().replace('\\', '/') + "' (FORMAT PARQUET)");
+                }
+            }
+        }
+    }
+
+    private static Map<String, Long> sinkRows(Path data, List<JobConfig> jobs) throws Exception {
+        Map<String, Long> out = new TreeMap<>();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            for (JobConfig j : jobs) {
+                String sink = j.params().get("sink_dataset");
+                try (ResultSet rs = st.executeQuery("SELECT count(*) FROM read_parquet('"
+                        + data.resolve(sink).toString().replace('\\', '/') + "/*.parquet')")) {
+                    rs.next();
+                    out.put(sink, rs.getLong(1));
+                }
+            }
+        }
+        return out;
     }
 
     /** {@code POST /spaces} with the template (every seed gate); the Space is closed again before the test drives it. */

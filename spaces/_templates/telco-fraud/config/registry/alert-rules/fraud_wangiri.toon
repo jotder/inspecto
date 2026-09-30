@@ -1,9 +1,9 @@
 name: fraud_wangiri
 dataset: fraud_wangiri
-measure: sum(callback_targets)
-by[2]: caller, window_date
+measure: max(callback_targets)
+by[1]: caller
 comparator: gt
 threshold: 3
-stormCap: 50
+stormCap: 500
 severity: WARNING
 description: "Wangiri"

@@ -624,8 +624,8 @@ public final class AlertService {
     /**
      * Evaluate one {@code by} rule. <b>Edge-triggered per key</b>, unlike the cooldown-throttled scalar rules:
      * a key that starts breaching raises ONE Alert (and, at critical/error, one Incident) named for it; while it
-     * stays breached nothing new is raised; when it stops breaching its Alert and Incident are resolved and an
-     * all-clear is emitted. Above {@link AlertRule#stormCap} breached keys ONE storm Alert stands for them all,
+     * stays breached nothing new is raised; when it stops breaching its Alert is resolved and an all-clear is
+     * emitted, while its Incident stays open until a person records a Disposition (D-P11). Above {@link AlertRule#stormCap} breached keys ONE storm Alert stands for them all,
      * and no key fires or heals until the count is back under the cap — a capped read cannot see which keys
      * healed. An empty probe answer is UNKNOWN: nothing fires and nothing heals.
      */

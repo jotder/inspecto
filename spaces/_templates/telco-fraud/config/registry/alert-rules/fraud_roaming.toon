@@ -1,9 +1,9 @@
 name: fraud_roaming
 dataset: fraud_roaming
-measure: sum(roaming_charge)
-by[2]: msisdn, window_date
+measure: max(roaming_charge)
+by[1]: msisdn
 comparator: gt
 threshold: 500
-stormCap: 50
+stormCap: 500
 severity: WARNING
 description: "Roaming high usage"
