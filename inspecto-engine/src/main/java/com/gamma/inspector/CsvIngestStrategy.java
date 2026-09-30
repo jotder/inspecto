@@ -52,6 +52,32 @@ final class CsvIngestStrategy implements ConsignmentIngestStrategy {
 
     @Override
     public IngestOutcome ingest(Consignment batch, PipelineConfig cfg) {
+        // processing.refusal: a file whose NAME or HEADER carries a card number is restricted before any lane reads
+        // it; its batch-mates go on as a smaller Consignment. Off (the default) this is a no-op.
+        List<MemberAudit> refused = new ArrayList<>();
+        List<Consignment.Member> kept = new ArrayList<>();
+        for (Consignment.Member m : batch.members()) {
+            String code = RefusalQuarantine.nameOrHeaderRefusal(cfg, m.file());
+            if (code == null) { kept.add(m); continue; }
+            try {
+                refused.add(RefusalQuarantine.restrict(m, cfg, code, batch.batchId(), LocalDateTime.now()));
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException("restricted quarantine move failed", e);
+            }
+        }
+        if (refused.isEmpty()) return ingestAll(batch, cfg);
+        if (kept.isEmpty())
+            return new IngestOutcome(LocalDateTime.now(), "EMPTY", "", List.of(), refused, List.of(), List.of(), 0,
+                    batch.schemaName());
+        IngestOutcome rest = ingestAll(new Consignment(batch.batchId(), batch.schemaName(), batch.table(), kept), cfg);
+        List<MemberAudit> audits = new ArrayList<>(refused);
+        audits.addAll(rest.memberAudits());
+        return new IngestOutcome(rest.batchStart(), rest.status(), rest.error(), rest.survivors(), audits,
+                rest.outputs(), rest.lineage(), rest.totalInputRows(), rest.schemaLabel(), rest.bounds(),
+                rest.schemaByOutput(), rest.castFailures());
+    }
+
+    private IngestOutcome ingestAll(Consignment batch, PipelineConfig cfg) {
         LocalDateTime batchStart = LocalDateTime.now();
         String batchStatus = "SUCCESS";
         String batchError  = "";
@@ -157,6 +183,20 @@ final class CsvIngestStrategy implements ConsignmentIngestStrategy {
                         memberAudits.add(ConsignmentIngestStrategy.quarantineAllOrNothing(m, ing.errorRows(), cfg, mStart));
                         dropTable(conn, tempTable);
                         continue;
+                    }
+
+                    if (cfg.refusal().restricted()) {
+                        try (Statement st = conn.createStatement()) {
+                            st.execute("CREATE OR REPLACE TEMP VIEW \"__refusal_src\" AS SELECT *, CAST(" + m.srcId()
+                                    + " AS INTEGER) AS __src_id FROM \"" + tempTable + "\"");
+                        }
+                        String code = RefusalQuarantine.probe(conn, m.selection().schema(), cfg, "__refusal_src");
+                        ConsignmentIngestStrategy.dropView(conn, "__refusal_src");
+                        if (code != null) {
+                            memberAudits.add(RefusalQuarantine.restrict(m, cfg, code, batch.batchId(), mStart));
+                            dropTable(conn, tempTable);
+                            continue;
+                        }
                     }
 
                     try (Statement st = conn.createStatement()) {

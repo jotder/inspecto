@@ -250,6 +250,44 @@ owned by [pipeline-editor](../../frontend/features/pipeline-editor.md) and
 `PMXDR_20260904_001.psv.defect` in as `.psv` for the fault run. Build record:
 [postmed-xdr-pipeline-build](../../../archived-documents/plans-archive/postmed-xdr-pipeline-build.md).
 
+**Content refusal: `processing.refusal: restricted_quarantine`.** This is opt-in per Pipeline and **off** by
+default (added 2026-09-30, `RefusalQuarantine`). With it on, a Pipeline's own mapping can refuse a whole file by
+raising DuckDB `error('INGEST_REFUSE:<CODE>')`.
+
+- **What triggers it.** Only the first `SQLException` in the cause chain counts, and its message must be exactly
+  `Invalid Input Error: ` followed by a code matching `^INGEST_REFUSE:[A-Z][A-Z_]{0,63}$`. A conversion or cast
+  error never triggers it, and neither does a code that merely appears somewhere in a message. Data content
+  cannot reach it: a strict `CAST` over a value that spells the code is a `Conversion Error`, so it fails the batch
+  as it always has.
+- **What happens to the file.** It is **moved, never deleted**, to `<quarantine>/../restricted-quarantine/` under
+  a generated `refused-<ms>-<n>.<ext>` name, because the original name may itself be the refused value.
+  - That directory is not the inbox, so it is never re-polled.
+  - `BackupTask.secret` skips it, so no backup carries it.
+  - It is not the quarantine tree the run routes list.
+  - `processing.refusal_retention_days` (optional, ≥ 1) deletes restricted files older than that at the next
+    refusal.
+- **What is recorded.** Only the reason code:
+  - the member row becomes `QUARANTINED_RESTRICTED`, with the generated `filename`, the `error` set to the code
+    and a blank `logical_name`;
+  - one WARN line;
+  - one AUDIT event, `ingest.refused` in the `security` category, with the pipeline, the code, the Consignment
+    and the stored name.
+
+  Exception text, values and the original name are never recorded.
+- **Every lane.**
+  - Single-file streaming: the transform failure is caught.
+  - `chunkedIngest`: the chunks already written are rolled back first.
+  - Union multi-member batches and the Java path: each member's transform is probed alone before it joins, so only
+    the refused file is restricted and its batch-mates land.
+- **File name and header line.** With the mode on, a file whose name or header line holds a card-shaped
+  Luhn-valid 13–19 digit number is refused before any lane reads it (`CARD_NUMBER_IN_FILE_NAME` /
+  `CARD_NUMBER_IN_HEADER`).
+- ⚠ **Not covered:** the Collector's discovery logs and its acquisition ledger see the inbox name before the
+  check runs.
+- It replaced the 2026-09-30 purge seam (`PURGED_REFUSED`). Data content could trigger that seam, it applied to
+  every Pipeline, and it deleted irreversibly. Proof: `RefusalQuarantineTest`, and the payment pack's
+  `PaymentFraudTemplateGoldenTest` ([Spaces §3.5.1](../spaces/spaces.md)).
+
 ### 3.7 Expectations
 
 `com.gamma.expectation` (`inspecto`): an `expectation` component (a condition tree in the shared query-types

@@ -24,6 +24,11 @@ record MemberAudit(int srcId, String filename, MemberStatus status,
                 origin(m), originPath(m));
     }
 
+    /** A restricted refusal: the row names the GENERATED stored name and carries the reason code alone. */
+    static MemberAudit refused(Consignment.Member m, String storedName, String code, LocalDateTime start) {
+        return new MemberAudit(m.srcId(), storedName, MemberStatus.QUARANTINED_RESTRICTED, 0, 0, code, start, "", null);
+    }
+
     /** As {@link #rejected}, but keeping the reject count — a file quarantined BECAUSE of its rejects. */
     static MemberAudit rejectedWithRejects(Consignment.Member m, MemberStatus status, String error, long errors,
                                            LocalDateTime start) {

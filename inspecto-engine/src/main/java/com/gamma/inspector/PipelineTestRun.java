@@ -242,7 +242,7 @@ public final class PipelineTestRun {
         static MemberKind of(MemberStatus status, boolean batchFailed) {
             return switch (status) {
                 case SUCCESS -> batchFailed ? FAULT : WOULD_LAND;
-                case QUARANTINED_EMPTY, QUARANTINED_MISMATCH, QUARANTINED_UNREADABLE, PURGED_REFUSED -> REJECTED;
+                case QUARANTINED_EMPTY, QUARANTINED_MISMATCH, QUARANTINED_UNREADABLE, QUARANTINED_RESTRICTED -> REJECTED;
                 case SKIPPED_UNREADABLE -> SKIPPED;
                 // Assigned by ConsignmentIngestor's park tail, never by an ingest pass.
                 case PARKED -> throw new IllegalStateException("PARKED is a commit-tail status, not an ingest one");

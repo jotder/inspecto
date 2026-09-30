@@ -730,6 +730,8 @@ public final class ConsignmentIngestor {
      * an identity from) — a blank groups with nothing, an invented key groups with the wrong thing.
      */
     private static String logicalNameOf(MemberAudit ma, Map<Integer, File> memberFiles, PipelineConfig cfg) {
+        // A restricted refusal's original name may itself be the refused value — its row names the generated one only.
+        if (ma.status() == com.gamma.etl.MemberStatus.QUARANTINED_RESTRICTED) return "";
         File inbox = ma.originPath() != null ? ma.originPath() : memberFiles.get(ma.srcId());
         if (inbox == null) return "";
         Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();

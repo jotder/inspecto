@@ -50,11 +50,12 @@ public enum MemberStatus {
     SKIPPED_UNREADABLE,
 
     /**
-     * An authored mapping expression refused the file by its content ({@code error('INGEST_PURGE_FILE: …')}) and
-     * the raw file was DELETED — never quarantined, backed up or marked — so the refused value is kept nowhere.
-     * Single-member native batches only; elsewhere the same refusal fails the batch.
+     * {@code processing.refusal: restricted_quarantine}: the Pipeline's own mapping refused the file by content
+     * ({@code error('INGEST_REFUSE:<CODE>')}), or its name/header carried a card number. The file was moved, under
+     * a generated name, to the restricted quarantine (never re-polled, backed up or served); the audit row's error
+     * is the reason code alone and its filename is the generated one.
      */
-    PURGED_REFUSED,
+    QUARANTINED_RESTRICTED,
 
     /**
      * Phase 4 S4b (park/drain, D-13): the member ingested cleanly but its Consignment PARKED at a

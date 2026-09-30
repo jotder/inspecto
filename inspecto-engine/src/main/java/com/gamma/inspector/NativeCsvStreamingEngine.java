@@ -122,6 +122,15 @@ final class NativeCsvStreamingEngine {
                 continue;
             }
 
+            // processing.refusal: judge this member's transform ALONE before it joins the union, so one refused
+            // file is restricted and its batch-mates still land (the union would otherwise fail them all).
+            String refusedCode = RefusalQuarantine.probe(conn, schema, cfg, view);
+            if (refusedCode != null) {
+                dropView(conn, view);
+                memberAudits.add(RefusalQuarantine.restrict(m, cfg, refusedCode, batch.batchId(), mStart));
+                continue;
+            }
+
             // lineageName: the ENTRY name for an unpack-expanded archive member, the plain
             // filename otherwise — the temp name is workspace bookkeeping, never DATA.
             srcIdToFile.put(m.srcId(), com.gamma.etl.unpack.UnpackOrigins.lineageName(m.file()));
@@ -190,15 +199,9 @@ final class NativeCsvStreamingEngine {
             s = streamUnit(conn, m.file(), m.file().getName(), schema, cfg,
                     dbDir, baseName, partCols, m.srcId(), batch.batchId(), m.selection().table());
         } catch (TransformFailedException e) {
-            String refusal = purgeRefusal(e);
-            if (refusal == null) throw e;   // the transform failed, not the read → fail the batch (don't quarantine)
-            // A mapping expression refused the file's CONTENT (error('INGEST_PURGE_FILE: …'), e.g. the payment
-            // pack's card-number tripwire). The raw file is DELETED, never quarantined or backed up: a copy anywhere
-            // would keep the value it refused at rest, and leaving it in the inbox re-polls and re-fails it forever.
-            // Nothing was written (the transform is the step before the write), and no rejects sidecar exists yet.
-            Files.deleteIfExists(m.file().toPath());
-            log.warn("[INGEST] [{}] purged: {}", m.file().getName(), refusal);
-            return empty(batch, batchStart, MemberAudit.rejected(m, MemberStatus.PURGED_REFUSED, refusal, mStart));
+            String code = RefusalQuarantine.reasonCode(cfg, e);
+            if (code == null) throw e;   // the transform failed, not the read → fail the batch (don't quarantine)
+            return empty(batch, batchStart, RefusalQuarantine.restrict(m, cfg, code, batch.batchId(), mStart));
         } catch (SinkFlushException e) {
             throw e;   // the write failed, not the read → fail the batch (don't quarantine)
         } catch (Exception e) {
@@ -243,6 +246,7 @@ final class NativeCsvStreamingEngine {
         long castTotal = -1;   // stays "not measured" unless at least one chunk measured
         int chunkCount = 0;
         String unreadable = null;   // set when a chunk proves the FILE unreadable (CHUNKED-UNREADABLE-FAILS-BATCH-1)
+        String refused = null;      // set when the author's mapping refused a chunk (processing.refusal)
 
         // Each chunk's failure is classified exactly as the single-member lane classifies its one unit:
         // streamUnit's read probe splits a failed materialize into TransformFailedException (readable → fail
@@ -251,7 +255,7 @@ final class NativeCsvStreamingEngine {
         // its scratch writes stay plain IOExceptions and fail the batch — the host's fault, not the file's.
         try (FileChunker chunker = new FileChunker(m.file(), cfg, chunkDir)) {
             int seq = 0;
-            while (unreadable == null && chunker.hasNext()) {
+            while (unreadable == null && refused == null && chunker.hasNext()) {
                 File chunk;
                 try {
                     chunk = chunker.next();
@@ -272,8 +276,11 @@ final class NativeCsvStreamingEngine {
                     bounds.putAll(s.bounds());
                     // Sum across chunks; one unmeasurable chunk must not erase the others' counts.
                     if (s.castFailures() >= 0) castTotal = Math.max(castTotal, 0) + s.castFailures();
-                } catch (SinkFlushException | TransformFailedException e) {
-                    throw e;   // the write or the transform failed, not the read → fail the batch
+                } catch (TransformFailedException e) {
+                    refused = RefusalQuarantine.reasonCode(cfg, e);
+                    if (refused == null) throw e;   // the transform failed, not the read → fail the batch
+                } catch (SinkFlushException e) {
+                    throw e;   // the write failed, not the read → fail the batch
                 } catch (Exception e) {
                     unreadable = "chunk " + seq + " unreadable: " + msg(e);
                 } finally {
@@ -283,6 +290,12 @@ final class NativeCsvStreamingEngine {
             }
         } catch (FileChunker.UnreadableSourceException e) {
             unreadable = "unreadable: " + msg(e);   // the constructor's first read of the source failed
+        }
+        if (refused != null) {
+            // Only AFTER the chunker is closed (an open handle refuses the move on Windows); the chunks already
+            // written are rolled back, so a refused file leaves no rows behind.
+            rollBackChunks(outputs, cfg, batch.batchId());
+            return empty(batch, batchStart, RefusalQuarantine.restrict(m, cfg, refused, batch.batchId(), mStart));
         }
         if (unreadable != null) {
             // Quarantine only AFTER the chunker is closed: an open handle refuses the move on Windows.
@@ -417,26 +430,6 @@ final class NativeCsvStreamingEngine {
     private static IngestOutcome empty(Consignment batch, LocalDateTime batchStart, MemberAudit memberAudit) {
         return new IngestOutcome(batchStart, "EMPTY", "", List.of(), List.of(memberAudit),
                 List.of(), List.of(), 0, batch.schemaName());
-    }
-
-    /**
-     * The prefix an authored mapping expression puts in DuckDB {@code error()} to refuse a file by its content and
-     * have it purged ({@link #streamingIngest}). Only the text after the prefix is kept, up to the end of that line —
-     * the expression's own constant message, which must never quote the value it refused.
-     */
-    static final String PURGE_SENTINEL = "INGEST_PURGE_FILE:";
-
-    /** The refusal text when {@code e}'s cause chain carries {@link #PURGE_SENTINEL}; else {@code null}. */
-    static String purgeRefusal(Throwable e) {
-        for (Throwable t = e; t != null; t = t.getCause()) {
-            String m = t.getMessage();
-            int i = m == null ? -1 : m.indexOf(PURGE_SENTINEL);
-            if (i < 0) continue;
-            String rest = m.substring(i + PURGE_SENTINEL.length());
-            int nl = rest.indexOf('\n');
-            return "refused by mapping:" + (nl < 0 ? rest : rest.substring(0, nl));
-        }
-        return null;
     }
 
     /** The transform failed over an input that reads fine — a batch failure, never a quarantine. */

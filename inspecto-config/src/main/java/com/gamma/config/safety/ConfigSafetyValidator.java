@@ -262,6 +262,11 @@ public final class ConfigSafetyValidator {
                         + "N s|m|h|d (got '" + d + "')"));
         }
         // X4 deferral: reject_mode is a closed set — an unknown mode must not silently read as eject.
+        String refusal = RawConfig.str(raw, "processing.refusal");
+        if (refusal != null && !refusal.isBlank()
+                && !List.of("off", "restricted_quarantine").contains(refusal.trim().toLowerCase(java.util.Locale.ROOT)))
+            out.add(Finding.error("processing.refusal", "refusal must be one of off, restricted_quarantine (got '"
+                    + refusal + "')"));
         String rejectMode = RawConfig.str(raw, "processing.reject_mode");
         if (rejectMode != null && !rejectMode.isBlank()
                 && !List.of("eject", "all_or_nothing").contains(rejectMode.trim().toLowerCase(java.util.Locale.ROOT)))

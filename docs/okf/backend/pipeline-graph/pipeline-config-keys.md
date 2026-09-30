@@ -277,6 +277,8 @@ against, round-tripped untouched.
 | `processing.pool` | spec |
 | `processing.priority` | spec |
 | `processing.profile` | spec |
+| `processing.refusal` | spec |
+| `processing.refusal_retention_days` | spec |
 | `processing.reject_mode` | spec |
 | `processing.retry` | spec |
 | `processing.schema_file` | spec |

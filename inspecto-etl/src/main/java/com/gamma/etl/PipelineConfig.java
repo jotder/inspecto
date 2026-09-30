@@ -445,6 +445,33 @@ public final class PipelineConfig {
      * the FILE (the Consignment member), exactly like every other per-member quarantine: its clean
      * batch-mates still land.
      */
+    /**
+     * Content refusal ({@code processing.refusal}, opt-in, default {@code off}). With
+     * {@code restricted_quarantine}, a file whose transform an AUTHORED mapping expression refuses — DuckDB
+     * {@code error('INGEST_REFUSE:<CODE>')}, the whole message exactly that reason code — is moved to the
+     * restricted quarantine (never re-polled, never backed up, never served) instead of failing the batch; only the
+     * reason code is recorded. {@code retentionDays} (optional, {@code processing.refusal_retention_days}) ages out
+     * restricted files. See {@code com.gamma.inspector.RefusalQuarantine}.
+     */
+    @PublicApi(since = "4.0.0")
+    public record Refusal(boolean restricted, Integer retentionDays) {
+        public static final Refusal OFF = new Refusal(false, null);
+
+        /** The authored spelling: {@code off} (or absent) | {@code restricted_quarantine}. */
+        public static Refusal parse(Object mode, Integer retentionDays) {
+            String v = mode == null ? "" : String.valueOf(mode).trim();
+            if (retentionDays != null && retentionDays < 1)
+                throw new IllegalArgumentException("processing.refusal_retention_days must be >= 1 (got " + retentionDays + ")");
+            if (v.isEmpty() || v.equalsIgnoreCase("off")) {
+                if (retentionDays != null)
+                    throw new IllegalArgumentException("processing.refusal_retention_days needs processing.refusal: restricted_quarantine");
+                return OFF;
+            }
+            if (v.equalsIgnoreCase("restricted_quarantine")) return new Refusal(true, retentionDays);
+            throw new IllegalArgumentException("processing.refusal must be one of off, restricted_quarantine (got '" + v + "')");
+        }
+    }
+
     @PublicApi(since = "4.0.0")
     public enum RejectMode {
         EJECT, ALL_OR_NOTHING;
@@ -1222,6 +1249,7 @@ public final class PipelineConfig {
     private final Intake         intake;
     private final CommitRetryPolicy commitRetry;
     private final RejectMode     rejectMode;
+    private final Refusal        refusal;
     private final Unpack         unpack;
     private final FixedWidth     fixedWidth;
     private final Json           json;
@@ -1393,6 +1421,8 @@ public final class PipelineConfig {
     public CommitRetryPolicy commitRetry() { return commitRetry; }
     /** {@code processing.reject_mode}; never null — absent reads as {@link RejectMode#EJECT}. */
     public RejectMode     rejectMode() { return rejectMode; }
+    /** {@code processing.refusal} / {@code processing.refusal_retention_days}; never null — absent reads as off. */
+    public Refusal        refusal() { return refusal; }
     /** True when a file with any rejected record must land nothing ({@code reject_mode: all_or_nothing}). */
     public boolean        rejectsAllOrNothing() { return rejectMode == RejectMode.ALL_OR_NOTHING; }
     /** Never null — an absent {@code processing.unpack} block reads as {@link Unpack#defaults()}. */
@@ -1514,6 +1544,7 @@ public final class PipelineConfig {
         this.intake = b.intake;
         this.commitRetry = b.commitRetry;
         this.rejectMode = b.rejectMode == null ? RejectMode.EJECT : b.rejectMode;
+        this.refusal = b.refusal == null ? Refusal.OFF : b.refusal;
         this.unpack = b.unpack;
         this.fixedWidth = b.fixedWidth;
         this.json = b.json;
@@ -1606,6 +1637,7 @@ public final class PipelineConfig {
         this.intake = src.intake;
         this.commitRetry = src.commitRetry;
         this.rejectMode = src.rejectMode;
+        this.refusal = src.refusal;
         this.unpack = src.unpack;
         this.fixedWidth = src.fixedWidth;
         this.json = src.json;
@@ -2163,6 +2195,7 @@ public final class PipelineConfig {
         Intake intake            = null;   // absent block = inherit the -Dingest.* globals whole
         CommitRetryPolicy commitRetry = null;   // absent block = inherit the -Dingest.retry.* globals whole
         RejectMode rejectMode    = RejectMode.EJECT;   // absent key = eject-and-continue
+        Refusal    refusal       = Refusal.OFF;
         Unpack unpack            = null;   // absent block = Unpack.defaults() (stage on, shipped caps)
         String batchesFilePath;
         String lineageFilePath;

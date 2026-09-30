@@ -429,6 +429,9 @@ final class BackupTask {
             // ASSURE-ACTION-REQUESTS-1: Action Request records hold rendered payloads and target response
             // excerpts — sensitive operational data a backup archive must not spread.
             if (name.equals("action-requests")) return true;
+            // processing.refusal: a restricted-quarantine file was refused BECAUSE of its content (e.g. a card
+            // number) — no backup may carry it (RefusalQuarantine.DIR, restated: no engine dependency here).
+            if (name.equals("restricted-quarantine")) return true;
         }
         return false;
     }

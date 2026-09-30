@@ -359,6 +359,13 @@ public final class ConfigSpecs {
                                 + "records land. all_or_nothing: a file with ANY rejected record lands nothing and is "
                                 + "quarantined whole under rejects_all_or_nothing, its reject sidecar beside it.",
                         FieldType.ENUM, false, null, List.of("eject", "all_or_nothing"), null, "select", null),
+                new FieldSpec("processing.refusal", "Content refusal",
+                        "off (unset): a failing transform fails the batch. restricted_quarantine: a file an authored "
+                                + "mapping refuses with error('INGEST_REFUSE:<CODE>') moves to the restricted quarantine "
+                                + "(never re-polled, backed up or served) and only the reason code is recorded.",
+                        FieldType.ENUM, false, null, List.of("off", "restricted_quarantine"), null, "select", null),
+                FieldSpec.of("processing.refusal_retention_days", "Restricted quarantine retention (days)", FieldType.INT,
+                        "Optional: restricted-quarantine files older than this are deleted at the next refusal. Unset = kept."),
                 FieldSpec.withDefault("processing.streaming.large_file_bytes", "Streaming generation-mode threshold (bytes)",
                         FieldType.LONG, 268_435_456L,
                         "Plugin-ingester batches whose largest member is >= this run in bounded generation mode (huge files); smaller batches use union mode (many small files packed → one transform/write). 0 = always union."),

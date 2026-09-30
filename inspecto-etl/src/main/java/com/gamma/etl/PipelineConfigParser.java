@@ -310,6 +310,9 @@ final class PipelineConfigParser {
 
         // ── processing.reject_mode (X4 deferral, 2026-09-28): eject (default) | all_or_nothing ──
         b.rejectMode = PipelineConfig.RejectMode.parse(proc.get("reject_mode"));
+        // ── processing.refusal (opt-in content refusal → restricted quarantine), default off ──
+        b.refusal = PipelineConfig.Refusal.parse(proc.get("refusal"),
+                intOrNull(proc.get("refusal_retention_days"), "processing.refusal_retention_days"));
 
         // ── unpack stage (Collector-level decompression, additive, optional) ──
         // Unlike `intake` above, an absent KEY here takes the shipped default rather than a global:
