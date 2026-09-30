@@ -176,6 +176,35 @@ public final class QueryExecutor {
      */
     public static Result run(Request req, SqlSandboxPolicy policy, java.time.ZoneId timeZone)
             throws SQLException, IOException {
+        return run(req, null, policy, timeZone);
+    }
+
+    /**
+     * Builds the statement once the dataset relation's REAL column names are known, for a caller that must
+     * validate identifiers against the relation before assembling any statement text. An unchecked refusal
+     * it throws propagates unchanged, and no statement runs.
+     */
+    @FunctionalInterface
+    public interface Planner {
+        Request plan(List<String> columns);
+    }
+
+    /**
+     * Probe the relation's columns and run the statement {@code planner} builds from them, in ONE sandbox
+     * session (LA-11 G-R4, 2026-09-30). A zero-row probe through {@link #run(Request)} followed by the
+     * statement opened, registered and closed a second temp-file DuckDB per request, measured as the largest
+     * share of the route overhead above the traversal statement. Nothing is cached: the columns are read from
+     * the very view the statement then runs against, so they cannot be stale.
+     *
+     * <p>The planned request's own {@code datasetName}/{@code relationSql} are ignored in favour of these.
+     */
+    public static Result runPlanned(String datasetName, String relationSql, SqlSandboxPolicy policy, Planner planner)
+            throws SQLException, IOException {
+        return run(new Request(datasetName, relationSql, null, 0, 0, List.of(), List.of()), planner, policy, null);
+    }
+
+    private static Result run(Request req, Planner planner, SqlSandboxPolicy policy, java.time.ZoneId timeZone)
+            throws SQLException, IOException {
         long t0 = System.nanoTime();
         try (SqlSandbox sandbox = SqlSandbox.open(policy)) {
             Connection conn = sandbox.connection();
@@ -191,6 +220,17 @@ public final class QueryExecutor {
                 try (Statement st = conn.createStatement()) {
                     st.execute("CREATE VIEW " + q(req.datasetName()) + " AS " + req.relationSql());
                 }
+            }
+            if (planner != null) {
+                List<String> columns = new ArrayList<>();
+                try (Statement st = sandbox.statement();
+                     ResultSet rs = st.executeQuery("SELECT * FROM " + q(req.datasetName()) + " LIMIT 0")) {
+                    ResultSetMetaData md = rs.getMetaData();
+                    for (int c = 1; c <= md.getColumnCount(); c++) columns.add(md.getColumnLabel(c));
+                }
+                Request planned = planner.plan(List.copyOf(columns));
+                req = new Request(req.datasetName(), req.relationSql(), planned.sql(), planned.limit(), planned.offset(),
+                        planned.projection(), planned.sort(), planned.binds());
             }
             String wrapped = wrap(req);
             // A Rule Template's `:name` holes arrive here already rewritten to positional `?` with their

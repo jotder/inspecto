@@ -140,4 +140,32 @@ class QueryExecutorRecursiveCteTest {
         long ms = (System.nanoTime() - t0) / 1_000_000;
         assertTrue(ms < 15_000, "the 1 s fence should cancel well before the walk ends, took " + ms + " ms: " + timedOut);
     }
+
+    /**
+     * G-R4 (2026-09-30): the traversal probes the relation's columns in the SAME session its walk runs in.
+     * The planner sees the relation's real columns, and they are read per call — change the relation and the
+     * next call sees the change, so no stale column list can survive (nothing is cached).
+     */
+    @Test
+    void runPlannedHandsThePlannerTheRelationsCurrentColumns() throws Exception {
+        List<List<String>> seen = new java.util.ArrayList<>();
+        QueryExecutor.Planner planner = cols -> {
+            seen.add(cols);
+            return new QueryExecutor.Request(null, null, "SELECT count(*) AS c FROM \"ds\"", 10, 0, List.of(), List.of());
+        };
+        QueryExecutor.Result r = QueryExecutor.runPlanned("ds", "SELECT 1 AS src, 2 AS dst", null, planner);
+        assertEquals(1, ((Number) r.rows().get(0).get("c")).intValue());
+        QueryExecutor.runPlanned("ds", "SELECT 1 AS src, 2 AS dst, 3 AS ts", null, planner);
+        assertEquals(List.of(List.of("src", "dst"), List.of("src", "dst", "ts")), seen);
+    }
+
+    /** A planner refusal propagates unchanged and no statement runs — the column check still gates assembly. */
+    @Test
+    void aPlannerRefusalPropagatesAndNothingRuns() {
+        IllegalStateException refused = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> QueryExecutor.runPlanned("ds", "SELECT 1 AS src", null, cols -> {
+                    throw new IllegalStateException("unknown column 'dst'");
+                }));
+        assertEquals("unknown column 'dst'", refused.getMessage());
+    }
 }

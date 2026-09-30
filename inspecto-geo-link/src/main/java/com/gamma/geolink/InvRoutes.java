@@ -927,20 +927,19 @@ public final class InvRoutes implements RouteModule {
         if (startNode == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'startNode'");
         String targetNode = ApiContext.str(body, "targetNode");
         if (startNode.equals(targetNode)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'targetNode' must differ from 'startNode'");
-        String direction = ApiContext.str(body, "direction");
-        if (direction == null) direction = "DIRECTED";
+        String direction = ApiContext.str(body, "direction") != null ? ApiContext.str(body, "direction") : "DIRECTED";
         if (!direction.equals("DIRECTED") && !direction.equals("UNDIRECTED"))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'direction' must be DIRECTED or UNDIRECTED");
-        String tsCol = null;
-        boolean monotonic = false;
-        Double maxHours = null;
+        String tsColIn = null;
+        boolean monotonicIn = false;
+        Double maxHoursIn = null;
         if (body.get("temporalConstraint") instanceof Map<?, ?> tc) {
             @SuppressWarnings("unchecked") Map<String, Object> t = (Map<String, Object>) tc;
-            tsCol = ident(t, "timestampCol", true);
-            monotonic = Boolean.TRUE.equals(t.get("monotonic"));
+            tsColIn = ident(t, "timestampCol", true);
+            monotonicIn = Boolean.TRUE.equals(t.get("monotonic"));
             if (t.get("maxTotalDurationHours") instanceof Number h) {
                 if (h.doubleValue() <= 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'maxTotalDurationHours' must be positive");
-                maxHours = h.doubleValue();
+                maxHoursIn = h.doubleValue();
             }
         }
         int maxDepth = clamp(body.get("maxDepth"), DEFAULT_DEPTH, MAX_DEPTH);
@@ -948,9 +947,14 @@ public final class InvRoutes implements RouteModule {
         int limit = clamp(body.get("limit"), DEFAULT_PATHS, MAX_PATHS);
 
         String relationSql = relationFor(api, ex, writeRoot, datasetId);
+        String tsCol = tsColIn;
+        boolean monotonic = monotonicIn;
+        Double maxHours = maxHoursIn;
 
-        // Every identifier is checked against the REAL columns before any statement text is assembled.
-        List<String> columns = relationColumns(datasetId, relationSql);
+        // Every identifier is checked against the REAL columns before any statement text is assembled. The
+        // columns are probed in the SAME sandbox session the walk then runs in (G-R4, 2026-09-30): a separate
+        // probe cost a second temp-DB open/register/close per request.
+        QueryExecutor.Planner planner = columns -> {
         for (String col : java.util.Arrays.asList(sourceCol, targetCol, weightCol, tsCol)) {
             if (col != null && !containsIgnoreCase(columns, col))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
@@ -1000,11 +1004,11 @@ public final class InvRoutes implements RouteModule {
             binds.add(targetNode);
         }
         sql.append(" ORDER BY hops, path_json");
+        return new QueryExecutor.Request(datasetId, relationSql, sql.toString(), limit, 0, List.of(), List.of(), binds);
+        };
 
         try {
-            QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
-                    datasetId, relationSql, sql.toString(), limit, 0, List.of(), List.of(), binds),
-                    SqlSandboxPolicy.withCaps(null, 0, TRAVERSAL_TIMEOUT_SECONDS));
+            QueryExecutor.Result r = QueryExecutor.runPlanned(datasetId, relationSql, traversalPolicy(), planner);
             List<Map<String, Object>> paths = new ArrayList<>(r.rows().size());
             boolean yieldCapped = false;
             for (Map<String, Object> row : r.rows()) {
@@ -1030,6 +1034,16 @@ public final class InvRoutes implements RouteModule {
         } catch (SQLException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "traversal failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
+    }
+
+    /**
+     * The JVM-wide sandbox caps ({@code assist.sql.memory_limit} / {@code assist.sql.threads}) with the route's
+     * own statement timeout. It used to be {@code withCaps(null, 0, timeout)}, which silently replaced the
+     * operator's memory and thread caps with the hard-coded 1 GB / 2 threads (G-R4 profiling, 2026-09-30).
+     */
+    static SqlSandboxPolicy traversalPolicy() {
+        SqlSandboxPolicy configured = SqlSandboxPolicy.defaultPolicy();
+        return SqlSandboxPolicy.withCaps(configured.memoryLimit(), configured.maxThreads(), TRAVERSAL_TIMEOUT_SECONDS);
     }
 
     /** An optional positive integer body field, defaulted when absent and clamped to {@code max}. */
