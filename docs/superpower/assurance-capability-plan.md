@@ -8,7 +8,7 @@ timestamp: 2026-09-26T00:00:00Z
 
 # Assurance capability plan — build the product before the project
 
-> **Status: ACTIVE — waves 1–3 SHIPPED 2026-09-27 (`origin/master` `d5bf89ad1`) except 2.2 ⏸ (Link Analysis leads the Entity List); wave 4 SHIPPED 2026-09-29/30 (all six items, `origin/master` `2844ba34a`); wave 5 STARTED 2026-09-30. Decisions D-P1 … D-P14 answered (§5).**
+> **Status: ACTIVE — waves 1–3 SHIPPED 2026-09-27 (`origin/master` `d5bf89ad1`) except 2.2 ⏸ (Link Analysis leads the Entity List); wave 4 SHIPPED 2026-09-29/30 (all six items, `origin/master` `2844ba34a`); wave 5 BUILT 2026-09-30/10-01 — all four packs on `origin/master` (5.4 `b9e88805a`, 5.1 `ca89b9979`, 5.2 `62c0ee613`, 5.3 slice 1 `a2b6ee8c5`); their rows stay open as BUILT with recorded residuals. Decisions D-P1 … D-P14 answered (§5).**
 > **Why this exists.** An assurance bid was planned workstream by workstream (`WS-01 … WS-46`) in a
 > local, git-excluded working set (`superpower/rfp-mvno-assurance/build-plan.md`, listed in
 > [`../INDEX.md`](../INDEX.md)). That project is **not confirmed**. The operator's call (2026-09-26):
