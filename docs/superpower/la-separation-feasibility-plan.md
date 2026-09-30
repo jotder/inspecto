@@ -534,3 +534,35 @@ measures against it.
 | D-S3 | At what depth × volume does DuckDB stop being enough? | A curve, not an opinion; only a measured gap opens the external graph DB question |
 | D-S4 | Can the browser algorithms run server side with identical results? | Parity fixture green in both languages for the ported set |
 | D-S5 | Do N concurrent sandboxes (per-sandbox DuckDB file, shared read-only base) hold the D21 target? | Latency and memory per sandbox at the target concurrency; one heavy job does not move the others' p95 beyond a stated bound |
+
+#### 7.10.1 Spike results — 2026-09-30 (first measurement)
+
+**Method.** Harness `inspecto-geo-link/src/test/java/com/gamma/control/InvTraversalBench.java` (`@Tag("bench")`,
+skipped unless `-Dinspecto.bench.dir` is set; generated Parquet lives outside git under `.claude/worktrees/`).
+Machine: Intel i7-9850H (6 cores / 12 threads, 2.6 GHz), 32 GB RAM, Windows 11, JDK 27, DuckDB **1.5.2**
+(the repo pin). Corpus: `nodes = edges / 5`, source `= floor(nodes · u³)`, target `= floor(nodes · u²)`, `u` a
+deterministic hash of the row — a heavy-tailed out-degree, mean 5, median 3, p99 ≈ 39, top hub 17 k / 79 k / 368 k
+edges at 10⁶ / 10⁷ / 10⁸. Warm figures drop the first run; the OS file cache is always warm (no cache drop on
+Windows), so "cold" means a fresh engine, not a cold disk.
+
+| Spike | Verdict | Evidence |
+|---|---|---|
+| **D-S1** pruning | ✅ **PASS for partitions and row groups; bloom filters not isolated** | One-hop lookup of a median-degree node, p50 (p95): flat unsorted file 20 (23) / 126 (156) / **1 031 (1 215) ms** at 10⁶ / 10⁷ / 10⁸; entity-hash partitioned (64 buckets) + sorted by (entity, time), bucket predicate supplied: 24 (28) / 39 (55) / **43 (49) ms**; same layout without the bucket predicate: 29 / 40 / 97 ms. `EXPLAIN ANALYZE` at 10⁸: *Total Files Read* 64 → **1** with the bucket predicate; the 10× gain without it is row-group min/max skipping on the sorted key. Bloom-filter skipping was not separated from min/max skipping. |
+| **D-S2** DuckPGQ | ⛔ **NOT RUN — not staged** | `LOAD duckpgq` with autoinstall/autoload off: *extension not found* in `~/.duckdb/extensions/v1.5.2`. Staging it means downloading a community binary — an operator call. |
+| **D-S3** depth × volume | ✅ **curve measured — the gap is VOLUME, not depth** | Route-shaped recursive CTE, p99-degree start, yield fence 10 000 (100 000), p50 ms at depth 2 / 4 / 6 / 8. **10⁶:** 61 / 133 / 134 / 172 (56 / 123 / 196 / 286). **10⁷:** 306 / 392 / 467 / 438 (286 / 471 / 594 / 656). **10⁸:** 2 698 / 3 087 / 3 091 / 3 340 (3 110 / 6 115 / 6 087 / 6 347). Depth costs ≈ linear in rows walked (bounded by depth × yield); volume costs ≈ linear in edges scanned, because a flat Dataset is re-scanned per level. Materialising the edge CTE is 1.5–2× faster at 10⁶–10⁷ and **2× slower at 10⁸** (4 966 – 17 223 ms), so it is not the fix. |
+| **D-S4** algorithm parity | ⏸ **NOT RUN — needs ports (building)** | Grounded only: `graph-analysis.ts` exports ~40 algorithms; exactly one (branching pattern) has a Java port with a shared golden fixture, green in both languages. Iterative ones (PageRank, eigenvector, Katz, HITS, Louvain) will need tolerance-based parity, not equality. |
+| **D-S5** concurrency | ⏸ **NOT RUN** | Not cheap on one laptop; left for D-2 proper. |
+
+**Extrapolation to 10⁹ edges (D21).** Flat layout: one hop scales ≈ linearly (20 → 126 → 1 031 ms per decade), so
+≈ 10 s per hop at 10⁹ — unusable, and a 5-hop walk would breach the 5 s fence at 10⁸ already. Partitioned
+layout: one hop grew 24 → 39 → 43 ms over two decades; with the bucket count raised so a bucket stays near
+10⁶–10⁷ edges (≈ 256–1 024 buckets at 10⁹) one hop should stay in the tens of milliseconds, and a 5-hop walk
+that does one bucket lookup per frontier node lands in the low seconds. ⚠ This is an **extrapolation**: 10⁹ was
+not generated (≈ 20 GB of Parquet and hours on this machine), the lookup was a single-key probe rather than a
+frontier batch, and one machine says nothing about concurrent Drafts (D-S5).
+
+**Implications.** **D9 holds** — DuckDB SQL plus the index is enough up to 10⁸ on a laptop *provided the traversal
+reads the index, not a flat Dataset*; no measured gap opens the external graph DB question, and DuckPGQ stays
+unmeasured until it is staged. **D10 confirmed** — entity-hash partitioning with (entity, time) sort is the
+default, and the reader **must compute and push the bucket predicate** (2.3× at 10⁸ over relying on pruning
+alone). Today's route walks a flat Dataset, so its practical ceiling is ≈ 10⁷ edges within the 5 s fence.

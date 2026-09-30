@@ -909,6 +909,10 @@ public final class InvRoutes implements RouteModule {
      *   <li><b>timeout</b> — a {@value #TRAVERSAL_TIMEOUT_SECONDS} s statement timeout via a route-local
      *       sandbox policy, tighter than the JVM-wide default.</li>
      * </ul>
+     * {@code __walk} is {@code MATERIALIZED}: it is read twice (the paths and the per-level widths), and inlined
+     * DuckDB ran the whole recursion twice — 2.5× the G-R4 cost, and the capped width could come from a
+     * different walk than the paths. {@code __e0} stays inlined on purpose: materialising it copies the whole
+     * edge relation per request, faster at 10⁶ edges but 2× slower at 10⁸ (§7.10 D-S3).
      * With {@code targetNode}, a path stops extending once it reaches the target and only paths ending
      * there are returned. Every named column is checked against the relation's actual columns first.
      */
@@ -967,7 +971,7 @@ public final class InvRoutes implements RouteModule {
                 .append(" WHERE ").append(src).append(" IS NOT NULL AND ").append(tgt).append(" IS NOT NULL AND (")
                 .append(filterSql).append(")), __e AS (SELECT s, t, w, ts FROM __e0");
         if (direction.equals("UNDIRECTED")) sql.append(" UNION ALL SELECT t, s, w, ts FROM __e0");
-        sql.append("), __walk(node, path, depth, weight, first_ts, last_ts) AS (")
+        sql.append("), __walk(node, path, depth, weight, first_ts, last_ts) AS MATERIALIZED (")
            .append("SELECT CAST(? AS VARCHAR), list_value(CAST(? AS VARCHAR)), 0, CAST(0 AS DOUBLE),")
            .append(" CAST(NULL AS TIMESTAMP), CAST(NULL AS TIMESTAMP)")
            .append(" UNION ALL SELECT * FROM (SELECT e.t, list_append(w.path, e.t), w.depth + 1,")
