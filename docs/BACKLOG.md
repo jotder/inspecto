@@ -13,10 +13,11 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **60<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 24<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
+> **61<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 24<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
 > ⬇ **56 on 2026-09-30**: closed P3 `ERRORCODE-DEFAULTED-1` (`2f6d5e52a`) — the last 15 bare `ApiException` sites (all 422s in `inspecto-geo-link`: `AdmiraltyGrade` 1 · `InvestigationCoverageRoutes` 4 · `PatternRoutes` 5 · `WorkingSetRoutes` 5) now pass `CONFIG_VALIDATION_FAILED`, the status default, so no wire change; 0 of 1155 sites take `defaultFor` (the derive's 4 remaining lines pass computed codes). Truth in `okf/capabilities/control-api/control-api.md`.
 > ⬆ **52 → 53 on 2026-09-29**: filed P3 `TEMPLATE-RECOVERY-IMPORT-GATE-1` (the zero-Space recovery create skips the import gate) from the `publish.postgres` review.
 > ⬆ **50 → 51 on 2026-09-29**: filed P3 `ASSURE-CLASSIFICATION-PROPAGATION-1` (carry column classification through lineage) from the `publish.postgres` security review.
+> ⬆ **60 → 61 on 2026-09-30**: filed P1 `SEC-INGEST-EXPR-EXTERNAL-ACCESS-1` (§3.8) — a `fn: custom` mapping expression reads host files, other Spaces' data and URLs through the unsealed ingest connection.
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬆ **56 → 60 on 2026-09-30**: filed assurance wave 5 — P2 `ASSURE-PACK-TELCO-FRAUD-1`, `ASSURE-PACK-TELCO-RA-1`, `ASSURE-PACK-PAYMENT-FRAUD-1`, `ASSURE-PACK-BUSINESS-ASSURANCE-1`.
 > ↔ **57 on 2026-09-30**: closed P2 `ASSURE-XLSX-ATTACHMENTS-1` — `ReportJob` renders `format: xlsx` through the staged DuckDB `excel` extension (sealed connection, formula neutraliser shared with CSV); mail carries size-capped attachments only from the Job's own Run Artifact, to an admin-set recipient-domain allowlist, and an attaching Job needs four-eyes approval pinned to a content fingerprint (template-expanded Job + resolved Dataset relation) bound by nonce to the MAC'd Pending Change and re-checked every run. Five adversarial rounds; residual `SCHEDULE-EXPORT-DIALOG-DEAD-1` (P3) stays open; filed P2 `APPROVAL-FINGERPRINT-UNIFY-1` (net ↔).
@@ -89,9 +90,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 24<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 1<!--count:backlog-p1--> P1 + 24<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 60<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 61<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -119,7 +120,7 @@ changes**; a row that cannot is a decision (§1) or a design (P2). **P2** = buil
 or decision lands. **P3** = demand-gated; build only when someone asks by name. Every §3–§5 row carries its
 rank.
 
-**P1: none.** Assurance wave 1 (`superpower/assurance-capability-plan.md` §3) ✅ **shipped 2026-09-26** — `ASSURE-PER-ENTITY-ALERTS-1`, `ASSURE-BREAK-LIFECYCLE-1` and `ASSURE-IMPACT-LEDGER-1`. The P2 rows split three ways — pick from the first group:
+**P1: `SEC-INGEST-EXPR-EXTERNAL-ACCESS-1`** (§3.8, filed 2026-09-30). Assurance wave 1 (`superpower/assurance-capability-plan.md` §3) ✅ **shipped 2026-09-26** — `ASSURE-PER-ENTITY-ALERTS-1`, `ASSURE-BREAK-LIFECYCLE-1` and `ASSURE-IMPACT-LEDGER-1`. The P2 rows split three ways — pick from the first group:
 
 | State | P2 rows |
 |---|---|
@@ -345,6 +346,7 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 ### 3.8 Security, Policy, Editions & Compliance
 
+- **P1** · `SEC-INGEST-EXPR-EXTERNAL-ACCESS-1` — **a schema mapping's `fn: custom` expression reads host files and URLs through the unsealed ingest DuckDB connection.** The expression is spliced verbatim into ingest SQL, and every ingest connection (`CsvIngestStrategy`, `UnionModeIngester`, `GenerationModeIngester`, `DrainCommand`, all via `ConsignmentIngestStrategy.configure`) is opened by `DuckDbUtil.openConnection` with `enable_external_access`, `lock_configuration` and extension autoload at DuckDB defaults. Repro: `expression: "(SELECT content FROM read_text('<abs>/secret.txt'))"` lands the file's contents in the store; `read_csv`/`read_parquet` reach another Space's data and an `http://` URL autoloads httpfs (SSRF). Any Workbench author can plant it (`ImportCapabilityGuard` gates pipeline/schema files at `canAuthorWorkbench`), including by Space import. Pre-existing since `dd4b8c372` (2026-09-05; the legacy `EXPR` was verbatim too). Fix: seal every ingest connection (`SqlSandbox.disableExtensionAutoload` + `sealAllowing` over the Pipeline's own dirs) — `ConsignmentIngestStrategy.java`.
 - **P2** · `DB-QUERY-UNGATED-1` — **`POST /db/query` reads operational-store rows with no capability gate.** It is exempt in `CapabilityManifest` as "read-shaped" (read-only SQL behind `SqlGuard`). Since 2026-09-29 (`ASSURE-INTELLIGENCE-BUNDLE-1`, operator decision), the agent tools that read the same store rows, `anomaly_scan` and `suggest_expectations`, require `canAuthorWorkbench` through `POST /agent/tools/{name}`. So an Enterprise reader is refused the tool yet can still run the equivalent SQL directly. Decide the read capability for store rows, then gate both routes the same way and move `ToolCapabilities.ROW_READERS` onto that capability. → `inspecto/src/main/java/com/gamma/control/DbBrowserRoutes.java` · `inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/ToolCapabilities.java`
 - **P2** · `ASSIST-MODEL-EGRESS-1` — **the assist agent's own model calls do not go through the model endpoint allowlist.** Since 2026-09-29 the intelligence gateway dials only a host the Space's `models` allowlist names (`ModelEgress`, pinned to the checked address), and `POST /assist/settings` needs `canAdminister`. But `inspecto-agent` (the `/assist/*` sidecar) builds its own provider clients from the same settings (`ModelProviderFactory.create`), and `POST /assist/settings/test` makes a real outbound call to the saved `baseUrl` without either check. Route those through `ModelEgress` too. → `inspecto-agent/src/main/java/com/gamma/agent/UccAssistAgent.java` · `inspecto-engine/src/main/java/com/gamma/pipeline/exec/ModelEgress.java`
 - **P3** · `NATIVE-LICENCE-TEXTS-1` — **the GPL-3.0, GCC Runtime Library Exception 3.1 and mingw-w64 winpthreads licence texts must ship beside the DLLs the Enterprise intelligence sidecar carries** (`libstdc++-6.dll`, `libgcc_s_seh-1.dll`, `libwinpthread-1.dll`, inside the DJL tokenizers artifact). They are not in the offline cache, and downloading them was not approved (2026-09-29). Also merge colliding `META-INF/LICENSE*` files in the shade, so JNA's licence survives. evidence in root `compliance/evidence/third-party-natives.md` ("Open")
