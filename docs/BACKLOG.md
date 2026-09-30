@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **63<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 36<!--count:backlog-p3--> × P3** —
+> **62<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 35<!--count:backlog-p3--> × P3** —
 > ⬇ **56 on 2026-09-30**: closed P3 `ERRORCODE-DEFAULTED-1` (`2f6d5e52a`) — the last 15 bare `ApiException` sites (all 422s in `inspecto-geo-link`: `AdmiraltyGrade` 1 · `InvestigationCoverageRoutes` 4 · `PatternRoutes` 5 · `WorkingSetRoutes` 5) now pass `CONFIG_VALIDATION_FAILED`, the status default, so no wire change; 0 of 1155 sites take `defaultFor` (the derive's 4 remaining lines pass computed codes). Truth in `okf/capabilities/control-api/control-api.md`.
 > ⬆ **52 → 53 on 2026-09-29**: filed P3 `TEMPLATE-RECOVERY-IMPORT-GATE-1` (the zero-Space recovery create skips the import gate) from the `publish.postgres` review.
 > ⬆ **50 → 51 on 2026-09-29**: filed P3 `ASSURE-CLASSIFICATION-PROPAGATION-1` (carry column classification through lineage) from the `publish.postgres` security review.
@@ -21,6 +21,7 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ **63 → 62 on 2026-09-30**: closed P1 `SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1` — an Enrichment's `transformSql` now passes `SqlGuard` (one read-only statement) and runs on a connection sealed by `SqlSandbox.sealAllowing` to its own dirs (input, output + `_quarantine`, path-reference dirs, by-name reference producers' `dirs.database`, a per-run scratch dir), on both the run and the preview path; reproduced first — the capability-free `POST /enrichment/preview` returned a host file's content with a 200 (as-built `okf/backend/engine/duckdb.md`).
 > ↔ **63 on 2026-09-30**: closed P1 `SEC-INGEST-EXPR-EXTERNAL-ACCESS-1` — every ingest connection is sealed in `ConsignmentIngestStrategy.configure` (autoload off, `allowed_directories` = the Pipeline's own dirs + inputs, external access off, configuration locked; as-built `okf/backend/engine/duckdb.md`); its wider check filed P1 `SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1`, P2 `SEC-DRYRUN-EXPR-UNSEALED-1` and P2 `SEC-ATREST-PIPELINE-UNSEALED-1`.
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ⬇ **63 → 62 on 2026-09-30**: closed P3 `ASSURE-STREAM-LANE-BACKOFF-1` — a dead stream lane is replaced, and an unreachable broker re-probed, on a bounded exponential backoff with equal jitter (first failure of a streak immediate, then 1 s doubling to a 60 s cap; `-Dstream.lane.backoff.baseMs` / `maxMs`); the stack trace and the probe WARN log once per streak, and a healthy probe or drain resets it (as-built `okf/capabilities/acquisition/acquisition.md`).
 > ⬆ **63 → 64 on 2026-09-30**: filed P2 `INGEST-FAILURE-TEXT-QUOTES-VALUE-1` (round-3 verification of `ASSURE-PACK-PAYMENT-FRAUD-1`: a failing transform quotes the cell into the batch ledger and retry record).
 > ⬆ **62 → 63 on 2026-09-30**: filed P2 `INGEST-REJECT-SIDECAR-RAW-PAN-1` (adversarial verification of `ASSURE-PACK-PAYMENT-FRAUD-1` slice 1: a card number inside a malformed row is kept in quarantine).
 > ⬆ **56 → 60 on 2026-09-30**: filed assurance wave 5 — P2 `ASSURE-PACK-TELCO-FRAUD-1`, `ASSURE-PACK-TELCO-RA-1`, `ASSURE-PACK-PAYMENT-FRAUD-1`, `ASSURE-PACK-BUSINESS-ASSURANCE-1`.
@@ -95,8 +96,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 27<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 36<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 63<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 35<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 62<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -245,7 +246,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 ### 3.3 Acquisition, Collectors & Parsing
 
-- **P3** · `ASSURE-STREAM-LANE-BACKOFF-1` — **a stream lane restarts with no backoff (residual of `ASSURE-PUSH-INGEST-1`, wave 4.1 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** A lane whose probe always throws an Error dies and is replaced on every acquire tick (an ERROR + stack trace, a `inspecto_stream_lane_deaths_total` bump and a fresh connector each tick); an unreachable broker's ordinary probe failure retries every 200 ms (`STREAM_PROBE_MS`) with a WARN each time. Bounded, not a hot loop; wants exponential backoff or a consecutive-death cap. `KafkaRealBrokerTest` has still never run against a real broker.
 
 #### Unpack & codecs
 

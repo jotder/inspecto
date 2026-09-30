@@ -633,6 +633,7 @@ final class PipelineScheduler {
         eventCoalescers.remove(id);
         StreamLane lane = streamLanes.remove(id);
         if (lane != null) lane.close();
+        streamLaneBackoff.remove(id);
         acquireGuard.forget(id);              // per-pipeline acquire lock (B3b) — same leak-under-churn reason
         IntakeGovernor.shared().forget(id);   // same leak-under-churn reason, one map further down
     }
@@ -747,6 +748,10 @@ final class PipelineScheduler {
     static final long STREAM_PROBE_MS = 200;
 
     private final Map<String, StreamLane> streamLanes = new ConcurrentHashMap<>();
+    /** Per-Pipeline restart backoff, kept across dead-lane replacements (ASSURE-STREAM-LANE-BACKOFF-1). */
+    private final Map<String, StreamLane.Backoff> streamLaneBackoff = new ConcurrentHashMap<>();
+    static final long STREAM_BACKOFF_BASE_MS = Long.getLong("stream.lane.backoff.baseMs", StreamLane.Backoff.DEFAULT_BASE_MS);
+    static final long STREAM_BACKOFF_MAX_MS = Long.getLong("stream.lane.backoff.maxMs", StreamLane.Backoff.DEFAULT_MAX_MS);
 
     /** Start a lane for every eligible Pipeline that lacks one; close the lanes of those no longer eligible. */
     void reconcileStreamLanes() {
@@ -778,10 +783,14 @@ final class PipelineScheduler {
             return true;
         });
         Map<String, String> mdc = MDC.getCopyOfContextMap();
+        streamLaneBackoff.keySet().retainAll(want.keySet());
         want.forEach((id, t) -> streamLanes.computeIfAbsent(id, k -> {
+            StreamLane.Backoff backoff = streamLaneBackoff.computeIfAbsent(id, x ->
+                    new StreamLane.Backoff(STREAM_BACKOFF_BASE_MS, STREAM_BACKOFF_MAX_MS, System::currentTimeMillis));
+            if (!backoff.ready()) return null;   // a dead lane's replacement waits out its backoff
             StreamLane lane = new StreamLane(id, t.streamRecords(), t.everyMs(), STREAM_PROBE_MS,
                     () -> CollectorConnectors.forConfig(configRegistry.get(id).orElseThrow()),
-                    () -> drainNow(id), System::currentTimeMillis);
+                    () -> drainNow(id), System::currentTimeMillis, backoff);
             lane.start(mdc);
             log.info("Stream lane started for '{}' (drain at {} record(s) or {} ms)", id, t.streamRecords(), t.everyMs());
             return lane;

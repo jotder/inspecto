@@ -144,6 +144,60 @@ class StreamLaneTest {
         assertFalse(l.dead());
     }
 
+    @Test
+    void anAlwaysThrowingProbeIsReplacedAtGrowingBoundedSpacing() {
+        // The owner's loop: every 200 ms tick, replace the dead lane once its shared backoff is ready.
+        StreamLane.Backoff b = new StreamLane.Backoff(1_000, 8_000, now::get);
+        double before = deaths("backoff-dies");
+        List<Long> deathsAt = new java.util.ArrayList<>();
+        for (int tick = 0; tick < 3_000; tick++, now.addAndGet(200)) {   // 10 minutes
+            if (!b.ready()) continue;
+            StreamLane l = new StreamLane("backoff-dies", 1, 5_000, 50, () -> { throw new OutOfMemoryError("x"); },
+                    drained::incrementAndGet, now::get, b);
+            assertFalse(l.step());
+            assertTrue(l.dead());
+            deathsAt.add(now.get());
+        }
+        assertTrue(deathsAt.size() < 200, "not one replacement per tick: " + deathsAt.size() + " of 3000");
+        for (int i = 2; i < deathsAt.size(); i++) {
+            long gap = deathsAt.get(i) - deathsAt.get(i - 1);
+            assertTrue(gap <= 8_200, "spacing is capped: " + gap);
+            if (i < 5) assertTrue(gap >= deathsAt.get(i - 1) - deathsAt.get(i - 2), "spacing grows: " + deathsAt);
+        }
+        assertTrue(deathsAt.get(deathsAt.size() - 1) - deathsAt.get(deathsAt.size() - 2) >= 4_000, "reached the cap band");
+        assertEquals(before + deathsAt.size(), deaths("backoff-dies"), "one death counted per replacement");
+    }
+
+    @Test
+    void aHealthyProbeResetsTheDeathBackoff() {
+        StreamLane.Backoff b = new StreamLane.Backoff(1_000, 8_000, now::get);
+        for (int i = 0; i < 6; i++) b.fail();
+        assertFalse(b.ready());
+        now.addAndGet(8_001);
+        StreamLane l = new StreamLane("backoff-ok", 1_000, 60_000, 50, () -> probe, drained::incrementAndGet, now::get, b);
+        probe.pending = 0;
+        assertFalse(l.step());
+        assertEquals(0, b.streak(), "a healthy probe resets the death streak");
+        assertEquals(1, b.fail());
+        assertTrue(b.ready(), "so the next death restarts at once again");
+    }
+
+    @Test
+    void anUnreachableBrokerIsReprobedWithBackoffAndResetsOnSuccess() {
+        StreamLane l = lane(1, 5_000);
+        probe.fail = true;
+        for (int i = 0; i < 300; i++, now.addAndGet(200)) l.step();   // 60 s of 200 ms probe ticks
+        assertTrue(opens.get() < 30, "backoff spaced the reopens: " + opens.get() + " of 300 ticks");
+        probe.fail = false;
+        probe.pending = 5;
+        now.addAndGet(60_001);
+        assertTrue(l.step(), "a reachable broker drains again");
+        probe.fail = true;
+        l.step();                                  // a new streak starts at 1: no wait
+        probe.fail = false;
+        assertTrue(l.step(), "success reset the probe backoff, so the next probe is immediate");
+    }
+
     @SuppressWarnings("unchecked")
     private static double deaths(String pipeline) {
         var snap = com.gamma.metrics.MetricRegistry.global().snapshot("inspecto_stream_lane_deaths_total"::equals);
