@@ -341,6 +341,39 @@ class DbRunLeaseTest {
         }
     }
 
+    /**
+     * ⛔ Fails CLOSED on a read error, and the error is not a verdict: while the database is down the claim
+     * reads as invalid (a commit is refused and retried, never risked), but it is NOT marked lost — once the
+     * database is back, and nobody took the lease over, the same claim is valid again.
+     */
+    @Test
+    void anSqlErrorRefusesTheCommitButDoesNotMarkTheClaimLost(@TempDir Path dir) throws Exception {
+        String url = urlIn(dir);
+        java.util.concurrent.atomic.AtomicBoolean down = new java.util.concurrent.atomic.AtomicBoolean();
+        com.gamma.util.ConnectionSource real = JdbcDrivers.source(url, null, null, "run-lease");
+        com.gamma.util.ConnectionSource flaky = new com.gamma.util.ConnectionSource() {
+            @Override public <T> T with(SqlFunction<T> body) throws java.sql.SQLException {
+                if (down.get()) throw new java.sql.SQLException("db down");
+                return real.with(body);
+            }
+            @Override public boolean isPostgres() { return real.isPostgres(); }
+            @Override public void close() { real.close(); }
+        };
+        try (DbRunLease pod = new DbRunLease(flaky, "s1", DbRunLease.SCOPE_RUN, "pod-a", TTL)) {
+            RunLease.Claim c = pod.tryAcquire("orders");
+            assertNotNull(c);
+            assertTrue(c.isValid());
+
+            down.set(true);
+            assertFalse(c.isValid(), "an unreadable lease table is not proof the lease is still ours");
+            Thread.sleep(TTL.toMillis());                         // and a renewer tick fails too — still not 'lost'
+
+            down.set(false);
+            assertTrue(c.isValid(), "the database is back and nobody took the lease: the same claim is valid again");
+            c.close();
+        }
+    }
+
     /** The in-memory guard behaves the same way: valid while held, invalid once released. */
     @Test
     void theHeapGuardClaimIsValidUntilReleased() {

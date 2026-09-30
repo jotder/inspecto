@@ -126,6 +126,10 @@ public final class ConsignmentIngestor {
 
         String status = outcome.status();
         String error  = outcome.error();
+        // LEASE-TAKEOVER-INFLIGHT-1: the commit was refused because another node took the run lease over. That
+        // is not this Consignment's fault, so it must never spend an X1 attempt (five HA flaps would otherwise
+        // quarantine a good file as RETRY_EXHAUSTED) — the file is simply left for the new holder.
+        boolean leaseLost = false;
 
         if (dryRun) {
             // Every durable tail site in one place, each logged as a would-have. ParkedBranches.drain is
@@ -148,6 +152,11 @@ public final class ConsignmentIngestor {
                     parkSource(batch, cfg, outcome.survivors(), parked,
                             outcome.outputs(), outcome.lineage(), outcome.bounds());
                     status = "PARKED";
+                } catch (CommitFence.LeaseLostException e) {
+                    status = "FAILED";
+                    error  = e.getMessage();
+                    leaseLost = true;
+                    log.warn("Consignment {} not parked: {}", batch.batchId(), e.getMessage());
                 } catch (Exception e) {
                     status = "FAILED";
                     error  = "park failed: " + ConsignmentIngestStrategy.msg(e);
@@ -157,6 +166,11 @@ public final class ConsignmentIngestor {
                 try {
                     commit(batch, cfg, outcome.survivors(), outcome.outputs(), outcome.lineage(),
                             outcome.bounds(), outcome.schemaByOutput(), outcome.memberAudits(), runId);
+                } catch (CommitFence.LeaseLostException e) {
+                    status = "FAILED";
+                    error  = e.getMessage();   // "lease lost: ..." — distinct from "commit failed: ..."
+                    leaseLost = true;
+                    log.warn("Consignment {} not committed: {}", batch.batchId(), e.getMessage());
                 } catch (Exception e) {
                     // Output was written, but a side effect (backup/manifest/markers) failed. Demote
                     // to FAILED so the batch stays visible to audit/lineage/recovery instead of
@@ -182,7 +196,9 @@ public final class ConsignmentIngestor {
             // X1: a FAILED Consignment's files stay in the inbox and re-encounter next cycle — that retry is
             // now BOUNDED (attempt record, backoff, exhaustion → quarantine + CRITICAL Signal). A committed
             // or parked one has spent its record. After the audit, so the attempt is on the record first.
-            if ("FAILED".equals(status)) CommitRetry.recordFailure(batch, cfg, error);
+            // A lease loss touches neither: no attempt is spent, and no record the new holder may own is cleared.
+            if (leaseLost) { /* files stay in the inbox for the new holder */ }
+            else if ("FAILED".equals(status)) CommitRetry.recordFailure(batch, cfg, error);
             else CommitRetry.clear(batch, cfg);
         }
     }
@@ -260,6 +276,8 @@ public final class ConsignmentIngestor {
                                    Map<String, java.nio.file.Path> parked,
                                    List<PartitionOutput> outputs, List<LineageRow> lineage,
                                    Map<String, EventTimeBounds> bounds) throws IOException {
+        // LEASE-TAKEOVER-INFLIGHT-1: parking MOVES each original out of the inbox — refused for a lost lease.
+        CommitFence.check(CommitFence.Scope.RUN, cfg.identity().pipelineName());
         Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
         Path parkHome = Paths.get(cfg.dirs().backup(), "parked");
         Files.createDirectories(parkHome);
@@ -575,6 +593,12 @@ public final class ConsignmentIngestor {
                     bounds, cfg.identity().pipelineName(), schemaByOutput));
             recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.OUTPUT_REGISTERED);
         }
+
+        // LEASE-TAKEOVER-INFLIGHT-1, second look: the backup MOVES the original out of the inbox, which is the
+        // one step that takes the file away from a new holder that has already claimed it. The manifest and
+        // registry rows written above stay behind on a refusal — the same posture a crash mid-commit has always
+        // had (markers absent, the rerun overwrites the same-named outputs) — which is the safer side of it.
+        CommitFence.check(CommitFence.Scope.RUN, cfg.identity().pipelineName());
 
         // Backup BEFORE markers — see ordering rationale at top of method.
         // ⚠ An EXPANDED member is skipped here and handled in the deferred block at the end of this

@@ -238,7 +238,9 @@ final class DbRunLease implements RunLease, AutoCloseable {
                 if (released) return false;
                 Long gone = lost.get(pipeline);
                 if (gone != null && gone == epoch) return false;
-                if (!stillOurs(pipeline, epoch)) {
+                Boolean ours = stillOurs(pipeline, epoch);
+                if (ours == null) return false;   // unreadable: refuse this commit, but it is not a verdict
+                if (!ours) {
                     lost.put(pipeline, epoch);
                     return false;
                 }
@@ -319,9 +321,10 @@ final class DbRunLease implements RunLease, AutoCloseable {
     /**
      * Whether the row still names this process at {@code epoch} — one read, so owner and epoch are compared
      * together. ⛔ Fails CLOSED: an unreadable lease table is not proof we still hold it; refusing a commit
-     * leaves the file in the inbox for a retry, whereas a wrong "yes" is a double commit.
+     * leaves the file in the inbox for a retry, whereas a wrong "yes" is a double commit. {@code null} means
+     * "could not read" — refused, but never recorded as a loss.
      */
-    private boolean stillOurs(String pipeline, long epoch) {
+    private Boolean stillOurs(String pipeline, long epoch) {
         String sql = "SELECT owner, epoch FROM " + TABLE + " WHERE space = ? AND scope = ? AND pipeline = ?";
         try {
             return src.with(conn -> {
@@ -335,8 +338,8 @@ final class DbRunLease implements RunLease, AutoCloseable {
                 }
             });
         } catch (SQLException e) {
-            log.warn("Could not verify the run lease for '{}': {} — treating it as lost", pipeline, e.getMessage());
-            return false;
+            log.warn("Could not verify the run lease for '{}': {} — refusing the commit", pipeline, e.getMessage());
+            return null;   // not "lost": a blip must not mark a claim we may still hold
         }
     }
 

@@ -226,11 +226,22 @@ re-reads `owner` + `epoch` in one query (fail-closed on a read error); the renew
 its fenced renew matches no row. The run holds `com.gamma.inspector.CommitFence` (keyed scope + Space MDC +
 pipeline) around each claim — `PipelineScheduler.runOne`/`acquireOne`/`drainNow`, `CollectorService.runPipeline`/
 `replayRejects` — and the engine checks it before the first durable side effect of
-`ConsignmentIngestor.finalizeSource` (run) and before `materializeRemote` lands fetched files (acquire). A lost
-claim throws `LeaseLostException` ("lease lost"), so the Consignment is audited FAILED, nothing is registered,
-backed up or marked, and its files stay in the inbox for the new holder. The heap guard's claim is valid until
-released. ⚠ Parquet outputs already written by the lost run stay on disk (the rerun overwrites them —
-`OVERWRITE_OR_IGNORE`), and the refused batch counts one X1 commit-retry attempt.
+`ConsignmentIngestor.finalizeSource` (run), again just before its backup move (the step that takes the original
+out of the inbox), at the top of `parkSource`, and before `materializeRemote` lands fetched files (acquire). A
+lost claim throws `LeaseLostException` ("lease lost"), so the Consignment is audited FAILED with that reason,
+nothing more is registered, backed up, parked or marked, and its files stay in the inbox for the new holder.
+⛔ A lease loss spends **no** X1 commit-retry attempt and clears no record (`ConsignmentIngestor.process` catches
+it before the generic commit catch) — five HA flaps would otherwise quarantine a good file as `RETRY_EXHAUSTED`.
+An unreadable lease table refuses the commit but is never recorded as a loss (`stillOurs` answers `null`). The
+heap guard's claim is valid until released.
+⚠ What a refusal leaves behind: the lost run's output files were already written by the sink (the graph lane's
+`finalizeSource` runs only after every branch committed), and a glob reader can see them until the new holder
+commits. They carry the same names the new holder's run writes for the same source file (`consolidatedBaseName`),
+so its `OVERWRITE_OR_IGNORE` write replaces them in place and nothing doubles — the crash-mid-commit posture.
+A lease lost between the first check and the backup move also leaves that batch's manifest and §11.3 registry
+rows (written in between). Job / authored-Pipeline runs hold `SCOPE_JOB` / `SCOPE_AUTHORED` claims through
+`RunClaims`, which has no validity check yet (`LEASE-TAKEOVER-JOB-RUNS-1`); `commitRetryAct` needs none — it
+holds its claim for one operator act, to exclude a running cycle, and commits no run output.
 
 **Selected by `-Drun.lease.backend`** (`heap` default · `db` · `postgres` · a raw `jdbc:` URL), with
 `-Drun.lease.db.url` / `.user` / `.password` and `-Drun.lease.owner`. ⛔ The default is `heap`, never a
