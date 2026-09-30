@@ -12,3 +12,37 @@ raw:
     charge,"7",DOUBLE,"Rated charge","USD","INTERNAL"
     roaming,"8",VARCHAR,"Y when the a_number was roaming","","INTERNAL"
     cell_id,"9",VARCHAR,"Serving cell","","CONFIDENTIAL"
+mapping:
+  canonicalName: cdr
+  rawName: CDR
+  fields[10]:
+    - name: record_id
+      from: record_id
+      fn: keep
+    - name: start_ts
+      from: start_ts
+      fn: keep
+    - name: direction
+      from: direction
+      fn: keep
+    - name: service
+      from: service
+      fn: keep
+    - name: a_number
+      from: a_number
+      fn: keep
+    - name: b_number
+      from: b_number
+      fn: keep
+    - name: duration_s
+      from: duration_s
+      fn: keep
+    - name: charge
+      from: charge
+      fn: keep
+    - name: roaming
+      from: roaming
+      fn: keep
+    - name: cell_id
+      from: cell_id
+      fn: keep

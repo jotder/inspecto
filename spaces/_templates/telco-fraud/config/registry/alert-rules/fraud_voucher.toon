@@ -1,7 +1,7 @@
 name: fraud_voucher
 dataset: fraud_voucher
 measure: sum(redemptions)
-by[1]: voucher_serial
+by[2]: voucher_serial, window_date
 comparator: gt
 threshold: 1
 stormCap: 50

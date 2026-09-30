@@ -9,3 +9,28 @@ raw:
     amount,"4",DOUBLE,"Transaction amount","USD","INTERNAL"
     voucher_serial,"5",VARCHAR,"Voucher serial (VOUCHER only)","","INTERNAL"
     ref_txn_id,"6",VARCHAR,"The PAYMENT a REVERSAL reverses","","INTERNAL"
+mapping:
+  canonicalName: payments
+  rawName: PAYMENTS
+  fields[7]:
+    - name: txn_id
+      from: txn_id
+      fn: keep
+    - name: txn_ts
+      from: txn_ts
+      fn: keep
+    - name: txn_type
+      from: txn_type
+      fn: keep
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: voucher_serial
+      from: voucher_serial
+      fn: keep
+    - name: ref_txn_id
+      from: ref_txn_id
+      fn: keep

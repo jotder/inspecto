@@ -1,7 +1,7 @@
 name: fraud_dealer
 dataset: fraud_dealer
 measure: sum(idle_activations)
-by[1]: dealer_id
+by[2]: dealer_id, window_date
 comparator: gt
 threshold: 20
 stormCap: 50

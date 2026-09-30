@@ -1,7 +1,7 @@
 name: fraud_identity
 dataset: fraud_identity
 measure: sum(lines_on_document)
-by[1]: id_doc
+by[2]: id_doc, window_date
 comparator: gt
 threshold: 5
 stormCap: 50

@@ -8,3 +8,25 @@ raw:
     msisdn,"3",VARCHAR,"Subscriber number","","CONFIDENTIAL"
     dealer_id,"4",VARCHAR,"Dealer that performed the activation","","INTERNAL"
     id_doc,"5",VARCHAR,"Identity document presented","","CONFIDENTIAL"
+mapping:
+  canonicalName: subscriber_events
+  rawName: SUBSCRIBER_EVENTS
+  fields[6]:
+    - name: event_id
+      from: event_id
+      fn: keep
+    - name: event_ts
+      from: event_ts
+      fn: keep
+    - name: event_type
+      from: event_type
+      fn: keep
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: dealer_id
+      from: dealer_id
+      fn: keep
+    - name: id_doc
+      from: id_doc
+      fn: keep

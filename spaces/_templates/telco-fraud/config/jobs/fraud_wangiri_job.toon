@@ -1,11 +1,14 @@
 job:
   name: fraud_wangiri
   type: sql.template
-  description: "Wangiri - distinct subscribers hit by very short terminated calls, per calling number"
-  sql: "SELECT a_number AS caller, CAST($window_start AS DATE) AS window_date, count(*) AS short_calls, count(DISTINCT b_number) AS short_call_targets FROM cdr WHERE direction = 'MT' AND service = 'VOICE' AND duration_s <= CAST($max_ring_seconds AS INTEGER) AND start_ts >= CAST($window_start AS TIMESTAMP) AND start_ts < CAST($window_end AS TIMESTAMP) GROUP BY a_number"
-  sources: cdr
+  description: "Wangiri - ring targets of short terminated calls that called the ringing number back within callback_hours"
+  sql: "WITH cur AS (WITH n AS (SELECT direction, service, duration_s, start_ts, CASE WHEN a_number LIKE '+%' THEN substr(a_number, 2) WHEN a_number LIKE '00%' THEN substr(a_number, 3) WHEN a_number LIKE '0%' THEN $home_cc || substr(a_number, 2) ELSE a_number END AS na, CASE WHEN b_number LIKE '+%' THEN substr(b_number, 2) WHEN b_number LIKE '00%' THEN substr(b_number, 3) WHEN b_number LIKE '0%' THEN $home_cc || substr(b_number, 2) ELSE b_number END AS nb FROM cdr WHERE service = 'VOICE' AND start_ts >= CAST($window_start AS TIMESTAMP) AND start_ts < CAST($window_end AS TIMESTAMP) + to_hours(CAST($callback_hours AS INTEGER))), rings AS (SELECT na AS caller, nb AS target, start_ts FROM n WHERE direction = 'MT' AND duration_s <= CAST($max_ring_seconds AS INTEGER) AND start_ts >= CAST($window_start AS TIMESTAMP) AND start_ts < CAST($window_end AS TIMESTAMP)), cb AS (SELECT na AS target, nb AS callee, start_ts FROM n WHERE direction = 'MO') SELECT r.caller, CAST($window_start AS DATE) AS window_date, count(DISTINCT r.target) AS ring_targets, count(DISTINCT c.target) AS callback_targets FROM rings r LEFT JOIN cb c ON c.target = r.target AND c.callee = r.caller AND c.start_ts > r.start_ts AND c.start_ts <= r.start_ts + to_hours(CAST($callback_hours AS INTEGER)) GROUP BY r.caller) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM fraud_wangiri WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
+  sources: cdr,fraud_wangiri
   sink_dataset: fraud_wangiri
   window_start: "2026-07-01 00:00:00"
   window_end: "2026-07-02 00:00:00"
+  retention_days: "30"
   max_ring_seconds: "3"
+  callback_hours: "24"
+  home_cc: "999"
   enabled: true

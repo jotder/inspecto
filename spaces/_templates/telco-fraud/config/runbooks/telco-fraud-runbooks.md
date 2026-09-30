@@ -1,83 +1,98 @@
 # Telecom fraud runbooks
 
 One runbook per typology in this Space Template. Each Alert Rule `fraud_<typology>` is per-entity: it
-raises one Alert and one Incident per offender (the `by` key), and a healed key resolves its Alert but
-never its Incident. A person records the Disposition.
+raises one Alert and one Incident per offender and window (`by` = the offender key + `window_date`). A
+healed key resolves its Alert but never its Incident. A person records the Disposition.
 
 **Running the windows.** Each detection is a `sql.template` Job (`config/jobs/fraud_<typology>_job.toon`)
 with `window_start` / `window_end` parameters. Run a Job for another window by passing those parameters on
-the run. Detection thresholds sit in two places, both configuration: the Job's parameters (what counts, e.g.
-`irsf_prefixes`, `max_ring_seconds`) and the Alert Rule's `threshold` (how much is too much).
+the run. A run keeps the rows of every other window within `retention_days` (default 30), so the next day's
+run does not drop yesterday's offenders and their Alerts stay open. An offender's key heals only when its
+window ages out of retention.
 
-**Corpus.** `data/samples/` holds a synthetic corpus (fixed seed). It has planted offenders and planted
-look-alikes for every typology. Copy each feed into `data/inbox/<feed>` to ingest it.
+**Thresholds are configuration** in two places: the Job's parameters (what counts, e.g. `irsf_prefixes`,
+`max_ring_seconds`) and the Alert Rule's `threshold` (how much is too much; `gt`, so a value exactly AT the
+threshold stays silent). A parameter may not be empty: set an exemption list to `none` to exempt nothing.
+
+**Number formats.** Subscriber numbers are E.164 digits with no `+`. Dialled numbers may be `+<E.164>`,
+`00<E.164>`, national `0<NSN>` or bare E.164. The Jobs normalise all four (`home_cc` supplies the country
+code of a national number) before matching. Prefix lists hold E.164 digit prefixes of any length; an entry
+that is not 1-15 digits fails the run.
+
+**Corpus.** `data/samples/` holds a synthetic corpus (fixed seed, fictional numbering: home country code
+`999`, foreign callers `287` / `289`). It has planted offenders and look-alikes for every typology. Copy each
+feed into `data/inbox/<feed>` to ingest it.
 
 ## IRSF (International Revenue Share Fraud) - `fraud_irsf`
 
-- **Detects:** originated voice seconds to the high-risk ranges in `irsf_prefixes`, per caller, above `threshold` (default 3600 s).
+- **Detects:** originated voice seconds to the ranges in `irsf_prefixes`, per caller, above `threshold` (default 3600 s).
 - **Check:** is the line new or recently swapped? Are the calls long and back-to-back, at night, from one cell?
 - **Act:** bar international calls on the line; ask the interconnect partner to withhold settlement for the ranges hit.
-- **Look-alike:** heavy callers to ordinary international ranges, or a few calls to a listed range.
+- **Silent by design:** heavy calls to unlisted ranges; national numbers that happen to start with a listed prefix.
+- **Known false-positive source (no defence here):** a legitimate satellite-phone user calling a listed range heavily.
 
 ## Wangiri - `fraud_wangiri`
 
-- **Detects:** distinct subscribers hit by terminated calls of at most `max_ring_seconds` from one calling number, above `threshold` (default 20).
-- **Check:** is the calling number foreign? Do the called subscribers call it back?
-- **Act:** block the calling number at the gateway; warn the subscribers that were called.
-- **Look-alike:** a foreign call centre with real conversations.
+- **Detects:** subscribers rung for at most `max_ring_seconds` who then call the ringing number back within `callback_hours`, per ringing number, above `threshold` (default 3).
+- **Check:** is the ringing number foreign? What did the callbacks cost?
+- **Act:** block the ringing number at the gateway; warn the subscribers who called back.
+- **Silent by design:** a flash-call OTP sender (rings, nobody calls back); a call centre (real conversations); calls to the number made before the ring.
 
 ## SIM-box - `fraud_simbox`
 
 - **Detects:** distinct voice targets of a line that receives no calls, sends no SMS and uses at most `max_cells` cells, above `threshold` (default 50).
 - **Check:** IMEI and cell history; the share of on-net targets; the activation dealer.
 - **Act:** suspend the line; check other lines activated by the same dealer or identity document.
-- **Look-alike:** a busy line that also receives calls, or one that moves between cells.
+- **Silent by design:** a busy line that also receives calls or moves between cells; a registered PBX or outbound-dialler line listed in `exempt_msisdns`.
+- **Known false-positive source (no defence here):** an unregistered PBX or dialler SIM looks exactly like a SIM-box. Register it in `exempt_msisdns`.
 
 ## Premium-rate - `fraud_premium_rate`
 
-- **Detects:** charge to the premium-rate ranges in `premium_prefixes`, per caller, above `threshold` (default 100).
+- **Detects:** charge to the ranges in `premium_prefixes` (E.164, so `999900` is national `0900`), per caller, above `threshold` (default 100).
 - **Check:** is the premium-rate number owned by a known content partner? Is the traffic machine-regular?
 - **Act:** bar premium-rate access on the line; hold the partner's revenue share.
-- **Look-alike:** an occasional premium-rate user.
+- **Silent by design:** an occasional premium-rate user.
 
 ## Roaming high usage - `fraud_roaming`
 
 - **Detects:** roaming charge per subscriber in the window, above `threshold` (default 500).
 - **Check:** the visited network, and whether the usage fits the subscriber's history and credit limit.
 - **Act:** apply the roaming spending cap; contact the subscriber.
-- **Look-alike:** an ordinary traveller.
+- **Known false-positive source (no defence here):** a business traveller whose legitimate spend passes the threshold. The pack has no subscriber tier to tell them apart.
 
 ## SIM-swap - `fraud_sim_swap`
 
-- **Detects:** payments out of a line within `window_hours` after its SIM swap, above `threshold` (default 200).
+- **Detects:** payments out of a line within `window_hours` after its latest SIM swap, each payment counted once, above `threshold` (default 200).
 - **Check:** how the swap was authorised (channel, agent, identity check), and whether the subscriber confirms it.
 - **Act:** freeze outgoing payments on the line; reverse the swap if the subscriber did not ask for it.
-- **Look-alike:** a swap with no payment, a payment with no swap, or a payment outside the window.
+- **Silent by design:** a swap with no payment, a payment with no swap, a payment outside the window or before the swap, several swaps before one small payment.
+- **Known false-positive source (no defence here):** a genuine lost-phone swap followed by a large genuine payment.
 
 ## Subscription / identity - `fraud_identity`
 
 - **Detects:** lines activated on one identity document in the window, above `threshold` (default 5).
 - **Check:** the document's validity; whether the lines share a dealer, device or address.
 - **Act:** suspend the extra lines pending identity checks; report the document.
-- **Look-alike:** a family with a few lines on one document.
+- **Silent by design:** a family with a few lines on one document; a corporate account whose document starts with one of `exempt_doc_prefixes` (default `CORP-`).
 
 ## Dealer activations - `fraud_dealer`
 
-- **Detects:** activations by one dealer that make no originated traffic in the window, above `threshold` (default 20).
+- **Detects:** activations by one dealer with no originated traffic up to `traffic_grace_hours` (default 48) after the window, above `threshold` (default 20).
 - **Check:** the dealer's commission claims against those lines; the identity documents used.
 - **Act:** hold the dealer's commission; audit the dealer.
-- **Look-alike:** a busy dealer whose lines are used, or a small dealer with a few idle lines.
+- **Silent by design:** a busy dealer whose lines are used; late-day activations whose lines are first used the next morning.
+- **Known false-positive source (no defence here):** a dealer selling prepaid stock that buyers activate but use later than the grace period.
 
 ## Voucher / EVD - `fraud_voucher`
 
 - **Detects:** redemptions of one voucher serial, above `threshold` (default 1: a serial redeems once).
 - **Check:** the voucher platform's log for the serial; the channel that sold it.
 - **Act:** block the serial and the batch it came from; claw back the credit.
-- **Look-alike:** a heavy top-up user redeeming many different vouchers.
+- **Silent by design:** a heavy top-up user redeeming many different vouchers.
 
 ## Payment reversal - `fraud_reversal`
 
 - **Detects:** reversals per subscriber in the window, above `threshold` (default 3).
 - **Check:** what was bought with each payment before it was reversed; the payment instrument.
 - **Act:** block the instrument; limit payments on the line.
-- **Look-alike:** a subscriber with one or two reversals, or many payments with none reversed.
+- **Silent by design:** a subscriber with a few reversals, or many payments with none reversed.
