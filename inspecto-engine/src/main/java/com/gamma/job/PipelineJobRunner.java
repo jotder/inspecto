@@ -26,7 +26,10 @@ import com.gamma.pipeline.exec.BranchCommitLog;
 import com.gamma.pipeline.exec.ConservationCheck;
 import com.gamma.pipeline.exec.DbProvenanceStore;
 import com.gamma.pipeline.exec.DryRunSinkWriter;
+import com.gamma.pipeline.BuiltinNodeType;
 import com.gamma.pipeline.exec.PartitionSinkWriter;
+import com.gamma.pipeline.exec.PipelineDryRun;
+import com.gamma.sql.SqlSandbox;
 import com.gamma.pipeline.exec.PipelineExecutor;
 import com.gamma.pipeline.exec.PipelineWatermarkStore;
 import com.gamma.pipeline.exec.ProvenanceRow;
@@ -42,14 +45,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -307,7 +313,15 @@ public final class PipelineJobRunner implements Job {
         PipelineWatermarkStore watermarks = incremental ? new PipelineWatermarkStore(Path.of(auditDir)) : null;
 
         long t0 = System.nanoTime();
-        File db = DuckDbUtil.tempDbFile("flowjob_");
+        // A fresh scratch dir per run: the seal allowlists it, and allowlisting java.io.tmpdir itself would admit all of it.
+        Path scratch = Files.createTempDirectory("flowjob_");
+        File db;
+        try {
+            db = DuckDbUtil.tempDbFile("flowjob_", scratch);
+        } catch (java.io.IOException | RuntimeException e) {
+            PipelineDryRun.removeScratch(scratch);   // nothing below owns the dir yet
+            throw e;
+        }
         File dryRunBranchLog = null;
         try (Connection conn = DuckDbUtil.openConnection(db)) {
             // Flow-jobs have no per-pipeline processing.duckdb config; honour the global -D caps so this
@@ -324,6 +338,8 @@ public final class PipelineJobRunner implements Job {
                 reportSources(ctx, seed.store(), read);
                 seedViews.put(seed.node(), view);
             }
+            RowShaper.ReferenceResolver refs = references();
+            seal(conn, g, seeds, dir, refs, scratch);
 
             // Every run gets a batch-unique base name (addressing step 6). Incremental runs always did — each
             // increment is its own file — and a full recompute now does too, so it writes a new revision beside
@@ -374,7 +390,7 @@ public final class PipelineJobRunner implements Job {
             // stable key, rename-proof like the watermark's producer), this run's batch id, and the
             // space's dedup ledger — so a windowed transform.dedup can claim keys durably here.
             PipelineExecutor.execute(conn, g, seedViews, batchId, coordinator, writer, () -> {}, collector,
-                    references(), null, RowShaper.ExecutionContext.forRun(pipelineId, batchId));
+                    refs, null, RowShaper.ExecutionContext.forRun(pipelineId, batchId));
 
             if (provenance != null) {
                 provenance.record(provRows);
@@ -406,10 +422,61 @@ public final class PipelineJobRunner implements Job {
         } finally {
             if (dryRunBranchLog != null) DuckDbUtil.deleteTempDb(dryRunBranchLog);
             DuckDbUtil.deleteTempDb(db);
+            PipelineDryRun.removeScratch(scratch);
         }
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────
+
+    /**
+     * <b>SEC-ATREST-PIPELINE-UNSEALED-1</b> — seal the run's connection after the source-store views exist and
+     * before the walk runs any authored SQL ({@code fn: custom} mapping expressions, {@code transform.sql},
+     * filters). {@code allowed_directories} = this run's scratch dir, the global spill directory, each seed's
+     * source-store dir, each on-disk sink's store dir, and each {@code transform.join} reference's read dirs/files
+     * as {@code refs} declares them. Every entry is filtered through {@link PathJail#readAllowlistRefusal} and a
+     * store dir must stay under {@code dir}; either failing refuses the run, closed. {@code registerInLakehouse}
+     * opens its own connection, so the seal does not touch it.
+     */
+    private static void seal(Connection conn, PipelineGraph g, List<Seed> seeds, String dir,
+                             RowShaper.ReferenceResolver refs, Path scratch) throws Exception {
+        LinkedHashSet<Path> allowed = new LinkedHashSet<>();
+        LinkedHashSet<Path> homes = new LinkedHashSet<>();
+        LinkedHashSet<Path> files = new LinkedHashSet<>();
+        Path root = Path.of(dir.trim()).toAbsolutePath().normalize();
+        allowed.add(scratch.toAbsolutePath().normalize());
+        String spill = System.getProperty(DuckDbUtil.PROP_TEMP_DIRECTORY);
+        if (spill != null && !spill.isBlank()) allowed.add(Path.of(spill).toAbsolutePath().normalize());
+        List<String> stores = new ArrayList<>();
+        for (Seed s : seeds) stores.add(s.store());
+        for (PipelineStores.Produced p : PipelineStores.producedStores(g)) if (p.restsOnDisk()) stores.add(p.store());
+        for (String store : stores) {
+            Path storeDir = root.resolve(store).normalize();
+            if (!storeDir.startsWith(root) || storeDir.equals(root))
+                throw new IllegalArgumentException("pipeline job refused: store '" + store + "' resolves to "
+                        + storeDir + ", outside the data directory " + root + " (SEC-ATREST-PIPELINE-UNSEALED-1)");
+            allowed.add(storeDir);
+        }
+        for (PipelineNode n : g.nodes()) {
+            Object ref = BuiltinNodeType.TRANSFORM_JOIN.type().equals(n.type()) ? n.cfg("reference") : null;
+            if (ref == null || ref.toString().isBlank()) continue;
+            for (Path d : refs.readDirs(ref.toString().trim())) allowed.add(d.toAbsolutePath().normalize());
+            for (Path f : refs.readFiles(ref.toString().trim())) {
+                Path file = f.toAbsolutePath().normalize();
+                files.add(file);
+                // admitted alone, but its home is still judged (a file in a config/ or *.secrets tree is refused)
+                if (file.getParent() != null) homes.add(file.getParent());
+                homes.add(file);
+            }
+        }
+        homes.addAll(allowed);
+        for (Path d : homes) {
+            String why = PathJail.readAllowlistRefusal(d);
+            if (why != null)
+                throw new IllegalArgumentException("pipeline job refused: its sealed connection would be allowed to read "
+                        + d + ", which " + why + " (SEC-ATREST-PIPELINE-UNSEALED-1)");
+        }
+        SqlSandbox.sealAllowing(conn, List.copyOf(allowed), List.copyOf(files));
+    }
 
     /** View-name prefix for a resolved Reference Dataset (distinct from the {@code source_store} seeds). */
     private static final String REF_VIEW_PREFIX = "pipeline_ref";
@@ -427,21 +494,54 @@ public final class PipelineJobRunner implements Job {
      * changed between them.
      */
     private RowShaper.ReferenceResolver references() {
-        return (conn, reference) -> {
-            String view = REF_VIEW_PREFIX + "_" + safe(reference);
-            EnrichmentConfig.Reference parsed = ReferenceReader.parse(reference);
-            // A path reference is a DATA path: it resolves under this Space's directory, exactly as the flat
-            // config's join reference does at load (DATA-DIRS-RESOLVE-AGAINST-CWD-1). A by-name one is an id.
-            if (!parsed.byName())
-                parsed = ReferenceReader.parse(PathJail.dataPath(SpaceConfigRoot.current(), reference,
-                        "transform.join.reference"));
-            String sql = ReferenceReader.sqlFor(parsed, pipelines == null ? null : pipelines.get());
-            try (Statement st = conn.createStatement()) {
-                st.execute("CREATE OR REPLACE VIEW \"" + view + "\" AS SELECT * FROM " + sql);
+        return new RowShaper.ReferenceResolver() {
+            @Override
+            public String resolve(Connection conn, String reference) throws SQLException {
+                String view = REF_VIEW_PREFIX + "_" + safe(reference);
+                EnrichmentConfig.Reference parsed = parsedReference(reference);
+                String sql = ReferenceReader.sqlFor(parsed, pipelines == null ? null : pipelines.get());
+                try (Statement st = conn.createStatement()) {
+                    st.execute("CREATE OR REPLACE VIEW \"" + view + "\" AS SELECT * FROM " + sql);
+                }
+                log.info("[PIPELINEJOB] {} resolved reference '{}' for join", cfg.name(), reference);
+                return view;
             }
-            log.info("[PIPELINEJOB] {} resolved reference '{}' for join", cfg.name(), reference);
-            return view;
+
+            /** SEC-ATREST-PIPELINE-UNSEALED-1: a by-name reference reads the producing Pipeline's database dir. */
+            @Override
+            public List<Path> readDirs(String reference) {
+                EnrichmentConfig.Reference parsed;
+                try { parsed = parsedReference(reference); } catch (RuntimeException unresolvable) { return List.of(); }
+                if (!parsed.byName() || pipelines == null) return List.of();
+                return pipelines.get().stream()
+                        .filter(p -> p.identity().pipelineName().equals(parsed.ref()) && p.producesReference()
+                                && p.dirs() != null && p.dirs().database() != null && !p.dirs().database().isBlank())
+                        .findFirst().map(p -> List.of(Path.of(p.dirs().database()))).orElse(List.of());
+            }
+
+            /** A {@code path:} reference is admitted as the one file, so an expression cannot read a sibling. */
+            @Override
+            public List<Path> readFiles(String reference) {
+                try {
+                    EnrichmentConfig.Reference parsed = parsedReference(reference);
+                    return parsed.byName() ? List.of() : List.of(Path.of(parsed.path()));
+                } catch (RuntimeException unresolvable) {
+                    return List.of();
+                }
+            }
         };
+    }
+
+    /**
+     * A path reference is a DATA path: it resolves under this Space's directory, exactly as the flat
+     * config's join reference does at load (DATA-DIRS-RESOLVE-AGAINST-CWD-1). A by-name one is an id.
+     */
+    private static EnrichmentConfig.Reference parsedReference(String reference) {
+        EnrichmentConfig.Reference parsed = ReferenceReader.parse(reference);
+        if (!parsed.byName())
+            parsed = ReferenceReader.parse(PathJail.dataPath(SpaceConfigRoot.current(), reference,
+                    "transform.join.reference"));
+        return parsed;
     }
 
     /**

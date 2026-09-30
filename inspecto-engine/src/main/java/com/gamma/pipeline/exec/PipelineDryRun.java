@@ -199,7 +199,7 @@ public final class PipelineDryRun {
      * refused; everything else (host files, {@code config.secrets}, URLs) DuckDB itself then refuses.
      */
     /** Delete the scratch dir with whatever DuckDB left in it (the {@code <db>.tmp} spill dir). Best effort. */
-    static void removeScratch(java.nio.file.Path scratch) {
+    public static void removeScratch(java.nio.file.Path scratch) {
         try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(scratch)) {
             for (java.nio.file.Path p : walk.sorted(java.util.Comparator.reverseOrder()).toList())
                 java.nio.file.Files.deleteIfExists(p);

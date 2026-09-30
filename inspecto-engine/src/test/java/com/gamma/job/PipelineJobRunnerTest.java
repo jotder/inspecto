@@ -1314,6 +1314,70 @@ class PipelineJobRunnerTest {
         assertTrue(e.getMessage().contains("pick one graph source"), e.getMessage());
     }
 
+    // ── SEC-ATREST-PIPELINE-UNSEALED-1: the authored graph runs on a SEALED connection ────────────
+
+    /** events --data--> [join(reference)] --data--> map(one authored expression) --data--> sink {@code leaked}. */
+    private JobResult runWithExpr(String expr, String joinReference) throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        seedParquet(dataDir, "events", "(1,150),(2,50)");
+        List<PipelineNode> nodes = new ArrayList<>();
+        List<PipelineEdge> edges = new ArrayList<>();
+        nodes.add(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")));
+        String upstream = "src";
+        if (joinReference != null) {
+            nodes.add(PipelineNode.of("j", "transform.join", Map.of("reference", joinReference, "on", "id")));
+            edges.add(PipelineEdge.data("src", "j"));
+            upstream = "j";
+        }
+        nodes.add(PipelineNode.of("m", "transform.sql", Map.of("columns", List.of(
+                Map.of("name", "id", "expr", "id"), Map.of("name", "leak", "expr", expr)))));
+        nodes.add(new PipelineNode("out", "sink.persistent", "Leaked", null, Map.of("store", "leaked"), null));
+        edges.add(PipelineEdge.data(upstream, "m"));
+        edges.add(PipelineEdge.data("m", "out"));
+        PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+        store.write("sealed_flow", new PipelineGraph("sealed_flow", true, nodes, edges));
+        JobConfig cfg = new JobConfig("sealed", JobType.PIPELINE, null, null, true, false,
+                Map.of("flow", "sealed_flow", "data_dir", dataDir));
+        return new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir,
+                tmp.resolve("audit").toString()).run();
+    }
+
+    private static String readTextOf(Path file) {
+        return "(SELECT content FROM read_text('" + file.toAbsolutePath().toString().replace('\\', '/') + "'))";
+    }
+
+    private static void assertPermissionRefused(Throwable t) {
+        StringBuilder all = new StringBuilder();
+        for (Throwable c = t; c != null; c = c.getCause()) all.append(c.getMessage()).append(" | ");
+        assertTrue(all.toString().contains("Permission Error"), "expected a DuckDB permission refusal: " + all);
+    }
+
+    @Test
+    void anAtRestMappingExpressionCannotReadAHostFile() throws Exception {
+        Path host = Files.writeString(Files.createDirectories(tmp.resolve("elsewhere")).resolve("host.txt"), "host-secret");
+        assertPermissionRefused(assertThrows(Exception.class, () -> runWithExpr(readTextOf(host), null)));
+    }
+
+    @Test
+    void anAtRestMappingExpressionCannotReadTheSpaceSecrets() throws Exception {
+        Path creds = Files.writeString(Files.createDirectories(tmp.resolve("config.secrets")).resolve("db.toon"),
+                "password: hunter2");
+        assertPermissionRefused(assertThrows(Exception.class, () -> runWithExpr(readTextOf(creds), null)));
+    }
+
+    @Test
+    void aSealedAtRestRunStillJoinsItsPathReferenceButNotASiblingOfIt() throws Exception {
+        Path refs = Files.createDirectories(tmp.resolve("refs"));
+        seedDim(refs.resolve("dim.parquet"), "(1,'EMEA'),(2,'APAC')");
+        Path sibling = Files.writeString(refs.resolve("other.txt"), "sibling-secret");
+        String ref = refs.resolve("dim.parquet").toAbsolutePath().toString().replace('\\', '/');
+
+        JobResult ok = runWithExpr("region", ref);   // precondition: the join itself works when sealed
+        assertTrue(ok.success(), ok.message());
+
+        assertPermissionRefused(assertThrows(Exception.class, () -> runWithExpr(readTextOf(sibling), ref)));
+    }
+
     /** Write {@code (id,amt)} VALUES as a Parquet file under {@code <dataDir>/<store>/} (the at-rest store). */
     private static void seedParquet(String dataDir, String store, String valuesSql) throws Exception {
         seedParquetFile(dataDir, store, "seed", valuesSql);

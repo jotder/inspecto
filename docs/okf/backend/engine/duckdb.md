@@ -314,6 +314,26 @@ expression could `read_text` any host file.
   Parquet store still joins, 200). Each goes red with its fix reverted (the glob test pins the fail-closed
   outcome rather than a single line of code).
 
+### The at-rest Pipeline Job is sealed too (`SEC-ATREST-PIPELINE-UNSEALED-1`, 2026-10-01)
+
+`PipelineJobRunner.execute` (the only caller is `JobService`) runs the authored graph over `SourceStoreReader`
+views on a scratch DuckDB. The same authored SQL as the dry run runs there (`fn: custom` expressions,
+`transform.sql`), so it was the same hole.
+
+- **Sealed after the source-store views, before the walk** (`PipelineJobRunner.seal`, `SqlSandbox.sealAllowing(conn,
+  dirs, files)`). Allowlist: a per-run scratch dir (the scratch DB now lives in it, so its `<db>.tmp` spill is
+  covered; removed recursively via `PipelineDryRun.removeScratch`, now `public`), the global spill dir, each seed's
+  and each on-disk sink's `<data_dir>/<store>`, and each `transform.join` reference's `readDirs`/`readFiles`. The
+  runner's own resolver declares them: a by-name reference is the producer's `dirs.database` (only if it declares
+  `produces: reference`), a `path:` reference is the one file. Reference views are still created lazily, after the seal.
+- **Fail closed.** Every entry, and a reference file's parent, goes through `PathJail.readAllowlistRefusal`. A store
+  that resolves outside `data_dir` (or to `data_dir` itself) refuses the run, because `readAllowlistRefusal` alone
+  would not stop a `../../etc` store name.
+- **DuckLake is unaffected.** `registerInLakehouse` → `DuckLakeRegistrar.registerInto` opens its own connection.
+- **Pinned by** `PipelineJobRunnerTest`: `read_text` of a host file and of `config.secrets/…` → `Permission Error`; a
+  sealed run still joins its `path:` reference but not a sibling of it. All three go red with the `seal(...)` call
+  removed; the existing DuckLake-registration and join tests in that class cover the positive paths.
+
 ## The source time zone for temporal data
 
 **SHIPPED 2026-08-29** (engine + config `44ecef76`, surfaces `dd02d377`). Plan + the full live-probe
