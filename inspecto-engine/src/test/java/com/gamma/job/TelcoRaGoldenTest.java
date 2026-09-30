@@ -124,7 +124,7 @@ class TelcoRaGoldenTest {
             if (!"ra_xdr_lost".equals(control)) plantedTotal += CORPUS.planted.get(control).size();
         }
         // leakage and data quality are separate Datasets, with separate Alert Rules
-        Set<String> dq = Set.of("ambiguous_tariff", "no_tariff", "null_value", "missing_statement");
+        Set<String> dq = Set.of("ambiguous_tariff", "no_tariff", "null_value", "missing_statement", "split_statement");
         long plantedDq = 0;
         for (String control : List.of("ra_rerating", "ra_rollforward", "ra_settlement"))
             plantedDq += CORPUS.planted.get(control).stream()
@@ -177,8 +177,8 @@ class TelcoRaGoldenTest {
         assertEquals(AMBIGUOUS, CORPUS.planted.get("ra_rerating").stream().filter(k -> k.endsWith("|ambiguous_tariff")).count(),
                 "calls under the duplicate tariff row: data quality, one row each");
         assertEquals(6, CORPUS.planted.get("ra_rollforward").size(), "3 movement, 2 continuity, 1 null opening");
-        assertEquals(8, CORPUS.planted.get("ra_settlement").size(),
-                "2 over-billed, 1 missing statement, 2 unknown partner (one duplicated), 3 duplicate statements");
+        assertEquals(10, CORPUS.planted.get("ra_settlement").size(),
+                "2 over-billed, 1 missing statement, 2 unknown partner (one duplicated), 3 duplicate statements, 2 split statements");
         assertEquals(1, CORPUS.planted.get("ra_rerating").stream().filter(k -> k.endsWith("|no_tariff")).count());
         assertEquals(Map.of("ra_xdr_completeness", 4, "ra_xdr_lost", 4, "ra_rerating", 6, "ra_rated_vs_billed", 3,
                         "ra_rollforward", 5, "ra_settlement", 2),

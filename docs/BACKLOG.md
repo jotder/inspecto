@@ -282,11 +282,11 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
     | Rated vs billed | 4 |
     | Re-rating | 5 rate mismatches + 12 ambiguous tariff + 1 no tariff |
     | Roll-forward | 6 |
-    | Settlement | 8 (a duplicate's loss = billed total − expected) |
+    | Settlement | 10 (a duplicate's loss = billed total − expected; a split within tolerance is data quality) |
 
     - The boundary look-alikes stay silent.
-    - 17 leakage rows and 15 data-quality rows land in separate Datasets.
-    - Nineteen separate mutations each go red (okf `capabilities/spaces/spaces.md` §3.5).
+    - 17 leakage rows and 17 data-quality rows land in separate Datasets.
+    - Twenty-two separate mutations each go red (okf `capabilities/spaces/spaces.md` §3.5).
   - **Same lane, platform-wide:** the template gallery reports `creatable` / `missingFeatures` per edition,
     and `recon.run` counts the Breaks of every pair.
   - 🔴 **Open:**

@@ -223,6 +223,8 @@ exists (§2, §5).
     - `missing_statement` (data quality).
     - `unknown_partner`: the whole billed total, every line, is the leakage.
     - `no_traffic`.
+    - `split_statement` (data quality): several lines whose total is within tolerance of the expected amount.
+      It is a legitimate split bill, so it never reaches `ra_leakage` or the CRITICAL Alert.
     - `duplicate_statement`: the amount is the billed total of ALL lines minus the expected amount. It never
       depends on which line is "first". `LINES_DISAGREE` marks a line that is also off-tolerance, and
       `STATEMENT_ID` reports the lowest id, for reference only.
@@ -257,11 +259,11 @@ exists (§2, §5).
   | Rated vs billed | 4 |
   | Re-rating | 5 `rate_mismatch` (2 half-rate + 3 still on the pre-change rate), 12 `ambiguous_tariff` and 1 `no_tariff` |
   | Roll-forward | 6 (3 movement, 2 continuity, 1 NULL opening) |
-  | Settlement | 8 (2 over-billed, 1 missing statement, 2 unknown partner (one day duplicated: 90.00, not 45.00), 3 duplicates) |
+  | Settlement | 10 (2 over-billed, 1 missing statement, 2 unknown partner (one day duplicated: 90.00, not 45.00), 3 duplicates, 2 split statements: one exact, one at +0.9 % of a 1 % tolerance) |
 
   - The three duplicates are an exact copy of a correct line, an over-billed line billed twice, and a
     different line that sorts first. The test pins each one's exact loss.
-  - Split by Dataset: **17 leakage rows** in `ra_leakage` and **15 data-quality rows** in `ra_data_quality`.
+  - Split by Dataset: **17 leakage rows** in `ra_leakage` and **17 data-quality rows** in `ra_data_quality`.
 
   - It also checks that leakage amounts are never NULL, that they are DECIMAL, and that the committed samples
     are byte-identical to the generator (`-Dtelcora.regenerate=true`).
@@ -292,7 +294,10 @@ exists (§2, §5).
     - the highest statement id reported;
     - a duplicate outranking an unknown partner;
     - `no_tariff` routed as leakage;
-    - lines-disagree ignoring the lowest line.
+    - lines-disagree ignoring the lowest line;
+    - no split-statement rule;
+    - a split bound of an exact sum only;
+    - a split routed as leakage.
   - ⚠ The golden test loads the corpus straight into the stores. It does not ingest through the eight
     Pipelines.
 - `ControlApiSpaceTemplateSeedGateTest` applies the template through the real seed gate.

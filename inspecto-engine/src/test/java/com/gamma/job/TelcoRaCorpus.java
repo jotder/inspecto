@@ -34,9 +34,9 @@ final class TelcoRaCorpus {
     static final int XDRS = 600;
     static final int SUBSCRIBERS = 40;
     static final String[] DAYS = {"2026-07-01", "2026-07-02", "2026-07-03"};
-    static final String[] PARTNERS = {"IC_P1", "IC_P2", "IC_P3"};
+    static final String[] PARTNERS = {"IC_P1", "IC_P2", "IC_P3", "IC_P4"};
     static final String UNKNOWN_PARTNER = "IC_P9";
-    static final Map<String, String> PARTNER_RATE = new TreeMap<>(Map.of("IC_P1", "0.0500", "IC_P2", "0.0800", "IC_P3", "0.0600"));
+    static final Map<String, String> PARTNER_RATE = new TreeMap<>(Map.of("IC_P1", "0.0500", "IC_P2", "0.0800", "IC_P3", "0.0600", "IC_P4", "0.0700"));
     static final String OPEN_FROM = "2026-01-01 00:00:00";
     /** PLAN_A VOICE changes rate at this instant; a call is rated at its START. */
     static final String CHANGE_TS = "2026-07-02 12:00:00";
@@ -268,7 +268,7 @@ final class TelcoRaCorpus {
         Collections.shuffle(partnerDays, rnd);
         Set<String> overBilled = new LinkedHashSet<>(), missingStatement = new LinkedHashSet<>(),
                 justUnder = new LinkedHashSet<>();
-        String dupExact = null, dupOverCopy = null, dupDifferentFirst = null;
+        String dupExact = null, dupOverCopy = null, dupDifferentFirst = null, splitExact = null, splitNearTolerance = null;
         for (String pd : partnerDays) {
             long expected = cents(minutes.get(pd), PARTNER_RATE.get(pd.split("\\|")[0]));
             if (overBilled.size() < 2) overBilled.add(pd);
@@ -277,8 +277,10 @@ final class TelcoRaCorpus {
             else if (dupExact == null) dupExact = pd;                  // a correct line billed twice
             else if (dupOverCopy == null) dupOverCopy = pd;            // an over-billed line billed twice
             else if (dupDifferentFirst == null && expected >= 100) dupDifferentFirst = pd;   // a second, different line sorts first
+            else if (splitExact == null) splitExact = pd;                            // one bill in two lines, summing exactly
+            else if (splitNearTolerance == null && expected >= 1000) splitNearTolerance = pd;   // two lines at +0.9 %
         }
-        if (justUnder.size() < 2 || dupDifferentFirst == null)
+        if (justUnder.size() < 2 || dupDifferentFirst == null || splitNearTolerance == null)
             throw new IllegalStateException("corpus too small for the settlement cases");
         Set<String> st = new LinkedHashSet<>();
         overBilled.forEach(k -> st.add(k + "|amount_mismatch"));
@@ -287,6 +289,7 @@ final class TelcoRaCorpus {
         st.add(unknownSingle + "|unknown_partner");
         st.add(unknownDuplicated + "|unknown_partner");
         for (String k : List.of(dupExact, dupOverCopy, dupDifferentFirst)) st.add(k + "|duplicate_statement");
+        for (String k : List.of(splitExact, splitNearTolerance)) st.add(k + "|split_statement");
         planted.put("ra_settlement", st);
         benign.put("ra_settlement", justUnder);
         StringBuilder ir = new StringBuilder("PARTNER,RATE_PER_MIN\n");
@@ -304,6 +307,13 @@ final class TelcoRaCorpus {
             if (overBilled.contains(key) || key.equals(dupOverCopy)) amount = expected * 11 / 10 + 1;
             if (justUnder.contains(key)) amount = expected + expected * 9 / 1000;
             String id = String.format("ST%04d", line++);
+            if (key.equals(splitExact) || key.equals(splitNearTolerance)) {
+                // a legitimate split: two lines whose total is within tolerance of the expected amount
+                long total = key.equals(splitExact) ? expected : expected + expected * 9 / 1000;
+                statementLine(sb, id, pd, mins / 2, total / 2);
+                statementLine(sb, id + "B", pd, mins - mins / 2, total - total / 2);
+                continue;
+            }
             statementLine(sb, id, pd, mins, amount);
             if (key.equals(dupExact) || key.equals(dupOverCopy)) {
                 statementLine(sb, "STDUP" + id.substring(2), pd, mins, amount);      // an exact copy, sorting after

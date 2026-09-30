@@ -111,7 +111,12 @@ and A↔C. On the golden corpus, **15 Breaks are 9 distinct lost or short xDRs**
 - **Reasons:**
   - `amount_mismatch` (leakage): the difference is more than the tolerance. A positive amount is an
     overcharge by the partner. Dispute it, with our minute count attached.
-  - `duplicate_statement` (leakage): the partner sent more than one line for the same day.
+  - `split_statement` (data quality): the partner sent more than one line for the same day, and the lines
+    **sum to the expected amount within the tolerance**. It is a legitimate split bill, not a loss, so it
+    raises the WARNING data-quality Alert and never the CRITICAL leakage one. Confirm the split with the
+    partner.
+  - `duplicate_statement` (leakage): the partner sent more than one line for the same day, and their total
+    is outside the tolerance of the expected amount.
     - The amount is the **billed total of all the lines, minus the expected amount**, so it counts both the
       extra line and any over-billing on the lines themselves. It does not depend on which line came first.
     - `LINES_DISAGREE` is true when any single line is also outside the tolerance of the expected amount; an
