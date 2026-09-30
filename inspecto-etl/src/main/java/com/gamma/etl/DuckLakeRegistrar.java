@@ -62,6 +62,12 @@ public final class DuckLakeRegistrar {
      * @param cfg         pipeline configuration
      */
     public static void register(List<String> outputPaths, String tableName, PipelineConfig cfg) {
+        register(outputPaths, tableName, cfg, null);
+    }
+
+    /** As above, idempotent per {@code consignmentId} ({@code null} derives the key from the file set). */
+    public static void register(List<String> outputPaths, String tableName, PipelineConfig cfg,
+                                String consignmentId) {
         if (outputPaths.isEmpty()) return;
         List<Registration> plan = plan(outputPaths, cfg);
         // G9 backstop for a lane the pipeline registry does not guard (the job lane, the CLI entry points):
@@ -75,7 +81,7 @@ public final class DuckLakeRegistrar {
         boolean multi = cfg.sinks().size() > 1;
         for (Registration r : plan)
             requireRegistrationConfigured(r.duckLake(), multi ? r.sink().database() : null);
-        for (Registration r : plan) registerOne(r.files(), tableName, r.duckLake());
+        for (Registration r : plan) registerOne(r.files(), tableName, r.duckLake(), consignmentId);
     }
 
     /** One destination's share of a batch: the sink, its effective lake ({@code null} if none), its files. */
@@ -117,7 +123,8 @@ public final class DuckLakeRegistrar {
         return plan;
     }
 
-    private static void registerOne(List<String> outputPaths, String tableName, Map<String, Object> dl) {
+    private static void registerOne(List<String> outputPaths, String tableName, Map<String, Object> dl,
+                                    String consignmentId) {
         if (dl == null) return;
         if (!Boolean.parseBoolean(String.valueOf(dl.getOrDefault("enabled", false)))) return;
 
@@ -126,7 +133,7 @@ public final class DuckLakeRegistrar {
         String schema     = (String) dl.getOrDefault("schema", "main");
         String table      = (tableName != null) ? tableName : (String) dl.get("table");
 
-        registerInto(outputPaths, table, catalogUrl, dataPath, schema);
+        registerInto(outputPaths, table, catalogUrl, dataPath, schema, consignmentId);
     }
 
     /**
@@ -150,6 +157,17 @@ public final class DuckLakeRegistrar {
      */
     public static void registerInto(List<String> outputPaths, String table,
                                     String catalogUrl, String dataPath, String schemaOrNull) {
+        registerInto(outputPaths, table, catalogUrl, dataPath, schemaOrNull, null);
+    }
+
+    /**
+     * As above, <b>idempotent</b> (DUCKLAKE-REGISTER-NOT-IDEMPOTENT-1): registering the same
+     * {@code consignmentId} into the same table twice inserts the rows once. A {@code null} id derives the key
+     * from the sorted file paths (the job lane has no consignment). See {@link #registerOnce}.
+     */
+    public static void registerInto(List<String> outputPaths, String table,
+                                    String catalogUrl, String dataPath, String schemaOrNull,
+                                    String consignmentId) {
         if (outputPaths.isEmpty()) return;
         String schema = (schemaOrNull == null || schemaOrNull.isBlank()) ? "main" : schemaOrNull;
 
@@ -183,20 +201,7 @@ public final class DuckLakeRegistrar {
                 stmt.execute(String.format(
                         "ATTACH 'ducklake:%s' AS lake (DATA_PATH '%s'%s)",
                         catalogUrl, dataPath.replace("\\", "/"), attachOptions()));
-                stmt.execute("CREATE SCHEMA IF NOT EXISTS lake.\"" + schema + '"');
-
-                String firstPath = outputPaths.get(0).replace("\\", "/");
-                stmt.execute(String.format(
-                        "CREATE TABLE IF NOT EXISTS lake.\"%s\".\"%s\" AS" +
-                                " SELECT * FROM read_parquet('%s') LIMIT 0",
-                        schema, table, firstPath));
-
-                String pathList = outputPaths.stream()
-                        .map(p -> '\'' + p.replace("\\", "/") + '\'')
-                        .collect(Collectors.joining(", ", "[", "]"));
-                stmt.execute(String.format(
-                        "INSERT INTO lake.\"%s\".\"%s\" SELECT * FROM read_parquet(%s)",
-                        schema, table, pathList));
+                registerOnce(conn, outputPaths, table, schema, consignmentId);
 
                 log.info("DuckLake: OK — {} file(s) registered in {}.{}",
                         outputPaths.size(), schema, table);
@@ -205,6 +210,80 @@ public final class DuckLakeRegistrar {
             }
         } catch (Exception e) {
             onRegistrationFailure(e, catalogUrl);
+        }
+    }
+
+    /** Catalog table recording which consignments were registered into which table. Created on demand. */
+    static final String RECORD_TABLE = "_inspecto_registered_consignments";
+
+    /**
+     * Insert the files' rows into {@code lake.schema.table} <b>at most once per key</b>, on a connection
+     * where the catalog is already attached as {@code lake}.
+     *
+     * <p>Design: the check, the data INSERT and the record INSERT run in ONE transaction, so a crash
+     * between them rolls both back (never registered-without-record, never a record without data) and a
+     * re-registration sees the record and skips. Chosen over delete-then-insert because deleting by a
+     * deterministic id could destroy the other holder's committed rows. The record table is created on
+     * demand ({@code CREATE TABLE IF NOT EXISTS}), so an existing lake needs no migration; rows registered
+     * before this change have no record and are not deduplicated retroactively.
+     * A null/blank id derives the key from the file set.
+     * ⚠ Two truly concurrent registrars could both pass the check (DuckLake has no constraints); the run
+     * lease is what excludes that, as before.
+     */
+    static void registerOnce(Connection conn, List<String> outputPaths, String table, String schema,
+                             String consignmentId) throws java.sql.SQLException {
+        String key = (consignmentId == null || consignmentId.isBlank()) ? derivedKey(outputPaths) : consignmentId;
+        String target = schema + "." + table;
+        String rec = "lake.\"" + schema + "\".\"" + RECORD_TABLE + '"';
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE SCHEMA IF NOT EXISTS lake.\"" + schema + '"');
+            stmt.execute(String.format(
+                    "CREATE TABLE IF NOT EXISTS lake.\"%s\".\"%s\" AS SELECT * FROM read_parquet('%s') LIMIT 0",
+                    schema, table, outputPaths.get(0).replace("\\", "/")));
+            stmt.execute("CREATE TABLE IF NOT EXISTS " + rec
+                    + " (target_table VARCHAR, consignment_id VARCHAR, registered_at TIMESTAMP)");
+            String pathList = outputPaths.stream().map(p -> '\'' + p.replace("\\", "/") + '\'')
+                    .collect(Collectors.joining(", ", "[", "]"));
+            stmt.execute("BEGIN");
+            try {
+                try (java.sql.PreparedStatement q = conn.prepareStatement(
+                        "SELECT count(*) FROM " + rec + " WHERE target_table = ? AND consignment_id = ?")) {
+                    q.setString(1, target);
+                    q.setString(2, key);
+                    try (java.sql.ResultSet rs = q.executeQuery()) {
+                        rs.next();
+                        if (rs.getLong(1) > 0) {
+                            stmt.execute("ROLLBACK");
+                            log.info("DuckLake: {} already registered into {} -- skipped", key, target);
+                            return;
+                        }
+                    }
+                }
+                stmt.execute(String.format("INSERT INTO lake.\"%s\".\"%s\" SELECT * FROM read_parquet(%s)",
+                        schema, table, pathList));
+                try (java.sql.PreparedStatement ins = conn.prepareStatement(
+                        "INSERT INTO " + rec + " VALUES (?, ?, now())")) {
+                    ins.setString(1, target);
+                    ins.setString(2, key);
+                    ins.executeUpdate();
+                }
+                stmt.execute("COMMIT");
+            } catch (java.sql.SQLException | RuntimeException e) {
+                try { stmt.execute("ROLLBACK"); } catch (java.sql.SQLException ignored) { /* already ended */ }
+                throw e;
+            }
+        }
+    }
+
+    /** Key for callers with no consignment id: SHA-256 of the sorted, slash-normalised file paths. */
+    static String derivedKey(List<String> outputPaths) {
+        try {
+            var md = java.security.MessageDigest.getInstance("SHA-256");
+            outputPaths.stream().map(p -> p.replace("\\", "/")).sorted()
+                    .forEach(p -> md.update((p + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            return "files:" + java.util.HexFormat.of().formatHex(md.digest());
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
         }
     }
 

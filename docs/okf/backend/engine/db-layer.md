@@ -247,8 +247,15 @@ manifest and (via `supersede`) its LIVE registry rows, with the files already in
 overwrites in place (`OVERWRITE_OR_IGNORE`) and self-heals; pinned by `CommitFenceTest`. A different membership
 mints a different id and leaves an orphan — a bounded residual. A lease lost between the first check and the
 pre-backup check also leaves that batch's manifest and registry rows; the holder rewrites the same-named manifest.
-⚠ The DuckLake catalog is the exception: `DuckLakeRegistrar.registerInto` inserts with no dedup, so files registered
-before a late refusal are inserted again by the holder (`DUCKLAKE-REGISTER-NOT-IDEMPOTENT-1`, P2).
+The DuckLake catalog is idempotent too: `DuckLakeRegistrar.registerOnce` checks, inserts and records in ONE
+transaction against `_inspecto_registered_consignments` (`target_table`, `consignment_id`, `registered_at`), so the
+holder's re-registration of the same `consignment_id` is skipped, and a crash between insert and record rolls both
+back (no double, no record-less registration). The table is created on demand (`CREATE TABLE IF NOT EXISTS`), so an
+existing lake needs no migration; rows registered before it have no record and are not deduplicated retroactively.
+`finalizeSource` passes the batch id; the job lane (`registerInLakehouse`, unchanged) has none, so the key is a
+SHA-256 of its sorted file paths. ⚠ Same paths rewritten with new content are skipped on that lane. ⚠ Two truly
+concurrent registrars could both pass the check (DuckLake has no constraints); the lease excludes that. ⚠ Tested
+on a native attached DuckDB (same SQL and transactions), NOT a real DuckLake ATTACH.
 ⚠ A long lease-table outage makes every run refuse each cycle ("lease unverifiable"), with no attempt spent and
 nothing quarantined; nothing raises a Signal for it, so the symptom is files not draining and the log line.
 Job / authored-Pipeline runs hold `SCOPE_JOB` / `SCOPE_AUTHORED` claims through `RunClaims`, which has no validity

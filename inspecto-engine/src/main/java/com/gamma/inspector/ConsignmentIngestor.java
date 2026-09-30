@@ -442,7 +442,7 @@ public final class ConsignmentIngestor {
         CommitFence.check(CommitFence.Scope.RUN, cfg.identity().pipelineName());
 
         DuckLakeRegistrar.register(outputs.stream().map(PartitionOutput::outputFile).toList(),
-                batch.table(), cfg);
+                batch.table(), cfg, batch.batchId());
 
         String stageSourceId = cfg.collector().id();
         String batchIdForStages = batch.batchId();
