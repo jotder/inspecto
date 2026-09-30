@@ -13,10 +13,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -128,6 +130,70 @@ class ControlApiDryRunBlindSpotsTest {
                     "a preview must not show a healthy branch the run would refuse: " + r.body());
             assertTrue(r.body().contains("'hook'") && r.body().contains("Professional"),
                     "the refusal names the sink and the edition, in WebhookSink's own words: " + r.body());
+        }
+    }
+
+    // ── 3 · SEC-DRYRUN-EXPR-UNSEALED-1: authored SQL in a dry run runs on a sealed connection ────
+
+    private static String fwd(Path p) { return p.toString().replace("\\", "/"); }
+
+    /** acq -> map(one authored expression reading {@code readFile}) -> join(reference) -> sink. */
+    private static String exprThenJoin(String readFile, String reference) {
+        return """
+            {"pipeline":
+              {"name":"seal_flow","active":false,
+               "nodes":[{"id":"acq","type":"acquisition"},
+                        {"id":"m","type":"transform.sql","config":{"columns":[
+                            {"name":"id","expr":"id"},
+                            {"name":"leak","expr":"(SELECT content FROM read_text('%s'))"}]}},
+                        {"id":"j","type":"transform.join","config":{"reference":"%s","on":"id"}},
+                        {"id":"sink","type":"sink.persistent","config":{"store":"out"}}],
+               "edges":[{"from":"acq","rel":"data","to":"m"},{"from":"m","rel":"data","to":"j"},
+                        {"from":"j","rel":"data","to":"sink"}]},
+             "sampleRows":[{"id":"1"}]}""".formatted(readFile, reference);
+    }
+
+    private HttpResponse<String> dryRunSealFlow(Path dir, String body) throws Exception {
+        try (Ctx c = open(dir)) {
+            return send(c.port, "POST", "/pipelines/authored/seal_flow/dry-run", body);
+        }
+    }
+
+    private static void assertSealed(HttpResponse<String> r) {
+        assertTrue(r.statusCode() >= 400, "the expression must not run: " + r.body());
+        assertTrue(r.body().contains("Permission Error"), "a DuckDB permission refusal, not a later failure: " + r.body());
+        assertFalse(r.body().contains("host-secret"), "the file content must not leak: " + r.body());
+    }
+
+    @Test
+    @DisplayName("SEC-DRYRUN: a path: join reference admits that one file, not its siblings")
+    void aPathReferenceDoesNotAdmitItsSiblings(@TempDir Path dir) throws Exception {
+        Path ref = Files.writeString(dir.resolve("ref.csv"), "id,label\n1,Alpha\n");
+        Path sibling = Files.writeString(dir.resolve("other.csv"), "host-secret");
+        assertSealed(dryRunSealFlow(dir, exprThenJoin(fwd(sibling), fwd(ref))));
+    }
+
+    @Test
+    @DisplayName("SEC-DRYRUN: an expression cannot read a host file outside the roots, whatever the join reads")
+    void anExpressionCannotReadAHostFileThroughTheRoute(@TempDir Path dir, @TempDir Path elsewhere) throws Exception {
+        Path ref = Files.writeString(dir.resolve("ref.csv"), "id,label\n1,Alpha\n");
+        Path host = Files.writeString(elsewhere.resolve("host.txt"), "host-secret");
+        assertSealed(dryRunSealFlow(dir, exprThenJoin(fwd(host), fwd(ref))));
+    }
+
+    @Test
+    @DisplayName("SEC-DRYRUN: a join reference file directly in the data root is refused 400")
+    void aReferenceFileInTheDataRootIsRefused(@TempDir Path dir, @TempDir Path elsewhere) throws Exception {
+        Path ref = Files.writeString(dir.resolve("ref.csv"), "id,label\n1,Alpha\n");
+        Path host = Files.writeString(elsewhere.resolve("host.txt"), "host-secret");
+        String prior = System.getProperty("data.dir");
+        System.setProperty("data.dir", dir.toString());
+        try {
+            HttpResponse<String> r = dryRunSealFlow(dir, exprThenJoin(fwd(host), fwd(ref)));
+            assertEquals(400, r.statusCode(), r.body());
+            assertTrue(r.body().contains("refused"), r.body());
+        } finally {
+            if (prior != null) System.setProperty("data.dir", prior); else System.clearProperty("data.dir");
         }
     }
 }

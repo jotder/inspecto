@@ -284,17 +284,28 @@ expression could `read_text` any host file.
 - **Sealed after seeding, before the walk.** The seed tables are trusted inserts. After them comes
   `SqlSandbox.sealAllowing(conn, allowed)`.
 - **The allowlist:** the run's own scratch dir (`Files.createTempDirectory("dryrun_")`, never tmpdir itself), the
-  global `-Dprocessing.duckdb.temp_directory` when set, and, for each `transform.join` node, the dirs its
-  `reference` reads as declared by `RowShaper.ReferenceResolver.readDirs`. That method defaults to none.
-  The route's resolver (`PipelineGraphRoutes.dryRunReferences`) returns a `path:` file's directory, jailed first,
-  or a by-name producer's `dirs.database`. References still resolve lazily. Their views are created after the
-  seal, so the views' reads prove the allowlist.
-- **Fail closed.** Every entry passes `PathJail.readAllowlistRefusal`. A refused entry, such as a Space root, a
+  global `-Dprocessing.duckdb.temp_directory` when set, and, for each `transform.join` node, what its
+  `reference` reads as declared by `RowShaper.ReferenceResolver`: `readDirs` (directories) and `readFiles`
+  (single files). Both default to none. The route's resolver (`PipelineGraphRoutes.dryRunReferences`) declares
+  - a `path:` reference as the **one file** (jailed first), admitted by exact path through
+    `SqlSandbox.sealAllowing(conn, dirs, files)` (`allowed_paths`), so a sibling file in the same directory
+    stays refused;
+  - a by-name reference as the producing Pipeline's `dirs.database`, **only if that Pipeline declares
+    `produces: reference`** (as `ReferenceReader.sqlFor` requires). A join naming any other loaded Pipeline
+    does not open its store, so a mapping expression in the same graph cannot read it.
+  References still resolve lazily. Their views are created after the seal, so the views' reads prove the allowlist.
+- **Fail closed.** Every entry passes `PathJail.readAllowlistRefusal`; a reference file is judged by its
+  directory too, so a file directly in the Space data root, a `config/` or a `*.secrets` tree is refused. A refused entry, such as a Space root, a
   `config/` tree, a `*.secrets` dir, tmpdir or a restricted store, refuses the whole run with
   `IllegalArgumentException`. The route maps that to 400.
-- **Pinned by** `PipelineDryRunTest`: `read_text` of a host file and of `config.secrets/…` → DuckDB
-  `Permission Error`; a sealed join still reads its declared dir; a refused dir fails closed. The first two
-  and the fail-closed test go red with the seal removed.
+- **The scratch dir is removed recursively** (`PipelineDryRun.removeScratch`): DuckDB leaves a `<db>.tmp` spill
+  dir in it when it spills, and `deleteIfExists` on a non-empty dir fails silently.
+- **Pinned by** `PipelineDryRunTest` (engine): `read_text` of a host file and of `config.secrets/…` → DuckDB
+  `Permission Error`; a sealed join still reads its declared dir; a `path:` file's sibling is refused; a refused
+  dir fails closed; the scratch dir is removed with its spill. Over real HTTP: `ControlApiDryRunBlindSpotsTest`
+  (a sibling of a `path:` reference, a host file, a reference file in the data root → 400) and
+  `ControlApiPreviewReferenceJailTest.aByNameJoinToANonReferencePipelineDoesNotOpenItsStore`. Each goes red
+  with its fix reverted.
 
 ## The source time zone for temporal data
 

@@ -101,6 +101,12 @@ public final class RowShaper {
          */
         default List<java.nio.file.Path> readDirs(String reference) { return List.of(); }
 
+        /**
+         * The single files {@code reference} reads (a {@code path:} reference), admitted by exact path rather
+         * than by directory, so an authored expression cannot read a sibling. The default declares none.
+         */
+        default List<java.nio.file.Path> readFiles(String reference) { return List.of(); }
+
         /** The no-context default: any resolution attempt refuses with the reference it could not reach. */
         ReferenceResolver NONE = (conn, reference) -> {
             throw new IllegalStateException("no ReferenceResolver supplied — cannot resolve reference '"

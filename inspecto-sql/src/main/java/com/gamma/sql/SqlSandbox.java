@@ -119,7 +119,25 @@ public final class SqlSandbox implements AutoCloseable {
      * itself, whatever a lexical guard missed. An empty list is exactly {@link #seal()}.
      */
     public static void sealAllowing(Connection conn, List<Path> dirs) throws SQLException {
+        sealAllowing(conn, dirs, List.of());
+    }
+
+    /**
+     * As {@link #sealAllowing(Connection, List)}, plus {@code files}: each is admitted by <em>exact path</em>
+     * ({@code allowed_paths}), so a sibling in the same directory stays refused
+     * ({@code SEC-DRYRUN-EXPR-UNSEALED-1}: a {@code path:} reference is one file, not its directory).
+     */
+    public static void sealAllowing(Connection conn, List<Path> dirs, List<Path> files) throws SQLException {
         try (Statement st = conn.createStatement()) {
+            if (!files.isEmpty()) {
+                StringBuilder list = new StringBuilder("[");
+                for (Path f : files) {
+                    String file = f.toAbsolutePath().normalize().toString().replace('\\', '/');
+                    if (list.length() > 1) list.append(", ");
+                    list.append('\'').append(file.replace("'", "''")).append('\'');
+                }
+                st.execute("SET allowed_paths=" + list.append(']'));
+            }
             if (!dirs.isEmpty()) {
                 StringBuilder list = new StringBuilder("[");
                 for (Path d : dirs) {

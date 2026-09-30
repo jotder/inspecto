@@ -103,6 +103,37 @@ class ControlApiPreviewReferenceJailTest {
         assertFalse(r.body().contains("North"), "the reference file must not be read: " + r.body());
     }
 
+    /**
+     * SEC-DRYRUN-EXPR-UNSEALED-1: a by-name join reference opens ONLY a Pipeline that declares
+     * {@code produces: reference}. test_etl does not, so its store must stay sealed even though the graph
+     * names it. (A stored graph is used: the candidate-graph validator refuses this reference earlier.)
+     * The expression runs BEFORE the join, so the join's own refusal cannot mask a read that succeeded.
+     */
+    @Test
+    void aByNameJoinToANonReferencePipelineDoesNotOpenItsStore(@TempDir Path roots) throws Exception {
+        Path store = Files.createDirectories(roots.resolve("db"));
+        Path secret = Files.writeString(store.resolve("batch1.csv"), "host-secret");
+        String flow = """
+            {"name":"join_flow","active":false,
+             "nodes":[{"id":"acq","type":"acquisition"},
+                      {"id":"m","type":"transform.sql","config":{"columns":[
+                          {"name":"id","expr":"id"},
+                          {"name":"leak","expr":"(SELECT content FROM read_text('%s'))"}]}},
+                      {"id":"j","type":"transform.join","config":{"reference":"reference/test_etl","on":"id"}},
+                      {"id":"sink","type":"sink.persistent","config":{"store":"joined"}}],
+             "edges":[{"from":"acq","rel":"data","to":"m"},{"from":"m","rel":"data","to":"j"},
+                      {"from":"j","rel":"data","to":"sink"}]}""".formatted(fwd(secret));
+        new PipelineStore(roots.resolve("wr").resolve("flows")).write("join_flow",
+                PipelineCodec.fromMap(JSON.readValue(flow, Map.class)));
+        try (Ctx c = open(roots)) {
+            HttpResponse<String> r = post(c.port, "/pipelines/authored/join_flow/dry-run",
+                    "{\"sampleRows\":[{\"id\":\"1\"}]}");
+            assertTrue(r.statusCode() >= 400, r.body());
+            assertTrue(r.body().contains("Permission Error"), "the store is sealed, not merely refused later: " + r.body());
+            assertFalse(r.body().contains("host-secret"), r.body());
+        }
+    }
+
     @Test
     void dryRunReadsAReferenceInsideTheRoots(@TempDir Path roots) throws Exception {
         Path inside = roots.resolve("dim.csv");

@@ -179,7 +179,7 @@ public final class PipelineDryRun {
             return new Result(seedNode, nodes, sinks, List.copyOf(warnings));
         } finally {
             DuckDbUtil.deleteTempDb(db);
-            try { java.nio.file.Files.deleteIfExists(scratch); } catch (java.io.IOException ignored) { /* best effort */ }
+            removeScratch(scratch);
         }
     }
 
@@ -192,25 +192,47 @@ public final class PipelineDryRun {
      * {@link com.gamma.config.safety.PathJail#readAllowlistRefusal} and the run refuses, fail closed, if one is
      * refused; everything else (host files, {@code config.secrets}, URLs) DuckDB itself then refuses.
      */
+    /** Delete the scratch dir with whatever DuckDB left in it (the {@code <db>.tmp} spill dir). Best effort. */
+    static void removeScratch(java.nio.file.Path scratch) {
+        try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(scratch)) {
+            for (java.nio.file.Path p : walk.sorted(java.util.Comparator.reverseOrder()).toList())
+                java.nio.file.Files.deleteIfExists(p);
+        } catch (java.io.IOException | RuntimeException ignored) {
+            // best effort: a scratch dir that cannot be removed holds only this run's throwaway data
+        }
+    }
+
     private static void seal(Connection conn, PipelineGraph g, RowShaper.ReferenceResolver references,
                              java.nio.file.Path scratch) throws Exception {
         LinkedHashSet<java.nio.file.Path> allowed = new LinkedHashSet<>();
+        LinkedHashSet<java.nio.file.Path> allowedHomes = new LinkedHashSet<>();
         allowed.add(scratch.toAbsolutePath().normalize());
         String spill = System.getProperty(DuckDbUtil.PROP_TEMP_DIRECTORY);
         if (spill != null && !spill.isBlank()) allowed.add(java.nio.file.Paths.get(spill).toAbsolutePath().normalize());
+        LinkedHashSet<java.nio.file.Path> files = new LinkedHashSet<>();
         for (PipelineNode n : g.nodes()) {
             Object ref = BuiltinNodeType.TRANSFORM_JOIN.type().equals(n.type()) ? n.cfg("reference") : null;
-            if (ref != null && !ref.toString().isBlank())
+            if (ref != null && !ref.toString().isBlank()) {
                 for (java.nio.file.Path d : references.readDirs(ref.toString().trim()))
                     allowed.add(d.toAbsolutePath().normalize());
+                for (java.nio.file.Path f : references.readFiles(ref.toString().trim())) {
+                    java.nio.file.Path file = f.toAbsolutePath().normalize();
+                    files.add(file);
+                    // the file is admitted alone, but its home is still judged: a file in the Space root or
+                    // a config/ / *.secrets tree is refused exactly as its directory would be
+                    if (file.getParent() != null) allowedHomes.add(file.getParent());
+                    allowedHomes.add(file);
+                }
+            }
         }
-        for (java.nio.file.Path dir : allowed) {
+        allowedHomes.addAll(allowed);
+        for (java.nio.file.Path dir : allowedHomes) {
             String why = com.gamma.config.safety.PathJail.readAllowlistRefusal(dir);
             if (why != null)
                 throw new IllegalArgumentException("dry run refused: its sealed connection would be allowed to read "
                         + dir + ", which " + why + " (SEC-DRYRUN-EXPR-UNSEALED-1)");
         }
-        com.gamma.sql.SqlSandbox.sealAllowing(conn, List.copyOf(allowed));
+        com.gamma.sql.SqlSandbox.sealAllowing(conn, List.copyOf(allowed), List.copyOf(files));
     }
 
     /**

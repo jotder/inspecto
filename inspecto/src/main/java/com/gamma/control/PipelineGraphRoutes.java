@@ -847,13 +847,24 @@ final class PipelineGraphRoutes implements RouteModule {
             }
             if (!parsed.byName()) {
                 WriteGates.jailToAllowedRoots(parsed.path(), "transform.join.reference");
-                Path parent = Path.of(parsed.path()).toAbsolutePath().normalize().getParent();
-                return parent == null ? List.of() : List.of(parent);
+                return List.of();   // a path: reference is admitted as the one file, see readFiles
             }
+            // only a Pipeline that declares produces: reference is a legitimate join target (ReferenceReader.sqlFor)
             return api.service().loadedPipelines().stream()
-                    .filter(p -> p.identity().pipelineName().equals(parsed.ref()) && p.dirs() != null
+                    .filter(p -> p.identity().pipelineName().equals(parsed.ref()) && p.producesReference()
+                            && p.dirs() != null
                             && p.dirs().database() != null && !p.dirs().database().isBlank())
                     .findFirst().map(p -> List.of(Path.of(p.dirs().database()))).orElse(List.of());
+          }
+
+          @Override
+          public List<Path> readFiles(String reference) {
+            try {
+                com.gamma.enrich.EnrichmentConfig.Reference parsed = ReferenceReader.parse(reference);
+                return parsed.byName() ? List.of() : List.of(Path.of(parsed.path()));
+            } catch (RuntimeException unresolvable) {
+                return List.of();
+            }
           }
 
           @Override

@@ -423,6 +423,48 @@ class PipelineDryRunTest {
                 .findFirst().orElseThrow().get("label"));
     }
 
+    /** join(reference) --data--> map(expr) --data--> sink: the expression runs AFTER the seal, beside the join. */
+    private static PipelineGraph graphWithJoinAndExpr(String expr) {
+        return new PipelineGraph("demo", true,
+                List.of(PipelineNode.of("acq", "acquisition"),
+                        PipelineNode.of("j", "transform.join", Map.of("reference", "reference/groups", "on", "id")),
+                        PipelineNode.of("m", "transform.sql",
+                                Map.of("columns", List.of(Map.of("name", "id", "expr", "id"),
+                                        Map.of("name", "leak", "expr", expr)))),
+                        new PipelineNode("sink", "sink.persistent", "S", null, Map.of("store", "out"), null)),
+                List.of(PipelineEdge.data("acq", "j"), PipelineEdge.data("j", "m"), PipelineEdge.data("m", "sink")));
+    }
+
+    @Test
+    void aPathReferenceIsAdmittedAsOneFileNotItsDirectory(@TempDir Path refDir) throws Exception {
+        Path ref = Files.writeString(refDir.resolve("groups.csv"), "id,label\n1,Alpha\n");
+        Path sibling = Files.writeString(refDir.resolve("other.csv"), "secret\n");
+        String path = ref.toAbsolutePath().toString().replace('\\', '/');
+        RowShaper.ReferenceResolver resolver = new RowShaper.ReferenceResolver() {
+            @Override public List<Path> readFiles(String reference) { return List.of(ref); }
+            @Override public String resolve(java.sql.Connection conn, String reference) throws java.sql.SQLException {
+                try (java.sql.Statement st = conn.createStatement()) {
+                    st.execute("CREATE VIEW refdim AS SELECT * FROM read_csv('" + path + "', all_varchar=true)");
+                }
+                return "refdim";
+            }
+        };
+        Exception e = assertThrows(Exception.class,
+                () -> PipelineDryRun.run(graphWithJoinAndExpr(readTextOf(sibling)), SAMPLE, resolver));
+        assertPermissionRefused(e);
+        // and the declared file itself is still readable: the join alone works
+        assertEquals(3, PipelineDryRun.run(graphWithJoin(), SAMPLE, resolver).sinks().get(0).rowCount());
+    }
+
+    @Test
+    void theScratchDirIsRemovedWithTheSpillDirDuckDbLeavesInIt(@TempDir Path base) throws Exception {
+        Path scratch = Files.createDirectories(base.resolve("dryrun_x"));
+        Files.writeString(Files.createDirectories(scratch.resolve("x.db.tmp")).resolve("spill.tmp"), "s");
+        Files.writeString(scratch.resolve("x.db"), "d");
+        PipelineDryRun.removeScratch(scratch);
+        assertFalse(Files.exists(scratch), "a non-empty scratch dir must be removed recursively");
+    }
+
     @Test
     void aReferenceDirTheAllowlistRefusesFailsTheRunClosed(@TempDir Path space) throws Exception {
         Files.createDirectories(space.resolve("config"));
