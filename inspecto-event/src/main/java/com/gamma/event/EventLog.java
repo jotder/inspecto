@@ -166,7 +166,7 @@ public final class EventLog {
     /**
      * Process-wide taps: invoked after every {@link #emit} on EVERY log, with the log the event landed on. The one
      * seam an optional module uses to observe all Spaces' ledgers, including Spaces created after it registered
-     * (the Exchange's cross-Space Signal forwarder, {@code superpower/cross-space-consequence-design.md} §5.5).
+     * (the Exchange's cross-Space Signal forwarder, {@code archived-documents/plans-archive/cross-space-consequence-design.md} §5.5).
      * Guarded like subscribers: a tap fault never breaks the emit. A tap runs on the emitting thread, under the
      * emitter's MDC, so a tap that writes to ANOTHER log must bind that log's Space itself.
      */

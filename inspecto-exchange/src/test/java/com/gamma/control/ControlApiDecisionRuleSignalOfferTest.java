@@ -29,7 +29,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Cross-Space consequence slice 5 ({@code docs/superpower/cross-space-consequence-design.md} §6; operator
+ * Cross-Space consequence slice 5 ({@code docs/archived-documents/plans-archive/cross-space-consequence-design.md} §6; operator
  * 2026-09-28: the emitter is a Decision Rule {@code emit-signal} payload, not a named Collector). An opco
  * Decision Rule's {@code emit-signal} names the Space it offers to ({@code offerTo}), the Signal type, and maps
  * the applied record's fields onto the payload. It passes the manual offer's {@code canOfferSignals} gate in

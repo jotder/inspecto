@@ -9,7 +9,7 @@ import java.util.function.Supplier;
 
 /**
  * The {@code incident.open} Job Type: opens a managed {@link ObjectType#INCIDENT} in THIS Space from the Signal
- * that fired the Job. Built for the cross-Space consequence ({@code superpower/cross-space-consequence-design.md}
+ * that fired the Job. Built for the cross-Space consequence ({@code archived-documents/plans-archive/cross-space-consequence-design.md}
  * D10): a hub Space's Job, {@code on_signal: exchange.<opco>.fraud.alert}, opens a hub Incident. The target Space
  * authors what happens in it; the origin only announces.
  *

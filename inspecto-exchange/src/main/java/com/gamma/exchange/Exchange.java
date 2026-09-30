@@ -36,7 +36,7 @@ public final class Exchange {
     /** The saved-view kind the Exchange carries (BACKLOG D9) — live-mode only; see {@link #effectiveMode}. */
     public static final String VIEW = "link-analysis-view";
 
-    /** The Signal kind (cross-Space consequence, design {@code superpower/cross-space-consequence-design.md}):
+    /** The Signal kind (cross-Space consequence, design {@code archived-documents/plans-archive/cross-space-consequence-design.md}):
      *  the item is a dotted Signal type the owner Space announces; an ACTIVE grant lets the consumer Space
      *  receive it as {@code exchange.<owner>.<type>}. Live-mode only — there is nothing to snapshot. */
     public static final String SIGNAL = "signal";

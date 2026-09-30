@@ -34,7 +34,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Cross-Space Signal delivery — slice 3 ({@code docs/superpower/cross-space-consequence-design.md} §5.5, tests
+ * Cross-Space Signal delivery — slice 3 ({@code docs/archived-documents/plans-archive/cross-space-consequence-design.md} §5.5, tests
  * N3–N6, N10, N11, T4, T7). The consent handshake runs over real HTTP with an armed per-Space-roles
  * authenticator: {@code opco} offers {@code fraud.alert} allowlisting {@code {caseId, typology, impact}},
  * {@code hub} requests, {@code opco} approves. The origin Signal is then emitted on opco's own ledger, the way

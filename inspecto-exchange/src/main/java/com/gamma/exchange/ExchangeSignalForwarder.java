@@ -21,7 +21,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Delivers a Signal across Spaces under a consented {@code signal} Share Grant — cross-Space consequence slice 3
- * ({@code docs/superpower/cross-space-consequence-design.md} §5.5). Only a Signal crosses (D1): the origin Space
+ * ({@code docs/archived-documents/plans-archive/cross-space-consequence-design.md} §5.5). Only a Signal crosses (D1): the origin Space
  * announces, and the consumer Space decides what happens with its own {@code on_signal} Jobs.
  *
  * <p>An {@link EventLog#addTap process-wide tap}, so a Space created after the module registered is covered.

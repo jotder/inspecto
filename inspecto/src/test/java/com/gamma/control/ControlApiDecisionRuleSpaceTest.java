@@ -24,7 +24,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Cross-Space consequence slice 1 ({@code docs/superpower/cross-space-consequence-design.md} §6): a Decision
+ * Cross-Space consequence slice 1 ({@code docs/archived-documents/plans-archive/cross-space-consequence-design.md} §6): a Decision
  * Rule's Signal is stamped with the Space whose ledger records it and the person who applied the rule, and
  * {@code /apply} refuses a consequence that names another Space (D1, test N7) with 422 before anything runs.
  *

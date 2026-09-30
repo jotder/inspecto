@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * The Exchange's {@code signal} kind — cross-Space consequence slice 2
- * ({@code docs/superpower/cross-space-consequence-design.md} §6): an owner Space offers a Signal type with a
+ * ({@code docs/archived-documents/plans-archive/cross-space-consequence-design.md} §6): an owner Space offers a Signal type with a
  * payload allowlist ({@code POST /exchange/signal-offers}, {@code canOfferSignals} in the OWNER, D7), a
  * consumer requests it ({@code canRequestShares} in the CONSUMER), the owner approves ({@code canApproveShares}
  * in the OWNER) — two-party consent (D2). No delivery at this slice.

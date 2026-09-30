@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * The cross-Space consequence that was asked for — D10 (operator 2026-09-28), the acceptance test of slice 4
- * ({@code docs/superpower/cross-space-consequence-design.md}; N9, N13): an OpCo Space's {@code fraud.alert}
+ * ({@code docs/archived-documents/plans-archive/cross-space-consequence-design.md}; N9, N13): an OpCo Space's {@code fraud.alert}
  * Signal, offered to the Group hub Space, makes a hub Job open a hub Incident carrying only
  * {@code {caseId, typology, impact}} — never the MSISDN.
  *
