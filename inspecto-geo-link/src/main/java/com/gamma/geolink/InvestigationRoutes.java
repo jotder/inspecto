@@ -113,8 +113,6 @@ public final class InvestigationRoutes implements RouteModule {
     private static final Set<String> DEFERRED = Set.of("threshold", "snapshot");
     /** A list op seals at most this many members (design §4.4.1: bounded like every other op payload). */
     private static final int MAX_LIST_MEMBERS = 5_000;
-    /** {@code seedBy} reads at most this many distinct values per bound column — the {@code InvRoutes} row cap. */
-    static final int SEED_BY_DISTINCT_CAP = 20_000;
     /** An {@code expand} rung's traversal direction (plan §2.4). */
     private static final List<String> DIRECTIONS = List.of("either", "out", "in", "reciprocal");
     private static final int MAX_IDS = 1_000;
@@ -1040,7 +1038,8 @@ public final class InvestigationRoutes implements RouteModule {
      * {@code targetCol} over the Investigation's Dataset (R3 gate on the read, as {@link #read}), normalised in Java
      * with the sealed list's normaliser, keeping the RAW values whose key is a member. Shaped like an expand's read —
      * {@code {dataset, readAt, query, ids[], rowCount, fingerprint}}, the fingerprint over the ids — so the Dossier's
-     * integrity check covers it. Above {@link #SEED_BY_DISTINCT_CAP} distinct values in a column → 422, never a sample.
+     * integrity check covers it. Above the Space's {@code seed_by_distinct_cap} ({@link
+     * LinkAnalysisSettings#effectiveSeedByDistinctCap}) distinct values in a column → 422, never a sample.
      */
     private Map<String, Object> seedRead(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> list) {
         String dataset = inv.dataset();
@@ -1050,12 +1049,13 @@ public final class InvestigationRoutes implements RouteModule {
         List<String> columns = new ArrayList<>(new LinkedHashSet<>(List.of(
                 String.valueOf(inv.header().get("sourceCol")), String.valueOf(inv.header().get("targetCol")))));
         TreeSet<String> ids = new TreeSet<>();
+        int cap = LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveSeedByDistinctCap();
         for (String col : columns)
-            for (String v : distinctValues(dataset, relationSql, col, SEED_BY_DISTINCT_CAP))
+            for (String v : distinctValues(dataset, relationSql, col, cap, "seedBy", "the Space's seed_by_distinct_cap"))
                 if (members.contains(EntityTypes.normalise(normaliser, v))) ids.add(v);
         Map<String, Object> query = new LinkedHashMap<>();
         query.put("columns", columns);
-        query.put("distinctCap", SEED_BY_DISTINCT_CAP);
+        query.put("distinctCap", cap);
         List<String> sealed = new ArrayList<>(ids);
         Map<String, Object> read = new LinkedHashMap<>();
         read.put("dataset", dataset);

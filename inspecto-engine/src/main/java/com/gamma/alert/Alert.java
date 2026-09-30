@@ -62,8 +62,9 @@ public record Alert(String rule, String severity, String pipeline, String metric
                 : r.isInvestigationRule() ? r.relation() + " " + r.measure() : r.measure();
         String windowLabel = r.window() != null
                 ? (r.batchWindow() ? "the last " + r.windowBatches() + " batches" : "the last " + r.window())
-                : r.isValueMeasureRule() ? "the whole Dataset, " + r.valueMeasure().get("from") + " to "
-                        + r.valueMeasure().get("to")
+                : r.isValueMeasureRule() ? (r.valueMeasure().get("last") != null
+                        ? "the whole Dataset, the last " + r.valueMeasure().get("last") + " (UTC)"
+                        : "the whole Dataset, " + r.valueMeasure().get("from") + " to " + r.valueMeasure().get("to"))
                 : r.isInvestigationRule() ? "the sealed Working Set" : "current data";
         String against = switch (r.comparator()) {
             case "gt" -> "above";

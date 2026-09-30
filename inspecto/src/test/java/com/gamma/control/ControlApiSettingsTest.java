@@ -301,6 +301,29 @@ class ControlApiSettingsTest {
         }
     }
 
+    /** The seedBy twin of merged_distinct_cap: a per-Space setting, 1..100 000, default 20 000. */
+    @Test
+    void linkAnalysisSeedByDistinctCapRoundTripsAndDefaults(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            JsonNode def = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null));
+            assertTrue(def.get("seedByDistinctCap").isNull(), "absent => inherit");
+            assertEquals(20_000, def.get("seedByDistinctCapInForce").asInt(), "the shipped default");
+            HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"seedByDistinctCap\":700}");
+            assertEquals(200, put.statusCode(), put.body());
+            String toon = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
+            assertTrue(toon.contains("seed_by_distinct_cap: 700"), toon);
+            JsonNode got = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null));
+            assertEquals(700, got.get("seedByDistinctCap").asInt());
+            assertEquals(700, got.get("seedByDistinctCapInForce").asInt());
+            assertEquals(20_000, got.get("mergedDistinctCapInForce").asInt(), "independent of the merged cap");
+            assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"seedByDistinctCap\":0}").statusCode(), "a cap is >= 1");
+            assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"seedByDistinctCap\":100001}").statusCode(), "a cap is <= 100 000");
+        }
+    }
+
     /** LA-17 step 2: per-Space Entity Types — inherit the seeded nine, a stated list replaces them, 422 on bad. */
     @Test
     void linkAnalysisEntityTypesRoundTripAndRefuseBadLists(@TempDir Path root) throws Exception {

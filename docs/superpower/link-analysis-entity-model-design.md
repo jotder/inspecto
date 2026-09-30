@@ -428,7 +428,8 @@ append time and replay never re-reads the list:
     the admitted entities resolving to it, and every value of the bound columns whose key under a member type's
     SEALED normaliser is a member (a DISTINCT read through `InvRoutes.relationFor`, capped per column by the per-Space setting
     `merged_distinct_cap` (`link-analysis.toon`, `mergedDistinctCap` on `/settings/link-analysis`, default 20 000;
-    operator 2026-09-30) — refused 422 above it, never a sample; `seedBy` keeps its fixed 20 000) — and seals it in the rung as `query.merged {groupOf{value → group}, anchorOf{non-admitted member value →
+    operator 2026-09-30) — refused 422 above it, never a sample; `seedBy`'s own cap is its twin setting `seed_by_distinct_cap` / `seedByDistinctCap`, 1..100 000, default 20 000,
+    2026-09-30) — and seals it in the rung as `query.merged {groupOf{value → group}, anchorOf{non-admitted member value →
     the admitted entity it stands for}}`. The evaluator admits a reached member value at its anchor's hop and seed
     (the same identity), the far end at `hop+1`. `reread` re-runs the sealed widened query; nothing re-reads the fact log.
   - **Fences count the COMBINED fan-out**: `maxFanOut` partitions per GROUP (`fr(id, g)`; a plain expand's `g` is its

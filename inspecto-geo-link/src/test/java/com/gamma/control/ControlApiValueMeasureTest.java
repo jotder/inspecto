@@ -209,6 +209,86 @@ class ControlApiValueMeasureTest {
         }
     }
 
+    // ── agentList: cashOutConcentration restricted to an `agent` Entity List ─────────────────────────────
+
+    private void entityList(Ctx c, String id, String type, String... members) throws Exception {
+        assertEquals(201, send(c.port, "POST", "/inv/entity-lists", "{\"id\":\"" + id + "\",\"title\":\"" + id
+                + "\",\"purpose\":\"watch\",\"entityType\":\"" + type + "\",\"reason\":\"r\"}", null).statusCode());
+        if (members.length > 0)
+            ok(c, "POST", "/inv/entity-lists/" + id + "/members", "{\"add\":[\"" + String.join("\",\"", members)
+                    + "\"],\"reason\":\"r\"}");
+    }
+
+    @Test
+    void anAgentListRestrictsCashOutConcentrationAndFailsClosed(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            java.nio.file.Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: none\n");
+            entityList(c, "tills", "agent", "till6");         // upper-trim: stated in another form
+            entityList(c, "other-tills", "agent", "TILL1");
+            entityList(c, "phones", "msisdn", "+447700900123");
+            String co = Q + "&name=cashOutConcentration&cashOutKinds=cash_out";
+            JsonNode m = ok(c, "GET", co + "&agentList=tills", null);
+            assertEquals("TILL6", m.at("/entities/0/entity").asText(), m.toString());
+            assertEquals("tills", m.at("/measure/agentList").asText());
+            assertEquals(0, ok(c, "GET", co + "&agentList=other-tills", null).get("count").asInt(),
+                    "TILL6 is not on that list; TILL1 is under the share");
+            assertEquals(404, status(c, "GET", co + "&agentList=ghost", null), "unknown list");
+            assertEquals(422, status(c, "GET", co + "&agentList=phones", null), "not of Entity Type agent");
+            assertEquals(422, status(c, "GET", Q + "&name=structuring&agentList=tills", null), "cash-out concentration only");
+        }
+    }
+
+    @Test
+    void aMaskedAgentListNeverLeaksItsMembers(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            java.nio.file.Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: all\n");
+            entityList(c, "tills", "agent", "TILL6");
+            String token = JSON.readTree(send(c.port, "GET", "/inv/entity-lists/tills", null, null).body())
+                    .at("/data/members/0").asText();
+            assertTrue(token.startsWith("masked:"), token);
+            HttpResponse<String> r = send(c.port, "GET", Q + "&name=cashOutConcentration&cashOutKinds=cash_out"
+                    + "&agentList=tills", null, null);
+            assertEquals(200, r.statusCode(), r.body());
+            assertEquals(token, JSON.readTree(r.body()).at("/data/entities/0/entity").asText(), "the list's own token");
+            assertFalse(r.body().contains("TILL6"), r.body());
+        }
+    }
+
+    // ── rolling windows (`last`) ───────────────────────────────────────────────────────────────────────
+
+    @Test
+    void aRollingRuleIsStoredRelativeAndTheSweepReadsTheWindowNow(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            // the structuring ring, 2 hours ago in UTC — a fixed window would have to be re-authored to see it
+            String twoHoursAgo = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).minusHours(2)
+                    .withNano(0).toString().replace('T', ' ');
+            new ViewStore(root.resolve("views")).write(new ViewDefinition("tx_view", "flow-x", List.of(),
+                    com.gamma.geolink.ValueMeasuresTest.ROWS.replace("2026-09-01 10:00:00", twoHoursAgo),
+                    "2026-09-30T00:00:00Z"));
+            JsonNode m = ok(c, "GET", Q.replace("&from=2026-09-01&to=2026-09-08", "&last=24h") + "&name=structuring", null);
+            assertEquals("HUB", m.at("/entities/0/entity").asText(), m.toString());
+            assertEquals("UTC", m.at("/window/timezone").asText());
+            assertEquals("24h", m.at("/measure/last").asText());
+            assertEquals(0, ok(c, "GET", Q.replace("&from=2026-09-01&to=2026-09-08", "&last=1h") + "&name=structuring",
+                    null).get("count").asInt(), "the ring is 2 h old: outside the last hour");
+            assertEquals(422, status(c, "GET", Q + "&last=24h&name=structuring", null), "both windows");
+            assertEquals(422, status(c, "GET", Q.replace("&from=2026-09-01&to=2026-09-08", "&last=32d")
+                    + "&name=structuring", null), "the 31-day cap");
+
+            ok(c, "POST", "/inv/investigations", CREATE);
+            String rule = "{\"name\":\"rolling\",\"severity\":\"CRITICAL\",\"valueMeasure\":{\"name\":\"structuring\","
+                    + "\"valueCol\":\"amt\",\"timeCol\":\"booked\",\"last\":\"24h\"}}";
+            JsonNode bound = ok(c, "POST", "/inv/investigations/case-v/alert-rules", rule);
+            assertEquals("24h", bound.at("/rule/valueMeasure/last").asText());
+            assertTrue(bound.at("/rule/valueMeasure/from").isMissingNode(), "never a baked window: " + bound);
+            assertEquals(1, bound.get("current").asDouble());
+            JsonNode fired = ok(c, "POST", "/alerts/evaluate", "");
+            assertEquals(1, fired.size(), fired.toString());
+            assertEquals(422, status(c, "POST", "/inv/investigations/case-v/alert-rules",
+                    rule.replace("\"last\":\"24h\"", "\"last\":\"24h\",\"from\":\"2026-09-01\"")), "exactly one window");
+        }
+    }
+
     /** {@code canAuthorAlertRules} — tested WITH a Subject, since with none {@code withCapability} is a no-op. */
     @Test
     void bindingNeedsTheAlertAuthoringCapability(@TempDir Path cfg, @TempDir Path root) throws Exception {

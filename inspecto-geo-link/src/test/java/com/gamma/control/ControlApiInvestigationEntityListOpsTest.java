@@ -366,6 +366,22 @@ class ControlApiInvestigationEntityListOpsTest {
         }
     }
 
+    /** The Space's seed_by_distinct_cap bounds the seedBy scan: above it the seed is refused (naming it), never sampled. */
+    @Test
+    void theSpacesSeedByDistinctCapTakesEffectAndIsRefusedNotSampled(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            settings(c, "masking_mode: none\nseed_by_distinct_cap: 1\n");
+            list(c, "watch", "watch", "+447700900123", "+447700900555");
+            data(post(c, "/inv/investigations", CREATE), 200);
+            HttpResponse<String> r = post(c, "/inv/investigations/case-a/ops", "{\"op\":\"seedBy\",\"listId\":\"watch\"}");
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("reads at most 1 distinct values") && r.body().contains("seed_by_distinct_cap"), r.body());
+            settings(c, "masking_mode: none\nseed_by_distinct_cap: 100\n");
+            JsonNode seeded = op(c, "case-a", "{\"op\":\"seedBy\",\"listId\":\"watch\"}");
+            assertEquals(100, seeded.at("/read/rung/distinctCap").asInt(), seeded.toString());
+        }
+    }
+
     /**
      * Under {@code typed} (the default) an msisdn list masks its members and the ids it seeded — and an id it MATCHED,
      * even one an expand admitted untyped: {@code 0044 7700-900123} is the member {@code +447700900123} in another form.

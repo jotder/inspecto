@@ -353,7 +353,22 @@ added; (4) the 31-day window cap and the defaults above, editable per Alert Rule
   `mule_transfers` from their own RNG and id sequence (`TXV-…`); every earlier row byte-identical (checked as a
   prefix of each file); `check-split-identity-fixture.mjs` still passes. On it: structuring → `MULE-HUB-01`;
   time-to-cash-out → the 8 CASHERs only; concentration → `TILL-06`; benefit-transfer → `SKIMMER-01` first.
-* Tests: `ValueMeasuresTest` 9, `ControlApiValueMeasureTest` 6. Mutation-checked: narrowing the evaluated rows to
+* **Rolling windows + agent Entity List (2026-09-30, operator "take the still-open items"):** a block takes
+  EXACTLY ONE of `from`+`to` or `last: <N>h|<N>d` (≤ 31 days; 422 otherwise). `last` is stored relative on the
+  Alert Rule and resolved at EVALUATION time — every GET, bind and sweep — against the server clock in **UTC** to
+  `[now − N, now)`, truncated to the second, so an armed rule never watches a stale window. Timezone contract: every
+  value-measure statement now runs with the DuckDB session `TimeZone` set to `UTC` (never the host's); a
+  `TIMESTAMPTZ` `timeCol` reads as UTC wall time, a naive one as it is (assumed UTC). The answer carries
+  `window {from, to, timezone}`. `cashOutConcentration` takes an optional `agentList`: an Entity List of Entity Type
+  `agent` (422 otherwise; unknown 404; retired 409), read LIVE at the fact log's head so an armed rule follows the
+  list; the window's DISTINCT cash-out payees (≤ 10 000, more refused) are normalised in Java under the list's
+  SEALED normaliser (D-M9), and only payees whose key is a live EXACT member are answered (range entries are not
+  applied, as with `seedBy`). The share's denominator stays ALL cash-out. When the list renders masked, each agent
+  is the list's own `EntityMasking` token. No new route; `alert.valueMeasure`'s description in `ConfigSpecs` states
+  both keys.
+* Tests: `ValueMeasuresTest` 15, `ControlApiValueMeasureTest` 9. Mutation-checked (2026-09-30): resolving `last`
+  in the host zone, baking the resolved window into the stored rule, or ignoring the clock each turn tests red;
+  so do dropping the agent restriction, comparing raw instead of normalised payees, and skipping the mask. Earlier: narrowing the evaluated rows to
   `≥ 5 000` turns 7 tests red (structuring loses `HUB`); a count off by one, or a `gt 1` comparator, stops
   the firing tests.
 

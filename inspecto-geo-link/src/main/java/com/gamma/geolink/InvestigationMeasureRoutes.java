@@ -135,7 +135,8 @@ public final class InvestigationMeasureRoutes implements RouteModule {
         if (spec != null) {
             // The WHOLE Dataset the Investigation is bound to, R3-gated for this caller now (a sweep has none).
             String ds = inv.dataset();
-            valued = evaluate(ds, InvRoutes.relationFor(api, ex, inv.writeRoot(), ds), inv.header(), spec);
+            String relationSql = InvRoutes.relationFor(api, ex, inv.writeRoot(), ds);
+            valued = evaluate(ds, relationSql, inv.header(), spec, ValueMeasures.agents(inv.writeRoot(), spec));
             current = OptionalDouble.of(valued.entities().size());
         } else {
             WorkingSetRoutes.Relation rel = WorkingSetRoutes.relation(inv, new boolean[1]);
@@ -184,9 +185,9 @@ public final class InvestigationMeasureRoutes implements RouteModule {
 
     /** A value Measure over the whole Dataset, its failures as 422s. */
     static ValueMeasures.Result evaluate(String dataset, String relationSql, Map<String, Object> header,
-                                         ValueMeasures.Spec spec) {
+                                         ValueMeasures.Spec spec, ValueMeasures.Agents agents) {
         try {
-            return ValueMeasures.forInvestigation(dataset, relationSql, header, spec);
+            return ValueMeasures.forInvestigation(dataset, relationSql, header, spec, agents);
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         } catch (java.sql.SQLException | IOException e) {

@@ -399,6 +399,13 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   most 31 days. No view filter is accepted, so a `≥ 5 000` view cannot hide structuring. An Alert Rule binds one
   through `POST /inv/investigations/{id}/alert-rules` with `valueMeasure:{…}` and fires when at least one entity
   breaches (one Alert per rule). Definitions, defaults and deviations: plan §2.6.1. No SPA yet.
+  Since 2026-09-30 the window may instead be ROLLING — `last: <N>h|<N>d` (exactly one of it or `from`/`to`, same
+  31-day cap), stored relative and resolved at every read, bind and sweep against the server clock in **UTC**
+  (statements run with DuckDB `TimeZone=UTC`; a naive `timeCol` is assumed UTC); the answer's `window` states the
+  `[from, to)` it read. `cashOutConcentration` takes an optional `agentList` — an Entity List of Entity Type
+  `agent` (other type 422, unknown 404, retired 409) — restricting the answered agents to its live exact members
+  under the list's sealed normaliser (the share's denominator stays all cash-out); a masked list answers its own
+  tokens, never raw values.
 * **The server half runs the SAME motif over the whole Dataset** (LA-14b, 2026-09-23):
   `POST /inv/pattern/branching` (`inspecto-geo-link` `PatternRoutes` → `PatternQueryCompiler` →
   `BranchingPatternEngine`). 🔴 **Why:** the projection is capped (2 000 links, `cnt DESC`; and 500 nodes in the

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -165,6 +166,115 @@ public class ValueMeasuresTest {
         assertEquals(List.of("SKIMMER-01"), benefit, "story (g) alone at the default: " + benefit);
         assertTrue(on.apply(new HashMap<>(Map.of("name", "benefitTransfer", "benefitKinds", "benefit",
                 "minRecipients", 3))).size() > 1, "the looser ≥ 3 twin still flags ordinary accounts");
+    }
+
+    // ── rolling windows (`last`) ──────────────────────────────────────────────────────────────────────
+
+    private static Map<String, Object> rolling(String name, String last, Object... kv) {
+        Map<String, Object> m = block(name);
+        m.remove("from");
+        m.remove("to");
+        m.put("last", last);
+        for (int i = 0; i < kv.length; i += 2) m.put((String) kv[i], kv[i + 1]);
+        return m;
+    }
+
+    private static java.time.Clock at(String utcInstant) {
+        return java.time.Clock.fixed(java.time.Instant.parse(utcInstant), java.time.ZoneOffset.UTC);
+    }
+
+    @Test
+    void aRollingWindowResolvesAgainstTheClockInUtcAndIsStoredRelative() {
+        ValueMeasures.Spec s = ValueMeasures.parse(rolling("structuring", "24h"), true, at("2026-09-02T00:00:00.750Z"));
+        assertEquals("2026-09-01T00:00", s.from());
+        assertEquals("2026-09-02T00:00", s.to(), "truncated to the second, UTC");
+        ValueMeasures.Spec later = ValueMeasures.parse(rolling("structuring", "7d"), true, at("2026-09-30T12:00:00Z"));
+        assertEquals("2026-09-23T12:00", later.from());
+        assertEquals("2026-09-30T12:00", later.to());
+        Map<String, Object> stored = s.toMap();
+        assertEquals("24h", stored.get("last"));
+        assertFalse(stored.containsKey("from") || stored.containsKey("to"), "stored relative, never a baked window");
+        // a re-parse of the stored block at a later clock moves the window (what the sweep does)
+        assertEquals("2026-09-09T00:00", ValueMeasures.parse(stored, true, at("2026-09-10T00:00:00Z")).from());
+    }
+
+    @Test
+    void aRollingWindowFollowsTheClockOverTheData() throws Exception {
+        java.util.function.Function<String, List<Object>> on = now -> {
+            try {
+                return entities(ValueMeasures.evaluate("tx", ROWS, "src", "dst", "ch",
+                        ValueMeasures.parse(rolling("structuring", "24h"), false, at(now))));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        };
+        assertEquals(List.of("HUB"), on.apply("2026-09-02T00:00:00Z"), "the ring sits inside the last 24 h");
+        assertEquals(List.of(), on.apply("2026-09-10T00:00:00Z"), "a week later the window has moved past it");
+    }
+
+    @Test
+    void exactlyOneWindowAndTheSameCap() {
+        for (Map<String, Object> bad : List.of(rolling("structuring", "7d", "from", "2026-09-01", "to", "2026-09-08"),
+                rolling("structuring", "7d", "to", "2026-09-08"), rolling("structuring", "7w"),
+                rolling("structuring", "0d"), rolling("structuring", "-1d"), rolling("structuring", "32d"),
+                rolling("structuring", "745h")))
+            assertThrows(IllegalArgumentException.class, () -> ValueMeasures.parse(bad, true), bad.toString());
+        Map<String, Object> none = block("structuring");
+        none.remove("from");
+        none.remove("to");
+        assertThrows(IllegalArgumentException.class, () -> ValueMeasures.parse(none, true), "no window at all");
+        assertEquals("31d", ValueMeasures.parse(rolling("structuring", "31d"), true).last());
+        assertEquals("744h", ValueMeasures.parse(rolling("structuring", "744h"), true).last(), "744 h = 31 days");
+    }
+
+    // ── cashOutConcentration restricted to an `agent` Entity List ────────────────────────────────────
+
+    private static ValueMeasures.Result agents(ValueMeasures.Agents a, Object... kv) throws Exception {
+        Object[] all = new Object[kv.length + 4];
+        all[0] = "cashOutKinds";
+        all[1] = "cash_out";
+        all[2] = "agentList";
+        all[3] = "tills";
+        System.arraycopy(kv, 0, all, 4, kv.length);
+        return ValueMeasures.evaluate("tx", ROWS, "src", "dst", "ch",
+                ValueMeasures.parse(block("cashOutConcentration", all), false), a);
+    }
+
+    @Test
+    void anAgentListRestrictsTheAgentsButNotTheShareOfAllCashOut() throws Exception {
+        // the list's sealed normaliser (upper-trim) matches a member stated in another form
+        ValueMeasures.Agents till1 = new ValueMeasures.Agents("upper-trim", Set.of("TILL1"), null);
+        assertEquals(List.of(), entities(agents(till1)), "TILL1 takes 100 of 57 600 — under the default share");
+        ValueMeasures.Result loose = agents(till1, "minShare", 0, "minPayers", 1);
+        assertEquals(List.of("TILL1"), entities(loose), "TILL6 is not on the list, so it is not answered");
+        assertEquals(100.0 / 57_600, ((Number) loose.entities().get(0).get("share")).doubleValue(), 1e-9,
+                "the denominator stays ALL cash-out, not the list's");
+        assertEquals(List.of("TILL6"), entities(agents(new ValueMeasures.Agents("upper-trim", Set.of("TILL6"), null))));
+        String lower = ROWS.replace("'TILL6'", "' till6 '");
+        assertEquals(List.of(" till6 "), entities(ValueMeasures.evaluate("tx", lower, "src", "dst", "ch",
+                ValueMeasures.parse(block("cashOutConcentration", "cashOutKinds", "cash_out", "agentList", "tills"), false),
+                new ValueMeasures.Agents("upper-trim", Set.of("TILL6"), null))), "compared under the list's normaliser");
+        assertEquals(List.of(), entities(agents(new ValueMeasures.Agents("upper-trim", Set.of(), null))),
+                "an empty list admits no agent");
+    }
+
+    @Test
+    void aMaskedAgentListAnswersTheListsTokenNeverTheRawValue() throws Exception {
+        byte[] key = new byte[32];
+        ValueMeasures.Result r = agents(new ValueMeasures.Agents("upper-trim", Set.of("TILL6"), key));
+        assertEquals(List.of(EntityMasking.token(key, "TILL6")), entities(r));
+    }
+
+    @Test
+    void agentListIsASettingOfCashOutConcentrationOnly() {
+        assertThrows(IllegalArgumentException.class, () -> ValueMeasures.parse(block("structuring", "agentList", "tills"), true));
+        assertThrows(IllegalArgumentException.class, () -> ValueMeasures.parse(block("cashOutConcentration",
+                "cashOutKinds", "cash_out", "agentList", "Not A List"), true));
+        ValueMeasures.Spec s = ValueMeasures.parse(block("cashOutConcentration", "cashOutKinds", "cash_out",
+                "agentList", "tills"), true);
+        assertEquals("tills", s.toMap().get("agentList"));
+        assertThrows(IllegalStateException.class, () -> ValueMeasures.evaluate("tx", ROWS, "src", "dst", "ch", s),
+                "an unresolved list is never silently ignored");
     }
 
     @Test

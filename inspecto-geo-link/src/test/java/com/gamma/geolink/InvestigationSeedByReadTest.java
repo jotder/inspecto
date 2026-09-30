@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * LA-17 step 4 — the bounded {@code SELECT DISTINCT} behind {@code seedBy} (design §4.4.1). The route's cap is
- * {@link InvestigationRoutes#SEED_BY_DISTINCT_CAP} (20 000), too large to exceed in a real-HTTP fixture, so the refusal
+ * the Space's {@code seed_by_distinct_cap} (default 20 000), too large to exceed in a real-HTTP fixture, so the refusal
  * is pinned here with a small cap: above it is a 422 NAMING the cap — never a silent sample.
  */
 class InvestigationSeedByReadTest {

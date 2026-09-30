@@ -5,8 +5,16 @@ import com.gamma.query.QueryExecutor;
 import com.gamma.util.SqlIdent;
 import com.gamma.sql.SqlSandboxPolicy;
 
+import com.gamma.control.ApiException;
+import com.gamma.control.EntityTypes;
+import com.gamma.control.ErrorCodes;
+
+import java.nio.file.Path;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -15,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -30,6 +39,19 @@ import java.util.regex.Pattern;
  * <p>Fences: every identifier checked against the relation's real columns by the caller and quoted here; every value
  * bound; a {@value #TIMEOUT_SECONDS} s statement timeout; at most {@value #MAX_ENTITIES} entities leave DuckDB
  * (more ⇒ {@code truncated}); the window at most {@value #MAX_WINDOW_DAYS} days.
+ *
+ * <p><b>Window and timezone contract.</b> Exactly one of a fixed {@code from}/{@code to} or a ROLLING
+ * {@code last: <N>h|<N>d}. Window bounds are UTC wall-clock timestamps. {@code last} is stored relative and resolved
+ * at EVALUATION time (every GET, every bind, every Alert sweep) against the server clock in UTC to
+ * {@code [now − N, now)}, truncated to the second, so an armed Alert Rule never watches a stale window. Every
+ * statement runs with the DuckDB session {@code TimeZone} set to {@code UTC} (the session default is the HOST's), so
+ * a {@code TIMESTAMPTZ} {@code timeCol} is read as UTC wall time, and a naive {@code TIMESTAMP} one as it is — i.e.
+ * it is ASSUMED to be UTC.
+ *
+ * <p><b>Agent list</b> ({@code cashOutConcentration} only): an optional {@code agentList} — an Entity List of Entity
+ * Type {@code agent} — restricts the AGENTS answered to the list's live exact members, each payee compared under the
+ * list's SEALED normaliser (D-M9); the share's denominator stays ALL cash-out in the window. When the list renders
+ * masked (the Space's {@code maskingMode}), each answered agent is the list's own mask token, never the raw value.
  */
 final class ValueMeasures {
 
@@ -56,11 +78,21 @@ final class ValueMeasures {
     /** The Measures that read a list of link kinds from {@code kindCol}. */
     private static final Map<String, String> KIND_LIST = Map.of("timeToCashOut", "cashOutKinds",
             "cashOutConcentration", "cashOutKinds", "benefitTransfer", "benefitKinds");
-    private static final Set<String> COMMON = Set.of("name", "valueCol", "timeCol", "from", "to");
+    private static final Set<String> COMMON = Set.of("name", "valueCol", "timeCol", "from", "to", "last");
+    /** The one Measure an {@code agent} Entity List may restrict, and the key naming that list. */
+    private static final String AGENT_MEASURE = "cashOutConcentration";
+    static final String AGENT_LIST = "agentList";
+    private static final String AGENT_TYPE = "agent";
+    /** A rolling window: {@code <N>h} or {@code <N>d}. */
+    private static final Pattern LAST = Pattern.compile("([1-9][0-9]{0,5})([hd])");
+    private static final java.time.ZoneId UTC = java.time.ZoneId.of("UTC");   // DuckDB refuses "Z"
 
-    /** One parsed, validated Measure: its name, columns, window, thresholds (defaults filled) and kind list. */
+    /**
+     * One parsed, validated Measure: its name, columns, RESOLVED window ({@code from}/{@code to}, UTC), thresholds
+     * (defaults filled), kind list, the rolling {@code last} it was resolved from (null = fixed) and {@code agentList}.
+     */
     record Spec(String name, String valueCol, String timeCol, String from, String to, Map<String, Double> thresholds,
-                List<String> kinds) {
+                List<String> kinds, String last, String agentList) {
 
         /** The block as stored on an Alert Rule and answered to the caller — every threshold spelled out. */
         Map<String, Object> toMap() {
@@ -68,10 +100,14 @@ final class ValueMeasures {
             m.put("name", name);
             m.put("valueCol", valueCol);
             m.put("timeCol", timeCol);
-            m.put("from", from);
-            m.put("to", to);
+            if (last != null) m.put("last", last);   // rolling: stored relative, resolved at every evaluation
+            else {
+                m.put("from", from);
+                m.put("to", to);
+            }
             m.putAll(thresholds);
             if (KIND_LIST.containsKey(name)) m.put(KIND_LIST.get(name), kinds);
+            if (agentList != null) m.put(AGENT_LIST, agentList);
             return m;
         }
 
@@ -85,8 +121,20 @@ final class ValueMeasures {
 
     private ValueMeasures() {}
 
-    /** Parse and validate a block {@code {name, valueCol, timeCol, from, to, …thresholds}}; defaults fill the rest. */
+    /** An {@code agentList} resolved: the list's live exact members (normalised keys), its normaliser, its mask key
+     *  ({@code null} = the list renders raw). */
+    record Agents(String normaliser, Set<String> members, byte[] maskKey) {}
+
+    /** {@link #parse(Map, boolean, Clock)} against the server clock (UTC). */
     static Spec parse(Map<String, Object> block, boolean alertable) {
+        return parse(block, alertable, Clock.systemUTC());
+    }
+
+    /**
+     * Parse and validate a block {@code {name, valueCol, timeCol, from + to | last, …thresholds}}; defaults fill the
+     * rest. A {@code last} window is resolved HERE against {@code clock} in UTC — so every evaluation re-parses.
+     */
+    static Spec parse(Map<String, Object> block, boolean alertable, Clock clock) {
         String name = str(block.get("name"));
         if (name == null || !DEFAULTS.containsKey(name) || (alertable && !ALERTABLE.contains(name)))
             throw new IllegalArgumentException("value measure 'name' must be one of "
@@ -94,16 +142,40 @@ final class ValueMeasures {
         Map<String, Double> defaults = DEFAULTS.get(name);
         String kindKey = KIND_LIST.get(name);
         for (String k : block.keySet())
-            if (!COMMON.contains(k) && !defaults.containsKey(k) && !k.equals(kindKey))
+            if (!COMMON.contains(k) && !defaults.containsKey(k) && !k.equals(kindKey)
+                    && !(k.equals(AGENT_LIST) && name.equals(AGENT_MEASURE)))
                 throw new IllegalArgumentException("'" + k + "' is not a setting of " + name + " — its settings are "
-                        + COMMON + " + " + defaults.keySet() + (kindKey == null ? "" : " + " + kindKey));
+                        + COMMON + " + " + defaults.keySet() + (kindKey == null ? "" : " + " + kindKey)
+                        + (name.equals(AGENT_MEASURE) ? " + " + AGENT_LIST : ""));
         String valueCol = ident(block, "valueCol");
         String timeCol = ident(block, "timeCol");
-        LocalDateTime from = instant(block, "from");
-        LocalDateTime to = instant(block, "to");
-        if (!to.isAfter(from)) throw new IllegalArgumentException("'to' must be after 'from'");
-        if (Duration.between(from, to).compareTo(Duration.ofDays(MAX_WINDOW_DAYS)) > 0)
-            throw new IllegalArgumentException("the window may span at most " + MAX_WINDOW_DAYS + " days");
+        String last = str(block.get("last"));
+        boolean fixed = str(block.get("from")) != null || str(block.get("to")) != null;
+        if (fixed == (last != null))
+            throw new IllegalArgumentException("value measure needs exactly one window: 'from' + 'to', or 'last' "
+                    + "(<N>h or <N>d — rolling, resolved in UTC at evaluation)");
+        LocalDateTime from, to;
+        if (last != null) {
+            Matcher lm = LAST.matcher(last);
+            if (!lm.matches())
+                throw new IllegalArgumentException("'last' must be <N>h or <N>d (e.g. 24h, 7d), got '" + last + "'");
+            long n = Long.parseLong(lm.group(1));
+            Duration span = lm.group(2).equals("h") ? Duration.ofHours(n) : Duration.ofDays(n);
+            if (span.compareTo(Duration.ofDays(MAX_WINDOW_DAYS)) > 0)
+                throw new IllegalArgumentException("the window may span at most " + MAX_WINDOW_DAYS + " days");
+            to = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS);
+            from = to.minus(span);
+        } else {
+            from = instant(block, "from");
+            to = instant(block, "to");
+            if (!to.isAfter(from)) throw new IllegalArgumentException("'to' must be after 'from'");
+            if (Duration.between(from, to).compareTo(Duration.ofDays(MAX_WINDOW_DAYS)) > 0)
+                throw new IllegalArgumentException("the window may span at most " + MAX_WINDOW_DAYS + " days");
+        }
+        String agentList = str(block.get(AGENT_LIST));
+        if (agentList != null && !EntityListRoutes.LIST_ID.matcher(agentList).matches())
+            throw new IllegalArgumentException("'" + AGENT_LIST + "' must be an Entity List id matching "
+                    + EntityListRoutes.LIST_ID.pattern());
         Map<String, Double> thresholds = new LinkedHashMap<>();
         for (var d : new java.util.TreeMap<>(defaults).entrySet()) {
             Object v = block.get(d.getKey());
@@ -128,7 +200,7 @@ final class ValueMeasures {
             if (kinds.isEmpty())
                 throw new IllegalArgumentException(name + " needs '" + kindKey + "' — the link kinds that mark it");
         }
-        return new Spec(name, valueCol, timeCol, from.toString(), to.toString(), thresholds, kinds);
+        return new Spec(name, valueCol, timeCol, from.toString(), to.toString(), thresholds, kinds, last, agentList);
     }
 
     /** The one-line statement of a Measure's thresholds, e.g. {@code passThrough ≥ 0.9 with inbound ≥ 10000}. */
@@ -141,7 +213,8 @@ final class ValueMeasures {
             case "timeToCashOut" -> "median hours from inbound to next cash-out " + s.kinds() + " ≤ "
                     + js(t.get("maxHours")) + " with inbound ≥ " + js(t.get("minInbound"));
             case "cashOutConcentration" -> "share of all cash-out " + s.kinds() + " ≥ " + js(t.get("minShare"))
-                    + " from ≥ " + js(t.get("minPayers")) + " payers";
+                    + " from ≥ " + js(t.get("minPayers")) + " payers"
+                    + (s.agentList() == null ? "" : ", agents in Entity List " + s.agentList());
             case "structuring" -> "≥ " + js(t.get("minLegs")) + " legs " + js(t.get("min")) + " ≤ " + s.valueCol()
                     + " < " + js(t.get("max")) + " from ≥ " + js(t.get("minPayers")) + " payers";
             case "benefitTransfer" -> "≥ " + js(t.get("minRecipients")) + " recipients of " + s.kinds()
@@ -156,6 +229,14 @@ final class ValueMeasures {
      */
     static Result evaluate(String datasetId, String relationSql, String sourceCol, String targetCol, String kindCol,
                            Spec s) throws SQLException, java.io.IOException {
+        return evaluate(datasetId, relationSql, sourceCol, targetCol, kindCol, s, null);
+    }
+
+    /** As above, with the Measure's {@code agentList} resolved by {@link #agents} ({@code null} iff it names none). */
+    static Result evaluate(String datasetId, String relationSql, String sourceCol, String targetCol, String kindCol,
+                           Spec s, Agents agents) throws SQLException, java.io.IOException {
+        if ((s.agentList() != null) != (agents != null))
+            throw new IllegalStateException("an agentList is resolved before evaluation, and only then");
         if (KIND_LIST.containsKey(s.name()) && kindCol == null)
             throw new IllegalArgumentException(s.name() + " needs a link-kind column (linkKindCol)");
         List<String> binds = new ArrayList<>(List.of(s.from(), s.to()));
@@ -169,7 +250,7 @@ final class ValueMeasures {
 
         Map<String, Object> stats = QueryExecutor.run(new QueryExecutor.Request(datasetId, relationSql,
                 base + " SELECT count(*) AS n, count(*) FILTER (WHERE v IS NULL) AS unvalued FROM __x", 1, 0,
-                List.of(), List.of(), List.copyOf(binds)), policy).rows().get(0);
+                List.of(), List.of(), List.copyOf(binds)), policy, UTC).rows().get(0);
 
         Map<String, Double> t = s.thresholds();
         String sql = switch (s.name()) {
@@ -200,11 +281,13 @@ final class ValueMeasures {
             }
             case "cashOutConcentration" -> {
                 String kinds = placeholders(s.kinds(), binds);
+                String cte = base + ", __c AS (SELECT * FROM __w WHERE k IN (" + kinds + "))";
+                String only = agents == null ? "" : " WHERE " + agentPayees(datasetId, relationSql, cte, binds, agents, policy);
                 binds.add(num(t.get("minShare")));
                 binds.add(num(t.get("minPayers")));
-                yield base + ", __c AS (SELECT * FROM __w WHERE k IN (" + kinds + "))"
+                yield cte
                         + " SELECT t AS entity, sum(v) AS cashOut, sum(v) / (SELECT sum(v) FROM __c) AS share,"
-                        + " count(DISTINCT s) AS payers FROM __c GROUP BY t"
+                        + " count(DISTINCT s) AS payers FROM __c" + only + " GROUP BY t"
                         + " HAVING sum(v) / (SELECT sum(v) FROM __c) >= CAST(? AS DOUBLE)"
                         + " AND count(DISTINCT s) >= CAST(? AS DOUBLE) ORDER BY share DESC, entity";
             }
@@ -234,9 +317,15 @@ final class ValueMeasures {
                     + " FROM __w GROUP BY s, t, k ORDER BY total DESC, source, target";
         };
         QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(datasetId, relationSql, sql,
-                MAX_ENTITIES, 0, List.of(), List.of(), binds), policy);
+                MAX_ENTITIES, 0, List.of(), List.of(), binds), policy, UTC);
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (Map<String, Object> row : r.rows()) rows.add(new LinkedHashMap<>(row));
+        for (Map<String, Object> row : r.rows()) {
+            Map<String, Object> out = new LinkedHashMap<>(row);
+            if (agents != null && agents.maskKey() != null)   // the list's own token — its members never leave raw
+                out.put("entity", EntityMasking.token(agents.maskKey(),
+                        EntityTypes.normalise(agents.normaliser(), String.valueOf(row.get("entity")))));
+            rows.add(out);
+        }
         return new Result(rows, r.truncated(), ((Number) stats.get("n")).longValue(),
                 ((Number) stats.get("unvalued")).longValue());
     }
@@ -246,14 +335,56 @@ final class ValueMeasures {
      * {@code linkKindCol} roles, the Measure's own {@code valueCol}/{@code timeCol}, every one checked against the
      * relation's real columns first. Throws {@link IllegalArgumentException} for an unknown column.
      */
-    static Result forInvestigation(String datasetId, String relationSql, Map<String, Object> header, Spec s)
-            throws SQLException, java.io.IOException {
+    static Result forInvestigation(String datasetId, String relationSql, Map<String, Object> header, Spec s,
+                                   Agents agents) throws SQLException, java.io.IOException {
         String src = str(header.get("sourceCol")), tgt = str(header.get("targetCol")), kind = str(header.get("linkKindCol"));
         List<String> columns = InvRoutes.relationColumns(datasetId, relationSql);
         for (String col : java.util.Arrays.asList(src, tgt, kind, s.valueCol(), s.timeCol()))
             if (col != null && !InvRoutes.containsIgnoreCase(columns, col))
                 throw new IllegalArgumentException("unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
-        return evaluate(datasetId, relationSql, src, tgt, kind, s);
+        return evaluate(datasetId, relationSql, src, tgt, kind, s, agents);
+    }
+
+    /**
+     * Resolve the Measure's {@code agentList} at the identity fact log's HEAD (live, so an armed rule follows the
+     * list): {@code null} when it names none. Refusals: unknown list 404 · retired 409 · Entity Type not
+     * {@code agent} 422. Only EXACT live members count (range entries are not applied, as with {@code seedBy}).
+     */
+    static Agents agents(Path writeRoot, Spec s) throws java.io.IOException {
+        if (s.agentList() == null) return null;
+        EntityFactLog log = new EntityFactLog(writeRoot);
+        EntityFactLog.Log head = EntityListRoutes.read(log);
+        EntityRegistry.EntityList l = EntityRegistry.fold(head.facts(), head.headSeq()).get(s.agentList());
+        if (l == null)
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "entity list '" + s.agentList() + "' not found");
+        if (l.retired())
+            throw new ApiException(409, ErrorCodes.CONFLICT, "entity list '" + s.agentList() + "' is retired");
+        if (!AGENT_TYPE.equals(l.entityType()))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + AGENT_LIST + "' must name an Entity "
+                    + "List of Entity Type '" + AGENT_TYPE + "'; '" + s.agentList() + "' is '" + l.entityType() + "'");
+        byte[] key = EntityListRoutes.masked(writeRoot, l) ? EntityMasking.key(log.directory()) : null;
+        return new Agents(l.normaliser(), Set.copyOf(l.liveMembers(java.time.Instant.now())), key);
+    }
+
+    /**
+     * The predicate restricting {@code __c} to the agents' payees: the DISTINCT cash-out payees in the window (at most
+     * {@link #MAX_ENTITIES}, more ⇒ refused, never sampled) normalised in Java under the list's sealed normaliser; the
+     * raw values whose key is a member are BOUND. No member matches ⇒ {@code FALSE}.
+     */
+    private static String agentPayees(String datasetId, String relationSql, String cte, List<String> binds,
+                                      Agents agents, SqlSandboxPolicy policy) throws SQLException, java.io.IOException {
+        QueryExecutor.Result payees = QueryExecutor.run(new QueryExecutor.Request(datasetId, relationSql,
+                cte + " SELECT DISTINCT t AS p FROM __c", MAX_ENTITIES, 0, List.of(), List.of(), List.copyOf(binds)),
+                policy, UTC);
+        if (payees.truncated())
+            throw new IllegalArgumentException("more than " + MAX_ENTITIES + " distinct cash-out payees in the window — "
+                    + "never a silent sample; narrow the window");
+        List<String> raw = new ArrayList<>();
+        for (Map<String, Object> row : payees.rows()) {
+            String p = String.valueOf(row.get("p"));
+            if (agents.members().contains(EntityTypes.normalise(agents.normaliser(), p))) raw.add(p);
+        }
+        return raw.isEmpty() ? "FALSE" : "t IN (" + placeholders(raw, binds) + ")";
     }
 
     private static String placeholders(List<String> values, List<String> binds) {

@@ -27,8 +27,12 @@ import java.util.regex.Pattern;
  * {@code {measure, threshold, entities, count, truncated, rowsInWindow, unvalued, fences}} — {@code measure} is the
  * block with every default filled in, exactly what an Alert Rule bound with it would store.
  *
- * <p>Gate order: write root 503 → query 422 → Dataset 404 (R3 via {@link InvRoutes#relationFor}) → unknown column
- * 422. ⛔ No {@code filter} is accepted — the Measure reads the Dataset, never an analyst's view (the §2.6 ≥ 5 000
+ * <p>{@code last} ({@code <N>h|<N>d}, exclusive with {@code from}/{@code to}) is a rolling window resolved at read
+ * time in UTC; the answer's {@code window} states the {@code [from, to)} it resolved. {@code agentList}
+ * ({@code cashOutConcentration} only) restricts the agents to an Entity List of Entity Type {@code agent}.
+ *
+ * <p>Gate order: write root 503 → query 422 → Dataset 404 (R3 via {@link InvRoutes#relationFor}) → agent list 404 /
+ * retired 409 / not of Entity Type {@code agent} 422 → unknown column 422. ⛔ No {@code filter} is accepted — the Measure reads the Dataset, never an analyst's view (the §2.6 ≥ 5 000
  * trap). A GET: read-only, persists nothing, audited as {@code LINK_VALUE_MEASURED}.
  */
 public final class ValueMeasureRoutes implements RouteModule {
@@ -75,7 +79,8 @@ public final class ValueMeasureRoutes implements RouteModule {
         String relationSql = InvRoutes.relationFor(api, ex, writeRoot, datasetId.trim());
         ValueMeasures.Result r;
         try {
-            r = ValueMeasures.forInvestigation(datasetId.trim(), relationSql, roles, spec);
+            r = ValueMeasures.forInvestigation(datasetId.trim(), relationSql, roles, spec,
+                    ValueMeasures.agents(writeRoot, spec));
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException | java.io.IOException e) {
@@ -103,6 +108,8 @@ public final class ValueMeasureRoutes implements RouteModule {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("measure", spec.toMap());
         out.put("threshold", ValueMeasures.label(spec));
+        // the window THIS evaluation read — for a rolling `last`, resolved now against the server clock
+        out.put("window", Map.of("from", spec.from(), "to", spec.to(), "timezone", "UTC"));
         out.put("entities", r.entities());
         out.put("count", r.entities().size());
         out.put("truncated", r.truncated());

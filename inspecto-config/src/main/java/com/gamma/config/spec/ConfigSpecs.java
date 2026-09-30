@@ -771,8 +771,10 @@ public final class ConfigSpecs {
                 // LA-18 value-measure rule: an Investigation rule over the WHOLE Dataset the Investigation is bound
                 // to. Authored only through POST /inv/investigations/{id}/alert-rules, like alert.investigation.
                 FieldSpec.of("alert.valueMeasure", "Value Measure", FieldType.MAP,
-                        "A named value Measure over the whole Dataset {name, valueCol, timeCol, from, to, and the "
-                                + "Measure's own visible thresholds}. The rule fires when at least one entity "
+                        "A named value Measure over the whole Dataset {name, valueCol, timeCol, a window — from + to, "
+                                + "or a rolling last: <N>h|<N>d (at most 31 days, resolved in UTC at every sweep) — "
+                                + "the Measure's own visible thresholds, and for cashOutConcentration an optional "
+                                + "agentList (an Entity List of Entity Type agent)}. The rule fires when at least one entity "
                                 + "breaches them; requires alert.investigation, takes no alert.measure."),
                 // ASSURE-PER-ENTITY-ALERTS-1: a Dataset measure rule evaluated per key instead of as one aggregate.
                 FieldSpec.of("alert.by", "Group by", FieldType.LIST,
@@ -1219,6 +1221,10 @@ public final class ConfigSpecs {
                 FieldSpec.of("merged_distinct_cap", "Merged expand distinct-value cap", FieldType.INT,
                         "Distinct values per bound column a merged expand (LA-17) may scan to find an identity "
                                 + "group's member values; above it the expand is refused, never sampled; "
+                                + "absent = 20000."),
+                FieldSpec.of("seed_by_distinct_cap", "seedBy distinct-value cap", FieldType.INT,
+                        "Distinct values per bound column a seedBy (LA-17) may scan to find an Entity List's "
+                                + "members in the Dataset; above it the seed is refused, never sampled; "
                                 + "absent = 20000.")
         );
         return new ConfigSpec("link-analysis-settings", fields, List.of());

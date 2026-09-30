@@ -139,8 +139,10 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
         }
         String relationSql = com.gamma.query.DatasetRelation.relationSql(dataset, dataRoot,
                 new com.gamma.pipeline.ViewStore(writeRoot.resolve("views")));
+        // parsed NOW: a rolling `last` window resolves against the sweep's clock (UTC), never the binding's
         ValueMeasures.Spec spec = ValueMeasures.parse(rule.valueMeasure(), true);
-        return OptionalDouble.of(ValueMeasures.forInvestigation(ds, relationSql, header, spec).entities().size());
+        return OptionalDouble.of(ValueMeasures.forInvestigation(ds, relationSql, header, spec,
+                ValueMeasures.agents(writeRoot, spec)).entities().size());
     }
 
     /** The hash a binding records: SHA-256 of the rule's canonical JSON — any edit to the rule breaks the match. */
