@@ -156,7 +156,7 @@ public final class ConsignmentIngestor {
                     status = "FAILED";
                     error  = e.getMessage();
                     leaseLost = true;
-                    log.warn("Consignment {} not parked: {}", batch.batchId(), e.getMessage());
+                    log.warn("Consignment {} not parked: {}", batch.batchId(), e.getMessage());   // no cleanup — see above
                 } catch (Exception e) {
                     status = "FAILED";
                     error  = "park failed: " + ConsignmentIngestStrategy.msg(e);
@@ -170,6 +170,11 @@ public final class ConsignmentIngestor {
                     status = "FAILED";
                     error  = e.getMessage();   // "lease lost: ..." — distinct from "commit failed: ..."
                     leaseLost = true;
+                    // ⛔ Deliberately NO cleanup of the lost run's outputs, manifest or registry rows: the batch id is
+                    // a deterministic hash of the members (ConsignmentId), so the new holder re-plans the same
+                    // inbox and mints the SAME id — the same output names, manifest and registry key. By now it
+                    // may already have committed them; deleting by id would destroy ITS data. An identical
+                    // re-plan overwrites in place (OVERWRITE_OR_IGNORE), which is the self-heal.
                     log.warn("Consignment {} not committed: {}", batch.batchId(), e.getMessage());
                 } catch (Exception e) {
                     // Output was written, but a side effect (backup/manifest/markers) failed. Demote

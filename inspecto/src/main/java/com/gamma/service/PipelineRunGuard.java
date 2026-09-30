@@ -87,7 +87,9 @@ final class PipelineRunGuard implements RunLease {
                 released = true;
                 permit.release();
             }
-            @Override public boolean isValid() { return !released; }   // a heap permit is never taken over
+            @Override public com.gamma.inspector.CommitFence.State state() {   // a heap permit is never taken over
+                return released ? com.gamma.inspector.CommitFence.State.LOST : com.gamma.inspector.CommitFence.State.HELD;
+            }
             @Override public String toString() { return "Claim[" + pipeline + "]"; }
         };
     }

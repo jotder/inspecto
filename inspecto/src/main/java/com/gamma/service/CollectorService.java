@@ -1835,7 +1835,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 try (RunLease.Claim claim = runGuard.acquire(pipelineName);
                      // LEASE-TAKEOVER-INFLIGHT-1: the engine asks this before it commits a Consignment
                      com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
-                             com.gamma.inspector.CommitFence.Scope.RUN, pipelineName, claim::isValid)) {
+                             com.gamma.inspector.CommitFence.Scope.RUN, pipelineName, claim::state)) {
                     running.add(pipelineName);
                     try {
                         // T13: any run resets the cadence — but a simulated one must not, or a dry run
@@ -1939,7 +1939,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             return Optional.of(triggerWorkers.submit(() -> underSpace(() -> {
                 try (RunLease.Claim claim = runGuard.acquire(pipelineName);
                      com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
-                             com.gamma.inspector.CommitFence.Scope.RUN, pipelineName, claim::isValid)) {
+                             com.gamma.inspector.CommitFence.Scope.RUN, pipelineName, claim::state)) {
                     running.add(pipelineName);
                     try {
                         return com.gamma.inspector.RecordReplay.replay(

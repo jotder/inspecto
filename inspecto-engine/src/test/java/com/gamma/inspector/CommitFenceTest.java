@@ -184,6 +184,153 @@ class CommitFenceTest {
         assertEquals(0, filesUnder(cfg.dirs().backup()), "no backup");
         assertEquals(0, filesUnder(cfg.dirs().markers()), "no marker");
         assertNull(CommitRetry.recordFor(feed, cfg), "still no X1 attempt spent");
+        assertTrue(filesUnder(cfg.dirs().manifestsDir()) > 0,
+                "the manifest written between the two looks stays (documented): its id is the new holder's too");
+    }
+
+    private static Consignment batchOf(PipelineConfig cfg, String id, File... files) {
+        SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
+        List<Consignment.Member> members = new java.util.ArrayList<>();
+        for (int i = 0; i < files.length; i++) members.add(new Consignment.Member(files[i], i, files[i].length(), sel));
+        return new Consignment(id, "mini", null, members);
+    }
+
+    private static ConsignmentAuditWriter auditOf(PipelineConfig cfg) {
+        return new ConsignmentAuditWriter(cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(),
+                cfg.dirs().lineageFilePath());
+    }
+
+    /**
+     * ⛔ The hazard that ruled out cleaning up. A batch id is a deterministic hash of its members
+     * ({@code ConsignmentId}), so the new holder re-plans the same inbox and mints the SAME id — the same output
+     * names, manifest name and registry key. Here the new holder commits that batch BEFORE the lost run's refusal
+     * runs; the refusal must leave everything the holder committed exactly as it is.
+     */
+    @Test
+    void aRefusalNeverTouchesTheNewHoldersCommittedBatchOfTheSameId(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = pipelineWithFeed(dir);
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.writeString(inbox.resolve("second.csv"), "ID,AMT,EVENT_DATE\nr2,2.0,2020-04-04\n");
+        File a = inbox.resolve("feed.csv").toFile();
+        File b = inbox.resolve("second.csv").toFile();
+        String sameId = cfg.identity().runTimestamp() + "_mini_0001";
+        AtomicInteger asked = new AtomicInteger();
+        java.util.concurrent.atomic.AtomicReference<Set<String>> held = new java.util.concurrent.atomic.AtomicReference<>();
+
+        try (CommitFence.Held fence = CommitFence.hold(CommitFence.Scope.RUN, cfg.identity().pipelineName(), () -> {
+            if (asked.getAndIncrement() > 0) return CommitFence.State.HELD;      // the new holder's own checks
+            try {
+                ConsignmentIngestor.process(batchOf(cfg, sameId, a, b), cfg, auditOf(cfg));   // it commits first
+                held.set(relFiles(cfg.dirs().database()));
+            } catch (Exception e) {
+                throw new AssertionError(e);
+            }
+            return CommitFence.State.LOST;                                       // ... and only now A is refused
+        })) {
+            ConsignmentIngestor.process(batchOf(cfg, sameId, a, b), cfg, auditOf(cfg));
+        }
+        assertNotNull(held.get());
+        assertFalse(held.get().isEmpty(), "harness: the new holder wrote its outputs");
+        assertTrue(held.get().stream().allMatch(f -> f.contains(sameId)), "harness: named by the shared batch id");
+        assertEquals(held.get(), relFiles(cfg.dirs().database()), "the holder's outputs survive the refusal");
+        assertTrue(Files.exists(Path.of(cfg.dirs().manifestsDir(), sameId + ".json")),
+                "and so does the holder's manifest");
+        assertFalse(a.exists() || b.exists(), "the holder's backup moves stand");
+        assertEquals(Set.of("feed.csv", "second.csv"), relFiles(cfg.dirs().backup()));
+    }
+
+    /** The same hazard at the §11.3 registry: the holder's LIVE rows stay LIVE through the lost run's refusal. */
+    @Test
+    void aRefusalLeavesTheNewHoldersLiveRegistryRowsLive(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTestRef.writePipeline(dir, "").toString());
+        Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
+        Path solo = Files.writeString(inbox.resolve("solo.csv"), "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
+        List<Consignment.Member> survivors = List.of(new Consignment.Member(solo.toFile(), 0, Files.size(solo),
+                new SchemaSelector.Selection(cfg.schemas().single(), null)));
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, survivors);
+
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            ConsignmentOutputStores.register(space, store);
+            File db = com.gamma.util.DuckDbUtil.tempDbFile("cf_same_");
+            try (Connection conn = twoPartitions(db)) {
+                ConsignmentIngestStrategy.Written written = ConsignmentIngestStrategy.writeAndTrace(
+                        conn, "transformed", List.of("year", "month", "day"), cfg,
+                        cfg.dirs().database(), "b1", batch.batchId(), java.util.Map.of(1, "a.csv", 2, "b.csv"), "");
+                ConsignmentIngestor.finalizeSource(batch, cfg, survivors, written.outputs(), written.lineage());   // the holder
+                assertEquals(2, store.outputs(batch.batchId()).size(), "harness: the holder registered its outputs");
+
+                try (CommitFence.Held fence = CommitFence.hold(
+                        CommitFence.Scope.RUN, cfg.identity().pipelineName(), () -> false)) {
+                    assertThrows(CommitFence.LeaseLostException.class, () -> ConsignmentIngestor.finalizeSource(
+                            batch, cfg, survivors, written.outputs(), written.lineage()));      // the lost run, SAME id
+                }
+                assertEquals(2, store.outputs(batch.batchId()).size());
+                assertTrue(store.outputs(batch.batchId()).stream()
+                                .allMatch(o -> o.state() == com.gamma.consignment.ConsignmentOutput.State.LIVE),
+                        "the holder's rows are still LIVE");
+            } finally {
+                com.gamma.util.DuckDbUtil.deleteTempDb(db);
+            }
+        }
+    }
+
+    /**
+     * An identical re-plan self-heals: the refused run's outputs carry the same names the new holder's run writes
+     * for the same members, so its write replaces them in place and nothing is left over.
+     */
+    @Test
+    void anIdenticalReBatchOverwritesTheRefusedRunsOutputsInPlace(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = pipelineWithFeed(dir);
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.writeString(inbox.resolve("second.csv"), "ID,AMT,EVENT_DATE\nr2,2.0,2020-04-04\n");
+        File a = inbox.resolve("feed.csv").toFile();
+        File b = inbox.resolve("second.csv").toFile();
+        String sameId = cfg.identity().runTimestamp() + "_mini_0001";
+
+        try (CommitFence.Held fence = CommitFence.hold(
+                CommitFence.Scope.RUN, cfg.identity().pipelineName(), () -> false)) {
+            ConsignmentIngestor.process(batchOf(cfg, sameId, a, b), cfg, auditOf(cfg));
+        }
+        Set<String> refused = relFiles(cfg.dirs().database());
+        assertFalse(refused.isEmpty(), "the refused run's outputs are on disk (the documented posture)");
+        assertTrue(a.exists() && b.exists(), "both files stay in the inbox");
+
+        ConsignmentIngestor.process(batchOf(cfg, sameId, a, b), cfg, auditOf(cfg));     // the new holder, same members
+        assertEquals(refused, relFiles(cfg.dirs().database()), "same names, replaced in place — nothing left over");
+        assertFalse(a.exists() || b.exists(), "and it committed");
+    }
+
+    /** An unreadable lease is refused with its OWN cause, spends no attempt, and never quarantines a good file. */
+    @Test
+    void anUnreadableLeaseIsRefusedWithItsOwnCauseAndNeverQuarantines(@TempDir Path dir) throws Exception {
+        System.setProperty("ingest.retry.max", "2");
+        System.setProperty("ingest.retry.backoff.initialMs", "0");
+        PipelineConfig cfg = pipelineWithFeed(dir);
+        File feed = Path.of(cfg.dirs().poll()).resolve("feed.csv").toFile();
+        try (CommitFence.Held fence = CommitFence.hold(CommitFence.Scope.RUN, cfg.identity().pipelineName(),
+                () -> CommitFence.State.UNREADABLE)) {
+            for (int i = 0; i < 4; i++) CollectorProcessor.run(cfg);
+        }
+        assertTrue(feed.exists(), "never quarantined for a database blip");
+        assertNull(CommitRetry.recordFor(feed, cfg));
+        assertEquals(0, filesUnder(cfg.dirs().quarantine()));
+        String audit = Files.readString(Path.of(cfg.dirs().batchesFilePath()));
+        assertTrue(audit.contains("lease unverifiable") && audit.contains("could not be read"), audit);
+        assertFalse(audit.contains("taken over by another node"), "a blip must not read as a takeover");
+    }
+
+    /** The catch around {@code process} spends an attempt for a thrown fault, but never for a lost lease. */
+    @Test
+    void aLeaseLossThatEscapesProcessSpendsNoAttempt(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = pipelineWithFeed(dir);
+        File feed = Path.of(cfg.dirs().poll()).resolve("feed.csv").toFile();
+        Consignment batch = batchOf(cfg, cfg.identity().runTimestamp() + "_mini_0001", feed);
+
+        CollectorProcessor.onBatchThrown(batch, cfg, false, new CommitFence.LeaseLostException("lease lost: x"));
+        assertNull(CommitRetry.recordFor(feed, cfg), "no attempt for a lost lease");
+
+        CollectorProcessor.onBatchThrown(batch, cfg, false, new IllegalStateException("boom"));
+        assertNotNull(CommitRetry.recordFor(feed, cfg), "control: an ordinary thrown fault does spend one");
     }
 
     /** Parking moves the original out of the inbox too, so it is refused for a lost lease as well. */

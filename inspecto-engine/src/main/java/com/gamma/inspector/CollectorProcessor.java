@@ -273,8 +273,7 @@ public class CollectorProcessor {
                             } catch (Exception thrown) {
                                 // X1: a THROWN ingest (framework/schema fault) also leaves its files for the
                                 // next cycle — count the attempt, then let the failure surface as before.
-                                if (!dryRun)
-                                    CommitRetry.recordFailure(b, cfg, ConsignmentIngestStrategy.msg(thrown));
+                                onBatchThrown(b, cfg, dryRun, thrown);
                                 throw thrown;
                             }
                         }
@@ -453,6 +452,16 @@ public class CollectorProcessor {
             CommitFence.check(CommitFence.Scope.ACQUIRE, cfg.identity().pipelineName());
             return RemoteAcquisitionHandler.materializeRemote(cfg, connector, ready, retry, skipPostAction).size();
         }
+    }
+
+    /**
+     * X1: a THROWN ingest leaves its files for the next cycle — count the attempt. ⛔ Except a lost lease: it is
+     * not this Consignment's fault, and a fence call that ever escapes {@code ConsignmentIngestor}'s own catches
+     * must not spend an attempt either (five HA flaps would quarantine a good file). LEASE-TAKEOVER-INFLIGHT-1.
+     */
+    static void onBatchThrown(Consignment b, PipelineConfig cfg, boolean dryRun, Exception thrown) {
+        if (dryRun || thrown instanceof CommitFence.LeaseLostException) return;
+        CommitRetry.recordFailure(b, cfg, ConsignmentIngestStrategy.msg(thrown));
     }
 
     /**

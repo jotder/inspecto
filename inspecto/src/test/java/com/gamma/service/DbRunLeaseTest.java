@@ -295,6 +295,7 @@ class DbRunLeaseTest {
             assertNotNull(b);
 
             assertFalse(a.isValid(), "A's claim was taken over — it must read as lost");
+            assertEquals(com.gamma.inspector.CommitFence.State.LOST, a.state());
             try (com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
                     com.gamma.inspector.CommitFence.Scope.RUN, "orders", a::isValid)) {
                 assertThrows(com.gamma.inspector.CommitFence.LeaseLostException.class,
@@ -366,10 +367,13 @@ class DbRunLeaseTest {
 
             down.set(true);
             assertFalse(c.isValid(), "an unreadable lease table is not proof the lease is still ours");
+            assertEquals(com.gamma.inspector.CommitFence.State.UNREADABLE, c.state(),
+                    "and it is said as such, not as a takeover");
             Thread.sleep(TTL.toMillis());                         // and a renewer tick fails too — still not 'lost'
 
             down.set(false);
             assertTrue(c.isValid(), "the database is back and nobody took the lease: the same claim is valid again");
+            assertEquals(com.gamma.inspector.CommitFence.State.HELD, c.state());
             c.close();
         }
     }

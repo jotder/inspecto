@@ -390,7 +390,7 @@ final class PipelineScheduler {
         try (RunLease.Claim claim = due.claim();
              // LEASE-TAKEOVER-INFLIGHT-1: the engine asks this before it commits a Consignment
              com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
-                     com.gamma.inspector.CommitFence.Scope.RUN, due.id(), claim::isValid)) {
+                     com.gamma.inspector.CommitFence.Scope.RUN, due.id(), claim::state)) {
             runPermits.acquire();
             // Clock starts AFTER the permit: time spent queued for the budget is not this pipeline's run
             // duration, and admitting fewer of its files could not shorten it.
@@ -717,7 +717,7 @@ final class PipelineScheduler {
         try (RunLease.Claim claim = due.claim();
              // LEASE-TAKEOVER-INFLIGHT-1: the engine asks this before it lands fetched files
              com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
-                     com.gamma.inspector.CommitFence.Scope.ACQUIRE, due.id(), claim::isValid)) {
+                     com.gamma.inspector.CommitFence.Scope.ACQUIRE, due.id(), claim::state)) {
             acquirePermits.acquire();
             try {
                 int landed = CollectorProcessor.acquire(due.cfg());
@@ -810,7 +810,7 @@ final class PipelineScheduler {
         RunLease.Claim claim = acquireGuard.tryAcquire(id);
         if (claim != null) {
             try (claim; com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
-                    com.gamma.inspector.CommitFence.Scope.ACQUIRE, id, claim::isValid)) {
+                    com.gamma.inspector.CommitFence.Scope.ACQUIRE, id, claim::state)) {
                 CollectorProcessor.acquire(cfg.forNewRun());
             } catch (Exception e) {
                 log.error("Stream lane acquisition failed for '{}'", id, e);

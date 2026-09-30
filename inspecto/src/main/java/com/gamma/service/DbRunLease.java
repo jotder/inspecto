@@ -234,17 +234,18 @@ final class DbRunLease implements RunLease, AutoCloseable {
             }
 
             @Override
-            public boolean isValid() {
-                if (released) return false;
+            public com.gamma.inspector.CommitFence.State state() {
+                if (released) return com.gamma.inspector.CommitFence.State.LOST;
                 Long gone = lost.get(pipeline);
-                if (gone != null && gone == epoch) return false;
+                if (gone != null && gone == epoch) return com.gamma.inspector.CommitFence.State.LOST;
                 Boolean ours = stillOurs(pipeline, epoch);
-                if (ours == null) return false;   // unreadable: refuse this commit, but it is not a verdict
+                // unreadable: refuse this commit, but it is not a verdict
+                if (ours == null) return com.gamma.inspector.CommitFence.State.UNREADABLE;
                 if (!ours) {
                     lost.put(pipeline, epoch);
-                    return false;
+                    return com.gamma.inspector.CommitFence.State.LOST;
                 }
-                return true;
+                return com.gamma.inspector.CommitFence.State.HELD;
             }
 
             @Override

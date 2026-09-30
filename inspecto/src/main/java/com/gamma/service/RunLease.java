@@ -49,7 +49,14 @@ interface RunLease {
          * cheap). A run whose claim is no longer valid aborts without committing, leaving its files for the
          * new holder. ⚠ An in-process implementation cannot lose a claim it has not released.
          */
-        boolean isValid();
+        default boolean isValid() { return state() == com.gamma.inspector.CommitFence.State.HELD; }
+
+        /**
+         * The three-way answer behind {@link #isValid}: {@code HELD}, {@code LOST} (released, or another owner took
+         * it over), or {@code UNREADABLE} (a shared implementation could not read its lease table — refuse the
+         * commit, but the claim is not written off). What {@code CommitFence} is handed.
+         */
+        com.gamma.inspector.CommitFence.State state();
     }
 
     /**

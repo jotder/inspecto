@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 /**
  * The engine side of a run lease's validity check (LEASE-TAKEOVER-INFLIGHT-1): the service layer registers
@@ -25,7 +26,10 @@ public final class CommitFence {
     /** Which lease the check belongs to — a run's, or a remote acquisition's. */
     public enum Scope { RUN, ACQUIRE }
 
-    /** Thrown at a commit point when the pipeline's lease has been taken over. */
+    /** What a lease check found. UNREADABLE is not a verdict — the commit is refused, the claim is not written off. */
+    public enum State { HELD, LOST, UNREADABLE }
+
+    /** Thrown at a commit point when the pipeline's lease is lost (taken over) or could not be verified. */
     public static final class LeaseLostException extends IllegalStateException {
         LeaseLostException(String msg) { super(msg); }
     }
@@ -35,7 +39,7 @@ public final class CommitFence {
         @Override void close();
     }
 
-    private static final Map<String, BooleanSupplier> CHECKS = new ConcurrentHashMap<>();
+    private static final Map<String, Supplier<State>> CHECKS = new ConcurrentHashMap<>();
 
     private CommitFence() {}
 
@@ -43,17 +47,30 @@ public final class CommitFence {
         return scope + "\u0000" + com.gamma.event.EventLog.currentSpaceId() + "\u0000" + pipeline;
     }
 
-    /** Register {@code stillHeld} for {@code pipeline} in the current thread's Space until the handle closes. */
-    public static Held hold(Scope scope, String pipeline, BooleanSupplier stillHeld) {
+    /** Register {@code state} for {@code pipeline} in the current thread's Space until the handle closes. */
+    public static Held hold(Scope scope, String pipeline, Supplier<State> state) {
         String k = key(scope, pipeline);
-        CHECKS.put(k, stillHeld);
-        return () -> CHECKS.remove(k, stillHeld);
+        CHECKS.put(k, state);
+        return () -> CHECKS.remove(k, state);
     }
 
-    /** Refuse the commit when {@code pipeline}'s registered lease is no longer held. */
+    /** {@link #hold(Scope, String, Supplier)} for a plain held / not-held answer. */
+    public static Held hold(Scope scope, String pipeline, BooleanSupplier stillHeld) {
+        return hold(scope, pipeline, () -> stillHeld.getAsBoolean() ? State.HELD : State.LOST);
+    }
+
+    /** Refuse the commit unless {@code pipeline}'s registered lease is held; no registration means nothing to lose. */
     public static void check(Scope scope, String pipeline) {
-        BooleanSupplier c = CHECKS.get(key(scope, pipeline));
-        if (c == null || c.getAsBoolean()) return;
+        Supplier<State> c = CHECKS.get(key(scope, pipeline));
+        State st = c == null ? State.HELD : c.get();
+        if (st == State.HELD) return;
+        if (st == State.UNREADABLE) {
+            log.warn("Run lease for '{}' ({}) could not be read — the lease table is unreachable; refusing the "
+                    + "commit without spending a retry attempt, the files stay in the inbox for the next cycle",
+                    pipeline, scope);
+            throw new LeaseLostException("lease unverifiable: '" + pipeline
+                    + "' — the lease table could not be read; not committed, will retry next cycle");
+        }
         log.warn("Run lease lost for '{}' ({}) — another node took it over; aborting without committing, the "
                 + "files stay in the inbox for the new holder", pipeline, scope);
         throw new LeaseLostException("lease lost: '" + pipeline + "' was taken over by another node — not committed");

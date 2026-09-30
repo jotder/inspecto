@@ -232,16 +232,28 @@ lost claim throws `LeaseLostException` ("lease lost"), so the Consignment is aud
 nothing more is registered, backed up, parked or marked, and its files stay in the inbox for the new holder.
 ⛔ A lease loss spends **no** X1 commit-retry attempt and clears no record (`ConsignmentIngestor.process` catches
 it before the generic commit catch) — five HA flaps would otherwise quarantine a good file as `RETRY_EXHAUSTED`.
-An unreadable lease table refuses the commit but is never recorded as a loss (`stillOurs` answers `null`). The
-heap guard's claim is valid until released.
+A claim answers a three-way `CommitFence.State` (`HELD` / `LOST` / `UNREADABLE`): an unreadable lease table refuses
+the commit with its own reason ("lease unverifiable … could not be read", not "taken over") but is never
+recorded as a loss (`stillOurs` answers `null`). `CollectorProcessor.onBatchThrown` also refuses to spend an X1
+attempt for a `LeaseLostException` that ever escapes `process`. The heap guard's claim is valid until released.
 ⚠ What a refusal leaves behind: the lost run's output files were already written by the sink (the graph lane's
 `finalizeSource` runs only after every branch committed), and a glob reader can see them until the new holder
-commits. They carry the same names the new holder's run writes for the same source file (`consolidatedBaseName`),
-so its `OVERWRITE_OR_IGNORE` write replaces them in place and nothing doubles — the crash-mid-commit posture.
-A lease lost between the first check and the backup move also leaves that batch's manifest and §11.3 registry
-rows (written in between). Job / authored-Pipeline runs hold `SCOPE_JOB` / `SCOPE_AUTHORED` claims through
-`RunClaims`, which has no validity check yet (`LEASE-TAKEOVER-JOB-RUNS-1`); `commitRetryAct` needs none — it
-holds its claim for one operator act, to exclude a running cycle, and commits no run output.
+commits. ⛔ **There is deliberately NO cleanup** (a `discardLostRun` was built and removed the same day): the
+batch id is `ConsignmentId`, a deterministic hash of the members' sorted relative paths and bytes, so the new
+holder re-plans the same inbox — the lost run never moved the files — and mints the SAME id, hence the same output
+names (`consolidatedBaseName`: the source stem for one file, the batch id for several), the same manifest name and
+the same registry `consignment_id`. Deleting by id after the holder has committed destroys the holder's data, its
+manifest and (via `supersede`) its LIVE registry rows, with the files already in backup. An identical re-plan
+overwrites in place (`OVERWRITE_OR_IGNORE`) and self-heals; pinned by `CommitFenceTest`. A different membership
+mints a different id and leaves an orphan — a bounded residual. A lease lost between the first check and the
+pre-backup check also leaves that batch's manifest and registry rows; the holder rewrites the same-named manifest.
+⚠ The DuckLake catalog is the exception: `DuckLakeRegistrar.registerInto` inserts with no dedup, so files registered
+before a late refusal are inserted again by the holder (`DUCKLAKE-REGISTER-NOT-IDEMPOTENT-1`, P2).
+⚠ A long lease-table outage makes every run refuse each cycle ("lease unverifiable"), with no attempt spent and
+nothing quarantined; nothing raises a Signal for it, so the symptom is files not draining and the log line.
+Job / authored-Pipeline runs hold `SCOPE_JOB` / `SCOPE_AUTHORED` claims through `RunClaims`, which has no validity
+check yet, so they can double-register (`LEASE-TAKEOVER-JOB-RUNS-1`, P2); `commitRetryAct` needs none — it holds
+its claim for one operator act, to exclude a running cycle, and commits no run output.
 
 **Selected by `-Drun.lease.backend`** (`heap` default · `db` · `postgres` · a raw `jdbc:` URL), with
 `-Drun.lease.db.url` / `.user` / `.password` and `-Drun.lease.owner`. ⛔ The default is `heap`, never a
