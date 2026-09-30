@@ -480,7 +480,10 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
   One walk yields each id once (a per-walk Set), because a backdated insert mid-walk shifts the page boundary;
   the sweep also re-reads the stored object before stamping, so a breach fires once and never overwrites a newer
   status. `ARCHIVED` is skipped by name as well, so it stops the clock even in a workflow where it is not terminal.
-  ⚠ `active()` still reads the scope's terminal history and filters in Java — `OBJECTS-ACTIVE-READ-PUSHDOWN-1` (P3).
+  `active()` (and `openCaseRaisedBy`) query with `ObjectQuery.openOnly` — `closed_at = 0` pushed into SQL — so the
+  terminal history is never read; the Java `isTerminal` filter stays for a state made terminal after its objects
+  were left open. ⚠ The reverse case — a state that STOPS being terminal while its objects keep `closed_at > 0` —
+  now drops those objects from `active()` until they are moved again.
 
 ### 3.5 Cases
 

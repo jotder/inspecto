@@ -27,12 +27,16 @@ import static com.gamma.util.Values.trimToNull;
  *                      closed", so a reopened object must never satisfy a cutoff (MNT-14 G1).
  * @param oldestFirst   {@code true} to order oldest-first by {@code createdAt} instead of the default
  *                      newest-first
+ * @param openOnly      {@code true} to keep only objects not yet closed ({@code closedAt == 0}, which
+ *                      {@link OperationalObject#withStatus} maintains on every terminal move) — pushed into
+ *                      SQL so an "active" lookup never reads the terminal history. {@code false} = no constraint.
  * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record ObjectQuery(ObjectType objectType, String status, String severity, String assignee,
                           String owner, String correlationId, String textContains,
-                          int limit, int offset, long closedBefore, boolean oldestFirst) {
+                          int limit, int offset, long closedBefore, boolean oldestFirst,
+                          boolean openOnly) {
 
     public static final int DEFAULT_LIMIT = 100;
     public static final int MAX_LIMIT = 10_000;
@@ -42,6 +46,14 @@ public record ObjectQuery(ObjectType objectType, String status, String severity,
         limit = Math.max(1, Math.min(MAX_LIMIT, limit == 0 ? DEFAULT_LIMIT : limit));
         offset = Math.max(0, offset);
         closedBefore = Math.max(0, closedBefore);
+    }
+
+    /** The pre-open-only shape: no {@code openOnly} constraint. */
+    public ObjectQuery(ObjectType objectType, String status, String severity, String assignee,
+                       String owner, String correlationId, String textContains,
+                       int limit, int offset, long closedBefore, boolean oldestFirst) {
+        this(objectType, status, severity, assignee, owner, correlationId, textContains, limit, offset,
+                closedBefore, oldestFirst, false);
     }
 
     /** The pre-MNT-14 shape: no retention cutoff, newest-first. */
@@ -60,7 +72,7 @@ public record ObjectQuery(ObjectType objectType, String status, String severity,
      *  the ordered source set a caller slices itself (keyset pagination, scope-filtered analytics). */
     public ObjectQuery unbounded() {
         return new ObjectQuery(objectType, status, severity, assignee, owner, correlationId, textContains,
-                MAX_LIMIT, 0, closedBefore, oldestFirst);
+                MAX_LIMIT, 0, closedBefore, oldestFirst, openOnly);
     }
 
     /**
@@ -96,6 +108,7 @@ public record ObjectQuery(ObjectType objectType, String status, String severity,
         if (correlationId != null && !correlationId.equals(o.correlationId())) return false;
         // closedAt == 0 means "not closed", so a reopened object can never satisfy a retention cutoff.
         if (closedBefore > 0 && !(o.closedAt() > 0 && o.closedAt() < closedBefore)) return false;
+        if (openOnly && o.closedAt() != 0) return false;
         if (textContains != null && !textContains.isBlank()) {
             String needle = textContains.toLowerCase(Locale.ROOT);
             boolean inTitle = o.title() != null && o.title().toLowerCase(Locale.ROOT).contains(needle);
@@ -113,6 +126,7 @@ public record ObjectQuery(ObjectType objectType, String status, String severity,
         private int offset = 0;
         private long closedBefore = 0L;
         private boolean oldestFirst = false;
+        private boolean openOnly = false;
 
         public Builder objectType(ObjectType t) { this.objectType = t; return this; }
         public Builder status(String s) { this.status = trimToNull(s); return this; }
@@ -125,10 +139,11 @@ public record ObjectQuery(ObjectType objectType, String status, String severity,
         public Builder offset(int n) { this.offset = n; return this; }
         public Builder closedBefore(long epochMillis) { this.closedBefore = epochMillis; return this; }
         public Builder oldestFirst(boolean b) { this.oldestFirst = b; return this; }
+        public Builder openOnly(boolean b) { this.openOnly = b; return this; }
 
         public ObjectQuery build() {
             return new ObjectQuery(objectType, status, severity, assignee, owner, correlationId,
-                    textContains, limit, offset, closedBefore, oldestFirst);
+                    textContains, limit, offset, closedBefore, oldestFirst, openOnly);
         }
     }
 }

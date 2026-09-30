@@ -167,6 +167,7 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
         if (q.correlationId() != null) { where.add("correlation_id = ?"); params.add(q.correlationId()); }
         // closed_at = 0 means "not closed" — a reopened object must never satisfy a retention cutoff.
         if (q.closedBefore() > 0) { where.add("closed_at > 0 AND closed_at < ?"); params.add(q.closedBefore()); }
+        if (q.openOnly()) where.add("closed_at = 0");
         if (q.textContains() != null) {
             where.add("(LOWER(title) LIKE ? OR LOWER(description) LIKE ?)");
             String like = "%" + q.textContains().toLowerCase(Locale.ROOT) + "%";

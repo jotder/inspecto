@@ -64,4 +64,17 @@ class InMemoryObjectStoreTest {
         assertEquals(2, store.query(ObjectQuery.builder().limit(2).build()).size());
         assertEquals(1, store.query(ObjectQuery.builder().limit(2).offset(2).build()).size(), "offset pages");
     }
+
+    @Test
+    void openOnlyKeepsUnclosedObjects() {
+        InMemoryObjectStore store = new InMemoryObjectStore();
+        OperationalObject open = obj(ObjectType.ALERT, "OPEN", 100);
+        OperationalObject closed = obj(ObjectType.ALERT, "OPEN", 200);
+        store.create(open);
+        store.create(closed);
+        store.update(closed.withStatus("RESOLVED", 300, true));
+        assertEquals(List.of(open.id()), store.query(ObjectQuery.builder().openOnly(true).build())
+                .stream().map(OperationalObject::id).toList());
+        assertEquals(2, store.query(ObjectQuery.builder().build()).size());
+    }
 }

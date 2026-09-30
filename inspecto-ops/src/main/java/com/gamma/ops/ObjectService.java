@@ -497,7 +497,7 @@ public final class ObjectService {
                     if (last) return false;
                     page = store.query(new ObjectQuery(filter.objectType(), filter.status(), filter.severity(),
                             filter.assignee(), filter.owner(), filter.correlationId(), filter.textContains(),
-                            ObjectQuery.MAX_LIMIT, offset, filter.closedBefore(), true));
+                            ObjectQuery.MAX_LIMIT, offset, filter.closedBefore(), true, filter.openOnly()));
                     index = 0;
                     offset += page.size();
                     last = page.size() < ObjectQuery.MAX_LIMIT;
@@ -519,7 +519,9 @@ public final class ObjectService {
     public List<OperationalObject> active(ObjectType type, String correlationId) {
         Workflow wf = workflow(type);
         List<OperationalObject> out = new ArrayList<>();   // every page, only the non-terminal ones kept
-        for (OperationalObject o : allMatching(ObjectQuery.builder().objectType(type).correlationId(correlationId).build()))
+        // openOnly pushes closed_at = 0 into the store; isTerminal still catches a state made terminal later.
+        for (OperationalObject o : allMatching(ObjectQuery.builder().objectType(type).correlationId(correlationId)
+                .openOnly(true).build()))
             if (!wf.isTerminal(o.status())) out.add(o);
         return out.reversed();   // newest-first, as before
 
@@ -981,7 +983,7 @@ public final class ObjectService {
     private String openCaseRaisedBy(String ruleName) {
         Workflow wf = workflow(ObjectType.CASE);
         String newest = null;   // oldest-first walk over every page, so the LAST hit is the newest, as before
-        for (OperationalObject c : allMatching(ObjectQuery.builder().objectType(ObjectType.CASE).build()))
+        for (OperationalObject c : allMatching(ObjectQuery.builder().objectType(ObjectType.CASE).openOnly(true).build()))
             if (ruleName.equals(c.attributes().get(ATTR_RAISED_BY_RULE)) && !wf.isTerminal(c.status())) newest = c.id();
         return newest;
     }

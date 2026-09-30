@@ -87,6 +87,32 @@ class ObjectServiceTest {
     }
 
     @Test
+    void activePushesOpenOnlyIntoTheStoreQuery() {
+        // A recording proxy: every query the service sends, and every row the store hands back.
+        InMemoryObjectStore real = new InMemoryObjectStore();
+        List<ObjectQuery> queries = new java.util.ArrayList<>();
+        List<Object> rowsRead = new java.util.ArrayList<>();
+        ObjectStore store = (ObjectStore) java.lang.reflect.Proxy.newProxyInstance(
+                ObjectStore.class.getClassLoader(), new Class<?>[]{ObjectStore.class}, (p, m, args) -> {
+                    Object r;
+                    try { r = m.invoke(real, args); }
+                    catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
+                    if (m.getName().equals("query")) { queries.add((ObjectQuery) args[0]); rowsRead.addAll((List<?>) r); }
+                    return r;
+                });
+        ObjectService svc = new ObjectService(store);
+        for (int i = 0; i < 3; i++)
+            svc.resolve(svc.open(ObjectType.ALERT, "t", "d", "INFO", "pipe", Map.of("rule", "r")).id(), null);
+        OperationalObject open = svc.open(ObjectType.ALERT, "t", "d", "INFO", "pipe", Map.of("rule", "r"));
+        queries.clear(); rowsRead.clear();
+
+        List<OperationalObject> active = svc.active(ObjectType.ALERT, "pipe");
+        assertEquals(List.of(open.id()), active.stream().map(OperationalObject::id).toList());
+        assertTrue(queries.stream().allMatch(ObjectQuery::openOnly), "open-only reaches the store");
+        assertEquals(1, rowsRead.size(), "the 3 resolved alerts are never read");
+    }
+
+    @Test
     void transitionToValidatesNeighbour() {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
         OperationalObject o = svc.open(ObjectType.ALERT, "t", "d", "INFO", null, Map.of());

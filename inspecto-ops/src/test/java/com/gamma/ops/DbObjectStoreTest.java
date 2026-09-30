@@ -77,6 +77,20 @@ class DbObjectStoreTest {
     }
 
     @Test
+    void openOnlyIsPushedIntoSql() {
+        OperationalObject open = alert("OPEN", 1000);
+        OperationalObject closed = alert("OPEN", 2000);
+        store.create(open);
+        store.create(closed);
+        store.update(closed.withStatus("RESOLVED", 3000, true));
+        List<OperationalObject> got = store.query(ObjectQuery.builder().openOnly(true).build());
+        assertEquals(List.of(open.id()), got.stream().map(OperationalObject::id).toList());
+        assertEquals(2, store.query(ObjectQuery.builder().build()).size(), "default: no constraint");
+        // The 11-arg shape still means "no open-only constraint".
+        assertFalse(new ObjectQuery(null, null, null, null, null, null, null, 10, 0, 0L, false).openOnly());
+    }
+
+    @Test
     void deleteRemovesAndRequiresExisting() {
         OperationalObject o = alert("OPEN", 1000);
         store.create(o);
