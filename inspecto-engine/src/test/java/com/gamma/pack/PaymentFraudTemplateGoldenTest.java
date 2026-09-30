@@ -156,6 +156,14 @@ class PaymentFraudTemplateGoldenTest {
             new String[]{"MERCHANT_ID", "12/28 4111 1111 1111 1111"},                             // expiry + PAN
             new String[]{"MERCHANT_ID", "card " + TEST_PAN + " 12/27"},
             new String[]{"MERCHANT_ID", "3782 822463 10005"},                                     // 4-6-5 (published Amex test)
+            new String[]{"MERCHANT_ID", "3530111333300000"},                                      // JCB 35 (published test)
+            new String[]{"MERCHANT_ID", "3566 0020 2036 0505"},                                   // JCB 35, grouped
+            new String[]{"MERCHANT_ID", "3056 930902 5904"},                                      // Diners 30, 4-6-4
+            new String[]{"MERCHANT_ID", "38520000023237"},                                        // Diners 38
+            new String[]{"MERCHANT_ID", "36227206271667"},                                        // Diners 36
+            new String[]{"MERCHANT_ID", "6759649826438453"},                                      // Maestro 67
+            new String[]{"MERCHANT_ID", "5018000000000009"},                                      // Maestro 50
+            new String[]{"MERCHANT_ID", "5610591081018250"},                                      // Maestro 56
             new String[]{"AMOUNT", TEST_PAN});                                                    // the numeric leak path
     /** True negatives: digit strings that are NOT card numbers — each must ingest. */
     private static final List<String[]> PASSES = List.of(
@@ -166,7 +174,9 @@ class PaymentFraudTemplateGoldenTest {
             new String[]{"MERCHANT_ID", "41111111111111111111"},
             new String[]{"MERCHANT_ID", "ORD-2026-482913-0071"},
             new String[]{"MERCHANT_ID", "1751328000123"},                                         // epoch ms
-            new String[]{"MERCHANT_ID", "356938035643809"},                                       // a Luhn-valid IMEI
+            new String[]{"MERCHANT_ID", "356938035643809"},                                       // a Luhn-valid IMEI (15 digits: no JCB length)
+            new String[]{"MERCHANT_ID", "DE89 3704 0044 0532 0130 00"},                           // an IBAN in 4-digit groups
+            new String[]{"MERCHANT_ID", "+49 1512 3456789"},                                      // E.164
             new String[]{"AMOUNT", "1234567.89"});
 
     private static String fold(String ascii, int zero) {
@@ -208,14 +218,15 @@ class PaymentFraudTemplateGoldenTest {
     }
 
     private static Path restricted(PipelineConfig pc) {
-        return Path.of(pc.dirs().quarantine()).toAbsolutePath().normalize().resolveSibling("restricted-quarantine");
+        return Path.of(pc.dirs().quarantine()).toAbsolutePath().normalize().resolve(".restricted");
     }
 
     /** The refused file sits ONLY in the restricted quarantine, and nothing anywhere names the value. */
     private static void assertRestricted(PipelineConfig pc, String what, int files) throws Exception {
         assertEquals(files, count(restricted(pc)), what + ": the file is in the restricted quarantine");
         for (String kept : new String[]{pc.dirs().quarantine(), pc.dirs().errors(), pc.dirs().temp()})
-            assertEquals(0, count(Path.of(kept)), what + ": no copy of the file is kept in " + kept);
+            assertEquals(0, count(Path.of(kept)) - (kept.equals(pc.dirs().quarantine()) ? count(restricted(pc)) : 0),
+                    what + ": no copy of the file is kept in " + kept + " (outside .restricted)");
         if (Files.isDirectory(Path.of(pc.dirs().backup())))   // a clean batch-mate is backed up; the refused file never
             try (Stream<Path> b = Files.walk(Path.of(pc.dirs().backup()))) {
                 for (Path f : b.filter(Files::isRegularFile).toList())
@@ -280,7 +291,7 @@ class PaymentFraudTemplateGoldenTest {
     }
 
     @Test
-    void aChunkedFileIsRolledBackAndRestricted(@TempDir Path tmp) throws Exception {
+    void aChunkedFileIsScannedWholeAndRestricted(@TempDir Path tmp) throws Exception {
         StringBuilder body = new StringBuilder(HEADER).append('\n');
         for (int k = 0; k < 40; k++) body.append(CLEAN_ROW.replace("pa_x1", "pa_c" + k)).append('\n');
         body.append(row("INSTRUMENT_TOKEN", TEST_PAN)).append('\n');
@@ -288,8 +299,44 @@ class PaymentFraudTemplateGoldenTest {
                         "  chunking:\n    max_file_bytes: 1000\n    target_chunk_bytes: 1000\n"),
                 Map.of("PAYMENT_ATTEMPTS_20260704.csv", body.toString()));
         assertTrue(pc.chunking().appliesTo(body.length()), "the premise: this file is chunked");
-        assertEquals(0, count(Path.of(pc.dirs().database())), "the chunks written before the refusal are rolled back");
+        assertEquals(0, count(Path.of(pc.dirs().database())), "nothing of the file landed");
         assertRestricted(pc, "chunked", 1);
+    }
+
+    /** An AUTHOR-raised refusal in a later chunk: the chunks written before it are rolled back. */
+    @Test
+    void anAuthorRefusalInALaterChunkRollsTheEarlierChunksBack(@TempDir Path tmp) throws Exception {
+        StringBuilder body = new StringBuilder(HEADER).append('\n');
+        for (int k = 0; k < 40; k++) body.append(CLEAN_ROW.replace("pa_x1", "pa_c" + k)).append('\n');
+        body.append(row("MERCHANT_ID", "refuse_me")).append('\n');
+        Path space = copyTemplate(tmp);
+        Path schema = space.resolve("config/payment_attempts/payment_attempts_schema.toon");
+        Files.writeString(schema, Files.readString(schema).replace("    - name: MERCHANT_ID\n      from: MERCHANT_ID\n      fn: keep",
+                "    - name: MERCHANT_ID\n      from: \"\"\n      fn: custom\n      args:\n        expression: \"CASE WHEN "
+                        + "MERCHANT_ID = 'refuse_me' THEN error('INGEST_REFUSE:TEST_REFUSAL') ELSE MERCHANT_ID END\""));
+        Path toon = space.resolve("config/payment_attempts/payment_attempts_pipeline.toon");
+        Files.writeString(toon, Files.readString(toon).replace("  reject_mode: all_or_nothing\n",
+                "  chunking:\n    max_file_bytes: 1000\n    target_chunk_bytes: 1000\n"));
+        PipelineConfig pc = PipelineConfig.load(toon.toString());
+        Path inbox = Files.createDirectories(Path.of(pc.dirs().poll()));
+        Files.writeString(inbox.resolve("PAYMENT_ATTEMPTS_20260704.csv"), body.toString());
+        CollectorProcessor.run(pc);
+        assertEquals(0, count(Path.of(pc.dirs().database())), "the chunks written before the refusal are rolled back");
+        assertEquals(1, count(restricted(pc)));
+        assertTrue(Files.readString(Path.of(pc.dirs().statusFilePath())).contains("INGEST_REFUSE:TEST_REFUSAL"));
+    }
+
+    @Test
+    void anExemptColumnIsNotScanned(@TempDir Path tmp) throws Exception {
+        String file = HEADER + "\n" + CLEAN_ROW + "\n" + row("MERCHANT_ID", TEST_PAN) + "\n";
+        PipelineConfig exempt = run(tmp.resolve("x"), t -> t.replace("  refusal_scan: card_number\n",
+                "  refusal_scan: card_number\n  refusal_scan_exempt[1]: MERCHANT_ID\n"), Map.of("PAYMENT_ATTEMPTS_20260704.csv", file));
+        assertEquals(List.of("MERCHANT_ID"), exempt.refusal().scanExempt(), "the premise: the key parsed");
+        assertEquals(2L, scalar(Path.of(exempt.dirs().database()).getParent().getParent(), "payment_attempts/database",
+                "SELECT count(*) FROM \"s\""), "an exempt column is the operator's call: the file lands");
+        assertEquals(0, count(restricted(exempt)));
+        PipelineConfig scanned = run(tmp.resolve("y"), t -> t, Map.of("PAYMENT_ATTEMPTS_20260704.csv", file));
+        assertRestricted(scanned, "not exempt", 1);
     }
 
     @Test

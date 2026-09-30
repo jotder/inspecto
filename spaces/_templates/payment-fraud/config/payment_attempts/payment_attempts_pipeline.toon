@@ -22,6 +22,7 @@ processing:
   reject_mode: all_or_nothing
   refusal: restricted_quarantine
   refusal_retention_days: 30
+  refusal_scan: card_number
   duplicate_check:
     enabled: true
     marker_extension: .processed
