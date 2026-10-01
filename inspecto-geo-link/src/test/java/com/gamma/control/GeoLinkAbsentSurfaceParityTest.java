@@ -15,7 +15,8 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * {@code AbsentGeoLinkRoutes.SURFACE} must list EXACTLY the routes this module registers — both directions.
+ * {@code AbsentGeoLinkRoutes.SURFACE} must list EXACTLY the Link Analysis routes registered by {@code inspecto-la-api} and this
+ * bridge together (the union, read off the live route table) — both directions.
  *
  * <p><b>Why this test exists.</b> The core cannot see this module's classes (it declares no dependency on it,
  * deliberately: {@code inspecto-geo-link} is an optional edition module and Personal must not ship it). So the

@@ -26,7 +26,7 @@ Assembly mechanisms:
   that survives because it appears to work.
 * **An optional Maven module** — the primary mechanism, and as of 2026-09-08 there are **ten**:
   `inspecto-security` (OIDC/Nimbus, role mapping, token relay — see [auth & security](auth-security.md)),
-  `inspecto-policy` (Enterprise ABAC), `inspecto-entity-list` (SEP-08, 2026-10-01 — Entity Lists and the shared entity fact log; `inspecto-geo-link` depends on it; bundled wherever geo-link is), and the **seven** EDG-01 modules (this said “five” before 2026-09-09 while listing seven) `inspecto-notify-channels`,
+  `inspecto-policy` (Enterprise ABAC), `inspecto-entity-list` (SEP-08, 2026-10-01 — Entity Lists and the shared entity fact log; `inspecto-geo-link` depends on it; bundled wherever geo-link is), `inspecto-la-core` + `inspecto-la-api` (D-1 step 5b, 2026-10-01 — the host-free Link Analysis model/ports and the Link Analysis routes written against them; bundled wherever geo-link is; `inspecto-geo-link` is now the **bridge** that implements their `DatasetProvider` and `CasePort` ports from the engine and the host and holds the Alert Rule routes), and the **seven** EDG-01 modules (this said “five” before 2026-09-09 while listing seven) `inspecto-notify-channels`,
   `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`, `inspecto-metrics`, `inspecto-events`, `inspecto-ops`.
   Each joins the reactor only under `edition-professional`/`edition-enterprise`, so Personal never even
   compiles it.

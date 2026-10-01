@@ -46,7 +46,7 @@ storage. Option B (§3) is superseded as a target by D; its ports become D's ste
   helpers (6).
 - **Deep, concrete (the real coupling):** LA reads Datasets by constructing core storage classes directly —
   `new ComponentStore(writeRoot.resolve("registry"))`, `ViewStore`, `DatasetRelation.relationSql(...)`,
-  `QueryExecutor` (e.g. `inspecto-geo-link/src/main/java/com/gamma/geolink/InvRoutes.java` ~l.265–275).
+  `QueryExecutor` (e.g. `inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` ~l.265–275).
   "Drop the jar beside `inspecto.jar`" works **only because it is the same JVM**. A remote LA needs a real
   Dataset query API, which does not exist.
 - **Moderate:** `WriteGates.requireWriteRoot`, `ComponentAccess.canView`, `LinkAnalysisSettings.forRoot`,
@@ -272,8 +272,8 @@ LA uses them yet). Move Entity Lists to core so assurance works without LA, or k
   The projection is capped at 500 nodes **before** any centrality runs, and the analysis cap (2 000) throws
   ([`link-analysis-backlog-plan.md`](../archived-documents/plans-archive/link-analysis-backlog-plan.md) §1). The server-side exceptions so far are
   traversal, the hop ladder and the branching pattern
-  (`inspecto-geo-link/src/main/java/com/gamma/geolink/PatternQueryCompiler.java`,
-  `inspecto-geo-link/src/main/java/com/gamma/geolink/BranchingPatternEngine.java`).
+  (`inspecto-la-core/src/main/java/com/gamma/la/core/PatternQueryCompiler.java`,
+  `inspecto-la-core/src/main/java/com/gamma/la/core/BranchingPatternEngine.java`).
 - **Every read is an aggregation over a Dataset at request time** (`GROUP BY` fold, no persisted graph).
   Fine at demo scale; the wrong shape for multi-hop over billions of rows.
 - **The module cannot leave the core** (§1.1, §1.4): 17 of 21 classes use request types in
@@ -384,7 +384,7 @@ the database.
 #### 7.7.1 What already exists (grounded 2026-09-27)
 
 - The Investigation is an ordered, replayable op log (`seed` · `expand` · `exclude` · `hide` · `keep` …) that
-  evaluates to a Working Set (`inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationEvaluator.java`).
+  evaluates to a Working Set (`inspecto-la-core/src/main/java/com/gamma/la/core/InvestigationEvaluator.java`).
 - **Forks exist**: `POST /inv/investigations/{id}/reorder` makes a new Investigation naming its parent,
   re-applies the ops and seals a fresh read; the fork is assembled off to the side and moved in with one rename.
 - **Entity Lists are pinnable**: `GET /entity-lists/{id}?at=<seq>` returns `{atSeq, headHash}`, a

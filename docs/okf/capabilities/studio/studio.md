@@ -691,7 +691,7 @@ protocol for a future customer archive, and **no code in the tree references it 
 place-table Geocoder sits behind a pluggable seam.
 
 **Data plane.** A **GeoSource** projects Dataset rows to GeoPoints (lat/lon column mapping) or to
-weighted great-circle **od-routes**. Server side (`inspecto-geo-link/src/main/java/com/gamma/geolink/GeoRoutes.java`):
+weighted great-circle **od-routes**. Server side (`inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java`):
 `POST /geo/projection` filters valid WGS84 coordinates with `TRY_CAST` and reports a `skipped` count;
 `POST /geo/routes` folds origin/destination/kind with a summed `weight`. **Plain SQL only** — no `ST_*`
 call exists anywhere in the tree. The client cap is `GEO_POINT_CAP = 5000` on both paths.
@@ -725,8 +725,9 @@ list, and no `features.*` flag governs the Query Library, Viz Library, Dashboard
 Gallery or KPI gallery. `EDITIONS` `CP-08` is ✅ in all three editions and is correct.
 
 **The two investigation studios are Professional+** (`CP-09`, EDG-01 cell 3b, 2026-09-07).
-`inspecto-geo-link` contributes `GeoRoutes` and `InvRoutes` through the public `RouteModule`
-ServiceLoader seam (`inspecto-geo-link/src/main/resources/META-INF/services/com.gamma.control.RouteModule`).
+`inspecto-la-api` contributes `GeoRoutes` and `InvRoutes` (and the rest of the Link Analysis routes) through the public `RouteModule`
+ServiceLoader seam (`inspecto-la-api/src/main/resources/META-INF/services/com.gamma.control.RouteModule`); `inspecto-geo-link` is the
+bridge (it binds the Dataset and Case ports and holds the Alert Rule routes).
 Absent the module, core `AbsentGeoLinkRoutes` claims the five paths and answers `503` naming what is not
 installed. The SPA reads `bootstrap.features.geoLink` into a session signal and **hides** the two nav
 entries and the Menu-Builder offer.
@@ -905,9 +906,9 @@ query failure. Pinned by `NoGeoLinkShipsInThePersonalBuildTest`.
 | Dashboards | `inspecto-ui/src/app/modules/admin/studio/dashboards/dashboard-types.ts`, `dashboard-editor.component.ts`, `dashboard-filter-bar.component.ts`, `dashboard-drill-drawer.component.ts` | [`dashboard.md`](../../frontend/features/dashboard.md) |
 | KPIs, Reports, delivery | `inspecto-ui/src/app/modules/admin/kpi-reports/kpi-reports.component.ts`; `inspecto-engine/src/main/java/com/gamma/job/ReportJob.java`, `TablePngRenderer.java`, `PdfRenderer.java` | [`kpi-reports.md`](../../frontend/features/kpi-reports.md) |
 | Measure alerting | `inspecto-engine/src/main/java/com/gamma/alert/AlertRule.java`, `AlertService.java`; `inspecto-engine/src/main/java/com/gamma/query/DatasetMeasureProbe.java`; `spaces/demo/config/registry/alert-rules/orders_low_volume.toon` | `INC` §3 (the Alert object) |
-| Link Analysis | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvRoutes.java`; `inspecto-ui/src/app/inspecto/api/inv.service.ts`; `inspecto-ui/src/app/inspecto/graph/graph-analysis.ts`, `graph-source.ts`, `graph-export.ts`, `graph-history.ts` (pure libs); `inspecto-ui/src/app/inspecto/graph/graph-view.component.ts` (**the host component + `GRAPH_LAYOUTS`**); `inspecto-ui/src/app/modules/admin/studio/link-analysis/entity-projection.ts`, `graph-sources.ts`, `pattern-packs.ts`, `link-analysis-toolbox.component.ts`, `link-view-widget.component.ts` | [`link-analysis.md`](../../frontend/features/link-analysis.md) |
-| Geo Map Analysis | `inspecto-geo-link/src/main/java/com/gamma/geolink/GeoRoutes.java`; `inspecto-ui/src/app/inspecto/api/geo.service.ts`; `inspecto-ui/src/app/modules/admin/studio/geo-map/geo-projection.ts`, `geo-map.component.ts`, `geo-view-widget.component.ts`, `colocation-graph.dialog.ts` | [`geo-map.md`](../../frontend/features/geo-map.md) |
-| Edition gate | `inspecto/src/main/java/com/gamma/control/AbsentGeoLinkRoutes.java`, `ApiContext.java`, `BootstrapRoutes.java`; `inspecto-geo-link/src/main/resources/META-INF/services/com.gamma.control.RouteModule`; `inspecto-ui/src/app/inspecto/api/session.service.ts` | `EDITIONS.md` `CP-09`; `PKG` |
+| Link Analysis | `inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java`; `inspecto-ui/src/app/inspecto/api/inv.service.ts`; `inspecto-ui/src/app/inspecto/graph/graph-analysis.ts`, `graph-source.ts`, `graph-export.ts`, `graph-history.ts` (pure libs); `inspecto-ui/src/app/inspecto/graph/graph-view.component.ts` (**the host component + `GRAPH_LAYOUTS`**); `inspecto-ui/src/app/modules/admin/studio/link-analysis/entity-projection.ts`, `graph-sources.ts`, `pattern-packs.ts`, `link-analysis-toolbox.component.ts`, `link-view-widget.component.ts` | [`link-analysis.md`](../../frontend/features/link-analysis.md) |
+| Geo Map Analysis | `inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java`; `inspecto-ui/src/app/inspecto/api/geo.service.ts`; `inspecto-ui/src/app/modules/admin/studio/geo-map/geo-projection.ts`, `geo-map.component.ts`, `geo-view-widget.component.ts`, `colocation-graph.dialog.ts` | [`geo-map.md`](../../frontend/features/geo-map.md) |
+| Edition gate | `inspecto/src/main/java/com/gamma/control/AbsentGeoLinkRoutes.java`, `ApiContext.java`, `BootstrapRoutes.java`; `inspecto-la-api/src/main/resources/META-INF/services/com.gamma.control.RouteModule`; `inspecto-ui/src/app/inspecto/api/session.service.ts` | `EDITIONS.md` `CP-09`; `PKG` |
 | Saved-view + widget kinds | `inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java` (`WRITABLE_TYPES`); `spaces/demo/config/registry/` | `MET` §3 |
 | Cases (**`INC`'s**) | `inspecto-engine/src/main/java/com/gamma/objects/ObjectType.java`; `inspecto-ops/src/main/java/com/gamma/ops/ObjectService.java`; `inspecto-ui/src/app/modules/admin/objects/cases.routes.ts` | [`incidents/incidents.md`](../incidents/incidents.md) |
 

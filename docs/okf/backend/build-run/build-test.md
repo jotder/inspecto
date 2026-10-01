@@ -191,7 +191,7 @@ doc since 2026-09-08 and **did not prevent either occurrence** — which is why 
 
 ```
 mvn -o clean test -Pedition-enterprise -B > build.log 2>&1     # -B, NEVER -q
-node tools/check-reactor-verdict.mjs build.log --expect-modules 39   # 38 until D-1 step 5a added inspecto-entity-store; 33 until D-1 (2026-10-01) added inspecto-audit-spi, -la-graph, -auth-spi, -http-spi; 37 until SEP-08 added inspecto-entity-list
+node tools/check-reactor-verdict.mjs build.log --expect-modules 41   # 39 until D-1 step 5b added inspecto-la-core and inspecto-la-api; 38 until D-1 step 5a added inspecto-entity-store; 33 until D-1 (2026-10-01) added inspecto-audit-spi, -la-graph, -auth-spi, -http-spi; 37 until SEP-08 added inspecto-entity-list
 ```
 
 Reproduced deliberately on 2026-09-16 with the real toolchain (Maven 3.9.16 / surefire 3.2.5). Three

@@ -79,9 +79,43 @@ a derived guard, not a hand-kept list; mutation-check it by adding a banned depe
 | **2** | **`inspecto-audit-spi`.** Move `Event` `EventLog` `EventType` (+ the 59 `LINK_*` constants stay for now); `inspecto-event` and `inspecto-processor` depend on it; `ParquetEventStore` stays in `inspecto-event` | `inspecto-audit-spi`'s dependency tree has no `inspecto-etl`; `inspecto-event` and the audit tests green |
 | **3** | ✅ **BUILT 2026-10-01 as two modules, `inspecto-http-spi` → `inspecto-auth-spi` (Decision 6).** Plan as written was: Split `ApiContext`; add `HostContext`; move the ~22 classes (the 23 in `inspecto` minus `EntityTypes`, which is LA's); fix the ~40 importing files in `-ops` `-events` `-exchange` `-metrics` `-policy` `-security` `-demo-auth` `-geo-link`. **Keep the package name `com.gamma.control`** (Decision 2) | The affected modules' unit tests; `openapi-v1.json` unchanged (a route table must not move); `AbsentGeoLinkRoutes` parity test green |
 | **4** | ✅ **BUILT 2026-10-01.** `inspecto-security` no longer depends on `inspecto-processor` at all (test scope only — one test boots a real `CollectorService`). `OidcAuthenticator` alone closed over auth-spi classes; the OTHER four classes of the module needed four more small, host-free types, so they moved into `inspecto-auth-spi` too (packages unchanged, Decision 2): `TokenRelay` (from `inspecto`), `EgressPolicy` (from `inspecto-engine`, plain JDK), `SecretResolver` + `SecretsProvider` (from `inspecto-acquire`); `inspecto-acquire` now depends on auth-spi. `AccessGrants` was already in auth-spi. Planned as: `OidcAuthenticator` depends on `inspecto-auth-spi`, not `inspecto-processor` (ground `AccessGrants` first — it is not in the 20-class closure) | `inspecto-security` tests with a Subject attached; ⚠ a `Roles.SEED` change needs `inspecto-security` tests (project gotcha) |
-| **5** | **`la-core` / `la-api` out of `inspecto-geo-link`.** What remains in `inspecto-geo-link` is the bridge. Move `EntityTypes`, `LinkAnalysisSettings` and the LA event-type constants into `la-core` | Dependency rule green (mutation-checked); `ControlApiInv*` real-HTTP tests green |
-| **6** | **Ports + bridge.** Introduce `DatasetProvider`, `CasePort`, `AlertPort`; `la-inspecto` implements them from `DatasetRead`, `ObjectAccess`, `AlertService`; `AnnotationTargets`, `PendingChanges` and the Alert-Rule-bound Investigation code move behind it | LA real-HTTP tests green with all three ports bound **and** with each port unbound (feature reports absent, 503/capability off — never a stack trace) |
+| **5** | ✅ **BUILT 2026-10-01 (5a `7180a18c3` entity store; 5b with step 6, see "As built" below).** **`la-core` / `la-api` out of `inspecto-geo-link`.** What remains in `inspecto-geo-link` is the bridge. Move `EntityTypes`, `LinkAnalysisSettings` and the LA event-type constants into `la-core` | Dependency rule green (mutation-checked); `ControlApiInv*` real-HTTP tests green |
+| **6** | ✅ **BUILT 2026-10-01, together with 5b — with two ports, not three (see "As built").** **Ports + bridge.** Introduce `DatasetProvider`, `CasePort`, `AlertPort`; `la-inspecto` implements them from `DatasetRead`, `ObjectAccess`, `AlertService`; `AnnotationTargets`, `PendingChanges` and the Alert-Rule-bound Investigation code move behind it | LA real-HTTP tests green with all three ports bound **and** with each port unbound (feature reports absent, 503/capability off — never a stack trace) |
 | **7** | **Reactor gate.** One full `mvn -o clean test -Pedition-enterprise` plus UI lint/test/build, in a clean worktree at HEAD | Operator-asked GAUNTLET; not once per step |
+
+> **As built — steps 5b + 6 (2026-10-01, one lane, three commits).** Link Analysis stands on the platform without the core.
+> `inspecto-la-core` (package `com.gamma.la.core`): `AdmiraltyGrade` `BranchingPatternEngine` `InvestigationEvaluator` `InvestigationTime`
+> `LinkIds` `PatternQueryCompiler` `SnapshotStore` + the ports `DatasetProvider` / `DatasetProviders` and `CasePort` / `CasePorts`.
+> `inspecto-la-api` (`com.gamma.la.api`): `GeoRoutes` `InvRoutes` `PatternRoutes` `ValueMeasureRoutes` `InvestigationRoutes` `DossierRoutes`
+> `WorkingSetRoutes` `InvestigationTemplateRoutes` `InvestigationCoverageRoutes` `InvestigationCaseRoutes` `EntityIdentityRoutes` +
+> `EntityMasking` `GraphDossierBuilder` `ValueMeasures`. `inspecto-geo-link` (`com.gamma.geolink`) is the **bridge**: `EngineDatasetProvider`,
+> `HostCasePort`, and the Alert-Rule-bound `InvestigationMeasureRoutes` + `WorkingSetMeasures`; artifactId and bundle name unchanged.
+> Routes, URLs and `openapi-v1.json` are unchanged. Both new modules are in the four edition profiles, staged as optional jars
+> (`tools/bundle-modules.mjs`, `package.ps1`), and governed: `tools/check-module-deps.mjs` + a matching enforcer rule in each pom,
+> mutation-checked (adding `inspecto-engine` to `inspecto-la-api` turns BOTH layers red).
+>
+> **What changed from the plan, and why.**
+> * **Two ports, not three.** `AlertPort` was not built: the Alert-Rule code (`InvestigationMeasureRoutes`, `WorkingSetMeasures` — it implements the
+>   ENGINE SPI `InvestigationMeasureProbe`) is bridge code by nature and stays in `inspecto-geo-link`, which depends on `la-api`/`la-core` (the correct
+>   direction). Nothing in `la-*` calls the Alert service, so there is nothing to put behind a port.
+> * **`InvestigationCaseRoutes` moved to `la-api` whole**, not split. The host-bound part is exactly two reads — the Case summary and "may the caller
+>   see it" — so `CasePort` is `available(api)` / `summary(api, ref)` / `visibleTo(ex, summary)` and the Case rules (kind, closed, owner/assignee) stay
+>   with the routes. Unbound or without ops installed = the existing "ops not installed" behaviour (a link is stored unverified and grants nothing).
+> * **`DatasetProvider`** = `dataset` / `datasets` / `relationSql` / `run` ×3 / `runPlanned` / `predicate`, with LA-owned `Request` `Result` `Column` `Sort`
+>   `Entry` `Planner` records. Unbound = `503 CAPABILITY_UNAVAILABLE` from `DatasetProviders.require()`. `SpiSlot` was made `public` (class, constructors,
+>   `active`, `forTest`) so the ports can use it; both `*Ports` gained `forTestAbsent` so the bridge's own tests can prove the unbound path with the bridge on the classpath.
+> * **`GraphDossierBuilder`, `ValueMeasures`, `EntityMasking` live in `la-api`, not `la-core`:** each calls static helpers of a route class
+>   (`InvestigationRoutes.listClause`…, `InvRoutes.relationColumns`) and `EntityMasking` is route-side masking. Pulling those helpers down would have been a
+>   refactor of 1900-line `InvestigationRoutes`; the dependency rule is satisfied either way.
+> * **`EntityListRoutes`' host-free statics** (`read` `append` `reason` `type` `masked` `LIST_ID`) moved to `inspecto-entity-store` as `EntityListFacts`, because
+>   LA may not depend on `inspecto-entity-list`.
+> * **Allowlists.** `la-core`: api, util, config, audit-spi, auth-spi, **http-spi** (reached through `entity-store` whether named or not), entity-store, **sql**
+>   (`SqlGuard` / `SqlSandboxPolicy` — host-free: it reaches only api, config, util). `la-api` adds `la-core`.
+> * **Not done:** Decision 3's move of the 59 `LINK_*` event-type constants out of `inspecto-audit-spi` (still owed; nothing outside `la-*` / the bridge uses them).
+>   `PendingChanges` stays host-side with the Alert Rule route.
+> * **Tests.** `LaApiPortsTest` (6, a proxy `ApiContext` + a fake `DatasetProvider`, asserts the engine is not on the classpath), `ControlApiLaPortsBridgeTest` (4:
+>   ServiceLoader binding, adapter contract against `DatasetRead`/`QueryExecutor`/`ConditionSql`, each port unbound over real HTTP). The 261 pre-existing tests of
+>   the old module are all present: 252 in the bridge, 5 in `la-core` (`LinkIdsTest` `SnapshotStoreTest`), 4 in `la-api` (`InvRoutesTraversalPolicyTest`).
 
 Steps 1 and 2 are independent and can run in parallel lanes; 3 precedes 4–6; 5 and 6 can split by file set.
 **Size:** step 1 S · 2 S · 3 M · 4 S · 5 M · 6 M. Total **M–L**, down from the feasibility plan's L.
