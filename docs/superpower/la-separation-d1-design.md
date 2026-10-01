@@ -20,12 +20,14 @@ than the import counts suggested:
 
 | Finding (2026-10-01) | Consequence |
 |---|---|
-| The HTTP + auth contract (`ApiContext` `ApiException` `ErrorCodes` `RouteModule` `Subject` `RowScope` `ComponentAccess` `WriteGates` `EntityTypes`) closes over **20 classes** once `ApiContext`'s host hooks are cut: 14 in `inspecto`, 4 in `inspecto-util`, 1 each in `inspecto-config` / `inspecto-api`. With the hooks left in, the same closure is **248 classes** across nine modules | The whole problem is one interface. `ApiContext.service()` (`CollectorService`) and `ApiContext.spaces()` (`SpaceManager`) are the **only** edges from the contract into the core |
+| The HTTP + auth contract (`ApiContext` `ApiException` `ErrorCodes` `RouteModule` `Subject` `RowScope` `ComponentAccess` `WriteGates` `EntityTypes`) closes over **46 classes** once `ApiContext`'s host hooks are cut: 23 in `inspecto` (the 9 seeds plus `AccessDecider(s)` `AccessPolicies` `AuditTrail` `Authenticator(s)` `CapabilityManifest` `Envelope` `GeoCountryResolver(s)` `Handler` `Idempotency` `Roles` `SpiSlot`), 11 in `inspecto-audit-spi` (already extracted), 7 in `inspecto-util`, 4 in `inspecto-config`, 1 in `inspecto-api`. With the hooks left in, the same closure is **503 classes** | The whole problem is one interface: `ApiContext` is the **only** class in the cluster that touches the host (`CollectorService`, `SpaceManager`, `SseStreams`) |
 | LA uses those hooks **five times**: `service().objects()` ×4 (Cases) and `service().alertService()` ×1 | Both are bridge jobs (Cases, Alert Rules); `la-core` never needs them |
-| `inspecto-event` → `inspecto-etl` is **one edge**: `ParquetEventStore` → `PartitionWriter`. The audit trio `Event` `EventLog` `EventType` closes over **13 classes** (10 event + 3 util) with no ETL | The audit SPI is a move, not a rewrite — and `inspecto-event` can keep `ParquetEventStore` untouched |
+| `inspecto-event` → `inspecto-etl` is **one edge**: `ParquetEventStore` → `PartitionWriter`. The audit trio `Event` `EventLog` `EventType` closed over 11 classes in `inspecto-event` plus 3 util with no ETL (`EventLog` ↔ `MetricRegistry` call each other, so both moved — shipped as step 2, `09a94ab56`) | The audit SPI is a move, not a rewrite — and `inspecto-event` can keep `ParquetEventStore` untouched |
 | `EventType` is a `final class` of constants (not an enum) and nothing outside `inspecto-event` calls `values()` / `valueOf()`; **59 `LINK_*` constants** live in core | LA's event types can leave core with no behaviour change |
-| `DatasetRead` closes over **17 classes** (sql 2, engine 7, util 3, config 4, api 1); `QueryExecutor` over 9, one of them in `inspecto-etl` (`DuckDbExtension`) | The Dataset-read port is already small and already extracted (SEP-01); the bridge implements it |
-| `Authenticator` closes over **4 classes** (itself, `Subject`, `ApiContext`, `PublicApi`); `OidcAuthenticator` adds `AccessGrants` and `Roles` | Moving OIDC (D12) is cheap once the auth contract is out |
+| `DatasetRead` closes over **54 classes** (engine 21, audit-spi 11, util 10, config 7, sql 4, api 1); `QueryExecutor` over 10, one of them in `inspecto-etl` (`DuckDbExtension`) | The Dataset-read port is already extracted (SEP-01) but is a real slice of the engine, not a small one; the bridge implements it and LA never imports it |
+| `Authenticator` closes over **23 classes** with the host hooks cut (493 with them in); `OidcAuthenticator` over **26** (15 in `inspecto`) | Moving OIDC (D12) is cheap once the contract is out — it adds only `AccessGrants` and the `inspecto-security` classes |
+| 🔴 **The HTTP half and the auth half are mutually dependent.** `ApiContext` references `Authenticator`, `ComponentAccess`, `Roles` and `Subject`; `Subject`, `Roles`, `ComponentAccess`, `RowScope`, `AccessDecider`, `AccessPolicies` and `AuditTrail` reference `ApiContext` back | Two modules `inspecto-http-spi` + `inspecto-auth-spi` are **impossible** (a Maven cycle). The contract must be ONE module (Decision 6) or `ApiContext` must stop naming auth types, which is a larger redesign |
+| `PendingChanges` (LA uses it in one file) is a **host** class: it references `ControlApi`, `JobRoutes`, `ApprovalPolicy`, `AccessGrants` and `ContentHash`. `AnnotationTargets` references engine classes plus `RowScope` | Neither can move into the SPI; LA's use of both goes behind a port in the bridge |
 | The **graph algorithms** (`GraphAlgorithms`, `GraphPaths`, `GraphStructure`, `GraphCentrality`, `GraphIterative`, `GraphSuspicion`) import **nothing** from the platform — plain JDK | `la-graph` can be carved out **first**, before any SPI exists |
 | Outside `inspecto`, the contract is imported by `inspecto-geo-link` (most), `-ops`, `-events`, `-exchange`, `-metrics`, plus `Subject` / `ComponentAccess` in `-policy`, `-security`, `-demo-auth` | Every optional module is touched by the `ApiContext` split; the edit per file is one import or one cast |
 
@@ -66,7 +68,7 @@ a derived guard, not a hand-kept list; mutation-check it by adding a banned depe
 |---|---|---|
 | **1** | **`la-graph`.** Move the six `Graph*` classes and their five parity tests (the fixtures stay where the TS specs read them) into a new module | The parity classes green from the new module; `mvn dependency:tree` for it shows the JDK only; `inspecto-geo-link` depends on it |
 | **2** | **`inspecto-audit-spi`.** Move `Event` `EventLog` `EventType` (+ the 59 `LINK_*` constants stay for now); `inspecto-event` and `inspecto-processor` depend on it; `ParquetEventStore` stays in `inspecto-event` | `inspecto-audit-spi`'s dependency tree has no `inspecto-etl`; `inspecto-event` and the audit tests green |
-| **3** | **`inspecto-http-spi` + `inspecto-auth-spi`.** Split `ApiContext`; add `HostContext`; move the 14 classes; fix the ~40 importing files in `-ops` `-events` `-exchange` `-metrics` `-policy` `-security` `-demo-auth` `-geo-link`. **Keep the package name `com.gamma.control`** (Decision 2) | The affected modules' unit tests; `openapi-v1.json` unchanged (a route table must not move); `AbsentGeoLinkRoutes` parity test green |
+| **3** | **ONE control-contract module (name and shape: Decision 6 — the two-module layout in §2 cannot be built, see §1).** Split `ApiContext`; add `HostContext`; move the ~22 classes (the 23 in `inspecto` minus `EntityTypes`, which is LA's); fix the ~40 importing files in `-ops` `-events` `-exchange` `-metrics` `-policy` `-security` `-demo-auth` `-geo-link`. **Keep the package name `com.gamma.control`** (Decision 2) | The affected modules' unit tests; `openapi-v1.json` unchanged (a route table must not move); `AbsentGeoLinkRoutes` parity test green |
 | **4** | **Move OIDC.** `OidcAuthenticator` depends on `inspecto-auth-spi`, not `inspecto-processor` (ground `AccessGrants` first — it is not in the 20-class closure) | `inspecto-security` tests with a Subject attached; ⚠ a `Roles.SEED` change needs `inspecto-security` tests (project gotcha) |
 | **5** | **`la-core` / `la-api` out of `inspecto-geo-link`.** What remains in `inspecto-geo-link` is the bridge. Move `EntityTypes`, `LinkAnalysisSettings` and the LA event-type constants into `la-core` | Dependency rule green (mutation-checked); `ControlApiInv*` real-HTTP tests green |
 | **6** | **Ports + bridge.** Introduce `DatasetProvider`, `CasePort`, `AlertPort`; `la-inspecto` implements them from `DatasetRead`, `ObjectAccess`, `AlertService`; `AnnotationTargets`, `PendingChanges` and the Alert-Rule-bound Investigation code move behind it | LA real-HTTP tests green with all three ports bound **and** with each port unbound (feature reports absent, 503/capability off — never a stack trace) |
@@ -74,6 +76,13 @@ a derived guard, not a hand-kept list; mutation-check it by adding a banned depe
 
 Steps 1 and 2 are independent and can run in parallel lanes; 3 precedes 4–6; 5 and 6 can split by file set.
 **Size:** step 1 S · 2 S · 3 M · 4 S · 5 M · 6 M. Total **M–L**, down from the feasibility plan's L.
+
+> **Correction (2026-10-01, step-3 re-grounding).** The first version of §1 used a closure script whose comment stripper
+> treated a `/*` inside a string literal as the start of a block comment, so it silently dropped real references: it said
+> 20 / 248 / 17 / 4 classes where the corrected figures are 46 / 503 / 54 / 23. The conclusions that survive are the central ones —
+> `ApiContext` is the single host-touching class, and the LA ↔ host coupling is five calls — but the layout changed:
+> the HTTP and auth contracts are cyclic, so §2's two SPI modules become one (Decision 6). Re-ground with a string-aware
+> tokenizer, never a regex over raw source.
 
 ## 4. Risks
 
@@ -123,6 +132,15 @@ test under `tools/`?
 *Recommendation:* both — the enforcer fails fast at build time, the tool test is mutation-checkable in CI like the repo's
 other derived guards.
 **Answer:** both — `maven-enforcer` banned-dependency rules plus a dependency-tree test under `tools/`, mutation-checked. — operator 2026-10-01
+
+**Decision 6 — One module for the HTTP + auth contract (supersedes the two-module layout in §2).** The grounding in §1 shows
+`ApiContext` and the auth types depend on each other, so they cannot be separate Maven modules. Options: (a) one module named
+for what it holds — `inspecto-control-spi` (package `com.gamma.control` is kept, Decision 2); (b) one module named
+`inspecto-http-spi`; (c) break the cycle by making `ApiContext` independent of `Subject` / `Roles` / `ComponentAccess` /
+`Authenticator` (a redesign of the request pipeline — not recommended for D-1).
+*Recommendation:* (a) — the name matches the package it keeps and it holds the whole 22-class contract; `inspecto-audit-spi`
+already sits beside it as the other narrow module (D8).
+**Answer:** *(unsigned)*
 
 ## 6. References
 
