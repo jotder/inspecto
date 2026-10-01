@@ -188,6 +188,11 @@ public final class GraphAlgorithms {
 
     /** TS {@code kCore}: each node's core number on the undirected simple graph, descending. */
     public static List<Score> kCore(Graph g) {
+        return kCore(g, RunControl.NONE);
+    }
+
+    /** As {@link #kCore(Graph)}, with a checkpoint per peeled node. */
+    public static List<Score> kCore(Graph g, RunControl ctl) {
         Map<String, Set<String>> nb = undirectedNeighbors(g);
         Map<String, Integer> deg = new LinkedHashMap<>();
         nb.forEach((id, set) -> deg.put(id, set.size()));
@@ -195,6 +200,7 @@ public final class GraphAlgorithms {
         Set<String> remaining = new LinkedHashSet<>(deg.keySet());
         int k = 0;
         while (!remaining.isEmpty()) {
+            ctl.checkpoint();
             String min = null;
             int minDeg = Integer.MAX_VALUE;
             for (String id : remaining) {
@@ -215,6 +221,11 @@ public final class GraphAlgorithms {
 
     /** TS {@code triangleCount}: triangles each node participates in, on the undirected simple graph, descending. */
     public static List<Score> triangleCount(Graph g) {
+        return triangleCount(g, RunControl.NONE);
+    }
+
+    /** As {@link #triangleCount(Graph)}, with a checkpoint per outer pair index (a hub is O(d^2)). */
+    public static List<Score> triangleCount(Graph g, RunControl ctl) {
         Map<String, Set<String>> nb = undirectedNeighbors(g);
         Map<String, Integer> tri = new LinkedHashMap<>();
         for (Node n : g.nodes()) tri.put(n.id(), 0);
@@ -222,6 +233,7 @@ public final class GraphAlgorithms {
             List<String> arr = new ArrayList<>(en.getValue());
             int count = 0;
             for (int i = 0; i < arr.size(); i++) {
+                ctl.checkpoint();
                 for (int j = i + 1; j < arr.size(); j++) {
                     if (nb.getOrDefault(arr.get(i), Set.of()).contains(arr.get(j))) count++;
                 }

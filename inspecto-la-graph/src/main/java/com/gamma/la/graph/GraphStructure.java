@@ -161,6 +161,11 @@ public final class GraphStructure {
 
     /** TS {@code findCycles}: every simple directed cycle (canonical start = smallest member), up to limit, each at most maxLen hops. */
     public static List<Selection> findCycles(Graph g, int limit, int maxLen) {
+        return findCycles(g, limit, maxLen, RunControl.NONE);
+    }
+
+    /** As {@link #findCycles(Graph, int, int)}, with a checkpoint per DFS step. */
+    public static List<Selection> findCycles(Graph g, int limit, int maxLen, RunControl ctl) {
         GraphAlgorithms.Adjacency adj = GraphAlgorithms.adjacency(g);
         List<Selection> results = new ArrayList<>();
         List<String> nodePath = new ArrayList<>();
@@ -170,7 +175,7 @@ public final class GraphStructure {
             if (results.size() >= limit) break;
             onPath.add(n.id());
             nodePath.add(n.id());
-            walkCycles(adj, n.id(), n.id(), limit, maxLen, results, nodePath, edgePath, onPath);
+            walkCycles(adj, n.id(), n.id(), limit, maxLen, results, nodePath, edgePath, onPath, ctl);
             onPath.remove(n.id());
             nodePath.remove(nodePath.size() - 1);
         }
@@ -184,7 +189,8 @@ public final class GraphStructure {
 
     private static void walkCycles(GraphAlgorithms.Adjacency adj, String start, String cur, int limit, int maxLen,
                                    List<Selection> results, List<String> nodePath, List<String> edgePath,
-                                   Set<String> onPath) {
+                                   Set<String> onPath, RunControl ctl) {
+        ctl.checkpoint();
         for (Hop h : adj.out().getOrDefault(cur, List.of())) {
             String next = h.node();
             if (results.size() >= limit) return;
@@ -198,7 +204,7 @@ public final class GraphStructure {
             onPath.add(next);
             nodePath.add(next);
             edgePath.add(h.edge());
-            walkCycles(adj, start, next, limit, maxLen, results, nodePath, edgePath, onPath);
+            walkCycles(adj, start, next, limit, maxLen, results, nodePath, edgePath, onPath, ctl);
             onPath.remove(next);
             nodePath.remove(nodePath.size() - 1);
             edgePath.remove(edgePath.size() - 1);
@@ -207,9 +213,14 @@ public final class GraphStructure {
 
     /** TS {@code cliques}: maximal cliques of size >= minSize (Bron-Kerbosch with pivoting), largest first. */
     public static List<List<String>> cliques(Graph g, int minSize) {
+        return cliques(g, minSize, RunControl.NONE);
+    }
+
+    /** As {@link #cliques(Graph, int)}, with a checkpoint per Bron-Kerbosch call. */
+    public static List<List<String>> cliques(Graph g, int minSize, RunControl ctl) {
         Map<String, Set<String>> nb = GraphAlgorithms.undirectedNeighbors(g);
         List<List<String>> found = new ArrayList<>();
-        bronKerbosch(nb, minSize, new LinkedHashSet<>(), new LinkedHashSet<>(nb.keySet()), new LinkedHashSet<>(), found);
+        bronKerbosch(nb, minSize, new LinkedHashSet<>(), new LinkedHashSet<>(nb.keySet()), new LinkedHashSet<>(), found, ctl);
         found.sort(Comparator.comparingInt((List<String> c) -> c.size()).reversed().thenComparing(c -> c.get(0)));
         return found;
     }
@@ -220,7 +231,8 @@ public final class GraphStructure {
     }
 
     private static void bronKerbosch(Map<String, Set<String>> nb, int minSize, Set<String> r, Set<String> p,
-                                     Set<String> x, List<List<String>> found) {
+                                     Set<String> x, List<List<String>> found, RunControl ctl) {
+        ctl.checkpoint();
         if (p.isEmpty() && x.isEmpty()) {
             if (r.size() >= minSize) found.add(r.stream().sorted().toList());
             return;
@@ -249,7 +261,7 @@ public final class GraphStructure {
             for (String w : p) if (vn.contains(w)) p2.add(w);
             Set<String> x2 = new LinkedHashSet<>();
             for (String w : x) if (vn.contains(w)) x2.add(w);
-            bronKerbosch(nb, minSize, r2, p2, x2, found);
+            bronKerbosch(nb, minSize, r2, p2, x2, found, ctl);
             p.remove(v);
             x.add(v);
         }

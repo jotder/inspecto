@@ -59,10 +59,16 @@ public final class GraphCentrality {
 
     /** TS {@code betweennessCentrality}: Brandes, unweighted, undirected, descending. */
     public static List<Score> betweennessCentrality(Graph g) {
+        return betweennessCentrality(g, RunControl.NONE);
+    }
+
+    /** As {@link #betweennessCentrality(Graph)}, with a checkpoint per Brandes source. */
+    public static List<Score> betweennessCentrality(Graph g, RunControl ctl) {
         Map<String, List<String>> adj = bothNeighbors(g);
         Map<String, Double> bc = new LinkedHashMap<>();
         for (Node n : g.nodes()) bc.put(n.id(), 0.0);
         for (Node s : g.nodes()) {
+            ctl.checkpoint();
             List<String> stack = new ArrayList<>();
             Map<String, List<String>> preds = new LinkedHashMap<>();
             Map<String, Double> sigma = new LinkedHashMap<>();
@@ -101,11 +107,17 @@ public final class GraphCentrality {
 
     /** TS {@code closenessCentrality}: Wasserman-Faust, so a small component cannot out-score the main one. */
     public static List<Score> closenessCentrality(Graph g) {
+        return closenessCentrality(g, RunControl.NONE);
+    }
+
+    /** As {@link #closenessCentrality(Graph)}, with a checkpoint per source. */
+    public static List<Score> closenessCentrality(Graph g, RunControl ctl) {
         Map<String, List<String>> adj = bothNeighbors(g);
         List<String> ids = g.nodes().stream().map(Node::id).toList();
         int n = ids.size();
         Map<String, Double> close = new LinkedHashMap<>();
         for (String s : ids) {
+            ctl.checkpoint();
             Map<String, Integer> dist = new LinkedHashMap<>();
             dist.put(s, 0);
             List<String> queue = new ArrayList<>(List.of(s));
@@ -128,12 +140,18 @@ public final class GraphCentrality {
 
     /** TS {@code jaccardSimilarity}: neighbourhood overlap of every other node with {@code nodeId}; empty if absent. */
     public static List<Score> jaccardSimilarity(Graph g, String nodeId) {
+        return jaccardSimilarity(g, nodeId, RunControl.NONE);
+    }
+
+    /** As {@link #jaccardSimilarity(Graph, String)}, with a checkpoint per compared node. */
+    public static List<Score> jaccardSimilarity(Graph g, String nodeId, RunControl ctl) {
         Map<String, Set<String>> nb = GraphAlgorithms.undirectedNeighbors(g);
         Set<String> mine = nb.get(nodeId);
         if (mine == null) return List.of();
         Map<String, Double> sim = new LinkedHashMap<>();
         for (String other : nb.keySet()) {
             if (other.equals(nodeId)) continue;
+            ctl.checkpoint();
             Set<String> theirs = nb.get(other);
             int inter = 0;
             for (String x : mine) if (theirs.contains(x)) inter++;
@@ -152,6 +170,11 @@ public final class GraphCentrality {
 
     /** TS {@code linkPrediction}: non-adjacent pairs with a shared neighbour, top {@code limit} by score. */
     public static List<PredictedLink> linkPrediction(Graph g, Method method, int limit) {
+        return linkPrediction(g, method, limit, RunControl.NONE);
+    }
+
+    /** As {@link #linkPrediction(Graph, Method, int)}, with a checkpoint per anchor node (the inner scan is O(n)). */
+    public static List<PredictedLink> linkPrediction(Graph g, Method method, int limit, RunControl ctl) {
         Map<String, Set<String>> nb = GraphAlgorithms.undirectedNeighbors(g);
         Map<String, String> label = new LinkedHashMap<>();
         for (Node n : g.nodes()) label.put(n.id(), n.label());
@@ -159,6 +182,7 @@ public final class GraphCentrality {
         ids.sort(Comparator.naturalOrder());
         List<PredictedLink> out = new ArrayList<>();
         for (int i = 0; i < ids.size(); i++) {
+            ctl.checkpoint();
             String a = ids.get(i);
             Set<String> an = nb.get(a);
             for (int j = i + 1; j < ids.size(); j++) {

@@ -57,6 +57,11 @@ public final class GraphIterative {
 
     /** TS {@code pageRank}: dangling nodes redistribute uniformly; rank flows along edge direction. */
     public static List<Score> pageRank(Graph g, double damping, int iterations) {
+        return pageRank(g, damping, iterations, RunControl.NONE);
+    }
+
+    /** As {@link #pageRank(Graph, double, int)}, with a checkpoint per iteration. */
+    public static List<Score> pageRank(Graph g, double damping, int iterations, RunControl ctl) {
         List<String> ids = ids(g);
         int n = ids.size();
         if (n == 0) return List.of();
@@ -70,6 +75,7 @@ public final class GraphIterative {
         for (String id : ids) outDeg.put(id, outLinks.get(id).size());
         Map<String, Double> pr = filled(ids, 1.0 / n);
         for (int it = 0; it < iterations; it++) {
+            ctl.checkpoint();
             Map<String, Double> next = filled(ids, (1 - damping) / n);
             double dangling = 0;
             for (String id : ids) if (outDeg.get(id) == 0) dangling += pr.get(id);
@@ -92,10 +98,11 @@ public final class GraphIterative {
     }
 
     /** TS {@code powerIterate}: x = 1; repeat next = step(x), L2-normalise, stop early on a zero norm. */
-    private static Map<String, Double> powerIterate(Graph g, Step step, int iterations) {
+    private static Map<String, Double> powerIterate(Graph g, Step step, int iterations, RunControl ctl) {
         List<String> ids = ids(g);
         Map<String, Double> x = filled(ids, 1);
         for (int it = 0; it < iterations; it++) {
+            ctl.checkpoint();
             Map<String, Double> next = filled(ids, 0);
             step.apply(x, next);
             double norm = 0;
@@ -114,6 +121,11 @@ public final class GraphIterative {
 
     /** TS {@code eigenvectorCentrality}: undirected power iteration (a self-loop counts twice, like the browser). */
     public static List<Score> eigenvectorCentrality(Graph g, int iterations) {
+        return eigenvectorCentrality(g, iterations, RunControl.NONE);
+    }
+
+    /** As {@link #eigenvectorCentrality(Graph, int)}, with a checkpoint per power iteration. */
+    public static List<Score> eigenvectorCentrality(Graph g, int iterations, RunControl ctl) {
         Adjacency adj = GraphAlgorithms.adjacency(g);
         Map<String, Double> x = powerIterate(g, (cur, next) -> {
             for (Map.Entry<String, Double> en : next.entrySet()) {
@@ -124,7 +136,7 @@ public final class GraphIterative {
                 }
                 en.setValue(s);
             }
-        }, iterations);
+        }, iterations, ctl);
         return GraphAlgorithms.scored(g, x);
     }
 
@@ -134,10 +146,16 @@ public final class GraphIterative {
 
     /** TS {@code katzCentrality}: {@code x = beta + alpha * A * x} from x = 0. */
     public static List<Score> katzCentrality(Graph g, double alpha, double beta, int iterations) {
+        return katzCentrality(g, alpha, beta, iterations, RunControl.NONE);
+    }
+
+    /** As {@link #katzCentrality(Graph, double, double, int)}, with a checkpoint per iteration. */
+    public static List<Score> katzCentrality(Graph g, double alpha, double beta, int iterations, RunControl ctl) {
         Adjacency adj = GraphAlgorithms.adjacency(g);
         List<String> ids = ids(g);
         Map<String, Double> x = filled(ids, 0);
         for (int it = 0; it < iterations; it++) {
+            ctl.checkpoint();
             Map<String, Double> next = filled(ids, beta);
             for (String id : ids) {
                 double s = 0;
@@ -158,11 +176,17 @@ public final class GraphIterative {
 
     /** TS {@code hits}: directed; authority from incoming hubs, then hub from the NEW authorities; both L2-normalised. */
     public static HitsResult hits(Graph g, int iterations) {
+        return hits(g, iterations, RunControl.NONE);
+    }
+
+    /** As {@link #hits(Graph, int)}, with a checkpoint per iteration. */
+    public static HitsResult hits(Graph g, int iterations, RunControl ctl) {
         Adjacency adj = GraphAlgorithms.adjacency(g);
         List<String> ids = ids(g);
         Map<String, Double> hub = filled(ids, 1);
         Map<String, Double> auth = filled(ids, 1);
         for (int it = 0; it < iterations; it++) {
+            ctl.checkpoint();
             Map<String, Double> nextAuth = filled(ids, 0);
             for (String id : ids) {
                 double s = 0;
@@ -207,11 +231,17 @@ public final class GraphIterative {
      * (members grouped by community in first-seen label order) — the fixture asserts it as ordered pairs.
      */
     public static Map<String, String> detectCommunities(Graph g, int maxIterations) {
+        return detectCommunities(g, maxIterations, RunControl.NONE);
+    }
+
+    /** As {@link #detectCommunities(Graph, int)}, with a checkpoint per propagation round. */
+    public static Map<String, String> detectCommunities(Graph g, int maxIterations, RunControl ctl) {
         Adjacency adj = GraphAlgorithms.adjacency(g);
         List<String> ids = sortedIds(g);
         Map<String, String> label = new LinkedHashMap<>();
         for (String id : ids) label.put(id, id);
         for (int it = 0; it < maxIterations; it++) {
+            ctl.checkpoint();
             boolean changed = false;
             Map<String, String> next = new LinkedHashMap<>(label);
             for (String id : ids) {
@@ -273,6 +303,11 @@ public final class GraphIterative {
      * gain (&gt; 1e-12), then aggregation to convergence. Weights stay integral so they are carried as doubles exactly.
      */
     public static Map<String, String> louvainCommunities(Graph g) {
+        return louvainCommunities(g, RunControl.NONE);
+    }
+
+    /** As {@link #louvainCommunities(Graph)}, with a checkpoint per level and per local-move sweep. */
+    public static Map<String, String> louvainCommunities(Graph g, RunControl ctl) {
         List<String> ids = sortedIds(g);
         int n = ids.size();
         if (n == 0) return new LinkedHashMap<>();
@@ -306,6 +341,7 @@ public final class GraphIterative {
         int[] membership = new int[n]; // original node idx -> current-level node idx
         for (int i = 0; i < n; i++) membership[i] = i;
         for (;;) {
+            ctl.checkpoint();
             int size = adj.size();
             double[] deg = new double[size];
             for (int i = 0; i < size; i++) {
@@ -319,6 +355,7 @@ public final class GraphIterative {
             boolean improved = true;
             boolean moved = false;
             while (improved) {
+                ctl.checkpoint();
                 improved = false;
                 for (int i = 0; i < size; i++) {
                     int ci = comm[i];

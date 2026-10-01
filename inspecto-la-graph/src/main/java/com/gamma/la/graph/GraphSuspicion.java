@@ -44,11 +44,16 @@ public final class GraphSuspicion {
     }
 
     public static List<Suspicion> suspicionScore(Graph g, Weights w) {
+        return suspicionScore(g, w, RunControl.NONE);
+    }
+
+    /** As {@link #suspicionScore(Graph, Weights)}; the control is passed to each composed algorithm. */
+    public static List<Suspicion> suspicionScore(Graph g, Weights w, RunControl ctl) {
         Map<String, Double> deg = normalize(GraphAlgorithms.degreeCentrality(g));
-        Map<String, Double> btw = normalize(GraphCentrality.betweennessCentrality(g));
-        Map<String, Double> pr = normalize(GraphIterative.pageRank(g));
-        Map<String, Double> core = normalize(GraphAlgorithms.kCore(g));
-        Map<String, Double> tri = normalize(GraphAlgorithms.triangleCount(g));
+        Map<String, Double> btw = normalize(GraphCentrality.betweennessCentrality(g, ctl));
+        Map<String, Double> pr = normalize(GraphIterative.pageRank(g, 0.85, 60, ctl));
+        Map<String, Double> core = normalize(GraphAlgorithms.kCore(g, ctl));
+        Map<String, Double> tri = normalize(GraphAlgorithms.triangleCount(g, ctl));
         double sum = w.degree() + w.betweenness() + w.pageRank() + w.core() + w.triangles();
         double wSum = sum != 0 ? sum : 1; // TS: `a + b + … || 1`
         List<Suspicion> out = new ArrayList<>();

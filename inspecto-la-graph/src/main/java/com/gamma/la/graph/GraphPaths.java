@@ -58,8 +58,11 @@ public final class GraphPaths {
         final List<String> nodeStack = new ArrayList<>();
         final List<String> edgeStack = new ArrayList<>();
         final Set<String> onPath = new HashSet<>();
+        final RunControl ctl;
 
-        PathWalk(GraphAlgorithms.Adjacency adj, String toId, int limit, int maxHops, Direction direction) {
+        PathWalk(GraphAlgorithms.Adjacency adj, String toId, int limit, int maxHops, Direction direction,
+                 RunControl ctl) {
+            this.ctl = ctl;
             this.adj = adj;
             this.toId = toId;
             this.limit = limit;
@@ -68,6 +71,7 @@ public final class GraphPaths {
         }
 
         void walk(String cur) {
+            ctl.checkpoint();
             if (results.size() >= limit) return;
             if (cur.equals(toId)) {
                 results.add(new Selection(new ArrayList<>(nodeStack), new ArrayList<>(edgeStack)));
@@ -90,8 +94,14 @@ public final class GraphPaths {
     /** TS {@code allPaths}: simple paths, DFS in adjacency order, at most {@code limit}, depth-capped at {@code maxHops}. */
     public static List<Selection> allPaths(Graph g, String fromId, String toId, int limit, int maxHops,
                                            Direction direction) {
+        return allPaths(g, fromId, toId, limit, maxHops, direction, RunControl.NONE);
+    }
+
+    /** As {@link #allPaths(Graph, String, String, int, int, Direction)}, with a checkpoint per DFS step. */
+    public static List<Selection> allPaths(Graph g, String fromId, String toId, int limit, int maxHops,
+                                           Direction direction, RunControl ctl) {
         GraphAlgorithms.Adjacency adj = GraphAlgorithms.adjacency(g);
-        PathWalk w = new PathWalk(adj, toId, limit, maxHops, direction);
+        PathWalk w = new PathWalk(adj, toId, limit, maxHops, direction, ctl);
         w.nodeStack.add(fromId);
         w.onPath.add(fromId);
         if (adj.out().containsKey(fromId) && adj.out().containsKey(toId)) w.walk(fromId);
@@ -154,6 +164,12 @@ public final class GraphPaths {
 
     /** TS {@code maxFlow}: Edmonds-Karp, capacity = edge weight, directed; value 0 and an empty cut when an endpoint is absent. */
     public static MaxFlowResult maxFlow(Graph g, Map<String, Double> weights, String sourceId, String sinkId) {
+        return maxFlow(g, weights, sourceId, sinkId, RunControl.NONE);
+    }
+
+    /** As {@link #maxFlow(Graph, Map, String, String)}, with a checkpoint per BFS node expansion. */
+    public static MaxFlowResult maxFlow(Graph g, Map<String, Double> weights, String sourceId, String sinkId,
+                                        RunControl ctl) {
         MaxFlowResult empty = new MaxFlowResult(0, new Selection(List.of(), List.of()));
         if (sourceId.equals(sinkId)) return empty;
         Set<String> nodeIds = new HashSet<>();
@@ -177,6 +193,7 @@ public final class GraphPaths {
             List<String> queue = new ArrayList<>(List.of(sourceId));
             prev.put(sourceId, sourceId);
             for (int head = 0; head < queue.size(); head++) {
+                ctl.checkpoint();
                 String u = queue.get(head);
                 if (u.equals(sinkId)) break;
                 for (String v : adj.getOrDefault(u, Set.of())) {
