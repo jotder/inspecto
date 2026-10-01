@@ -84,6 +84,12 @@ Angular build), `-NoRuntime` (skip the embedded jlinked JVM), and **`-Edition Pe
 the Maven [edition](../editions/editions-model.md) profile + assembles the per-edition fat-JAR). Generated
 launch scripts embed the native-access flag and the key [`-D` flags](operations.md).
 
+The SBOM step (`tools/sbom.mjs`) runs `mvn package dependency:list -DskipTests` over the edition's modules with
+`-am`, so reactor siblings (and their `tests` test-jars) resolve from `target/` outputs: **no prior `mvn install`
+into `~/.m2` is needed** (a bare `dependency:list -am` died "Could not find artifact ...inspecto-audit-spi" on a
+machine whose `~/.m2` lacked newly extracted modules). `MVN_CMD` / `MVN_OFFLINE=1` still apply; the step re-runs
+the package phase (about 2 min), it does not reuse a `-NoBuild` jar untouched.
+
 ### What the bundle contains — and what it deliberately does not
 
 Verified by building both flavors 2026-08-27 (Personal 169.3 MB, Enterprise 170.3 MB, exit 0):

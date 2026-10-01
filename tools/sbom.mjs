@@ -86,7 +86,11 @@ function mvn() {
 }
 
 function resolve() {
-    const args = ['-B', 'dependency:list', '-DincludeScope=runtime', '-pl', plModules.join(','), '-am'];
+    // `package -DskipTests` first: a bare `dependency:list -am` resolves reactor siblings (and their
+    // `tests` test-jars) from ~/.m2, which only an earlier `mvn install` fills - so it died on a
+    // fresh machine. With the package phase in the same invocation the reactor resolves siblings
+    // from their target/ outputs; nothing is installed into ~/.m2.
+    const args = ['-B', 'package', 'dependency:list', '-DskipTests', '-DincludeScope=runtime', '-pl', plModules.join(','), '-am'];
     if (profile) args.push(`-P${profile}`);
     if (process.env.MVN_OFFLINE === '1') args.unshift('-o');
     let out;
