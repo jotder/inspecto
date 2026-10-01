@@ -258,7 +258,7 @@ LA uses them yet). Move Entity Lists to core so assurance works without LA, or k
    both products need is *extracted* into a shared module, never copied.
 2. **Big Datasets** — the product must handle data far beyond today's browser caps.
 3. **A strong graph on the backend** — the analysis the SPA runs today must also run server side.
-4. **Storage:** Parquet queried by DuckDB, in an **LA-specific partitioning scheme**, possibly with **DuckPGQ**.
+4. **Storage:** Parquet queried by DuckDB, in an **LA-specific partitioning scheme**. (DuckPGQ was dropped 2026-10-01; see D9.)
 5. **An optional graph database, with or without a vector database, is acceptable** — provided it is
    **LA-exclusive** (it never becomes a dependency of the rest of Inspecto).
 6. The operator's eight points: metadata from Parquet · LA-owned storage · Investigation metadata under an LA
@@ -335,7 +335,7 @@ freshness (incremental vs rebuild) and residency need an owner — decided in D1
 | Engine | When | Notes |
 |---|---|---|
 | DuckDB SQL (recursive CTE + the index) | Default, always present | What traversal already does; the index makes it scale |
-| **DuckPGQ** (SQL/PGQ on DuckDB) | If a spike proves it on the index | ⚠ A **community** extension: must be staged for air-gapped installs, and this repo has been bitten before — a staged extension is not necessarily loadable. It must load on an **LA-exclusive connection**, never through `inspecto-sql/src/main/java/com/gamma/sql/SqlSandboxPolicy.java`'s locked-down sandbox (the reason DuckDB `spatial` is still not loaded) |
+| **DuckPGQ** (SQL/PGQ on DuckDB) | ⛔ **Dropped 2026-10-01** (operator) | A community extension with no build for the pinned DuckDB 1.5.2 (spike D-S2, §7.10.1). Graph features arrive with DuckDB 2.0's own capabilities; revisit when the pin moves, as a new spike against whatever 2.0 ships — not as DuckPGQ |
 | External graph database | Only if depth × volume measurements exceed the two above | LA-exclusive; evaluated at spike time on licence, air-gap install, JVM embedding |
 | Vector index (e.g. DuckDB `vss`, or an external engine) | With fingerprinting / entity similarity | LA-exclusive; pairs with the future entity-context port (I4) |
 
@@ -452,7 +452,7 @@ This is **L–XL** on its own and depends on: versioned inputs (§7.4 index mani
 | **D-1** | Extract the shared platform layer: `http-spi`, `auth-spi` (+ move OIDC), `audit-spi` (cut the ETL edge); move LA onto them; `la-inspecto` bridge; Inspecto behaviour unchanged | L | D-0 |
 | **D-2** | Spikes D-S1…D-S4 (§7.10) — decide storage and engine from measurements | M | — (parallel) |
 | **D-3** | `la-storage` edge/node index + builder (both hosts); `la-data` providers | L | D-1, D-2 |
-| **D-4** | `la-graph`: GraphEngine SPI, server-side algorithms with parity fixtures, async jobs; optional DuckPGQ / graph / vector engines | L–XL | D-3 |
+| **D-4** | `la-graph`: GraphEngine SPI, server-side algorithms with parity fixtures, async jobs; optional graph / vector engines | L–XL | D-3 |
 | **D-5** | `la-app` host + `projects/la-app` shell + LA product flavor (bundle, boot smoke, licence text) | M–L | D-1, SEP-03…06 |
 | **D-6** | Integration: external references, Dossier export bundle, embeddable view; I1 trust only if live calls are needed | M | D-5 |
 | **D-7** | Parallel analyst sandboxes (§7.7): membership model, pinned baselines, per-sandbox DuckDB files, incremental evaluation + checkpoints, admission control, promote/rebase with conflict report, hibernate/rehydrate | L–XL | D-3, D-4, D16–D21 |
@@ -464,7 +464,7 @@ light modules (`inspecto-api` holds one class today)?
 *Recommendation:* new, narrowly named modules — easier to police with a dependency guard.
 **Answer:** new, narrowly named modules — easier to police with a dependency guard. — operator 2026-09-30
 
-**D9 — Graph engine order.** DuckDB SQL + index first, DuckPGQ only after spike D-S2, external graph DB only
+**D9 — Graph engine order.** DuckDB SQL + index first, DuckDB 2.0's own graph features when the pin moves (DuckPGQ dropped 2026-10-01, operator), external graph DB only
 after D-S3 measures a gap?
 *Recommendation:* yes, in that order.
 **Answer:** yes, in that order. — operator 2026-09-30
@@ -534,7 +534,7 @@ measures against it.
 | Id | Question | Pass condition |
 |---|---|---|
 | D-S1 | Does DuckDB (current major) prune partitions, row groups and bloom filters for an entity-key lookup on the proposed index? | `EXPLAIN ANALYZE` shows files / row groups skipped on a planted corpus; one-hop latency measured at 3 sizes |
-| D-S2 | Does DuckPGQ load offline on an LA-exclusive connection and beat recursive SQL on 2–4 hop paths over the index? | Loads from a staged directory with network off; timing table vs SQL |
+| ~~D-S2~~ | ~~Does DuckPGQ load offline on an LA-exclusive connection and beat recursive SQL on 2–4 hop paths over the index?~~ **Dropped 2026-10-01** (operator): no build exists for DuckDB 1.5.2; DuckDB 2.0's graph features are assessed when the pin moves | — |
 | D-S3 | At what depth × volume does DuckDB stop being enough? | A curve, not an opinion; only a measured gap opens the external graph DB question |
 | D-S4 | Can the browser algorithms run server side with identical results? | Parity fixture green in both languages for the ported set |
 | D-S5 | Do N concurrent sandboxes (per-sandbox DuckDB file, shared read-only base) hold the D21 target? | Latency and memory per sandbox at the target concurrency; one heavy job does not move the others' p95 beyond a stated bound |
@@ -552,7 +552,7 @@ Windows), so "cold" means a fresh engine, not a cold disk.
 | Spike | Verdict | Evidence |
 |---|---|---|
 | **D-S1** pruning | ✅ **PASS for partitions and row groups; bloom filters not isolated** | One-hop lookup of a median-degree node, p50 (p95): flat unsorted file 20 (23) / 126 (156) / **1 031 (1 215) ms** at 10⁶ / 10⁷ / 10⁸; entity-hash partitioned (64 buckets) + sorted by (entity, time), bucket predicate supplied: 24 (28) / 39 (55) / **43 (49) ms**; same layout without the bucket predicate: 29 / 40 / 97 ms. `EXPLAIN ANALYZE` at 10⁸: *Total Files Read* 64 → **1** with the bucket predicate; the 10× gain without it is row-group min/max skipping on the sorted key. Bloom-filter skipping was not separated from min/max skipping. |
-| **D-S2** DuckPGQ | ⛔ **CANNOT RUN on the repo pin — no DuckPGQ build exists for DuckDB 1.5.2** (2026-09-30, download approved); deferred until DuckPGQ publishes for the pinned DuckDB; operator 2026-09-30 | `INSTALL duckpgq FROM community` on 1.5.2: HTTP 404 from `community-extensions.duckdb.org/v1.5.2/windows_amd64/`; the same path is 404 for `linux_amd64` and `osx_arm64`, while `v1.5.1`, `v1.5.0`, `v1.4.4`, `v1.4.3`, `v1.4.1` all serve it (200). Extensions are ABI-bound to the exact engine version, so measuring it means either a 1.5.1 engine in the bench (a different DuckDB than the product) or waiting for a 1.5.2 build — an operator call. Nothing was installed or staged; nothing enters the bundle. |
+| ~~**D-S2** DuckPGQ~~ | ⛔ **DROPPED 2026-10-01 (operator)** — no DuckPGQ build exists for the repo pin DuckDB 1.5.2 (HTTP 404 at `community-extensions.duckdb.org/v1.5.2/…`, 2026-09-30; builds exist for 1.5.1 and earlier, extensions are ABI-bound to the exact engine). Not pursued: DuckDB 2.0's own graph features are the intended route once the pin moves. | Nothing was installed or staged; nothing enters the bundle. The bench's D-S2 probe was deleted. |
 | **D-S3** depth × volume | ✅ **curve measured — the gap is VOLUME, not depth** | Route-shaped recursive CTE, p99-degree start, yield fence 10 000 (100 000), p50 ms at depth 2 / 4 / 6 / 8. **10⁶:** 61 / 133 / 134 / 172 (56 / 123 / 196 / 286). **10⁷:** 306 / 392 / 467 / 438 (286 / 471 / 594 / 656). **10⁸:** 2 698 / 3 087 / 3 091 / 3 340 (3 110 / 6 115 / 6 087 / 6 347). Depth costs ≈ linear in rows walked (bounded by depth × yield); volume costs ≈ linear in edges scanned, because a flat Dataset is re-scanned per level. Materialising the edge CTE is 1.5–2× faster at 10⁶–10⁷ and **2× slower at 10⁸** (4 966 – 17 223 ms), so it is not the fix. |
 | **D-S4** algorithm parity | ✅ **PASS 2026-10-01 — all 28 algorithms of classes A, A′, B, B′ ported (17 + 5 + 4 + 2 — an earlier version of this row said 34, an addition error); the 11 class-C transforms stay in the browser by design (§7.13)** | Grounded only: `graph-analysis.ts` exports ~40 algorithms; exactly one (branching pattern) has a Java port with a shared golden fixture, green in both languages. Iterative ones (PageRank, eigenvector, Katz, HITS, Louvain) will need tolerance-based parity, not equality. |
 | **D-S5** concurrency | ⏸ **NOT RUN** | Not cheap on one laptop; left for D-2 proper. |
@@ -566,8 +566,8 @@ not generated (≈ 20 GB of Parquet and hours on this machine), the lookup was a
 frontier batch, and one machine says nothing about concurrent Drafts (D-S5).
 
 **Implications.** **D9 holds** — DuckDB SQL plus the index is enough up to 10⁸ on a laptop *provided the traversal
-reads the index, not a flat Dataset*; no measured gap opens the external graph DB question, and DuckPGQ stays
-unmeasured because no build exists for the pinned DuckDB 1.5.2 (D-S2), so D9 rests on SQL + index alone. **D10 confirmed** — entity-hash partitioning with (entity, time) sort is the
+reads the index, not a flat Dataset*; no measured gap opens the external graph DB question, and DuckPGQ was
+dropped (D-S2; no build for the pinned DuckDB 1.5.2), so D9 rests on SQL + index alone. **D10 confirmed** — entity-hash partitioning with (entity, time) sort is the
 default, and the reader **must compute and push the bucket predicate** (2.3× at 10⁸ over relying on pruning
 alone). Today's route walks a flat Dataset, so its practical ceiling is ≈ 10⁷ edges within the 5 s fence.
 

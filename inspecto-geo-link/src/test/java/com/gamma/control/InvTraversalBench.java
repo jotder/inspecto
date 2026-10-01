@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * MEASUREMENT harness, not a test: LA-11 gate G-R4 (5 hops over 1 000 000 edges in under 350 ms through
- * {@code POST /inv/traversal/recursive-paths}) and the option-D spikes D-S1 / D-S2 / D-S3
+ * {@code POST /inv/traversal/recursive-paths}) and the option-D spikes D-S1 / D-S3 (D-S2, DuckPGQ, was dropped 2026-10-01)
  * ({@code docs/superpower/la-separation-feasibility-plan.md} §7.10). Results are recorded there.
  *
  * <p>Never runs in the default suite: it needs {@code -Dinspecto.bench.dir=<dir>} (generated Parquet goes there —
@@ -174,23 +174,6 @@ class InvTraversalBench {
                     log(String.format("D-S1 n=%d %s: one-hop p50 %.2f ms p95 %.2f ms", n, q[0], pct(t, 50), pct(t, 95)));
                     if (n == sizes().get(sizes().size() - 1)) log("EXPLAIN ANALYZE (" + q[0] + ")\n" + explain(s, q[1]));
                 }
-            }
-        }
-    }
-
-    // ---------------------------------------------------------------- D-S2 DuckPGQ offline load
-
-    @Test
-    void spikeDS2_duckpgqLoadsOffline() throws Exception {
-        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement s = c.createStatement()) {
-            s.execute("SET autoinstall_known_extensions = false");
-            s.execute("SET autoload_known_extensions = false");
-            try (ResultSet r = s.executeQuery("SELECT version()")) { r.next(); log("DuckDB " + r.getString(1)); }
-            try {
-                s.execute("LOAD duckpgq");
-                log("D-S2 duckpgq LOADED offline");
-            } catch (SQLException e) {
-                log("D-S2 duckpgq NOT loadable offline: " + e.getMessage().lines().findFirst().orElse(""));
             }
         }
     }

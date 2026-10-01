@@ -54,7 +54,7 @@ interface GraphEngine {                      // one implementation per backing s
 * `RunControl` is defined in **`la-graph`** (JDK only): `checkpoint()` (throws `GraphAborted` on cancel or deadline), `progress(done,total)`, `budget()`. The 28
   algorithms get an overload taking it; the existing signatures delegate with a no-op `RunControl`, so **parity fixtures are untouched**.
 * `GraphResult` = `{ kind: scores|selection|groups|graph, payload, order: "canonical-v1" }`.
-* Engines: **`InMemoryGraphEngine`** (la-graph over a materialised Working Set) is the whole of D-4. **`SqlGraphEngine`** over the Parquet edge index and any DuckPGQ
+* Engines: **`InMemoryGraphEngine`** (la-graph over a materialised Working Set) is the whole of D-4. **`SqlGraphEngine`** over the Parquet edge index and any other index-backed
   engine are D-3/D-2: D-4 only guarantees the SPI does not mention memory — `GraphInput` is an interface (`nodes()`, `edges()`, `weightOf(edgeId)`), so an
   index-backed input can stream instead of materialising.
 
@@ -149,7 +149,7 @@ JDK/ICU version; the answer would change by host). Second tie rule owed: the `hi
 
 ## 4. NOT in D-4
 
-The Parquet edge/node index (D-2), index-backed traversal and `SqlGraphEngine` (D-3), DuckPGQ (D-S2 cannot run on the pinned DuckDB 1.5.2), the external graph database,
+The Parquet edge/node index (D-2), index-backed traversal and `SqlGraphEngine` (D-3), DuckPGQ (dropped 2026-10-01; DuckDB 2.0's graph features are assessed when the pin moves), the external graph database,
 parallel analyst sandboxes (D-S5), a server-side `matchPattern` (class C, stays in the browser), SSE progress, results shared across Investigations, and the app shell.
 
 ## 5. Ordered steps (each compiles, passes its unit tests, ships alone)

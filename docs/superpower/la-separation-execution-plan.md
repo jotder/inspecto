@@ -50,6 +50,6 @@ is unchanged. The operator signs it before any extraction starts.
 ## Deliberately not now
 
 - **D-S5** concurrency rig — needed only when D-7 (Drafts) is near.
-- **D-S2** DuckPGQ — blocked: no build for the pinned DuckDB 1.5.2.
+- **D-S2** DuckPGQ — dropped 2026-10-01 (operator); DuckDB 2.0's own graph features are assessed when the pin moves.
 - **D-3 / D-4 / D-7** — depend on Stage 3.
 - **Vocabulary:** the per-analyst working copy is a **Draft** (D16) — enter it in `docs/GLOSSARY.md` §13 before any code uses the word.
