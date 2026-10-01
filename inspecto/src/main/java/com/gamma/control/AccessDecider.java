@@ -37,12 +37,12 @@ public interface AccessDecider {
 
     /** Stamp the matched policy name ({@code null} clears) — the decider-side write seam. Request-scoped
      *  via {@link ApiContext#attr}, never the JDK's exchange map (shared across in-flight requests on
-     *  pre-JDK-26 runtimes — see ApiContext.REQUEST_SCOPES). */
-    static void matchedPolicy(HttpExchange ex, String policy) { ApiContext.attr(ex, ATTR_MATCHED_POLICY, policy); }
+     *  pre-JDK-26 runtimes — see RequestAttrs.REQUEST_SCOPES). */
+    static void matchedPolicy(HttpExchange ex, String policy) { RequestAttrs.attr(ex, ATTR_MATCHED_POLICY, policy); }
 
     /** The stamped matched-policy name, or {@code null}. */
     static String matchedPolicy(HttpExchange ex) {
-        return ApiContext.attr(ex, ATTR_MATCHED_POLICY) instanceof String s ? s : null;
+        return RequestAttrs.attr(ex, ATTR_MATCHED_POLICY) instanceof String s ? s : null;
     }
 
     /**

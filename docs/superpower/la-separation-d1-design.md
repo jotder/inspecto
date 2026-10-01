@@ -35,8 +35,9 @@ than the import counts suggested:
 
 ```
  shared (extracted)         inspecto-audit-spi   Event · EventLog · EventType            (+ util: CurrentSpace, JsonAttributes, Values)
-                            inspecto-http-spi    ApiContext (HTTP half) · ApiException · ErrorCodes · RouteModule · SpiSlot · WriteGates
-                            inspecto-auth-spi    Subject · RowScope · ComponentAccess · Authenticator · AccessDecider(s) · AccessPolicies · Roles
+                            inspecto-auth-spi    LOWER layer — RequestAttrs · WriteRootProvider · ApiException · ErrorCodes · SpiSlot · WriteGates · Subject · Roles · ComponentAccess ·
+                                                 RowScope · AccessDecider(s) · AccessPolicies · AuditTrail · AccessGrants · Authenticator(s) · CapabilityManifest · GeoCountryResolver(s)
+                            inspecto-http-spi    UPPER layer, depends on auth-spi — ApiContext (extends WriteRootProvider) · RouteModule · Handler · Envelope · Idempotency
                             (existing, unchanged) inspecto-api · -util · -config · -sql
  LA (new, LA-only deps)     la-graph             the six Graph* classes — no dependency but the JDK
                             la-core              model, Investigation log + evaluator, pattern engine, Snapshot/Fact stores, EntityTypes, LinkAnalysisSettings, LA event-type constants
@@ -48,6 +49,14 @@ than the import counts suggested:
 registry read, relation SQL, query), `CasePort` (the four `service().objects()` uses), `AlertPort` (the one
 `service().alertService()` use). A port with no implementation makes its feature report itself **absent**, never
 half-working (feasibility plan §7.3).
+
+**How the cycle is broken (Decision 6 = break it, two modules; mechanism built and verified 2026-10-01).** The auth classes used
+`ApiContext` only through its **static** request-attribute helpers, never an instance, and `WriteGates.requireWriteRoot` needed only
+`api.writeRoot()`. So: a new `RequestAttrs` (the 15 `ATTR_*` names, `REQUEST_SCOPES`, `attr`, `dropAttrScope`, `correlationId`, `subject`,
+`actor`, `actorType`, `ip`, `userAgent`, `HEADER_AGENT_SESSION`) and a one-method `WriteRootProvider` sit in the lower layer;
+`ApiContext` extends `WriteRootProvider` and keeps one-line aliases and delegates, so no call site changed. Dependency graph afterwards:
+lower → upper edges **none**; the lower set references no other `inspecto` class; the upper set touches the host only through
+`CollectorService`, `SpaceManager` and `SseStreams` (what `HostContext` takes over). Direction is **`inspecto-http-spi` → `inspecto-auth-spi`**.
 
 **The `ApiContext` split.** `ApiContext` keeps routing (`get/post/put/patch/delete/hasRoute/stub`), the request
 helpers (`body`, `rawBody`, `replay`, `actor`, `ip`, `query`, `param`, `paged`), the response helpers and the capability
@@ -140,7 +149,8 @@ for what it holds — `inspecto-control-spi` (package `com.gamma.control` is kep
 `Authenticator` (a redesign of the request pipeline — not recommended for D-1).
 *Recommendation:* (a) — the name matches the package it keeps and it holds the whole 22-class contract; `inspecto-audit-spi`
 already sits beside it as the other narrow module (D8).
-**Answer:** *(unsigned)*
+**Answer:** (c) break the cycle and keep two modules — operator 2026-10-01 (not the recommendation). Built as `RequestAttrs` + `WriteRootProvider`
+in the lower layer (see §2); 462 tests green across the 50 test classes that touch these types.
 
 ## 6. References
 

@@ -46,9 +46,9 @@ public final class ComponentAccess {
 
     /** The {@link #ATTR_HELD_ROLES} write seam for the security module's {@link Authenticator} — the
      *  one out-of-package writer. Request-scoped via {@link ApiContext#attr}, never the JDK's exchange
-     *  map (shared across in-flight requests on pre-JDK-26 runtimes — see ApiContext.REQUEST_SCOPES). */
+     *  map (shared across in-flight requests on pre-JDK-26 runtimes — see RequestAttrs.REQUEST_SCOPES). */
     public static void heldRoles(HttpExchange ex, Set<String> roles) {
-        ApiContext.attr(ex, ATTR_HELD_ROLES, roles);
+        RequestAttrs.attr(ex, ATTR_HELD_ROLES, roles);
     }
 
     static final String OWNER = "owner";
@@ -95,7 +95,7 @@ public final class ComponentAccess {
      *  otherwise let a creator address a rule's alerts to anyone. */
     static Map<String, Object> onCreate(HttpExchange ex, Map<String, Object> content) {
         Map<String, Object> out = new LinkedHashMap<>(content);
-        if (ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s && !out.containsKey(OWNER))
+        if (RequestAttrs.attr(ex, RequestAttrs.ATTR_SUBJECT) instanceof Subject s && !out.containsKey(OWNER))
             out.put(OWNER, s.id());
         validate(out);
         requireOwnerIsCaller(ex, out.get(OWNER));
@@ -105,7 +105,7 @@ public final class ComponentAccess {
     /** 403 when {@code owner} names someone other than the authenticated caller, unless the caller holds
      *  canConfigureAccess or canAdminister. No subject (Personal): no check. */
     private static void requireOwnerIsCaller(HttpExchange ex, Object owner) {
-        if (!(ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s)) return;
+        if (!(RequestAttrs.attr(ex, RequestAttrs.ATTR_SUBJECT) instanceof Subject s)) return;
         if (s.capabilities().contains(Roles.CAN_CONFIGURE_ACCESS) || s.capabilities().contains(Roles.CAN_ADMINISTER)) return;
         if (owner != null && !trimOrEmpty(owner).equals(s.id()))
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
@@ -139,7 +139,7 @@ public final class ComponentAccess {
     // ── decision ─────────────────────────────────────────────────────────────────
 
     private static int level(HttpExchange ex, Map<String, Object> content) {
-        if (!(ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s)) return OWN;  // Personal: fail-open
+        if (!(RequestAttrs.attr(ex, RequestAttrs.ATTR_SUBJECT) instanceof Subject s)) return OWN;  // Personal: fail-open
         String owner = trimOrEmpty(content.get(OWNER));
         boolean ownerMatch = !owner.isEmpty() && owner.equals(s.id());
         boolean admin = s.capabilities().contains(Roles.CAN_CONFIGURE_ACCESS);
@@ -163,7 +163,7 @@ public final class ComponentAccess {
     /** May this request manage the envelope? True with no subject, for an access admin, for the
      *  declared owner — and for anyone when no owner is declared yet (first claim on a legacy doc). */
     private static boolean ownsEnvelope(HttpExchange ex, Map<String, Object> current) {
-        if (!(ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s)) return true;
+        if (!(RequestAttrs.attr(ex, RequestAttrs.ATTR_SUBJECT) instanceof Subject s)) return true;
         if (s.capabilities().contains(Roles.CAN_CONFIGURE_ACCESS)) return true;
         String owner = trimOrEmpty(current.get(OWNER));
         return owner.isEmpty() || owner.equals(s.id());
@@ -172,7 +172,7 @@ public final class ComponentAccess {
     /** The stamped recognised role names, lowercased; empty when unstamped. The read seam paired with
      *  {@link #heldRoles(HttpExchange, Set)} — deciders read through here, never the JDK exchange map. */
     public static Set<String> heldRoles(HttpExchange ex) {
-        if (!(ApiContext.attr(ex, ATTR_HELD_ROLES) instanceof Set<?> roles)) return Set.of();
+        if (!(RequestAttrs.attr(ex, ATTR_HELD_ROLES) instanceof Set<?> roles)) return Set.of();
         Set<String> out = new java.util.LinkedHashSet<>();
         for (Object r : roles) if (r != null) out.add(String.valueOf(r).toLowerCase(Locale.ROOT));
         return out;

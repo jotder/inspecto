@@ -56,14 +56,14 @@ public final class Roles {
      *  authenticate stage, and tests standing in for it). Request-scoped via {@link ApiContext#attr},
      *  never the JDK's exchange map (shared across in-flight requests on pre-JDK-26 runtimes). */
     public static void configRoot(com.sun.net.httpserver.HttpExchange ex, java.nio.file.Path root) {
-        ApiContext.attr(ex, ATTR_CONFIG_ROOT, root);
+        RequestAttrs.attr(ex, ATTR_CONFIG_ROOT, root);
     }
 
     /** The config root bound to this request by {@link #configRoot(com.sun.net.httpserver.HttpExchange, java.nio.file.Path)},
      *  or {@code null} — the read half of the seam, for an out-of-package Authenticator (the demo-auth module reads its
      *  Space's {@code demo-users.toon} from it). */
     public static java.nio.file.Path configRoot(com.sun.net.httpserver.HttpExchange ex) {
-        return ApiContext.attr(ex, ATTR_CONFIG_ROOT) instanceof java.nio.file.Path p ? p : null;
+        return RequestAttrs.attr(ex, ATTR_CONFIG_ROOT) instanceof java.nio.file.Path p ? p : null;
     }
 
     static final String FILE = "roles.toon";
@@ -234,7 +234,7 @@ public final class Roles {
     /** Per-request table for an {@link Authenticator}: resolves the bound space's authored doc via
      *  {@link #ATTR_CONFIG_ROOT} (seed-only when unset). Never null; see class doc for merge rules. */
     public static Map<String, Def> effective(HttpExchange ex) {
-        return effective(ApiContext.attr(ex, ATTR_CONFIG_ROOT) instanceof Path p ? p : null);
+        return effective(RequestAttrs.attr(ex, ATTR_CONFIG_ROOT) instanceof Path p ? p : null);
     }
 
     /** The effective table for {@code configRoot}: authored roles overlaid on {@link #SEED} per role
@@ -284,7 +284,7 @@ public final class Roles {
      *  only IdP claims an {@link Authenticator} may surface as {@link Subject#attributes()}. Empty
      *  when unset — and when the doc is unreadable (fail-closed: no grants, no attributes). */
     public static List<String> attributeClaims(HttpExchange ex) {
-        return load(ApiContext.attr(ex, ATTR_CONFIG_ROOT) instanceof Path p ? p : null).attributeClaims();
+        return load(RequestAttrs.attr(ex, ATTR_CONFIG_ROOT) instanceof Path p ? p : null).attributeClaims();
     }
 
     // ── validation (shared by the PUT route and the file parser — one grammar) ──────

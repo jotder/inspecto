@@ -50,7 +50,7 @@ final class AuditTrail {
         try {
             Action action = classify(method, path);
             if (action == null) return;
-            String actor = ApiContext.actor(ex);
+            String actor = RequestAttrs.actor(ex);
             String targetType = resource(path);
             String targetId = targetId(path);
             // Say so when the action was REFUSED (4xx) or FAILED (5xx). The action name is the one that was
@@ -64,25 +64,25 @@ final class AuditTrail {
             // AUDIT row therefore means "an ordinary mutation, or Personal where nothing is checked";
             // its presence is what lets "every privileged write, by actor, by capability, in the window"
             // be one /audit/search query instead of a hand-built join (compliance plan step 4b).
-            Object capability = ApiContext.attr(ex, ApiContext.ATTR_CAPABILITY);
+            Object capability = RequestAttrs.attr(ex, RequestAttrs.ATTR_CAPABILITY);
             var event = located(ex, Event.builder(EventType.AUDIT))
                     .source("audit")
                     .message(actor + " " + action.name() + (targetId == null ? "" : " " + targetId) + outcome)
-                    .actor(actor).actorType(ApiContext.actorType(ex))
+                    .actor(actor).actorType(RequestAttrs.actorType(ex))
                     .action(action.name()).actionCategory(action.category())
                     .target(targetType, targetId)
-                    .userAgent(ApiContext.userAgent(ex))
+                    .userAgent(RequestAttrs.userAgent(ex))
                     // The request's Correlation-ID, so a failed request's row joins its ERROR log line.
-                    .correlationId(ApiContext.attr(ex, ApiContext.ATTR_CORRELATION_ID) instanceof String c ? c : null)
+                    .correlationId(RequestAttrs.attr(ex, RequestAttrs.ATTR_CORRELATION_ID) instanceof String c ? c : null)
                     .attr(AuditAttrs.HTTP_METHOD, method)
                     .attr(AuditAttrs.HTTP_PATH, path)
                     .attr(AuditAttrs.HTTP_STATUS, status);
             if (capability != null) event.attr(AuditAttrs.CAPABILITY, capability);
-            if (ApiContext.attr(ex, ApiContext.ATTR_AUDIT_ATTRS) instanceof java.util.Map<?, ?> extra)
+            if (RequestAttrs.attr(ex, RequestAttrs.ATTR_AUDIT_ATTRS) instanceof java.util.Map<?, ?> extra)
                 extra.forEach((k, v) -> event.attr(String.valueOf(k), v));
             // ASSURE-MAKER-CHECKER-1 (D-P13): an approved Pending Change's write is the author's (the actor
             // above); the approver who let it through rides on the same row.
-            if (ApiContext.attr(ex, ApiContext.ATTR_APPROVED_CHANGE) instanceof java.util.Map<?, ?> pc) {
+            if (RequestAttrs.attr(ex, RequestAttrs.ATTR_APPROVED_CHANGE) instanceof java.util.Map<?, ?> pc) {
                 event.attr("approvedBy", pc.get("approvedBy"));
                 event.attr("pendingChange", pc.get("id"));
             }
@@ -106,7 +106,7 @@ final class AuditTrail {
      * @param status  the HTTP status the caller received
      */
     static void authentication(HttpExchange ex, String action, boolean ok, int status) {
-        authentication(ex, action, ok, status, ApiContext.actor(ex));
+        authentication(ex, action, ok, status, RequestAttrs.actor(ex));
     }
 
     /** As above, naming the {@code actor} explicitly — {@code /auth/exchange} passes the Subject the minted token
@@ -118,9 +118,9 @@ final class AuditTrail {
             EventLog.current().emit(located(ex, Event.builder(ok ? EventType.AUDIT : EventType.ACCESS_DENIED))
                     .source("audit")
                     .message(actor + " " + action + (ok ? "" : " (refused, HTTP " + status + ")"))
-                    .actor(actor).actorType(ApiContext.actorType(ex))
+                    .actor(actor).actorType(RequestAttrs.actorType(ex))
                     .action(action).actionCategory("authentication")
-                    .userAgent(ApiContext.userAgent(ex))
+                    .userAgent(RequestAttrs.userAgent(ex))
                     .attr(AuditAttrs.HTTP_METHOD, "POST")
                     .attr(AuditAttrs.HTTP_PATH, path)
                     .attr(AuditAttrs.HTTP_STATUS, status));
@@ -135,7 +135,7 @@ final class AuditTrail {
      * plus {@link AuditAttrs#GEO_DB_BUILD}. Never a city. A resolver that throws costs the geo attributes only.
      */
     static Event.Builder located(HttpExchange ex, Event.Builder b) {
-        String ip = ApiContext.ip(ex);
+        String ip = RequestAttrs.ip(ex);
         b.ip(ip);
         if (ip == null) return b;
         try {
@@ -159,20 +159,20 @@ final class AuditTrail {
      *  (`AUDIT-REFUSAL-GAP-1`). Never throws. */
     static void accessDenied(HttpExchange ex, String method, String path, int status) {
         try {
-            String actor = ApiContext.actor(ex);
+            String actor = RequestAttrs.actor(ex);
             // The capability a 403 was refused FOR, when a capability check is what refused it. Set by
             // ApiContext.requireCapability; absent on a 401 (authentication, no capability was reached)
             // and on a policy DENY (which records itself through policyDecision). Until 2026-09-15 this
             // name reached only the exception message and never the audit row — so the one question an
             // investigator asks of a refusal, "denied WHAT?", had no answer in the log (plan step 4a).
-            Object capability = ApiContext.attr(ex, ApiContext.ATTR_CAPABILITY);
+            Object capability = RequestAttrs.attr(ex, RequestAttrs.ATTR_CAPABILITY);
             var event = located(ex, Event.builder(EventType.ACCESS_DENIED))
                     .source("audit")
                     .message(actor + " access.denied " + method + " " + path + " (" + status + ")"
                             + (capability == null ? "" : " missing " + capability))
-                    .actor(actor).actorType(ApiContext.actorType(ex))
+                    .actor(actor).actorType(RequestAttrs.actorType(ex))
                     .action("access.denied").actionCategory("authorization")
-                    .userAgent(ApiContext.userAgent(ex))
+                    .userAgent(RequestAttrs.userAgent(ex))
                     .attr(AuditAttrs.HTTP_METHOD, method)
                     .attr(AuditAttrs.HTTP_PATH, path)
                     .attr(AuditAttrs.HTTP_STATUS, status);
@@ -199,16 +199,16 @@ final class AuditTrail {
     static void policyDecision(HttpExchange ex, boolean granted, String abacAction, String route,
                                String resourceType, String resourceId, String policy) {
         try {
-            String actor = ApiContext.actor(ex);
+            String actor = RequestAttrs.actor(ex);
             String verb = granted ? "access.granted" : "access.denied";
             EventLog.current().emit(located(ex, Event.builder(granted ? EventType.AUDIT : EventType.ACCESS_DENIED))
                     .source("audit")
                     .message(actor + " " + verb + " " + abacAction + " " + route
                             + (policy == null ? "" : " (policy " + policy + ")"))
-                    .actor(actor).actorType(ApiContext.actorType(ex))
+                    .actor(actor).actorType(RequestAttrs.actorType(ex))
                     .action(verb).actionCategory("authorization")
                     .target(resourceType, resourceId)
-                    .userAgent(ApiContext.userAgent(ex))
+                    .userAgent(RequestAttrs.userAgent(ex))
                     .attr(AuditAttrs.HTTP_PATH, route)
                     .attr(AuditAttrs.ABAC_ACTION, abacAction)
                     .attr(AuditAttrs.POLICY, policy));

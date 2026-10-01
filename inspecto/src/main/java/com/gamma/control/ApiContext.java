@@ -24,7 +24,7 @@ import java.util.regex.Matcher;
  * indirection lets cohesive route groups live in their own classes (lower coupling, thinner host).
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
-public interface ApiContext {
+public interface ApiContext extends WriteRootProvider {
 
     /** Returned by a handler that has already written its own (non-JSON) response. */
     Object HANDLED = new Object();
@@ -40,65 +40,24 @@ public interface ApiContext {
     ObjectMapper JSON = new ObjectMapper()
             .registerModule(new SimpleModule().addSerializer(Temporal.class, new ToStringSerializer()));
 
-    // ── per-exchange attributes set by ControlApi.dispatch (v1 transport spine, v4.8.0) ─────────
-    //
-    // ⚠ "Per-exchange" is a JDK-VERSION-DEPENDENT promise, not a guarantee. `ExchangeImpl` picks its
-    // attribute map like this:
-    //
-    //     private static final boolean perExchangeAttributes =
-    //         !System.getProperty("jdk.httpserver.attributes", "").equals("context");
-    //     ...
-    //     this.attributes = perExchangeAttributes ? new ConcurrentHashMap<>()
-    //                                             : getHttpContext().getAttributes();
-    //
-    // So the map is private to the exchange only by DEFAULT and only on a JDK new enough to have that
-    // switch. Where it resolves to the HttpContext's map, every attribute below is shared by every
-    // request the server ever handles — ControlApi serves everything from one createContext("/") — and a
-    // value stamped by one request is readable by the next. Anything that must not leak across requests
-    // therefore has to be either derived from the request itself (see #v1) or cleared at dispatch —
-    // every constant below is on ControlApi.REQUEST_SCOPED_ATTRS, cleared as dispatch's first act.
-    /** The request's correlation id (caller-supplied {@code Correlation-ID} header, or issued). */
-    String ATTR_CORRELATION_ID = "inspecto.correlationId";
-    /** {@code System.nanoTime()} at dispatch start (v1 {@code metadata.durationMs}). */
-    String ATTR_START_NANOS    = "inspecto.startNanos";
-    /** The original request path incl. the {@code /api/v1} prefix (v1 {@code links.self}). */
-    String ATTR_SELF_PATH      = "inspecto.selfPath";
-    /** A specific {@link ErrorCodes} value chosen by the throwing site (else derived from status). */
-    String ATTR_ERROR_CODE     = "inspecto.errorCode";
-    /** The {@link Idempotency.Pending} marker for this exchange (present only for a keyed write that missed). */
-    String ATTR_IDEMPOTENCY_KEY   = "inspecto.idempotency.key";
-    /** The request body's raw bytes, cached because {@code ex.getRequestBody()} is single-read (D8). */
-    String ATTR_RAW_BODY          = "inspecto.rawBody";
-    /** The client IP resolved against the trusted-proxy list at dispatch start ({@link #ip}, SEC review F3). */
-    String ATTR_CLIENT_IP         = "inspecto.clientIp";
-    /** The authenticated {@link Subject} (W6), set by {@link ControlApi#dispatch} once an
-     *  {@link Authenticator} validates the request; absent on Personal edition (no Authenticator present)
-     *  and on the public bootstrap/health surface. */
-    String ATTR_SUBJECT           = "inspecto.subject";
-    /** The issuer ({@code iss}) of the token the {@link Subject} was verified from, stamped by the Authenticator. */
-    String ATTR_SUBJECT_ISSUER    = "inspecto.subject.issuer";
-    /** The capability {@link #requireCapability} CHECKED on this exchange — set only when a Subject was
-     *  attached, i.e. only when a check actually ran. Read by {@code AuditTrail}: on a 403 it is the
-     *  capability that was missing, on a permitted write the one the write was privileged by. Absent on
-     *  Personal (nothing is checked there) and on any route with no gate (compliance plan step 4a/4b). */
-    String ATTR_CAPABILITY        = "inspecto.capability";
-    /** SEC-7(b): the capability set applicable to the single resource this response carries, declared by
-     *  the route via {@link #resourcePermissions}; {@link Envelope} intersects it with the Subject's
-     *  session grants. Absent ⇒ the envelope keeps the session-wide array (lists, un-migrated routes). */
-    String ATTR_RESOURCE_PERMISSIONS = "inspecto.resourcePermissions";
-    /** Cursor pagination (api-contract-design §7): a list route's paging block, declared via
-     *  {@link #pagination}; {@link Envelope} emits it under {@code metadata.pagination}. Absent ⇒ no block. */
-    String ATTR_PAGINATION = "inspecto.pagination";
-    /** Pod-scoped response (`POD-SCOPE-DIVERGENCE-1`): this payload describes only the Pod that answered,
-     *  declared via {@link #podScoped}; {@link Envelope} emits it as {@code metadata.podScoped}. */
-    String ATTR_POD_SCOPED = "inspecto.podScoped";
-    /** The Pending Change an approval is applying (`ASSURE-MAKER-CHECKER-1`): stamped ONLY on the in-process
-     *  replay {@link #replay} runs, where {@code PendingChanges.hold} reads it as "this write was approved —
-     *  verify it is the one that was, then let it through". Absent on every request a client sends. */
-    String ATTR_APPROVED_CHANGE = "inspecto.approvedChange";
-    /** Extra {@code Map<String,Object>} attributes a handler adds to its request's AUDIT row (push ingest
-     *  records the record count and byte size here — never the payload). */
-    String ATTR_AUDIT_ATTRS = "inspecto.auditAttrs";
+    // The per-exchange attribute NAMES, their scope and the identity helpers live in RequestAttrs (D-1 step 3: the auth
+    // classes sit below this interface). These aliases and delegates keep every ApiContext.ATTR_* / ApiContext.attr(…)
+    // call site compiling unchanged.
+    String ATTR_CORRELATION_ID = RequestAttrs.ATTR_CORRELATION_ID;
+    String ATTR_START_NANOS = RequestAttrs.ATTR_START_NANOS;
+    String ATTR_SELF_PATH = RequestAttrs.ATTR_SELF_PATH;
+    String ATTR_ERROR_CODE = RequestAttrs.ATTR_ERROR_CODE;
+    String ATTR_IDEMPOTENCY_KEY = RequestAttrs.ATTR_IDEMPOTENCY_KEY;
+    String ATTR_RAW_BODY = RequestAttrs.ATTR_RAW_BODY;
+    String ATTR_CLIENT_IP = RequestAttrs.ATTR_CLIENT_IP;
+    String ATTR_SUBJECT = RequestAttrs.ATTR_SUBJECT;
+    String ATTR_SUBJECT_ISSUER = RequestAttrs.ATTR_SUBJECT_ISSUER;
+    String ATTR_CAPABILITY = RequestAttrs.ATTR_CAPABILITY;
+    String ATTR_RESOURCE_PERMISSIONS = RequestAttrs.ATTR_RESOURCE_PERMISSIONS;
+    String ATTR_PAGINATION = RequestAttrs.ATTR_PAGINATION;
+    String ATTR_POD_SCOPED = RequestAttrs.ATTR_POD_SCOPED;
+    String ATTR_APPROVED_CHANGE = RequestAttrs.ATTR_APPROVED_CHANGE;
+    String ATTR_AUDIT_ATTRS = RequestAttrs.ATTR_AUDIT_ATTRS;
 
     /** JSON bodies at or above this size are gzipped when the client sent {@code Accept-Encoding: gzip}. */
     int GZIP_MIN_BYTES = 1024;
@@ -125,55 +84,22 @@ public interface ApiContext {
         return path.equals("/api/v1") || path.startsWith("/api/v1/");
     }
 
-    // ── the per-exchange attribute SCOPE — the storage behind every ATTR_* above ────────────────
-    //
-    // SEC-EXCHANGE-ATTRS, closed for real 2026-08-19: request-scoped values are NEVER stored via
-    // HttpExchange.set/getAttribute. On any pre-JDK-26 runtime that map is the shared HttpContext map
-    // (see the block comment above), and clearing it at dispatch start only fixed the SEQUENTIAL leak —
-    // two requests IN FLIGHT still raced on it. Observed shipping on the bundle's GraalVM 25 runtime:
-    // 53 of 1200 concurrent static-asset responses carried ANOTHER request's file, because the
-    // effective path itself rode that map (request B read request A's path between A's setPath and A's
-    // serveStatic). The same race crossed ATTR_RAW_BODY (a handler reading another request's body) and,
-    // under auth, ATTR_SUBJECT/ATTR_HELD_ROLES (another request's identity).
-    //
-    // This map is keyed by exchange IDENTITY (HttpExchange does not override equals), so a scope is
-    // per-request by construction on every runtime. Writes create the scope lazily; a null value is a
-    // remove (matching the old setAttribute(k, null) idiom); ControlApi's correlation stage — the
-    // outermost pipeline stage — drops the whole scope in its finally, so entries cannot outlive their
-    // request. Do not "simplify" back to exchange attributes: the JDK's map choice is a static final
-    // read at class-init, invisible to every test run on JDK 26.
-    ConcurrentHashMap<HttpExchange, ConcurrentHashMap<String, Object>> REQUEST_SCOPES = new ConcurrentHashMap<>();
+    ConcurrentHashMap<HttpExchange, ConcurrentHashMap<String, Object>> REQUEST_SCOPES = RequestAttrs.REQUEST_SCOPES;
 
-    /** The request-scoped value stamped under {@code key}, or {@code null}. Never reads the JDK map. */
-    static Object attr(HttpExchange ex, String key) {
-        ConcurrentHashMap<String, Object> scope = REQUEST_SCOPES.get(ex);
-        return scope == null ? null : scope.get(key);
-    }
+    /** See {@link RequestAttrs#attr(HttpExchange, String)}. */
+    static Object attr(HttpExchange ex, String key) { return RequestAttrs.attr(ex, key); }
 
-    /** Stamp a request-scoped value ({@code null} removes). Never writes the JDK map. */
-    static void attr(HttpExchange ex, String key, Object value) {
-        if (value == null) {
-            ConcurrentHashMap<String, Object> scope = REQUEST_SCOPES.get(ex);
-            if (scope != null) scope.remove(key);
-        } else {
-            REQUEST_SCOPES.computeIfAbsent(ex, x -> new ConcurrentHashMap<>()).put(key, value);
-        }
-    }
+    /** See {@link RequestAttrs#attr(HttpExchange, String, Object)}. */
+    static void attr(HttpExchange ex, String key, Object value) { RequestAttrs.attr(ex, key, value); }
 
-    /** Drop the whole scope — the outermost stage's finally. After this the request left no trace. */
-    static void dropAttrScope(HttpExchange ex) { REQUEST_SCOPES.remove(ex); }
+    /** See {@link RequestAttrs#dropAttrScope}. */
+    static void dropAttrScope(HttpExchange ex) { RequestAttrs.dropAttrScope(ex); }
 
-    /** The request's correlation id (set by dispatch on every request), or {@code null} pre-dispatch. */
-    static String correlationId(HttpExchange ex) {
-        Object v = attr(ex, ATTR_CORRELATION_ID);
-        return v == null ? null : v.toString();
-    }
+    /** See {@link RequestAttrs#correlationId}. */
+    static String correlationId(HttpExchange ex) { return RequestAttrs.correlationId(ex); }
 
-    /** The authenticated {@link Subject}, when {@link ControlApi#dispatch} resolved one for this request
-     *  (W6: Standard edition, security module present). Empty on Personal edition. */
-    static java.util.Optional<Subject> subject(HttpExchange ex) {
-        return attr(ex, ATTR_SUBJECT) instanceof Subject s ? java.util.Optional.of(s) : java.util.Optional.empty();
-    }
+    /** See {@link RequestAttrs#subject}. */
+    static java.util.Optional<Subject> subject(HttpExchange ex) { return RequestAttrs.subject(ex); }
 
     /** AuthZ gate (W6): when a {@link Subject} is attached (Standard edition, authenticated request) it
      *  must carry {@code capability}, else {@code 403 PERMISSION_DENIED}. A no-op on Personal edition — no
@@ -397,52 +323,19 @@ public interface ApiContext {
      *  Used by query execution to resolve a dataset's {@code physicalRef} to its at-rest Parquet (W4). */
     Path dataRoot();
 
-    /** Request header set by the client-side agent surface (S6) when a mutating call executes a
-     *  human-confirmed agent/decision proposal — e.g. the A2UI {@code invoke} confirm-then-apply flow —
-     *  so the audit trail can attribute it to the agent session rather than the browsing human. Additive
-     *  only: absent on every existing caller, so the default (human) path is unchanged. */
-    String HEADER_AGENT_SESSION = "X-Agent-Session";
+    String HEADER_AGENT_SESSION = RequestAttrs.HEADER_AGENT_SESSION;
 
-    /** The acting identity for the audit trail. When the security module authenticated this request
-     *  (W6), the resolved {@link Subject}'s id is authoritative. Otherwise, when the request carries
-     *  {@link #HEADER_AGENT_SESSION} (S6 — an agent-confirmed apply), the actor is {@code agent:<sessionId>}.
-     *  Otherwise (Personal edition, or a public route no {@link Authenticator} ran on) the actor is the
-     *  caller-supplied {@code X-Actor} header, defaulting to {@code appUser} — the historic auth-free
-     *  behaviour, unchanged. On Standard/Enterprise the header never reaches here: {@code ControlApi}'s
-     *  authenticate stage rejects any {@code X-Actor} outright (SEC-7a spoof guard), so the actor is
-     *  always the authenticated {@link Subject}. */
-    static String actor(HttpExchange ex) {
-        if (attr(ex, ATTR_SUBJECT) instanceof Subject s) return s.id();
-        String agentSession = ex.getRequestHeaders().getFirst(HEADER_AGENT_SESSION);
-        if (agentSession != null && !agentSession.isBlank()) return "agent:" + agentSession.trim();
-        String a = ex.getRequestHeaders().getFirst("X-Actor");
-        return (a == null || a.isBlank()) ? "appUser" : a.trim();
-    }
+    /** See {@link RequestAttrs#actor}. */
+    static String actor(HttpExchange ex) { return RequestAttrs.actor(ex); }
 
-    /** The audit {@code actorType} for this request: {@code "agent"} when {@link #HEADER_AGENT_SESSION}
-     *  is present (and no authenticated human {@link Subject} overrides it), else the historic
-     *  {@code "user"}. Additive-only companion to {@link #actor} — see there for precedence. */
-    static String actorType(HttpExchange ex) {
-        if (attr(ex, ATTR_SUBJECT) instanceof Subject) return "user";
-        String agentSession = ex.getRequestHeaders().getFirst(HEADER_AGENT_SESSION);
-        return (agentSession != null && !agentSession.isBlank()) ? "agent" : "user";
-    }
+    /** See {@link RequestAttrs#actorType}. */
+    static String actorType(HttpExchange ex) { return RequestAttrs.actorType(ex); }
 
-    /** The originating client IP, as resolved once per request by {@code ControlApi} against
-     *  {@code -Dcontrol.trustedProxies} ({@link TrustedProxies}, SEC review F3): {@code X-Forwarded-For} is
-     *  believed only from a trusted direct peer, right-most untrusted hop first. Without that stamp (an
-     *  exchange that never went through the pipeline) it is the socket peer — never a header value.
-     *  {@code null} only if the address is somehow unavailable. */
-    static String ip(HttpExchange ex) {
-        if (attr(ex, ATTR_CLIENT_IP) instanceof String stamped) return stamped;
-        var addr = ex.getRemoteAddress();
-        return addr == null || addr.getAddress() == null ? null : addr.getAddress().getHostAddress();
-    }
+    /** See {@link RequestAttrs#ip}. */
+    static String ip(HttpExchange ex) { return RequestAttrs.ip(ex); }
 
-    /** The request {@code User-Agent}, or {@code null} if absent. */
-    static String userAgent(HttpExchange ex) {
-        return ex.getRequestHeaders().getFirst("User-Agent");
-    }
+    /** See {@link RequestAttrs#userAgent}. */
+    static String userAgent(HttpExchange ex) { return RequestAttrs.userAgent(ex); }
 
     /**
      * Decode the {@code key} query-string parameter, or {@code null} if absent. Parses the RAW query and decodes once:

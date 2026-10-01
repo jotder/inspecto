@@ -16,7 +16,7 @@ public final class WriteGates {
     private WriteGates() {}
 
     /** Gate 1 — writes disabled → 503. {@code what} names the capability (e.g. "config write"). */
-    public static Path requireWriteRoot(ApiContext api, String what) {
+    public static Path requireWriteRoot(WriteRootProvider api, String what) {
         Path root = api.writeRoot();
         if (root == null)
             throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY,
