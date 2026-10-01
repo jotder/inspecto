@@ -570,3 +570,41 @@ reads the index, not a flat Dataset*; no measured gap opens the external graph D
 unmeasured because no build exists for the pinned DuckDB 1.5.2 (D-S2), so D9 rests on SQL + index alone. **D10 confirmed** — entity-hash partitioning with (entity, time) sort is the
 default, and the reader **must compute and push the bucket predicate** (2.3× at 10⁸ over relying on pruning
 alone). Today's route walks a flat Dataset, so its practical ceiling is ≈ 10⁷ edges within the 5 s fence.
+
+### 7.11 Grounded dependency edges — 2026-10-01 (input to the D-1 design)
+
+Read from the module poms (compile/provided/test scope, profiles excluded) and from `import` lines in `inspecto-geo-link/src/main`.
+⚠ Maven artifact `inspecto-processor` is the directory `inspecto/` (the control plane + `com.gamma.control`).
+
+**Reactor edges.** Core chain: `inspecto-api` ← `inspecto-util` ← `inspecto-config`/`inspecto-sql` ← `inspecto-etl` ← `inspecto-event` and `inspecto-acquire` ← `inspecto-engine` ← `inspecto-processor`. Every optional module (`agent`, `backup`, `connectors`, `events`, `exchange`, `geo-link`, `metrics`, `ops`, `policy`, `security`, …) depends on `inspecto-processor` alone (compile or `provided`) plus a test-scope `inspecto-etl`. `inspecto-geo-link` → `inspecto-processor`, `inspecto-etl[test]`. The only Java edge INTO it is `inspecto-policy` → `inspecto-geo-link[test]`.
+
+**What geo-link main imports from core (by owning module).**
+
+| Owner | Classes | Imports | Note |
+|---|---|---|---|
+| `inspecto-processor` (`com.gamma.control`) | `ApiContext` `ApiException` `ErrorCodes` `RouteModule` (the http-spi seed); `Subject` `RowScope` `ComponentAccess` (auth-spi seed); `WriteGates` `EntityTypes` `LinkAnalysisSettings` `PendingChanges` `AnnotationTargets` | ~95 | `http-spi` + `auth-spi` must be cut OUT of this module; five of these are not SPI-shaped (`WriteGates`, `EntityTypes`, `LinkAnalysisSettings`, `PendingChanges`, `AnnotationTargets`) and each needs a home or an adapter |
+| `inspecto-event` | `Event` `EventLog` `EventType` | 39 | the `audit-spi` seed; this module depends on `inspecto-etl` (the edge to cut) |
+| `inspecto-engine` | `QueryExecutor` `DatasetRead` `ResultSetDescriptor` `MeasureCompiler` `DatasetMeasureProbe` `ConditionSql` · `AlertRule` `AlertService` `InvestigationMeasureProbe` · `ComponentRegistry` · `ObjectAccess` · `WatchListFeed` | ~30 | the Dataset-read port (`DatasetRead`, SEP-01) is the start; Alert Rule + Pipeline + Cases usage belongs in the bridge, not `la-core` |
+| `inspecto-util` | `SqlIdent` `DuckDbUtil` `JsonAttributes` | 14 | stays shared |
+| `inspecto-sql` | `SqlGuard` `SqlSandboxPolicy` | 6 | stays shared |
+| `inspecto-config` | `SourceZoneGrammar` | 1 | stays shared |
+
+**Inbound references to LA.** Real code: `ControlApi` registers `AbsentGeoLinkRoutes` (the Personal 503 stub). `inspecto-engine` (`AlertRule`, `AlertService`, `InvestigationMeasureProbe`, `WatchListFeed`) names LA only in prose, not in an import. Other mentions are `package.ps1`, `NoGeoLinkShipsInThePersonalBuildTest`, `BootstrapRoutes`, `CollectorService`, SBOMs.
+
+**Consequence for D-1.** `la-core`/`la-graph`/`la-storage` can already stay clear of `inspecto-processor`, `inspecto-etl` and `inspecto-engine` only if the 12 `com.gamma.control` classes, the three event classes and the engine's query/alert/pipeline/objects classes are each re-homed behind an SPI. The engine group is the biggest: Alert Rule, Pipeline and Cases usage moves to `la-inspecto`.
+
+### 7.12 Grounded SPA dependency edges — 2026-10-01 (input to D-5)
+
+Non-spec `import` lines under `inspecto-ui/src/app/modules/admin/studio/link-analysis` (LA) and `…/geo-map` (Geo), after D-0 (SEP-03…06).
+
+| Import target | LA | Geo | Target home |
+|---|---|---|---|
+| `inspecto/graph` (engine, canvas, brush, entity-id mint) | 25 | 3 | the `link-analysis` library |
+| `inspecto/geo`, `inspecto/investigation` | 2 (investigation) | 8 + 2 | the `link-analysis` library |
+| `inspecto/components`, `theme`, `format`, `data-table`, `viz`, `query`, `confirm.service`, `dialog-dirty-guard`, `component-model` | ~75 | ~13 | shared core library |
+| `inspecto/api` | 34 | 4 | API client base shared; LA's own routes move into the library |
+| `studio/datasets` (6 LA / 3 Geo), `widgets` (3), `dashboards/dashboard-header`, `catalog` (2), `pipelines` (1), `tags`, `transfer`, `ai-assist`, Cases via `ObjectsService` | ~18 | ~5 | **host-service tokens** (Inspecto and LA-App implementations) |
+
+Inbound references into the two features: `app.config.ts` (viz-kind registration, via `provideAppInitializer` since SEP-06), `inspecto/api/link-analysis-settings.service.ts` (a client the library will own), `modules/admin/menu/menu-artifact.component.ts` (a host feature that opens LA; becomes a URL or a library-exposed route). Nav gating by `features.geoLink` stays in the Inspecto shell.
+
+Target: `projects/inspecto-ui-core` (shared) ← `projects/link-analysis` (library; reaches the host only through injected tokens) ← two shells (the Inspecto SPA and `projects/la-app`). No module federation (D3). Library rules: no import from `modules/admin/**` (enforce with a lint rule), configuration only through tokens, and a missing host service makes its feature report itself absent. Owed before extraction: ~8 host-service interfaces (datasets, widgets, Cases, tags, transfer, AI assist, dashboard header, catalog link) and the move out of `modules/admin/studio/{link-analysis,geo-map}`. D-5 depends on D-1 and SEP-03…06.
