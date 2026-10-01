@@ -259,6 +259,24 @@ class ControlApiGraphRunTest {
         }
     }
 
+    /** Verifier finding on step 6: the result cache key omitted `kinds`, so a second filter on one Working Set got the first one's answer. */
+    @Test
+    void aDifferentKindsFilterOnTheSameWorkingSetIsNeverServedFromTheCache(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            investigation(c);
+            JsonNode sms = ok(c, "POST", "/inv/graph/runs", run("connectedComponents", "\"kinds\":[\"sms\"]"), ANALYST);
+            JsonNode all = ok(c, "POST", "/inv/graph/runs", run("connectedComponents", ""), ANALYST);
+            assertFalse(all.get("cached").asBoolean(), "no filter is a different graph from the sms filter");
+            assertNotEquals(sms.get("consumed").get("edges").asInt(), all.get("consumed").get("edges").asInt());
+            assertNotEquals(sms.get("result").get("groups").size(), all.get("result").get("groups").size(),
+                    "the unfiltered graph has fewer components than the one-link graph");
+            JsonNode smsAgain = ok(c, "POST", "/inv/graph/runs", run("connectedComponents", "\"kinds\":[\"sms\"]"), ANALYST);
+            assertTrue(smsAgain.get("cached").asBoolean(), "the SAME filter is still a hit");
+            assertEquals(sms.get("result").get("groups"), smsAgain.get("result").get("groups"));
+        }
+    }
+
     @Test
     void aRunPastItsInlineWaitIs202WithALocationAndLaterCompletesWithItsResult(@TempDir Path cfg, @TempDir Path root) throws Exception {
         subjects();

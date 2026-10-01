@@ -232,7 +232,7 @@ public final class GraphRunRoutes implements RouteModule {
         String owner = callerId(ex);
         RunView v;
         try {
-            v = svc.submit(new GraphRunService.Request(owner, invId, rel.key(), scopeFingerprint(ex), algorithm, params,
+            v = svc.submit(new GraphRunService.Request(owner, invId, cacheScope(rel.key(), kinds), scopeFingerprint(ex), algorithm, params,
                     weights, input, budget));
         } catch (InvalidGraphRequest bad) {
             throw bad(bad.getMessage());
@@ -286,6 +286,15 @@ public final class GraphRunRoutes implements RouteModule {
         if (raw == null) return "count";
         if (!"count".equals(raw) && !"none".equals(raw)) throw bad("'weights' must be \"count\" or \"none\", got '" + raw + "'");
         return (String) raw;
+    }
+
+    /**
+     * The Working Set key PLUS the link-kind filter: {@code kinds} shapes the graph the run sees, so it must separate cache
+     * entries ({@code kinds:["sms"]} then {@code kinds:["voice"]} on one Working Set are different graphs).
+     */
+    private static String cacheScope(String relationKey, List<String> kinds) {
+        if (kinds == null || kinds.isEmpty()) return relationKey;
+        return relationKey + "|kinds=" + String.join(",", kinds.stream().sorted().distinct().toList());
     }
 
     private static List<String> kinds(Map<String, Object> body) {
