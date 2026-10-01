@@ -2,14 +2,14 @@
 type: Concept
 title: Events & Metrics
 description: EventLog (synchronous bus + the run-claim hand-off seam), MetricRegistry, the StabilityGate, notifications + audit trail, and alert-rule authoring.
-resource: inspecto-event/src/main/java/com/gamma/event/EventLog.java
+resource: inspecto-audit-spi/src/main/java/com/gamma/event/EventLog.java
 tags: [control-plane, events, metrics, observability, deadlock]
 timestamp: 2026-07-16T00:00:00Z
 ---
 
 # Events & Metrics
 
-* **`EventLog`** (`inspecto-event/src/main/java/com/gamma/event/EventLog.java`) — the event bus. `global()` +
+* **`EventLog`** (`inspecto-audit-spi/src/main/java/com/gamma/event/EventLog.java`) — the event bus. `global()` +
   per-space instances; `current()` routes by the calling thread's `space` MDC, falling back to global.
   ⛔ An MDC naming a Space that was **unregistered** (a late emitter outliving `CollectorService.close()`) is NOT routed to global: the event is dropped with one rate-limited stderr line (fail-closed, 2026-09-28) — it must not enter the default Space's store or audit chain.
   **Emission is synchronous on the publishing thread** (`emit()` calls each subscriber inline). This is the
@@ -20,7 +20,7 @@ timestamp: 2026-07-16T00:00:00Z
   hung (see [cross-cutting gotchas](../gotchas/cross-cutting.md)). `emit()` uses no SLF4J (avoids re-entrant capture) and
   swallows subscriber errors. A startup store-swap (`InMemoryEventStore` → configured backend) drains the old
   store oldest-first so nothing is lost.
-* **`MetricRegistry`** (`inspecto-event/src/main/java/com/gamma/metrics/MetricRegistry.java`) — counters/gauges/
+* **`MetricRegistry`** (`inspecto-audit-spi/src/main/java/com/gamma/metrics/MetricRegistry.java`) — counters/gauges/
   histograms keyed by name + sorted labels; `scrape()` runs registered collectors then renders Prometheus
   text. The per-space `space` label is supplied by callers as a label (no registry-level space awareness).
   The scrape endpoint `/metrics` (with `/metrics/acquisition`, `/health`, `/ready`) is one of the four
@@ -146,7 +146,7 @@ timestamp: 2026-07-16T00:00:00Z
   Pinned by three tests in `ControlApiAuthV1Test`, each proven red by removing the recording call.
 * **Tamper evidence — the audit hash chain (`ASSURE-AUDIT-CHAIN-1`, 2026-09-27).** Every `AUDIT` and
   `ACCESS_DENIED` event a Space's `EventLog` emits is linked onto that Space's chain
-  (`inspecto-event/src/main/java/com/gamma/event/AuditChain.java`): attributes `audit_seq` (from 1),
+  (`inspecto-audit-spi/src/main/java/com/gamma/event/AuditChain.java`): attributes `audit_seq` (from 1),
   `audit_prev_hash` (`""` at genesis — the Entity Fact log's convention) and `audit_hash`, SHA-256 over a
   canonical encoding (JSON, keys sorted at every depth, nulls written, UTF-8, format version `v: 1`; the payload
   is normalised through the store's own JSON round trip first, so a double reads back as the same text).

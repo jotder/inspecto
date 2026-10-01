@@ -62,7 +62,7 @@ profile-scoped** (rebuild the list from `pom.xml`, which is the only current sou
 extractions after it was written. Read it for the *reasoning* behind the split, not for the module list. The **core / composition root** [`inspecto/`](./modules/engine.md)
 holds `control/` (HTTP API), `service/` (spaces + host), `assist/spi/`, `report/`, `exchange/`,
 `expectation/`, `intelligence/`, `model/` and ships the fat JAR. The **engine** was extracted below it:
-`etl/` (ingest/transform/output) → `inspecto-etl`; `event/` + `metrics/` → `inspecto-event`; `acquire/`
+`etl/` (ingest/transform/output) → `inspecto-etl`; `event/` + `metrics/` → `inspecto-event` (its audit core — `Event`/`EventLog`/`EventType` + `MetricRegistry` — in `inspecto-audit-spi`, D-1 step 2); `acquire/`
 (acquisition) → `inspecto-acquire`; and `inspector/` (batch coordination), `pipeline/` (pipeline graph +
 components), `query/` (query catalog), `job/`, `signal/`, `enrich/`, `catalog/`, `alert/`,
 `notify/`, `ingester/` → `inspecto-engine`. Foundation leaves: `api/` → `inspecto-api`, `util/` (DuckDB

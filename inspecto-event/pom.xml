@@ -25,6 +25,11 @@
     <name>Inspecto event (Operational-Intelligence event store + metrics)</name>
 
     <dependencies>
+        <!-- LA separation D-1 step 2: Event/EventLog/EventType + closure + MetricRegistry live here now. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-audit-spi</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-api</artifactId>

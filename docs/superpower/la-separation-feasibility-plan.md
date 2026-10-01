@@ -61,7 +61,7 @@ All of these are **hand-kept mirrors** of the module's real surface:
   `SURFACE` table. Its own header records a drift incident: routes added to the module and forgotten here
   silently 404'd **and vanished from `docs/api/openapi-v1.json`** while the guard stayed green.
 - `inspecto/src/main/java/com/gamma/control/CapabilityManifest.java` — LA capabilities named by class.
-- `inspecto-event/src/main/java/com/gamma/event/EventType.java` — ~24 `LINK_*` / `LINK_INVESTIGATION_*` constants.
+- `inspecto-audit-spi/src/main/java/com/gamma/event/EventType.java` — ~24 `LINK_*` / `LINK_INVESTIGATION_*` constants.
 - `inspecto/src/main/java/com/gamma/control/BootstrapRoutes.java` — `features.geoLink`, derived from
   `ApiContext.hasRoute(...)` (honest: it reflects what actually registered).
 - `inspecto-policy/pom.xml` — a **test-scope** dependency on `inspecto-geo-link` (the only Java edge into it).
@@ -583,7 +583,7 @@ Read from the module poms (compile/provided/test scope, profiles excluded) and f
 | Owner | Classes | Imports | Note |
 |---|---|---|---|
 | `inspecto-processor` (`com.gamma.control`) | `ApiContext` `ApiException` `ErrorCodes` `RouteModule` (the http-spi seed); `Subject` `RowScope` `ComponentAccess` (auth-spi seed); `WriteGates` `EntityTypes` `LinkAnalysisSettings` `PendingChanges` `AnnotationTargets` | ~95 | `http-spi` + `auth-spi` must be cut OUT of this module; five of these are not SPI-shaped (`WriteGates`, `EntityTypes`, `LinkAnalysisSettings`, `PendingChanges`, `AnnotationTargets`) and each needs a home or an adapter |
-| `inspecto-event` | `Event` `EventLog` `EventType` | 39 | the `audit-spi` seed; this module depends on `inspecto-etl` (the edge to cut) |
+| `inspecto-event` | `Event` `EventLog` `EventType` | 39 | the `audit-spi` seed; EXTRACTED 2026-10-01 into `inspecto-audit-spi` (D-1 step 2; also takes `MetricRegistry`); `inspecto-event` keeps the edge to `inspecto-etl` |
 | `inspecto-engine` | `QueryExecutor` `DatasetRead` `ResultSetDescriptor` `MeasureCompiler` `DatasetMeasureProbe` `ConditionSql` · `AlertRule` `AlertService` `InvestigationMeasureProbe` · `ComponentRegistry` · `ObjectAccess` · `WatchListFeed` | ~30 | the Dataset-read port (`DatasetRead`, SEP-01) is the start; Alert Rule + Pipeline + Cases usage belongs in the bridge, not `la-core` |
 | `inspecto-util` | `SqlIdent` `DuckDbUtil` `JsonAttributes` | 14 | stays shared |
 | `inspecto-sql` | `SqlGuard` `SqlSandboxPolicy` | 6 | stays shared |

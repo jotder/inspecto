@@ -47,6 +47,7 @@
         <module>inspecto-config</module>
         <module>inspecto-sql</module>
         <module>inspecto-etl</module>
+        <module>inspecto-audit-spi</module>
         <module>inspecto-event</module>
         <module>inspecto-acquire</module>
         <module>inspecto-engine</module>
@@ -311,6 +312,11 @@
                 <artifactId>inspecto-etl</artifactId>
                 <version>${project.version}</version>
                 <type>test-jar</type>
+            </dependency>
+            <dependency>
+                <groupId>com.gamma.inspector</groupId>
+                <artifactId>inspecto-audit-spi</artifactId>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.gamma.inspector</groupId>

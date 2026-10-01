@@ -512,7 +512,7 @@ function isSentence(fragment) {
 // Same `<path>::<ruleId>` keying and the same self-retirement as CONFIG_ALLOW: an entry that stops
 // suppressing anything is debt that has been PAID and must be deleted.
 const SOURCE_ALLOW = {
-    'inspecto-event/src/main/java/com/gamma/event/EventType.java::flow-identifier':
+    'inspecto-audit-spi/src/main/java/com/gamma/event/EventType.java::flow-identifier':
         'Deliberate Tier-2 read-alias: FLOW_CONSERVATION_IMBALANCE_LEGACY must keep the pre-rename spelling — it exists to match events already persisted under the old type. Renaming it would defeat its purpose.',
     'inspecto-ops/src/main/java/com/gamma/ops/EventObjectBridge.java::flow-identifier':
         'Reads the Tier-2 legacy alias above so pre-rename events still promote — the whole point of the alias.',

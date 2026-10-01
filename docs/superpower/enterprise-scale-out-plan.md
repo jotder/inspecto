@@ -201,7 +201,7 @@ The defaults that a second pod turns into split-brain (`ServiceStores.java`):
 | **`events.backend`** | **`memory`** | **`memory` · `parquet` only — NO database backend** | `:216-230` |
 
 🔴 **Events have no shared backend at all.** `EventLog` is a per-process, per-Space static registry
-(`inspecto-event/src/main/java/com/gamma/event/EventLog.java:42, :61`). The Signal ledger — the spine
+(`inspecto-audit-spi/src/main/java/com/gamma/event/EventLog.java:42, :61`). The Signal ledger — the spine
 of Ops — is invisible across pods today.
 
 ### 3.4 No connection pool — one `Connection` per store
