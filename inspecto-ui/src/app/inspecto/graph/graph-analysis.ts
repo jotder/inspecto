@@ -998,7 +998,7 @@ export function weightedShortestPath(
         let cur: string | null = null;
         let best = Infinity;
         for (let top = heap.pop(); top; top = heap.pop()) {
-            if (visited.has(top.id) || top.d !== dist.get(top.id)) continue; // stale: superseded by a shorter entry
+            if (visited.has(top.id)) continue; // stale: a shorter entry for this node was popped first
             cur = top.id;
             best = top.d;
             break;

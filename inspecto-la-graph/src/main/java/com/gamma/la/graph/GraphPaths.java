@@ -140,7 +140,7 @@ public final class GraphPaths {
             double best = Double.POSITIVE_INFINITY;
             while (!heap.isEmpty()) {
                 Frontier f = heap.poll();
-                if (visited.contains(f.node) || f.dist != dist.get(f.node)) continue; // stale: superseded by a shorter entry
+                if (visited.contains(f.node)) continue; // stale: a shorter entry for this node was popped first
                 cur = f.node;
                 best = f.dist;
                 break;
