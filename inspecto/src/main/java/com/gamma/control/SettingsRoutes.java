@@ -15,7 +15,7 @@ import java.util.Map;
  *   PUT /settings/geo        replace the space's geo/tile-server config (same gates as branding)
  *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap, suspicionNodeCap,
  *                                 maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove, entityTypes,
- *                                 mergedDistinctCap, seedByDistinctCap, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue}} (nulls = shipped defaults)
+ *                                 mergedDistinctCap, seedByDistinctCap, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue,maxResultItems}} (nulls = shipped defaults)
  *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding)
  *   GET /settings/pipeline-history   the space's {keep, effectiveKeep, defaultKeep, maxKeep} — Pipeline config
  *                                    versions kept per Pipeline (keep null = the shipped default)
@@ -180,6 +180,7 @@ final class SettingsRoutes implements RouteModule {
             run.put("timeoutMs", g.timeoutMs());
             run.put("threads", g.threads());
             run.put("queue", g.queue());
+            run.put("maxResultItems", g.maxResultItems());
         }
         m.put("graphRun", run);
         return m;
@@ -196,11 +197,12 @@ final class SettingsRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "graphRun must be an object, got '" + raw + "'");
         Map<String, Object> g = (Map<String, Object>) raw;
         for (String k : g.keySet())
-            if (!List.of("maxNodes", "maxEdges", "timeoutMs", "threads", "queue").contains(k))
+            if (!List.of("maxNodes", "maxEdges", "timeoutMs", "threads", "queue", "maxResultItems").contains(k))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "graphRun has no key '" + k + "'");
         return new LinkAnalysisSettings.GraphRun(boundedInt(g, "maxNodes", "graphRun.maxNodes"),
                 boundedInt(g, "maxEdges", "graphRun.maxEdges"), boundedInt(g, "timeoutMs", "graphRun.timeoutMs"),
-                boundedInt(g, "threads", "graphRun.threads"), boundedInt(g, "queue", "graphRun.queue"));
+                boundedInt(g, "threads", "graphRun.threads"), boundedInt(g, "queue", "graphRun.queue"),
+                boundedInt(g, "maxResultItems", "graphRun.maxResultItems"));
     }
 
     private static Integer boundedInt(Map<String, Object> g, String key, String label) {

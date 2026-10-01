@@ -54,11 +54,13 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
      * field is optional ({@code null} = the service's shipped default). A default above the hard server ceiling is
      * clamped by the service, and the clamp is echoed - the ceilings themselves are not a setting.
      */
-    public record GraphRun(Integer maxNodes, Integer maxEdges, Integer timeoutMs, Integer threads, Integer queue) {
-        public static final GraphRun NONE = new GraphRun(null, null, null, null, null);
+    public record GraphRun(Integer maxNodes, Integer maxEdges, Integer timeoutMs, Integer threads, Integer queue,
+                           Integer maxResultItems) {
+        public static final GraphRun NONE = new GraphRun(null, null, null, null, null, null);
 
         boolean isNone() {
-            return maxNodes == null && maxEdges == null && timeoutMs == null && threads == null && queue == null;
+            return maxNodes == null && maxEdges == null && timeoutMs == null && threads == null && queue == null
+                    && maxResultItems == null;
         }
     }
 
@@ -116,6 +118,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             if (graphRun.timeoutMs() != null) g.put("timeout_ms", graphRun.timeoutMs());
             if (graphRun.threads() != null) g.put("threads", graphRun.threads());
             if (graphRun.queue() != null) g.put("queue", graphRun.queue());
+            if (graphRun.maxResultItems() != null) g.put("max_result_items", graphRun.maxResultItems());
             m.put("graph_run", g);
         }
         AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".link-analysis-");
@@ -147,7 +150,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         if (!(raw instanceof Map<?, ?>)) return null;
         Map<String, Object> g = (Map<String, Object>) raw;
         GraphRun r = new GraphRun(optInt(g, "max_nodes"), optInt(g, "max_edges"), optInt(g, "timeout_ms"),
-                optInt(g, "threads"), optInt(g, "queue"));
+                optInt(g, "threads"), optInt(g, "queue"), optInt(g, "max_result_items"));
         return r.isNone() ? null : r;
     }
 

@@ -331,13 +331,16 @@ class ControlApiSettingsTest {
             assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
             assertTrue(json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("graphRun").isNull(), "absent => inherit");
             HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
-                    "{\"graphRun\":{\"maxNodes\":900,\"timeoutMs\":4000,\"threads\":3}}");
+                    "{\"graphRun\":{\"maxNodes\":900,\"timeoutMs\":4000,\"threads\":3,\"maxResultItems\":250}}");
             assertEquals(200, put.statusCode(), put.body());
             String toon = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
             assertTrue(toon.contains("graph_run") && toon.contains("max_nodes: 900") && toon.contains("timeout_ms: 4000"), toon);
             JsonNode got = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("graphRun");
             assertEquals(900, got.get("maxNodes").asInt());
             assertEquals(3, got.get("threads").asInt());
+            assertEquals(250, got.get("maxResultItems").asInt());
+            assertTrue(toon.contains("max_result_items: 250"), toon);
+            assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"graphRun\":{\"maxResultItems\":0}}").statusCode());
             assertTrue(got.get("maxEdges").isNull() && got.get("queue").isNull(), "unstated knobs stay unstated");
             assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"graphRun\":{\"threads\":0}}").statusCode());
             assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"graphRun\":{\"bogus\":1}}").statusCode());

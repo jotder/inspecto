@@ -1245,6 +1245,8 @@ public final class ConfigSpecs {
                         "The server-side graph-run service (D-4): {max_nodes, max_edges, timeout_ms} is the DEFAULT "
                                 + "budget of a run that states none (clamped to the server's hard ceilings, echoed by "
                                 + "GET /inv/graph/algorithms); {threads, queue} size the workers and the waiting line; "
+                                + "max_result_items caps each list of a run's result on the way out (cut lists say "
+                                + "truncated/total/limit; absent = 10000, hard ceiling 1000000); "
                                 + "every key absent = the shipped default.")
         );
         return new ConfigSpec("link-analysis-settings", fields, List.of());

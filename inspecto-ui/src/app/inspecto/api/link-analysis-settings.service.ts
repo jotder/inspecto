@@ -61,6 +61,8 @@ export interface LinkAnalysisLimits {
         timeoutMs: number | null;
         threads: number | null;
         queue: number | null;
+        /** Items per list a run's result may carry (absent/null = 10 000). */
+        maxResultItems?: number | null;
     } | null;
 }
 
