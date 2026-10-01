@@ -135,6 +135,35 @@ describe('LinkAnalysisServerRunComponent', () => {
         expect(completed).toEqual([RESULT]);
     });
 
+    it('prefers the server fraction and elapsed time when they are > 0, and falls back to steps and the browser clock when they are 0', () => {
+        let now = 1_000_000;
+        const spy = vi.spyOn(Date, 'now').mockImplementation(() => now);
+        try {
+            const { click, push, q } = make();
+            click('run-on-server');
+            now += 5000; // the browser has waited 5 s by the time the first view arrives
+            push(
+                view('RUNNING', {
+                    progress: { work: 316, fraction: 0.25 },
+                    consumed: { nodes: 800, edges: 1200, elapsedMs: 1500, work: 316 },
+                }),
+            );
+            // the server's 1 500 ms wins over the browser's 5 000 ms (it used to show the larger of the two)
+            expect(q('run-progress')!.textContent).toMatch(/25%.*1,500 ms elapsed/s);
+            expect(q('run-progress')!.textContent).not.toMatch(/5,000/);
+            // an older server reports neither: steps done and the browser-measured wait
+            push(
+                view('RUNNING', {
+                    progress: { work: 316, fraction: 0 },
+                    consumed: { nodes: 800, edges: 1200, elapsedMs: 0, work: 316 },
+                }),
+            );
+            expect(q('run-progress')!.textContent).toMatch(/316 steps done.*5,000 ms elapsed/s);
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
     it('Cancel calls the cancel route and the polled CANCELLED view ends the run with no result', () => {
         const { click, push, q, runs, completed, el } = make();
         click('run-on-server');

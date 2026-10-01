@@ -168,10 +168,14 @@ export class LinkAnalysisServerRunComponent {
     readonly view = signal<GraphRunView | null>(null);
     readonly error = signal('');
     readonly cancelling = signal(false);
-    /** Milliseconds since Run was pressed, as the browser saw them - the server reports elapsed time only once a run ends. */
+    /** Milliseconds since Run was pressed, as the browser saw them - what a server that reports no elapsed time yet falls back to. */
     private readonly waitedMs = signal(0);
     private startedAt = 0;
-    readonly elapsedMs = computed(() => Math.max(this.view()?.consumed.elapsedMs ?? 0, this.waitedMs()));
+    /** The server's own elapsed time when it reports one (> 0, live on a newer server), else the browser-measured wait. */
+    readonly elapsedMs = computed(() => {
+        const server = this.view()?.consumed.elapsedMs ?? 0;
+        return server > 0 ? server : this.waitedMs();
+    });
     private readonly starting = signal(false);
 
     readonly active = computed(() => {
