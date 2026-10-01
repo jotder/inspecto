@@ -1,5 +1,6 @@
 package com.gamma.geolink;
 
+import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.api.InvRoutes;
 import com.gamma.la.api.InvestigationRoutes;
 import com.gamma.la.api.ValueMeasureRoutes;
@@ -16,7 +17,6 @@ import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
 import com.gamma.query.DatasetRead;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -93,7 +93,7 @@ public final class InvestigationMeasureRoutes implements RouteModule {
         }
         out.put("key", rel.key());
         out.put("cached", cached[0]);
-        emit(ex, EventType.LINK_INVESTIGATION_MEASURED, "link.investigation.measured",
+        emit(ex, LinkEventTypes.LINK_INVESTIGATION_MEASURED, "link.investigation.measured",
                 "link.investigation.measured — " + id,
                 b -> b.attr("investigationId", id).attr("key", rel.key()).attr("cached", cached[0])
                         .attr("measure", measure));
@@ -176,7 +176,7 @@ public final class InvestigationMeasureRoutes implements RouteModule {
         inv.store().bindAlertRule(id, rule.name(), InvestigationEvaluator.canonical(binding));
         alerts.upsert(rule);   // armed last: a rule is never live without the binding that lets it evaluate
 
-        emit(ex, EventType.LINK_INVESTIGATION_ALERT_RULE_BOUND, "link.investigation.alert_rule.bound",
+        emit(ex, LinkEventTypes.LINK_INVESTIGATION_ALERT_RULE_BOUND, "link.investigation.alert_rule.bound",
                 "link.investigation.alert_rule.bound — " + rule.name() + " on " + id,
                 b -> b.attr("rule", rule.name()).attr("investigationId", id).attr("relation", rule.relation())
                         .attr("measure", rule.measure()).attr("threshold", rule.threshold())

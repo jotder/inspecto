@@ -1,11 +1,11 @@
 package com.gamma.control;
 
+import com.gamma.la.core.LinkEventTypes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
@@ -418,12 +418,12 @@ class ControlApiInvProjectionTest {
             seedOverlap(c);
             List<Event> events = captureEvents(() ->
                     assertEquals(200, overlapProfile(c.port, "{}").statusCode()));
-            Event e = ofType(events, EventType.LINK_OVERLAP_PROFILED);
+            Event e = ofType(events, LinkEventTypes.LINK_OVERLAP_PROFILED);
             assertEquals("link.overlap.profiled", e.attributes().get("action"));
             assertEquals("4", e.attributes().get("columnsProfiled"));
             assertEquals("4", e.attributes().get("pairsProfiled"));
             assertEquals("false", e.attributes().get("truncated"));
-            assertTrue(events.stream().noneMatch(x -> EventType.LINK_SCHEMA_INSPECTED.equals(x.type())),
+            assertTrue(events.stream().noneMatch(x -> LinkEventTypes.LINK_SCHEMA_INSPECTED.equals(x.type())),
                     "a value profile is not a schema read: " + events);
         }
     }
@@ -475,7 +475,7 @@ class ControlApiInvProjectionTest {
             seedCalls(c);
             List<Event> events = captureEvents(() -> assertEquals(200, project(c.port, """
                     {"dataset":"calls_ds","sourceCol":"caller","targetCol":"callee","limit":1}""").statusCode()));
-            Event e = ofType(events, EventType.LINK_PROJECTED);
+            Event e = ofType(events, LinkEventTypes.LINK_PROJECTED);
             assertEquals("link.projected", e.attributes().get("action"));
             assertEquals("calls_ds", e.attributes().get("dataset"));
             assertEquals("1", e.attributes().get("rows"));
@@ -490,12 +490,12 @@ class ControlApiInvProjectionTest {
             seedCalls(c);
             List<Event> events = captureEvents(() -> assertEquals(200, neighbors(c.port, """
                     {"dataset":"calls_ds","sourceCol":"caller","targetCol":"callee","value":"bob"}""").statusCode()));
-            Event e = ofType(events, EventType.LINK_EXPANDED);
+            Event e = ofType(events, LinkEventTypes.LINK_EXPANDED);
             assertEquals("link.expanded", e.attributes().get("action"));
             assertEquals("calls_ds", e.attributes().get("dataset"));
             assertEquals("bob", e.attributes().get("value"));
             assertEquals("false", e.attributes().get("truncated"));
-            assertTrue(events.stream().noneMatch(x -> EventType.LINK_PROJECTED.equals(x.type())),
+            assertTrue(events.stream().noneMatch(x -> LinkEventTypes.LINK_PROJECTED.equals(x.type())),
                     "an expansion is not logged as a fresh projection: " + events);
         }
     }
@@ -507,7 +507,7 @@ class ControlApiInvProjectionTest {
             seedOrdersAndCustomers(c);
             List<Event> events = captureEvents(
                     () -> assertEquals(200, schemaRelationships(c.port).statusCode()));
-            Event e = ofType(events, EventType.LINK_SCHEMA_INSPECTED);
+            Event e = ofType(events, LinkEventTypes.LINK_SCHEMA_INSPECTED);
             assertEquals("link.schema.inspected", e.attributes().get("action"));
             assertEquals("2", e.attributes().get("datasetsScanned"));
         }

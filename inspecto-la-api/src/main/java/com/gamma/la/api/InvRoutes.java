@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.SnapshotStore;
@@ -14,7 +15,6 @@ import com.gamma.control.WriteGates;
 
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
 import com.gamma.sql.SqlGuard;
 import com.gamma.sql.SqlSandboxPolicy;
 import com.gamma.util.DuckDbUtil;
@@ -158,7 +158,7 @@ public final class InvRoutes implements RouteModule {
         if (!store.create(id, json))
             throw new ApiException(409, ErrorCodes.CONFLICT, "snapshot '" + id + "' already exists — a sealed snapshot is never replaced");
 
-        emitSnapshotEvent(ex, EventType.LINK_SNAPSHOT_SEALED, "link.snapshot.sealed",
+        emitSnapshotEvent(ex, LinkEventTypes.LINK_SNAPSHOT_SEALED, "link.snapshot.sealed",
                 "link.snapshot.sealed — " + sizeOf(body.get("nodes")) + " nodes, "
                         + sizeOf(body.get("edges")) + " edges",
                 b -> b.attr("snapshotId", id).attr("nodes", sizeOf(body.get("nodes")))
@@ -215,7 +215,7 @@ public final class InvRoutes implements RouteModule {
         SnapshotStore store = new SnapshotStore(writeRoot);
         if (store.read(snapshotId) == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no sealed snapshot '" + snapshotId + "'");
         store.attach(snapshotId, caseId, java.time.Instant.now().toString());
-        emitSnapshotEvent(ex, EventType.LINK_SNAPSHOT_ATTACHED, "link.snapshot.attached",
+        emitSnapshotEvent(ex, LinkEventTypes.LINK_SNAPSHOT_ATTACHED, "link.snapshot.attached",
                 "link.snapshot.attached — " + snapshotId + " → " + caseId,
                 b -> b.attr("snapshotId", snapshotId).attr("caseId", caseId));
         return Map.of("snapshotId", snapshotId, "attachedTo", store.attachmentsOf(snapshotId));
@@ -306,7 +306,7 @@ public final class InvRoutes implements RouteModule {
         });
 
         try {
-            EventLog.current().emit(Event.builder(EventType.LINK_SCHEMA_INSPECTED).source("inv")
+            EventLog.current().emit(Event.builder(LinkEventTypes.LINK_SCHEMA_INSPECTED).source("inv")
                     .message("link.schema.inspected — " + relationships.size() + " relationships over "
                             + columnsByDataset.size() + " datasets")
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
@@ -456,7 +456,7 @@ public final class InvRoutes implements RouteModule {
         }
 
         try {
-            EventLog.current().emit(Event.builder(EventType.LINK_OVERLAP_PROFILED).source("inv")
+            EventLog.current().emit(Event.builder(LinkEventTypes.LINK_OVERLAP_PROFILED).source("inv")
                     .message("link.overlap.profiled — " + pairs.size() + " pairs over " + profiles.size()
                             + " columns in " + scanned + " datasets")
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
@@ -1046,7 +1046,7 @@ public final class InvRoutes implements RouteModule {
     private static void auditTraversal(HttpExchange ex, String datasetId, String startNode, String targetNode,
                                        int maxDepth, int paths, boolean truncated) {
         try {
-            Event.Builder b = Event.builder(EventType.LINK_TRAVERSED)
+            Event.Builder b = Event.builder(LinkEventTypes.LINK_TRAVERSED)
                     .source("inv")
                     .message("link.traversed " + datasetId + " from " + startNode + " — " + paths + " paths"
                             + (truncated ? " (truncated)" : ""))
@@ -1072,7 +1072,7 @@ public final class InvRoutes implements RouteModule {
         try {
             boolean expand = neighborsOf != null;
             String action = expand ? "link.expanded" : "link.projected";
-            Event.Builder b = Event.builder(expand ? EventType.LINK_EXPANDED : EventType.LINK_PROJECTED)
+            Event.Builder b = Event.builder(expand ? LinkEventTypes.LINK_EXPANDED : LinkEventTypes.LINK_PROJECTED)
                     .source("inv")
                     .message(action + " " + datasetId + " — " + rows + " rows" + (truncated ? " (truncated)" : ""))
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))

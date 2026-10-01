@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.InvestigationEvaluator;
 import com.gamma.la.core.LinkIds;
 import com.gamma.control.ApiContext;
@@ -8,7 +9,6 @@ import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -283,7 +283,7 @@ public final class WorkingSetRoutes implements RouteModule {
     /** Best-effort audit (LA-04 pattern): an audit failure never fails the analyst's read. */
     private static void emit(HttpExchange ex, String id, java.util.function.UnaryOperator<Event.Builder> attrs) {
         try {
-            Event.Builder b = Event.builder(EventType.LINK_INVESTIGATION_WORKING_SET_READ).source("inv")
+            Event.Builder b = Event.builder(LinkEventTypes.LINK_INVESTIGATION_WORKING_SET_READ).source("inv")
                     .message("link.investigation.working_set.read — " + id)
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
                     .action("link.investigation.working_set.read").actionCategory("analysis");

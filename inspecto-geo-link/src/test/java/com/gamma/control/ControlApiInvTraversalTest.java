@@ -1,11 +1,11 @@
 package com.gamma.control;
 
+import com.gamma.la.core.LinkEventTypes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
@@ -309,7 +309,7 @@ class ControlApiInvTraversalTest {
             } finally {
                 EventLog.current().removeSubscriber(sub);
             }
-            Event e = seen.stream().filter(x -> EventType.LINK_TRAVERSED.equals(x.type())).findFirst()
+            Event e = seen.stream().filter(x -> LinkEventTypes.LINK_TRAVERSED.equals(x.type())).findFirst()
                     .orElseThrow(() -> new AssertionError("no LINK_TRAVERSED in " + seen));
             assertEquals("link.traversed", e.attributes().get("action"));
             assertEquals("wires_ds", e.attributes().get("dataset"));

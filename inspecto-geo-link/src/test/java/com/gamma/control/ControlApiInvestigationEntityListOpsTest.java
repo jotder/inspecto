@@ -1,11 +1,11 @@
 package com.gamma.control;
 
+import com.gamma.la.core.LinkEventTypes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
@@ -220,7 +220,7 @@ class ControlApiInvestigationEntityListOpsTest {
             assertEquals(2, excluded.at("/list/atSeq").asLong(), "resolved at the fact log's head");
             assertEquals(3, excluded.at("/list/members").asInt());
 
-            Event stepped = seen.stream().filter(e -> EventType.LINK_INVESTIGATION_STEPPED.equals(e.type()))
+            Event stepped = seen.stream().filter(e -> LinkEventTypes.LINK_INVESTIGATION_STEPPED.equals(e.type()))
                     .findFirst().orElseThrow();
             assertEquals("mules", stepped.attributes().get("listId"));
             assertEquals("2", stepped.attributes().get("atSeq"));

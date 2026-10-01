@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.LinkEventTypes;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
@@ -7,7 +8,6 @@ import com.gamma.control.RouteModule;
 import com.gamma.control.WriteGates;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
 import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -91,7 +91,7 @@ public final class ValueMeasureRoutes implements RouteModule {
         out.put("fences", Map.of("maxEntities", ValueMeasures.MAX_ENTITIES, "timeoutSeconds",
                 ValueMeasures.TIMEOUT_SECONDS, "maxWindowDays", ValueMeasures.MAX_WINDOW_DAYS));
         try {
-            EventLog.current().emit(Event.builder(EventType.LINK_VALUE_MEASURED).source("inv")
+            EventLog.current().emit(Event.builder(LinkEventTypes.LINK_VALUE_MEASURED).source("inv")
                     .message("link.value.measured — " + spec.name() + " over " + datasetId)
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
                     .action("link.value.measured").actionCategory("analysis")

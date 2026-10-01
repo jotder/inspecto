@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.CasePort;
 import com.gamma.la.core.CasePorts;
 import com.gamma.la.core.SnapshotStore;
@@ -10,7 +11,6 @@ import com.gamma.control.RouteModule;
 import com.gamma.control.Subject;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -85,7 +85,7 @@ public final class InvestigationCaseRoutes implements RouteModule {
         InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
         String prior = caseRef(inv.store(), id);
         if (inv.store().deleteCaseLink(id))
-            emit(ex, EventType.LINK_INVESTIGATION_CASE_UNLINKED, "link.investigation.case.unlinked",
+            emit(ex, LinkEventTypes.LINK_INVESTIGATION_CASE_UNLINKED, "link.investigation.case.unlinked",
                     "link.investigation.case.unlinked — " + id + " from " + prior,
                     b -> b.attr("investigationId", id).attr("caseId", String.valueOf(prior)));
         return describe(api, ex, inv);
@@ -122,7 +122,7 @@ public final class InvestigationCaseRoutes implements RouteModule {
     static void write(HttpExchange ex, SnapshotStore store, String id, Map<String, Object> record) throws IOException {
         store.writeCaseLink(id, ApiContext.JSON.writeValueAsString(record));
         Object caseRef = record.get("caseRef");
-        emit(ex, EventType.LINK_INVESTIGATION_CASE_LINKED, "link.investigation.case.linked",
+        emit(ex, LinkEventTypes.LINK_INVESTIGATION_CASE_LINKED, "link.investigation.case.linked",
                 "link.investigation.case.linked — " + id + " → " + caseRef,
                 b -> b.attr("investigationId", id).attr("caseId", String.valueOf(caseRef))
                         .attr("verified", String.valueOf(record.get("verified"))));

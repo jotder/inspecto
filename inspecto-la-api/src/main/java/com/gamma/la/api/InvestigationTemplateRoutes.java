@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.InvestigationEvaluator;
 import com.gamma.la.core.SnapshotStore;
 import com.gamma.control.ApiContext;
@@ -10,7 +11,6 @@ import com.gamma.control.Subject;
 import com.gamma.control.WriteGates;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -176,7 +176,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         doc.put("generalised", generalised);
         if (!inv.store().createTemplate(id, canonical(doc)))
             throw new ApiException(409, ErrorCodes.CONFLICT, "investigation template '" + id + "' already exists");
-        emit(ex, EventType.LINK_INVESTIGATION_TEMPLATE_SAVED, "link.investigation.template.saved",
+        emit(ex, LinkEventTypes.LINK_INVESTIGATION_TEMPLATE_SAVED, "link.investigation.template.saved",
                 "link.investigation.template.saved — " + invId + " → " + id,
                 b -> b.attr("templateId", id).attr("investigationId", invId).attr("parameters", parameters.size())
                         .attr("dropped", dropped.size()));
@@ -244,7 +244,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         }
         Map<String, Object> out = new InvestigationRoutes().instantiate(api, ex, tpl.writeRoot(), header, ops);
         String invId = String.valueOf(out.get("id"));
-        emit(ex, EventType.LINK_INVESTIGATION_TEMPLATE_INSTANTIATED, "link.investigation.template.instantiated",
+        emit(ex, LinkEventTypes.LINK_INVESTIGATION_TEMPLATE_INSTANTIATED, "link.investigation.template.instantiated",
                 "link.investigation.template.instantiated — " + templateId + " → " + invId,
                 b -> b.attr("templateId", templateId).attr("investigationId", invId)
                         .attr("dataset", header.get("dataset")).attr("steps", out.get("steps")));

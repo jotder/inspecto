@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.BranchingPatternEngine;
 import com.gamma.la.core.PatternQueryCompiler;
 import com.gamma.la.core.DatasetProviders;
@@ -11,7 +12,6 @@ import com.gamma.control.RouteModule;
 import com.gamma.control.WriteGates;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
 import com.gamma.la.core.BranchingPatternEngine.Edge;
 import com.gamma.la.core.PatternQueryCompiler.Compiled;
 import com.gamma.la.core.PatternQueryCompiler.Stage;
@@ -215,7 +215,7 @@ public final class PatternRoutes implements RouteModule {
     /** Best-effort audit (LA-04 pattern): a whole-Dataset pattern search is its own analytic act. */
     private static void audit(HttpExchange ex, String datasetId, int matches, boolean truncated, String refusal) {
         try {
-            Event.Builder b = Event.builder(EventType.LINK_PATTERN_MATCHED)
+            Event.Builder b = Event.builder(LinkEventTypes.LINK_PATTERN_MATCHED)
                     .source("inv")
                     .message("link.pattern.matched " + datasetId + " — " + matches + " matches"
                             + (truncated ? " (truncated)" : "") + (refusal != null ? " (refused)" : ""))

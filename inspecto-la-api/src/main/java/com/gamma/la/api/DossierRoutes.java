@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.LinkIds;
 import com.gamma.la.core.SnapshotStore;
@@ -10,7 +11,6 @@ import com.gamma.control.ComponentAccess;
 import com.gamma.control.RouteModule;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -101,7 +101,7 @@ public final class DossierRoutes implements RouteModule {
         @SuppressWarnings("unchecked") Map<String, Object> manifest = (Map<String, Object>) dossier.get("manifest");
         @SuppressWarnings("unchecked") Map<String, Object> integrity = (Map<String, Object>) dossier.get("integrity");
         int stepsAt = at;
-        emit(ex, EventType.LINK_DOSSIER_BUILT, "link.dossier.built",
+        emit(ex, LinkEventTypes.LINK_DOSSIER_BUILT, "link.dossier.built",
                 "link.dossier.built — " + id + " at step " + at + (Boolean.TRUE.equals(integrity.get("intact"))
                         ? "" : " (INTEGRITY FAILURE)"),
                 b -> b.attr("investigationId", id).attr("at", stepsAt).attr("format", format)
@@ -152,7 +152,7 @@ public final class DossierRoutes implements RouteModule {
         Map<String, Object> result = GraphDossierBuilder.verify(submitted,
                 (Map<String, Object>) dossier.get("manifest"), intact);
         result.put("integrity", dossier.get("integrity"));
-        emit(ex, EventType.LINK_DOSSIER_VERIFIED, "link.dossier.verified",
+        emit(ex, LinkEventTypes.LINK_DOSSIER_VERIFIED, "link.dossier.verified",
                 "link.dossier.verified — " + id + (Boolean.TRUE.equals(result.get("verified")) ? "" : " (FAILED)"),
                 b -> b.attr("investigationId", id).attr("verified", result.get("verified"))
                         .attr("submittedRoot", result.get("submittedRoot")).attr("currentRoot", result.get("currentRoot"))

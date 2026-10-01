@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.la.core.LinkEventTypes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.alert.AlertRule;
@@ -7,7 +8,6 @@ import com.gamma.alert.AlertService;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
@@ -123,7 +123,7 @@ class ControlApiValueMeasureTest {
             assertEquals("≥ 10 legs 900 ≤ amt < 1000 from ≥ 5 payers", m.get("threshold").asText());
             assertEquals(1, m.get("unvalued").asInt());
             assertFalse(m.get("truncated").asBoolean());
-            assertTrue(seen.stream().anyMatch(e -> EventType.LINK_VALUE_MEASURED.equals(e.type())
+            assertTrue(seen.stream().anyMatch(e -> LinkEventTypes.LINK_VALUE_MEASURED.equals(e.type())
                     && "structuring".equals(e.attributes().get("measure"))), "audited");
 
             JsonNode pt = ok(c, "GET", Q + "&name=passThrough&minRatio=0.96", null);

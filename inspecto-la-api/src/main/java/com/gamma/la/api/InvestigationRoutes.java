@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.InvestigationEvaluator;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.DatasetProvider;
@@ -22,7 +23,6 @@ import com.gamma.entitylist.EntityListFacts;
 import com.gamma.entitylist.EntityRegistry;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -223,7 +223,7 @@ public final class InvestigationRoutes implements RouteModule {
                 throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
         }
         if (caseLink != null) InvestigationCaseRoutes.write(ex, store, id, caseLink);
-        emit(ex, EventType.LINK_INVESTIGATION_CREATED, "link.investigation.created",
+        emit(ex, LinkEventTypes.LINK_INVESTIGATION_CREATED, "link.investigation.created",
                 "link.investigation.created — " + id + " over " + dataset,
                 b -> b.attr("investigationId", id).attr("dataset", dataset));
         return header;
@@ -454,7 +454,7 @@ public final class InvestigationRoutes implements RouteModule {
                 throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + forkId + "' already exists");
         }
         String fid = forkId;
-        emit(ex, EventType.LINK_INVESTIGATION_FORKED, "link.investigation.forked",
+        emit(ex, LinkEventTypes.LINK_INVESTIGATION_FORKED, "link.investigation.forked",
                 "link.investigation.forked — " + parent.id() + " → " + fid,
                 b -> b.attr("investigationId", fid).attr("parentId", parent.id()).attr("steps", order.size()));
         Map<String, Object> out = new LinkedHashMap<>();
@@ -609,7 +609,7 @@ public final class InvestigationRoutes implements RouteModule {
             }
         }
         boolean div = diverged;
-        emit(ex, EventType.LINK_INVESTIGATION_REPLAYED, "link.investigation.replayed",
+        emit(ex, LinkEventTypes.LINK_INVESTIGATION_REPLAYED, "link.investigation.replayed",
                 "link.investigation.replayed — " + id + (mismatches.isEmpty() ? "" : " (NOT equivalent)")
                         + (div ? " (diverged)" : ""),
                 b -> b.attr("investigationId", id).attr("equivalent", mismatches.isEmpty())
@@ -698,7 +698,7 @@ public final class InvestigationRoutes implements RouteModule {
         String op = "undo".equals(e.get("kind")) ? "undo" : String.valueOf(e.get("op"));
         @SuppressWarnings("unchecked") Map<String, Object> read = (Map<String, Object>) e.get("read");
         boolean truncated = read != null && Boolean.TRUE.equals(read.get("truncated"));
-        emit(ex, EventType.LINK_INVESTIGATION_STEPPED, "link.investigation.stepped",
+        emit(ex, LinkEventTypes.LINK_INVESTIGATION_STEPPED, "link.investigation.stepped",
                 "link.investigation.stepped — " + inv.id() + " step " + step + " " + op,
                 b -> {
                     b.attr("investigationId", inv.id()).attr("step", step).attr("op", op);
@@ -1705,7 +1705,7 @@ public final class InvestigationRoutes implements RouteModule {
         rec.put("requestedBy", ApiContext.actor(ex));
         rec.put("requestedAt", Instant.now().toString());
         inv.store().writePending(inv.id(), rid, canonical(rec));
-        emit(ex, EventType.LINK_EXPANSION_REQUESTED, "link.expansion.requested",
+        emit(ex, LinkEventTypes.LINK_EXPANSION_REQUESTED, "link.expansion.requested",
                 "link.expansion.requested — " + inv.id() + " " + rid + " " + sensitive.get("exceeded"),
                 b -> b.attr("investigationId", inv.id()).attr("requestId", rid).attr("budget", sensitive.get("budget"))
                         .attr("maxFanOut", sensitive.get("maxFanOut")).attr("exceeded", sensitive.get("exceeded")));
@@ -1754,7 +1754,7 @@ public final class InvestigationRoutes implements RouteModule {
                 rec.put("status", "denied");
                 if (reason != null) rec.put("reason", reason);
                 inv.store().writePending(inv.id(), rid, canonical(rec));
-                emit(ex, EventType.LINK_EXPANSION_DENIED, "link.expansion.denied",
+                emit(ex, LinkEventTypes.LINK_EXPANSION_DENIED, "link.expansion.denied",
                         "link.expansion.denied — " + id + " " + rid + " by " + by,
                         b -> b.attr("investigationId", id).attr("requestId", rid)
                                 .attr("requestedBy", rec.get("requestedBy")).attr("reason", reason));
@@ -1789,7 +1789,7 @@ public final class InvestigationRoutes implements RouteModule {
             rec.put("status", "approved");
             rec.put("step", out.get("step"));
             inv.store().writePending(inv.id(), rid, canonical(rec));
-            emit(ex, EventType.LINK_EXPANSION_APPROVED, "link.expansion.approved",
+            emit(ex, LinkEventTypes.LINK_EXPANSION_APPROVED, "link.expansion.approved",
                     "link.expansion.approved — " + id + " " + rid + " by " + by + " → step " + out.get("step"),
                     b -> b.attr("investigationId", id).attr("requestId", rid)
                             .attr("requestedBy", rec.get("requestedBy")).attr("step", out.get("step")));
@@ -1818,7 +1818,7 @@ public final class InvestigationRoutes implements RouteModule {
             else revealed.add(Map.of("token", token, "id", value));
         }
         List<Object> tokens = revealed.stream().map(r -> r.get("token")).toList();
-        emit(ex, EventType.LINK_ENTITY_REVEALED, "link.entity.revealed",
+        emit(ex, LinkEventTypes.LINK_ENTITY_REVEALED, "link.entity.revealed",
                 "link.entity.revealed — " + id + " " + revealed.size() + " entit" + (revealed.size() == 1 ? "y" : "ies"),
                 b -> b.attr("investigationId", id).attr("tokens", tokens).attr("count", revealed.size()));
         Map<String, Object> out = new LinkedHashMap<>();

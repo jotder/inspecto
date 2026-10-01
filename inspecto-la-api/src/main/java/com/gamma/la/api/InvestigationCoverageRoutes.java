@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.InvestigationEvaluator;
@@ -10,7 +11,6 @@ import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -147,7 +147,7 @@ public final class InvestigationCoverageRoutes implements RouteModule {
 
     private static void emit(HttpExchange ex, String id, String dataset, int expected, int missing) {
         try {
-            EventLog.current().emit(Event.builder(EventType.LINK_INVESTIGATION_COVERAGE).source("inv")
+            EventLog.current().emit(Event.builder(LinkEventTypes.LINK_INVESTIGATION_COVERAGE).source("inv")
                     .message("link.investigation.coverage — " + id + ": " + missing + " of " + expected + " days missing")
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
                     .action("link.investigation.coverage").actionCategory("analysis")
