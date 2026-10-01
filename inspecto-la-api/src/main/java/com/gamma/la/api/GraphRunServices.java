@@ -18,7 +18,7 @@ import java.util.function.LongSupplier;
  * first use. Unlike a plain map, it does not keep a pool for the process lifetime:
  *
  * <ul>
- *   <li><b>Idle shutdown.</b> A service nobody asked for in {@code idleTtlMs} and with no run in flight is closed (its
+ *   <li><b>Idle shutdown.</b> A service nobody asked for, and none of whose runs finished, in {@code idleTtlMs} and with no run in flight is closed (its
  *       worker threads end) and forgotten; the next use builds a fresh one. The sweep runs on access - no extra thread, no
  *       timer. The TTL is as long as a finished run's retention, so closing never shortens what an analyst can still read.</li>
  *   <li><b>A Space that is gone is not kept.</b> A service whose write root is no longer a directory is closed at the next
@@ -88,7 +88,9 @@ final class GraphRunServices implements AutoCloseable {
             if (me.getKey().equals(keep)) continue;
             Entry e = me.getValue();
             boolean gone = !Files.isDirectory(me.getKey());
-            boolean idle = now - e.lastUsed >= idleTtlMs && e.service.active() == 0;
+            // A finished run is retained (and readable) for its TTL, so its finish time counts as use: closing never shortens retention.
+            long lastActive = Math.max(e.lastUsed, e.service.lastActivityMillis());
+            boolean idle = now - lastActive >= idleTtlMs && e.service.active() == 0;
             if (gone || idle) {
                 e.service.close();
                 it.remove();

@@ -160,6 +160,18 @@ public final class GraphRunService implements AutoCloseable {
         }
     }
 
+    /**
+     * When the most recent run of this service finished (epoch millis of the service clock; 0 = none retained). An owner
+     * deciding to close an unused service must count this as activity: a finished run is still readable for the run TTL.
+     */
+    public long lastActivityMillis() {
+        synchronized (runs) {
+            long t = 0;
+            for (Run r : runs.values()) if (r.status().terminal()) t = Math.max(t, r.finishedAt);
+            return t;
+        }
+    }
+
     public GraphEngine engine() {
         return engine;
     }

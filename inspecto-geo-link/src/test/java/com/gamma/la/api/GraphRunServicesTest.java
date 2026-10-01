@@ -141,6 +141,42 @@ class GraphRunServicesTest {
         }
     }
 
+    /** D3: a run that finishes after the last get() is activity - its retained result must outlive a sweep triggered for ANOTHER Space. */
+    @Test
+    void aServiceWhoseRunJustFinishedIsNotClosedWhileItsResultIsRetained(@TempDir Path a, @TempDir Path b) throws Exception {
+        CountDownLatch inside = new CountDownLatch(1), release = new CountDownLatch(1);
+        GraphEngine hold = new GraphEngine() {
+            @Override public String engineId() { return "hold"; }
+            @Override public Set<Algorithm> supported() { return EnumSet.allOf(Algorithm.class); }
+
+            @Override
+            public GraphResult run(Algorithm al, Map<String, Object> p, GraphInput in, RunControl ctl) {
+                inside.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return new GraphResult(al, new GraphResult.Flag(true), 0, 1);
+            }
+        };
+        try (GraphRunServices reg = new GraphRunServices(root -> new GraphRunService(hold, LIMITS, now::get), now::get, TTL)) {
+            GraphRunService s = reg.get(a);                    // last get at t = 0
+            GraphRunService.RunView v = s.submit(request());
+            inside.await();
+            now.set(TTL - 100);                                // nobody polls; the run finishes just inside the idle TTL
+            release.countDown();
+            assertEquals(GraphRunService.Status.COMPLETED, s.await(v.id(), 5_000).status());
+            now.set(TTL + 500);                                // 1.5 TTL after the last get, 0.6 TTL after the finish
+            reg.get(b);                                        // sweeps a: it must be kept, its result is still retained
+            assertEquals(2, reg.open(), "a service holding a retained fresh result is not idle");
+            assertEquals(GraphRunService.Status.COMPLETED, s.get(v.id()).status());
+            now.set(TTL * 3);                                  // past the TTL of the finish too: now it may go
+            reg.get(b);
+            assertEquals(1, reg.open());
+        }
+    }
+
     @Test
     void aSpaceThatIsGoneIsClosedAtOnceHoweverRecentlyItWasUsed(@TempDir Path base, @TempDir Path b) throws Exception {
         Path gone = Files.createDirectory(base.resolve("space-x"));
