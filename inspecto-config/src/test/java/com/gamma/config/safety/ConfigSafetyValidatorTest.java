@@ -86,7 +86,11 @@ class ConfigSafetyValidatorTest {
                 enrichment("data/in", "data/out", "dim.csv"), p, configDir), "references.dim.path"),
                 "a reference file at the Space root allowlists the root");
         // PathJail.canonical spellings: a trailing dot (Windows drops it) and case variants.
-        for (String v : List.of(s.toString().replace('\\', '/') + "/config.", "config./x", "CONFIG", "Config/orders"))
+        List<String> spellings = new java.util.ArrayList<>(List.of(s.toString().replace('\\', '/') + "/config.", "config./x"));
+        // CONFIG is config only on a case-insensitive filesystem (PathJail.CASE_INSENSITIVE_FS); on Linux it is its own dir.
+        if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows"))
+            spellings.addAll(List.of("CONFIG", "Config/orders"));
+        for (String v : spellings)
             assertTrue(refuses(ConfigSafetyValidator.check("enrichment", enrichment("data/in", v, null), p, configDir),
                     "output.database"), v);
         assertTrue(refuses(ConfigSafetyValidator.check("enrichment",
@@ -811,10 +815,10 @@ class ConfigSafetyValidatorTest {
         Path configDir = java.nio.file.Files.createDirectories(s.resolve("config/orders"));
         String abs = s.toString();
         List<String> spellings = new java.util.ArrayList<>(List.of("config..", "config. .", "config/new/child",
-                abs + "/config..", abs + "/config/orders/not-yet/there", "config\\orders",
-                abs.replace('\\', '/') + "\\config/orders"));
+                abs + "/config..", abs + "/config/orders/not-yet/there"));
+        // A backslash is a separator only on Windows; on Linux `config\orders` is one ordinary filename.
         if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows"))
-            spellings.addAll(List.of("config::$DATA", "config:x", abs + "\\config::$DATA",
+            spellings.addAll(List.of("config\\orders", abs.replace('\\', '/') + "\\config/orders","config::$DATA", "config:x", abs + "\\config::$DATA",
                     "\\\\?\\" + abs + "\\config", "\\\\?\\" + abs + "\\config\\orders"));
         for (String v : spellings)
             assertTrue(refuses(ConfigSafetyValidator.check("pipeline", pipelineWithDir("poll", v),

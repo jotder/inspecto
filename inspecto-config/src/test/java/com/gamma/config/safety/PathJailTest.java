@@ -320,9 +320,10 @@ class PathJailTest {
         String abs = s.toString();
         for (String v : new String[]{"config..", "config. .", "config/new/child", "config/orders/not-yet/there"})
             refusedOrUnconstructible(abs + "/" + v);
-        refusedOrUnconstructible(abs.replace('\\', '/') + "\\config/orders");   // mixed separators
-        refusedOrUnconstructible(abs + "/config\\orders");
         if (WINDOWS) {
+            // A backslash is a separator only on Windows; on Linux it is an ordinary filename character.
+            refusedOrUnconstructible(abs.replace('\\', '/') + "\\config/orders");   // mixed separators
+            refusedOrUnconstructible(abs + "/config\\orders");
             refusedOrUnconstructible(abs + "\\config::$DATA");
             refusedOrUnconstructible(abs + "\\config:x");
             refusedOrUnconstructible("\\\\?\\" + abs + "\\config");
