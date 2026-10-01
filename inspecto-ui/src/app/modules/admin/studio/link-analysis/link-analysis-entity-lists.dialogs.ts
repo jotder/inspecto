@@ -32,7 +32,7 @@ export interface CreateEntityListData {
 }
 
 /**
- * LA-17 **New Entity List** — `POST /inv/entity-lists`. The id is left to the server to mint (ask the minimum);
+ * LA-17 **New Entity List** — `POST /entity-lists`. The id is left to the server to mint (ask the minimum);
  * a 409/422 stays in the dialog so the analyst can correct it. Closes with the created list.
  */
 @Component({

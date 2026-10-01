@@ -795,7 +795,7 @@ export type ValueMeasureAlertRuleResult = InvestigationAlertRuleResult & Partial
 
 export type EntityListPurpose = 'allow' | 'block' | 'watch' | 'exclusion';
 
-/** One list as `GET /inv/entity-lists` lists it. A Space object — reads need only Space access. */
+/** One list as `GET /entity-lists` lists it. A Space object — reads need only Space access. */
 export interface EntityListSummary {
     id: string;
     title: string;
@@ -817,7 +817,7 @@ export interface EntityListIndex {
     headHash: string | null;
 }
 
-/** `GET /inv/entity-lists/{id}` — the list as of `atSeq`. `members` are normalised keys, sorted, and MASKED per the
+/** `GET /entity-lists/{id}` — the list as of `atSeq`. `members` are normalised keys, sorted, and MASKED per the
  *  Space's `maskingMode` (reveal is not in this slice) — never treat them as raw values to send back. */
 export interface EntityListDetail extends EntityListSummary {
     members: string[];
@@ -825,7 +825,7 @@ export interface EntityListDetail extends EntityListSummary {
     headHash: string | null;
 }
 
-/** `POST /inv/entity-lists` → 201. `id` is minted when absent, else `^[a-z0-9][a-z0-9_-]{0,63}$`; an id ever used
+/** `POST /entity-lists` → 201. `id` is minted when absent, else `^[a-z0-9][a-z0-9_-]{0,63}$`; an id ever used
  *  (retired too) is a 409. `reason` must be non-blank. */
 export interface EntityListCreateRequest {
     id?: string;
@@ -835,7 +835,7 @@ export interface EntityListCreateRequest {
     reason: string;
 }
 
-/** `POST /inv/entity-lists/{id}/members` — RAW values (the server normalises with the list's Entity Type);
+/** `POST /entity-lists/{id}/members` — RAW values (the server normalises with the list's Entity Type);
  *  ≤ 5 000 per call; a value in both `add` and `remove` is a 422. */
 export interface EntityListMembersRequest {
     add?: string[];
@@ -1079,7 +1079,7 @@ export class InvService {
     // ── LA-17 Entity Lists. Writes need `canManageIncidents`; no write root → 503; unknown list → 404. ──
 
     listEntityLists(): Observable<EntityListIndex> {
-        return this.http.get<EntityListIndex>(apiUrl('/inv/entity-lists'));
+        return this.http.get<EntityListIndex>(apiUrl('/entity-lists'));
     }
 
     /** `at` pins the read to a fact-log position: beyond the head → 422; the list did not exist yet → 404. */
@@ -1088,7 +1088,7 @@ export class InvService {
     }
 
     createEntityList(req: EntityListCreateRequest): Observable<EntityListDetail> {
-        return this.http.post<EntityListDetail>(apiUrl('/inv/entity-lists'), req);
+        return this.http.post<EntityListDetail>(apiUrl('/entity-lists'), req);
     }
 
     /** A retired list → 409. */
@@ -1128,7 +1128,7 @@ export class InvService {
 }
 
 function entityListPath(id: string, suffix: string): string {
-    return apiUrl(`/inv/entity-lists/${encodeURIComponent(id)}${suffix}`);
+    return apiUrl(`/entity-lists/${encodeURIComponent(id)}${suffix}`);
 }
 
 function dossierParams(q: DossierQuery, format: string) {

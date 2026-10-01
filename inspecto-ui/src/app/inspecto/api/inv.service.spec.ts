@@ -249,7 +249,7 @@ describe('InvService (LA-08 multi projection, LA-11 recursive paths)', () => {
     it('lists Entity Lists with a bare GET and returns the index verbatim', () => {
         let got: EntityListIndex | undefined;
         svc.listEntityLists().subscribe((r) => (got = r));
-        const req = httpMock.expectOne(`${base}/inv/entity-lists`);
+        const req = httpMock.expectOne(`${base}/entity-lists`);
         expect(req.request.method).toBe('GET');
         expect(req.request.params.keys()).toEqual([]);
         const res: EntityListIndex = { lists: [], headSeq: 0, headHash: null };
@@ -259,18 +259,18 @@ describe('InvService (LA-08 multi projection, LA-11 recursive paths)', () => {
 
     it('reads one list with `at` as a query param only when given; the id is path-encoded', () => {
         svc.getEntityList('wl/1', 7).subscribe();
-        const pinned = httpMock.expectOne((r) => r.url === `${base}/inv/entity-lists/wl%2F1`);
+        const pinned = httpMock.expectOne((r) => r.url === `${base}/entity-lists/wl%2F1`);
         expect(pinned.request.method).toBe('GET');
         expect(pinned.request.params.get('at')).toBe('7');
         pinned.flush({});
 
         svc.getEntityList('wl-1', 0).subscribe(); // seq 0 is a position, not "absent"
-        const zero = httpMock.expectOne((r) => r.url === `${base}/inv/entity-lists/wl-1`);
+        const zero = httpMock.expectOne((r) => r.url === `${base}/entity-lists/wl-1`);
         expect(zero.request.params.get('at')).toBe('0');
         zero.flush({});
 
         svc.getEntityList('wl-1').subscribe();
-        const head = httpMock.expectOne((r) => r.url === `${base}/inv/entity-lists/wl-1`);
+        const head = httpMock.expectOne((r) => r.url === `${base}/entity-lists/wl-1`);
         expect(head.request.params.keys()).toEqual([]);
         head.flush({});
     });
@@ -283,7 +283,7 @@ describe('InvService (LA-08 multi projection, LA-11 recursive paths)', () => {
             reason: 'warrant 7',
         };
         svc.createEntityList(body).subscribe();
-        const req = httpMock.expectOne(`${base}/inv/entity-lists`);
+        const req = httpMock.expectOne(`${base}/entity-lists`);
         expect(req.request.method).toBe('POST');
         expect(req.request.body).toEqual(body);
         req.flush({ id: 'burners' }, { status: 201, statusText: 'Created' });
@@ -294,14 +294,14 @@ describe('InvService (LA-08 multi projection, LA-11 recursive paths)', () => {
         svc.changeEntityListMembers('wl/1', { add: ['+44 7700 900123'], reason: 'seen at scene' }).subscribe(
             (r) => (changed = r.changed),
         );
-        const members = httpMock.expectOne(`${base}/inv/entity-lists/wl%2F1/members`);
+        const members = httpMock.expectOne(`${base}/entity-lists/wl%2F1/members`);
         expect(members.request.method).toBe('POST');
         expect(members.request.body).toEqual({ add: ['+44 7700 900123'], reason: 'seen at scene' });
         members.flush({ id: 'wl/1', changed: 0 });
         expect(changed).toBe(0);
 
         svc.retireEntityList('wl/1', 'case closed').subscribe();
-        const retire = httpMock.expectOne(`${base}/inv/entity-lists/wl%2F1/retire`);
+        const retire = httpMock.expectOne(`${base}/entity-lists/wl%2F1/retire`);
         expect(retire.request.method).toBe('POST');
         expect(retire.request.body).toEqual({ reason: 'case closed' });
         retire.flush({});
@@ -309,18 +309,18 @@ describe('InvService (LA-08 multi projection, LA-11 recursive paths)', () => {
 
     it('passes 409 / 422 / 503 through untouched, so apiErrorMessage shows the server message', () => {
         const cases: [number, string, () => Observable<unknown>, string][] = [
-            [409, 'Conflict', () => svc.retireEntityList('wl-1', 'again'), `${base}/inv/entity-lists/wl-1/retire`],
+            [409, 'Conflict', () => svc.retireEntityList('wl-1', 'again'), `${base}/entity-lists/wl-1/retire`],
             [
                 422,
                 'Unprocessable Entity',
                 () => svc.changeEntityListMembers('wl-1', { add: ['a'], remove: ['a'], reason: 'x' }),
-                `${base}/inv/entity-lists/wl-1/members`,
+                `${base}/entity-lists/wl-1/members`,
             ],
             [
                 503,
                 'Service Unavailable',
                 () => svc.createEntityList({ title: 't', purpose: 'allow', entityType: 'imsi', reason: 'r' }),
-                `${base}/inv/entity-lists`,
+                `${base}/entity-lists`,
             ],
         ];
         for (const [status, statusText, call, url] of cases) {

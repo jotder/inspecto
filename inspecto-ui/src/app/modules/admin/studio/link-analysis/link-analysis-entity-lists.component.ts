@@ -29,7 +29,7 @@ import {
 import { isUnavailable } from './link-analysis-template.dialogs';
 
 /**
- * **Link Analysis — Entity Lists** (LA-17 step 6, SPA half) inside the Investigation panel, over `/inv/entity-lists*`
+ * **Link Analysis — Entity Lists** (LA-17 step 6, SPA half) inside the Investigation panel, over `/entity-lists*`
  * (entity-model design §4.3.1): list the Space's lists, create one, add the selected canvas entity, retire one, and —
  * on the open Investigation — append `excludeBy` / `seedBy` through the store's op path, so undo, replay and the log
  * refresh work as for every other op.

@@ -142,7 +142,7 @@ export function investigationErrorMessage(err: unknown, fallback: string): strin
 }
 
 /**
- * LA-17 — a readable message for an Entity List failure: the `/inv/entity-lists*` routes, and (`onInvestigation`)
+ * LA-17 — a readable message for an Entity List failure: the `/entity-lists*` routes, and (`onInvestigation`)
  * an `excludeBy` / `seedBy` step, where a 404 may be the list OR the Investigation. 409 is a retired list or one
  * whose Entity Type is no longer in force; 422 carries the server's reason (a blank reason, a value empty after
  * normalising, a list over 5 000 members …). 503 is a deployment state (no module / no write root), not a fault.
