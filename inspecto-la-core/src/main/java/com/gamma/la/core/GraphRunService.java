@@ -227,6 +227,17 @@ public final class GraphRunService implements AutoCloseable {
     @Override
     public void close() {
         pool.shutdownNow();
+        List<Run> waiting = new ArrayList<>();
+        synchronized (runs) {
+            for (Run r : runs.values()) if (r.status() == Status.QUEUED) waiting.add(r);
+        }
+        for (Run r : waiting) {                       // the pool dropped their tasks: end them, so no await() runs to its timeout
+            try {
+                r.requestCancel(clock.getAsLong());
+            } catch (GraphRunException ignored) {
+                // already moved on
+            }
+        }
     }
 
     // ── execution ────────────────────────────────────────────────────────────────────────────────────────────────

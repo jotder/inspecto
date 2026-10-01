@@ -499,4 +499,20 @@ class GraphRunServiceTest {
             assertEquals(1, seen.stream().filter(v -> v.id().equals(queued.id())).count());
         }
     }
+
+    @Test
+    void closingTheServiceEndsTheRunsStillWaitingInTheQueue() throws Exception {
+        CountDownLatch inside = new CountDownLatch(1);
+        svc = new GraphRunService(new Probe(ctl -> {
+            inside.countDown();
+            while (true) ctl.checkpoint();
+        }), TIGHT);                                            // 1 worker, 1 queue slot
+        svc.submit(req("alice", ring(4)));
+        inside.await();
+        RunView queued = svc.submit(withAlgorithm(req("alice", ring(4)), Algorithm.IS_FOREST, Map.of()));
+        assertEquals(Status.QUEUED, queued.status());
+        svc.close();
+        assertEquals(Status.CANCELLED, svc.get(queued.id()).status(), "a dropped task must not stay QUEUED forever");
+        assertTrue(svc.await(queued.id(), 50).status().terminal());
+    }
 }

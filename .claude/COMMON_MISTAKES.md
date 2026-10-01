@@ -80,6 +80,20 @@ Learned the hard way on 2026-10-01 (D-S4 + D-1: 6 lanes, 3 of them started from 
    [build-test.md](../docs/okf/backend/build-run/build-test.md) "Proving a cut".
 5. **An incremental `mvn compile` after a shared-interface change is a FALSE GREEN** (downstream modules not recompiled; 9 s, exit
    0). Always `clean`, and read the log, not the exit code.
+6. **A peer's STAGED file blocks a cherry-pick and an ff-merge in the main tree** — integrate through a clean worktree
+   (`git worktree add .claude/worktrees/integ-x -b integ-x HEAD`, cherry-pick or copy your files there, commit, then
+   `git merge --ff-only integ-x` in the main tree). The ff also refuses if your own copies of the new files are sitting
+   untracked or modified in the main tree: delete or `git checkout --` them first (they equal the commit).
+7. **Never `git commit -o <path>` with a peer's rows in the index** — `-o` sweeps the whole index entry of a shared file
+   (`docs/INDEX.md`, `docs/BACKLOG.md`), not your hunk. Stage shared files by hunk, or commit from the clean worktree.
+8. **Run `npm run lint` on an integrated UI change before pushing** — a lane's own green does not include the merged tree
+   (`no-explicit-any` went red on master once from an integration).
+9. **`JAVA_HOME` may be 26 while PATH `java` is 27** — Maven then dies "release version 27 not supported". Export
+   `JAVA_HOME` to the PATH JDK (`java -XshowSettings:properties -version` prints `java.home`) before any `mvn`. The extracted LA
+   modules are only in the reactor with `-Pedition-enterprise`.
+10. **Check GitHub Actions after a push, not just the local gate.** CI was red on every master commit from 2026-09-30 and nobody
+    saw it: the Linux-only failure in `inspecto-config` halts the reactor, so 28 of 41 modules were SKIPPED. `gh run list --limit 3`
+    after every push; "BUILD FAILURE" early in the reactor hides everything after it.
 
 ---
 
