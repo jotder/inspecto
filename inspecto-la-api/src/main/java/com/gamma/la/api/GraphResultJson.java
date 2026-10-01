@@ -79,7 +79,7 @@ final class GraphResultJson {
 
     /**
      * <b>Never a silent cap.</b> Each list-shaped part of the payload (scores, hubs, authorities, groups, ids, communities,
-     * links, suspicions, selections, sub-graph nodes and edges, a selection's node and edge ids) is cut to its first
+     * links, suspicions, selections, sub-graph nodes and edges (an edge is returned only when both its nodes are), a selection's node and edge ids) is cut to its first
      * {@code maxItems} entries - the engine's canonical-v1 order, so the top of a ranking survives - and the cut is SAID:
      * {@code truncated} is true and {@code lists.<key> = {total, returned, limit, truncated}} gives the full count. Every
      * top-level list has a {@code lists} entry whether cut or not; a list nested inside another (one group, one path) gets
@@ -107,6 +107,16 @@ final class GraphResultJson {
 
         Cap(int limit) {
             this.limit = limit;
+        }
+
+        /** Re-states a recorded list as cut from {@code total} to {@code returned} (edges dropped because their node was cut). */
+        @SuppressWarnings("unchecked")
+        void restate(String key, int total, int returned) {
+            Map<String, Object> o = (Map<String, Object>) lists.get(key);
+            o.put("total", total);
+            o.put("returned", returned);
+            o.put("truncated", true);
+            truncated = true;
         }
 
         /** The first {@code limit} entries of {@code in}. {@code always} = record the list even when not cut (top-level lists). */
@@ -208,20 +218,31 @@ final class GraphResultJson {
             }
             case GraphResult.SubGraph p -> {
                 List<Object> nodes = new ArrayList<>();
-                cap.cut("nodes", p.graph().nodes(), true).forEach(n -> {
+                List<com.gamma.la.graph.GraphAlgorithms.Node> keptNodes = cap.cut("nodes", p.graph().nodes(), true);
+                keptNodes.forEach(n -> {
                     Map<String, Object> o = new LinkedHashMap<>();
                     o.put("id", ids.node(n.id()));
                     o.put("label", ids.node(n.label()));
                     nodes.add(o);
                 });
+                // An edge whose endpoint node was cut would dangle: keep only edges with both endpoints returned, and say
+                // so in lists.edges (total = every edge of the result, returned = what is here).
+                List<com.gamma.la.graph.GraphAlgorithms.Edge> allEdges = p.graph().edges();
+                List<com.gamma.la.graph.GraphAlgorithms.Edge> reachable = allEdges;
+                if (keptNodes.size() < p.graph().nodes().size()) {
+                    java.util.Set<String> keptIds = new java.util.HashSet<>();
+                    keptNodes.forEach(n -> keptIds.add(n.id()));
+                    reachable = allEdges.stream().filter(e -> keptIds.contains(e.source()) && keptIds.contains(e.target())).toList();
+                }
                 List<Object> edges = new ArrayList<>();
-                cap.cut("edges", p.graph().edges(), true).forEach(e -> {
+                cap.cut("edges", reachable, true).forEach(e -> {
                     Map<String, Object> o = new LinkedHashMap<>();
                     o.put("id", ids.edge(e.id()));
                     o.put("source", ids.node(e.source()));
                     o.put("target", ids.node(e.target()));
                     edges.add(o);
                 });
+                if (reachable.size() < allEdges.size()) cap.restate("edges", allEdges.size(), edges.size());
                 m.put("nodes", nodes);
                 m.put("edges", edges);
             }

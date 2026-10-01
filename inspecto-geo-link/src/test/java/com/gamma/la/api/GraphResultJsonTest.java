@@ -180,6 +180,13 @@ class GraphResultJsonTest {
                 int total = ((List<?>) full.get(e.getKey())).size();
                 assertEquals(total, note.get("total"), a.id() + "." + e.getKey());
                 assertEquals(1, note.get("limit"));
+                if (e.getKey().equals("edges") && out.containsKey("nodes")) {
+                    // a sub-graph returns only edges whose nodes were both returned: fewer than the limit is legal, but said
+                    assertEquals(l.size(), note.get("returned"));
+                    assertEquals(total > l.size(), note.get("truncated"), a.id() + ".edges");
+                    anyCut |= total > l.size();
+                    continue;
+                }
                 assertEquals(Math.min(total, 1), l.size(), a.id() + "." + e.getKey());
                 assertEquals(total > 1, note.get("truncated"), a.id() + "." + e.getKey());
                 assertEquals(l.size(), note.get("returned"));
@@ -221,6 +228,29 @@ class GraphResultJsonTest {
         assertEquals(3, gl.get("groups[0]").get("total"));
         assertFalse(gl.containsKey("groups[1]"), "an inner list that was not cut has no entry");
         assertFalse(g.toString().contains("alice"), "the cut result is still masked");
+    }
+
+    @Test
+    void aCutSubGraphReturnsNoEdgeWhoseNodeWasCutAndSaysSo() {
+        var g = new com.gamma.la.graph.GraphAlgorithms.Graph(
+                List.of(new com.gamma.la.graph.GraphAlgorithms.Node("a", "a"), new com.gamma.la.graph.GraphAlgorithms.Node("b", "b"),
+                        new com.gamma.la.graph.GraphAlgorithms.Node("c", "c")),
+                List.of(new com.gamma.la.graph.GraphAlgorithms.Edge(LinkIds.encode("a", "b", "k"), "a", "b"),
+                        new com.gamma.la.graph.GraphAlgorithms.Edge(LinkIds.encode("b", "c", "k"), "b", "c"),
+                        new com.gamma.la.graph.GraphAlgorithms.Edge(LinkIds.encode("c", "a", "k"), "c", "a")));
+        GraphResult r = new GraphResult(Algorithm.MAXIMUM_SPANNING_FOREST, new GraphResult.SubGraph(g), 0, 1);
+        Map<String, Object> out = GraphResultJson.of(r, GraphResultJson.Ids.NONE, 2);
+        @SuppressWarnings("unchecked") List<Map<String, Object>> edges = (List<Map<String, Object>>) out.get("edges");
+        assertEquals(1, edges.size(), "only a-b has both endpoints among the two returned nodes");
+        assertEquals("a", edges.get(0).get("source"));
+        @SuppressWarnings("unchecked") Map<String, Map<String, Object>> lists = (Map<String, Map<String, Object>>) out.get("lists");
+        assertEquals(3, lists.get("edges").get("total"));
+        assertEquals(1, lists.get("edges").get("returned"));
+        assertEquals(true, lists.get("edges").get("truncated"));
+        assertEquals(true, out.get("truncated"));
+        Map<String, Object> whole = GraphResultJson.of(r, GraphResultJson.Ids.NONE, 10);
+        assertEquals(3, ((List<?>) whole.get("edges")).size(), "nothing cut, every edge returned");
+        assertEquals(false, whole.get("truncated"));
     }
 
     @Test
