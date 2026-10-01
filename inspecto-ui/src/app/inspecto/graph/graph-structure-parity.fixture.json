@@ -1,0 +1,64 @@
+{
+  "graph": {
+    "nodes": ["x", "y", "z", "a", "b", "c", "d", "e", "g", "f", "h", "i", "j", "k", "l", "m", "t", "p", "r", "s"],
+    "edges": [
+      ["e1", "a", "b"], ["e2", "b", "c"], ["e3", "c", "a"], ["e4", "c", "d"], ["e5", "d", "e"], ["e6", "e", "e"],
+      ["e7", "f", "g"], ["e8", "g", "f"], ["e9", "g", "h"],
+      ["e10", "i", "j"], ["e11", "i", "k"], ["e12", "i", "l"], ["e13", "j", "k"], ["e14", "j", "l"], ["e15", "k", "l"],
+      ["e16", "x", "y"], ["e17", "y", "z"], ["e18", "z", "x"],
+      ["e19", "t", "p"], ["e20", "p", "r"], ["e21", "r", "s"], ["e22", "s", "p"]
+    ]
+  },
+  "expected": {
+    "articulationPoints": ["c", "d", "g", "p"],
+    "bridges": ["e19", "e4", "e5", "e9"],
+    "isForest": [
+      { "name": "empty", "graph": { "nodes": [], "edges": [] }, "forest": false },
+      { "name": "tree", "graph": { "nodes": ["r", "s", "t", "u"], "edges": [["f1", "r", "s"], ["f2", "r", "t"], ["f3", "t", "u"]] }, "forest": true },
+      { "name": "two parents", "graph": { "nodes": ["r", "s", "t"], "edges": [["f1", "r", "t"], ["f2", "s", "t"]] }, "forest": false },
+      { "name": "2-cycle", "graph": { "nodes": ["p", "q"], "edges": [["f1", "p", "q"], ["f2", "q", "p"]] }, "forest": false },
+      { "name": "forest with isolated node", "graph": { "nodes": ["a", "b", "c", "d", "z"], "edges": [["f1", "a", "b"], ["f2", "c", "d"]] }, "forest": true },
+      { "name": "self-loop", "graph": { "nodes": ["a"], "edges": [["f1", "a", "a"]] }, "forest": false },
+      { "name": "parallel edges", "graph": { "nodes": ["a", "b"], "edges": [["f1", "a", "b"], ["f2", "a", "b"]] }, "forest": false },
+      { "name": "main graph (has cycles)", "forest": false }
+    ],
+    "descendants": [
+      { "root": "a", "ids": ["b", "c", "d", "e"] },
+      { "root": "g", "ids": ["f", "h"] },
+      { "root": "f", "ids": ["g", "h"] },
+      { "root": "e", "ids": [] },
+      { "root": "m", "ids": [] },
+      { "root": "nope", "ids": [] },
+      { "root": "i", "ids": ["j", "k", "l"] },
+      { "root": "x", "ids": ["y", "z"] },
+      { "root": "t", "ids": ["p", "r", "s"] }
+    ],
+    "cycles": [
+      { "name": "defaults", "opts": {}, "cycles": [
+        { "nodeIds": ["x", "y", "z"], "edgeIds": ["e16", "e17", "e18"] },
+        { "nodeIds": ["a", "b", "c"], "edgeIds": ["e1", "e2", "e3"] },
+        { "nodeIds": ["e"], "edgeIds": ["e6"] },
+        { "nodeIds": ["f", "g"], "edgeIds": ["e7", "e8"] },
+        { "nodeIds": ["p", "r", "s"], "edgeIds": ["e20", "e21", "e22"] }
+      ] },
+      { "name": "limit 2", "opts": { "limit": 2 }, "cycles": [
+        { "nodeIds": ["x", "y", "z"], "edgeIds": ["e16", "e17", "e18"] },
+        { "nodeIds": ["a", "b", "c"], "edgeIds": ["e1", "e2", "e3"] }
+      ] },
+      { "name": "maxLen 2", "opts": { "maxLen": 2 }, "cycles": [
+        { "nodeIds": ["e"], "edgeIds": ["e6"] },
+        { "nodeIds": ["f", "g"], "edgeIds": ["e7", "e8"] }
+      ] },
+      { "name": "maxLen 1 (self-loop only)", "opts": { "maxLen": 1 }, "cycles": [
+        { "nodeIds": ["e"], "edgeIds": ["e6"] }
+      ] },
+      { "name": "limit 0", "opts": { "limit": 0 }, "cycles": [] }
+    ],
+    "cliques": [
+      { "name": "defaults", "opts": {}, "cliques": [["i", "j", "k", "l"], ["a", "b", "c"], ["p", "r", "s"], ["x", "y", "z"]] },
+      { "name": "minSize 2", "opts": { "minSize": 2 }, "cliques": [["i", "j", "k", "l"], ["a", "b", "c"], ["p", "r", "s"], ["x", "y", "z"], ["c", "d"], ["d", "e"], ["f", "g"], ["g", "h"], ["p", "t"]] },
+      { "name": "minSize 4", "opts": { "minSize": 4 }, "cliques": [["i", "j", "k", "l"]] },
+      { "name": "minSize 5", "opts": { "minSize": 5 }, "cliques": [] }
+    ]
+  }
+}
