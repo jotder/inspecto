@@ -194,6 +194,8 @@ export function graphRunErrorMessage(err: unknown, fallback: string): string {
 export class GraphRunsService {
     private readonly http = inject(HttpClient);
 
+    private loadingCatalogue = false;
+
     /** How often a started run is re-read, in ms. */
     pollMs = 1000;
 
@@ -206,8 +208,13 @@ export class GraphRunsService {
 
     /** Fetch the catalogue once into {@link catalogue}; a failure leaves it null (the footer and the Run button degrade). */
     loadCatalogue(): void {
-        if (this.catalogue()) return;
-        this.algorithms().subscribe({ next: (c) => this.catalogue.set(c), error: () => undefined });
+        if (this.catalogue() || this.loadingCatalogue) return; // the footer and a Run control both ask, at once
+        this.loadingCatalogue = true;
+        this.algorithms().subscribe({
+            next: (c) => this.catalogue.set(c),
+            error: () => (this.loadingCatalogue = false),
+            complete: () => (this.loadingCatalogue = false),
+        });
     }
 
     /** `200` when the run is already terminal (over budget at submit, a cache hit, a fast run), `202` otherwise. */

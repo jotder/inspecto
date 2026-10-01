@@ -140,6 +140,7 @@ describe('GraphRunsService', () => {
 
     it('loadCatalogue(): fills the signal once and swallows a failure', () => {
         svc.loadCatalogue();
+        svc.loadCatalogue(); // a second asker while the first is in flight does not send a second request
         http.expectOne(`${base}/inv/graph/algorithms`).flush({
             engine: 'in-memory',
             algorithms: [],

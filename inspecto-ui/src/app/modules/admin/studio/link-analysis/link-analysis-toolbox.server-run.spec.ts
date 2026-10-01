@@ -89,6 +89,8 @@ function make(
     opts: {
         allowed?: boolean;
         investigationId?: string | null;
+        workingSetNodes?: number | null;
+        graph?: typeof CANVAS | null;
         answer?: (r: GraphRunRequest) => Observable<GraphRunView>;
     } = {},
 ) {
@@ -112,7 +114,8 @@ function make(
     });
     const fixture = TestBed.createComponent(LinkAnalysisToolboxComponent);
     const c = fixture.componentInstance;
-    fixture.componentRef.setInput('graph', CANVAS);
+    fixture.componentRef.setInput('graph', opts.graph === undefined ? CANVAS : opts.graph);
+    fixture.componentRef.setInput('workingSetNodes', opts.workingSetNodes ?? null);
     fixture.componentRef.setInput(
         'nodeOptions',
         CANVAS.nodes.map((n) => ({ id: n.id, label: n.data.label })),
@@ -267,5 +270,22 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
         c.tab.set('communities');
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="blocked-reason"]')!.textContent).toMatch(/Investigation/);
+    });
+    it('with a Working Set open the decision is made on ITS size, not the query graph under it', () => {
+        configureGraphLimits({ analysisNodeCap: 750, suspicionNodeCap: 750 });
+        // no query graph loaded at all, but an Investigation whose Working Set has 1 225 nodes
+        const big = make({ graph: null, workingSetNodes: 1225 });
+        big.c.tab.set('scoring');
+        big.fixture.detectChanges();
+        expect(big.c.serverSpecs().scoring?.note).toBe(
+            'The Working Set has 1225 nodes - above the 750-node limit for running this in the browser.',
+        );
+        expect(big.button(/Run on server/)).toBeDefined();
+    });
+
+    it('a Working Set under the cap stays local even when the query graph beside it is over', () => {
+        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        const { c } = make({ workingSetNodes: 2 }); // CANVAS has 5 nodes, over the 3-node cap
+        expect(c.serverSpecs().scoring).toBeNull();
     });
 });

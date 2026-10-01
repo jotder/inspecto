@@ -251,6 +251,12 @@ export class LinkAnalysisToolboxComponent {
      * Subject holds `canRunLinkGraphAnalysis`.
      */
     readonly investigationId = input<string | null>(null);
+    /**
+     * How many nodes the open Investigation's Working Set has (hidden ones left out), or null when the canvas shows a
+     * query graph. A server run reads the Working Set, so when one is open THAT is the size the browser-or-server
+     * decision is made on - the displayed query graph is not what the server would analyse.
+     */
+    readonly workingSetNodes = input<number | null>(null);
     readonly serverIds = input<ServerIdMap | null>(null);
     readonly canRunOnServer = input(true);
 
@@ -349,7 +355,8 @@ export class LinkAnalysisToolboxComponent {
      * untouched. A computed, so the child control gets a stable object until something it depends on changes.
      */
     readonly serverSpecs = computed<Record<ServerTool, ServerRunSpec | null>>(() => {
-        const n = this.graph()?.nodes.length ?? 0;
+        const n = this.workingSetNodes() ?? this.graph()?.nodes.length ?? 0;
+        const subject = this.workingSetNodes() !== null ? 'The Working Set' : 'This graph';
         const spec = (
             algorithm: string,
             cap: number,
@@ -361,7 +368,7 @@ export class LinkAnalysisToolboxComponent {
                       algorithm,
                       params,
                       hold,
-                      note: `This graph has ${n} nodes - above the ${cap}-node limit for running this in the browser.`,
+                      note: `${subject} has ${n} nodes - above the ${cap}-node limit for running this in the browser.`,
                   }
                 : null;
         const analysis = analysisNodeCapValue();

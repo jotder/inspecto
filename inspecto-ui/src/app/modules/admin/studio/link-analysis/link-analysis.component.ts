@@ -719,6 +719,11 @@ export class LinkAnalysisComponent implements OnInit {
     readonly graphRunInvestigationId = computed(() =>
         this.investigation.canvas() ? this.investigation.activeId() : null,
     );
+    /** Nodes in the Working Set the canvas draws (hidden ones left out), or null while the canvas shows a query graph. */
+    readonly workingSetNodeCount = computed(() => {
+        const ws = this.investigation.workingSet();
+        return this.investigation.canvas() && ws ? ws.entities.filter((e) => !e.hidden).length : null;
+    });
     readonly canRunGraphOnServer = computed(() => this.lens.canRunLinkGraphAnalysis());
     /** The server's node/edge ids translated to the canvas's, rebuilt whenever the Working Set changes. */
     readonly serverIds = computed(() => {

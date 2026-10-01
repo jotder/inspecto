@@ -79,8 +79,10 @@ import { BudgetNextAction, budgetNextAction } from './graph-run-apply';
                     {{ v.status === 'QUEUED' ? 'Queued on the server' : 'Running on the server' }}
                     @if (v.status === 'RUNNING' && v.progress.fraction > 0) {
                         - {{ v.progress.fraction * 100 | number: '1.0-0' }}%
+                    } @else if (v.status === 'RUNNING' && v.progress.work > 0) {
+                        - {{ v.progress.work | number: '1.0-0' }} steps done
                     }
-                    - {{ v.consumed.elapsedMs | number: '1.0-0' }} ms elapsed ({{ v.consumed.nodes }} nodes,
+                    - {{ elapsedMs() | number: '1.0-0' }} ms elapsed ({{ v.consumed.nodes }} nodes,
                     {{ v.consumed.edges }} links)
                 </p>
             } @else {
@@ -95,7 +97,7 @@ import { BudgetNextAction, budgetNextAction } from './graph-run-apply';
                     }
                     @case ('BUDGET_EXCEEDED') {
                         <inspecto-alert variant="warning" title="Over budget - no result">
-                            <p data-testid="budget-reason">{{ v.reason }}</p>
+                            <p data-testid="budget-reason">{{ reasonFacts() }}</p>
                             <ul class="mt-1 list-disc pl-5" data-testid="budget-numbers">
                                 <li>
                                     Limit hit: <strong>{{ v.exceeded }}</strong>
@@ -166,6 +168,10 @@ export class LinkAnalysisServerRunComponent {
     readonly view = signal<GraphRunView | null>(null);
     readonly error = signal('');
     readonly cancelling = signal(false);
+    /** Milliseconds since Run was pressed, as the browser saw them - the server reports elapsed time only once a run ends. */
+    private readonly waitedMs = signal(0);
+    private startedAt = 0;
+    readonly elapsedMs = computed(() => Math.max(this.view()?.consumed.elapsedMs ?? 0, this.waitedMs()));
     private readonly starting = signal(false);
 
     readonly active = computed(() => {
@@ -180,6 +186,11 @@ export class LinkAnalysisServerRunComponent {
             return "Running on the server works on an Investigation's Working Set - open or start an Investigation first.";
         return this.hold();
     });
+    /**
+     * The server's sentence about which limit was hit, WITHOUT the advice it appends ("Raise it..., filter..., or pick..."):
+     * the banner states the facts and offers exactly one next action of its own.
+     */
+    readonly reasonFacts = computed(() => (this.view()?.reason ?? '').replace(/\s+(Raise|Filter|Pick)[\s\S]*$/, ''));
     readonly nextAction = computed<BudgetNextAction | null>(() => {
         const v = this.view();
         return v && v.status === 'BUDGET_EXCEEDED'
@@ -207,6 +218,7 @@ export class LinkAnalysisServerRunComponent {
         this.error.set('');
         this.cancelling.set(false);
         this.starting.set(false);
+        this.waitedMs.set(0);
     }
 
     start(budget?: Partial<GraphBudgetView>): void {
@@ -214,6 +226,7 @@ export class LinkAnalysisServerRunComponent {
         if (this.blockedReason() || !investigationId) return;
         this.reset();
         this.starting.set(true);
+        this.startedAt = Date.now();
         const req: GraphRunRequest = {
             investigationId,
             algorithm: this.algorithm(),
@@ -223,6 +236,7 @@ export class LinkAnalysisServerRunComponent {
         this.sub = this.runs.run(req).subscribe({
             next: (v) => {
                 this.starting.set(false);
+                this.waitedMs.set(Date.now() - this.startedAt);
                 this.view.set(v);
                 // The ONE place a server answer reaches the canvas: a COMPLETED run, and only that.
                 if (v.status === 'COMPLETED' && v.result) this.completed.emit(v.result);

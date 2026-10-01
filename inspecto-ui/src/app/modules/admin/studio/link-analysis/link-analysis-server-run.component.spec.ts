@@ -121,6 +121,15 @@ describe('LinkAnalysisServerRunComponent', () => {
         );
         expect(q('run-progress')!.textContent).toMatch(/Running.*40%.*1,500 ms elapsed/s);
         expect(completed).toEqual([]);
+        // an engine that counts steps but knows no fraction: the steps are shown, not a made-up percentage
+        push(
+            view('RUNNING', {
+                progress: { work: 316, fraction: 0 },
+                consumed: { nodes: 800, edges: 1200, elapsedMs: 0, work: 316 },
+            }),
+        );
+        expect(q('run-progress')!.textContent).toMatch(/316 steps done/);
+        expect(q('run-progress')!.textContent).not.toMatch(/%/);
         push(view('COMPLETED', { result: RESULT }));
         expect(q('run-done')!.textContent).toMatch(/Ran on the server/);
         expect(completed).toEqual([RESULT]);
@@ -145,14 +154,16 @@ describe('LinkAnalysisServerRunComponent', () => {
         push(
             view('BUDGET_EXCEEDED', {
                 exceeded: 'NODES',
-                reason: 'the Working Set has 800 nodes; the budget allows 500 (budget.maxNodes).',
+                reason: 'the Working Set has 800 nodes; the budget allows 500 (budget.maxNodes). Raise it (up to the server ceiling), filter the Working Set, or pick a cheaper algorithm.',
                 budget: { maxNodes: 500, maxEdges: 5000, timeoutMs: 10000 },
                 consumed: { nodes: 800, edges: 1200, elapsedMs: 3, work: 0 },
                 result: RESULT, // a server that wrongly sent one would still not be applied
             }),
         );
         expect(completed).toEqual([]);
-        expect(q('budget-reason')!.textContent).toContain('the Working Set has 800 nodes; the budget allows 500');
+        expect(q('budget-reason')!.textContent!.trim()).toBe(
+            'the Working Set has 800 nodes; the budget allows 500 (budget.maxNodes).',
+        ); // the facts, without the server's own list of three remedies
         const numbers = q('budget-numbers')!.textContent!.replace(/\s+/g, ' ');
         expect(numbers).toContain('NODES');
         expect(numbers).toContain('Budget: 500 nodes, 5000 links, 10000 ms');
