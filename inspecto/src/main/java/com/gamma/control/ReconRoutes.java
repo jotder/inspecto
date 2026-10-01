@@ -254,7 +254,7 @@ final class ReconRoutes implements RouteModule {
         component(store, "reconciliation", reconId)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no reconciliation '" + reconId + "'"));
 
-        com.gamma.objects.ObjectAccess objects = api.service().objects().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
+        com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                 "operational objects are not installed — promoting a Break to an Incident needs the "
                         + "inspecto-ops module, which ships in Standard and Enterprise (EDITIONS CP-11)"));
 
@@ -324,7 +324,7 @@ final class ReconRoutes implements RouteModule {
         if (root == null || component(new ComponentStore(root.resolve("registry")), "reconciliation", safeId).isEmpty())
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no reconciliation '" + safeId + "'");
 
-        com.gamma.objects.ObjectAccess objects = api.service().objects().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
+        com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                 "operational objects are not installed — reading promoted Breaks needs the "
                         + "inspecto-ops module, which ships in Standard and Enterprise (EDITIONS CP-11)"));
 

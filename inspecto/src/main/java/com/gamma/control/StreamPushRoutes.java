@@ -93,9 +93,9 @@ final class StreamPushRoutes implements RouteModule {
     enum Format { NDJSON, CSV }
 
     private Object push(ApiContext api, HttpExchange ex, String streamId) throws IOException {
-        String pipeline = api.service().pipelineForSourceId(streamId)
+        String pipeline = HostContext.of(api).service().pipelineForSourceId(streamId)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no Stream '" + streamId + "'"));
-        PipelineConfig cfg = api.service().configFor(pipeline)
+        PipelineConfig cfg = HostContext.of(api).service().configFor(pipeline)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no Stream '" + streamId + "'"));
         if (cfg.collector().hasDataset())
             throw new ApiException(501, ErrorCodes.NOT_SUPPORTED, "Stream '" + streamId + "' is fed by the Dataset '"
@@ -104,7 +104,7 @@ final class StreamPushRoutes implements RouteModule {
             throw new ApiException(409, ErrorCodes.CONFLICT, "Pipeline '" + pipeline + "' is an authoring template — it never runs");
         // A paused or inactive Pipeline would let the batch sit in the inbox unseen; refuse, so the producer
         // retries later instead of believing its records are on their way (409, never 202-and-strand).
-        boolean paused = api.service().pipelines().stream().anyMatch(v -> v.name().equals(pipeline) && v.paused());
+        boolean paused = HostContext.of(api).service().pipelines().stream().anyMatch(v -> v.name().equals(pipeline) && v.paused());
         if (paused || !cfg.active())
             throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline paused: '" + pipeline + "' is "
                     + (paused ? "paused" : "not active") + " — retry once it runs");

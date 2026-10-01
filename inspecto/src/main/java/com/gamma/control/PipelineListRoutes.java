@@ -44,8 +44,8 @@ final class PipelineListRoutes implements RouteModule {
     /** Lift every registered pipeline to a {@link PipelineGraph} and project a compact summary (GET /pipelines). */
     private Object pipelineSummaries(ApiContext api) {
         List<Map<String, Object>> out = new ArrayList<>();
-        for (PipelineView pv : api.service().pipelines()) {
-            api.service().configFor(pv.name()).ifPresent(c -> {
+        for (PipelineView pv : HostContext.of(api).service().pipelines()) {
+            HostContext.of(api).service().configFor(pv.name()).ifPresent(c -> {
                 Map<String, Object> s = PipelineProjection.summary(PipelineLift.lift(c));
                 // Emitted only when set, so an ordinary pipeline's payload is unchanged. Kept out of
                 // PipelineGraph/PipelineProjection deliberately: `template` is a config-level lifecycle
@@ -64,7 +64,7 @@ final class PipelineListRoutes implements RouteModule {
         // PIPELINE-LOAD-FAILURE-INVISIBLE-1 (operator decision 2026-09-23): a registered file that does not
         // load stays a ROW, after the healthy ones, carrying the loader's message. It has no graph fields —
         // it never lifted — and it is listed HERE only: every run/schedule/count surface reads pipelines().
-        for (ConfigRegistry.LoadFailure f : api.service().pipelineLoadFailures()) {
+        for (ConfigRegistry.LoadFailure f : HostContext.of(api).service().pipelineLoadFailures()) {
             Map<String, Object> loadError = new LinkedHashMap<>();
             loadError.put("file", f.file());
             if (f.line() != null) loadError.put("line", f.line());
@@ -80,7 +80,7 @@ final class PipelineListRoutes implements RouteModule {
 
     /** Lift every registered pipeline and project the combined pipeline+job topology (GET /pipelines/combined, T24). */
     private Object combinedPipelines(ApiContext api) {
-        return PipelineProjection.combined(PipelineSupport.liftedPipelines(api.service()));
+        return PipelineProjection.combined(PipelineSupport.liftedPipelines(HostContext.of(api).service()));
     }
 
     private PipelineStore pipelineStore(ApiContext api) {

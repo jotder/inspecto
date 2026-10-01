@@ -198,7 +198,7 @@ final class SaveGate {
                             + "batch_size and retry here"));
         }
         if (api == null) return List.of();
-        ConnectionProfile p = api.service().connections().get(w.connection());
+        ConnectionProfile p = HostContext.of(api).service().connections().get(w.connection());
         if (p == null) {
             if (referents == Referents.MAY_ARRIVE_LATER)
                 return List.of(new Finding(Severity.WARNING, "webhook.connection",

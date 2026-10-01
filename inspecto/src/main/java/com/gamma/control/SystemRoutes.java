@@ -36,7 +36,7 @@ final class SystemRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/system/operational-db", ApiContext.withCapability("canConfigureAccess",
-                (e, m) -> ETags.respond(e, OperationalDbReport.of(api.spaces().current()))));
+                (e, m) -> ETags.respond(e, OperationalDbReport.of(HostContext.of(api).spaces().current()))));
         api.post("/system/operational-db/test", ApiContext.withCapability("canConfigureAccess",
                 (e, m) -> testConnection(api.body(e))));
     }

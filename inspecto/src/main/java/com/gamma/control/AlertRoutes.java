@@ -36,15 +36,15 @@ final class AlertRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.get("/alerts", (e, m) -> api.service().alertService()
+        api.get("/alerts", (e, m) -> HostContext.of(api).service().alertService()
                 .map(a -> (Object) a.recent(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50)))
                 .orElse(java.util.List.of()));
-        api.get("/alerts/rules", (e, m) -> api.service().alertService()
+        api.get("/alerts/rules", (e, m) -> HostContext.of(api).service().alertService()
                 .map(a -> (Object) a.rules())
                 .orElse(java.util.List.of()));
         // Gated 2026-09-17: a fired rule emits ALERT_FIRED, which the default NotificationRules dispatch to
         // email/webhook — this route can page people, so it is an operate action, not a read.
-        api.post("/alerts/evaluate", ApiContext.withCapability("canOperateRuns", (e, m) -> api.service().alertService()
+        api.post("/alerts/evaluate", ApiContext.withCapability("canOperateRuns", (e, m) -> HostContext.of(api).service().alertService()
                 .map(a -> (Object) a.evaluateAll())
                 .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                         "alert engine not armed (no alert-rule components loaded)"))));
@@ -184,7 +184,7 @@ final class AlertRoutes implements RouteModule {
     }
 
     private static AlertService alerts(ApiContext api) {
-        return api.service().alertService()
+        return HostContext.of(api).service().alertService()
                 .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "alert engine unavailable"));
     }
 

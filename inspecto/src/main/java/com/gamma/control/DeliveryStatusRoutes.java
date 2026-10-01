@@ -90,7 +90,7 @@ final class DeliveryStatusRoutes implements RouteModule {
      * are seeing.
      */
     private Object suppressions(ApiContext api, HttpExchange e) {
-        var suppression = api.service().notificationService().suppression();
+        var suppression = HostContext.of(api).service().notificationService().suppression();
         int limit = Math.min(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 100), MAX_SUPPRESSIONS);
         var all = suppression.suppressions(System.currentTimeMillis(), MAX_SUPPRESSIONS);
         var page = all.size() > limit ? all.subList(0, limit) : all;
@@ -120,7 +120,7 @@ final class DeliveryStatusRoutes implements RouteModule {
         if (target == null || target.isBlank()) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "target is required: DELETE /notifications/suppressions?target=<address>");
         }
-        DeliveryReceiptStore receipts = api.service().deliveryReceipts();
+        DeliveryReceiptStore receipts = HostContext.of(api).service().deliveryReceipts();
         long now = System.currentTimeMillis();
         if (receipts == null || !receipts.unsuppress(target.trim(), now, ApiContext.actor(e))) {
             throw new ApiException(409, ErrorCodes.CONFLICT, "this deployment cannot record a suppression override — "
@@ -157,7 +157,7 @@ final class DeliveryStatusRoutes implements RouteModule {
         List<DeliveryEvent> events = adapter.parse(raw);
         if (events.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "no delivery-status events in payload");
 
-        DeliveryReceiptStore receipts = api.service().deliveryReceipts();
+        DeliveryReceiptStore receipts = HostContext.of(api).service().deliveryReceipts();
         List<Map<String, Object>> stamped = new ArrayList<>();
         int unknown = 0;
         for (DeliveryEvent event : events) {
@@ -180,7 +180,7 @@ final class DeliveryStatusRoutes implements RouteModule {
     }
 
     private Object deliveries(ApiContext api, HttpExchange e) {
-        DeliveryReceiptStore receipts = api.service().deliveryReceipts();
+        DeliveryReceiptStore receipts = HostContext.of(api).service().deliveryReceipts();
         String notificationId = ApiContext.query(e, "notificationId");
         List<DeliveryReceipt> found = notificationId == null || notificationId.isBlank()
                 ? receipts.recent(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 100))

@@ -98,7 +98,7 @@ final class DbBrowserRoutes implements RouteModule {
     /** The live DB-backed operational stores as catalog groups (empty on the default in-memory/file backends). */
     private static List<Map<String, Object>> operationalGroups(ApiContext api) {
         List<Map<String, Object>> groups = new ArrayList<>();
-        for (BrowsableStore b : api.service().browsableStores()) {
+        for (BrowsableStore b : HostContext.of(api).service().browsableStores()) {
             List<Map<String, Object>> tables = b.browseTables().stream()
                     .<Map<String, Object>>map(t -> Map.of("name", t)).toList();
             Map<String, Object> g = new LinkedHashMap<>();
@@ -253,7 +253,7 @@ final class DbBrowserRoutes implements RouteModule {
                                      int limit, int offset) {
         String id = group.substring("ops:".length());
         BrowsableStore store = null;
-        for (BrowsableStore b : api.service().browsableStores())
+        for (BrowsableStore b : HostContext.of(api).service().browsableStores())
             if (b.browseId().equals(id)) { store = b; break; }
         if (store == null)
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no live operational store '" + id + "' (its backend is not DB-backed)");
@@ -303,7 +303,7 @@ final class DbBrowserRoutes implements RouteModule {
      * pre-mapping backup CSVs, hiding mapped columns (the demo {@code orders} store's {@code GROSS}).
      */
     private static Optional<Path> pipelineDatabaseDir(ApiContext api, String storeName) {
-        return api.service().configFor(storeName)
+        return HostContext.of(api).service().configFor(storeName)
                 .map(cfg -> Path.of(cfg.dirs().database()).toAbsolutePath().normalize())
                 .filter(Files::isDirectory);
     }

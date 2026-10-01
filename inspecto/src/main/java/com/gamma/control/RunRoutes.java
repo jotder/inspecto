@@ -42,7 +42,7 @@ final class RunRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         // Optional ?limit=&offset= (ui-design-review R6a) — absent limit returns every pipeline, unchanged.
-        api.get("/runs", (e, m) -> ApiContext.paged(api.service().pipelines(), e));
+        api.get("/runs", (e, m) -> ApiContext.paged(HostContext.of(api).service().pipelines(), e));
         // Register a new pipeline from a config on disk under the write root (control scope).
         // Registration is a workbench-authoring action (W6: canAuthorWorkbench); trigger/pause/resume/
         // reprocess below are operational (canOperateRuns) — both a no-op on Personal (rbac-groundwork.md §2).
@@ -53,19 +53,19 @@ final class RunRoutes implements RouteModule {
         // /runs/runs/, so it never collides with the /runs list or the /runs/{name}/<audit> routes.
         api.get("/runs/runs/([^/]+)", (e, m) -> pipelineRunById(api, ApiContext.name(m)));
         api.post("/runs/([^/]+)/pause", ApiContext.withCapability("canOperateRuns", (e, m) -> {
-            if (!api.service().pause(ApiContext.name(m))) throw notFound(ApiContext.name(m));
+            if (!HostContext.of(api).service().pause(ApiContext.name(m))) throw notFound(ApiContext.name(m));
             return Map.of("pipeline", ApiContext.name(m), "paused", true);
         }));
         api.post("/runs/([^/]+)/resume", ApiContext.withCapability("canOperateRuns", (e, m) -> {
-            if (!api.service().resume(ApiContext.name(m))) throw notFound(ApiContext.name(m));
+            if (!HostContext.of(api).service().resume(ApiContext.name(m))) throw notFound(ApiContext.name(m));
             return Map.of("pipeline", ApiContext.name(m), "paused", false);
         }));
 
-        api.get("/runs/([^/]+)/commits",    (e, m) -> api.service().statusStore().committedBatches(cfg(api, m)));
-        api.get("/runs/([^/]+)/batches",    (e, m) -> withParkDetail(cfg(api, m), api.service().statusStore().batches(cfg(api, m))));
-        api.get("/runs/([^/]+)/files",      (e, m) -> api.service().statusStore().files(cfg(api, m)));
-        api.get("/runs/([^/]+)/lineage",    (e, m) -> api.service().statusStore().lineage(cfg(api, m), ApiContext.query(e, "batchId")));
-        api.get("/runs/([^/]+)/quarantine", (e, m) -> api.service().statusStore().quarantine(cfg(api, m)));
+        api.get("/runs/([^/]+)/commits",    (e, m) -> HostContext.of(api).service().statusStore().committedBatches(cfg(api, m)));
+        api.get("/runs/([^/]+)/batches",    (e, m) -> withParkDetail(cfg(api, m), HostContext.of(api).service().statusStore().batches(cfg(api, m))));
+        api.get("/runs/([^/]+)/files",      (e, m) -> HostContext.of(api).service().statusStore().files(cfg(api, m)));
+        api.get("/runs/([^/]+)/lineage",    (e, m) -> HostContext.of(api).service().statusStore().lineage(cfg(api, m), ApiContext.query(e, "batchId")));
+        api.get("/runs/([^/]+)/quarantine", (e, m) -> HostContext.of(api).service().statusStore().quarantine(cfg(api, m)));
         // The Consignment output registry, scoped to one Consignment: every file it wrote, INCLUDING the
         // derived tables and summaries a post-sync step registered onto it. Until this the lane was
         // real and invisible — a chain could derive a table and nothing in the UI could show it.
@@ -78,7 +78,7 @@ final class RunRoutes implements RouteModule {
         // Inbox/processing status: files still pending (matched, not yet processed) + whether the
         // pipeline is currently ingesting. Complements the audit-backed /files (processed history).
         api.get("/runs/([^/]+)/pending",    (e, m) ->
-                api.service().inboxStatus(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m))));
+                HostContext.of(api).service().inboxStatus(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m))));
         // "Where is file X right now" (Phase 4 §2.4 — Stage C's per-file stage progression), backed by the
         // durable FileStages registry; empty when the registry is default-off or the file predates it —
         // never an error, since the registry is an index beside the manifest, not the record of existence.
@@ -91,8 +91,8 @@ final class RunRoutes implements RouteModule {
                 });
 
         api.post("/runs/([^/]+)/reprocess", ApiContext.withCapability("canOperateRuns", (e, m) -> {
-            var path = api.service().pathFor(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m)));
-            if (api.service().isTemplate(ApiContext.name(m)))   // a template has no committed batches anyway
+            var path = HostContext.of(api).service().pathFor(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m)));
+            if (HostContext.of(api).service().isTemplate(ApiContext.name(m)))   // a template has no committed batches anyway
                 throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline '" + ApiContext.name(m) + "' is a template and is not runnable");
             String batchId = ApiContext.str(api.body(e), "batchId");
             if (batchId == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'batchId'");
@@ -118,8 +118,8 @@ final class RunRoutes implements RouteModule {
         // Deliberately explicit — re-enabling the step is a CONFIG save and must not start batch work
         // as a side effect; the save surfaces the parked batch ids, the operator drains them here.
         api.post("/runs/([^/]+)/drain", ApiContext.withCapability("canOperateRuns", (e, m) -> {
-            var path = api.service().pathFor(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m)));
-            if (api.service().isTemplate(ApiContext.name(m)))   // a template has no parked batches anyway
+            var path = HostContext.of(api).service().pathFor(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m)));
+            if (HostContext.of(api).service().isTemplate(ApiContext.name(m)))   // a template has no parked batches anyway
                 throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline '" + ApiContext.name(m) + "' is a template and is not runnable");
             String batchId = ApiContext.str(api.body(e), "batchId");
             if (batchId == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'batchId'");
@@ -139,20 +139,20 @@ final class RunRoutes implements RouteModule {
                     "branches", r.drainedBranches(), "outputFiles", r.outputFiles(), "rows", r.rows());
         }));
 
-        api.post("/trigger", ApiContext.withCapability("canOperateRuns", (e, m) -> api.service().runAllOnce()));
+        api.post("/trigger", ApiContext.withCapability("canOperateRuns", (e, m) -> HostContext.of(api).service().runAllOnce()));
 
         // ── v2.8.0: aggregated reports (status snapshot + batch-audit rollup) ──
         // v2.10.0: ?from=&to= scope the rollup to a date range (inclusive; date or datetime).
-        api.get("/status", (e, m) -> api.service().reports().statusReport());
+        api.get("/status", (e, m) -> HostContext.of(api).service().reports().statusReport());
         // Cross-pipeline problem files (2026-08-23, operator-requested): every pipeline's WHOLE
         // failures (quarantined) and PARTIAL failures (ingested with error_rows > 0) in one bounded,
         // newest-first list — the file-grain companion to /status's pipeline-grain rollup, so an
         // operator with 100s of pipelines stops drilling into each Run Detail to find the bad ones.
         api.get("/status/problem-files", (e, m) -> problemFiles(api, e));
-        api.get("/report", (e, m) -> api.service().reports().serviceReport(window(e)));
+        api.get("/report", (e, m) -> HostContext.of(api).service().reports().serviceReport(window(e)));
         api.get("/runs/([^/]+)/report", (e, m) -> {
             cfg(api, m);   // 404 if no such pipeline
-            return api.service().reports().batchReport(ApiContext.name(m), window(e));
+            return HostContext.of(api).service().reports().batchReport(ApiContext.name(m), window(e));
         });
     }
 
@@ -187,14 +187,14 @@ final class RunRoutes implements RouteModule {
         boolean skipPostAction = dryRun || "true".equalsIgnoreCase(ApiContext.query(e, "skipPostAction"));
         try {
             if (ApiContext.v1(e)) {
-                String runId = api.service().triggerRunAsync(name, skipPostAction, dryRun)
+                String runId = HostContext.of(api).service().triggerRunAsync(name, skipPostAction, dryRun)
                         .orElseThrow(() -> notFound(name));
                 e.getResponseHeaders().set("Location", "/api/v1/runs/runs/" + runId);
                 return ApiContext.respondJson(e, 202,
                         Map.of("runId", runId, "pipeline", name, "status", "running",
                                 "skipPostAction", skipPostAction, "dryRun", dryRun));
             }
-            return api.service().runPipelineOffThread(name, skipPostAction, dryRun).orElseThrow(() -> notFound(name));
+            return HostContext.of(api).service().runPipelineOffThread(name, skipPostAction, dryRun).orElseThrow(() -> notFound(name));
         } catch (IllegalStateException notRunnable) {
             throw new ApiException(409, ErrorCodes.CONFLICT, notRunnable.getMessage());   // a `template: true` pipeline
         }
@@ -202,7 +202,7 @@ final class RunRoutes implements RouteModule {
 
     /** {@code GET /runs/runs/{runId}} — poll one manual pipeline run's status (W5b); 404 once evicted or unknown. */
     private Object pipelineRunById(ApiContext api, String runId) {
-        PipelineRun r = api.service().pipelineRunById(runId)
+        PipelineRun r = HostContext.of(api).service().pipelineRunById(runId)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no run '" + runId + "'"));
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("runId", r.runId());
@@ -226,8 +226,8 @@ final class RunRoutes implements RouteModule {
      * 200 with {@code status: FAILED} — nothing landed and the claim was released, so it may be retried.
      */
     private Object replayRejects(ApiContext api, HttpExchange e, String name) throws IOException {
-        if (api.service().pathFor(name).isEmpty()) throw notFound(name);
-        if (api.service().isTemplate(name))
+        if (HostContext.of(api).service().pathFor(name).isEmpty()) throw notFound(name);
+        if (HostContext.of(api).service().isTemplate(name))
             throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline '" + name + "' is a template and is not runnable");
         String file = ApiContext.str(api.body(e), "file");
         if (file == null || file.isBlank())
@@ -236,7 +236,7 @@ final class RunRoutes implements RouteModule {
             throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "'file' must be a bare file name, not a path");
         com.gamma.inspector.RecordReplay.Result r;
         try {
-            r = api.service().replayRejects(name, file).orElseThrow(() -> notFound(name));
+            r = HostContext.of(api).service().replayRejects(name, file).orElseThrow(() -> notFound(name));
         } catch (java.nio.file.NoSuchFileException none) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, none.getMessage());
         } catch (IllegalArgumentException unreplayable) {
@@ -328,8 +328,8 @@ final class RunRoutes implements RouteModule {
      * 409 — each with the reason, so nothing appears to act that did not.
      */
     private Object retryAct(ApiContext api, HttpExchange e, String name, boolean cancel) throws IOException {
-        PipelineConfig cfg = api.service().configFor(name).orElseThrow(() -> notFound(name));
-        if (api.service().isTemplate(name))
+        PipelineConfig cfg = HostContext.of(api).service().configFor(name).orElseThrow(() -> notFound(name));
+        if (HostContext.of(api).service().isTemplate(name))
             throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline '" + name + "' is a template and is not runnable");
         String rel = ApiContext.str(api.body(e), "file");
         if (rel == null || rel.isBlank())
@@ -337,7 +337,7 @@ final class RunRoutes implements RouteModule {
         java.io.File file = com.gamma.inspector.CommitRetry.inboxFile(cfg, rel);
         if (file == null)
             throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "'file' must be a path relative to the poll directory");
-        com.gamma.inspector.CommitRetry.Outcome o = api.service().commitRetryAct(name, file, cancel)
+        com.gamma.inspector.CommitRetry.Outcome o = HostContext.of(api).service().commitRetryAct(name, file, cancel)
                 .orElseThrow(() -> notFound(name));
         switch (o.result()) {
             case NO_RECORD, NOT_IN_INBOX -> throw new ApiException(404, ErrorCodes.NOT_FOUND, "'" + rel + "': " + o.detail());
@@ -478,11 +478,11 @@ final class RunRoutes implements RouteModule {
         int full = 0, partial = 0, warnings = 0;
         java.util.Set<String> pipelinesWithProblems = new java.util.TreeSet<>();
 
-        for (PipelineConfig cfg : api.service().loadedPipelines()) {
+        for (PipelineConfig cfg : HostContext.of(api).service().loadedPipelines()) {
             String pipeline = cfg.identity().pipelineName();
             try {
                 java.util.Set<String> seen = new java.util.HashSet<>();
-                for (Map<String, String> f : api.service().statusStore().files(cfg)) {
+                for (Map<String, String> f : HostContext.of(api).service().statusStore().files(cfg)) {
                     String status = f.getOrDefault("status", "");
                     long errorRows = parseLongOr(f.get("error_rows"), 0);
                     boolean fullFail = !"SUCCESS".equals(status);
@@ -502,7 +502,7 @@ final class RunRoutes implements RouteModule {
                             // column existed (readers parse by header NAME, so that is a blank too).
                             f.getOrDefault("origin", ""), f.getOrDefault("logical_name", "")));
                 }
-                for (Map<String, String> q : api.service().statusStore().quarantine(cfg)) {
+                for (Map<String, String> q : HostContext.of(api).service().statusStore().quarantine(cfg)) {
                     String file = q.getOrDefault("file", "");
                     if (seen.contains(file)) continue;   // the status ledger's row is richer
                     full++;
@@ -637,7 +637,7 @@ final class RunRoutes implements RouteModule {
     }
 
     private PipelineConfig cfg(ApiContext api, Matcher m) {
-        return api.service().configFor(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m)));
+        return HostContext.of(api).service().configFor(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m)));
     }
 
     /**
@@ -659,7 +659,7 @@ final class RunRoutes implements RouteModule {
         // X2 cross-lane provenance, the reverse half: the at-rest runs that READ this Consignment. Independent
         // of the outputs registry (it lives beside the job-run ledger), and present only when a run store
         // exists — absent ≠ empty: a deployment without the DB projection cannot know.
-        api.service().jobService().flatMap(com.gamma.job.JobService::runStore)
+        HostContext.of(api).service().jobService().flatMap(com.gamma.job.JobService::runStore)
                 .ifPresent(runs -> page.put("derivedRuns", runs.runsDerivedFrom(consignmentId)));
         if (store == null) {
             page.put("outputs", List.of());
@@ -744,14 +744,14 @@ final class RunRoutes implements RouteModule {
 
         String id;
         try {
-            id = api.service().registerPipeline(resolved);
+            id = HostContext.of(api).service().registerPipeline(resolved);
         } catch (IllegalStateException collision) {
             throw new ApiException(409, ErrorCodes.CONFLICT, collision.getMessage());
         } catch (RuntimeException invalid) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "config is not a valid pipeline: " + invalid.getMessage());
         }
 
-        PipelineView view = api.service().pipelines().stream()
+        PipelineView view = HostContext.of(api).service().pipelines().stream()
                 .filter(p -> p.name().equals(id)).findFirst().orElse(null);
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("registered", true);

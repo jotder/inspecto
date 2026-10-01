@@ -289,13 +289,13 @@ public final class PendingChanges {
 
     /** The content fingerprints of a proposed publication Job, against this Space's Connections and Datasets now. */
     static Map<String, String> publicationFingerprints(ApiContext api, Map<?, ?> proposed) {
-        return com.gamma.job.PublicationApproval.fingerprints(proposed, api.writeRoot(), api.service()::connection);
+        return com.gamma.job.PublicationApproval.fingerprints(proposed, api.writeRoot(), HostContext.of(api).service()::connection);
     }
 
     /** Whether the proposed publication's Connection sets {@code insecure_tls: true}. */
     static boolean insecureTls(ApiContext api, Map<?, ?> proposed) {
         Object conn = jobSection(proposed).get("connection");
-        return conn != null && api.service().connection(String.valueOf(conn).trim())
+        return conn != null && HostContext.of(api).service().connection(String.valueOf(conn).trim())
                 .map(p -> p.options() != null && "true".equalsIgnoreCase(String.valueOf(p.options().get("insecure_tls")).trim()))
                 .orElse(false);
     }

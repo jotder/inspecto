@@ -1,5 +1,6 @@
 package com.gamma.geolink;
 
+import com.gamma.control.HostContext;
 import com.gamma.control.AnnotationTargets;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
@@ -101,7 +102,7 @@ public final class InvestigationCaseRoutes implements RouteModule {
         if (caseRef == null) return null;
         if (!CASE_REF.matcher(caseRef).matches())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'caseRef' must match " + CASE_REF.pattern());
-        Optional<ObjectAccess> objects = api.service().objects();
+        Optional<ObjectAccess> objects = HostContext.of(api).service().objects();
         if (objects.isPresent()) {
             Map<String, Object> c = objects.get().summary(caseRef).orElse(null);
             if (c == null || !"case".equals(c.get("kind")) || !AnnotationTargets.objectVisibleTo(ex, c))
@@ -136,7 +137,7 @@ public final class InvestigationCaseRoutes implements RouteModule {
         try {
             String caseRef = caseRef(store, id);
             if (caseRef == null) return false;
-            ObjectAccess objects = api.service().objects().orElse(null);
+            ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
             if (objects == null) return false;
             Map<String, Object> c = objects.summary(caseRef).orElse(null);
             if (c == null || !"case".equals(c.get("kind")) || !Boolean.FALSE.equals(c.get("closed"))) return false;
@@ -169,10 +170,10 @@ public final class InvestigationCaseRoutes implements RouteModule {
         boolean owner = s.isEmpty() || Objects.equals(s.get().id(), inv.header().get("owner"));
         out.put("access", owner ? "owner" : "case-member");
         out.put("readOnly", !owner);
-        boolean ops = api.service().objects().isPresent();
+        boolean ops = HostContext.of(api).service().objects().isPresent();
         // plan §5.10: say what grants() will do — a closed, vanished or non-Case link shares nothing (fail closed).
         Map<String, Object> c = link == null || !ops ? null
-                : api.service().objects().get().summary(String.valueOf(link.get("caseRef"))).orElse(null);
+                : HostContext.of(api).service().objects().get().summary(String.valueOf(link.get("caseRef"))).orElse(null);
         boolean open = c != null && "case".equals(c.get("kind")) && Boolean.FALSE.equals(c.get("closed"));
         out.put("sharing", open);
         out.put("reason", link == null ? "not linked to a Case — owner-only"

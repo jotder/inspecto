@@ -3,8 +3,6 @@ package com.gamma.control;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
-import com.gamma.service.CollectorService;
-import com.gamma.service.SpaceManager;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -306,15 +304,7 @@ public interface ApiContext extends WriteRootProvider {
      */
     byte[] rawBody(HttpExchange ex, int maxBytes) throws IOException;
 
-    /** The running service host the routes act on (the request's bound space, per the {@code /spaces/{id}} seam). */
-    CollectorService service();
-
-    /** The live SSE streams this host ends on close (see {@link SseStreams}). */
-    SseStreams sseStreams();
-
-    /** The container of all hosted spaces — for the server-global {@code SpaceRoutes} CRUD group, and the
-     *  {@code canAdminister}-gated {@code SpaceComparisonRoutes} (which resolves Spaces only past that gate). */
-    SpaceManager spaces();
+    // service(), sseStreams() and spaces() moved to HostContext (inspecto-processor): this SPI names no host class.
 
     /** The configured write root, or {@code null} when filesystem writes are disabled. */
     Path writeRoot();

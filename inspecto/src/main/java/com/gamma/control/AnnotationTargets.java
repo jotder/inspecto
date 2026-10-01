@@ -87,7 +87,7 @@ public final class AnnotationTargets {
      * not a promise that a route is behind it.
      */
     private static String visibleObjectCorrelationId(ApiContext api, HttpExchange ex, String id) {
-        com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+        com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
         if (objects == null)
             throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "Operational objects are not installed in this bundle - they are "
                     + "provided by the optional inspecto-ops module (Professional edition and above).");

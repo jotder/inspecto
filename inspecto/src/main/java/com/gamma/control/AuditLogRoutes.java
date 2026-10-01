@@ -80,7 +80,7 @@ final class AuditLogRoutes implements RouteModule {
         Path root = api.writeRoot();
         AuditAnchors.AnchorFile anchors = root == null ? AuditAnchors.AnchorFile.NONE : AuditAnchors.readFile(root);
         java.util.Map<String, Object> out = new java.util.LinkedHashMap<>(AuditVerifier.verify(
-                api.service().events(), anchors, from, to, MAX_VERIFY, e -> true,
+                HostContext.of(api).service().events(), anchors, from, to, MAX_VERIFY, e -> true,
                 policy(api, root, "current".equals(ApiContext.query(ex, "epoch")))).toMap());
         out.put("anchors", root == null ? "unavailable" : "checked");
         return out;
@@ -105,7 +105,7 @@ final class AuditLogRoutes implements RouteModule {
      *  verify. {@code created: false} when nothing was chained since the last anchor. */
     private static Object anchorNow(ApiContext api) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "audit anchors");
-        AuditAnchors.OnDemand done = AuditAnchors.onDemand(api.service().events(), root);
+        AuditAnchors.OnDemand done = AuditAnchors.onDemand(HostContext.of(api).service().events(), root);
         java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
         out.put("created", done.created());
         out.put("anchor", done.anchor() == null ? null : done.anchor().toMap());
@@ -116,7 +116,7 @@ final class AuditLogRoutes implements RouteModule {
      *  cutoff — the shortest enabled {@code event_prune} window, or none. */
     private static AuditVerifier.Policy policy(ApiContext api, Path root, boolean currentEpochOnly) {
         java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
-        java.util.OptionalLong days = api.service().jobService()
+        java.util.OptionalLong days = HostContext.of(api).service().jobService()
                 .map(com.gamma.job.JobService::eventRetentionDays).orElse(java.util.OptionalLong.empty());
         java.time.LocalDate cutoff = days.isPresent() ? today.minusDays(days.getAsLong()) : null;
         // reported only: truncation is judged by the chained prune records, never by what is merely configured
@@ -140,7 +140,7 @@ final class AuditLogRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
                     "reason is required: a non-blank string of at most " + REASON_MAX + " characters");
         String actor = ApiContext.actor(ex);
-        AuditAnchors.Anchor b = AuditAnchors.rebaseline(api.service().events(), root, reason.trim(),
+        AuditAnchors.Anchor b = AuditAnchors.rebaseline(HostContext.of(api).service().events(), root, reason.trim(),
                 policy(api, root, false), actor);
         // its OWN audit event, chained like every other, carrying what the break records (beside the generic
         // POST row the dispatch seam writes)
@@ -204,7 +204,7 @@ final class AuditLogRoutes implements RouteModule {
     }
 
     private static Object search(ApiContext api, HttpExchange ex) {
-        return api.service().events().query(auditQuery(ex, EventQuery.DEFAULT_LIMIT))
+        return HostContext.of(api).service().events().query(auditQuery(ex, EventQuery.DEFAULT_LIMIT))
                 .stream().map(Event::toMap).toList();
     }
 
@@ -215,7 +215,7 @@ final class AuditLogRoutes implements RouteModule {
      * auditable types get the audit columns, because both are what the plain projection used to drop.
      */
     private static Object export(ApiContext api, HttpExchange ex) throws IOException {
-        List<Event> rows = api.service().events().query(auditQuery(ex, EventQuery.MAX_LIMIT));
+        List<Event> rows = HostContext.of(api).service().events().query(auditQuery(ex, EventQuery.MAX_LIMIT));
         if (!"csv".equalsIgnoreCase(ApiContext.query(ex, "format"))) {
             return rows.stream().map(Event::toMap).toList();
         }

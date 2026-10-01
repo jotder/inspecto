@@ -67,7 +67,7 @@ public final class WidgetTags {
         // ⚠ Through the seam since EDG-01 cell 7, and absent on a bundle without inspecto-ops. Tag
         // assignments are operational-object domain, so on Personal a widget simply carries no managed
         // tags — the persisted TOON keeps whatever it was authored with rather than being rewritten.
-        com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+        com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
         if (objects == null) return;
         if (create) {
             for (String tag : names(content.get(TAGS))) {
@@ -107,7 +107,7 @@ public final class WidgetTags {
     public static int reproject(ApiContext api, Collection<String> widgetIds) {
         if (widgetIds.isEmpty() || api.writeRoot() == null) return 0;
         // Nothing to re-project without the operational-object module (EDG-01 cell 7).
-        com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+        com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
         if (objects == null) return 0;
         ComponentStore store = new ComponentStore(api.writeRoot().resolve("registry"));
         int done = 0;
@@ -139,7 +139,7 @@ public final class WidgetTags {
 
     /** The widget ids currently carrying {@code tag} — the component half of a vocabulary change. */
     public static List<String> targetsOf(ApiContext api, String tag) {
-        return api.service().objects()
+        return HostContext.of(api).service().objects()
                 .map(o -> o.targetIdsForTag(tag, KIND).stream().distinct().toList())
                 .orElseGet(List::of);
     }
@@ -161,7 +161,7 @@ public final class WidgetTags {
     public static void backfillOnce(ApiContext api, Consumer<String> ensureTag) {
         Object space;
         try {
-            space = api.service();
+            space = HostContext.of(api).service();
         } catch (RuntimeException noSpace) {
             return;   // nothing hosted yet — the next tag request in a live Space runs it
         }
@@ -194,7 +194,7 @@ public final class WidgetTags {
             return 0;
         }
         // Nothing to adopt without the operational-object module (EDG-01 cell 7).
-        com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+        com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
         if (objects == null) return 0;
         List<String> touched = new ArrayList<>();
         int created = 0;

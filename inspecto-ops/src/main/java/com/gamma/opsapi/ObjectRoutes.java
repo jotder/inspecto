@@ -1,5 +1,6 @@
 package com.gamma.opsapi;
 
+import com.gamma.control.HostContext;
 import com.gamma.control.RouteErrors;
 import com.gamma.control.RowScope;
 import com.gamma.control.Subject;
@@ -701,7 +702,7 @@ public final class ObjectRoutes implements RouteModule {
         RcaTemplate template;
         Object t = body.get("template");
         if (t instanceof String named) {       // a *_rca.toon template referenced by name
-            template = api.service().rcaTemplate(named).orElseThrow(
+            template = HostContext.of(api).service().rcaTemplate(named).orElseThrow(
                     () -> new ApiException(404, ErrorCodes.NOT_FOUND, "no RCA template named '" + named + "'"));
         } else {                                // an inline template ({template:{…}} or the body itself)
             Map<String, Object> tmpl = new LinkedHashMap<>();
@@ -723,7 +724,7 @@ public final class ObjectRoutes implements RouteModule {
 
     /** {@code GET /rca/templates} (Phase 4) — the RCA templates loaded from {@code *_rca.toon}, by name. */
     private Object rcaTemplateList(ApiContext api) {
-        return api.service().rcaTemplates().values().stream().map(RcaTemplate::toMap).toList();
+        return HostContext.of(api).service().rcaTemplates().values().stream().map(RcaTemplate::toMap).toList();
     }
 
     /**

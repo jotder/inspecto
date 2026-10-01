@@ -303,7 +303,7 @@ final class ExpectationRoutes implements RouteModule {
             // ⚠ Through the seam since EDG-01 cell 7. Absent inspecto-ops there is nothing to raise an
             // Incident on, so the breach is still EVENTED below but not promoted — the same posture the
             // amended EDITIONS SP-CTL-02 takes for a sequence gap.
-            com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+            com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
             if (objects == null) return;
             if (objects.hasActive(ObjectType.INCIDENT, correlationId)) return;   // one Incident already tracks it
 

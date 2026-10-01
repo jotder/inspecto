@@ -1,5 +1,6 @@
 package com.gamma.opsapi;
 
+import com.gamma.control.HostContext;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
@@ -31,7 +32,7 @@ final class OpsEngine {
      * without its {@code ObjectEngineProvider} — a deployment fault worth naming, not a missing resource.
      */
     static ObjectService of(ApiContext api) {
-        return api.service().objects()
+        return HostContext.of(api).service().objects()
                 .filter(ObjectServiceAccess.class::isInstance)
                 .map(access -> ((ObjectServiceAccess) access).service())
                 .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,

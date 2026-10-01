@@ -20,7 +20,7 @@ final class AcquisitionRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.get("/collectors", (e, m) -> api.service().collectors());
+        api.get("/collectors", (e, m) -> HostContext.of(api).service().collectors());
         // ACQ-6 push discovery: an external system (S3 event notification, upload script, upstream job)
         // tells Inspecto a file has landed on a source, triggering an immediate scan cycle instead of
         // waiting out the poll interval. Same operate capability + lock-safe trigger as /runs/{x}/trigger;
@@ -41,16 +41,16 @@ final class AcquisitionRoutes implements RouteModule {
      */
     private Object notifySource(ApiContext api, com.sun.net.httpserver.HttpExchange e, String sourceId)
             throws java.io.IOException {
-        String pipeline = api.service().pipelineForSourceId(sourceId)
+        String pipeline = HostContext.of(api).service().pipelineForSourceId(sourceId)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no source '" + sourceId + "'"));
         if (ApiContext.v1(e)) {
-            String runId = api.service().triggerRunAsync(pipeline, "notify")
+            String runId = HostContext.of(api).service().triggerRunAsync(pipeline, "notify")
                     .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no source '" + sourceId + "'"));
             e.getResponseHeaders().set("Location", "/api/v1/runs/runs/" + runId);
             return ApiContext.respondJson(e, 202, java.util.Map.of(
                     "runId", runId, "source", sourceId, "pipeline", pipeline, "status", "running"));
         }
-        return api.service().runPipelineOffThread(pipeline)
+        return HostContext.of(api).service().runPipelineOffThread(pipeline)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no source '" + sourceId + "'"));
     }
 

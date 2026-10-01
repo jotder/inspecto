@@ -90,7 +90,7 @@ final class PipelineHistoryRoutes implements RouteModule {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline restore");
         Resolved p = resolve(api, name);
         PipelineHistory.Version v = version(p, version, "version");
-        Path registered = api.service().pathFor(p.id()).map(Path::normalize)
+        Path registered = HostContext.of(api).service().pathFor(p.id()).map(Path::normalize)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "pipeline '" + p.id() + "' is not registered; nothing to restore over"));
         byte[] bytes = Files.readAllBytes(v.file());
         Map<String, Object> config = ConfigCodec.toMap(new String(bytes, StandardCharsets.UTF_8));
@@ -112,7 +112,7 @@ final class PipelineHistoryRoutes implements RouteModule {
 
         RefusalConfigAudit.write(target, bytes, ".cfg-");
         PipelineHistory.record(writeRoot, target);
-        api.service().refreshConfigs();   // the editor reloads GET …/graph/raw next, which lifts the REGISTERED config
+        HostContext.of(api).service().refreshConfigs();   // the editor reloads GET …/graph/raw next, which lifts the REGISTERED config
         ETags.set(ex, ETags.of(ContentHash.of(ConfigLoader.filesystem().decode(target.toString()))));
         List<PipelineHistory.Version> now = PipelineHistory.versions(p.dir());
         log.info("[PIPELINE-HISTORY] restored '{}' v{} to {}", p.id(), v.version(), target.getFileName());
@@ -140,7 +140,7 @@ final class PipelineHistoryRoutes implements RouteModule {
         PipelineHistory.Version from = version(p, fromArg, "from");
         Path toFile;
         if (toCurrent) {
-            toFile = api.service().pathFor(p.id()).filter(Files::isRegularFile)
+            toFile = HostContext.of(api).service().pathFor(p.id()).filter(Files::isRegularFile)
                     .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "pipeline '" + p.id() + "' has no current config file"));
         } else {
             toFile = version(p, toArg, "to").file();
@@ -158,7 +158,7 @@ final class PipelineHistoryRoutes implements RouteModule {
     private record Resolved(String id, Path dir) {}
 
     private static Resolved resolve(ApiContext api, String name) {
-        String id = api.service().configFor(name).map(PipelineConfig::identity)
+        String id = HostContext.of(api).service().configFor(name).map(PipelineConfig::identity)
                 .map(PipelineConfig.Identity::pipelineName).orElse(null);
         boolean registered = id != null;
         if (id == null) id = name;

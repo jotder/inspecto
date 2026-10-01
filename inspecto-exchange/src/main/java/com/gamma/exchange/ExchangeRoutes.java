@@ -1,5 +1,6 @@
 package com.gamma.exchange;
 
+import com.gamma.control.HostContext;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
@@ -60,12 +61,12 @@ public final class ExchangeRoutes implements RouteModule {
         // edition-correct: without this module DatasetRelation keeps SharedRefResolver.NONE and every
         // `shared/<owner>/<item>` ref fails to resolve — fail-closed, with zero wiring. `install` is a
         // public idempotent static, so registering twice is harmless.
-        com.gamma.query.SharedRefResolver.install(new ExchangeRefResolver(api.spaces()));
+        com.gamma.query.SharedRefResolver.install(new ExchangeRefResolver(HostContext.of(api).spaces()));
         // Cross-Space consequence slice 3: deliver consented Signals between this installation's Spaces.
-        ExchangeSignalForwarder.install(api.spaces());
+        ExchangeSignalForwarder.install(HostContext.of(api).spaces());
         // Slice 5: a Decision Rule emit-signal with offerTo asks this before it emits (absent module => refused).
         com.gamma.control.SignalOfferGrants.install((owner, consumer, type) -> {
-            Exchange ex = Exchange.under(api.spaces().containerRoot());
+            Exchange ex = Exchange.under(HostContext.of(api).spaces().containerRoot());
             return ex.enabled() && ex.activeGrant(consumer, owner, Exchange.SIGNAL, type).isPresent()
                     && ex.offer(owner, Exchange.SIGNAL, type).isPresent();
         });
@@ -74,7 +75,7 @@ public final class ExchangeRoutes implements RouteModule {
         // why the core could not drop this package. Absent module ⇒ SharedItemConsumers.NONE ⇒ empty, which
         // is right: with no Exchange nothing can have been offered, so no consumer can be harmed.
         com.gamma.control.SharedItemConsumers.install((type, id) -> {
-            Exchange ex = Exchange.under(api.spaces().containerRoot());
+            Exchange ex = Exchange.under(HostContext.of(api).spaces().containerRoot());
             if (!ex.enabled()) return java.util.List.of();
             String owner = com.gamma.event.EventLog.currentSpaceId();
             return ex.grants().stream()
@@ -139,7 +140,7 @@ public final class ExchangeRoutes implements RouteModule {
         String item  = requireItem(body);
         if (ex.offer(owner, "dataset", item).isEmpty())
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no offered dataset " + owner + "/" + item);
-        SpaceContext ctx = api.spaces().space(SpaceId.of(owner))
+        SpaceContext ctx = HostContext.of(api).spaces().space(SpaceId.of(owner))
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + owner + "'"));
         java.nio.file.Path config = ctx.root().config();
         if (config == null) throw new ApiException(409, ErrorCodes.CONFLICT, "space '" + owner + "' has no registry");
@@ -513,7 +514,7 @@ public final class ExchangeRoutes implements RouteModule {
 
     /** The Exchange for this installation, or a 409 in single-tenant mode (fail-closed). */
     private static Exchange requireExchange(ApiContext api) {
-        Exchange ex = Exchange.under(api.spaces().containerRoot());
+        Exchange ex = Exchange.under(HostContext.of(api).spaces().containerRoot());
         if (!ex.enabled())
             throw new ApiException(409, ErrorCodes.CONFLICT, "cross-space sharing needs the multi-space runtime (-Dspaces.root)");
         return ex;
@@ -549,7 +550,7 @@ public final class ExchangeRoutes implements RouteModule {
     private static String requireSignalSpace(ApiContext api, String id, String field, String capability) {
         if (id == null || !SpaceId.isValid(id))
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'" + field + "' must be a valid space id");
-        if (api.spaces().space(SpaceId.of(id)).isEmpty()) throw notPermitted(capability);
+        if (HostContext.of(api).spaces().space(SpaceId.of(id)).isEmpty()) throw notPermitted(capability);
         return id;
     }
 
@@ -561,7 +562,7 @@ public final class ExchangeRoutes implements RouteModule {
 
     /** The config root holding {@code space}'s role table — what its capability gate is decided by. */
     private static java.nio.file.Path spaceRoles(ApiContext api, String space) {
-        SpaceContext ctx = api.spaces().space(SpaceId.of(space))
+        SpaceContext ctx = HostContext.of(api).spaces().space(SpaceId.of(space))
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + space + "'"));
         java.nio.file.Path config = ctx.root().config();
         if (config == null) throw new ApiException(409, ErrorCodes.CONFLICT, "space '" + space + "' has no config root");
@@ -569,7 +570,7 @@ public final class ExchangeRoutes implements RouteModule {
     }
 
     private static ComponentStore ownerRegistry(ApiContext api, String owner) {
-        SpaceContext ctx = api.spaces().space(SpaceId.of(owner))
+        SpaceContext ctx = HostContext.of(api).spaces().space(SpaceId.of(owner))
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + owner + "'"));
         java.nio.file.Path config = ctx.root().config();
         if (config == null) throw new ApiException(409, ErrorCodes.CONFLICT, "space '" + owner + "' has no registry");
@@ -596,7 +597,7 @@ public final class ExchangeRoutes implements RouteModule {
     private static String requireSpace(ApiContext api, String id, String field) {
         if (id == null || !SpaceId.isValid(id))
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'" + field + "' must be a valid space id");
-        if (api.spaces().space(SpaceId.of(id)).isEmpty())
+        if (HostContext.of(api).spaces().space(SpaceId.of(id)).isEmpty())
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + id + "'");
         return id;
     }

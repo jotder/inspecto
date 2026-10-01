@@ -1,5 +1,6 @@
 package com.gamma.eventsapi;
 
+import com.gamma.control.HostContext;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
@@ -48,10 +49,10 @@ public final class EventRoutes implements RouteModule {
         // Legacy: the newest ?limit= events from the live-tail ring, byte-for-byte unchanged. On /api/v1
         // the list is instead cursor-paginated over the full retained history (eventsPage), sharing the route.
         api.get("/events", (e, m) -> ApiContext.v1(e) ? eventsPage(api, e)
-                : toMaps(api.service().events().recent(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))));
-        api.get("/events/search", (e, m) -> toMaps(api.service().events().query(eventQuery(e, EventQuery.DEFAULT_LIMIT))));
+                : toMaps(HostContext.of(api).service().events().recent(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))));
+        api.get("/events/search", (e, m) -> toMaps(HostContext.of(api).service().events().query(eventQuery(e, EventQuery.DEFAULT_LIMIT))));
         api.get("/events/export", (e, m) -> exportEvents(api, e));
-        api.get("/events/views", (e, m) -> api.service().savedViews().list());
+        api.get("/events/views", (e, m) -> HostContext.of(api).service().savedViews().list());
         // A saved view is SERVER-WIDE, not per-user: SavedView is (name, filters, createdAt) with no subject,
         // over one SavedViewStore per service. Any caller creates what every caller sees and can delete
         // another caller's view — that is authoring, not a personal convenience, so both writes take the
@@ -60,7 +61,7 @@ public final class EventRoutes implements RouteModule {
         api.post("/events/views", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> saveView(api, api.body(e))));
         api.post("/events/views/([^/]+)/delete", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> {
-            if (!api.service().savedViews().delete(ApiContext.name(m)))
+            if (!HostContext.of(api).service().savedViews().delete(ApiContext.name(m)))
                 throw new ApiException(404, ErrorCodes.NOT_FOUND, "no saved view named '" + ApiContext.name(m) + "'");
             return Map.of("name", ApiContext.name(m), "deleted", true);
         }));
@@ -87,7 +88,7 @@ public final class EventRoutes implements RouteModule {
         Long afterTs = key.size() == 2 ? parseLongOrNull(key.get(0)) : null;
         String afterId = key.size() == 2 ? key.get(1) : null;
 
-        List<Event> rows = api.service().events().page(limit + 1, afterTs, afterId);
+        List<Event> rows = HostContext.of(api).service().events().page(limit + 1, afterTs, afterId);
         boolean hasMore = rows.size() > limit;
         if (hasMore) rows = rows.subList(0, limit);
         String nextCursor = null;
@@ -96,7 +97,7 @@ public final class EventRoutes implements RouteModule {
             nextCursor = Cursor.encode(List.of(String.valueOf(last.ts()),
                     last.eventId() == null ? "" : last.eventId()));
         }
-        ApiContext.pagination(e, cursor, nextCursor, limit, api.service().events().count());
+        ApiContext.pagination(e, cursor, nextCursor, limit, HostContext.of(api).service().events().count());
         return toMaps(rows);
     }
 
@@ -127,7 +128,7 @@ public final class EventRoutes implements RouteModule {
 
     /** {@code GET /events/{id}} — scan the newest events (buffer + Parquet) for an exact id, else 404. */
     private Object eventById(ApiContext api, String id) {
-        return api.service().events().query(EventQuery.recent(EventQuery.MAX_LIMIT)).stream()
+        return HostContext.of(api).service().events().query(EventQuery.recent(EventQuery.MAX_LIMIT)).stream()
                 .filter(ev -> id.equals(ev.eventId())).findFirst()
                 .map(Event::toMap)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no event with id '" + id + "'"));
@@ -142,7 +143,7 @@ public final class EventRoutes implements RouteModule {
      * JSON always carries {@code attributes} whole.
      */
     private Object exportEvents(ApiContext api, HttpExchange ex) throws IOException {
-        List<Event> rows = api.service().events().query(eventQuery(ex, EventQuery.MAX_LIMIT));
+        List<Event> rows = HostContext.of(api).service().events().query(eventQuery(ex, EventQuery.MAX_LIMIT));
         if ("csv".equalsIgnoreCase(ApiContext.query(ex, "format"))) {
             String type = ApiContext.query(ex, "type");
             List<String> attributeColumns =
@@ -185,6 +186,6 @@ public final class EventRoutes implements RouteModule {
             String v = ApiContext.str(reqBody, k);
             if (v != null) filters.put(k, v);
         }
-        return api.service().savedViews().save(new SavedView(viewName, filters, System.currentTimeMillis())).toMap();
+        return HostContext.of(api).service().savedViews().save(new SavedView(viewName, filters, System.currentTimeMillis())).toMap();
     }
 }

@@ -237,7 +237,7 @@ final class DecisionRoutes implements RouteModule {
                 String incidentDetail = null;
                 // ⚠ Through the seam since EDG-01 cell 7, and empty on a bundle without inspecto-ops —
                 // in which case no Incident is raised and the decision still executes and audits.
-                com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+                com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
                 if (isHighSeverity(severity)) {
                     // ⛔ Three outcomes, not two. An absent module must NOT be reported as "already open":
                     // that is a different fact, and an operator reading it would believe an Incident exists.
@@ -260,7 +260,7 @@ final class DecisionRoutes implements RouteModule {
             }
             case "start-job" -> {
                 String jobId = targetId(c);
-                JobService svc = api.service().jobService().orElse(null);
+                JobService svc = HostContext.of(api).service().jobService().orElse(null);
                 // A disabled job is "not scheduled", not "not runnable" (operator 2026-09-25): an AUTOMATIC
                 // application skips it; a PERSON's apply runs it like Run now. JobService builds disabled
                 // jobs (so /jobs/{name}/trigger works), which is why the automatic skip is gated here.
@@ -279,7 +279,7 @@ final class DecisionRoutes implements RouteModule {
             }
             case "trigger-pipeline" -> {
                 String pipelineId = targetId(c);
-                if (pipelineId != null && api.service().triggerRunAsync(pipelineId).isPresent()) {
+                if (pipelineId != null && HostContext.of(api).service().triggerRunAsync(pipelineId).isPresent()) {
                     status = "executed";
                     detail = "triggered pipeline '" + pipelineId + "'";
                 } else {
@@ -296,7 +296,7 @@ final class DecisionRoutes implements RouteModule {
                 String title = paramStr(c, "title", "Decision Rule " + ruleName);
                 String severity = paramStr(c, "severity", "error");
                 status = "executed";
-                com.gamma.objects.ObjectAccess objs = api.service().objects().orElse(null);
+                com.gamma.objects.ObjectAccess objs = HostContext.of(api).service().objects().orElse(null);
                 // ⛔ Same three-way split as create-alert above: "not installed" is not "already open".
                 if (objs == null) {
                     detail = "no Incident opened for rule '" + ruleName + "' — operational objects are not "
@@ -351,7 +351,7 @@ final class DecisionRoutes implements RouteModule {
 
     private static String[] proposeActionRequest(ApiContext api, String ruleName, Map<String, Object> rule,
                                                  Map<String, Object> c, boolean automatic, String actor) {
-        com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+        com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
         if (objects == null)
             return new String[] {"skipped", "no Action Request — operational objects are not installed in this "
                     + "bundle, so there is no Incident to raise it on", null};

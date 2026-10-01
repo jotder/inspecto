@@ -403,7 +403,7 @@ final class BundleRoutes implements RouteModule {
                         // record, not an accident. Adopt-then-reproject, exactly as a create does.
                         if (WidgetTags.KIND.equals(kind)) {
                             WidgetTags.project(api, kind, id, new LinkedHashMap<>(content), true,
-                                    name -> api.service().objects().ifPresent(o -> o.ensureTag(name)));
+                                    name -> HostContext.of(api).service().objects().ifPresent(o -> o.ensureTag(name)));
                             WidgetTags.reproject(api, List.of(id));
                         }
                         status = exists ? "overwritten" : "imported";
@@ -509,7 +509,7 @@ final class BundleRoutes implements RouteModule {
         return switch (kind) {
             case "authored-pipeline" -> new PipelineBundleSource(new PipelineStore(SpaceRoot.pipelinesSubdir(root)));
             case "job" -> new JobBundleSource(api);
-            case "saved-view" -> new SavedViewBundleSource(api.service().savedViews());
+            case "saved-view" -> new SavedViewBundleSource(HostContext.of(api).service().savedViews());
             case "connection" -> new ConnectionBundleSource(api);
             case "enrichment" -> new EnrichmentBundleSource(api, root);
             default -> null;
@@ -522,7 +522,7 @@ final class BundleRoutes implements RouteModule {
         for (Map<String, Object> item : items) {
             if (!"job".equals(ApiContext.str(item, "kind")) || !(item.get("content") instanceof Map<?, ?> c)) continue;
             String id = ApiContext.str(item, "id");
-            String prior = id == null ? null : api.service().jobService().flatMap(s -> s.jobConfig(id))
+            String prior = id == null ? null : HostContext.of(api).service().jobService().flatMap(s -> s.jobConfig(id))
                     .map(j -> j.params().get(JobConfig.CREATED_BY)).orElse(null);
             item.put("content", JobAuthority.stamp(ex, (Map<String, Object>) c, prior));
         }
@@ -588,12 +588,12 @@ final class BundleRoutes implements RouteModule {
      */
     private record RegisteredPipelineBundleSource(ApiContext api) implements BundleSource {
         public Optional<Map<String, Object>> get(String id) {
-            if (api.service().configFor(id).isEmpty()) return Optional.empty();
+            if (HostContext.of(api).service().configFor(id).isEmpty()) return Optional.empty();
             try {
                 PipelineBundleRoutes.Closure c = PipelineBundleRoutes.exportClosure(api, id);
                 Map<String, Object> content = new LinkedHashMap<>(com.gamma.pipeline.PipelineEditable.toMap(
-                        api.service().configFor(id).orElseThrow(),
-                        ConfigLoader.filesystem().decode(api.service().pathFor(id).orElseThrow().toString())));
+                        HostContext.of(api).service().configFor(id).orElseThrow(),
+                        ConfigLoader.filesystem().decode(HostContext.of(api).service().pathFor(id).orElseThrow().toString())));
                 Map<String, Object> files = new LinkedHashMap<>();
                 c.entries().forEach((name, bytes) -> files.put(name, encodeFile(bytes)));
                 Map<String, Object> closure = new LinkedHashMap<>();
@@ -605,7 +605,7 @@ final class BundleRoutes implements RouteModule {
                 throw new java.io.UncheckedIOException(unreadable);
             }
         }
-        public boolean exists(String id) { return api.service().configFor(id).isPresent(); }
+        public boolean exists(String id) { return HostContext.of(api).service().configFor(id).isPresent(); }
         public Map<String, Object> write(String id, Map<String, Object> content) throws IOException {
             if (!(content.get("closure") instanceof Map<?, ?> closure) || !(closure.get("manifest") instanceof Map<?, ?> m)
                     || !(closure.get("files") instanceof Map<?, ?> files))
@@ -684,7 +684,7 @@ final class BundleRoutes implements RouteModule {
         public Optional<Map<String, Object>> get(String id) {
             // A plain read must not instantiate a JobService that doesn't exist yet (matches GET /jobs'
             // use of the non-creating jobService() accessor, unlike the write path below).
-            return api.service().jobService().flatMap(s -> s.jobConfig(id)).map(JobConfig::toMap);
+            return HostContext.of(api).service().jobService().flatMap(s -> s.jobConfig(id)).map(JobConfig::toMap);
         }
         public boolean exists(String id) { return get(id).isPresent(); }
         public Map<String, Object> write(String id, Map<String, Object> content) throws IOException {
@@ -722,7 +722,7 @@ final class BundleRoutes implements RouteModule {
             byte[] bytes = com.gamma.config.io.ConfigCodec.toToon(Map.of("job", c.toMap()))
                     .getBytes(java.nio.charset.StandardCharsets.UTF_8);
             com.gamma.util.AtomicFiles.write(target, bytes, ".job-");
-            api.service().jobServiceOrCreate().upsertJob(c);
+            HostContext.of(api).service().jobServiceOrCreate().upsertJob(c);
             return c.toMap();
         }
         public Map<String, Object> normalized(String id, Map<String, Object> content) {
@@ -783,7 +783,7 @@ final class BundleRoutes implements RouteModule {
             Files.createDirectories(target.getParent());
             AtomicFiles.write(target, ConfigCodec.toToon(stamped).getBytes(StandardCharsets.UTF_8), ".cfg-");
             try {
-                api.service().registerEnrichment(EnrichmentConfig.load(target.toString()));
+                HostContext.of(api).service().registerEnrichment(EnrichmentConfig.load(target.toString()));
             } catch (RuntimeException invalid) {
                 throw new IllegalArgumentException("not a valid enrichment: " + invalid.getMessage());
             }
@@ -814,7 +814,7 @@ final class BundleRoutes implements RouteModule {
 
     private record ConnectionBundleSource(ApiContext api) implements BundleSource {
         public Optional<Map<String, Object>> get(String id) {
-            return api.service().connection(id).map(ConnectionProfile::toBundleMap);
+            return HostContext.of(api).service().connection(id).map(ConnectionProfile::toBundleMap);
         }
         public boolean exists(String id) { return get(id).isPresent(); }
         public Map<String, Object> write(String id, Map<String, Object> content) throws IOException {

@@ -49,7 +49,7 @@ final class JobWriteGuard {
      * whose route already made the JobService; with none, the report Job's own default (no data root) is used.
      */
     static String dataDir(ApiContext api) {
-        return api.service().jobService().map(com.gamma.job.JobService::dataDir).orElse(null);
+        return HostContext.of(api).service().jobService().map(com.gamma.job.JobService::dataDir).orElse(null);
     }
 
     /** The mandatory four-eyes rule when {@code fingerprint} is not the approved version of Job {@code proposed}. */

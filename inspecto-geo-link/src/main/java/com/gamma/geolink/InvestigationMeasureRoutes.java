@@ -1,5 +1,6 @@
 package com.gamma.geolink;
 
+import com.gamma.control.HostContext;
 import com.gamma.alert.AlertRule;
 import com.gamma.alert.AlertService;
 import com.gamma.control.ApiContext;
@@ -143,7 +144,7 @@ public final class InvestigationMeasureRoutes implements RouteModule {
             current = compute(rel, rule.relation(), rule.measure());   // 422 if the relation cannot
         }
 
-        AlertService alerts = api.service().alertService()
+        AlertService alerts = HostContext.of(api).service().alertService()
                 .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "alert engine unavailable"));
         var store = DatasetRead.registry(inv.writeRoot());
         if (store.get("alert-rule", rule.name()).isPresent())

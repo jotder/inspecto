@@ -77,7 +77,7 @@ a derived guard, not a hand-kept list; mutation-check it by adding a banned depe
 |---|---|---|
 | **1** | **`la-graph`.** Move the six `Graph*` classes and their five parity tests (the fixtures stay where the TS specs read them) into a new module | The parity classes green from the new module; `mvn dependency:tree` for it shows the JDK only; `inspecto-geo-link` depends on it |
 | **2** | **`inspecto-audit-spi`.** Move `Event` `EventLog` `EventType` (+ the 59 `LINK_*` constants stay for now); `inspecto-event` and `inspecto-processor` depend on it; `ParquetEventStore` stays in `inspecto-event` | `inspecto-audit-spi`'s dependency tree has no `inspecto-etl`; `inspecto-event` and the audit tests green |
-| **3** | **ONE control-contract module (name and shape: Decision 6 — the two-module layout in §2 cannot be built, see §1).** Split `ApiContext`; add `HostContext`; move the ~22 classes (the 23 in `inspecto` minus `EntityTypes`, which is LA's); fix the ~40 importing files in `-ops` `-events` `-exchange` `-metrics` `-policy` `-security` `-demo-auth` `-geo-link`. **Keep the package name `com.gamma.control`** (Decision 2) | The affected modules' unit tests; `openapi-v1.json` unchanged (a route table must not move); `AbsentGeoLinkRoutes` parity test green |
+| **3** | ✅ **BUILT 2026-10-01 as two modules, `inspecto-http-spi` → `inspecto-auth-spi` (Decision 6).** Plan as written was: Split `ApiContext`; add `HostContext`; move the ~22 classes (the 23 in `inspecto` minus `EntityTypes`, which is LA's); fix the ~40 importing files in `-ops` `-events` `-exchange` `-metrics` `-policy` `-security` `-demo-auth` `-geo-link`. **Keep the package name `com.gamma.control`** (Decision 2) | The affected modules' unit tests; `openapi-v1.json` unchanged (a route table must not move); `AbsentGeoLinkRoutes` parity test green |
 | **4** | **Move OIDC.** `OidcAuthenticator` depends on `inspecto-auth-spi`, not `inspecto-processor` (ground `AccessGrants` first — it is not in the 20-class closure) | `inspecto-security` tests with a Subject attached; ⚠ a `Roles.SEED` change needs `inspecto-security` tests (project gotcha) |
 | **5** | **`la-core` / `la-api` out of `inspecto-geo-link`.** What remains in `inspecto-geo-link` is the bridge. Move `EntityTypes`, `LinkAnalysisSettings` and the LA event-type constants into `la-core` | Dependency rule green (mutation-checked); `ControlApiInv*` real-HTTP tests green |
 | **6** | **Ports + bridge.** Introduce `DatasetProvider`, `CasePort`, `AlertPort`; `la-inspecto` implements them from `DatasetRead`, `ObjectAccess`, `AlertService`; `AnnotationTargets`, `PendingChanges` and the Alert-Rule-bound Investigation code move behind it | LA real-HTTP tests green with all three ports bound **and** with each port unbound (feature reports absent, 503/capability off — never a stack trace) |
@@ -92,6 +92,13 @@ Steps 1 and 2 are independent and can run in parallel lanes; 3 precedes 4–6; 5
 > `ApiContext` is the single host-touching class, and the LA ↔ host coupling is five calls — but the layout changed:
 > the HTTP and auth contracts are cyclic, so §2's two SPI modules become one (Decision 6). Re-ground with a string-aware
 > tokenizer, never a regex over raw source.
+>
+> **Second blind spot, found by the compiler while building step 3.** The closure tool resolves `import` lines and same-package
+> simple names only, so a *fully-qualified inline reference* (`com.gamma.service.OptionalSpi.first(…)`, `com.gamma.pipeline.ComponentStore`)
+> is invisible to it. Four such references sat in the "closed" lower layer: `SpiSlot` → `OptionalSpi` (moved down with it — plain
+> JDK + slf4j) and `WriteGates`' config-registry checks → `ImportPaths` / `ComponentStore` / `ComponentRegistry` (split out into the
+> package-private `ConfigTargetGuard` in `inspecto`, used only by the three `/config/*` route classes). **A closure is a
+> prediction; the compile of a clean checkout (`mvn clean test-compile`, never an incremental one) is the proof.**
 
 ## 4. Risks
 

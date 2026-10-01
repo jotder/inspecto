@@ -61,7 +61,7 @@ final class SignalRoutes implements RouteModule {
         Long since = parseEpochMs(ApiContext.query(e, "since"), "since");
         Long until = parseEpochMs(ApiContext.query(e, "until"), "until");
         int page = com.gamma.event.EventQuery.MAX_LIMIT;
-        List<Signal> found = Signals.query(api.service().events(), type, since, until, null, null, page);
+        List<Signal> found = Signals.query(HostContext.of(api).service().events(), type, since, until, null, null, page);
         java.util.Set<String> datasets = new java.util.HashSet<>();
         for (Signal sig : found) {
             Object ds = sig.payload() == null ? null : sig.payload().get("dataset");
@@ -84,7 +84,7 @@ final class SignalRoutes implements RouteModule {
         Long until = parseEpochMs(ApiContext.query(e, "until"), "until");
         Severity minSeverity = parseSeverity(ApiContext.query(e, "severity"));
         String source = ApiContext.query(e, "source");
-        List<Signal> found = Signals.query(api.service().events(),
+        List<Signal> found = Signals.query(HostContext.of(api).service().events(),
                 ApiContext.query(e, "type"), since, until, minSeverity,
                 ApiContext.query(e, "correlationId"), limit);
         return found.stream()
@@ -105,7 +105,7 @@ final class SignalRoutes implements RouteModule {
         if (correlationId == null || correlationId.isBlank())
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'correlationId' is required for /signals/tree (a tree is scoped to one correlation chain)");
         int limit = clampLimit(ApiContext.query(e, "limit"));
-        List<Signal> found = Signals.query(api.service().events(),
+        List<Signal> found = Signals.query(HostContext.of(api).service().events(),
                 null, null, null, null, correlationId, limit);
         return Signals.assembleTree(found).stream().map(SignalRoutes::toNode).toList();
     }
@@ -148,7 +148,7 @@ final class SignalRoutes implements RouteModule {
      * heartbeat poll, {@code finally}-deregister).
      */
     private static Object stream(ApiContext api, HttpExchange ex) throws IOException {
-        EventLog log = api.service().eventLog();
+        EventLog log = HostContext.of(api).service().eventLog();
         String type = ApiContext.query(ex, "type");
         Severity minSeverity = parseSeverity(ApiContext.query(ex, "severity"));
         String source = ApiContext.query(ex, "source");
@@ -164,7 +164,7 @@ final class SignalRoutes implements RouteModule {
         // seeing the headers and the listener being live.
         log.addSubscriber(listener);
         // ControlApi.close() ends the stream: drops the subscriber, interrupts the poll, closes the exchange.
-        SseStreams.Stream registration = api.sseStreams().register(ex, () -> log.removeSubscriber(listener));
+        SseStreams.Stream registration = HostContext.of(api).sseStreams().register(ex, () -> log.removeSubscriber(listener));
         ex.getResponseHeaders().set("Content-Type", "text/event-stream; charset=utf-8");
         ex.getResponseHeaders().set("Cache-Control", "no-cache");
         ex.getResponseHeaders().set("Connection", "keep-alive");

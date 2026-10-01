@@ -53,7 +53,7 @@ final class JobRoutes implements RouteModule {
         // unchanged. On /api/v1 the list is instead cursor-paginated (jobsPage), sharing this one route.
         api.get("/jobs", (e, m) -> {
             java.util.List<JobService.JobView> all =
-                    api.service().jobService().map(JobService::jobs).orElseGet(java.util.List::of);
+                    HostContext.of(api).service().jobService().map(JobService::jobs).orElseGet(java.util.List::of);
             return ApiContext.v1(e) ? jobsPage(all, e) : ApiContext.paged(all, e);
         });
         // Job CRUD (Scheduler write actions). Requires canAuthorWorkbench (W6; a no-op on Personal).
@@ -287,7 +287,7 @@ final class JobRoutes implements RouteModule {
      * a delete or a disable — silently switch off the check it exists for. It stays triggerable.
      */
     private static void refuseSystemJob(ApiContext api, String name) {
-        boolean system = api.service().jobService().map(js -> js.isSystemJob(name)).orElse(false);
+        boolean system = HostContext.of(api).service().jobService().map(js -> js.isSystemJob(name)).orElse(false);
         WriteGates.conflictIf(system, "job '" + name + "' is a system job armed by the platform; it is "
                 + "derived from the Alert Rules and cannot be edited, disabled or deleted here");
     }
@@ -360,7 +360,7 @@ final class JobRoutes implements RouteModule {
         WriteGates.requireWriteRoot(api, "job write");
         JobConfig c = JobAuthority.stamp(ex, parseJob(body), null);   // MAINT-TASK-AUTHORITY-1: server-stamped author
         requireAdministerForEventPrune(ex, c);
-        WriteGates.conflictIf(api.service().jobServiceOrCreate().jobs().stream()
+        WriteGates.conflictIf(HostContext.of(api).service().jobServiceOrCreate().jobs().stream()
                         .anyMatch(v -> v.name().equals(c.name())),
                 "job '" + c.name() + "' already exists (use PUT to update)");
         PendingChanges.hold(api, ex, KIND, c.name(), c.toMap(), null);   // maker-checker (operator, 2026-09-28)
@@ -474,7 +474,7 @@ final class JobRoutes implements RouteModule {
         Path target = jobFile(api, c.name());
         byte[] bytes = ConfigCodec.toToon(Map.of("job", c.toMap())).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".job-");
-        api.service().jobServiceOrCreate().upsertJob(c);
+        HostContext.of(api).service().jobServiceOrCreate().upsertJob(c);
     }
 
     /** The jailed {@code jobs/<name>_job.toon} path under the write root; 422 on an unsafe name, 403 on escape. */
@@ -521,7 +521,7 @@ final class JobRoutes implements RouteModule {
     }
 
     private JobService jobs(ApiContext api) {
-        return api.service().jobService().orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no jobs registered"));
+        return HostContext.of(api).service().jobService().orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no jobs registered"));
     }
 
     /** The DuckDB job-run reporting store (T27), or a 404 when no backend is configured (-Djobs.backend). */

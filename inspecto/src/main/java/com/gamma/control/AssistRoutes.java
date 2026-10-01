@@ -25,7 +25,7 @@ final class AssistRoutes implements RouteModule {
     public void register(ApiContext api) {
         // ── v3.7.0: recent failure diagnoses (read-only) — registered before the POST catch-all ──
         api.get("/assist/diagnoses", (e, m) ->
-                api.service().assistAgent()
+                HostContext.of(api).service().assistAgent()
                         .map(a -> (Object) a.recentDiagnoses(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50)))
                         .orElse(List.of()));
         // ── v4.1: assist model-provider settings (masked read / validated write / round-trip test).
@@ -65,7 +65,7 @@ final class AssistRoutes implements RouteModule {
 
     /** The in-process assist agent, or 503 when the optional module is absent (v4.1 settings routes). */
     private AssistAgent assistAgentOr503(ApiContext api) {
-        return api.service().assistAgent().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
+        return HostContext.of(api).service().assistAgent().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                 "assist agent not available (inspecto-agent not on classpath)"));
     }
 
@@ -81,7 +81,7 @@ final class AssistRoutes implements RouteModule {
      * {@link AssistResult} is returned as JSON (200).
      */
     private Object assist(ApiContext api, String intent, Map<String, Object> body) {
-        Optional<AssistAgent> agent = api.service().assistAgent();
+        Optional<AssistAgent> agent = HostContext.of(api).service().assistAgent();
         if (agent.isEmpty())
             throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "assist agent not available (inspecto-agent not on classpath)");
         AssistRequest req = new AssistRequest(

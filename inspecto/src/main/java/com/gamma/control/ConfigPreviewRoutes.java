@@ -73,7 +73,7 @@ final class ConfigPreviewRoutes implements RouteModule {
         if (pipeline.contains("/") || pipeline.contains("\\") || pipeline.contains(".."))
             throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "'pipeline' must be a bare pipeline name, not a path");
 
-        PipelineConfig cfg = api.service().configFor(pipeline)
+        PipelineConfig cfg = HostContext.of(api).service().configFor(pipeline)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + pipeline + "'"));
         PipelineConfig.Schemas schemas = cfg.schemas();
 

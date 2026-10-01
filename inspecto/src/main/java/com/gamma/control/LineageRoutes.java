@@ -61,8 +61,8 @@ final class LineageRoutes implements RouteModule {
      */
     private List<Map<String, Object>> upstream(ApiContext api, String store) {
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (var pv : api.service().pipelines()) {
-            var cfg = api.service().configFor(pv.name());
+        for (var pv : HostContext.of(api).service().pipelines()) {
+            var cfg = HostContext.of(api).service().configFor(pv.name());
             if (cfg.isEmpty()) continue;
             var dirs = cfg.get().dirs();
             if (dirs.batchesFilePath() == null || dirs.lineageFilePath() == null) continue;

@@ -23,7 +23,7 @@ final class CatalogRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.get("/catalog", (e, m) -> api.service().catalog().tables());
+        api.get("/catalog", (e, m) -> HostContext.of(api).service().catalog().tables());
         // MET-4 (2026-07-08): Streams — the Catalog's browsable data origins: each pipeline's Collector
         // (+ its Connection binding) as a catalog node. A pure projection of the collectors read-model,
         // shaped exactly like the UI's MetadataNode contract (the mock's CATALOG_STREAMS twin).
@@ -31,7 +31,7 @@ final class CatalogRoutes implements RouteModule {
         // References — the Catalog's dimension origins: every REFERENCE_DATASET node joined into a transform.
         api.get("/catalog/references", (e, m) -> references(api));
         api.get("/catalog/kpis", (e, m) -> catalogKpis(api));
-        api.get("/catalog/graph", (e, m) -> api.service().catalog().traverse(
+        api.get("/catalog/graph", (e, m) -> HostContext.of(api).service().catalog().traverse(
                 ApiContext.query(e, "from"),
                 ApiContext.parseIntOr(ApiContext.query(e, "depth"), 1),
                 direction(ApiContext.query(e, "direction")),
@@ -51,7 +51,7 @@ final class CatalogRoutes implements RouteModule {
      * is to render a link only when the target is proven, never a best guess.
      */
     private Map<String, Object> resolveTable(ApiContext api, String table) {
-        MetadataNode node = api.service().catalog().nodeByTable(table);
+        MetadataNode node = HostContext.of(api).service().catalog().nodeByTable(table);
         if (node == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no unique catalog node for table '" + table + "'");
         return Map.of("id", node.id(), "label", node.label(), "kind", node.kind().name());
     }
@@ -66,7 +66,7 @@ final class CatalogRoutes implements RouteModule {
         if (table != null && !table.isBlank()) return resolveTable(api, table);
         if (pipeline == null || pipeline.isBlank())
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no unique catalog node for table '" + table + "'");   // the pre-existing contract: nothing named ⇒ 404, never a guess
-        MetadataNode node = api.service().catalog().nodeByPipeline(pipeline);
+        MetadataNode node = HostContext.of(api).service().catalog().nodeByPipeline(pipeline);
         if (node == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no catalog node for pipeline '" + pipeline + "'");
         return Map.of("id", node.id(), "label", node.label(), "kind", node.kind().name());
     }
@@ -74,7 +74,7 @@ final class CatalogRoutes implements RouteModule {
     /** {@code GET /catalog/streams} — every Collector's data-origin stream as a browsable node (MET-4). */
     private List<Map<String, Object>> streams(ApiContext api) {
         List<Map<String, Object>> out = new ArrayList<>();
-        for (Map<String, Object> s : api.service().collectors()) {
+        for (Map<String, Object> s : HostContext.of(api).service().collectors()) {
             // produces:reference pipelines are dimension origins — they list under /catalog/references.
             if ("reference".equals(s.get("produces"))) continue;
             Map<String, Object> node = new LinkedHashMap<>();
@@ -98,12 +98,12 @@ final class CatalogRoutes implements RouteModule {
 
     /** {@code GET /catalog/references} — every Reference (dimension) origin as a catalog node. */
     private List<MetadataNode> references(ApiContext api) {
-        return api.service().catalog().nodesOfKind(NodeKind.REFERENCE_DATASET);
+        return HostContext.of(api).service().catalog().nodesOfKind(NodeKind.REFERENCE_DATASET);
     }
 
     /** A node (any kind) with its operational overlay + immediate neighbours, or 404. */
     private Map<String, Object> catalogNodeDetail(ApiContext api, String id) {
-        MetadataGraphService catalog = api.service().catalog();
+        MetadataGraphService catalog = HostContext.of(api).service().catalog();
         MetadataNode node = catalog.hydrated(id);
         if (node == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no catalog node '" + id + "'");
         Map<String, Object> out = new LinkedHashMap<>();
@@ -115,7 +115,7 @@ final class CatalogRoutes implements RouteModule {
 
     /** The KPI catalog (each KPI with its resolved inputs) + merged domain notes. */
     private Map<String, Object> catalogKpis(ApiContext api) {
-        MetadataGraphService catalog = api.service().catalog();
+        MetadataGraphService catalog = HostContext.of(api).service().catalog();
         MetadataGraph g = catalog.structural();
         List<Map<String, Object>> kpis = new ArrayList<>();
         for (MetadataNode k : catalog.nodesOfKind(NodeKind.KPI)) {

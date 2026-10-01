@@ -424,7 +424,7 @@ final class ComponentRoutes implements RouteModule {
         }
         com.gamma.objects.Workflow next = after == null ? com.gamma.objects.Workflow.defaultFor(old.objectType())
                 : com.gamma.objects.Workflow.fromMap(after);
-        com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+        com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
         if (objects == null) return;
         List<String> stranded = new java.util.ArrayList<>();
         for (String state : old.states()) {
@@ -453,7 +453,7 @@ final class ComponentRoutes implements RouteModule {
         ComponentRegistry.Component current = existing(store, type, id);
         if (current == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no " + type + " component '" + id + "'");
         ComponentAccess.requireDelete(ex, type, id, current.content());   // R3: shared ⇒ owner-only delete
-        List<String> refs = PipelineReferences.referencedBy(type + "/" + id, PipelineSupport.liftedPipelines(api.service()));
+        List<String> refs = PipelineReferences.referencedBy(type + "/" + id, PipelineSupport.liftedPipelines(HostContext.of(api).service()));
         if (!refs.isEmpty())
             throw new ApiException(409, ErrorCodes.CONFLICT, type + " component '" + id + "' is referenced by pipeline(s): "
                     + String.join(", ", refs));
@@ -721,7 +721,7 @@ final class ComponentRoutes implements RouteModule {
             // D7 (c): a widget's `tags` array is a projection of the assignment store, so it is derived
             // here rather than taken from the body — adopted on create, overwritten on update.
             WidgetTags.project(api, type, id, content, !componentExists(store, type, id),
-                    name -> api.service().objects().ifPresent(o -> o.ensureTag(name)));
+                    name -> HostContext.of(api).service().objects().ifPresent(o -> o.ensureTag(name)));
             ComponentRegistry.Component c = store.write(type, id, content);
             log.info("[COMPONENT-WRITE] wrote {}", c.ref());
             ETags.set(ex, ETags.of(ContentHash.of(c.content())));

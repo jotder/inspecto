@@ -73,14 +73,14 @@ final class SpaceComparisonRoutes implements RouteModule {
         // Only past the capability gate: resolve exactly the named Spaces, nothing else.
         Map<String, Path> roots = new LinkedHashMap<>();
         for (String id : ids) {
-            SpaceContext space = api.spaces().space(SpaceId.of(id))
+            SpaceContext space = HostContext.of(api).spaces().space(SpaceId.of(id))
                     .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no hosted Space '" + id + "'"));
             Path root = space.service().dataRoot();
             if (root == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "Space '" + id + "' has no data root to compare");
             roots.put(id, root);
         }
 
-        JobService jobs = api.service().jobServiceOrCreate();
+        JobService jobs = HostContext.of(api).service().jobServiceOrCreate();
         WriteGates.conflictIf(jobs.isRunning(JobService.SPACE_COMPARISON_RUN),
                 "a space comparison is already running in this Space");
         String runId = jobs.triggerSpaceComparisonRun(params, SpaceStorageAccess.granting(roots),

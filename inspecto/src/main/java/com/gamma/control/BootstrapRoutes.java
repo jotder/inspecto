@@ -92,13 +92,13 @@ final class BootstrapRoutes implements RouteModule {
     private static Map<String, Object> features(ApiContext api) {
         Map<String, Object> f = new LinkedHashMap<>();
         f.put("authoring", writeRootOrNull(api) != null); // write-root set ⇒ config authoring enabled
-        f.put("multiSpace", api.spaces().supportsCrud());
+        f.put("multiSpace", HostContext.of(api).spaces().supportsCrud());
         // EDITIONS SEC-10 (EDG-01 cell 4): BOTH conditions. The multi-space runtime is necessary
         // (-Dspaces.root) but not sufficient — the optional inspecto-exchange module must also have
         // registered. ⚠ Until 2026-09-07 this was the containerRoot check alone, so a Personal install with
         // -Dspaces.root reported exchange:true and the SPA's Share buttons 404'd on click. Derived from what
         // registered, never guessed; the stub does not count (ApiContext.hasRoute excludes stubs).
-        f.put("exchange", api.spaces().containerRoot() != null && api.hasRoute("POST", "/exchange/offers"));
+        f.put("exchange", HostContext.of(api).spaces().containerRoot() != null && api.hasRoute("POST", "/exchange/offers"));
         // EDITIONS CP-09 (EDG-01 cell 3b): true only when the optional inspecto-geo-link module actually
         // registered its routes — derived, never an edition guess. The SPA hides the two nav entries and
         // the two widget offers on it.
@@ -168,7 +168,7 @@ final class BootstrapRoutes implements RouteModule {
     }
 
     private Object spaces(ApiContext api) {
-        return api.spaces().all().stream()
+        return HostContext.of(api).spaces().all().stream()
                 .sorted(Comparator.comparing(c -> c.id().value()))
                 .map(BootstrapRoutes::spaceEntry)
                 .toList();

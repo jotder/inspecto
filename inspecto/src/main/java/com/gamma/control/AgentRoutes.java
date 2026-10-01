@@ -362,7 +362,7 @@ final class AgentRoutes implements RouteModule {
 
     /** The in-process intelligence agent, or 503 when the optional module is absent. */
     private IntelligenceAgent agentOr503(ApiContext api) {
-        return api.service().intelligenceAgent().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
+        return HostContext.of(api).service().intelligenceAgent().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                 "intelligence agent not available (inspecto-intelligence not on classpath)"));
     }
 

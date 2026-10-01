@@ -175,7 +175,7 @@ import java.util.regex.Pattern;
  * </ul>
  */
 @PublicApi(since = "2.4.0")
-public final class ControlApi implements AutoCloseable, ApiContext {
+public final class ControlApi implements AutoCloseable, HostContext {
 
     private static final Logger log = LoggerFactory.getLogger(ControlApi.class);
     private static final Object HANDLED = ApiContext.HANDLED;

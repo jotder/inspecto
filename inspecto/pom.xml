@@ -88,6 +88,10 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-event</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+        </dependency>
 
         <!-- com.gamma.acquire (WS-D increment 4) — extracted below fp-event once acquire was no
              longer SCC-trapped. Declared directly since ~6 core main-code files import it directly. -->

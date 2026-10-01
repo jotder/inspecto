@@ -54,7 +54,7 @@ final class NotificationRoutes implements RouteModule {
         // admin-gated. On Personal (no Subject) there is one user, and PUT keeps writing the single grid.
         api.get("/notifications/preferences", (e, m) -> myPreferences(api, e));
         api.put("/notifications/preferences", (e, m) -> saveMyPreferences(api, e, api.body(e)));
-        api.get("/notifications/preferences/default", (e, m) -> api.service().notificationPreferences().grid());
+        api.get("/notifications/preferences/default", (e, m) -> HostContext.of(api).service().notificationPreferences().grid());
         api.put("/notifications/preferences/default", ApiContext.withCapability("canAdminister",
                 (e, m) -> savePreferences(api, api.body(e))));
         // ⚠ The archive ("delete") is ONE shared state per Space (the store has no recipient), so it changes
@@ -97,7 +97,7 @@ final class NotificationRoutes implements RouteModule {
      * …]}}. Critical/unknown categories are ignored by the store (locked); the full refreshed grid is returned.
      */
     private static Object savePreferences(ApiContext api, Map<String, Object> body) {
-        var prefs = api.service().notificationPreferences();
+        var prefs = HostContext.of(api).service().notificationPreferences();
         cells(body).forEach((category, channels) -> {
             Map<String, Boolean> toggles = new LinkedHashMap<>();
             channels.forEach((k, v) -> { if (v != null) toggles.put(k, v); });   // null = reset: no meaning here
@@ -112,13 +112,13 @@ final class NotificationRoutes implements RouteModule {
      */
     private static Object myPreferences(ApiContext api, HttpExchange ex) {
         Subject s = ApiContext.subject(ex).orElse(null);
-        if (s == null) return api.service().notificationPreferences().grid();
+        if (s == null) return HostContext.of(api).service().notificationPreferences().grid();
         try {   // keep the security-recipient flag current (a demotion stops security mail)
             overrides(api).noteAdministrator(s.id(), s.capabilities().contains(Roles.CAN_ADMINISTER));
         } catch (IOException ignore) {
             // best effort — reading one's own grid must not fail on a write
         }
-        return overrides(api).grid(api.service().notificationPreferences(), s.id(), s.email());
+        return overrides(api).grid(HostContext.of(api).service().notificationPreferences(), s.id(), s.email());
     }
 
     /**
@@ -156,7 +156,7 @@ final class NotificationRoutes implements RouteModule {
     }
 
     private static NotificationPreferenceOverrides overrides(ApiContext api) {
-        return api.spaces().notificationOverrides();
+        return HostContext.of(api).spaces().notificationOverrides();
     }
 
     /**
@@ -186,16 +186,16 @@ final class NotificationRoutes implements RouteModule {
         if (NotificationCategory.SECURITY.id().equals(n.category())
                 && !s.capabilities().contains(Roles.CAN_ADMINISTER)) return false;
         if (NotificationCategory.byId(n.category()).isEmpty()) return true;
-        return overrides(api).enabled(api.service().notificationPreferences(), n.category(),
+        return overrides(api).enabled(HostContext.of(api).service().notificationPreferences(), n.category(),
                 NotificationPreferences.IN_APP, s.id(), s.email());
     }
 
     private static NotificationStore store(ApiContext api) {
-        return api.service().notifications();
+        return HostContext.of(api).service().notifications();
     }
 
     private static NotificationReadState readState(ApiContext api) {
-        return api.service().notificationReadState();
+        return HostContext.of(api).service().notificationReadState();
     }
 
     /** Every active notification — the feed is bounded by the store itself, so this is never unbounded. */
@@ -410,7 +410,7 @@ final class NotificationRoutes implements RouteModule {
      * The UI falls back to polling the feed/unread-count if the stream drops.
      */
     private static Object stream(ApiContext api, HttpExchange ex) throws IOException {
-        NotificationService svc = api.service().notificationService();
+        NotificationService svc = HostContext.of(api).service().notificationService();
         String reader = ApiContext.actor(ex);
         BlockingQueue<Notification> queue = new LinkedBlockingQueue<>();
         Consumer<Notification> listener = queue::offer;
@@ -421,7 +421,7 @@ final class NotificationRoutes implements RouteModule {
         svc.addListener(listener);
         svc.onClose(closer);
         // ControlApi.close() ends the stream too: drops the listener, interrupts the poll, closes the exchange.
-        SseStreams.Stream registration = api.sseStreams().register(ex, () -> svc.removeListener(listener));
+        SseStreams.Stream registration = HostContext.of(api).sseStreams().register(ex, () -> svc.removeListener(listener));
         ex.getResponseHeaders().set("Content-Type", "text/event-stream; charset=utf-8");
         ex.getResponseHeaders().set("Cache-Control", "no-cache");
         ex.getResponseHeaders().set("Connection", "keep-alive");

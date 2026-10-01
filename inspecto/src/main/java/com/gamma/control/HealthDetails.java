@@ -44,9 +44,9 @@ final class HealthDetails {
                     dataRoot == null ? "no data root bound" : "not present yet (created on first write): " + dataRoot));
         }
 
-        subs.put("pipelines", sub("UP", api.service().pipelines().size() + " registered"));
+        subs.put("pipelines", sub("UP", HostContext.of(api).service().pipelines().size() + " registered"));
 
-        Optional<JobService> jobs = api.service().jobService();
+        Optional<JobService> jobs = HostContext.of(api).service().jobService();
         if (jobs.isEmpty()) {
             subs.put("scheduler", sub("NOT_CONFIGURED", "no jobs registered"));
             subs.put("jobRunsProjection", sub("NOT_CONFIGURED", "no jobs registered"));
@@ -74,7 +74,7 @@ final class HealthDetails {
         // open one reports DOWN, which is what VER-3 asserts ("every intended subsystem UP — not silently
         // NOT_CONFIGURED or an in-memory fallback"). A family that was never asked for stays NOT_CONFIGURED and
         // is not a failure, so Personal, which configures none of them, is unaffected.
-        StoreHealth.of(api.service().spaceId()).forEach((family, r) -> {
+        StoreHealth.of(HostContext.of(api).service().spaceId()).forEach((family, r) -> {
             String status = switch (r.status()) {
                 case UP -> "UP";
                 case NOT_CONFIGURED -> "NOT_CONFIGURED";

@@ -72,10 +72,10 @@ final class PipelineSettingsRoutes implements RouteModule {
     private Object relabel(ApiContext api, HttpExchange e, String source, Map<String, Object> body)
             throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
-        Path srcPath = api.service().pathFor(source)
+        Path srcPath = HostContext.of(api).service().pathFor(source)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + source + "'"));
         WriteGates.jail(writeRoot, srcPath, "config path");   // refuse a config outside the write root
-        PipelineConfig live = api.service().configFor(source)
+        PipelineConfig live = HostContext.of(api).service().configFor(source)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + source + "'"));
 
         String raw = ApiContext.str(body, "name");
@@ -135,7 +135,7 @@ final class PipelineSettingsRoutes implements RouteModule {
      * (the parser's own default) so a config that omits the key round-trips as an explicit choice.
      */
     private Object pipelineSettings(ApiContext api, String name) throws IOException {
-        Path srcPath = api.service().pathFor(name)
+        Path srcPath = HostContext.of(api).service().pathFor(name)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
         Map<String, Object> raw = ConfigLoader.filesystem().decode(srcPath.toString());
         Map<String, Object> out = new LinkedHashMap<>();
@@ -155,7 +155,7 @@ final class PipelineSettingsRoutes implements RouteModule {
     private Object savePipelineSettings(ApiContext api, HttpExchange e, String name, Map<String, Object> body)
             throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
-        Path srcPath = api.service().pathFor(name)
+        Path srcPath = HostContext.of(api).service().pathFor(name)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
         WriteGates.jail(writeRoot, srcPath, "config path");
 
@@ -221,7 +221,7 @@ final class PipelineSettingsRoutes implements RouteModule {
     private Object saveAsTemplate(ApiContext api, HttpExchange e, String source, Map<String, Object> body)
             throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
-        Path srcPath = api.service().pathFor(source)
+        Path srcPath = HostContext.of(api).service().pathFor(source)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + source + "'"));
 
         String rawId = ApiContext.str(body, "id");
@@ -233,7 +233,7 @@ final class PipelineSettingsRoutes implements RouteModule {
                     + "' must match [a-z0-9][a-z0-9_]* (lowercase letters, digits and underscores)");
 
         // The id must be free as a live pipeline AND on disk — either would collide at registration.
-        WriteGates.conflictIf(api.service().pathFor(id).isPresent(),
+        WriteGates.conflictIf(HostContext.of(api).service().pathFor(id).isPresent(),
                 "pipeline id '" + id + "' is already registered");
         String fileName = WriteGates.safeName(id, "pipeline id") + "_pipeline.toon";
         Path target = WriteGates.jail(writeRoot, writeRoot.resolve(fileName), "resolved path");
@@ -274,7 +274,7 @@ final class PipelineSettingsRoutes implements RouteModule {
 
         // Register it so it shows up in GET /pipelines for editing/promotion. Safe: every run path
         // (trigger, reprocess, poll cycle) refuses a template, so being in the registry cannot run it.
-        api.service().registerPipeline(target);
+        HostContext.of(api).service().registerPipeline(target);
 
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("written", true);

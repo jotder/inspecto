@@ -49,7 +49,7 @@ final class SpaceRoutes implements RouteModule {
         // every consumer doing `response.map(...)`.
         api.get("/spaces", (e, m) -> {
             ApiContext.podScoped(e);
-            return api.spaces().all().stream()
+            return HostContext.of(api).spaces().all().stream()
                     .sorted(java.util.Comparator.comparing(c -> c.id().value()))
                     .map(SpaceRoutes::manifest)
                     .toList();
@@ -57,11 +57,11 @@ final class SpaceRoutes implements RouteModule {
 
         // Server capability probe — lets the UI distinguish the discover (CRUD-capable) runtime from a
         // single-tenant server without inferring it from the (possibly empty) space list. See class javadoc.
-        api.get("/spaces/_meta", (e, m) -> Map.of("multiSpace", api.spaces().supportsCrud()));
+        api.get("/spaces/_meta", (e, m) -> Map.of("multiSpace", HostContext.of(api).spaces().supportsCrud()));
 
         // The shipped-template gallery. Empty (not 409) on a single-tenant server — the UI hides the
         // gallery there, and an empty list is the honest capability answer either way.
-        api.get("/spaces/templates", (e, m) -> api.spaces().templates());
+        api.get("/spaces/templates", (e, m) -> HostContext.of(api).spaces().templates());
 
         // ⛔ NOT gated on canAdminister, and that is a DECISION (2026-09-15). This is the
         // RECOVERY route: deleting the last Space leaves a server hosting none, and a capability
@@ -88,7 +88,7 @@ final class SpaceRoutes implements RouteModule {
         if (id == null || !SpaceId.isValid(id))
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "query param 'id' is required and must be a valid space id ([a-z0-9-], 1-63 chars)");
         try {
-            return manifest(api.spaces().createFromBundle(SpaceId.of(id), e.getRequestBody().readAllBytes(),
+            return manifest(HostContext.of(api).spaces().createFromBundle(SpaceId.of(id), e.getRequestBody().readAllBytes(),
                     b -> {   // IMPORT-CONNECTION-JOB-GATE-1: each carried kind needs its own route's gate
                         ImportCapabilityGuard.checkFiles(e, b.configEntries(), true);   // a NEW Space may seed dedicated-only kinds
                         // a NEW Space: no stored rule, no live registry; carried Jobs server-stamped (MAINT-TASK-AUTHORITY-1)
@@ -105,7 +105,7 @@ final class SpaceRoutes implements RouteModule {
      *  seeds the new space from {@code spaces/_templates/<template>/} (400 when no such template ships). */
     private Object createSpace(ApiContext api, HttpExchange e, Map<String, Object> body) throws IOException {
         requireMultiSpace(api);
-        boolean recovering = api.spaces().size() == 0;
+        boolean recovering = HostContext.of(api).spaces().size() == 0;
         requireAdministerUnlessRecovering(api, e);
         String id = ApiContext.str(body, "id");
         if (id == null || !SpaceId.isValid(id))
@@ -113,9 +113,9 @@ final class SpaceRoutes implements RouteModule {
         String template = ApiContext.str(body, "template");
         try {
             SpaceContext ctx = template == null
-                    ? api.spaces().create(SpaceId.of(id),
+                    ? HostContext.of(api).spaces().create(SpaceId.of(id),
                             ApiContext.str(body, "display_name"), ApiContext.str(body, "description"))
-                    : api.spaces().createFromTemplate(SpaceId.of(id),
+                    : HostContext.of(api).spaces().createFromTemplate(SpaceId.of(id),
                             ApiContext.str(body, "display_name"), ApiContext.str(body, "description"), template,
                             base -> TemplateSeedGate.require(e, base, !recovering));   // every seeded kind meets its own route
             return manifest(ctx);
@@ -131,7 +131,7 @@ final class SpaceRoutes implements RouteModule {
         requireMultiSpace(api);
         if (!SpaceId.isValid(id)) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "invalid space id '" + id + "'");
         if ("default".equals(id)) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "the default space cannot be edited");
-        SpaceContext ctx = api.spaces().update(SpaceId.of(id),
+        SpaceContext ctx = HostContext.of(api).spaces().update(SpaceId.of(id),
                 ApiContext.str(body, "display_name"), ApiContext.str(body, "description"));
         if (ctx == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + id + "'");
         return manifest(ctx);
@@ -146,10 +146,10 @@ final class SpaceRoutes implements RouteModule {
         // Purging the last space DIRECTORY is irrecoverable over HTTP: its tree is the last copy. (Its first reason —
         // main() refused to boot an empty -Dspaces.root — is gone since 2026-09-25: zero Spaces is a clean state.)
         // Deregister-only stays allowed — it leaves the files for re-discovery.
-        if (purge && api.spaces().space(SpaceId.of(id)).isPresent() && api.spaces().isLastOnDisk(SpaceId.of(id)))
+        if (purge && HostContext.of(api).spaces().space(SpaceId.of(id)).isPresent() && HostContext.of(api).spaces().isLastOnDisk(SpaceId.of(id)))
             throw new ApiException(409, ErrorCodes.CONFLICT, "refusing to purge '" + id + "' — it is the last space on disk; "
                     + "delete it without ?purge=true (the files stay for re-discovery), or create another space first");
-        if (!api.spaces().delete(SpaceId.of(id), purge))
+        if (!HostContext.of(api).spaces().delete(SpaceId.of(id), purge))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + id + "'");
         return Map.of("id", id, "deleted", true, "purged", purge);
     }
@@ -164,12 +164,12 @@ final class SpaceRoutes implements RouteModule {
      * Recorded in {@code CapabilityManifest.EXEMPTIONS} as {@code recovery-route} with this condition named.
      */
     private static void requireAdministerUnlessRecovering(ApiContext api, HttpExchange e) {
-        if (api.spaces().size() > 0) ApiContext.requireCapability(e, Roles.CAN_ADMINISTER);
+        if (HostContext.of(api).spaces().size() > 0) ApiContext.requireCapability(e, Roles.CAN_ADMINISTER);
     }
 
     private static void requireMultiSpace(ApiContext api) {
 
-        if (!api.spaces().supportsCrud())
+        if (!HostContext.of(api).spaces().supportsCrud())
             throw new ApiException(409, ErrorCodes.CONFLICT, "this server hosts a single space; launch with -Dspaces.root to manage many");
     }
 

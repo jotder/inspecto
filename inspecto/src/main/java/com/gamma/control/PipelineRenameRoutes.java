@@ -74,10 +74,10 @@ final class PipelineRenameRoutes implements RouteModule {
     private Object rename(ApiContext api, HttpExchange e, String source, Map<String, Object> body)
             throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
-        Path srcPath = api.service().pathFor(source)
+        Path srcPath = HostContext.of(api).service().pathFor(source)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + source + "'"));
         WriteGates.jail(writeRoot, srcPath, "config path");
-        PipelineConfig live = api.service().configFor(source)
+        PipelineConfig live = HostContext.of(api).service().configFor(source)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + source + "'"));
 
         String rawId = ApiContext.str(body, "newId");
@@ -91,9 +91,9 @@ final class PipelineRenameRoutes implements RouteModule {
         String oldId = live.identity().pipelineName();
         WriteGates.conflictIf(live.active(),
                 "pipeline '" + oldId + "' is active; deactivate (active: false) before renaming");
-        WriteGates.conflictIf(api.service().isRunning(oldId),
+        WriteGates.conflictIf(HostContext.of(api).service().isRunning(oldId),
                 "pipeline '" + oldId + "' is currently running; wait for it to finish before renaming");
-        WriteGates.conflictIf(api.service().pathFor(newId).isPresent(),
+        WriteGates.conflictIf(HostContext.of(api).service().pathFor(newId).isPresent(),
                 "pipeline id '" + newId + "' is already registered");
         String newFileName = WriteGates.safeName(newId, "pipeline id") + "_pipeline.toon";
         Path newPath = WriteGates.jail(writeRoot, writeRoot.resolve(newFileName), "resolved path");
@@ -126,7 +126,7 @@ final class PipelineRenameRoutes implements RouteModule {
 
         // Step 1 (S9): evict per-pipeline bookkeeping + the run registry. Cheaply reversible on failure —
         // re-registering the same path restores exactly what this undid.
-        api.service().unregisterPipeline(srcPath);
+        HostContext.of(api).service().unregisterPipeline(srcPath);
         journalStep(journalFile, oldId, newId, "unregistered source", journal);
 
         try {
@@ -139,7 +139,7 @@ final class PipelineRenameRoutes implements RouteModule {
             journalStep(journalFile, oldId, newId, "audit files renamed: " + auditFiles, journal);
 
             // Step 4 (S4): the DuckDB status mirror, when DB-backed; no-op for the file-only default.
-            if (api.service().statusStore() instanceof DbStatusStore db) {
+            if (HostContext.of(api).service().statusStore() instanceof DbStatusStore db) {
                 db.renamePipeline(oldId, newId);
                 journalStep(journalFile, oldId, newId, "status DB rows updated", journal);
             }
@@ -162,11 +162,11 @@ final class PipelineRenameRoutes implements RouteModule {
                 journalStep(journalFile, oldId, newId, "dependents rewritten: " + dependents, journal);
 
             // Step 8 (S7): re-register under the new identity — fires catalog invalidation as a side effect.
-            api.service().registerPipeline(newPath);
+            HostContext.of(api).service().registerPipeline(newPath);
             journalStep(journalFile, oldId, newId, "registered " + newId, journal);
 
             // Step 9 (S10 stays untouched — history keeps recording what was true then).
-            api.service().eventLog().emit(Event.builder(EventType.PIPELINE_RENAMED)
+            HostContext.of(api).service().eventLog().emit(Event.builder(EventType.PIPELINE_RENAMED)
                     .source(PipelineRenameRoutes.class.getName()).pipeline(newId)
                     .message("Pipeline '" + oldId + "' renamed to '" + newId + "'")
                     .attr("oldId", oldId).attr("newId", newId));
@@ -192,7 +192,7 @@ final class PipelineRenameRoutes implements RouteModule {
             // itself), so re-registering it keeps the pipeline reachable rather than silently vanishing
             // from the registry — though state already moved under steps completed before the failure
             // (named in `journal`) stays moved; this is the plan's documented residual risk, not a bug.
-            if (Files.exists(srcPath)) api.service().registerPipeline(srcPath);
+            if (Files.exists(srcPath)) HostContext.of(api).service().registerPipeline(srcPath);
             log.warn("[PIPELINE-RENAME] '{}' -> '{}' failed after {}", oldId, newId, journal, ex);
             throw new ApiException(500, ErrorCodes.INTERNAL, "rename of '" + oldId + "' to '" + newId + "' failed after "
                     + journal.size() + " step(s) — see server log / rename.journal for detail: " + ex.getMessage());
@@ -300,10 +300,10 @@ final class PipelineRenameRoutes implements RouteModule {
             // started since — the same lifecycle gates a fresh rename runs.
             WriteGates.conflictIf(srcCfg.active(), "pipeline '" + oldId
                     + "' is active; deactivate (active: false) before resuming the rename");
-            WriteGates.conflictIf(api.service().isRunning(oldId), "pipeline '" + oldId
+            WriteGates.conflictIf(HostContext.of(api).service().isRunning(oldId), "pipeline '" + oldId
                     + "' is currently running; wait for it to finish before resuming the rename");
         }
-        Optional<Path> registeredNew = api.service().pathFor(newId);
+        Optional<Path> registeredNew = HostContext.of(api).service().pathFor(newId);
         if (registeredNew.isPresent()
                 && !registeredNew.get().toAbsolutePath().normalize().equals(newPath.toAbsolutePath().normalize()))
             throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline id '" + newId + "' is registered to a different config ("
@@ -312,7 +312,7 @@ final class PipelineRenameRoutes implements RouteModule {
         refuseGovernedDependents(writeRoot, oldId, newId, p.rewriteDependents());   // finding 2, before any step
         List<String> journal = new ArrayList<>();
         journalStep(journalFile, oldId, newId, "resume", journal);
-        if (srcExists) api.service().unregisterPipeline(srcPath);
+        if (srcExists) HostContext.of(api).service().unregisterPipeline(srcPath);
         try {
             int ledgerRows = com.gamma.acquire.AcquisitionLedgers.shared().renameSource(oldId, newId);
             journalStep(journalFile, oldId, newId, "ledger rows moved: " + ledgerRows, journal);
@@ -323,7 +323,7 @@ final class PipelineRenameRoutes implements RouteModule {
             int auditFiles = renameAuditFiles(cfgForDirs, oldId, newId);
             journalStep(journalFile, oldId, newId, "audit files renamed: " + auditFiles, journal);
 
-            if (api.service().statusStore() instanceof DbStatusStore db) {
+            if (HostContext.of(api).service().statusStore() instanceof DbStatusStore db) {
                 db.renamePipeline(oldId, newId);
                 journalStep(journalFile, oldId, newId, "status DB rows updated", journal);
             }
@@ -355,10 +355,10 @@ final class PipelineRenameRoutes implements RouteModule {
             if (p.rewriteDependents())
                 journalStep(journalFile, oldId, newId, "dependents rewritten: " + dependents, journal);
 
-            api.service().registerPipeline(newPath);
+            HostContext.of(api).service().registerPipeline(newPath);
             journalStep(journalFile, oldId, newId, "registered " + newId, journal);
 
-            api.service().eventLog().emit(Event.builder(EventType.PIPELINE_RENAMED)
+            HostContext.of(api).service().eventLog().emit(Event.builder(EventType.PIPELINE_RENAMED)
                     .source(PipelineRenameRoutes.class.getName()).pipeline(newId)
                     .message("Pipeline '" + oldId + "' renamed to '" + newId + "' (resumed)")
                     .attr("oldId", oldId).attr("newId", newId));
@@ -382,7 +382,7 @@ final class PipelineRenameRoutes implements RouteModule {
         } catch (RuntimeException | IOException ex) {
             // Same posture as rename's catch: keep the pipeline reachable if its old config survives; the
             // bracket stays open, so the NEXT resume picks up from here.
-            if (Files.exists(srcPath)) api.service().registerPipeline(srcPath);
+            if (Files.exists(srcPath)) HostContext.of(api).service().registerPipeline(srcPath);
             log.warn("[PIPELINE-RENAME] resume '{}' -> '{}' failed after {}", oldId, newId, journal, ex);
             throw new ApiException(500, ErrorCodes.INTERNAL, "resume of '" + oldId + "' to '" + newId + "' failed after "
                     + journal.size() + " step(s) — see server log / rename.journal for detail: " + ex.getMessage());
@@ -417,7 +417,7 @@ final class PipelineRenameRoutes implements RouteModule {
         if (!introduced.isEmpty()) {
             journalStep(journalFile, oldId, newId,
                     "refused: renamed config introduces ERROR findings — source restored", journal);
-            api.service().registerPipeline(srcPath);   // the config write never happened — restore visibility
+            HostContext.of(api).service().registerPipeline(srcPath);   // the config write never happened — restore visibility
             return new ConfigWrite(null, null, ApiContext.respondJson(e, 422, Map.of("written", false,
                     "error", "the renamed config introduces ERROR-level findings; not written",
                     "findings", introduced, "journal", journal)));

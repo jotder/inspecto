@@ -64,19 +64,19 @@ final class ConnectionRoutes implements RouteModule {
 
     /** {@code GET /connections} — all connection profiles, secret-masked. */
     private Object connectionList(ApiContext api) {
-        return api.service().connections().values().stream().map(ConnectionProfile::toMap).toList();
+        return HostContext.of(api).service().connections().values().stream().map(ConnectionProfile::toMap).toList();
     }
 
     /** {@code GET /connections/{id}} — one connection profile (secret-masked); 404 if unknown. */
     private Object connectionById(ApiContext api, String id) {
-        return api.service().connection(id)
+        return HostContext.of(api).service().connection(id)
                 .map(ConnectionProfile::toMap)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no connection profile '" + id + "'"));
     }
 
     /** {@code POST /connections/{id}/test} — TCP-reachability + secret-resolution test; 404 if unknown. */
     private Object testConnection(ApiContext api, String id) {
-        ConnectionProfile p = api.service().connection(id)
+        ConnectionProfile p = HostContext.of(api).service().connection(id)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no connection profile '" + id + "'"));
         return ConnectionTester.test(p).toMap();
     }
@@ -119,7 +119,7 @@ final class ConnectionRoutes implements RouteModule {
      * 404 unknown id, 422 unknown check name. Checks a connector cannot answer come back {@code skipped}.
      */
     private Object probeConnection(ApiContext api, String id, Map<String, Object> body) {
-        ConnectionProfile p = api.service().connection(id)
+        ConnectionProfile p = HostContext.of(api).service().connection(id)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no connection profile '" + id + "'"));
         EnumSet<ProbeCheck> checks = EnumSet.noneOf(ProbeCheck.class);
         if (body != null && body.get("checks") instanceof List<?> names) {
@@ -168,7 +168,7 @@ final class ConnectionRoutes implements RouteModule {
 
     /** Resolve the workbench for a saved profile: 404 unknown id, 501 connector without workbench support. */
     private ConnectionWorkbench workbench(ApiContext api, String id) {
-        ConnectionProfile p = api.service().connection(id)
+        ConnectionProfile p = HostContext.of(api).service().connection(id)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no connection profile '" + id + "'"));
         ConnectionWorkbench wb = ConnectionProber.workbenchFor(p);
         if (wb == null) throw new ApiException(501, ErrorCodes.NOT_SUPPORTED,
@@ -192,7 +192,7 @@ final class ConnectionRoutes implements RouteModule {
         WriteGates.requireWriteRoot(api, "connection write");
         String id = ApiContext.str(body, "id");
         if (id == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'id'");
-        WriteGates.conflictIf(api.service().connection(id).isPresent(),
+        WriteGates.conflictIf(HostContext.of(api).service().connection(id).isPresent(),
                 "connection '" + id + "' already exists (use PUT to update)");
         ConnectionProfile p = connectionFromBody(id, body, null);
         persistConnection(api, p);
@@ -202,7 +202,7 @@ final class ConnectionRoutes implements RouteModule {
     /** {@code PUT /connections/{id}} — replace a profile (masked secrets preserved); 404 if unknown. */
     private Object updateConnection(ApiContext api, String id, Map<String, Object> body) throws IOException {
         WriteGates.requireWriteRoot(api, "connection write");
-        ConnectionProfile existing = api.service().connection(id)
+        ConnectionProfile existing = HostContext.of(api).service().connection(id)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no connection profile '" + id + "'"));
         ConnectionProfile p = connectionFromBody(id, body, existing);
         persistConnection(api, p);
@@ -212,12 +212,12 @@ final class ConnectionRoutes implements RouteModule {
     /** {@code DELETE /connections/{id}} — remove a profile; 404 if unknown, 409 if a pipeline source uses it. */
     private Object deleteConnection(ApiContext api, String id) throws IOException {
         WriteGates.requireWriteRoot(api, "connection write");
-        if (api.service().connection(id).isEmpty())
+        if (HostContext.of(api).service().connection(id).isEmpty())
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no connection profile '" + id + "'");
-        WriteGates.conflictIf(api.service().connectionInUse(id),
+        WriteGates.conflictIf(HostContext.of(api).service().connectionInUse(id),
                 "connection '" + id + "' is in use by a pipeline source");
         boolean removed = Files.deleteIfExists(connectionFile(api, id));
-        api.service().unregisterConnection(id);
+        HostContext.of(api).service().unregisterConnection(id);
         return Map.of("id", id, "deleted", true, "fileRemoved", removed);
     }
 
@@ -298,7 +298,7 @@ final class ConnectionRoutes implements RouteModule {
         byte[] bytes = ConfigCodec.toToon(Map.of("connection", connectionDoc(p))).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".conn-");
         // Registered exactly as a reload would load it: a local base_path resolved under the Space dir.
-        api.service().registerConnection(p.resolvedBeside(target.getParent()));
+        HostContext.of(api).service().registerConnection(p.resolvedBeside(target.getParent()));
         log.info("[CONNECTION-WRITE] wrote {} ({} bytes)",
                 api.writeRoot().relativize(target).toString().replace('\\', '/'), bytes.length);
     }

@@ -75,7 +75,7 @@ final class ConfigReadRoutes implements RouteModule {
             dir = WriteGates.jail(writeRoot, writeRoot.resolve(sub), "subdir");
         }
         Path target = ConfigFileSupport.resolveRegisteredConfigFile(api, writeRoot, dir, type, fileName, subdir);
-        WriteGates.refuseReservedConfigTarget(writeRoot, target);   // CONFIG-WRITE-REGISTRY-1, before the 404
+        ConfigTargetGuard.refuseReservedConfigTarget(writeRoot, target);   // CONFIG-WRITE-REGISTRY-1, before the 404
         String rel = writeRoot.relativize(target).toString().replace('\\', '/');
         if (!Files.isRegularFile(target)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such config: " + rel);
 
@@ -146,12 +146,12 @@ final class ConfigReadRoutes implements RouteModule {
             Files.deleteIfExists(MappingCsv.siblingFor(target));
         }
         if ("pipeline".equals(type)) {
-            api.service().unregisterPipeline(target);   // drop the ghost row instead of waiting for the next poll cycle
+            HostContext.of(api).service().unregisterPipeline(target);   // drop the ghost row instead of waiting for the next poll cycle
             // PIPELINE-CONFIG-HISTORY-1: the config history goes with the config, as ComponentStore.delete
             // purges a component's — the data and audit trail kept above are what record what happened.
             PipelineHistory.purge(writeRoot, pipelineIdOf(deletedRaw, fileName));
         } else if ("enrichment".equals(type)) {
-            api.service().unregisterEnrichment(fileName);   // stop its schedule timer immediately, not at restart
+            HostContext.of(api).service().unregisterEnrichment(fileName);   // stop its schedule timer immediately, not at restart
         }
         log.info("[CONFIG-DELETE] type={} deleted {}", type, rel);
         Map<String, Object> r = new LinkedHashMap<>();
@@ -244,7 +244,7 @@ final class ConfigReadRoutes implements RouteModule {
         // CONFIG-WRITE-REGISTRY-1 (read side): a registry component is read through /components/<kind>, which
         // applies ComponentAccess.requireView; a reserved file (roles, demo-users, approval) is never served
         // here. Before the 404, so no existence oracle; the satellite scan below skips such hits for the same reason.
-        WriteGates.refuseReservedConfigTarget(writeRoot, target);
+        ConfigTargetGuard.refuseReservedConfigTarget(writeRoot, target);
         // A satellite (schema/mapping/enrichment) lives beside its pipeline, not at the write root —
         // resolve it there when the convention path misses. READ ONLY; see resolveSatelliteForRead.
         target = ConfigFileSupport.resolveSatelliteForRead(writeRoot, target, type, fileName, subdir);

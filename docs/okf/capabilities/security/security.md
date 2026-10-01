@@ -95,7 +95,7 @@ citing either. The EDITIONS rows are the edition truth and are corrected here in
 
 | EDITIONS row | What it said | What the build does |
 |---|---|---|
-| `SEC-09` note | Personal events carry `actor=anonymous` | The unauthenticated default actor is **`appUser`** (`ApiContext.actor`, `inspecto/src/main/java/com/gamma/control/ApiContext.java:285`): an authenticated `Subject.id()` first, else `agent:<session>`, else the `X-Actor` header, else `appUser`. No `anonymous` string exists in the tree |
+| `SEC-09` note | Personal events carry `actor=anonymous` | The unauthenticated default actor is **`appUser`** (`RequestAttrs.actor`, `inspecto-auth-spi/src/main/java/com/gamma/control/RequestAttrs.java`; `ApiContext.actor` delegates to it): an authenticated `Subject.id()` first, else `agent:<session>`, else the `X-Actor` header, else `appUser`. No `anonymous` string exists in the tree |
 | `SEC-11` note | "client-migration-gated" | The API-v1 sunset apparatus was deleted 2026-07-25; `BACKLOG.md` §2 restated the gate 2026-09-07 as **the next MAJOR tag** |
 | `SEC-12` (end-session redirect) | `— / 🔲 / 🔲`, "nobody has asked" | **Half built.** The SPA implements RP-Initiated Logout (`SessionService.logout()` redirects to `endSessionUrl` with `client_id` + `post_logout_redirect_uri`, 2026-07-26) and reads `boot.auth?.endSessionUrl ?? environment.oidc.endSessionUrl`. **The server never publishes an `auth` block** — `BootstrapRoutes` emits only `features.authMode`; no Java file contains `authorizeUrl` or `endSessionUrl` — so the only working path is the build-time `environment.ts` value. 🟡 for S/E: works, but configured at UI build time, not at deployment |
 

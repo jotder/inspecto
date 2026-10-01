@@ -19,6 +19,8 @@
 /inspecto-sql/target/
 /inspecto-etl/target/
 /inspecto-audit-spi/target/
+/inspecto-auth-spi/target/
+/inspecto-http-spi/target/
 /inspecto-la-graph/target/
 /inspecto-event/target/
 /inspecto-acquire/target/

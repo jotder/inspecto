@@ -115,7 +115,7 @@ final class PipelineInboxRoutes implements RouteModule {
     }
 
     private static PipelineConfig configOf(ApiContext api, String id) {
-        return api.service().configFor(id)
+        return HostContext.of(api).service().configFor(id)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no authored pipeline '" + id + "'"));
     }
 

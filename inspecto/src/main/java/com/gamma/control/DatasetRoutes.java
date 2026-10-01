@@ -155,7 +155,7 @@ final class DatasetRoutes implements RouteModule {
         // ⚠ ...OrCreate, not jobService(): this run is ad-hoc and needs no registry, so a space holding no
         // *_job.toon must still be able to materialize. JobRoutes' own trigger uses the Optional form
         // because triggering a REGISTERED job by name genuinely requires the registry to exist.
-        JobService jobs = api.service().jobServiceOrCreate();
+        JobService jobs = HostContext.of(api).service().jobServiceOrCreate();
 
         // Gate 4 — non-overlap, surfaced as a refusal instead of a silently-SKIPPED run.
         String runName = "materialize:" + target;

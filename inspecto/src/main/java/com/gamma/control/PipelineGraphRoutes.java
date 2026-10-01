@@ -102,7 +102,7 @@ final class PipelineGraphRoutes implements RouteModule {
      * with one name — the very defect this plan spent its Sprint A closing.
      */
     private Object graphForPipeline(ApiContext api, HttpExchange ex, String name) {
-        PipelineConfig c = api.service().configFor(name)
+        PipelineConfig c = HostContext.of(api).service().configFor(name)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
         Map<String, Object> out = new LinkedHashMap<>(PipelineProjection.graph(PipelineLift.lift(c)));
         out.put("readOnlyProjection", true);
@@ -122,9 +122,9 @@ final class PipelineGraphRoutes implements RouteModule {
      * lowered graph. 404 if no such registered pipeline.
      */
     private Object document(ApiContext api, HttpExchange ex, String name) throws IOException {
-        PipelineConfig cfg = api.service().configFor(name)
+        PipelineConfig cfg = HostContext.of(api).service().configFor(name)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
-        Path file = api.service().pathFor(name)
+        Path file = HostContext.of(api).service().pathFor(name)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no config file for pipeline '" + name + "'"));
 
         Map<String, Object> recipe = RecipeConverter.toRecipe(ConfigLoader.filesystem().decode(file.toString()));
@@ -252,14 +252,14 @@ final class PipelineGraphRoutes implements RouteModule {
      * edit exactly like {@code ComponentRoutes}' component CRUD (W3 optimistic locking).
      */
     private Object editableGraph(ApiContext api, HttpExchange ex, String name) throws IOException {
-        Optional<PipelineConfig> loaded = api.service().configFor(name);
+        Optional<PipelineConfig> loaded = HostContext.of(api).service().configFor(name);
         if (loaded.isEmpty()) {
             Optional<ConfigRegistry.LoadFailure> broken = loadFailure(api, name);
             if (broken.isPresent()) return repairGraph(ex, name, broken.get());
         }
         PipelineConfig cfg = loaded
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
-        Path file = api.service().pathFor(name)
+        Path file = HostContext.of(api).service().pathFor(name)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no config file for pipeline '" + name + "'"));
         Map<String, Object> raw = ConfigLoader.filesystem().decode(file.toString());
         ETags.set(ex, ETags.of(ContentHash.of(raw)));
@@ -270,7 +270,7 @@ final class PipelineGraphRoutes implements RouteModule {
 
     /** The registered file named {@code name} that did NOT load ({@code GET /pipelines} lists it by this stem). */
     private static Optional<ConfigRegistry.LoadFailure> loadFailure(ApiContext api, String name) {
-        return api.service().pipelineLoadFailures().stream().filter(f -> f.name().equals(name)).findFirst();
+        return HostContext.of(api).service().pipelineLoadFailures().stream().filter(f -> f.name().equals(name)).findFirst();
     }
 
     /**
@@ -412,7 +412,7 @@ final class PipelineGraphRoutes implements RouteModule {
         PipelineHistory.record(writeRoot, target);   // PIPELINE-CONFIG-HISTORY-1
         // GET …/graph/raw lifts the REGISTERED config, so without this a reopen straight after Save served
         // the pre-save graph until the next poll cycle (the history restore route does the same).
-        api.service().refreshConfigs();
+        HostContext.of(api).service().refreshConfigs();
         log.info("[PIPELINE-WRITE] lowered graph '{}' to {} ({} bytes)", name, target.getFileName(), bytes.length);
         // The etag a next save (or a re-read) must accept — the same bytes just written, not the pre-save hash.
         ETags.set(e, ETags.of(ContentHash.of(lowered)));
@@ -432,7 +432,7 @@ final class PipelineGraphRoutes implements RouteModule {
      * beside the broken one, the exact second-file defect the registered-path rule above exists to prevent.
      */
     private static Optional<Path> registeredFile(ApiContext api, String name) {
-        return api.service().pathFor(name).or(() -> loadFailure(api, name).map(ConfigRegistry.LoadFailure::path));
+        return HostContext.of(api).service().pathFor(name).or(() -> loadFailure(api, name).map(ConfigRegistry.LoadFailure::path));
     }
 
     /**
@@ -560,7 +560,7 @@ final class PipelineGraphRoutes implements RouteModule {
                         + " — Node '" + n.id() + "' (transform.join): " + e.getMessage() + "]");
             }
             if (!ref.byName()) continue;
-            PipelineConfig target = api.service().loadedPipelines().stream()
+            PipelineConfig target = HostContext.of(api).service().loadedPipelines().stream()
                     .filter(p -> p.identity().pipelineName().equals(ref.ref()))
                     .findFirst().orElse(null);
             if (target == null)
@@ -591,7 +591,7 @@ final class PipelineGraphRoutes implements RouteModule {
         if (g == null) {
             // BUNDLE-AUTHORED-PIPELINE-STORE-1: the REGISTERED pipeline wins — a PipelineStore graph under the
             // same id must never shadow it. The store answers only for a grandfathered, unregistered id.
-            g = api.service().configFor(id).map(PipelineLift::lift).orElse(null);
+            g = HostContext.of(api).service().configFor(id).map(PipelineLift::lift).orElse(null);
             Path root = PipelineSupport.pipelinesRootOrNull(api);
             try {
                 if (g == null && root != null) g = new PipelineStore(root).get(id).orElse(null);
@@ -632,7 +632,7 @@ final class PipelineGraphRoutes implements RouteModule {
      * acquisition first).
      */
     private Object testRun(ApiContext api, String id, String to, Map<String, Object> body) {
-        PipelineConfig cfg = api.service().configFor(id)
+        PipelineConfig cfg = HostContext.of(api).service().configFor(id)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no authored pipeline '" + id + "'"));
         List<String> files = fileList(body);
         Path jailRoot = testRunRoot(api, cfg);
@@ -730,7 +730,7 @@ final class PipelineGraphRoutes implements RouteModule {
         if (!cfg.collector().hasConnection())
             return Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
         String connId = cfg.collector().connection();
-        ConnectionProfile p = api.service().connection(connId)
+        ConnectionProfile p = HostContext.of(api).service().connection(connId)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "pipeline's connection '" + connId + "' is not registered"));
         if (!"local".equalsIgnoreCase(p.connector()))
             throw new ApiException(501, ErrorCodes.NOT_SUPPORTED, "run-to-here supports local sources only; connection '" + connId
@@ -850,7 +850,7 @@ final class PipelineGraphRoutes implements RouteModule {
                 return List.of();   // a path: reference is admitted as the one file, see readFiles
             }
             // only a Pipeline that declares produces: reference is a legitimate join target (ReferenceReader.sqlFor)
-            return api.service().loadedPipelines().stream()
+            return HostContext.of(api).service().loadedPipelines().stream()
                     .filter(p -> p.identity().pipelineName().equals(parsed.ref()) && p.producesReference()
                             && p.dirs() != null
                             && p.dirs().database() != null && !p.dirs().database().isBlank())
@@ -879,7 +879,7 @@ final class PipelineGraphRoutes implements RouteModule {
             }
             if (!parsed.byName()) WriteGates.jailToAllowedRoots(parsed.path(), "transform.join.reference");
             try {
-                sql = ReferenceReader.sqlFor(parsed, api.service().loadedPipelines());
+                sql = ReferenceReader.sqlFor(parsed, HostContext.of(api).service().loadedPipelines());
             } catch (RuntimeException unresolvable) {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "dry-run cannot resolve reference '" + reference + "': "
                         + unresolvable.getMessage());
@@ -937,7 +937,7 @@ final class PipelineGraphRoutes implements RouteModule {
         if (!new PipelineStore(root).exists(id)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no authored pipeline '" + id + "'");
         String runId;
         try {
-            runId = api.service().jobServiceOrCreate().triggerPipelineRun(id, ApiContext.query(e, "actor"));
+            runId = HostContext.of(api).service().jobServiceOrCreate().triggerPipelineRun(id, ApiContext.query(e, "actor"));
         } catch (IllegalStateException ex) {
             // the service booted without a write root, so its pipeline store never opened — same gate as above
             throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY, ex.getMessage());

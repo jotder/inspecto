@@ -636,7 +636,7 @@ final class ConfigRoutes {
         Object id = collector.get("connection");
         if (id == null) return List.of();
         String conn = String.valueOf(id).trim();
-        if (conn.isEmpty() || api.service().connections().containsKey(conn)) return List.of();
+        if (conn.isEmpty() || HostContext.of(api).service().connections().containsKey(conn)) return List.of();
         return List.of(new Finding(Severity.ERROR, "collector.connection",
                 "unknown connection '" + conn + "' — no such connection profile in this space;"
                         + " create the connection first, or clear collector.connection"));

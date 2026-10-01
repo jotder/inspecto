@@ -129,9 +129,9 @@ final class PipelineBundleRoutes implements RouteModule {
      * 404 unknown pipeline; 409 on a satellite basename collision (see {@link #exportBundle}).
      */
     static Closure exportClosure(ApiContext api, String name) throws IOException {
-        PipelineConfig cfg = api.service().configFor(name)
+        PipelineConfig cfg = HostContext.of(api).service().configFor(name)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
-        Path file = api.service().pathFor(name)
+        Path file = HostContext.of(api).service().pathFor(name)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no config file for pipeline '" + name + "'"));
         String id = cfg.identity().pipelineName();
 
@@ -192,7 +192,7 @@ final class PipelineBundleRoutes implements RouteModule {
             Map<String, Object> req = new LinkedHashMap<>();
             req.put("kind", "connection");
             req.put("profile", conn);
-            api.service().connection(conn).ifPresent(p -> req.put("connector", p.connector()));
+            HostContext.of(api).service().connection(conn).ifPresent(p -> req.put("connector", p.connector()));
             requirements.add(req);
         }
 
@@ -317,7 +317,7 @@ final class PipelineBundleRoutes implements RouteModule {
         }
         // Overwrite lands on the pipeline's REGISTERED file (the saveGraph rule — never a second,
         // shadow file); anything else gets the sample-space layout <write-root>/<id>/<id>_pipeline.toon.
-        Path registered = api.service().pathFor(newId).map(Path::normalize)
+        Path registered = HostContext.of(api).service().pathFor(newId).map(Path::normalize)
                 .filter(p -> p.startsWith(writeRoot)).orElse(null);
         Path target = WriteGates.jail(writeRoot,
                 registered != null ? registered
@@ -429,7 +429,7 @@ final class PipelineBundleRoutes implements RouteModule {
             // registers, it does not merely persist" rule the metadata bundle's enrichment kind follows.
             String registeredName;
             try {
-                registeredName = api.service().registerPipeline(target);
+                registeredName = HostContext.of(api).service().registerPipeline(target);
                 registeredHere = !wasRegistered;
             } catch (IllegalArgumentException invalid) {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "imported pipeline did not register: " + invalid.getMessage());
@@ -438,7 +438,7 @@ final class PipelineBundleRoutes implements RouteModule {
             }
             for (Path et : companions.keySet()) {
                 try {
-                    api.service().registerEnrichment(EnrichmentConfig.load(et.toString()));
+                    HostContext.of(api).service().registerEnrichment(EnrichmentConfig.load(et.toString()));
                 } catch (RuntimeException invalid) {
                     notes.add("companion " + et.getFileName() + " was written but did not register: "
                             + invalid.getMessage());
@@ -471,9 +471,9 @@ final class PipelineBundleRoutes implements RouteModule {
             throw ImportRollback.failure(failed, undone);   // the 500 body names what was not rolled back
         } finally {
             if (!done) {
-                if (registeredHere) api.service().unregisterPipeline(target);
+                if (registeredHere) HostContext.of(api).service().unregisterPipeline(target);
                 journal.rollback();
-                api.service().refreshConfigs();
+                HostContext.of(api).service().refreshConfigs();
             }
         }
     }
@@ -482,9 +482,9 @@ final class PipelineBundleRoutes implements RouteModule {
     private static ImportRollback.Outcome undo(ApiContext api, com.gamma.service.ImportJournal journal, Path writeRoot,
                                                Path target, boolean registeredHere) {
         return ImportRollback.run(journal, writeRoot, () -> {
-            if (registeredHere) api.service().unregisterPipeline(target);
+            if (registeredHere) HostContext.of(api).service().unregisterPipeline(target);
             journal.rollback();
-            api.service().refreshConfigs();
+            HostContext.of(api).service().refreshConfigs();
         });
     }
 
@@ -538,7 +538,7 @@ final class PipelineBundleRoutes implements RouteModule {
             return;
         }
         String newId = WriteGates.safeName(String.valueOf(id).trim().toLowerCase(), "pipeline name");
-        Path registered = api.service().pathFor(newId).map(Path::normalize)
+        Path registered = HostContext.of(api).service().pathFor(newId).map(Path::normalize)
                 .filter(p -> p.startsWith(writeRoot)).orElse(null);
         Path destDir = registered != null ? registered.getParent() : writeRoot.resolve(newId);
         judgeSatellites(writeRoot, destDir, asMapList(manifest.get("satellites")), sourceMap, entries);
@@ -764,7 +764,7 @@ final class PipelineBundleRoutes implements RouteModule {
 
     /** Is {@code id} taken — registered live, or already a file at either canonical location? */
     private static boolean taken(ApiContext api, Path writeRoot, String id) {
-        return api.service().pathFor(id).isPresent()
+        return HostContext.of(api).service().pathFor(id).isPresent()
                 || Files.exists(writeRoot.resolve(id).resolve(id + "_pipeline.toon"))
                 || Files.exists(writeRoot.resolve(id + "_pipeline.toon"));
     }
@@ -848,7 +848,7 @@ final class PipelineBundleRoutes implements RouteModule {
     private static List<Map<String, Object>> classifyRequirements(ApiContext api, Map<String, Object> manifest,
                                                                   Map<String, Object> pipeline,
                                                                   List<Finding> findings) {
-        Set<String> known = api.service().connections().keySet();
+        Set<String> known = HostContext.of(api).service().connections().keySet();
         Set<String> wanted = new java.util.LinkedHashSet<>();
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> req : asMapList(manifest.get("requirements"))) {

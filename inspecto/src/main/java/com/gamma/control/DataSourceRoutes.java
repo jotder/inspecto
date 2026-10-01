@@ -103,7 +103,7 @@ final class DataSourceRoutes implements RouteModule {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
         }
 
-        Set<String> existing = api.service().pipelines().stream()
+        Set<String> existing = HostContext.of(api).service().pipelines().stream()
                 .map(PipelineView::name).collect(Collectors.toSet());
         BundleImporter.Narrowed narrowed = BundleImporter.keepExistingReferences(bundle, existing);
         bundle = narrowed.bundle();
@@ -114,7 +114,7 @@ final class DataSourceRoutes implements RouteModule {
         // the same missing connections and the same configs the commit will land disabled. A WARNING, not an
         // ERROR: since 2026-09-25 a missing connection disables its dependents rather than refusing the import.
         List<Map<String, Object>> connectionWarnings = BundleImporter.disableForMissingConnections(
-                bundle, api.service().connections().keySet()).warnings();
+                bundle, HostContext.of(api).service().connections().keySet()).warnings();
         Map<String, Set<String>> missingByFile = missingConnectionsByFile(connectionWarnings);
 
         Map<String, List<Finding>> findings = new LinkedHashMap<>();
@@ -262,7 +262,7 @@ final class DataSourceRoutes implements RouteModule {
         bundle = JobAuthority.stampBundle(e, bundle);   // MAINT-TASK-AUTHORITY-1: carried Jobs server-stamped
 
         // Conflict = a bundle pipeline id that already exists in this space's registry.
-        Set<String> existing = api.service().pipelines().stream()
+        Set<String> existing = HostContext.of(api).service().pipelines().stream()
                 .map(PipelineView::name).collect(Collectors.toSet());
         // A carried Reference the target already hosts is the target's to keep, not a clash (W5 forward).
         List<String> referencesKept = List.of();
@@ -282,7 +282,7 @@ final class DataSourceRoutes implements RouteModule {
         // every config that needs it is written switched off by its own switch, and the response names each
         // missing connection with the configs it disabled — "connect X to enable".
         BundleImporter.MissingConnections missing = BundleImporter.disableForMissingConnections(
-                bundle, api.service().connections().keySet());
+                bundle, HostContext.of(api).service().connections().keySet());
         bundle = missing.bundle();
 
         // The registration pre-check that CAN run before a write: a bundle pipeline whose id is registered from a
@@ -297,7 +297,7 @@ final class DataSourceRoutes implements RouteModule {
             }
             if (name == null) continue;
             Path lands = config.resolve(en.getKey()).toAbsolutePath().normalize();
-            api.service().pathFor(name.toString().toLowerCase()).map(p -> p.toAbsolutePath().normalize())
+            HostContext.of(api).service().pathFor(name.toString().toLowerCase()).map(p -> p.toAbsolutePath().normalize())
                     .filter(p -> !p.equals(lands)).ifPresent(p -> {
                         throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline id '" + name
                                 + "' is already registered from " + p + "; nothing was written");
@@ -343,17 +343,17 @@ final class DataSourceRoutes implements RouteModule {
             for (String rel : written) {
                 if (!rel.endsWith("_connection.toon")) continue;
                 ConnectionProfile profile = ConnectionProfile.load(config.resolve(rel));
-                connectionsBefore.putIfAbsent(profile.id(), api.service().connection(profile.id()));
-                api.service().registerConnection(profile);
+                connectionsBefore.putIfAbsent(profile.id(), HostContext.of(api).service().connection(profile.id()));
+                HostContext.of(api).service().registerConnection(profile);
             }
-            Set<Path> registeredBefore = api.service().pipelines().stream()
-                    .flatMap(v -> api.service().pathFor(v.name()).stream())
+            Set<Path> registeredBefore = HostContext.of(api).service().pipelines().stream()
+                    .flatMap(v -> HostContext.of(api).service().pathFor(v.name()).stream())
                     .map(p -> p.toAbsolutePath().normalize()).collect(Collectors.toSet());
             for (String rel : written) {
                 if (!rel.endsWith("_pipeline.toon")) continue;
                 Path file = config.resolve(rel).toAbsolutePath().normalize();
                 try {
-                    pipelines.add(api.service().registerPipeline(file));
+                    pipelines.add(HostContext.of(api).service().registerPipeline(file));
                     if (!registeredBefore.contains(file)) registeredHere.add(file);
                 } catch (IllegalArgumentException invalid) {
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "invalid pipeline " + rel + ": " + invalid.getMessage());
@@ -386,13 +386,13 @@ final class DataSourceRoutes implements RouteModule {
      */
     private static void undo(ApiContext api, ImportJournal journal, List<Path> registeredHere,
                              Map<String, java.util.Optional<ConnectionProfile>> connectionsBefore) throws IOException {
-        for (Path p : registeredHere) api.service().unregisterPipeline(p);
+        for (Path p : registeredHere) HostContext.of(api).service().unregisterPipeline(p);
         connectionsBefore.forEach((id, before) -> {
-            if (before.isPresent()) api.service().registerConnection(before.get());
-            else api.service().unregisterConnection(id);
+            if (before.isPresent()) HostContext.of(api).service().registerConnection(before.get());
+            else HostContext.of(api).service().unregisterConnection(id);
         });
         journal.rollback();
-        api.service().refreshConfigs();
+        HostContext.of(api).service().refreshConfigs();
     }
 
     private static Map<String, Object> importedBody(BundleImporter.Bundle bundle, List<String> written,
@@ -412,7 +412,7 @@ final class DataSourceRoutes implements RouteModule {
         Path config = requireConfig(api);
         DataSourceBundle bundle;
         try {
-            bundle = new DataSourceBundleResolver(api.service(), config).resolve(ds);
+            bundle = new DataSourceBundleResolver(HostContext.of(api).service(), config).resolve(ds);
         } catch (NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
@@ -428,7 +428,7 @@ final class DataSourceRoutes implements RouteModule {
     }
 
     private static DataSourceBundleResolver resolver(ApiContext api) {
-        return new DataSourceBundleResolver(api.service(), requireConfig(api));
+        return new DataSourceBundleResolver(HostContext.of(api).service(), requireConfig(api));
     }
 
     /** The bound space's config dir, or {@code 503} when filesystem writes are disabled (no write root). */

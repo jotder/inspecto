@@ -48,12 +48,12 @@ final class EnrichmentRoutes implements RouteModule {
         api.get("/enrichment/([^/]+)/lineage", (e, m) ->
                 enrichment(api).lineage(enrichJob(api, m), ApiContext.query(e, "runId")));
         api.get("/enrichment/([^/]+)/report", (e, m) ->
-                api.service().reports().enrichmentReport(enrichJob(api, m), window(e)));
+                HostContext.of(api).service().reports().enrichmentReport(enrichJob(api, m), window(e)));
     }
 
     /** The enrichment service, or a 404 when no enrichment jobs are registered. */
     private EnrichmentService enrichment(ApiContext api) {
-        return api.service().enrichmentService()
+        return HostContext.of(api).service().enrichmentService()
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no enrichment jobs registered"));
     }
 
@@ -114,7 +114,7 @@ final class EnrichmentRoutes implements RouteModule {
         } catch (RuntimeException invalid) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "config is not a valid enrichment: " + invalid.getMessage());
         }
-        api.service().registerEnrichment(cfg);
+        HostContext.of(api).service().registerEnrichment(cfg);
 
         EnrichmentService.JobView view = enrichment(api).views().stream()
                 .filter(v -> v.name().equals(cfg.name())).findFirst().orElse(null);
@@ -154,7 +154,7 @@ final class EnrichmentRoutes implements RouteModule {
         for (EnrichmentConfig.Reference r : cfg.references())
             if (!r.byName()) WriteGates.jailToAllowedRoots(r.path(), "references." + r.name() + ".path");
         try {
-            return EnrichmentEngine.preview(cfg, sampleRows, api.service().loadedPipelines(), PREVIEW_LIMIT).toMap();
+            return EnrichmentEngine.preview(cfg, sampleRows, HostContext.of(api).service().loadedPipelines(), PREVIEW_LIMIT).toMap();
         } catch (Exception compute) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "enrichment preview failed on the sample: " + DuckDbUtil.withoutPendingQueryPreamble(compute.getMessage()));
         }

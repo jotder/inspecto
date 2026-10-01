@@ -89,8 +89,8 @@ final class SchedulerRoutes implements RouteModule {
             broker.setPools(sys.pools());
             IntakeGovernor.shared().setGlobalPolicy(effectiveIntake(sys));
             installResourceCaps(api, sys);
-            if (api.spaces() != null) {
-                for (SpaceContext s : api.spaces().all()) {
+            if (HostContext.of(api).spaces() != null) {
+                for (SpaceContext s : HostContext.of(api).spaces().all()) {
                     Path cfg = s.root().config();
                     if (cfg == null) continue;
                     SchedulerSettings ss = SchedulerSettings.read(cfg.resolve(SchedulerSettings.FILE));
@@ -189,7 +189,7 @@ final class SchedulerRoutes implements RouteModule {
         int total = 0;
         try {
             IntakeGovernor gov = IntakeGovernor.shared();
-            for (var p : api.service().pipelines()) {
+            for (var p : HostContext.of(api).service().pipelines()) {
                 IntakeGovernor.Policy policy = gov.policyFor(p.name());
                 if (!policy.active()) continue;                       // admission control off for it
                 int cap = gov.capFor(p.name());
@@ -268,9 +268,9 @@ final class SchedulerRoutes implements RouteModule {
         // install also covers spaces created AFTER this call: a new JobService constructs its bound
         // from effectiveMaxConcurrentRuns(), so it cannot silently revert to the property.
         com.gamma.job.JobService.installMaxConcurrentRuns(ss.maxConcurrentJobRuns());
-        if (api.spaces() == null) return;
+        if (HostContext.of(api).spaces() == null) return;
         int effective = com.gamma.job.JobService.effectiveMaxConcurrentRuns();
-        for (SpaceContext s : api.spaces().all())
+        for (SpaceContext s : HostContext.of(api).spaces().all())
             s.service().jobService().ifPresent(j -> j.setMaxConcurrentRuns(effective));
     }
 
@@ -358,7 +358,7 @@ final class SchedulerRoutes implements RouteModule {
             // instance, while current() routes by the thread's space MDC and falls back to global —
             // so a bare /system/scheduler call would file the entry in a log the operator's /events
             // view never reads. Same seam PipelineRoutes uses for PIPELINE_RENAMED.
-            api.service().eventLog().emit(b);
+            HostContext.of(api).service().eventLog().emit(b);
         } catch (RuntimeException ignore) {
             // best effort — a settings change that succeeded must not fail on its own journal entry
         }
@@ -450,7 +450,7 @@ final class SchedulerRoutes implements RouteModule {
     private static Path systemDocPath(ApiContext api) {
         String dir = System.getProperty("system.config.dir");
         if (dir != null && !dir.isBlank()) return Path.of(dir).resolve(SchedulerSettings.FILE);
-        Path container = api.spaces() != null ? api.spaces().containerRoot() : null;
+        Path container = HostContext.of(api).spaces() != null ? HostContext.of(api).spaces().containerRoot() : null;
         if (container != null) return container.resolve(SchedulerSettings.FILE);
         Path wr = api.writeRoot();
         return wr == null ? null : wr.resolve(SchedulerSettings.FILE);
@@ -475,8 +475,8 @@ final class SchedulerRoutes implements RouteModule {
         m.put("id", spaceId);
         // The cadences in force on this space's running timers (hot-applied; -D-seeded when unstated).
         try {
-            m.put("effectivePollSeconds", api.service().pollSeconds());
-            m.put("effectiveAcquirePollSeconds", api.service().acquirePollSeconds());
+            m.put("effectivePollSeconds", HostContext.of(api).service().pollSeconds());
+            m.put("effectiveAcquirePollSeconds", HostContext.of(api).service().acquirePollSeconds());
         } catch (RuntimeException noService) {
             // no space bound (fresh hosted deployment) — cadence has no meaning yet
         }
@@ -509,10 +509,10 @@ final class SchedulerRoutes implements RouteModule {
         // The space tier has no -D fallback: a cleared cap reverts, live, to unbounded.
         ConcurrencyBroker.shared().setSpaceCap(EventLog.currentSpaceId(), cap != null ? cap : 0);
         if (body.containsKey("pollSeconds"))
-            api.service().reschedulePoll(poll != null ? poll : Long.getLong("service.poll.seconds", 60L));
+            HostContext.of(api).service().reschedulePoll(poll != null ? poll : Long.getLong("service.poll.seconds", 60L));
         if (body.containsKey("acquirePollSeconds"))
-            api.service().rescheduleAcquire(acquire != null ? acquire
-                    : Long.getLong("acquire.pollSeconds", api.service().pollSeconds()));
+            HostContext.of(api).service().rescheduleAcquire(acquire != null ? acquire
+                    : Long.getLong("acquire.pollSeconds", HostContext.of(api).service().pollSeconds()));
         journal(api, ex, "space", EventLog.currentSpaceId(), stored, next);
         log.info("Space '{}' scheduler settings applied: cap={} poll={}s acquire={}s",
                 EventLog.currentSpaceId(), cap, poll, acquire);

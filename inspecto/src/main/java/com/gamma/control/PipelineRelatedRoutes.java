@@ -37,7 +37,7 @@ final class PipelineRelatedRoutes implements RouteModule {
     private Object related(ApiContext api, HttpExchange ex, String name) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline related");
         String id = WriteGates.safeName(name, "pipeline name");
-        PipelineConfig cfg = api.service().configFor(id)
+        PipelineConfig cfg = HostContext.of(api).service().configFor(id)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + id + "'"));
         return PipelineRelated.toJson(PipelineRelated.of(writeRoot, cfg, limit(ex)));
     }
