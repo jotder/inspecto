@@ -65,6 +65,7 @@ import {
     ServerIdMap,
     countDropped,
     droppedNotice,
+    truncationNotice,
     toCommunityMap,
     toGroups,
     toNodeScores,
@@ -354,8 +355,18 @@ export class LinkAnalysisToolboxComponent {
     readonly cycles = signal<GraphSelection[]>([]);
     readonly cutNodes = signal<string[]>([]);
     readonly cutEdges = signal<string[]>([]);
+    /** The id map (= Working Set) each server cut-points half was computed for; null = none, or a local run. */
+    private cutNodesMap: ServerIdMap | null = null;
+    private cutEdgesMap: ServerIdMap | null = null;
     /** The sentence for a server result the canvas could not fully show ('' = it showed all of it, or no server result). */
     readonly serverDropped = signal('');
+    /** The sentence for a COMPLETED server result the server cut at its result cap ('' = not cut, or no server result). */
+    readonly serverTruncated = signal('');
+
+    private clearServerNotices(): void {
+        this.serverDropped.set('');
+        this.serverTruncated.set('');
+    }
     readonly cohesionMetric = signal<'k-core' | 'triangles' | 'cliques'>('k-core');
     readonly cohesionRanking = signal<NodeScore[]>([]);
     readonly cliquesResult = signal<string[][]>([]);
@@ -464,10 +475,11 @@ export class LinkAnalysisToolboxComponent {
         const map = this.serverIds();
         if (!map) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         this.applyServerAnswer(r, map);
         // The analyst must be told when the canvas could not show all of a result (it drops ids it does not draw).
         this.serverDropped.set(droppedNotice(countDropped(r, map)));
+        this.serverTruncated.set(truncationNotice(r));
     }
 
     private applyServerAnswer(r: GraphRunResult, map: ServerIdMap): void {
@@ -502,16 +514,23 @@ export class LinkAnalysisToolboxComponent {
                 return this.applyAllPaths((r.selections ?? []).map((s) => toSelection(s, map)));
             case 'findCycles':
                 return this.applyCycles((r.selections ?? []).map((s) => toSelection(s, map)));
-            case 'articulationPoints':
-                return this.applyCutPoints(
-                    (r.ids ?? []).map((id) => map.node(id)).filter((id): id is string => !!id),
-                    this.cutEdges(),
-                );
-            case 'bridges':
-                return this.applyCutPoints(
-                    this.cutNodes(),
-                    (r.ids ?? []).map((id) => map.edge(id)).filter((id): id is string => !!id),
-                );
+            case 'articulationPoints': {
+                // The other half only counts if the SAME id map (= the same Working Set) produced it; else it is stale.
+                const nodes = (r.ids ?? []).map((id) => map.node(id)).filter((id): id is string => !!id);
+                const edgesKnown = this.cutEdgesMap === map;
+                this.applyCutPoints(nodes, edgesKnown ? this.cutEdges() : [], edgesKnown ? 'both' : 'nodes');
+                this.cutNodesMap = map;
+                this.cutEdgesMap = edgesKnown ? map : null;
+                return;
+            }
+            case 'bridges': {
+                const edges = (r.ids ?? []).map((id) => map.edge(id)).filter((id): id is string => !!id);
+                const nodesKnown = this.cutNodesMap === map;
+                this.applyCutPoints(nodesKnown ? this.cutNodes() : [], edges, nodesKnown ? 'both' : 'edges');
+                this.cutEdgesMap = map;
+                this.cutNodesMap = nodesKnown ? map : null;
+                return;
+            }
             case 'maximumSpanningForest':
                 return this.applySpanningForest(toSelection(r.selection ?? { nodeIds: [], edgeIds: [] }, map));
         }
@@ -535,6 +554,8 @@ export class LinkAnalysisToolboxComponent {
         this.cycles.set([]);
         this.cutNodes.set([]);
         this.cutEdges.set([]);
+        this.cutNodesMap = null;
+        this.cutEdgesMap = null;
         this.cohesionRanking.set([]);
         this.cliquesResult.set([]);
         this.similarityResult.set([]);
@@ -543,7 +564,7 @@ export class LinkAnalysisToolboxComponent {
         this.spanningForest.set(null);
         this.suspicion.set([]);
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         this.pathFrom.set('');
         this.pathTo.set('');
         this.explainFor.set('');
@@ -617,7 +638,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g || !this.pathFrom() || !this.pathTo()) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         this.applyPath(
             this.pathMetric() === 'weighted'
                 ? weightedShortestPath(g, this.pathFrom(), this.pathTo())
@@ -649,7 +670,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         try {
             this.applyRanking(this.centralityScores(g));
         } catch (err) {
@@ -692,7 +713,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         let byNode: Map<string, string>;
         try {
             byNode = this.communityMethod() === 'louvain' ? louvainCommunities(g) : detectCommunities(g);
@@ -726,7 +747,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g || !this.pathFrom() || !this.pathTo()) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         this.applyAllPaths(allPaths(g, this.pathFrom(), this.pathTo()));
     }
 
@@ -772,7 +793,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         this.components.set(connectedComponents(g));
     }
 
@@ -795,7 +816,7 @@ export class LinkAnalysisToolboxComponent {
         this.patternSteps.set(pack.steps.map((s) => ({ ...s })));
         this.patternMatches.set([]);
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
     }
 
     addPatternStep(): void {
@@ -835,7 +856,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         const stages = this.branchStages();
         if (stages) {
             this.runBranching(g, stages);
@@ -915,7 +936,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         this.applyCycles(findCycles(g));
     }
 
@@ -945,16 +966,25 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
-        this.applyCutPoints(articulationPoints(g), bridges(g));
+        this.clearServerNotices();
+        this.cutNodesMap = null;
+        this.cutEdgesMap = null;
+        this.applyCutPoints(articulationPoints(g), bridges(g), 'both');
     }
 
-    private applyCutPoints(nodes: string[], edges: string[]): void {
+    /** `ran` = which halves this answer actually computed; "No cut points" is only claimed when both were. */
+    private applyCutPoints(nodes: string[], edges: string[], ran: 'both' | 'nodes' | 'edges'): void {
         this.cutNodes.set(nodes);
         this.cutEdges.set(edges);
         if (!nodes.length && !edges.length) {
             this.emphasisChange.emit(null);
-            this.analysisError.set('No cut points — the graph has no single points of failure.');
+            this.analysisError.set(
+                ran === 'both'
+                    ? 'No cut points — the graph has no single points of failure.'
+                    : ran === 'nodes'
+                      ? 'No articulation nodes found — links (bridges) have not been checked for this Working Set yet.'
+                      : 'No bridges found — nodes (articulation) have not been checked for this Working Set yet.',
+            );
             return;
         }
         this.emphasisChange.emit({ nodeIds: nodes, edgeIds: edges });
@@ -966,7 +996,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         try {
             if (this.cohesionMetric() === 'cliques') {
                 this.applyCliques(cliques(g));
@@ -1004,7 +1034,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g || !this.similarityFor()) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         this.similarityResult.set(
             jaccardSimilarity(g, this.similarityFor())
                 .filter((s) => s.score > 0)
@@ -1017,7 +1047,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         try {
             this.applyPredictions(linkPrediction(g));
         } catch (err) {
@@ -1041,7 +1071,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g || !this.flowFrom() || !this.flowTo()) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         try {
             this.applyFlow(maxFlow(g, this.flowFrom(), this.flowTo()));
         } catch (err) {
@@ -1061,7 +1091,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         this.applySpanningForest(maximumSpanningForest(g));
     }
 
@@ -1077,7 +1107,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
-        this.serverDropped.set('');
+        this.clearServerNotices();
         try {
             this.applySuspicion(suspicionScore(g));
         } catch (err) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GraphRunView, WorkingSet } from 'app/inspecto/api';
+import { GraphRunResult, GraphRunView, WorkingSet } from 'app/inspecto/api';
 import { EntityProjection } from 'app/inspecto/graph';
 import {
     budgetNextAction,
@@ -12,6 +12,7 @@ import {
     toPredictedLinks,
     toSelection,
     toSuspicionScores,
+    truncationNotice,
 } from './graph-run-apply';
 import { workingSetToGraph } from './investigation-state';
 
@@ -287,6 +288,48 @@ describe('countDropped / droppedNotice (LA-GRAPH-RUN-HIDDEN-NODES-1)', () => {
         );
         expect(droppedNotice({ nodes: { dropped: 1, total: 3 }, edges: { dropped: 1, total: 2 } })).toBe(
             '1 of 3 result nodes and 1 of 2 result links are not drawn on the canvas right now, so the result shown here leaves them out.',
+        );
+    });
+});
+
+describe('truncationNotice (D1 - never a silent cap)', () => {
+    const r = (more: Partial<GraphRunResult>): GraphRunResult => ({
+        algorithm: 'x',
+        kind: 'SCORES',
+        dropped: 0,
+        elapsedMs: 1,
+        ...more,
+    });
+    const tail = '(the server cap is 2; raise graph_run.max_result_items in Settings).';
+
+    it('is empty for a whole result', () => {
+        const whole = { scores: { total: 3, returned: 3, limit: 10, truncated: false } };
+        expect(truncationNotice(r({ truncated: false, lists: whole }))).toBe('');
+        expect(truncationNotice(r({}))).toBe('');
+    });
+
+    it('names the kept and total counts and the cap for a cut list', () => {
+        const lists = { scores: { total: 25311, returned: 10000, limit: 10000, truncated: true } };
+        expect(truncationNotice(r({ truncated: true, lists }))).toBe(
+            'Showing the first 10,000 of 25,311 scores (the server cap is 10,000; raise graph_run.max_result_items in Settings).',
+        );
+    });
+
+    it('words nested cuts plainly and joins several lists', () => {
+        const lists = {
+            'selection.nodeIds': { total: 9, returned: 2, limit: 2, truncated: true },
+            'selections[2].edgeIds': { total: 7, returned: 2, limit: 2, truncated: true },
+            hubs: { total: 4, returned: 2, limit: 2, truncated: true },
+        };
+        expect(truncationNotice(r({ truncated: true, lists }))).toBe(
+            `Showing the first 2 of 9 nodes of the selection; the first 2 of 7 links of selection 3; the first 2 of 4 hubs ${tail}`,
+        );
+    });
+
+    it('says links were left out because their nodes were cut', () => {
+        const lists = { edges: { total: 3, returned: 1, limit: 2, truncated: true } };
+        expect(truncationNotice(r({ truncated: true, lists }))).toBe(
+            `Showing 1 of 3 links (links whose nodes were cut are left out) ${tail}`,
         );
     });
 });

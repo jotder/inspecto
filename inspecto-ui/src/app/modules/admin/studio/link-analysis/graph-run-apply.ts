@@ -1,6 +1,7 @@
 import { G6GraphData, NodeScore, PredictedLink, SuspicionScore, endpointId, EntityIdMapping } from 'app/inspecto/graph';
 import {
     GraphBudgetView,
+    GraphListCut,
     GraphPredictedLinkView,
     GraphRunResult,
     GraphRunView,
@@ -210,4 +211,54 @@ export function droppedNotice(c: DroppedCounts): string {
     return parts.length
         ? `${parts.join(' and ')} are not drawn on the canvas right now, so the result shown here leaves them out.`
         : '';
+}
+
+/** What a list key of `GraphResultJson.lists` holds, in the analyst's words. */
+const LIST_NOUN: Record<string, string> = {
+    scores: 'scores',
+    hubs: 'hubs',
+    authorities: 'authorities',
+    groups: 'groups',
+    ids: 'results',
+    communities: 'community assignments',
+    links: 'predicted links',
+    selections: 'selections',
+    nodes: 'nodes',
+    edges: 'links',
+};
+
+function cutPhrase(key: string, c: GraphListCut): string {
+    const n = (v: number) => v.toLocaleString('en-US');
+    // `groups[0]`, `selections[2].nodeIds`, `selection.edgeIds`, `minCut.nodeIds`: a list nested inside another.
+    const nested = /^(\w+?)(?:\[(\d+)\])?(?:\.(nodeIds|edgeIds))?$/.exec(key);
+    const base = nested?.[1] ?? key;
+    const index = nested?.[2] === undefined ? null : Number(nested[2]) + 1;
+    const part = nested?.[3] === 'nodeIds' ? 'nodes' : nested?.[3] === 'edgeIds' ? 'links' : null;
+    // Fewer than the limit came back: the rest were left out because they depend on something cut (a link whose node was cut).
+    const shown =
+        c.returned < c.limit ? `${n(c.returned)} of ${n(c.total)}` : `the first ${n(c.returned)} of ${n(c.total)}`;
+    if (part) {
+        const owner =
+            index === null
+                ? `the ${base === 'minCut' ? 'minimum cut' : base}`
+                : `${base === 'groups' ? 'group' : 'selection'} ${index}`;
+        return `${shown} ${part} of ${owner}`;
+    }
+    if (index !== null) return `${shown} members of ${base === 'groups' ? 'group' : 'item'} ${index}`;
+    const tail = key === 'edges' && c.returned < c.limit ? ' (links whose nodes were cut are left out)' : '';
+    return `${shown} ${LIST_NOUN[key] ?? key}${tail}`;
+}
+
+/**
+ * Never a silent cap (the SPA half): the sentence for a COMPLETED server result the server cut at `graph_run.max_result_items`,
+ * built from `lists` (what was kept, of how many, against which limit); '' when nothing was cut.
+ */
+export function truncationNotice(r: GraphRunResult): string {
+    if (!r.truncated) return '';
+    const cuts = Object.entries(r.lists ?? {}).filter(([, c]) => c.truncated);
+    if (!cuts.length)
+        return 'The server cut this result at its cap; raise graph_run.max_result_items in Settings to see more.';
+    const limit = Math.max(...cuts.map(([, c]) => c.limit));
+    const parts = cuts.map(([k, c]) => cutPhrase(k, c)).join('; ');
+    return `Showing ${parts} (the server cap is ${limit.toLocaleString('en-US')}; raise graph_run.max_result_items in Settings).`;
 }

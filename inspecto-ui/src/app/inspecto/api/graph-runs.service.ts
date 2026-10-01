@@ -64,12 +64,24 @@ export interface GraphPredictedLinkView {
     score: number;
 }
 
+/** One list of a result as the server cut it (`GraphResultJson`): `total` is the full count, `returned` what is here. */
+export interface GraphListCut {
+    total: number;
+    returned: number;
+    limit: number;
+    truncated: boolean;
+}
+
 /** `{algorithm, kind, dropped, elapsedMs}` plus the fields of the variant `kind` names. */
 export interface GraphRunResult {
     algorithm: string;
     kind: GraphResultKind;
     dropped: number;
     elapsedMs: number;
+    /** Never a silent cap: true when ANY list below was cut at `graph_run.max_result_items`; `lists` says which and by how much. */
+    truncated?: boolean;
+    /** Per list: every top-level one, plus a nested one (`groups[0]`, `selection.nodeIds`) only when it was cut. */
+    lists?: Record<string, GraphListCut>;
     scores?: GraphScoreView[] | GraphSuspicionView[];
     hubs?: GraphScoreView[];
     authorities?: GraphScoreView[];

@@ -978,7 +978,7 @@ and measured size and exactly ONE next action ("run again with a budget of N" on
 Working Set or pick a cheaper algorithm"). On the SPA the capability is `LensService.canRunLinkGraphAnalysis`, access-catalog node
 `linkgraph.run`.
 
-**Selection algorithms (2026-10-01).** Shortest and weighted shortest path, all paths, cycles, cut points (articulation points and bridges, TWO server algorithms with one Run on server control each) and the maximum spanning forest have no browser cap of their own, so they get the same browser-first / server-above route. The ONE threshold is `selectionNodeCapValue()` in `graph-analysis.ts` (= the analysis cap, so one setting moves every decision); the toolbox lowers it to the server's per-algorithm `inlineNodeCeiling` (`serverCeilings` input, from `GET /inv/graph/algorithms`) and never raises it. The local button is replaced ONLY when a server run can really start (`serverFirst`: over the threshold, an Investigation open, the capability held); otherwise it stays, because these never refuse locally and a big query graph must not lose them. Server selections (`selection`, `selections`, `ids` - bridges name LINKS, the rest nodes) go through `applyServerResult` into the SAME `applyPath` / `applyAllPaths` / `applyCycles` / `applyCutPoints` / `applySpanningForest` the local runs call.
+**Selection algorithms (2026-10-01).** Shortest and weighted shortest path, all paths, cycles, cut points (articulation points and bridges, TWO server algorithms with one Run on server control each) and the maximum spanning forest have no browser cap of their own, so they get the same browser-first / server-above route. The ONE threshold is `selectionNodeCapValue()` in `graph-analysis.ts` (= the analysis cap, so one setting moves every decision); the toolbox lowers it to the server's per-algorithm `inlineNodeCeiling` (`serverCeilings` input, from `GET /inv/graph/algorithms`) and never raises it. The local button is replaced ONLY when a server run can really start (`serverFirst`: over the threshold, an Investigation open, the capability held); otherwise it stays, because these never refuse locally and a big query graph must not lose them. Server selections (`selection`, `selections`, `ids` - bridges name LINKS, the rest nodes) go through `applyServerResult` into the SAME `applyPath` / `applyAllPaths` / `applyCycles` / `applyCutPoints` / `applySpanningForest` the local runs call. Cut points are two server runs whose halves combine ONLY when both were computed against the same id map (= the same Working Set); a half from an earlier map is dropped, and "No cut points" is claimed only when both halves ran on this map (otherwise the message names the half that was checked).
 
 **Not drawn on the canvas.** `countDropped` / `droppedNotice` (`graph-run-apply.ts`) count the distinct node and link ids of a COMPLETED result that the id map cannot place, and the toolbox states `N of M result nodes and K of L result links are not drawn on the canvas right now`; a later browser run clears it. There is no reveal action: collapse and the kind/time filters act on the QUERY graph, not on an open Investigation's canvas, so what is missing is not collapsed. In the 2026-10-01 preview the cause was `projectTriples`' node cap dropping Working Set links (`LA-WORKING-SET-CANVAS-LINKS-1`).
 
@@ -1011,7 +1011,7 @@ betweenness and suspicion).
 * The toolbox's local runs still analyse the displayed query graph, not the Working Set, when an Investigation is open.
 * **Service lifetime.** One `GraphRunService` per Space write root, held by `GraphRunServices` (la-api): created lazily, closed by
   `ApiContext.onClose(Runnable)` (`ControlApi.close()` runs its hooks first), **or earlier** - closed and forgotten when unused for 1 h
-  (`IDLE_TTL_MS`, the finished-run retention, so closing never shortens what an analyst can still read) with no run in flight, or at once
+  (`IDLE_TTL_MS`, the finished-run retention, so closing never shortens what an analyst can still read) with no run in flight AND no run finished within that hour (`GraphRunService.lastActivityMillis()` counts a finish as use, so a result that completed after the last poll is not discarded by another Space's sweep), or at once
   when its Space's directory is gone. The sweep runs on access (touching another Space); one lock covers sweep, lookup, create and close,
   so nothing is created after close and a racing creation cannot leak. Worker threads additionally time out after 30 s idle
   (`allowCoreThreadTimeOut`), so even the only Space's idle pool holds no thread; the next run starts one. `threads`/`queue` apply when a
@@ -1025,6 +1025,11 @@ betweenness and suspicion).
   no re-run. The cut keeps the FIRST entries of the canonical-v1 order (the top of a ranking). It is always said: `result.truncated` is true
   when anything was cut and `result.lists.<name> = {total, returned, limit, truncated}` exists for every top-level list (a nested list - one
   group, one path - gets an entry such as `groups[0]` only when cut). The limit is per list, not per payload. Both keys are additive.
+  A sub-graph returns only edges whose BOTH nodes are returned (no dangling edge); when node cutting leaves edges out, `lists.edges` is
+  `{total: every edge, returned: what is here, truncated: true}`, so `returned` can be below `limit`. **The SPA says it:** a COMPLETED
+  result with `truncated` shows a warning beside the not-drawn notice (`truncationNotice` in `graph-run-apply.ts`, toolbox
+  `serverTruncated`), built from `lists`, e.g. "Showing the first 10,000 of 25,311 scores (the server cap is 10,000; raise
+  graph_run.max_result_items in Settings)"; a nested cut reads "the first 2 of 5 members of group 1".
 * A raw id sent as `from` / `to` / `node` while masking is on is not refused.
 
 **Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-GRAPH-RUN-LOCAL-WORKING-SET-1` ·

@@ -532,3 +532,139 @@ describe('LinkAnalysisToolboxComponent - selection algorithms on the server', ()
         expect(c.serverDropped()).toBe('');
     });
 });
+
+describe('LinkAnalysisToolboxComponent - the server result cap is never silent (D1)', () => {
+    afterEach(() => resetGraphLimits());
+    const over = () => configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+    const ranking = (more: Partial<GraphRunResult>): GraphRunResult => ({
+        algorithm: 'betweennessCentrality',
+        kind: 'SCORES',
+        dropped: 0,
+        elapsedMs: 4,
+        scores: [{ id: 'c', label: 'c', score: 4 }],
+        truncated: false,
+        lists: { scores: { total: 1, returned: 1, limit: 10000, truncated: false } },
+        ...more,
+    });
+    const runRanking = (result: GraphRunResult) => {
+        over();
+        const m = make({ answer: () => of(view('COMPLETED', { result })) });
+        m.c.tab.set('centrality');
+        m.c.centralityMetric.set('betweenness');
+        m.fixture.detectChanges();
+        m.button(/Run on server/)!.click();
+        m.fixture.detectChanges();
+        return m;
+    };
+
+    it('a result cut at the server cap says exactly what was cut and the cap', () => {
+        const { c, el } = runRanking(
+            ranking({
+                truncated: true,
+                lists: { scores: { total: 25311, returned: 10000, limit: 10000, truncated: true } },
+            }),
+        );
+        const text =
+            'Showing the first 10,000 of 25,311 scores (the server cap is 10,000; raise graph_run.max_result_items in Settings).';
+        expect(c.serverTruncated()).toBe(text);
+        expect(el.querySelector('[data-testid="server-truncated"]')!.textContent).toBe(text);
+    });
+
+    it('a result that was not cut shows no notice', () => {
+        const { c, el } = runRanking(ranking({}));
+        expect(c.serverTruncated()).toBe('');
+        expect(el.querySelector('[data-testid="server-truncated"]')).toBeNull();
+    });
+
+    it('a list nested inside another (one group) is worded plainly, and a reset clears it', () => {
+        over();
+        const { fixture, c, el, button } = make({
+            answer: () =>
+                of(
+                    view('COMPLETED', {
+                        result: {
+                            algorithm: 'cliques',
+                            kind: 'GROUPS',
+                            dropped: 0,
+                            elapsedMs: 1,
+                            groups: [['a', 'b', 'c']],
+                            truncated: true,
+                            lists: {
+                                groups: { total: 1, returned: 1, limit: 2, truncated: false },
+                                'groups[0]': { total: 5, returned: 2, limit: 2, truncated: true },
+                            },
+                        },
+                    }),
+                ),
+        });
+        c.tab.set('cohesion');
+        c.cohesionMetric.set('cliques');
+        fixture.detectChanges();
+        button(/Run on server/)!.click();
+        fixture.detectChanges();
+        expect(c.serverTruncated()).toBe(
+            'Showing the first 2 of 5 members of group 1 (the server cap is 2; raise graph_run.max_result_items in Settings).',
+        );
+        expect(el.querySelector('[data-testid="server-truncated"]')).not.toBeNull();
+        c.reset();
+        expect(c.serverTruncated()).toBe('');
+    });
+});
+
+describe('LinkAnalysisToolboxComponent - a server cut-points answer never combines with another Working Set (D2)', () => {
+    afterEach(() => resetGraphLimits());
+    const result = (more: Partial<GraphRunResult>): GraphRunResult => ({
+        algorithm: 'x',
+        kind: 'IDS',
+        dropped: 0,
+        elapsedMs: 1,
+        ...more,
+    });
+
+    it('articulation on one Working Set, then bridges on another: the bridges answer carries no old cut nodes', () => {
+        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        const answers: Record<string, GraphRunResult> = {
+            articulationPoints: result({ algorithm: 'articulationPoints', ids: ['b', 'c'] }),
+            bridges: result({ algorithm: 'bridges', ids: [linkId('a', 'b', 'calls')] }),
+        };
+        const { fixture, c, el, last } = make({
+            answer: (req) => of(view('COMPLETED', { result: answers[req.algorithm] })),
+        });
+        c.tab.set('cut-points');
+        fixture.detectChanges();
+        const controls = () => el.querySelectorAll<HTMLButtonElement>('[data-testid="run-on-server"]');
+        controls()[0].click();
+        fixture.detectChanges();
+        expect(c.cutNodes()).toEqual(['b', 'c'].map(nodeId));
+        // the Working Set changed: the host rebuilds the id map (a new object)
+        fixture.componentRef.setInput('serverIds', buildServerIdMap(WS, P, CANVAS));
+        fixture.detectChanges();
+        controls()[1].click();
+        fixture.detectChanges();
+        expect(c.cutEdges()).toEqual([edgeId('a', 'b')]);
+        expect(c.cutNodes()).toEqual([]);
+        expect(last()?.nodeIds).toEqual([]);
+        expect(last()?.edgeIds).toEqual([edgeId('a', 'b')]);
+    });
+
+    it('"No cut points" is claimed only when both halves were checked on this Working Set', () => {
+        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        const answers: Record<string, GraphRunResult> = {
+            articulationPoints: result({ algorithm: 'articulationPoints', ids: [] }),
+            bridges: result({ algorithm: 'bridges', ids: [] }),
+        };
+        const { fixture, c, el } = make({
+            answer: (req) => of(view('COMPLETED', { result: answers[req.algorithm] })),
+        });
+        c.tab.set('cut-points');
+        fixture.detectChanges();
+        const controls = () => el.querySelectorAll<HTMLButtonElement>('[data-testid="run-on-server"]');
+        controls()[0].click();
+        fixture.detectChanges();
+        expect(c.analysisError()).not.toContain('No cut points');
+        expect(c.analysisError()).toContain('No articulation nodes found');
+        controls()[1].click();
+        fixture.detectChanges();
+        expect(c.analysisError()).toContain('No cut points');
+    });
+});

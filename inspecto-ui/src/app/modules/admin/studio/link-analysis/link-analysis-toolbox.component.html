@@ -3,6 +3,11 @@
         ><span data-testid="server-dropped">{{ serverDropped() }}</span></inspecto-alert
     >
 }
+@if (serverTruncated()) {
+    <inspecto-alert variant="warning" title="The server cut this result"
+        ><span data-testid="server-truncated">{{ serverTruncated() }}</span></inspecto-alert
+    >
+}
 @if (analysisError()) {
     <inspecto-alert variant="warning" title="Analysis">{{ analysisError() }}</inspecto-alert>
 }
