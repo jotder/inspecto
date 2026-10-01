@@ -144,6 +144,16 @@ public final class Roles {
     public static final String CAN_APPROVE_LINK_EXPANSIONS = "canApproveLinkExpansions";
 
     /**
+     * Starting a server-side graph run over an Investigation's Working Set ({@code POST /inv/graph/runs}, LA separation
+     * D-4 step 6): a run spends compute (a worker slot and up to its budget's time and memory), which a read does not.
+     * Granted in {@link #SEED} to the roles that already own Investigations through {@link #CAN_MANAGE_INCIDENTS}
+     * ({@code operations}, {@code support}, {@code power}, {@code admin}); {@code super} holds everything. Reading a run
+     * and listing runs need no capability - they inherit the Investigation's own access - and cancelling is the run's
+     * starter or an administrator, enforced by the service.
+     */
+    public static final String CAN_RUN_LINK_GRAPH_ANALYSIS = "canRunLinkGraphAnalysis";
+
+    /**
      * Approving (or declining) a <b>Pending Change</b> — a config change an approval policy held
      * (`ASSURE-MAKER-CHECKER-1`, {@code POST /pending-changes/{id}/approve | decline}). A per-kind policy may
      * demand a further capability on top ({@code approverCapability}); with {@code fourEyes} the approver must
@@ -197,7 +207,8 @@ public final class Roles {
         Set<String> builder = Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_REQUEST_SHARES);
         // Opening an Incident is triage work, so Operations/Support get it with their run duties — and working
         // one (ack / resolve / transition / assign) since 2026-09-26, so an analyst can close their own Case.
-        Set<String> ops = Set.of(CAN_OPERATE_RUNS, CAN_REQUEST_SHARES, CAN_MANAGE_INCIDENTS, CAN_WORK_INCIDENTS);
+        Set<String> ops = Set.of(CAN_OPERATE_RUNS, CAN_REQUEST_SHARES, CAN_MANAGE_INCIDENTS, CAN_WORK_INCIDENTS,
+                CAN_RUN_LINK_GRAPH_ANALYSIS);
         Map<String, Def> m = new LinkedHashMap<>();
         m.put("pipeline-developer", new Def(builder, null));
         m.put("app-developer", new Def(builder, null));
@@ -209,10 +220,10 @@ public final class Roles {
         m.put("admin", new Def(Set.of(CAN_ONBOARD_CONNECTIONS, CAN_CONFIGURE_ACCESS, CAN_APPROVE_SHARES,
                 CAN_OFFER_DATASETS, CAN_OFFER_SIGNALS, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_ADMINISTER,
                 CAN_MANAGE_INCIDENTS, CAN_WORK_INCIDENTS, CAN_REVEAL_LINK_ENTITIES, CAN_APPROVE_LINK_EXPANSIONS,
-                CAN_APPROVE_CHANGES), null));
+                CAN_APPROVE_CHANGES, CAN_RUN_LINK_GRAPH_ANALYSIS), null));
         m.put("power", new Def(Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_OPERATE_RUNS,
                 CAN_REQUEST_SHARES, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_MANAGE_INCIDENTS,
-                CAN_WORK_INCIDENTS), null));
+                CAN_WORK_INCIDENTS, CAN_RUN_LINK_GRAPH_ANALYSIS), null));
         m.put("super", new Def(KNOWN_CAPABILITIES, null));
         m.put("business", new Def(Set.of(CAN_TRIAGE_REQUIREMENTS), null));
         return java.util.Collections.unmodifiableMap(m);   // keeps seed iteration order

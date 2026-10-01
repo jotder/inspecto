@@ -61,6 +61,9 @@ final class CapabilityManifest {
             new Entry("POST", "/inv/investigations/([^/]+)/reveal", Roles.CAN_REVEAL_LINK_ENTITIES),
             new Entry("POST", "/inv/investigations/([^/]+)/pending/([^/]+)/approve", Roles.CAN_APPROVE_LINK_EXPANSIONS),
             new Entry("POST", "/inv/investigations/([^/]+)/pending/([^/]+)/deny", Roles.CAN_APPROVE_LINK_EXPANSIONS),
+            // GraphRunRoutes (LA separation D-4 step 6) - starting a graph run spends compute; reading, listing and
+            // cancelling one are not gated by a capability (they inherit the Investigation's access / the run's owner).
+            new Entry("POST", "/inv/graph/runs", Roles.CAN_RUN_LINK_GRAPH_ANALYSIS),
             // ActionRequestRoutes (ASSURE-ACTION-REQUESTS-1) — proposing an outbound call from an Incident / Case is
             // working it; approving, declining and retrying one is oversight, the Pending Change capability reused
             // (four-eyes enforced in the handler, always).
@@ -397,6 +400,7 @@ final class CapabilityManifest {
             new Exemption("POST", "/notifications/([^/]+)/unread", "self-service", "marks one notification unread in the CALLER's own NotificationReadState only — pinned by ControlApiNotificationsTest.readStateIsPerSubject"),
             new Exemption("POST", "/pending-changes/([^/]+)/withdraw", "self-service", "only the AUTHOR of a Pending Change may withdraw it — the handler's author check is the gate (403 for anyone else, 403 with no Subject), so no capability could add anything; ASSURE-MAKER-CHECKER-RESIDUALS-1 (2) — pinned by ControlApiPendingChangesTest.onlyTheAuthorWithdrawsTheirOwnPendingChange"),
             new Exemption("PUT", "/notifications/preferences", "self-service", "writes the CALLER's own override in NotificationPreferenceOverrides, keyed by Subject id (the default is PUT /notifications/preferences/default, canAdminister); on Personal there is one user and it writes the single grid — pinned by ControlApiSubjectPreferencesTest.oneSubjectsPutNeverChangesAnotherSubjectsEffectiveGrid"),
+            new Exemption("POST", "/inv/graph/runs/([^/]+)/cancel", "self-service", "stops a graph run only for its STARTER or an administrator - GraphRunService.cancel is the gate (403 for anyone else, 409 once finished), so no capability could add anything; a cancel frees compute and returns no data - pinned by ControlApiGraphRunTest.theStarterAndAnAdministratorCanCancelARunningJobAnd409AfterItFinished and anotherSubjectCannotStartReadListOrCancelYourRun"),
             // §4 read-shaped POST — a POST because the request carries a body, persists nothing. Reads are
             // open by design, so these are exempt AS READS (operator, 2026-09-15) — not "deferred".
             new Exemption("POST", "/components/transform/([^/]+)/test", "read-shaped", "dry-runs a saved component against sample rows"),
