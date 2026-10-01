@@ -1,5 +1,5 @@
 import { WorkingSetRelation, WorkingSetRelationName } from 'app/inspecto/api';
-import type { WorkingSetBinding } from '../widgets/widget-types';
+import type { WorkingSetBinding } from 'app/inspecto/la-host';
 
 /**
  * LA-21 — the pure half of the **Working Set Widget** (decision D-E6): reading a binding, measuring drift between the

@@ -1,12 +1,13 @@
+import { NgComponentOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { G6GraphData } from 'app/inspecto/graph';
+import { LA_DASHBOARD_HEADER } from 'app/inspecto/la-host';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { GraphViewComponent } from 'app/inspecto/graph/graph-view.component';
 import { LinkAnalysisService, LinkAnalysisView, SAVED_VIEW_NOT_EVIDENCE } from './link-analysis.service';
 import { GraphSourcesService } from './graph-sources';
 import { legendEdgeKindsFor, legendItemsFor, LinkAnalysisLegendComponent } from './link-analysis-overlays.component';
-import { DashboardHeaderComponent } from '../dashboards/dashboard-header.component';
 
 /**
  * Read-only **Link analysis widget** host (Phase 4): renders a saved `link-analysis-view` Component on a
@@ -23,17 +24,19 @@ import { DashboardHeaderComponent } from '../dashboards/dashboard-header.compone
     selector: 'app-link-view-widget',
     standalone: true,
     imports: [
-        DashboardHeaderComponent,
         GraphViewComponent,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
         LinkAnalysisLegendComponent,
+        NgComponentOutlet,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <div class="flex h-full min-h-0 flex-col">
-            @if (showDescription()) {
-                <app-dashboard-header class="mb-2 block shrink-0 empty:hidden" [header]="header()" />
+            @if (showDescription() && header().description) {
+                <div class="mb-2 block shrink-0">
+                    <ng-container *ngComponentOutlet="headerComponent; inputs: { header: header() }" />
+                </div>
             }
             @if (error(); as message) {
                 <inspecto-alert class="block" variant="warning">{{ message }}</inspecto-alert>
@@ -73,6 +76,7 @@ export class LinkViewWidgetComponent {
     readonly savedViewNotice = SAVED_VIEW_NOT_EVIDENCE;
     private linkAnalysisApi = inject(LinkAnalysisService);
     private graphSources = inject(GraphSourcesService);
+    protected readonly headerComponent = inject(LA_DASHBOARD_HEADER);
 
     /** The saved `link-analysis-view` id this widget renders (the widget's binding). */
     readonly viewId = input<string | undefined>(undefined);

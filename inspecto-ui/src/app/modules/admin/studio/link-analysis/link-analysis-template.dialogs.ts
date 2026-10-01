@@ -27,7 +27,7 @@ import { AttributeOptionLoader, InspectoSchemaFormComponent } from 'app/inspecto
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
-import { DatasetsService } from '../datasets/datasets.service';
+import { LA_DATASETS } from 'app/inspecto/la-host';
 import { investigationErrorMessage } from './investigation-state';
 import { SAFE_ID_PATTERN, templatePreview } from './investigation-template';
 
@@ -202,7 +202,7 @@ export class SaveTemplateDialog {
 
 /** Columns of the Dataset a sibling field names — declared, else probed (the query panel's own rule). */
 function datasetColumnLoader(sourceKey: string): AttributeOptionLoader {
-    const datasets = inject(DatasetsService);
+    const datasets = inject(LA_DATASETS);
     const rows = inject(DatasetRowsService);
     return async (v) => {
         const id = String(v[sourceKey] ?? '').trim();

@@ -4,10 +4,7 @@ import { CatalogService, InvService, PipelinesService } from 'app/inspecto/api';
 import { G6GraphData, GraphSource, GraphSourceQuery, mergeGraphs } from 'app/inspecto/graph';
 import { deriveComponentGraph } from 'app/inspecto/component-model';
 import { toG6Data } from 'app/inspecto/graph/catalog-graph';
-import { ComponentsDataProvider } from 'app/modules/admin/catalog/components-data-provider';
-import { REGISTRY_KINDS } from 'app/modules/admin/catalog/registry.component';
-import { provenanceCounts, toPipelineG6Data } from 'app/modules/admin/pipelines/pipeline-graph';
-import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
+import { LA_CATALOG, LA_DATASETS, LA_PIPELINE_GRAPH, LaCatalog, LaPipelineGraph } from 'app/inspecto/la-host';
 import { EntityProjectionGraphSource, MultiProjectionGraphSource } from './entity-projection';
 
 /**
@@ -61,10 +58,10 @@ export class LineageGraphSource implements GraphSource {
 export class ComponentRegistryGraphSource implements GraphSource {
     readonly id = 'component-registry' as const;
     readonly label = 'Components (reuse graph)';
-    constructor(private provider: ComponentsDataProvider) {}
+    constructor(private provider: LaCatalog) {}
 
     async query(_q: GraphSourceQuery): Promise<G6GraphData> {
-        const settled = await Promise.allSettled(REGISTRY_KINDS.map((k) => this.provider.list(k)));
+        const settled = await Promise.allSettled(this.provider.kinds.map((k) => this.provider.list(k)));
         const components = settled.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
         return deriveComponentGraph({ components });
     }
@@ -74,7 +71,10 @@ export class ComponentRegistryGraphSource implements GraphSource {
 export class PipelineGraphSource implements GraphSource {
     readonly id = 'provenance' as const;
     readonly label = 'Pipeline (provenance)';
-    constructor(private pipelines: PipelinesService) {}
+    constructor(
+        private pipelines: PipelinesService,
+        private graph: LaPipelineGraph,
+    ) {}
 
     async query(q: GraphSourceQuery): Promise<G6GraphData> {
         const roots = q.roots?.length ? q.roots : q.from ? [q.from] : [];
@@ -85,11 +85,11 @@ export class PipelineGraphSource implements GraphSource {
 
     private async queryOne(pipeline: string, counts?: boolean): Promise<G6GraphData> {
         const g = await firstValueFrom(this.pipelines.graph(pipeline));
-        if (!counts) return toPipelineG6Data(g);
+        if (!counts) return this.graph.toG6Data(g);
         const batches = await firstValueFrom(this.pipelines.provenanceBatches(pipeline)).catch(() => []);
-        if (!batches.length) return toPipelineG6Data(g);
+        if (!batches.length) return this.graph.toG6Data(g);
         const rows = await firstValueFrom(this.pipelines.provenance(pipeline, batches[0].batchId)).catch(() => []);
-        return toPipelineG6Data(g, provenanceCounts(rows));
+        return this.graph.toG6Data(g, this.graph.provenanceCounts(rows));
     }
 }
 
@@ -98,8 +98,9 @@ export class PipelineGraphSource implements GraphSource {
 export class GraphSourcesService {
     private catalog = inject(CatalogService);
     private pipelines = inject(PipelinesService);
-    private components = inject(ComponentsDataProvider);
-    private datasets = inject(DatasetsService);
+    private components = inject(LA_CATALOG);
+    private datasets = inject(LA_DATASETS);
+    private pipelineGraph = inject(LA_PIPELINE_GRAPH);
     private inv = inject(InvService);
 
     readonly sources: GraphSource[] = [
@@ -107,7 +108,7 @@ export class GraphSourcesService {
         new MultiProjectionGraphSource(this.inv),
         new LineageGraphSource(this.catalog),
         new ComponentRegistryGraphSource(this.components),
-        new PipelineGraphSource(this.pipelines),
+        new PipelineGraphSource(this.pipelines, this.pipelineGraph),
     ];
 
     byId(id: string): GraphSource | undefined {

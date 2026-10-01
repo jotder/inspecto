@@ -28,7 +28,7 @@ import {
 } from 'app/inspecto/api';
 import { firstValueFrom } from 'rxjs';
 import { CHART_CATEGORICAL_NEUTRAL } from 'app/inspecto/theme/chart-tokens';
-import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
+import type { LaDatasets } from 'app/inspecto/la-host';
 
 /**
  * The P3 **entity-projection** GraphSource (GLOSSARY §11): fold a Dataset's rows into a business
@@ -279,7 +279,7 @@ export class EntityProjectionGraphSource implements GraphSource {
     readonly id = 'entity-projection' as const;
     readonly label = 'Entity/Link (from a Dataset)';
     constructor(
-        private datasets: DatasetsService,
+        private datasets: LaDatasets,
         private inv: InvService,
     ) {}
 

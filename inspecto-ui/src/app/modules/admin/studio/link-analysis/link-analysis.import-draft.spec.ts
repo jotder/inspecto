@@ -14,6 +14,7 @@ import { ImportDraft, TransferMenuComponent } from 'app/inspecto/transfer';
 import { apiUrl } from 'app/inspecto/api/api-base';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisComponent } from './link-analysis.component';
+import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 
 const base = apiUrl('');
 const QUERY = { projection: { datasetId: 'links-ds', sourceCol: 'a_party', targetCol: 'b_party' } };
@@ -63,6 +64,7 @@ function create() {
     TestBed.configureTestingModule({
         imports: [LinkAnalysisComponent],
         providers: [
+            ...provideLaHostServices(),
             provideNoopAnimations(),
             provideRouter([]),
             provideHttpClient(withXhr()),

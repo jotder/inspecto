@@ -13,6 +13,7 @@ import {
     WatchMeasureDialog,
     instantiateSpecs,
 } from './link-analysis-template.dialogs';
+import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 
 const TEMPLATE: InvestigationTemplate = {
     id: 'tpl-1',
@@ -43,6 +44,7 @@ function configure(data: unknown, inv: Partial<Record<keyof InvService, unknown>
     const close = vi.fn();
     TestBed.configureTestingModule({
         providers: [
+            ...provideLaHostServices(),
             provideNoopAnimations(),
             { provide: MAT_DIALOG_DATA, useValue: data },
             { provide: MatDialogRef, useValue: { close } },

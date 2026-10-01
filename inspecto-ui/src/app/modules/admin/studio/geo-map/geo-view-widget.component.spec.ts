@@ -6,6 +6,7 @@ import { ComponentDef, ComponentsService, GeoSettingsService } from 'app/inspect
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { DatasetsService } from '../datasets/datasets.service';
 import { GeoViewWidgetComponent } from './geo-view-widget.component';
+import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 
 /** MapLibre never mounts in these paths (no data), so the host is jsdom-safe — same discipline as the
  *  studio spec: the pure projection logic is covered by geo-projection.spec. */
@@ -13,6 +14,7 @@ function create(components: Partial<ComponentsService>) {
     TestBed.configureTestingModule({
         imports: [GeoViewWidgetComponent],
         providers: [
+            ...provideLaHostServices(),
             provideNoopAnimations(),
             { provide: ComponentsService, useValue: components },
             { provide: GeoSettingsService, useValue: { get: () => of({ tileServerUrl: null }) } },

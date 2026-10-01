@@ -64,8 +64,8 @@ import {
     uniqueNameValidator,
 } from 'app/inspecto/investigation';
 import { ComponentsService, GeoSettingsService, apiErrorMessage, SessionService } from 'app/inspecto/api';
-import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
-import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
+import type { LaDataset } from 'app/inspecto/la-host';
+import { LA_DATASETS } from 'app/inspecto/la-host';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { ICON_COLOR_SWATCHES } from 'app/inspecto/theme/chart-tokens';
 import { GeoSourcesService, ProjectedGeo } from './geo-projection';
@@ -160,7 +160,7 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     private route = inject(ActivatedRoute);
     private pivotService = inject(PivotService);
     private geoSources = inject(GeoSourcesService);
-    private datasetsService = inject(DatasetsService);
+    private datasetsService = inject(LA_DATASETS);
     private viewsService = inject(GeoMapService);
     private components = inject(ComponentsService);
     /** LA-22: the shared Geo ↔ Link brush (keyed by `GeoPoint.key`, D-U3). */
@@ -184,7 +184,7 @@ export class GeoMapComponent implements OnInit, OnDestroy {
 
     // ── query builder ──
     readonly sourceId = signal<GeoSourceId>('dataset');
-    readonly datasets = signal<Dataset[]>([]);
+    readonly datasets = signal<LaDataset[]>([]);
     readonly datasetColumns = signal<string[]>([]);
     /** Full query form vs its collapsed summary (auto-collapses after a run). */
     readonly queryOpen = signal(true);

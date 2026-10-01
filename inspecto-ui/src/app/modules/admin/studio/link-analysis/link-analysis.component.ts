@@ -129,8 +129,8 @@ import {
 } from 'app/inspecto/graph/graph-view.component';
 import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
 import { ElementDetailDialog, ElementDetailResult, ElementObjectRef, PivotService } from 'app/inspecto/investigation';
-import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
-import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
+import type { LaDataset } from 'app/inspecto/la-host';
+import { LA_DATASETS } from 'app/inspecto/la-host';
 import {
     MultiProjectedGraph,
     ProjectedGraph,
@@ -284,7 +284,7 @@ export class LinkAnalysisComponent implements OnInit {
      */
     private readonly exchangeEnabled = inject(SessionService).exchangeEnabled;
     readonly canShare = computed(() => this.exchangeEnabled() && this.lens.canOfferDatasets());
-    private datasetsService = inject(DatasetsService);
+    private datasetsService = inject(LA_DATASETS);
     /**
      * Injected for its side effect, not for a value: constructing it applies the active space's tuning
      * limits to the two pure graph modules. Without an injector asking for it, a `providedIn: 'root'`
@@ -386,7 +386,7 @@ export class LinkAnalysisComponent implements OnInit {
 
     // ── query source (the form itself lives in the query-panel child) ──
     readonly sourceId = signal<GraphSourceId>('entity-projection');
-    readonly datasets = signal<Dataset[]>([]);
+    readonly datasets = signal<LaDataset[]>([]);
     readonly pipelines = signal<PipelineSummary[]>([]);
 
     // ── result state ──

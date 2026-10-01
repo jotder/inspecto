@@ -60,6 +60,29 @@ export default tseslint.config(
         rules: { '@angular-eslint/prefer-on-push-component-change-detection': 'off' },
     },
     {
+        // REVIEWED DECISION (D-5 prep, la-separation-feasibility-plan §7.5/§7.12): the Link Analysis and Geo
+        // feature code is the future `projects/link-analysis` library. It must not import a host feature
+        // (`app/modules/**`) nor escape its own folder with `../`; everything host-specific enters through the
+        // injected tokens in `app/inspecto/la-host`, provided by `modules/admin/studio/la-host.providers.ts`.
+        // Specs are exempt (they may import host doubles). Dynamic `import()` is not covered by this rule.
+        files: ['src/app/modules/admin/studio/link-analysis/**/*.ts', 'src/app/modules/admin/studio/geo-map/**/*.ts'],
+        ignores: ['**/*.spec.ts'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            group: ['app/modules/**', 'src/app/modules/**', '../**'],
+                            message:
+                                'Link Analysis / Geo must not import host features: inject a token from app/inspecto/la-host instead (D-5 prep).',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
         // Inline templates reach this block too: `processInlineTemplates` above lifts them out of the .ts
         // file as virtual .html documents.
         files: ['**/*.html'],

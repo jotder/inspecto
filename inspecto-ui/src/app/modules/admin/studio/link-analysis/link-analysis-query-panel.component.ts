@@ -22,7 +22,7 @@ import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { PipelineSummary } from 'app/inspecto/api';
 import { EntityProjection, GraphSource, GraphSourceId, GraphSourceQuery } from 'app/inspecto/graph';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
-import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
+import type { LaDataset } from 'app/inspecto/la-host';
 import { LinkAnalysisView } from './link-analysis.service';
 
 /** `InvRoutes.MAX_MAPPINGS` — the server 422s above it; the form says so first. */
@@ -65,7 +65,7 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
     private datasetRows = inject(DatasetRowsService);
 
     readonly sources = input<GraphSource[]>([]);
-    readonly datasets = input<Dataset[]>([]);
+    readonly datasets = input<LaDataset[]>([]);
     readonly pipelines = input<PipelineSummary[]>([]);
     readonly sourceId = input<GraphSourceId>('entity-projection');
     /** Full form vs the collapsed selected-values summary (owned by the host). */

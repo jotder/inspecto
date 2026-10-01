@@ -9,6 +9,8 @@ import { REGISTRY_KINDS } from 'app/modules/admin/catalog/registry.component';
 import { mergeGraphs } from 'app/inspecto/graph';
 import { ComponentRegistryGraphSource, LineageGraphSource, PipelineGraphSource } from './graph-sources';
 
+const hostGraph = { toG6Data: toPipelineG6Data, provenanceCounts };
+
 /**
  * The behavior-preserving contract (design doc §6): each GraphSource.query() must return data
  * deep-equal to its plane's existing pure mapper for the same input — proving the seam adds no logic.
@@ -90,7 +92,7 @@ describe('ComponentRegistryGraphSource', () => {
     ];
 
     it('returns exactly deriveComponentGraph() over all listed kinds', async () => {
-        const provider = { list: (kind: string) => Promise.resolve(comps.filter((c) => c.kind === kind)) };
+        const provider = { kinds: REGISTRY_KINDS, list: (kind: string) => Promise.resolve(comps.filter((c) => c.kind === kind)) };
         const src = new ComponentRegistryGraphSource(provider as never);
         // expected components in REGISTRY_KINDS load order, exactly as the source assembles them
         const ordered = REGISTRY_KINDS.flatMap((k) => comps.filter((c) => c.kind === k));
@@ -99,6 +101,7 @@ describe('ComponentRegistryGraphSource', () => {
 
     it('a failing kind degrades to the remaining kinds (no throw)', async () => {
         const provider = {
+            kinds: REGISTRY_KINDS,
             list: (kind: string) =>
                 kind === 'widget'
                     ? Promise.reject(new Error('boom'))
@@ -120,13 +123,13 @@ describe('PipelineGraphSource', () => {
     } as PipelineGraph;
 
     it('requires a pipeline root', async () => {
-        const src = new PipelineGraphSource({} as never);
+        const src = new PipelineGraphSource({} as never, hostGraph);
         await expect(src.query({})).rejects.toThrow(/pipeline/);
     });
 
     it('without counts returns exactly toPipelineG6Data()', async () => {
         const pipelines = { graph: () => of(graph) };
-        const src = new PipelineGraphSource(pipelines as never);
+        const src = new PipelineGraphSource(pipelines as never, hostGraph);
         expect(await src.query({ from: 'p1' })).toEqual(toPipelineG6Data(graph));
     });
 
@@ -140,13 +143,13 @@ describe('PipelineGraphSource', () => {
             provenanceBatches: () => of(batches),
             provenance: () => of(rows),
         };
-        const src = new PipelineGraphSource(pipelines as never);
+        const src = new PipelineGraphSource(pipelines as never, hostGraph);
         expect(await src.query({ from: 'p1', counts: true })).toEqual(toPipelineG6Data(graph, provenanceCounts(rows)));
     });
 
     it('with counts but no recorded batches falls back to the unweighted mapper', async () => {
         const pipelines = { graph: () => of(graph), provenanceBatches: () => of([]) };
-        const src = new PipelineGraphSource(pipelines as never);
+        const src = new PipelineGraphSource(pipelines as never, hostGraph);
         expect(await src.query({ from: 'p1', counts: true })).toEqual(toPipelineG6Data(graph));
     });
 
@@ -156,7 +159,7 @@ describe('PipelineGraphSource', () => {
             edges: [],
         } as never;
         const pipelines = { graph: (id: string) => of(id === 'p2' ? graph2 : graph) };
-        const src = new PipelineGraphSource(pipelines as never);
+        const src = new PipelineGraphSource(pipelines as never, hostGraph);
         const out = await src.query({ roots: ['p1', 'p2'] });
         expect(out).toEqual(mergeGraphs([toPipelineG6Data(graph), toPipelineG6Data(graph2)]));
     });

@@ -14,6 +14,7 @@ import { authInterceptor } from './inspecto/api/auth.interceptor';
 import { v1Interceptor } from './inspecto/api/v1.interceptor';
 import { registerGeoMapViz } from './modules/admin/studio/geo-map/geo-map.viz';
 import { registerLinkAnalysisViz } from './modules/admin/studio/link-analysis/link-analysis.viz';
+import { provideLaHostServices } from './modules/admin/studio/la-host.providers';
 import { SessionService } from './inspecto/api/session.service';
 
 export const appConfig: ApplicationConfig = {
@@ -70,6 +71,8 @@ export const appConfig: ApplicationConfig = {
             registerGeoMapViz();
             registerLinkAnalysisViz();
         }),
+        // D-5 prep: the host services the Link Analysis / Geo features reach only through tokens (inspecto/la-host).
+        ...provideLaHostServices(),
 
         // Gamma
         // provideAuth(),

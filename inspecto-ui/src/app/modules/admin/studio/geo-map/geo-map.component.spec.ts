@@ -17,6 +17,7 @@ import { GeoMapComponent } from './geo-map.component';
 import { GeoSourcesService, ProjectedGeo } from './geo-projection';
 import { GeoMapService, GeoMapView } from './geo-map.service';
 import { GeoLinkBrushService } from 'app/inspecto/graph';
+import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 
 const DS: Dataset = {
     id: 'towers-ds',
@@ -80,6 +81,7 @@ function create(
     TestBed.configureTestingModule({
         imports: [GeoMapComponent],
         providers: [
+            ...provideLaHostServices(),
             provideNoopAnimations(),
             provideRouter([]),
             { provide: GeoSourcesService, useValue: { sources: [fakeSource, fakeRouteSource] } },

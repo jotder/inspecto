@@ -17,6 +17,7 @@ import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisComponent } from './link-analysis.component';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
+import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 
 const DS: Dataset = {
     id: 'links-ds',
@@ -72,6 +73,7 @@ function create(
     TestBed.configureTestingModule({
         imports: [LinkAnalysisComponent],
         providers: [
+            ...provideLaHostServices(),
             provideNoopAnimations(),
             provideRouter([]),
             { provide: GraphSourcesService, useValue: { sources: [fakeSource], byId: () => fakeSource } },

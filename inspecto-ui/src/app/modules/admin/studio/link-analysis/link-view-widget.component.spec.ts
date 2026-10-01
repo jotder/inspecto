@@ -10,6 +10,7 @@ import { G6GraphData, SUPER_NODE_KIND } from 'app/inspecto/graph';
 import { nodeColor } from 'app/inspecto/graph/catalog-graph';
 import { LinkViewWidgetComponent } from './link-view-widget.component';
 import { legendItemsFor } from './link-analysis-overlays.component';
+import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 
 /** G6 never mounts in these paths (no data), so the host is jsdom-safe — the source query contracts are
  *  covered by graph-sources.spec. */
@@ -17,6 +18,7 @@ function create(components: Partial<ComponentsService>) {
     TestBed.configureTestingModule({
         imports: [LinkViewWidgetComponent],
         providers: [
+            ...provideLaHostServices(),
             provideNoopAnimations(),
             { provide: ComponentsService, useValue: components },
             { provide: CatalogService, useValue: {} },

@@ -20,6 +20,7 @@ import { LinkAnalysisInvestigationComponent } from './link-analysis-investigatio
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { WidgetsService } from '../widgets/widgets.service';
 import { Widget } from '../widgets/widget-types';
+import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 
 @Component({
     standalone: true,
@@ -149,6 +150,7 @@ function create() {
     TestBed.configureTestingModule({
         imports: [Host],
         providers: [
+            ...provideLaHostServices(),
             provideNoopAnimations(),
             InvestigationSessionStore,
             { provide: InvService, useValue: inv },

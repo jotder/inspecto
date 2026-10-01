@@ -11,7 +11,7 @@ import {
     validCoordinate,
 } from 'app/inspecto/geo';
 import { GeoProjectionResult, GeoService } from 'app/inspecto/api';
-import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
+import { LA_DATASETS, type LaDatasets } from 'app/inspecto/la-host';
 
 /**
  * The `dataset` **GeoSource**: project a Dataset's rows onto the map — each row with a valid
@@ -188,7 +188,7 @@ export class DatasetGeoSource implements GeoSource {
     readonly id = 'dataset' as const;
     readonly label = 'Locations (from a Dataset)';
     constructor(
-        private datasets: DatasetsService,
+        private datasets: LaDatasets,
         private geo: GeoService,
     ) {}
 
@@ -216,7 +216,7 @@ export class RouteProjectionGeoSource implements GeoSource {
     readonly id = 'od-routes' as const;
     readonly label = 'Routes (origin → destination)';
     constructor(
-        private datasets: DatasetsService,
+        private datasets: LaDatasets,
         private geo: GeoService,
     ) {}
 
@@ -246,7 +246,7 @@ export class RouteProjectionGeoSource implements GeoSource {
 @Injectable({ providedIn: 'root' })
 export class GeoSourcesService {
     readonly sources: GeoSource[] = [
-        new DatasetGeoSource(inject(DatasetsService), inject(GeoService)),
-        new RouteProjectionGeoSource(inject(DatasetsService), inject(GeoService)),
+        new DatasetGeoSource(inject(LA_DATASETS), inject(GeoService)),
+        new RouteProjectionGeoSource(inject(LA_DATASETS), inject(GeoService)),
     ];
 }

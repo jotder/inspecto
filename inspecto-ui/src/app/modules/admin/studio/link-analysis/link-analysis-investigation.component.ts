@@ -31,8 +31,7 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
-import { buildWidget } from '../widgets/widget-types';
-import { WidgetsService } from '../widgets/widgets.service';
+import { LA_WIDGETS } from 'app/inspecto/la-host';
 import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component';
 import { LinkAnalysisEntityListsComponent } from './link-analysis-entity-lists.component';
 import { LinkAnalysisIdentitiesComponent } from './link-analysis-identities.component';
@@ -78,7 +77,7 @@ import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set
 export class LinkAnalysisInvestigationComponent {
     readonly store = inject(InvestigationSessionStore);
     private inv = inject(InvService);
-    private widgets = inject(WidgetsService);
+    private widgets = inject(LA_WIDGETS);
 
     /** The last run's single Entity/Link mapping, or null when the query cannot bind an Investigation. */
     readonly projection = input<EntityProjection | null>(null);
@@ -345,20 +344,17 @@ export class LinkAnalysisInvestigationComponent {
         this.pinnedWidget.set('');
         try {
             const { head } = await firstValueFrom(this.inv.workingSetRelation(id, { of: relation, limit: 1 }));
-            const widget = buildWidget(
-                name,
-                '',
-                WORKING_SET_PLUGIN.meta.type,
-                {},
-                {
+            await firstValueFrom(
+                this.widgets.saveWorkingSetWidget({
+                    name,
+                    vizType: WORKING_SET_PLUGIN.meta.type,
                     viewId: id,
                     workingSet: pinBinding(relation, mode, head),
                     description: `${RELATION_NOUN[relation].title} of Investigation ${id} — ${
                         mode === 'live' ? 'Live' : `Frozen at step ${head.step}`
                     }`,
-                },
+                }),
             );
-            await firstValueFrom(this.widgets.save(widget));
             this.pinnedWidget.set(name);
             this.pinFormDirective()?.resetForm({ name: '', relation, mode });
         } catch (err) {

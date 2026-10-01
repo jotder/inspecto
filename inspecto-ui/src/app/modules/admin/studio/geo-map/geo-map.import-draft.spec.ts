@@ -15,6 +15,7 @@ import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { apiUrl } from 'app/inspecto/api/api-base';
 import { GeoMapComponent } from './geo-map.component';
 import { GeoSourcesService, ProjectedGeo } from './geo-projection';
+import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 
 const base = apiUrl('');
 const QUERY = { projection: { datasetId: 'towers-ds', latCol: 'lat', lonCol: 'lon', kindCol: 'type' } };
@@ -59,6 +60,7 @@ function create() {
     TestBed.configureTestingModule({
         imports: [GeoMapComponent],
         providers: [
+            ...provideLaHostServices(),
             provideNoopAnimations(),
             provideRouter([]),
             provideHttpClient(withXhr()),

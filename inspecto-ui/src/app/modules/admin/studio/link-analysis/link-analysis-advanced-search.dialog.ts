@@ -8,11 +8,11 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
-import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
+import type { LaDataset } from 'app/inspecto/la-host';
 import { ProjectedGraph, projectEntities } from './entity-projection';
 
 export interface LinkAnalysisAdvancedSearchData {
-    dataset: Dataset;
+    dataset: LaDataset;
     /** The mapping the resulting rows are folded with when the analyst projects them. */
     projection: EntityProjection;
 }

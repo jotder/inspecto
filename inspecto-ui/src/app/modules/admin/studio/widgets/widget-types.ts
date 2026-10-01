@@ -1,18 +1,7 @@
 import { ControlValues, VizRenderOptions } from 'app/inspecto/viz';
-import type { WorkingSetRelationName } from 'app/inspecto/api';
+import type { WorkingSetBinding } from 'app/inspecto/la-host';
 
-/**
- * LA-21 — a **Working Set Widget**'s binding (decision D-E6). The Widget's `viewId` names the Investigation; this says
- * which relation it shows, how, and from where. It holds NO rows: every render reads through the Investigation-scoped
- * route, so the owner-only / PDP gate (D-E7) applies to every viewer of every dashboard it sits on.
- * - `frozen` (the default) re-reads the relation AT `pin.step` and checks the answer's hash against `pin.workingSetHash`;
- * - `live` re-reads the head and shows what changed since the pin. A Live Widget cannot leave its Space.
- */
-export interface WorkingSetBinding {
-    relation: WorkingSetRelationName;
-    mode: 'frozen' | 'live';
-    pin: { step: number; workingSetHash: string; pinnedAt: string };
-}
+export type { WorkingSetBinding };
 
 /**
  * Studio **Widget** model — a saved visualization = a dataset reference + a viz plugin type + the field→channel
