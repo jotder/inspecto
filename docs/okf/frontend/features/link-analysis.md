@@ -926,7 +926,7 @@ time (lose the Investigation, lose the run: 404). The four route gates are done:
 `okf/capabilities/security/security.md`). **Cancel carries no capability**: the service's starter-or-administrator check is the gate, and
 the manifest declares a `self-service` exemption. Settings (`link-analysis.toon` block `graph_run`, wire `graphRun`, 1..10 000 000 each,
 a bad value is 422): `max_nodes`, `max_edges`, `timeout_ms` (the DEFAULT budget), `threads`, `queue` (read when the Space's service is
-first used; restart to change). `Limits.standard()` supplies the rest and is deliberately not a setting: default budget 50 000 nodes /
+built - first use, or the first use after it was closed idle), `max_result_items` (the response-size cap, read per request). `Limits.standard()` supplies the rest and is deliberately not a setting: default budget 50 000 nodes /
 500 000 edges / 30 s, HARD ceilings 500 000 / 5 000 000 / 300 s, 2 threads, queue 16, run TTL 1 h, `maxRuns` 200, cache TTL 10 min,
 32 cache entries.
 
@@ -993,21 +993,39 @@ betweenness and suspicion).
 * Hidden entities are excluded and `resolve` groups are not merged (see Input rows).
 * `linkPrediction` stays a JOB: its output is every pair that shares a neighbour, which a hub makes quadratic by definition.
   `jaccardSimilarity` cost depends on the chosen node's degree, so a node-count ceiling alone does not bound it.
-* Server `progress.fraction` is always 0 and `consumed.elapsedMs` is 0 until a run ends; the SPA shows `progress.work` as "N steps done"
-  and measures elapsed time in the browser.
+* **Live progress.** A RUNNING run's `consumed.elapsedMs` is the monotonic time since it began executing (0 while QUEUED; final at the end),
+  and `progress` is `{work, fraction, known}`. `fraction` is the algorithm's own 0..1 (`RunControl.progress(done, total)`, called next to
+  `checkpoint()` once per source or sweep, never in an inner loop) and is meaningful only when `known` is true; `known: false` means this
+  algorithm reports none and `fraction` 0 is "unknown", not "just started". A COMPLETED run that reports one shows 1. Reporting: betweenness,
+  closeness and link prediction (per source), PageRank, eigenvector, Katz, HITS and label propagation (per iteration, of the requested
+  maximum - a run that converges early finishes below 1 until it completes). **Louvain** (passes run to convergence) and the 11 algorithms
+  without a `RunControl` overload report nothing. `known` is additive: a client that reads only `fraction` keeps working.
 * Cancel on someone else's run is **403** (the service's FORBIDDEN) while a READ of it is **404** (a run id is an unguessable UUID);
   cancel does not re-open the Investigation. Administrator = `Roles.CAN_ADMINISTER`, or no Subject at all.
 * Algorithms with a selection result and no browser cap (shortest and all paths, cycles, spanning forest, bridges) stay local-only.
 * A server result for a node the canvas has collapsed or filtered away is dropped by the id map.
 * The toolbox's local runs still analyse the displayed query graph, not the Working Set, when an Investigation is open.
-* One `GraphRunService` per Space write root, created lazily, closed by `ApiContext.onClose(Runnable)` (a new hook; `ControlApi.close()`
-  runs its hooks first).
-* A result payload is bounded only by each algorithm's own limit params (a ranking lists every node).
+* **Service lifetime.** One `GraphRunService` per Space write root, held by `GraphRunServices` (la-api): created lazily, closed by
+  `ApiContext.onClose(Runnable)` (`ControlApi.close()` runs its hooks first), **or earlier** - closed and forgotten when unused for 1 h
+  (`IDLE_TTL_MS`, the finished-run retention, so closing never shortens what an analyst can still read) with no run in flight, or at once
+  when its Space's directory is gone. The sweep runs on access (touching another Space); one lock covers sweep, lookup, create and close,
+  so nothing is created after close and a racing creation cannot leak. Worker threads additionally time out after 30 s idle
+  (`allowCoreThreadTimeOut`), so even the only Space's idle pool holds no thread; the next run starts one. `threads`/`queue` apply when a
+  service is built (a rebuilt one re-reads them).
+* **`maxRuns` is soft by design.** It bounds FINISHED runs only (retention never drops a live one), but live runs are hard-bounded by the
+  pool (`threads + queue`, a further submit is `503 STORE_BUSY`), so the run table holds at most `maxRuns + threads + queue` entries.
+* **Result size - never a silent cap.** Each list of a result (`scores`, `hubs`, `authorities`, `groups`, `ids`, `communities`, `links`,
+  suspicion `scores`, `selections`, sub-graph `nodes` and `edges`, and a selection's `nodeIds`/`edgeIds`) is cut to `graph_run.max_result_items`
+  (wire `graphRun.maxResultItems`, default 10 000, hard ceiling 1 000 000 - clamped and echoed by `GET /inv/graph/algorithms`
+  `resultItems{limit,default,ceiling,clamped}`) **on the way out, like masking**; the cache keeps the full result, so raising the setting needs
+  no re-run. The cut keeps the FIRST entries of the canonical-v1 order (the top of a ranking). It is always said: `result.truncated` is true
+  when anything was cut and `result.lists.<name> = {total, returned, limit, truncated}` exists for every top-level list (a nested list - one
+  group, one path - gets an entry such as `groups[0]` only when cut). The limit is per list, not per payload. Both keys are additive.
 * A raw id sent as `from` / `to` / `node` while masking is on is not refused.
 
-**Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-GRAPH-RUN-PROGRESS-1` · `LA-GRAPH-RUN-LOCAL-WORKING-SET-1` ·
-`LA-GRAPH-RUN-MASK-ORACLE-1` · `LA-GRAPH-RUN-SELECTION-LOCAL-ONLY-1` · `LA-GRAPH-RUN-HIDDEN-NODES-1` · `LA-GRAPH-RUN-PAYLOAD-SIZE-1` ·
-`LA-GRAPH-RUN-POOL-LIFECYCLE-1` · `LA-GRAPH-RUN-CANCEL-GATE-1`. The remaining option-D phases are in
+**Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-GRAPH-RUN-LOCAL-WORKING-SET-1` ·
+`LA-GRAPH-RUN-MASK-ORACLE-1` · `LA-GRAPH-RUN-SELECTION-LOCAL-ONLY-1` · `LA-GRAPH-RUN-HIDDEN-NODES-1` ·
+`LA-GRAPH-RUN-CANCEL-GATE-1`. The remaining option-D phases are in
 [`la-separation-feasibility-plan.md`](../../../superpower/la-separation-feasibility-plan.md) §7.8.
 
 ## Closed-plan record (2026-10-01)

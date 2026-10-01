@@ -38,7 +38,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Server-side graph analysis over an Investigation's Working Set (LA separation D-4 step 6, design §3.3): the 28
@@ -73,8 +72,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * before the cache is consulted.
  *
  * <p><b>Service lifetime.</b> One {@link GraphRunService} per Space (write root), created on first use with that Space's
- * {@code graph_run} {@code threads}/{@code queue} (changing them needs a restart), closed with the API ({@link
- * ApiContext#onClose}). Terminal events of asynchronous runs are audited from the service's terminal hook.
+ * {@code graph_run} {@code threads}/{@code queue} (applied when the service is built), closed with the API ({@link
+ * ApiContext#onClose}) - or earlier, when it has been unused for {@link GraphRunServices#IDLE_TTL_MS} or its Space is gone
+ * ({@link GraphRunServices}). Terminal events of asynchronous runs are audited from the service's terminal hook.
+ *
+ * <p><b>Result size.</b> Each list of a result is cut to {@code graph_run.max_result_items} (default 10 000, ceiling 1 000 000)
+ * on the way out, never in the cache; {@link GraphResultJson#of(com.gamma.la.core.GraphResult, GraphResultJson.Ids, int)}
+ * says what it cut.
  */
 public final class GraphRunRoutes implements RouteModule {
 
@@ -93,8 +97,8 @@ public final class GraphRunRoutes implements RouteModule {
         inlineWaitOverrideMs = inlineWaitMs;
     }
 
-    private final Map<Path, GraphRunService> services = new ConcurrentHashMap<>();
-    private volatile boolean closing;
+    private final GraphRunServices services = new GraphRunServices(GraphRunRoutes::newService, System::currentTimeMillis,
+            GraphRunServices.IDLE_TTL_MS);
 
     @Override
     public void register(ApiContext api) {
@@ -111,22 +115,28 @@ public final class GraphRunRoutes implements RouteModule {
     // ── lifecycle ────────────────────────────────────────────────────────────────────────────────────────────
 
     private void closeServices() {
-        closing = true;
-        services.values().forEach(GraphRunService::close);
-        services.clear();
+        services.close();
     }
 
     private GraphRunService service(Path writeRoot) {
-        if (closing) throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "the server is shutting down");
-        return services.computeIfAbsent(writeRoot, root -> {
-            GraphRunService.Limits std = GraphRunService.Limits.standard();
-            LinkAnalysisSettings.GraphRun g = LinkAnalysisSettings.forRoot(root).effectiveGraphRun();
-            GraphRunService.Limits limits = new GraphRunService.Limits(std.defaults(), std.ceilings(),
-                    g.threads() != null ? g.threads() : std.threads(), g.queue() != null ? g.queue() : std.queue(),
-                    std.runTtlMs(), std.maxRuns(), std.cacheTtlMs(), std.cacheEntries());
-            GraphEngine engine = engineOverride != null ? engineOverride : new InMemoryGraphEngine();
-            return new GraphRunService(engine, limits, System::currentTimeMillis, GraphRunRoutes::auditTerminal);
-        });
+        return services.get(writeRoot);
+    }
+
+    /** A Space's service, with that Space's {@code threads}/{@code queue} (read now; they apply for this service's lifetime). */
+    private static GraphRunService newService(Path root) {
+        GraphRunService.Limits std = GraphRunService.Limits.standard();
+        LinkAnalysisSettings.GraphRun g = LinkAnalysisSettings.forRoot(root).effectiveGraphRun();
+        GraphRunService.Limits limits = new GraphRunService.Limits(std.defaults(), std.ceilings(),
+                g.threads() != null ? g.threads() : std.threads(), g.queue() != null ? g.queue() : std.queue(),
+                std.runTtlMs(), std.maxRuns(), std.cacheTtlMs(), std.cacheEntries());
+        GraphEngine engine = engineOverride != null ? engineOverride : new InMemoryGraphEngine();
+        return new GraphRunService(engine, limits, System::currentTimeMillis, GraphRunRoutes::auditTerminal);
+    }
+
+    /** Items per result list in force: the Space's {@code max_result_items}, else the default, never above the hard ceiling. */
+    private static int resultItemLimit(Path writeRoot) {
+        Integer stated = LinkAnalysisSettings.forRoot(writeRoot).effectiveGraphRun().maxResultItems();
+        return Math.min(stated != null ? stated : GraphResultJson.DEFAULT_MAX_RESULT_ITEMS, GraphResultJson.MAX_RESULT_ITEMS);
     }
 
     private static long inlineWaitMs() {
@@ -178,6 +188,12 @@ public final class GraphRunRoutes implements RouteModule {
         pool.put("queue", g.queue() != null ? g.queue() : std.queue());
         out.put("pool", pool);
         out.put("inlineWaitMs", inlineWaitMs());
+        Map<String, Object> items = new LinkedHashMap<>();                   // the response-size policy, stated like the budget
+        items.put("limit", resultItemLimit(api.writeRoot()));
+        items.put("default", GraphResultJson.DEFAULT_MAX_RESULT_ITEMS);
+        items.put("ceiling", GraphResultJson.MAX_RESULT_ITEMS);
+        items.put("clamped", g.maxResultItems() != null && g.maxResultItems() > GraphResultJson.MAX_RESULT_ITEMS);
+        out.put("resultItems", items);
         return out;
     }
 
@@ -250,7 +266,7 @@ public final class GraphRunRoutes implements RouteModule {
                 Thread.currentThread().interrupt();
             }
         }
-        Map<String, Object> out = view(v, mask, v.status() == Status.COMPLETED, true);
+        Map<String, Object> out = view(v, mask, v.status() == Status.COMPLETED, true, resultItemLimit(writeRoot));
         Map<String, Object> inputNote = new LinkedHashMap<>();
         inputNote.put("nodes", nodes);
         inputNote.put("edges", edges);
@@ -341,7 +357,7 @@ public final class GraphRunRoutes implements RouteModule {
         RunView v = visible(service(writeRoot), ex, id);
         InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, v.investigationId());   // access is the Investigation's
         EntityMasking mask = EntityMasking.of(inv, List.of());
-        return view(v, mask, v.status() == Status.COMPLETED, true);
+        return view(v, mask, v.status() == Status.COMPLETED, true, resultItemLimit(writeRoot));
     }
 
     private Object list(ApiContext api, HttpExchange ex) throws IOException {
@@ -359,7 +375,7 @@ public final class GraphRunRoutes implements RouteModule {
                     return false;                                       // no longer readable by this caller: absent, as a read is
                 }
             });
-            if (ok) items.add(view(v, null, false, false));
+            if (ok) items.add(view(v, null, false, false, 0));
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("runs", items);
@@ -406,7 +422,7 @@ public final class GraphRunRoutes implements RouteModule {
      * {@code result} is added only when {@code withResult} AND the run is COMPLETED - a run that did not complete has no
      * result key whatever the caller passed. {@code mask} may be null only when no result is rendered.
      */
-    private static Map<String, Object> view(RunView v, EntityMasking mask, boolean withResult, boolean withMasking) {
+    private static Map<String, Object> view(RunView v, EntityMasking mask, boolean withResult, boolean withMasking, int maxItems) {
         Map<String, Object> o = new LinkedHashMap<>();
         o.put("runId", v.id());
         o.put("status", v.status().name());
@@ -424,6 +440,7 @@ public final class GraphRunRoutes implements RouteModule {
         Map<String, Object> progress = new LinkedHashMap<>();
         progress.put("work", v.progress().work());
         progress.put("fraction", v.progress().fraction());
+        progress.put("known", v.progress().known());          // additive: false = this algorithm reports no fraction (0 = unknown)
         o.put("progress", progress);
         o.put("cancelRequested", v.cancelRequested());
         o.put("cached", v.cached());
@@ -435,7 +452,7 @@ public final class GraphRunRoutes implements RouteModule {
         o.put("createdAt", v.createdAt());
         if (v.status().terminal()) o.put("finishedAt", v.finishedAt());
         if (withResult && v.status() == Status.COMPLETED && v.result() != null && mask != null) {
-            o.put("result", GraphResultJson.of(v.result(), GraphResultJson.Ids.of(mask)));
+            o.put("result", GraphResultJson.of(v.result(), GraphResultJson.Ids.of(mask), maxItems));
             if (withMasking) {
                 Map<String, Object> note = new LinkedHashMap<>(mask.describe());
                 note.put("ordering", "ranked lists keep the order of the raw ids (computed before masking); tied entries with "

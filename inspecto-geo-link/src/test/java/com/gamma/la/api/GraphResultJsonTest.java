@@ -6,6 +6,8 @@ import com.gamma.la.core.GraphResult;
 import com.gamma.la.core.InMemoryGraphEngine;
 import com.gamma.la.core.LinkIds;
 import com.gamma.la.core.SnapshotStore;
+import com.gamma.la.graph.GraphAlgorithms.Score;
+import com.gamma.la.graph.GraphAlgorithms.Selection;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -155,6 +157,77 @@ class GraphResultJsonTest {
                 Map.of("dataset", "calls_ds"));
         Files.createDirectories(inv.dir());
         assertSame(GraphResultJson.Ids.NONE, GraphResultJson.Ids.of(EntityMasking.of(inv, List.of(), List.of())));
+    }
+
+    // ── response size (LA-GRAPH-RUN-PAYLOAD-SIZE-1): never a silent cap ─────────────────────────────────────────
+
+    /** Every list in the tree is either whole or has a {@code lists} entry that says it was cut, and the entry's numbers add up. */
+    @Test
+    void everyAlgorithmAtALimitOfOneCutsOnlyWhatItSaysItCut() {
+        InMemoryGraphEngine engine = new InMemoryGraphEngine();
+        int cutSomething = 0;
+        for (Algorithm a : Algorithm.values()) {
+            GraphResult r = engine.run(a, a.resolve(params(a)), graph(), null);
+            Map<String, Object> full = GraphResultJson.of(r, GraphResultJson.Ids.NONE, 1_000);
+            assertFalse((Boolean) full.get("truncated"), a.id() + ": nothing is cut under a generous limit");
+            Map<String, Object> out = GraphResultJson.of(r, GraphResultJson.Ids.NONE, 1);
+            @SuppressWarnings("unchecked") Map<String, Map<String, Object>> lists = (Map<String, Map<String, Object>>) out.get("lists");
+            boolean anyCut = false;
+            for (Map.Entry<String, Object> e : out.entrySet()) {
+                if (!(e.getValue() instanceof List<?> l) || e.getKey().equals("lists")) continue;
+                Map<String, Object> note = lists.get(e.getKey());
+                assertTrue(note != null, a.id() + ": list '" + e.getKey() + "' has no lists entry");
+                int total = ((List<?>) full.get(e.getKey())).size();
+                assertEquals(total, note.get("total"), a.id() + "." + e.getKey());
+                assertEquals(1, note.get("limit"));
+                assertEquals(Math.min(total, 1), l.size(), a.id() + "." + e.getKey());
+                assertEquals(total > 1, note.get("truncated"), a.id() + "." + e.getKey());
+                assertEquals(l.size(), note.get("returned"));
+                // the survivors are the FIRST entries of the full answer (canonical order), not a sample
+                if (!Set.of("groups", "selections").contains(e.getKey()))     // those hold lists that are themselves cut
+                    assertEquals(((List<?>) full.get(e.getKey())).subList(0, l.size()), l, a.id() + "." + e.getKey());
+                anyCut |= total > 1;
+            }
+            // nested lists (one path's nodes...) are said too: anything truncated at any depth raises the flag
+            if (lists.values().stream().anyMatch(n -> Boolean.TRUE.equals(n.get("truncated")))) anyCut = true;
+            assertEquals(anyCut, out.get("truncated"), a.id() + ": the flag matches the entries");
+            if (anyCut) cutSomething++;
+        }
+        assertTrue(cutSomething >= 10, "the probe graph must actually exercise the cut: " + cutSomething);
+    }
+
+    @Test
+    void aSelectionsInnerListsAreCutAndNamedAndAMaskedCutKeepsTheRawOrder(@TempDir Path root) throws Exception {
+        GraphResult sel = new GraphResult(Algorithm.SHORTEST_PATH, new GraphResult.OneSelection(
+                new Selection(List.of("alice", "bob", "carol", "dave"), List.of("e1", "e2", "e3"))), 0, 1);
+        Map<String, Object> out = GraphResultJson.of(sel, GraphResultJson.Ids.NONE, 2);
+        @SuppressWarnings("unchecked") Map<String, Object> s = (Map<String, Object>) out.get("selection");
+        assertEquals(List.of("alice", "bob"), s.get("nodeIds"));
+        assertEquals(2, ((List<?>) s.get("edgeIds")).size());
+        @SuppressWarnings("unchecked") Map<String, Map<String, Object>> lists = (Map<String, Map<String, Object>>) out.get("lists");
+        assertEquals(4, lists.get("selection.nodeIds").get("total"));
+        assertEquals(3, lists.get("selection.edgeIds").get("total"));
+        assertEquals(true, out.get("truncated"));
+
+        GraphResult groups = new GraphResult(Algorithm.CONNECTED_COMPONENTS, new GraphResult.Groups(
+                List.of(List.of("alice", "bob", "carol"), List.of("dave"), List.of("erin"))), 0, 1);
+        EntityMasking mask = maskAll(root);
+        Map<String, Object> g = GraphResultJson.of(groups, GraphResultJson.Ids.of(mask), 2);
+        @SuppressWarnings("unchecked") List<List<Object>> kept = (List<List<Object>>) g.get("groups");
+        assertEquals(2, kept.size(), "two of three groups");
+        assertEquals(List.of(mask.apply("alice"), mask.apply("bob")), kept.get(0), "and the first group is cut to two members, in raw order");
+        @SuppressWarnings("unchecked") Map<String, Map<String, Object>> gl = (Map<String, Map<String, Object>>) g.get("lists");
+        assertEquals(3, gl.get("groups").get("total"));
+        assertEquals(3, gl.get("groups[0]").get("total"));
+        assertFalse(gl.containsKey("groups[1]"), "an inner list that was not cut has no entry");
+        assertFalse(g.toString().contains("alice"), "the cut result is still masked");
+    }
+
+    @Test
+    void aLimitBelowOneIsTreatedAsOneNeverAsZeroItems() {
+        GraphResult r = new GraphResult(Algorithm.DEGREE_CENTRALITY, new GraphResult.Scores(
+                List.of(new Score("a", "a", 2), new Score("b", "b", 1))), 0, 1);
+        assertEquals(1, ((List<?>) GraphResultJson.of(r, GraphResultJson.Ids.NONE, 0).get("scores")).size());
     }
 
     private static void assertSame(Object expected, Object actual) {

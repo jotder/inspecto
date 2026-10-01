@@ -171,6 +171,7 @@ class ControlApiGraphRunTest {
         @Override
         public GraphResult run(Algorithm a, Map<String, Object> params, GraphInput in, RunControl ctl) {
             try {
+                ctl.progress(1, 4);                                  // a reporting algorithm: a quarter done, live
                 while (release.getCount() > 0) {
                     ctl.checkpoint();
                     Thread.sleep(5);
@@ -353,6 +354,101 @@ class ControlApiGraphRunTest {
             JsonNode edges = data(start(c, run("degreeCentrality", "\"budget\":{\"maxEdges\":1}"), ANALYST), 200);
             assertEquals("EDGES", edges.get("exceeded").asText());
             assertFalse(edges.has("result"));
+        }
+    }
+
+    /** LA-GRAPH-RUN-PROGRESS-1: a RUNNING run's view carries the live fraction and elapsed time, and the final ones when done. */
+    @Test
+    void aRunningRunReportsLiveProgressAndElapsedTimeOverTheWire(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        Blocking engine = new Blocking();
+        GraphRunRoutes.forTest(engine, 50);
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            investigation(c);
+            String id = data(start(c, run("degreeCentrality", ""), ANALYST), 202).get("runId").asText();
+            until(() -> "RUNNING".equals(status(c, id, ANALYST)));
+            Thread.sleep(80);
+            JsonNode live = ok(c, "GET", "/inv/graph/runs/" + id, null, ANALYST);
+            assertTrue(live.get("progress").get("known").asBoolean(), live.toString());
+            assertEquals(0.25, live.get("progress").get("fraction").asDouble(), 1e-9);
+            assertTrue(live.get("consumed").get("elapsedMs").asLong() >= 50, "live elapsedMs: " + live);
+            assertTrue(live.get("progress").get("work").asLong() > 0);
+
+            engine.release.countDown();
+            until(() -> "COMPLETED".equals(status(c, id, ANALYST)));
+            JsonNode done = ok(c, "GET", "/inv/graph/runs/" + id, null, ANALYST);
+            assertEquals(1.0, done.get("progress").get("fraction").asDouble(), 1e-9);
+            assertTrue(done.get("consumed").get("elapsedMs").asLong() >= live.get("consumed").get("elapsedMs").asLong());
+        }
+    }
+
+    /** An algorithm that reports no fraction says so (known=false) instead of showing a fake 0 %; real algorithm, real HTTP. */
+    @Test
+    void anAlgorithmWithoutAFractionIsKnownFalseAndOneWithAFractionIsKnownTrue(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            investigation(c);
+            JsonNode flat = ok(c, "POST", "/inv/graph/runs", run("degreeCentrality", ""), ANALYST);
+            assertFalse(flat.get("progress").get("known").asBoolean(), flat.toString());
+            assertEquals(0.0, flat.get("progress").get("fraction").asDouble());
+            JsonNode swept = ok(c, "POST", "/inv/graph/runs", run("pageRank", ""), ANALYST);
+            assertTrue(swept.get("progress").get("known").asBoolean(), swept.toString());
+            assertEquals(1.0, swept.get("progress").get("fraction").asDouble(), "a COMPLETED reporting run shows 1");
+        }
+    }
+
+    /** LA-GRAPH-RUN-PAYLOAD-SIZE-1: a result list is cut to graph_run.max_result_items at the top of the ranking, and the cut is said. */
+    @Test
+    void aRankingLongerThanTheResultLimitIsCutAtItsTopAndTheCutIsSaid(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            investigation(c);
+            JsonNode full = ok(c, "POST", "/inv/graph/runs", run("degreeCentrality", ""), ANALYST);
+            String id = full.get("runId").asText();
+            JsonNode all = full.get("result").get("scores");
+            assertEquals(5, all.size());
+            assertFalse(full.get("result").get("truncated").asBoolean());
+            JsonNode whole = full.get("result").get("lists").get("scores");
+            assertEquals(5, whole.get("total").asInt());
+            assertEquals(10_000, whole.get("limit").asInt(), "the shipped default");
+            assertFalse(whole.get("truncated").asBoolean());
+
+            Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: none\ngraph_run:\n  max_result_items: 2\n");
+            JsonNode cut = ok(c, "GET", "/inv/graph/runs/" + id, null, ANALYST).get("result");
+            assertEquals(2, cut.get("scores").size());
+            assertEquals(all.get(0), cut.get("scores").get(0), "the cut keeps the TOP of the ranking...");
+            assertEquals(all.get(1), cut.get("scores").get(1));
+            assertTrue(cut.get("truncated").asBoolean());
+            JsonNode l = cut.get("lists").get("scores");
+            assertTrue(l.get("truncated").asBoolean());
+            assertEquals(5, l.get("total").asInt(), "...and says how many there were");
+            assertEquals(2, l.get("limit").asInt());
+            assertEquals(2, l.get("returned").asInt());
+            assertEquals(2, ok(c, "GET", "/inv/graph/algorithms", null, READER).get("resultItems").get("limit").asInt());
+            // a cache hit at the same limit is cut the same way
+            assertEquals(2, ok(c, "POST", "/inv/graph/runs", run("degreeCentrality", ""), ANALYST).get("result").get("scores").size());
+
+            // the cache holds the FULL result: raising the setting needs no re-run
+            Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: none\ngraph_run:\n  max_result_items: 100\n");
+            JsonNode back = ok(c, "GET", "/inv/graph/runs/" + id, null, ANALYST).get("result");
+            assertEquals(all, back.get("scores"));
+            assertFalse(back.get("truncated").asBoolean());
+        }
+    }
+
+    @Test
+    void theResultLimitIsEchoedByTheCatalogueAndClampedToItsCeiling(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            JsonNode d = ok(c, "GET", "/inv/graph/algorithms", null, READER).get("resultItems");
+            assertEquals(10_000, d.get("limit").asInt());
+            assertEquals(1_000_000, d.get("ceiling").asInt());
+            assertFalse(d.get("clamped").asBoolean());
+        }
+        try (Ctx c = open(cfg, root, "graph_run:\n  max_result_items: 5000000\n")) {
+            JsonNode d = ok(c, "GET", "/inv/graph/algorithms", null, READER).get("resultItems");
+            assertEquals(1_000_000, d.get("limit").asInt(), "above the hard ceiling: clamped...");
+            assertTrue(d.get("clamped").asBoolean(), "...and says so");
         }
     }
 

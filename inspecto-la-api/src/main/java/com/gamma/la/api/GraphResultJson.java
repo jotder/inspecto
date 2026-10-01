@@ -27,7 +27,7 @@ import java.util.Map;
  * kind, exactly as the Working Set's links relation does) and encoding again, so a masked edge id equals the {@code linkId}
  * the masked Working Set serves for that link and carries no raw value. A masked ranking keeps the raw order.
  *
- * <p>Wire shape: {@code {algorithm, kind, dropped, elapsedMs, ...the variant's own fields}}.
+ * <p>Wire shape: {@code {algorithm, kind, dropped, elapsedMs, ...the variant's own fields, truncated, lists}}.
  */
 final class GraphResultJson {
 
@@ -68,14 +68,61 @@ final class GraphResultJson {
 
     private GraphResultJson() {}
 
+    /** Items per list when {@code graph_run.max_result_items} is not stated. */
+    static final int DEFAULT_MAX_RESULT_ITEMS = 10_000;
+    /** The hard ceiling of {@code graph_run.max_result_items}: a stated value above it is clamped, and the clamp is echoed. */
+    static final int MAX_RESULT_ITEMS = 1_000_000;
+
     static Map<String, Object> of(GraphResult r, Ids ids) {
+        return of(r, ids, DEFAULT_MAX_RESULT_ITEMS);
+    }
+
+    /**
+     * <b>Never a silent cap.</b> Each list-shaped part of the payload (scores, hubs, authorities, groups, ids, communities,
+     * links, suspicions, selections, sub-graph nodes and edges, a selection's node and edge ids) is cut to its first
+     * {@code maxItems} entries - the engine's canonical-v1 order, so the top of a ranking survives - and the cut is SAID:
+     * {@code truncated} is true and {@code lists.<key> = {total, returned, limit, truncated}} gives the full count. Every
+     * top-level list has a {@code lists} entry whether cut or not; a list nested inside another (one group, one path) gets
+     * an entry, keyed {@code groups[2]}, only when it was cut. The cache holds the FULL result; the cut is applied here, on
+     * the way out (like masking), so raising the setting needs no re-run.
+     */
+    static Map<String, Object> of(GraphResult r, Ids ids, int maxItems) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("algorithm", r.algorithm().id());
         out.put("kind", r.payload().kind().name());
         out.put("dropped", r.dropped());
         out.put("elapsedMs", r.elapsedMs());
-        out.putAll(data(r.algorithm(), r.payload(), ids));
+        Cap cap = new Cap(Math.max(1, maxItems));
+        out.putAll(data(r.algorithm(), r.payload(), ids, cap));
+        out.put("truncated", cap.truncated);
+        out.put("lists", cap.lists);
         return out;
+    }
+
+    /** The response-size policy of one result: cuts a list to {@code limit} and records what it did, per list. */
+    private static final class Cap {
+        final int limit;
+        final Map<String, Object> lists = new LinkedHashMap<>();
+        boolean truncated;
+
+        Cap(int limit) {
+            this.limit = limit;
+        }
+
+        /** The first {@code limit} entries of {@code in}. {@code always} = record the list even when not cut (top-level lists). */
+        <T> List<T> cut(String key, List<T> in, boolean always) {
+            boolean cut = in.size() > limit;
+            if (cut || always) {
+                Map<String, Object> o = new LinkedHashMap<>();
+                o.put("total", in.size());
+                o.put("returned", cut ? limit : in.size());
+                o.put("limit", limit);
+                o.put("truncated", cut);
+                lists.put(key, o);
+            }
+            if (cut) truncated = true;
+            return cut ? in.subList(0, limit) : in;
+        }
     }
 
     /** The algorithms whose {@code Ids} payload names EDGES (the rest name nodes) - pinned by {@code GraphResultJsonTest}. */
@@ -83,23 +130,26 @@ final class GraphResultJson {
         return a == Algorithm.BRIDGES;
     }
 
-    private static Map<String, Object> data(Algorithm a, GraphResult.Payload payload, Ids ids) {
+    private static Map<String, Object> data(Algorithm a, GraphResult.Payload payload, Ids ids, Cap cap) {
         Map<String, Object> m = new LinkedHashMap<>();
         switch (payload) {
-            case GraphResult.Scores p -> m.put("scores", scores(p.scores(), ids));
+            case GraphResult.Scores p -> m.put("scores", scores(cap.cut("scores", p.scores(), true), ids));
             case GraphResult.Hits p -> {
-                m.put("hubs", scores(p.hubs(), ids));
-                m.put("authorities", scores(p.authorities(), ids));
+                m.put("hubs", scores(cap.cut("hubs", p.hubs(), true), ids));
+                m.put("authorities", scores(cap.cut("authorities", p.authorities(), true), ids));
             }
-            case GraphResult.OneSelection p -> m.put("selection", p.selection() == null ? null : selection(p.selection(), ids));
+            case GraphResult.OneSelection p ->
+                    m.put("selection", p.selection() == null ? null : selection(p.selection(), ids, cap, "selection"));
             case GraphResult.Selections p -> {
                 List<Object> all = new ArrayList<>();
-                for (Selection s : p.selections()) all.add(selection(s, ids));
+                List<Selection> kept = cap.cut("selections", p.selections(), true);
+                for (int i = 0; i < kept.size(); i++) all.add(selection(kept.get(i), ids, cap, "selections[" + i + "]"));
                 m.put("selections", all);
             }
             case GraphResult.Groups p -> {
                 List<Object> groups = new ArrayList<>();
-                for (List<String> g : p.groups()) groups.add(nodes(g, ids));
+                List<List<String>> kept = cap.cut("groups", p.groups(), true);
+                for (int i = 0; i < kept.size(); i++) groups.add(nodes(cap.cut("groups[" + i + "]", kept.get(i), false), ids));
                 m.put("groups", groups);
             }
             case GraphResult.Communities p -> {
@@ -107,27 +157,27 @@ final class GraphResultJson {
                 // id is one of the member node ids (label propagation) or a number (Louvain); masking an exact id
                 // match covers the first and leaves the second alone.
                 List<Object> pairs = new ArrayList<>();
-                p.communityOf().forEach((node, community) -> {
+                for (Map.Entry<String, String> e : cap.cut("communities", new ArrayList<>(p.communityOf().entrySet()), true)) {
                     Map<String, Object> pair = new LinkedHashMap<>();
-                    pair.put("id", ids.node(node));
-                    pair.put("community", ids.node(community));
+                    pair.put("id", ids.node(e.getKey()));
+                    pair.put("community", ids.node(e.getValue()));
                     pairs.add(pair);
-                });
+                }
                 m.put("communities", pairs);
             }
             case GraphResult.Ids p -> {
                 List<Object> out = new ArrayList<>();
-                for (String id : p.ids()) out.add(idsAreEdges(a) ? ids.edge(id) : ids.node(id));
+                for (String id : cap.cut("ids", p.ids(), true)) out.add(idsAreEdges(a) ? ids.edge(id) : ids.node(id));
                 m.put("ids", out);
             }
             case GraphResult.Flag p -> m.put("value", p.value());
             case GraphResult.Flow p -> {
                 m.put("value", p.flow().value());
-                m.put("minCut", p.flow().minCut() == null ? null : selection(p.flow().minCut(), ids));
+                m.put("minCut", p.flow().minCut() == null ? null : selection(p.flow().minCut(), ids, cap, "minCut"));
             }
             case GraphResult.Links p -> {
                 List<Object> links = new ArrayList<>();
-                for (PredictedLink l : p.links()) {
+                for (PredictedLink l : cap.cut("links", p.links(), true)) {
                     Map<String, Object> o = new LinkedHashMap<>();
                     o.put("source", ids.node(l.source()));
                     o.put("target", ids.node(l.target()));
@@ -140,7 +190,7 @@ final class GraphResultJson {
             }
             case GraphResult.Suspicions p -> {
                 List<Object> out = new ArrayList<>();
-                for (Suspicion s : p.scores()) {
+                for (Suspicion s : cap.cut("scores", p.scores(), true)) {
                     Map<String, Object> o = new LinkedHashMap<>();
                     o.put("id", ids.node(s.id()));
                     o.put("label", ids.node(s.label()));
@@ -158,14 +208,14 @@ final class GraphResultJson {
             }
             case GraphResult.SubGraph p -> {
                 List<Object> nodes = new ArrayList<>();
-                p.graph().nodes().forEach(n -> {
+                cap.cut("nodes", p.graph().nodes(), true).forEach(n -> {
                     Map<String, Object> o = new LinkedHashMap<>();
                     o.put("id", ids.node(n.id()));
                     o.put("label", ids.node(n.label()));
                     nodes.add(o);
                 });
                 List<Object> edges = new ArrayList<>();
-                p.graph().edges().forEach(e -> {
+                cap.cut("edges", p.graph().edges(), true).forEach(e -> {
                     Map<String, Object> o = new LinkedHashMap<>();
                     o.put("id", ids.edge(e.id()));
                     o.put("source", ids.node(e.source()));
@@ -191,11 +241,14 @@ final class GraphResultJson {
         return out;
     }
 
-    private static Map<String, Object> selection(Selection s, Ids ids) {
+    /** A selection's id lists are cut too; {@code at} names it in {@code lists} (an entry only when a list was cut, or for the top-level one). */
+    private static Map<String, Object> selection(Selection s, Ids ids, Cap cap, String at) {
+        boolean top = !at.contains("[");                       // selections[i] are nested in a cut list already
         Map<String, Object> o = new LinkedHashMap<>();
-        o.put("nodeIds", nodes(s.nodeIds(), ids));
-        List<Object> edges = new ArrayList<>(s.edgeIds().size());
-        for (String e : s.edgeIds()) edges.add(ids.edge(e));
+        o.put("nodeIds", nodes(cap.cut(at + ".nodeIds", s.nodeIds(), top), ids));
+        List<String> keptEdges = cap.cut(at + ".edgeIds", s.edgeIds(), top);
+        List<Object> edges = new ArrayList<>(keptEdges.size());
+        for (String e : keptEdges) edges.add(ids.edge(e));
         o.put("edgeIds", edges);
         return o;
     }
