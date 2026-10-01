@@ -1,4 +1,4 @@
-package com.gamma.geolink;
+package com.gamma.entitylist;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -123,7 +123,7 @@ class EntityFactLogTest {
             for (int i = 0; i < n; i++) {
                 Callable<String> first = () -> {
                     go.await();
-                    return HexFormat.of().formatHex(EntityMasking.key(dir));
+                    return HexFormat.of().formatHex(MaskTokens.key(dir));
                 };
                 keys.add(pool.submit(first));
             }

@@ -1,4 +1,4 @@
-package com.gamma.geolink;
+package com.gamma.entitylist;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
@@ -33,12 +33,12 @@ import java.util.regex.Pattern;
  * {@link EntityFactLog} and read as a fold over it ({@link EntityRegistry}).
  *
  * <ul>
- *   <li>{@code GET /inv/entity-lists} → {@code {lists: [summary…], headSeq, headHash}} (retired lists included).</li>
- *   <li>{@code GET /inv/entity-lists/{id}?at=<seq>} → summary + {@code {members, atSeq, headHash}}.</li>
- *   <li>{@code POST /inv/entity-lists} {@code {id?, title, purpose, entityType, reason}} → 201 + the list.</li>
- *   <li>{@code POST /inv/entity-lists/{id}/members} {@code {add?, remove?, reason}} → 200 + the list + {@code changed}.</li>
- *   <li>{@code POST /inv/entity-lists/{id}/retire} {@code {reason}} → 200 + the list.</li>
- *   <li>{@code POST /inv/entity-lists/{id}/match} {@code {values[]}} → {@code {matches: [{value, matched, entry?, match?}]}}
+ *   <li>{@code GET /entity-lists} → {@code {lists: [summary…], headSeq, headHash}} (retired lists included).</li>
+ *   <li>{@code GET /entity-lists/{id}?at=<seq>} → summary + {@code {members, atSeq, headHash}}.</li>
+ *   <li>{@code POST /entity-lists} {@code {id?, title, purpose, entityType, reason}} → 201 + the list.</li>
+ *   <li>{@code POST /entity-lists/{id}/members} {@code {add?, remove?, reason}} → 200 + the list + {@code changed}.</li>
+ *   <li>{@code POST /entity-lists/{id}/retire} {@code {reason}} → 200 + the list.</li>
+ *   <li>{@code POST /entity-lists/{id}/match} {@code {values[]}} → {@code {matches: [{value, matched, entry?, match?}]}}
  *       (ASSURE-ENTITY-LISTS-1; read-shaped: a POST so keys never ride in a URL).</li>
  * </ul>
  *
@@ -61,12 +61,12 @@ import java.util.regex.Pattern;
  *
  * <p><b>Masking</b> (D-U6) at render only: under the Space's {@code maskingMode} {@code typed}, a list whose Entity Type
  * is {@code masked: true} — or is no longer in force, failing closed — has its members masked; {@code all} masks every
- * list, {@code none} none. The token is {@link EntityMasking}'s HMAC, under one key per Space fact log. Members are
+ * list, {@code none} none. The token is {@link MaskTokens}' HMAC (the one Link Analysis' {@code EntityMasking} uses), under one key per Space fact log. Members are
  * sorted AFTER rendering, so the order of masked tokens says nothing about the raw keys.
  */
 public final class EntityListRoutes implements RouteModule {
 
-    static final Pattern LIST_ID = Pattern.compile("^[a-z0-9][a-z0-9_-]{0,63}$");
+    public static final Pattern LIST_ID = Pattern.compile("^[a-z0-9][a-z0-9_-]{0,63}$");
     private static final List<String> PURPOSES = List.of("allow", "block", "watch", "exclusion");
     private static final int MAX_VALUES = 5_000;
     private static final int MAX_REASON = 1_000;
@@ -76,15 +76,15 @@ public final class EntityListRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         // ⚠ String LITERALS on purpose — CapabilityManifestTest's scanner matches only a literal argument.
-        api.get("/inv/entity-lists", (e, m) -> list(api));
-        api.get("/inv/entity-lists/([^/]+)", (e, m) -> one(api, e, m.group(1)));
-        api.post("/inv/entity-lists", ApiContext.withCapability("canManageIncidents",
+        api.get("/entity-lists", (e, m) -> list(api));
+        api.get("/entity-lists/([^/]+)", (e, m) -> one(api, e, m.group(1)));
+        api.post("/entity-lists", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> create(api, e, api.body(e))));
-        api.post("/inv/entity-lists/([^/]+)/members", ApiContext.withCapability("canManageIncidents",
+        api.post("/entity-lists/([^/]+)/members", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> members(api, e, m.group(1), api.body(e))));
-        api.post("/inv/entity-lists/([^/]+)/retire", ApiContext.withCapability("canManageIncidents",
+        api.post("/entity-lists/([^/]+)/retire", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> retire(api, e, m.group(1), api.body(e))));
-        api.post("/inv/entity-lists/([^/]+)/match", (e, m) -> match(api, m.group(1), api.body(e)));
+        api.post("/entity-lists/([^/]+)/match", (e, m) -> match(api, m.group(1), api.body(e)));
     }
 
     // ── reads ──────────────────────────────────────────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ public final class EntityListRoutes implements RouteModule {
         EntityRegistry.EntityList l = current(facts, id);
         if (l == null) throw notFound(id, "");
         boolean masked = masked(root, l);
-        byte[] key = masked ? EntityMasking.key(log.directory()) : null;
+        byte[] key = masked ? MaskTokens.key(log.directory()) : null;
         Instant now = Instant.now();
         List<Map<String, Object>> out = new ArrayList<>();
         for (String v : values) {
@@ -145,7 +145,7 @@ public final class EntityListRoutes implements RouteModule {
             if (entry != null) {
                 boolean exact = entry.equals(EntityTypes.normalise(l.normaliser(), v)) && l.members().contains(entry);
                 m.put("match", exact ? "key" : EntityListEntries.parse(entry).match());
-                m.put("entry", masked ? EntityMasking.token(key, entry) : entry);
+                m.put("entry", masked ? MaskTokens.token(key, entry) : entry);
             }
             out.add(m);
         }
@@ -392,8 +392,8 @@ public final class EntityListRoutes implements RouteModule {
             throws IOException {
         List<String> out = new ArrayList<>(entries);
         if (!out.isEmpty() && masked(root, l)) {
-            byte[] key = EntityMasking.key(log.directory());
-            out.replaceAll(k -> EntityMasking.token(key, k));
+            byte[] key = MaskTokens.key(log.directory());
+            out.replaceAll(k -> MaskTokens.token(key, k));
             out.sort(null);
         }
         return out;
@@ -401,7 +401,7 @@ public final class EntityListRoutes implements RouteModule {
 
     // ── helpers ────────────────────────────────────────────────────────────────────────────────────────
 
-    static EntityFactLog.Log read(EntityFactLog log) throws IOException {
+    public static EntityFactLog.Log read(EntityFactLog log) throws IOException {
         try {
             return log.read();
         } catch (EntityFactLog.BrokenChainException broken) {
@@ -409,7 +409,7 @@ public final class EntityListRoutes implements RouteModule {
         }
     }
 
-    static EntityFactLog.Log append(EntityFactLog log, EntityFactLog.Log head, HttpExchange ex, String reason,
+    public static EntityFactLog.Log append(EntityFactLog log, EntityFactLog.Log head, HttpExchange ex, String reason,
                                             String kind, String id, Map<String, Object> payload) throws IOException {
         try {
             return log.append(head, ApiContext.actor(ex), reason, kind, id, payload);
@@ -427,7 +427,7 @@ public final class EntityListRoutes implements RouteModule {
         return new ApiException(404, ErrorCodes.NOT_FOUND, "entity list '" + id + "' not found" + at);
     }
 
-    static String reason(Map<String, Object> body) {
+    public static String reason(Map<String, Object> body) {
         String r = ApiContext.str(body, "reason");
         if (r == null || r.length() > MAX_REASON)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'reason', 1.." + MAX_REASON
@@ -464,7 +464,7 @@ public final class EntityListRoutes implements RouteModule {
         return out;
     }
 
-    static Optional<EntityTypes.EntityType> type(Path root, String id) {
+    public static Optional<EntityTypes.EntityType> type(Path root, String id) {
         return LinkAnalysisSettings.forRoot(root).effectiveEntityTypes().stream().filter(t -> t.id().equals(id)).findFirst();
     }
 
@@ -494,22 +494,22 @@ public final class EntityListRoutes implements RouteModule {
         Map<String, Object> out = summary(l);
         List<String> members = new ArrayList<>(l.members());
         if (!members.isEmpty() && masked(root, l)) {
-            byte[] key = EntityMasking.key(log.directory());
-            members.replaceAll(k -> EntityMasking.token(key, k));
+            byte[] key = MaskTokens.key(log.directory());
+            members.replaceAll(k -> MaskTokens.token(key, k));
             members.sort(null);
         }
         out.put("members", members);
         // ASSURE-ENTITY-LISTS-1: the range entries and every expiring entry, masked like the members.
         boolean masked = masked(root, l);
-        byte[] key = masked && (!l.ranges().isEmpty() || !l.expiresAt().isEmpty()) ? EntityMasking.key(log.directory()) : null;
+        byte[] key = masked && (!l.ranges().isEmpty() || !l.expiresAt().isEmpty()) ? MaskTokens.key(log.directory()) : null;
         List<String> ranges = new ArrayList<>(l.ranges());
-        if (masked) ranges.replaceAll(k -> EntityMasking.token(key, k));
+        if (masked) ranges.replaceAll(k -> MaskTokens.token(key, k));
         ranges.sort(null);
         out.put("ranges", ranges);
         Instant now = Instant.now();
         List<Map<String, Object>> expiring = new ArrayList<>();
-        l.expiresAt().forEach((k, at) -> expiring.add(expiring(masked ? EntityMasking.token(key, k) : k, "key", at, now)));
-        l.rangeExpiresAt().forEach((k, at) -> expiring.add(expiring(masked ? EntityMasking.token(key, k) : k, "range", at, now)));
+        l.expiresAt().forEach((k, at) -> expiring.add(expiring(masked ? MaskTokens.token(key, k) : k, "key", at, now)));
+        l.rangeExpiresAt().forEach((k, at) -> expiring.add(expiring(masked ? MaskTokens.token(key, k) : k, "range", at, now)));
         expiring.sort(java.util.Comparator.comparing(m -> String.valueOf(m.get("entry"))));
         out.put("expiring", expiring);
         out.put("atSeq", atSeq);
@@ -526,7 +526,7 @@ public final class EntityListRoutes implements RouteModule {
         return m;
     }
 
-    static boolean masked(Path root, EntityRegistry.EntityList l) {
+    public static boolean masked(Path root, EntityRegistry.EntityList l) {
         return switch (LinkAnalysisSettings.forRoot(root).effectiveMaskingMode()) {
             case "none" -> false;
             case "all" -> true;

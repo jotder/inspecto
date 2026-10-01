@@ -2,23 +2,17 @@ package com.gamma.geolink;
 
 import com.gamma.control.EntityTypes;
 import com.gamma.control.LinkAnalysisSettings;
+import com.gamma.entitylist.EntityListRoutes;
+import com.gamma.entitylist.MaskTokens;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.query.DatasetRead;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.security.GeneralSecurityException;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,8 +73,7 @@ final class EntityMasking {
 
     /** Response keys whose values are prose that may mention an id inline. */
     private static final Set<String> FREE_TEXT = Set.of("text", "note", "reason", "method", "steps", "purpose", "title");
-    static final String TOKEN_PREFIX = "masked:";
-    private static final String KEY_FILE = "mask.key";
+    static final String TOKEN_PREFIX = MaskTokens.TOKEN_PREFIX;
 
     private final String mode;
     private final String basis;
@@ -252,36 +245,15 @@ final class EntityMasking {
         return out;
     }
 
-    /** The per-Investigation HMAC key, created on first use. Never served. {@link EntityListRoutes} keys
-     *  Entity List members the same way, with one key per Space fact log. ⚠ The key is written to a sibling temp
-     *  file and only then published by {@link EntityFactLog#publishNew} (a hard link, never a replace), so a
-     *  concurrent first reader never sees a partly written {@code mask.key}; the loser of a race reads the winner's. */
+    /** The per-Investigation HMAC key, created on first use. Never served. The algorithm lives in {@link MaskTokens}
+     *  (inspecto-entity-list, SEP-08), which {@code EntityListRoutes} shares to key Entity List members the same way,
+     *  with one key per Space fact log. */
     static byte[] key(Path dir) throws IOException {
-        Path f = dir.resolve(KEY_FILE);
-        if (!Files.isRegularFile(f)) {
-            byte[] k = new byte[32];
-            new SecureRandom().nextBytes(k);
-            Path tmp = Files.createTempFile(dir, ".mask-", ".tmp");
-            try {
-                Files.writeString(tmp, HexFormat.of().formatHex(k), StandardCharsets.UTF_8);
-                EntityFactLog.publishNew(tmp, f);
-            } catch (FileAlreadyExistsException raced) {
-                // another request created it first — read theirs below
-            } finally {
-                Files.deleteIfExists(tmp);
-            }
-        }
-        return HexFormat.of().parseHex(Files.readString(f, StandardCharsets.UTF_8).trim());
+        return MaskTokens.key(dir);
     }
 
     static String token(byte[] key, String id) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(key, "HmacSHA256"));
-            return TOKEN_PREFIX + HexFormat.of().formatHex(mac.doFinal(id.getBytes(StandardCharsets.UTF_8))).substring(0, 16);
-        } catch (GeneralSecurityException e) {
-            throw new IllegalStateException(e);
-        }
+        return MaskTokens.token(key, id);
     }
 
     // ── use ────────────────────────────────────────────────────────────────────────────────────────────

@@ -230,7 +230,7 @@ class ControlApiEntityIdentityTest {
             status(422, post(c, IDS + "/2/retract", "{}"), "missing reason");
             status(422, post(c, IDS + "/two/retract", "{\"reason\":\"r\"}"), "not a seq");
             status(409, post(c, IDS + "/9/retract", "{\"reason\":\"r\"}"), "unknown assertion");
-            data(post(c, "/inv/entity-lists", "{\"id\":\"wl\",\"title\":\"T\",\"purpose\":\"watch\",\"entityType\":\"imsi\","
+            data(post(c, "/entity-lists", "{\"id\":\"wl\",\"title\":\"T\",\"purpose\":\"watch\",\"entityType\":\"imsi\","
                     + "\"reason\":\"r\"}"), 201);                               // 3 — a list fact, not an assertion
             status(409, post(c, IDS + "/3/retract", "{\"reason\":\"r\"}"), "a list fact is not an assertion");
             assertEquals(3, facts(c));

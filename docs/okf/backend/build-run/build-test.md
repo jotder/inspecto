@@ -178,7 +178,7 @@ node tools/compile-clean.mjs                                                    
 `compile-clean` always runs `mvn -o clean test-compile -DskipTests -B -fae -Pedition-enterprise` (pass `-P…` to change the profile),
 reads the log rather than the exit code, and exits 0 only on BUILD SUCCESS with every reactor module SUCCESS, none SKIPPED, no
 `[ERROR] …java` line (de-duplicated — Maven prints each twice) and no "Nothing to compile". It prints errors grouped by module and
-file. JDK 27 on `JAVA_HOME`; about 2 min for 37 modules. `java-closure` strips comments with a tokenizer (a `/*` inside a string
+file. JDK 27 on `JAVA_HOME`; about 2 min for 38 modules. `java-closure` strips comments with a tokenizer (a `/*` inside a string
 literal cannot open a fake comment) and resolves inline fully-qualified names; it still cannot see reflection, `ServiceLoader`
 providers or a class named only inside a string. Both are fixture-tested (`tools/*.test.mjs`, each blind spot planted and the
 test confirmed RED against the old behaviour) and run in CI.
@@ -191,7 +191,7 @@ doc since 2026-09-08 and **did not prevent either occurrence** — which is why 
 
 ```
 mvn -o clean test -Pedition-enterprise -B > build.log 2>&1     # -B, NEVER -q
-node tools/check-reactor-verdict.mjs build.log --expect-modules 37   # 33 until D-1 (2026-10-01) added inspecto-audit-spi, -la-graph, -auth-spi, -http-spi
+node tools/check-reactor-verdict.mjs build.log --expect-modules 38   # 33 until D-1 (2026-10-01) added inspecto-audit-spi, -la-graph, -auth-spi, -http-spi; 37 until SEP-08 added inspecto-entity-list
 ```
 
 Reproduced deliberately on 2026-09-16 with the real toolchain (Maven 3.9.16 / surefire 3.2.5). Three

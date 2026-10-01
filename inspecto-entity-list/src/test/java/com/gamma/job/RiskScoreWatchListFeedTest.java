@@ -1,6 +1,6 @@
 package com.gamma.job;
 
-import com.gamma.geolink.EntityFactsForTest;
+import com.gamma.entitylist.EntityFactsForTest;
 import com.gamma.risk.RiskScoreModel;
 import com.gamma.risk.RiskScorer;
 import com.gamma.risk.WatchListFeed;
@@ -39,7 +39,7 @@ class RiskScoreWatchListFeedTest {
 
     @Test
     void theEntityListsModuleProvidesTheFeed() {
-        assertEquals("com.gamma.geolink.RiskWatchListFeed", WatchListFeed.installed().orElseThrow().getClass().getName());
+        assertEquals("com.gamma.entitylist.RiskWatchListFeed", WatchListFeed.installed().orElseThrow().getClass().getName());
     }
 
     @Test

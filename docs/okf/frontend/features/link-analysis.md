@@ -816,10 +816,10 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   not been checked.
 * **Entity Lists section** (LA-17 step 6, SPA half, 2026-09-26; `link-analysis-entity-lists.component` +
   `link-analysis-entity-lists.dialogs`, hosted at the foot of the Investigation panel in BOTH its states). It reads
-  `GET /inv/entity-lists` and shows each list's title, purpose, Entity Type label (from the settings'
+  `GET /entity-lists` and shows each list's title, purpose, Entity Type label (from the settings'
   `entityTypesInForce`; a type no longer in force says so), size and a *Retired* status badge — ⛔ **never its
   members**: they arrive masked per `maskingMode`, and member browsing is out of scope. *New list…* (`POST
-  /inv/entity-lists`: title, purpose, Entity Type, required reason; the id is left to the server to mint) keeps a
+  /entity-lists`: title, purpose, Entity Type, required reason; the id is left to the server to mint) keeps a
   409/422 in the dialog. *Add selection* sends the selected canvas entity's RAW spellings (`rawIdsOf`) to `…/members`
   `{add, reason}` and states `changed`; ⚠ the selection is `InvestigationSessionStore.selected`, which a canvas click
   sets only **while an Investigation is open** — there is no multi-node selection. ⚠ `masked:<hex>` pseudonyms are

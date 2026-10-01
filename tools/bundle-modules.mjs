@@ -55,6 +55,7 @@ const MODULES = [
     // inspecto-connectors, whose pom no longer declares it.
     { artifactId: 'inspecto-notify-channels', dir: 'inspecto-notify-channels', bundleFile: 'inspecto-notify-channels.jar', from: 'professional' },
     { artifactId: 'inspecto-backup', dir: 'inspecto-backup', bundleFile: 'inspecto-backup.jar', from: 'professional' },        // cell 2 (OPS-06)
+    { artifactId: 'inspecto-entity-list', dir: 'inspecto-entity-list', bundleFile: 'inspecto-entity-list.jar', from: 'professional' },  // SEP-08 (Entity Lists + the shared fact log; geo-link depends on it)
     { artifactId: 'inspecto-geo-link', dir: 'inspecto-geo-link', bundleFile: 'inspecto-geo-link.jar', from: 'professional' },  // cell 3b (CP-09)
     { artifactId: 'inspecto-exchange', dir: 'inspecto-exchange', bundleFile: 'inspecto-exchange.jar', from: 'professional' },  // cell 4 (SEC-10)
     { artifactId: 'inspecto-metrics', dir: 'inspecto-metrics', bundleFile: 'inspecto-metrics.jar', from: 'professional' },     // cell 5 (CP-13, /metrics)
@@ -82,7 +83,7 @@ export function editionProfile(edition) {
 
 /**
  * The first-party modules staged for `edition`, in package.ps1's staging order.
- * Personal 2, Professional 11, Enterprise 13, Preview 13 — first-party only; add PG_SIDECAR for the jar count.
+ * Personal 2, Professional 12, Enterprise 14, Preview 14 — first-party only; add PG_SIDECAR for the jar count.
  * ⚠ Those three numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this
  * very line. They said 2/10/11 from EDG-01 until 2026-09-17, missing inspecto-agent (PKG-5, 2026-09-12);
  * the assertion exists so the next module to arrive cannot leave them wrong again.

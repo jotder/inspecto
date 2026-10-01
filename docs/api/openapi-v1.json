@@ -8588,9 +8588,7 @@
     },
     "/components/escalation-rule" : {
       "post" : {
-        "tags" : [
-          "components"
-        ],
+        "tags" : [ "components" ],
         "summary" : "POST /components/escalation-rule",
         "operationId" : "postComponentsEscalationRule",
         "description" : "Writes an escalation-rule component - on an SLA breach or at an age, reassign / notify / raise priority, at most once per breach (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; applied by the SLA sweep. The generic /components door and every import refuse this kind.",
@@ -8603,22 +8601,18 @@
     },
     "/components/escalation-rule/{escalationruleId}" : {
       "put" : {
-        "tags" : [
-          "components"
-        ],
+        "tags" : [ "components" ],
         "summary" : "PUT /components/escalation-rule/{escalationruleId}",
         "operationId" : "putComponentsEscalationRuleByEscalationruleId",
         "description" : "Writes an escalation-rule component - on an SLA breach or at an age, reassign / notify / raise priority, at most once per breach (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; applied by the SLA sweep. The generic /components door and every import refuse this kind.",
-        "parameters" : [
-          {
-            "name" : "escalationruleId",
-            "in" : "path",
-            "required" : true,
-            "schema" : {
-              "type" : "string"
-            }
+        "parameters" : [ {
+          "name" : "escalationruleId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
           }
-        ],
+        } ],
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -8626,22 +8620,18 @@
         }
       },
       "delete" : {
-        "tags" : [
-          "components"
-        ],
+        "tags" : [ "components" ],
         "summary" : "DELETE /components/escalation-rule/{escalationruleId}",
         "operationId" : "deleteComponentsEscalationRuleByEscalationruleId",
         "description" : "Writes an escalation-rule component - on an SLA breach or at an age, reassign / notify / raise priority, at most once per breach (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; applied by the SLA sweep. The generic /components door and every import refuse this kind.",
-        "parameters" : [
-          {
-            "name" : "escalationruleId",
-            "in" : "path",
-            "required" : true,
-            "schema" : {
-              "type" : "string"
-            }
+        "parameters" : [ {
+          "name" : "escalationruleId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
           }
-        ],
+        } ],
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -8651,30 +8641,25 @@
     },
     "/components/escalation-rule/{escalationruleId}/versions/{versionId}/restore" : {
       "post" : {
-        "tags" : [
-          "components"
-        ],
+        "tags" : [ "components" ],
         "summary" : "POST /components/escalation-rule/{escalationruleId}/versions/{versionId}/restore",
         "operationId" : "postComponentsEscalationRuleByEscalationruleIdVersionsByVersionIdRestore",
         "description" : "Writes an escalation-rule component - on an SLA breach or at an age, reassign / notify / raise priority, at most once per breach (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; applied by the SLA sweep. The generic /components door and every import refuse this kind.",
-        "parameters" : [
-          {
-            "name" : "escalationruleId",
-            "in" : "path",
-            "required" : true,
-            "schema" : {
-              "type" : "string"
-            }
-          },
-          {
-            "name" : "versionId",
-            "in" : "path",
-            "required" : true,
-            "schema" : {
-              "type" : "string"
-            }
+        "parameters" : [ {
+          "name" : "escalationruleId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
           }
-        ],
+        }, {
+          "name" : "versionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -8684,9 +8669,7 @@
     },
     "/components/sla-policy" : {
       "post" : {
-        "tags" : [
-          "components"
-        ],
+        "tags" : [ "components" ],
         "summary" : "POST /components/sla-policy",
         "operationId" : "postComponentsSlaPolicy",
         "description" : "Writes an sla-policy component - per-priority response and resolution targets of one ObjectType, counted in a business calendar with an explicit IANA zone (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; hot-reloaded by the SLA sweep. The generic /components door and every import refuse this kind.",
@@ -8699,22 +8682,18 @@
     },
     "/components/sla-policy/{slapolicyId}" : {
       "put" : {
-        "tags" : [
-          "components"
-        ],
+        "tags" : [ "components" ],
         "summary" : "PUT /components/sla-policy/{slapolicyId}",
         "operationId" : "putComponentsSlaPolicyBySlapolicyId",
         "description" : "Writes an sla-policy component - per-priority response and resolution targets of one ObjectType, counted in a business calendar with an explicit IANA zone (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; hot-reloaded by the SLA sweep. The generic /components door and every import refuse this kind.",
-        "parameters" : [
-          {
-            "name" : "slapolicyId",
-            "in" : "path",
-            "required" : true,
-            "schema" : {
-              "type" : "string"
-            }
+        "parameters" : [ {
+          "name" : "slapolicyId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
           }
-        ],
+        } ],
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -8722,22 +8701,18 @@
         }
       },
       "delete" : {
-        "tags" : [
-          "components"
-        ],
+        "tags" : [ "components" ],
         "summary" : "DELETE /components/sla-policy/{slapolicyId}",
         "operationId" : "deleteComponentsSlaPolicyBySlapolicyId",
         "description" : "Writes an sla-policy component - per-priority response and resolution targets of one ObjectType, counted in a business calendar with an explicit IANA zone (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; hot-reloaded by the SLA sweep. The generic /components door and every import refuse this kind.",
-        "parameters" : [
-          {
-            "name" : "slapolicyId",
-            "in" : "path",
-            "required" : true,
-            "schema" : {
-              "type" : "string"
-            }
+        "parameters" : [ {
+          "name" : "slapolicyId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
           }
-        ],
+        } ],
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -8747,30 +8722,25 @@
     },
     "/components/sla-policy/{slapolicyId}/versions/{versionId}/restore" : {
       "post" : {
-        "tags" : [
-          "components"
-        ],
+        "tags" : [ "components" ],
         "summary" : "POST /components/sla-policy/{slapolicyId}/versions/{versionId}/restore",
         "operationId" : "postComponentsSlaPolicyBySlapolicyIdVersionsByVersionIdRestore",
         "description" : "Writes an sla-policy component - per-priority response and resolution targets of one ObjectType, counted in a business calendar with an explicit IANA zone (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; hot-reloaded by the SLA sweep. The generic /components door and every import refuse this kind.",
-        "parameters" : [
-          {
-            "name" : "slapolicyId",
-            "in" : "path",
-            "required" : true,
-            "schema" : {
-              "type" : "string"
-            }
-          },
-          {
-            "name" : "versionId",
-            "in" : "path",
-            "required" : true,
-            "schema" : {
-              "type" : "string"
-            }
+        "parameters" : [ {
+          "name" : "slapolicyId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
           }
-        ],
+        }, {
+          "name" : "versionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -8780,9 +8750,7 @@
     },
     "/components/workflow" : {
       "post" : {
-        "tags" : [
-          "components"
-        ],
+        "tags" : [ "components" ],
         "summary" : "POST /components/workflow",
         "operationId" : "postComponentsWorkflow",
         "description" : "Writes a workflow component - the states and transitions of one ObjectType (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister: a governance change. Validated fail-closed (422): exactly one initial state, a declared terminal state, every state reachable and every non-terminal state with a way out, no ambiguous action, and for INCIDENT a RESOLVED state with no terminal move around it. Held for approval like every governable kind; hot-reloaded by inspecto-ops. The generic /components door and every import refuse this kind.",
@@ -8795,22 +8763,18 @@
     },
     "/components/workflow/{workflowId}" : {
       "put" : {
-        "tags" : [
-          "components"
-        ],
+        "tags" : [ "components" ],
         "summary" : "PUT /components/workflow/{workflowId}",
         "operationId" : "putComponentsWorkflowByWorkflowId",
         "description" : "Writes a workflow component - the states and transitions of one ObjectType (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister: a governance change. Validated fail-closed (422): exactly one initial state, a declared terminal state, every state reachable and every non-terminal state with a way out, no ambiguous action, and for INCIDENT a RESOLVED state with no terminal move around it. Held for approval like every governable kind; hot-reloaded by inspecto-ops. The generic /components door and every import refuse this kind.",
-        "parameters" : [
-          {
-            "name" : "workflowId",
-            "in" : "path",
-            "required" : true,
-            "schema" : {
-              "type" : "string"
-            }
+        "parameters" : [ {
+          "name" : "workflowId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
           }
-        ],
+        } ],
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -8818,22 +8782,18 @@
         }
       },
       "delete" : {
-        "tags" : [
-          "components"
-        ],
+        "tags" : [ "components" ],
         "summary" : "DELETE /components/workflow/{workflowId}",
         "operationId" : "deleteComponentsWorkflowByWorkflowId",
         "description" : "Writes a workflow component - the states and transitions of one ObjectType (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister: a governance change. Validated fail-closed (422): exactly one initial state, a declared terminal state, every state reachable and every non-terminal state with a way out, no ambiguous action, and for INCIDENT a RESOLVED state with no terminal move around it. Held for approval like every governable kind; hot-reloaded by inspecto-ops. The generic /components door and every import refuse this kind.",
-        "parameters" : [
-          {
-            "name" : "workflowId",
-            "in" : "path",
-            "required" : true,
-            "schema" : {
-              "type" : "string"
-            }
+        "parameters" : [ {
+          "name" : "workflowId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
           }
-        ],
+        } ],
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -8843,30 +8803,25 @@
     },
     "/components/workflow/{workflowId}/versions/{versionId}/restore" : {
       "post" : {
-        "tags" : [
-          "components"
-        ],
+        "tags" : [ "components" ],
         "summary" : "POST /components/workflow/{workflowId}/versions/{versionId}/restore",
         "operationId" : "postComponentsWorkflowByWorkflowIdVersionsByVersionIdRestore",
         "description" : "Writes a workflow component - the states and transitions of one ObjectType (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister: a governance change. Validated fail-closed (422): exactly one initial state, a declared terminal state, every state reachable and every non-terminal state with a way out, no ambiguous action, and for INCIDENT a RESOLVED state with no terminal move around it. Held for approval like every governable kind; hot-reloaded by inspecto-ops. The generic /components door and every import refuse this kind.",
-        "parameters" : [
-          {
-            "name" : "workflowId",
-            "in" : "path",
-            "required" : true,
-            "schema" : {
-              "type" : "string"
-            }
-          },
-          {
-            "name" : "versionId",
-            "in" : "path",
-            "required" : true,
-            "schema" : {
-              "type" : "string"
-            }
+        "parameters" : [ {
+          "name" : "workflowId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
           }
-        ],
+        }, {
+          "name" : "versionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -9156,13 +9111,30 @@
                     "type" : "object",
                     "additionalProperties" : false,
                     "properties" : {
-                      "suspected" : { "type" : [ "number", "string" ] },
-                      "confirmed" : { "type" : [ "number", "string" ] },
-                      "recovered" : { "type" : [ "number", "string" ] },
-                      "prevented" : { "type" : [ "number", "string" ] },
-                      "currency" : { "type" : "string", "pattern" : "^[A-Za-z]{3}$" },
-                      "period" : { "type" : "string", "maxLength" : 64 },
-                      "basis" : { "type" : "string", "maxLength" : 2000 }
+                      "suspected" : {
+                        "type" : [ "number", "string" ]
+                      },
+                      "confirmed" : {
+                        "type" : [ "number", "string" ]
+                      },
+                      "recovered" : {
+                        "type" : [ "number", "string" ]
+                      },
+                      "prevented" : {
+                        "type" : [ "number", "string" ]
+                      },
+                      "currency" : {
+                        "type" : "string",
+                        "pattern" : "^[A-Za-z]{3}$"
+                      },
+                      "period" : {
+                        "type" : "string",
+                        "maxLength" : 64
+                      },
+                      "basis" : {
+                        "type" : "string",
+                        "maxLength" : 2000
+                      }
                     }
                   }
                 }
@@ -9186,126 +9158,6 @@
         "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
         "parameters" : [ {
           "name" : "objectId",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
-          }
-        },
-        "x-generated" : true,
-        "x-optional-module" : true
-      }
-    },
-    "/inv/entity-lists" : {
-      "get" : {
-        "tags" : [ "inv" ],
-        "summary" : "GET /inv/entity-lists (generated skeleton)",
-        "operationId" : "getInvEntityLists",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
-          }
-        },
-        "x-generated" : true,
-        "x-optional-module" : true
-      },
-      "post" : {
-        "tags" : [ "inv" ],
-        "summary" : "POST /inv/entity-lists (generated skeleton)",
-        "operationId" : "postInvEntityLists",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
-          }
-        },
-        "x-generated" : true,
-        "x-optional-module" : true
-      }
-    },
-    "/inv/entity-lists/{entitylistId}" : {
-      "get" : {
-        "tags" : [ "inv" ],
-        "summary" : "GET /inv/entity-lists/{entitylistId} (generated skeleton)",
-        "operationId" : "getInvEntityListsByEntitylistId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
-        "parameters" : [ {
-          "name" : "entitylistId",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
-          }
-        },
-        "x-generated" : true,
-        "x-optional-module" : true
-      }
-    },
-    "/inv/entity-lists/{entitylistId}/members" : {
-      "post" : {
-        "tags" : [ "inv" ],
-        "summary" : "POST /inv/entity-lists/{entitylistId}/members (generated skeleton)",
-        "operationId" : "postInvEntityListsByEntitylistIdMembers",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
-        "parameters" : [ {
-          "name" : "entitylistId",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
-          }
-        },
-        "x-generated" : true,
-        "x-optional-module" : true
-      }
-    },
-    "/inv/entity-lists/{entitylistId}/retire" : {
-      "post" : {
-        "tags" : [ "inv" ],
-        "summary" : "POST /inv/entity-lists/{entitylistId}/retire (generated skeleton)",
-        "operationId" : "postInvEntityListsByEntitylistIdRetire",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
-        "parameters" : [ {
-          "name" : "entitylistId",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
-          }
-        },
-        "x-generated" : true,
-        "x-optional-module" : true
-      }
-    },
-    "/inv/entity-lists/{entitylistId}/match" : {
-      "post" : {
-        "tags" : [ "inv" ],
-        "summary" : "POST /inv/entity-lists/{entitylistId}/match (generated skeleton)",
-        "operationId" : "postInvEntityListsByEntitylistIdMatch",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
-        "parameters" : [ {
-          "name" : "entitylistId",
           "in" : "path",
           "required" : true,
           "schema" : {
@@ -10198,19 +10050,29 @@
           "name" : "model",
           "in" : "path",
           "required" : true,
-          "schema" : { "type" : "string", "pattern" : "^[A-Za-z0-9][A-Za-z0-9_]*$" }
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^[A-Za-z0-9][A-Za-z0-9_]*$"
+          }
         }, {
           "name" : "entityKey",
           "in" : "path",
           "required" : true,
-          "schema" : { "type" : "string", "maxLength" : 256 }
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 256
+          }
         } ],
         "responses" : {
           "200" : {
             "description" : "Envelope-wrapped: data = {model, entityType, entityKey, score, high, highThreshold, modelVersion, runId, scoredAt, factors[{indicator, label, value, missing, weight, cap, capped, contribution, evidence[]}]}"
           },
-          "403" : { "description" : "The caller lacks canWorkIncidents." },
-          "404" : { "description" : "No visible score for that model and entity." }
+          "403" : {
+            "description" : "The caller lacks canWorkIncidents."
+          },
+          "404" : {
+            "description" : "No visible score for that model and entity."
+          }
         }
       }
     },
@@ -10436,31 +10298,183 @@
           "in" : "path",
           "required" : true,
           "description" : "The Collector id (the id GET /catalog/streams lists).",
-          "schema" : { "type" : "string" }
+          "schema" : {
+            "type" : "string"
+          }
         }, {
           "name" : "Idempotency-Key",
           "in" : "header",
           "required" : false,
-          "schema" : { "type" : "string" }
+          "schema" : {
+            "type" : "string"
+          }
         } ],
         "requestBody" : {
           "required" : true,
           "content" : {
-            "application/x-ndjson" : { "schema" : { "type" : "string", "description" : "One JSON object per line." } },
-            "text/csv" : { "schema" : { "type" : "string", "description" : "RFC 4180 rows, the Pipeline's delimiter; every row the first row's field count." } }
+            "application/x-ndjson" : {
+              "schema" : {
+                "type" : "string",
+                "description" : "One JSON object per line."
+              }
+            },
+            "text/csv" : {
+              "schema" : {
+                "type" : "string",
+                "description" : "RFC 4180 rows, the Pipeline's delimiter; every row the first row's field count."
+              }
+            }
           }
         },
         "responses" : {
-          "201" : { "description" : "Envelope-wrapped: data = {stream, pipeline, file, records, bytes}. A replay carries Idempotency-Replayed: true." },
-          "403" : { "description" : "The caller lacks canOperateRuns." },
-          "404" : { "description" : "No such Stream." },
-          "409" : { "description" : "pipeline paused (paused or not active), an authoring template, or the same caller's Idempotency-Key still in flight." },
-          "413" : { "description" : "Over the byte or record cap, or a keyed push over the 1 MiB idempotency hash window." },
-          "415" : { "description" : "Neither NDJSON nor CSV." },
-          "422" : { "description" : "Not UTF-8, a malformed line (named), no records, or the Pipeline's file_pattern would never ingest the format." },
-          "429" : { "description" : "The caller's push budget is spent." },
-          "501" : { "description" : "A Dataset-fed Pipeline has no inbox." }
+          "201" : {
+            "description" : "Envelope-wrapped: data = {stream, pipeline, file, records, bytes}. A replay carries Idempotency-Replayed: true."
+          },
+          "403" : {
+            "description" : "The caller lacks canOperateRuns."
+          },
+          "404" : {
+            "description" : "No such Stream."
+          },
+          "409" : {
+            "description" : "pipeline paused (paused or not active), an authoring template, or the same caller's Idempotency-Key still in flight."
+          },
+          "413" : {
+            "description" : "Over the byte or record cap, or a keyed push over the 1 MiB idempotency hash window."
+          },
+          "415" : {
+            "description" : "Neither NDJSON nor CSV."
+          },
+          "422" : {
+            "description" : "Not UTF-8, a malformed line (named), no records, or the Pipeline's file_pattern would never ingest the format."
+          },
+          "429" : {
+            "description" : "The caller's push budget is spent."
+          },
+          "501" : {
+            "description" : "A Dataset-fed Pipeline has no inbox."
+          }
         }
+      }
+    },
+    "/entity-lists" : {
+      "get" : {
+        "tags" : [ "entity-lists" ],
+        "summary" : "GET /entity-lists (generated skeleton)",
+        "operationId" : "getEntityLists",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "post" : {
+        "tags" : [ "entity-lists" ],
+        "summary" : "POST /entity-lists (generated skeleton)",
+        "operationId" : "postEntityLists",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/entity-lists/{entitylistId}" : {
+      "get" : {
+        "tags" : [ "entity-lists" ],
+        "summary" : "GET /entity-lists/{entitylistId} (generated skeleton)",
+        "operationId" : "getEntityListsByEntitylistId",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "entitylistId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/entity-lists/{entitylistId}/members" : {
+      "post" : {
+        "tags" : [ "entity-lists" ],
+        "summary" : "POST /entity-lists/{entitylistId}/members (generated skeleton)",
+        "operationId" : "postEntityListsByEntitylistIdMembers",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "entitylistId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/entity-lists/{entitylistId}/retire" : {
+      "post" : {
+        "tags" : [ "entity-lists" ],
+        "summary" : "POST /entity-lists/{entitylistId}/retire (generated skeleton)",
+        "operationId" : "postEntityListsByEntitylistIdRetire",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "entitylistId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/entity-lists/{entitylistId}/match" : {
+      "post" : {
+        "tags" : [ "entity-lists" ],
+        "summary" : "POST /entity-lists/{entitylistId}/match (generated skeleton)",
+        "operationId" : "postEntityListsByEntitylistIdMatch",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "entitylistId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
       }
     }
   },
@@ -10711,11 +10725,11 @@
         }
       },
       "Disposition" : {
-      "type" : "string",
-      "description" : "The Disposition ladder (GLOSSARY §9; FindingsSpec.DISPOSITIONS): the outcome an Incident is resolved with, and the default choices of a Case's Findings. Case-insensitive on input, stored upper-case.",
-      "enum" : [ "CONFIRMED", "FALSE_POSITIVE", "RECOVERED", "WRITTEN_OFF", "INCONCLUSIVE", "DUPLICATE", "ACCEPTED_RISK" ]
-    },
-    "ErrorResponse" : {
+        "type" : "string",
+        "description" : "The Disposition ladder (GLOSSARY §9; FindingsSpec.DISPOSITIONS): the outcome an Incident is resolved with, and the default choices of a Case's Findings. Case-insensitive on input, stored upper-case.",
+        "enum" : [ "CONFIRMED", "FALSE_POSITIVE", "RECOVERED", "WRITTEN_OFF", "INCONCLUSIVE", "DUPLICATE", "ACCEPTED_RISK" ]
+      },
+      "ErrorResponse" : {
         "type" : "object",
         "required" : [ "error" ],
         "properties" : {

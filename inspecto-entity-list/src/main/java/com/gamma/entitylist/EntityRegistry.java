@@ -1,13 +1,12 @@
-package com.gamma.geolink;
+package com.gamma.entitylist;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
-
-import static com.gamma.geolink.InvestigationEvaluator.strings;
 
 /**
  * The Entity Lists as of one position in the identity fact log (LA-17, design §4.2) — a pure fold over
@@ -34,27 +33,34 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  * <p>⛔ <b>Not cached.</b> {@link EntityFactLog#read()} must parse every fact to verify the chain, so the only thing a
  * head-hash cache (the {@code WorkingSetRoutes} idiom) could save is this linear set fold — not worth a cache.
  */
-final class EntityRegistry {
+public final class EntityRegistry {
 
     private EntityRegistry() {}
+
+    /** A JSON array of anything as strings; a non-array is empty. Same coercion as Link Analysis' evaluator — duplicated, not shared, so this module needs nothing from it. */
+    static List<String> strings(Object raw) {
+        List<String> out = new ArrayList<>();
+        if (raw instanceof List<?> l) for (Object o : l) out.add(String.valueOf(o));
+        return out;
+    }
 
     /**
      * One Entity List as of a log position. {@code members} are normalised keys, sorted; {@code ranges} the canonical
      * range entries; {@code expiresAt} / {@code rangeExpiresAt} the expiry of each expiring member / range (absent =
      * permanent). Two maps, because a member key of a {@code default} list may spell like a range entry.
      */
-    record EntityList(String id, String title, String purpose, String entityType, String normaliser, String createdAt,
+    public record EntityList(String id, String title, String purpose, String entityType, String normaliser, String createdAt,
                       String createdBy, boolean retired, long lastSeq, SortedSet<String> members,
                       SortedSet<String> ranges, java.util.SortedMap<String, String> expiresAt,
                       java.util.SortedMap<String, String> rangeExpiresAt) {
 
         /** Whether member {@code key} still matches at {@code now}: it has no expiry, or one after now. */
-        boolean live(String key, java.time.Instant now) {
+        public boolean live(String key, java.time.Instant now) {
             return notExpired(expiresAt.get(key), now);
         }
 
         /** Whether range entry {@code range} still matches at {@code now}. */
-        boolean liveRange(String range, java.time.Instant now) {
+        public boolean liveRange(String range, java.time.Instant now) {
             return notExpired(rangeExpiresAt.get(range), now);
         }
 
@@ -63,7 +69,7 @@ final class EntityRegistry {
         }
 
         /** The members that still match at {@code now}. */
-        SortedSet<String> liveMembers(java.time.Instant now) {
+        public SortedSet<String> liveMembers(java.time.Instant now) {
             SortedSet<String> out = new TreeSet<>();
             for (String k : members) if (live(k, now)) out.add(k);
             return Collections.unmodifiableSortedSet(out);
@@ -73,7 +79,7 @@ final class EntityRegistry {
          * The entry that admits {@code raw} at {@code now}: its key when an exact member, else the first live range
          * entry that contains it; {@code null} when none does. An expired entry never matches.
          */
-        String match(String raw, java.time.Instant now) {
+        public String match(String raw, java.time.Instant now) {
             String key = com.gamma.control.EntityTypes.normalise(normaliser, raw);
             if (!key.isEmpty() && members.contains(key) && live(key, now)) return key;
             for (String r : ranges)
@@ -83,7 +89,7 @@ final class EntityRegistry {
     }
 
     /** Every list that existed at {@code atSeq}, in creation order. */
-    static Map<String, EntityList> fold(List<EntityFactLog.Fact> facts, long atSeq) {
+    public static Map<String, EntityList> fold(List<EntityFactLog.Fact> facts, long atSeq) {
         Map<String, Acc> lists = new LinkedHashMap<>();
         for (EntityFactLog.Fact f : facts) {
             if (f.seq() > atSeq) break;
@@ -129,19 +135,19 @@ final class EntityRegistry {
     // ── identity resolution (slice 2, design §8.1) ─────────────────────────────────────────────────────
 
     /** One {@code identity.asserted} fact: typed keys {@code a}, {@code b} (normalised, sealed), and whether it is retracted. */
-    record Assertion(long seq, String a, String b, String via, String actor, String at, String reason,
+    public record Assertion(long seq, String a, String b, String via, String actor, String at, String reason,
                      long retractedBy) {
-        boolean live() { return retractedBy == 0; }
+        public boolean live() { return retractedBy == 0; }
     }
 
     /**
      * One resolved group: its id (the lexicographically smallest member key), every member key (sorted) and the
      * seqs of the live assertions that join it (sorted) — a merge never hides which assertion matched.
      */
-    record Group(String id, SortedSet<String> members, SortedSet<Long> assertions) {}
+    public record Group(String id, SortedSet<String> members, SortedSet<Long> assertions) {}
 
     /** Every {@code identity.asserted} fact as of {@code atSeq}, by seq, with the retraction (if any) as of {@code atSeq}. */
-    static Map<Long, Assertion> assertions(List<EntityFactLog.Fact> facts, long atSeq) {
+    public static Map<Long, Assertion> assertions(List<EntityFactLog.Fact> facts, long atSeq) {
         Map<Long, Assertion> out = new LinkedHashMap<>();
         for (EntityFactLog.Fact f : facts) {
             if (f.seq() > atSeq) break;
@@ -166,7 +172,7 @@ final class EntityRegistry {
      * result depends only on the set of live edges, never on the order they were applied, so it is deterministic:
      * groups keyed and sorted by their smallest member key. A key in no live assertion is in no group.
      */
-    static Map<String, Group> resolve(List<EntityFactLog.Fact> facts, long atSeq) {
+    public static Map<String, Group> resolve(List<EntityFactLog.Fact> facts, long atSeq) {
         Map<String, String> parent = new java.util.HashMap<>();
         List<Assertion> live = assertions(facts, atSeq).values().stream().filter(Assertion::live).toList();
         for (Assertion x : live) {

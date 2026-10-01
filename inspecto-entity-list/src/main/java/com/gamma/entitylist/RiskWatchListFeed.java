@@ -1,4 +1,4 @@
-package com.gamma.geolink;
+package com.gamma.entitylist;
 
 import com.gamma.control.EntityTypes;
 import com.gamma.risk.WatchListFeed;

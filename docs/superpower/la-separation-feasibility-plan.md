@@ -387,7 +387,7 @@ the database.
   evaluates to a Working Set (`inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationEvaluator.java`).
 - **Forks exist**: `POST /inv/investigations/{id}/reorder` makes a new Investigation naming its parent,
   re-applies the ops and seals a fresh read; the fork is assembled off to the side and moved in with one rename.
-- **Entity Lists are pinnable**: `GET /inv/entity-lists/{id}?at=<seq>` returns `{atSeq, headHash}`, a
+- **Entity Lists are pinnable**: `GET /entity-lists/{id}?at=<seq>` returns `{atSeq, headHash}`, a
   self-verifying pin over the hash-chained fact log (`EntityFactLog`); a list op keeps the list it sealed,
   and a fork does not re-resolve it.
 - 🔴 **Access is owner-only** (D-E7, LA-20): a non-owner reads 404. **Parallel multi-analyst work contradicts a

@@ -214,10 +214,10 @@ class ControlApiValueMeasureTest {
     // ── agentList: cashOutConcentration restricted to an `agent` Entity List ─────────────────────────────
 
     private void entityList(Ctx c, String id, String type, String... members) throws Exception {
-        assertEquals(201, send(c.port, "POST", "/inv/entity-lists", "{\"id\":\"" + id + "\",\"title\":\"" + id
+        assertEquals(201, send(c.port, "POST", "/entity-lists", "{\"id\":\"" + id + "\",\"title\":\"" + id
                 + "\",\"purpose\":\"watch\",\"entityType\":\"" + type + "\",\"reason\":\"r\"}", null).statusCode());
         if (members.length > 0)
-            ok(c, "POST", "/inv/entity-lists/" + id + "/members", "{\"add\":[\"" + String.join("\",\"", members)
+            ok(c, "POST", "/entity-lists/" + id + "/members", "{\"add\":[\"" + String.join("\",\"", members)
                     + "\"],\"reason\":\"r\"}");
     }
 
@@ -253,7 +253,7 @@ class ControlApiValueMeasureTest {
             ok(c, "POST", "/inv/investigations/case-v/alert-rules", "{\"name\":\"tills-rule\",\"severity\":\"WARNING\","
                     + "\"valueMeasure\":{\"name\":\"cashOutConcentration\",\"valueCol\":\"amt\",\"timeCol\":\"booked\","
                     + "\"from\":\"2026-09-01\",\"to\":\"2026-09-08\",\"cashOutKinds\":[\"cash_out\"],\"agentList\":\"tills\"}}");
-            JsonNode head = ok(c, "GET", "/inv/entity-lists", null);
+            JsonNode head = ok(c, "GET", "/entity-lists", null);
             JsonNode fired = ok(c, "POST", "/alerts/evaluate", "");
             assertEquals(1, fired.size(), fired.toString());
             assertEquals("tills", fired.at("/0/evidence/agentList").asText(), fired.toString());
@@ -261,8 +261,8 @@ class ControlApiValueMeasureTest {
             assertEquals(head.get("headHash").asText(), fired.at("/0/evidence/agentListHash").asText(), fired.toString());
 
             // live, not pinned: after the list changes, the next reading carries the NEW version
-            ok(c, "POST", "/inv/entity-lists/tills/members", "{\"add\":[\"TILL1\"],\"reason\":\"r\"}");
-            JsonNode after = ok(c, "GET", "/inv/entity-lists", null);
+            ok(c, "POST", "/entity-lists/tills/members", "{\"add\":[\"TILL1\"],\"reason\":\"r\"}");
+            JsonNode after = ok(c, "GET", "/entity-lists", null);
             AlertRule rule = AlertRule.fromMap(c.alerts().rules().stream()   // the armed rule, as the sweep holds it
                     .filter(r -> "tills-rule".equals(r.get("name"))).findFirst().orElseThrow());
             var reading = new com.gamma.geolink.WorkingSetMeasures().read(root, null, rule);
@@ -289,7 +289,7 @@ class ControlApiValueMeasureTest {
         try (Ctx c = open(cfg, root)) {
             java.nio.file.Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: all\n");
             entityList(c, "tills", "agent", "TILL6");
-            String token = JSON.readTree(send(c.port, "GET", "/inv/entity-lists/tills", null, null).body())
+            String token = JSON.readTree(send(c.port, "GET", "/entity-lists/tills", null, null).body())
                     .at("/data/members/0").asText();
             assertTrue(token.startsWith("masked:"), token);
             HttpResponse<String> r = send(c.port, "GET", Q + "&name=cashOutConcentration&cashOutKinds=cash_out"

@@ -66,7 +66,8 @@
     <!--
         Edition assembly (docs/EDITIONS.md): inspecto-security (W6 — the Authenticator SPI's OIDC
         implementation), inspecto-notify-channels (CP-15 — the webhook + SMTP transports), inspecto-backup (OPS-06 — the
-        backup/backup_verify/restore tasks) inspecto-geo-link (CP-09 — the geo map + link analysis
+        backup/backup_verify/restore tasks) inspecto-entity-list (SEP-08 — Entity Lists + the shared entity fact log),
+        inspecto-geo-link (CP-09 — the geo map + link analysis
         routes), inspecto-exchange (SEC-10 — cross-space sharing), inspecto-metrics (CP-13 — the
         Prometheus exposition), inspecto-events (CP-13 — the /events* feed) and inspecto-ops (CP-11 —
         operational objects) are Professional-edition-only.
@@ -88,6 +89,10 @@
                 <!-- EDG-01 cell 2 (2026-09-07): backup / backup_verify / restore. OPS-06 is "not for
                      Personal"; BackupTask lived in inspecto-engine and so shipped in every bundle. -->
                 <module>inspecto-backup</module>
+                <!-- SEP-08 (2026-10-01): Entity Lists + the ONE shared entity fact log, out of inspecto-geo-link
+                     (which depends on it) so assurance can use a watch list without Link Analysis. Bundled in
+                     exactly the editions that ship geo-link; absent on Personal. -->
+                <module>inspecto-entity-list</module>
                 <!-- EDG-01 cell 3b (2026-09-07): geo map + link analysis routes. CP-09 is "not for Personal";
                      GeoRoutes/InvRoutes lived in the core and so shipped in every bundle. -->
                 <module>inspecto-geo-link</module>
@@ -124,6 +129,7 @@
                 <module>inspecto-security</module>
                 <module>inspecto-notify-channels</module>
                 <module>inspecto-backup</module>
+                <module>inspecto-entity-list</module>
                 <module>inspecto-geo-link</module>
                 <module>inspecto-la-graph</module>
                 <module>inspecto-exchange</module>
@@ -149,6 +155,7 @@
                 <module>inspecto-policy</module>
                 <module>inspecto-notify-channels</module>
                 <module>inspecto-backup</module>
+                <module>inspecto-entity-list</module>
                 <module>inspecto-geo-link</module>
                 <module>inspecto-la-graph</module>
                 <module>inspecto-exchange</module>
@@ -167,6 +174,7 @@
                 <module>inspecto-policy</module>
                 <module>inspecto-notify-channels</module>
                 <module>inspecto-backup</module>
+                <module>inspecto-entity-list</module>
                 <module>inspecto-geo-link</module>
                 <module>inspecto-la-graph</module>
                 <module>inspecto-exchange</module>

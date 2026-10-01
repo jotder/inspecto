@@ -289,6 +289,8 @@ if ($Edition -ne 'Personal') {
     # EDG-01 cell 1: inspecto-notify-channels rides with security in BOTH non-Personal editions — CP-15
     # is "Professional and above", and Enterprise is a superset of Professional.
     # EDG-01 cell 2: inspecto-backup (OPS-06) rides alongside, Professional and above.
+    # SEP-08: inspecto-entity-list (Entity Lists + the shared fact log; inspecto-geo-link depends on it) rides
+    # alongside, Professional and above.
     # EDG-01 cell 3b: inspecto-geo-link (CP-09) rides alongside, Professional and above.
     # EDG-01 cell 4: inspecto-exchange (SEC-10) rides alongside, Professional and above.
     # EDG-01 cell 5: inspecto-metrics (CP-13, the /metrics exposition), Professional and above.
@@ -301,7 +303,7 @@ if ($Edition -ne 'Personal') {
     # builds its `sidecar` artifact for the editions that stage it.
     # ASSURE-INTELLIGENCE-BUNDLE-1 (D-P2): inspecto-intelligence (the /agent/* agent, onnxruntime inside)
     # is ENTERPRISE only - also a default-reactor module, listed so this pass builds its `sidecar`.
-    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent,inspecto-intelligence' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent' }
+    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent,inspecto-intelligence' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent' }
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
@@ -338,6 +340,14 @@ if ($Edition -ne 'Personal') {
                      Select-Object -First 1 -ExpandProperty FullName
     if (-not $backupJarSrc -or -not (Test-Path $backupJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $backupTargetDir\inspecto-backup-*.jar."
+    }
+    # The Entity List module (SEP-08). THIN like inspecto-geo-link, which depends on it.
+    $entityListTargetDir = Join-Path $sandboxRoot 'inspecto-entity-list\target'
+    $entityListJarSrc = Get-ChildItem -Path $entityListTargetDir -Filter 'inspecto-entity-list-*.jar' -ErrorAction SilentlyContinue |
+                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                      Select-Object -First 1 -ExpandProperty FullName
+    if (-not $entityListJarSrc -or -not (Test-Path $entityListJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $entityListTargetDir\inspecto-entity-list-*.jar."
     }
     # The geo/link module (EDG-01 cell 3b). THIN like inspecto-policy and inspecto-backup.
     $geoLinkTargetDir = Join-Path $sandboxRoot 'inspecto-geo-link\target'
@@ -489,6 +499,24 @@ if ($backupJarSrc) {
         }
         Write-Host "  verified: MaintenanceTaskProvider registration present in the backup module" -ForegroundColor DarkGray
     } finally { $bkZip.Dispose() }
+}
+if ($entityListJarSrc) {
+    Copy-Item $entityListJarSrc "$bundleDir\inspecto-entity-list.jar"
+    Write-Host "Bundled Entity List module -> inspecto-entity-list.jar" -ForegroundColor Green
+    # Thin jar: the only way it ships INERT is a missing META-INF/services entry - the six /entity-lists paths would 503
+    # on a bundle supposed to have them, and the risk-score WatchListFeed would never be installed.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $elZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-entity-list.jar")
+    try {
+        $spiEntry = $elZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.control.RouteModule' }
+        if (-not $spiEntry) { throw "inspecto-entity-list.jar has no META-INF/services/com.gamma.control.RouteModule - EntityListRoutes would never be discovered." }
+        $reader = New-Object System.IO.StreamReader($spiEntry.Open())
+        try { $spiBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
+        if ($spiBody -notmatch [regex]::Escape('com.gamma.entitylist.EntityListRoutes')) { throw "inspecto-entity-list.jar registers no com.gamma.entitylist.EntityListRoutes - the SPI file lists only: $spiBody" }
+        $feedEntry = $elZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.risk.WatchListFeed' }
+        if (-not $feedEntry) { throw "inspecto-entity-list.jar has no META-INF/services/com.gamma.risk.WatchListFeed - watch lists would never feed the risk score." }
+        Write-Host "  verified: RouteModule and WatchListFeed registrations present in the Entity List module" -ForegroundColor DarkGray
+    } finally { $elZip.Dispose() }
 }
 if ($geoLinkJarSrc) {
     Copy-Item $geoLinkJarSrc "$bundleDir\inspecto-geo-link.jar"
@@ -822,6 +850,7 @@ CP="inspecto.jar"
 # Backup / restore tasks (EDG-01 cell 2): Professional/Enterprise only; same contract as the line above.
 [ -f inspecto-backup.jar ] && CP="${CP}:inspecto-backup.jar"
 # Geo map + link analysis routes (EDG-01 cell 3b): Professional/Enterprise only; same contract as above.
+[ -f inspecto-entity-list.jar ] && CP="${CP}:inspecto-entity-list.jar"
 [ -f inspecto-geo-link.jar ] && CP="${CP}:inspecto-geo-link.jar"
 # Cross-space exchange (EDG-01 cell 4): Professional/Enterprise only; same contract as above.
 [ -f inspecto-exchange.jar ] && CP="${CP}:inspecto-exchange.jar"
@@ -924,6 +953,7 @@ if exist inspecto-notify-channels.jar set "CP=%CP%;inspecto-notify-channels.jar"
 rem Backup / restore tasks (EDG-01 cell 2) - Professional/Enterprise only.
 if exist inspecto-backup.jar set "CP=%CP%;inspecto-backup.jar"
 rem Geo map + link analysis routes (EDG-01 cell 3b) - Professional/Enterprise only.
+if exist inspecto-entity-list.jar set "CP=%CP%;inspecto-entity-list.jar"
 if exist inspecto-geo-link.jar set "CP=%CP%;inspecto-geo-link.jar"
 rem Cross-space exchange (EDG-01 cell 4) - Professional/Enterprise only.
 if exist inspecto-exchange.jar set "CP=%CP%;inspecto-exchange.jar"
@@ -1089,6 +1119,7 @@ fi
 # Backup / restore tasks (EDG-01 cell 2): Professional/Enterprise only; same contract as the line above.
 [ -f inspecto-backup.jar ] && CP="${CP}:inspecto-backup.jar"
 # Geo map + link analysis routes (EDG-01 cell 3b): Professional/Enterprise only; same contract as above.
+[ -f inspecto-entity-list.jar ] && CP="${CP}:inspecto-entity-list.jar"
 [ -f inspecto-geo-link.jar ] && CP="${CP}:inspecto-geo-link.jar"
 # Cross-space exchange (EDG-01 cell 4): Professional/Enterprise only; same contract as above.
 [ -f inspecto-exchange.jar ] && CP="${CP}:inspecto-exchange.jar"
@@ -1213,6 +1244,7 @@ if exist inspecto-notify-channels.jar set "CP=%CP%;inspecto-notify-channels.jar"
 rem Backup / restore tasks (EDG-01 cell 2) - Professional/Enterprise only.
 if exist inspecto-backup.jar set "CP=%CP%;inspecto-backup.jar"
 rem Geo map + link analysis routes (EDG-01 cell 3b) - Professional/Enterprise only.
+if exist inspecto-entity-list.jar set "CP=%CP%;inspecto-entity-list.jar"
 if exist inspecto-geo-link.jar set "CP=%CP%;inspecto-geo-link.jar"
 rem Cross-space exchange (EDG-01 cell 4) - Professional/Enterprise only.
 if exist inspecto-exchange.jar set "CP=%CP%;inspecto-exchange.jar"
@@ -1640,7 +1672,7 @@ if ($DemoAuth) {
         Remove-Item (Join-Path $bundleDir $f) -ErrorAction SilentlyContinue
     }
     $demoJars = @('inspecto.jar', 'inspecto-demo-auth.jar', 'inspecto-policy.jar', 'inspecto-connectors.jar', 'inspecto-notify-channels.jar',
-                  'inspecto-backup.jar', 'inspecto-geo-link.jar', 'inspecto-exchange.jar', 'inspecto-metrics.jar', 'inspecto-events.jar',
+                  'inspecto-backup.jar', 'inspecto-entity-list.jar', 'inspecto-geo-link.jar', 'inspecto-exchange.jar', 'inspecto-metrics.jar', 'inspecto-events.jar',
                   'inspecto-ops.jar', 'inspecto-agent.jar', 'inspecto-intelligence.jar', 'postgresql.jar') | Where-Object { Test-Path (Join-Path $bundleDir $_) }
     $demoFlags = '--enable-native-access=ALL-UNNAMED -Dcontrol.bind=127.0.0.1 -Dauth.mode=demo -Dobjects.backend=db -Devents.backend=parquet -Djobs.backend=duckdb'
     $serveDemoBat = @"
@@ -1806,7 +1838,7 @@ if (-not $SkipBootCheck) {
             else { 'java' }
     # The same classpath the generated launchers build -- deliberately re-derived from the staged files
     # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
-    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-metrics.jar','inspecto-events.jar','inspecto-ops.jar','inspecto-agent.jar','inspecto-intelligence.jar','postgresql.jar' |
+    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-entity-list.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-metrics.jar','inspecto-events.jar','inspecto-ops.jar','inspecto-agent.jar','inspecto-intelligence.jar','postgresql.jar' |
         Where-Object { Test-Path (Join-Path $bundleDir $_) })
     # DEMO-AUTH-1: appended AFTER the parsed literal on purpose (see the -DemoAuth param note).
     if ($DemoAuth -and (Test-Path (Join-Path $bundleDir 'inspecto-demo-auth.jar'))) { $cp += 'inspecto-demo-auth.jar' }

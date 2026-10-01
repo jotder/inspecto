@@ -45,6 +45,15 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- SEP-08: the Entity List store, its routes and the ONE shared entity fact log live there; the Identity
+             Fact routes, EntityMasking and the Investigation list-ops read and append to that log through it.
+             Compile scope, like the core. Never the reverse: inspecto-entity-list must not depend on this module. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-entity-list</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs / PipelineConfigBatchTest boot a
              real CollectorService + ControlApi in the two HTTP tests that moved here with the routes (same
              pattern as inspecto-policy; test scope is not transitive, so declared explicitly). -->

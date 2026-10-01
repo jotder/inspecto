@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-entity-list</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Entity Lists + the shared entity fact log (optional)</name>
+    <description>
+        OPTIONAL control-plane module (SEP-08 of the Link Analysis separation, 2026-10-01): the Entity List store and its
+        routes (GET /entity-lists, GET /entity-lists/{id}, POST /entity-lists, POST /entity-lists/{id}/members,
+        POST /entity-lists/{id}/retire, POST /entity-lists/{id}/match), the ONE hash-chained entity fact log and its
+        registry fold (EntityFactLog, EntityRegistry — the log Link Analysis also writes its Identity Facts to), the
+        Entity List sidecar and the risk-score WatchListFeed. Package com.gamma.entitylist.
+
+        WHY A MODULE OF ITS OWN. Entity Lists were born inside inspecto-geo-link (LA-17) but a watch list or a block list
+        is not a Link Analysis concept — assurance WS-12 needs it without LA. The fact log is shared, so it lives HERE and
+        inspecto-geo-link depends on this module, never the reverse. On-disk format and paths are unchanged
+        ({write root}/audit/entity-facts/, {write root}/audit/entity-facts/mask.key): a Space created before the move keeps
+        verifying its chain.
+
+        Contributed through the core's public com.gamma.control.RouteModule ServiceLoader seam and bundled in exactly the
+        editions that ship inspecto-geo-link (Standard, Professional, Enterprise, Preview); on Personal the core answers
+        the six routes with 503 "not installed" (AbsentEntityListRoutes) and /bootstrap reports features.entityList=false.
+
+        THIN, like inspecto-ops / inspecto-geo-link: nothing beyond what the core already supplies, so no shade and no
+        sidecar classifier. Built only under the "edition-standard"/"-professional"/"-enterprise"/"-preview" profiles (see
+        the parent pom's profile-scoped &lt;modules&gt;), so a routine "mvn -o clean test" (= Personal) never compiles it.
+    </description>
+
+    <dependencies>
+        <!-- The core: RouteModule/ApiContext/ApiException/WriteGates, EntityTypes, LinkAnalysisSettings and PendingChanges
+             (host classes). Compile scope, as inspecto-geo-link and inspecto-ops do — a thin jar dropped beside
+             inspecto.jar resolves all of it from there at run time. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs / PipelineConfigBatchTest boot a real
+             CollectorService + ControlApi in the two HTTP tests that moved here with the routes (same pattern as
+             inspecto-geo-link; test scope is not transitive, so declared explicitly). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

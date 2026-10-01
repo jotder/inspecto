@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ControlApiEntityListTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String LISTS = "/inv/entity-lists";
+    private static final String LISTS = "/entity-lists";
     private static final String WATCH = "{\"id\":\"wl\",\"title\":\"Mule watchlist\",\"purpose\":\"watch\","
             + "\"entityType\":\"msisdn\",\"reason\":\"FR-7 referral\"}";
     private final HttpClient client = HttpClient.newHttpClient();
@@ -123,10 +123,10 @@ class ControlApiEntityListTest {
     void everyRouteIs503WithoutAWriteRoot(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg, null)) {
             status(503, get(c, LISTS), "list");
-            status(503, get(c, "/inv/entity-lists/wl"), "one");
+            status(503, get(c, "/entity-lists/wl"), "one");
             status(503, post(c, LISTS, WATCH), "create");
-            status(503, post(c, "/inv/entity-lists/wl/members", "{\"add\":[\"1\"],\"reason\":\"r\"}"), "members");
-            status(503, post(c, "/inv/entity-lists/wl/retire", "{\"reason\":\"r\"}"), "retire");
+            status(503, post(c, "/entity-lists/wl/members", "{\"add\":[\"1\"],\"reason\":\"r\"}"), "members");
+            status(503, post(c, "/entity-lists/wl/retire", "{\"reason\":\"r\"}"), "retire");
         }
     }
 
@@ -174,7 +174,7 @@ class ControlApiEntityListTest {
             status(409, post(c, LISTS, WATCH), "an existing id");
             JsonNode minted = data(post(c, LISTS, WATCH.replace("\"id\":\"wl\",", "")), 201);
             assertTrue(minted.get("id").asText().matches("^[a-z0-9][a-z0-9_-]{0,63}$"), minted.toString());
-            status(200, post(c, "/inv/entity-lists/wl/retire", "{\"reason\":\"closed\"}"), "retire");
+            status(200, post(c, "/entity-lists/wl/retire", "{\"reason\":\"closed\"}"), "retire");
             status(409, post(c, LISTS, WATCH), "a retired id is still used");
             assertEquals(3, facts(c).size());
         }
@@ -193,7 +193,7 @@ class ControlApiEntityListTest {
         try (Ctx c = open(cfg, root)) {
             settings(c, "masking_mode: none\n");
             data(post(c, LISTS, WATCH), 201);
-            String members = "/inv/entity-lists/wl/members";
+            String members = "/entity-lists/wl/members";
 
             JsonNode added = data(post(c, members,
                     "{\"add\":[\"+44 7700 900123\",\"0044 7700-900123\"],\"reason\":\"from the SIM register\"}"), 200);
@@ -223,7 +223,7 @@ class ControlApiEntityListTest {
     @Test
     void memberWritesRefuseBadBodiesUnknownListsAndRetiredLists(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            String members = "/inv/entity-lists/wl/members";
+            String members = "/entity-lists/wl/members";
             status(404, post(c, members, "{\"add\":[\"1\"],\"reason\":\"r\"}"), "unknown list");
             data(post(c, LISTS, WATCH), 201);
             status(422, post(c, members, "{\"add\":[\"1\"]}"), "reason is required");
@@ -243,7 +243,7 @@ class ControlApiEntityListTest {
                     .get("changed").asInt(), "exactly 5 000 is allowed, and is ONE fact");
             assertEquals(2, facts(c).size());
 
-            status(200, post(c, "/inv/entity-lists/wl/retire", "{\"reason\":\"closed\"}"), "retire");
+            status(200, post(c, "/entity-lists/wl/retire", "{\"reason\":\"closed\"}"), "retire");
             status(409, post(c, members, "{\"add\":[\"+442\"],\"reason\":\"r\"}"), "a retired list is read-only");
         }
     }
@@ -253,7 +253,7 @@ class ControlApiEntityListTest {
     @Test
     void retireFlagsTheListOnceAndKeepsItListed(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            String retire = "/inv/entity-lists/wl/retire";
+            String retire = "/entity-lists/wl/retire";
             status(404, post(c, retire, "{\"reason\":\"r\"}"), "unknown list");
             data(post(c, LISTS, WATCH), 201);
             status(422, post(c, retire, "{}"), "reason is required");
@@ -280,32 +280,32 @@ class ControlApiEntityListTest {
             assertEquals(0, empty.get("lists").size());
             assertEquals(0, empty.get("headSeq").asLong());
             assertEquals("", empty.get("headHash").asText());
-            status(404, get(c, "/inv/entity-lists/wl"), "unknown list");
+            status(404, get(c, "/entity-lists/wl"), "unknown list");
 
             data(post(c, LISTS, WATCH), 201);                                                           // seq 1
             data(post(c, LISTS, WATCH.replace("\"wl\"", "\"other\"").replace("msisdn", "imsi")), 201); // seq 2
-            data(post(c, "/inv/entity-lists/wl/members", "{\"add\":[\"+441\",\"+442\"],\"reason\":\"r\"}"), 200); // 3
-            data(post(c, "/inv/entity-lists/wl/members", "{\"remove\":[\"+441\"],\"reason\":\"r\"}"), 200);      // 4
+            data(post(c, "/entity-lists/wl/members", "{\"add\":[\"+441\",\"+442\"],\"reason\":\"r\"}"), 200); // 3
+            data(post(c, "/entity-lists/wl/members", "{\"remove\":[\"+441\"],\"reason\":\"r\"}"), 200);      // 4
 
-            JsonNode now = data(get(c, "/inv/entity-lists/wl"), 200);
+            JsonNode now = data(get(c, "/entity-lists/wl"), 200);
             assertEquals(List.of("+442"), texts(now.get("members")));
             assertEquals(4, now.get("atSeq").asLong());
             assertEquals(4, now.get("lastSeq").asLong());
             assertEquals(sha256(Files.readAllBytes(facts(c).get(3))), now.get("headHash").asText());
 
-            JsonNode at3 = data(get(c, "/inv/entity-lists/wl?at=3"), 200);
+            JsonNode at3 = data(get(c, "/entity-lists/wl?at=3"), 200);
             assertEquals(List.of("+441", "+442"), texts(at3.get("members")), "sorted, as it was at seq 3");
             assertEquals(3, at3.get("atSeq").asLong());
             assertEquals(3, at3.get("lastSeq").asLong());
             assertEquals(sha256(Files.readAllBytes(facts(c).get(2))), at3.get("headHash").asText(),
                     "the hash of the fact AT atSeq — a self-verifying pin");
-            assertEquals(0, data(get(c, "/inv/entity-lists/wl?at=1"), 200).get("members").size());
+            assertEquals(0, data(get(c, "/entity-lists/wl?at=1"), 200).get("members").size());
 
-            status(404, get(c, "/inv/entity-lists/other?at=1"), "a list that did not exist at 'at'");
-            status(404, get(c, "/inv/entity-lists/wl?at=0"), "nothing existed before seq 1");
-            status(422, get(c, "/inv/entity-lists/wl?at=5"), "'at' beyond head");
-            status(422, get(c, "/inv/entity-lists/wl?at=-1"), "negative 'at'");
-            status(422, get(c, "/inv/entity-lists/wl?at=head"), "non-numeric 'at'");
+            status(404, get(c, "/entity-lists/other?at=1"), "a list that did not exist at 'at'");
+            status(404, get(c, "/entity-lists/wl?at=0"), "nothing existed before seq 1");
+            status(422, get(c, "/entity-lists/wl?at=5"), "'at' beyond head");
+            status(422, get(c, "/entity-lists/wl?at=-1"), "negative 'at'");
+            status(422, get(c, "/entity-lists/wl?at=head"), "non-numeric 'at'");
 
             JsonNode all = data(get(c, LISTS), 200);
             assertEquals(List.of("wl", "other"), all.get("lists").findValuesAsText("id"));
@@ -322,28 +322,28 @@ class ControlApiEntityListTest {
         try (Ctx c = open(cfg, root)) {
             data(post(c, LISTS, WATCH), 201);                                                     // msisdn: masked
             data(post(c, LISTS, WATCH.replace("\"wl\"", "\"hs\"").replace("msisdn", "handset")), 201); // not masked
-            data(post(c, "/inv/entity-lists/wl/members", "{\"add\":[\"+447700900123\"],\"reason\":\"r\"}"), 200);
-            data(post(c, "/inv/entity-lists/hs/members", "{\"add\":[\"Nokia 3310\"],\"reason\":\"r\"}"), 200);
+            data(post(c, "/entity-lists/wl/members", "{\"add\":[\"+447700900123\"],\"reason\":\"r\"}"), 200);
+            data(post(c, "/entity-lists/hs/members", "{\"add\":[\"Nokia 3310\"],\"reason\":\"r\"}"), 200);
 
             // typed (the default): a masked Entity Type's list is masked; an unmasked type's is not.
-            String token = data(get(c, "/inv/entity-lists/wl"), 200).at("/members/0").asText();
+            String token = data(get(c, "/entity-lists/wl"), 200).at("/members/0").asText();
             assertTrue(token.matches("masked:[0-9a-f]{16}"), token);
-            assertEquals(token, data(get(c, "/inv/entity-lists/wl"), 200).at("/members/0").asText(), "stable");
-            assertEquals("nokia 3310", data(get(c, "/inv/entity-lists/hs"), 200).at("/members/0").asText());
+            assertEquals(token, data(get(c, "/entity-lists/wl"), 200).at("/members/0").asText(), "stable");
+            assertEquals("nokia 3310", data(get(c, "/entity-lists/hs"), 200).at("/members/0").asText());
             assertTrue(Files.readString(facts(c).get(2)).contains("+447700900123"), "masking is render-time only");
 
             settings(c, "masking_mode: all\n");
-            assertTrue(data(get(c, "/inv/entity-lists/hs"), 200).at("/members/0").asText().startsWith("masked:"),
+            assertTrue(data(get(c, "/entity-lists/hs"), 200).at("/members/0").asText().startsWith("masked:"),
                     "all masks every list");
-            assertEquals(token, data(get(c, "/inv/entity-lists/wl"), 200).at("/members/0").asText());
+            assertEquals(token, data(get(c, "/entity-lists/wl"), 200).at("/members/0").asText());
 
             settings(c, "masking_mode: none\n");
-            assertEquals("+447700900123", data(get(c, "/inv/entity-lists/wl"), 200).at("/members/0").asText(),
+            assertEquals("+447700900123", data(get(c, "/entity-lists/wl"), 200).at("/members/0").asText(),
                     "none masks nothing");
 
             // A write answers through the same rendering.
             settings(c, "masking_mode: typed\n");
-            JsonNode written = data(post(c, "/inv/entity-lists/wl/members", "{\"add\":[\"+447700900124\"],\"reason\":\"r\"}"), 200);
+            JsonNode written = data(post(c, "/entity-lists/wl/members", "{\"add\":[\"+447700900124\"],\"reason\":\"r\"}"), 200);
             assertFalse(written.toString().contains("+44770090012"), written.toString());
         }
     }
@@ -354,17 +354,17 @@ class ControlApiEntityListTest {
             throws Exception {
         try (Ctx c = open(cfg, root)) {
             data(post(c, LISTS, WATCH), 201);
-            data(post(c, "/inv/entity-lists/wl/members", "{\"add\":[\"+447700900123\"],\"reason\":\"r\"}"), 200);
+            data(post(c, "/entity-lists/wl/members", "{\"add\":[\"+447700900123\"],\"reason\":\"r\"}"), 200);
             String handsetOnly = "{\"maskingMode\":\"typed\",\"entityTypes\":[{\"id\":\"handset\",\"label\":\"Handset\","
                     + "\"normaliser\":\"default\",\"masked\":false,\"classifications\":[\"HANDSET\"]}]}";
             status(200, send(c.port, "PUT", "/settings/link-analysis", handsetOnly, null), "drop msisdn from the types");
 
-            HttpResponse<String> refused = post(c, "/inv/entity-lists/wl/members", "{\"add\":[\"+447700900124\"],\"reason\":\"r\"}");
+            HttpResponse<String> refused = post(c, "/entity-lists/wl/members", "{\"add\":[\"+447700900124\"],\"reason\":\"r\"}");
             status(409, refused, "a list of a type no longer in force is read-only");
             assertTrue(refused.body().contains("no longer in force"), refused.body());
             assertEquals(2, facts(c).size(), "the refusal wrote no fact");
 
-            JsonNode read = data(get(c, "/inv/entity-lists/wl"), 200);
+            JsonNode read = data(get(c, "/entity-lists/wl"), 200);
             assertTrue(read.at("/members/0").asText().matches("masked:[0-9a-f]{16}"), "typed fails closed: " + read);
             assertFalse(read.toString().contains("7700900123"), read.toString());
         }
@@ -376,14 +376,14 @@ class ControlApiEntityListTest {
     void aTamperedFactLogFailsLoudlyOnEveryRoute(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             data(post(c, LISTS, WATCH), 201);
-            data(post(c, "/inv/entity-lists/wl/members", "{\"add\":[\"+441\"],\"reason\":\"r\"}"), 200);
-            data(post(c, "/inv/entity-lists/wl/members", "{\"add\":[\"+442\"],\"reason\":\"r\"}"), 200);
+            data(post(c, "/entity-lists/wl/members", "{\"add\":[\"+441\"],\"reason\":\"r\"}"), 200);
+            data(post(c, "/entity-lists/wl/members", "{\"add\":[\"+442\"],\"reason\":\"r\"}"), 200);
             Path second = facts(c).get(1);
             Files.writeString(second, Files.readString(second).replace("+441", "+449"));
 
-            for (HttpResponse<String> r : List.of(get(c, LISTS), get(c, "/inv/entity-lists/wl"),
-                    post(c, "/inv/entity-lists/wl/members", "{\"add\":[\"+443\"],\"reason\":\"r\"}"),
-                    post(c, "/inv/entity-lists/wl/retire", "{\"reason\":\"r\"}"))) {
+            for (HttpResponse<String> r : List.of(get(c, LISTS), get(c, "/entity-lists/wl"),
+                    post(c, "/entity-lists/wl/members", "{\"add\":[\"+443\"],\"reason\":\"r\"}"),
+                    post(c, "/entity-lists/wl/retire", "{\"reason\":\"r\"}"))) {
                 status(500, r, "a broken chain is never folded");
                 assertEquals(ErrorCodes.INTEGRITY_VIOLATION, JSON.readTree(r.body()).at("/error/errorCode").asText());
             }
@@ -401,9 +401,9 @@ class ControlApiEntityListTest {
             EventLog.current().addSubscriber(sub);
             try {
                 data(post(c, LISTS, WATCH), 201);
-                data(post(c, "/inv/entity-lists/wl/members", "{\"add\":[\"+447700900123\",\"+447700900124\"],"
+                data(post(c, "/entity-lists/wl/members", "{\"add\":[\"+447700900123\",\"+447700900124\"],"
                         + "\"reason\":\"r\"}"), 200);
-                data(post(c, "/inv/entity-lists/wl/members", "{\"add\":[\"+447700900123\"],\"reason\":\"r\"}"), 200);
+                data(post(c, "/entity-lists/wl/members", "{\"add\":[\"+447700900123\"],\"reason\":\"r\"}"), 200);
             } finally {
                 EventLog.current().removeSubscriber(sub);
             }
@@ -429,21 +429,21 @@ class ControlApiEntityListTest {
             default -> Optional.empty();
         });
         try (Ctx c = open(cfg, root)) {
-            status(401, send(c.port, "POST", "/inv/entity-lists", WATCH, null), "no credential");
-            status(403, send(c.port, "POST", "/inv/entity-lists", WATCH, "Bearer viewer"), "create needs the capability");
-            JsonNode created = data(send(c.port, "POST", "/inv/entity-lists", WATCH, "Bearer analyst"), 201);
+            status(401, send(c.port, "POST", "/entity-lists", WATCH, null), "no credential");
+            status(403, send(c.port, "POST", "/entity-lists", WATCH, "Bearer viewer"), "create needs the capability");
+            JsonNode created = data(send(c.port, "POST", "/entity-lists", WATCH, "Bearer analyst"), 201);
             assertEquals("analyst-1", created.get("createdBy").asText(), "the actor is the Subject");
-            status(403, send(c.port, "POST", "/inv/entity-lists/wl/members", "{\"add\":[\"+441\"],\"reason\":\"r\"}",
+            status(403, send(c.port, "POST", "/entity-lists/wl/members", "{\"add\":[\"+441\"],\"reason\":\"r\"}",
                     "Bearer viewer"), "members needs the capability");
-            status(403, send(c.port, "POST", "/inv/entity-lists/wl/retire", "{\"reason\":\"r\"}", "Bearer viewer"),
+            status(403, send(c.port, "POST", "/entity-lists/wl/retire", "{\"reason\":\"r\"}", "Bearer viewer"),
                     "retire needs the capability");
             assertEquals(1, facts(c).size(), "no refused caller wrote a fact");
 
-            status(200, send(c.port, "GET", "/inv/entity-lists", null, "Bearer viewer"), "reads are open to the Space");
-            status(200, send(c.port, "GET", "/inv/entity-lists/wl", null, "Bearer viewer"), "reads are open to the Space");
-            status(200, send(c.port, "POST", "/inv/entity-lists/wl/members", "{\"add\":[\"+441\"],\"reason\":\"r\"}",
+            status(200, send(c.port, "GET", "/entity-lists", null, "Bearer viewer"), "reads are open to the Space");
+            status(200, send(c.port, "GET", "/entity-lists/wl", null, "Bearer viewer"), "reads are open to the Space");
+            status(200, send(c.port, "POST", "/entity-lists/wl/members", "{\"add\":[\"+441\"],\"reason\":\"r\"}",
                     "Bearer analyst"), "members with the capability");
-            status(200, send(c.port, "POST", "/inv/entity-lists/wl/retire", "{\"reason\":\"r\"}", "Bearer analyst"),
+            status(200, send(c.port, "POST", "/entity-lists/wl/retire", "{\"reason\":\"r\"}", "Bearer analyst"),
                     "retire with the capability");
         } finally {
             Authenticators.forTest(null);
@@ -460,13 +460,13 @@ class ControlApiEntityListTest {
                     + "\"normaliser\":\"digits\",\"masked\":false,\"classifications\":[\"MSISDN\"]}]}";
             status(200, send(c.port, "PUT", "/settings/link-analysis", digits, null), "msisdn under digits");
             data(post(c, LISTS, WATCH), 201);
-            JsonNode added = data(post(c, "/inv/entity-lists/wl/members",
+            JsonNode added = data(post(c, "/entity-lists/wl/members",
                     "{\"add\":[\"+44 7700 900123\"],\"reason\":\"r\"}"), 200);
             assertEquals(List.of("447700900123"), texts(added.get("members")));
 
             status(200, send(c.port, "PUT", "/settings/link-analysis", digits.replace("digits", "e164"), null),
                     "msisdn now under e164");
-            JsonNode removed = data(post(c, "/inv/entity-lists/wl/members",
+            JsonNode removed = data(post(c, "/entity-lists/wl/members",
                     "{\"remove\":[\"+44 7700 900123\"],\"reason\":\"r\"}"), 200);
             assertEquals(1, removed.get("changed").asInt(), "removed under the SEALED rule: " + removed);
             assertEquals(List.of(), texts(removed.get("members")));
@@ -485,9 +485,9 @@ class ControlApiEntityListTest {
             String legacy = Files.readString(first).replace(",\"normaliser\":\"e164\"", "");
             assertFalse(legacy.contains("normaliser"), legacy);
             Files.writeString(first, legacy);   // a lone fact: nothing chains after it
-            JsonNode read = data(get(c, "/inv/entity-lists/wl"), 200);
+            JsonNode read = data(get(c, "/entity-lists/wl"), 200);
             assertEquals("default", read.get("normaliser").asText(), read.toString());
-            JsonNode added = data(post(c, "/inv/entity-lists/wl/members", "{\"add\":[\"+44 7700 900123\"],\"reason\":\"r\"}"), 200);
+            JsonNode added = data(post(c, "/entity-lists/wl/members", "{\"add\":[\"+44 7700 900123\"],\"reason\":\"r\"}"), 200);
             assertEquals(List.of("+44 7700 900123"), texts(added.get("members")), "normalised by default, not e164");
         }
     }

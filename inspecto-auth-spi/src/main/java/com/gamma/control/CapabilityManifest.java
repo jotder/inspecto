@@ -47,9 +47,9 @@ final class CapabilityManifest {
             new Entry("DELETE", "/inv/investigations/([^/]+)/case", Roles.CAN_MANAGE_INCIDENTS),
             // EntityListRoutes (LA-17) — an Entity List is appended to the Space's identity fact log, evidence
             // like the op log, so changing one is Case work. The two GETs are reads (Space access only).
-            new Entry("POST", "/inv/entity-lists", Roles.CAN_MANAGE_INCIDENTS),
-            new Entry("POST", "/inv/entity-lists/([^/]+)/members", Roles.CAN_MANAGE_INCIDENTS),
-            new Entry("POST", "/inv/entity-lists/([^/]+)/retire", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/entity-lists", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/entity-lists/([^/]+)/members", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/entity-lists/([^/]+)/retire", Roles.CAN_MANAGE_INCIDENTS),
             // EntityIdentityRoutes (LA-17 slice 2) — identity assertions share the same fact log, same capability.
             new Entry("GET", "/inv/entity-identities", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("GET", "/inv/entity-identities/group", Roles.CAN_MANAGE_INCIDENTS),
@@ -435,7 +435,7 @@ final class CapabilityManifest {
             new Exemption("POST", "/inv/pattern/branching", "read-shaped", "matches a branching motif over a Dataset (LA-14b); persists nothing"),
             new Exemption("POST", "/inv/investigations/([^/]+)/replay", "read-shaped", "re-evaluates a sealed Investigation log (LA-10); persists nothing"),
             new Exemption("POST", "/inv/investigations/([^/]+)/dossier/verify", "read-shaped", "checks a Dossier manifest against the store (LA-12); persists nothing"),
-            new Exemption("POST", "/inv/entity-lists/([^/]+)/match", "read-shaped", "matches body values against an Entity List (ASSURE-ENTITY-LISTS-1); persists nothing — a POST so keys never ride in a URL"),
+            new Exemption("POST", "/entity-lists/([^/]+)/match", "read-shaped", "matches body values against an Entity List (ASSURE-ENTITY-LISTS-1); persists nothing — a POST so keys never ride in a URL"),
             new Exemption("POST", "/recon/columns", "read-shaped", "lists comparable columns for a draft"),
             new Exemption("POST", "/recon/breaks", "read-shaped", "computes breaks for a draft; persists nothing"),
             new Exemption("POST", "/recon/rows", "read-shaped", "lists the raw rows behind one key (RECON-CARDINALITY-2); persists nothing"),

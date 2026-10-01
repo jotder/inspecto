@@ -62,7 +62,7 @@ function scan() {
 
 /** The recorded exemptions, read from the manifest itself rather than re-listed here. */
 function exemptions() {
-  const src = readFileSync('inspecto/src/main/java/com/gamma/control/CapabilityManifest.java', 'utf8');
+  const src = readFileSync('inspecto-auth-spi/src/main/java/com/gamma/control/CapabilityManifest.java', 'utf8');
   const out = new Map();
   for (const m of src.matchAll(/new Exemption\(\s*"([A-Z]+)"\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,/g))
     out.set(`${m[1]} ${m[2]}`, m[3]);

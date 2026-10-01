@@ -1,4 +1,4 @@
-package com.gamma.geolink;
+package com.gamma.entitylist;
 
 import java.nio.file.Path;
 import java.util.List;

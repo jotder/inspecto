@@ -239,7 +239,7 @@ public final class EventType {
      *  D-U6) — per entity, by a holder of {@code canRevealLinkEntities}. {@code investigationId}, {@code tokens}
      *  (the pseudonyms revealed — never the raw values, so the trail does not re-leak them) and {@code count}. */
     public static final String LINK_ENTITY_REVEALED = "LINK_ENTITY_REVEALED";
-    /** An Entity List changed ({@code POST /inv/entity-lists}, {@code .../members}, {@code .../retire}, LA-17) — one
+    /** An Entity List changed ({@code POST /entity-lists}, {@code .../members}, {@code .../retire}, LA-17) — one
      *  event per identity fact written. {@code listId}, {@code kind} (the fact kind), {@code added}, {@code removed}
      *  (counts — never the keys, as {@link #LINK_ENTITY_REVEALED}) and {@code seq} (the fact's log position). */
     public static final String ENTITY_LIST_CHANGED = "ENTITY_LIST_CHANGED";

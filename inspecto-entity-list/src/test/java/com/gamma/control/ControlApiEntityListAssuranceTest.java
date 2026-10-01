@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * ASSURE-ENTITY-LISTS-1 (WS-12) over real HTTP, ARMED: range / CIDR entries and expiry through
- * {@code POST /inv/entity-lists/{id}/members}, matching through {@code POST /inv/entity-lists/{id}/match}, and the
+ * {@code POST /entity-lists/{id}/members}, matching through {@code POST /entity-lists/{id}/match}, and the
  * maker-checker hold on list changes: under an approval policy for kind {@code entity-list} a change is held (202,
  * no fact) and applied only when a SECOND person approves it; an add-only change whose every entry expires within
  * 24 h applies at once and says it is to be reviewed after (D-P5).
@@ -110,7 +110,7 @@ class ControlApiEntityListAssuranceTest {
     }
 
     private JsonNode match(Ctx c, String... values) throws Exception {
-        return data(send(c, "POST", "/inv/entity-lists/bl/match", JSON.writeValueAsString(
+        return data(send(c, "POST", "/entity-lists/bl/match", JSON.writeValueAsString(
                 java.util.Map.of("values", List.of(values))), VIEWER), 200).get("matches");
     }
 
@@ -130,15 +130,15 @@ class ControlApiEntityListAssuranceTest {
     void rangesAndCidrBlocksMatchOverHttpAndAnExpiredEntryDoesNot(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             noMasking(root);
-            data(send(c, "POST", "/inv/entity-lists", BLOCK, MAKER), 201);
+            data(send(c, "POST", "/entity-lists", BLOCK, MAKER), 201);
             String soon = Instant.now().plusMillis(1500).toString();
-            JsonNode r = data(send(c, "POST", "/inv/entity-lists/bl/members", "{\"add\":[\"+44 7700 900001\"],"
+            JsonNode r = data(send(c, "POST", "/entity-lists/bl/members", "{\"add\":[\"+44 7700 900001\"],"
                     + "\"addRanges\":[{\"prefix\":\"+4479\"},{\"from\":\"+447800000000\",\"to\":\"+447800000999\"},"
                     + "{\"cidr\":\"10.1.0.0/16\"},{\"cidr\":\"2001:db8::/32\"}],\"reason\":\"FR-9\"}", MAKER), 200);
             assertEquals(5, r.get("changed").asInt());
             assertEquals(4, r.get("rangeCount").asInt());
             assertEquals("none", r.get("sidecar").asText(), "no data root on this harness: nothing to write, and it says so");
-            data(send(c, "POST", "/inv/entity-lists/bl/members", "{\"add\":[\"+447700900002\"],\"expiresAt\":\""
+            data(send(c, "POST", "/entity-lists/bl/members", "{\"add\":[\"+447700900002\"],\"expiresAt\":\""
                     + soon + "\",\"reason\":\"24h hold\"}", MAKER), 200);
 
             JsonNode m = match(c, "0044 7700 900001", "+447912345678", "+447800000500", "+447800001000", "10.1.200.3",
@@ -153,7 +153,7 @@ class ControlApiEntityListAssuranceTest {
             Thread.sleep(Math.max(0, Instant.parse(soon).toEpochMilli() - System.currentTimeMillis()) + 300);
             assertEquals(List.of(false, true), matched(match(c, "+447700900002", "+447700900001")),
                     "the expired key no longer matches");
-            JsonNode list = data(send(c, "GET", "/inv/entity-lists/bl", null, VIEWER), 200);
+            JsonNode list = data(send(c, "GET", "/entity-lists/bl", null, VIEWER), 200);
             assertTrue(texts(list.get("members")).contains("+447700900002"), "the as-of read still shows it");
             assertTrue(list.at("/expiring/0/expired").asBoolean(), list.toString());
 
@@ -166,15 +166,15 @@ class ControlApiEntityListAssuranceTest {
                     "{\"add\":[\"+441\"],\"expiresAt\":\"2020-01-01T00:00:00Z\",\"reason\":\"r\"}",
                     "{\"add\":[\"+441\"],\"expiresAt\":\"tomorrow\",\"reason\":\"r\"}",
                     "{\"addRanges\":[{\"prefix\":\"+4479\"}],\"removeRanges\":[\"prefix:+4479\"],\"reason\":\"r\"}"))
-                assertEquals(422, send(c, "POST", "/inv/entity-lists/bl/members", bad, MAKER).statusCode(), bad);
+                assertEquals(422, send(c, "POST", "/entity-lists/bl/members", bad, MAKER).statusCode(), bad);
             assertEquals(before, facts(c), "no refusal wrote a fact");
-            assertEquals(422, send(c, "POST", "/inv/entity-lists/bl/match", "{\"values\":[]}", VIEWER).statusCode());
-            assertEquals(404, send(c, "POST", "/inv/entity-lists/nope/match", "{\"values\":[\"1\"]}", VIEWER).statusCode());
+            assertEquals(422, send(c, "POST", "/entity-lists/bl/match", "{\"values\":[]}", VIEWER).statusCode());
+            assertEquals(404, send(c, "POST", "/entity-lists/nope/match", "{\"values\":[\"1\"]}", VIEWER).statusCode());
 
-            data(send(c, "POST", "/inv/entity-lists/bl/members", "{\"removeRanges\":[\"cidr:10.1.0.0/16\"],\"reason\":\"r\"}",
+            data(send(c, "POST", "/entity-lists/bl/members", "{\"removeRanges\":[\"cidr:10.1.0.0/16\"],\"reason\":\"r\"}",
                     MAKER), 200);
             assertEquals(List.of(false), matched(match(c, "10.1.200.3")), "a removed block no longer matches");
-            data(send(c, "POST", "/inv/entity-lists/bl/retire", "{\"reason\":\"done\"}", MAKER), 200);
+            data(send(c, "POST", "/entity-lists/bl/retire", "{\"reason\":\"done\"}", MAKER), 200);
             assertEquals(List.of(false), matched(match(c, "+447700900001")), "a retired list matches nothing");
         }
     }
@@ -183,9 +183,9 @@ class ControlApiEntityListAssuranceTest {
     void anExpiringAddNeverShortensAPermanentEntry(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             noMasking(root);
-            data(send(c, "POST", "/inv/entity-lists", BLOCK, MAKER), 201);
-            data(send(c, "POST", "/inv/entity-lists/bl/members", "{\"add\":[\"+441\"],\"reason\":\"r\"}", MAKER), 200);
-            JsonNode r = data(send(c, "POST", "/inv/entity-lists/bl/members", "{\"add\":[\"+441\"],\"expiresAt\":\""
+            data(send(c, "POST", "/entity-lists", BLOCK, MAKER), 201);
+            data(send(c, "POST", "/entity-lists/bl/members", "{\"add\":[\"+441\"],\"reason\":\"r\"}", MAKER), 200);
+            JsonNode r = data(send(c, "POST", "/entity-lists/bl/members", "{\"add\":[\"+441\"],\"expiresAt\":\""
                     + Instant.now().plusSeconds(60) + "\",\"reason\":\"r\"}", MAKER), 200);
             assertEquals(0, r.get("changed").asInt(), "a no-op");
             assertEquals(0, r.get("expiring").size());
@@ -195,19 +195,19 @@ class ControlApiEntityListAssuranceTest {
     @Test
     void theMatchRouteIs503WithoutAWriteRootAndMasksAMaskedList(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx none = open(cfg, null)) {
-            assertEquals(503, send(none, "POST", "/inv/entity-lists/bl/match", "{\"values\":[\"1\"]}", VIEWER).statusCode());
+            assertEquals(503, send(none, "POST", "/entity-lists/bl/match", "{\"values\":[\"1\"]}", VIEWER).statusCode());
         }
         try (Ctx c = open(cfg, root)) {
-            data(send(c, "POST", "/inv/entity-lists", BLOCK, MAKER), 201);   // msisdn is a masked type by default
-            data(send(c, "POST", "/inv/entity-lists/bl/members", "{\"add\":[\"+447700900001\"],"
+            data(send(c, "POST", "/entity-lists", BLOCK, MAKER), 201);   // msisdn is a masked type by default
+            data(send(c, "POST", "/entity-lists/bl/members", "{\"add\":[\"+447700900001\"],"
                     + "\"addRanges\":[{\"prefix\":\"+4479\"}],\"reason\":\"r\"}", MAKER), 200);
-            HttpResponse<String> r = send(c, "POST", "/inv/entity-lists/bl/match",
+            HttpResponse<String> r = send(c, "POST", "/entity-lists/bl/match",
                     "{\"values\":[\"+447700900001\",\"+447912\"]}", VIEWER);
             JsonNode m = data(r, 200).get("matches");
             assertEquals(List.of(true, true), matched(m));
             assertFalse(m.get(0).get("entry").asText().contains("7700"), "the matched entry is masked: " + r.body());
             assertFalse(m.get(1).get("entry").asText().contains("4479"), "a matched range too: " + r.body());
-            JsonNode list = data(send(c, "GET", "/inv/entity-lists/bl", null, VIEWER), 200);
+            JsonNode list = data(send(c, "GET", "/entity-lists/bl", null, VIEWER), 200);
             assertFalse(list.get("ranges").toString().contains("4479"), "ranges are masked like members: " + list);
         }
     }
@@ -219,14 +219,14 @@ class ControlApiEntityListAssuranceTest {
         Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             noMasking(root);
-            data(send(c, "POST", "/inv/entity-lists", BLOCK, MAKER), 201);
+            data(send(c, "POST", "/entity-lists", BLOCK, MAKER), 201);
             assertEquals(422, send(c, "PUT", "/settings/approval", "{\"approval\":{\"entity-lists\":{\"required\":true}}}",
                     ADMIN).statusCode(), "the kind is named exactly");
             data(send(c, "PUT", "/settings/approval", "{\"approval\":{\"entity-list\":{\"required\":true}}}", ADMIN), 200);
             int before = facts(c);
 
             // A permanent block: held, nothing written.
-            JsonNode held = data(send(c, "POST", "/inv/entity-lists/bl/members",
+            JsonNode held = data(send(c, "POST", "/entity-lists/bl/members",
                     "{\"add\":[\"+447700900001\"],\"addRanges\":[{\"cidr\":\"10.1.0.0/16\"}],\"reason\":\"FR-9\"}", MAKER), 202);
             assertEquals("pending", held.get("status").asText());
             String id = held.at("/pendingChange/id").asText();
@@ -238,7 +238,7 @@ class ControlApiEntityListAssuranceTest {
             JsonNode diff = data(send(c, "GET", "/pending-changes/" + id + "/diff", null, CHECKER), 200);
             assertTrue(diff.toString().contains("cidr:10.1.0.0/16") && diff.toString().contains("+447700900001"),
                     "the approver reads what they approve: " + diff);
-            assertEquals(409, send(c, "POST", "/inv/entity-lists/bl/members", "{\"add\":[\"+442\"],\"reason\":\"r\"}",
+            assertEquals(409, send(c, "POST", "/entity-lists/bl/members", "{\"add\":[\"+442\"],\"reason\":\"r\"}",
                     MAKER).statusCode(), "one pending change per list");
 
             assertEquals(403, send(c, "POST", "/pending-changes/" + id + "/approve", "{}", MAKER).statusCode(),
@@ -252,31 +252,31 @@ class ControlApiEntityListAssuranceTest {
             assertEquals(List.of(true, true), matched(match(c, "+447700900001", "10.1.9.9")));
 
             // D-P5: an expiring (<= 24 h) add applies at once and is flagged for review after.
-            JsonNode quick = data(send(c, "POST", "/inv/entity-lists/bl/members", "{\"add\":[\"+447700900002\"],"
+            JsonNode quick = data(send(c, "POST", "/entity-lists/bl/members", "{\"add\":[\"+447700900002\"],"
                     + "\"expiresAt\":\"" + Instant.now().plusSeconds(6 * 3600) + "\",\"reason\":\"hot\"}", MAKER), 200);
             assertTrue(quick.get("reviewAfter").asBoolean(), quick.toString());
             assertEquals(List.of(true), matched(match(c, "+447700900002")));
             // ... but not longer than 24 h, and never a removal.
-            data(send(c, "POST", "/inv/entity-lists/bl/members", "{\"add\":[\"+447700900003\"],"
+            data(send(c, "POST", "/entity-lists/bl/members", "{\"add\":[\"+447700900003\"],"
                     + "\"expiresAt\":\"" + Instant.now().plusSeconds(25 * 3600) + "\",\"reason\":\"long\"}", MAKER), 202);
             String longId = data(send(c, "GET", "/pending-changes?status=pending", null, CHECKER), 200).at("/items/0/id").asText();
             data(send(c, "POST", "/pending-changes/" + longId + "/decline", "{\"reason\":\"no\"}", CHECKER), 200);
 
             // A stale proposal is never applied: the list moves under it.
-            String stale = data(send(c, "POST", "/inv/entity-lists/bl/members",
+            String stale = data(send(c, "POST", "/entity-lists/bl/members",
                     "{\"remove\":[\"+447700900001\"],\"reason\":\"cleared\"}", MAKER), 202).at("/pendingChange/id").asText();
             data(send(c, "PUT", "/settings/approval", "{\"approval\":{}}", ADMIN), 200);
-            data(send(c, "POST", "/inv/entity-lists/bl/members", "{\"add\":[\"+449\"],\"reason\":\"moved\"}", MAKER), 200);
+            data(send(c, "POST", "/entity-lists/bl/members", "{\"add\":[\"+449\"],\"reason\":\"moved\"}", MAKER), 200);
             data(send(c, "PUT", "/settings/approval", "{\"approval\":{\"entity-list\":{\"required\":true}}}", ADMIN), 200);
             assertEquals(409, send(c, "POST", "/pending-changes/" + stale + "/approve", "{}", CHECKER).statusCode());
             assertEquals(List.of(true), matched(match(c, "+447700900001")), "the stale removal was not applied");
 
             // Retire is held too: retiring a block list loosens control.
-            String retire = data(send(c, "POST", "/inv/entity-lists/bl/retire", "{\"reason\":\"done\"}", MAKER), 202)
+            String retire = data(send(c, "POST", "/entity-lists/bl/retire", "{\"reason\":\"done\"}", MAKER), 202)
                     .at("/pendingChange/id").asText();
-            assertFalse(data(send(c, "GET", "/inv/entity-lists/bl", null, VIEWER), 200).get("retired").asBoolean());
+            assertFalse(data(send(c, "GET", "/entity-lists/bl", null, VIEWER), 200).get("retired").asBoolean());
             data(send(c, "POST", "/pending-changes/" + retire + "/approve", "{}", CHECKER), 200);
-            assertTrue(data(send(c, "GET", "/inv/entity-lists/bl", null, VIEWER), 200).get("retired").asBoolean());
+            assertTrue(data(send(c, "GET", "/entity-lists/bl", null, VIEWER), 200).get("retired").asBoolean());
         }
     }
 

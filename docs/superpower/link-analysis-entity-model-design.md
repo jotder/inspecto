@@ -74,28 +74,28 @@
 
 ### 4.3 Entity Lists — routes (`inspecto-geo-link`, new `EntityListRoutes`)
 Following the `endpoint` skill's gate order (503 write root → 422 spec → 403 → 409 → act):
-- `GET /inv/entity-lists` · `GET /inv/entity-lists/{id}?at=<seq>`
-- `POST /inv/entity-lists` `{id, title, purpose, entityType}` (409 on existing id)
-- `POST /inv/entity-lists/{id}/members` `{add[], remove[], reason}` — keys normalised by the type's normaliser server-side
-- `POST /inv/entity-lists/{id}/retire` `{reason}`
+- `GET /entity-lists` · `GET /entity-lists/{id}?at=<seq>`
+- `POST /entity-lists` `{id, title, purpose, entityType}` (409 on existing id)
+- `POST /entity-lists/{id}/members` `{add[], remove[], reason}` — keys normalised by the type's normaliser server-side
+- `POST /entity-lists/{id}/retire` `{reason}`
 - Writes under `canManageIncidents`; members masked at render per `maskingMode` (D-U6), reveal via the existing capability.
 - Audit: `ENTITY_LIST_CHANGED` carrying list id + counts (never raw keys, as `LINK_ENTITY_REVEALED`).
 
 #### 4.3.1 Wire contract (fixed 2026-09-26 for step 3 — backend and SPA build against this)
 - A **list summary**: `{id, title, purpose, entityType, size, retired, createdAt, createdBy, lastSeq}`.
-- `GET /inv/entity-lists` → `{lists: [summary…], headSeq, headHash}` (retired lists included, flagged).
-- `GET /inv/entity-lists/{id}?at=<seq>` → `summary + {members: [key…], atSeq, headHash}`; `at` beyond head → 422;
+- `GET /entity-lists` → `{lists: [summary…], headSeq, headHash}` (retired lists included, flagged).
+- `GET /entity-lists/{id}?at=<seq>` → `summary + {members: [key…], atSeq, headHash}`; `at` beyond head → 422;
   a list that did not exist at `at` → 404. Members sorted, rendered through `maskingMode` (a list whose Entity Type
   has `masked: true` is masked under `typed`; `all` masks every list; `none` masks nothing) using the same token as
   `EntityMasking`. Reveal of list members is **not** in this slice.
-- `POST /inv/entity-lists` `{id?, title, purpose, entityType, reason}` → **201** + the list. `purpose` ∈
+- `POST /entity-lists` `{id?, title, purpose, entityType, reason}` → **201** + the list. `purpose` ∈
   `allow · block · watch · exclusion` (D-P10); `entityType` must be in force (`entityTypesInForce`); id minted when absent,
   else `^[a-z0-9][a-z0-9_-]{0,63}$`; an id ever used (retired too) → **409**.
-- `POST /inv/entity-lists/{id}/members` `{add?: [raw…], remove?: [raw…], reason}` → 200 + the list. Values are
+- `POST /entity-lists/{id}/members` `{add?: [raw…], remove?: [raw…], reason}` → 200 + the list. Values are
   normalised server-side with the list's Entity Type normaliser; a value empty after normalising → 422; a key in both
   `add` and `remove` → 422; ≤ 5 000 values per call. Only effective changes write facts; a call that changes nothing
   writes nothing and answers 200 with `changed: 0`. Retired list → 409.
-- `POST /inv/entity-lists/{id}/retire` `{reason}` → 200; already retired → 409.
+- `POST /entity-lists/{id}/retire` `{reason}` → 200; already retired → 409.
 - Every write: `reason` non-blank (422), capability `canManageIncidents`, no write root → 503, unknown list → 404.
   Reads need only Space access (a list is a Space object, not owner-scoped like an Investigation).
 - Audit: `ENTITY_LIST_CHANGED` `{listId, kind, added, removed, seq}` — counts, never keys.

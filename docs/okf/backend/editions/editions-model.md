@@ -24,9 +24,9 @@ Assembly mechanisms:
   ⚠ Maven only *warns* on a profile that does not exist and then builds the default, so the old
   `-Pedition-personal` produced a correct Personal jar for an incorrect reason — the kind of instruction
   that survives because it appears to work.
-* **An optional Maven module** — the primary mechanism, and as of 2026-09-08 there are **nine**:
+* **An optional Maven module** — the primary mechanism, and as of 2026-09-08 there are **ten**:
   `inspecto-security` (OIDC/Nimbus, role mapping, token relay — see [auth & security](auth-security.md)),
-  `inspecto-policy` (Enterprise ABAC), and the **seven** EDG-01 modules (this said “five” before 2026-09-09 while listing seven) `inspecto-notify-channels`,
+  `inspecto-policy` (Enterprise ABAC), `inspecto-entity-list` (SEP-08, 2026-10-01 — Entity Lists and the shared entity fact log; `inspecto-geo-link` depends on it; bundled wherever geo-link is), and the **seven** EDG-01 modules (this said “five” before 2026-09-09 while listing seven) `inspecto-notify-channels`,
   `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`, `inspecto-metrics`, `inspecto-events`, `inspecto-ops`.
   Each joins the reactor only under `edition-professional`/`edition-enterprise`, so Personal never even
   compiles it.

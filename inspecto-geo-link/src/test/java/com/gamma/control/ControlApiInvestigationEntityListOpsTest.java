@@ -114,14 +114,14 @@ class ControlApiInvestigationEntityListOpsTest {
 
     /** An msisdn Entity List {@code id} of {@code purpose}, with {@code members} added in one call (two facts). */
     private void list(Ctx c, String id, String purpose, String... members) throws Exception {
-        data(post(c, "/inv/entity-lists", "{\"id\":\"" + id + "\",\"title\":\"" + id + "\",\"purpose\":\"" + purpose
+        data(post(c, "/entity-lists", "{\"id\":\"" + id + "\",\"title\":\"" + id + "\",\"purpose\":\"" + purpose
                 + "\",\"entityType\":\"msisdn\",\"reason\":\"referral\"}"), 201);
         if (members.length > 0) members(c, id, "add", members);
     }
 
     private void members(Ctx c, String id, String verb, String... values) throws Exception {
         String vs = java.util.Arrays.stream(values).map(v -> "\"" + v + "\"").collect(Collectors.joining(","));
-        data(post(c, "/inv/entity-lists/" + id + "/members", "{\"" + verb + "\":[" + vs + "],\"reason\":\"r\"}"), 200);
+        data(post(c, "/entity-lists/" + id + "/members", "{\"" + verb + "\":[" + vs + "],\"reason\":\"r\"}"), 200);
     }
 
     private static Set<String> entityIds(JsonNode workingSet) {
@@ -163,7 +163,7 @@ class ControlApiInvestigationEntityListOpsTest {
             assertTrue(unknown.body().contains("mules"), unknown.body());
 
             list(c, "old", "block", "+447700900123");
-            data(post(c, "/inv/entity-lists/old/retire", "{\"reason\":\"superseded\"}"), 200);
+            data(post(c, "/entity-lists/old/retire", "{\"reason\":\"superseded\"}"), 200);
             HttpResponse<String> retired = post(c, ops, "{\"op\":\"seedBy\",\"listId\":\"old\"}");
             assertEquals(409, retired.statusCode(), retired.body());
             assertTrue(retired.body().contains("retired"), retired.body());
@@ -299,7 +299,7 @@ class ControlApiInvestigationEntityListOpsTest {
             String sealed = op(c, "case-a", EXCLUDE_BY).at("/workingSet/hash").asText();
 
             members(c, "mules", "remove", "+447700900123", "+447700900555");
-            data(post(c, "/inv/entity-lists/mules/retire", "{\"reason\":\"closed\"}"), 200);
+            data(post(c, "/entity-lists/mules/retire", "{\"reason\":\"closed\"}"), 200);
 
             JsonNode replayed = replay(c, "case-a");
             assertTrue(replayed.get("equivalent").asBoolean(), replayed.toString());
@@ -444,7 +444,7 @@ class ControlApiInvestigationEntityListOpsTest {
                     "handset", List.of("hs-pp55", "unm-hs-84"));
             for (var t : cases.entrySet()) {
                 String type = t.getKey(), value = t.getValue().get(0), unmatched = t.getValue().get(1);
-                data(post(c, "/inv/entity-lists", "{\"id\":\"l-" + type + "\",\"title\":\"t\",\"purpose\":\"watch\","
+                data(post(c, "/entity-lists", "{\"id\":\"l-" + type + "\",\"title\":\"t\",\"purpose\":\"watch\","
                         + "\"entityType\":\"" + type + "\",\"reason\":\"r\"}"), 201);
                 members(c, "l-" + type, "add", value, unmatched);
                 String inv = "case-" + type;
@@ -488,7 +488,7 @@ class ControlApiInvestigationEntityListOpsTest {
             JsonNode keys = data(replayed, 200).at("/workingSet/excludedKeys");
             assertEquals(2, keys.size(), replayed.body());
             for (JsonNode k : keys) assertTrue(k.get("key").asText().startsWith("masked:"), replayed.body());
-            HttpResponse<String> listed = send(c, "GET", "/inv/entity-lists/mules", null);
+            HttpResponse<String> listed = send(c, "GET", "/entity-lists/mules", null);
             for (JsonNode m : data(listed, 200).get("members")) assertTrue(m.asText().startsWith("masked:"), listed.body());
             String all = String.join("\n", excluded.body(), replayed.body(), listed.body(),
                     send(c, "GET", "/inv/investigations/case-a/log", null).body());
@@ -510,7 +510,7 @@ class ControlApiInvestigationEntityListOpsTest {
                     + "\"label\":\"MSISDN\",\"normaliser\":\"e164\",\"masked\":false,\"classifications\":[\"MSISDN\"]}]}"), 200);
             list(c, "mules", "exclusion", "+447700900123", "+447700900555");
             assertEquals(List.of("+447700900123", "+447700900555"),
-                    texts(data(send(c, "GET", "/inv/entity-lists/mules", null), 200).get("members")));
+                    texts(data(send(c, "GET", "/entity-lists/mules", null), 200).get("members")));
             data(post(c, "/inv/investigations", CREATE), 200);
             JsonNode seeded = op(c, "case-a", "{\"op\":\"seed\",\"ids\":[\"alice\"],\"entityType\":\"MSISDN\"}");
             assertEquals("alice", seeded.at("/delta/admitted/0").asText(), seeded.toString());
@@ -587,7 +587,7 @@ class ControlApiInvestigationEntityListOpsTest {
             assertTrue(entityIds(replay(c, "case-t").get("workingSet")).contains(MULE),
                     "the old membership did not travel: the removed member no longer excludes");
 
-            data(post(c, "/inv/entity-lists/mules/retire", "{\"reason\":\"closed\"}"), 200);
+            data(post(c, "/entity-lists/mules/retire", "{\"reason\":\"closed\"}"), 200);
             HttpResponse<String> refused = post(c, "/inv/investigation-templates/tpl-1/instantiate",
                     "{\"id\":\"case-u\",\"purpose\":\"rerun\",\"params\":{\"seed1\":[\"alice\"]}}");
             assertEquals(409, refused.statusCode(), refused.body());

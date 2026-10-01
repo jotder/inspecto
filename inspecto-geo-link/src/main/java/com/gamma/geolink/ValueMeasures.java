@@ -8,6 +8,9 @@ import com.gamma.sql.SqlSandboxPolicy;
 import com.gamma.control.ApiException;
 import com.gamma.control.EntityTypes;
 import com.gamma.control.ErrorCodes;
+import com.gamma.entitylist.EntityFactLog;
+import com.gamma.entitylist.EntityListRoutes;
+import com.gamma.entitylist.EntityRegistry;
 
 import java.nio.file.Path;
 import java.sql.SQLException;

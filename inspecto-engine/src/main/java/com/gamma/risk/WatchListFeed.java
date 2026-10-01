@@ -13,7 +13,7 @@ import java.util.ServiceLoader;
  * an expiry of at most 24 h. An expiring entry applies at once and is reviewed after (D-P5), so there is no
  * Pending Change.
  *
- * <p>The Entity List store (the Identity Fact log) lives in the optional {@code inspecto-geo-link} module, which
+ * <p>The Entity List store (the Identity Fact log) lives in the optional {@code inspecto-entity-list} module, which
  * provides the one implementation through {@link ServiceLoader}. Without it (Personal) there is no provider: a model
  * naming a {@code watchList} is refused at save and fails its run. It is never silently left unfed.
  */

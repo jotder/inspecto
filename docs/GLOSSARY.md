@@ -941,7 +941,7 @@ untyped Entity keeps `entity:<value>`. ⛔ Never call it a *classification* — 
 label (`columns[].classification`); the Entity Type is what that label maps to. Design:
 [`superpower/link-analysis-entity-model-design.md`](superpower/link-analysis-entity-model-design.md).
 
-**Entity List** *(added 2026-09-26, `LA-17`; ✅ backend + SPA client built 2026-09-26: `/inv/entity-lists*`, `EntityListRoutes`; `excludeBy`/`seedBy` and the panel not yet)* — A named, persisted, Space-scoped set of typed Entity keys
+**Entity List** *(added 2026-09-26, `LA-17`; ✅ backend + SPA client built 2026-09-26: `/entity-lists*`, `EntityListRoutes`; `excludeBy`/`seedBy` and the panel not yet)* — A named, persisted, Space-scoped set of typed Entity keys
 with a stated purpose (`allow` · `block` · `watch` · `exclusion`), held as a fold over the Space's **Identity Fact** log,
 so it can be read as of any log position. Consumed by the Investigation ops `excludeBy` / `seedBy`, and it travels
 with an **Investigation Template** (D-E8). ⛔ Never *Reference List* — **Reference** is the Catalog's dimension data

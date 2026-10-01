@@ -1,4 +1,4 @@
-package com.gamma.geolink;
+package com.gamma.entitylist;
 
 import com.gamma.control.ApiContext;
 
@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 
 /**
  * The per-Space, append-only <b>identity fact log</b> (LA-17, {@code docs/superpower/link-analysis-entity-model-design.md}
- * §4.2): {@code <Space config root>/audit/entity-facts/}, beside {@link SnapshotStore}'s {@code audit/snapshots/}.
+ * §4.2): {@code <Space config root>/audit/entity-facts/}, beside {@code SnapshotStore}'s {@code audit/snapshots/}.
  *
  * <p><b>Format.</b> One immutable JSON file per fact, named by its 12-digit zero-padded sequence number
  * ({@code 000000000001.json}, …). Fields, in this order: {@code seq, at, actor, reason, kind, listId}, the kind's
@@ -42,45 +42,45 @@ import java.util.regex.Pattern;
  * {@link BrokenChainException} — never a silent fold of what happens to be readable. ⚠ Truncation of the TAIL is
  * not detectable from the log alone (the prefix is still a valid chain); a cited head hash is what catches it.
  */
-final class EntityFactLog {
+public final class EntityFactLog {
 
-    static final String DIR = "entity-facts";
+    public static final String DIR = "entity-facts";
     private static final Pattern FACT_FILE = Pattern.compile("(\\d{12})\\.json");
     private static final ConcurrentHashMap<Path, Object> LOCKS = new ConcurrentHashMap<>();
 
     /** One verified fact: its sequence number, parsed body and the SHA-256 of its file bytes. */
-    record Fact(long seq, Map<String, Object> body, String hash) {
-        String kind() { return String.valueOf(body.get("kind")); }
-        String listId() { return String.valueOf(body.get("listId")); }
+    public record Fact(long seq, Map<String, Object> body, String hash) {
+        public String kind() { return String.valueOf(body.get("kind")); }
+        public String listId() { return String.valueOf(body.get("listId")); }
     }
 
     /** The verified log: every fact in seq order, the head seq ({@code 0} when empty) and head hash ({@code ""}). */
-    record Log(List<Fact> facts, long headSeq, String headHash) {}
+    public record Log(List<Fact> facts, long headSeq, String headHash) {}
 
     /** The chain does not verify. The route answers 500 {@code INTEGRITY_VIOLATION}; nothing is folded. */
-    static final class BrokenChainException extends IllegalStateException {
-        BrokenChainException(String message) {
+    public static final class BrokenChainException extends IllegalStateException {
+        public BrokenChainException(String message) {
             super(message);
         }
     }
 
     private final Path dir;
 
-    EntityFactLog(Path writeRoot) {
+    public EntityFactLog(Path writeRoot) {
         this.dir = writeRoot.resolve("audit").resolve(DIR);
     }
 
-    Path directory() {
+    public Path directory() {
         return dir;
     }
 
     /** The JVM-wide monitor writers to this log hold across read-head → append. */
-    Object lock() {
+    public Object lock() {
         return LOCKS.computeIfAbsent(dir.toAbsolutePath().normalize(), k -> new Object());
     }
 
     /** Every fact, chain-verified. An absent directory is an empty log. */
-    Log read() throws IOException {
+    public Log read() throws IOException {
         if (!Files.isDirectory(dir)) return new Log(List.of(), 0, "");
         List<Long> seqs = new ArrayList<>();
         try (var s = Files.list(dir)) {
@@ -123,7 +123,7 @@ final class EntityFactLog {
      * {@code payload} goes between {@code listId} and {@code prevHash}. A {@code null} {@code listId} (the
      * {@code identity.*} kinds, design §8.1) omits the field.
      */
-    Log append(Log head, String actor, String reason, String kind, String listId, Map<String, Object> payload)
+    public Log append(Log head, String actor, String reason, String kind, String listId, Map<String, Object> payload)
             throws IOException {
         long seq = head.headSeq() + 1;
         Map<String, Object> body = new LinkedHashMap<>();
@@ -169,7 +169,7 @@ final class EntityFactLog {
      * <p>The directory is then fsynced, best effort, so the new name survives a crash; platforms that cannot open a
      * directory as a channel (Windows) throw {@code IOException} there, which is ignored.
      */
-    static void publishNew(Path tmp, Path target) throws IOException {
+    public static void publishNew(Path tmp, Path target) throws IOException {
         try {
             Files.createLink(target, tmp);
         } catch (UnsupportedOperationException noHardLinks) {
@@ -186,7 +186,7 @@ final class EntityFactLog {
         return dir.resolve(String.format("%012d.json", seq));
     }
 
-    static String sha256(byte[] bytes) {
+    public static String sha256(byte[] bytes) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         } catch (NoSuchAlgorithmException e) {

@@ -1,4 +1,4 @@
-package com.gamma.geolink;
+package com.gamma.entitylist;
 
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
@@ -58,9 +58,9 @@ final class EntityListSidecar {
                 for (EntityFactLog.Fact f : facts) {
                     if (f.seq() > l.lastSeq() || !l.id().equals(f.listId())) continue;
                     if ("list.member.added".equals(f.kind()))
-                        InvestigationEvaluator.strings(f.body().get("keys")).forEach(k -> keyBy.put(k, f.body()));
+                        EntityRegistry.strings(f.body().get("keys")).forEach(k -> keyBy.put(k, f.body()));
                     if ("list.range.added".equals(f.kind()))
-                        InvestigationEvaluator.strings(f.body().get("ranges")).forEach(k -> rangeBy.put(k, f.body()));
+                        EntityRegistry.strings(f.body().get("ranges")).forEach(k -> rangeBy.put(k, f.body()));
                 }
                 if (!l.retired()) {
                     try (PreparedStatement ps = c.prepareStatement("INSERT INTO e VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {

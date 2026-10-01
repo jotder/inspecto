@@ -578,6 +578,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // EDITIONS §4 contract for every client, not just the SPA. Order matters: after discovery, or the
         // stub would win first-match and the module's real handler would never run.
         new AbsentGeoLinkRoutes().register(this);
+        new AbsentEntityListRoutes().register(this);
         new AbsentExchangeRoutes().register(this);
         new AbsentMetricsRoutes().register(this);
         new AbsentEventsRoutes().register(this);

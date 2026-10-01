@@ -2,7 +2,7 @@
 type: Concept
 title: Entity Lists — assurance entries (ranges, CIDR, expiry, sidecar, four-eyes)
 description: What ASSURE-ENTITY-LISTS-1 (WS-12) added on top of the LA-17 Entity List — range and CIDR entries, expiring entries, the Parquet sidecar Dataset, the match route, the maker-checker hold, and the Risk Score watch-list feed.
-resource: inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java
+resource: inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java
 tags: [control-plane, entity-list, assurance, ws-12, maker-checker, risk-score, link-analysis]
 timestamp: 2026-09-28T00:00:00Z
 ---
@@ -16,11 +16,18 @@ masking and `excludeBy` / `seedBy` are in
 [`link-analysis-entity-model-design.md`](../../../superpower/link-analysis-entity-model-design.md) §4.
 
 `ASSURE-ENTITY-LISTS-1` (WS-12, shipped 2026-09-28) extends the same store and the same routes. It adds no kind and
-no second store. The store stays in the optional `inspecto-geo-link` module, so Personal has no Entity Lists.
+no second store. 🔁 **SEP-08 (2026-10-01):** the store, the six routes (`/entity-lists…`, renamed from `/inv/entity-lists…`) and the
+one shared, hash-chained fact log (`EntityFactLog`, `EntityRegistry`, package `com.gamma.entitylist`) now live in the optional
+**`inspecto-entity-list`** module, bundled in exactly the editions that ship `inspecto-geo-link` and absent on Personal
+(`AbsentEntityListRoutes` answers the six routes 503; `/bootstrap` `features.entityList` is `false`). Link Analysis
+(`inspecto-geo-link`) depends on it — its `/inv/entity-identities*` routes, `EntityMasking` and the Investigation list-ops
+append to and read the SAME log through it; the reverse dependency does not exist. The on-disk format and paths are
+unchanged (`audit/entity-facts/`, `mask.key`), so a Space created before the move still verifies its chain. The masking
+token algorithm moved with it as `MaskTokens`.
 
 ## Range entries (`EntityListEntries`)
 
-`POST /inv/entity-lists/{id}/members` takes `addRanges` / `removeRanges`. Each entry is exactly one of:
+`POST /entity-lists/{id}/members` takes `addRanges` / `removeRanges`. Each entry is exactly one of:
 
 | Authored | Stored (canonical) | Matches |
 |---|---|---|
@@ -46,14 +53,14 @@ Range entries live in their own set, beside the members. A `default`-normalised 
 keeps an expired entry (an as-of read shows it, and `expiring[]` flags `expired: true`), but it **stops
 matching**:
 
-- `POST /inv/entity-lists/{id}/match` does not return it;
+- `POST /entity-lists/{id}/match` does not return it;
 - `excludeBy` / `seedBy` do not seal it (`InvestigationRoutes.sealList` seals `liveMembers(now)`);
 - the sidecar keeps the row with its `expires_at`, and the consumer filters on it.
 
 A later permanent add revives the entry, and a remove forgets the expiry. **An expiring add never shortens a
 PERMANENT entry**: that add is a no-op (`changed: 0`). To shorten one, remove it and add it again.
 
-## `POST /inv/entity-lists/{id}/match`
+## `POST /entity-lists/{id}/match`
 
 `{values: [...]}` (1..5 000) returns `{listId, purpose, atSeq, matches: [{value, matched, match?, entry?}]}`.
 `match` is `key | prefix | range | cidr`, and `entry` is masked exactly as the list renders. A retired list
@@ -108,7 +115,7 @@ run:
 
 The 24 h cap is what lets a Job skip four-eyes (D-P5).
 
-The seam is `com.gamma.risk.WatchListFeed`, an engine SPI that `inspecto-geo-link` provides by `ServiceLoader`
+The seam is `com.gamma.risk.WatchListFeed`, an engine SPI that `inspecto-entity-list` provides by `ServiceLoader`
 (`RiskWatchListFeed`). The feed fails closed:
 
 - the save is refused (422) when the list is unknown, retired, not `watch`, or its type is no longer in force;
@@ -117,7 +124,7 @@ The seam is `com.gamma.risk.WatchListFeed`, an engine SPI that `inspecto-geo-lin
 
 ## Session decisions (2026-09-28, lane `ASSURE-ENTITY-LISTS-1`)
 
-1. **The store stays in `inspecto-geo-link`.** Moving it into core was not needed. The one core consumer, the
+1. **The store stayed in `inspecto-geo-link`** (superseded by SEP-08, 2026-10-01: it is now the `inspecto-entity-list` module). Moving it into core was not needed. The one core consumer, the
    Risk Score Job, reaches it through a small SPI, and moving it would have meant rewriting Link Analysis-owned
    files. Personal therefore has no Entity Lists.
 2. **Ranges are canonical strings in a separate set**, folded like members, so as-of reads and the chain cover

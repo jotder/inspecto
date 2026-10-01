@@ -65,7 +65,7 @@ record ApprovalPolicy(Map<String, Rule> rules, int expiresAfterHours, boolean fa
         Set<String> s = new TreeSet<>(ComponentStore.WRITABLE_TYPES);
         s.removeAll(Set.of("requirement", "channel", "notification-rule"));
         s.addAll(Set.of("pipeline", "schema", "enrichment", "meta", JobRoutes.KIND));
-        // ASSURE-ENTITY-LISTS-1 (D-P5): member / range changes and retire of an Entity List (inspecto-geo-link) hold
+        // ASSURE-ENTITY-LISTS-1 (D-P5): member / range changes and retire of an Entity List (inspecto-entity-list) hold
         // here; an add-only change whose every entry expires within 24 h applies at once and is reviewed after.
         s.add("entity-list");
         return java.util.Collections.unmodifiableSet(s);
