@@ -978,6 +978,10 @@ and measured size and exactly ONE next action ("run again with a budget of N" on
 Working Set or pick a cheaper algorithm"). On the SPA the capability is `LensService.canRunLinkGraphAnalysis`, access-catalog node
 `linkgraph.run`.
 
+**Selection algorithms (2026-10-01).** Shortest and weighted shortest path, all paths, cycles, cut points (articulation points and bridges, TWO server algorithms with one Run on server control each) and the maximum spanning forest have no browser cap of their own, so they get the same browser-first / server-above route. The ONE threshold is `selectionNodeCapValue()` in `graph-analysis.ts` (= the analysis cap, so one setting moves every decision); the toolbox lowers it to the server's per-algorithm `inlineNodeCeiling` (`serverCeilings` input, from `GET /inv/graph/algorithms`) and never raises it. The local button is replaced ONLY when a server run can really start (`serverFirst`: over the threshold, an Investigation open, the capability held); otherwise it stays, because these never refuse locally and a big query graph must not lose them. Server selections (`selection`, `selections`, `ids` - bridges name LINKS, the rest nodes) go through `applyServerResult` into the SAME `applyPath` / `applyAllPaths` / `applyCycles` / `applyCutPoints` / `applySpanningForest` the local runs call.
+
+**Not drawn on the canvas.** `countDropped` / `droppedNotice` (`graph-run-apply.ts`) count the distinct node and link ids of a COMPLETED result that the id map cannot place, and the toolbox states `N of M result nodes and K of L result links are not drawn on the canvas right now`; a later browser run clears it. There is no reveal action: collapse and the kind/time filters act on the QUERY graph, not on an open Investigation's canvas, so what is missing is not collapsed. In the 2026-10-01 preview the cause was `projectTriples`' node cap dropping Working Set links (`LA-WORKING-SET-CANVAS-LINKS-1`).
+
 **Parity guarantee.** The six `graph-*-parity.fixture.json` files are asserted in TS and in Java (engine-level `GraphEngineParityTest`
 too), plus a route-level test that feeds `graph-algorithms-parity.fixture.json` through a real Dataset → Investigation → Working Set →
 `POST /inv/graph/runs` (components, k-core, triangles, shortest paths, neighborhood; `degree` deliberately not asserted, see Input rows).
@@ -1000,10 +1004,10 @@ betweenness and suspicion).
   closeness and link prediction (per source), PageRank, eigenvector, Katz, HITS and label propagation (per iteration, of the requested
   maximum - a run that converges early finishes below 1 until it completes). **Louvain** (passes run to convergence) and the 11 algorithms
   without a `RunControl` overload report nothing. `known` is additive: a client that reads only `fraction` keeps working.
+  The SPA prefers the server's `progress.fraction` and `consumed.elapsedMs` whenever they are > 0 and falls back to "N steps done" and a browser-measured wait otherwise.
 * Cancel on someone else's run is **403** (the service's FORBIDDEN) while a READ of it is **404** (a run id is an unguessable UUID);
   cancel does not re-open the Investigation. Administrator = `Roles.CAN_ADMINISTER`, or no Subject at all.
-* Algorithms with a selection result and no browser cap (shortest and all paths, cycles, spanning forest, bridges) stay local-only.
-* A server result for a node the canvas has collapsed or filtered away is dropped by the id map.
+* A server result for a node or link the canvas does not draw is dropped by the id map, and the toolbox says how many (see above).
 * The toolbox's local runs still analyse the displayed query graph, not the Working Set, when an Investigation is open.
 * **Service lifetime.** One `GraphRunService` per Space write root, held by `GraphRunServices` (la-api): created lazily, closed by
   `ApiContext.onClose(Runnable)` (`ControlApi.close()` runs its hooks first), **or earlier** - closed and forgotten when unused for 1 h
@@ -1024,8 +1028,7 @@ betweenness and suspicion).
 * A raw id sent as `from` / `to` / `node` while masking is on is not refused.
 
 **Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-GRAPH-RUN-LOCAL-WORKING-SET-1` ·
-`LA-GRAPH-RUN-MASK-ORACLE-1` · `LA-GRAPH-RUN-SELECTION-LOCAL-ONLY-1` · `LA-GRAPH-RUN-HIDDEN-NODES-1` ·
-`LA-GRAPH-RUN-CANCEL-GATE-1`. The remaining option-D phases are in
+`LA-GRAPH-RUN-MASK-ORACLE-1` · `LA-WORKING-SET-CANVAS-LINKS-1` · `LA-GRAPH-RUN-CANCEL-GATE-1`. The remaining option-D phases are in
 [`la-separation-feasibility-plan.md`](../../../superpower/la-separation-feasibility-plan.md) §7.8.
 
 ## Closed-plan record (2026-10-01)
