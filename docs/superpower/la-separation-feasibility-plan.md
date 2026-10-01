@@ -452,7 +452,7 @@ This is **L–XL** on its own and depends on: versioned inputs (§7.4 index mani
 | **D-1** | Extract the shared platform layer: `http-spi`, `auth-spi` (+ move OIDC), `audit-spi` (cut the ETL edge); move LA onto them; `la-inspecto` bridge; Inspecto behaviour unchanged | L | D-0 |
 | **D-2** | Spikes D-S1…D-S4 (§7.10) — decide storage and engine from measurements | M | — (parallel) |
 | **D-3** | `la-storage` edge/node index + builder (both hosts); `la-data` providers | L | D-1, D-2 |
-| **D-4** | `la-graph`: GraphEngine SPI, server-side algorithms with parity fixtures, async jobs; optional graph / vector engines | L–XL | D-3 |
+| **D-4** | ✅ **DONE 2026-10-01** (built ahead of D-3 over the in-memory Working Set; as-built in `okf/frontend/features/link-analysis.md` §*Graph Run*; open remainder `LA-GRAPH-RUN-*` on the board). `la-graph`: GraphEngine SPI, server-side algorithms with parity fixtures, async jobs; optional graph / vector engines | L–XL | D-3 |
 | **D-5** | `la-app` host + `projects/la-app` shell + LA product flavor (bundle, boot smoke, licence text) | M–L | D-1, SEP-03…06 |
 | **D-6** | Integration: external references, Dossier export bundle, embeddable view; I1 trust only if live calls are needed | M | D-5 |
 | **D-7** | Parallel analyst sandboxes (§7.7): membership model, pinned baselines, per-sandbox DuckDB files, incremental evaluation + checkpoints, admission control, promote/rebase with conflict report, hibernate/rehydrate | L–XL | D-3, D-4, D16–D21 |

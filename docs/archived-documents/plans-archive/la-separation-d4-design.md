@@ -1,12 +1,8 @@
-<!--
-  ACTIVE PLAN — docs/superpower/
-  Created 2026-10-01 (option D, phase D-4). DESIGN ONLY — nothing is built. DECISIONS 1–7 SIGNED 2026-10-01 (operator; Decision 3 with a changed sort key, see its Answer).
-  Retire per the three-tier lifecycle in CLAUDE.md when D-4 ships (or is declined).
--->
+<!-- ARCHIVED 2026-10-01 — shipped (D-4 steps 1-7 built). Durable facts: docs/okf/frontend/features/link-analysis.md §Graph Run; unbuilt remainder: docs/BACKLOG.md §3.12 (`LA-GRAPH-RUN-*`). Kept for provenance (decisions 1-7, §6.1 measurements, §6.2 Java timings); never maintained. -->
 
 # LA separation — D-4 design (the server-side graph engine)
 
-Option D's phase **D-4** ([`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md) §7.4, §7.8): run Link Analysis
+Option D's phase **D-4** ([`la-separation-feasibility-plan.md`](../../superpower/la-separation-feasibility-plan.md) §7.4, §7.8): run Link Analysis
 (LA) graph algorithms on the server, behind one SPI, as asynchronous jobs "with progress, cancel and a stated budget — never a silent
 cap" (§7.4). D-S4 answered the parity question (28 algorithms ported to `inspecto-la-graph`, §7.13); nothing yet *calls* them. This file
 is the design the operator signs before any step. When this and the code disagree, the code wins — re-ground.
@@ -335,6 +331,6 @@ slightly pessimistic. Allocation is worker-thread allocated MB, not peak heap.
 
 ## 8. References
 
-[`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md) §7.2–§7.4, §7.10–§7.13 · [`la-separation-d1-design.md`](la-separation-d1-design.md) (module layout, ports, dependency
-rule, Decision 3) · [`../okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md) (the SPA caps and the browser algorithms) ·
-[`../GLOSSARY.md`](../GLOSSARY.md).
+[`la-separation-feasibility-plan.md`](../../superpower/la-separation-feasibility-plan.md) §7.2–§7.4, §7.10–§7.13 · [`la-separation-d1-design.md`](../../superpower/la-separation-d1-design.md) (module layout, ports, dependency
+rule, Decision 3) · [`../okf/frontend/features/link-analysis.md`](../../okf/frontend/features/link-analysis.md) (the SPA caps and the browser algorithms) ·
+[`../GLOSSARY.md`](../../GLOSSARY.md).

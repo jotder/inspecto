@@ -894,6 +894,122 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   population plus four planted stories (burner rotation, a one-way hub, a daily repeating pair, a SIM moved
   between handsets) makes it **873 edges over 174 nodes**.
 
+## Graph Run (server-side graph analysis — as-built 2026-10-01)
+
+A **Graph Run** is one execution of one of the 28 graph algorithms on the SERVER over an Investigation's Working Set
+(LA separation D-4; `GLOSSARY` *Graph Run*). The browser keeps its own copy of the algorithms and runs them under the
+per-Space node caps; a Graph Run is the way past those caps. Both implementations are held equal by the parity fixtures.
+
+**Module layout.**
+
+| Module | Holds |
+|---|---|
+| `inspecto-la-graph` (pure JDK) | the 28 ported algorithms (six `Graph*` classes) plus `RunControl` / `GraphAborted` (`checkpoint()`, progress, deadline). The old signatures delegate with a no-op `RunControl`, so the parity fixtures are untouched. 17 algorithms are instrumented; the 11 without a `RunControl` overload (paths, ego, neighborhood, components, degree, structure, forest) cannot be cancelled mid-run |
+| `inspecto-la-core` (`com.gamma.la.core`) | `Algorithm` (the catalogue: id = the TS export name, `cost` SYNC/JOB as a hint, `inlineNodeCeiling`, typed `params`, `needsWeights` / `needsSource` / `needsTarget` / `needsNode`, `resultKind`, `resolve(params)`), the `GraphEngine` SPI (`engineId`, `supported`, `run`), `InMemoryGraphEngine` (exhaustive switch, no `default`), `GraphInput`, `WorkingSetGraphInput`, `GraphResult`, `InvalidGraphRequest`, `GraphBudget`, `GraphRunException`, `GraphRunService` |
+| `inspecto-la-api` (`com.gamma.la.api`) | `GraphRunRoutes`, `GraphResultJson` (the one serializer: an exhaustive `switch` over the sealed `Payload`, so a 13th result shape does not compile) |
+
+`la-core` depends on `la-graph` (allowlisted in `tools/check-module-deps.mjs` and both enforcer lists; `inspecto-la-graph.jar` is staged
+in the bundle). The SPI does not mention memory: an index-backed engine is a later phase (D-3), not built.
+
+**Routes** (all `/api/v1`). `GET /inv/graph/algorithms` (catalogue, `ceilings`, `defaults{maxNodes,maxEdges,timeoutMs,clamped}`,
+`pool{threads,queue}`, `inlineWaitMs`; a read, no capability) · `POST /inv/graph/runs` (`{investigationId, at?, algorithm, params?,
+weights: "count"|"none", kinds?, budget?}`; an unknown field is 422) answers `200` with the run view when it is terminal at submit or
+finishes within the inline wait, else `202` + `Location` · `GET /inv/graph/runs[?investigationId=]` · `GET /inv/graph/runs/{id}` ·
+`POST /inv/graph/runs/{id}/cancel` answers `202 {runId,status,cancelRequested}`. A Working Set at or under the algorithm's
+`inlineNodeCeiling` is awaited `INLINE_WAIT_MS` = 3 000 ms; above it the request never waits. A queue-full submit is `503 STORE_BUSY`
+(retryable), a missing write root `503 CONTROL_PLANE_READ_ONLY`. Reads and the list re-run `openForRead` on the run's Investigation every
+time (lose the Investigation, lose the run: 404). The four route gates are done: `openapi-v1.json`, `CapabilityManifest`, the
+`AbsentGeoLinkRoutes.SURFACE` mirror, and real-HTTP tests with an armed Authenticator.
+
+**Capability and settings.** Starting a run needs **`canRunLinkGraphAnalysis`** (`Roles.CAN_RUN_LINK_GRAPH_ANALYSIS`, a literal in
+`withCapability`; seeded to `operations` / `support` / `power` / `admin`, `super` by the all-capabilities convention; listed in
+`okf/capabilities/security/security.md`). **Cancel carries no capability**: the service's starter-or-administrator check is the gate, and
+the manifest declares a `self-service` exemption. Settings (`link-analysis.toon` block `graph_run`, wire `graphRun`, 1..10 000 000 each,
+a bad value is 422): `max_nodes`, `max_edges`, `timeout_ms` (the DEFAULT budget), `threads`, `queue` (read when the Space's service is
+first used; restart to change). `Limits.standard()` supplies the rest and is deliberately not a setting: default budget 50 000 nodes /
+500 000 edges / 30 s, HARD ceilings 500 000 / 5 000 000 / 300 s, 2 threads, queue 16, run TTL 1 h, `maxRuns` 200, cache TTL 10 min,
+32 cache entries.
+
+**States and the budget.** `QUEUED → RUNNING → COMPLETED | CANCELLED | BUDGET_EXCEEDED | FAILED`; all four terminals are final. The
+budget the service sees is always fully stated (the request, else the Space's `graph_run`, else the service default), clamped to the
+ceilings, and echoed with `budgetClamped`. **"Never a silent cap":** `submit` validates params first (`InvalidGraphRequest` is the 422,
+no run is created), checks size BEFORE work (terminal `BUDGET_EXCEEDED` with reason NODES or EDGES and the measured size; the engine is
+never reached), then the cache, then the bounded pool. `timeoutMs` counts from execution start, not queueing. A run that returns AFTER
+its deadline (an algorithm with no checkpoint) is also `BUDGET_EXCEEDED` and its answer is discarded; a cancel that loses the race to a
+finished uncancellable algorithm is `CANCELLED` and discarded. **A `result` (and `masking`) exists only for `COMPLETED`**, and only
+`COMPLETED` is cached. `FAILED` names the exception class, never its message (it could carry an entity id).
+
+**Input rows.** `WorkingSetGraphInput.from(entityRows, linkRows, kinds)` takes the evaluator's neutral row maps. The row set is the
+Working Set at `at` MINUS entities a `hide` op hid and the links touching them (counted in `input.hiddenEntities`); `resolve` identity
+groups are NOT merged. Links with an endpoint that is no `entities` row are dropped and counted (`droppedDangling`), never silently.
+Edge id = the wire `LinkIds.encode(source,target,kind)`, the `linkId` the links relation serves (NOT the SPA's canvas id). Weight =
+`GraphPaths.edgeWeight(count, kind)`: a positive `count`, else 1; `weights: "none"` is unweighted. Parallel edges of one
+`(source,target,kind)` fold into one Link, so an edge-counting figure (`degree`) legitimately differs from a browser graph that kept them.
+
+**Masking after the cache.** Results are computed on RAW ids and cached once per Working Set, then masked on the way out
+(`GraphResultJson.of` with `Ids.of(EntityMasking)`), the same discipline as `WorkingSetRoutes`. Node ids and labels go through the token
+map; **edge ids are `LinkIds.decode` → mask both endpoints AND the kind → `encode`**, so a masked edge id equals the `linkId` the masked
+Working Set serves (asserted over the wire). A masked pseudonym is accepted back as `from` / `to` / `node`. Communities are an ordered
+`[{id, community}]` list (pair order is part of the answer).
+
+**Cache key and scope.** Relation key + row-scope fingerprint (a tripwire) + algorithm + RESOLVED params + weights spec. The Working Set
+is a pure function of the sealed log, which holds the Dataset reads of write time; Dataset gates and masking run outside the cache, so
+two Subjects share entries safely today (`ControlApiWorkingSetSubjectScopeTest` is the proof and must keep passing). **The key must gain
+the Subject's resolved row scope the day a Dataset is read live or gains row filtering.**
+
+**Canonical order (`canonical-v1`).** Equal scores rank by UTF-16 code-unit order of the NORMALISED entity id, then the label (Java
+`BY_SCORE_THEN_ID_THEN_LABEL`, TS `compareCanonicalV1`), replacing six `localeCompare` sites; it is host-independent. Pinned by a
+mixed-case fixture row asserted in both languages.
+
+**Audit.** `LINK_GRAPH_RUN_STARTED`, `_COMPLETED`, `_CANCELLED`, `_BUDGET_EXCEEDED`, `_FAILED` in `LinkEventTypes`. The terminal four
+come from a `GraphRunService` terminal hook (exactly once per run, outside every lock, exceptions swallowed); STARTED is emitted from the
+request thread, so a fast run's terminal event can precede STARTED by milliseconds (both carry `runId`). Attributes never include params;
+the actor of a terminal event is the run's owner (the canceller is not recorded).
+
+**Where it runs — the SPA** (`GraphRunsService`, `LinkAnalysisServerRunComponent`, `graph-run-apply.ts`). Browser-first under the cap,
+server above it. A tool group shows **Run on server** INSTEAD of its local button when the Working Set's node count exceeds that
+algorithm's browser cap (`suspicionNodeCap` for betweenness and suspicion; `analysisNodeCap` for closeness, eigenvector, Katz, HITS,
+label propagation, Louvain, cliques, link prediction, max-flow); the server's `inlineNodeCeiling` is not used for the decision. The count
+is the Working Set's (hidden entities left out), not the displayed query graph's; with no Investigation open the control is disabled with
+the stated reason "open an Investigation". No `at` is sent (the canvas shows the committed head). `run()` starts, then polls at 1 s until
+terminal. The id map (`buildServerIdMap`) matches server node ids against every raw spelling a canvas node folded and maps a `linkId` by
+re-minting the canvas edge id; an id the canvas does not draw is dropped, never invented. BUDGET_EXCEEDED shows the server's code, budget
+and measured size and exactly ONE next action ("run again with a budget of N" only when it fits under `ceilings`, else "filter the
+Working Set or pick a cheaper algorithm"). On the SPA the capability is `LensService.canRunLinkGraphAnalysis`, access-catalog node
+`linkgraph.run`.
+
+**Parity guarantee.** The six `graph-*-parity.fixture.json` files are asserted in TS and in Java (engine-level `GraphEngineParityTest`
+too), plus a route-level test that feeds `graph-algorithms-parity.fixture.json` through a real Dataset → Investigation → Working Set →
+`POST /inv/graph/runs` (components, k-core, triangles, shortest paths, neighborhood; `degree` deliberately not asserted, see Input rows).
+`GraphComplexityEquivalenceTest` and `graph-complexity-equivalence.spec.ts` keep the pre-fix `kCore`, `weightedShortestPath` and
+`linkPrediction` as private references (`LA-GRAPH-QUADRATIC-1`, closed 2026-10-01). `GraphAlgorithmsBench` (`-Dinspecto.bench=true`,
+`-Dinspecto.bench.only=`) is the timing harness behind `inlineNodeCeiling` (largest benched node count with median ≤ 1 000 ms; 500 for
+betweenness and suspicion).
+
+**Deliberate decisions and gotchas.**
+
+* A well-formed node id that names no node is NOT a 422; it yields the algorithm's empty answer (the browser and the fixtures do). Only an
+  absent, blank or mistyped node id, an unknown name, a bad type or an out-of-range value is refused, before any work. Count params accept 0.
+* Hidden entities are excluded and `resolve` groups are not merged (see Input rows).
+* `linkPrediction` stays a JOB: its output is every pair that shares a neighbour, which a hub makes quadratic by definition.
+  `jaccardSimilarity` cost depends on the chosen node's degree, so a node-count ceiling alone does not bound it.
+* Server `progress.fraction` is always 0 and `consumed.elapsedMs` is 0 until a run ends; the SPA shows `progress.work` as "N steps done"
+  and measures elapsed time in the browser.
+* Cancel on someone else's run is **403** (the service's FORBIDDEN) while a READ of it is **404** (a run id is an unguessable UUID);
+  cancel does not re-open the Investigation. Administrator = `Roles.CAN_ADMINISTER`, or no Subject at all.
+* Algorithms with a selection result and no browser cap (shortest and all paths, cycles, spanning forest, bridges) stay local-only.
+* A server result for a node the canvas has collapsed or filtered away is dropped by the id map.
+* The toolbox's local runs still analyse the displayed query graph, not the Working Set, when an Investigation is open.
+* One `GraphRunService` per Space write root, created lazily, closed by `ApiContext.onClose(Runnable)` (a new hook; `ControlApi.close()`
+  runs its hooks first).
+* A result payload is bounded only by each algorithm's own limit params (a ranking lists every node).
+* A raw id sent as `from` / `to` / `node` while masking is on is not refused.
+
+**Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-GRAPH-RUN-PROGRESS-1` · `LA-GRAPH-RUN-LOCAL-WORKING-SET-1` ·
+`LA-GRAPH-RUN-MASK-ORACLE-1` · `LA-GRAPH-RUN-SELECTION-LOCAL-ONLY-1` · `LA-GRAPH-RUN-HIDDEN-NODES-1` · `LA-GRAPH-RUN-PAYLOAD-SIZE-1` ·
+`LA-GRAPH-RUN-POOL-LIFECYCLE-1` · `LA-GRAPH-RUN-CANCEL-GATE-1`. The remaining option-D phases are in
+[`la-separation-feasibility-plan.md`](../../../superpower/la-separation-feasibility-plan.md) §7.8.
+
 ## Closed-plan record (2026-10-01)
 
 `link-analysis-backlog-plan.md` was the only open backlog for Link Analysis from 2026-09-22; it was retired

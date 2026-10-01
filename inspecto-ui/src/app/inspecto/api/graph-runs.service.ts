@@ -4,8 +4,8 @@ import { EMPTY, Observable, concat, defer, exhaustMap, of, switchMap, takeWhile,
 import { apiErrorMessage, apiUrl, toParams } from './api-base';
 
 /**
- * LA separation D-4 step 7 — the server side of graph analysis (`GraphRunRoutes`, design `la-separation-d4-design.md`
- * §3.3): start a **Graph Run** over an Investigation's Working Set, poll it, cancel it. The browser keeps running every
+ * LA separation D-4 step 7 — the server side of graph analysis (`GraphRunRoutes`, as built in `docs/okf/frontend/features/link-analysis.md`
+ * §Graph Run): start a **Graph Run** over an Investigation's Working Set, poll it, cancel it. The browser keeps running every
  * algorithm locally under its cap; this is what runs above it.
  *
  * The wire shapes below mirror `GraphRunRoutes.view` / `GraphResultJson` field for field.
