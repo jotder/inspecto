@@ -170,13 +170,71 @@ Total **L** (steps 2, 4–7 are the weight). Steps 1 and 3 are independent and c
 ## 6. Risks and what I could not ground
 
 * **JOB/SYNC split is an estimate.** Only the browser's timings are measured (`graph-analysis.ts:17-22,49-70`); no Java timing exists. A 1-hour bench of the 13 JOB algorithms at 10³ / 10⁴ / 10⁵ nodes sets the thresholds; do it before step 5.
-* **Is the result cache scope-safe?** I did not establish whether `Relation.key()` (sha256 of the log, `InvestigationEvaluator.java`) varies with the caller's `RowScope`. If not, a per-Subject-scope key is needed (Decision 5).
+* ~~**Is the result cache scope-safe?** I did not establish whether `Relation.key()` (sha256 of the log, `InvestigationEvaluator.java`) varies with the caller's `RowScope`. If not, a per-Subject-scope key is needed (Decision 5).~~ Grounded in §6.1 B: safe today.
 * **Edge-id agreement.** I did not read `LinkIds` against the SPA's mint end to end; the adapter proof in step 4 is the check.
 * **How the SPA builds a `G6GraphData` from a Working Set** (`link-analysis-investigation.store.ts:71`) was not traced; browser and server may disagree on which links a "graph" holds (excluded, hidden) — step 4 must pin it.
 * **Memory.** A 10⁶-edge Working Set materialised as `Graph` objects was not measured; `budget.maxEdges` ceiling is a guess until step 4's tests run.
 * **Count discrepancy.** The feasibility plan says 34 algorithms were ported (§7.10 D-S4 row); the D-1 design says 59 `LINK_*` constants where `EventType.java` holds 27; the six classes and the §7.13 table total **28**. This design uses 28 and 27.
 * **Thread model.** Whether LA may own a thread pool (versus the host's) was not checked against the Windows/service lifecycle (`ControlApi.close()` interrupts SSE only).
 * Stale `limits.projectionNodeCap` at `/bootstrap` claim in `entity-projection.ts:58` is the same wrong claim `graph-analysis.ts:19` already corrected; not fixed here.
+
+### 6.1 Measurements (2026-10-01)
+
+Evidence for Decisions 3 and 5. **No decision is answered here.** Throwaway scripts (not committed) read the repo's own data; numbers are reproducible with Node 24 `Intl.Collator()` default (what `localeCompare` uses in the SPA) against plain UTF-16 code-unit comparison (what `String.compareTo` does in Java, `GraphAlgorithms.java:92`).
+
+#### A. Canonical order — how often do browser order and Java order disagree?
+
+**The six sites are confirmed** (`graph-analysis.ts`): `:266` (label), `:1361` (path, `a[0]`), `:1462` (edge `e.id`), `:1498` (label), `:1550` (`source`), `:1616` (label); `grep -c '\.sort()'` finds the nine plain sorts the design cites. Each is a tie-break after a score or weight, so order only matters among equal scores.
+
+**Method.** Corpora (distinct values per VARCHAR column, read-only via DuckDB): every Space's sample CSV/Parquet (`spaces/{default,demo,ucc,telco-assurance,cricket-analytics,_templates}`, 1 401 columns). "Entity-like" = column name matches account/msisdn/imsi/customer/payer/payee/name/city/venue/team/player/region/sender/recipient/id/plmn (a heuristic, 266 columns). Per column: sort by code unit, then count (i) adjacent pairs the ICU collator orders the other way, (ii) positions where the two sorted lists differ. A second pass builds the real degree graph of five demo/cricket datasets and ranks nodes by degree with each tie-break (disagreement only matters among tied scores).
+
+| Corpus | Columns (differing) | Labels | Adjacent pairs disagreeing | Positions differing | Cause |
+|---|---|---|---|---|---|
+| The six `graph-*-parity.fixture.json` | n/a | all lowercase ASCII **by design** | 0 | 0 | proves nothing: both orders agree on that alphabet |
+| `demo` entity-like | 81 (10) | 9 210 | 10 of 9 129 (0.11 %) | 25 | upper vs lower of the same letter (`Quartz` vs `QUARTZ`, `acc-` vs `ACC-`) |
+| `cricket-analytics` entity-like | 9 (2) | 155 | 3 of 146 (2.1 %) | 8 | `player_of_the_match`, `top_scorer`: case |
+| `default` entity-like | 59 (1) | 294 | 1 of 235 | 6 | `REGION`: case |
+| `telco-assurance` entity-like | 55 (0) | 32 328 | **0** | 0 | none |
+| `ucc` (all columns; synthetic `V1_n`/`IDnnn`) | 895 (0) | 3 432 | **0** | 0 | none |
+| `telco-assurance` all columns (catalogue free text) | 228 (29) | 33 899 | 43 (0.13 %) | 222 | case 34, accent 5, punct 3, digit/punct 1 |
+| Typed ids `<type>:<key>` (msisdn/imsi/account/imei, `normalizeEntityKey` applied) | n/a | 8 856 | **0** | 0 | already lower-cased |
+| Every group above, after `normalizeEntityKey` | n/a | n/a | 0, except 9 free-text pairs (telco catalogue) | n/a | n/a |
+
+**Real degree ties** (what an analyst sees; score = degree, tie-break = label):
+
+| Graph | Nodes | Nodes in a tie | Rank positions that differ (raw label) | (normalised id) |
+|---|---|---|---|---|
+| demo `mule_transfers` PAYER to PAYEE (3 files) | 193 | 189 | **0** (all `ACC-nnnn`, one case) | 0 |
+| demo `account_links` | 7 | 6 | **6 of 7** (`ACC-1133`, `MULE-HUB-01` against a lowercase `acc-1121`) | 0 |
+| demo `roaming_tap` operator names | 14 | 0 | 0 | 0 |
+| cricket team-team / venue-team / top-scorer-player-of-match | 10 / 23 / 66 | 8 / 22 / 66 | 0 / 0 / 0 | 0 |
+
+Classes that separate the orders (probe `a:1 a_1 a-1 a.1 a 1 a1 A1 b B é z Z`): code-unit order is `A1 B Z a 1 a-1 a.1 a1 a:1 a_1 b z é`; ICU order is `a 1 a_1 a-1 a:1 a.1 a1 A1 b B é z Z`. The four classes: **(1) upper vs lower case** (code units put every capital before every small letter; ICU interleaves), **(2) punctuation vs digits** (ICU puts all punctuation before digits; code units split it around them), **(3) accents** (`é` after `z` in code units), **(4) space** (first in ICU).
+
+**Verdict for the corpora we have: cosmetic, with one user-visible case.** Over the id spelling (`normalizeEntityKey` lower-cases and strips trailing punctuation) the divergence is **zero** on every entity corpus and on all typed ids. It appears only where the SORT KEY is the raw label spelling, and only for data whose spelling mixes case (cricket player names, `REGION`, operator names, one demo account list where `acc-1121` meets `ACC-...`). Among real degree ties it moved 6 of 7 nodes in that one graph and none in the other five. What `canonical-v1` changes for an analyst: in mixed-case lists, equal-score nodes show capitals first (`ACC-1133`, `MULE-HUB-01`, then `acc-1121`) instead of alphabetical-ignoring-case; browser, Java and server then agree byte for byte. **Not established:** a non-ASCII or non-Latin entity corpus (none in the repo, so accents and apostrophes in real names such as `Müller` are unmeasured); the `hits` rounding tie (§3.6). **The design should state before signing** whether the sort key is the raw label or the normalised id: it is 6 of 7 versus 0.
+
+*In light of §6.1:* the evidence favours (a), the cost being cosmetic on every corpus we hold, but is silent on non-Latin names, so the decision should also say whether the key is the raw label or the id.
+
+#### B. Is a cached algorithm result scope-safe?
+
+(a) **Does the key already include scope? No, and it does not need to.** `WorkingSetRoutes.Relation` (`inspecto-la-api`, **not** `InvestigationEvaluator`; `:89`) is cached under `<inv dir> \0 sha256(committed log) [@at]` (`:180`, LRU of 32, `:81`). The relation is computed by `InvestigationEvaluator.evaluate(log, at, null)` (`:197`): **its only input is the sealed log**. It reads no Dataset and takes no `HttpExchange` or Subject. Whatever a Dataset read returned was sealed into the log at write time by the writer.
+
+(b) **What can vary per caller, and where it sits:**
+
+| Caller-varying input | Where | Inside the cached value? |
+|---|---|---|
+| Who may open the Investigation (owner, Case member, PDP `RowScope.visible` on resource kind `investigation`) | `InvestigationRoutes.open` `:1601-1609`, via `openForRead` before `relation()` (`WorkingSetRoutes.java:105`) | No: decided every request, BEFORE the cache |
+| Who may view the bound Dataset (`ComponentAccess.canView`) | `InvestigationRoutes.java:1606`; `InvRoutes.relationFor:831-835` on every live read | No: per request |
+| **Row-level scope of Dataset data** | **does not exist.** `RowScope` is a resource-visibility PEP (ALLOW/DENY per record, `RowScope.java:30`); `DatasetProvider.relationSql(dataset, dataRoot, writeRoot)` (`DatasetProvider.java:78`) takes **no Subject**; `Subject.dataScopes` is read nowhere in `inspecto-la-*` or `inspecto-geo-link` (grep: 0) | n/a |
+| Entity masking (D-U6/LA-19) | `EntityMasking.of(inv, ...)` (`WorkingSetRoutes.java:147`) is a function of Space settings (`EntityMasking.java:103`), the log and the bound columns' classification, with **no Subject**; applied AFTER the cache (`:148`) | No, and the token is per Investigation, not per Subject |
+
+So two Subjects who both pass the gates see **identical raw and identical masked** rows for one Investigation at one log position. A per-Subject key component would only duplicate entries.
+
+(c) **Existing proof?** None for two Subjects reading the same Working Set (`ControlApiInvestigationCaseShareTest` proves the 200/404 gate, not equal bodies). **New:** `inspecto-geo-link/src/test/java/com/gamma/control/ControlApiWorkingSetSubjectScopeTest.java`, real HTTP with an armed Authenticator and two Subjects. (1) Owner and Case member get identical `entities` and `links` rows and key, and the member's read is `cached:true`. (2) Under `masking_mode: all` both get the same masked tokens, and once the Dataset is restricted to its owner the member gets 404 from a warm cache while the owner gets 200 (the same call returned 200 one statement earlier, so the 404 is a real probe). Run: 2 tests, 0 failures.
+
+**Conclusion: SAFE** to share a cache across Subjects for a result that is a pure function of the sealed log, provided (i) the Investigation and Dataset gates run before the cache lookup on every request, (ii) the cached value holds raw ids and masking is applied after, as `:148` does, and (iii) the key adds only what the computation reads: `<log hash> + algorithm + version + params + weights`. **It becomes UNSAFE the day** `GraphInput` reads a Dataset live (D-3's `SqlGraphEngine`) or a Dataset gains real row-level filtering; then the key needs the Subject's resolved scope fingerprint, computed where `relationFor` runs. Worth a guard test that fails when `Subject.dataScopes` or a Dataset row filter first reaches LA code. **Not established:** Enterprise PDP policies keyed on `resource.*` are per request and so safe here, but no Enterprise policy was run against this route.
+
+*In light of §6.1:* option (a) minus the Subject fingerprint is enough today (key = log hash + algorithm + params + weights); keep the fingerprint as a documented trigger, not a component.
 
 ## 7. Decisions owed (operator)
 
@@ -191,7 +249,7 @@ Total **L** (steps 2, 4–7 are the weight). Steps 1 and 3 are independent and c
 **Answer:** *(unsigned)*
 
 **Decision 3 — Canonical order.** (a) `canonical-v1` UTF-16 code-unit order on label then id, change the six TS sites; (b) `localeCompare` semantics in Java via `Collator`; (c) leave divergent and document.
-*Recommendation:* (a) — no host dependence, six edits, matches the nine `.sort()` calls already in the file; sign only after the corpus measurement in §6.
+*Recommendation:* (a) — no host dependence, six edits, matches the nine `.sort()` calls already in the file; sign only after the corpus measurement in §6. In light of §6.1: the divergence is zero over normalised ids and cosmetic over raw labels in our corpora (one mixed-case graph moved 6 of 7 ranks), so (a) stands; state whether the sort key is the label or the id.
 **Answer:** *(unsigned)*
 
 **Decision 4 — Capability for starting a JOB run.** (a) A new capability; (b) reuse `canManageIncidents`; (c) no gate beyond Investigation access.
@@ -199,7 +257,7 @@ Total **L** (steps 2, 4–7 are the weight). Steps 1 and 3 are independent and c
 **Answer:** *(unsigned)*
 
 **Decision 5 — Result cache key.** (a) `Relation.key()` + algorithm + params + weights + the Subject's row-scope fingerprint; (b) per-Subject only; (c) no cache.
-*Recommendation:* (a), after confirming whether `Relation.key()` already carries scope (§6).
+*Recommendation:* (a), after confirming whether `Relation.key()` already carries scope (§6). In light of §6.1: the key carries no scope and needs none today (the relation is a pure function of the sealed log; gates and masking run outside the cache); drop the Subject fingerprint, keep it as a documented trigger.
 **Answer:** *(unsigned)*
 
 **Decision 6 — Over-budget outcome.** (a) Terminal `BUDGET_EXCEEDED`, no payload, numbers stated; (b) return a flagged partial result.
