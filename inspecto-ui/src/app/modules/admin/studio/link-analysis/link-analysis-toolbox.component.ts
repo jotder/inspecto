@@ -22,6 +22,7 @@ import {
     SuspicionScore,
     allPaths,
     analysisNodeCapValue,
+    selectionNodeCapValue,
     articulationPoints,
     betweennessCentrality,
     bridges,
@@ -62,6 +63,8 @@ import { ServerPathsState, ServerPatternState } from './entity-projection';
 import { LinkAnalysisServerRunComponent } from './link-analysis-server-run.component';
 import {
     ServerIdMap,
+    countDropped,
+    droppedNotice,
     toCommunityMap,
     toGroups,
     toNodeScores,
@@ -105,7 +108,19 @@ type AnalysisTab =
     | 'scoring';
 
 /** The tool groups that can hand an over-cap run to the server (D-4 step 7). */
-type ServerTool = 'centrality' | 'communities' | 'cliques' | 'prediction' | 'flow' | 'scoring';
+type ServerTool =
+    | 'centrality'
+    | 'communities'
+    | 'cliques'
+    | 'prediction'
+    | 'flow'
+    | 'scoring'
+    | 'path'
+    | 'allPaths'
+    | 'cycles'
+    | 'cutNodes'
+    | 'cutEdges'
+    | 'forest';
 
 /** One "Run on server" control: which server algorithm, with what parameters, why the browser did not run it. */
 export interface ServerRunSpec {
@@ -258,6 +273,12 @@ export class LinkAnalysisToolboxComponent {
      */
     readonly workingSetNodes = input<number | null>(null);
     readonly serverIds = input<ServerIdMap | null>(null);
+    /**
+     * The server's per-algorithm `inlineNodeCeiling` (`GET /inv/graph/algorithms`), by algorithm id; null until it is
+     * known. The selection algorithms have no browser cap, so the browser threshold is {@link selectionNodeCapValue}
+     * LOWERED to this where the server states a smaller one.
+     */
+    readonly serverCeilings = input<Record<string, number> | null>(null);
     readonly canRunOnServer = input(true);
 
     /** A selection to emphasize on the canvas (`null` clears). */
@@ -333,6 +354,8 @@ export class LinkAnalysisToolboxComponent {
     readonly cycles = signal<GraphSelection[]>([]);
     readonly cutNodes = signal<string[]>([]);
     readonly cutEdges = signal<string[]>([]);
+    /** The sentence for a server result the canvas could not fully show ('' = it showed all of it, or no server result). */
+    readonly serverDropped = signal('');
     readonly cohesionMetric = signal<'k-core' | 'triangles' | 'cliques'>('k-core');
     readonly cohesionRanking = signal<NodeScore[]>([]);
     readonly cliquesResult = signal<string[][]>([]);
@@ -372,6 +395,18 @@ export class LinkAnalysisToolboxComponent {
                   }
                 : null;
         const analysis = analysisNodeCapValue();
+        // Selection algorithms: no browser cap of their own - one shared threshold, lowered by the server's ceiling.
+        const selCap = (algorithm: string) =>
+            Math.min(selectionNodeCapValue(), this.serverCeilings()?.[algorithm] ?? Number.POSITIVE_INFINITY);
+        const pick = (a: string, b: string) => {
+            const from = this.serverIds()?.serverNode(a);
+            const to = this.serverIds()?.serverNode(b);
+            return from && to ? { params: { from, to }, hold: '' } : { params: {}, hold: 'Pick the two nodes first.' };
+        };
+        const named = (prefix: string, s: ServerRunSpec | null): ServerRunSpec | null =>
+            s && { ...s, note: prefix + s.note };
+        const pathAlgorithm = this.pathMetric() === 'weighted' ? 'weightedShortestPath' : 'shortestPath';
+        const pathPick = pick(this.pathFrom(), this.pathTo());
         const metric = this.centralityMetric();
         const centrality =
             metric === 'betweenness'
@@ -402,8 +437,24 @@ export class LinkAnalysisToolboxComponent {
                 from && to ? '' : 'Pick a source and a sink first.',
             ),
             scoring: spec('suspicionScore', suspicionNodeCapValue()),
+            path: spec(pathAlgorithm, selCap(pathAlgorithm), pathPick.params, pathPick.hold),
+            allPaths: spec('allPaths', selCap('allPaths'), pathPick.params, pathPick.hold),
+            cycles: spec('findCycles', selCap('findCycles')),
+            // Two algorithms behind one button: each has its own control, so each note names which one it is.
+            cutNodes: named('Articulation nodes: ', spec('articulationPoints', selCap('articulationPoints'))),
+            cutEdges: named('Bridges: ', spec('bridges', selCap('bridges'))),
+            forest: spec('maximumSpanningForest', selCap('maximumSpanningForest')),
         };
     });
+
+    /**
+     * A selection algorithm hands over to the server (its local button is replaced) only when a server run can really
+     * start: the Working Set is over the threshold AND an Investigation is open AND the Subject may run one. Otherwise
+     * the local button stays, so a big query graph is never left with no way to run these (they never refuse locally).
+     */
+    serverFirst(tool: ServerTool): boolean {
+        return !!this.serverSpecs()[tool] && !!this.investigationId() && this.canRunOnServer();
+    }
 
     /**
      * A COMPLETED server run, applied through the SAME code as the matching local run (the `apply*` methods below), so a
@@ -413,6 +464,13 @@ export class LinkAnalysisToolboxComponent {
         const map = this.serverIds();
         if (!map) return;
         this.analysisError.set('');
+        this.serverDropped.set('');
+        this.applyServerAnswer(r, map);
+        // The analyst must be told when the canvas could not show all of a result (it drops ids it does not draw).
+        this.serverDropped.set(droppedNotice(countDropped(r, map)));
+    }
+
+    private applyServerAnswer(r: GraphRunResult, map: ServerIdMap): void {
         switch (r.algorithm) {
             case 'betweennessCentrality':
             case 'closenessCentrality':
@@ -437,6 +495,25 @@ export class LinkAnalysisToolboxComponent {
                 });
             case 'suspicionScore':
                 return this.applySuspicion(toSuspicionScores((r.scores ?? []) as GraphSuspicionView[], map));
+            case 'shortestPath':
+            case 'weightedShortestPath':
+                return this.applyPath(r.selection ? toSelection(r.selection, map) : null);
+            case 'allPaths':
+                return this.applyAllPaths((r.selections ?? []).map((s) => toSelection(s, map)));
+            case 'findCycles':
+                return this.applyCycles((r.selections ?? []).map((s) => toSelection(s, map)));
+            case 'articulationPoints':
+                return this.applyCutPoints(
+                    (r.ids ?? []).map((id) => map.node(id)).filter((id): id is string => !!id),
+                    this.cutEdges(),
+                );
+            case 'bridges':
+                return this.applyCutPoints(
+                    this.cutNodes(),
+                    (r.ids ?? []).map((id) => map.edge(id)).filter((id): id is string => !!id),
+                );
+            case 'maximumSpanningForest':
+                return this.applySpanningForest(toSelection(r.selection ?? { nodeIds: [], edgeIds: [] }, map));
         }
     }
 
@@ -466,6 +543,7 @@ export class LinkAnalysisToolboxComponent {
         this.spanningForest.set(null);
         this.suspicion.set([]);
         this.analysisError.set('');
+        this.serverDropped.set('');
         this.pathFrom.set('');
         this.pathTo.set('');
         this.explainFor.set('');
@@ -539,10 +617,15 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g || !this.pathFrom() || !this.pathTo()) return;
         this.analysisError.set('');
-        const p =
+        this.serverDropped.set('');
+        this.applyPath(
             this.pathMetric() === 'weighted'
                 ? weightedShortestPath(g, this.pathFrom(), this.pathTo())
-                : shortestPath(g, this.pathFrom(), this.pathTo());
+                : shortestPath(g, this.pathFrom(), this.pathTo()),
+        );
+    }
+
+    private applyPath(p: GraphSelection | null): void {
         if (!p) {
             this.pathResult.set(null);
             this.emphasisChange.emit(null);
@@ -566,6 +649,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
+        this.serverDropped.set('');
         try {
             this.applyRanking(this.centralityScores(g));
         } catch (err) {
@@ -608,6 +692,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
+        this.serverDropped.set('');
         let byNode: Map<string, string>;
         try {
             byNode = this.communityMethod() === 'louvain' ? louvainCommunities(g) : detectCommunities(g);
@@ -641,7 +726,11 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g || !this.pathFrom() || !this.pathTo()) return;
         this.analysisError.set('');
-        const paths = allPaths(g, this.pathFrom(), this.pathTo());
+        this.serverDropped.set('');
+        this.applyAllPaths(allPaths(g, this.pathFrom(), this.pathTo()));
+    }
+
+    private applyAllPaths(paths: GraphSelection[]): void {
         this.allPathsResult.set(paths);
         if (!paths.length) {
             this.emphasisChange.emit(null);
@@ -683,6 +772,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
+        this.serverDropped.set('');
         this.components.set(connectedComponents(g));
     }
 
@@ -705,6 +795,7 @@ export class LinkAnalysisToolboxComponent {
         this.patternSteps.set(pack.steps.map((s) => ({ ...s })));
         this.patternMatches.set([]);
         this.analysisError.set('');
+        this.serverDropped.set('');
     }
 
     addPatternStep(): void {
@@ -744,6 +835,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
+        this.serverDropped.set('');
         const stages = this.branchStages();
         if (stages) {
             this.runBranching(g, stages);
@@ -823,7 +915,11 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
-        const found = findCycles(g);
+        this.serverDropped.set('');
+        this.applyCycles(findCycles(g));
+    }
+
+    private applyCycles(found: GraphSelection[]): void {
         this.cycles.set(found);
         if (!found.length) {
             this.emphasisChange.emit(null);
@@ -849,8 +945,11 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
-        const nodes = articulationPoints(g);
-        const edges = bridges(g);
+        this.serverDropped.set('');
+        this.applyCutPoints(articulationPoints(g), bridges(g));
+    }
+
+    private applyCutPoints(nodes: string[], edges: string[]): void {
         this.cutNodes.set(nodes);
         this.cutEdges.set(edges);
         if (!nodes.length && !edges.length) {
@@ -867,6 +966,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
+        this.serverDropped.set('');
         try {
             if (this.cohesionMetric() === 'cliques') {
                 this.applyCliques(cliques(g));
@@ -904,6 +1004,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g || !this.similarityFor()) return;
         this.analysisError.set('');
+        this.serverDropped.set('');
         this.similarityResult.set(
             jaccardSimilarity(g, this.similarityFor())
                 .filter((s) => s.score > 0)
@@ -916,6 +1017,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
+        this.serverDropped.set('');
         try {
             this.applyPredictions(linkPrediction(g));
         } catch (err) {
@@ -939,6 +1041,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g || !this.flowFrom() || !this.flowTo()) return;
         this.analysisError.set('');
+        this.serverDropped.set('');
         try {
             this.applyFlow(maxFlow(g, this.flowFrom(), this.flowTo()));
         } catch (err) {
@@ -958,7 +1061,11 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
-        const msf = maximumSpanningForest(g);
+        this.serverDropped.set('');
+        this.applySpanningForest(maximumSpanningForest(g));
+    }
+
+    private applySpanningForest(msf: GraphSelection): void {
         this.spanningForest.set(msf);
         this.flowResult.set(null);
         this.emphasisChange.emit(msf.edgeIds.length ? msf : null);
@@ -970,6 +1077,7 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
+        this.serverDropped.set('');
         try {
             this.applySuspicion(suspicionScore(g));
         } catch (err) {

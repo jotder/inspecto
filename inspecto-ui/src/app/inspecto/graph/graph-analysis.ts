@@ -31,6 +31,19 @@ export function analysisNodeCapValue(): number {
 }
 
 /**
+ * The Working Set size above which the SELECTION algorithms (shortest and all paths, cycles, cut points, spanning
+ * forest) are handed to the server instead of run in the browser (LA-GRAPH-RUN-SELECTION-LOCAL-ONLY-1).
+ *
+ * ⚠ These algorithms have NO browser cap of their own - they never refuse - so there is nothing configured to
+ * reuse. This is the ONE place their threshold is defined: it is the analysis cap (the largest graph the
+ * deployment says the browser analyses comfortably), so one setting moves every browser-or-server decision. The
+ * server's own per-algorithm `inlineNodeCeiling` can only LOWER it (see the toolbox), never raise it.
+ */
+export function selectionNodeCapValue(): number {
+    return analysisNodeCap;
+}
+
+/**
  * Apply a deployment's tuning limits, normally once at startup from `/bootstrap`.
  *
  * ⛔ **Fails closed on nonsense rather than applying it.** A cap that is not a finite number ≥ 1 is

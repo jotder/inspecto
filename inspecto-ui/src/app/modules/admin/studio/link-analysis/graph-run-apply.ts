@@ -2,6 +2,7 @@ import { G6GraphData, NodeScore, PredictedLink, SuspicionScore, endpointId, Enti
 import {
     GraphBudgetView,
     GraphPredictedLinkView,
+    GraphRunResult,
     GraphRunView,
     GraphScoreView,
     GraphSelectionView,
@@ -159,4 +160,54 @@ export function budgetNextAction(run: GraphRunView, ceilings: GraphBudgetView | 
         default:
             return narrow;
     }
+}
+
+/**
+ * What a COMPLETED server result names that the canvas does not draw (LA-GRAPH-RUN-HIDDEN-NODES-1). The `to*`
+ * functions above drop such an id - never invent one - so without this a result over a Working Set the canvas draws
+ * only part of would look complete. Counts are of DISTINCT ids, nodes and edges apart.
+ */
+export interface DroppedCounts {
+    nodes: { dropped: number; total: number };
+    edges: { dropped: number; total: number };
+}
+
+export function countDropped(r: GraphRunResult, map: ServerIdMap): DroppedCounts {
+    const nodes = new Set<string>();
+    const edges = new Set<string>();
+    const sel = (s: GraphSelectionView | null | undefined): void => {
+        s?.nodeIds.forEach((id) => nodes.add(id));
+        s?.edgeIds.forEach((id) => edges.add(id));
+    };
+    (r.scores ?? []).forEach((s) => nodes.add(s.id));
+    (r.hubs ?? []).forEach((s) => nodes.add(s.id));
+    (r.authorities ?? []).forEach((s) => nodes.add(s.id));
+    sel(r.selection);
+    (r.selections ?? []).forEach(sel);
+    sel(r.minCut);
+    (r.groups ?? []).forEach((g) => g.forEach((id) => nodes.add(id)));
+    (r.communities ?? []).forEach((p) => nodes.add(p.id)); // the pair's `community` may be a label, not a node
+    (r.ids ?? []).forEach((id) => (r.algorithm === 'bridges' ? edges : nodes).add(id));
+    (r.links ?? []).forEach((l) => {
+        nodes.add(l.source);
+        nodes.add(l.target);
+    });
+    (r.nodes ?? []).forEach((n) => nodes.add(n.id));
+    (r.edges ?? []).forEach((e) => edges.add(e.id));
+    const missing = (ids: Set<string>, has: (id: string) => string | undefined) =>
+        [...ids].filter((id) => !has(id)).length;
+    return {
+        nodes: { dropped: missing(nodes, map.node), total: nodes.size },
+        edges: { dropped: missing(edges, map.edge), total: edges.size },
+    };
+}
+
+/** The sentence the toolbox shows when part of a server result has no place on the canvas; '' when all of it is drawn. */
+export function droppedNotice(c: DroppedCounts): string {
+    const parts: string[] = [];
+    if (c.nodes.dropped) parts.push(`${c.nodes.dropped} of ${c.nodes.total} result nodes`);
+    if (c.edges.dropped) parts.push(`${c.edges.dropped} of ${c.edges.total} result links`);
+    return parts.length
+        ? `${parts.join(' and ')} are not drawn on the canvas right now, so the result shown here leaves them out.`
+        : '';
 }

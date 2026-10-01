@@ -90,6 +90,7 @@ function make(
         allowed?: boolean;
         investigationId?: string | null;
         workingSetNodes?: number | null;
+        serverCeilings?: Record<string, number> | null;
         graph?: typeof CANVAS | null;
         answer?: (r: GraphRunRequest) => Observable<GraphRunView>;
     } = {},
@@ -121,6 +122,7 @@ function make(
         CANVAS.nodes.map((n) => ({ id: n.id, label: n.data.label })),
     );
     fixture.componentRef.setInput('serverIds', IDS);
+    fixture.componentRef.setInput('serverCeilings', opts.serverCeilings ?? null);
     fixture.componentRef.setInput('canRunOnServer', opts.allowed ?? true);
     fixture.componentRef.setInput(
         'investigationId',
@@ -287,5 +289,246 @@ describe('LinkAnalysisToolboxComponent - Run on server (D-4 step 7)', () => {
         configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
         const { c } = make({ workingSetNodes: 2 }); // CANVAS has 5 nodes, over the 3-node cap
         expect(c.serverSpecs().scoring).toBeNull();
+    });
+});
+
+/**
+ * LA-GRAPH-RUN-SELECTION-LOCAL-ONLY-1: the algorithms with a SELECTION result and no browser cap of their own (paths,
+ * cycles, cut points, spanning forest) take the same browser-first / server-above route. The one threshold is
+ * `selectionNodeCapValue()` (the analysis cap), lowered by the server's per-algorithm `inlineNodeCeiling`.
+ */
+describe('LinkAnalysisToolboxComponent - selection algorithms on the server', () => {
+    afterEach(() => resetGraphLimits());
+    const over = () => configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+    const sel = (nodes: string[], edges: [string, string][]) => ({
+        nodeIds: nodes,
+        edgeIds: edges.map(([s, t]) => linkId(s, t, 'calls')),
+    });
+    const result = (more: Partial<GraphRunResult>): GraphRunResult => ({
+        algorithm: 'x',
+        kind: 'SELECTION',
+        dropped: 0,
+        elapsedMs: 1,
+        ...more,
+    });
+    const AE = sel(
+        ['a', 'b', 'c', 'd', 'e'],
+        [
+            ['a', 'b'],
+            ['b', 'c'],
+            ['c', 'd'],
+            ['d', 'e'],
+        ],
+    );
+
+    it('shortest path: the local button is replaced, the run is held until both nodes are picked, then the path lands on canvas ids', () => {
+        over();
+        const { fixture, c, button, run, last } = make({
+            answer: () => of(view('COMPLETED', { result: result({ algorithm: 'shortestPath', selection: AE }) })),
+        });
+        c.tab.set('path');
+        fixture.detectChanges();
+        expect(button(/Find shortest path/)).toBeUndefined();
+        expect((button(/Run on server/) as HTMLButtonElement).disabled).toBe(true);
+        expect(fixture.nativeElement.textContent).toContain('Pick the two nodes first.');
+
+        c.pathFrom.set(nodeId('a'));
+        c.pathTo.set(nodeId('e'));
+        fixture.detectChanges();
+        button(/Run on server/)!.click();
+        fixture.detectChanges();
+        expect(run).toHaveBeenCalledWith({
+            investigationId: 'inv-1',
+            algorithm: 'shortestPath',
+            params: { from: 'a', to: 'e' },
+        });
+        expect(c.pathResult()?.hops).toEqual(['a', 'b', 'c', 'd', 'e'].map(nodeId));
+        expect(last()?.edgeIds).toEqual([edgeId('a', 'b'), edgeId('b', 'c'), edgeId('c', 'd'), edgeId('d', 'e')]);
+        expect(c.serverDropped()).toBe('');
+    });
+
+    it('strongest ties asks the server for the weighted algorithm; "no path" is the browser sentence', () => {
+        over();
+        const { fixture, c, button, run, last } = make({
+            answer: () =>
+                of(view('COMPLETED', { result: result({ algorithm: 'weightedShortestPath', selection: null }) })),
+        });
+        c.tab.set('path');
+        c.pathMetric.set('weighted');
+        c.pathFrom.set(nodeId('a'));
+        c.pathTo.set(nodeId('e'));
+        fixture.detectChanges();
+        button(/Run on server/)!.click();
+        expect(run.mock.calls[0][0].algorithm).toBe('weightedShortestPath');
+        expect(c.analysisError()).toBe('No path connects the two nodes.');
+        expect(last()).toBeNull();
+    });
+
+    it('all paths applies its selection LIST through the same code as the local run', () => {
+        over();
+        const { fixture, c, button, run, last } = make({
+            answer: () =>
+                of(
+                    view('COMPLETED', {
+                        result: result({
+                            algorithm: 'allPaths',
+                            kind: 'SELECTIONS',
+                            selections: [
+                                sel(
+                                    ['a', 'b', 'c'],
+                                    [
+                                        ['a', 'b'],
+                                        ['b', 'c'],
+                                    ],
+                                ),
+                                sel(['a', 'b'], [['a', 'b']]),
+                            ],
+                        }),
+                    }),
+                ),
+        });
+        c.tab.set('all-paths');
+        c.pathFrom.set(nodeId('a'));
+        c.pathTo.set(nodeId('c'));
+        fixture.detectChanges();
+        button(/Run on server/)!.click();
+        expect(run).toHaveBeenCalledWith({
+            investigationId: 'inv-1',
+            algorithm: 'allPaths',
+            params: { from: 'a', to: 'c' },
+        });
+        expect(c.allPathsResult().map((p) => p.nodeIds.length)).toEqual([3, 2]);
+        expect(last()?.nodeIds).toEqual(['a', 'b', 'c'].map(nodeId));
+        expect(last()?.edgeIds).toEqual([edgeId('a', 'b'), edgeId('b', 'c')]);
+    });
+
+    it('cycles: the local button is replaced and the returned loops land on canvas ids', () => {
+        over();
+        const { fixture, c, button, run } = make({
+            answer: () =>
+                of(
+                    view('COMPLETED', {
+                        result: result({
+                            algorithm: 'findCycles',
+                            kind: 'SELECTIONS',
+                            selections: [
+                                sel(
+                                    ['b', 'c', 'd'],
+                                    [
+                                        ['b', 'c'],
+                                        ['c', 'd'],
+                                    ],
+                                ),
+                            ],
+                        }),
+                    }),
+                ),
+        });
+        c.tab.set('cycles');
+        fixture.detectChanges();
+        expect(button(/Find cycles/)).toBeUndefined();
+        button(/Run on server/)!.click();
+        expect(run).toHaveBeenCalledWith({ investigationId: 'inv-1', algorithm: 'findCycles' });
+        expect(c.cycles()[0].nodeIds).toEqual(['b', 'c', 'd'].map(nodeId));
+    });
+
+    it('cut points are two server algorithms: nodes and bridges each have a control, and the two results combine', () => {
+        over();
+        const answers: Record<string, GraphRunResult> = {
+            articulationPoints: result({ algorithm: 'articulationPoints', kind: 'IDS', ids: ['b', 'c'] }),
+            bridges: result({
+                algorithm: 'bridges',
+                kind: 'IDS',
+                ids: [linkId('a', 'b', 'calls'), linkId('d', 'e', 'calls')],
+            }),
+        };
+        const { fixture, c, el, run, last } = make({
+            answer: (req) => of(view('COMPLETED', { result: answers[req.algorithm] })),
+        });
+        c.tab.set('cut-points');
+        fixture.detectChanges();
+        const controls = () => el.querySelectorAll<HTMLButtonElement>('[data-testid="run-on-server"]');
+        expect(controls()).toHaveLength(2);
+        expect(el.textContent).toContain('Articulation nodes: This graph');
+        expect(el.textContent).toContain('Bridges: This graph');
+        controls()[0].click();
+        fixture.detectChanges();
+        expect(c.cutNodes()).toEqual(['b', 'c'].map(nodeId));
+        controls()[1].click();
+        fixture.detectChanges();
+        expect(run.mock.calls.map((x) => x[0].algorithm)).toEqual(['articulationPoints', 'bridges']);
+        expect(c.cutEdges()).toEqual([edgeId('a', 'b'), edgeId('d', 'e')]);
+        expect(c.cutNodes()).toEqual(['b', 'c'].map(nodeId)); // the first result is still there
+        expect(last()?.nodeIds).toEqual(['b', 'c'].map(nodeId));
+        expect(last()?.edgeIds).toEqual([edgeId('a', 'b'), edgeId('d', 'e')]);
+    });
+
+    it('the strongest backbone (maximum spanning forest) applies like the local run', () => {
+        over();
+        const { fixture, c, button, last, el } = make({
+            answer: () =>
+                of(view('COMPLETED', { result: result({ algorithm: 'maximumSpanningForest', selection: AE }) })),
+        });
+        c.tab.set('flow');
+        fixture.detectChanges();
+        expect(button(/Strongest backbone/)).toBeUndefined();
+        const runs = el.querySelectorAll<HTMLButtonElement>('[data-testid="run-on-server"]');
+        runs[runs.length - 1].click(); // flow's own control comes first, the backbone's is last
+        fixture.detectChanges();
+        expect(c.spanningForest()?.edgeIds).toHaveLength(4);
+        expect(last()?.edgeIds).toContain(edgeId('c', 'd'));
+        expect(c.flowResult()).toBeNull();
+    });
+
+    it('the threshold is ONE shared cap, lowered (never raised) by the server ceiling', () => {
+        configureGraphLimits({ analysisNodeCap: 100, suspicionNodeCap: 100 });
+        // 5 nodes: under the 100 cap, so the browser runs it...
+        expect(make().c.serverSpecs().cycles).toBeNull();
+        TestBed.resetTestingModule();
+        // ...unless the server says it only waits for 3 inline
+        expect(make({ serverCeilings: { findCycles: 3 } }).c.serverSpecs().cycles?.algorithm).toBe('findCycles');
+        TestBed.resetTestingModule();
+        // a HIGHER server ceiling never raises the browser threshold
+        configureGraphLimits({ analysisNodeCap: 3, suspicionNodeCap: 3 });
+        expect(make({ serverCeilings: { findCycles: 100_000 } }).c.serverSpecs().cycles?.algorithm).toBe('findCycles');
+    });
+
+    it('with no Investigation open the local button stays (these never refuse locally) and the server control says why it cannot run', () => {
+        over();
+        const { fixture, c, button, el } = make({ investigationId: null });
+        c.tab.set('cycles');
+        fixture.detectChanges();
+        expect(c.serverFirst('cycles')).toBe(false);
+        expect(button(/Find cycles/)).toBeDefined();
+        expect(el.querySelector('[data-testid="blocked-reason"]')!.textContent).toMatch(/Investigation/);
+    });
+
+    it('a server result naming nodes and links the canvas does not draw states how many (LA-GRAPH-RUN-HIDDEN-NODES-1)', () => {
+        over();
+        const partial = sel(
+            ['a', 'b', 'ghost'],
+            [
+                ['a', 'b'],
+                ['b', 'ghost'],
+            ],
+        );
+        const { fixture, c, button, el } = make({
+            answer: () => of(view('COMPLETED', { result: result({ algorithm: 'shortestPath', selection: partial }) })),
+        });
+        c.tab.set('path');
+        c.pathFrom.set(nodeId('a'));
+        c.pathTo.set(nodeId('b'));
+        fixture.detectChanges();
+        button(/Run on server/)!.click();
+        fixture.detectChanges();
+        expect(c.serverDropped()).toBe(
+            '1 of 3 result nodes and 1 of 2 result links are not drawn on the canvas right now, so the result shown here leaves them out.',
+        );
+        expect(el.querySelector('[data-testid="server-dropped"]')!.textContent).toContain('1 of 3 result nodes');
+        // the drawn part is still applied
+        expect(c.pathResult()?.hops).toEqual(['a', 'b'].map(nodeId));
+        // a later browser run clears the (now untrue) notice
+        c.runCycles();
+        expect(c.serverDropped()).toBe('');
     });
 });

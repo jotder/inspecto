@@ -1,3 +1,8 @@
+@if (serverDropped()) {
+    <inspecto-alert variant="info" title="Part of the server result is not on the canvas"
+        ><span data-testid="server-dropped">{{ serverDropped() }}</span></inspecto-alert
+    >
+}
 @if (analysisError()) {
     <inspecto-alert variant="warning" title="Analysis">{{ analysisError() }}</inspecto-alert>
 }
@@ -58,11 +63,28 @@
                                     <mat-button-toggle value="hops">Fewest hops</mat-button-toggle>
                                     <mat-button-toggle value="weighted">Strongest ties</mat-button-toggle>
                                 </mat-button-toggle-group>
-                                <button mat-stroked-button (click)="runPath()" [disabled]="!pathFrom() || !pathTo()">
-                                    <mat-icon svgIcon="heroicons_outline:arrows-right-left"></mat-icon>
-                                    Find shortest path
-                                </button>
+                                @if (!serverFirst('path')) {
+                                    <button
+                                        mat-stroked-button
+                                        (click)="runPath()"
+                                        [disabled]="!pathFrom() || !pathTo()"
+                                    >
+                                        <mat-icon svgIcon="heroicons_outline:arrows-right-left"></mat-icon>
+                                        Find shortest path
+                                    </button>
+                                }
                             </div>
+                            @if (serverSpecs().path; as srv) {
+                                <inspecto-link-analysis-server-run
+                                    [algorithm]="srv.algorithm"
+                                    [params]="srv.params"
+                                    [note]="srv.note"
+                                    [hold]="srv.hold"
+                                    [investigationId]="investigationId()"
+                                    [allowed]="canRunOnServer()"
+                                    (completed)="applyServerResult($event)"
+                                />
+                            }
                             @if (pathResult(); as p) {
                                 <ol class="mt-1 list-inside list-decimal text-sm" aria-label="Path hops">
                                     @for (hop of p.hops; track hop) {
@@ -91,15 +113,28 @@
                                     [ngModel]="pathTo()"
                                     (ngModelChange)="pathTo.set($any($event))"
                                 />
-                                <button
-                                    mat-stroked-button
-                                    (click)="runAllPaths()"
-                                    [disabled]="!pathFrom() || !pathTo()"
-                                >
-                                    <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
-                                    Find all paths
-                                </button>
+                                @if (!serverFirst('allPaths')) {
+                                    <button
+                                        mat-stroked-button
+                                        (click)="runAllPaths()"
+                                        [disabled]="!pathFrom() || !pathTo()"
+                                    >
+                                        <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
+                                        Find all paths
+                                    </button>
+                                }
                             </div>
+                            @if (serverSpecs().allPaths; as srv) {
+                                <inspecto-link-analysis-server-run
+                                    [algorithm]="srv.algorithm"
+                                    [params]="srv.params"
+                                    [note]="srv.note"
+                                    [hold]="srv.hold"
+                                    [investigationId]="investigationId()"
+                                    [allowed]="canRunOnServer()"
+                                    (completed)="applyServerResult($event)"
+                                />
+                            }
                             @if (allPathsResult().length) {
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="All paths">
                                     @for (p of allPathsResult(); track $index) {
@@ -372,14 +407,27 @@
                         }
                         @case ('cycles') {
                             <div class="flex flex-wrap items-center gap-2">
-                                <button mat-stroked-button (click)="runCycles()">
-                                    <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
-                                    Find cycles
-                                </button>
+                                @if (!serverFirst('cycles')) {
+                                    <button mat-stroked-button (click)="runCycles()">
+                                        <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+                                        Find cycles
+                                    </button>
+                                }
                                 <span class="text-sm text-secondary"
                                     >Directed loops — circular flow, forwarding loops.</span
                                 >
                             </div>
+                            @if (serverSpecs().cycles; as srv) {
+                                <inspecto-link-analysis-server-run
+                                    [algorithm]="srv.algorithm"
+                                    [params]="srv.params"
+                                    [note]="srv.note"
+                                    [hold]="srv.hold"
+                                    [investigationId]="investigationId()"
+                                    [allowed]="canRunOnServer()"
+                                    (completed)="applyServerResult($event)"
+                                />
+                            }
                             @if (cycles().length) {
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Cycles">
                                     @for (c of cycles(); track $index) {
@@ -394,14 +442,38 @@
                         }
                         @case ('cut-points') {
                             <div class="flex flex-wrap items-center gap-2">
-                                <button mat-stroked-button (click)="runCutPoints()">
-                                    <mat-icon svgIcon="heroicons_outline:scissors"></mat-icon>
-                                    Find cut points
-                                </button>
+                                @if (!serverFirst('cutNodes')) {
+                                    <button mat-stroked-button (click)="runCutPoints()">
+                                        <mat-icon svgIcon="heroicons_outline:scissors"></mat-icon>
+                                        Find cut points
+                                    </button>
+                                }
                                 <span class="text-sm text-secondary"
                                     >Nodes / links whose removal splits the graph.</span
                                 >
                             </div>
+                            @if (serverSpecs().cutNodes; as srv) {
+                                <inspecto-link-analysis-server-run
+                                    [algorithm]="srv.algorithm"
+                                    [params]="srv.params"
+                                    [note]="srv.note"
+                                    [hold]="srv.hold"
+                                    [investigationId]="investigationId()"
+                                    [allowed]="canRunOnServer()"
+                                    (completed)="applyServerResult($event)"
+                                />
+                            }
+                            @if (serverSpecs().cutEdges; as srv) {
+                                <inspecto-link-analysis-server-run
+                                    [algorithm]="srv.algorithm"
+                                    [params]="srv.params"
+                                    [note]="srv.note"
+                                    [hold]="srv.hold"
+                                    [investigationId]="investigationId()"
+                                    [allowed]="canRunOnServer()"
+                                    (completed)="applyServerResult($event)"
+                                />
+                            }
                             @if (cutNodes().length) {
                                 <div class="mt-1 text-sm">
                                     <span class="font-medium">Articulation nodes:</span>
@@ -595,12 +667,25 @@
                                         Max flow / min cut
                                     </button>
                                 }
-                                <button mat-stroked-button (click)="runSpanningForest()">
-                                    <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
-                                    Strongest backbone
-                                </button>
+                                @if (!serverFirst('forest')) {
+                                    <button mat-stroked-button (click)="runSpanningForest()">
+                                        <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
+                                        Strongest backbone
+                                    </button>
+                                }
                             </div>
                             @if (serverSpecs().flow; as srv) {
+                                <inspecto-link-analysis-server-run
+                                    [algorithm]="srv.algorithm"
+                                    [params]="srv.params"
+                                    [note]="srv.note"
+                                    [hold]="srv.hold"
+                                    [investigationId]="investigationId()"
+                                    [allowed]="canRunOnServer()"
+                                    (completed)="applyServerResult($event)"
+                                />
+                            }
+                            @if (serverSpecs().forest; as srv) {
                                 <inspecto-link-analysis-server-run
                                     [algorithm]="srv.algorithm"
                                     [params]="srv.params"

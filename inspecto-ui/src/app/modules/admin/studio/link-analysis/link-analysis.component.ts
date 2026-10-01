@@ -721,6 +721,11 @@ export class LinkAnalysisComponent implements OnInit {
 
     /** D-4 step 7: the server's hard ceiling on a graph run (null until `GET /inv/graph/algorithms` answers). */
     readonly serverRunCeiling = computed(() => this.graphRuns.catalogue()?.ceilings.maxNodes ?? null);
+    /** The server's per-algorithm `inlineNodeCeiling`, by algorithm id - what lowers the selection algorithms' browser threshold. */
+    readonly serverAlgorithmCeilings = computed(() => {
+        const algorithms = this.graphRuns.catalogue()?.algorithms;
+        return algorithms ? Object.fromEntries(algorithms.map((a) => [a.id, a.inlineNodeCeiling])) : null;
+    });
     /** A server run is over the Working Set, so it needs an open Investigation AND the canvas drawing that set. */
     readonly graphRunInvestigationId = computed(() =>
         this.investigation.canvas() ? this.investigation.activeId() : null,

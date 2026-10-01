@@ -4,6 +4,8 @@ import { EntityProjection } from 'app/inspecto/graph';
 import {
     budgetNextAction,
     buildServerIdMap,
+    countDropped,
+    droppedNotice,
     toCommunityMap,
     toGroups,
     toNodeScores,
@@ -209,5 +211,82 @@ describe('budgetNextAction', () => {
         ).toBe('narrow');
         expect(budgetNextAction(run({ exceeded: 'WORK' }), ceilings).kind).toBe('narrow');
         expect(budgetNextAction(run({ exceeded: 'NODES' }), null).kind).toBe('narrow');
+    });
+});
+
+describe('countDropped / droppedNotice (LA-GRAPH-RUN-HIDDEN-NODES-1)', () => {
+    const w = ws();
+    const canvas = workingSetToGraph(w, P);
+    const map = buildServerIdMap(w, P, canvas);
+    const base = { dropped: 0, elapsedMs: 1 };
+
+    it('counts distinct node and link ids the canvas does not draw, per result shape', () => {
+        const sel = countDropped(
+            {
+                ...base,
+                algorithm: 'shortestPath',
+                kind: 'SELECTION',
+                selection: { nodeIds: ['Ann', 'Bob', 'Zed'], edgeIds: [linkId('Ann', 'Bob', 'calls'), 'lk.gone'] },
+            },
+            map,
+        );
+        expect(sel).toEqual({ nodes: { dropped: 1, total: 3 }, edges: { dropped: 1, total: 2 } });
+
+        // a list of selections counts each id once even when several paths share it
+        const many = countDropped(
+            {
+                ...base,
+                algorithm: 'allPaths',
+                kind: 'SELECTIONS',
+                selections: [
+                    { nodeIds: ['Ann', 'Bob'], edgeIds: [] },
+                    { nodeIds: ['Ann', 'Zed'], edgeIds: [] },
+                ],
+            },
+            map,
+        );
+        expect(many.nodes).toEqual({ dropped: 1, total: 3 });
+
+        // bridges name LINKS in `ids`; articulation points name nodes
+        const bridgeIds = countDropped(
+            { ...base, algorithm: 'bridges', kind: 'IDS', ids: [linkId('Bob', 'Cy', 'calls'), 'lk.gone'] },
+            map,
+        );
+        expect(bridgeIds).toEqual({ nodes: { dropped: 0, total: 0 }, edges: { dropped: 1, total: 2 } });
+        const cutIds = countDropped(
+            { ...base, algorithm: 'articulationPoints', kind: 'IDS', ids: ['Bob', 'Zed'] },
+            map,
+        );
+        expect(cutIds).toEqual({ nodes: { dropped: 1, total: 2 }, edges: { dropped: 0, total: 0 } });
+
+        // scores, groups, communities and predicted links
+        expect(
+            countDropped(
+                {
+                    ...base,
+                    algorithm: 'closenessCentrality',
+                    kind: 'SCORES',
+                    scores: [{ id: 'Zed', label: 'Z', score: 1 }],
+                },
+                map,
+            ).nodes,
+        ).toEqual({ dropped: 1, total: 1 });
+        expect(
+            countDropped({ ...base, algorithm: 'cliques', kind: 'GROUPS', groups: [['Ann', 'Zed', 'Yan']] }, map).nodes,
+        ).toEqual({ dropped: 2, total: 3 });
+    });
+
+    it('a result the canvas draws in full has no notice; a partial one states both counts', () => {
+        const whole = countDropped(
+            { ...base, algorithm: 'cliques', kind: 'GROUPS', groups: [['Ann', 'Bob', 'Cy']] },
+            map,
+        );
+        expect(droppedNotice(whole)).toBe('');
+        expect(droppedNotice({ nodes: { dropped: 2, total: 9 }, edges: { dropped: 0, total: 4 } })).toBe(
+            '2 of 9 result nodes are not drawn on the canvas right now, so the result shown here leaves them out.',
+        );
+        expect(droppedNotice({ nodes: { dropped: 1, total: 3 }, edges: { dropped: 1, total: 2 } })).toBe(
+            '1 of 3 result nodes and 1 of 2 result links are not drawn on the canvas right now, so the result shown here leaves them out.',
+        );
     });
 });
