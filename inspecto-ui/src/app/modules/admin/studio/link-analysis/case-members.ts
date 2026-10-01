@@ -1,5 +1,5 @@
 import { G6GraphData, G6Node } from 'app/inspecto/graph';
-import { CaseEntityMember } from 'app/inspecto/api';
+import type { LaCaseEntityMember } from 'app/inspecto/la-host';
 
 /** At most this many members per Case opened from Link Analysis — the server's own cap (422 above it). */
 export const MAX_CASE_MEMBERS = 100;
@@ -10,7 +10,7 @@ export interface CaseMemberCandidate {
     label: string;
     /** `Dataset · entity key`, or the Incident id — what the picker shows under the label. */
     detail: string;
-    member: CaseEntityMember;
+    member: LaCaseEntityMember;
 }
 
 /**

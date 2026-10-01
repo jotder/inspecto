@@ -13,7 +13,11 @@
         }
         @if (importDraft(); as draft) {
             <div class="flex flex-col gap-2">
-                <inspecto-import-draft-banner [draft]="draft" [stored]="draftStored()" (discard)="discardDraft()" />
+                <inspecto-la-host-slot
+                    [component]="transfer.banner"
+                    [inputs]="{ draft: draft, stored: draftStored() }"
+                    [outputs]="transferBannerOutputs"
+                />
                 <div class="flex justify-end">
                     <button type="button" mat-flat-button color="primary" [disabled]="saving()" (click)="saveDraft()">
                         Save draft as “{{ draft.id }}”
@@ -400,13 +404,15 @@
                 </ng-template>
             </mat-menu>
 
-            <inspecto-transfer-menu
-                [items]="transferItems()"
-                [allowedKinds]="['geo-map-view']"
-                [importDraft]="true"
-                (draftImported)="onDraftImported($event)"
-                (changed)="reloadViews()"
-                label="Import / export saved views"
+            <inspecto-la-host-slot
+                [component]="transfer.menu"
+                [inputs]="{
+                    items: transferItems(),
+                    allowedKinds: ['geo-map-view'],
+                    importDraft: true,
+                    label: 'Import / export saved views',
+                }"
+                [outputs]="transferMenuOutputs"
             />
 
             <!-- save view — needs a rendered map -->

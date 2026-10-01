@@ -16,13 +16,12 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
-import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { PipelineSummary } from 'app/inspecto/api';
 import { EntityProjection, GraphSource, GraphSourceId, GraphSourceQuery } from 'app/inspecto/graph';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
-import type { LaDataset } from 'app/inspecto/la-host';
+import type { LaAiDraft, LaDataset } from 'app/inspecto/la-host';
+import { LA_AI_ASSIST, LaHostSlotComponent } from 'app/inspecto/la-host';
 import { LinkAnalysisView } from './link-analysis.service';
 
 /** `InvRoutes.MAX_MAPPINGS` — the server 422s above it; the form says so first. */
@@ -55,7 +54,7 @@ export interface QuerySummaryItem {
         MatIconModule,
         MatInputModule,
         MatSelectModule,
-        AiAssistComponent,
+        LaHostSlotComponent,
         InspectoOptionPickerComponent,
     ],
     templateUrl: './link-analysis-query-panel.component.html',
@@ -63,6 +62,9 @@ export interface QuerySummaryItem {
 export class LinkAnalysisQueryPanelComponent implements OnInit {
     private fb = inject(FormBuilder);
     private datasetRows = inject(DatasetRowsService);
+    /** The host's AI assist component, rendered through `<inspecto-la-host-slot>`. */
+    readonly aiAssist = inject(LA_AI_ASSIST).assist;
+    readonly aiAssistOutputs = { applyDraft: (d: LaAiDraft) => this.applyProjectionDraft(d) };
 
     readonly sources = input<GraphSource[]>([]);
     readonly datasets = input<LaDataset[]>([]);
@@ -399,7 +401,7 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
      * Adopt a drafted mapping into the form (AGT-6a A2). It stops at the form — dirty, never saved: the
      * operator still presses Run and the host's own Save, so the human stays the actor.
      */
-    applyProjectionDraft(draft: AiDraft): void {
+    applyProjectionDraft(draft: LaAiDraft): void {
         const query = draft.config['query'];
         if (typeof query !== 'object' || query === null) return;
         this.patchFormFromQuery(query as GraphSourceQuery, false);

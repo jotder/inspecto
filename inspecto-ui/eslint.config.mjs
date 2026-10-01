@@ -77,6 +77,34 @@ export default tseslint.config(
                             message:
                                 'Link Analysis / Geo must not import host features: inject a token from app/inspecto/la-host instead (D-5 prep).',
                         },
+                        {
+                            // The four `app/inspecto/**` host edges tokenised in D-5 prep part 2 (§7.12): Tags,
+                            // Transfer (import/export), AI assist, Cases. The shared library paths stay allowed.
+                            group: [
+                                'app/inspecto/tags',
+                                'app/inspecto/tags/**',
+                                'app/inspecto/transfer',
+                                'app/inspecto/transfer/**',
+                                'app/inspecto/ai-assist',
+                                'app/inspecto/ai-assist/**',
+                                'app/inspecto/api/objects.service',
+                                'src/app/inspecto/tags/**',
+                                'src/app/inspecto/transfer/**',
+                                'src/app/inspecto/ai-assist/**',
+                                'src/app/inspecto/api/objects.service',
+                            ],
+                            message:
+                                'Tags / Transfer / AI assist / Cases are host edges: inject LA_TAGS / LA_TRANSFER / LA_AI_ASSIST / LA_CASES from app/inspecto/la-host instead (D-5 prep).',
+                        },
+                    ],
+                    paths: [
+                        {
+                            // `ObjectsService` is also re-exported by the `api` barrel, which LA otherwise uses freely.
+                            name: 'app/inspecto/api',
+                            importNames: ['ObjectsService'],
+                            message:
+                                'Cases are a host edge: inject LA_CASES from app/inspecto/la-host instead (D-5 prep).',
+                        },
                     ],
                 },
             ],

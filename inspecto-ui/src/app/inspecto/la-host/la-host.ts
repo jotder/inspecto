@@ -1,4 +1,4 @@
-import { InjectionToken, Type } from '@angular/core';
+import { InjectionToken, Signal, Type } from '@angular/core';
 import { Observable } from 'rxjs';
 import type { PipelineGraph, ProvenanceCount, WorkingSetRelationName } from 'app/inspecto/api';
 import type { Component as ModelComponent } from 'app/inspecto/component-model';
@@ -100,3 +100,104 @@ export const LA_PIPELINE_GRAPH = hostToken<LaPipelineGraph>('LA_PIPELINE_GRAPH',
 
 /** The host's Dashboard header component; takes a `header` input `{description?: string}`. */
 export const LA_DASHBOARD_HEADER = hostToken<Type<unknown>>('LA_DASHBOARD_HEADER', 'the Dashboard header component');
+
+// ── Tags ──────────────────────────────────────────────────────────────────────────────────────────
+
+/** What a Tag assignment is about: the saved view being labelled. */
+export interface LaTagTarget {
+    targetKind: string;
+    targetId: string;
+    label: string;
+}
+
+/** Cross-entity Tag assignment: the host owns the dialog and the assignment edges. */
+export interface LaTags {
+    open(target: LaTagTarget): void;
+}
+
+export const LA_TAGS = hostToken<LaTags>('LA_TAGS', 'the Tag assignment dialog');
+
+// ── Transfer (import / export) ────────────────────────────────────────────────────────────────────
+
+/**
+ * A bundle item handed to the editor as UNSAVED work (Import as draft). Same fields the host's `ImportDraft`
+ * carries; `kind` is a plain string here so the contract does not own the host's bundle-kind union.
+ */
+export interface LaImportDraft {
+    kind: string;
+    id: string;
+    content: Record<string, unknown>;
+    sourceSpace: string | null;
+    targetExists: boolean;
+    integrity: string[] | null;
+    prerequisites: string[];
+}
+
+/**
+ * The host's transfer widgets, rendered with `<la-host-slot>`.
+ * - `menu` — inputs `items` (`{kind, id}[]`), `allowedKinds`, `label`, `importDraft`; outputs `changed`,
+ *   `draftImported` (a {@link LaImportDraft}).
+ * - `banner` — inputs `draft` ({@link LaImportDraft}), `stored`; output `discard`.
+ */
+export interface LaTransfer {
+    readonly menu: Type<unknown>;
+    readonly banner: Type<unknown>;
+}
+
+export const LA_TRANSFER = hostToken<LaTransfer>('LA_TRANSFER', 'the Import / export menu and draft banner');
+
+// ── AI assist ─────────────────────────────────────────────────────────────────────────────────────
+
+/** A drafted config the operator reviewed and applied — only the part Link Analysis reads. */
+export interface LaAiDraft {
+    config: Record<string, unknown>;
+}
+
+/**
+ * The host's AI components, rendered with `<la-host-slot>`.
+ * - `assist` — inputs `tool`, `args`, `current`, `label`, `disabled`, `disabledReason`; output `applyDraft`
+ *   ({@link LaAiDraft}).
+ * - `explain` — inputs `screen`, `terms`.
+ */
+export interface LaAiAssist {
+    readonly assist: Type<unknown>;
+    readonly explain: Type<unknown>;
+}
+
+export const LA_AI_ASSIST = hostToken<LaAiAssist>('LA_AI_ASSIST', 'the AI assist and explain components');
+
+// ── Cases ─────────────────────────────────────────────────────────────────────────────────────────
+
+/** An open Case as the pickers offer it. */
+export interface LaCaseRef {
+    id: string;
+    title: string;
+}
+
+/** One member of a Case opened from Link Analysis: an Entity to mint, or an Incident the graph already references. */
+export type LaCaseEntityMember = { id: string; dataset: string; label?: string } | { objectId: string };
+
+/** The Case that `openFromEntities` opened. */
+export interface LaOpenedCase {
+    caseId: string;
+    memberCount: number;
+}
+
+/**
+ * Case management as Link Analysis uses it. `available` is the HOST's decision: false when Case management
+ * (the ops module) is not installed — Link Analysis then shows its own placeholder Cases and never calls
+ * `list` / `openFromEntities`.
+ */
+export interface LaCases {
+    readonly available: Signal<boolean>;
+    /** The open Cases. */
+    list(): Observable<LaCaseRef[]>;
+    /** Open a Case whose first members come from these Entities (one call: a refused member creates nothing). */
+    openFromEntities(
+        title: string,
+        description: string | undefined,
+        members: LaCaseEntityMember[],
+    ): Observable<LaOpenedCase>;
+}
+
+export const LA_CASES = hostToken<LaCases>('LA_CASES', 'Case management');

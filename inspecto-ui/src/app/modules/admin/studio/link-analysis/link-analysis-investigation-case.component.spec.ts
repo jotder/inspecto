@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { InvService, InvestigationCaseLink, ObjectsService, SessionService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 import { LinkAnalysisInvestigationCaseComponent } from './link-analysis-investigation-case.component';
 
 @Component({
@@ -39,6 +40,7 @@ async function create(link: InvestigationCaseLink, opsEnabled: boolean) {
     TestBed.configureTestingModule({
         imports: [Host],
         providers: [
+            ...provideLaHostServices(),
             provideNoopAnimations(),
             { provide: InvService, useValue: inv },
             { provide: ObjectsService, useValue: objects },

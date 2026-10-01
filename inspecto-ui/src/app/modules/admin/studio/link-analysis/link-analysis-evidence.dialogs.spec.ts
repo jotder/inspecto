@@ -9,6 +9,7 @@ import { SessionService } from 'app/inspecto/api';
 import { ObjectsService } from 'app/inspecto/api/objects.service';
 import { G6GraphData, GraphSnapshot, verifySnapshot } from 'app/inspecto/graph';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 import {
     LinkAnalysisAttachCaseDialog,
     LinkAnalysisSnapshotDialog,
@@ -90,6 +91,7 @@ describe('LinkAnalysisSnapshotDialog', () => {
         TestBed.configureTestingModule({
             imports: [LinkAnalysisSnapshotDialog],
             providers: [
+                ...provideLaHostServices(),
                 provideNoopAnimations(),
                 { provide: LinkAnalysisSnapshotsService, useValue: fakeSnapshots() },
                 { provide: SessionService, useValue: { opsEnabled: () => true } },
@@ -135,6 +137,7 @@ describe('LinkAnalysisSnapshotDialog — the Case is optional', () => {
         TestBed.configureTestingModule({
             imports: [LinkAnalysisSnapshotDialog],
             providers: [
+                ...provideLaHostServices(),
                 provideNoopAnimations(),
                 { provide: LinkAnalysisSnapshotsService, useValue: store },
                 { provide: SessionService, useValue: { opsEnabled: () => true } },
@@ -256,6 +259,7 @@ describe('LinkAnalysisSnapshotDialog — create a Case in place (LA-CASE-CREATE-
         TestBed.configureTestingModule({
             imports: [LinkAnalysisSnapshotDialog],
             providers: [
+                ...provideLaHostServices(),
                 provideNoopAnimations(),
                 { provide: LinkAnalysisSnapshotsService, useValue: store },
                 { provide: SessionService, useValue: { opsEnabled: () => o.opsEnabled ?? true } },
@@ -385,6 +389,7 @@ describe('LinkAnalysisAttachCaseDialog', () => {
         TestBed.configureTestingModule({
             imports: [LinkAnalysisAttachCaseDialog],
             providers: [
+                ...provideLaHostServices(),
                 provideNoopAnimations(),
                 { provide: LinkAnalysisSnapshotsService, useValue: store },
                 { provide: SessionService, useValue: { opsEnabled: () => opsEnabled } },
@@ -465,6 +470,7 @@ describe('LinkAnalysisSnapshotDialog — a failed seal keeps the work on screen'
         TestBed.configureTestingModule({
             imports: [LinkAnalysisSnapshotDialog],
             providers: [
+                ...provideLaHostServices(),
                 provideNoopAnimations(),
                 { provide: LinkAnalysisSnapshotsService, useValue: store },
                 { provide: SessionService, useValue: { opsEnabled: () => true } },
@@ -521,6 +527,7 @@ describe('LinkAnalysisSnapshotDialog — a failed seal keeps the work on screen'
         TestBed.configureTestingModule({
             imports: [LinkAnalysisSnapshotDialog],
             providers: [
+                ...provideLaHostServices(),
                 provideNoopAnimations(),
                 { provide: LinkAnalysisSnapshotsService, useValue: store },
                 { provide: SessionService, useValue: { opsEnabled: () => true } },

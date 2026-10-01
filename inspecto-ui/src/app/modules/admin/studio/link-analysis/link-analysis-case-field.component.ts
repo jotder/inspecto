@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, forwardRef, inject, input, signal } from '@angular/core';
 import { ControlValueAccessor, FormControl, NG_VALUE_ACCESSOR, ReactiveFormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { SessionService, apiErrorMessage } from 'app/inspecto/api';
-import { ObjectsService } from 'app/inspecto/api/objects.service';
+import { apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoOptionPickerComponent } from 'app/inspecto/components/option-picker.component';
+import { LA_CASES } from 'app/inspecto/la-host';
 import { CaseRef, LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
 
 /**
@@ -58,9 +58,9 @@ export class LinkAnalysisCaseFieldComponent implements ControlValueAccessor, OnI
     readonly required = input(false);
     readonly placeholder = input('Select');
 
-    private readonly objects = inject(ObjectsService);
+    private readonly caseMgmt = inject(LA_CASES);
     private readonly store = inject(LinkAnalysisSnapshotsService);
-    private readonly opsEnabled = inject(SessionService).opsEnabled;
+    private readonly opsEnabled = this.caseMgmt.available;
 
     readonly cases = signal<CaseRef[]>([]);
     /** Non-empty once the lookup FAILED — distinct from the ops-absent path, which has placeholders. */
@@ -89,8 +89,8 @@ export class LinkAnalysisCaseFieldComponent implements ControlValueAccessor, OnI
             this.cases.set([...this.store.mockCases]);
             return;
         }
-        this.objects.list({ type: 'CASE' }).subscribe({
-            next: (rows) => this.cases.set(rows.map((o) => ({ id: o.id, title: o.title }))),
+        this.caseMgmt.list().subscribe({
+            next: (rows) => this.cases.set(rows),
             error: (err) => {
                 this.cases.set([]);
                 this.loadError.set(apiErrorMessage(err, 'The Cases lookup failed.'));

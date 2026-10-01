@@ -2,9 +2,10 @@ import { ChangeDetectionStrategy, Component, effect, inject, input, signal, untr
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { Observable, firstValueFrom } from 'rxjs';
-import { InvService, InvestigationCaseLink, ObjectsService, SessionService, apiErrorMessage } from 'app/inspecto/api';
+import { InvService, InvestigationCaseLink, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { LA_CASES } from 'app/inspecto/la-host';
 
 /**
  * **Link to a Case** (LA-24, decision D-U10) — the Investigation panel's OPTIONAL Case link. Linking shares the
@@ -65,8 +66,8 @@ export class LinkAnalysisInvestigationCaseComponent {
     readonly investigationId = input.required<string>();
 
     private readonly inv = inject(InvService);
-    private readonly objects = inject(ObjectsService);
-    readonly opsEnabled = inject(SessionService).opsEnabled;
+    private readonly caseMgmt = inject(LA_CASES);
+    readonly opsEnabled = this.caseMgmt.available;
 
     readonly link = signal<InvestigationCaseLink | null>(null);
     readonly cases = signal<PickerOption[]>([]);
@@ -98,7 +99,7 @@ export class LinkAnalysisInvestigationCaseComponent {
     /** The picker's options — only for the owner, only while unlinked, only with Case management installed. */
     private async loadCases(l: InvestigationCaseLink): Promise<void> {
         if (l.readOnly || l.caseRef || !this.opsEnabled() || this.cases().length) return;
-        const rows = await firstValueFrom(this.objects.list({ type: 'CASE' }));
+        const rows = await firstValueFrom(this.caseMgmt.list());
         this.cases.set(rows.map((o) => ({ value: o.id, label: o.id + ' · ' + o.title })));
     }
 

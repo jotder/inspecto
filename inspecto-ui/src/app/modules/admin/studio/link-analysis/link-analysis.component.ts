@@ -45,13 +45,11 @@ import {
     apiErrorMessage,
 } from 'app/inspecto/api';
 import { OfferShareDialog, OfferShareResult } from 'app/inspecto/components/offer-share.dialog';
-import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
-import { ImportDraft, ImportDraftBannerComponent, TransferMenuComponent } from 'app/inspecto/transfer';
 import {
     G6GraphData,
     EntityProjection,
@@ -130,7 +128,8 @@ import {
 import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
 import { ElementDetailDialog, ElementDetailResult, ElementObjectRef, PivotService } from 'app/inspecto/investigation';
 import type { LaDataset } from 'app/inspecto/la-host';
-import { LA_DATASETS } from 'app/inspecto/la-host';
+import { LA_AI_ASSIST, LA_DATASETS, LA_TAGS, LA_TRANSFER, LaHostSlotComponent } from 'app/inspecto/la-host';
+import type { LaImportDraft } from 'app/inspecto/la-host';
 import {
     MultiProjectedGraph,
     ProjectedGraph,
@@ -144,7 +143,6 @@ import {
     splitIdentityGroups,
 } from './entity-projection';
 import { GraphSourcesService } from './graph-sources';
-import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';
 import {
     LinkAnalysisService,
@@ -227,8 +225,7 @@ const SERVER_PATH_LIMIT = 100;
         InspectoSkeletonComponent,
         GraphViewComponent,
         DataTableComponent,
-        TransferMenuComponent,
-        ImportDraftBannerComponent,
+        LaHostSlotComponent,
         LinkAnalysisToolboxComponent,
         LinkAnalysisQueryPanelComponent,
         LinkAnalysisLegendComponent,
@@ -236,7 +233,6 @@ const SERVER_PATH_LIMIT = 100;
         LinkAnalysisFilterComponent,
         InspectoSplitDirective,
         InspectoOptionPickerComponent,
-        AiExplainComponent,
         LinkAnalysisInvestigationComponent,
     ],
     // LA-10: the Investigation session outlives the toolbox dock, which destroys its panel on collapse.
@@ -258,6 +254,15 @@ export class LinkAnalysisComponent implements OnInit {
     readonly opsEnabled = inject(SessionService).opsEnabled;
     private toastr = inject(ToastrService);
     private dialog = inject(MatDialog);
+    private readonly tags = inject(LA_TAGS);
+    /** The host's Import/export menu + draft banner and AI explain, rendered through `<inspecto-la-host-slot>`. */
+    readonly transfer = inject(LA_TRANSFER);
+    readonly aiExplain = inject(LA_AI_ASSIST).explain;
+    readonly transferMenuOutputs = {
+        draftImported: (d: LaImportDraft) => void this.onDraftImported(d),
+        changed: () => this.reloadViews(),
+    };
+    readonly transferBannerOutputs = { discard: () => void this.discardDraft() };
     private router = inject(Router);
     private route = inject(ActivatedRoute);
     /**
@@ -862,7 +867,7 @@ export class LinkAnalysisComponent implements OnInit {
     readonly saving = signal(false);
 
     /** An imported draft this editor holds UNSAVED (Import as draft, D1–D8) — in memory only. */
-    readonly importDraft = signal<ImportDraft | null>(null);
+    readonly importDraft = signal<LaImportDraft | null>(null);
     /** The stored copy the draft replaces (D6 diff baseline); null when the id is new here. */
     readonly draftStored = signal<Record<string, unknown> | null>(null);
     /** The stored copy's hash, sent as `If-Match` on the draft's Save so it cannot clobber a concurrent edit. */
@@ -1694,7 +1699,7 @@ export class LinkAnalysisComponent implements OnInit {
      * does — re-running its read-only projection — and nothing is written until {@link saveDraft}. An
      * existing id (D6) also reads the stored copy: the banner's diff baseline and the Save's `If-Match`.
      */
-    async onDraftImported(draft: ImportDraft): Promise<void> {
+    async onDraftImported(draft: LaImportDraft): Promise<void> {
         // `/bundle/preview` judges references only for the kinds ComponentIntegrity knows (dataset, query,
         // widget, dashboard, reconciliation) — never a link-analysis-view — so its list is ALWAYS empty
         // here, which the banner would show as clean. Say "not checked" instead.
@@ -1791,9 +1796,7 @@ export class LinkAnalysisComponent implements OnInit {
     /** Per-view tags (D7) — labels the view in place, through the cross-entity assignment edges. Like
      *  Comments, this annotates the saved view rather than editing it, so there is nothing to reload. */
     openTags(view: LinkAnalysisView): void {
-        this.dialog.open(TagAssignmentDialog, {
-            data: { targetKind: 'link-analysis-view', targetId: view.id, label: view.name },
-        });
+        this.tags.open({ targetKind: 'link-analysis-view', targetId: view.id, label: view.name });
     }
 
     /**

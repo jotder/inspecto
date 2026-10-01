@@ -32,7 +32,11 @@
         }
         @if (importDraft(); as draft) {
             <div class="flex flex-col gap-2">
-                <inspecto-import-draft-banner [draft]="draft" [stored]="draftStored()" (discard)="discardDraft()" />
+                <inspecto-la-host-slot
+                    [component]="transfer.banner"
+                    [inputs]="{ draft: draft, stored: draftStored() }"
+                    [outputs]="transferBannerOutputs"
+                />
                 <div class="flex justify-end">
                     <button type="button" mat-flat-button color="primary" [disabled]="saving()" (click)="saveDraft()">
                         Save draft as “{{ draft.id }}”
@@ -261,9 +265,12 @@
 
             <span class="flex-auto"></span>
 
-            <inspecto-ai-explain
-                screen="Link Analysis"
-                [terms]="['Entity', 'Link', 'Entity Projection', 'Link-Analysis View', 'Dataset', 'Widget']"
+            <inspecto-la-host-slot
+                [component]="aiExplain"
+                [inputs]="{
+                    screen: 'Link Analysis',
+                    terms: ['Entity', 'Link', 'Entity Projection', 'Link-Analysis View', 'Dataset', 'Widget'],
+                }"
             />
 
             <!-- saved views (open) — always available -->
@@ -341,13 +348,15 @@
                 </ng-template>
             </mat-menu>
 
-            <inspecto-transfer-menu
-                [items]="transferItems()"
-                [allowedKinds]="['link-analysis-view']"
-                [importDraft]="true"
-                (draftImported)="onDraftImported($event)"
-                (changed)="reloadViews()"
-                label="Import / export saved views"
+            <inspecto-la-host-slot
+                [component]="transfer.menu"
+                [inputs]="{
+                    items: transferItems(),
+                    allowedKinds: ['link-analysis-view'],
+                    importDraft: true,
+                    label: 'Import / export saved views',
+                }"
+                [outputs]="transferMenuOutputs"
             />
 
             <!-- save view — needs a rendered graph -->

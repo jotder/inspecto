@@ -29,7 +29,6 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
-import { ImportDraft, ImportDraftBannerComponent, TransferMenuComponent } from 'app/inspecto/transfer';
 import {
     GeoBBox,
     GeoCamera,
@@ -65,7 +64,8 @@ import {
 } from 'app/inspecto/investigation';
 import { ComponentsService, GeoSettingsService, apiErrorMessage, SessionService } from 'app/inspecto/api';
 import type { LaDataset } from 'app/inspecto/la-host';
-import { LA_DATASETS } from 'app/inspecto/la-host';
+import { LA_DATASETS, LA_TAGS, LA_TRANSFER, LaHostSlotComponent } from 'app/inspecto/la-host';
+import type { LaImportDraft } from 'app/inspecto/la-host';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { ICON_COLOR_SWATCHES } from 'app/inspecto/theme/chart-tokens';
 import { GeoSourcesService, ProjectedGeo } from './geo-projection';
@@ -74,7 +74,6 @@ import { GeocodeResult } from 'app/inspecto/geo';
 
 /** Annotation accent — the amber chart-token swatch (visually distinct from data kinds). */
 const NOTE_ACCENT = ICON_COLOR_SWATCHES[3];
-import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { GeoMapService, GeoMapView } from './geo-map.service';
 import { GeoAnalysisFocus, GeoAnalysisToolboxComponent } from './geo-analysis-toolbox.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -139,8 +138,7 @@ interface PointRow {
         InspectoSkeletonComponent,
         MapViewComponent,
         DataTableComponent,
-        TransferMenuComponent,
-        ImportDraftBannerComponent,
+        LaHostSlotComponent,
         GeoAnalysisToolboxComponent,
     ],
     templateUrl: './geo-map.component.html',
@@ -156,6 +154,14 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     readonly opsEnabled = inject(SessionService).opsEnabled;
     private toastr = inject(ToastrService);
     private dialog = inject(MatDialog);
+    private readonly tags = inject(LA_TAGS);
+    /** The host's Import/export menu + draft banner, rendered through `<inspecto-la-host-slot>`. */
+    readonly transfer = inject(LA_TRANSFER);
+    readonly transferMenuOutputs = {
+        draftImported: (d: LaImportDraft) => void this.onDraftImported(d),
+        changed: () => this.reloadViews(),
+    };
+    readonly transferBannerOutputs = { discard: () => void this.discardDraft() };
     private router = inject(Router);
     private route = inject(ActivatedRoute);
     private pivotService = inject(PivotService);
@@ -401,7 +407,7 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     });
 
     /** An imported draft this editor holds UNSAVED (Import as draft, D1–D8) — in memory only. */
-    readonly importDraft = signal<ImportDraft | null>(null);
+    readonly importDraft = signal<LaImportDraft | null>(null);
     /** The stored copy the draft replaces (D6 diff baseline); null when the id is new here. */
     readonly draftStored = signal<Record<string, unknown> | null>(null);
     /** The stored copy's hash, sent as `If-Match` on the draft's Save so it cannot clobber a concurrent edit. */
@@ -884,7 +890,7 @@ export class GeoMapComponent implements OnInit, OnDestroy {
      * does — re-running its read-only projection — and nothing is written until {@link saveDraft}. An
      * existing id (D6) also reads the stored copy: the banner's diff baseline and the Save's `If-Match`.
      */
-    async onDraftImported(draft: ImportDraft): Promise<void> {
+    async onDraftImported(draft: LaImportDraft): Promise<void> {
         // `/bundle/preview` judges references only for the kinds ComponentIntegrity knows (dataset, query,
         // widget, dashboard, reconciliation) — never a geo-map-view — so its list is ALWAYS empty here,
         // which the banner would show as clean. Say "not checked" instead.
@@ -952,9 +958,7 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     /** Per-view tags (D7) — labels the saved view in place, through the cross-entity assignment edges.
      *  An annotation on the view, not an edit of it, so there is nothing to reload afterwards. */
     openTags(view: GeoMapView): void {
-        this.dialog.open(TagAssignmentDialog, {
-            data: { targetKind: 'geo-map-view', targetId: view.id, label: view.name },
-        });
+        this.tags.open({ targetKind: 'geo-map-view', targetId: view.id, label: view.name });
     }
 
     async loadView(view: GeoMapView): Promise<void> {

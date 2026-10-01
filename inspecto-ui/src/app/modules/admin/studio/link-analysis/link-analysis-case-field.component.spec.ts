@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SessionService } from 'app/inspecto/api';
 import { ObjectsService } from 'app/inspecto/api/objects.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 import { LinkAnalysisCaseFieldComponent } from './link-analysis-case-field.component';
 import { LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
 
@@ -37,6 +38,7 @@ function create(opsEnabled: boolean, list: () => unknown) {
     TestBed.configureTestingModule({
         imports: [Host],
         providers: [
+            ...provideLaHostServices(),
             provideNoopAnimations(),
             { provide: LinkAnalysisSnapshotsService, useValue: store },
             { provide: SessionService, useValue: { opsEnabled: () => opsEnabled } },

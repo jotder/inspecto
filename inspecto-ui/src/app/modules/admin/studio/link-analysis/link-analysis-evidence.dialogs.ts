@@ -6,12 +6,12 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
-import { SessionService, apiErrorMessage } from 'app/inspecto/api';
-import { ObjectsService } from 'app/inspecto/api/objects.service';
+import { apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { G6GraphData, GraphSnapshot, snapshotGraph } from 'app/inspecto/graph';
+import { LA_CASES } from 'app/inspecto/la-host';
 import { ConditionGroup } from 'app/inspecto/query/query-types';
 import { of } from 'rxjs';
 import { MAX_CASE_MEMBERS, caseMemberCandidates } from './case-members';
@@ -206,8 +206,8 @@ export class LinkAnalysisSnapshotDialog {
     private readonly ref = inject<MatDialogRef<LinkAnalysisSnapshotDialog, GraphSnapshot | undefined>>(MatDialogRef);
     private readonly confirm = inject(InspectoConfirmService);
     private readonly store = inject(LinkAnalysisSnapshotsService);
-    private readonly objects = inject(ObjectsService);
-    private readonly opsEnabled = inject(SessionService).opsEnabled;
+    private readonly caseMgmt = inject(LA_CASES);
+    private readonly opsEnabled = this.caseMgmt.available;
     private readonly fb = inject(FormBuilder);
 
     /** Non-empty when the seal failed — rendered in place, and the dialog stays open. */
@@ -385,21 +385,21 @@ export class LinkAnalysisSnapshotDialog {
      */
     private createCaseAndAttach(snap: GraphSnapshot): void {
         const members = this.candidates.filter((c) => this.picked().has(c.nodeId)).map((c) => c.member);
-        this.objects
-            .openCaseFromEntities(this.caseForm.controls.title.value.trim(), snap.description, members)
+        this.caseMgmt
+            .openFromEntities(this.caseForm.controls.title.value.trim(), snap.description, members)
             .subscribe({
                 next: (made) => {
-                    this.store.attachTo(snap.id, made.case.id).subscribe({
+                    this.store.attachTo(snap.id, made.caseId).subscribe({
                         next: (attachedTo) => {
                             this.saving.set(false);
                             this.ref.close({ ...snap, attachedTo });
                         },
                         error: (e: unknown) => {
                             this.saving.set(false);
-                            this.form.controls.caseId.setValue(made.case.id);
+                            this.form.controls.caseId.setValue(made.caseId);
                             this.caseForm.controls.mode.setValue('existing');
                             this.caseError.set(
-                                `Case ${made.case.id} was created with ${made.members.length} member(s), but the ` +
+                                `Case ${made.caseId} was created with ${made.memberCount} member(s), but the ` +
                                     `analysis could not be attached to it: ${apiErrorMessage(e, 'the attachment failed')}. ` +
                                     'Save again to attach it — the Case will not be created twice.',
                             );

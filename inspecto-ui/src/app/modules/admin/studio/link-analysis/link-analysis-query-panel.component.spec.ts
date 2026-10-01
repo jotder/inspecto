@@ -6,12 +6,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { GraphSourceId } from 'app/inspecto/graph';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
+import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 
 function make(sourceId: GraphSourceId = 'entity-projection', extraProviders: unknown[] = []) {
     TestBed.configureTestingModule({
         imports: [LinkAnalysisQueryPanelComponent],
         providers: [
+            ...provideLaHostServices(),
             ...(extraProviders as []),
             provideNoopAnimations(),
             // The panel now hosts <inspecto-ai-assist> (projection_author), which injects AgentService +
@@ -163,9 +165,6 @@ describe('LinkAnalysisQueryPanelComponent', () => {
     it('projection_author: applying a draft patches the form and persists nothing', () => {
         const { c } = make('entity-projection');
         c.applyProjectionDraft({
-            label: 'cdr',
-            clean: true,
-            findings: [],
             config: {
                 query: {
                     projections: [

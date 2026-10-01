@@ -1,13 +1,27 @@
 import { Provider, inject } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
+import { map } from 'rxjs';
+import { SessionService } from 'app/inspecto/api';
+import { ObjectsService } from 'app/inspecto/api/objects.service';
+import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
+import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
+import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
+import { ImportDraftBannerComponent, TransferMenuComponent } from 'app/inspecto/transfer';
 import {
+    LA_AI_ASSIST,
+    LA_CASES,
     LA_CATALOG,
     LA_DASHBOARD_HEADER,
     LA_DATASETS,
     LA_PIPELINE_GRAPH,
+    LA_TAGS,
+    LA_TRANSFER,
     LA_WIDGETS,
+    LaCases,
     LaCatalog,
     LaDatasets,
     LaPipelineGraph,
+    LaTags,
     LaWidgets,
 } from 'app/inspecto/la-host';
 import { ComponentsDataProvider } from 'app/modules/admin/catalog/components-data-provider';
@@ -60,5 +74,32 @@ export function provideLaHostServices(): Provider[] {
             useFactory: (): LaPipelineGraph => ({ toG6Data: toPipelineG6Data, provenanceCounts }),
         },
         { provide: LA_DASHBOARD_HEADER, useValue: DashboardHeaderComponent },
+        {
+            provide: LA_TAGS,
+            useFactory: (): LaTags => {
+                const dialog = inject(MatDialog);
+                return { open: (target) => void dialog.open(TagAssignmentDialog, { data: target }) };
+            },
+        },
+        { provide: LA_TRANSFER, useValue: { menu: TransferMenuComponent, banner: ImportDraftBannerComponent } },
+        { provide: LA_AI_ASSIST, useValue: { assist: AiAssistComponent, explain: AiExplainComponent } },
+        {
+            // The host decides real vs placeholder: `available` is false when `inspecto-ops` is not installed.
+            provide: LA_CASES,
+            useFactory: (): LaCases => {
+                const objects = inject(ObjectsService);
+                return {
+                    available: inject(SessionService).opsEnabled,
+                    list: () =>
+                        objects
+                            .list({ type: 'CASE' })
+                            .pipe(map((rows) => rows.map((o) => ({ id: o.id, title: o.title })))),
+                    openFromEntities: (title, description, members) =>
+                        objects
+                            .openCaseFromEntities(title, description, members)
+                            .pipe(map((made) => ({ caseId: made.case.id, memberCount: made.members.length }))),
+                };
+            },
+        },
     ];
 }
