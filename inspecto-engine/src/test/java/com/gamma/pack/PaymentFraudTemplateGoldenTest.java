@@ -225,6 +225,10 @@ class PaymentFraudTemplateGoldenTest {
                 .resolve(".restricted").resolve(pc.identity().pipelineName());
     }
 
+    /** The test PAN 4111 1111 1111 1111 with up to 3 non-digit separators between digits. */
+    private static final java.util.regex.Pattern LEAKED_PAN = java.util.regex.Pattern.compile(
+            "4(?:\\D{0,3}1){15}");
+
     /** The refused file sits ONLY in the restricted quarantine, and nothing anywhere names the value. */
     private static void assertRestricted(PipelineConfig pc, String what, int files) throws Exception {
         assertEquals(files, count(restricted(pc)), what + ": the file is in the restricted quarantine");
@@ -242,7 +246,10 @@ class PaymentFraudTemplateGoldenTest {
         }
         String status = Files.readString(Path.of(pc.dirs().statusFilePath()));
         assertTrue(status.contains("QUARANTINED_RESTRICTED") && status.contains("INGEST_REFUSE:"), what + ": " + status);
-        assertFalse(status.contains("1111") || status.contains("Invalid Input") || status.contains("4111"),
+        // The status row legitimately holds digits — the generated stored name (refused-<CODE>-<epoch ms>-<seq>), durations,
+        // timestamps — so a bare "1111"/"4111" substring fails by chance (the JVM-wide seq reaching 1111, a ms value
+        // containing it). What must never appear is the card number itself, in any separator spelling.
+        assertFalse(status.contains("Invalid Input") || LEAKED_PAN.matcher(status).find(),
                 what + ": the status holds the reason code alone: " + status);
     }
 
@@ -279,6 +286,20 @@ class PaymentFraudTemplateGoldenTest {
                 Map.of("PAYMENT_ATTEMPTS_20260704.csv", HEADER.replace("OUTCOME", "OUTCOME " + TEST_PAN) + "\n" + CLEAN_ROW + "\n"));
         assertRestricted(header, "header", 1);
         assertTrue(Files.readString(Path.of(header.dirs().statusFilePath())).contains("CARD_NUMBER_IN_HEADER"));
+    }
+
+    /** Regression: digits in the generated stored name (the JVM-wide seq reaching 1111) are not a leaked card number. */
+    @Test
+    void aStoredNameCarryingADigitRunIsNotMistakenForALeak(@TempDir Path tmp) throws Exception {
+        java.lang.reflect.Field f = Class.forName("com.gamma.inspector.RefusalQuarantine").getDeclaredField("SEQ");
+        f.setAccessible(true);
+        ((java.util.concurrent.atomic.AtomicLong) f.get(null)).set(1110);
+        PipelineConfig pc = plant(tmp, "INSTRUMENT_TOKEN", TEST_PAN);
+        assertRestricted(pc, "scratch", 1);
+        assertTrue(LEAKED_PAN.matcher("a,4111-1111-1111-1111,b").find());
+        assertTrue(LEAKED_PAN.matcher("a,4111111111111111,b").find());
+        assertTrue(LEAKED_PAN.matcher("a,4111 - 1111 - 1111 - 1111,b").find(), "the detector still catches a spelled PAN");
+        assertFalse(LEAKED_PAN.matcher("refused-CARD_NUMBER-1774111111111-1111.csv,111111").find());
     }
 
     @Test
