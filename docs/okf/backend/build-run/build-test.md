@@ -168,7 +168,7 @@ doc since 2026-09-08 and **did not prevent either occurrence** — which is why 
 
 ```
 mvn -o clean test -Pedition-enterprise -B > build.log 2>&1     # -B, NEVER -q
-node tools/check-reactor-verdict.mjs build.log --expect-modules 35   # 33 until D-1 added inspecto-audit-spi + inspecto-la-graph (2026-10-01)
+node tools/check-reactor-verdict.mjs build.log --expect-modules 37   # 33 until D-1 (2026-10-01) added inspecto-audit-spi, -la-graph, -auth-spi, -http-spi
 ```
 
 Reproduced deliberately on 2026-09-16 with the real toolchain (Maven 3.9.16 / surefire 3.2.5). Three
