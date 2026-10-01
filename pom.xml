@@ -96,6 +96,8 @@
                 <module>inspecto-entity-list</module>
                 <!-- EDG-01 cell 3b (2026-09-07): geo map + link analysis routes. CP-09 is "not for Personal";
                      GeoRoutes/InvRoutes lived in the core and so shipped in every bundle. -->
+                <module>inspecto-la-core</module>
+                <module>inspecto-la-api</module>
                 <module>inspecto-geo-link</module>
                 <module>inspecto-la-graph</module>
                 <!-- EDG-01 cell 4 (2026-09-07): cross-space exchange / sharing. SEC-10 is "not for Personal";
@@ -131,6 +133,8 @@
                 <module>inspecto-notify-channels</module>
                 <module>inspecto-backup</module>
                 <module>inspecto-entity-list</module>
+                <module>inspecto-la-core</module>
+                <module>inspecto-la-api</module>
                 <module>inspecto-geo-link</module>
                 <module>inspecto-la-graph</module>
                 <module>inspecto-exchange</module>
@@ -157,6 +161,8 @@
                 <module>inspecto-notify-channels</module>
                 <module>inspecto-backup</module>
                 <module>inspecto-entity-list</module>
+                <module>inspecto-la-core</module>
+                <module>inspecto-la-api</module>
                 <module>inspecto-geo-link</module>
                 <module>inspecto-la-graph</module>
                 <module>inspecto-exchange</module>
@@ -176,6 +182,8 @@
                 <module>inspecto-notify-channels</module>
                 <module>inspecto-backup</module>
                 <module>inspecto-entity-list</module>
+                <module>inspecto-la-core</module>
+                <module>inspecto-la-api</module>
                 <module>inspecto-geo-link</module>
                 <module>inspecto-la-graph</module>
                 <module>inspecto-exchange</module>

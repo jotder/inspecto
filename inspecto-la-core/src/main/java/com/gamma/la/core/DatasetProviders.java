@@ -1,0 +1,36 @@
+package com.gamma.la.core;
+
+import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
+import com.gamma.control.SpiSlot;
+
+import java.util.Optional;
+
+/**
+ * The active {@link DatasetProvider}, or none — the same {@link SpiSlot} discovery the control plane uses for its other
+ * optional seams. Absent, a route that needs a Dataset answers {@code 503 CAPABILITY_UNAVAILABLE} naming what is missing;
+ * the feature reports itself absent rather than half-working.
+ */
+public final class DatasetProviders {
+
+    static final String MESSAGE = "Link Analysis cannot read Datasets in this bundle - no Dataset provider is installed "
+            + "(it is supplied by the inspecto-geo-link bridge module).";
+
+    private static final SpiSlot<DatasetProvider> SLOT = new SpiSlot<>(DatasetProvider.class);
+
+    private DatasetProviders() {}
+
+    public static Optional<DatasetProvider> active() {
+        return SLOT.active();
+    }
+
+    /** The provider, or a clean {@code 503} {@link ApiException} when none is bound. */
+    public static DatasetProvider require() {
+        return SLOT.active().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, MESSAGE));
+    }
+
+    /** Test seam: force the provider for this JVM; {@code null} re-arms classpath discovery. */
+    public static void forTest(DatasetProvider provider) {
+        SLOT.forTest(provider);
+    }
+}

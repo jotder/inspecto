@@ -1,0 +1,305 @@
+package com.gamma.la.api;
+
+import com.gamma.la.core.DatasetProviders;
+import com.gamma.la.core.DatasetProvider;
+import com.gamma.control.ApiContext;
+import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
+import com.gamma.control.RouteModule;
+import com.gamma.control.WriteGates;
+
+import com.gamma.event.Event;
+import com.gamma.event.EventLog;
+import com.gamma.event.EventType;
+
+import com.gamma.util.DuckDbUtil;
+import com.gamma.util.SqlIdent;
+import com.sun.net.httpserver.HttpExchange;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+/**
+ * Geo Map Phase 4 backend: the real <b>server-side projection</b> the Geo Map studio's client-side
+ * {@code geo-projection} GeoSources were designed against ({@code docs/okf/frontend/features/geo-map.md};
+ * provenance only: {@code docs/archived-documents/plans-archive/geo-map-analysis-plan.md} Phase 4). The DuckDB-side
+ * fold of {@code projectPoints}/{@code projectRoutes}, so a projection scales past the ~5k-point browser cap.
+ *
+ * <p>{@code POST /geo/projection} — body {@code {dataset, latCol, lonCol, entityCol?, kindCol?, timeCol?,
+ * attrCols?, limit?}} → {@code {points:[{id,lat,lon,kind,label?,time?,attrs?}], truncated, skipped}}: each
+ * dataset row with a valid WGS84 coordinate becomes a point. Rows whose lat/lon is missing, non-numeric, or
+ * out of range are excluded and counted in {@code skipped} (mirrors the client's NaN-skip).
+ *
+ * <p>{@code POST /geo/routes} — body {@code {dataset, fromLatCol, fromLonCol, toLatCol, toLonCol, fromCol?,
+ * toCol?, kindCol?, limit?}} → {@code {points, routes:[{id,from,to,kind,weight}], truncated, skipped}}: each
+ * row is one origin→destination movement. Endpoints fold into points (by name, else rounded coordinate) and
+ * rows fold into routes deduplicated per (origin, destination, kind) with a summed weight — the aggregation
+ * runs as a DuckDB {@code GROUP BY}, so it scales far beyond a row-by-row browser fold.
+ *
+ * <p>Fail-closed like {@link InvRoutes}: write root unset → 503; unknown dataset → 404; a non-identifier
+ * column or unusable dataset → 422. Column names are validated identifiers — no caller SQL text enters the
+ * statement. Deliberately plain SQL: no DuckDB {@code spatial} extension (no geometry op is needed here, and
+ * the hardened {@code SqlSandbox} disables extension loading) — see the plan's Phase 4 note.
+ */
+/*
+ * ⚠ Relocated from com.gamma.control (inspecto) on 2026-09-07, EDG-01 cell 3b — EDITIONS CP-09 is "not for
+ * Personal", and this class shipped in every bundle because it sat in the core. It now reaches ControlApi only
+ * through the public RouteModule SPI (META-INF/services), from a module the Personal build does not include.
+ * The package moved with it so com.gamma.control is not split across two jars. Nothing in the handlers changed.
+ */
+public final class GeoRoutes implements RouteModule {
+
+    private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+    /** Mirrors the client's GEO_POINT_CAP; the server can scale far higher on request. */
+    private static final int DEFAULT_LIMIT = 5_000;
+    private static final int MAX_LIMIT = 100_000;
+
+    @Override
+    public void register(ApiContext api) {
+        api.post("/geo/projection", (e, m) -> projection(api, e, api.body(e)));
+        api.post("/geo/routes", (e, m) -> routes(api, e, api.body(e)));
+    }
+
+    // ── POST /geo/projection ────────────────────────────────────────────────────
+    private Object projection(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        Ctx c = context(api, ex, body);
+        String lat = ident(body, "latCol", true), lon = ident(body, "lonCol", true);
+        String entity = ident(body, "entityCol", false);
+        // 🔴 D-U3: the STABLE key, distinct from the display label. `entityCol` is what a human reads and
+        // `id` below is `pt:<row index>` — a positional decoy that is regenerated every projection run and
+        // must never be treated as identity. Geo ↔ Link brushing (LA-22) needs a key that means the same
+        // thing on both canvases, and the only honest source is a column the caller names.
+        String entityId = ident(body, "entityIdCol", false);
+        String kind = ident(body, "kindCol", false);
+        String time = ident(body, "timeCol", false);
+        List<String> attrCols = attrCols(body);
+        int limit = limit(body);
+
+        String valid = "TRY_CAST(" + q(lat) + " AS DOUBLE) BETWEEN -90 AND 90"
+                + " AND TRY_CAST(" + q(lon) + " AS DOUBLE) BETWEEN -180 AND 180";
+        StringBuilder sel = new StringBuilder("SELECT TRY_CAST(").append(q(lat)).append(" AS DOUBLE) AS lat")
+                .append(", TRY_CAST(").append(q(lon)).append(" AS DOUBLE) AS lon");
+        if (kind != null) sel.append(", CAST(").append(q(kind)).append(" AS VARCHAR) AS kind");
+        if (entity != null) sel.append(", CAST(").append(q(entity)).append(" AS VARCHAR) AS label");
+        if (entityId != null) sel.append(", CAST(").append(q(entityId)).append(" AS VARCHAR) AS entity_key");
+        if (time != null) {
+            // epoch millis from a timestamp/date, else a numeric epoch as-is, else NULL (client parseTime parity).
+            sel.append(", COALESCE(epoch_ms(TRY_CAST(").append(q(time)).append(" AS TIMESTAMP)), TRY_CAST(")
+                    .append(q(time)).append(" AS BIGINT)) AS time");
+        }
+        for (int i = 0; i < attrCols.size(); i++) {
+            sel.append(", CAST(").append(q(attrCols.get(i))).append(" AS VARCHAR) AS attr_").append(i);
+        }
+        sel.append(" FROM ").append(q(c.datasetId)).append(" WHERE ").append(valid);
+
+        DatasetProvider.Result r = run(c, sel.toString(), limit);
+        List<Map<String, Object>> points = new ArrayList<>(r.rows().size());
+        int i = 0;
+        for (Map<String, Object> row : r.rows()) {
+            Map<String, Object> pt = new LinkedHashMap<>();
+            pt.put("id", "pt:" + i++);
+            pt.put("lat", row.get("lat"));
+            pt.put("lon", row.get("lon"));
+            pt.put("kind", nonBlankOr(kind != null ? row.get("kind") : null, "point"));
+            if (entity != null) pt.put("label", row.get("label"));
+            // Absent when unmapped — an absent key is honest; a fabricated one would let brushing isolate
+            // the wrong nodes, which in an investigative tool is a wrong answer wearing the shape of a finding.
+            if (entityId != null) pt.put("key", row.get("entity_key"));
+            if (time != null) pt.put("time", row.get("time"));
+            if (!attrCols.isEmpty()) {
+                Map<String, Object> attrs = new LinkedHashMap<>();
+                for (int a = 0; a < attrCols.size(); a++) attrs.put(attrCols.get(a), row.get("attr_" + a));
+                pt.put("attrs", attrs);
+            }
+            points.add(pt);
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("points", points);
+        out.put("routes", List.of());
+        out.put("truncated", r.truncated());
+        long skipped = skipped(c, valid);
+        out.put("skipped", skipped);
+        audit(ex, EventType.GEO_PROJECTED, "geo.projected", c.datasetId, "points", points.size(),
+                r.truncated(), skipped);
+        return out;
+    }
+
+    // ── POST /geo/routes ──────────────────────────────────────────────────────────
+    private Object routes(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        Ctx c = context(api, ex, body);
+        String fromLat = ident(body, "fromLatCol", true), fromLon = ident(body, "fromLonCol", true);
+        String toLat = ident(body, "toLatCol", true), toLon = ident(body, "toLonCol", true);
+        String fromCol = ident(body, "fromCol", false), toCol = ident(body, "toCol", false);
+        String kindCol = ident(body, "kindCol", false);
+        int limit = limit(body);
+
+        String aName = fromCol != null ? "TRIM(CAST(" + q(fromCol) + " AS VARCHAR))" : "''";
+        String bName = toCol != null ? "TRIM(CAST(" + q(toCol) + " AS VARCHAR))" : "''";
+        String kindExpr = kindCol != null ? "NULLIF(TRIM(CAST(" + q(kindCol) + " AS VARCHAR)), '')" : "NULL";
+        String valid = "a_lat BETWEEN -90 AND 90 AND a_lon BETWEEN -180 AND 180"
+                + " AND b_lat BETWEEN -90 AND 90 AND b_lon BETWEEN -180 AND 180";
+        // The per-row TRY_CAST relation, shared by the aggregation and the skipped counter.
+        String rCte = "WITH r AS (SELECT"
+                + " TRY_CAST(" + q(fromLat) + " AS DOUBLE) AS a_lat, TRY_CAST(" + q(fromLon) + " AS DOUBLE) AS a_lon,"
+                + " TRY_CAST(" + q(toLat) + " AS DOUBLE) AS b_lat, TRY_CAST(" + q(toLon) + " AS DOUBLE) AS b_lon,"
+                + " " + aName + " AS a_name, " + bName + " AS b_name, " + kindExpr + " AS kind"
+                + " FROM " + q(c.datasetId) + ")";
+        // Endpoint identity = name, else the rounded coordinate (matches the client's `${lat.toFixed(4)}, ...`).
+        String sql = rCte
+                + " SELECT COALESCE(NULLIF(a_name, ''), printf('%.4f, %.4f', a_lat, a_lon)) AS a_label,"
+                + " COALESCE(NULLIF(b_name, ''), printf('%.4f, %.4f', b_lat, b_lon)) AS b_label,"
+                + " kind, ANY_VALUE(a_lat) AS a_lat, ANY_VALUE(a_lon) AS a_lon,"
+                + " ANY_VALUE(b_lat) AS b_lat, ANY_VALUE(b_lon) AS b_lon, COUNT(*) AS weight"
+                + " FROM r WHERE " + valid
+                + " GROUP BY a_label, b_label, kind ORDER BY weight DESC, a_label, b_label";
+
+        DatasetProvider.Result r = run(c, sql, limit);
+        Map<String, Map<String, Object>> points = new LinkedHashMap<>();
+        List<Map<String, Object>> routeList = new ArrayList<>(r.rows().size());
+        for (Map<String, Object> row : r.rows()) {
+            String from = endpoint(points, row.get("a_label"), row.get("a_lat"), row.get("a_lon"));
+            String to = endpoint(points, row.get("b_label"), row.get("b_lat"), row.get("b_lon"));
+            String kind = (String) nonBlankOr(row.get("kind"), "route");
+            Map<String, Object> route = new LinkedHashMap<>();
+            route.put("id", from + "->" + to + ":" + kind);
+            route.put("from", from);
+            route.put("to", to);
+            route.put("kind", kind);
+            route.put("weight", row.get("weight"));
+            routeList.add(route);
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("points", new ArrayList<>(points.values()));
+        out.put("routes", routeList);
+        out.put("truncated", r.truncated());
+        long skipped = skipped(c, rCte + " SELECT * FROM r WHERE ", valid);
+        out.put("skipped", skipped);
+        audit(ex, EventType.GEO_ROUTES_PROJECTED, "geo.routes.projected", c.datasetId, "routes",
+                routeList.size(), r.truncated(), skipped);
+        return out;
+    }
+
+    /**
+     * Best-effort audit of one analytic act (LA-04). Emitted only after the result is built, so
+     * {@code sizeKey}/{@code truncated} describe what the analyst actually saw — a projection cut short
+     * by the limit is a partial picture, and an audit that cannot say so is worthless.
+     */
+    private static void audit(HttpExchange ex, String type, String action, String datasetId,
+                              String sizeKey, int size, boolean truncated, long skipped) {
+        try {
+            EventLog.current().emit(Event.builder(type).source("geo")
+                    .message(action + " " + datasetId + " — " + size + " " + sizeKey
+                            + (truncated ? " (truncated)" : ""))
+                    .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
+                    .action(action).actionCategory("analysis")
+                    .target("dataset", datasetId)
+                    .attr("dataset", datasetId).attr(sizeKey, size)
+                    .attr("truncated", truncated).attr("skipped", skipped));
+        } catch (RuntimeException ignore) {
+            // best effort — the audit must never fail the analyst's query
+        }
+    }
+
+    /** Fold an endpoint into the shared points map (id {@code ep:<label>}); returns the point id. */
+    private static String endpoint(Map<String, Map<String, Object>> points, Object label, Object lat, Object lon) {
+        String id = "ep:" + label;
+        points.computeIfAbsent(id, k -> {
+            Map<String, Object> pt = new LinkedHashMap<>();
+            pt.put("id", id);
+            pt.put("lat", lat);
+            pt.put("lon", lon);
+            pt.put("kind", "place");
+            pt.put("label", label);
+            return pt;
+        });
+        return id;
+    }
+
+    // ── shared helpers ────────────────────────────────────────────────────────────
+
+    /** Resolved dataset + its trusted relation SQL, or a fail-closed {@link ApiException}. */
+    private record Ctx(String datasetId, String relationSql) {}
+
+    private Ctx context(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "geo projection");
+        String datasetId = ApiContext.str(body, "dataset");
+        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
+        // The gate order every projection shares — unknown → 404, shared-away → the SAME 404 (R3), unusable → 422.
+        return new Ctx(datasetId, InvRoutes.relationFor(api, ex, writeRoot, datasetId));
+    }
+
+    private static DatasetProvider.Result run(Ctx c, String sql, int limit) {
+        try {
+            return DatasetProviders.require().run(new DatasetProvider.Request(
+                    c.datasetId, c.relationSql, sql, limit, 0, List.of(), List.of()));
+        } catch (SQLException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+        } catch (IOException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection failed: " + e.getMessage());
+        }
+    }
+
+    /** Rows excluded for an invalid coordinate — a scalar COUNT over the same validity predicate. */
+    private long skipped(Ctx c, String validPredicate) {
+        return skipped(c, "SELECT * FROM " + q(c.datasetId) + " WHERE ", validPredicate);
+    }
+
+    /**
+     * Count rows the projection dropped: everything for which {@code validPredicate} is not TRUE (NULL
+     * coordinates included). {@code fromClausePrefix} ends just before the predicate so points and routes
+     * share one counter over their own (possibly CTE-wrapped) relation.
+     */
+    private long skipped(Ctx c, String fromClausePrefix, String validPredicate) {
+        String base = fromClausePrefix + "(" + validPredicate + ") IS NOT TRUE";
+        String count = "SELECT COUNT(*) AS skipped FROM (" + base + ") AS __s";
+        DatasetProvider.Result r = run(c, count, 1);
+        Object v = r.rows().isEmpty() ? 0L : r.rows().get(0).get("skipped");
+        return v instanceof Number n ? n.longValue() : 0L;
+    }
+
+    private static Object nonBlankOr(Object v, String fallback) {
+        String s = v == null ? "" : String.valueOf(v).trim();
+        return s.isEmpty() ? fallback : s;
+    }
+
+    private static int limit(Map<String, Object> body) {
+        return body.get("limit") instanceof Number n
+                ? Math.max(1, Math.min(MAX_LIMIT, n.intValue())) : DEFAULT_LIMIT;
+    }
+
+    private static List<String> attrCols(Map<String, Object> body) {
+        Object raw = body.get("attrCols");
+        if (!(raw instanceof List<?> list)) return List.of();
+        List<String> out = new ArrayList<>(list.size());
+        for (Object o : list) {
+            String v = String.valueOf(o);
+            if (!SAFE_IDENT.matcher(v).matches())
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsafe column identifier '" + v + "' for attrCols");
+            out.add(v);
+        }
+        return out;
+    }
+
+    private static String ident(Map<String, Object> body, String key, boolean required) {
+        String v = ApiContext.str(body, key);
+        if (v == null) {
+            if (required) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include '" + key + "'");
+            return null;
+        }
+        if (!SAFE_IDENT.matcher(v).matches())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsafe column identifier '" + v + "' for " + key);
+        return v;
+    }
+
+    private static String q(String ident) {
+        return SqlIdent.q(ident);
+    }
+}

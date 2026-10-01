@@ -14,7 +14,6 @@ import com.gamma.event.EventType;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -25,7 +24,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.regex.Pattern;
+
+import static com.gamma.entitylist.EntityListFacts.LIST_ID;
+import static com.gamma.entitylist.EntityListFacts.append;
+import static com.gamma.entitylist.EntityListFacts.masked;
+import static com.gamma.entitylist.EntityListFacts.read;
+import static com.gamma.entitylist.EntityListFacts.reason;
+import static com.gamma.entitylist.EntityListFacts.type;
 
 /**
  * <b>Entity Lists</b> (LA-17 slice 1, {@code docs/superpower/link-analysis-entity-model-design.md} §4.3 and the
@@ -66,10 +71,8 @@ import java.util.regex.Pattern;
  */
 public final class EntityListRoutes implements RouteModule {
 
-    public static final Pattern LIST_ID = Pattern.compile("^[a-z0-9][a-z0-9_-]{0,63}$");
     private static final List<String> PURPOSES = List.of("allow", "block", "watch", "exclusion");
     private static final int MAX_VALUES = 5_000;
-    private static final int MAX_REASON = 1_000;
     private static final int MAX_TITLE = 200;
     private static final int MAX_VALUE_LENGTH = 512;
 
@@ -401,38 +404,12 @@ public final class EntityListRoutes implements RouteModule {
 
     // ── helpers ────────────────────────────────────────────────────────────────────────────────────────
 
-    public static EntityFactLog.Log read(EntityFactLog log) throws IOException {
-        try {
-            return log.read();
-        } catch (EntityFactLog.BrokenChainException broken) {
-            throw new ApiException(500, ErrorCodes.INTEGRITY_VIOLATION, broken.getMessage());
-        }
-    }
-
-    public static EntityFactLog.Log append(EntityFactLog log, EntityFactLog.Log head, HttpExchange ex, String reason,
-                                            String kind, String id, Map<String, Object> payload) throws IOException {
-        try {
-            return log.append(head, ApiContext.actor(ex), reason, kind, id, payload);
-        } catch (FileAlreadyExistsException raced) {
-            // Another process appended the same seq between our read and our move — nothing was overwritten.
-            throw new ApiException(409, ErrorCodes.CONFLICT, "the identity fact log moved on concurrently; retry");
-        }
-    }
-
     private static EntityRegistry.EntityList current(EntityFactLog.Log head, String id) {
         return EntityRegistry.fold(head.facts(), head.headSeq()).get(id);
     }
 
     private static ApiException notFound(String id, String at) {
         return new ApiException(404, ErrorCodes.NOT_FOUND, "entity list '" + id + "' not found" + at);
-    }
-
-    public static String reason(Map<String, Object> body) {
-        String r = ApiContext.str(body, "reason");
-        if (r == null || r.length() > MAX_REASON)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'reason', 1.." + MAX_REASON
-                    + " characters");
-        return r.trim();
     }
 
     /** {@code add} / {@code remove}: absent = none; otherwise a list of strings. */
@@ -462,10 +439,6 @@ public final class EntityListRoutes implements RouteModule {
             out.add(k);
         }
         return out;
-    }
-
-    public static Optional<EntityTypes.EntityType> type(Path root, String id) {
-        return LinkAnalysisSettings.forRoot(root).effectiveEntityTypes().stream().filter(t -> t.id().equals(id)).findFirst();
     }
 
     private static List<String> typeIds(Path root) {
@@ -524,14 +497,6 @@ public final class EntityListRoutes implements RouteModule {
         m.put("expiresAt", at);
         m.put("expired", !Instant.parse(at).isAfter(now));
         return m;
-    }
-
-    public static boolean masked(Path root, EntityRegistry.EntityList l) {
-        return switch (LinkAnalysisSettings.forRoot(root).effectiveMaskingMode()) {
-            case "none" -> false;
-            case "all" -> true;
-            default -> type(root, l.entityType()).map(EntityTypes.EntityType::masked).orElse(true);
-        };
     }
 
     /** Best-effort audit (LA-04 pattern), emitted only AFTER the fact is sealed. Counts, never keys. */

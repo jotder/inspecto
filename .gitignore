@@ -121,6 +121,8 @@ inspecto-consignment-outputs.db.wal
 /inspecto-backup/target/
 /inspecto-entity-list/target/
 /inspecto-geo-link/target/
+/inspecto-la-core/target/
+/inspecto-la-api/target/
 /inspecto-exchange/target/
 /inspecto-metrics/target/
 /inspecto-events/target/

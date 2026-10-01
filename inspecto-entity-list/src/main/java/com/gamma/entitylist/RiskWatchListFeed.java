@@ -63,7 +63,7 @@ public final class RiskWatchListFeed implements WatchListFeed {
             throw new IllegalArgumentException("Entity List '" + listId + "' has purpose '" + l.purpose()
                     + "'; a Risk Score feeds only a 'watch' list");
         if (l.retired()) throw new IllegalArgumentException("Entity List '" + listId + "' is retired");
-        if (EntityListRoutes.type(writeRoot, l.entityType()).isEmpty())
+        if (EntityListFacts.type(writeRoot, l.entityType()).isEmpty())
             throw new IllegalArgumentException("Entity List '" + listId + "' is of an Entity Type no longer in force");
         return l;
     }

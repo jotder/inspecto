@@ -1,0 +1,11 @@
+com.gamma.la.api.GeoRoutes
+com.gamma.la.api.InvRoutes
+com.gamma.la.api.PatternRoutes
+com.gamma.la.api.ValueMeasureRoutes
+com.gamma.la.api.InvestigationRoutes
+com.gamma.la.api.DossierRoutes
+com.gamma.la.api.WorkingSetRoutes
+com.gamma.la.api.InvestigationTemplateRoutes
+com.gamma.la.api.InvestigationCoverageRoutes
+com.gamma.la.api.InvestigationCaseRoutes
+com.gamma.la.api.EntityIdentityRoutes

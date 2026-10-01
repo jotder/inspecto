@@ -74,7 +74,7 @@ class ControlApiValueMeasureTest {
             api.start();
             if (writeRoot != null) {
                 new ViewStore(writeRoot.resolve("views")).write(new ViewDefinition("tx_view", "flow-x", List.of(),
-                        com.gamma.geolink.ValueMeasuresTest.ROWS, "2026-09-30T00:00:00Z"));
+                        com.gamma.la.api.ValueMeasuresTest.ROWS, "2026-09-30T00:00:00Z"));
                 new ComponentStore(writeRoot.resolve("registry")).write("dataset", "tx_ds", Map.of("view", "tx_view"));
             }
             return new Ctx(svc, api, api.port(), writeRoot);
@@ -309,7 +309,7 @@ class ControlApiValueMeasureTest {
             String twoHoursAgo = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).minusHours(2)
                     .withNano(0).toString().replace('T', ' ');
             new ViewStore(root.resolve("views")).write(new ViewDefinition("tx_view", "flow-x", List.of(),
-                    com.gamma.geolink.ValueMeasuresTest.ROWS.replace("2026-09-01 10:00:00", twoHoursAgo),
+                    com.gamma.la.api.ValueMeasuresTest.ROWS.replace("2026-09-01 10:00:00", twoHoursAgo),
                     "2026-09-30T00:00:00Z"));
             JsonNode m = ok(c, "GET", Q.replace("&from=2026-09-01&to=2026-09-08", "&last=24h") + "&name=structuring", null);
             assertEquals("HUB", m.at("/entities/0/entity").asText(), m.toString());

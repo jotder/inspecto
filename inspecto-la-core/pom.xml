@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-la-core</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Link Analysis core (host-free model, stores, pure logic + the ports) (optional)</name>
+    <description>
+        OPTIONAL Link Analysis module (LA separation D-1 step 5b/6, 2026-10-01): the host-free half of Link Analysis —
+        the Investigation evaluator, the branching-pattern engine and query compiler, the snapshot store, the
+        Admiralty grade, Investigation time and link ids (package com.gamma.la.core) — PLUS the two LA-owned PORTS it
+        stands on: DatasetProvider (what LA reads from the Dataset registry and query engine) and CasePort (the
+        host-bound part of sharing an Investigation with a Case team), each found through the fail-closed SpiSlot
+        discovery. It names no engine, ETL, acquisition or control-plane class: inspecto-geo-link (the bridge)
+        implements the ports from the engine and the host.
+
+        Dependency rule (Decision 5): this module may reach ONLY the inspecto-* modules listed in
+        tools/check-module-deps.mjs (the maven-enforcer rule below and the Node guard both derive from that table).
+        Bundled in exactly the editions that ship inspecto-geo-link; staged as an optional jar, not part of the fat jar.
+        Built only under the edition profiles (see the parent pom's profile-scoped &lt;modules&gt;).
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-entity-store</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-auth-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-audit-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-config</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-sql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-util</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Publish a test-jar: the LA-owned fake DatasetProvider is reused by inspecto-la-api's tests. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- LA separation D-1 (Decision 5): this module may reach ONLY the inspecto-* modules below, directly or
+                 transitively, at compile/provided/runtime scope. tools/check-module-deps.mjs derives the same answer from the
+                 poms and fails if this list drifts from its ALLOWED table. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>platform-layer-deps</id>
+                        <phase>validate</phase>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <searchTransitive>true</searchTransitive>
+                                    <excludes>
+                                        <exclude>com.gamma.inspector:*:*:*:compile</exclude>
+                                        <exclude>com.gamma.inspector:*:*:*:provided</exclude>
+                                        <exclude>com.gamma.inspector:*:*:*:runtime</exclude>
+                                    </excludes>
+                                    <includes>
+                                        <include>com.gamma.inspector:inspecto-api</include>
+                                        <include>com.gamma.inspector:inspecto-audit-spi</include>
+                                        <include>com.gamma.inspector:inspecto-auth-spi</include>
+                                        <include>com.gamma.inspector:inspecto-config</include>
+                                        <include>com.gamma.inspector:inspecto-entity-store</include>
+                                        <include>com.gamma.inspector:inspecto-http-spi</include>
+                                        <include>com.gamma.inspector:inspecto-sql</include>
+                                        <include>com.gamma.inspector:inspecto-util</include>
+                                    </includes>
+                                    <message>inspecto-la-core may depend only on the inspecto-* modules listed in tools/check-module-deps.mjs (LA separation, D-1). A host module here silently undoes the extraction.</message>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

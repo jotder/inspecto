@@ -1,12 +1,1 @@
-com.gamma.geolink.GeoRoutes
-com.gamma.geolink.InvRoutes
-com.gamma.geolink.PatternRoutes
-com.gamma.geolink.ValueMeasureRoutes
-com.gamma.geolink.InvestigationRoutes
-com.gamma.geolink.DossierRoutes
-com.gamma.geolink.WorkingSetRoutes
-com.gamma.geolink.InvestigationTemplateRoutes
 com.gamma.geolink.InvestigationMeasureRoutes
-com.gamma.geolink.InvestigationCoverageRoutes
-com.gamma.geolink.InvestigationCaseRoutes
-com.gamma.geolink.EntityIdentityRoutes

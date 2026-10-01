@@ -45,15 +45,27 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- SEP-08: the Entity List store, its routes and the ONE shared entity fact log live there; the Identity
-             Fact routes, EntityMasking and the Investigation list-ops read and append to that log through it.
-             Compile scope, like the core. Never the reverse: inspecto-entity-list must not depend on this module. -->
+        <!-- LA separation D-1 step 5b/6: Link Analysis itself. inspecto-la-api holds the routes (written against the ports),
+             inspecto-la-core the host-free model + the two ports (DatasetProvider, CasePort). THIS module is the BRIDGE: it
+             implements the ports from the engine and the host and holds the host-bound routes (Alert Rules). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-la-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-la-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- SEP-08: the Entity List routes (POST /entity-lists ...) are driven by the real-HTTP tests that moved with the
+             stack; Link Analysis itself reads the fact log through inspecto-entity-store, never through this module. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-entity-list</artifactId>
             <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
-        <!-- LA separation D-1 step 5a: the host-free store (fact log, EntityTypes, LinkAnalysisSettings), direct. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-entity-store</artifactId>

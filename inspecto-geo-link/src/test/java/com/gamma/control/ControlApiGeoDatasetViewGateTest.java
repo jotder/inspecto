@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * R3 on the Geo routes — a Dataset shared away from the caller is indistinguishable from an absent one on
  * {@code POST /geo/projection} and {@code POST /geo/routes}, exactly as it already is on {@code /inv/projection}
- * ({@link com.gamma.geolink.InvRoutes#relationFor}: unknown → 404, not viewable → the SAME 404).
+ * ({@link com.gamma.la.api.InvRoutes#relationFor}: unknown → 404, not viewable → the SAME 404).
  *
  * <p><b>No core-level gate covers {@code /geo/*}.</b> Neither route carries {@code withCapability}, the core
  * {@code ControlApi} knows the paths only for the Personal absent-stub and the {@code features.geoLink} probe, and

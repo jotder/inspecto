@@ -10,13 +10,13 @@ import java.util.ServiceLoader;
  * {@link AccessDeciders} and {@link TokenRelays} are typed facades over one slot each — they
  * used to carry three hand-mirrored copies of this logic.
  */
-final class SpiSlot<T> {
+public final class SpiSlot<T> {
 
     private final Class<T> spi;
     private final boolean failClosed;
     private volatile Optional<T> cached;
 
-    SpiSlot(Class<T> spi) {
+    public SpiSlot(Class<T> spi) {
         this(spi, false);
     }
 
@@ -25,7 +25,7 @@ final class SpiSlot<T> {
      *                   instead of degrading to absence. ⚠ Only for an SPI whose absence removes a
      *                   safety property — see {@link #active()}.
      */
-    SpiSlot(Class<T> spi, boolean failClosed) {
+    public SpiSlot(Class<T> spi, boolean failClosed) {
         this.spi = spi;
         this.failClosed = failClosed;
     }
@@ -56,7 +56,7 @@ final class SpiSlot<T> {
      * runtime: throw, naming both, before either is constructed. (The build-side half is
      * {@code tools/check-demo-auth-isolation.mjs}.)
      */
-    Optional<T> active() {
+    public Optional<T> active() {
         Optional<T> c = cached;
         if (c != null) return c;
         if (!failClosed) return cached = com.gamma.service.OptionalSpi.first(spi);
@@ -87,7 +87,7 @@ final class SpiSlot<T> {
      * assertion needs a probe that would otherwise SUCCEED — the strengthened test now re-arms a slot
      * whose provider DOES resolve, so the two outcomes differ.
      */
-    void forTest(T t) {
+    public void forTest(T t) {
         cached = t == null ? null : Optional.of(t);
     }
 }

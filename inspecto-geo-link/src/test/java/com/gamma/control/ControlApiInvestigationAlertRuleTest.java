@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.la.api.InvestigationRoutes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.alert.AlertRule;
