@@ -29,15 +29,15 @@ Question: can the browser algorithms run server side with identical results?
   `BranchingPatternEngine.java` + `branching-parity.fixture.json`, asserted by both `branching-parity.spec.ts` and a Java test.
 - **2.1 Inventory.** ✅ DONE 2026-10-01 (§7.13). Classify every export: *exact* (degree, components, shortest path, k-core…), *iterative* (PageRank,
   eigenvector, Katz, HITS, Louvain), *UI-only* (layout, styling — not ported). Write the table into the feasibility plan §7.10.1.
-- **2.2 Tranche A — exact algorithms.** 🟡 slice 1 done (6 of 17: `shortestPath` `neighborhood` `degreeCentrality` `connectedComponents` `kCore` `triangleCount`), mutation-checked. Port a first batch to a new package in `inspecto-geo-link` (no new module yet;
+- **2.2 Tranche A — exact algorithms.** ✅ DONE 2026-10-01 — all 17 class-A algorithms ported (slice 1 + paths + structure lanes), mutation-checked. Port a first batch to a new package in `inspecto-geo-link` (no new module yet;
   D-1 moves it). One golden fixture per algorithm, asserted byte-for-byte in TS and Java.
-- **2.3 Tranche B — iterative algorithms.** Tolerance-based parity: fixed iteration count, fixed seed and tie-break order,
+- **2.3 Tranche B — iterative algorithms.** ✅ DONE 2026-10-01 (`GraphIterative`, `GraphCentrality`, `GraphSuspicion`). Tolerance-based parity: fixed iteration count, fixed seed and tie-break order,
   stated epsilon per algorithm. ⚠ Louvain is order-sensitive — pin the node order in the fixture or accept
   partition-equivalence rather than label equality; decide per algorithm and write it on the fixture.
-- **2.4 Mutation check.** For each ported algorithm, break the Java port and confirm the parity test goes red for the right values.
+- **2.4 Mutation check.** ✅ DONE — ~60 mutants across the lanes. For each ported algorithm, break the Java port and confirm the parity test goes red for the right values.
 - **Test:** `-pl inspecto-geo-link -am -Dtest=<classes>` (commas), JDK 27; UI via `npx ng test`. Unit level only; full gate at handoff.
 
-**Gate:** parity table in §7.10.1 with a verdict per algorithm; D-S4 row flips from NOT RUN to a result.
+**Gate:** ✅ MET 2026-10-01 — D-S4 recorded as PASS in the feasibility plan §7.10.1 / §7.13. Stage 3 (plan D-1) is next.
 
 ## Stage 3 — decide D-1 (planning only, no code)
 

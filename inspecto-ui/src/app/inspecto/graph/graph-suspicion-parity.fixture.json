@@ -1,0 +1,346 @@
+{
+ "_doc": "D-S4 parity fixture, suspicionScore. Asserted by graph-suspicion-parity.spec.ts and GraphSuspicionParityTest. `expected` is [id, score, [degree, betweenness, pageRank, core, triangles]] in rank order, produced by an independent Python transcription of the TS (not by either implementation) and checked at `tolerance`. Labels are lowercase ASCII (ties break by label; browser localeCompare vs Java ordinal agree only on such labels). Graph `main` plants a parallel edge (e6), a self-loop (e7), a triangle (a,b,c), a tail and an isolated node (f); `edgeless` pins max=0 normalisation and, with its nodes listed z,x,y, the label tie-break; the all-zero weights case pins the `|| 1` guard.",
+ "tolerance": 1e-09,
+ "graphs": {
+  "main": {
+   "nodes": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f"
+   ],
+   "edges": [
+    [
+     "e1",
+     "a",
+     "b"
+    ],
+    [
+     "e2",
+     "b",
+     "c"
+    ],
+    [
+     "e3",
+     "c",
+     "a"
+    ],
+    [
+     "e4",
+     "c",
+     "d"
+    ],
+    [
+     "e5",
+     "d",
+     "e"
+    ],
+    [
+     "e6",
+     "a",
+     "b"
+    ],
+    [
+     "e7",
+     "e",
+     "e"
+    ]
+   ]
+  },
+  "edgeless": {
+   "nodes": [
+    "z",
+    "x",
+    "y"
+   ],
+   "edges": []
+  }
+ },
+ "cases": [
+  {
+   "name": "default weights",
+   "graph": "main",
+   "weights": {
+    "degree": 1,
+    "betweenness": 1,
+    "pageRank": 1,
+    "core": 1,
+    "triangles": 1
+   },
+   "expected": [
+    [
+     "c",
+     83.49010740566142,
+     [
+      1.0,
+      1.0,
+      0.17450537028307095,
+      1.0,
+      1.0
+     ]
+    ],
+    [
+     "b",
+     63.00000000031325,
+     [
+      1.0,
+      0.0,
+      0.15000000001566244,
+      1.0,
+      1.0
+     ]
+    ],
+    [
+     "a",
+     62.4234030528867,
+     [
+      1.0,
+      0.0,
+      0.12117015264433457,
+      1.0,
+      1.0
+     ]
+    ],
+    [
+     "e",
+     50.0,
+     [
+      1.0,
+      0.0,
+      1.0,
+      0.5,
+      0.0
+     ]
+    ],
+    [
+     "d",
+     40.75673638622003,
+     [
+      0.6666666666666666,
+      0.75,
+      0.12117015264433457,
+      0.5,
+      0.0
+     ]
+    ],
+    [
+     "f",
+     0.9401074053524419,
+     [
+      0.0,
+      0.0,
+      0.04700537026762209,
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "name": "mixed weights",
+   "graph": "main",
+   "weights": {
+    "degree": 2,
+    "betweenness": 0,
+    "pageRank": 0.5,
+    "core": 1,
+    "triangles": 3
+   },
+   "expected": [
+    [
+     "c",
+     93.65004130986978,
+     [
+      1.0,
+      1.0,
+      0.17450537028307095,
+      1.0,
+      1.0
+     ]
+    ],
+    [
+     "b",
+     93.46153846165895,
+     [
+      1.0,
+      0.0,
+      0.15000000001566244,
+      1.0,
+      1.0
+     ]
+    ],
+    [
+     "a",
+     93.23977040495642,
+     [
+      1.0,
+      0.0,
+      0.12117015264433457,
+      1.0,
+      1.0
+     ]
+    ],
+    [
+     "e",
+     46.15384615384615,
+     [
+      1.0,
+      0.0,
+      1.0,
+      0.5,
+      0.0
+     ]
+    ],
+    [
+     "d",
+     29.137206302392315,
+     [
+      0.6666666666666666,
+      0.75,
+      0.12117015264433457,
+      0.5,
+      0.0
+     ]
+    ],
+    [
+     "f",
+     0.36157977128940066,
+     [
+      0.0,
+      0.0,
+      0.04700537026762209,
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "name": "all-zero weights",
+   "graph": "main",
+   "weights": {
+    "degree": 0,
+    "betweenness": 0,
+    "pageRank": 0,
+    "core": 0,
+    "triangles": 0
+   },
+   "expected": [
+    [
+     "a",
+     0.0,
+     [
+      1.0,
+      0.0,
+      0.12117015264433457,
+      1.0,
+      1.0
+     ]
+    ],
+    [
+     "b",
+     0.0,
+     [
+      1.0,
+      0.0,
+      0.15000000001566244,
+      1.0,
+      1.0
+     ]
+    ],
+    [
+     "c",
+     0.0,
+     [
+      1.0,
+      1.0,
+      0.17450537028307095,
+      1.0,
+      1.0
+     ]
+    ],
+    [
+     "d",
+     0.0,
+     [
+      0.6666666666666666,
+      0.75,
+      0.12117015264433457,
+      0.5,
+      0.0
+     ]
+    ],
+    [
+     "e",
+     0.0,
+     [
+      1.0,
+      0.0,
+      1.0,
+      0.5,
+      0.0
+     ]
+    ],
+    [
+     "f",
+     0.0,
+     [
+      0.0,
+      0.0,
+      0.04700537026762209,
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "name": "edgeless graph",
+   "graph": "edgeless",
+   "weights": {
+    "degree": 1,
+    "betweenness": 1,
+    "pageRank": 1,
+    "core": 1,
+    "triangles": 1
+   },
+   "expected": [
+    [
+     "x",
+     20.0,
+     [
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     "y",
+     20.0,
+     [
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     "z",
+     20.0,
+     [
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  }
+ ]
+}
