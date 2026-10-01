@@ -1,6 +1,6 @@
 <!--
   ACTIVE PLAN — docs/superpower/
-  Created 2026-10-01 (option D, phase D-4). DESIGN ONLY — nothing is built, every decision below is UNSIGNED.
+  Created 2026-10-01 (option D, phase D-4). DESIGN ONLY — nothing is built. DECISIONS 1–7 SIGNED 2026-10-01 (operator; Decision 3 with a changed sort key, see its Answer).
   Retire per the three-tier lifecycle in CLAUDE.md when D-4 ships (or is declined).
 -->
 
@@ -242,31 +242,31 @@ So two Subjects who both pass the gates see **identical raw and identical masked
 
 **Decision 1 — Job infrastructure.** (a) An LA-owned `GraphRunService` in `la-core` with the `JobRoutes` wire shape; (b) a `JobPort` implemented in the bridge over `JobService`, which first needs progress and running-run cancel added to `inspecto-engine`; (c) (b) later, (a) now.
 *Recommendation:* (c) — the engine has no cancel or progress today, `la-*` cannot import it, and the ledger can mirror terminal states afterwards.
-**Answer:** *(unsigned)*
+**Answer:** (c) an LA-owned `GraphRunService` in `la-core` now, with the `JobRoutes` wire shape; a `JobPort` bridge over the platform `JobService` later, once the engine has progress and running-run cancel. — operator 2026-10-01
 
 **Decision 2 — Who decides browser vs server.** (a) Browser-first under the cap, "Run on server" above it; (b) always server when the engine is present; (c) per-space setting.
 *Recommendation:* (a) — small graphs keep their instant, offline, un-audited path and D-4 changes nothing for them.
-**Answer:** *(unsigned)*
+**Answer:** (a) browser-first under the cap; an explicit "Run on server" action above it. — operator 2026-10-01
 
 **Decision 3 — Canonical order.** (a) `canonical-v1` UTF-16 code-unit order on label then id, change the six TS sites; (b) `localeCompare` semantics in Java via `Collator`; (c) leave divergent and document.
 *Recommendation:* (a) — no host dependence, six edits, matches the nine `.sort()` calls already in the file; sign only after the corpus measurement in §6. In light of §6.1: the divergence is zero over normalised ids and cosmetic over raw labels in our corpora (one mixed-case graph moved 6 of 7 ranks), so (a) stands; state whether the sort key is the label or the id.
-**Answer:** *(unsigned)*
+**Answer:** (a) `canonical-v1`, **with the sort key changed from the design's first proposal**: UTF-16 code-unit order on the **normalised entity id**, then the label as the final tiebreak (§6.1: zero divergence over normalised ids on every corpus; the raw-label key is the one that moves 6 of 7 ranks on the demo `account_links` graph). The six `localeCompare` sites in `graph-analysis.ts` change. — operator 2026-10-01
 
 **Decision 4 — Capability for starting a JOB run.** (a) A new capability; (b) reuse `canManageIncidents`; (c) no gate beyond Investigation access.
 *Recommendation:* (a) — starting compute is not an Incident action and not free; a literal-string gate with a real-HTTP test.
-**Answer:** *(unsigned)*
+**Answer:** (a) a new capability, a literal-string gate with a real-HTTP gate test. — operator 2026-10-01
 
 **Decision 5 — Result cache key.** (a) `Relation.key()` + algorithm + params + weights + the Subject's row-scope fingerprint; (b) per-Subject only; (c) no cache.
 *Recommendation:* (a), after confirming whether `Relation.key()` already carries scope (§6). In light of §6.1: the key carries no scope and needs none today (the relation is a pure function of the sealed log; gates and masking run outside the cache); drop the Subject fingerprint, keep it as a documented trigger.
-**Answer:** *(unsigned)*
+**Answer:** (a) the Working Set `Relation` key + algorithm + params + weights; **no scope component today** (§6.1 B: safe). Tripwire, to be written into the engine's tests: the day a Dataset is read live or gains row filtering, add the Subject's row-scope fingerprint — `ControlApiWorkingSetSubjectScopeTest` is the existing proof that must keep passing. — operator 2026-10-01
 
 **Decision 6 — Over-budget outcome.** (a) Terminal `BUDGET_EXCEEDED`, no payload, numbers stated; (b) return a flagged partial result.
 *Recommendation:* (a) — a partial centrality ranking reads as a complete one; "never a silent cap" is safest when no result exists.
-**Answer:** *(unsigned)*
+**Answer:** (a) terminal `BUDGET_EXCEEDED`, no result payload, the budget and what was reached stated. — operator 2026-10-01
 
 **Decision 7 — Inline answer for SYNC algorithms.** (a) `200` inline for SYNC under its threshold, `202` otherwise (one route, two outcomes); (b) always `202`.
 *Recommendation:* (a) — one extra round trip for every degree centrality is not worth the uniformity.
-**Answer:** *(unsigned)*
+**Answer:** (a) `200` inline for SYNC algorithms under their threshold, `202` otherwise — one route, two outcomes. — operator 2026-10-01
 
 ## 8. References
 
