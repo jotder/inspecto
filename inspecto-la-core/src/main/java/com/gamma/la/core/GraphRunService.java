@@ -143,6 +143,7 @@ public final class GraphRunService implements AutoCloseable {
         int nodes = req.input().nodes().size(), edges = req.input().edges().size();
         if (nodes > budget.maxNodes() || edges > budget.maxEdges()) {
             run.finish(Status.BUDGET_EXCEEDED, nodes > budget.maxNodes() ? Exceeded.NODES : Exceeded.EDGES, null, null, 0, now);
+            run.release();
             return store(run).view();
         }
         String key = cacheKey(req, params);
@@ -150,6 +151,7 @@ public final class GraphRunService implements AutoCloseable {
         if (hit != null) {
             run.cached = true;
             run.finish(Status.COMPLETED, null, null, hit, 0, now);
+            run.release();
             return store(run).view();
         }
         run.cacheKey = key;
