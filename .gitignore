@@ -19,6 +19,7 @@
 /inspecto-sql/target/
 /inspecto-etl/target/
 /inspecto-audit-spi/target/
+/inspecto-la-graph/target/
 /inspecto-event/target/
 /inspecto-acquire/target/
 /inspecto-engine/target/
