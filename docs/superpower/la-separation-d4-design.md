@@ -157,8 +157,8 @@ parallel analyst sandboxes (D-S5), a server-side `matchPattern` (class C, stays 
 | Step | Work | Proof | Size |
 |---|---|---|---|
 | **1** | Add `inspecto-la-graph` to `la-core`'s pom, `ALLOWED['inspecto-la-core']`, `ALLOWED['inspecto-la-api']` (transitive) and each enforcer allowlist | `check-module-deps.mjs` green; mutation: add `inspecto-engine` to `la-core` → red in both layers | S |
-| **2** | `RunControl` in `la-graph` + overloads on the 28 algorithms with a `checkpoint()` in each hot loop (betweenness, closeness, louvain, label propagation, cliques, findCycles, allPaths, maxFlow, iterative family) | All 30 parity tests unchanged and green; new tests: cancel mid-run throws `GraphAborted` per JOB algorithm; a mutant that removes a `checkpoint` is caught by a deadline test (mutant can hang — give tests a timeout, §7.13) | M |
-| **3** | `canonical-v1`: change the 6 TS sites + add the mixed-label fixture row asserted in both languages | TS and Java parity green on the new row; the old `localeCompare` mutant turns the TS spec red | S |
+| **2** | ✅ **BUILT 2026-10-01** (`RunControl`, `GraphAborted`; 17 algorithms instrumented; 71 new tests, 31 parity tests unchanged; ≈0.1 ns per checkpoint amortised). Planned as: `RunControl` in `la-graph` + overloads on the 28 algorithms with a `checkpoint()` in each hot loop (betweenness, closeness, louvain, label propagation, cliques, findCycles, allPaths, maxFlow, iterative family) | All 30 parity tests unchanged and green; new tests: cancel mid-run throws `GraphAborted` per JOB algorithm; a mutant that removes a `checkpoint` is caught by a deadline test (mutant can hang — give tests a timeout, §7.13) | M |
+| **3** | ✅ **BUILT 2026-10-01** (`compareCanonicalV1` in TS, `BY_SCORE_THEN_ID_THEN_LABEL` in Java, a mixed-case fixture row asserted in both languages, both old behaviours caught by mutants). Planned as: `canonical-v1`: change the 6 TS sites + add the mixed-label fixture row asserted in both languages | TS and Java parity green on the new row; the old `localeCompare` mutant turns the TS spec red | S |
 | **4** | `GraphEngine`, `Algorithm`, `GraphInput`, `WorkingSetGraphInput`, `InMemoryGraphEngine` in `la-core` | Unit tests: adapter edge ids equal `LinkIds`/wire ids; dropped-dangling count reported; weights = `count`; SYNC results equal the fixtures | M |
 | **5** | `GraphRunService` (executor, run table, budget, cancel, retention, result cache) | Tests: budget-before-work, deadline, cancel latency, terminal states, a result never present after `BUDGET_EXCEEDED` (negative test with a probe that would otherwise succeed) | M |
 | **6** | `GraphRunRoutes` in `la-api` + `openapi-v1.json` + capability + `LINK_GRAPH_*` events + masking | Real-HTTP test class covering 202/200/422/403/404/409/503, masked ids, no-Subject-bypass; route-level parity test (§3.5) | M |
@@ -235,6 +235,62 @@ So two Subjects who both pass the gates see **identical raw and identical masked
 **Conclusion: SAFE** to share a cache across Subjects for a result that is a pure function of the sealed log, provided (i) the Investigation and Dataset gates run before the cache lookup on every request, (ii) the cached value holds raw ids and masking is applied after, as `:148` does, and (iii) the key adds only what the computation reads: `<log hash> + algorithm + version + params + weights`. **It becomes UNSAFE the day** `GraphInput` reads a Dataset live (D-3's `SqlGraphEngine`) or a Dataset gains real row-level filtering; then the key needs the Subject's resolved scope fingerprint, computed where `relationFor` runs. Worth a guard test that fails when `Subject.dataScopes` or a Dataset row filter first reaches LA code. **Not established:** Enterprise PDP policies keyed on `resource.*` are per request and so safe here, but no Enterprise policy was run against this route.
 
 *In light of §6.1:* option (a) minus the Subject fingerprint is enough today (key = log hash + algorithm + params + weights); keep the fingerprint as a documented trigger, not a component.
+
+### 6.2 Java timings (2026-10-01, `GraphAlgorithmsBench`)
+
+Harness `inspecto-la-graph/src/test/java/com/gamma/la/graph/GraphAlgorithmsBench.java` (`@Tag("bench")`, skipped unless
+`-Dinspecto.bench=true`; 60 s guard per run). Machine: Intel64 Family 6 Model 158, 12 cores, 32 GB RAM, 8 GB max heap, JDK 27,
+Windows 11. Generator: heavy-tailed, edges = 5 × nodes, `src = floor(n·u³)`, `dst = floor(n·u²)`, seeded SplitMix64; median of 3 after
+one warm-up (one cold run where a run exceeded 20 s). A timed-out run cannot be killed, so it keeps burning a core and later timings are
+slightly pessimistic. Allocation is worker-thread allocated MB, not peak heap.
+
+| algorithm | class in §3 | 10³ ms | 10⁴ ms | 10⁵ ms | 10⁶ ms |
+|---|---|---:|---:|---:|---:|
+| degreeCentrality | SYNC | 2 | 8 | 189 | 6023 |
+| connectedComponents | SYNC | 4 | 30 | 615 | 11271 |
+| shortestPath | SYNC | 2 | 11 | 543 | 6688 |
+| neighborhood (3 hops) | SYNC | 4 | 35 | 828 | 12167 |
+| isForest | SYNC | 2 | 16 | 254 | 6078 |
+| descendants | SYNC | 2 | 12 | 224 | 5209 |
+| articulationPoints | SYNC | 10 | 38 | 866 | — |
+| bridges | SYNC | 3 | 35 | 878 | — |
+| maximumSpanningForest | SYNC | 8 | 73 | 1066 | — |
+| triangleCount | SYNC | 14 | 143 | 4418 | — |
+| pageRank | SYNC | 61 | 356 | 11610 | — |
+| jaccardSimilarity (one node) | SYNC | 13 | 385 | 36898 (the biggest hub) | — |
+| **kCore** | SYNC | 21 | 672 | **timeout** | — |
+| **weightedShortestPath** | SYNC | 46 | 1740 | **timeout** | — |
+| findCycles | JOB | 0 | 21 | 292 | — |
+| allPaths (limit 10, 8 hops) | JOB | 3 | 44 | 16839 (2.9 GB allocated) | — |
+| louvainCommunities | JOB | 39 | 616 | 4642 | — |
+| detectCommunities | JOB | 14 | 239 | 8831 | — |
+| eigenvectorCentrality | JOB | 60 | 1725 | 52999 | — |
+| katzCentrality | JOB | 78 | 1623 | 48699 | — |
+| hits | JOB | 91 | 1823 | 49213 | — |
+| cliques | JOB | 38 | 2376 | timeout | — |
+| maxFlow | JOB | 76 | 7308 | timeout | — |
+| linkPrediction (CN, 20) | JOB | 129 | 13728 | timeout | — |
+| betweennessCentrality | JOB | 1335 | timeout | — | — |
+| closenessCentrality | JOB | 393 | timeout | — | — |
+| suspicionScore | JOB | 1366 | timeout | — | — |
+
+**What the numbers change in this design.**
+* **No algorithm is under 100 ms at 10⁵ nodes** (the fastest, `degreeCentrality`, takes 189 ms). So the SYNC/JOB split of §3 cannot be a
+  *class* of algorithm; it has to be a **per-algorithm node-count threshold** — "inline up to N nodes, otherwise a job" — which is what
+  Decision 7 (200 inline under a threshold, 202 otherwise) already says. Step 5 turns this table into constants; the provisional reading is
+  inline up to 10⁴ nodes for everything except `kCore`/`weightedShortestPath`/`jaccardSimilarity`/`pageRank`/`triangleCount` (inline up to ~10³–10⁴) and
+  never inline for the five that exceed 5 s at 10⁴ (`betweenness`, `closeness`, `suspicionScore`, `maxFlow`, `linkPrediction`).
+* **The five clearest JOB algorithms** (> 5 s at 10⁴ nodes, or timeout): `betweennessCentrality`, `closenessCentrality`, `suspicionScore`
+  (which composes betweenness), `maxFlow` (7.3 s), `linkPrediction` (13.7 s).
+* **A fixed iteration count does not make an algorithm cheap**: `pageRank` (listed SYNC) takes 11.6 s at 10⁵; `eigenvector`, `katz` and `hits` take
+  about 50 s at 10⁵ with 2 GB allocated.
+* **Three ports are accidentally quadratic** (and, being line-for-line ports, so are their TypeScript twins — a different fix is needed in both
+  languages, protected by the existing parity fixtures): `kCore` re-scans all remaining nodes for the minimum on every pick
+  (`GraphAlgorithms.java` ≈ 198–204), `weightedShortestPath` is a linear-scan Dijkstra (`GraphPaths.java` ≈ 120–126), `linkPrediction` has an O(N²)
+  pair loop (`GraphCentrality.java` ≈ 161–162). Filed as `LA-GRAPH-QUADRATIC-1`.
+* **`jaccardSimilarity` is O(N × degree of the chosen node)**: 36.9 s at 10⁵ is for the biggest hub, so its cost is input-dependent — a threshold on
+  node count alone is not enough for it.
+* Not measured: peak heap (only worker-thread allocation), more than one machine, and anything above 10⁶ nodes.
 
 ## 7. Decisions owed (operator)
 
