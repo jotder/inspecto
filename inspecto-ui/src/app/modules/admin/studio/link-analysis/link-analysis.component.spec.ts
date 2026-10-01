@@ -846,6 +846,37 @@ describe('LinkAnalysisComponent', () => {
         expect(dataAt(2).graph).toBe(c.canvasData());
         expect(dataAt(2).graph.nodes).toHaveLength(5);
     });
+    it('footer: a Working Set over the link render ceiling says how many links were left off; below it, nothing', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.investigation.activeId.set('inv-9');
+        c.investigation.log.set({ header: { dataset: 'd', sourceCol: 's', targetCol: 't' }, entries: [] } as never);
+        const ws = (links: number) => ({
+            entities: Array.from({ length: 200 }, (_, i) => ({ id: `n${i}`, hidden: false })),
+            links: Array.from({ length: links }, (_, k) => ({
+                source: `n${Math.floor(k / 199)}`,
+                target: `n${(Math.floor(k / 199) + 1 + (k % 199)) % 200}`,
+                kind: 'k',
+                count: 1,
+                admittedBy: 2,
+            })),
+            excluded: [],
+            hash: 'h',
+        });
+        c.investigation.workingSet.set(ws(5003) as never);
+        fixture.detectChanges();
+        const footer = (fixture.nativeElement as HTMLElement).querySelector('[aria-label="Render status"]')!;
+        expect(footer.textContent).toContain('Showing 5,000 of 5,003 links (render limit)');
+        expect(c.workingSetCanvas()).toBe(true);
+
+        c.investigation.workingSet.set(ws(40) as never);
+        fixture.detectChanges();
+        expect(footer.textContent).not.toContain('render limit');
+        expect(footer.textContent).toContain('40 links drawn');
+        fixture.destroy();
+    });
     it('level of detail: drops labels above the cap while on, and the footer states the published caps', async () => {
         const big: G6GraphData = {
             nodes: Array.from({ length: 301 }, (_, i) => ({ id: `n${i}`, data: { label: `N${i}`, kind: 'entity' } })),

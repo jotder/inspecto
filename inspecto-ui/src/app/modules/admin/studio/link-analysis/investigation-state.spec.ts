@@ -10,6 +10,7 @@ import {
     moveStep,
     rawIdsOf,
     truncatedSteps,
+    WORKING_SET_LINK_RENDER_CEILING,
     workingSetToGraph,
 } from './investigation-state';
 
@@ -54,6 +55,43 @@ describe('LA-10 investigation-state', () => {
         // the fold trims, but an op must send the id exactly as the server holds it
         const alice = g.nodes.find((n) => n.id === entityId('msisdn', 'Alice'))!;
         expect(idsInWorkingSet(alice, ws)).toEqual(['Alice ']);
+    });
+
+    it('draws EVERY link among a Working Set above the projection node cap (1 200 entities / 1 501 links)', () => {
+        const ids = Array.from({ length: 1200 }, (_, i) => `e${i}`);
+        const links = [
+            ...ids.slice(1).map((t, i) => ({ source: ids[i], target: t, kind: 'k', count: 1, admittedBy: 2 })),
+            ...ids.slice(2, 303).map((t, i) => ({ source: ids[i], target: t, kind: 'k', count: 1, admittedBy: 2 })),
+            { source: 'e5', target: 'e900', kind: 'k', count: 1, admittedBy: 2 },
+        ];
+        expect(links).toHaveLength(1501);
+        const ws: WorkingSet = { entities: ids.map((i) => entity(i)), links, excluded: [], hash: 'h' };
+        const g = workingSetToGraph(ws, P);
+        expect(g.nodes).toHaveLength(1200);
+        expect(g.edges).toHaveLength(1501);
+        expect(g.omittedLinks).toBeUndefined();
+    });
+
+    it('above the render ceiling draws exactly the ceiling, heaviest then id first, and counts what it left out', () => {
+        const ids = Array.from({ length: 200 }, (_, i) => `n${i}`);
+        const links = Array.from({ length: WORKING_SET_LINK_RENDER_CEILING + 20 }, (_, k) => ({
+            source: ids[Math.floor(k / 199)],
+            target: ids[(Math.floor(k / 199) + 1 + (k % 199)) % 200],
+            kind: 'k',
+            count: 1 + (k % 7),
+            admittedBy: 2,
+        }));
+        const ws: WorkingSet = { entities: ids.map((i) => entity(i)), links, excluded: [], hash: 'h' };
+        const g = workingSetToGraph(ws, P);
+        expect(g.edges).toHaveLength(WORKING_SET_LINK_RENDER_CEILING);
+        expect(g.omittedLinks).toBe(20);
+        expect(g.nodes).toHaveLength(200); // every entity is still drawn
+        const order = g.edges.map((e) => [(e.data as { count?: number }).count ?? 0, e.id] as const);
+        const canonical = [...order].sort((a, b) => b[0] - a[0] || (a[1] < b[1] ? -1 : 1));
+        expect(order).toEqual(canonical);
+        // the lightest kept link weighs 3: every count-1/2 link is left out first (20 of the 2 857 lightest)
+        expect(order[order.length - 1][0]).toBeLessThanOrEqual(3);
+        expect(workingSetToGraph(ws, P).edges.map((e) => e.id)).toEqual(g.edges.map((e) => e.id));
     });
 
     it('leaves HIDDEN entities (and their links) off the canvas — hide is display-only', () => {

@@ -42,16 +42,27 @@ export function idsInWorkingSet(node: G6Node, ws: WorkingSet | null): string[] {
 }
 
 /**
+ * The most Working Set links the canvas draws. The Working Set's entities are bounded server-side, so the
+ * query graph's node cap does not apply; this is the one RENDER limit (G6 with many thousands of edges). Above
+ * it the heaviest links are drawn and the footer states how many were left out — never a silent cut.
+ */
+export const WORKING_SET_LINK_RENDER_CEILING = 5000;
+
+const weightOf = (e: { data: object }): number => (e.data as { count?: number }).count ?? 0;
+
+/**
  * The Working Set as a graph, through the SAME fold as the query graph ({@link projectTriples} →
  * {@link entityId}), so an entity has one node id on both canvases. Seeded entities with no link yet are added
  * as isolated nodes. HIDDEN entities are left off the canvas (hide is display-only; they still count and are
- * listed by the panel). `truncated` means the browser node cap cut the drawing.
+ * listed by the panel). Every entity and every link is drawn up to {@link WORKING_SET_LINK_RENDER_CEILING}
+ * links (heaviest first, then by id); `omittedLinks` says how many the ceiling left out.
  */
 export function workingSetToGraph(ws: WorkingSet, projection: EntityProjection): ProjectedGraph {
     const g = projectTriples(
         ws.links.map((l) => ({ source: l.source, target: l.target, kind: l.kind, count: l.count })),
         false,
         projection,
+        Infinity,
     );
     const byId = new Map(g.nodes.map((n) => [n.id, n]));
     for (const e of ws.entities) {
@@ -69,7 +80,14 @@ export function workingSetToGraph(ws: WorkingSet, projection: EntityProjection):
         }
     }
     const hidden = new Set(ws.entities.filter((e) => e.hidden).map((e) => e.id));
-    if (!hidden.size) return g;
+    const done = (out: ProjectedGraph): ProjectedGraph => {
+        if (out.edges.length <= WORKING_SET_LINK_RENDER_CEILING) return out;
+        const kept = [...out.edges]
+            .sort((a, b) => weightOf(b) - weightOf(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+            .slice(0, WORKING_SET_LINK_RENDER_CEILING);
+        return { ...out, edges: kept, omittedLinks: out.edges.length - kept.length };
+    };
+    if (!hidden.size) return done(g);
     const members = new Set(ws.entities.map((e) => e.id));
     const gone = new Set(
         g.nodes
@@ -79,11 +97,11 @@ export function workingSetToGraph(ws: WorkingSet, projection: EntityProjection):
             })
             .map((n) => n.id),
     );
-    return {
+    return done({
         nodes: g.nodes.filter((n) => !gone.has(n.id)),
         edges: g.edges.filter((e) => !gone.has(e.source) && !gone.has(e.target)),
         truncated: g.truncated,
-    };
+    });
 }
 
 /** The op steps still in effect — what undo can revert and what a re-order permutes. */

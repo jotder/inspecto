@@ -651,6 +651,12 @@ export class LinkAnalysisComponent implements OnInit {
     });
     /** What the canvas draws: an open Investigation's Working Set, else the query graph. */
     readonly canvasData = computed<G6GraphData | null>(() => this.investigation.canvas() ?? this.displayed());
+    /** True while the canvas draws an open Investigation's Working Set, not the query graph. */
+    readonly workingSetCanvas = computed(() => this.investigation.canvas() !== null);
+    /** Why the query-graph-only tools are disabled on an Investigation canvas (they would silently do nothing). */
+    readonly queryGraphOnlyReason = 'Applies to the query graph — the Investigation canvas draws its Working Set.';
+    /** Working Set links the canvas left off at the render ceiling (0 = all drawn). */
+    readonly omittedLinks = computed(() => this.investigation.canvas()?.omittedLinks ?? 0);
     /**
      * LA-10: an Investigation binds ONE Dataset + source/target columns, so it can start only from a last run
      * of a single Entity/Link mapping. `investigationIssue` says why not otherwise.

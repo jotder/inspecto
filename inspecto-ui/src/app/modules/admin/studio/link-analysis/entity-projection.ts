@@ -141,6 +141,11 @@ export interface ProjectedGraph extends G6GraphData {
     /** True when the node cap cut the projection short — surfaced as a banner. */
     truncated: boolean;
     /**
+     * Links the Working Set canvas left off because it holds more than the render ceiling
+     * ({@code WORKING_SET_LINK_RENDER_CEILING}); absent or 0 = every link is drawn. Never a silent cut.
+     */
+    omittedLinks?: number;
+    /**
      * LA-17 D-M6: the mappings the node ids were minted with, column types resolved — what a later mint over the
      * same graph (brush, path hop) must use. Set by the GraphSources; absent on a pure fold.
      */
@@ -222,6 +227,8 @@ export function projectTriples(
     triples: ProjectionTriple[],
     serverTruncated: boolean,
     p?: EntityProjection,
+    /** The node cap guards the QUERY graph; a caller whose nodes are already bounded elsewhere passes Infinity. */
+    nodeCap: number = projectionNodeCapValue(),
 ): ProjectedGraph {
     const nodes = new Map<string, G6Node>();
     // Keyed by edge id: two server triples whose spellings normalise to one pair fold into one edge (D-S4).
@@ -232,7 +239,7 @@ export function projectTriples(
         const id = endpointId(p, end, value);
         if (!id) return null;
         if (!nodes.has(id)) {
-            if (nodes.size >= projectionNodeCapValue()) {
+            if (nodes.size >= nodeCap) {
                 truncated = true;
                 return null;
             }
