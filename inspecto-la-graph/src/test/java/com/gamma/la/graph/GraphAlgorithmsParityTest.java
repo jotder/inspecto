@@ -116,4 +116,25 @@ class GraphAlgorithmsParityTest {
             assertEquals(strings(c.get("edgeIds")), r.edges().stream().map(Edge::id).toList(), label + " edges");
         }
     }
+
+    private static Graph canonicalGraph() throws Exception {
+        load();
+        JsonNode c = fx.get("canonicalV1");
+        List<Node> nodes = new ArrayList<>();
+        c.get("graph").get("nodes").forEach(n -> nodes.add(new Node(n.get("id").asText(), n.get("label").asText())));
+        List<Edge> edges = new ArrayList<>();
+        c.get("graph").get("edges").forEach(e -> edges.add(new Edge(e.get(0).asText(), e.get(1).asText(), e.get(2).asText())));
+        return new Graph(nodes, edges);
+    }
+
+    /** canonical-v1 (D-4 Decision 3): equal scores rank by id code units, then label — never by label first. */
+    @Test
+    void canonicalV1DegreeTies() throws Exception {
+        assertScores(fx.get("canonicalV1").get("expected").get("degree"), GraphAlgorithms.degreeCentrality(canonicalGraph()));
+    }
+
+    @Test
+    void canonicalV1KCoreTies() throws Exception {
+        assertScores(fx.get("canonicalV1").get("expected").get("kCore"), GraphAlgorithms.kCore(canonicalGraph()));
+    }
 }

@@ -43,3 +43,13 @@ describe('graph algorithms parity fixture (D-S4, tranche A slice 1)', () => {
         });
     }
 });
+
+describe('canonical-v1 tie-break order (D-4 Decision 3)', () => {
+    const c = fixture.canonicalV1;
+    const g: G6GraphData = {
+        nodes: c.graph.nodes.map((n) => ({ id: n.id, data: { label: n.label, kind: 'entity' } })),
+        edges: c.graph.edges.map(([id, source, target]) => ({ id, source, target, data: { kind: 'link' } })),
+    };
+    it('degree ties rank by id code units, not label', () => expect(scores(degreeCentrality(g))).toEqual(c.expected.degree));
+    it('k-core ties rank by id code units, not label', () => expect(scores(kCore(g))).toEqual(c.expected.kCore));
+});

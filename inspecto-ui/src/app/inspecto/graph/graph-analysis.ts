@@ -260,10 +260,20 @@ export interface NodeScore {
     score: number;
 }
 
+/**
+ * canonical-v1 (D-4 Decision 3): the ONE tie-break order the browser and the server share. Equal scores rank by
+ * UTF-16 code-unit order of the normalised entity ID (JS `<` on strings), then by label as a final tiebreak. NOT
+ * `localeCompare` and NOT label-first: the label key reorders ranks that Java's ordinal order cannot reproduce
+ * (e.g. 'acc-1121' vs 'ACC-0007'). Java twin: `GraphAlgorithms.BY_SCORE_THEN_ID_THEN_LABEL`.
+ */
+export const compareUnits = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+export const compareCanonicalV1 = (a: { id: string; label: string }, b: { id: string; label: string }): number =>
+    compareUnits(a.id, b.id) || compareUnits(a.label, b.label);
+
 function scored(g: G6GraphData, score: Map<string, number>): NodeScore[] {
     return g.nodes
         .map((n) => ({ id: n.id, label: n.data.label, score: score.get(n.id) ?? 0 }))
-        .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label));
+        .sort((a, b) => b.score - a.score || compareCanonicalV1(a, b));
 }
 
 /** Degree centrality (in + out), descending. */
@@ -1358,7 +1368,7 @@ export function cliques(g: G6GraphData, opts: { minSize?: number } = {}): string
         }
     };
     bk(new Set(), new Set(nb.keys()), new Set());
-    return found.sort((a, b) => b.length - a.length || a[0].localeCompare(b[0]));
+    return found.sort((a, b) => b.length - a.length || compareUnits(a[0], b[0]));
 }
 
 /** Max-flow value plus the min-cut edges between a source and sink. */
@@ -1459,7 +1469,7 @@ export function maximumSpanningForest(g: G6GraphData): GraphSelection {
     const sorted = g.edges
         .filter((e) => e.source !== e.target)
         .map((e) => ({ e, w: edgeWeight(e) }))
-        .sort((a, b) => b.w - a.w || a.e.id.localeCompare(b.e.id));
+        .sort((a, b) => b.w - a.w || compareUnits(a.e.id, b.e.id));
     const edgeIds: string[] = [];
     const nodeIds = new Set<string>();
     for (const { e } of sorted) {
@@ -1495,7 +1505,7 @@ export function jaccardSimilarity(g: G6GraphData, nodeId: string): NodeScore[] {
     return g.nodes
         .filter((n) => n.id !== nodeId)
         .map((n) => ({ id: n.id, label: n.data.label, score: sim.get(n.id) ?? 0 }))
-        .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label));
+        .sort((a, b) => b.score - a.score || compareCanonicalV1(a, b));
 }
 
 /** A predicted (not-yet-present) link between two nodes, with a likelihood score. */
@@ -1547,7 +1557,7 @@ export function linkPrediction(
             }
         }
     }
-    return out.sort((x, y) => y.score - x.score || x.source.localeCompare(y.source)).slice(0, limit);
+    return out.sort((x, y) => y.score - x.score || compareUnits(x.source, y.source)).slice(0, limit);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════════════════
@@ -1613,5 +1623,5 @@ export function suspicionScore(g: G6GraphData, weights: SuspicionWeights = {}): 
                 w.triangles * factors.triangles;
             return { id: n.id, label: n.data.label, score: (blend / wSum) * 100, factors };
         })
-        .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label));
+        .sort((a, b) => b.score - a.score || compareCanonicalV1(a, b));
 }

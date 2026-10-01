@@ -624,7 +624,7 @@ Target: `projects/inspecto-ui-core` (shared) ← `projects/link-analysis` (libra
 | **C — transform / UI, not ported** | `mergeGraphs` `searchNodes` `filterByKinds` `filterByTime` `collapseBranches` `aggregateSuperNodes` `superMembersOf` `explainNode` `matchPattern` (+ `followsInTime` `edgeTimeIndex` `patternNeedsTime`) `configureGraphLimits` and caps | Server already folds and filters; the linear matcher stays in the browser (branching is already ported) |
 
 **Traps found while grounding.**
-- 🔴 **Tie-break by label.** `scored()` sorts equal scores with `localeCompare`; Java ports use ordinal compare. They agree only on lowercase ASCII labels, so fixtures use such labels and a server result shown in the browser needs a stated canonical order before this ships. Not solved, recorded.
+- ✅ **CLOSED 2026-10-01 by `canonical-v1` (D-4 Decision 3): equal scores rank by UTF-16 code-unit order of the normalised entity id, then label — `compareCanonicalV1` (TS) / `BY_SCORE_THEN_ID_THEN_LABEL` (Java), pinned by the mixed-case `canonicalV1` row of `graph-algorithms-parity.fixture.json` in both languages.** Original note: 🔴 **Tie-break by label.** `scored()` sorts equal scores with `localeCompare`; Java ports use ordinal compare. They agree only on lowercase ASCII labels, so fixtures use such labels and a server result shown in the browser needs a stated canonical order before this ships. Not solved, recorded.
 - **Closed-graph assumption.** An edge whose endpoint is not a node leaks into `undirectedNeighbors` (the real node gets a phantom neighbour). The Java port keeps the assumption; fixtures contain no dangling edges.
 - **Multigraph rules.** Degree counts parallel edges and a self-loop twice; `kCore`, `triangleCount` and `cliques` collapse them. The fixture plants both (`e4`, `e11`).
 
@@ -644,7 +644,7 @@ Target: `projects/inspecto-ui-core` (shared) ← `projects/link-analysis` (libra
 Integrated result: **Java 30 parity tests green** (the five parity classes in `inspecto-la-graph` plus `GraphSuspicionParityTest`; 29 + 1) and **TypeScript 128 tests green** over the six `graph-*-parity.spec.ts` files (124 + 4). Floats assert at 1e-9 (Java `double` = JS `number`; the arithmetic order is ported, so the doubles agree far inside that). **Every port was mutation-checked** — about 60 mutants across the lanes, each turned red on the right values; the equivalent mutants are named in the commit messages' lane reports, not hidden.
 
 🔴 **Findings the ports surfaced.**
-- *Tie-break order is still open* (§7.13 above): ordinal vs `localeCompare`; every fixture uses lowercase ASCII labels.
+- ~~*Tie-break order is still open*~~ closed by `canonical-v1` (§7.13 above): ordinal vs `localeCompare`; every fixture uses lowercase ASCII labels.
 - *Label propagation floods a bridge* (`detectCommunities` on the lane's `main` fixture merges two triangles joined by a bridge into one community), which contradicts the TS comment about avoiding that. Java agrees with the TS, so this is browser behaviour to decide on, not a port defect.
 - *`hits` eigenvector of the `hitsGraph` fixture is omitted*: three values sit within 2e-16 of each other, so their rank order is arithmetic noise. Any server result shown ranked needs an explicit tie rule.
 - *The graph model carries no edge data.* `GraphAlgorithms.Edge` is `(id, source, target)`, so the weighted functions take a `Map<String, Double>` of edge id → weight. The real server graph model (D-3/D-4) must decide where weights and kinds live.

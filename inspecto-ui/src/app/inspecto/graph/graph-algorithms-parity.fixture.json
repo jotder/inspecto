@@ -33,5 +33,24 @@
       { "node": "a", "hops": 2, "direction": "both", "nodeIds": ["a", "b", "c", "d"], "edgeIds": ["e1", "e2", "e3", "e4", "e5"] },
       { "node": "a", "hops": 1, "direction": "out", "nodeIds": ["a", "b"], "edgeIds": ["e1", "e4"] }
     ]
+  },
+  "canonicalV1": {
+    "_doc": "canonical-v1 (D-4 Decision 3): equal scores rank by UTF-16 code-unit order of the ENTITY ID, then label. Two disjoint edges, so every node has degree 1, core 1, triangles 0 (all tied). Ids by code unit: ACC-0007 < Acc-9 < acc-0042 < acc-1121 (uppercase before lowercase, 'C' 67 < 'c' 99). Labels are chosen so the OTHER orders differ: code-unit order on the label gives Acc-9, acc-1121, acc-0042, ACC-0007 (Alpha < Beta < alpha < zeta); localeCompare on the label gives acc-0042, Acc-9, acc-1121, ACC-0007 (alpha < Alpha < Beta < zeta). Hand-derived.",
+    "graph": {
+      "nodes": [
+        { "id": "acc-1121", "label": "Beta" },
+        { "id": "ACC-0007", "label": "zeta" },
+        { "id": "acc-0042", "label": "alpha" },
+        { "id": "Acc-9", "label": "Alpha" }
+      ],
+      "edges": [
+        ["c1", "acc-1121", "ACC-0007"],
+        ["c2", "acc-0042", "Acc-9"]
+      ]
+    },
+    "expected": {
+      "degree": [["ACC-0007", 1], ["Acc-9", 1], ["acc-0042", 1], ["acc-1121", 1]],
+      "kCore": [["ACC-0007", 1], ["Acc-9", 1], ["acc-0042", 1], ["acc-1121", 1]]
+    }
   }
 }

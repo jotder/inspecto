@@ -88,9 +88,9 @@ public final class GraphAlgorithms {
         return nb;
     }
 
-    /** Descending by score, ties by ORDINAL label (the browser uses localeCompare — see the class note). */
-    static final Comparator<Score> BY_SCORE_THEN_LABEL =
-            Comparator.comparingDouble(Score::score).reversed().thenComparing(Score::label);
+    /** canonical-v1 (D-4 Decision 3): score descending, ties by id (UTF-16 code units), then label. TS twin: {@code compareCanonicalV1}. */
+    static final Comparator<Score> BY_SCORE_THEN_ID_THEN_LABEL =
+            Comparator.comparingDouble(Score::score).reversed().thenComparing(Score::id).thenComparing(Score::label);
 
     /** Descending by score, ties by label; stable, like the browser's {@code Array.sort}. */
     static List<Score> scored(Graph g, Map<String, ? extends Number> score) {
@@ -99,7 +99,7 @@ public final class GraphAlgorithms {
             Number s = score.get(n.id());
             out.add(new Score(n.id(), n.label(), s == null ? 0 : s.doubleValue()));
         }
-        out.sort(BY_SCORE_THEN_LABEL);
+        out.sort(BY_SCORE_THEN_ID_THEN_LABEL);
         return out;
     }
 

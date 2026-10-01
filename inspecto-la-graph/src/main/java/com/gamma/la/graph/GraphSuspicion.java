@@ -62,7 +62,7 @@ public final class GraphSuspicion {
                     + w.triangles() * f.triangles();
             out.add(new Suspicion(n.id(), n.label(), (blend / wSum) * 100, f));
         }
-        out.sort(Comparator.comparingDouble(Suspicion::score).reversed().thenComparing(Suspicion::label));
+        out.sort(Comparator.comparingDouble(Suspicion::score).reversed().thenComparing(Suspicion::id).thenComparing(Suspicion::label));
         return out;
     }
 }

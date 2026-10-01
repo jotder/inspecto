@@ -146,7 +146,7 @@ public final class GraphCentrality {
             Double s = sim.get(n.id());
             out.add(new Score(n.id(), n.label(), s == null ? 0 : s));
         }
-        out.sort(GraphAlgorithms.BY_SCORE_THEN_LABEL);
+        out.sort(GraphAlgorithms.BY_SCORE_THEN_ID_THEN_LABEL);
         return out;
     }
 
