@@ -31,6 +31,12 @@
     </description>
 
     <dependencies>
+        <!-- D-4 step 4: the graph engine seam (InMemoryGraphEngine) runs the ported algorithms. Plain JDK, no platform module. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-la-graph</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-entity-store</artifactId>
@@ -109,6 +115,7 @@
                                         <include>com.gamma.inspector:inspecto-config</include>
                                         <include>com.gamma.inspector:inspecto-entity-store</include>
                                         <include>com.gamma.inspector:inspecto-http-spi</include>
+                                        <include>com.gamma.inspector:inspecto-la-graph</include>
                                         <include>com.gamma.inspector:inspecto-sql</include>
                                         <include>com.gamma.inspector:inspecto-util</include>
                                     </includes>

@@ -29,8 +29,8 @@ export const ALLOWED = {
     'inspecto-entity-store': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi'],
     // D-1 step 5b: the host-free halves of Link Analysis. inspecto-sql is host-free too (SqlGuard / SqlSandboxPolicy: it reaches only
     // api, config and util). inspecto-http-spi arrives through inspecto-entity-store, so la-core reaches it transitively whether or not it names it.
-    'inspecto-la-core': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql'],
-    'inspecto-la-api': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-core'],
+    'inspecto-la-core': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph'],
+    'inspecto-la-api': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core'],
     'inspecto-security': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
 };
 

@@ -56,6 +56,7 @@ const MODULES = [
     { artifactId: 'inspecto-notify-channels', dir: 'inspecto-notify-channels', bundleFile: 'inspecto-notify-channels.jar', from: 'professional' },
     { artifactId: 'inspecto-backup', dir: 'inspecto-backup', bundleFile: 'inspecto-backup.jar', from: 'professional' },        // cell 2 (OPS-06)
     { artifactId: 'inspecto-entity-list', dir: 'inspecto-entity-list', bundleFile: 'inspecto-entity-list.jar', from: 'professional' },  // SEP-08 (Entity Lists + the shared fact log; geo-link depends on it)
+    { artifactId: 'inspecto-la-graph', dir: 'inspecto-la-graph', bundleFile: 'inspecto-la-graph.jar', from: 'professional' },  // LA separation D-4 step 4 (the ported graph algorithms - la-core's InMemoryGraphEngine calls them, so they ship)
     { artifactId: 'inspecto-la-core', dir: 'inspecto-la-core', bundleFile: 'inspecto-la-core.jar', from: 'professional' },    // LA separation D-1 step 5b (host-free Link Analysis model + the Dataset/Case ports)
     { artifactId: 'inspecto-la-api', dir: 'inspecto-la-api', bundleFile: 'inspecto-la-api.jar', from: 'professional' },       // LA separation D-1 step 5b (the Link Analysis routes, written against the ports)
     { artifactId: 'inspecto-geo-link', dir: 'inspecto-geo-link', bundleFile: 'inspecto-geo-link.jar', from: 'professional' },  // cell 3b (CP-09) - since D-1 step 5b the BRIDGE: implements the ports, holds the Alert Rule routes
@@ -85,7 +86,7 @@ export function editionProfile(edition) {
 
 /**
  * The first-party modules staged for `edition`, in package.ps1's staging order.
- * Personal 2, Professional 14, Enterprise 16, Preview 16 — first-party only; add PG_SIDECAR for the jar count.
+ * Personal 2, Professional 15, Enterprise 17, Preview 17 — first-party only; add PG_SIDECAR for the jar count.
  * ⚠ Those three numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this
  * very line. They said 2/10/11 from EDG-01 until 2026-09-17, missing inspecto-agent (PKG-5, 2026-09-12);
  * the assertion exists so the next module to arrive cannot leave them wrong again.

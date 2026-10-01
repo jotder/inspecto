@@ -303,7 +303,7 @@ if ($Edition -ne 'Personal') {
     # builds its `sidecar` artifact for the editions that stage it.
     # ASSURE-INTELLIGENCE-BUNDLE-1 (D-P2): inspecto-intelligence (the /agent/* agent, onnxruntime inside)
     # is ENTERPRISE only - also a default-reactor module, listed so this pass builds its `sidecar`.
-    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent,inspecto-intelligence' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent' }
+    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent,inspecto-intelligence' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent' }
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
@@ -351,6 +351,16 @@ if ($Edition -ne 'Personal') {
     }
     # LA separation D-1 step 5b: inspecto-la-core (host-free model + the Dataset/Case ports) and inspecto-la-api (the Link
     # Analysis routes) ride beside inspecto-geo-link (the bridge that implements the ports). THIN, optional jars.
+    # D-4 step 4: inspecto-la-graph (the ported graph algorithms, JDK only) is la-core's runtime dependency - InMemoryGraphEngine
+    # calls it - so it is staged beside it and MUST be on the explicit launcher classpath (a staged jar missing from the
+    # classpath is a Link Analysis engine that fails with NoClassDefFoundError the first time a graph run is asked for).
+    $laGraphTargetDir = Join-Path $sandboxRoot 'inspecto-la-graph\target'
+    $laGraphJarSrc = Get-ChildItem -Path $laGraphTargetDir -Filter 'inspecto-la-graph-*.jar' -ErrorAction SilentlyContinue |
+                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                      Select-Object -First 1 -ExpandProperty FullName
+    if (-not $laGraphJarSrc -or -not (Test-Path $laGraphJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $laGraphTargetDir\inspecto-la-graph-*.jar."
+    }
     $laCoreTargetDir = Join-Path $sandboxRoot 'inspecto-la-core\target'
     $laCoreJarSrc = Get-ChildItem -Path $laCoreTargetDir -Filter 'inspecto-la-core-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
@@ -533,6 +543,10 @@ if ($entityListJarSrc) {
         if (-not $feedEntry) { throw "inspecto-entity-list.jar has no META-INF/services/com.gamma.risk.WatchListFeed - watch lists would never feed the risk score." }
         Write-Host "  verified: RouteModule and WatchListFeed registrations present in the Entity List module" -ForegroundColor DarkGray
     } finally { $elZip.Dispose() }
+}
+if ($laGraphJarSrc) {
+    Copy-Item $laGraphJarSrc "$bundleDir\inspecto-la-graph.jar"
+    Write-Host "Bundled Link Analysis graph algorithms -> inspecto-la-graph.jar" -ForegroundColor Green
 }
 if ($laCoreJarSrc) {
     Copy-Item $laCoreJarSrc "$bundleDir\inspecto-la-core.jar"
@@ -894,6 +908,7 @@ CP="inspecto.jar"
 [ -f inspecto-backup.jar ] && CP="${CP}:inspecto-backup.jar"
 # Geo map + link analysis routes (EDG-01 cell 3b): Professional/Enterprise only; same contract as above.
 [ -f inspecto-entity-list.jar ] && CP="${CP}:inspecto-entity-list.jar"
+[ -f inspecto-la-graph.jar ] && CP="${CP}:inspecto-la-graph.jar"
 [ -f inspecto-la-core.jar ] && CP="${CP}:inspecto-la-core.jar"
 [ -f inspecto-la-api.jar ] && CP="${CP}:inspecto-la-api.jar"
 [ -f inspecto-geo-link.jar ] && CP="${CP}:inspecto-geo-link.jar"
@@ -999,6 +1014,7 @@ rem Backup / restore tasks (EDG-01 cell 2) - Professional/Enterprise only.
 if exist inspecto-backup.jar set "CP=%CP%;inspecto-backup.jar"
 rem Geo map + link analysis routes (EDG-01 cell 3b) - Professional/Enterprise only.
 if exist inspecto-entity-list.jar set "CP=%CP%;inspecto-entity-list.jar"
+if exist inspecto-la-graph.jar set "CP=%CP%;inspecto-la-graph.jar"
 if exist inspecto-la-core.jar set "CP=%CP%;inspecto-la-core.jar"
 if exist inspecto-la-api.jar set "CP=%CP%;inspecto-la-api.jar"
 if exist inspecto-geo-link.jar set "CP=%CP%;inspecto-geo-link.jar"
@@ -1167,6 +1183,7 @@ fi
 [ -f inspecto-backup.jar ] && CP="${CP}:inspecto-backup.jar"
 # Geo map + link analysis routes (EDG-01 cell 3b): Professional/Enterprise only; same contract as above.
 [ -f inspecto-entity-list.jar ] && CP="${CP}:inspecto-entity-list.jar"
+[ -f inspecto-la-graph.jar ] && CP="${CP}:inspecto-la-graph.jar"
 [ -f inspecto-la-core.jar ] && CP="${CP}:inspecto-la-core.jar"
 [ -f inspecto-la-api.jar ] && CP="${CP}:inspecto-la-api.jar"
 [ -f inspecto-geo-link.jar ] && CP="${CP}:inspecto-geo-link.jar"
@@ -1294,6 +1311,7 @@ rem Backup / restore tasks (EDG-01 cell 2) - Professional/Enterprise only.
 if exist inspecto-backup.jar set "CP=%CP%;inspecto-backup.jar"
 rem Geo map + link analysis routes (EDG-01 cell 3b) - Professional/Enterprise only.
 if exist inspecto-entity-list.jar set "CP=%CP%;inspecto-entity-list.jar"
+if exist inspecto-la-graph.jar set "CP=%CP%;inspecto-la-graph.jar"
 if exist inspecto-la-core.jar set "CP=%CP%;inspecto-la-core.jar"
 if exist inspecto-la-api.jar set "CP=%CP%;inspecto-la-api.jar"
 if exist inspecto-geo-link.jar set "CP=%CP%;inspecto-geo-link.jar"
@@ -1723,7 +1741,7 @@ if ($DemoAuth) {
         Remove-Item (Join-Path $bundleDir $f) -ErrorAction SilentlyContinue
     }
     $demoJars = @('inspecto.jar', 'inspecto-demo-auth.jar', 'inspecto-policy.jar', 'inspecto-connectors.jar', 'inspecto-notify-channels.jar',
-                  'inspecto-backup.jar', 'inspecto-entity-list.jar', 'inspecto-la-core.jar', 'inspecto-la-api.jar', 'inspecto-geo-link.jar', 'inspecto-exchange.jar', 'inspecto-metrics.jar', 'inspecto-events.jar',
+                  'inspecto-backup.jar', 'inspecto-entity-list.jar', 'inspecto-la-graph.jar', 'inspecto-la-core.jar', 'inspecto-la-api.jar', 'inspecto-geo-link.jar', 'inspecto-exchange.jar', 'inspecto-metrics.jar', 'inspecto-events.jar',
                   'inspecto-ops.jar', 'inspecto-agent.jar', 'inspecto-intelligence.jar', 'postgresql.jar') | Where-Object { Test-Path (Join-Path $bundleDir $_) }
     $demoFlags = '--enable-native-access=ALL-UNNAMED -Dcontrol.bind=127.0.0.1 -Dauth.mode=demo -Dobjects.backend=db -Devents.backend=parquet -Djobs.backend=duckdb'
     $serveDemoBat = @"
@@ -1889,7 +1907,7 @@ if (-not $SkipBootCheck) {
             else { 'java' }
     # The same classpath the generated launchers build -- deliberately re-derived from the staged files
     # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
-    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-entity-list.jar','inspecto-la-core.jar','inspecto-la-api.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-metrics.jar','inspecto-events.jar','inspecto-ops.jar','inspecto-agent.jar','inspecto-intelligence.jar','postgresql.jar' |
+    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-entity-list.jar','inspecto-la-graph.jar','inspecto-la-core.jar','inspecto-la-api.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-metrics.jar','inspecto-events.jar','inspecto-ops.jar','inspecto-agent.jar','inspecto-intelligence.jar','postgresql.jar' |
         Where-Object { Test-Path (Join-Path $bundleDir $_) })
     # DEMO-AUTH-1: appended AFTER the parsed literal on purpose (see the -DemoAuth param note).
     if ($DemoAuth -and (Test-Path (Join-Path $bundleDir 'inspecto-demo-auth.jar'))) { $cp += 'inspecto-demo-auth.jar' }

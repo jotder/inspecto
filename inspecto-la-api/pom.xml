@@ -115,6 +115,7 @@
                                         <include>com.gamma.inspector:inspecto-config</include>
                                         <include>com.gamma.inspector:inspecto-entity-store</include>
                                         <include>com.gamma.inspector:inspecto-http-spi</include>
+                                        <include>com.gamma.inspector:inspecto-la-graph</include>
                                         <include>com.gamma.inspector:inspecto-la-core</include>
                                         <include>com.gamma.inspector:inspecto-sql</include>
                                         <include>com.gamma.inspector:inspecto-util</include>

@@ -19,8 +19,8 @@
         The server-side port of the SPA's graph algorithms (shortest path, centrality, PageRank, Louvain,
         suspicion score, ...), carved out of inspecto-geo-link as D-1 step 1 of the Link Analysis separation
         (docs/superpower/la-separation-d1-design.md). Plain JDK: NO dependency on any platform module, by
-        design — that is what lets it be extracted before any SPI exists. Nothing calls it yet (D-4), so it
-        is not in any bundle.
+        design — that is what lets it be extracted before any SPI exists. Since D-4 step 4 inspecto-la-core's
+        InMemoryGraphEngine calls it, so it is staged in the bundles beside inspecto-la-core.jar.
 
         Built only under the edition profiles (see the parent pom's profile-scoped modules), alongside
         inspecto-geo-link. The parity tests read their fixtures from ../inspecto-ui/src/app/inspecto/graph,
