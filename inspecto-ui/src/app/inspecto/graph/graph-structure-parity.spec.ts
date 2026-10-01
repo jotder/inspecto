@@ -5,7 +5,7 @@ import fixture from './graph-structure-parity.fixture.json';
 
 /**
  * D-S4 parity — the browser half, structure lane. `graph-structure-parity.fixture.json` is ALSO run through the
- * Java port by `GraphStructureParityTest` (inspecto-geo-link); both assert the SAME hand-derived `expected`.
+ * Java port by `GraphStructureParityTest` (inspecto-la-graph); both assert the SAME hand-derived `expected`.
  */
 const toGraph = (g: { nodes: string[]; edges: string[][] }): G6GraphData => ({
     nodes: g.nodes.map((id) => ({ id, data: { label: id, kind: 'entity' } })),

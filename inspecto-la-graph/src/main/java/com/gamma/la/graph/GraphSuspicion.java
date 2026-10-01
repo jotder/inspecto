@@ -1,8 +1,8 @@
-package com.gamma.geolink;
+package com.gamma.la.graph;
 
-import com.gamma.geolink.GraphAlgorithms.Graph;
-import com.gamma.geolink.GraphAlgorithms.Node;
-import com.gamma.geolink.GraphAlgorithms.Score;
+import com.gamma.la.graph.GraphAlgorithms.Graph;
+import com.gamma.la.graph.GraphAlgorithms.Node;
+import com.gamma.la.graph.GraphAlgorithms.Score;
 
 import java.util.ArrayList;
 import java.util.Comparator;

@@ -6,7 +6,7 @@ import fixture from './graph-paths-parity.fixture.json';
 
 /**
  * D-S4 parity — the browser half, paths-and-flow lane. `graph-paths-parity.fixture.json` is ALSO run through the
- * Java port by `GraphPathsParityTest` (inspecto-geo-link); both assert the SAME hand-derived `expected`.
+ * Java port by `GraphPathsParityTest` (inspecto-la-graph); both assert the SAME hand-derived `expected`.
  */
 type EdgeData = G6GraphData['edges'][number]['data'];
 const edgeData = (kind: string, count: number | null): EdgeData => ({ kind, count }) as unknown as EdgeData;

@@ -5,7 +5,7 @@ import fixture from './graph-suspicion-parity.fixture.json';
 
 /**
  * D-S4 parity — the browser half, suspicion score. `graph-suspicion-parity.fixture.json` is ALSO run through the Java
- * port by `GraphSuspicionParityTest` (inspecto-geo-link); both assert the SAME `expected` (score + the five factors, in
+ * port by `GraphSuspicionParityTest` (inspecto-la-graph); both assert the SAME `expected` (score + the five factors, in
  * rank order) at the fixture's `tolerance`.
  */
 type FixtureGraph = { nodes: string[]; edges: string[][] };

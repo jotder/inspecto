@@ -13,7 +13,7 @@ import fixture from './graph-algorithms-parity.fixture.json';
 
 /**
  * D-S4 parity — the browser half, tranche A slice 1. `graph-algorithms-parity.fixture.json` is ALSO run through the
- * Java port by `GraphAlgorithmsParityTest` (inspecto-geo-link); both assert the SAME hand-derived `expected`.
+ * Java port by `GraphAlgorithmsParityTest` (inspecto-la-graph); both assert the SAME hand-derived `expected`.
  */
 const graph: G6GraphData = {
     nodes: fixture.graph.nodes.map((id) => ({ id, data: { label: id, kind: 'entity' } })),

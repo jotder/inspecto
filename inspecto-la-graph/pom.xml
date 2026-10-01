@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-la-graph</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Link Analysis graph algorithms (la-graph, optional)</name>
+    <description>
+        The server-side port of the SPA's graph algorithms (shortest path, centrality, PageRank, Louvain,
+        suspicion score, ...), carved out of inspecto-geo-link as D-1 step 1 of the Link Analysis separation
+        (docs/superpower/la-separation-d1-design.md). Plain JDK: NO dependency on any platform module, by
+        design — that is what lets it be extracted before any SPI exists. Nothing calls it yet (D-4), so it
+        is not in any bundle.
+
+        Built only under the edition profiles (see the parent pom's profile-scoped modules), alongside
+        inspecto-geo-link. The parity tests read their fixtures from ../inspecto-ui/src/app/inspecto/graph,
+        where the TypeScript specs read them too.
+    </description>
+
+    <dependencies>
+        <!-- Tests only: the parity tests parse the shared JSON fixtures. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

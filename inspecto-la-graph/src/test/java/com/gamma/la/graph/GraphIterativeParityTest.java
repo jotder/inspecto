@@ -1,12 +1,12 @@
-package com.gamma.geolink;
+package com.gamma.la.graph;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gamma.geolink.GraphAlgorithms.Edge;
-import com.gamma.geolink.GraphAlgorithms.Graph;
-import com.gamma.geolink.GraphAlgorithms.Node;
-import com.gamma.geolink.GraphAlgorithms.Score;
-import com.gamma.geolink.GraphIterative.HitsResult;
+import com.gamma.la.graph.GraphAlgorithms.Edge;
+import com.gamma.la.graph.GraphAlgorithms.Graph;
+import com.gamma.la.graph.GraphAlgorithms.Node;
+import com.gamma.la.graph.GraphAlgorithms.Score;
+import com.gamma.la.graph.GraphIterative.HitsResult;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;

@@ -12,7 +12,7 @@ import fixture from './graph-iterative-parity.fixture.json';
 
 /**
  * D-S4 parity — the browser half, tranche A, iterative + communities slice. `graph-iterative-parity.fixture.json` is
- * ALSO run through the Java port by `GraphIterativeParityTest` (inspecto-geo-link). Scores are compared in rank order
+ * ALSO run through the Java port by `GraphIterativeParityTest` (inspecto-la-graph). Scores are compared in rank order
  * to `fixture.epsilon`; communities as EXACT ordered (node, community) pairs (the community id is its smallest member,
  * and the Map's iteration order — members grouped by first-seen label — is part of the contract).
  */

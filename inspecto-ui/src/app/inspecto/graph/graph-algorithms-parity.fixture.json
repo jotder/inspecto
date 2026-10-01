@@ -1,5 +1,5 @@
 {
-  "_doc": "D-S4 parity fixture, tranche A slice 1. Asserted by graph-algorithms-parity.spec.ts (browser) AND GraphAlgorithmsParityTest (inspecto-geo-link). The expected values are DERIVED BY HAND from the graph, not produced by either implementation. Labels are lowercase ASCII on purpose: ties break by label, and the browser uses localeCompare while Java uses ordinal compare, which agree only on such labels. Every edge endpoint is a node (the algorithms assume a closed graph). e4 duplicates e1 and e11 is a self-loop, to pin the multigraph rules: degree counts both, the undirected simple-graph algorithms collapse them.",
+  "_doc": "D-S4 parity fixture, tranche A slice 1. Asserted by graph-algorithms-parity.spec.ts (browser) AND GraphAlgorithmsParityTest (inspecto-la-graph). The expected values are DERIVED BY HAND from the graph, not produced by either implementation. Labels are lowercase ASCII on purpose: ties break by label, and the browser uses localeCompare while Java uses ordinal compare, which agree only on such labels. Every edge endpoint is a node (the algorithms assume a closed graph). e4 duplicates e1 and e11 is a self-loop, to pin the multigraph rules: degree counts both, the undirected simple-graph algorithms collapse them.",
   "graph": {
     "nodes": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"],
     "edges": [

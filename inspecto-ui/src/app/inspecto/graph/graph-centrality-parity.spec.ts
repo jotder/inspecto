@@ -5,7 +5,7 @@ import fixture from './graph-centrality-parity.fixture.json';
 
 /**
  * D-S4 parity — the browser half, single-pass float centrality lane. `graph-centrality-parity.fixture.json` is ALSO
- * run through the Java port by `GraphCentralityParityTest` (inspecto-geo-link); both assert the SAME hand-derived
+ * run through the Java port by `GraphCentralityParityTest` (inspecto-la-graph); both assert the SAME hand-derived
  * `expected`, floats at `fixture.tolerance`.
  */
 const graph: G6GraphData = {

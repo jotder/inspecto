@@ -1,4 +1,4 @@
-package com.gamma.geolink;
+package com.gamma.la.graph;
 
 import java.util.ArrayList;
 import java.util.Comparator;

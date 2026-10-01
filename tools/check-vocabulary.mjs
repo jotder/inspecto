@@ -527,7 +527,7 @@ const SOURCE_ALLOW = {
         'The TS twin of ExpressionGuard.FLOW_KEYWORDS — same SQL control-flow sense.',
     'inspecto-ui/src/app/inspecto/graph/graph-analysis.ts::flow-identifier':
         'maxFlow is the **max-flow/min-cut** graph algorithm — the mathematical sense, and the only correct name for it.',
-    'inspecto-geo-link/src/main/java/com/gamma/geolink/GraphPaths.java::flow-identifier':
+    'inspecto-la-graph/src/main/java/com/gamma/la/graph/GraphPaths.java::flow-identifier':
         'The Java port of graph-analysis.ts maxFlow — the same **max-flow/min-cut** algorithm, kept under the same name so the parity fixture reads identically on both sides.',
     'inspecto-ui/src/app/modules/admin/studio/link-analysis/link-analysis-toolbox.component.html::flow-identifier':
         'The template half of the max-flow toolbox below (flowFrom/flowTo/runFlow) — same algorithmic sense.',
