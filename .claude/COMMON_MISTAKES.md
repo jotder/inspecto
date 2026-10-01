@@ -59,6 +59,30 @@ per `processing.duplicate_check.retention_days`).
 
 ---
 
+## Parallel lanes (worktree agents) and build proofs
+
+Learned the hard way on 2026-10-01 (D-S4 + D-1: 6 lanes, 3 of them started from the wrong commit).
+
+1. **A lane worktree is cut from the last PUSHED `origin/master` tip — not from your local `HEAD`.** Observed twice: lanes started
+   at `98fce480f` (pushed) while local `HEAD` was already several commits ahead. Anything unpushed (a helper refactor, a signed
+   design) is invisible to the lane. Either push first, or open the lane prompt with
+   `git merge --ff-only <sha>` — the commit is reachable because a worktree shares the object store. The lane that forgets
+   builds on a base where the code it must move is still `private` and reports a confusing compile error.
+2. **Give every lane the same preamble** (paste it; do not paraphrase): *first `git merge --ff-only <sha>`; do not push; do not
+   touch other lanes' files, `docs/INDEX.md` or `.claude/launch.json`; no `node_modules` junction/symlink (cleaning the worktree
+   wiped the main checkout's once); use uniquely named scratch scripts — the session scratchpad is SHARED and a lane's `mut.sh`
+   was overwritten mid-run; `git add` only the files you changed; run `-Pedition-enterprise -pl <module> -am -Dtest=A,B` (commas,
+   never `+`; `-am` or a stale sibling jar is tested) and count the `Tests run:` lines; report SHA, files, counts, surprises.*
+3. **Integrate in the main tree by `git cherry-pick`** (lanes touch new files, so conflicts are only the shared `pom.xml` /
+   bundle lists), then run the **independent** verifier once on the combined result — a lane's own green is not the gate.
+4. **A closure script is a PREDICTION; `node tools/compile-clean.mjs` is the PROOF.** `tools/java-closure.mjs` predicts what a cut
+   drags along; only a clean compile of the whole reactor says the cut is real. See
+   [build-test.md](../docs/okf/backend/build-run/build-test.md) "Proving a cut".
+5. **An incremental `mvn compile` after a shared-interface change is a FALSE GREEN** (downstream modules not recompiled; 9 s, exit
+   0). Always `clean`, and read the log, not the exit code.
+
+---
+
 ## Environment & tooling (shared — so every profile on this sandbox has them)
 
 > Consolidated here from per-profile session memory. Auto-memory lives under each Windows profile's

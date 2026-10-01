@@ -160,6 +160,29 @@ that proves an optional module is **self-contained**. `inspecto-ops` ships in St
 direction still PASSED locally off a stale `~/.m2`. A run that stops at a failing module reports a PARTIAL sum and SKIPS the trailing modules —
 do not read that as the total, and do not conclude a module "failed" when the build never reached it.
 
+### 🔴 Proving a cut or a shared-interface change: `compile-clean`, never an incremental `compile`
+
+Filed 2026-10-01 (D-1 of the Link Analysis separation). Two things looked like proof and were not:
+
+- **An incremental compile after a shared-interface change is a false green.** After `ApiContext` lost three methods,
+  `mvn compile -pl inspecto -am` finished in 9 s with exit 0 — the dependants (`-geo-link`, `-ops`, …) were never
+  recompiled, so their stale classes still matched the OLD interface. Only `clean` makes the dependants get seen.
+- **A closure script is a prediction.** The first one said a contract was 20 classes; it was 46, and the compiler found four
+  fully-qualified inline references (`com.gamma.service.OptionalSpi.first(…)`) that no import scan can see.
+
+```
+node tools/java-closure.mjs --seeds ApiContext,Subject --stop CollectorService,SpaceManager   # PREDICT what a cut drags along
+node tools/compile-clean.mjs                                                                # PROVE it: clean test-compile, whole reactor
+```
+
+`compile-clean` always runs `mvn -o clean test-compile -DskipTests -B -fae -Pedition-enterprise` (pass `-P…` to change the profile),
+reads the log rather than the exit code, and exits 0 only on BUILD SUCCESS with every reactor module SUCCESS, none SKIPPED, no
+`[ERROR] …java` line (de-duplicated — Maven prints each twice) and no "Nothing to compile". It prints errors grouped by module and
+file. JDK 27 on `JAVA_HOME`; about 2 min for 37 modules. `java-closure` strips comments with a tokenizer (a `/*` inside a string
+literal cannot open a fake comment) and resolves inline fully-qualified names; it still cannot see reflection, `ServiceLoader`
+providers or a class named only inside a string. Both are fixture-tested (`tools/*.test.mjs`, each blind spot planted and the
+test confirmed RED against the old behaviour) and run in CI.
+
 ### 🔴 A halted reactor is a SILENT PASS — check it mechanically, not by reading
 
 `REACTOR-HALT-IS-A-SILENT-PASS-1`, filed 2026-09-16 after it nearly landed a false verdict twice in one

@@ -254,6 +254,14 @@ jobs:
       - name: Guard — every DuckDB extension the bundle stages is published for every platform
         run: node tools/fetch-duckdb-extensions.mjs --check && node --test tools/fetch-duckdb-extensions.test.mjs
 
+      # Build-proof tools (D-1, 2026-10-01). tools/java-closure.mjs predicts what a code cut drags along and
+      # tools/compile-clean.mjs proves it with a clean whole-reactor compile; both exist because their
+      # predecessors lied (a regex comment-stripper that a "/*" inside a string defeated, and an incremental
+      # compile that went green without recompiling the dependants). The fixture tests plant each blind spot and
+      # were confirmed RED against the old behaviour. Pure Node, ~instant.
+      - name: Tools — java-closure and compile-clean fixture tests
+        run: node --test tools/java-closure.test.mjs tools/compile-clean.test.mjs
+
       # Launcher guard (LAUNCHER-GUARD-1, 2026-09-14). Third in the same family: package.ps1 emits the
       # deployment surface and nothing had ever EXECUTED any of it. serve.bat spent its life dropping
       # -Dauth.mode=oidc on every Windows Standard/Enterprise bundle — a parenthesised `if` block, which
