@@ -258,5 +258,47 @@ class RunControlTest {
         ctl.setFraction(0.25);
         assertEquals(1000, ctl.work());
         assertEquals(0.25, ctl.fraction());
+        assertTrue(ctl.fractionKnown());
+    }
+
+    @Test
+    void progressClampsAndAControlThatNeverReportsIsNotKnown() {
+        RunControl ctl = RunControl.create();
+        assertFalse(ctl.fractionKnown(), "0 before any report is 'unknown'");
+        ctl.progress(5, 0);
+        assertFalse(ctl.fractionKnown(), "a zero total reports nothing");
+        ctl.progress(3, 4);
+        assertEquals(0.75, ctl.fraction());
+        ctl.progress(9, 4);
+        assertEquals(1.0, ctl.fraction(), "clamped");
+        RunControl.NONE.progress(1, 2);
+        assertFalse(RunControl.NONE.fractionKnown());
+    }
+
+    /** Which algorithms report a fraction: the per-source and per-sweep ones do, the rest stay unknown (never a fake 0%). */
+    @Test
+    void instrumentedAlgorithmsReportAFractionThatReachesTheLastUnitAndTheOthersDoNot() {
+        Graph g = heavyTailed(40, 2);
+        Map<String, Function<RunControl, Object>> reporting = Map.of(
+                "betweenness", c -> GraphCentrality.betweennessCentrality(g, c),
+                "closeness", c -> GraphCentrality.closenessCentrality(g, c),
+                "linkPrediction", c -> GraphCentrality.linkPrediction(g, GraphCentrality.Method.COMMON_NEIGHBORS, 10, c),
+                "pageRank", c -> GraphIterative.pageRank(g, 0.85, 10, c),
+                "eigenvector", c -> GraphIterative.eigenvectorCentrality(g, 10, c),
+                "katz", c -> GraphIterative.katzCentrality(g, 0.1, 1, 10, c),
+                "hits", c -> GraphIterative.hits(g, 10, c),
+                "labelPropagation", c -> GraphIterative.detectCommunities(g, 10, c));
+        reporting.forEach((name, run) -> {
+            RunControl ctl = RunControl.create();
+            run.apply(ctl);
+            assertTrue(ctl.fractionKnown(), name + " reports a fraction");
+            assertTrue(ctl.fraction() >= 0 && ctl.fraction() < 1.0, name + " reports done-before-this-unit, was " + ctl.fraction());
+        });
+        RunControl bc = RunControl.create();
+        GraphCentrality.betweennessCentrality(g, bc);
+        assertEquals(39.0 / 40, bc.fraction(), 1e-12, "betweenness: 39 of 40 sources finished when the last one starts");
+        RunControl louvain = RunControl.create();
+        GraphIterative.louvainCommunities(g, louvain);
+        assertFalse(louvain.fractionKnown(), "louvain has no natural total (passes run to convergence)");
     }
 }

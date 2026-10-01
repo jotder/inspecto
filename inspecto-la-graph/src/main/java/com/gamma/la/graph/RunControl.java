@@ -27,6 +27,7 @@ public final class RunControl {
     private final AtomicLong work = new AtomicLong();
     private volatile boolean cancelled;
     private volatile double fraction;
+    private volatile boolean fractionKnown;
 
     private RunControl(boolean live, boolean hasDeadline, long deadlineNanos, long ceiling) {
         this.live = live;
@@ -71,7 +72,23 @@ public final class RunControl {
     }
 
     public void setFraction(double f) {
-        if (live) fraction = f;
+        if (live) {
+            fraction = f;
+            fractionKnown = true;
+        }
+    }
+
+    /**
+     * Reports {@code done} of {@code total} units finished (clamped to [0,1]). Call it once per source / sweep, next to
+     * {@link #checkpoint()}, never in an innermost loop: it is a volatile write.
+     */
+    public void progress(long done, long total) {
+        if (live && total > 0) setFraction(Math.min(1.0, Math.max(0.0, (double) done / total)));
+    }
+
+    /** True once the algorithm has reported a fraction; false means {@link #fraction()}'s 0 is "unknown", not "just started". */
+    public boolean fractionKnown() {
+        return fractionKnown;
     }
 
     /** Throws {@link GraphAborted} when cancelled, past the deadline, or over the work ceiling; else counts one unit. */

@@ -76,6 +76,7 @@ public final class GraphIterative {
         Map<String, Double> pr = filled(ids, 1.0 / n);
         for (int it = 0; it < iterations; it++) {
             ctl.checkpoint();
+            ctl.progress(it, iterations);
             Map<String, Double> next = filled(ids, (1 - damping) / n);
             double dangling = 0;
             for (String id : ids) if (outDeg.get(id) == 0) dangling += pr.get(id);
@@ -103,6 +104,7 @@ public final class GraphIterative {
         Map<String, Double> x = filled(ids, 1);
         for (int it = 0; it < iterations; it++) {
             ctl.checkpoint();
+            ctl.progress(it, iterations);
             Map<String, Double> next = filled(ids, 0);
             step.apply(x, next);
             double norm = 0;
@@ -156,6 +158,7 @@ public final class GraphIterative {
         Map<String, Double> x = filled(ids, 0);
         for (int it = 0; it < iterations; it++) {
             ctl.checkpoint();
+            ctl.progress(it, iterations);
             Map<String, Double> next = filled(ids, beta);
             for (String id : ids) {
                 double s = 0;
@@ -187,6 +190,7 @@ public final class GraphIterative {
         Map<String, Double> auth = filled(ids, 1);
         for (int it = 0; it < iterations; it++) {
             ctl.checkpoint();
+            ctl.progress(it, iterations);
             Map<String, Double> nextAuth = filled(ids, 0);
             for (String id : ids) {
                 double s = 0;
@@ -242,6 +246,7 @@ public final class GraphIterative {
         for (String id : ids) label.put(id, id);
         for (int it = 0; it < maxIterations; it++) {
             ctl.checkpoint();
+            ctl.progress(it, maxIterations);
             boolean changed = false;
             Map<String, String> next = new LinkedHashMap<>(label);
             for (String id : ids) {

@@ -515,4 +515,116 @@ class GraphRunServiceTest {
         assertEquals(Status.CANCELLED, svc.get(queued.id()).status(), "a dropped task must not stay QUEUED forever");
         assertTrue(svc.await(queued.id(), 50).status().terminal());
     }
+
+    // ── live progress (LA-GRAPH-RUN-PROGRESS-1) ─────────────────────────────────────────────────────────────────
+
+    @Test
+    void aRunningRunReportsItsFractionAndElapsedTimeLiveAndTheFinalOnesAtTheEnd() throws Exception {
+        CountDownLatch half = new CountDownLatch(1), release = new CountDownLatch(1);
+        svc = new GraphRunService(new Probe(ctl -> {
+            ctl.progress(1, 4);
+            half.countDown();
+            release.await();
+            return answer();
+        }), TIGHT);
+        RunView queued = svc.submit(req("alice", ring(4)));
+        half.await();
+        RunView live = svc.get(queued.id());
+        assertEquals(Status.RUNNING, live.status());
+        assertTrue(live.progress().known());
+        assertEquals(0.25, live.progress().fraction(), 1e-9, "the algorithm's own fraction, live");
+        Thread.sleep(60);
+        long mid = svc.get(queued.id()).consumed().elapsedMs();
+        assertTrue(mid >= 50, "elapsedMs is live while RUNNING, was " + mid);
+        release.countDown();
+        RunView done = settle(queued);
+        assertEquals(Status.COMPLETED, done.status());
+        assertEquals(1.0, done.progress().fraction(), 1e-9, "a finished run whose algorithm reports shows 1");
+        assertTrue(done.consumed().elapsedMs() >= mid, "the final elapsed is not smaller than a live one");
+        long fixed = done.consumed().elapsedMs();
+        Thread.sleep(30);
+        assertEquals(fixed, svc.get(done.id()).consumed().elapsedMs(), "a terminal run's elapsedMs no longer moves");
+    }
+
+    @Test
+    void anAlgorithmThatReportsNoFractionIsKnownFalseNotAnInventedZeroPercent() throws Exception {
+        CountDownLatch inside = new CountDownLatch(1), release = new CountDownLatch(1);
+        svc = new GraphRunService(new Probe(ctl -> {
+            ctl.checkpoint();
+            inside.countDown();
+            release.await();
+            return answer();
+        }), TIGHT);
+        RunView started = svc.submit(req("alice", ring(4)));
+        inside.await();
+        RunView live = svc.get(started.id());
+        assertFalse(live.progress().known());
+        assertEquals(0.0, live.progress().fraction());
+        assertEquals(1, live.progress().work(), "the checkpoint count is still live");
+        release.countDown();
+        RunView done = settle(started);
+        assertFalse(done.progress().known(), "no fraction was ever reported, so none is claimed at the end either");
+        assertEquals(0.0, done.progress().fraction());
+    }
+
+    @Test
+    void aQueuedRunHasZeroElapsedTime() throws Exception {
+        CountDownLatch inside = new CountDownLatch(1), release = new CountDownLatch(1);
+        svc = new GraphRunService(new Probe(ctl -> {
+            inside.countDown();
+            release.await();
+            return answer();
+        }), TIGHT);
+        RunView a = svc.submit(req("alice", ring(4)));
+        inside.await();
+        RunView b = svc.submit(withAlgorithm(req("alice", ring(4)), Algorithm.IS_FOREST, Map.of()));
+        Thread.sleep(40);
+        assertEquals(Status.QUEUED, svc.get(b.id()).status());
+        assertEquals(0, svc.get(b.id()).consumed().elapsedMs(), "elapsed counts from execution start, not from queueing");
+        release.countDown();
+        settle(a);
+        settle(b);
+    }
+
+    // ── run table bound (LA-GRAPH-RUN-POOL-LIFECYCLE-1) ─────────────────────────────────────────────────────────
+
+    private static long workerThreads() {
+        return Thread.getAllStackTraces().keySet().stream().filter(t -> t.getName().startsWith("la-graph-run-") && t.isAlive()).count();
+    }
+
+    /** An unused service holds no thread: workers time out when idle, with no timer and no sweep thread, and a new run restarts one. */
+    @Test
+    void anIdleServiceHoldsNoWorkerThreadAndARunStartsOneAgain() throws Exception {
+        long before = workerThreads();
+        svc = new GraphRunService(new InMemoryGraphEngine(), TIGHT, System::currentTimeMillis, null, 40);
+        assertEquals(Status.COMPLETED, settle(svc.submit(req("alice", ring(4)))).status());
+        assertTrue(workerThreads() > before, "the run started a worker");
+        until(() -> workerThreads() == before);                                         // idle for the 40 ms keep-alive: it ended
+        assertEquals(Status.COMPLETED, settle(svc.submit(withAlgorithm(req("alice", ring(4)), Algorithm.IS_FOREST, Map.of()))).status(),
+                "the pool is still usable: a fresh worker took the next run");
+        until(() -> workerThreads() == before);
+    }
+
+    /** maxRuns is soft (live runs are never dropped) yet the table stays bounded: live runs are capped by threads + queue. */
+    @Test
+    void maxRunsIsSoftForLiveRunsButTheTableStaysBoundedByThePool() throws Exception {
+        CountDownLatch inside = new CountDownLatch(1), release = new CountDownLatch(1);
+        Limits lim = new Limits(TIGHT.defaults(), TIGHT.ceilings(), 1, 1, 60_000L, 1, 60_000L, 8);   // maxRuns 1, 1 running + 1 waiting
+        svc = new GraphRunService(new Probe(ctl -> {
+            inside.countDown();
+            release.await();
+            return answer();
+        }), lim);
+        RunView a = svc.submit(req("alice", ring(4)));
+        inside.await();
+        RunView b = svc.submit(withAlgorithm(req("alice", ring(4)), Algorithm.IS_FOREST, Map.of()));
+        assertEquals(2, svc.list("alice", null).size(), "two live runs exceed maxRuns = 1: live runs are never dropped");
+        assertEquals(2, svc.active());
+        assertEquals(Kind.REJECTED, assertThrows(GraphRunException.class,
+                () -> svc.submit(withAlgorithm(req("alice", ring(4)), Algorithm.BRIDGES, Map.of()))).kind(), "but a third cannot join");
+        assertEquals(2, svc.list("alice", null).size());
+        release.countDown();
+        until(() -> svc.active() == 0);          // (not settle(): with maxRuns = 1 a finished run is dropped as soon as the next is stored)
+        assertTrue(svc.list("alice", null).size() <= 1, "finished runs are held to maxRuns");
+    }
 }

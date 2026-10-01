@@ -55,7 +55,11 @@ public final class GraphRunService implements AutoCloseable {
     /** Why a run ended {@code BUDGET_EXCEEDED}. */
     public enum Exceeded { NODES, EDGES, TIMEOUT, WORK }
 
-    /** Sizing and retention. {@code threads} run concurrently; {@code queue} more may wait; beyond that a submit is refused. */
+    /**
+     * Sizing and retention. {@code threads} run concurrently; {@code queue} more may wait; beyond that a submit is refused.
+     * {@code maxRuns} is SOFT by design: it bounds only FINISHED runs (retention never drops a live one), so the run table
+     * holds at most {@code maxRuns + threads + queue} entries - the live part is already hard-bounded by the pool.
+     */
     public record Limits(GraphBudget defaults, GraphBudget ceilings, int threads, int queue, long runTtlMs, int maxRuns,
                          long cacheTtlMs, int cacheEntries) {
         public static Limits standard() {
@@ -81,8 +85,12 @@ public final class GraphRunService implements AutoCloseable {
     /** What a run has consumed so far: the input's size, the compute time and the engine's checkpoints. */
     public record Consumed(int nodes, int edges, long elapsedMs, long work) {}
 
-    /** Where a RUNNING run is: the engine's checkpoint count and the algorithm's own fraction (0 until it reports one). */
-    public record Progress(long work, double fraction) {}
+    /**
+     * Where a RUNNING run is: the engine's checkpoint count and the algorithm's own fraction. {@code known} is false for an
+     * algorithm that never reports one (then {@code fraction} is 0 and means "unknown", not "just started"); a COMPLETED
+     * run whose algorithm reports a fraction shows 1.
+     */
+    public record Progress(long work, double fraction, boolean known) {}
 
     /**
      * An immutable view of one run. {@code result} is non-null only when {@code status == COMPLETED}; {@code exceeded}
@@ -119,17 +127,37 @@ public final class GraphRunService implements AutoCloseable {
      * end of an asynchronous run. An exception it throws is swallowed: a hook never changes a run's outcome.
      */
     public GraphRunService(GraphEngine engine, Limits limits, LongSupplier clock, Consumer<RunView> onTerminal) {
+        this(engine, limits, clock, onTerminal, WORKER_KEEPALIVE_MS);
+    }
+
+    /** How long an idle worker thread lives before it ends (a new run starts a fresh one): an unused service holds no threads. */
+    static final long WORKER_KEEPALIVE_MS = 30_000L;
+
+    GraphRunService(GraphEngine engine, Limits limits, LongSupplier clock, Consumer<RunView> onTerminal, long workerKeepAliveMs) {
         this.engine = engine;
         this.limits = limits;
         this.clock = clock;
         this.onTerminal = onTerminal;
         AtomicInteger n = new AtomicInteger();
-        this.pool = new ThreadPoolExecutor(limits.threads(), limits.threads(), 0L, TimeUnit.MILLISECONDS,
+        this.pool = new ThreadPoolExecutor(limits.threads(), limits.threads(), workerKeepAliveMs, TimeUnit.MILLISECONDS,
                 new ArrayBlockingQueue<>(limits.queue()), r -> {
             Thread t = new Thread(r, "la-graph-run-" + n.incrementAndGet());
             t.setDaemon(true);
             return t;
         }, new ThreadPoolExecutor.AbortPolicy());
+        this.pool.allowCoreThreadTimeOut(true);
+    }
+
+    /**
+     * How many runs are QUEUED or RUNNING right now. Zero means the service holds nothing in flight (finished runs may still
+     * be retained), so an owner may close it when it has been unused for a while.
+     */
+    public int active() {
+        synchronized (runs) {
+            int n = 0;
+            for (Run r : runs.values()) if (!r.status().terminal()) n++;
+            return n;
+        }
     }
 
     public GraphEngine engine() {
@@ -364,6 +392,7 @@ public final class GraphRunService implements AutoCloseable {
         volatile long finishedAt;
         private Status status = Status.QUEUED;
         private RunControl ctl;
+        private long startNanos;                         // System.nanoTime() when execution began; guarded by this
         private Exceeded exceeded;
         private String failure;
         private GraphResult result;
@@ -393,6 +422,7 @@ public final class GraphRunService implements AutoCloseable {
         synchronized RunControl start() {
             if (status != Status.QUEUED) return null;
             status = Status.RUNNING;
+            startNanos = System.nanoTime();
             ctl = RunControl.withTimeout(budget.timeoutMs());
             return ctl;
         }
@@ -434,9 +464,13 @@ public final class GraphRunService implements AutoCloseable {
 
         synchronized RunView view() {
             RunControl c = ctl;
-            Progress p = new Progress(c == null ? 0 : c.work(), c == null ? 0 : c.fraction());
+            boolean known = c != null && c.fractionKnown();
+            double fraction = !known ? 0 : status == Status.COMPLETED ? 1.0 : c.fraction();
+            Progress p = new Progress(c == null ? 0 : c.work(), fraction, known);
+            // live elapsed compute time for a RUNNING run (monotonic, from execution start - 0 while QUEUED); the final value after
+            long elapsed = status == Status.RUNNING ? (System.nanoTime() - startNanos) / 1_000_000L : elapsedMs;
             return new RunView(id, owner, investigationId, relationKey, algorithm, engine.engineId(), status, budget, clamped,
-                    new Consumed(nodes, edges, elapsedMs, p.work()), p, cancelRequested, cached, exceeded, failure,
+                    new Consumed(nodes, edges, elapsed, p.work()), p, cancelRequested, cached, exceeded, failure,
                     result, createdAt, finishedAt);
         }
     }

@@ -68,8 +68,10 @@ public final class GraphCentrality {
         Map<String, List<String>> adj = bothNeighbors(g);
         Map<String, Double> bc = new LinkedHashMap<>();
         for (Node n : g.nodes()) bc.put(n.id(), 0.0);
+        int total = g.nodes().size(), done = 0;
         for (Node s : g.nodes()) {
             ctl.checkpoint();
+            ctl.progress(done++, total);
             List<String> stack = new ArrayList<>();
             Map<String, List<String>> preds = new LinkedHashMap<>();
             Map<String, Double> sigma = new LinkedHashMap<>();
@@ -117,8 +119,10 @@ public final class GraphCentrality {
         List<String> ids = g.nodes().stream().map(Node::id).toList();
         int n = ids.size();
         Map<String, Double> close = new LinkedHashMap<>();
+        int done = 0;
         for (String s : ids) {
             ctl.checkpoint();
+            ctl.progress(done++, n);
             Map<String, Integer> dist = new LinkedHashMap<>();
             dist.put(s, 0);
             List<String> queue = new ArrayList<>(List.of(s));
@@ -187,8 +191,10 @@ public final class GraphCentrality {
         List<String> ids = new ArrayList<>(nb.keySet());
         ids.sort(Comparator.naturalOrder());
         List<PredictedLink> out = new ArrayList<>();
+        int done = 0;
         for (String a : ids) {
             ctl.checkpoint();
+            ctl.progress(done++, ids.size());
             Set<String> an = nb.get(a);
             // partner -> score, accumulated while walking the anchor's neighbours c in their set order: the adds happen in
             // the same order as the old per-pair "for c in an" intersection, so the floating-point sums are bit-identical.
