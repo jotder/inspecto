@@ -10,7 +10,6 @@ import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentRegistry;
-import com.gamma.query.DatasetRead;
 import com.gamma.query.QueryExecutor;
 
 import com.gamma.util.DuckDbUtil;
@@ -69,7 +68,7 @@ public final class GeoRoutes implements RouteModule {
 
     // ── POST /geo/projection ────────────────────────────────────────────────────
     private Object projection(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
-        Ctx c = context(api, body);
+        Ctx c = context(api, ex, body);
         String lat = ident(body, "latCol", true), lon = ident(body, "lonCol", true);
         String entity = ident(body, "entityCol", false);
         // 🔴 D-U3: the STABLE key, distinct from the display label. `entityCol` is what a human reads and
@@ -134,7 +133,7 @@ public final class GeoRoutes implements RouteModule {
 
     // ── POST /geo/routes ──────────────────────────────────────────────────────────
     private Object routes(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
-        Ctx c = context(api, body);
+        Ctx c = context(api, ex, body);
         String fromLat = ident(body, "fromLatCol", true), fromLon = ident(body, "fromLonCol", true);
         String toLat = ident(body, "toLatCol", true), toLon = ident(body, "toLonCol", true);
         String fromCol = ident(body, "fromCol", false), toCol = ident(body, "toCol", false);
@@ -229,18 +228,12 @@ public final class GeoRoutes implements RouteModule {
     /** Resolved dataset + its trusted relation SQL, or a fail-closed {@link ApiException}. */
     private record Ctx(String datasetId, String relationSql) {}
 
-    private Ctx context(ApiContext api, Map<String, Object> body) throws IOException {
+    private Ctx context(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "geo projection");
         String datasetId = ApiContext.str(body, "dataset");
         if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
-        Map<String, Object> dataset = DatasetRead.dataset(writeRoot, datasetId)
-                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + datasetId + "'"));
-        try {
-            return new Ctx(datasetId,
-                    DatasetRead.relationSql(dataset, api.dataRoot(), writeRoot));
-        } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
-        }
+        // The gate order every projection shares — unknown → 404, shared-away → the SAME 404 (R3), unusable → 422.
+        return new Ctx(datasetId, InvRoutes.relationFor(api, ex, writeRoot, datasetId));
     }
 
     private static QueryExecutor.Result run(Ctx c, String sql, int limit) {
