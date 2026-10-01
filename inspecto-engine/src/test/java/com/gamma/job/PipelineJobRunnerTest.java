@@ -1435,9 +1435,11 @@ class PipelineJobRunnerTest {
         seedParquet(dataDir, "config.secrets", "(3,60)");
         seedParquet(dataDir, "rs", "(4,70)");
         Files.createDirectories(Path.of(dataDir, "rs", ".restricted"));
-        List<String> stores = new java.util.ArrayList<>(List.of("config", "config.secrets", "config.", "rs"));
-        // CONFIG is config only on a case-insensitive filesystem (PathJail.CASE_INSENSITIVE_FS); on Linux it is a missing dir.
-        if (System.getProperty("os.name", "").toLowerCase().startsWith("windows")) stores.add("CONFIG");
+        List<String> stores = new java.util.ArrayList<>(List.of("config", "config.secrets", "rs"));
+        // CONFIG is config only on a case-insensitive filesystem (PathJail.CASE_INSENSITIVE_FS), and `config.` is config only
+        // where Win32 strips the trailing dot (see aWindowsTrailingDotStoreThatWin32StripsToDataDirIsRefused); on Linux each
+        // is just a missing directory, so the run reaches DuckDB and fails there, not at the seal.
+        if (System.getProperty("os.name", "").toLowerCase().startsWith("windows")) stores.addAll(List.of("config.", "CONFIG"));
         for (String store : stores) {
             Exception e = assertThrows(Exception.class, () -> runSourceStore(dataDir, store, Map.of()), store);
             assertRefusedWith("would be allowed to read", e);
