@@ -37,12 +37,14 @@ public final class GraphAlgorithms {
 
     public enum Direction { OUT, IN, BOTH }
 
+    /* Package-private on purpose: the later D-S4 slices live in sibling classes and share these four helpers. */
+
     /** An adjacency entry: the neighbour and the edge that reaches it. */
-    private record Hop(String node, String edge) {}
+    record Hop(String node, String edge) {}
 
-    private record Adjacency(Map<String, List<Hop>> out, Map<String, List<Hop>> in) {}
+    record Adjacency(Map<String, List<Hop>> out, Map<String, List<Hop>> in) {}
 
-    private static Adjacency adjacency(Graph g) {
+    static Adjacency adjacency(Graph g) {
         Map<String, List<Hop>> out = new LinkedHashMap<>();
         Map<String, List<Hop>> in = new LinkedHashMap<>();
         for (Node n : g.nodes()) {
@@ -58,7 +60,7 @@ public final class GraphAlgorithms {
         return new Adjacency(out, in);
     }
 
-    private static List<Hop> neighborsOf(Adjacency adj, String id, Direction direction) {
+    static List<Hop> neighborsOf(Adjacency adj, String id, Direction direction) {
         List<Hop> out = adj.out().getOrDefault(id, List.of());
         List<Hop> in = adj.in().getOrDefault(id, List.of());
         return switch (direction) {
@@ -73,7 +75,7 @@ public final class GraphAlgorithms {
     }
 
     /** Undirected simple-graph neighbours: self-loops dropped, parallel edges collapsed. */
-    private static Map<String, Set<String>> undirectedNeighbors(Graph g) {
+    static Map<String, Set<String>> undirectedNeighbors(Graph g) {
         Map<String, Set<String>> nb = new LinkedHashMap<>();
         for (Node n : g.nodes()) nb.put(n.id(), new LinkedHashSet<>());
         for (Edge e : g.edges()) {
@@ -87,7 +89,7 @@ public final class GraphAlgorithms {
     }
 
     /** Descending by score, ties by label; stable, like the browser's {@code Array.sort}. */
-    private static List<Score> scored(Graph g, Map<String, ? extends Number> score) {
+    static List<Score> scored(Graph g, Map<String, ? extends Number> score) {
         List<Score> out = new ArrayList<>();
         for (Node n : g.nodes()) {
             Number s = score.get(n.id());
