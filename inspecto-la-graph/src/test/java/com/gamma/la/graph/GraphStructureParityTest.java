@@ -83,9 +83,21 @@ class GraphStructureParityTest {
     @Test
     void findCycles() throws Exception {
         load();
-        for (JsonNode c : fx.get("expected").get("cycles")) {
+        assertCycles(graph, fx.get("expected").get("cycles"));
+    }
+
+    /** Two cycles from ONE start node: only the limit check INSIDE the walk can stop the second (mutation-found gap). */
+    @Test
+    void findCyclesStopsAtTheLimitInsideOneWalk() throws Exception {
+        load();
+        JsonNode w = fx.get("expected").get("cyclesTwoInOneWalk");
+        assertCycles(toGraph(w.get("graph")), w.get("cases"));
+    }
+
+    private static void assertCycles(Graph g, JsonNode cases) {
+        for (JsonNode c : cases) {
             JsonNode o = c.get("opts");
-            List<Selection> r = GraphStructure.findCycles(graph, o.has("limit") ? o.get("limit").asInt() : 50,
+            List<Selection> r = GraphStructure.findCycles(g, o.has("limit") ? o.get("limit").asInt() : 50,
                     o.has("maxLen") ? o.get("maxLen").asInt() : 8);
             String label = c.get("name").asText();
             JsonNode expected = c.get("cycles");

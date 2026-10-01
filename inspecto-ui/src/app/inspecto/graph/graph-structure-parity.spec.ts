@@ -32,6 +32,12 @@ describe('graph structure parity fixture (D-S4, structure lane)', () => {
         it(`findCycles: ${c.name}`, () => expect(findCycles(graph, c.opts)).toEqual(c.cycles));
     }
 
+    const walk = fixture.expected.cyclesTwoInOneWalk;
+    for (const c of walk.cases) {
+        it(`findCycles (two cycles in one walk): ${c.name}`, () =>
+            expect(findCycles(toGraph(walk.graph), c.opts)).toEqual(c.cycles));
+    }
+
     for (const c of fixture.expected.cliques) {
         it(`cliques: ${c.name}`, () => expect(cliques(graph, c.opts)).toEqual(c.cliques));
     }

@@ -1,7 +1,10 @@
 package com.gamma.la.graph;
 
 import com.gamma.la.graph.GraphAlgorithms.Edge;
+import com.gamma.la.graph.GraphAlgorithms.Adjacency;
+import com.gamma.la.graph.GraphAlgorithms.Direction;
 import com.gamma.la.graph.GraphAlgorithms.Graph;
+import com.gamma.la.graph.GraphAlgorithms.Hop;
 import com.gamma.la.graph.GraphAlgorithms.Node;
 import com.gamma.la.graph.GraphAlgorithms.Score;
 
@@ -29,44 +32,6 @@ public final class GraphIterative {
 
     /** TS {@code HitsResult}. */
     public record HitsResult(List<Score> hubs, List<Score> authorities) {}
-
-    private record Hop(String node, String edge) {}
-
-    private record Adjacency(Map<String, List<Hop>> out, Map<String, List<Hop>> in) {}
-
-    private static Adjacency adjacency(Graph g) {
-        Map<String, List<Hop>> out = new LinkedHashMap<>();
-        Map<String, List<Hop>> in = new LinkedHashMap<>();
-        for (Node n : g.nodes()) {
-            out.put(n.id(), new ArrayList<>());
-            in.put(n.id(), new ArrayList<>());
-        }
-        for (Edge e : g.edges()) {
-            List<Hop> o = out.get(e.source());
-            if (o != null) o.add(new Hop(e.target(), e.id()));
-            List<Hop> i = in.get(e.target());
-            if (i != null) i.add(new Hop(e.source(), e.id()));
-        }
-        return new Adjacency(out, in);
-    }
-
-    /** TS {@code neighborsOf(adj, id, 'both')}: outgoing then incoming. */
-    private static List<Hop> bothOf(Adjacency adj, String id) {
-        List<Hop> both = new ArrayList<>(adj.out().getOrDefault(id, List.of()));
-        both.addAll(adj.in().getOrDefault(id, List.of()));
-        return both;
-    }
-
-    /** Descending by score, ties by label; stable, like the browser's {@code Array.sort}. */
-    private static List<Score> scored(Graph g, Map<String, Double> score) {
-        List<Score> out = new ArrayList<>();
-        for (Node n : g.nodes()) {
-            Double s = score.get(n.id());
-            out.add(new Score(n.id(), n.label(), s == null ? 0 : s));
-        }
-        out.sort(Comparator.comparingDouble(Score::score).reversed().thenComparing(Score::label));
-        return out;
-    }
 
     private static List<String> ids(Graph g) {
         List<String> ids = new ArrayList<>();
@@ -118,7 +83,7 @@ public final class GraphIterative {
             for (String id : ids) next.put(id, next.get(id) + danglingShare);
             pr = next;
         }
-        return scored(g, pr);
+        return GraphAlgorithms.scored(g, pr);
     }
 
     /** Callback for {@link #powerIterate}: fill {@code next} from {@code x}. */
@@ -149,18 +114,18 @@ public final class GraphIterative {
 
     /** TS {@code eigenvectorCentrality}: undirected power iteration (a self-loop counts twice, like the browser). */
     public static List<Score> eigenvectorCentrality(Graph g, int iterations) {
-        Adjacency adj = adjacency(g);
+        Adjacency adj = GraphAlgorithms.adjacency(g);
         Map<String, Double> x = powerIterate(g, (cur, next) -> {
             for (Map.Entry<String, Double> en : next.entrySet()) {
                 double s = 0;
-                for (Hop nb : bothOf(adj, en.getKey())) {
+                for (Hop nb : GraphAlgorithms.neighborsOf(adj, en.getKey(), Direction.BOTH)) {
                     Double c = cur.get(nb.node());
                     s += c == null ? 0 : c;
                 }
                 en.setValue(s);
             }
         }, iterations);
-        return scored(g, x);
+        return GraphAlgorithms.scored(g, x);
     }
 
     public static List<Score> katzCentrality(Graph g) {
@@ -169,14 +134,14 @@ public final class GraphIterative {
 
     /** TS {@code katzCentrality}: {@code x = beta + alpha * A * x} from x = 0. */
     public static List<Score> katzCentrality(Graph g, double alpha, double beta, int iterations) {
-        Adjacency adj = adjacency(g);
+        Adjacency adj = GraphAlgorithms.adjacency(g);
         List<String> ids = ids(g);
         Map<String, Double> x = filled(ids, 0);
         for (int it = 0; it < iterations; it++) {
             Map<String, Double> next = filled(ids, beta);
             for (String id : ids) {
                 double s = 0;
-                for (Hop nb : bothOf(adj, id)) {
+                for (Hop nb : GraphAlgorithms.neighborsOf(adj, id, Direction.BOTH)) {
                     Double c = x.get(nb.node());
                     s += c == null ? 0 : c;
                 }
@@ -184,7 +149,7 @@ public final class GraphIterative {
             }
             x = next;
         }
-        return scored(g, x);
+        return GraphAlgorithms.scored(g, x);
     }
 
     public static HitsResult hits(Graph g) {
@@ -193,7 +158,7 @@ public final class GraphIterative {
 
     /** TS {@code hits}: directed; authority from incoming hubs, then hub from the NEW authorities; both L2-normalised. */
     public static HitsResult hits(Graph g, int iterations) {
-        Adjacency adj = adjacency(g);
+        Adjacency adj = GraphAlgorithms.adjacency(g);
         List<String> ids = ids(g);
         Map<String, Double> hub = filled(ids, 1);
         Map<String, Double> auth = filled(ids, 1);
@@ -221,7 +186,7 @@ public final class GraphIterative {
             auth = nextAuth;
             hub = nextHub;
         }
-        return new HitsResult(scored(g, hub), scored(g, auth));
+        return new HitsResult(GraphAlgorithms.scored(g, hub), GraphAlgorithms.scored(g, auth));
     }
 
     /** TS {@code l2} inside {@code hits}: a zero norm divides by 1. */
@@ -242,7 +207,7 @@ public final class GraphIterative {
      * (members grouped by community in first-seen label order) — the fixture asserts it as ordered pairs.
      */
     public static Map<String, String> detectCommunities(Graph g, int maxIterations) {
-        Adjacency adj = adjacency(g);
+        Adjacency adj = GraphAlgorithms.adjacency(g);
         List<String> ids = sortedIds(g);
         Map<String, String> label = new LinkedHashMap<>();
         for (String id : ids) label.put(id, id);
@@ -251,7 +216,7 @@ public final class GraphIterative {
             Map<String, String> next = new LinkedHashMap<>(label);
             for (String id : ids) {
                 Map<String, Integer> counts = new LinkedHashMap<>();
-                for (Hop nb : bothOf(adj, id)) counts.merge(label.get(nb.node()), 1, Integer::sum);
+                for (Hop nb : GraphAlgorithms.neighborsOf(adj, id, Direction.BOTH)) counts.merge(label.get(nb.node()), 1, Integer::sum);
                 if (counts.isEmpty()) continue;
                 String own = label.get(id);
                 String best = own;
@@ -280,7 +245,7 @@ public final class GraphIterative {
             Integer sz = size.get(own);
             if (sz == null || sz != 1) continue;
             List<String> nbs = new ArrayList<>();
-            for (Hop nb : bothOf(adj, id)) nbs.add(nb.node());
+            for (Hop nb : GraphAlgorithms.neighborsOf(adj, id, Direction.BOTH)) nbs.add(nb.node());
             nbs.sort(null);
             if (nbs.isEmpty()) continue;
             String target = label.get(nbs.get(0));

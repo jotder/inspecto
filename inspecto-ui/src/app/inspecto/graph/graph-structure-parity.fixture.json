@@ -54,6 +54,14 @@
       ] },
       { "name": "limit 0", "opts": { "limit": 0 }, "cycles": [] }
     ],
+    "cyclesTwoInOneWalk": {
+      "_doc": "Kills the in-walk limit check of findCycles: from start u BOTH u>v>u and u>w>u are reachable in ONE walk, so with limit 1 only the per-edge check at the top of the walk stops the second cycle (the between-starts check never sees it). Start v and start w find nothing: u < v and u < w, so the canonical-start rule skips them.",
+      "graph": { "nodes": ["u", "v", "w"], "edges": [["c1", "u", "v"], ["c2", "v", "u"], ["c3", "u", "w"], ["c4", "w", "u"]] },
+      "cases": [
+        { "name": "limit 1 stops inside the walk", "opts": { "limit": 1 }, "cycles": [{ "nodeIds": ["u", "v"], "edgeIds": ["c1", "c2"] }] },
+        { "name": "defaults find both", "opts": {}, "cycles": [{ "nodeIds": ["u", "v"], "edgeIds": ["c1", "c2"] }, { "nodeIds": ["u", "w"], "edgeIds": ["c3", "c4"] }] }
+      ]
+    },
     "cliques": [
       { "name": "defaults", "opts": {}, "cliques": [["i", "j", "k", "l"], ["a", "b", "c"], ["p", "r", "s"], ["x", "y", "z"]] },
       { "name": "minSize 2", "opts": { "minSize": 2 }, "cliques": [["i", "j", "k", "l"], ["a", "b", "c"], ["p", "r", "s"], ["x", "y", "z"], ["c", "d"], ["d", "e"], ["f", "g"], ["g", "h"], ["p", "t"]] },

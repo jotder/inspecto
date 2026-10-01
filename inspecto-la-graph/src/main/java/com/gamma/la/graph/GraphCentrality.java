@@ -57,34 +57,6 @@ public final class GraphCentrality {
         return both;
     }
 
-    /** Undirected simple-graph neighbours: self-loops dropped, parallel edges collapsed. */
-    private static Map<String, Set<String>> undirectedNeighbors(Graph g) {
-        Map<String, Set<String>> nb = new LinkedHashMap<>();
-        for (Node n : g.nodes()) nb.put(n.id(), new LinkedHashSet<>());
-        for (Edge e : g.edges()) {
-            if (e.source().equals(e.target())) continue;
-            Set<String> s = nb.get(e.source());
-            if (s != null) s.add(e.target());
-            Set<String> t = nb.get(e.target());
-            if (t != null) t.add(e.source());
-        }
-        return nb;
-    }
-
-    private static final Comparator<Score> BY_SCORE_THEN_LABEL =
-            Comparator.comparingDouble(Score::score).reversed().thenComparing(Score::label);
-
-    /** Descending by score, ties by label; stable, like the browser's {@code Array.sort}. */
-    private static List<Score> scored(Graph g, Map<String, Double> score) {
-        List<Score> out = new ArrayList<>();
-        for (Node n : g.nodes()) {
-            Double s = score.get(n.id());
-            out.add(new Score(n.id(), n.label(), s == null ? 0 : s));
-        }
-        out.sort(BY_SCORE_THEN_LABEL);
-        return out;
-    }
-
     /** TS {@code betweennessCentrality}: Brandes, unweighted, undirected, descending. */
     public static List<Score> betweennessCentrality(Graph g) {
         Map<String, List<String>> adj = bothNeighbors(g);
@@ -124,7 +96,7 @@ public final class GraphCentrality {
         }
         // undirected: every pair counted twice
         bc.replaceAll((k, v) -> v / 2);
-        return scored(g, bc);
+        return GraphAlgorithms.scored(g, bc);
     }
 
     /** TS {@code closenessCentrality}: Wasserman-Faust, so a small component cannot out-score the main one. */
@@ -151,12 +123,12 @@ public final class GraphCentrality {
             }
             close.put(s, reach > 0 && n > 1 ? ((double) reach / (n - 1)) * (reach / sum) : 0.0);
         }
-        return scored(g, close);
+        return GraphAlgorithms.scored(g, close);
     }
 
     /** TS {@code jaccardSimilarity}: neighbourhood overlap of every other node with {@code nodeId}; empty if absent. */
     public static List<Score> jaccardSimilarity(Graph g, String nodeId) {
-        Map<String, Set<String>> nb = undirectedNeighbors(g);
+        Map<String, Set<String>> nb = GraphAlgorithms.undirectedNeighbors(g);
         Set<String> mine = nb.get(nodeId);
         if (mine == null) return List.of();
         Map<String, Double> sim = new LinkedHashMap<>();
@@ -174,13 +146,13 @@ public final class GraphCentrality {
             Double s = sim.get(n.id());
             out.add(new Score(n.id(), n.label(), s == null ? 0 : s));
         }
-        out.sort(BY_SCORE_THEN_LABEL);
+        out.sort(GraphAlgorithms.BY_SCORE_THEN_LABEL);
         return out;
     }
 
     /** TS {@code linkPrediction}: non-adjacent pairs with a shared neighbour, top {@code limit} by score. */
     public static List<PredictedLink> linkPrediction(Graph g, Method method, int limit) {
-        Map<String, Set<String>> nb = undirectedNeighbors(g);
+        Map<String, Set<String>> nb = GraphAlgorithms.undirectedNeighbors(g);
         Map<String, String> label = new LinkedHashMap<>();
         for (Node n : g.nodes()) label.put(n.id(), n.label());
         List<String> ids = new ArrayList<>(nb.keySet());
