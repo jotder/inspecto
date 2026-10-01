@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The <b>Working Set as a derived relation</b> (LA-20, {@code docs/superpower/link-analysis-backlog-plan.md} §2.7):
+ * The <b>Working Set as a derived relation</b> (LA-20, {@code docs/archived-documents/plans-archive/link-analysis-backlog-plan.md} §2.7):
  * {@code GET /inv/investigations/{id}/working-set?of=entities|links|excluded&limit&offset} answers an
  * Investigation's Working Set as rows with fixed columns, carrying the provenance columns §2.7 names
  * ({@code opSeq}, {@code seedId}, {@code hop}, {@code reason}). It is evaluated from the SEALED log alone

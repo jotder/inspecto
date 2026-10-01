@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 
 /**
  * Durable storage for Link Analysis evidence snapshots (LA-03, decisions {@code D-S1}/{@code D-E2}/{@code D-E3}
- * in {@code docs/superpower/link-analysis-backlog-plan.md}).
+ * in {@code docs/archived-documents/plans-archive/link-analysis-backlog-plan.md}).
  *
  * <p><b>Why a new store rather than an existing one.</b> {@code ComponentStore} was rejected on SEMANTICS,
  * not size: it keeps a single <em>overwritable</em> document per id, and evidence must never be silently

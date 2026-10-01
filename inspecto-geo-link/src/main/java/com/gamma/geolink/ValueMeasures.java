@@ -27,7 +27,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * <b>LA-18 value Measures</b> ({@code docs/superpower/link-analysis-backlog-plan.md} §2.6.1, DECIDED 2026-09-30) —
+ * <b>LA-18 value Measures</b> ({@code docs/archived-documents/plans-archive/link-analysis-backlog-plan.md} §2.6.1, DECIDED 2026-09-30) —
  * named Measures with VISIBLE thresholds over the WHOLE Dataset, never an opaque score. Each answers the entities
  * that breach its thresholds in a {@code [from, to)} window; an Alert Rule ({@code alert.valueMeasure}) watches the
  * COUNT of those entities and fires when it is above 0 (one Alert per rule, never per entity — G-42).

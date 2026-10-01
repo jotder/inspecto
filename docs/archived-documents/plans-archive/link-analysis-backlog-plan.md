@@ -1,12 +1,4 @@
-<!--
-  ACTIVE PLAN — docs/superpower/
-  Created 2026-09-22 by consolidating three documents that were archived the same day:
-    link-analysis-spec.md (2026-09-20)             — target state, clause-tagged
-    link-analysis-advancement-plan.md (2026-09-17) — Sprints 9-11 roadmap
-    link-analysis-enquiry-model-plan.md (2026-09-22) — the investigation as an object
-  This is the ONLY open backlog for Link Analysis. Nothing pending lives anywhere else.
-  Retire per the three-tier lifecycle in CLAUDE.md when the work ships.
--->
+<!-- ARCHIVED 2026-10-01 — shipped (gate G-R4 certified). Durable facts: docs/okf/frontend/features/link-analysis.md §Closed-plan record; unbuilt remainder: docs/BACKLOG.md §3.12 and §6. Provenance only; never read for current state. -->
 
 # Link Analysis — Backlog Plan (`INV-1` / `CP-09`)
 

@@ -28,7 +28,7 @@ import static com.gamma.geolink.InvestigationEvaluator.canonical;
 import static com.gamma.geolink.InvestigationEvaluator.strings;
 
 /**
- * The <b>Investigation Template</b> (LA-23, {@code docs/superpower/link-analysis-backlog-plan.md} §2.7; the Type half
+ * The <b>Investigation Template</b> (LA-23, {@code docs/archived-documents/plans-archive/link-analysis-backlog-plan.md} §2.7; the Type half
  * of the D-E1 pair): an Investigation's op log saved as a reusable METHOD, and instantiated into a new Investigation
  * over a (possibly different) Dataset with the same column roles.
  *

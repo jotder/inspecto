@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **51<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 31<!--count:backlog-p3--> × P3** —
+> **57<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 37<!--count:backlog-p3--> × P3** —
+> ⬆ **51 → 57 on 2026-10-01**: filed six demand-gated P3 rows from the retired Link Analysis backlog plan — `LA-SPA-OWED-SURFACES-1`, `LA-INVESTIGATION-OPS-DEFERRED-1`, `LA-LIVE-DETECTION-1`, `LA-DOSSIER-OUTPUT-1`, `LA-COLLECTOR-COVERAGE-1`, `LA-SEP-SPIKES-1` (§3.12).
 > ⬇ **56 on 2026-09-30**: closed P3 `ERRORCODE-DEFAULTED-1` (`2f6d5e52a`) — the last 15 bare `ApiException` sites (all 422s in `inspecto-geo-link`: `AdmiraltyGrade` 1 · `InvestigationCoverageRoutes` 4 · `PatternRoutes` 5 · `WorkingSetRoutes` 5) now pass `CONFIG_VALIDATION_FAILED`, the status default, so no wire change; 0 of 1155 sites take `defaultFor` (the derive's 4 remaining lines pass computed codes). Truth in `okf/capabilities/control-api/control-api.md`.
 > ⬆ **52 → 53 on 2026-09-29**: filed P3 `TEMPLATE-RECOVERY-IMPORT-GATE-1` (the zero-Space recovery create skips the import gate) from the `publish.postgres` review.
 > ⬆ **50 → 51 on 2026-09-29**: filed P3 `ASSURE-CLASSIFICATION-PROPAGATION-1` (carry column classification through lineage) from the `publish.postgres` security review.
@@ -111,8 +112,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 31<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 51<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 37<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 57<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -129,7 +130,7 @@ number** — rows moved between sections in this consolidation, and older docs c
 | [3.9](#39-cases-incidents--assistant) | Cases, Incidents & Assistant | [findings-spec-authoring-ui-design.md](archived-documents/plans-archive/findings-spec-authoring-ui-design.md) (archived) | AGT-6b |
 | [3.10](#310-deployment-packaging--scale-out) | Deployment, Packaging & Scale-out | [enterprise-scale-out-plan.md](superpower/enterprise-scale-out-plan.md) | Deployment topology live validation · `SPACES-FROM-PARTITION-MAP-1` · E1 |
 | [3.11](#311-web-ui--spa-wide-hygiene) | Web UI — SPA-wide hygiene | — | — |
-| [3.12](#312-link-analysis--geo) | Link Analysis & Geo | [link-analysis-backlog-plan.md](superpower/link-analysis-backlog-plan.md) — the ONLY Link Analysis backlog | — |
+| [3.12](#312-link-analysis--geo) | Link Analysis & Geo | [la-separation-execution-plan.md](superpower/la-separation-execution-plan.md) — option-D stages (the Link Analysis backlog plan was retired 2026-10-01) | — |
 | [4](#4-engineering-platform--build-test-ci--tooling) | Engineering platform — build, test, CI & tooling | — | — |
 | [5](#5-docs--board-hygiene) | Docs & board hygiene | — | — |
 
@@ -183,7 +184,7 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 
 | Area | Row | The call |
 |---|---|---|
-| 3.12 | Link Analysis | every open D-U* / LA-* call lives in `superpower/link-analysis-backlog-plan.md` |
+| 3.12 | Link Analysis | none — every `D-S*` / `D-E*` / `D-U*` call is answered (plan retired 2026-10-01); the option-D calls live in `superpower/la-separation-feasibility-plan.md` |
 | 3.2 | Platform Services Stage 2 / 3 | ✅ D-1…D-9 decided 2026-09-28 (operator, every recommendation accepted); open: D-10 ⏸ deferred, gates S3-3 only — `superpower/platform-services-stage2-design.md` §7 |
 | 3.5 | cross-Space consequence | none — all 12 answered (D2 2026-09-25; D1, D3–D12 2026-09-28, recommendations accepted); D10 named the consequence and lifted the ON HOLD |
 | 3.5 | `D8-SES-SNS-1` | none — every call answered (D1–D14; D12 operator-supplied GeoIP, country only); the row CLOSED 2026-09-29 when the `maxmind-db` resolver binding landed; the live SES checks are P3 `SES-SNS-LIVE-CHECKS-1` |
@@ -408,9 +409,18 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 
 ### 3.12 Link Analysis & Geo
 
-No board rows, by design: [`superpower/link-analysis-backlog-plan.md`](superpower/link-analysis-backlog-plan.md)
-is the **only** open backlog for Link Analysis (`INV-1` / `CP-09`) — its LA-* items, D-U* decisions and
-proofs live there, and nothing pending for it lives anywhere else. Geo map deferrals are in §6.
+`INV-1` / `CP-09`. The Link Analysis backlog plan was retired 2026-10-01 (every `LA-01`…`LA-24` item shipped,
+declined or closed; every `D-S*`/`D-E*`/`D-U*` decision answered; gate `G-R4` certified) — as-built in
+[`okf/frontend/features/link-analysis.md`](okf/frontend/features/link-analysis.md) §*Closed-plan record*,
+provenance in [`archived-documents/plans-archive/link-analysis-backlog-plan.md`](archived-documents/plans-archive/link-analysis-backlog-plan.md).
+What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
+
+- **P3** · `LA-SPA-OWED-SURFACES-1` — **SPA surfaces owed behind shipped Link Analysis backends.** Grounded 2026-10-01: the Investigation tab has no *reveal*, no approve / deny and no pending-expand rendering (`canRevealLinkEntities` / `canApproveLinkExpansions` appear only in the access catalog, so a four-eyes `pending` answer to an expand is not shown as such); it offers no hop-ladder rung fields or `window` op (`InvService` types carry them, no panel sends them); the Value Measures form omits the rolling `last:` window and `agentList` (typed on `ValueMeasureBlock` only); the Bundle UI does not surface `converted`; an Investigation started from the panel sends no `timeCol`, so its coverage read answers 422; the multi-mapping GraphSource has no node/edge `attributes`, per-edge `filter` authoring or expand. Trigger: an analyst needs the surface. → `okf/frontend/features/link-analysis.md`
+- **P3** · `LA-INVESTIGATION-OPS-DEFERRED-1` — **the unbuilt half of the Investigation model.** `threshold` and `snapshot` ops answer 422 *not implemented yet* (`InvestigationRoutes.DEFERRED`; in-window thresholds ship as rung fields instead); no calendar exclusions, comparison mode (two windows diffed), server-side time-respecting paths, timeline playback or burst / periodicity detection; no separate *layering* pack beyond `layering-chain` and no *circular-financing* branching pack (`circular-flow` still routes to the Cycles tool). Trigger: an operator asks for one by name. → `okf/frontend/features/link-analysis.md`
+- **P3** · `LA-LIVE-DETECTION-1` — **Investigation Template → Alert Rule is a one-off, not standing detection.** The Alert Rule watches the SEALED Working Set, so it moves when the log moves, never when the Dataset grows; owed: live (Monitoring) evaluation, scheduled re-instantiation (a Job Type), a PDP re-check at sweep time (a sweep has no Subject), a template list route and template sharing, editing a bound rule (today: delete, then re-bind). Blocked on: a Dataset read with no caller cannot pass the R3 gate the analyst's reads pass. → `okf/frontend/features/link-analysis.md`
+- **P3** · `LA-DOSSIER-OUTPUT-1` — **Dossier output formats.** Only `json` / `steps` / `method` exist (no PDF library in the dependency set); the Dossier is regenerated, not stored as an `opSeq`-anchored Artifact; centrality / risk tables are carried from a snapshot's client-computed scores (no server-side graph algorithm); a snapshot cannot be dossiered without an Investigation. → `okf/frontend/features/link-analysis.md`
+- **P3** · `LA-COLLECTOR-COVERAGE-1` — **per-Collector coverage.** The coverage indicator names days with zero rows; which Collectors are missing is not assessed (`collectors:{assessed:false}` in `InvestigationCoverageRoutes` and the Dossier negative space) because a Dataset row carries no Collector attribution. Options on record: provenance join Dataset filename → Consignment → Collector (physicalRef Datasets only; arrival ≠ event time) or arrival-only coverage from batches. Deferred by the operator until asked (D-U9). → `okf/frontend/features/link-analysis.md`
+- **P3** · `LA-SEP-SPIKES-1` — **separation spikes `D-S4` (algorithm parity) and `D-S5` (concurrency rig) are NOT RUN.** (These ids are the option-D spike ids of `superpower/la-separation-feasibility-plan.md` §7.10, not the retired plan's `D-S4`/`D-S5`, which were answered 2026-09-22/23.) `graph-analysis.ts` exports ~40 algorithms and exactly one (the branching pattern) has a Java port under a shared golden fixture; `D-S4` is Stage 2 of `superpower/la-separation-execution-plan.md` (iterative algorithms need tolerance-based parity); `D-S5` waits until D-7 (Drafts) is near; `D-S2` (DuckPGQ) is blocked — no build exists for the pinned DuckDB 1.5.2. → `okf/frontend/features/link-analysis.md`
 
 ## 4. Engineering platform — build, test, CI & tooling
 
@@ -547,6 +557,7 @@ someone asks what is still gated.
 
 #### Link Analysis & Geo
 
+- **Link Analysis — standing refusals and deferrals (reasons in `okf/frontend/features/link-analysis.md`)** — viewport culling and progressive edge loading (`LA-06`, refused as premature at a 500-node cap; reopen if the projection cap rises) · Web Worker for the algorithms (`LA-07`, closed 2026-09-23 — only betweenness is slow; reopen if an analyst reports the ~425 ms as a felt freeze) · retention / purge of Investigation evidence (`D-U8`, declined — append-only kept; reopen on a regulator or retention demand) · byte-identical replay `G-E2` (needs version-addressable Dataset reads; copy `ReferenceReader`'s SCD2 `asOf` when wanted) · four G6 plugins (`timebar`, `history`, `contextmenu`, `watermark`, `LA-09`) · module-contributed absent-surface list (`SEP-02`, keep `AbsentGeoLinkRoutes.SURFACE`; reopen with the standalone LA host)
 - **Geo map** — DuckDB `spatial` extension deferred (zero `ST_*` demand); progressive loading obsoleted by `GEO_POINT_CAP = 5000` → `okf/frontend/features/geo-map.md`
 
 #### Engineering platform

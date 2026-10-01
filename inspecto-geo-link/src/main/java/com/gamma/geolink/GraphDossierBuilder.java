@@ -16,7 +16,7 @@ import static com.gamma.geolink.InvestigationEvaluator.sha256;
 import static com.gamma.geolink.InvestigationEvaluator.strings;
 
 /**
- * The <b>Dossier</b> of one Investigation (LA-12, {@code docs/superpower/link-analysis-backlog-plan.md} §2.7, §3.4):
+ * The <b>Dossier</b> of one Investigation (LA-12, {@code docs/archived-documents/plans-archive/link-analysis-backlog-plan.md} §2.7, §3.4):
  * the evidential narrative, built mechanically from the sealed op log so no authored prose can drift from what the
  * analyst did.
  *

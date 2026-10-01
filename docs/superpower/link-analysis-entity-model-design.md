@@ -1,6 +1,6 @@
 # LA-17 — Entity model: design (slice 1: Entity Types + Entity Lists)
 
-> **Status:** 🟡 APPROVED 2026-09-26 (D-M1..D-M8); steps 1–5 done, step 6 panel done. Parent backlog: [`link-analysis-backlog-plan.md`](link-analysis-backlog-plan.md)
+> **Status:** 🟡 APPROVED 2026-09-26 (D-M1..D-M8); steps 1–5 done, step 6 panel done. Parent backlog: [`link-analysis-backlog-plan.md`](../archived-documents/plans-archive/link-analysis-backlog-plan.md)
 > row **LA-17** (§5, un-deferred 2026-09-24) and §2.6. Current knowledge: [`okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md).
 > When this plan and the code disagree, re-ground.
 

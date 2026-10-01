@@ -24,7 +24,7 @@ import java.util.Optional;
 import java.util.function.UnaryOperator;
 
 /**
- * The <b>Dossier</b> of an Investigation (LA-12, {@code docs/superpower/link-analysis-backlog-plan.md} §2.7, §3.4) —
+ * The <b>Dossier</b> of an Investigation (LA-12, {@code docs/archived-documents/plans-archive/link-analysis-backlog-plan.md} §2.7, §3.4) —
  * built by {@link GraphDossierBuilder} from what {@link SnapshotStore} holds, and verifiable later against the store.
  *
  * <ul>

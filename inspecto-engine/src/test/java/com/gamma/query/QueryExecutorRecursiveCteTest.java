@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The empirical check decision <b>D-S2</b> (Link Analysis, {@code docs/superpower/link-analysis-backlog-plan.md})
+ * The empirical check decision <b>D-S2</b> (Link Analysis, {@code docs/archived-documents/plans-archive/link-analysis-backlog-plan.md})
  * requires before server-side multi-hop traversal (LA-11) may be treated as a free option.
  *
  * <p>The question is narrow and structural. {@link QueryExecutor#run} wraps every caller's SQL as

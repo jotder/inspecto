@@ -17,7 +17,7 @@ Inspecto — with a Case, and later fingerprinting and 360 analysis?**
 | Drivers | Licensing / editions · architecture hygiene · customer ask · team parallelism |
 | Scope asked for | Split the module (Geo vs LA) · LA as a standalone product · move LA leftovers out of core · separate LA UI |
 | Module today | `inspecto-geo-link` (Professional / Enterprise; `CP-09` / `EDG-01`) |
-| Related plans | [`link-analysis-backlog-plan.md`](link-analysis-backlog-plan.md) (the LA feature backlog) · [`link-analysis-entity-model-design.md`](link-analysis-entity-model-design.md) · [`assurance-capability-plan.md`](assurance-capability-plan.md) (D-P10: Entity List is ONE kind shared with assurance) · [`enterprise-scale-out-plan.md`](enterprise-scale-out-plan.md) |
+| Related plans | [`link-analysis-backlog-plan.md`](../archived-documents/plans-archive/link-analysis-backlog-plan.md) (the LA feature backlog) · [`link-analysis-entity-model-design.md`](link-analysis-entity-model-design.md) · [`assurance-capability-plan.md`](assurance-capability-plan.md) (D-P10: Entity List is ONE kind shared with assurance) · [`enterprise-scale-out-plan.md`](enterprise-scale-out-plan.md) |
 | Grounding | Three independent code reads on 2026-09-27 (backend coupling · SPA coupling · packaging). ⛔ When this plan and the code disagree, re-ground; never trust the plan |
 
 ---
@@ -164,6 +164,8 @@ it exists here. Recommended: defer it (D3).
 
 **D-0 status (2026-10-01, worktree lane).** SEP-01 done: `DatasetRead` (inspecto-engine, `com.gamma.query`) is the Dataset-read port; geo-link main has no `new ComponentStore(` / `new ViewStore(` (the Alert Rule write in `InvestigationMeasureRoutes` goes through `DatasetRead.registry()`; `QueryExecutor.Request/Result` types are still used directly). SEP-03 done: `graph-view.component` + `catalog-graph` now live in `inspecto/graph/` (imported by path, NOT via the barrel, so G6 stays lazy). SEP-04 done: the brush service + the pure entity-id mint (`entityId`/`endpointId`/`entityIdCandidates`/`resolveEntityId`/`typedOrEntityId`) moved to `inspecto/graph/`; geo-map and link-analysis no longer import each other. SEP-05 done: the only `environments/environment` imports under the two features were two specs; now `apiUrl('')`. SEP-06 done: `geo-map.viz.ts` / `link-analysis.viz.ts` register their own render hosts from `app.config`; `widget.kind.ts` no longer imports either feature (reconciliation's host still registers there). **SEP-02 deferred** -- the absent stub must exist precisely when the module is NOT on the classpath, so a module-contributed list needs a design call (a build-time generated surface descriptor the core reads, vs. keeping `SURFACE` with the existing both-directions `GeoLinkAbsentSurfaceParityTest`); the parity test is the current guard.
 
+**D-0 closed (2026-10-01).** SEP-03 driven in the browser pane against `inspecto-ui` + the geo-link bundle: the shared graph canvas renders in Catalog → Lineage (137 nodes / 135 edges), in Link Analysis (the Lineage graph source, same 137 / 135, caps footer present) and in the Pipeline editor (`join_step` opened, G6 canvases present); the G6 chunk loads only on first graph use; no console errors beyond pre-existing `agent/approvals` 503s (inspecto-agent absent) and a `provenance/batches` 404 (no ingest yet). **SEP-02 decision: keep `AbsentGeoLinkRoutes.SURFACE`** guarded by `GeoLinkAbsentSurfaceParityTest`; revisit when the standalone host (D-5) exists ([`la-separation-execution-plan.md`](la-separation-execution-plan.md) §1.2, plan approved by the operator 2026-10-01).
+
 ### Phase 1 — the LA edition (**M**)
 
 | Id | Work | Proof |
@@ -268,7 +270,7 @@ LA uses them yet). Move Entity Lists to core so assurance works without LA, or k
 - **The graph is a browser feature.** All 27 algorithms run in the browser on the main thread; the backend
   folds and filters only ([`../okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md)).
   The projection is capped at 500 nodes **before** any centrality runs, and the analysis cap (2 000) throws
-  ([`link-analysis-backlog-plan.md`](link-analysis-backlog-plan.md) §1). The server-side exceptions so far are
+  ([`link-analysis-backlog-plan.md`](../archived-documents/plans-archive/link-analysis-backlog-plan.md) §1). The server-side exceptions so far are
   traversal, the hop ladder and the branching pattern
   (`inspecto-geo-link/src/main/java/com/gamma/geolink/PatternQueryCompiler.java`,
   `inspecto-geo-link/src/main/java/com/gamma/geolink/BranchingPatternEngine.java`).

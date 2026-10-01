@@ -249,7 +249,8 @@ node labels are untouched; the legend still names every link type.
 ## Grounded limits and consequences (code read 2026-09-20 / 2026-09-22)
 
 Durable as-built facts distilled from the archived `link-analysis-spec.md`. Open work against them is
-tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link-analysis-backlog-plan.md).
+tracked on the board (`docs/BACKLOG.md` §3.12 — see *Closed-plan record* below); the plan that held it is
+archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-archive/link-analysis-backlog-plan.md).
 
 | Limit | Value | Where | Behaviour at the edge |
 |---|---|---|---|
@@ -693,7 +694,9 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   (optional re-read → per-expand drift table) and re-order (up/down → an on-screen "this creates a fork"
   explanation → switch to the fork, whose header lineage is shown) are all wired. Truncation is shown from
   the log (every effective expand whose sealed read was cut), not only from the last response.
-  ⚠ **No list or get-one route exists**, so the SPA remembers the ids it created and saves them with the
+  ⚠ *(Superseded 2026-10-01 — see *Closed-plan record*: `GET /inv/investigations` lists what the caller may
+  read and the tab has *List Investigations* + *Open by id*.)* This paragraph was written when no list route
+  existed: the SPA also remembers the ids it created and saves them with the
   view (`LinkAnalysisView.investigations`: id, title, entityType, parentId); restoring a view opens none.
   ⚠ `/ops` and `/undo` answer the Working Set as COUNTS and the delta's link changes as counts, so the store
   re-reads `GET /log` + `POST /replay` after every mutation — which also writes a `link.investigation.replayed`
@@ -779,7 +782,7 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   rows and reads only the Investigation-scoped route, so a dashboard viewer who is not the owner sees *Not
   available to you*. ⛔ A Live Widget cannot leave the Space: the Exchange refuses Working Set Widgets (Frozen too,
   per D-E7), a bundle export converts Live → Frozen at its pin (`converted`). As-built:
-  `docs/superpower/link-analysis-backlog-plan.md` §5.8.
+  `docs/archived-documents/plans-archive/link-analysis-backlog-plan.md` §5.9.
 * **Annotation and the coverage indicator** (LA-19; backend 2026-09-24 in `InvestigationRoutes` /
   `InvestigationEvaluator` / `InvestigationCoverageRoutes`, SPA half the same day in the Investigation panel).
   *Annotate* sends `{op:'annotate', ids, note}` (note required, ≤ 2 000 chars) for the selected entity's Working
@@ -796,7 +799,7 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   needs a `timeCol` in the header and a bounded window, and *Start Investigation* sends no `timeCol` — so an
   Investigation started from this panel answers coverage with a 422, shown verbatim.
 * **Purpose, masking, four-eyes** (LA-19 operator decisions 2026-09-24, D-U5/D-U6/D-U7 — decision record in
-  `docs/superpower/link-analysis-backlog-plan.md` §4). *Start Investigation* now REQUIRES a *Purpose / legal
+  `docs/archived-documents/plans-archive/link-analysis-backlog-plan.md` §4). *Start Investigation* now REQUIRES a *Purpose / legal
   basis* field (the server answers 422 without one) and the template *Instantiate* form carries the same required
   field; the value is sealed in the header and shown in the Dossier, never enforced. Entity ids in every
   Investigation response may arrive MASKED as `masked:<16 hex>` per the Space's `maskingMode` (default `typed`:
@@ -885,6 +888,105 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   so its graph was ~1 200 disconnected edges** — useless for the analysis it was built to feed. A fixed
   population plus four planted stories (burner rotation, a one-way hub, a daily repeating pair, a SIM moved
   between handsets) makes it **873 edges over 174 nodes**.
+
+## Closed-plan record (2026-10-01)
+
+`link-analysis-backlog-plan.md` was the only open backlog for Link Analysis from 2026-09-22; it was retired
+2026-10-01 when gate `G-R4` certified ([archived](../../../archived-documents/plans-archive/link-analysis-backlog-plan.md);
+its §5 holds the per-route contracts and tamper-test narratives, kept for provenance). Every work item
+`LA-01`…`LA-24` and every decision `D-S1`…`D-U11` is SHIPPED, ANSWERED or DECLINED; the unbuilt remainder is
+filed on the board under the ids named below. The facts above are the as-built; this section adds only what
+no paragraph above states.
+
+**Measured limits — the shape, not the numbers.** One host, one browser, one synthetic shape (operator
+2026-09-22), so the numbers do not transfer and the caps are per-Space settings. The shape does: the default
+`dagre` layout has a **cliff between 500 and 750 nodes** (0.9 s → 10.7 s; 16.2 s at 1 000; force layout ~2.4×
+dearer at 500), which is why `PROJECTION_NODE_CAP = 500` is well chosen and cannot rise without changing the
+default layout. Analysis is not the constraint with ONE exception, **betweenness** (425 ms / 2.9 s / 9.8 s at
+500 / 1 000 / 2 000 nodes; the other 26 algorithms total ~129 ms at 2 000). 🔴 *Suspicion score* was first
+blamed because it was the only thing measured that called betweenness; the toolbox's centrality control offers
+seven algorithms and the sweep timed only the default (degree), so a per-feature table hid a
+per-option cliff — **time every option a control offers**. Betweenness now shares the lower 750 cap.
+`LA-07` (Web Worker for the algorithms) was therefore CLOSED 2026-09-23, not built: one slow algorithm under the
+750 cap does not repay a serialised-graph round trip plus new worker build config. Reopen only if an analyst
+reports the ~425 ms as a felt freeze. `LA-06`'s culling and progressive-load clauses were refused as premature
+(see above); if the projection cap ever rises, the cheap starting points are G6's registered
+`optimize-viewport-transform` and `auto-adapt-label`.
+
+**The model's closed rules** (the Investigation is the program, the Working Set its derived state, the Artifact
+immutable and anchored to a log position). The op vocabulary is **closed — no twelfth op without a decision
+entry**: `seed` · `seedBy` · `expand` · `exclude` · `excludeBy` · `keep` · `threshold` · `window` · `hide` ·
+`annotate` · `snapshot`; reasons: the backend is safe because it is narrow (`SAFE_IDENT` + bind parameters), a
+closed set renders mechanically as numbered plain-language steps for a court, and every open query language
+converges on SQL. As built, `undo` is a recorded log edit and **not** a twelfth op; `resolve` (LA-17) was added
+under its own decision (design `D-M…`) to seal identity groups. `threshold` and `snapshot` still answer 422 *"not implemented yet"* (`InvestigationRoutes.DEFERRED`),
+never *"unknown"*. The log is **ordered and non-commutative** (`exclude → expand` ≠ `expand → exclude`;
+re-ordering forks, D-E4); **`hide` ≠ `exclude` ≠ `keep`** (hide: gone from display, still traversed and counted;
+exclude: gone from all three, still inspectable as the `excluded` relation; keep: protected from later
+excludes). Two evaluators, one spec — incremental on append, full replay from the sealed log — with an
+`equivalent` check that is pinned to be able to FAIL. **Negative space is part of every rendering** (G-E10).
+Not built from the target model: comparison mode (two windows diffed), time-respecting paths on the server,
+timeline playback and burst / periodicity detection, calendar exclusions — see `LA-INVESTIGATION-OPS-DEFERRED-1`.
+
+**Listing and link notes (2026-10-01).** `GET /inv/investigations` lists what the caller may read — own plus
+those shared through an open linked Case, each judged by `openForRead` so R3 and a PDP DENY hide it — `{id,
+title, dataset, owner, createdAt, headStep, caseRef?, access: owner|case-member, readOnly}`, newest first,
+`limit`/`offset`/`total`/`truncated`. The Investigation tab has *List Investigations* (rows openable; Case-shared
+rows read-only) and *Open by id*; link notes are sent by `linkId` (*Annotate link*), the sealed `linkAnnotations`
+render, and the Dossier stamps `linkId` on its link annotations.
+
+**Decisions of record not stated above.**
+* **D-E3 deferral — byte-identical replay (`G-E2`) needs version-addressable Dataset reads and is the ONLY gate
+  that does.** `G-E11` (an Evidence Widget does not move) and `G-E3` (divergence detected, never served) are
+  satisfied today by sealing + fingerprint comparison. A recorded file list was **rejected** as a pin: compaction
+  moves files to `COMPACTED_AWAY`, so it would name files maintenance may delete — a pin that rots is worse than
+  none. When replay is wanted, copy `ReferenceReader`'s shipped SCD2 `asOf` read rather than inventing one.
+* **D-U8 — NO purge** (operator 2026-09-24): no retention period, no purge task, no legal-hold record; the store
+  stays append-only evidence. Reopen only if a regulator or retention policy demands it; the pattern to copy is
+  `incident_purge`.
+* **D-U9 — per-Collector coverage is DEFERRED until asked** (`collectors:{assessed:false}` in the coverage route and
+  the Dossier negative space) — `LA-COLLECTOR-COVERAGE-1`.
+* **D-U11 (2026-09-30) answers** that no paragraph above carries: A1 a snapshot captures what is on screen · A2 the
+  cash-out share denominator is ALL cash-out · A3 the agent Entity List is read LIVE and its fact-log head seq/hash
+  is recorded on each firing (`evidence.agentList` / `agentListSeq` / `agentListHash`) · A4 a retired list is 409 ·
+  A5 value-measure queries run in UTC · A9 `coverage` is readable by Case members (reverses D-U10's owner-only) ·
+  A10 pinned Widgets are unaffected. Merged-exclude follow-ups: the resolution view is widened by the SAME
+  matching rule as exclude/expand; only an UNAMBIGUOUS untyped match counts; old dev logs replaying
+  not-equivalent are acceptable (no compat path); the Dossier line states the full outcome.
+* **Naming (D-E1):** *Investigation* / *Investigation Template*; the Assistant's RCA run took *Triage* instead
+  (`GLOSSARY-CASE-1`, closed).
+* **`SEP-02` (separation plan, decided 2026-10-01):** keep `AbsentGeoLinkRoutes.SURFACE`, guarded in both
+  directions by `GeoLinkAbsentSurfaceParityTest`; revisit when the standalone LA host exists. A module-contributed
+  list cannot serve the stub, which must exist precisely when the module is NOT on the classpath.
+
+**`G-R4` certification (LA-11).** 5-hop recursive paths over a heavy-tailed 10⁶-edge Dataset, through the real
+route: warm p95 **209 / 188 / 171 ms** from a median-degree / p99 / top-hub start (all < 350 ms; the gate is stated
+on warm runs, cold p95 388 / 181 / 163 ms over 5 runs). The fix that mattered: `EXPLAIN ANALYZE` showed the
+recursion running TWICE (`__walk` read by the paths and again by the level widths) → `__walk AS MATERIALIZED`.
+Also: the column probe is folded into the walk's own session (`QueryExecutor.runPlanned`), and the walk runs under
+its own `-Dassist.sql.traversal_threads` (default 4; every other sandbox query keeps `assist.sql.threads`, 2).
+Harness `InvTraversalBench` (`@Tag("bench")`, skipped unless `-Dinspecto.bench.dir`); method in
+`la-separation-feasibility-plan.md` §7.10.1.
+
+**Gotchas worth keeping.**
+* The plan once said the `/inv/*` routes could not appear in `openapi-v1.json` because the contract test lives
+  in a module with no edge to the optional `inspecto-geo-link`. **That is no longer true** — all 38 `/inv/…`
+  paths are in `docs/api/openapi-v1.json`; trust the file, not the old note.
+* A DI change is invisible to type-checking (removing public methods from an injectable compiled clean; only
+  the specs found a caller using `new Service()`), and `link-analysis.component.spec.ts` (the only spec driving the
+  snapshot-and-attach flow end to end) was found 28/28 red on master (2026-09-23) and had hidden every regression
+  it guards — read a flow spec's last green date.
+* A well-tested evaluator can be DEAD while the live path has none (`evaluateRows` had zero callers): reviving it
+  must turn mirror coverage into live coverage.
+* Plan claims here went stale within days (five-place-wrong audit table; a premise that "published routes"
+  would break a rename when none had shipped; line cites drifting). Re-ground against code before acting on any
+  plan row — including these.
+* Live check 2026-09-30 (Enterprise `-DemoAuth` bundle, three Demo Users): 33/33 steps passed once the demo Dataset
+  classified its account columns as `ACCOUNT` and `account_links_dataset` existed for identity import.
+
+**Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-SPA-OWED-SURFACES-1` ·
+`LA-INVESTIGATION-OPS-DEFERRED-1` · `LA-LIVE-DETECTION-1` · `LA-DOSSIER-OUTPUT-1` · `LA-COLLECTOR-COVERAGE-1` ·
+`LA-SEP-SPIKES-1`. Standing refusals with reopen triggers are in §6 under *Link Analysis & Geo*.
 
 Design (archived): [`link-analysis-and-graphsource.md`](../../../archived-documents/plans-archive/link-analysis-and-graphsource.md)
 · [`link-analysis-projection-authoring-plan.md`](../../../archived-documents/plans-archive/link-analysis-projection-authoring-plan.md)

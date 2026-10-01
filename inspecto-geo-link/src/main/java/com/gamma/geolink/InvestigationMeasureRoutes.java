@@ -21,7 +21,7 @@ import java.util.Set;
 import java.util.function.UnaryOperator;
 
 /**
- * <b>Measure over the Working Set → Alert Rule</b> (LA-23, {@code docs/superpower/link-analysis-backlog-plan.md}
+ * <b>Measure over the Working Set → Alert Rule</b> (LA-23, {@code docs/archived-documents/plans-archive/link-analysis-backlog-plan.md}
  * §2.7: {@code Template → Measure over the relation → Alert Rule → Alert → Incident}).
  *
  * <ul>

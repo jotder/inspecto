@@ -153,7 +153,7 @@ mostly integration against the customer's own systems.
 
 **Not in this plan for other reasons:** WS-14 velocity / baseline Steps (Step Processor hold, operator
 2026-09-23 — SQL windows cover detection meanwhile); WS-29 investigation evidential controls (owned by
-[`link-analysis-backlog-plan.md`](link-analysis-backlog-plan.md), which is re-landing it); ML scoring and
+[`link-analysis-backlog-plan.md`](../archived-documents/plans-archive/link-analysis-backlog-plan.md), which is re-landing it); ML scoring and
 Arabic / RTL (roadmap).
 
 ## 5. Operator decisions owed (internal — no customer needed)

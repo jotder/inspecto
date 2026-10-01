@@ -6,7 +6,7 @@ import java.util.Optional;
 
 /**
  * The Space rule for a <b>Working Set Widget</b> (LA-21, decision D-E6 in
- * {@code docs/superpower/link-analysis-backlog-plan.md} §4): a {@code widget} component whose content carries a
+ * {@code docs/archived-documents/plans-archive/link-analysis-backlog-plan.md} §4): a {@code widget} component whose content carries a
  * {@code workingSet} binding {@code {relation, mode, pin{step, workingSetHash, pinnedAt}}} and whose {@code viewId} names
  * the Investigation it reads. The Widget holds NO rows — every render reads through
  * {@code GET /inv/investigations/{id}/working-set}, so the owner-only / PDP gate (D-E7) applies on every read.

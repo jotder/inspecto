@@ -45,7 +45,7 @@ import static com.gamma.geolink.InvestigationEvaluator.evaluate;
 import static com.gamma.geolink.InvestigationEvaluator.strings;
 
 /**
- * The <b>Investigation</b> object (LA-10, {@code docs/superpower/link-analysis-backlog-plan.md} §2, §5.5): an
+ * The <b>Investigation</b> object (LA-10, {@code docs/archived-documents/plans-archive/link-analysis-backlog-plan.md} §2, §5.5): an
  * ordered, append-only op log over one Dataset + projection mapping, and the <b>Working Set</b> it evaluates to.
  *
  * <ul>
