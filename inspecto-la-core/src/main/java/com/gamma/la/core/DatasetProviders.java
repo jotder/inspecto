@@ -18,19 +18,26 @@ public final class DatasetProviders {
 
     private static final SpiSlot<DatasetProvider> SLOT = new SpiSlot<>(DatasetProvider.class);
 
+    private static volatile boolean forcedAbsent;
+
     private DatasetProviders() {}
 
     public static Optional<DatasetProvider> active() {
-        return SLOT.active();
+        return forcedAbsent ? Optional.empty() : SLOT.active();
     }
 
     /** The provider, or a clean {@code 503} {@link ApiException} when none is bound. */
     public static DatasetProvider require() {
-        return SLOT.active().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, MESSAGE));
+        return active().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, MESSAGE));
     }
 
     /** Test seam: force the provider for this JVM; {@code null} re-arms classpath discovery. */
     public static void forTest(DatasetProvider provider) {
         SLOT.forTest(provider);
+    }
+
+    /** Test seam: behave as if no provider is bound ({@code true}) - even when the bridge is on the classpath - or restore ({@code false}). */
+    public static void forTestAbsent(boolean absent) {
+        forcedAbsent = absent;
     }
 }

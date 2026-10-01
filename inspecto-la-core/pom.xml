@@ -82,18 +82,6 @@
 
     <build>
         <plugins>
-            <!-- Publish a test-jar: the LA-owned fake DatasetProvider is reused by inspecto-la-api's tests. -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>test-jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
             <!-- LA separation D-1 (Decision 5): this module may reach ONLY the inspecto-* modules below, directly or
                  transitively, at compile/provided/runtime scope. tools/check-module-deps.mjs derives the same answer from the
                  poms and fails if this list drifts from its ALLOWED table. -->
