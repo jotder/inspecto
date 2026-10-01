@@ -27,9 +27,9 @@ Question: can the browser algorithms run server side with identical results?
 
 - **Reference:** `inspecto-ui/src/app/inspecto/graph/graph-analysis.ts` (~40 exports). **Template:** the branching pattern —
   `BranchingPatternEngine.java` + `branching-parity.fixture.json`, asserted by both `branching-parity.spec.ts` and a Java test.
-- **2.1 Inventory.** Classify every export: *exact* (degree, components, shortest path, k-core…), *iterative* (PageRank,
+- **2.1 Inventory.** ✅ DONE 2026-10-01 (§7.13). Classify every export: *exact* (degree, components, shortest path, k-core…), *iterative* (PageRank,
   eigenvector, Katz, HITS, Louvain), *UI-only* (layout, styling — not ported). Write the table into the feasibility plan §7.10.1.
-- **2.2 Tranche A — exact algorithms.** Port a first batch to a new package in `inspecto-geo-link` (no new module yet;
+- **2.2 Tranche A — exact algorithms.** 🟡 slice 1 done (6 of 17: `shortestPath` `neighborhood` `degreeCentrality` `connectedComponents` `kCore` `triangleCount`), mutation-checked. Port a first batch to a new package in `inspecto-geo-link` (no new module yet;
   D-1 moves it). One golden fixture per algorithm, asserted byte-for-byte in TS and Java.
 - **2.3 Tranche B — iterative algorithms.** Tolerance-based parity: fixed iteration count, fixed seed and tie-break order,
   stated epsilon per algorithm. ⚠ Louvain is order-sensitive — pin the node order in the fixture or accept

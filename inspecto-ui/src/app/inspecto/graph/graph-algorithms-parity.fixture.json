@@ -1,0 +1,37 @@
+{
+  "_doc": "D-S4 parity fixture, tranche A slice 1. Asserted by graph-algorithms-parity.spec.ts (browser) AND GraphAlgorithmsParityTest (inspecto-geo-link). The expected values are DERIVED BY HAND from the graph, not produced by either implementation. Labels are lowercase ASCII on purpose: ties break by label, and the browser uses localeCompare while Java uses ordinal compare, which agree only on such labels. Every edge endpoint is a node (the algorithms assume a closed graph). e4 duplicates e1 and e11 is a self-loop, to pin the multigraph rules: degree counts both, the undirected simple-graph algorithms collapse them.",
+  "graph": {
+    "nodes": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"],
+    "edges": [
+      ["e1", "a", "b"],
+      ["e2", "b", "c"],
+      ["e3", "c", "a"],
+      ["e4", "a", "b"],
+      ["e5", "c", "d"],
+      ["e6", "d", "e"],
+      ["e7", "e", "f"],
+      ["e8", "f", "g"],
+      ["e9", "g", "e"],
+      ["e10", "i", "j"],
+      ["e11", "j", "j"]
+    ]
+  },
+  "expected": {
+    "degree": [["a", 3], ["b", 3], ["c", 3], ["e", 3], ["j", 3], ["d", 2], ["f", 2], ["g", 2], ["i", 1], ["h", 0]],
+    "components": [["a", "b", "c", "d", "e", "f", "g"], ["i", "j"], ["h"]],
+    "kCore": [["a", 2], ["b", 2], ["c", 2], ["d", 2], ["e", 2], ["f", 2], ["g", 2], ["i", 1], ["j", 1], ["h", 0]],
+    "triangles": [["a", 1], ["b", 1], ["c", 1], ["e", 1], ["f", 1], ["g", 1], ["d", 0], ["h", 0], ["i", 0], ["j", 0]],
+    "shortestPath": [
+      { "from": "a", "to": "g", "direction": "both", "nodeIds": ["a", "c", "d", "e", "g"], "edgeIds": ["e3", "e5", "e6", "e9"] },
+      { "from": "a", "to": "g", "direction": "out", "nodeIds": ["a", "b", "c", "d", "e", "f", "g"], "edgeIds": ["e1", "e2", "e5", "e6", "e7", "e8"] },
+      { "from": "a", "to": "b", "direction": "in", "nodeIds": ["a", "c", "b"], "edgeIds": ["e3", "e2"] },
+      { "from": "a", "to": "a", "direction": "both", "nodeIds": ["a"], "edgeIds": [] },
+      { "from": "a", "to": "i", "direction": "both", "nodeIds": null, "edgeIds": null }
+    ],
+    "neighborhood": [
+      { "node": "a", "hops": 1, "direction": "both", "nodeIds": ["a", "b", "c"], "edgeIds": ["e1", "e2", "e3", "e4"] },
+      { "node": "a", "hops": 2, "direction": "both", "nodeIds": ["a", "b", "c", "d"], "edgeIds": ["e1", "e2", "e3", "e4", "e5"] },
+      { "node": "a", "hops": 1, "direction": "out", "nodeIds": ["a", "b"], "edgeIds": ["e1", "e4"] }
+    ]
+  }
+}
