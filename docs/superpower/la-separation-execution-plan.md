@@ -41,7 +41,7 @@ Question: can the browser algorithms run server side with identical results?
 
 ## Stage 3 — decide D-1 (planning only, no code)
 
-✅ DESIGN WRITTEN 2026-10-01 — [`la-separation-d1-design.md`](la-separation-d1-design.md); the five decisions in its §5 await the operator's signature before any extraction starts.
+✅ DESIGN WRITTEN 2026-10-01 — [`la-separation-d1-design.md`](la-separation-d1-design.md); the five decisions in its §5 were SIGNED 2026-10-01 (all recommendations). Next: D-1 step 1 (`la-graph`) and step 2 (`inspecto-audit-spi`), independent lanes.
 
 Using Stage 2's findings, write the D-1 design (`http-spi`, `auth-spi` + OIDC move, `audit-spi` cutting the ETL edge,
 the `la-inspecto` bridge) with a module dependency guard, the order of extraction, and what proves Inspecto's behaviour

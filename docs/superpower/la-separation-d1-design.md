@@ -1,7 +1,7 @@
 <!--
   ACTIVE PLAN — docs/superpower/
-  Created 2026-10-01 (Stage 3 of la-separation-execution-plan.md). DESIGN ONLY — nothing is built; every call below
-  that is the operator's is on a "Decision" line and is UNSIGNED until the operator writes the Answer.
+  Created 2026-10-01 (Stage 3 of la-separation-execution-plan.md). DESIGN ONLY — nothing is built. DECISIONS 1–5 SIGNED 2026-10-01
+  (operator: "go with your recommendations"); no step is started by this.
   Retire per the three-tier lifecycle in CLAUDE.md when D-1 ships (or is declined).
 -->
 
@@ -99,30 +99,30 @@ Steps 1 and 2 are independent and can run in parallel lanes; 3 precedes 4–6; 5
 for everything host-side, including for the non-LA modules.
 *Recommendation:* (a) for the platform and the non-LA modules (mechanical, one line per file), and LA-owned ports (§2)
 only for LA's three real needs — (b) for all modules is a wider rewrite with no second customer.
-**Answer:** *(unsigned)*
+**Answer:** (a) for the platform and the non-LA modules (`ApiContext` SPI + `HostContext` in the core, `HostContext.of(ctx)`), and LA-owned ports (§2) only for LA's three real needs. — operator 2026-10-01
 
 **Decision 2 — Package names for moved classes.** Keep `com.gamma.control` (and `com.gamma.event`) so D-1 is a pure move with no
 import churn, or rename now to `com.gamma.spi.*`?
 *Recommendation:* keep for D-1; rename in a separate mechanical change if JPMS or a clean public surface is wanted.
-**Answer:** *(unsigned)*
+**Answer:** keep `com.gamma.control` / `com.gamma.event` for D-1; rename in a separate mechanical change if JPMS or a clean public surface is wanted. — operator 2026-10-01
 
 **Decision 3 — Where LA's event-type constants live.** Move the 59 `LINK_*` constants out of core into `la-core` in step 5
 (requires `EventType` to accept module-defined types, or LA to define its own constants class), or leave them in
 `inspecto-audit-spi` for D-1 and move them at D-5?
 *Recommendation:* leave them for D-1 (step 2 stays a pure move); move them in step 5 once `la-core` exists, since nothing
 outside `inspecto-event` enumerates the type.
-**Answer:** *(unsigned)*
+**Answer:** leave the 59 `LINK_*` constants in `inspecto-audit-spi` for D-1 (step 2 stays a pure move); move them in step 5 once `la-core` exists. — operator 2026-10-01
 
 **Decision 4 — Order against Entity Lists (D7 / SEP-08).** Do SEP-08 (Entity List routes to core) **before** step 5, or
 let `la-core` own them in D-1 and move them later?
 *Recommendation:* SEP-08 first — one move now beats two, and assurance WS-12 needs Entity Lists without LA.
-**Answer:** *(unsigned)*
+**Answer:** SEP-08 first (Entity List routes to core before step 5). — operator 2026-10-01
 
 **Decision 5 — Dependency guard form.** `maven-enforcer` banned-dependency rules only, or those **plus** a dependency-tree
 test under `tools/`?
 *Recommendation:* both — the enforcer fails fast at build time, the tool test is mutation-checkable in CI like the repo's
 other derived guards.
-**Answer:** *(unsigned)*
+**Answer:** both — `maven-enforcer` banned-dependency rules plus a dependency-tree test under `tools/`, mutation-checked. — operator 2026-10-01
 
 ## 6. References
 
