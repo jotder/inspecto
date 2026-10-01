@@ -575,7 +575,7 @@ against a repeat. Round-trip equality holds only for `${…}` *references*: mask
 (`toBundleMap`) a literal is deliberate loss.
 
 **Secrets are never literals.** `SecretResolver`
-(`inspecto-acquire/src/main/java/com/gamma/acquire/SecretResolver.java`) expands **five** forms at connect
+(`inspecto-auth-spi/src/main/java/com/gamma/acquire/SecretResolver.java`) expands **five** forms at connect
 time, never at load — and `isResolvable()` answers the same question for a connection test without
 exposing the value:
 

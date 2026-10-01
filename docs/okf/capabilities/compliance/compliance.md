@@ -503,7 +503,7 @@ whichever edition was staged last, which reads exactly like a real failure.
 | The plan's provenance | `docs/archived-documents/plans-archive/compliance-certifications-plan.md` | ⛔ **ARCHIVED 2026-09-09** — a DRAFT, and several of its unratified claims are refuted in the current tier; read its banner before quoting anything from it |
 | Bill of materials · signing · dependency review | `tools/sbom.mjs`, `tools/check-dependencies.mjs`, `tools/dependencies.lock`, `.github/workflows/release.yml`, `.github/workflows/ci.yml`, `inspecto/package.ps1` | `PKG`, `TOOL` |
 | Audit trail · retention | `inspecto-auth-spi/src/main/java/com/gamma/control/AuditTrail.java`; `inspecto-audit-spi/src/main/java/com/gamma/event/EventStore.java` | `OPS` |
-| Access control · secrets | `inspecto-auth-spi/src/main/java/com/gamma/control/CapabilityManifest.java`, `Roles.java`; `inspecto-acquire/src/main/java/com/gamma/acquire/SecretResolver.java` | `SEC` |
+| Access control · secrets | `inspecto-auth-spi/src/main/java/com/gamma/control/CapabilityManifest.java`, `Roles.java`; `inspecto-auth-spi/src/main/java/com/gamma/acquire/SecretResolver.java` | `SEC` |
 | Configuration safety | `inspecto-config/src/main/java/com/gamma/config/safety/ConfigSafetyValidator.java`, `PathJail.java` | `PIP`, `SEC` |
 | Processing integrity | `inspecto/src/main/java/com/gamma/expectation/ExpectationEvaluator.java`; `inspecto-etl/src/main/java/com/gamma/etl/QuarantineManager.java`; `inspecto-engine/src/main/java/com/gamma/consignment/GuardedSummaryEmitter.java` | `ING`, `PIP` |
 | Change-management gates | `.github/workflows/branch-policy.yml`, `ui.yml`; `tools/check-vocabulary.mjs` | `TOOL`, `UI` |

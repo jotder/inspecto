@@ -33,14 +33,22 @@
     </properties>
 
     <dependencies>
-        <!-- The core: the Authenticator SPI + Subject. PROVIDED (SEC-SIDECAR-BOOT-1, 2026-09-07): this jar
-             is dropped onto a running engine's classpath, where inspecto.jar already supplies all of it.
-             Compile scope would drag the whole core into the shaded sidecar below. -->
+        <!-- The auth SPI: Authenticator, Subject, Roles, ComponentAccess, TokenRelay, GeoCountryResolver, SecretsProvider,
+             EgressPolicy (D-1 step 4, 2026-10-01 — this module no longer depends on the core at all). PROVIDED
+             (SEC-SIDECAR-BOOT-1, 2026-09-07): this jar is dropped onto a running engine's classpath, where inspecto.jar
+             already supplies all of it. Compile scope would drag the SPI into the shaded sidecar below. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-auth-spi</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- The core, for TESTS only: AuthenticatorDiscoveryFailClosedTest boots a real CollectorService. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-processor</artifactId>
             <version>${project.version}</version>
-            <scope>provided</scope>
+            <scope>test</scope>
         </dependency>
 
         <!-- JOSE/JWT signature verification + JWKS (Apache 2.0). Confined to this module. -->

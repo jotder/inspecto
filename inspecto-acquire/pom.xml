@@ -41,6 +41,11 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-event</artifactId>
         </dependency>
+        <!-- SecretResolver / SecretsProvider live in the auth SPI since D-1 step 4 (the security module needs them without the core). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-auth-spi</artifactId>
+        </dependency>
 
         <!-- Logging — slf4j-api facade (parent-managed). -->
         <dependency>
