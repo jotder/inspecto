@@ -17,6 +17,35 @@ import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import angular from 'angular-eslint';
 
+// Dynamic `import('...')` twin of the `no-restricted-imports` block further down (that rule ignores
+// ImportExpression). esquery regexes cannot hold `)` or groups, so every restricted module is written as
+// an exact match plus a `/`-prefix match. Keep these lists in step with that block's groups.
+const HOST_MSG =
+    'Link Analysis / Geo must not import host features (dynamic import): inject a token from app/inspecto/la-host instead (D-5 prep).';
+const EDGE_MSG =
+    'Tags / Transfer / AI assist / Cases are host edges (dynamic import): inject LA_TAGS / LA_TRANSFER / LA_AI_ASSIST / LA_CASES from app/inspecto/la-host instead (D-5 prep).';
+const dynSel = (re, message) => ({ selector: `ImportExpression > Literal.source[value=${re}]`, message });
+const SL = String.raw`\/`; // an escaped slash inside the selector regex
+const exactOrUnder = (mod, message) => [
+    dynSel(`/^${mod.replaceAll('/', SL)}$/`, message),
+    dynSel(`/^${mod.replaceAll('/', SL)}${SL}/`, message),
+];
+const laDynamicImportSelectors = [
+    dynSel(String.raw`/^\.\.$/`, HOST_MSG),
+    dynSel(String.raw`/^\.\.\//`, HOST_MSG),
+    ...['app/modules', 'src/app/modules'].flatMap((m) => exactOrUnder(m, HOST_MSG)),
+    ...['tags', 'transfer', 'ai-assist'].flatMap((m) =>
+        ['app', 'src/app'].flatMap((root) => exactOrUnder(`${root}/inspecto/${m}`, EDGE_MSG)),
+    ),
+    ...exactOrUnder('app/inspecto/api/objects.service', EDGE_MSG),
+    ...exactOrUnder('src/app/inspecto/api/objects.service', EDGE_MSG),
+    {
+        selector: 'ImportExpression > :not(Literal).source',
+        message:
+            'Dynamic import() in Link Analysis / Geo needs a string-literal specifier so the separation rule can check it (D-5 prep).',
+    },
+];
+
 export default tseslint.config(
     {
         // Same exclusions as .prettierignore: build output, the vendored gamma/Fuse template (the
@@ -64,7 +93,8 @@ export default tseslint.config(
         // feature code is the future `projects/link-analysis` library. It must not import a host feature
         // (`app/modules/**`) nor escape its own folder with `../`; everything host-specific enters through the
         // injected tokens in `app/inspecto/la-host`, provided by `modules/admin/studio/la-host.providers.ts`.
-        // Specs are exempt (they may import host doubles). Dynamic `import()` is not covered by this rule.
+        // Specs are exempt (they may import host doubles). Dynamic `import()` is not seen by
+        // `no-restricted-imports`, so `no-restricted-syntax` below applies the same restrictions to it.
         files: ['src/app/modules/admin/studio/link-analysis/**/*.ts', 'src/app/modules/admin/studio/geo-map/**/*.ts'],
         ignores: ['**/*.spec.ts'],
         rules: {
@@ -108,6 +138,9 @@ export default tseslint.config(
                     ],
                 },
             ],
+            // Same restrictions for dynamic `import('...')` (lazy routes, `await import(...)`), which
+            // `no-restricted-imports` ignores. Keep the two regexes in step with the groups above.
+            'no-restricted-syntax': ['error', ...laDynamicImportSelectors],
         },
     },
     {
