@@ -8,7 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { ComponentsService } from 'app/inspecto/api';
+import { ComponentsService, GraphRunResult, GraphScoreView, GraphSuspicionView } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import {
     BranchStage,
@@ -21,6 +21,7 @@ import {
     PredictedLink,
     SuspicionScore,
     allPaths,
+    analysisNodeCapValue,
     articulationPoints,
     betweennessCentrality,
     bridges,
@@ -45,6 +46,7 @@ import {
     neighborhood,
     pageRank,
     shortestPath,
+    suspicionNodeCapValue,
     suspicionScore,
     thresholdLabel,
     triangleCount,
@@ -57,6 +59,16 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { FormsModule } from '@angular/forms';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { ServerPathsState, ServerPatternState } from './entity-projection';
+import { LinkAnalysisServerRunComponent } from './link-analysis-server-run.component';
+import {
+    ServerIdMap,
+    toCommunityMap,
+    toGroups,
+    toNodeScores,
+    toPredictedLinks,
+    toSelection,
+    toSuspicionScores,
+} from './graph-run-apply';
 
 /**
  * LA-11: what the analyst asked the server to walk. `mapping` is the index into the host's
@@ -91,6 +103,18 @@ type AnalysisTab =
     | 'similarity'
     | 'flow'
     | 'scoring';
+
+/** The tool groups that can hand an over-cap run to the server (D-4 step 7). */
+type ServerTool = 'centrality' | 'communities' | 'cliques' | 'prediction' | 'flow' | 'scoring';
+
+/** One "Run on server" control: which server algorithm, with what parameters, why the browser did not run it. */
+export interface ServerRunSpec {
+    algorithm: string;
+    params: Record<string, unknown>;
+    note: string;
+    /** Why the run cannot start yet (a missing pick); '' = nothing holds it. */
+    hold: string;
+}
 
 /** The metrics the Centrality group can rank by — each returns a {@link NodeScore} list. */
 type CentralityMetric =
@@ -127,6 +151,7 @@ type CentralityMetric =
         InspectoOptionPickerComponent,
         FormsModule,
         RiskScorePanelComponent,
+        LinkAnalysisServerRunComponent,
     ],
     templateUrl: './link-analysis-toolbox.component.html',
 })
@@ -220,6 +245,15 @@ export class LinkAnalysisToolboxComponent {
     readonly serverPattern = input<ServerPatternState | null>(null);
     readonly serverPatternBusy = input(false);
 
+    /**
+     * D-4 step 7: the Investigation whose Working Set the canvas draws (null = the canvas shows a query graph, so a
+     * server run has nothing to run over), the server-to-canvas id translation for that Working Set, and whether the
+     * Subject holds `canRunLinkGraphAnalysis`.
+     */
+    readonly investigationId = input<string | null>(null);
+    readonly serverIds = input<ServerIdMap | null>(null);
+    readonly canRunOnServer = input(true);
+
     /** A selection to emphasize on the canvas (`null` clears). */
     readonly emphasisChange = output<GraphEmphasis | null>();
     /** LA-11: run a server-side multi-hop traversal — the host owns the call (this panel has no HTTP). */
@@ -308,6 +342,96 @@ export class LinkAnalysisToolboxComponent {
     readonly riskModel = signal('');
     /** The node whose Risk Score factor breakdown is shown (its id is the entity key). */
     readonly riskEntity = signal<string | null>(null);
+
+    /**
+     * Where an algorithm the browser would REFUSE (graph above its cap) goes instead: the server. Each entry is
+     * non-null only when the displayed graph is over that algorithm's cap - at or under it the local run is
+     * untouched. A computed, so the child control gets a stable object until something it depends on changes.
+     */
+    readonly serverSpecs = computed<Record<ServerTool, ServerRunSpec | null>>(() => {
+        const n = this.graph()?.nodes.length ?? 0;
+        const spec = (
+            algorithm: string,
+            cap: number,
+            params: Record<string, unknown> = {},
+            hold = '',
+        ): ServerRunSpec | null =>
+            n > cap
+                ? {
+                      algorithm,
+                      params,
+                      hold,
+                      note: `This graph has ${n} nodes - above the ${cap}-node limit for running this in the browser.`,
+                  }
+                : null;
+        const analysis = analysisNodeCapValue();
+        const metric = this.centralityMetric();
+        const centrality =
+            metric === 'betweenness'
+                ? spec('betweennessCentrality', suspicionNodeCapValue())
+                : metric === 'closeness'
+                  ? spec('closenessCentrality', analysis)
+                  : metric === 'eigenvector'
+                    ? spec('eigenvectorCentrality', analysis)
+                    : metric === 'katz'
+                      ? spec('katzCentrality', analysis)
+                      : metric === 'hub' || metric === 'authority'
+                        ? spec('hits', analysis)
+                        : null; // degree and PageRank have no browser cap
+        const from = this.serverIds()?.serverNode(this.flowFrom());
+        const to = this.serverIds()?.serverNode(this.flowTo());
+        return {
+            centrality,
+            communities: spec(
+                this.communityMethod() === 'louvain' ? 'louvainCommunities' : 'detectCommunities',
+                analysis,
+            ),
+            cliques: this.cohesionMetric() === 'cliques' ? spec('cliques', analysis) : null,
+            prediction: spec('linkPrediction', analysis),
+            flow: spec(
+                'maxFlow',
+                analysis,
+                from && to ? { from, to } : {},
+                from && to ? '' : 'Pick a source and a sink first.',
+            ),
+            scoring: spec('suspicionScore', suspicionNodeCapValue()),
+        };
+    });
+
+    /**
+     * A COMPLETED server run, applied through the SAME code as the matching local run (the `apply*` methods below), so a
+     * server answer and a browser answer leave identical state. The ids were translated by the host's {@link serverIds}.
+     */
+    applyServerResult(r: GraphRunResult): void {
+        const map = this.serverIds();
+        if (!map) return;
+        this.analysisError.set('');
+        switch (r.algorithm) {
+            case 'betweennessCentrality':
+            case 'closenessCentrality':
+            case 'eigenvectorCentrality':
+            case 'katzCentrality':
+                return this.applyRanking(toNodeScores((r.scores ?? []) as GraphScoreView[], map));
+            case 'hits':
+                return this.applyRanking(
+                    toNodeScores((this.centralityMetric() === 'authority' ? r.authorities : r.hubs) ?? [], map),
+                );
+            case 'detectCommunities':
+            case 'louvainCommunities':
+                return this.applyCommunities(toCommunityMap(r.communities ?? [], map));
+            case 'cliques':
+                return this.applyCliques(toGroups(r.groups ?? [], map));
+            case 'linkPrediction':
+                return this.applyPredictions(toPredictedLinks(r.links ?? [], map));
+            case 'maxFlow':
+                return this.applyFlow({
+                    value: Number(r.value ?? 0),
+                    minCut: toSelection(r.minCut ?? { nodeIds: [], edgeIds: [] }, map),
+                });
+            case 'suspicionScore':
+                return this.applySuspicion(toSuspicionScores((r.scores ?? []) as GraphSuspicionView[], map));
+        }
+    }
 
     /** Node label via the host-supplied lookup. */
     label(id: string): string {
@@ -436,12 +560,16 @@ export class LinkAnalysisToolboxComponent {
         if (!g) return;
         this.analysisError.set('');
         try {
-            this.ranking.set(this.centralityScores(g).slice(0, 20));
-            this.emphasisChange.emit(null);
+            this.applyRanking(this.centralityScores(g));
         } catch (err) {
             this.ranking.set([]);
             this.analysisError.set(err instanceof Error ? err.message : 'The analysis failed.');
         }
+    }
+
+    private applyRanking(scores: NodeScore[]): void {
+        this.ranking.set(scores.slice(0, 20));
+        this.emphasisChange.emit(null);
     }
 
     private centralityScores(g: G6GraphData): NodeScore[] {
@@ -481,6 +609,10 @@ export class LinkAnalysisToolboxComponent {
             this.analysisError.set(err instanceof Error ? err.message : 'The analysis failed.');
             return;
         }
+        this.applyCommunities(byNode);
+    }
+
+    private applyCommunities(byNode: Map<string, string>): void {
         const grouped = new Map<string, string[]>();
         for (const [node, community] of byNode) {
             const arr = grouped.get(community) ?? [];
@@ -730,11 +862,7 @@ export class LinkAnalysisToolboxComponent {
         this.analysisError.set('');
         try {
             if (this.cohesionMetric() === 'cliques') {
-                const found = cliques(g);
-                this.cliquesResult.set(found);
-                this.cohesionRanking.set([]);
-                this.emphasisChange.emit(found.length ? { nodeIds: [...new Set(found.flat())], edgeIds: [] } : null);
-                if (!found.length) this.analysisError.set('No cliques of size 3 or more.');
+                this.applyCliques(cliques(g));
             } else {
                 const scores = this.cohesionMetric() === 'triangles' ? triangleCount(g) : kCore(g);
                 this.cohesionRanking.set(scores.slice(0, 20));
@@ -746,6 +874,13 @@ export class LinkAnalysisToolboxComponent {
             this.cliquesResult.set([]);
             this.analysisError.set(err instanceof Error ? err.message : 'The analysis failed.');
         }
+    }
+
+    private applyCliques(found: string[][]): void {
+        this.cliquesResult.set(found);
+        this.cohesionRanking.set([]);
+        this.emphasisChange.emit(found.length ? { nodeIds: [...new Set(found.flat())], edgeIds: [] } : null);
+        if (!found.length) this.analysisError.set('No cliques of size 3 or more.');
     }
 
     focusClique(members: string[]): void {
@@ -775,12 +910,16 @@ export class LinkAnalysisToolboxComponent {
         if (!g) return;
         this.analysisError.set('');
         try {
-            this.predictions.set(linkPrediction(g));
-            if (!this.predictions().length) this.analysisError.set('No likely missing links found.');
+            this.applyPredictions(linkPrediction(g));
         } catch (err) {
             this.predictions.set([]);
             this.analysisError.set(err instanceof Error ? err.message : 'The analysis failed.');
         }
+    }
+
+    private applyPredictions(found: PredictedLink[]): void {
+        this.predictions.set(found);
+        if (!found.length) this.analysisError.set('No likely missing links found.');
     }
 
     focusPrediction(p: PredictedLink): void {
@@ -794,15 +933,18 @@ export class LinkAnalysisToolboxComponent {
         if (!g || !this.flowFrom() || !this.flowTo()) return;
         this.analysisError.set('');
         try {
-            const result = maxFlow(g, this.flowFrom(), this.flowTo());
-            this.flowResult.set(result);
-            this.spanningForest.set(null);
-            this.emphasisChange.emit(result.minCut.edgeIds.length ? result.minCut : null);
-            if (!result.value) this.analysisError.set('No flow between the two nodes.');
+            this.applyFlow(maxFlow(g, this.flowFrom(), this.flowTo()));
         } catch (err) {
             this.flowResult.set(null);
             this.analysisError.set(err instanceof Error ? err.message : 'The analysis failed.');
         }
+    }
+
+    private applyFlow(result: { value: number; minCut: GraphSelection }): void {
+        this.flowResult.set(result);
+        this.spanningForest.set(null);
+        this.emphasisChange.emit(result.minCut.edgeIds.length ? result.minCut : null);
+        if (!result.value) this.analysisError.set('No flow between the two nodes.');
     }
 
     runSpanningForest(): void {
@@ -822,14 +964,17 @@ export class LinkAnalysisToolboxComponent {
         if (!g) return;
         this.analysisError.set('');
         try {
-            const scores = suspicionScore(g);
-            this.suspicion.set(scores.slice(0, 20));
-            // Highlight the top decile (at least the top node) so the riskiest nodes stand out.
-            const topN = Math.max(1, Math.round(scores.length * 0.1));
-            this.emphasisChange.emit({ nodeIds: scores.slice(0, topN).map((s) => s.id), edgeIds: [] });
+            this.applySuspicion(suspicionScore(g));
         } catch (err) {
             this.suspicion.set([]);
             this.analysisError.set(err instanceof Error ? err.message : 'The analysis failed.');
         }
+    }
+
+    private applySuspicion(scores: SuspicionScore[]): void {
+        this.suspicion.set(scores.slice(0, 20));
+        // Highlight the top decile (at least the top node) so the riskiest nodes stand out.
+        const topN = Math.max(1, Math.round(scores.length * 0.1));
+        this.emphasisChange.emit({ nodeIds: scores.slice(0, topN).map((s) => s.id), edgeIds: [] });
     }
 }

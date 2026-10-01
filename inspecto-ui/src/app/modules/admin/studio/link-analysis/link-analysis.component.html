@@ -800,6 +800,9 @@
                             <span class="ml-auto">
                                 caps: projection {{ caps.projection }} nodes (server) · analysis
                                 {{ caps.analysis }} nodes (browser)
+                                @if (serverRunCeiling(); as ceiling) {
+                                    · graph run {{ ceiling }} nodes (server)
+                                }
                             </span>
                         </div>
                         <inspecto-link-analysis-working-set
@@ -888,6 +891,9 @@
                             [graphTruncated]="truncated()"
                             [serverPattern]="serverPattern()"
                             [serverPatternBusy]="serverPatternBusy()"
+                            [investigationId]="graphRunInvestigationId()"
+                            [serverIds]="serverIds()"
+                            [canRunOnServer]="canRunGraphOnServer()"
                             (emphasisChange)="emphasis.set($event)"
                             (findPaths)="findPaths($event)"
                             (runPatternOnServer)="runPatternOnServer($event)"

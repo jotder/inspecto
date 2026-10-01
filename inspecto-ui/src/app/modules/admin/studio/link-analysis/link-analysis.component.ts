@@ -35,6 +35,7 @@ import { map } from 'rxjs/operators';
 import {
     ComponentsService,
     ExchangeService,
+    GraphRunsService,
     InvService,
     LensService,
     MultiProjectionMappingSummary,
@@ -158,6 +159,7 @@ import {
 import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analysis-query-panel.component';
 import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
+import { buildServerIdMap } from './graph-run-apply';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
@@ -323,6 +325,7 @@ export class LinkAnalysisComponent implements OnInit {
     readonly toolboxTab = signal<'analysis' | 'view' | 'investigation'>('analysis');
     /** LA-10: the open Investigation (op log + Working Set); the Investigation tab renders it. */
     readonly investigation = inject(InvestigationSessionStore);
+    private readonly graphRuns = inject(GraphRunsService);
     /** Canvas overlays — each minimises to a pill so the graph gets the space. */
     readonly legendOpen = signal(true);
     readonly workingSetOpen = signal(true);
@@ -710,6 +713,20 @@ export class LinkAnalysisComponent implements OnInit {
         return { projection: projectionNodeCapValue(), analysis: analysisNodeCapValue() };
     }
 
+    /** D-4 step 7: the server's hard ceiling on a graph run (null until `GET /inv/graph/algorithms` answers). */
+    readonly serverRunCeiling = computed(() => this.graphRuns.catalogue()?.ceilings.maxNodes ?? null);
+    /** A server run is over the Working Set, so it needs an open Investigation AND the canvas drawing that set. */
+    readonly graphRunInvestigationId = computed(() =>
+        this.investigation.canvas() ? this.investigation.activeId() : null,
+    );
+    readonly canRunGraphOnServer = computed(() => this.lens.canRunLinkGraphAnalysis());
+    /** The server's node/edge ids translated to the canvas's, rebuilt whenever the Working Set changes. */
+    readonly serverIds = computed(() => {
+        const ws = this.investigation.workingSet();
+        const canvas = this.investigation.canvas();
+        return ws && canvas ? buildServerIdMap(ws, this.investigation.binding() ?? undefined, canvas) : null;
+    });
+
     readonly displayOptions = computed<GraphDisplayOptions>(
         () => ({
             nodeLabels: this.nodeLabels() && !this.lodLabelsOff(),
@@ -882,6 +899,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.datasetsService.list().subscribe({ next: (d) => this.datasets.set(d), error: () => undefined });
         this.pipelinesService.list().subscribe({ next: (p) => this.pipelines.set(p), error: () => undefined });
         this.viewsService.list().subscribe({ next: (v) => this.views.set(v), error: () => undefined });
+        this.graphRuns.loadCatalogue(); // the footer's server ceiling; absent when the server cannot answer
         this.pendingPivot = this.pivotService.readIncoming(this.route);
     }
 

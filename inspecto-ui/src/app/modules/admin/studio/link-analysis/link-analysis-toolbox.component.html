@@ -252,11 +252,24 @@
                                     [ngModel]="centralityMetric()"
                                     (ngModelChange)="centralityMetric.set($any($event))"
                                 />
-                                <button mat-stroked-button (click)="runCentrality()">
-                                    <mat-icon svgIcon="heroicons_outline:star"></mat-icon>
-                                    Rank nodes
-                                </button>
+                                @if (!serverSpecs().centrality) {
+                                    <button mat-stroked-button (click)="runCentrality()">
+                                        <mat-icon svgIcon="heroicons_outline:star"></mat-icon>
+                                        Rank nodes
+                                    </button>
+                                }
                             </div>
+                            @if (serverSpecs().centrality; as srv) {
+                                <inspecto-link-analysis-server-run
+                                    [algorithm]="srv.algorithm"
+                                    [params]="srv.params"
+                                    [note]="srv.note"
+                                    [hold]="srv.hold"
+                                    [investigationId]="investigationId()"
+                                    [allowed]="canRunOnServer()"
+                                    (completed)="applyServerResult($event)"
+                                />
+                            }
                             @if (ranking().length) {
                                 <table class="mt-1 w-full max-w-md text-sm">
                                     <caption class="sr-only">
@@ -302,11 +315,24 @@
                                     <mat-button-toggle value="label-prop">LP automatic clustering</mat-button-toggle>
                                     <mat-button-toggle value="louvain">Louvain</mat-button-toggle>
                                 </mat-button-toggle-group>
-                                <button mat-stroked-button (click)="runCommunities()">
-                                    <mat-icon svgIcon="heroicons_outline:user-group"></mat-icon>
-                                    Detect communities
-                                </button>
+                                @if (!serverSpecs().communities) {
+                                    <button mat-stroked-button (click)="runCommunities()">
+                                        <mat-icon svgIcon="heroicons_outline:user-group"></mat-icon>
+                                        Detect communities
+                                    </button>
+                                }
                             </div>
+                            @if (serverSpecs().communities; as srv) {
+                                <inspecto-link-analysis-server-run
+                                    [algorithm]="srv.algorithm"
+                                    [params]="srv.params"
+                                    [note]="srv.note"
+                                    [hold]="srv.hold"
+                                    [investigationId]="investigationId()"
+                                    [allowed]="canRunOnServer()"
+                                    (completed)="applyServerResult($event)"
+                                />
+                            }
                             @if (communities().length) {
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Communities">
                                     @for (c of communities(); track c.id; let i = $index) {
@@ -402,11 +428,24 @@
                                     [ngModel]="cohesionMetric()"
                                     (ngModelChange)="cohesionMetric.set($any($event))"
                                 />
-                                <button mat-stroked-button (click)="runCohesion()">
-                                    <mat-icon svgIcon="heroicons_outline:cube"></mat-icon>
-                                    Analyze
-                                </button>
+                                @if (!serverSpecs().cliques) {
+                                    <button mat-stroked-button (click)="runCohesion()">
+                                        <mat-icon svgIcon="heroicons_outline:cube"></mat-icon>
+                                        Analyze
+                                    </button>
+                                }
                             </div>
+                            @if (serverSpecs().cliques; as srv) {
+                                <inspecto-link-analysis-server-run
+                                    [algorithm]="srv.algorithm"
+                                    [params]="srv.params"
+                                    [note]="srv.note"
+                                    [hold]="srv.hold"
+                                    [investigationId]="investigationId()"
+                                    [allowed]="canRunOnServer()"
+                                    (completed)="applyServerResult($event)"
+                                />
+                            }
                             @if (cohesionRanking().length) {
                                 <table class="mt-1 w-full max-w-md text-sm">
                                     <caption class="sr-only">
@@ -465,11 +504,24 @@
                                     <mat-icon svgIcon="heroicons_outline:sparkles"></mat-icon>
                                     Find similar
                                 </button>
-                                <button mat-stroked-button (click)="runPrediction()">
-                                    <mat-icon svgIcon="heroicons_outline:link"></mat-icon>
-                                    Predict links
-                                </button>
+                                @if (!serverSpecs().prediction) {
+                                    <button mat-stroked-button (click)="runPrediction()">
+                                        <mat-icon svgIcon="heroicons_outline:link"></mat-icon>
+                                        Predict links
+                                    </button>
+                                }
                             </div>
+                            @if (serverSpecs().prediction; as srv) {
+                                <inspecto-link-analysis-server-run
+                                    [algorithm]="srv.algorithm"
+                                    [params]="srv.params"
+                                    [note]="srv.note"
+                                    [hold]="srv.hold"
+                                    [investigationId]="investigationId()"
+                                    [allowed]="canRunOnServer()"
+                                    (completed)="applyServerResult($event)"
+                                />
+                            }
                             @if (similarityResult().length) {
                                 <table class="mt-1 w-full max-w-md text-sm">
                                     <caption class="sr-only">
@@ -533,15 +585,32 @@
                                     [ngModel]="flowTo()"
                                     (ngModelChange)="flowTo.set($any($event))"
                                 />
-                                <button mat-stroked-button (click)="runFlow()" [disabled]="!flowFrom() || !flowTo()">
-                                    <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
-                                    Max flow / min cut
-                                </button>
+                                @if (!serverSpecs().flow) {
+                                    <button
+                                        mat-stroked-button
+                                        (click)="runFlow()"
+                                        [disabled]="!flowFrom() || !flowTo()"
+                                    >
+                                        <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
+                                        Max flow / min cut
+                                    </button>
+                                }
                                 <button mat-stroked-button (click)="runSpanningForest()">
                                     <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
                                     Strongest backbone
                                 </button>
                             </div>
+                            @if (serverSpecs().flow; as srv) {
+                                <inspecto-link-analysis-server-run
+                                    [algorithm]="srv.algorithm"
+                                    [params]="srv.params"
+                                    [note]="srv.note"
+                                    [hold]="srv.hold"
+                                    [investigationId]="investigationId()"
+                                    [allowed]="canRunOnServer()"
+                                    (completed)="applyServerResult($event)"
+                                />
+                            }
                             @if (flowResult(); as f) {
                                 <p class="mt-1 text-sm" role="status">
                                     Max flow = {{ f.value | number: '1.0-2' }}; {{ f.minCut.edgeIds.length }} min-cut
@@ -557,14 +626,27 @@
                         }
                         @case ('scoring') {
                             <div class="flex flex-wrap items-center gap-2">
-                                <button mat-stroked-button (click)="runScoring()">
-                                    <mat-icon svgIcon="heroicons_outline:shield-exclamation"></mat-icon>
-                                    Score nodes
-                                </button>
+                                @if (!serverSpecs().scoring) {
+                                    <button mat-stroked-button (click)="runScoring()">
+                                        <mat-icon svgIcon="heroicons_outline:shield-exclamation"></mat-icon>
+                                        Score nodes
+                                    </button>
+                                }
                                 <span class="text-sm text-secondary"
                                     >Composite risk from degree, betweenness, PageRank, k-core, triangles.</span
                                 >
                             </div>
+                            @if (serverSpecs().scoring; as srv) {
+                                <inspecto-link-analysis-server-run
+                                    [algorithm]="srv.algorithm"
+                                    [params]="srv.params"
+                                    [note]="srv.note"
+                                    [hold]="srv.hold"
+                                    [investigationId]="investigationId()"
+                                    [allowed]="canRunOnServer()"
+                                    (completed)="applyServerResult($event)"
+                                />
+                            }
                             <mat-form-field class="w-64" subscriptSizing="dynamic">
                                 <mat-label>Risk Score model</mat-label>
                                 <input
