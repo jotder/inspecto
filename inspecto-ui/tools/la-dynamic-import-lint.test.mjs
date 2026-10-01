@@ -22,6 +22,8 @@ for (const spec of [
     'app/inspecto/transfer/x',
     'app/inspecto/ai-assist',
     'app/inspecto/api/objects.service',
+    'app/inspecto/api/session.service',
+    'src/app/inspecto/api/session.service',
 ]) {
     test(`flags import('${spec}')`, async () => {
         assert.equal(await lint(`export const f = () => import('${spec}');`), 1);
@@ -32,7 +34,12 @@ test('flags a computed specifier', async () => {
     assert.equal(await lint('export const f = (n: string) => import(n);'), 1);
 });
 
-for (const spec of ['./link-view-widget.component', 'app/inspecto/api', 'app/inspecto/tagsx']) {
+for (const spec of [
+    './link-view-widget.component',
+    'app/inspecto/api',
+    'app/inspecto/tagsx',
+    'app/inspecto/api/session.servicex',
+]) {
     test(`allows import('${spec}')`, async () => {
         assert.equal(await lint(`export const f = () => import('${spec}');`), 0);
     });

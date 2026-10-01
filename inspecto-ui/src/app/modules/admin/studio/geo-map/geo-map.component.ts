@@ -62,9 +62,9 @@ import {
     PivotService,
     uniqueNameValidator,
 } from 'app/inspecto/investigation';
-import { ComponentsService, GeoSettingsService, apiErrorMessage, SessionService } from 'app/inspecto/api';
+import { ComponentsService, GeoSettingsService, apiErrorMessage } from 'app/inspecto/api';
 import type { LaDataset } from 'app/inspecto/la-host';
-import { LA_DATASETS, LA_TAGS, LA_TRANSFER, LaHostSlotComponent } from 'app/inspecto/la-host';
+import { LA_DATASETS, LA_FEATURES, LA_TAGS, LA_TRANSFER, LaHostSlotComponent } from 'app/inspecto/la-host';
 import type { LaImportDraft } from 'app/inspecto/la-host';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { ICON_COLOR_SWATCHES } from 'app/inspecto/theme/chart-tokens';
@@ -151,7 +151,7 @@ export class GeoMapComponent implements OnInit, OnDestroy {
      * (EDITIONS CP-11, EDG-01 cell 7). The menu action is HIDDEN when absent, the
      * geoLink precedent: an affordance that can only 503 is worse than none.
      */
-    readonly opsEnabled = inject(SessionService).opsEnabled;
+    readonly opsEnabled = inject(LA_FEATURES).ops;
     private toastr = inject(ToastrService);
     private dialog = inject(MatDialog);
     private readonly tags = inject(LA_TAGS);

@@ -1,4 +1,4 @@
-import { InjectionToken, Signal, Type } from '@angular/core';
+import { InjectionToken, Signal, Type, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 import type { PipelineGraph, ProvenanceCount, WorkingSetRelationName } from 'app/inspecto/api';
 import type { Component as ModelComponent } from 'app/inspecto/component-model';
@@ -201,3 +201,27 @@ export interface LaCases {
 }
 
 export const LA_CASES = hostToken<LaCases>('LA_CASES', 'Case management');
+
+// ── Feature flags ─────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The host's installed-module facts that Link Analysis / Geo adapt to. Each is a signal the HOST owns (Inspecto:
+ * `SessionService`, set from `/bootstrap`); a flag that is off hides the feature, it never errors.
+ * - `ops` - Case management (`inspecto-ops`) is installed: Case actions are real, not placeholders.
+ * - `exchange` - the multi-Space runtime hosts the cross-Space Exchange: an Investigation can be shared.
+ * - `geoLink` - the Link Analysis / Geo routes are registered in this bundle (server-side Entity Lists, Identity groups).
+ */
+export interface LaFeatures {
+    readonly ops: Signal<boolean>;
+    readonly exchange: Signal<boolean>;
+    readonly geoLink: Signal<boolean>;
+}
+
+/**
+ * Unlike the service tokens above, this one has a SAFE default: with no host provider every flag is off, so the
+ * features that depend on an optional module simply do not appear (it never throws).
+ */
+export const LA_FEATURES = new InjectionToken<LaFeatures>('LA_FEATURES', {
+    providedIn: 'root',
+    factory: () => ({ ops: signal(false), exchange: signal(false), geoLink: signal(false) }),
+});

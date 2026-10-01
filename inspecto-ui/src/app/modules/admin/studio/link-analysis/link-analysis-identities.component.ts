@@ -8,7 +8,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
-import { IdentityAssertion, IdentityGroup, InvService, LensService, SessionService } from 'app/inspecto/api';
+import { IdentityAssertion, IdentityGroup, InvService, LensService } from 'app/inspecto/api';
+import { LA_FEATURES } from 'app/inspecto/la-host';
 import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
@@ -45,7 +46,7 @@ import { isUnavailable } from './link-analysis-template.dialogs';
     ],
     host: { class: 'block' },
     template: `
-        @if (session.geoLinkEnabled()) {
+        @if (features.geoLink()) {
             <section class="flex flex-col gap-2 text-xs" aria-label="Identity resolution">
                 <div class="flex items-center gap-1">
                     <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">
@@ -210,7 +211,7 @@ export class LinkAnalysisIdentitiesComponent {
     private settings = inject(LinkAnalysisSettingsService);
     private lens = inject(LensService);
     private fb = inject(FormBuilder);
-    readonly session = inject(SessionService);
+    readonly features = inject(LA_FEATURES);
 
     readonly groups = signal<IdentityGroup[] | null>(null);
     readonly found = signal<IdentityGroup | null>(null);
@@ -239,7 +240,7 @@ export class LinkAnalysisIdentitiesComponent {
 
     constructor() {
         // Off the module every route 503s, and without the capability every read 403s — no call for either.
-        if (this.session.geoLinkEnabled() && this.canManage()) void this.load();
+        if (this.features.geoLink() && this.canManage()) void this.load();
     }
 
     async load(): Promise<void> {

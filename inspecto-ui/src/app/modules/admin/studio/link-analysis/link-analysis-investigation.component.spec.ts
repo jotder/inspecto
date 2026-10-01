@@ -4,14 +4,8 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import {
-    InvService,
-    InvestigationCoverage,
-    InvestigationLog,
-    LensService,
-    SessionService,
-    WorkingSet,
-} from 'app/inspecto/api';
+import { InvService, InvestigationCoverage, InvestigationLog, LensService, WorkingSet } from 'app/inspecto/api';
+import { LA_FEATURES } from 'app/inspecto/la-host';
 import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
 import { EntityProjection } from 'app/inspecto/graph';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
@@ -155,7 +149,7 @@ function create() {
             InvestigationSessionStore,
             { provide: InvService, useValue: inv },
             { provide: WidgetsService, useValue: widgets },
-            { provide: SessionService, useValue: { geoLinkEnabled: signal(true) } },
+            { provide: LA_FEATURES, useValue: { ops: signal(false), exchange: signal(false), geoLink: signal(true) } },
             { provide: LensService, useValue: { canManageIncidents: signal(true) } },
             { provide: LinkAnalysisSettingsService, useValue: { limits: signal({ entityTypesInForce: [] }) } },
             // the data-table's real theme service walks up to GAMMA_APP_CONFIG — stub it, as its own spec does

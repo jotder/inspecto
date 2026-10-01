@@ -5,7 +5,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { IdentityGroup, InvService, LensService, SessionService } from 'app/inspecto/api';
+import { IdentityGroup, InvService, LensService } from 'app/inspecto/api';
+import { LA_FEATURES } from 'app/inspecto/la-host';
 import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { identityKeyOf } from './investigation-state';
@@ -66,7 +67,7 @@ function create({ groups = [GROUP], canManage = true, listError }: Options = {})
             provideNoopAnimations(),
             { provide: InvService, useValue: inv },
             { provide: MatDialog, useValue: dialog },
-            { provide: SessionService, useValue: { geoLinkEnabled: signal(true) } },
+            { provide: LA_FEATURES, useValue: { ops: signal(false), exchange: signal(false), geoLink: signal(true) } },
             { provide: LensService, useValue: { canManageIncidents: signal(canManage) } },
             { provide: LinkAnalysisSettingsService, useValue: { limits: signal({ entityTypesInForce: TYPES }) } },
         ],

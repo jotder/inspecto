@@ -5,14 +5,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import {
-    EntityListSummary,
-    InvService,
-    InvestigationLog,
-    LensService,
-    SessionService,
-    WorkingSet,
-} from 'app/inspecto/api';
+import { EntityListSummary, InvService, InvestigationLog, LensService, WorkingSet } from 'app/inspecto/api';
+import { LA_FEATURES } from 'app/inspecto/la-host';
 import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { LinkAnalysisEntityListsComponent } from './link-analysis-entity-lists.component';
@@ -97,7 +91,10 @@ function create({ lists = LISTS, canWrite = true, geoLink = true }: Options = {}
             InvestigationSessionStore,
             { provide: InvService, useValue: inv },
             { provide: MatDialog, useValue: dialog },
-            { provide: SessionService, useValue: { geoLinkEnabled: signal(geoLink) } },
+            {
+                provide: LA_FEATURES,
+                useValue: { ops: signal(false), exchange: signal(false), geoLink: signal(geoLink) },
+            },
             { provide: LensService, useValue: { canManageIncidents: signal(canWrite) } },
             {
                 provide: LinkAnalysisSettingsService,

@@ -4,15 +4,9 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
-import {
-    EntityListDetail,
-    EntityListSummary,
-    InvService,
-    LensService,
-    SessionService,
-    unmatchedCount,
-} from 'app/inspecto/api';
+import { EntityListDetail, EntityListSummary, InvService, LensService, unmatchedCount } from 'app/inspecto/api';
 import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
+import { LA_FEATURES } from 'app/inspecto/la-host';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
@@ -52,7 +46,7 @@ import { isUnavailable } from './link-analysis-template.dialogs';
     ],
     host: { class: 'block' },
     template: `
-        @if (session.geoLinkEnabled()) {
+        @if (features.geoLink()) {
             <section class="flex flex-col gap-2 text-xs" aria-label="Entity Lists">
                 <div class="flex items-center gap-1">
                     <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Entity Lists</h3>
@@ -174,7 +168,7 @@ export class LinkAnalysisEntityListsComponent {
     private dialog = inject(MatDialog);
     private settings = inject(LinkAnalysisSettingsService);
     private lens = inject(LensService);
-    readonly session = inject(SessionService);
+    readonly features = inject(LA_FEATURES);
     readonly store = inject(InvestigationSessionStore);
 
     readonly lists = signal<EntityListSummary[] | null>(null);
@@ -192,7 +186,7 @@ export class LinkAnalysisEntityListsComponent {
 
     constructor() {
         // Off the module, every route 503s — no call for an explained absence the page already renders.
-        if (this.session.geoLinkEnabled()) void this.load();
+        if (this.features.geoLink()) void this.load();
     }
 
     async load(): Promise<void> {

@@ -41,7 +41,6 @@ import {
     MultiProjectionMappingSummary,
     PipelineSummary,
     PipelinesService,
-    SessionService,
     SpacesService,
     apiErrorMessage,
 } from 'app/inspecto/api';
@@ -129,7 +128,14 @@ import {
 import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
 import { ElementDetailDialog, ElementDetailResult, ElementObjectRef, PivotService } from 'app/inspecto/investigation';
 import type { LaDataset } from 'app/inspecto/la-host';
-import { LA_AI_ASSIST, LA_DATASETS, LA_TAGS, LA_TRANSFER, LaHostSlotComponent } from 'app/inspecto/la-host';
+import {
+    LA_AI_ASSIST,
+    LA_DATASETS,
+    LA_FEATURES,
+    LA_TAGS,
+    LA_TRANSFER,
+    LaHostSlotComponent,
+} from 'app/inspecto/la-host';
 import type { LaImportDraft } from 'app/inspecto/la-host';
 import {
     MultiProjectedGraph,
@@ -253,7 +259,7 @@ export class LinkAnalysisComponent implements OnInit {
      * (EDITIONS CP-11, EDG-01 cell 7). The menu action is HIDDEN when absent, the
      * geoLink precedent: an affordance that can only 503 is worse than none.
      */
-    readonly opsEnabled = inject(SessionService).opsEnabled;
+    readonly opsEnabled = inject(LA_FEATURES).ops;
     private toastr = inject(ToastrService);
     private dialog = inject(MatDialog);
     private readonly tags = inject(LA_TAGS);
@@ -289,7 +295,7 @@ export class LinkAnalysisComponent implements OnInit {
      * `POST /exchange/offers` on that same capability (D14: cross-space data exposure is admin-tier), and a
      * shared view exposes its datasets' rows, so it is the same authorization question.
      */
-    private readonly exchangeEnabled = inject(SessionService).exchangeEnabled;
+    private readonly exchangeEnabled = inject(LA_FEATURES).exchange;
     readonly canShare = computed(() => this.exchangeEnabled() && this.lens.canOfferDatasets());
     private datasetsService = inject(LA_DATASETS);
     /**

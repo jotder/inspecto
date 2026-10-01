@@ -13,6 +13,7 @@ import {
     LA_CATALOG,
     LA_DASHBOARD_HEADER,
     LA_DATASETS,
+    LA_FEATURES,
     LA_PIPELINE_GRAPH,
     LA_TAGS,
     LA_TRANSFER,
@@ -20,6 +21,7 @@ import {
     LaCases,
     LaCatalog,
     LaDatasets,
+    LaFeatures,
     LaPipelineGraph,
     LaTags,
     LaWidgets,
@@ -89,6 +91,17 @@ export function provideLaHostServices(): Provider[] {
         },
         { provide: LA_TRANSFER, useValue: { menu: TransferMenuComponent, banner: ImportDraftBannerComponent } },
         { provide: LA_AI_ASSIST, useValue: { assist: AiAssistComponent, explain: AiExplainComponent } },
+        {
+            provide: LA_FEATURES,
+            useFactory: (): LaFeatures => {
+                const session = inject(SessionService);
+                return {
+                    ops: session.opsEnabled,
+                    exchange: session.exchangeEnabled,
+                    geoLink: session.geoLinkEnabled,
+                };
+            },
+        },
         {
             // The host decides real vs placeholder: `available` is false when `inspecto-ops` is not installed.
             provide: LA_CASES,

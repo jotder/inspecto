@@ -24,6 +24,8 @@ const HOST_MSG =
     'Link Analysis / Geo must not import host features (dynamic import): inject a token from app/inspecto/la-host instead (D-5 prep).';
 const EDGE_MSG =
     'Tags / Transfer / AI assist / Cases are host edges (dynamic import): inject LA_TAGS / LA_TRANSFER / LA_AI_ASSIST / LA_CASES from app/inspecto/la-host instead (D-5 prep).';
+const FEATURES_MSG =
+    'Host module flags (ops / exchange / geoLink) are a host edge: inject LA_FEATURES from app/inspecto/la-host instead, not SessionService (D-5 prep).';
 const dynSel = (re, message) => ({ selector: `ImportExpression > Literal.source[value=${re}]`, message });
 const SL = String.raw`\/`; // an escaped slash inside the selector regex
 const exactOrUnder = (mod, message) => [
@@ -39,6 +41,8 @@ const laDynamicImportSelectors = [
     ),
     ...exactOrUnder('app/inspecto/api/objects.service', EDGE_MSG),
     ...exactOrUnder('src/app/inspecto/api/objects.service', EDGE_MSG),
+    ...exactOrUnder('app/inspecto/api/session.service', FEATURES_MSG),
+    ...exactOrUnder('src/app/inspecto/api/session.service', FEATURES_MSG),
     {
         selector: 'ImportExpression > :not(Literal).source',
         message:
@@ -63,11 +67,7 @@ export default tseslint.config(
     },
     {
         files: ['**/*.ts'],
-        extends: [
-            eslint.configs.recommended,
-            ...tseslint.configs.recommended,
-            ...angular.configs.tsRecommended,
-        ],
+        extends: [eslint.configs.recommended, ...tseslint.configs.recommended, ...angular.configs.tsRecommended],
         processor: angular.processInlineTemplates,
         rules: {
             // REVIEWED DECISION (operator, 2026-09-17, lint drain): after the mechanical sweep, every remaining
@@ -76,7 +76,10 @@ export default tseslint.config(
             // spec reads back through `mock.calls[i][k]`, or a non-trailing parameter a caller's arity pins.
             // Deleting them changes behaviour or breaks the type-check (TS2554 surfaced twice trying). The
             // `_` prefix is the conventional way to say "unused on purpose", so the rule is told to honour it.
-            '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true }],
+            '@typescript-eslint/no-unused-vars': [
+                'error',
+                { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true },
+            ],
         },
     },
     {
@@ -126,6 +129,12 @@ export default tseslint.config(
                             message:
                                 'Tags / Transfer / AI assist / Cases are host edges: inject LA_TAGS / LA_TRANSFER / LA_AI_ASSIST / LA_CASES from app/inspecto/la-host instead (D-5 prep).',
                         },
+                        {
+                            // Host module flags are read through LA_FEATURES; `SessionService` is the host's.
+                            group: ['app/inspecto/api/session.service', 'src/app/inspecto/api/session.service'],
+                            message:
+                                'Host module flags (ops / exchange / geoLink) are a host edge: inject LA_FEATURES from app/inspecto/la-host instead, not SessionService (D-5 prep).',
+                        },
                     ],
                     paths: [
                         {
@@ -134,6 +143,13 @@ export default tseslint.config(
                             importNames: ['ObjectsService'],
                             message:
                                 'Cases are a host edge: inject LA_CASES from app/inspecto/la-host instead (D-5 prep).',
+                        },
+                        {
+                            // Same barrel re-export: SessionService also comes out of `app/inspecto/api`.
+                            name: 'app/inspecto/api',
+                            importNames: ['SessionService'],
+                            message:
+                                'Host module flags (ops / exchange / geoLink) are a host edge: inject LA_FEATURES from app/inspecto/la-host instead, not SessionService (D-5 prep).',
                         },
                     ],
                 },

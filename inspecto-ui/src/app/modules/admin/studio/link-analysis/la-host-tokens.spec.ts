@@ -14,6 +14,7 @@ import {
     LA_CATALOG,
     LA_DASHBOARD_HEADER,
     LA_DATASETS,
+    LA_FEATURES,
     LA_PIPELINE_GRAPH,
     LA_TAGS,
     LA_TRANSFER,
@@ -270,5 +271,22 @@ describe('Link Analysis host-service tokens', () => {
     ] as [string, InjectionToken<unknown>][])('a missing %s provider fails loudly, naming the token', (name, token) => {
         TestBed.configureTestingModule({ providers: [] });
         expect(() => TestBed.inject(token)).toThrow(new RegExp(`${name} has no provider`));
+    });
+
+    it('LA_FEATURES has a safe default: every host module flag is off and injecting it never throws', () => {
+        TestBed.configureTestingModule({ providers: [] });
+        const f = TestBed.inject(LA_FEATURES);
+        expect([f.ops(), f.exchange(), f.geoLink()]).toEqual([false, false, false]);
+    });
+
+    it('LA_FEATURES follows the host: a provided flag set is what the feature code reads', () => {
+        const ops = signal(false);
+        TestBed.configureTestingModule({
+            providers: [{ provide: LA_FEATURES, useValue: { ops, exchange: signal(true), geoLink: signal(false) } }],
+        });
+        const f = TestBed.inject(LA_FEATURES);
+        expect([f.ops(), f.exchange(), f.geoLink()]).toEqual([false, true, false]);
+        ops.set(true);
+        expect(f.ops()).toBe(true);
     });
 });
