@@ -17,6 +17,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 
 /**
@@ -96,6 +97,7 @@ public final class GraphRunService implements AutoCloseable {
     private final GraphEngine engine;
     private final Limits limits;
     private final LongSupplier clock;
+    private final Consumer<RunView> onTerminal;
     private final ThreadPoolExecutor pool;
     private final Map<String, Run> runs = new LinkedHashMap<>();
     private final Map<String, Cached> cache = new LinkedHashMap<>();
@@ -106,9 +108,20 @@ public final class GraphRunService implements AutoCloseable {
 
     /** {@code clock} (epoch millis) drives retention and cache expiry only; elapsed compute time is always monotonic. */
     public GraphRunService(GraphEngine engine, Limits limits, LongSupplier clock) {
+        this(engine, limits, clock, null);
+    }
+
+    /**
+     * {@code onTerminal} (null = none) is called exactly once per run, by the thread that moves it to its terminal
+     * state - the submitting thread for a run that is terminal at submit or a cache hit, a worker otherwise, the
+     * canceller for a run cancelled while queued - with the final view, outside every lock. It lets a caller audit the
+     * end of an asynchronous run. An exception it throws is swallowed: a hook never changes a run's outcome.
+     */
+    public GraphRunService(GraphEngine engine, Limits limits, LongSupplier clock, Consumer<RunView> onTerminal) {
         this.engine = engine;
         this.limits = limits;
         this.clock = clock;
+        this.onTerminal = onTerminal;
         AtomicInteger n = new AtomicInteger();
         this.pool = new ThreadPoolExecutor(limits.threads(), limits.threads(), 0L, TimeUnit.MILLISECONDS,
                 new ArrayBlockingQueue<>(limits.queue()), r -> {
@@ -142,7 +155,7 @@ public final class GraphRunService implements AutoCloseable {
 
         int nodes = req.input().nodes().size(), edges = req.input().edges().size();
         if (nodes > budget.maxNodes() || edges > budget.maxEdges()) {
-            run.finish(Status.BUDGET_EXCEEDED, nodes > budget.maxNodes() ? Exceeded.NODES : Exceeded.EDGES, null, null, 0, now);
+            end(run, Status.BUDGET_EXCEEDED, nodes > budget.maxNodes() ? Exceeded.NODES : Exceeded.EDGES, null, null, 0, now);
             run.release();
             return store(run).view();
         }
@@ -150,7 +163,7 @@ public final class GraphRunService implements AutoCloseable {
         GraphResult hit = cached(key, now);
         if (hit != null) {
             run.cached = true;
-            run.finish(Status.COMPLETED, null, null, hit, 0, now);
+            end(run, Status.COMPLETED, null, null, hit, 0, now);
             run.release();
             return store(run).view();
         }
@@ -199,7 +212,7 @@ public final class GraphRunService implements AutoCloseable {
         Run r = find(id);
         if (!admin && !r.owner.equals(caller))
             throw new GraphRunException(GraphRunException.Kind.FORBIDDEN, "only the run's starter or an administrator may cancel it");
-        r.requestCancel(clock.getAsLong());
+        if (r.requestCancel(clock.getAsLong())) fire(r);        // cancelled while queued: this call ended it
         return r.view();
     }
 
@@ -225,23 +238,39 @@ public final class GraphRunService implements AutoCloseable {
             GraphResult result = engine.run(r.algorithm, r.params, r.input, ctl);
             long elapsed = (System.nanoTime() - t0) / 1_000_000L;
             if (r.cancelRequested)
-                r.finish(Status.CANCELLED, null, null, null, elapsed, clock.getAsLong());
+                end(r, Status.CANCELLED, null, null, null, elapsed, clock.getAsLong());
             else if (elapsed > r.budget.timeoutMs())
-                r.finish(Status.BUDGET_EXCEEDED, Exceeded.TIMEOUT, null, null, elapsed, clock.getAsLong());   // finished late: still over budget
-            else if (r.finish(Status.COMPLETED, null, null, result, elapsed, clock.getAsLong()))
+                end(r, Status.BUDGET_EXCEEDED, Exceeded.TIMEOUT, null, null, elapsed, clock.getAsLong());   // finished late: still over budget
+            else if (end(r, Status.COMPLETED, null, null, result, elapsed, clock.getAsLong()))
                 putCache(r.cacheKey, result);
         } catch (GraphAborted a) {
             long elapsed = (System.nanoTime() - t0) / 1_000_000L;
             long now = clock.getAsLong();
             switch (a.reason()) {
-                case CANCELLED -> r.finish(Status.CANCELLED, null, null, null, elapsed, now);
-                case DEADLINE -> r.finish(Status.BUDGET_EXCEEDED, Exceeded.TIMEOUT, null, null, elapsed, now);
-                case BUDGET -> r.finish(Status.BUDGET_EXCEEDED, Exceeded.WORK, null, null, elapsed, now);
+                case CANCELLED -> end(r, Status.CANCELLED, null, null, null, elapsed, now);
+                case DEADLINE -> end(r, Status.BUDGET_EXCEEDED, Exceeded.TIMEOUT, null, null, elapsed, now);
+                case BUDGET -> end(r, Status.BUDGET_EXCEEDED, Exceeded.WORK, null, null, elapsed, now);
             }
         } catch (RuntimeException | Error e) {
-            r.finish(Status.FAILED, null, e.getClass().getSimpleName(), null, (System.nanoTime() - t0) / 1_000_000L, clock.getAsLong());
+            end(r, Status.FAILED, null, e.getClass().getSimpleName(), null, (System.nanoTime() - t0) / 1_000_000L, clock.getAsLong());
         } finally {
             r.release();
+        }
+    }
+
+    /** Moves {@code r} to a terminal state and, when this call did, tells the hook. */
+    private boolean end(Run r, Status s, Exceeded ex, String fail, GraphResult res, long elapsed, long now) {
+        boolean moved = r.finish(s, ex, fail, res, elapsed, now);
+        if (moved) fire(r);
+        return moved;
+    }
+
+    private void fire(Run r) {
+        if (onTerminal == null) return;
+        try {
+            onTerminal.accept(r.view());
+        } catch (RuntimeException ignored) {
+            // a hook never changes a run's outcome
         }
     }
 
@@ -355,14 +384,18 @@ public final class GraphRunService implements AutoCloseable {
             return ctl;
         }
 
-        synchronized void requestCancel(long now) {
+        /** Returns true when this call ended the run (it was still QUEUED). */
+        synchronized boolean requestCancel(long now) {
             if (status.terminal())
                 throw new GraphRunException(GraphRunException.Kind.TERMINAL, "graph run " + id + " already finished (" + status + ")");
             cancelRequested = true;
             if (status == Status.QUEUED) {
                 finishLocked(Status.CANCELLED, null, null, null, 0, now);
                 input = null;
-            } else if (ctl != null) ctl.cancel();
+                return true;
+            }
+            if (ctl != null) ctl.cancel();
+            return false;
         }
 
         /** Moves to a terminal state unless already terminal; returns whether this call did. */

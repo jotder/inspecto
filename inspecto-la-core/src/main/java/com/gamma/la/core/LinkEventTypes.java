@@ -145,4 +145,23 @@ public final class LinkEventTypes {
     /** A pending sensitive expand was denied (LA-19 / D-U7); it never ran. {@code investigationId}, {@code requestId},
      *  {@code requestedBy}, {@code reason}. */
     public static final String LINK_EXPANSION_DENIED = "LINK_EXPANSION_DENIED";
+
+    /** A graph run was started ({@code POST /inv/graph/runs}, LA separation D-4). {@code investigationId},
+     *  {@code algorithm}, {@code nodes}/{@code edges} (the measured input), {@code key} (the Working Set's relation
+     *  key), {@code engine}, {@code runId}. Never the run's parameters: they can embed entity ids. */
+    public static final String LINK_GRAPH_RUN_STARTED = "LINK_GRAPH_RUN_STARTED";
+
+    /** A graph run finished with a result. Same attributes as {@link #LINK_GRAPH_RUN_STARTED} plus {@code elapsedMs}
+     *  and {@code cached} (the answer came from the result cache). */
+    public static final String LINK_GRAPH_RUN_COMPLETED = "LINK_GRAPH_RUN_COMPLETED";
+
+    /** A graph run was cancelled by its starter or an administrator and produced no result. */
+    public static final String LINK_GRAPH_RUN_CANCELLED = "LINK_GRAPH_RUN_CANCELLED";
+
+    /** A graph run went past its stated budget and produced no result. Adds {@code exceeded} (NODES, EDGES, TIMEOUT
+     *  or WORK) and the budget that was in force ({@code maxNodes}, {@code maxEdges}, {@code timeoutMs}). */
+    public static final String LINK_GRAPH_RUN_BUDGET_EXCEEDED = "LINK_GRAPH_RUN_BUDGET_EXCEEDED";
+
+    /** A graph run failed inside the engine. Adds {@code failure} (the exception CLASS name, never its message). */
+    public static final String LINK_GRAPH_RUN_FAILED = "LINK_GRAPH_RUN_FAILED";
 }

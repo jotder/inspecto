@@ -425,4 +425,78 @@ class GraphRunServiceTest {
         assertFalse(again.cached());
         assertNotEquals(0, probe.calls.get());
     }
+
+    // ── the terminal hook (D-4 step 6: the route layer audits the END of an asynchronous run) ──────────────────
+
+    private GraphRunService withHook(GraphEngine e, List<RunView> seen) {
+        return new GraphRunService(e, TIGHT, System::currentTimeMillis, v -> {
+            synchronized (seen) {
+                seen.add(v);
+            }
+        });
+    }
+
+    @Test
+    void theTerminalHookFiresExactlyOncePerRunForEveryTerminalState() throws Exception {
+        List<RunView> seen = new ArrayList<>();
+        CountDownLatch gate = new CountDownLatch(1);
+        AtomicInteger n = new AtomicInteger();
+        svc = withHook(new Probe(ctl -> {
+            int call = n.incrementAndGet();
+            if (call == 1) return answer();                                  // COMPLETED
+            if (call == 2) throw new IllegalStateException("boom");          // FAILED
+            gate.await();                                                    // call 3 blocks until cancelled
+            ctl.checkpoint();
+            return answer();
+        }), seen);
+
+        RunView done = settle(svc.submit(req("alice", ring(4))));
+        assertEquals(Status.COMPLETED, done.status());
+        RunView failed = settle(svc.submit(withAlgorithm(req("alice", ring(5)), Algorithm.BRIDGES, Map.of())));
+        assertEquals(Status.FAILED, failed.status());
+        RunView over = svc.submit(withBudget(req("alice", ring(50)), new GraphBudget(10, 0, 0)));   // terminal at submit
+        assertEquals(Status.BUDGET_EXCEEDED, over.status());
+        RunView cached = svc.submit(req("alice", ring(4)));                                          // terminal at submit (cache hit)
+        assertTrue(cached.cached());
+        RunView running = svc.submit(withAlgorithm(req("alice", ring(6)), Algorithm.IS_FOREST, Map.of()));
+        until(() -> svc.get(running.id()).status() == Status.RUNNING);
+        svc.cancel(running.id(), "alice", false);
+        gate.countDown();
+        assertEquals(Status.CANCELLED, settle(running).status());
+        until(() -> { synchronized (seen) { return seen.size() == 5; } });
+
+        synchronized (seen) {
+            assertEquals(5, seen.size(), "one call per run");
+            assertEquals(5, seen.stream().map(RunView::id).distinct().count(), "never twice for one run");
+            for (RunView v : seen) assertTrue(v.status().terminal(), "only the final view is handed over");
+            assertEquals(Set.of(Status.COMPLETED, Status.FAILED, Status.BUDGET_EXCEEDED, Status.CANCELLED),
+                    seen.stream().map(RunView::status).collect(java.util.stream.Collectors.toSet()));
+        }
+    }
+
+    @Test
+    void aRunCancelledWhileQueuedFiresTheHookOnceAndAHookThatThrowsChangesNothing() throws Exception {
+        List<RunView> seen = new ArrayList<>();
+        CountDownLatch gate = new CountDownLatch(1);
+        svc = new GraphRunService(new Probe(ctl -> {
+            gate.await();
+            return answer();
+        }), TIGHT, System::currentTimeMillis, v -> {
+            synchronized (seen) {
+                seen.add(v);
+            }
+            throw new IllegalStateException("a broken audit sink");
+        });
+        RunView first = svc.submit(req("alice", ring(4)));                       // occupies the one worker
+        until(() -> svc.get(first.id()).status() == Status.RUNNING);
+        RunView queued = svc.submit(withAlgorithm(req("alice", ring(5)), Algorithm.BRIDGES, Map.of()));
+        assertEquals(Status.QUEUED, queued.status());
+        assertEquals(Status.CANCELLED, svc.cancel(queued.id(), "alice", false).status(), "the throwing hook did not break cancel");
+        gate.countDown();
+        assertEquals(Status.COMPLETED, settle(first).status(), "nor the worker's own run");
+        until(() -> { synchronized (seen) { return seen.size() == 2; } });
+        synchronized (seen) {
+            assertEquals(1, seen.stream().filter(v -> v.id().equals(queued.id())).count());
+        }
+    }
 }
