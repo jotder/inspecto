@@ -15,9 +15,9 @@ import java.util.Set;
  * {@code GraphAlgorithmsParityTest} and {@code graph-algorithms-parity.spec.ts} assert the SAME hand-derived fixture
  * ({@code inspecto-ui/src/app/inspecto/graph/graph-algorithms-parity.fixture.json}).
  *
- * <p>Deliberate differences from the browser: no node cap (the caller bounds the input), and ties between equal
- * scores break by ORDINAL label compare where the browser uses {@code localeCompare}. The two agree on lowercase
- * ASCII labels (the fixture's) and may differ on mixed-case or punctuated ones — a known gap, not an oversight.
+ * <p>Deliberate difference from the browser: no node cap (the caller bounds the input). Ties between equal scores break
+ * by {@code canonical-v1} in BOTH languages (D-4 Decision 3): UTF-16 code-unit order on the normalised entity id, then
+ * the label — so browser and server rank identically, including mixed-case and punctuated ids.
  * Like the browser, every algorithm assumes a closed graph: each edge endpoint is a node.
  */
 public final class GraphAlgorithms {
@@ -92,7 +92,7 @@ public final class GraphAlgorithms {
     static final Comparator<Score> BY_SCORE_THEN_ID_THEN_LABEL =
             Comparator.comparingDouble(Score::score).reversed().thenComparing(Score::id).thenComparing(Score::label);
 
-    /** Descending by score, ties by label; stable, like the browser's {@code Array.sort}. */
+    /** Descending by score, ties by {@code canonical-v1} (id then label, UTF-16 code units — D-4 Decision 3); stable. */
     static List<Score> scored(Graph g, Map<String, ? extends Number> score) {
         List<Score> out = new ArrayList<>();
         for (Node n : g.nodes()) {

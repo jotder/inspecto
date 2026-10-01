@@ -22,7 +22,7 @@ import java.util.TreeMap;
  * {@code GraphIterativeParityTest} and {@code graph-iterative-parity.spec.ts} assert the SAME fixture
  * ({@code graph-iterative-parity.fixture.json}), scores to 1e-9.
  *
- * <p>Same deliberate differences as {@link GraphAlgorithms}: no node cap, ordinal label tie-break, closed graphs.
+ * <p>Same deliberate differences as {@link GraphAlgorithms}: no node cap, closed graphs (the tie-break is the shared {@code canonical-v1}).
  * The few helpers it needs are private copies — this class does not depend on {@code GraphAlgorithms}' internals.
  * Float arithmetic keeps the TS operation order exactly (summation order matters at the last ulp).
  */

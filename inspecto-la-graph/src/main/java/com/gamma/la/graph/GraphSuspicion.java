@@ -15,7 +15,7 @@ import java.util.Map;
  * {@code inspecto-ui/src/app/inspecto/graph/graph-analysis.ts} (option D, spike D-S4). It blends five normalised
  * factors, each already ported and pinned by its own parity fixture: degree, betweenness, PageRank, k-core and
  * triangles. {@code GraphSuspicionParityTest} and {@code graph-suspicion-parity.spec.ts} assert the SAME fixture.
- * Differences from the browser: no node cap (the caller bounds the input), ordinal tie-break on labels.
+ * Differences from the browser: no node cap (the caller bounds the input); the tie-break is the shared {@code canonical-v1} (id, then label).
  */
 public final class GraphSuspicion {
 

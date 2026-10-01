@@ -22,9 +22,8 @@ import java.util.Set;
  * step: {@code GraphStructureParityTest} and {@code graph-structure-parity.spec.ts} assert the SAME hand-derived fixture
  * ({@code inspecto-ui/src/app/inspecto/graph/graph-structure-parity.fixture.json}).
  *
- * <p>Same deliberate differences as {@link GraphAlgorithms}: no node cap ({@code cliques} does not throw), ordinal
- * string compares where the browser uses {@code localeCompare} (they agree on lowercase ASCII), and every algorithm
- * assumes a closed graph.
+ * <p>Same deliberate differences as {@link GraphAlgorithms}: no node cap ({@code cliques} does not throw), and every
+ * algorithm assumes a closed graph. String compares are UTF-16 code-unit order, matching the browser's {@code canonical-v1}.
  */
 public final class GraphStructure {
 

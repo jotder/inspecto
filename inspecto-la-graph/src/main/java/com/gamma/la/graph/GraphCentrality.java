@@ -18,7 +18,7 @@ import java.util.Set;
  * {@code inspecto-ui/src/app/inspecto/graph/graph-analysis.ts} (option D, spike D-S4): betweenness, closeness,
  * Jaccard similarity and link prediction. The arithmetic runs in the browser's order, so the doubles agree to
  * rounding; {@code GraphCentralityParityTest} asserts them at 1e-9. Same deliberate differences as
- * {@link GraphAlgorithms}: no node cap, ordinal label compare, closed graphs.
+ * {@link GraphAlgorithms}: no node cap, closed graphs (the tie-break is the shared {@code canonical-v1}).
  *
  * <p>NOT ported: {@code suspicionScore} — it blends {@code pageRank}, {@code kCore} and {@code triangleCount},
  * which live outside this lane.

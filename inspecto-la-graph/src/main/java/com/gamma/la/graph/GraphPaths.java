@@ -20,8 +20,8 @@ import java.util.Set;
  * {@code GraphPathsParityTest} and {@code graph-paths-parity.spec.ts} assert the SAME hand-derived fixture
  * ({@code inspecto-ui/src/app/inspecto/graph/graph-paths-parity.fixture.json}).
  *
- * <p>Same deliberate differences as {@link GraphAlgorithms}: no node cap, ordinal (not locale) id compare, closed
- * graphs. The browser reads an edge's weight from its {@code data}; {@link GraphAlgorithms.Edge} carries none, so the
+ * <p>Same deliberate differences as {@link GraphAlgorithms}: no node cap, closed
+ * graphs (id compares are UTF-16 code-unit order, the same {@code canonical-v1} as the browser). The browser reads an edge's weight from its {@code data}; {@link GraphAlgorithms.Edge} carries none, so the
  * weighted functions take {@code weights} (edge id to {@link #edgeWeight}), a missing id counting as 1.
  */
 public final class GraphPaths {
