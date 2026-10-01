@@ -10476,6 +10476,129 @@
         "x-generated" : true,
         "x-optional-module" : true
       }
+    },
+    "/inv/graph/algorithms" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "The graph-algorithm catalogue and run limits",
+        "operationId" : "getInvGraphAlgorithms",
+        "description" : "LA separation D-4. The 28 server-side graph algorithms ({id, label, cost, inlineNodeCeiling, params[], needsWeights, needsSource, needsTarget, needsNode, resultKind}), the hard server `ceilings`, the Space's effective default `defaults` (the `graph_run` settings, clamped to the ceilings; `clamped` says so), the worker `pool` and the `inlineWaitMs`. A read: no capability.",
+        "responses" : {
+          "200" : {
+            "description" : "The catalogue, ceilings and defaults."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/inv/graph/runs" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Start a graph run over an Investigation's Working Set",
+        "operationId" : "postInvGraphRuns",
+        "description" : "LA separation D-4. Body {investigationId, at?, algorithm, params?, weights: \"count\"|\"none\", kinds?, budget?{maxNodes,maxEdges,timeoutMs}}. Gated on canRunLinkGraphAnalysis. A Working Set within the algorithm's inlineNodeCeiling is waited for briefly and answered 200 with the run and its result; a larger one is a 202 with a Location to poll. A run already terminal at submit (BUDGET_EXCEEDED, or a result-cache hit) is a 200. BUDGET_EXCEEDED carries the budget, the measured consumed size and a reason - and never a `result` key. Entity ids in a result are masked per the Space's maskingMode, edge ids included.",
+        "responses" : {
+          "200" : {
+            "description" : "The run, terminal (COMPLETED with its `result`; or BUDGET_EXCEEDED / CANCELLED / FAILED without one)."
+          },
+          "202" : {
+            "description" : "Accepted; poll the run at the Location header. No `result`."
+          },
+          "403" : {
+            "description" : "The caller lacks canRunLinkGraphAnalysis."
+          },
+          "404" : {
+            "description" : "No such Investigation, or not readable by the caller."
+          },
+          "422" : {
+            "description" : "Unknown algorithm or field, a bad or missing parameter, a bad budget or `at`."
+          },
+          "503" : {
+            "description" : "No write root, or the run queue is full (STORE_BUSY)."
+          }
+        },
+        "x-optional-module" : true
+      },
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "List the caller's graph runs",
+        "operationId" : "getInvGraphRuns",
+        "description" : "LA separation D-4. `?investigationId=` narrows to one Investigation (404 as a read of it would). Only the caller's own runs, and only those whose Investigation the caller can still read. Views carry no `result`.",
+        "responses" : {
+          "200" : {
+            "description" : "{runs, total}."
+          },
+          "404" : {
+            "description" : "`investigationId` names no readable Investigation."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/inv/graph/runs/{runId}" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "Read one graph run",
+        "operationId" : "getInvGraphRunsByRunId",
+        "description" : "LA separation D-4. Status, progress, the budget in force, what was consumed, `cached`, `exceeded` + `reason` (BUDGET_EXCEEDED), `failure` (FAILED, the exception class only) and, only when COMPLETED, the masked `result`. A run another caller started, or one whose Investigation the caller can no longer read, is absent.",
+        "parameters" : [ {
+          "name" : "runId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The run view."
+          },
+          "404" : {
+            "description" : "No such run for this caller."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/inv/graph/runs/{runId}/cancel" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Cancel a graph run",
+        "operationId" : "postInvGraphRunsByRunIdCancel",
+        "description" : "LA separation D-4. The run's starter or an administrator (canAdminister); the run ends CANCELLED at its next checkpoint (a queued run at once). No capability beyond that.",
+        "parameters" : [ {
+          "name" : "runId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "202" : {
+            "description" : "{runId, status, cancelRequested}."
+          },
+          "403" : {
+            "description" : "Neither the starter nor an administrator."
+          },
+          "404" : {
+            "description" : "No such run."
+          },
+          "409" : {
+            "description" : "The run already finished."
+          },
+          "503" : {
+            "description" : "No write root."
+          }
+        },
+        "x-optional-module" : true
+      }
     }
   },
   "components" : {

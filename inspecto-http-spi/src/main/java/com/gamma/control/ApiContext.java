@@ -306,6 +306,13 @@ public interface ApiContext extends WriteRootProvider {
 
     // service(), sseStreams() and spaces() moved to HostContext (inspecto-processor): this SPI names no host class.
 
+    /**
+     * Registers {@code hook} to run once when this API closes, so a route module that owns a resource (a worker pool)
+     * can release it with the server instead of leaking it. The default registers nothing - a context with no
+     * lifecycle (a test double) simply never calls it. A hook that throws never stops the others.
+     */
+    default void onClose(Runnable hook) {}
+
     /** The configured write root, or {@code null} when filesystem writes are disabled. */
     Path writeRoot();
 

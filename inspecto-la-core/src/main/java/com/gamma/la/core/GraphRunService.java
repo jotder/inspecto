@@ -88,8 +88,9 @@ public final class GraphRunService implements AutoCloseable {
      * An immutable view of one run. {@code result} is non-null only when {@code status == COMPLETED}; {@code exceeded}
      * only for {@code BUDGET_EXCEEDED}; {@code failure} (an exception CLASS name — never its message, which could carry
      * an entity id) only for {@code FAILED}. {@code budgetClamped} says the request asked for more than a ceiling allows.
+     * {@code relationKey} is the key of the Working Set the run was started on (what the audit trail names).
      */
-    public record RunView(String id, String owner, String investigationId, Algorithm algorithm, String engine, Status status,
+    public record RunView(String id, String owner, String investigationId, String relationKey, Algorithm algorithm, String engine, Status status,
                           GraphBudget budget, boolean budgetClamped, Consumed consumed, Progress progress,
                           boolean cancelRequested, boolean cached, Exceeded exceeded, String failure, GraphResult result,
                           long createdAt, long finishedAt) {}
@@ -337,7 +338,7 @@ public final class GraphRunService implements AutoCloseable {
     // ── one run ──────────────────────────────────────────────────────────────────────────────────────────────────
 
     private final class Run {
-        final String id, owner, investigationId, weightsSpec;
+        final String id, owner, investigationId, relationKey, weightsSpec;
         final Algorithm algorithm;
         final Map<String, Object> params;
         final GraphBudget budget;
@@ -361,6 +362,7 @@ public final class GraphRunService implements AutoCloseable {
             this.id = id;
             this.owner = req.owner();
             this.investigationId = req.investigationId();
+            this.relationKey = req.relationKey();
             this.weightsSpec = req.weightsSpec();
             this.algorithm = req.algorithm();
             this.params = params;
@@ -422,7 +424,7 @@ public final class GraphRunService implements AutoCloseable {
         synchronized RunView view() {
             RunControl c = ctl;
             Progress p = new Progress(c == null ? 0 : c.work(), c == null ? 0 : c.fraction());
-            return new RunView(id, owner, investigationId, algorithm, engine.engineId(), status, budget, clamped,
+            return new RunView(id, owner, investigationId, relationKey, algorithm, engine.engineId(), status, budget, clamped,
                     new Consumed(nodes, edges, elapsedMs, p.work()), p, cancelRequested, cached, exceeded, failure,
                     result, createdAt, finishedAt);
         }

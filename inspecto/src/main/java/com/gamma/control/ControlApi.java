@@ -444,8 +444,21 @@ public final class ControlApi implements AutoCloseable, HostContext {
      *  which dropped in-flight requests immediately). */
     private static final int SHUTDOWN_DRAIN_SECONDS = 2;
 
+    /** Hooks route modules registered with {@link #onClose}; run once by {@link #close()}. */
+    private final java.util.List<Runnable> closeHooks = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    @Override
+    public void onClose(Runnable hook) { closeHooks.add(hook); }
+
     @Override
     public void close() {
+        for (Runnable hook : closeHooks) {
+            try {
+                hook.run();
+            } catch (RuntimeException e) {
+                log.warn("a close hook failed: {}", e.toString());
+            }
+        }
         sseStreams.closeAll();   // before http.stop: it neither interrupts handler threads nor ends SSE loops
         if (anchorRoll != null) anchorRoll.shutdownNow();
         http.stop(SHUTDOWN_DRAIN_SECONDS);

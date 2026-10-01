@@ -1,0 +1,163 @@
+package com.gamma.la.api;
+
+import com.gamma.la.core.Algorithm;
+import com.gamma.la.core.GraphInput;
+import com.gamma.la.core.GraphResult;
+import com.gamma.la.core.InMemoryGraphEngine;
+import com.gamma.la.core.LinkIds;
+import com.gamma.la.core.SnapshotStore;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * D-4 step 6 - {@link GraphResultJson}, the one serializer: ALL 28 algorithms run through the real engine on a graph of
+ * raw ids, serialized under {@code maskingMode all}, and the masked tree is checked three ways - no raw id and no raw
+ * edge endpoint anywhere in it (edge ids are decoded, they are base64 and a plain text search would miss them); mapping
+ * the pseudonyms back gives EXACTLY the unmasked tree (masking changed ids and nothing else - not the order, not a
+ * score); and the masked edge ids equal the wire ids minted from the pseudonyms.
+ */
+class GraphResultJsonTest {
+
+    private static final List<String> RAW = List.of("alice", "bob", "carol", "dave", "erin");
+    private static final String KIND = "voice";
+
+    private static GraphInput graph() {
+        String[][] links = {{"alice", "bob"}, {"bob", "carol"}, {"carol", "alice"}, {"carol", "dave"}, {"dave", "erin"}};
+        List<GraphInput.Node> nodes = new ArrayList<>();
+        for (String id : RAW) nodes.add(new GraphInput.Node(id, id));
+        List<GraphInput.Edge> edges = new ArrayList<>();
+        Map<String, Double> weights = new LinkedHashMap<>();
+        for (String[] l : links) {
+            String id = LinkIds.encode(l[0], l[1], KIND);
+            edges.add(new GraphInput.Edge(id, l[0], l[1]));
+            weights.put(id, 2.0);
+        }
+        return GraphInput.of(nodes, edges, weights);
+    }
+
+    private static EntityMasking maskAll(Path root) throws Exception {
+        Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: all\n");
+        InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(new SnapshotStore(root), root, "case-a",
+                Map.of("dataset", "calls_ds", "sourceCol", "caller", "targetCol", "callee"));
+        Files.createDirectories(inv.dir());
+        return EntityMasking.of(inv, List.of(Map.of("op", "seed", "params", Map.of("ids", RAW))), List.of(KIND));
+    }
+
+    private static Map<String, Object> params(Algorithm a) {
+        Map<String, Object> p = new LinkedHashMap<>();
+        if (a.needsSource()) p.put(Algorithm.FROM, "alice");
+        if (a.needsTarget()) p.put(Algorithm.TO, "erin");
+        if (a.needsNode()) p.put(Algorithm.NODE, "carol");
+        return p;
+    }
+
+    /** Every string in the tree, with edge ids decoded into their three parts. */
+    private static void strings(Object node, List<String> out) {
+        if (node instanceof Map<?, ?> m) m.forEach((k, v) -> {
+            out.add(String.valueOf(k));
+            strings(v, out);
+        });
+        else if (node instanceof List<?> l) l.forEach(v -> strings(v, out));
+        else if (node instanceof String s) {
+            out.add(s);
+            if (s.startsWith(LinkIds.PREFIX)) out.addAll(LinkIds.decode(s));
+        }
+    }
+
+    /** The masked tree with every pseudonym (node or edge endpoint) replaced by its raw value. */
+    private static Object unmask(Object node, Map<String, String> rawOf) {
+        if (node instanceof Map<?, ?> m) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            m.forEach((k, v) -> out.put(String.valueOf(k), unmask(v, rawOf)));
+            return out;
+        }
+        if (node instanceof List<?> l) return l.stream().map(v -> unmask(v, rawOf)).toList();
+        if (node instanceof String s) {
+            if (s.startsWith(LinkIds.PREFIX)) {
+                List<String> p = LinkIds.decode(s);
+                return LinkIds.encode(rawOf.getOrDefault(p.get(0), p.get(0)), rawOf.getOrDefault(p.get(1), p.get(1)),
+                        rawOf.getOrDefault(p.get(2), p.get(2)));
+            }
+            return rawOf.getOrDefault(s, s);
+        }
+        return node;
+    }
+
+    @Test
+    void everyAlgorithmsMaskedResultLeaksNoRawIdAndIsTheUnmaskedResultWithOnlyIdsChanged(@TempDir Path root) throws Exception {
+        EntityMasking mask = maskAll(root);
+        GraphResultJson.Ids masked = GraphResultJson.Ids.of(mask);
+        Map<String, String> rawOf = new LinkedHashMap<>();
+        for (String id : RAW) rawOf.put((String) mask.apply(id), id);
+        rawOf.put((String) mask.apply(KIND), KIND);       // the kind is part of a wire id and is pseudonymised like the Working Set's
+        assertEquals(RAW.size() + 1, mask.describe().get("masked"), "five ids and the kind are pseudonymised: " + mask.describe());
+
+        InMemoryGraphEngine engine = new InMemoryGraphEngine();
+        Set<Algorithm> seen = EnumSet.noneOf(Algorithm.class);
+        for (Algorithm a : Algorithm.values()) {
+            GraphResult r = engine.run(a, a.resolve(params(a)), graph(), null);
+            Map<String, Object> plain = GraphResultJson.of(r, GraphResultJson.Ids.NONE);
+            Map<String, Object> hidden = GraphResultJson.of(r, masked);
+            seen.add(a);
+
+            List<String> strings = new ArrayList<>();
+            strings(hidden, strings);
+            for (String s : strings)
+                for (String raw : RAW)
+                    assertFalse(s.equals(raw) || s.contains(raw), a.id() + ": raw id '" + raw + "' leaked as '" + s + "' in " + hidden);
+            assertEquals(plain, unmask(hidden, rawOf), a.id() + ": masking changed more than ids");
+            if (!strings.isEmpty() && plain.toString().contains(RAW.get(0)))
+                assertNotEquals(plain, hidden, a.id() + ": a result naming ids must differ once they are masked");
+        }
+        assertEquals(EnumSet.allOf(Algorithm.class), seen);
+    }
+
+    @Test
+    void aMaskedEdgeIdIsTheWireIdOfThePseudonymsAndTheKind(@TempDir Path root) throws Exception {
+        EntityMasking mask = maskAll(root);
+        GraphResultJson.Ids ids = GraphResultJson.Ids.of(mask);
+        String raw = LinkIds.encode("alice", "bob", KIND);
+        String out = ids.edge(raw);
+        assertEquals(LinkIds.encode((String) mask.apply("alice"), (String) mask.apply("bob"), (String) mask.apply(KIND)), out);
+        assertNotEquals(raw, out);
+        assertTrue(LinkIds.decode(out).stream().allMatch(p -> p.startsWith(EntityMasking.TOKEN_PREFIX)), LinkIds.decode(out).toString());
+    }
+
+    /** The edge-vs-node choice of an {@code Ids} payload is per algorithm; a new IDS-kind algorithm must be decided here. */
+    @Test
+    void theIdsPayloadAlgorithmsAreExactlyThoseWhoseEdgeOrNodeChoiceWasMade() {
+        Set<Algorithm> ids = EnumSet.noneOf(Algorithm.class);
+        for (Algorithm a : Algorithm.values()) if (a.resultKind() == Algorithm.ResultKind.IDS) ids.add(a);
+        assertEquals(EnumSet.of(Algorithm.ARTICULATION_POINTS, Algorithm.BRIDGES, Algorithm.DESCENDANTS), ids);
+        assertTrue(GraphResultJson.idsAreEdges(Algorithm.BRIDGES));
+        assertFalse(GraphResultJson.idsAreEdges(Algorithm.ARTICULATION_POINTS));
+        assertFalse(GraphResultJson.idsAreEdges(Algorithm.DESCENDANTS));
+    }
+
+    @Test
+    void withNothingMaskedTheSerializerIsTheIdentity(@TempDir Path root) throws Exception {
+        Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: none\n");
+        InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(new SnapshotStore(root), root, "case-a",
+                Map.of("dataset", "calls_ds"));
+        Files.createDirectories(inv.dir());
+        assertSame(GraphResultJson.Ids.NONE, GraphResultJson.Ids.of(EntityMasking.of(inv, List.of(), List.of())));
+    }
+
+    private static void assertSame(Object expected, Object actual) {
+        org.junit.jupiter.api.Assertions.assertSame(expected, actual);
+    }
+}

@@ -306,6 +306,11 @@ final class EntityMasking {
         return rawOf.get(token);
     }
 
+    /** True when at least one id is masked - false lets a caller skip masking work that would change nothing. */
+    boolean masking() {
+        return !tokenOf.isEmpty();
+    }
+
     /** What the response says about masking — the mode, how many ids are masked, and on what basis. */
     Map<String, Object> describe() {
         Map<String, Object> m = new LinkedHashMap<>();
