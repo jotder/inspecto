@@ -85,9 +85,20 @@ describe('governance-model', () => {
             reassign: 'duty',
             notify: true,
         });
-        expect(describeEscalationRule(breach)).toBe('INCIDENT CRITICAL on a response SLA breach: reassign to duty, notify');
-        const age = escalationRuleContent({ id: 'page', objectType: 'INCIDENT', on: 'age', afterMinutes: 90, target: 'resolution',
-            priority: '', reassign: '', notify: false, raisePriority: true });
+        expect(describeEscalationRule(breach)).toBe(
+            'INCIDENT CRITICAL on a response SLA breach: reassign to duty, notify',
+        );
+        const age = escalationRuleContent({
+            id: 'page',
+            objectType: 'INCIDENT',
+            on: 'age',
+            afterMinutes: 90,
+            target: 'resolution',
+            priority: '',
+            reassign: '',
+            notify: false,
+            raisePriority: true,
+        });
         expect(age).toEqual({ id: 'page', objectType: 'INCIDENT', on: 'age', afterMinutes: 90, raisePriority: true });
         expect(describeEscalationRule(age)).toBe('INCIDENT at 90 min old: raise priority');
     });

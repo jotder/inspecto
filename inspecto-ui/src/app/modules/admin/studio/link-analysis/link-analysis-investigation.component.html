@@ -41,7 +41,9 @@
                                     <span class="text-secondary">({{ i.id }})</span>
                                 }
                                 — {{ i.dataset }}, {{ i.headStep }} steps{{
-                                    i.access === 'case-member' ? ', shared through Case ' + i.caseRef + ' (read-only)' : ''
+                                    i.access === 'case-member'
+                                        ? ', shared through Case ' + i.caseRef + ' (read-only)'
+                                        : ''
                                 }}
                             </span>
                             <button mat-button [disabled]="store.busy()" (click)="openListed(i)">Open</button>
@@ -310,7 +312,10 @@
             <section aria-label="Link annotations">
                 <h3 class="text-secondary m-0 mb-1 text-xs font-semibold uppercase tracking-wide">Link annotations</h3>
                 <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs">
-                    @for (a of store.workingSet()!.linkAnnotations; track a.step + ':' + (a.linkId ?? a.source + a.target)) {
+                    @for (
+                        a of store.workingSet()!.linkAnnotations;
+                        track a.step + ':' + (a.linkId ?? a.source + a.target)
+                    ) {
                         <li [attr.title]="a.linkId">
                             <strong>{{ a.source }} → {{ a.target }}{{ a.kind ? ' (' + a.kind + ')' : '' }}</strong> —
                             {{ a.note }}{{ a.confidence ? ' [' + a.confidence + ']' : '' }} (step {{ a.step }})

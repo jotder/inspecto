@@ -53,11 +53,17 @@ export function provideLaHostServices(): Provider[] {
                 return {
                     saveWorkingSetWidget: (w) =>
                         widgets.save(
-                            buildWidget(w.name, '', w.vizType, {}, {
-                                viewId: w.viewId,
-                                workingSet: w.workingSet,
-                                description: w.description,
-                            }),
+                            buildWidget(
+                                w.name,
+                                '',
+                                w.vizType,
+                                {},
+                                {
+                                    viewId: w.viewId,
+                                    workingSet: w.workingSet,
+                                    description: w.description,
+                                },
+                            ),
                         ),
                 };
             },

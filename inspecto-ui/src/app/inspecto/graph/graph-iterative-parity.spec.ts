@@ -41,7 +41,8 @@ describe('iterative graph algorithms parity fixture (D-S4, tranche A)', () => {
         const g = build(graphs[name]);
         const e = expected[name];
         if (e['pageRank']) it(`pageRank / ${name}`, () => expectScores(pageRank(g), e['pageRank']));
-        if (e['eigenvector']) it(`eigenvector / ${name}`, () => expectScores(eigenvectorCentrality(g), e['eigenvector']));
+        if (e['eigenvector'])
+            it(`eigenvector / ${name}`, () => expectScores(eigenvectorCentrality(g), e['eigenvector']));
         if (e['katz']) it(`katz / ${name}`, () => expectScores(katzCentrality(g), e['katz']));
         if (e['hits']) {
             it(`hits / ${name}`, () => {
@@ -50,20 +51,27 @@ describe('iterative graph algorithms parity fixture (D-S4, tranche A)', () => {
                 expectScores(r.authorities, e['hits'].authorities);
             });
         }
-        if (e['communities']) it(`detectCommunities / ${name}`, () => expect(pairs(detectCommunities(g))).toEqual(e['communities']));
-        if (e['louvain']) it(`louvainCommunities / ${name}`, () => expect(pairs(louvainCommunities(g))).toEqual(e['louvain']));
+        if (e['communities'])
+            it(`detectCommunities / ${name}`, () => expect(pairs(detectCommunities(g))).toEqual(e['communities']));
+        if (e['louvain'])
+            it(`louvainCommunities / ${name}`, () => expect(pairs(louvainCommunities(g))).toEqual(e['louvain']));
     }
 
     describe('non-default parameters (main graph)', () => {
         const g = build(graphs['main']);
         const c = expected['mainCustom'];
-        it('pageRank', () => expectScores(pageRank(g, { damping: c['pageRank'].damping, iterations: c['pageRank'].iterations }), c['pageRank'].scores));
+        it('pageRank', () =>
+            expectScores(
+                pageRank(g, { damping: c['pageRank'].damping, iterations: c['pageRank'].iterations }),
+                c['pageRank'].scores,
+            ));
         it('katz', () =>
             expectScores(
                 katzCentrality(g, { alpha: c['katz'].alpha, beta: c['katz'].beta, iterations: c['katz'].iterations }),
                 c['katz'].scores,
             ));
-        it('eigenvector', () => expectScores(eigenvectorCentrality(g, c['eigenvector'].iterations), c['eigenvector'].scores));
+        it('eigenvector', () =>
+            expectScores(eigenvectorCentrality(g, c['eigenvector'].iterations), c['eigenvector'].scores));
         it('hits', () => {
             const r = hits(g, c['hits'].iterations);
             expectScores(r.hubs, c['hits'].hubs);

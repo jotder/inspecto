@@ -350,7 +350,14 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', () => {
                 workingSet: {
                     ...WS,
                     linkAnnotations: [
-                        { source: 'a', target: 'b', kind: 'voice', linkId: 'lk.YQBiAHZvaWNl', step: 3, note: 'shared SIM box' },
+                        {
+                            source: 'a',
+                            target: 'b',
+                            kind: 'voice',
+                            linkId: 'lk.YQBiAHZvaWNl',
+                            step: 3,
+                            note: 'shared SIM box',
+                        },
                     ],
                 },
             }),

@@ -990,7 +990,9 @@ export function weightedShortestPath(
     // Ties on distance go to the node that entered `dist` first (what a linear scan over the insertion-ordered map did),
     // so the heap orders on (distance, entry sequence).
     const entered = new Map<string, number>([[fromId, 0]]);
-    const heap = new MinHeap<{ d: number; seq: number; id: string }>((x, y) => (x.d < y.d ? -1 : x.d > y.d ? 1 : x.seq - y.seq));
+    const heap = new MinHeap<{ d: number; seq: number; id: string }>((x, y) =>
+        x.d < y.d ? -1 : x.d > y.d ? 1 : x.seq - y.seq,
+    );
     heap.push({ d: 0, seq: 0, id: fromId });
     const prev = new Map<string, { node: string; edge: string }>();
     const visited = new Set<string>();

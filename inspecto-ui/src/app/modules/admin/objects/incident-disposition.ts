@@ -19,7 +19,9 @@ export const DISPOSITIONS: readonly PickerOption[] = [
 ];
 
 /** What a resolve may send (the server 422s `ARCHIVED_UNDECIDED`) — `FindingsSpec.CHOOSABLE_DISPOSITIONS`. */
-export const CHOOSABLE_DISPOSITIONS: readonly PickerOption[] = DISPOSITIONS.filter((d) => d.value !== 'ARCHIVED_UNDECIDED');
+export const CHOOSABLE_DISPOSITIONS: readonly PickerOption[] = DISPOSITIONS.filter(
+    (d) => d.value !== 'ARCHIVED_UNDECIDED',
+);
 
 /** The operator-facing label of a stored Disposition; an unknown value is shown verbatim. */
 export function dispositionLabel(value: string | null | undefined): string {

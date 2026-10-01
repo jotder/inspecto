@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { GraphDirection } from 'app/inspecto/api';
 import type { G6GraphData } from './graph-types';
-import { compareCanonicalV1, compareUnits, edgeWeight, kCore, linkPrediction, weightedShortestPath } from './graph-analysis';
+import {
+    compareCanonicalV1,
+    compareUnits,
+    edgeWeight,
+    kCore,
+    linkPrediction,
+    weightedShortestPath,
+} from './graph-analysis';
 
 /**
  * LA-GRAPH-QUADRATIC-1 — the three formerly O(N^2) algorithms (`kCore`, `weightedShortestPath`, `linkPrediction`) now
@@ -73,7 +80,11 @@ function weightedShortestPathRef(g: G6GraphData, fromId: string, toId: string, d
     const adj = adjacencyRef(g);
     if (!adj.out.has(fromId) || !adj.out.has(toId)) return null;
     const neighbours = (id: string): Pair[] =>
-        direction === 'out' ? (adj.out.get(id) ?? []) : direction === 'in' ? (adj.in.get(id) ?? []) : [...(adj.out.get(id) ?? []), ...(adj.in.get(id) ?? [])];
+        direction === 'out'
+            ? (adj.out.get(id) ?? [])
+            : direction === 'in'
+              ? (adj.in.get(id) ?? [])
+              : [...(adj.out.get(id) ?? []), ...(adj.in.get(id) ?? [])];
     const cost = new Map(g.edges.map((e) => [e.id, 1 / edgeWeight(e)]));
     const dist = new Map<string, number>([[fromId, 0]]);
     const prev = new Map<string, { node: string; edge: string }>();
@@ -130,7 +141,13 @@ function linkPredictionRef(g: G6GraphData, method: 'common-neighbors' | 'adamic-
                 score += method === 'adamic-adar' ? (deg > 1 ? 1 / Math.log(deg) : 0) : 1;
             }
             if (score > 0) {
-                out.push({ source: a, target: b, sourceLabel: label.get(a) ?? a, targetLabel: label.get(b) ?? b, score });
+                out.push({
+                    source: a,
+                    target: b,
+                    sourceLabel: label.get(a) ?? a,
+                    targetLabel: label.get(b) ?? b,
+                    score,
+                });
             }
         }
     }
@@ -216,7 +233,10 @@ describe('LA-GRAPH-QUADRATIC-1 — the fast algorithms equal the quadratic refer
     });
 
     it('the random corpus actually exercises ties, loops, parallel edges and isolated nodes', () => {
-        let loops = 0, parallel = 0, isolated = 0, tiedScores = 0;
+        let loops = 0,
+            parallel = 0,
+            isolated = 0,
+            tiedScores = 0;
         for (const seed of SEEDS) {
             const g = randomGraph(seed);
             const keys = new Set<string>();

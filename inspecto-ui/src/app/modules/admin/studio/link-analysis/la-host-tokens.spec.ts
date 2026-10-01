@@ -104,7 +104,10 @@ function fakeHost() {
         { provide: LA_DATASETS, useValue: fakeDatasets },
         { provide: LA_CATALOG, useValue: fakeCatalog },
         { provide: LA_WIDGETS, useValue: { saveWorkingSetWidget: () => of(null) } },
-        { provide: LA_PIPELINE_GRAPH, useValue: { toG6Data: () => ({ nodes: [], edges: [] }), provenanceCounts: () => new Map() } },
+        {
+            provide: LA_PIPELINE_GRAPH,
+            useValue: { toG6Data: () => ({ nodes: [], edges: [] }), provenanceCounts: () => new Map() },
+        },
         { provide: LA_DASHBOARD_HEADER, useValue: FakeHeaderComponent },
         { provide: LA_TAGS, useValue: fakeTags },
         { provide: LA_TRANSFER, useValue: { menu: FakeTransferMenuComponent, banner: FakeBannerComponent } },
@@ -126,10 +129,16 @@ describe('Link Analysis host-service tokens', () => {
                 { provide: InvService, useValue: {} },
                 { provide: LinkAnalysisService, useValue: { list: () => of([]) } },
                 { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
-                { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined, info: () => undefined } },
+                {
+                    provide: ToastrService,
+                    useValue: { success: () => undefined, error: () => undefined, info: () => undefined },
+                },
                 {
                     provide: ActivatedRoute,
-                    useValue: { snapshot: { queryParamMap: convertToParamMap({}) }, queryParamMap: of(convertToParamMap({})) },
+                    useValue: {
+                        snapshot: { queryParamMap: convertToParamMap({}) },
+                        queryParamMap: of(convertToParamMap({})),
+                    },
                 },
             ],
         });
@@ -153,10 +162,16 @@ describe('Link Analysis host-service tokens', () => {
                 { provide: InvService, useValue: {} },
                 { provide: LinkAnalysisService, useValue: { list } },
                 { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
-                { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined, info: () => undefined } },
+                {
+                    provide: ToastrService,
+                    useValue: { success: () => undefined, error: () => undefined, info: () => undefined },
+                },
                 {
                     provide: ActivatedRoute,
-                    useValue: { snapshot: { queryParamMap: convertToParamMap({}) }, queryParamMap: of(convertToParamMap({})) },
+                    useValue: {
+                        snapshot: { queryParamMap: convertToParamMap({}) },
+                        queryParamMap: of(convertToParamMap({})),
+                    },
                 },
             ],
         });
@@ -229,7 +244,10 @@ describe('Link Analysis host-service tokens', () => {
                 { provide: CatalogService, useValue: {} },
                 { provide: PipelinesService, useValue: {} },
                 { provide: InvService, useValue: {} },
-                { provide: LinkAnalysisService, useValue: { get: () => of({ id: 'v', description: 'About this view' }) } },
+                {
+                    provide: LinkAnalysisService,
+                    useValue: { get: () => of({ id: 'v', description: 'About this view' }) },
+                },
             ],
         });
         const fixture = TestBed.createComponent(LinkViewWidgetComponent);

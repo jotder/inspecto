@@ -9,7 +9,14 @@ import { MatInputModule } from '@angular/material/input';
 import { Observable, catchError, of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 
-import { ComponentDef, ComponentType, ComponentsService, LensService, ObjectsService, apiErrorMessage } from 'app/inspecto/api';
+import {
+    ComponentDef,
+    ComponentType,
+    ComponentsService,
+    LensService,
+    ObjectsService,
+    apiErrorMessage,
+} from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -61,11 +68,7 @@ import {
                 </inspecto-alert>
             }
             <form [formGroup]="typeForm" class="max-w-80">
-                <inspecto-option-picker
-                    label="Object type"
-                    formControlName="objectType"
-                    [options]="typeOptions"
-                />
+                <inspecto-option-picker label="Object type" formControlName="objectType" [options]="typeOptions" />
             </form>
             @if (lastError()) {
                 <inspecto-alert variant="error" title="Not saved">{{ lastError() }}</inspecto-alert>
@@ -95,7 +98,9 @@ import {
                         </mat-form-field>
                     </div>
                     <table class="w-full max-w-200 text-sm">
-                        <caption class="sr-only">Transitions</caption>
+                        <caption class="sr-only">
+                            Transitions
+                        </caption>
                         <thead>
                             <tr class="text-secondary text-left">
                                 <th scope="col" class="py-1">From</th>
@@ -107,11 +112,35 @@ import {
                         <tbody formArrayName="transitions">
                             @for (row of transitions.controls; track row; let i = $index) {
                                 <tr [formGroupName]="i">
-                                    <td><input class="w-full rounded border px-2 py-1" formControlName="from" [attr.aria-label]="'Transition ' + (i + 1) + ' from'" /></td>
-                                    <td><input class="w-full rounded border px-2 py-1" formControlName="action" [attr.aria-label]="'Transition ' + (i + 1) + ' action'" /></td>
-                                    <td><input class="w-full rounded border px-2 py-1" formControlName="to" [attr.aria-label]="'Transition ' + (i + 1) + ' to'" /></td>
                                     <td>
-                                        <button mat-icon-button type="button" [disabled]="!canEdit()" (click)="transitions.removeAt(i)" [attr.aria-label]="'Remove transition ' + (i + 1)">
+                                        <input
+                                            class="w-full rounded border px-2 py-1"
+                                            formControlName="from"
+                                            [attr.aria-label]="'Transition ' + (i + 1) + ' from'"
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            class="w-full rounded border px-2 py-1"
+                                            formControlName="action"
+                                            [attr.aria-label]="'Transition ' + (i + 1) + ' action'"
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            class="w-full rounded border px-2 py-1"
+                                            formControlName="to"
+                                            [attr.aria-label]="'Transition ' + (i + 1) + ' to'"
+                                        />
+                                    </td>
+                                    <td>
+                                        <button
+                                            mat-icon-button
+                                            type="button"
+                                            [disabled]="!canEdit()"
+                                            (click)="transitions.removeAt(i)"
+                                            [attr.aria-label]="'Remove transition ' + (i + 1)"
+                                        >
                                             <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                                         </button>
                                     </td>
@@ -120,8 +149,12 @@ import {
                         </tbody>
                     </table>
                     <div class="flex gap-2">
-                        <button mat-stroked-button type="button" [disabled]="!canEdit()" (click)="addTransition()">Add transition</button>
-                        <button mat-flat-button color="primary" type="submit" [disabled]="!canEdit()">Save workflow</button>
+                        <button mat-stroked-button type="button" [disabled]="!canEdit()" (click)="addTransition()">
+                            Add transition
+                        </button>
+                        <button mat-flat-button color="primary" type="submit" [disabled]="!canEdit()">
+                            Save workflow
+                        </button>
                     </div>
                 </form>
             </section>
@@ -156,11 +189,18 @@ import {
                     <fieldset class="flex flex-wrap gap-3">
                         <legend class="text-secondary mb-1 text-sm">Working days</legend>
                         @for (d of weekDays; track d) {
-                            <mat-checkbox [checked]="hasDay(d)" [disabled]="!canEdit()" (change)="toggleDay(d, $event.checked)">{{ d }}</mat-checkbox>
+                            <mat-checkbox
+                                [checked]="hasDay(d)"
+                                [disabled]="!canEdit()"
+                                (change)="toggleDay(d, $event.checked)"
+                                >{{ d }}</mat-checkbox
+                            >
                         }
                     </fieldset>
                     <table class="w-full max-w-160 text-sm">
-                        <caption class="sr-only">SLA targets</caption>
+                        <caption class="sr-only">
+                            SLA targets
+                        </caption>
                         <thead>
                             <tr class="text-secondary text-left">
                                 <th scope="col" class="py-1">Priority</th>
@@ -172,11 +212,39 @@ import {
                         <tbody formArrayName="targets">
                             @for (row of targets.controls; track row; let i = $index) {
                                 <tr [formGroupName]="i">
-                                    <td><input class="w-full rounded border px-2 py-1" formControlName="priority" [attr.aria-label]="'Target ' + (i + 1) + ' priority'" /></td>
-                                    <td><input type="number" min="1" class="w-full rounded border px-2 py-1" formControlName="responseMinutes" [attr.aria-label]="'Target ' + (i + 1) + ' response minutes'" /></td>
-                                    <td><input type="number" min="1" class="w-full rounded border px-2 py-1" formControlName="resolutionMinutes" [attr.aria-label]="'Target ' + (i + 1) + ' resolution minutes'" /></td>
                                     <td>
-                                        <button mat-icon-button type="button" [disabled]="!canEdit()" (click)="targets.removeAt(i)" [attr.aria-label]="'Remove target ' + (i + 1)">
+                                        <input
+                                            class="w-full rounded border px-2 py-1"
+                                            formControlName="priority"
+                                            [attr.aria-label]="'Target ' + (i + 1) + ' priority'"
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            class="w-full rounded border px-2 py-1"
+                                            formControlName="responseMinutes"
+                                            [attr.aria-label]="'Target ' + (i + 1) + ' response minutes'"
+                                        />
+                                    </td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            class="w-full rounded border px-2 py-1"
+                                            formControlName="resolutionMinutes"
+                                            [attr.aria-label]="'Target ' + (i + 1) + ' resolution minutes'"
+                                        />
+                                    </td>
+                                    <td>
+                                        <button
+                                            mat-icon-button
+                                            type="button"
+                                            [disabled]="!canEdit()"
+                                            (click)="targets.removeAt(i)"
+                                            [attr.aria-label]="'Remove target ' + (i + 1)"
+                                        >
                                             <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                                         </button>
                                     </td>
@@ -185,8 +253,12 @@ import {
                         </tbody>
                     </table>
                     <div class="flex gap-2">
-                        <button mat-stroked-button type="button" [disabled]="!canEdit()" (click)="addTarget()">Add target</button>
-                        <button mat-flat-button color="primary" type="submit" [disabled]="!canEdit()">Save SLA policy</button>
+                        <button mat-stroked-button type="button" [disabled]="!canEdit()" (click)="addTarget()">
+                            Add target
+                        </button>
+                        <button mat-flat-button color="primary" type="submit" [disabled]="!canEdit()">
+                            Save SLA policy
+                        </button>
                     </div>
                 </form>
             </section>
@@ -198,9 +270,16 @@ import {
                     <ul class="flex max-w-200 flex-col divide-y rounded-lg border">
                         @for (r of rules(); track r.name) {
                             <li class="flex items-center justify-between gap-3 px-3 py-1.5">
-                                <span class="text-sm"><span class="font-mono">{{ r.name }}</span> — {{ describe(r) }}</span>
+                                <span class="text-sm"
+                                    ><span class="font-mono">{{ r.name }}</span> — {{ describe(r) }}</span
+                                >
                                 @if (canEdit()) {
-                                    <button mat-icon-button type="button" (click)="removeRule(r.name)" [attr.aria-label]="'Delete Escalation Rule ' + r.name">
+                                    <button
+                                        mat-icon-button
+                                        type="button"
+                                        (click)="removeRule(r.name)"
+                                        [attr.aria-label]="'Delete Escalation Rule ' + r.name"
+                                    >
                                         <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                                     </button>
                                 }
@@ -219,14 +298,22 @@ import {
                                 <mat-error>An id is required.</mat-error>
                             }
                         </mat-form-field>
-                        <div class="w-48"><inspecto-option-picker label="Fires" formControlName="on" [options]="onOptions" /></div>
+                        <div class="w-48">
+                            <inspecto-option-picker label="Fires" formControlName="on" [options]="onOptions" />
+                        </div>
                         @if (rule.controls.on.value === 'age') {
                             <mat-form-field class="w-40">
                                 <mat-label>After minutes</mat-label>
                                 <input matInput type="number" min="1" formControlName="afterMinutes" />
                             </mat-form-field>
                         } @else {
-                            <div class="w-48"><inspecto-option-picker label="Target" formControlName="target" [options]="targetOptions" /></div>
+                            <div class="w-48">
+                                <inspecto-option-picker
+                                    label="Target"
+                                    formControlName="target"
+                                    [options]="targetOptions"
+                                />
+                            </div>
                         }
                         <mat-form-field class="w-40">
                             <mat-label>Only priority</mat-label>
@@ -311,12 +398,15 @@ export class IncidentGovernanceComponent implements OnInit {
     load(): void {
         const type = this.type;
         this.lastError.set(null);
-        this.objects.workflow(type).pipe(catchError(() => of(null))).subscribe((wf) => {
-            const d = workflowDraft(type, wf as unknown as Record<string, unknown>);
-            this.workflow.patchValue({ initial: d.initial, terminal: d.terminal });
-            this.transitions.clear();
-            d.transitions.forEach((t) => this.transitions.push(this.fb.nonNullable.group(t)));
-        });
+        this.objects
+            .workflow(type)
+            .pipe(catchError(() => of(null)))
+            .subscribe((wf) => {
+                const d = workflowDraft(type, wf as unknown as Record<string, unknown>);
+                this.workflow.patchValue({ initial: d.initial, terminal: d.terminal });
+                this.transitions.clear();
+                d.transitions.forEach((t) => this.transitions.push(this.fb.nonNullable.group(t)));
+            });
         this.components
             .get('sla-policy', governanceId(type))
             .pipe(catchError(() => of(null)))
@@ -359,8 +449,16 @@ export class IncidentGovernanceComponent implements OnInit {
             return;
         }
         const v = this.workflow.getRawValue();
-        this.upsert('workflow', workflowContent({ objectType: this.type, initial: v.initial, terminal: v.terminal,
-            transitions: v.transitions as never }), 'Workflow');
+        this.upsert(
+            'workflow',
+            workflowContent({
+                objectType: this.type,
+                initial: v.initial,
+                terminal: v.terminal,
+                transitions: v.transitions as never,
+            }),
+            'Workflow',
+        );
     }
 
     saveSla(): void {
@@ -369,8 +467,19 @@ export class IncidentGovernanceComponent implements OnInit {
             return;
         }
         const v = this.sla.getRawValue();
-        this.upsert('sla-policy', slaContent({ objectType: this.type, zone: v.zone, workingDays: WEEK_DAYS.filter((d) =>
-            this.days().includes(d)), start: v.start, end: v.end, holidays: v.holidays, targets: v.targets as never }), 'SLA policy');
+        this.upsert(
+            'sla-policy',
+            slaContent({
+                objectType: this.type,
+                zone: v.zone,
+                workingDays: WEEK_DAYS.filter((d) => this.days().includes(d)),
+                start: v.start,
+                end: v.end,
+                holidays: v.holidays,
+                targets: v.targets as never,
+            }),
+            'SLA policy',
+        );
     }
 
     addRule(): void {
@@ -389,10 +498,17 @@ export class IncidentGovernanceComponent implements OnInit {
     /** Create the per-type document, or replace it when it already exists. */
     private upsert(kind: ComponentType, content: Record<string, unknown>, what: string): void {
         const id = String(content['id']);
-        this.components.get(kind, id).pipe(catchError(() => of(null))).subscribe((current) => {
-            this.report(current ? this.components.update(kind, id, content, { ifMatch: current.contentHash })
-                : this.components.create(kind, content), what);
-        });
+        this.components
+            .get(kind, id)
+            .pipe(catchError(() => of(null)))
+            .subscribe((current) => {
+                this.report(
+                    current
+                        ? this.components.update(kind, id, content, { ifMatch: current.contentHash })
+                        : this.components.create(kind, content),
+                    what,
+                );
+            });
     }
 
     private report(call: Observable<unknown>, what: string): void {

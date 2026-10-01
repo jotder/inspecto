@@ -24,82 +24,188 @@
   },
   "expected": {
     "edgeWeight": [
-      ["e1", 3], ["e2", 1], ["e3", 2], ["e4", 1], ["e5", 4], ["e6", 1], ["e7", 1],
-      ["e8", 2], ["e9", 5], ["e10", 1], ["e11", 7], ["e12", 1], ["e13", 1], ["e14", 1], ["e15", 1], ["e16", 1], ["e17", 1]
+      ["e1", 3],
+      ["e2", 1],
+      ["e3", 2],
+      ["e4", 1],
+      ["e5", 4],
+      ["e6", 1],
+      ["e7", 1],
+      ["e8", 2],
+      ["e9", 5],
+      ["e10", 1],
+      ["e11", 7],
+      ["e12", 1],
+      ["e13", 1],
+      ["e14", 1],
+      ["e15", 1],
+      ["e16", 1],
+      ["e17", 1]
     ],
     "edgeWeightExtra": [
-      {"count": null, "kind": "link · abc", "weight": 1},
-      {"count": 2.5, "kind": "x", "weight": 2.5},
-      {"count": -1, "kind": "x · 6", "weight": 6},
-      {"count": null, "kind": "a · 2 · 9", "weight": 2},
-      {"count": null, "kind": "link · ", "weight": 1}
+      { "count": null, "kind": "link · abc", "weight": 1 },
+      { "count": 2.5, "kind": "x", "weight": 2.5 },
+      { "count": -1, "kind": "x · 6", "weight": 6 },
+      { "count": null, "kind": "a · 2 · 9", "weight": 2 },
+      { "count": null, "kind": "link · ", "weight": 1 }
     ],
     "allPaths": [
-      {"from": "a", "to": "e", "direction": "out", "limit": 10, "maxHops": 8, "paths": [
-        [["a", "b", "c", "d", "e"], ["e1", "e3", "e5", "e8"]],
-        [["a", "b", "c", "e"], ["e1", "e3", "e9"]],
-        [["a", "b", "d", "e"], ["e1", "e6", "e8"]],
-        [["a", "b", "c", "d", "e"], ["e2", "e3", "e5", "e8"]],
-        [["a", "b", "c", "e"], ["e2", "e3", "e9"]],
-        [["a", "b", "d", "e"], ["e2", "e6", "e8"]],
-        [["a", "c", "d", "e"], ["e4", "e5", "e8"]],
-        [["a", "c", "e"], ["e4", "e9"]]
-      ]},
-      {"from": "a", "to": "e", "direction": "out", "limit": 3, "maxHops": 8, "paths": [
-        [["a", "b", "c", "d", "e"], ["e1", "e3", "e5", "e8"]],
-        [["a", "b", "c", "e"], ["e1", "e3", "e9"]],
-        [["a", "b", "d", "e"], ["e1", "e6", "e8"]]
-      ]},
-      {"from": "a", "to": "e", "direction": "out", "limit": 10, "maxHops": 2, "paths": [
-        [["a", "c", "e"], ["e4", "e9"]]
-      ]},
-      {"from": "a", "to": "e", "direction": "out", "limit": 10, "maxHops": 1, "paths": []},
-      {"from": "e", "to": "a", "direction": "in", "limit": 10, "maxHops": 8, "paths": [
-        [["e", "d", "c", "b", "a"], ["e8", "e5", "e3", "e1"]],
-        [["e", "d", "c", "b", "a"], ["e8", "e5", "e3", "e2"]],
-        [["e", "d", "c", "a"], ["e8", "e5", "e4"]],
-        [["e", "d", "b", "a"], ["e8", "e6", "e1"]],
-        [["e", "d", "b", "a"], ["e8", "e6", "e2"]],
-        [["e", "c", "b", "a"], ["e9", "e3", "e1"]],
-        [["e", "c", "b", "a"], ["e9", "e3", "e2"]],
-        [["e", "c", "a"], ["e9", "e4"]]
-      ]},
-      {"from": "a", "to": "a", "direction": "out", "limit": 10, "maxHops": 8, "paths": [
-        [["a"], []]
-      ]},
-      {"from": "a", "to": "g", "direction": "both", "limit": 10, "maxHops": 8, "paths": []},
-      {"from": "a", "to": "zz", "direction": "both", "limit": 10, "maxHops": 8, "paths": []}
+      {
+        "from": "a",
+        "to": "e",
+        "direction": "out",
+        "limit": 10,
+        "maxHops": 8,
+        "paths": [
+          [
+            ["a", "b", "c", "d", "e"],
+            ["e1", "e3", "e5", "e8"]
+          ],
+          [
+            ["a", "b", "c", "e"],
+            ["e1", "e3", "e9"]
+          ],
+          [
+            ["a", "b", "d", "e"],
+            ["e1", "e6", "e8"]
+          ],
+          [
+            ["a", "b", "c", "d", "e"],
+            ["e2", "e3", "e5", "e8"]
+          ],
+          [
+            ["a", "b", "c", "e"],
+            ["e2", "e3", "e9"]
+          ],
+          [
+            ["a", "b", "d", "e"],
+            ["e2", "e6", "e8"]
+          ],
+          [
+            ["a", "c", "d", "e"],
+            ["e4", "e5", "e8"]
+          ],
+          [
+            ["a", "c", "e"],
+            ["e4", "e9"]
+          ]
+        ]
+      },
+      {
+        "from": "a",
+        "to": "e",
+        "direction": "out",
+        "limit": 3,
+        "maxHops": 8,
+        "paths": [
+          [
+            ["a", "b", "c", "d", "e"],
+            ["e1", "e3", "e5", "e8"]
+          ],
+          [
+            ["a", "b", "c", "e"],
+            ["e1", "e3", "e9"]
+          ],
+          [
+            ["a", "b", "d", "e"],
+            ["e1", "e6", "e8"]
+          ]
+        ]
+      },
+      {
+        "from": "a",
+        "to": "e",
+        "direction": "out",
+        "limit": 10,
+        "maxHops": 2,
+        "paths": [
+          [
+            ["a", "c", "e"],
+            ["e4", "e9"]
+          ]
+        ]
+      },
+      { "from": "a", "to": "e", "direction": "out", "limit": 10, "maxHops": 1, "paths": [] },
+      {
+        "from": "e",
+        "to": "a",
+        "direction": "in",
+        "limit": 10,
+        "maxHops": 8,
+        "paths": [
+          [
+            ["e", "d", "c", "b", "a"],
+            ["e8", "e5", "e3", "e1"]
+          ],
+          [
+            ["e", "d", "c", "b", "a"],
+            ["e8", "e5", "e3", "e2"]
+          ],
+          [
+            ["e", "d", "c", "a"],
+            ["e8", "e5", "e4"]
+          ],
+          [
+            ["e", "d", "b", "a"],
+            ["e8", "e6", "e1"]
+          ],
+          [
+            ["e", "d", "b", "a"],
+            ["e8", "e6", "e2"]
+          ],
+          [
+            ["e", "c", "b", "a"],
+            ["e9", "e3", "e1"]
+          ],
+          [
+            ["e", "c", "b", "a"],
+            ["e9", "e3", "e2"]
+          ],
+          [
+            ["e", "c", "a"],
+            ["e9", "e4"]
+          ]
+        ]
+      },
+      { "from": "a", "to": "a", "direction": "out", "limit": 10, "maxHops": 8, "paths": [[["a"], []]] },
+      { "from": "a", "to": "g", "direction": "both", "limit": 10, "maxHops": 8, "paths": [] },
+      { "from": "a", "to": "zz", "direction": "both", "limit": 10, "maxHops": 8, "paths": [] }
     ],
     "egoNetwork": [
-      {"node": "d", "direction": "both", "nodeIds": ["b", "c", "d", "e"], "edgeIds": ["e3", "e5", "e6", "e7", "e8", "e9"]},
-      {"node": "d", "direction": "out", "nodeIds": ["d", "e"], "edgeIds": ["e7", "e8"]},
-      {"node": "d", "direction": "in", "nodeIds": ["b", "c", "d"], "edgeIds": ["e3", "e5", "e6", "e7"]},
-      {"node": "a", "direction": "both", "nodeIds": ["a", "b", "c"], "edgeIds": ["e1", "e2", "e3", "e4"]},
-      {"node": "g", "direction": "both", "nodeIds": ["g", "h"], "edgeIds": ["e11"]},
-      {"node": "h", "direction": "out", "nodeIds": ["h"], "edgeIds": []},
-      {"node": "zz", "direction": "both", "nodeIds": [], "edgeIds": []}
+      {
+        "node": "d",
+        "direction": "both",
+        "nodeIds": ["b", "c", "d", "e"],
+        "edgeIds": ["e3", "e5", "e6", "e7", "e8", "e9"]
+      },
+      { "node": "d", "direction": "out", "nodeIds": ["d", "e"], "edgeIds": ["e7", "e8"] },
+      { "node": "d", "direction": "in", "nodeIds": ["b", "c", "d"], "edgeIds": ["e3", "e5", "e6", "e7"] },
+      { "node": "a", "direction": "both", "nodeIds": ["a", "b", "c"], "edgeIds": ["e1", "e2", "e3", "e4"] },
+      { "node": "g", "direction": "both", "nodeIds": ["g", "h"], "edgeIds": ["e11"] },
+      { "node": "h", "direction": "out", "nodeIds": ["h"], "edgeIds": [] },
+      { "node": "zz", "direction": "both", "nodeIds": [], "edgeIds": [] }
     ],
     "weightedShortestPath": [
-      {"from": "a", "to": "e", "direction": "out", "nodeIds": ["a", "b", "c", "e"], "edgeIds": ["e1", "e3", "e9"]},
-      {"from": "a", "to": "d", "direction": "out", "nodeIds": ["a", "b", "c", "d"], "edgeIds": ["e1", "e3", "e5"]},
-      {"from": "d", "to": "a", "direction": "both", "nodeIds": ["d", "c", "b", "a"], "edgeIds": ["e5", "e3", "e1"]},
-      {"from": "i", "to": "j", "direction": "out", "nodeIds": ["i", "j"], "edgeIds": ["e12"]},
-      {"from": "p", "to": "s", "direction": "out", "nodeIds": ["p", "q", "s"], "edgeIds": ["e14", "e16"]},
-      {"from": "g", "to": "a", "direction": "out", "nodeIds": null, "edgeIds": null},
-      {"from": "e", "to": "a", "direction": "out", "nodeIds": null, "edgeIds": null},
-      {"from": "a", "to": "a", "direction": "out", "nodeIds": ["a"], "edgeIds": []},
-      {"from": "a", "to": "zz", "direction": "out", "nodeIds": null, "edgeIds": null}
+      { "from": "a", "to": "e", "direction": "out", "nodeIds": ["a", "b", "c", "e"], "edgeIds": ["e1", "e3", "e9"] },
+      { "from": "a", "to": "d", "direction": "out", "nodeIds": ["a", "b", "c", "d"], "edgeIds": ["e1", "e3", "e5"] },
+      { "from": "d", "to": "a", "direction": "both", "nodeIds": ["d", "c", "b", "a"], "edgeIds": ["e5", "e3", "e1"] },
+      { "from": "i", "to": "j", "direction": "out", "nodeIds": ["i", "j"], "edgeIds": ["e12"] },
+      { "from": "p", "to": "s", "direction": "out", "nodeIds": ["p", "q", "s"], "edgeIds": ["e14", "e16"] },
+      { "from": "g", "to": "a", "direction": "out", "nodeIds": null, "edgeIds": null },
+      { "from": "e", "to": "a", "direction": "out", "nodeIds": null, "edgeIds": null },
+      { "from": "a", "to": "a", "direction": "out", "nodeIds": ["a"], "edgeIds": [] },
+      { "from": "a", "to": "zz", "direction": "out", "nodeIds": null, "edgeIds": null }
     ],
     "maxFlow": [
-      {"from": "a", "to": "e", "value": 4, "nodeIds": ["b", "c", "a", "d"], "edgeIds": ["e3", "e4", "e6"]},
-      {"from": "a", "to": "f", "value": 1, "nodeIds": ["e", "f"], "edgeIds": ["e10"]},
-      {"from": "g", "to": "h", "value": 7, "nodeIds": ["g", "h"], "edgeIds": ["e11"]},
-      {"from": "i", "to": "j", "value": 2, "nodeIds": ["i", "j"], "edgeIds": ["e12", "e13"]},
-      {"from": "p", "to": "s", "value": 2, "nodeIds": ["p", "q", "r"], "edgeIds": ["e14", "e15"]},
-      {"from": "a", "to": "g", "value": 0, "nodeIds": [], "edgeIds": []},
-      {"from": "e", "to": "a", "value": 0, "nodeIds": [], "edgeIds": []},
-      {"from": "a", "to": "a", "value": 0, "nodeIds": [], "edgeIds": []},
-      {"from": "a", "to": "zz", "value": 0, "nodeIds": [], "edgeIds": []}
+      { "from": "a", "to": "e", "value": 4, "nodeIds": ["b", "c", "a", "d"], "edgeIds": ["e3", "e4", "e6"] },
+      { "from": "a", "to": "f", "value": 1, "nodeIds": ["e", "f"], "edgeIds": ["e10"] },
+      { "from": "g", "to": "h", "value": 7, "nodeIds": ["g", "h"], "edgeIds": ["e11"] },
+      { "from": "i", "to": "j", "value": 2, "nodeIds": ["i", "j"], "edgeIds": ["e12", "e13"] },
+      { "from": "p", "to": "s", "value": 2, "nodeIds": ["p", "q", "r"], "edgeIds": ["e14", "e15"] },
+      { "from": "a", "to": "g", "value": 0, "nodeIds": [], "edgeIds": [] },
+      { "from": "e", "to": "a", "value": 0, "nodeIds": [], "edgeIds": [] },
+      { "from": "a", "to": "a", "value": 0, "nodeIds": [], "edgeIds": [] },
+      { "from": "a", "to": "zz", "value": 0, "nodeIds": [], "edgeIds": [] }
     ],
     "maximumSpanningForest": {
       "nodeIds": ["g", "h", "c", "e", "d", "a", "b", "f", "i", "j", "p", "q", "r", "s"],

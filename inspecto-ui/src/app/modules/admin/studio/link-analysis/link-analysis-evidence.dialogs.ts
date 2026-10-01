@@ -385,35 +385,33 @@ export class LinkAnalysisSnapshotDialog {
      */
     private createCaseAndAttach(snap: GraphSnapshot): void {
         const members = this.candidates.filter((c) => this.picked().has(c.nodeId)).map((c) => c.member);
-        this.caseMgmt
-            .openFromEntities(this.caseForm.controls.title.value.trim(), snap.description, members)
-            .subscribe({
-                next: (made) => {
-                    this.store.attachTo(snap.id, made.caseId).subscribe({
-                        next: (attachedTo) => {
-                            this.saving.set(false);
-                            this.ref.close({ ...snap, attachedTo });
-                        },
-                        error: (e: unknown) => {
-                            this.saving.set(false);
-                            this.form.controls.caseId.setValue(made.caseId);
-                            this.caseForm.controls.mode.setValue('existing');
-                            this.caseError.set(
-                                `Case ${made.caseId} was created with ${made.memberCount} member(s), but the ` +
-                                    `analysis could not be attached to it: ${apiErrorMessage(e, 'the attachment failed')}. ` +
-                                    'Save again to attach it — the Case will not be created twice.',
-                            );
-                        },
-                    });
-                },
-                error: (e: unknown) => {
-                    this.saving.set(false);
-                    this.caseError.set(
-                        `The Case was not created: ${apiErrorMessage(e, 'the request failed')}. Nothing was created ` +
-                            'for it — save again to retry, or attach the analysis to an existing Case.',
-                    );
-                },
-            });
+        this.caseMgmt.openFromEntities(this.caseForm.controls.title.value.trim(), snap.description, members).subscribe({
+            next: (made) => {
+                this.store.attachTo(snap.id, made.caseId).subscribe({
+                    next: (attachedTo) => {
+                        this.saving.set(false);
+                        this.ref.close({ ...snap, attachedTo });
+                    },
+                    error: (e: unknown) => {
+                        this.saving.set(false);
+                        this.form.controls.caseId.setValue(made.caseId);
+                        this.caseForm.controls.mode.setValue('existing');
+                        this.caseError.set(
+                            `Case ${made.caseId} was created with ${made.memberCount} member(s), but the ` +
+                                `analysis could not be attached to it: ${apiErrorMessage(e, 'the attachment failed')}. ` +
+                                'Save again to attach it — the Case will not be created twice.',
+                        );
+                    },
+                });
+            },
+            error: (e: unknown) => {
+                this.saving.set(false);
+                this.caseError.set(
+                    `The Case was not created: ${apiErrorMessage(e, 'the request failed')}. Nothing was created ` +
+                        'for it — save again to retry, or attach the analysis to an existing Case.',
+                );
+            },
+        });
     }
 }
 

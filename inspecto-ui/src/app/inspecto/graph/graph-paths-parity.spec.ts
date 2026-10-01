@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { GraphDirection } from 'app/inspecto/api';
 import type { G6GraphData } from './graph-types';
-import { allPaths, edgeWeight, egoNetwork, maxFlow, maximumSpanningForest, weightedShortestPath } from './graph-analysis';
+import {
+    allPaths,
+    edgeWeight,
+    egoNetwork,
+    maxFlow,
+    maximumSpanningForest,
+    weightedShortestPath,
+} from './graph-analysis';
 import fixture from './graph-paths-parity.fixture.json';
 
 /**

@@ -33,7 +33,9 @@ function setup(opts: { canAdminister?: boolean; createFails?: boolean } = {}) {
         list: vi.fn(() => of([RULE])),
         create: vi.fn(() =>
             opts.createFails
-                ? throwError(() => new HttpErrorResponse({ status: 422, error: { error: 'state LIMBO is unreachable' } }))
+                ? throwError(
+                      () => new HttpErrorResponse({ status: 422, error: { error: 'state LIMBO is unreachable' } }),
+                  )
                 : of({}),
         ),
         update: vi.fn(() => of({})),
@@ -75,15 +77,18 @@ describe('IncidentGovernanceComponent', () => {
         c.addTransition();
         fixture.detectChanges();
         button('Save workflow')!.click();
-        expect(components.create).toHaveBeenCalledWith('workflow', expect.objectContaining({
-            id: 'incident',
-            initial: 'IDENTIFIED',
-            terminal: ['ARCHIVED'],
-            transitions: [
-                { from: 'IDENTIFIED', to: 'RESOLVED', action: 'resolve' },
-                { from: 'RESOLVED', to: 'ARCHIVED', action: 'archive' },
-            ],
-        }));
+        expect(components.create).toHaveBeenCalledWith(
+            'workflow',
+            expect.objectContaining({
+                id: 'incident',
+                initial: 'IDENTIFIED',
+                terminal: ['ARCHIVED'],
+                transitions: [
+                    { from: 'IDENTIFIED', to: 'RESOLVED', action: 'resolve' },
+                    { from: 'RESOLVED', to: 'ARCHIVED', action: 'archive' },
+                ],
+            }),
+        );
     });
 
     it('shows the server refusal inline and asks for an explicit time zone before saving an SLA policy', () => {

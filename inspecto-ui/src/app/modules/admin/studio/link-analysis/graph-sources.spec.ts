@@ -92,7 +92,10 @@ describe('ComponentRegistryGraphSource', () => {
     ];
 
     it('returns exactly deriveComponentGraph() over all listed kinds', async () => {
-        const provider = { kinds: REGISTRY_KINDS, list: (kind: string) => Promise.resolve(comps.filter((c) => c.kind === kind)) };
+        const provider = {
+            kinds: REGISTRY_KINDS,
+            list: (kind: string) => Promise.resolve(comps.filter((c) => c.kind === kind)),
+        };
         const src = new ComponentRegistryGraphSource(provider as never);
         // expected components in REGISTRY_KINDS load order, exactly as the source assembles them
         const ordered = REGISTRY_KINDS.flatMap((k) => comps.filter((c) => c.kind === k));

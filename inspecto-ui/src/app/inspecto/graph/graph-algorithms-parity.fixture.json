@@ -17,20 +17,71 @@
     ]
   },
   "expected": {
-    "degree": [["a", 3], ["b", 3], ["c", 3], ["e", 3], ["j", 3], ["d", 2], ["f", 2], ["g", 2], ["i", 1], ["h", 0]],
+    "degree": [
+      ["a", 3],
+      ["b", 3],
+      ["c", 3],
+      ["e", 3],
+      ["j", 3],
+      ["d", 2],
+      ["f", 2],
+      ["g", 2],
+      ["i", 1],
+      ["h", 0]
+    ],
     "components": [["a", "b", "c", "d", "e", "f", "g"], ["i", "j"], ["h"]],
-    "kCore": [["a", 2], ["b", 2], ["c", 2], ["d", 2], ["e", 2], ["f", 2], ["g", 2], ["i", 1], ["j", 1], ["h", 0]],
-    "triangles": [["a", 1], ["b", 1], ["c", 1], ["e", 1], ["f", 1], ["g", 1], ["d", 0], ["h", 0], ["i", 0], ["j", 0]],
+    "kCore": [
+      ["a", 2],
+      ["b", 2],
+      ["c", 2],
+      ["d", 2],
+      ["e", 2],
+      ["f", 2],
+      ["g", 2],
+      ["i", 1],
+      ["j", 1],
+      ["h", 0]
+    ],
+    "triangles": [
+      ["a", 1],
+      ["b", 1],
+      ["c", 1],
+      ["e", 1],
+      ["f", 1],
+      ["g", 1],
+      ["d", 0],
+      ["h", 0],
+      ["i", 0],
+      ["j", 0]
+    ],
     "shortestPath": [
-      { "from": "a", "to": "g", "direction": "both", "nodeIds": ["a", "c", "d", "e", "g"], "edgeIds": ["e3", "e5", "e6", "e9"] },
-      { "from": "a", "to": "g", "direction": "out", "nodeIds": ["a", "b", "c", "d", "e", "f", "g"], "edgeIds": ["e1", "e2", "e5", "e6", "e7", "e8"] },
+      {
+        "from": "a",
+        "to": "g",
+        "direction": "both",
+        "nodeIds": ["a", "c", "d", "e", "g"],
+        "edgeIds": ["e3", "e5", "e6", "e9"]
+      },
+      {
+        "from": "a",
+        "to": "g",
+        "direction": "out",
+        "nodeIds": ["a", "b", "c", "d", "e", "f", "g"],
+        "edgeIds": ["e1", "e2", "e5", "e6", "e7", "e8"]
+      },
       { "from": "a", "to": "b", "direction": "in", "nodeIds": ["a", "c", "b"], "edgeIds": ["e3", "e2"] },
       { "from": "a", "to": "a", "direction": "both", "nodeIds": ["a"], "edgeIds": [] },
       { "from": "a", "to": "i", "direction": "both", "nodeIds": null, "edgeIds": null }
     ],
     "neighborhood": [
       { "node": "a", "hops": 1, "direction": "both", "nodeIds": ["a", "b", "c"], "edgeIds": ["e1", "e2", "e3", "e4"] },
-      { "node": "a", "hops": 2, "direction": "both", "nodeIds": ["a", "b", "c", "d"], "edgeIds": ["e1", "e2", "e3", "e4", "e5"] },
+      {
+        "node": "a",
+        "hops": 2,
+        "direction": "both",
+        "nodeIds": ["a", "b", "c", "d"],
+        "edgeIds": ["e1", "e2", "e3", "e4", "e5"]
+      },
       { "node": "a", "hops": 1, "direction": "out", "nodeIds": ["a", "b"], "edgeIds": ["e1", "e4"] }
     ]
   },
@@ -49,8 +100,18 @@
       ]
     },
     "expected": {
-      "degree": [["ACC-0007", 1], ["Acc-9", 1], ["acc-0042", 1], ["acc-1121", 1]],
-      "kCore": [["ACC-0007", 1], ["Acc-9", 1], ["acc-0042", 1], ["acc-1121", 1]]
+      "degree": [
+        ["ACC-0007", 1],
+        ["Acc-9", 1],
+        ["acc-0042", 1],
+        ["acc-1121", 1]
+      ],
+      "kCore": [
+        ["ACC-0007", 1],
+        ["Acc-9", 1],
+        ["acc-0042", 1],
+        ["acc-1121", 1]
+      ]
     }
   }
 }
