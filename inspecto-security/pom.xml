@@ -83,6 +83,40 @@
 
     <build>
         <plugins>
+            <!-- LA separation D-1 (Decision 5): this module may reach ONLY the inspecto-* modules below, directly or
+                 transitively, at compile/provided/runtime scope. tools/check-module-deps.mjs derives the same answer from the
+                 poms and fails if this list drifts from its ALLOWED table. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>platform-layer-deps</id>
+                        <phase>validate</phase>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <searchTransitive>true</searchTransitive>
+                                    <excludes>
+                                        <exclude>com.gamma.inspector:*:*:*:compile</exclude>
+                                        <exclude>com.gamma.inspector:*:*:*:provided</exclude>
+                                        <exclude>com.gamma.inspector:*:*:*:runtime</exclude>
+                                    </excludes>
+                                    <includes>
+                                        <include>com.gamma.inspector:inspecto-api</include>
+                                        <include>com.gamma.inspector:inspecto-audit-spi</include>
+                                        <include>com.gamma.inspector:inspecto-auth-spi</include>
+                                        <include>com.gamma.inspector:inspecto-config</include>
+                                        <include>com.gamma.inspector:inspecto-util</include>
+                                    </includes>
+                                    <message>inspecto-security may depend only on the inspecto-* modules listed in tools/check-module-deps.mjs (LA separation, D-1). A host module here silently undoes the extraction.</message>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <!-- SEC-SIDECAR-BOOT-1 (2026-09-07). This module shipped as a 16 KB THIN jar with zero
                  com/nimbusds classes, while OidcAuthenticator has nine direct Nimbus imports and
                  ControlApi resolves the Authenticator SPI DURING STARTUP through an unguarded

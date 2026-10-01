@@ -262,6 +262,15 @@ jobs:
       - name: Tools — java-closure and compile-clean fixture tests
         run: node --test tools/java-closure.test.mjs tools/compile-clean.test.mjs
 
+      # Extracted-module dependency guard (LA separation D-1, Decision 5). The SPI modules and inspecto-la-graph exist so
+      # Link Analysis can stand on a thin platform layer without the core; one convenient <dependency> on
+      # inspecto-processor / -engine / -etl / -acquire / -event undoes that silently. This derives each governed module's
+      # transitive reach from the poms (test scope exempt) and fails if it leaves its allowlist, if the module lacks its
+      # maven-enforcer rule, or if the two have drifted. The enforcer half runs in every reactor build (validate phase);
+      # the fixture test plants each violation and requires red.
+      - name: Guard — extracted platform modules reach only their allowed modules
+        run: node tools/check-module-deps.mjs && node --test tools/check-module-deps.test.mjs
+
       # Launcher guard (LAUNCHER-GUARD-1, 2026-09-14). Third in the same family: package.ps1 emits the
       # deployment surface and nothing had ever EXECUTED any of it. serve.bat spent its life dropping
       # -Dauth.mode=oidc on every Windows Standard/Enterprise bundle — a parenthesised `if` block, which
