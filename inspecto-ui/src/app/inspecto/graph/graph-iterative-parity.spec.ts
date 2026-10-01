@@ -24,6 +24,9 @@ const build = (c: Case): G6GraphData => ({
 type Pair = [string, number];
 const GRAPHS = ['main', 'cliques', 'hitsGraph', 'edgeless', 'empty', 'louvainRand0', 'louvainRand296'] as const;
 const graphs = fixture.graphs as Record<string, Case>;
+// The fixture's `expected` block is heterogeneous JSON (a different shape per graph and per algorithm); each case below
+// asserts the shape it reads, so a precise static type would only restate the fixture.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const expected = fixture.expected as unknown as Record<string, Record<string, any>>;
 const eps = fixture.epsilon;
 
