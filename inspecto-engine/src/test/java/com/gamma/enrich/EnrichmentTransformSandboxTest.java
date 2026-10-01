@@ -145,12 +145,16 @@ class EnrichmentTransformSandboxTest {
         Path in = Files.createDirectories(space.resolve("data")).resolve("in");
         seedInput(in);
         List<EnrichmentConfig> bad = new java.util.ArrayList<>();
-        for (String out : List.of(fwd(space) + "/config.", fwd(space) + "/config./x", fwd(space) + "/CONFIG"))
+        // CONFIG / Config.Secrets are config / config.secrets only on a case-insensitive filesystem (Windows).
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows");
+        List<String> outs = new java.util.ArrayList<>(List.of(fwd(space) + "/config.", fwd(space) + "/config./x"));
+        if (windows) outs.add(fwd(space) + "/CONFIG");
+        for (String out : outs)
             bad.add(new EnrichmentConfig("LEAK", new EnrichmentConfig.Input(fwd(in), "PARQUET", List.of("day")),
                     List.of(), new EnrichmentConfig.Output(out, "PARQUET", "snappy", List.of("day")),
                     "SELECT day, id FROM input"));
         bad.add(new EnrichmentConfig("LEAK", new EnrichmentConfig.Input(fwd(in), "PARQUET", List.of("day")),
-                List.of(new EnrichmentConfig.Reference("k", fwd(space) + "/Config.Secrets/.pending-changes.key", "CSV")),
+                List.of(new EnrichmentConfig.Reference("k", fwd(space) + (windows ? "/Config.Secrets/" : "/config.secrets/") + ".pending-changes.key", "CSV")),
                 new EnrichmentConfig.Output(fwd(space.resolve("data").resolve("out")), "PARQUET", "snappy", List.of("day")),
                 "SELECT day, k FROM k"));
         for (EnrichmentConfig c : bad) {

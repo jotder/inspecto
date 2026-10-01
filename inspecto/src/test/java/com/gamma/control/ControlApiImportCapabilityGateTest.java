@@ -222,15 +222,18 @@ class ControlApiImportCapabilityGateTest {
     void aRawImportEnrichmentWhoseDataHomeIsTheSpaceRootOrSecretsIsRefused(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             String spaceRoot = c.config.getParent().toString().replace('\\', '/');
-            String[][] bad = {
-                    {"output.database", "input:\n  database: data/in\noutput:\n  database: .\n"},
-                    {"output.database", "input:\n  database: data/in\noutput:\n  database: \"" + spaceRoot + "/config.\"\n"},
-                    {"output.database", "input:\n  database: data/in\noutput:\n  database: config./x\n"},
-                    {"output.database", "input:\n  database: data/in\noutput:\n  database: CONFIG\n"},
-                    {"references.dim.path", "input:\n  database: data/in\noutput:\n  database: data/out\n"
-                            + "references:\n  dim:\n    path: Config.Secrets/.pending-changes.key\n"},
-                    {"references.dim.path", "input:\n  database: data/in\noutput:\n  database: data/out\n"
-                            + "references:\n  dim:\n    path: config.secrets/.pending-changes.key\n"}};
+            List<String[]> bad = new java.util.ArrayList<>(List.of(
+                    new String[]{"output.database", "input:\n  database: data/in\noutput:\n  database: .\n"},
+                    new String[]{"output.database", "input:\n  database: data/in\noutput:\n  database: \"" + spaceRoot + "/config.\"\n"},
+                    new String[]{"output.database", "input:\n  database: data/in\noutput:\n  database: config./x\n"},
+                    new String[]{"references.dim.path", "input:\n  database: data/in\noutput:\n  database: data/out\n"
+                            + "references:\n  dim:\n    path: config.secrets/.pending-changes.key\n"}));
+            // CONFIG / Config.Secrets are config / config.secrets only on a case-insensitive filesystem (Windows).
+            if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows")) {
+                bad.add(new String[]{"output.database", "input:\n  database: data/in\noutput:\n  database: CONFIG\n"});
+                bad.add(new String[]{"references.dim.path", "input:\n  database: data/in\noutput:\n  database: data/out\n"
+                        + "references:\n  dim:\n    path: Config.Secrets/.pending-changes.key\n"});
+            }
             for (String[] b : bad) {
                 Map<String, String> before = tree(c.config);
                 HttpResponse<String> r = send(c, "POST", "/import", dataSourceZip("leak/leak_enrich.toon",

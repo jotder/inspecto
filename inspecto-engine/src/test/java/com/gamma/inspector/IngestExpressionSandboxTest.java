@@ -179,8 +179,9 @@ class IngestExpressionSandboxTest {
     @Test
     void configureRefusesAConfigDirHoweverItIsSpelled(@TempDir Path dir) throws Exception {
         List<String> spellings = new java.util.ArrayList<>(List.of("config", "config.", "config./orders",
-                "config..", "config. .", "config/new/child", "config\\orders"));
-        if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows")) spellings.addAll(List.of("CONFIG", "Config/orders"));
+                "config..", "config. .", "config/new/child"));
+        // A backslash is a separator only on Windows; on Linux `config\orders` is one ordinary filename.
+        if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows")) spellings.addAll(List.of("config\\orders", "CONFIG", "Config/orders"));
         for (String v : spellings) {
             PipelineConfig cfg = pipeline(dir.resolve(v.replaceAll("[^a-zA-Z]", "_")), "upper(CUSTOMER)",
                     null);

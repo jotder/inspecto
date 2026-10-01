@@ -164,11 +164,11 @@ class ImportCapabilityGuardTest {
         try {
             String abs = s.toString();
             List<String> spellings = new ArrayList<>(List.of(".", "config", "config.", "config..", "config. .",
-                    "config./orders", "config/new/child", "config\\orders", "config.secrets", "x.secrets/y",
-                    abs, abs + "/config..", abs + "/config/orders/not-yet/there",
-                    abs.replace('\\', '/') + "\\config/orders"));
+                    "config./orders", "config/new/child", "config.secrets", "x.secrets/y",
+                    abs, abs + "/config..", abs + "/config/orders/not-yet/there"));
+            // A backslash is a separator, and CONFIG is config, only on Windows; on Linux they are ordinary names.
             if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows"))
-                spellings.addAll(List.of("CONFIG", "Config/orders", "config::$DATA", "config:x",
+                spellings.addAll(List.of("config\\orders", abs.replace('\\', '/') + "\\config/orders", "CONFIG", "Config/orders", "config::$DATA", "config:x",
                         abs + "\\config::$DATA", "\\\\?\\" + abs + "\\config"));
             for (String v : spellings) {
                 ApiException e = assertThrows(ApiException.class,
