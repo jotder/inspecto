@@ -231,6 +231,17 @@ export class LensService {
      *  the server lets save it. Client-side it gates only that editor today. */
     readonly canManageIncidents = computed(() => this.identityCapability('canManageIncidents', 'incidents.manage'));
 
+    /** May start a server-side Graph Run - the Link Analysis "Run on server" above the browser's node cap
+     *  (`POST /inv/graph/runs`, D-4 step 7). RBAC: Operations, Support, Power, Admin, Super - everyone who holds
+     *  `canManageIncidents`. A run spends server compute, so it is its own question; reading a run, and cancelling
+     *  one's own, need no grant.
+     *
+     *  {@link identityCapability}, as {@link canManageIncidents} is: the `admin` seed holds it and qualifies for no
+     *  non-Business lens, so a lens-scoped grant would hide the button from a subject the server allows. */
+    readonly canRunLinkGraphAnalysis = computed(() =>
+        this.identityCapability('canRunLinkGraphAnalysis', 'linkgraph.run'),
+    );
+
     /** May decide a Pending Change — approve or decline a held config change (`ASSURE-MAKER-CHECKER-1`,
      *  `POST /pending-changes/{id}/approve | decline`). RBAC: Admin, Super. {@link identityCapability}: the
      *  `admin` seed holds it and qualifies for no non-Business lens. The server adds the kind's own

@@ -132,6 +132,21 @@ describe('LensService', () => {
         expect(service.canWorkIncidents()).toBe(true);
     });
 
+    // D-4 step 7: a server-side Graph Run spends compute, so it has its own grant. Not implied by canManageIncidents
+    // (the server seeds them together but checks this exact name) and, like it, an identity capability.
+    it('canRunLinkGraphAnalysis is granted only to a subject holding it, and survives the business lens', () => {
+        const session = TestBed.inject(SessionService);
+        const service = TestBed.inject(LensService);
+        session.authMode.set('oidc');
+        service.selectLens('business');
+
+        session.capabilities.set(['canAdminister', 'canManageIncidents']);
+        expect(service.canRunLinkGraphAnalysis()).toBe(false);
+
+        session.capabilities.set(['canRunLinkGraphAnalysis']);
+        expect(service.canRunLinkGraphAnalysis()).toBe(true);
+    });
+
     // Off-OIDC there is no identity to justify the exemption — granted() is true for everyone — so the
     // lens stays the only signal and the Business "View as" preview keeps hiding authoring affordances.
     it('identity capabilities are still lens-suppressed in honor-system mode', () => {

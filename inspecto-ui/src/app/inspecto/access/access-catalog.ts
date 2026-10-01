@@ -108,6 +108,16 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             label: 'Request access to another Space’s offer',
         },
     ],
+    'studio-link-analysis': [
+        {
+            // D-4 step 7: a server-side Graph Run spends compute. Denying it here only hides "Run on server"; the
+            // server gates the route on the same capability.
+            id: 'linkgraph.run',
+            kind: 'action',
+            capability: 'canRunLinkGraphAnalysis',
+            label: 'Run graph analysis on the server (above the browser cap)',
+        },
+    ],
     settings: [
         {
             id: 'access.configure',

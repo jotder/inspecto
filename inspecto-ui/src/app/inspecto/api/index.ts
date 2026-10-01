@@ -59,6 +59,7 @@ export * from './timezone-settings.service';
 export * from './scheduler-settings.service';
 export * from './egress-settings.service';
 export * from './inv.service';
+export * from './graph-runs.service';
 export * from './share.service';
 export * from './exchange.service';
 export * from './shared-ref';
