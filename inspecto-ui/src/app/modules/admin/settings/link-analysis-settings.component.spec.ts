@@ -84,6 +84,13 @@ describe('LinkAnalysisSettingsComponent', () => {
         expect(toastr.success).toHaveBeenCalled();
     });
 
+    it('sends the graph-run knobs back untouched: the PUT replaces, so a save must not drop what it has no field for', () => {
+        const graphRun = { maxNodes: 900, maxEdges: null, timeoutMs: 4000, threads: 3, queue: null };
+        const { api, submit } = setup({ served: { graphRun } });
+        submit();
+        expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ graphRun }));
+    });
+
     it("shows a 422 inline in the server's words and a 503 as a writes-disabled notice", () => {
         const { el, api, submit } = setup({
             save: () =>

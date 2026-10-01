@@ -324,6 +324,27 @@ class ControlApiSettingsTest {
         }
     }
 
+    /** D-4 step 6: the graph-run knobs are a nested block; absent = inherit, a stated block round-trips and a bad one is 422. */
+    @Test
+    void linkAnalysisGraphRunRoundTripsAndRefusesBadValues(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            assertTrue(json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("graphRun").isNull(), "absent => inherit");
+            HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"graphRun\":{\"maxNodes\":900,\"timeoutMs\":4000,\"threads\":3}}");
+            assertEquals(200, put.statusCode(), put.body());
+            String toon = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
+            assertTrue(toon.contains("graph_run") && toon.contains("max_nodes: 900") && toon.contains("timeout_ms: 4000"), toon);
+            JsonNode got = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("graphRun");
+            assertEquals(900, got.get("maxNodes").asInt());
+            assertEquals(3, got.get("threads").asInt());
+            assertTrue(got.get("maxEdges").isNull() && got.get("queue").isNull(), "unstated knobs stay unstated");
+            assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"graphRun\":{\"threads\":0}}").statusCode());
+            assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"graphRun\":{\"bogus\":1}}").statusCode());
+            assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"graphRun\":7}").statusCode());
+        }
+    }
+
     /** LA-17 step 2: per-Space Entity Types — inherit the seeded nine, a stated list replaces them, 422 on bad. */
     @Test
     void linkAnalysisEntityTypesRoundTripAndRefuseBadLists(@TempDir Path root) throws Exception {

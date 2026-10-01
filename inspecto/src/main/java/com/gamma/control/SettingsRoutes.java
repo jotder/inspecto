@@ -15,7 +15,7 @@ import java.util.Map;
  *   PUT /settings/geo        replace the space's geo/tile-server config (same gates as branding)
  *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap, suspicionNodeCap,
  *                                 maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove, entityTypes,
- *                                 mergedDistinctCap, seedByDistinctCap} (nulls = shipped defaults)
+ *                                 mergedDistinctCap, seedByDistinctCap, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue}} (nulls = shipped defaults)
  *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding)
  *   GET /settings/pipeline-history   the space's {keep, effectiveKeep, defaultKeep, maxKeep} — Pipeline config
  *                                    versions kept per Pipeline (keep null = the shipped default)
@@ -45,6 +45,7 @@ final class SettingsRoutes implements RouteModule {
      *  {@code SchedulerRoutes.MAX_CAP}'s reasoning. A bad value is refused (422), never clamped: this is
      *  a persisted setting an operator explicitly typed, so it must come back for them to fix. */
     private static final int MAX_NODE_CAP = 100_000;
+    private static final int MAX_GRAPH_RUN = 10_000_000;
     /** Reject an over-large inline logo (defence-in-depth; the UI already caps ~200 KB). */
     private static final int MAX_LOGO_CHARS = 512 * 1024;
 
@@ -150,7 +151,7 @@ final class SettingsRoutes implements RouteModule {
         LinkAnalysisSettings s = new LinkAnalysisSettings(nodeCap(body, "projectionNodeCap"),
                 nodeCap(body, "analysisNodeCap"), nodeCap(body, "suspicionNodeCap"), maskingMode(body),
                 nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"), entityTypes(body),
-                nodeCap(body, "mergedDistinctCap"), nodeCap(body, "seedByDistinctCap"));
+                nodeCap(body, "mergedDistinctCap"), nodeCap(body, "seedByDistinctCap"), graphRun(body));
         s.write(root.resolve(LinkAnalysisSettings.FILE));
         return linkAnalysisShape(s);
     }
@@ -170,7 +171,50 @@ final class SettingsRoutes implements RouteModule {
         m.put("mergedDistinctCapInForce", s.effectiveMergedDistinctCap());
         m.put("seedByDistinctCap", s.seedByDistinctCap());
         m.put("seedByDistinctCapInForce", s.effectiveSeedByDistinctCap());
+        LinkAnalysisSettings.GraphRun g = s.graphRun();
+        Map<String, Object> run = null;   // D-4: null = every knob inherits the service's shipped default
+        if (g != null) {
+            run = new LinkedHashMap<>();
+            run.put("maxNodes", g.maxNodes());
+            run.put("maxEdges", g.maxEdges());
+            run.put("timeoutMs", g.timeoutMs());
+            run.put("threads", g.threads());
+            run.put("queue", g.queue());
+        }
+        m.put("graphRun", run);
         return m;
+    }
+
+    /** The graph-run knobs (D-4): absent/null = inherit; a stated block holds only positive ints (a size, a count or
+     *  milliseconds), each refused (422) outside {@code 1..MAX_GRAPH_RUN}, never clamped. The server's hard ceilings are
+     *  applied when a run starts and echoed by {@code GET /inv/graph/algorithms}; they are not a setting. */
+    @SuppressWarnings("unchecked")
+    private static LinkAnalysisSettings.GraphRun graphRun(Map<String, Object> body) {
+        Object raw = body.get("graphRun");
+        if (raw == null) return null;
+        if (!(raw instanceof Map<?, ?>))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "graphRun must be an object, got '" + raw + "'");
+        Map<String, Object> g = (Map<String, Object>) raw;
+        for (String k : g.keySet())
+            if (!List.of("maxNodes", "maxEdges", "timeoutMs", "threads", "queue").contains(k))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "graphRun has no key '" + k + "'");
+        return new LinkAnalysisSettings.GraphRun(boundedInt(g, "maxNodes", "graphRun.maxNodes"),
+                boundedInt(g, "maxEdges", "graphRun.maxEdges"), boundedInt(g, "timeoutMs", "graphRun.timeoutMs"),
+                boundedInt(g, "threads", "graphRun.threads"), boundedInt(g, "queue", "graphRun.queue"));
+    }
+
+    private static Integer boundedInt(Map<String, Object> g, String key, String label) {
+        Object raw = g.get(key);
+        if (raw == null) return null;
+        int v;
+        try {
+            v = Integer.parseInt(String.valueOf(raw).trim());
+        } catch (NumberFormatException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, label + " must be an integer, got '" + raw + "'");
+        }
+        if (v < 1 || v > MAX_GRAPH_RUN)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, label + " must be 1.." + MAX_GRAPH_RUN + ", got " + v);
+        return v;
     }
 
     /** A stated masking mode (D-U6): {@code null}/absent = inherit the default ({@code typed}); otherwise one of

@@ -23,7 +23,8 @@ import java.util.Map;
  * {@link EntityTypes Entity Types} (LA-17, design §4.1); plus {@code mergedDistinctCap}, the distinct values per bound
  * column a merged {@code expand} may scan to find a group's member values (LA-17 merged traversal, operator
  * 2026-09-30; default {@link #DEFAULT_MERGED_DISTINCT_CAP}, refused above it, never sampled) and its {@code seedBy}
- * twin {@code seedByDistinctCap} (default {@link #DEFAULT_SEED_BY_DISTINCT_CAP}, same posture). Persisted as
+ * twin {@code seedByDistinctCap} (default {@link #DEFAULT_SEED_BY_DISTINCT_CAP}, same posture); plus the {@link GraphRun}
+ * knobs of the server-side graph-run service (D-4). Persisted as
  * {@code link-analysis.toon} in the space's config tree (crash-safe TOON, mirroring {@link GeoSettings}
  * and {@link SchedulerSettings}); the keys are declared in {@link ConfigSpecs#linkAnalysisSettings()}.
  *
@@ -45,10 +46,25 @@ import java.util.Map;
 public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNodeCap, Integer suspicionNodeCap,
                                    String maskingMode, Integer fourEyesBudgetAbove, Integer fourEyesFanOutAbove,
                                    List<EntityTypes.EntityType> entityTypes, Integer mergedDistinctCap,
-                                   Integer seedByDistinctCap) {
+                                   Integer seedByDistinctCap, GraphRun graphRun) {
+
+    /**
+     * The graph-run service's per-Space knobs (LA separation D-4 step 6; {@code graph_run} in {@code link-analysis.toon}):
+     * the DEFAULT budget a run takes for a field its request leaves unstated, and the worker / waiting-queue sizes. Every
+     * field is optional ({@code null} = the service's shipped default). A default above the hard server ceiling is
+     * clamped by the service, and the clamp is echoed - the ceilings themselves are not a setting.
+     */
+    public record GraphRun(Integer maxNodes, Integer maxEdges, Integer timeoutMs, Integer threads, Integer queue) {
+        public static final GraphRun NONE = new GraphRun(null, null, null, null, null);
+
+        boolean isNone() {
+            return maxNodes == null && maxEdges == null && timeoutMs == null && threads == null && queue == null;
+        }
+    }
+
 
     public static final String FILE = "link-analysis.toon";
-    static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null);
+    static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null);
 
     /** The shipped default of {@code merged_distinct_cap}. */
     public static final int DEFAULT_MERGED_DISTINCT_CAP = 20_000;
@@ -64,6 +80,11 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     /** The seedBy distinct-value cap in force: the stated one, else {@link #DEFAULT_SEED_BY_DISTINCT_CAP}. */
     public int effectiveSeedByDistinctCap() {
         return seedByDistinctCap != null ? seedByDistinctCap : DEFAULT_SEED_BY_DISTINCT_CAP;
+    }
+
+    /** The graph-run knobs in force: the stated ones; a field never stated is {@code null} inside (the service's default). */
+    public GraphRun effectiveGraphRun() {
+        return graphRun != null ? graphRun : GraphRun.NONE;
     }
 
     /** The masking mode in force: the stated one, else the declared default ({@code typed}). */
@@ -88,6 +109,15 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         if (entityTypes != null) m.put("entity_types", EntityTypes.shape(entityTypes));
         if (mergedDistinctCap != null) m.put("merged_distinct_cap", mergedDistinctCap);
         if (seedByDistinctCap != null) m.put("seed_by_distinct_cap", seedByDistinctCap);
+        if (graphRun != null && !graphRun.isNone()) {
+            Map<String, Object> g = new LinkedHashMap<>();
+            if (graphRun.maxNodes() != null) g.put("max_nodes", graphRun.maxNodes());
+            if (graphRun.maxEdges() != null) g.put("max_edges", graphRun.maxEdges());
+            if (graphRun.timeoutMs() != null) g.put("timeout_ms", graphRun.timeoutMs());
+            if (graphRun.threads() != null) g.put("threads", graphRun.threads());
+            if (graphRun.queue() != null) g.put("queue", graphRun.queue());
+            m.put("graph_run", g);
+        }
         AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".link-analysis-");
     }
 
@@ -105,10 +135,20 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                     optInt(m, "suspicion_node_cap"), maskingMode(ToonHelper.opt(m, "masking_mode", "")),
                     optInt(m, "four_eyes_budget_above"), optInt(m, "four_eyes_fan_out_above"),
                     entityTypes(m.get("entity_types")), optInt(m, "merged_distinct_cap"),
-                    optInt(m, "seed_by_distinct_cap"));
+                    optInt(m, "seed_by_distinct_cap"), graphRun(m.get("graph_run")));
         } catch (Exception e) {
             return EMPTY;
         }
+    }
+
+    /** A stored {@code graph_run} block, else {@code null} = every knob inherits; a bad value inside costs only that knob. */
+    @SuppressWarnings("unchecked")
+    private static GraphRun graphRun(Object raw) {
+        if (!(raw instanceof Map<?, ?>)) return null;
+        Map<String, Object> g = (Map<String, Object>) raw;
+        GraphRun r = new GraphRun(optInt(g, "max_nodes"), optInt(g, "max_edges"), optInt(g, "timeout_ms"),
+                optInt(g, "threads"), optInt(g, "queue"));
+        return r.isNone() ? null : r;
     }
 
     /** A declared masking mode (case-insensitive), or {@code null} for anything else. */

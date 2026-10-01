@@ -51,6 +51,11 @@ export interface LinkAnalysisLimits {
     /** Parallel backend lane (may be absent): the `seedBy` distinct cap stated, and the one in force. */
     seedByDistinctCap?: number | null;
     seedByDistinctCapInForce?: number;
+    /**
+     * D-4: the server-side graph-run knobs stated (default budget, workers, waiting line); `null` = every one inherits.
+     * No form field yet - it is only round-tripped by a save, because the PUT replaces the whole document.
+     */
+    graphRun?: { maxNodes: number | null; maxEdges: number | null; timeoutMs: number | null; threads: number | null; queue: number | null } | null;
 }
 
 /** LA-17: one Entity Type (entity-model design §4.1) — `classifications` are the Dataset column classifications it claims. */

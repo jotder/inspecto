@@ -416,6 +416,11 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   (`fourEyesBudgetAbove`, `fourEyesFanOutAbove`), `mergedDistinctCap` with `mergedDistinctCapInForce`, and
   `seedByDistinctCap` only when the server reports that key. ⚠ `PUT /settings/link-analysis` REPLACES the
   document, so the save sends every other stated key back as read (node caps, masking mode, Entity Types).
+  Since 2026-10-01 the document also holds `graphRun` (`graph_run` in `link-analysis.toon`; LA separation D-4 step 6):
+  `{maxNodes, maxEdges, timeoutMs}` = the DEFAULT budget of a server graph run that states none (clamped to the
+  server's hard ceilings and echoed by `GET /inv/graph/algorithms`), `{threads, queue}` = the Space's graph-run workers
+  and waiting line (read when the Space's service is first used - restart to change). Every key absent = the shipped
+  default. The form has no field for it yet; a save round-trips it untouched (pinned by the component spec).
 * **The server half runs the SAME motif over the whole Dataset** (LA-14b, 2026-09-23):
   `POST /inv/pattern/branching` (`inspecto-geo-link` `PatternRoutes` → `PatternQueryCompiler` →
   `BranchingPatternEngine`). 🔴 **Why:** the projection is capped (2 000 links, `cnt DESC`; and 500 nodes in the

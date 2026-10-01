@@ -1240,7 +1240,12 @@ public final class ConfigSpecs {
                 FieldSpec.of("seed_by_distinct_cap", "seedBy distinct-value cap", FieldType.INT,
                         "Distinct values per bound column a seedBy (LA-17) may scan to find an Entity List's "
                                 + "members in the Dataset; above it the seed is refused, never sampled; "
-                                + "absent = 20000.")
+                                + "absent = 20000."),
+                FieldSpec.of("graph_run", "Graph run service", FieldType.MAP,
+                        "The server-side graph-run service (D-4): {max_nodes, max_edges, timeout_ms} is the DEFAULT "
+                                + "budget of a run that states none (clamped to the server's hard ceilings, echoed by "
+                                + "GET /inv/graph/algorithms); {threads, queue} size the workers and the waiting line; "
+                                + "every key absent = the shipped default.")
         );
         return new ConfigSpec("link-analysis-settings", fields, List.of());
     }
