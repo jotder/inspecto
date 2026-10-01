@@ -29,7 +29,8 @@ import java.util.function.Function;
  * {@code -Dinspecto.bench=true}. Example:
  * {@code mvn -o test -Pedition-enterprise -pl inspecto-la-graph -am -Dtest=GraphAlgorithmsBench
  * -Dinspecto.bench=true -Dsurefire.failIfNoSpecifiedTests=false} (optional {@code -Dinspecto.bench.out=<file>} for
- * the markdown table, {@code -Dinspecto.bench.timeoutSec=60}).
+ * the markdown table, {@code -Dinspecto.bench.timeoutSec=60}, {@code -Dinspecto.bench.only=kCore,linkPrediction} to
+ * run just the algorithms whose name starts with one of the listed prefixes).
  *
  * <p>Corpus (same idea as {@code InvTraversalBench}): {@code edges = 5 · nodes}; source {@code = floor(n · u³)},
  * target {@code = floor(n · u²)} with {@code u} a seeded SplitMix64 hash of the edge number mapped to [0,1) — a
@@ -218,6 +219,11 @@ class GraphAlgorithmsBench {
     @Test
     void bench() throws Exception {
         List<Algo> algos = catalogue();
+        String only = System.getProperty("inspecto.bench.only"); // comma list of name prefixes; default = all
+        if (only != null && !only.isBlank()) {
+            List<String> want = List.of(only.split(","));
+            algos = algos.stream().filter(a -> want.stream().anyMatch(w -> a.name().startsWith(w.trim()))).toList();
+        }
         Map<String, Result[]> res = new java.util.LinkedHashMap<>();
         for (Algo a : algos) res.put(a.name(), new Result[SIZES.length]);
 

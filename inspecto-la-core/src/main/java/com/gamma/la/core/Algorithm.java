@@ -40,7 +40,7 @@ public enum Algorithm {
     /** 4 / 30 / 615 ms. */
     CONNECTED_COMPONENTS("connectedComponents", "Connected components", Cost.SYNC, 100_000, ResultKind.GROUPS, false, false,
             false, false),
-    /** 21 / 672 / t ms — accidentally quadratic (LA-GRAPH-QUADRATIC-1). */
+    /** 6 / 46 / 629 ms after LA-GRAPH-QUADRATIC-1 (bucket queue; was 21 / 672 / t). 10⁵ is 0.6-2.1 s with the machine busy: kept at 10⁴. */
     K_CORE("kCore", "k-core", Cost.SYNC, 10_000, ResultKind.SCORES, false, false, false, false),
     /** 14 / 143 / 4 418 ms. */
     TRIANGLE_COUNT("triangleCount", "Triangle count", Cost.SYNC, 10_000, ResultKind.SCORES, false, false, false, false),
@@ -53,8 +53,8 @@ public enum Algorithm {
     IS_FOREST("isForest", "Is forest", Cost.SYNC, 100_000, ResultKind.FLAG, false, false, false, false),
     /** 2 / 12 / 224 ms. */
     DESCENDANTS("descendants", "Descendants", Cost.SYNC, 100_000, ResultKind.IDS, false, false, false, true),
-    /** 46 / 1 740 / t ms — accidentally quadratic (LA-GRAPH-QUADRATIC-1). */
-    WEIGHTED_SHORTEST_PATH("weightedShortestPath", "Weighted shortest path", Cost.SYNC, 1_000, ResultKind.SELECTION, true,
+    /** 10 / 100 / 931 ms after LA-GRAPH-QUADRATIC-1 (binary heap; was 46 / 1 740 / t). 10⁵ is 0.9-2.8 s with the machine busy: 10⁴. */
+    WEIGHTED_SHORTEST_PATH("weightedShortestPath", "Weighted shortest path", Cost.SYNC, 10_000, ResultKind.SELECTION, true,
             true, true, false, Param.DIRECTION),
     /** 8 / 73 / 1 066 ms. */
     MAXIMUM_SPANNING_FOREST("maximumSpanningForest", "Maximum spanning forest", Cost.SYNC, 10_000, ResultKind.SELECTION, true,
@@ -95,7 +95,7 @@ public enum Algorithm {
             Param.integer("limit", 10, 0, 10_000), Param.integer("maxHops", 8, 1, 64), Param.DIRECTION),
     /** 76 / 7 308 / t ms. */
     MAX_FLOW("maxFlow", "Maximum flow", Cost.JOB, 1_000, ResultKind.FLOW, true, true, true, false),
-    /** 129 / 13 728 / t ms — O(N²) pair loop (LA-GRAPH-QUADRATIC-1). */
+    /** 140 / 2 327 / t ms after LA-GRAPH-QUADRATIC-1 (2-hop candidates; was 129 / 13 728 / t). Output-bound: pairs sharing a hub neighbour. */
     LINK_PREDICTION("linkPrediction", "Link prediction", Cost.JOB, 1_000, ResultKind.LINKS, false, false, false, false,
             Param.choice("method", "adamic-adar", "common-neighbors", "adamic-adar"), Param.integer("limit", 20, 0, 10_000)),
     /** 60 / 1 725 / 52 999 ms. */

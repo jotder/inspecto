@@ -931,6 +931,45 @@ export function edgeWeight(e: G6Edge): number {
     return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
+/** A binary min-heap (private to this file): `pop()` returns the least item by `cmp`, or `undefined` when empty. */
+class MinHeap<T> {
+    private readonly items: T[] = [];
+    constructor(private readonly cmp: (a: T, b: T) => number) {}
+
+    push(item: T): void {
+        const a = this.items;
+        let i = a.push(item) - 1;
+        while (i > 0) {
+            const parent = (i - 1) >> 1;
+            if (this.cmp(a[i], a[parent]) >= 0) break;
+            [a[i], a[parent]] = [a[parent], a[i]];
+            i = parent;
+        }
+    }
+
+    pop(): T | undefined {
+        const a = this.items;
+        if (a.length === 0) return undefined;
+        const top = a[0];
+        const last = a.pop()!;
+        if (a.length > 0) {
+            a[0] = last;
+            let i = 0;
+            for (;;) {
+                const l = 2 * i + 1;
+                const r = l + 1;
+                let m = i;
+                if (l < a.length && this.cmp(a[l], a[m]) < 0) m = l;
+                if (r < a.length && this.cmp(a[r], a[m]) < 0) m = r;
+                if (m === i) break;
+                [a[i], a[m]] = [a[m], a[i]];
+                i = m;
+            }
+        }
+        return top;
+    }
+}
+
 /**
  * Cheapest path between two nodes by edge weight (Dijkstra), or `null` when disconnected. Cost per
  * edge is `1 / weight` so **stronger** ties (higher folded count) are cheaper to traverse — the
@@ -948,16 +987,21 @@ export function weightedShortestPath(
     if (!adj.out.has(fromId) || !adj.out.has(toId)) return null;
     const cost = new Map(g.edges.map((e) => [e.id, 1 / edgeWeight(e)]));
     const dist = new Map<string, number>([[fromId, 0]]);
+    // Ties on distance go to the node that entered `dist` first (what a linear scan over the insertion-ordered map did),
+    // so the heap orders on (distance, entry sequence).
+    const entered = new Map<string, number>([[fromId, 0]]);
+    const heap = new MinHeap<{ d: number; seq: number; id: string }>((x, y) => (x.d < y.d ? -1 : x.d > y.d ? 1 : x.seq - y.seq));
+    heap.push({ d: 0, seq: 0, id: fromId });
     const prev = new Map<string, { node: string; edge: string }>();
     const visited = new Set<string>();
     for (;;) {
         let cur: string | null = null;
         let best = Infinity;
-        for (const [id, d] of dist) {
-            if (!visited.has(id) && d < best) {
-                best = d;
-                cur = id;
-            }
+        for (let top = heap.pop(); top; top = heap.pop()) {
+            if (visited.has(top.id) || top.d !== dist.get(top.id)) continue; // stale: superseded by a shorter entry
+            cur = top.id;
+            best = top.d;
+            break;
         }
         if (cur === null || cur === toId) break;
         visited.add(cur);
@@ -967,6 +1011,9 @@ export function weightedShortestPath(
             if (nd < (dist.get(next) ?? Infinity)) {
                 dist.set(next, nd);
                 prev.set(next, { node: cur, edge: edgeId });
+                let seq = entered.get(next);
+                if (seq === undefined) entered.set(next, (seq = entered.size));
+                heap.push({ d: nd, seq, id: next });
             }
         }
     }
@@ -1293,25 +1340,62 @@ export function hits(g: G6GraphData, iterations = 100): HitsResult {
  * core number), descending; high core numbers mark densely interconnected cores (fraud rings).
  */
 export function kCore(g: G6GraphData): NodeScore[] {
+    // Batagelj-Zaversnik O(V + E) bucket peeling: nodes stay sorted by remaining degree in one array, so "the minimum-degree
+    // node" is the next slot, never a scan. A core number does not depend on the order ties are peeled in.
     const nb = undirectedNeighbors(g);
-    const deg = new Map<string, number>([...nb].map(([id, set]) => [id, set.size]));
-    const core = new Map<string, number>();
-    const remaining = new Set(deg.keys());
-    let k = 0;
-    while (remaining.size) {
-        let min: string | null = null;
-        let minDeg = Infinity;
-        for (const id of remaining) {
-            if (deg.get(id)! < minDeg) {
-                minDeg = deg.get(id)!;
-                min = id;
-            }
+    const ids = [...nb.keys()];
+    const n = ids.length;
+    const index = new Map(ids.map((id, i) => [id, i]));
+    const deg = new Array<number>(n);
+    const adj = new Array<number[]>(n);
+    let maxDeg = 0;
+    for (let i = 0; i < n; i++) {
+        const set = nb.get(ids[i])!;
+        deg[i] = set.size;
+        maxDeg = Math.max(maxDeg, deg[i]);
+        const a: number[] = [];
+        for (const other of set) {
+            const j = index.get(other);
+            if (j !== undefined) a.push(j);
         }
-        k = Math.max(k, minDeg);
-        core.set(min!, k);
-        remaining.delete(min!);
-        for (const other of nb.get(min!) ?? []) {
-            if (remaining.has(other)) deg.set(other, deg.get(other)! - 1);
+        adj[i] = a;
+    }
+    const bin = new Array<number>(maxDeg + 2).fill(0);
+    for (let i = 0; i < n; i++) bin[deg[i]]++;
+    let start = 0;
+    for (let d = 0; d <= maxDeg; d++) {
+        const num = bin[d];
+        bin[d] = start;
+        start += num;
+    }
+    const pos = new Array<number>(n);
+    const vert = new Array<number>(n);
+    for (let i = 0; i < n; i++) {
+        pos[i] = bin[deg[i]];
+        vert[pos[i]] = i;
+        bin[deg[i]]++;
+    }
+    for (let d = maxDeg; d >= 1; d--) bin[d] = bin[d - 1];
+    bin[0] = 0;
+    const core = new Map<string, number>();
+    for (let i = 0; i < n; i++) {
+        const v = vert[i];
+        core.set(ids[v], deg[v]);
+        for (const u of adj[v]) {
+            if (deg[u] > deg[v]) {
+                const du = deg[u];
+                const pu = pos[u];
+                const pw = bin[du];
+                const w = vert[pw];
+                if (u !== w) {
+                    pos[u] = pw;
+                    vert[pu] = w;
+                    pos[w] = pu;
+                    vert[pw] = u;
+                }
+                bin[du]++;
+                deg[u]--;
+            }
         }
     }
     return scored(g, core);
@@ -1533,19 +1617,22 @@ export function linkPrediction(
     const label = new Map(g.nodes.map((n) => [n.id, n.data.label]));
     const ids = [...nb.keys()].sort();
     const out: PredictedLink[] = [];
-    for (let i = 0; i < ids.length; i++) {
-        const a = ids[i];
+    for (const a of ids) {
         const an = nb.get(a)!;
-        for (let j = i + 1; j < ids.length; j++) {
-            const b = ids[j];
-            if (an.has(b)) continue; // already linked
-            const bn = nb.get(b)!;
-            let score = 0;
-            for (const c of an) {
-                if (!bn.has(c)) continue;
-                const deg = nb.get(c)!.size;
-                score += method === 'adamic-adar' ? (deg > 1 ? 1 / Math.log(deg) : 0) : 1;
+        // partner -> score, accumulated while walking the anchor's neighbours c in their set order: only nodes sharing a
+        // neighbour can score above 0, and the adds happen in the same order as an all-pairs intersection would.
+        const partners = new Map<string, number>();
+        for (const c of an) {
+            const cn = nb.get(c);
+            if (!cn) continue;
+            const deg = cn.size;
+            const share = method === 'adamic-adar' ? (deg > 1 ? 1 / Math.log(deg) : 0) : 1;
+            for (const b of cn) {
+                if (b > a && !an.has(b) && nb.has(b)) partners.set(b, (partners.get(b) ?? 0) + share);
             }
+        }
+        for (const b of [...partners.keys()].sort()) {
+            const score = partners.get(b)!;
             if (score > 0) {
                 out.push({
                     source: a,

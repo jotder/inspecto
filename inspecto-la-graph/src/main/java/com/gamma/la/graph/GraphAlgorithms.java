@@ -1,7 +1,9 @@
 package com.gamma.la.graph;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -191,29 +193,67 @@ public final class GraphAlgorithms {
         return kCore(g, RunControl.NONE);
     }
 
-    /** As {@link #kCore(Graph)}, with a checkpoint per peeled node. */
+    /**
+     * As {@link #kCore(Graph)}, with a checkpoint per peeled node. Batagelj-Zaversnik O(V + E) bucket peeling: the nodes
+     * stay sorted by remaining degree in one array, so "the minimum-degree node" is the next slot, never a scan. A
+     * node's core number is independent of the order ties are peeled in, so the result equals the old minimum-scan.
+     * A neighbour that is not a node (an open graph) keeps its degree contribution for ever, as it always did.
+     */
     public static List<Score> kCore(Graph g, RunControl ctl) {
         Map<String, Set<String>> nb = undirectedNeighbors(g);
-        Map<String, Integer> deg = new LinkedHashMap<>();
-        nb.forEach((id, set) -> deg.put(id, set.size()));
-        Map<String, Integer> core = new LinkedHashMap<>();
-        Set<String> remaining = new LinkedHashSet<>(deg.keySet());
-        int k = 0;
-        while (!remaining.isEmpty()) {
-            ctl.checkpoint();
-            String min = null;
-            int minDeg = Integer.MAX_VALUE;
-            for (String id : remaining) {
-                if (deg.get(id) < minDeg) {
-                    minDeg = deg.get(id);
-                    min = id;
-                }
+        int n = nb.size();
+        String[] ids = nb.keySet().toArray(new String[0]);
+        Map<String, Integer> index = new HashMap<>(n * 2);
+        for (int i = 0; i < n; i++) index.put(ids[i], i);
+        int[] deg = new int[n];
+        int[][] adj = new int[n][];
+        int maxDeg = 0;
+        for (int i = 0; i < n; i++) {
+            Set<String> set = nb.get(ids[i]);
+            deg[i] = set.size();
+            maxDeg = Math.max(maxDeg, deg[i]);
+            int[] a = new int[set.size()];
+            int len = 0;
+            for (String other : set) {
+                Integer j = index.get(other);
+                if (j != null) a[len++] = j;
             }
-            k = Math.max(k, minDeg);
-            core.put(min, k);
-            remaining.remove(min);
-            for (String other : nb.getOrDefault(min, Set.of())) {
-                if (remaining.contains(other)) deg.put(other, deg.get(other) - 1);
+            adj[i] = len == a.length ? a : Arrays.copyOf(a, len);
+        }
+        int[] bin = new int[maxDeg + 2];
+        for (int i = 0; i < n; i++) bin[deg[i]]++;
+        int start = 0;
+        for (int d = 0; d <= maxDeg; d++) {
+            int num = bin[d];
+            bin[d] = start;
+            start += num;
+        }
+        int[] pos = new int[n];
+        int[] vert = new int[n];
+        for (int i = 0; i < n; i++) {
+            pos[i] = bin[deg[i]];
+            vert[pos[i]] = i;
+            bin[deg[i]]++;
+        }
+        for (int d = maxDeg; d >= 1; d--) bin[d] = bin[d - 1];
+        bin[0] = 0;
+        Map<String, Integer> core = new LinkedHashMap<>();
+        for (int i = 0; i < n; i++) {
+            ctl.checkpoint();
+            int v = vert[i];
+            core.put(ids[v], deg[v]);
+            for (int u : adj[v]) {
+                if (deg[u] > deg[v]) {
+                    int du = deg[u], pu = pos[u], pw = bin[du], w = vert[pw];
+                    if (u != w) {
+                        pos[u] = pw;
+                        vert[pu] = w;
+                        pos[w] = pu;
+                        vert[pw] = u;
+                    }
+                    bin[du]++;
+                    deg[u]--;
+                }
             }
         }
         return scored(g, core);

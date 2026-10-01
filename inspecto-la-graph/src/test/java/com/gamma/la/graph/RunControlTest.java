@@ -110,7 +110,7 @@ class RunControlTest {
         Graph layeredSmall = layered(6, 3);
         Graph ht6000 = heavyTailed(6000, 4);
         Graph ht2000 = heavyTailed(2000, 4);
-        Graph ht20000 = heavyTailed(20000, 3);
+        Graph ht300000 = heavyTailed(300_000, 3); // kCore is O(V + E) now: ~1 s needs 10^5-10^6 nodes
         Graph ht30000 = heavyTailed(30000, 3);
         Graph star20000 = star(20000);
         Graph star30000 = star(30000);
@@ -118,12 +118,12 @@ class RunControlTest {
         Graph mm36 = moonMoser(36);
         Graph layeredBig = layered(500, 20);
         Graph ht3000 = heavyTailed(3000, 3);
-        Graph ht6000b = heavyTailed(6000, 3);
+        Graph ht40000 = heavyTailed(40_000, 3); // linkPrediction walks 2-hop pairs now: ~1.7 s
         return Stream.of(
                 new Case("betweennessCentrality", c -> GraphCentrality.betweennessCentrality(ht6000, c), c -> GraphCentrality.betweennessCentrality(ht300, c)),
                 new Case("closenessCentrality", c -> GraphCentrality.closenessCentrality(ht6000, c), c -> GraphCentrality.closenessCentrality(ht300, c)),
                 new Case("jaccardSimilarity", c -> GraphCentrality.jaccardSimilarity(star30000, "n0", c), c -> GraphCentrality.jaccardSimilarity(ht300, "n0", c)),
-                new Case("linkPrediction", c -> GraphCentrality.linkPrediction(ht6000b, GraphCentrality.Method.ADAMIC_ADAR, 10, c), c -> GraphCentrality.linkPrediction(ht300, GraphCentrality.Method.COMMON_NEIGHBORS, 10, c)),
+                new Case("linkPrediction", c -> GraphCentrality.linkPrediction(ht40000, GraphCentrality.Method.ADAMIC_ADAR, 10, c), c -> GraphCentrality.linkPrediction(ht300, GraphCentrality.Method.COMMON_NEIGHBORS, 10, c)),
                 new Case("suspicionScore", c -> GraphSuspicion.suspicionScore(ht3000, GraphSuspicion.Weights.DEFAULT, c), c -> GraphSuspicion.suspicionScore(ht300, GraphSuspicion.Weights.DEFAULT, c)),
                 new Case("pageRank", c -> GraphIterative.pageRank(ht2000, 0.85, FOREVER, c), c -> GraphIterative.pageRank(ht300, 0.85, 60, c)),
                 new Case("eigenvectorCentrality", c -> GraphIterative.eigenvectorCentrality(ht2000, FOREVER, c), c -> GraphIterative.eigenvectorCentrality(ht300, 100, c)),
@@ -136,7 +136,7 @@ class RunControlTest {
                 new Case("allPaths", c -> GraphPaths.allPaths(k12, "n0", "n11", 300_000, 11, GraphAlgorithms.Direction.OUT, c),
                         c -> GraphPaths.allPaths(k7, "n0", "n6", 50, 6, GraphAlgorithms.Direction.OUT, c)),
                 new Case("maxFlow", c -> GraphPaths.maxFlow(layeredBig, Map.of(), "s", "t", c), c -> GraphPaths.maxFlow(layeredSmall, Map.of(), "s", "t", c)),
-                new Case("kCore", c -> GraphAlgorithms.kCore(ht20000, c), c -> GraphAlgorithms.kCore(ht300, c)),
+                new Case("kCore", c -> GraphAlgorithms.kCore(ht300000, c), c -> GraphAlgorithms.kCore(ht300, c)),
                 new Case("triangleCount", c -> GraphAlgorithms.triangleCount(star20000, c), c -> GraphAlgorithms.triangleCount(ht300, c)));
     }
 

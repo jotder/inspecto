@@ -7,6 +7,7 @@ import com.gamma.la.graph.GraphAlgorithms.Score;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -173,7 +174,12 @@ public final class GraphCentrality {
         return linkPrediction(g, method, limit, RunControl.NONE);
     }
 
-    /** As {@link #linkPrediction(Graph, Method, int)}, with a checkpoint per anchor node (the inner scan is O(n)). */
+    /**
+     * As {@link #linkPrediction(Graph, Method, int)}, with a checkpoint per anchor node and per neighbour of it. A pair
+     * scores above 0 only if it shares a neighbour, so the partners of an anchor are found by walking its 2-hop
+     * neighbourhood instead of scanning every node; they are then scored in ascending id order and each score is summed
+     * over the anchor's neighbours in the same order as before, so the output is identical to the all-pairs scan.
+     */
     public static List<PredictedLink> linkPrediction(Graph g, Method method, int limit, RunControl ctl) {
         Map<String, Set<String>> nb = GraphAlgorithms.undirectedNeighbors(g);
         Map<String, String> label = new LinkedHashMap<>();
@@ -181,20 +187,26 @@ public final class GraphCentrality {
         List<String> ids = new ArrayList<>(nb.keySet());
         ids.sort(Comparator.naturalOrder());
         List<PredictedLink> out = new ArrayList<>();
-        for (int i = 0; i < ids.size(); i++) {
+        for (String a : ids) {
             ctl.checkpoint();
-            String a = ids.get(i);
             Set<String> an = nb.get(a);
-            for (int j = i + 1; j < ids.size(); j++) {
-                String b = ids.get(j);
-                if (an.contains(b)) continue; // already linked
-                Set<String> bn = nb.get(b);
-                double score = 0;
-                for (String c : an) {
-                    if (!bn.contains(c)) continue;
-                    int deg = nb.get(c).size();
-                    score += method == Method.ADAMIC_ADAR ? (deg > 1 ? 1 / Math.log(deg) : 0) : 1;
+            // partner -> score, accumulated while walking the anchor's neighbours c in their set order: the adds happen in
+            // the same order as the old per-pair "for c in an" intersection, so the floating-point sums are bit-identical.
+            Map<String, Double> partners = new HashMap<>();
+            for (String c : an) {
+                ctl.checkpoint();
+                Set<String> cn = nb.get(c);
+                if (cn == null) continue;
+                int deg = cn.size();
+                double share = method == Method.ADAMIC_ADAR ? (deg > 1 ? 1 / Math.log(deg) : 0) : 1;
+                for (String b : cn) {
+                    if (b.compareTo(a) > 0 && !an.contains(b) && nb.containsKey(b)) partners.merge(b, share, Double::sum);
                 }
+            }
+            List<String> order = new ArrayList<>(partners.keySet());
+            order.sort(Comparator.naturalOrder());
+            for (String b : order) {
+                double score = partners.get(b);
                 if (score > 0) {
                     out.add(new PredictedLink(a, b, label.getOrDefault(a, a), label.getOrDefault(b, b), score));
                 }

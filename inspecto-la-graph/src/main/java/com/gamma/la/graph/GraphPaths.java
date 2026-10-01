@@ -7,11 +7,13 @@ import com.gamma.la.graph.GraphAlgorithms.Selection;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
 
 /**
@@ -113,6 +115,8 @@ public final class GraphPaths {
         return GraphAlgorithms.neighborhood(g, nodeId, 1, direction);
     }
 
+    private record Frontier(double dist, int seq, String node) {}
+
     /** TS {@code weightedShortestPath}: Dijkstra with cost {@code 1 / weight}, {@code null} when disconnected. */
     public static Selection weightedShortestPath(Graph g, Map<String, Double> weights, String fromId, String toId,
                                                  Direction direction) {
@@ -121,18 +125,25 @@ public final class GraphPaths {
         if (!adj.out().containsKey(fromId) || !adj.out().containsKey(toId)) return null;
         Map<String, Double> cost = new LinkedHashMap<>();
         for (Edge e : g.edges()) cost.put(e.id(), 1 / weights.getOrDefault(e.id(), 1.0));
-        Map<String, Double> dist = new LinkedHashMap<>();
+        Map<String, Double> dist = new HashMap<>();
         dist.put(fromId, 0.0);
-        Map<String, GraphAlgorithms.Hop> prev = new LinkedHashMap<>();
+        // Ties on distance go to the node that entered `dist` first - what the old linear scan over the insertion-ordered
+        // map did - so the heap orders on (distance, entry sequence). Primitive < / > keep -0.0 equal to 0.0 as before.
+        Map<String, Integer> entered = new HashMap<>();
+        entered.put(fromId, 0);
+        PriorityQueue<Frontier> heap = new PriorityQueue<>((x, y) -> x.dist < y.dist ? -1 : x.dist > y.dist ? 1 : Integer.compare(x.seq, y.seq));
+        heap.add(new Frontier(0.0, 0, fromId));
+        Map<String, GraphAlgorithms.Hop> prev = new HashMap<>();
         Set<String> visited = new HashSet<>();
         for (;;) {
             String cur = null;
             double best = Double.POSITIVE_INFINITY;
-            for (Map.Entry<String, Double> en : dist.entrySet()) {
-                if (!visited.contains(en.getKey()) && en.getValue() < best) {
-                    best = en.getValue();
-                    cur = en.getKey();
-                }
+            while (!heap.isEmpty()) {
+                Frontier f = heap.poll();
+                if (visited.contains(f.node) || f.dist != dist.get(f.node)) continue; // stale: superseded by a shorter entry
+                cur = f.node;
+                best = f.dist;
+                break;
             }
             if (cur == null || cur.equals(toId)) break;
             visited.add(cur);
@@ -142,6 +153,10 @@ public final class GraphPaths {
                 if (nd < dist.getOrDefault(h.node(), Double.POSITIVE_INFINITY)) {
                     dist.put(h.node(), nd);
                     prev.put(h.node(), new GraphAlgorithms.Hop(cur, h.edge()));
+                    Integer known = entered.get(h.node());
+                    int seq = known != null ? known : entered.size();
+                    entered.putIfAbsent(h.node(), seq);
+                    heap.add(new Frontier(nd, seq, h.node()));
                 }
             }
         }
