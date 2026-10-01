@@ -258,8 +258,8 @@ slightly pessimistic. Allocation is worker-thread allocated MB, not peak heap.
 | triangleCount | SYNC | 14 | 143 | 4418 | — |
 | pageRank | SYNC | 61 | 356 | 11610 | — |
 | jaccardSimilarity (one node) | SYNC | 13 | 385 | 36898 (the biggest hub) | — |
-| **kCore** | SYNC | 21 | 672 | **timeout** | — |
-| **weightedShortestPath** | SYNC | 46 | 1740 | **timeout** | — |
+| kCore | SYNC | 6 | 46 | 629 | — |
+| weightedShortestPath | SYNC | 10 | 100 | 931 | — |
 | findCycles | JOB | 0 | 21 | 292 | — |
 | allPaths (limit 10, 8 hops) | JOB | 3 | 44 | 16839 (2.9 GB allocated) | — |
 | louvainCommunities | JOB | 39 | 616 | 4642 | — |
@@ -269,7 +269,7 @@ slightly pessimistic. Allocation is worker-thread allocated MB, not peak heap.
 | hits | JOB | 91 | 1823 | 49213 | — |
 | cliques | JOB | 38 | 2376 | timeout | — |
 | maxFlow | JOB | 76 | 7308 | timeout | — |
-| linkPrediction (CN, 20) | JOB | 129 | 13728 | timeout | — |
+| linkPrediction (CN, 20) | JOB | 140 | 2327 | timeout | — |
 | betweennessCentrality | JOB | 1335 | timeout | — | — |
 | closenessCentrality | JOB | 393 | timeout | — | — |
 | suspicionScore | JOB | 1366 | timeout | — | — |
@@ -284,10 +284,19 @@ slightly pessimistic. Allocation is worker-thread allocated MB, not peak heap.
   (which composes betweenness), `maxFlow` (7.3 s), `linkPrediction` (13.7 s).
 * **A fixed iteration count does not make an algorithm cheap**: `pageRank` (listed SYNC) takes 11.6 s at 10⁵; `eigenvector`, `katz` and `hits` take
   about 50 s at 10⁵ with 2 GB allocated.
-* **Three ports are accidentally quadratic** (and, being line-for-line ports, so are their TypeScript twins — a different fix is needed in both
-  languages, protected by the existing parity fixtures): `kCore` re-scans all remaining nodes for the minimum on every pick
-  (`GraphAlgorithms.java` ≈ 198–204), `weightedShortestPath` is a linear-scan Dijkstra (`GraphPaths.java` ≈ 120–126), `linkPrediction` has an O(N²)
-  pair loop (`GraphCentrality.java` ≈ 161–162). Filed as `LA-GRAPH-QUADRATIC-1`.
+* **Three ports were accidentally quadratic — fixed 2026-10-01 (`LA-GRAPH-QUADRATIC-1`), in both languages.** `kCore` picked the minimum by
+  scanning every remaining node (now a Batagelj-Zaversnik bucket peel, O(V + E)); `weightedShortestPath` was a linear-scan Dijkstra (now a binary
+  heap ordered on distance then on the order a node entered `dist`, which is exactly what the scan's tie-break was, so equal-cost paths are
+  unchanged); `linkPrediction` scored every node pair (now each anchor walks its 2-hop partners and sums each score in the neighbour order the
+  pair loop used, so even the floating-point bits match). Before, from the first bench of this section: kCore 21 / 672 / timeout, weightedShortestPath
+  46 / 1 740 / timeout, linkPrediction 129 / 13 728 / timeout at 10³ / 10⁴ / 10⁵ nodes. After (the rows above; one quiet run): 6 / 46 / 629,
+  10 / 100 / 931 and 140 / 2 327 / timeout. The same machine busy with a peer's build gave 18 / 117–179 / 1 893–2 118 (kCore) and 26 / 215–315 /
+  2 034–2 797 (weightedShortestPath), so the 10⁵ cells are near the 1 000 ms line and not robust. `linkPrediction` stays a JOB: its output is every pair
+  that shares a neighbour, which a hub makes quadratic by definition. Safety net: every parity fixture unchanged, plus
+  `GraphComplexityEquivalenceTest` and `graph-complexity-equivalence.spec.ts`, which keep the old code as a private reference and assert equal
+  output (order and score bits) on 400 seeded random graphs each (ties, parallel edges, self-loops, isolated nodes, equal / zero / negative /
+  infinite weights). `Algorithm.inlineNodeCeiling`: `weightedShortestPath` 1 000 to 10 000 (≤ 315 ms at 10⁴ in every run); `kCore` stays 10 000
+  and `linkPrediction` 1 000 (the 10⁵ cells do not hold ≤ 1 000 ms robustly). `GraphAlgorithmsBench` gained `-Dinspecto.bench.only=<name prefixes>`.
 * **`jaccardSimilarity` is O(N × degree of the chosen node)**: 36.9 s at 10⁵ is for the biggest hub, so its cost is input-dependent — a threshold on
   node count alone is not enough for it.
 * Not measured: peak heap (only worker-thread allocation), more than one machine, and anything above 10⁶ nodes.
