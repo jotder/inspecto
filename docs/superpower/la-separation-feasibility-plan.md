@@ -448,12 +448,12 @@ This is **L–XL** on its own and depends on: versioned inputs (§7.4 index mani
 
 | Phase | Content | Size | Depends on |
 |---|---|---|---|
-| **D-0** | §4 Phase 0 (SEP-01…06) — shared with A/B | M–L | — |
-| **D-1** | Extract the shared platform layer: `http-spi`, `auth-spi` (+ move OIDC), `audit-spi` (cut the ETL edge); move LA onto them; `la-inspecto` bridge; Inspecto behaviour unchanged | L | D-0 |
-| **D-2** | Spikes D-S1…D-S4 (§7.10) — decide storage and engine from measurements | M | — (parallel) |
+| **D-0** | ✅ **DONE 2026-10-01** (SEP-01…06 and SEP-08; SEP-07 not needed — one SKU, D2). §4 Phase 0 (SEP-01…06) — shared with A/B | M–L | — |
+| **D-1** | ✅ **DONE 2026-10-01** (steps 1–7; as-built in `la-separation-d1-design.md`). Extract the shared platform layer: `http-spi`, `auth-spi` (+ move OIDC), `audit-spi` (cut the ETL edge); move LA onto them; `la-inspecto` bridge; Inspecto behaviour unchanged | L | D-0 |
+| **D-2** | 🟡 **MOSTLY MEASURED** — D-S1 ✅ pass, D-S3 ✅ curve (the gap is volume), D-S4 ✅ pass, D-S2 ⛔ dropped 2026-10-01, D-S5 ⏸ not run (§7.10.1). Spikes D-S1…D-S4 (§7.10) — decide storage and engine from measurements | M | — (parallel) |
 | **D-3** | `la-storage` edge/node index + builder (both hosts); `la-data` providers | L | D-1, D-2 |
 | **D-4** | ✅ **DONE 2026-10-01** (built ahead of D-3 over the in-memory Working Set; as-built in `okf/frontend/features/link-analysis.md` §*Graph Run*; open remainder `LA-GRAPH-RUN-*` on the board). `la-graph`: GraphEngine SPI, server-side algorithms with parity fixtures, async jobs; optional graph / vector engines | L–XL | D-3 |
-| **D-5** | `la-app` host + `projects/la-app` shell + LA product flavor (bundle, boot smoke, licence text) | M–L | D-1, SEP-03…06 |
+| **D-5** | 🟡 **GROUNDWORK DONE 2026-10-02** (host injection tokens incl. `LA_FEATURES`, the lint locks incl. dynamic `import()`, SEP-03…06); the `la-app` shell, the physical move and the LA product flavor are NOT started. `la-app` host + `projects/la-app` shell + LA product flavor (bundle, boot smoke, licence text) | M–L | D-1, SEP-03…06 |
 | **D-6** | Integration: external references, Dossier export bundle, embeddable view; I1 trust only if live calls are needed | M | D-5 |
 | **D-7** | Parallel analyst sandboxes (§7.7): membership model, pinned baselines, per-sandbox DuckDB files, incremental evaluation + checkpoints, admission control, promote/rebase with conflict report, hibernate/rehydrate | L–XL | D-3, D-4, D16–D21 |
 
