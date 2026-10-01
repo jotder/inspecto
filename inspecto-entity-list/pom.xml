@@ -38,6 +38,14 @@
     </description>
 
     <dependencies>
+        <!-- LA separation D-1 step 5a: the host-free store (fact log, registry, sidecar, entries, EntityTypes,
+             LinkAnalysisSettings) lives below the core; this module keeps the routes + the risk-score feed. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-entity-store</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- The core: RouteModule/ApiContext/ApiException/WriteGates, EntityTypes, LinkAnalysisSettings and PendingChanges
              (host classes). Compile scope, as inspecto-geo-link and inspecto-ops do — a thin jar dropped beside
              inspecto.jar resolves all of it from there at run time. -->
@@ -53,6 +61,13 @@
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-entity-store</artifactId>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>

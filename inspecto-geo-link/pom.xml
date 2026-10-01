@@ -53,6 +53,12 @@
             <artifactId>inspecto-entity-list</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- LA separation D-1 step 5a: the host-free store (fact log, EntityTypes, LinkAnalysisSettings), direct. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-entity-store</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs / PipelineConfigBatchTest boot a
              real CollectorService + ControlApi in the two HTTP tests that moved here with the routes (same

@@ -26,6 +26,7 @@ export const ALLOWED = {
     'inspecto-audit-spi': ['inspecto-api', 'inspecto-util'],
     'inspecto-auth-spi': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi'],
     'inspecto-http-spi': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
+    'inspecto-entity-store': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi'],
     'inspecto-security': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
 };
 

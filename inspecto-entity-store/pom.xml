@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <!-- LA separation D-1 step 5a: the host-free Entity List store — the ONE hash-chained entity fact log and its registry
+         fold (EntityFactLog, EntityRegistry), the Entity List sidecar and entries (EntityListSidecar, EntityListEntries),
+         MaskTokens, plus EntityTypes and LinkAnalysisSettings (package com.gamma.control kept, split with the core).
+         A CORE module: it rides inside the shaded inspecto.jar like inspecto-audit-spi, so no edition stages it.
+         inspecto-entity-list (the routes) and inspecto-geo-link depend on it; the core (SettingsRoutes) does too. -->
+    <artifactId>inspecto-entity-store</artifactId>
+    <name>Inspecto entity store (entity fact log, Entity List sidecar, Entity Types)</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-util</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-config</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-audit-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-auth-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <!-- EntityListEntriesTest renders a relation through DatasetRelation. Test scope only (not part of the
+             compile closure the enforcer rule below bans). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Publish a test-jar: EntityFactsForTest (append/read facts) is reused by inspecto-entity-list's
+                 RiskScoreWatchListFeedTest. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- LA separation D-1 (Decision 5): this module may reach ONLY the inspecto-* modules below, directly or
+                 transitively, at compile/provided/runtime scope. tools/check-module-deps.mjs derives the same answer from the
+                 poms and fails if this list drifts from its ALLOWED table. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>platform-layer-deps</id>
+                        <phase>validate</phase>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <searchTransitive>true</searchTransitive>
+                                    <excludes>
+                                        <exclude>com.gamma.inspector:*:*:*:compile</exclude>
+                                        <exclude>com.gamma.inspector:*:*:*:provided</exclude>
+                                        <exclude>com.gamma.inspector:*:*:*:runtime</exclude>
+                                    </excludes>
+                                    <includes>
+                                        <include>com.gamma.inspector:inspecto-api</include>
+                                        <include>com.gamma.inspector:inspecto-audit-spi</include>
+                                        <include>com.gamma.inspector:inspecto-auth-spi</include>
+                                        <include>com.gamma.inspector:inspecto-config</include>
+                                        <include>com.gamma.inspector:inspecto-http-spi</include>
+                                        <include>com.gamma.inspector:inspecto-util</include>
+                                    </includes>
+                                    <message>inspecto-entity-store may depend only on the inspecto-* modules listed in tools/check-module-deps.mjs (LA separation, D-1). A host module here silently undoes the extraction.</message>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
