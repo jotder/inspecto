@@ -65,6 +65,28 @@ class IndexReaderTest {
     }
 
     @Test
+    void foldCountsEveryRowOfAPairPerSideAndBindsTheKindList(@TempDir Path tmp) throws Exception {
+        IndexBuilder.Result built = build(tmp);
+        try (IndexReader r = open(built)) {
+            List<IndexReader.Folded> out = r.fold("A", Side.OUT, List.of("kind"), null, null);
+            assertEquals(2, out.size(), "A>B call (x2 folded) and A>C sms: " + out);
+            assertEquals(2L, out.stream().filter(f -> f.target().equals("B")).findFirst().orElseThrow().count());
+            assertEquals(List.of("call"), out.stream().filter(f -> f.target().equals("B")).findFirst().orElseThrow().extras());
+            // without the extra column the kinds fold together; the in copy is the other side of the same key
+            assertEquals(2, r.fold("A", Side.OUT, List.of(), null, null).size());
+            assertEquals(2, r.fold("A", Side.IN, List.of(), null, null).size(), "C>A and D>A");
+            // a self-loop is on both sides of its key, one row each
+            assertEquals(1, r.fold("B", Side.OUT, List.of(), null, null).stream().filter(f -> f.target().equals("B")).count());
+            assertEquals(1, r.fold("B", Side.IN, List.of(), null, null).stream().filter(f -> f.source().equals("B")).count());
+            // the kind list is bound, the filter is applied, and a hostile column name never reaches SQL
+            assertEquals(List.of("C"), r.fold("A", Side.OUT, List.of("kind"), List.of("sms"), null).stream().map(IndexReader.Folded::target).toList());
+            assertEquals(1, r.fold("A", Side.OUT, List.of(), null, "kind = 'sms'").size());
+            assertThrows(IllegalArgumentException.class, () -> r.fold("A", Side.OUT, List.of("kind; DROP"), null, null));
+            assertThrows(IllegalArgumentException.class, () -> r.fold("A", Side.OUT, List.of(), List.of(), null));
+        }
+    }
+
+    @Test
     void thePerKeyLimitAndTheFilterApply(@TempDir Path tmp) throws Exception {
         IndexBuilder.Result built = build(tmp);
         try (IndexReader r = open(built)) {

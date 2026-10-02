@@ -691,7 +691,7 @@ public final class InvRoutes implements RouteModule {
             summary.put("truncated", r.truncated());
             mappings.add(summary);
             truncated |= r.truncated();
-            audit(ex, mp.dataset(), null, r.rows().size(), r.truncated());
+            audit(ex, mp.dataset(), null, r.rows().size(), r.truncated(), null);
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("nodes", nodes);
@@ -772,6 +772,27 @@ public final class InvRoutes implements RouteModule {
         refuseIfSensitive(writeRoot, (neighborsOf != null ? "a neighbours read" : "a projection")
                 + " (limit " + limit + ")", limit, limit);
 
+        // D-3 step 6: a one-hop neighbours read is answered from the edge index when - and only when - it can answer exactly
+        // (IndexedNeighbors). The view gate and the four-eyes refusal above have run; a fallback below is the unchanged flat
+        // read. Disabled by default (index.enabled), so the default response gains nothing but `source`.
+        IndexedRead.Outcome<IndexedNeighbors.Result> indexed = null;
+        if (neighborsOf != null) {
+            indexed = IndexedNeighbors.attempt(writeRoot, api.dataRoot(), relationSql, new IndexedNeighbors.Request(datasetId, sourceCol,
+                    targetCol, kindCol, attrCols, body.get("filter"), neighborsOf, limit), traversalPolicy());
+            if (indexed.served()) {
+                List<Map<String, Object>> rows = new ArrayList<>(indexed.result().rows().size());
+                for (Map<String, Object> row : indexed.result().rows())
+                    rows.add(edgeRow(row, kindCol != null ? row.get("kind") : null, attrCols));
+                Map<String, Object> out = new LinkedHashMap<>();
+                out.put("rows", rows);
+                out.put("truncated", indexed.result().truncated());
+                out.put("columnTypes", columnTypes(writeRoot, datasetId, List.of(sourceCol, targetCol)));
+                out.put("source", indexed.source());
+                audit(ex, datasetId, neighborsOf, rows.size(), indexed.result().truncated(), indexed);
+                return out;
+            }
+        }
+
         // The value is bound, not interpolated: `Request` gained `binds` and `QueryExecutor` a
         // PreparedStatement branch, which retired this route's hand-rolled quote-doubling. Two `?` in
         // source order — binds are positional, and `wrap()` adds none of its own. Column identifiers are
@@ -793,7 +814,8 @@ public final class InvRoutes implements RouteModule {
             out.put("rows", rows);
             out.put("truncated", r.truncated());
             out.put("columnTypes", columnTypes(writeRoot, datasetId, List.of(sourceCol, targetCol)));
-            audit(ex, datasetId, neighborsOf, rows.size(), r.truncated());
+            if (indexed != null) out.put("source", indexed.source());
+            audit(ex, datasetId, neighborsOf, rows.size(), r.truncated(), indexed);
             return out;
         } catch (SQLException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
@@ -943,7 +965,7 @@ public final class InvRoutes implements RouteModule {
 
         // D-3 step 5: answer from the edge index when - and only when - it can answer exactly (IndexedRecursivePaths). The view
         // gate above has run; a fallback below is the unchanged flat read, which then says why on `source`.
-        IndexedRecursivePaths.Outcome indexed = IndexedRecursivePaths.attempt(writeRoot, api.dataRoot(), relationSql,
+        IndexedRead.Outcome<com.gamma.la.storage.IndexedTraversal.Result> indexed = IndexedRecursivePaths.attempt(writeRoot, api.dataRoot(), relationSql,
                 new IndexedRecursivePaths.Request(datasetId, sourceCol, targetCol, weightCol, tsCol, body.get("filter"), startNode,
                         targetNode, direction.equals("UNDIRECTED"), maxDepth, maxEdges, limit, monotonic, maxHours),
                 traversalPolicy(), () -> refuseIfSensitive(writeRoot, "a traversal (maxDepth " + maxDepth + " × maxEdgeYield " + maxEdges + ")",
@@ -1077,7 +1099,7 @@ public final class InvRoutes implements RouteModule {
 
     /** Best-effort audit of one traversal (LA-04 pattern): a multi-hop walk is its own analytic act. */
     private static void auditTraversal(HttpExchange ex, String datasetId, String startNode, String targetNode,
-                                       int maxDepth, int paths, boolean truncated, IndexedRecursivePaths.Outcome source) {
+                                       int maxDepth, int paths, boolean truncated, IndexedRead.Outcome<?> source) {
         try {
             Event.Builder b = Event.builder(LinkEventTypes.LINK_TRAVERSED)
                     .source("inv")
@@ -1110,7 +1132,8 @@ public final class InvRoutes implements RouteModule {
      * so {@code rows}/{@code truncated} describe what the analyst actually saw; a partial result the trail
      * cannot show as partial is worth nothing to an investigator.
      */
-    private static void audit(HttpExchange ex, String datasetId, String neighborsOf, int rows, boolean truncated) {
+    private static void audit(HttpExchange ex, String datasetId, String neighborsOf, int rows, boolean truncated,
+                              IndexedRead.Outcome<?> source) {
         try {
             boolean expand = neighborsOf != null;
             String action = expand ? "link.expanded" : "link.projected";
@@ -1122,6 +1145,14 @@ public final class InvRoutes implements RouteModule {
                     .target("dataset", datasetId)
                     .attr("dataset", datasetId).attr("rows", rows).attr("truncated", truncated);
             if (expand) b.attr("value", neighborsOf);
+            if (source != null) {   // D-3 step 6: which store answered the expansion (a projection has no index path)
+                b.attr("source", source.served() ? "index" : "dataset");
+                if (source.served()) {
+                    b.attr("indexVersion", source.version()).attr("indexStale", source.stale());
+                } else {
+                    b.attr("sourceReason", source.reason().name());
+                }
+            }
             EventLog.current().emit(b);
         } catch (RuntimeException ignore) {
             // best effort — the audit must never fail the analyst's query

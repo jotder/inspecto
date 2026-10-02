@@ -17,6 +17,7 @@ import com.gamma.la.core.InputFingerprint;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.storage.BucketFunction;
 import com.gamma.la.storage.IndexBuildService;
+import com.gamma.la.storage.IndexReader;
 import com.gamma.la.storage.IndexBuildService.Refused;
 import com.gamma.la.storage.IndexBuildService.RunView;
 import com.gamma.la.storage.IndexBuildService.Status;
@@ -96,6 +97,7 @@ public final class IndexRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.onClose(services::close);
+        api.onClose(IndexReader::evictAll);                                                   // pooled sealed readers die with the API
         // ⚠ String LITERAL on purpose - CapabilityManifestTest's scanner matches only a literal argument.
         api.post("/inv/index/builds", ApiContext.withCapability("canBuildLinkIndex", (e, m) -> start(api, e, api.body(e))));
         api.get("/inv/index", (e, m) -> list(api, e));
@@ -452,7 +454,10 @@ public final class IndexRoutes implements RouteModule {
                 case QUEUED, RUNNING -> null;
             };
             if (type == null) return;
-            if (type.equals(LinkEventTypes.LINK_INDEX_BUILD_COMPLETED)) InputFingerprintCache.invalidate(v.datasetId(), v.mappingHash());
+            if (type.equals(LinkEventTypes.LINK_INDEX_BUILD_COMPLETED)) {
+                InputFingerprintCache.invalidate(v.datasetId(), v.mappingHash());
+                IndexReader.evictAll();                                                       // a new version is current: close the old one's idle readers
+            }
             Event.Builder b = base(type, v, v.owner(), "user").attr("elapsedMs", v.elapsedMs());
             if (v.result() != null) {
                 IndexBuilder.Result r = v.result();

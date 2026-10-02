@@ -605,6 +605,13 @@ public final class InvestigationRoutes implements RouteModule {
                 row.put("sealedRows", sealed.get("rowCount"));
                 row.put("currentRows", now.get("rowCount"));
                 row.put("diverged", d);
+                // D-3 step 6: the index moving is reported on its own - `diverged` stays about the fingerprint (the rows) alone.
+                Object sealedIx = sealed.get("index") instanceof Map<?, ?> si ? si.get("version") : null;
+                Object nowIx = now.get("index") instanceof Map<?, ?> ni ? ni.get("version") : null;
+                if (sealedIx != null || nowIx != null) {
+                    row.put("indexVersionSealed", sealedIx);
+                    row.put("indexVersionNow", nowIx);
+                }
                 drift.add(row);
             }
         }
@@ -704,6 +711,9 @@ public final class InvestigationRoutes implements RouteModule {
                     b.attr("investigationId", inv.id()).attr("step", step).attr("op", op);
                     if (read != null) b.attr("dataset", read.get("dataset")).attr("rows", read.get("rowCount"))
                             .attr("truncated", truncated).attr("fingerprint", read.get("fingerprint"));
+                    // D-3 step 6: only an index-answered read says so (a Dataset-answered read keeps today's attributes)
+                    if (read != null && read.get("index") instanceof Map<?, ?> ix)
+                        b.attr("source", "index").attr("indexVersion", ix.get("version")).attr("indexStale", ix.get("stale"));
                     // LA-17: which list, at which fact — never its members (as ENTITY_LIST_CHANGED carries counts).
                     if (e.get("list") instanceof Map<?, ?> l) b.attr("listId", l.get("listId")).attr("atSeq", l.get("atSeq"));
                     // LA-17 slice 2: which fact seq was pinned and how many groups it sealed — never a key.
@@ -730,6 +740,7 @@ public final class InvestigationRoutes implements RouteModule {
             r.put("fingerprint", read.get("fingerprint"));
             r.put("readAt", read.get("readAt"));
             r.put("fanOutCapped", read.get("fanOutCapped"));
+            if (read.get("index") != null) r.put("index", read.get("index"));   // D-3 step 6: only when the index answered
             r.put("rung", read.get("query"));   // the rung as READ: window resolved, frontier and exclusions included
             out.put("read", r);
         }
@@ -880,7 +891,23 @@ public final class InvestigationRoutes implements RouteModule {
         List<Map<String, Object>> rows = new ArrayList<>();
         boolean truncated = false;
         long capped = 0;
+        // D-3 step 6: a SIMPLE rung is answered from the edge index when - and only when - it can answer exactly
+        // (IndexedExpand); anything else, and every index failure, falls through to the CTE below untouched. The R3 gate above has run.
+        IndexedRead.Outcome<IndexedExpand.Result> indexed = null;
         if (!frontier.isEmpty()) {
+            Map<String, Object> hdr = inv.header();
+            indexed = IndexedExpand.attempt(inv.writeRoot(), api.dataRoot(), relationSql, new IndexedExpand.Request(dataset,
+                    String.valueOf(hdr.get("sourceCol")), String.valueOf(hdr.get("targetCol")),
+                    hdr.get("linkKindCol") == null ? null : String.valueOf(hdr.get("linkKindCol")), frontier, excluded, kinds,
+                    direction, ((Number) query.get("minEvents")).longValue(), fanOut, budget, window != null, minDays != null,
+                    degMin != null || degMax != null, query.get("merged") != null), InvRoutes.traversalPolicy());
+            if (indexed.served()) {
+                rows = new ArrayList<>(indexed.result().rows());
+                truncated = indexed.result().truncated();
+                capped = indexed.result().capped();
+            }
+        }
+        if (!frontier.isEmpty() && (indexed == null || !indexed.served())) {
             Map<String, Object> h = inv.header();
             String src = SqlIdent.q(String.valueOf(h.get("sourceCol")));
             String tgt = SqlIdent.q(String.valueOf(h.get("targetCol")));
@@ -988,7 +1015,8 @@ public final class InvestigationRoutes implements RouteModule {
         read.put("rowCount", rows.size());
         read.put("truncated", truncated);
         read.put("fanOutCapped", capped);
-        read.put("fingerprint", InvestigationEvaluator.sha256(canonical(rows)));
+        read.put("fingerprint", InvestigationEvaluator.sha256(canonical(rows)));   // rows ONLY: where they were read from never enters it
+        if (indexed != null && indexed.served()) read.put("index", indexed.readIndex());
         return read;
     }
 

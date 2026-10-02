@@ -162,6 +162,51 @@ public final class IndexReader implements AutoCloseable {
         return out;
     }
 
+    /**
+     * One folded link seen from a key (D-3 step 6): the distinct {@code (source, target, extras...)} with the number of edge rows
+     * that fold into it, as the flat {@code GROUP BY} reports it. {@code extras} are in the order asked for, null where the row's
+     * value is NULL.
+     */
+    public record Folded(String source, String target, List<String> extras, long count) { }
+
+    /**
+     * The folded links of ONE key on ONE side: one equality statement on the key's bucket, {@code GROUP BY src, dst, extras}.
+     * Every row of the key is folded (a count is only exact over all of them), so the cost is linear in the key's own degree,
+     * never in the Dataset. {@code extraCols} are index columns ({@code kind}, {@code a0..}); {@code kinds}, when non-null,
+     * keeps only edges whose kind is in the list (bound); {@code filterSql} is an already-rendered predicate or null.
+     */
+    public List<Folded> fold(String key, Side side, List<String> extraCols, List<String> kinds, String filterSql) throws SQLException {
+        for (String c : extraCols)
+            if (!c.matches("kind|a\\d{1,3}")) throw new IllegalArgumentException("not an index column: " + c);
+        if (kinds != null && kinds.isEmpty()) throw new IllegalArgumentException("kinds must not be empty");
+        String own = side == Side.OUT ? "src" : "dst";
+        StringBuilder sel = new StringBuilder("src, dst");
+        for (String c : extraCols) sel.append(", ").append(c);
+        StringBuilder sql = new StringBuilder("SELECT ").append(sel).append(", COUNT(*) AS cnt FROM e_")
+                .append(side == Side.OUT ? "out" : "in").append(" WHERE bucket = ").append(BucketFunction.bucketOf(key, buckets))
+                .append(" AND ").append(own).append(" = ?");
+        List<String> binds = new ArrayList<>();
+        binds.add(key);
+        if (kinds != null) {
+            sql.append(" AND kind IN (").append(String.join(",", java.util.Collections.nCopies(kinds.size(), "?"))).append(')');
+            binds.addAll(kinds);
+        }
+        if (filterSql != null) sql.append(" AND (").append(filterSql).append(')');
+        sql.append(" GROUP BY ").append(sel);
+        List<Folded> out = new ArrayList<>();
+        try (PreparedStatement ps = sandbox.preparedStatement(sql.toString())) {
+            for (int i = 0; i < binds.size(); i++) ps.setString(i + 1, binds.get(i));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    List<String> extras = new ArrayList<>(extraCols.size());
+                    for (int i = 0; i < extraCols.size(); i++) extras.add(rs.getString(3 + i));
+                    out.add(new Folded(rs.getString(1), rs.getString(2), extras, rs.getLong(3 + extraCols.size())));
+                }
+            }
+        }
+        return out;
+    }
+
     /** The sealed connection, for the test that proves it cannot read outside the version directory. */
     Connection connection() {
         return sandbox.connection();
