@@ -22,7 +22,7 @@ class IndexManifestTest {
     }
 
     static IndexMapping mapping() {
-        return new IndexMapping("a_party", "b_party", "ts", "dur", List.of("cell", "imei"));
+        return new IndexMapping("a_party", "b_party", "type", "ts", "Asia/Kolkata", "dur", List.of("cell", "imei"));
     }
 
     @Test
@@ -35,7 +35,7 @@ class IndexManifestTest {
 
     @Test
     void nullableFieldsRoundTrip() {
-        IndexMapping mp = new IndexMapping("s", "d", "t", null, null);
+        IndexMapping mp = new IndexMapping("s", "d", null, null, null, null, null);
         IndexManifest m = new IndexManifest(1, "x", IndexManifest.Builder.FULL, "1", "f", 1, 1, mp, mp.hash(), "d", "r", "b", "UTC", null, 0, null, null);
         IndexManifest back = IndexManifest.fromJson(m.toJson());
         assertEquals(m, back);
@@ -66,8 +66,11 @@ class IndexManifestTest {
     void mappingHashIsDeterministicAndSensitive() {
         assertEquals(mapping().hash(), mapping().hash());
         assertEquals(16, mapping().hash().length());
-        assertNotEquals(mapping().hash(), new IndexMapping("a_party", "b_party", "ts", "dur", List.of("imei", "cell")).hash());
-        assertNotEquals(new IndexMapping("ab", "c", "t", null, null).hash(), new IndexMapping("a", "bc", "t", null, null).hash());
-        assertNotEquals(new IndexMapping("a", "b", "t", null, null).hash(), new IndexMapping("a", "b", "t", "", null).hash());
+        assertNotEquals(mapping().hash(), new IndexMapping("a_party", "b_party", "type", "ts", "Asia/Kolkata", "dur", List.of("imei", "cell")).hash());
+        assertNotEquals(new IndexMapping("ab", "c", null, "t", null, null, null).hash(), new IndexMapping("a", "bc", null, "t", null, null, null).hash());
+        assertNotEquals(new IndexMapping("a", "b", null, "t", null, null, null).hash(), new IndexMapping("a", "b", null, "t", null, "", null).hash());
+        assertNotEquals(mapping().hash(), new IndexMapping("a_party", "b_party", "other", "ts", "Asia/Kolkata", "dur", List.of("cell", "imei")).hash());
+        assertNotEquals(mapping().hash(), new IndexMapping("a_party", "b_party", "type", "ts", "UTC", "dur", List.of("cell", "imei")).hash(),
+                "the time zone is part of the mapping");
     }
 }

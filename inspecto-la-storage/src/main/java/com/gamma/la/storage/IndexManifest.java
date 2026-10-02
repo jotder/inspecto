@@ -35,9 +35,10 @@ import java.util.Objects;
  * @param mappingHash     must equal {@code mapping.hash()}
  * @param relationSqlHash hash of the dataset relation SQL the build read
  * @param baseFingerprint fingerprint of the base data the full build covered
- * @param timeColZone     zone the time column was interpreted in
+ * @param timeColZone     the EFFECTIVE zone the time column was interpreted in (UTC when the mapping gave none; null when
+ *                        there is no time column or it is a TIMESTAMPTZ)
  * @param tables          per-table stats, keyed by table name (insertion order kept)
- * @param droppedNull     rows dropped because src, dst or time was null
+ * @param droppedNull     rows dropped because src or dst was null
  * @param parent          the version this one was appended to (null for a full build)
  */
 public record IndexManifest(long version, String builtAt, Builder builder, String duckdbVersion, String bucketFn,
@@ -78,8 +79,10 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
         ObjectNode m = n.putObject("mapping");
         m.put("srcColumn", mapping.srcColumn());
         m.put("dstColumn", mapping.dstColumn());
-        m.put("timeColumn", mapping.timeColumn());
-        if (mapping.weightColumn() == null) m.putNull("weightColumn"); else m.put("weightColumn", mapping.weightColumn());
+        putNullable(m, "kindColumn", mapping.kindColumn());
+        putNullable(m, "timeColumn", mapping.timeColumn());
+        putNullable(m, "timeColZone", mapping.timeColZone());
+        putNullable(m, "weightColumn", mapping.weightColumn());
         ArrayNode attrs = m.putArray("attributeColumns");
         mapping.attributeColumns().forEach(attrs::add);
         n.put("mappingHash", mappingHash);
@@ -115,7 +118,7 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
         List<String> attrs = new ArrayList<>();
         m.path("attributeColumns").forEach(a -> attrs.add(a.asText()));
         IndexMapping mapping = new IndexMapping(req(m, "srcColumn").asText(), req(m, "dstColumn").asText(),
-                req(m, "timeColumn").asText(), text(m, "weightColumn"), attrs);
+                text(m, "kindColumn"), text(m, "timeColumn"), text(m, "timeColZone"), text(m, "weightColumn"), attrs);
         Map<String, TableStats> tables = new LinkedHashMap<>();
         req(n, "tables").fields().forEachRemaining(e -> tables.put(e.getKey(), new TableStats(
                 e.getValue().path("rows").asLong(), e.getValue().path("files").asLong(), e.getValue().path("bytes").asLong())));
@@ -140,6 +143,10 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
 
     public static IndexManifest read(Path dir) throws IOException {
         return fromJson(Files.readString(dir.resolve(FILE_NAME), StandardCharsets.UTF_8));
+    }
+
+    private static void putNullable(ObjectNode n, String f, String v) {
+        if (v == null) n.putNull(f); else n.put(f, v);
     }
 
     private static JsonNode req(JsonNode n, String f) {

@@ -18,8 +18,8 @@
     <description>
         OPTIONAL Link Analysis module (LA separation D-3 step 2, 2026-10-02): the on-disk graph index store - the
         IndexManifest, IndexMapping and the versioned, atomically published IndexStore (package com.gamma.la.storage).
-        Skeleton only: later D-3 steps add the builder, the SqlGraphEngine and the routing engine. Plain java.nio and
-        Jackson; no DuckDB yet.
+        The IndexBuilder (D-3 step 3) writes the index through DuckDB; later steps add the SqlGraphEngine and the
+        routing engine.
 
         Dependency rule (D-3 Decision 7): depends on inspecto-la-core; inspecto-la-core must NEVER depend on it
         (inspecto-la-api will). The maven-enforcer rule below and tools/check-module-deps.mjs both derive from the
@@ -36,6 +36,12 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!-- The builder's OWN non-sandboxed connection (COPY ... TO is forbidden in the sandbox). Version managed by the
+             parent; not an inspecto-* module, so the enforcer allowlist and ALLOWED are unchanged. -->
+        <dependency>
+            <groupId>org.duckdb</groupId>
+            <artifactId>duckdb_jdbc</artifactId>
         </dependency>
 
         <dependency>
