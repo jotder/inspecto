@@ -10519,7 +10519,7 @@
         "tags" : [ "inv" ],
         "summary" : "The graph-algorithm catalogue and run limits",
         "operationId" : "getInvGraphAlgorithms",
-        "description" : "LA separation D-4. The 28 server-side graph algorithms ({id, label, cost, inlineNodeCeiling, params[], needsWeights, needsSource, needsTarget, needsNode, resultKind}), the hard server `ceilings`, the Space's effective default `defaults` (the `graph_run` settings, clamped to the ceilings; `clamped` says so), the worker `pool`, the `inlineWaitMs` and `resultItems` {limit, default, ceiling, clamped}: the most entries any one list of a run's result carries (the Space's `graph_run.max_result_items`, clamped to the ceiling). A read: no capability.",
+        "description" : "LA separation D-4. The 28 server-side graph algorithms ({id, label, cost, inlineNodeCeiling, params[], needsWeights, needsSource, needsTarget, needsNode, resultKind, engines[]}; `engines` lists \"memory\" and, for neighborhood, egoNetwork and degreeCentrality, \"index\"), the hard server `ceilings`, the Space's effective default `defaults` (the `graph_run` settings, clamped to the ceilings; `clamped` says so), the worker `pool`, the `inlineWaitMs` and `resultItems` {limit, default, ceiling, clamped}: the most entries any one list of a run's result carries (the Space's `graph_run.max_result_items`, clamped to the ceiling). A read: no capability.",
         "responses" : {
           "200" : {
             "description" : "The catalogue, ceilings and defaults."
@@ -10533,7 +10533,7 @@
         "tags" : [ "inv" ],
         "summary" : "Start a graph run over an Investigation's Working Set",
         "operationId" : "postInvGraphRuns",
-        "description" : "LA separation D-4. Body {investigationId, at?, algorithm, params?, weights: \"count\"|\"none\", kinds?, budget?{maxNodes,maxEdges,timeoutMs}}. Gated on canRunLinkGraphAnalysis. A Working Set within the algorithm's inlineNodeCeiling is waited for briefly and answered 200 with the run and its result; a larger one is a 202 with a Location to poll. A run already terminal at submit (BUDGET_EXCEEDED, or a result-cache hit) is a 200. BUDGET_EXCEEDED carries the budget, the measured consumed size and a reason - and never a `result` key. Entity ids in a result are masked per the Space's maskingMode, edge ids included.",
+        "description" : "LA separation D-4. Body {investigationId, input?: \"workingSet\"|\"index\", at?, algorithm, params?, weights: \"count\"|\"none\", kinds?, budget?{maxNodes,maxEdges,timeoutMs}}. `input` defaults to \"workingSet\" (today's behaviour, unchanged). With \"index\" (D-3 step 7; needs the Space setting index.enabled and a current, fitting edge index) the body also takes dataset, sourceCol, targetCol, linkKindCol? (as /inv/projection/neighbors) and, for degreeCentrality only, seeds[1..20]; it runs neighborhood (hops <= 2), egoNetwork or a SEEDS-ONLY degreeCentrality from one pinned index version, at most 20 keys looked up per level, and the response carries source {kind: \"index\", version, stale, staleReason?, fingerprint} and input {kind: \"index\", estimated: true, version}. Every case the index cannot serve exactly is a 422 naming the cause (index_disabled, no_index, an unfit mapping or column, index_stale_refused, a non-native algorithm, hops > 2, seeds > 20, `at`, an Investigation that hides entities) - it never falls back to the Working Set; a walk that reaches past the cap is a BUDGET_EXCEEDED run naming it. Gated on canRunLinkGraphAnalysis. A Working Set within the algorithm's inlineNodeCeiling is waited for briefly and answered 200 with the run and its result; a larger one is a 202 with a Location to poll. A run already terminal at submit (BUDGET_EXCEEDED, or a result-cache hit) is a 200. BUDGET_EXCEEDED carries the budget, the measured consumed size and a reason - and never a `result` key. Entity ids in a result are masked per the Space's maskingMode, edge ids included.",
         "responses" : {
           "200" : {
             "description" : "The run, terminal (COMPLETED with its `result`; or BUDGET_EXCEEDED / CANCELLED / FAILED without one)."
@@ -10548,7 +10548,7 @@
             "description" : "No such Investigation, or not readable by the caller."
           },
           "422" : {
-            "description" : "Unknown algorithm or field, a bad or missing parameter, a bad budget or `at`."
+            "description" : "Unknown algorithm or field, a bad or missing parameter, a bad budget or `at`, an unknown `input`, or an `input: \"index\"` run the index cannot serve (the cause is named)."
           },
           "503" : {
             "description" : "No write root, or the run queue is full (STORE_BUSY)."

@@ -94,7 +94,7 @@ class ControlApiWorkingSetGraphInputTest {
             JsonNode links = ok(c, "GET", INV + "/working-set?of=links", null);
             assertTrue(links.get("rows").size() >= 2, links.toString());
 
-            GraphInput in = WorkingSetGraphInput.from(rows(entities), rows(links), null);
+            GraphInput.Materialised in = WorkingSetGraphInput.from(rows(entities), rows(links), null);
 
             Map<String, JsonNode> served = new java.util.LinkedHashMap<>();       // linkId -> its row, as served
             for (JsonNode r : links.get("rows")) served.put(r.get("linkId").asText(), r);
@@ -113,7 +113,7 @@ class ControlApiWorkingSetGraphInputTest {
             assertEquals(0, in.droppedDangling());
 
             // the kinds filter is applied in the adapter, to those same served rows
-            GraphInput voice = WorkingSetGraphInput.from(rows(entities), rows(links), List.of("voice"));
+            GraphInput.Materialised voice = WorkingSetGraphInput.from(rows(entities), rows(links), List.of("voice"));
             assertEquals(served.values().stream().filter(r -> "voice".equals(r.get("kind").asText())).count(), voice.edges().size());
 
             // and an engine answer names links by the served ids

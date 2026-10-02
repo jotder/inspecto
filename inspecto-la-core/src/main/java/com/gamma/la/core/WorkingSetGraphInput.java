@@ -37,7 +37,7 @@ public final class WorkingSetGraphInput {
 
     private WorkingSetGraphInput() {}
 
-    public static GraphInput from(List<Map<String, Object>> entityRows, List<Map<String, Object>> linkRows,
+    public static GraphInput.Materialised from(List<Map<String, Object>> entityRows, List<Map<String, Object>> linkRows,
                                   Collection<String> kinds) {
         Set<String> wanted = kinds == null || kinds.isEmpty() ? null : Set.copyOf(kinds);
         List<GraphInput.Node> nodes = entityRows.stream()

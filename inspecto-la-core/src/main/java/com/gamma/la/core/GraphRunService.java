@@ -53,7 +53,7 @@ public final class GraphRunService implements AutoCloseable {
     }
 
     /** Why a run ended {@code BUDGET_EXCEEDED}. */
-    public enum Exceeded { NODES, EDGES, TIMEOUT, WORK }
+    public enum Exceeded { NODES, EDGES, TIMEOUT, WORK, INDEX_CAP }
 
     /**
      * Sizing and retention. {@code threads} run concurrently; {@code queue} more may wait; beyond that a submit is refused.
@@ -101,7 +101,7 @@ public final class GraphRunService implements AutoCloseable {
     public record RunView(String id, String owner, String investigationId, String relationKey, Algorithm algorithm, String engine, Status status,
                           GraphBudget budget, boolean budgetClamped, Consumed consumed, Progress progress,
                           boolean cancelRequested, boolean cached, Exceeded exceeded, String failure, GraphResult result,
-                          long createdAt, long finishedAt) {}
+                          long createdAt, long finishedAt, String exceededDetail, String inputKind, long indexVersion) {}
 
     private final GraphEngine engine;
     private final Limits limits;
@@ -194,7 +194,7 @@ public final class GraphRunService implements AutoCloseable {
         long now = clock.getAsLong();
         Run run = new Run("gr-" + UUID.randomUUID(), req, params, budget, clamped, now);
 
-        int nodes = req.input().nodes().size(), edges = req.input().edges().size();
+        int nodes = req.input().estimateNodes(), edges = req.input().estimateEdges();     // exact for a graph, an estimate for an index reference
         if (nodes > budget.maxNodes() || edges > budget.maxEdges()) {
             end(run, Status.BUDGET_EXCEEDED, nodes > budget.maxNodes() ? Exceeded.NODES : Exceeded.EDGES, null, null, 0, now);
             run.release();
@@ -287,10 +287,18 @@ public final class GraphRunService implements AutoCloseable {
         if (ctl == null) return;                                       // cancelled while queued
         long t0 = System.nanoTime();
         try {
-            GraphResult result = engine.run(r.algorithm, r.params, r.input, ctl);
+            GraphInput in = r.input;
+            GraphResult result = engine.run(r.algorithm, r.params, in, ctl);
             long elapsed = (System.nanoTime() - t0) / 1_000_000L;
+            int[] measured = in instanceof GraphInput.IndexRef ? measure(result) : null;    // an index reference had only an estimate
+            if (measured != null) {
+                r.nodes = measured[0];
+                r.edges = measured[1];
+            }
             if (r.cancelRequested)
                 end(r, Status.CANCELLED, null, null, null, elapsed, clock.getAsLong());
+            else if (measured != null && (measured[0] > r.budget.maxNodes() || measured[1] > r.budget.maxEdges()))
+                end(r, Status.BUDGET_EXCEEDED, measured[0] > r.budget.maxNodes() ? Exceeded.NODES : Exceeded.EDGES, null, null, elapsed, clock.getAsLong());
             else if (elapsed > r.budget.timeoutMs())
                 end(r, Status.BUDGET_EXCEEDED, Exceeded.TIMEOUT, null, null, elapsed, clock.getAsLong());   // finished late: still over budget
             else end(r, Status.COMPLETED, null, null, result, elapsed, clock.getAsLong(), () -> putCache(r.cacheKey, result));
@@ -302,6 +310,9 @@ public final class GraphRunService implements AutoCloseable {
                 case DEADLINE -> end(r, Status.BUDGET_EXCEEDED, Exceeded.TIMEOUT, null, null, elapsed, now);
                 case BUDGET -> end(r, Status.BUDGET_EXCEEDED, Exceeded.WORK, null, null, elapsed, now);
             }
+        } catch (IndexCapExceeded cap) {
+            r.exceededDetail = cap.getMessage();
+            end(r, Status.BUDGET_EXCEEDED, Exceeded.INDEX_CAP, null, null, (System.nanoTime() - t0) / 1_000_000L, clock.getAsLong());
         } catch (RuntimeException | Error e) {
             end(r, Status.FAILED, null, e.getClass().getSimpleName(), null, (System.nanoTime() - t0) / 1_000_000L, clock.getAsLong());
         } finally {
@@ -390,8 +401,18 @@ public final class GraphRunService implements AutoCloseable {
     }
 
     private static String cacheKey(Request r, Map<String, Object> resolved) {
+        String identity = r.input().cacheIdentity();          // empty for a Working Set graph: its key is unchanged
         return r.relationKey() + '\u0001' + r.scopeFingerprint() + '\u0001' + r.algorithm().id() + '\u0001'
-                + new TreeMap<>(resolved) + '\u0001' + r.weightsSpec();
+                + new TreeMap<>(resolved) + '\u0001' + r.weightsSpec() + (identity.isEmpty() ? "" : '\u0001' + identity);
+    }
+
+    /** The measured size of an index run's answer: {@code {nodes, edges}} of a sub-graph, the scored nodes of a ranking. */
+    private static int[] measure(GraphResult res) {
+        return switch (res.payload()) {
+            case GraphResult.SubGraph g -> new int[] {g.graph().nodes().size(), g.graph().edges().size()};
+            case GraphResult.Scores s -> new int[] {s.scores().size(), 0};
+            default -> new int[] {0, 0};
+        };
     }
 
     // ── one run ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -403,7 +424,11 @@ public final class GraphRunService implements AutoCloseable {
         final GraphBudget budget;
         final boolean clamped;
         final long createdAt;
-        final int nodes, edges;
+        final String engineId;                           // the engine that really runs this input (a routing engine names its delegate)
+        final String inputKind;                          // "materialised" or "index" (the audit trail names it)
+        final long indexVersion;                         // the pinned index version of an index run, else 0
+        volatile int nodes, edges;                       // exact for a graph; an index run's are the estimate until the walk measures them
+        volatile String exceededDetail;
         final CountDownLatch done = new CountDownLatch(1);
         volatile GraphInput input;                       // dropped when the run ends, so a finished run holds no graph
         volatile String cacheKey;
@@ -430,8 +455,11 @@ public final class GraphRunService implements AutoCloseable {
             this.clamped = clamped;
             this.createdAt = now;
             this.input = req.input();
-            this.nodes = req.input().nodes().size();
-            this.edges = req.input().edges().size();
+            this.nodes = req.input().estimateNodes();
+            this.edges = req.input().estimateEdges();
+            this.engineId = engine.engineIdFor(req.input());
+            this.inputKind = req.input().kind();
+            this.indexVersion = req.input() instanceof GraphInput.IndexRef ref ? ref.version() : 0;
         }
 
         synchronized Status status() {
@@ -494,9 +522,9 @@ public final class GraphRunService implements AutoCloseable {
             Progress p = new Progress(c == null ? 0 : c.work(), fraction, known);
             // live elapsed compute time for a RUNNING run (monotonic, from execution start - 0 while QUEUED); the final value after
             long elapsed = status == Status.RUNNING ? (System.nanoTime() - startNanos) / 1_000_000L : elapsedMs;
-            return new RunView(id, owner, investigationId, relationKey, algorithm, engine.engineId(), status, budget, clamped,
+            return new RunView(id, owner, investigationId, relationKey, algorithm, engineId, status, budget, clamped,
                     new Consumed(nodes, edges, elapsed, p.work()), p, cancelRequested, cached, exceeded, failure,
-                    result, createdAt, finishedAt);
+                    result, createdAt, finishedAt, exceededDetail, inputKind, indexVersion);
         }
     }
 }

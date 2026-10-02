@@ -22,6 +22,9 @@ import com.gamma.la.core.InMemoryGraphEngine;
 import com.gamma.la.core.InvalidGraphRequest;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.WorkingSetGraphInput;
+import com.gamma.la.storage.IndexReader;
+import com.gamma.la.storage.RoutingGraphEngine;
+import com.gamma.la.storage.SqlGraphEngine;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -29,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -86,7 +90,10 @@ public final class GraphRunRoutes implements RouteModule {
     /** How long a run within its algorithm's inline ceiling is waited for before the answer becomes a 202. */
     static final long INLINE_WAIT_MS = 3_000;
     private static final int MAX_KINDS = 100;
-    private static final Set<String> BODY_KEYS = Set.of("investigationId", "at", "algorithm", "params", "weights", "kinds", "budget");
+    private static final Set<String> BODY_KEYS = Set.of("investigationId", "at", "algorithm", "params", "weights", "kinds", "budget",
+            "input", "dataset", "sourceCol", "targetCol", "linkKindCol", "seeds");
+    /** The body fields only {@code input:"index"} takes (it reads a Dataset's edge index, not the Working Set). */
+    private static final Set<String> INDEX_KEYS = Set.of("dataset", "sourceCol", "targetCol", "linkKindCol", "seeds");
 
     /** Test seam (the {@code Authenticators.forTest} idiom): an engine for services created AFTER this call, and the inline wait. */
     private static volatile GraphEngine engineOverride;
@@ -130,7 +137,8 @@ public final class GraphRunRoutes implements RouteModule {
         GraphRunService.Limits limits = new GraphRunService.Limits(std.defaults(), std.ceilings(),
                 g.threads() != null ? g.threads() : std.threads(), g.queue() != null ? g.queue() : std.queue(),
                 std.runTtlMs(), std.maxRuns(), std.cacheTtlMs(), std.cacheEntries());
-        GraphEngine engine = engineOverride != null ? engineOverride : new InMemoryGraphEngine();
+        GraphEngine engine = new RoutingGraphEngine(engineOverride != null ? engineOverride : new InMemoryGraphEngine(),
+                new SqlGraphEngine(InvRoutes.traversalPolicy()));
         return new GraphRunService(engine, limits, System::currentTimeMillis, GraphRunRoutes::auditTerminal);
     }
 
@@ -151,6 +159,7 @@ public final class GraphRunRoutes implements RouteModule {
         LinkAnalysisSettings.GraphRun g = LinkAnalysisSettings.forRoot(api.writeRoot()).effectiveGraphRun();
         GraphBudget stated = settingsDefaults(g, std);
         GraphBudget inForce = stated.resolve(std.defaults(), std.ceilings());
+        String memoryId = (engineOverride != null ? engineOverride : new InMemoryGraphEngine()).engineId();
         List<Object> catalogue = new ArrayList<>();
         for (Algorithm a : Algorithm.values()) {
             Map<String, Object> o = new LinkedHashMap<>();
@@ -175,6 +184,7 @@ public final class GraphRunRoutes implements RouteModule {
             o.put("needsTarget", a.needsTarget());
             o.put("needsNode", a.needsNode());
             o.put("resultKind", a.resultKind().name());
+            o.put("engines", SqlGraphEngine.nativeAlgorithms().contains(a) ? List.of(memoryId, SqlGraphEngine.ENGINE_ID) : List.of(memoryId));
             catalogue.add(o);
         }
         Map<String, Object> out = new LinkedHashMap<>();
@@ -223,7 +233,7 @@ public final class GraphRunRoutes implements RouteModule {
         List<String> kinds = kinds(body);
         GraphBudget asked = budget(body);
         int at = at(body);
-
+        boolean indexed = indexInput(body);                                                  // 422 on an unknown input
         InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, invId);        // 422 · 403 · 404 · PDP
         EntityMasking mask = EntityMasking.of(inv, List.of());
         for (String node : List.of(Algorithm.FROM, Algorithm.TO, Algorithm.NODE))            // a pseudonym the caller saw -> its entity
@@ -231,19 +241,34 @@ public final class GraphRunRoutes implements RouteModule {
                 // a RAW id the masking hides is treated as a node that does not exist, so the answer cannot tell whether it is in the Working Set
                 params.put(node, mask.hidesRaw(s) ? ABSENT_NODE + node : mask.resolve(List.of(s)).get(0));
 
-        boolean[] cached = {false};
-        WorkingSetRoutes.Relation rel = WorkingSetRoutes.relation(inv, at, cached);
-        List<Map<String, Object>> entities = rel.tables().get("entities");
-        List<Map<String, Object>> links = rel.tables().get("links");
-        Set<String> hidden = new TreeSet<>();
-        for (Map<String, Object> r : entities) if (Boolean.TRUE.equals(r.get("hidden"))) hidden.add(String.valueOf(r.get("entityId")));
-        List<Map<String, Object>> shownEntities = hidden.isEmpty() ? entities
-                : entities.stream().filter(r -> !hidden.contains(String.valueOf(r.get("entityId")))).toList();
-        List<Map<String, Object>> shownLinks = hidden.isEmpty() ? links
-                : links.stream().filter(r -> !hidden.contains(String.valueOf(r.get("source")))
-                        && !hidden.contains(String.valueOf(r.get("target")))).toList();
-        GraphInput input = WorkingSetGraphInput.from(shownEntities, shownLinks, kinds);
-        if ("none".equals(weights)) input = new GraphInput(input.nodes(), input.edges(), Map.of(), input.droppedDangling());
+        GraphInput input;
+        String relationKey;
+        int hiddenCount = 0;
+        int headStep = -1;
+        IndexPlan plan = null;
+        if (indexed) {
+            plan = planIndexed(api, ex, writeRoot, inv, mask, body, algorithm, params, kinds, at, asked);
+            input = plan.ref();
+            relationKey = "index:" + plan.ref().indexId();
+        } else {
+            boolean[] cached = {false};
+            WorkingSetRoutes.Relation rel = WorkingSetRoutes.relation(inv, at, cached);
+            List<Map<String, Object>> entities = rel.tables().get("entities");
+            List<Map<String, Object>> links = rel.tables().get("links");
+            Set<String> hidden = new TreeSet<>();
+            for (Map<String, Object> r : entities) if (Boolean.TRUE.equals(r.get("hidden"))) hidden.add(String.valueOf(r.get("entityId")));
+            List<Map<String, Object>> shownEntities = hidden.isEmpty() ? entities
+                    : entities.stream().filter(r -> !hidden.contains(String.valueOf(r.get("entityId")))).toList();
+            List<Map<String, Object>> shownLinks = hidden.isEmpty() ? links
+                    : links.stream().filter(r -> !hidden.contains(String.valueOf(r.get("source")))
+                            && !hidden.contains(String.valueOf(r.get("target")))).toList();
+            GraphInput.Materialised graph = WorkingSetGraphInput.from(shownEntities, shownLinks, kinds);
+            if ("none".equals(weights)) graph = new GraphInput.Materialised(graph.nodes(), graph.edges(), Map.of(), graph.droppedDangling());
+            input = graph;
+            relationKey = cacheScope(rel.key(), kinds);
+            hiddenCount = hidden.size();
+            headStep = rel.headStep();
+        }
 
         GraphRunService svc = service(writeRoot);
         GraphRunService.Limits std = GraphRunService.Limits.standard();
@@ -254,17 +279,17 @@ public final class GraphRunRoutes implements RouteModule {
         String owner = callerId(ex);
         RunView v;
         try {
-            v = svc.submit(new GraphRunService.Request(owner, invId, cacheScope(rel.key(), kinds), scopeFingerprint(ex), algorithm, params,
+            v = svc.submit(new GraphRunService.Request(owner, invId, relationKey, scopeFingerprint(ex), algorithm, params,
                     weights, input, budget));
         } catch (InvalidGraphRequest bad) {
             throw bad(bad.getMessage());
         } catch (GraphRunException refused) {
             throw map(refused);
         }
-        emit(LinkEventTypes.LINK_GRAPH_RUN_STARTED, ex, v, input.nodes().size(), input.edges().size());
+        int nodes = input.estimateNodes(), edges = input.estimateEdges();
+        int dropped = input instanceof GraphInput.Materialised m ? m.droppedDangling() : 0;      // an index edge has both endpoints by construction
+        emit(LinkEventTypes.LINK_GRAPH_RUN_STARTED, ex, v, nodes, edges);
 
-        int hiddenCount = hidden.size();
-        int nodes = input.nodes().size(), edges = input.edges().size(), dropped = input.droppedDangling();
         if (!v.status().terminal() && nodes <= algorithm.inlineNodeCeiling()) {
             try {
                 v = svc.await(v.id(), inlineWaitMs());
@@ -278,7 +303,14 @@ public final class GraphRunRoutes implements RouteModule {
         inputNote.put("edges", edges);
         inputNote.put("hiddenEntities", hiddenCount);
         inputNote.put("droppedDangling", dropped);
-        inputNote.put("at", rel.headStep());
+        if (plan != null) {                                                                   // an index run: the figures are estimates until measured
+            inputNote.put("kind", "index");
+            inputNote.put("estimated", true);
+            inputNote.put("version", plan.ref().version());
+            out.put("source", plan.source());
+        } else {
+            inputNote.put("at", headStep);
+        }
         out.put("input", inputNote);
         if (v.status().terminal()) return out;                                                // 200
         ex.getResponseHeaders().set("Location", "/api/v1/inv/graph/runs/" + v.id());
@@ -354,6 +386,101 @@ public final class GraphRunRoutes implements RouteModule {
         if (!(v instanceof Number n) || n.doubleValue() != Math.rint(n.doubleValue()) || n.intValue() < 0)
             throw bad("'at' must be a log step >= 0, got '" + v + "'");
         return n.intValue();
+    }
+
+    // ── input: "index" (D-3 step 7) ──────────────────────────────────────────────────────────────────────────
+
+    /** {@code input}: {@code "workingSet"} (default, today's behaviour) or {@code "index"}; anything else is a 422. */
+    private static boolean indexInput(Map<String, Object> body) {
+        Object raw = body.get("input");
+        if (raw == null || "workingSet".equals(raw)) {
+            for (String k : INDEX_KEYS)
+                if (body.containsKey(k)) throw bad("'" + k + "' is only for input \"index\" (this run reads the Working Set)");
+            return false;
+        }
+        if ("index".equals(raw)) return true;
+        throw bad("'input' must be \"workingSet\" or \"index\", got '" + raw + "'");
+    }
+
+    private record IndexPlan(GraphInput.IndexRef ref, Map<String, Object> source) { }
+
+    /**
+     * Everything an {@code input:"index"} run decides BEFORE the service sees it, each refusal a stated 422 - never a silent
+     * reroute to the Working Set: the algorithm must be index-native, the walk within the cap, no time travel ({@code at}), no
+     * hidden entities, an index that fits and passes the staleness gate. Then the seeds' degrees are read once for the pre-work size
+     * estimate. The Dataset's view gate and the four-eyes bound run first, as on {@code /inv/projection/neighbors}.
+     */
+    private static IndexPlan planIndexed(ApiContext api, HttpExchange ex, Path writeRoot, InvestigationRoutes.Inv inv, EntityMasking mask,
+                                         Map<String, Object> body, Algorithm algorithm, Map<String, Object> params, List<String> kinds,
+                                         int at, GraphBudget asked) throws IOException {
+        if (!SqlGraphEngine.nativeAlgorithms().contains(algorithm))
+            throw bad("'" + algorithm.id() + "' cannot run from the index - only "
+                    + SqlGraphEngine.nativeAlgorithms().stream().map(Algorithm::id).sorted().toList()
+                    + " can; run it with input \"workingSet\"");
+        if (at >= 0)
+            throw bad("'at' cannot be combined with input \"index\": the index holds the Dataset as built, with no Working Set history "
+                    + "(and no time-zone contract yet)");
+        if (algorithm == Algorithm.NEIGHBORHOOD && params.get("hops") instanceof Number h && h.intValue() > SqlGraphEngine.MAX_HOPS)
+            throw bad("hops " + h + " is over the index cap of " + SqlGraphEngine.MAX_HOPS + " hops; run it with input \"workingSet\"");
+        String dataset = ApiContext.str(body, "dataset");
+        if (dataset == null || dataset.isBlank()) throw bad("input \"index\" needs 'dataset' (the Dataset whose edge index to read)");
+        String sourceCol = InvRoutes.ident(body, "sourceCol", true);
+        String targetCol = InvRoutes.ident(body, "targetCol", true);
+        String kindCol = InvRoutes.ident(body, "linkKindCol", false);
+        if (kinds != null && !kinds.isEmpty() && kindCol == null) throw bad("'kinds' needs 'linkKindCol' on input \"index\"");
+
+        List<String> seeds = new ArrayList<>();
+        if (algorithm == Algorithm.DEGREE_CENTRALITY) {
+            if (!(body.get("seeds") instanceof List<?> raw) || raw.isEmpty() || raw.stream().anyMatch(o -> !(o instanceof String s) || s.isBlank()))
+                throw bad("degreeCentrality from the index scores the SEED nodes only: 'seeds' must be a non-empty list of node ids");
+            if (raw.size() > SqlGraphEngine.FRONTIER_CAP)
+                throw bad("'seeds' lists " + raw.size() + " nodes; the index cap is " + SqlGraphEngine.FRONTIER_CAP + " keys per level");
+            for (Object o : raw) {
+                String s = (String) o;
+                seeds.add(mask.hidesRaw(s) ? ABSENT_NODE + "seed" : mask.resolve(List.of(s)).get(0));
+            }
+        } else {
+            if (body.containsKey("seeds")) throw bad("'seeds' is only for degreeCentrality; " + algorithm.id() + " starts from params.node");
+            if (!(params.get(Algorithm.NODE) instanceof String node) || node.isBlank()) throw bad("params.node is required");
+            seeds.add(node);
+        }
+
+        // hidden entities: the Investigation hides some, and the index cannot know which - refuse rather than show what it hides
+        for (Map<String, Object> r : WorkingSetRoutes.relation(inv, -1, new boolean[1]).tables().get("entities"))
+            if (Boolean.TRUE.equals(r.get("hidden")))
+                throw bad("the Investigation hides entities, which the index cannot honour; run it with input \"workingSet\"");
+
+        String relationSql = InvRoutes.relationFor(api, ex, writeRoot, dataset);                      // 404 · 422
+        GraphRunService.Limits std = GraphRunService.Limits.standard();
+        long bound = asked.maxEdges() > 0 ? asked.maxEdges()
+                : settingsDefaults(LinkAnalysisSettings.forRoot(writeRoot).effectiveGraphRun(), std).maxEdges();
+        InvRoutes.refuseIfSensitive(writeRoot, "a graph run from the index (budget " + bound + ")", bound, SqlGraphEngine.FRONTIER_CAP);
+
+        IndexedRead.Selection sel = IndexedRead.select(writeRoot, api.dataRoot(), relationSql, dataset, sourceCol, targetCol, (m, utc) -> {
+            boolean indexHasKind = m.kindColumn() != null;
+            if (indexHasKind != (kindCol != null) || (indexHasKind && !kindCol.equalsIgnoreCase(m.kindColumn())))
+                return IndexedRead.Fitted.no(IndexedRead.Reason.column_not_indexed);
+            return IndexedRead.Fitted.ok(null);
+        });
+        if (!sel.usable()) {
+            IndexedRead.Outcome<Object> no = sel.flat();
+            throw bad("the edge index cannot serve this run (" + no.reason().name() + (no.details() != null ? ": " + no.details() : "")
+                    + "); input \"index\" never falls back to the Working Set - fix the cause or run it with input \"workingSet\"");
+        }
+        long nodes = 0, edges = 0;
+        try (IndexReader reader = IndexReader.borrow(sel.dir(), sel.manifest(), InvRoutes.traversalPolicy())) {
+            for (String seed : seeds) {
+                if (seed.indexOf((char) 0) >= 0) continue;                                               // a masked raw id: names no node
+                long d = reader.degree(seed);
+                nodes += d + 1;
+                edges += d;
+            }
+        } catch (SQLException | IOException | RuntimeException unreadable) {
+            throw new ApiException(503, ErrorCodes.STORE_BUSY, "the edge index could not be read (" + unreadable.getClass().getSimpleName() + ")");
+        }
+        GraphInput.IndexRef ref = new GraphInput.IndexRef(sel.dir(), sel.version(), dataset + ":" + sel.manifest().mapping().hash(), seeds,
+                kinds, (int) Math.min(Integer.MAX_VALUE, nodes), (int) Math.min(Integer.MAX_VALUE, edges));
+        return new IndexPlan(ref, sel.<Boolean>served(Boolean.TRUE).source());
     }
 
     // ── reads ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -492,7 +619,16 @@ public final class GraphRunRoutes implements RouteModule {
 
     private static String reason(RunView v) {
         GraphBudget b = v.budget();
+        boolean index = "index".equals(v.inputKind());
+        if (index && (v.exceeded() == GraphRunService.Exceeded.NODES || v.exceeded() == GraphRunService.Exceeded.EDGES))
+            return "the index read " + (v.exceeded() == GraphRunService.Exceeded.NODES
+                    ? v.consumed().nodes() + " nodes; the budget allows " + b.maxNodes() + " (budget.maxNodes)"
+                    : v.consumed().edges() + " links; the budget allows " + b.maxEdges() + " (budget.maxEdges)")
+                    + " - a figure estimated from the seeds' degrees before the walk, or measured after it. Raise the budget (up to the "
+                    + "server ceiling) or pick fewer, smaller seeds.";
         return switch (v.exceeded()) {
+            case INDEX_CAP -> "the walk reached past the index's cap (" + v.exceededDetail() + "). The index never answers over its cap, "
+                    + "and does not fall back to the Working Set: pick a less connected seed or run it with input \"workingSet\".";
             case NODES -> "the Working Set has " + v.consumed().nodes() + " nodes; the budget allows " + b.maxNodes()
                     + " (budget.maxNodes). Raise it (up to the server ceiling), filter the Working Set, or pick a cheaper algorithm.";
             case EDGES -> "the Working Set has " + v.consumed().edges() + " links; the budget allows " + b.maxEdges()
@@ -588,9 +724,12 @@ public final class GraphRunRoutes implements RouteModule {
     /** Never the run's params: they can embed entity ids. */
     private static Event.Builder base(String type, RunView v, String actor, String actorType) {
         String action = "link.graph.run." + type.substring("LINK_GRAPH_RUN_".length()).toLowerCase(java.util.Locale.ROOT);
-        return Event.builder(type).source("inv").message(action + " - " + v.investigationId())
+        Event.Builder b = Event.builder(type).source("inv").message(action + " - " + v.investigationId())
                 .actor(actor).actorType(actorType).action(action).actionCategory("analysis")
                 .attr("investigationId", v.investigationId()).attr("algorithm", v.algorithm().id())
-                .attr("key", v.relationKey()).attr("engine", v.engine()).attr("runId", v.id());
+                .attr("key", v.relationKey()).attr("engine", v.engine()).attr("runId", v.id())
+                .attr("source", "index".equals(v.inputKind()) ? "index" : "workingSet");
+        if ("index".equals(v.inputKind())) b = b.attr("indexVersion", v.indexVersion());
+        return b;
     }
 }

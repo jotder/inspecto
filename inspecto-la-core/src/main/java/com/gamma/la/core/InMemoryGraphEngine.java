@@ -37,7 +37,9 @@ public final class InMemoryGraphEngine implements GraphEngine {
     }
 
     @Override
-    public GraphResult run(Algorithm algorithm, Map<String, Object> params, GraphInput input, RunControl ctl) {
+    public GraphResult run(Algorithm algorithm, Map<String, Object> params, GraphInput in, RunControl ctl) {
+        if (!(in instanceof GraphInput.Materialised input))
+            throw new IllegalArgumentException("the in-memory engine runs only a materialised graph, not an input of kind '" + in.kind() + "'");
         if (algorithm == null)
             throw new InvalidGraphRequest(InvalidGraphRequest.Reason.UNKNOWN_ALGORITHM, null, "no algorithm named");
         Map<String, Object> p = algorithm.resolve(params);        // refuses BEFORE any work
@@ -48,7 +50,7 @@ public final class InMemoryGraphEngine implements GraphEngine {
         return new GraphResult(algorithm, payload, input.droppedDangling(), (System.nanoTime() - t0) / 1_000_000L);
     }
 
-    private static Graph toGraph(GraphInput in) {
+    private static Graph toGraph(GraphInput.Materialised in) {
         var nodes = new ArrayList<GraphAlgorithms.Node>(in.nodes().size());
         for (GraphInput.Node n : in.nodes()) nodes.add(new GraphAlgorithms.Node(n.id(), n.label()));
         var edges = new ArrayList<GraphAlgorithms.Edge>(in.edges().size());

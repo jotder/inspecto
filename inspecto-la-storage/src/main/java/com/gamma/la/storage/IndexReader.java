@@ -207,6 +207,27 @@ public final class IndexReader implements AutoCloseable {
         return out;
     }
 
+    /**
+     * How many edge ROWS the key has on both sides (its raw degree: a self-loop row counts on each side, and parallel rows are not
+     * folded) - one equality statement per side, cost linear in the key's own rows. An upper bound of its folded links, which is
+     * what the pre-work size estimate of a graph run wants; zero means the key is not a node of the index.
+     */
+    public long degree(String key) throws SQLException {
+        long total = 0;
+        for (Side side : Side.values()) {
+            String own = side == Side.OUT ? "src" : "dst";
+            String sql = "SELECT COUNT(*) FROM e_" + (side == Side.OUT ? "out" : "in") + " WHERE bucket = "
+                    + BucketFunction.bucketOf(key, buckets) + " AND " + own + " = ?";
+            try (PreparedStatement ps = sandbox.preparedStatement(sql)) {
+                ps.setString(1, key);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) total += rs.getLong(1);
+                }
+            }
+        }
+        return total;
+    }
+
     /** The sealed connection, for the test that proves it cannot read outside the version directory. */
     Connection connection() {
         return sandbox.connection();

@@ -651,4 +651,101 @@ class GraphRunServiceTest {
         assertEquals(Status.COMPLETED, resubmitted.get().status(), "a hit is terminal at submit");
         assertTrue(resubmitted.get().cached());
     }
+
+    // ── an index reference (D-3 step 7): estimate before the walk, measurement after it ──────────────────────────
+
+    private static GraphInput.IndexRef indexRef(long version, int estNodes, int estEdges) {
+        return new GraphInput.IndexRef(java.nio.file.Path.of("v" + version), version, "ds:map", List.of("A"), List.of(), estNodes, estEdges);
+    }
+
+    private static GraphResult subGraph(int nodes, int edges) {
+        List<com.gamma.la.graph.GraphAlgorithms.Node> ns = new ArrayList<>();
+        List<com.gamma.la.graph.GraphAlgorithms.Edge> es = new ArrayList<>();
+        for (int i = 0; i < nodes; i++) ns.add(new com.gamma.la.graph.GraphAlgorithms.Node("n" + i, "n" + i));
+        for (int i = 0; i < edges; i++) es.add(new com.gamma.la.graph.GraphAlgorithms.Edge("e" + i, "n0", "n0"));
+        return new GraphResult(Algorithm.NEIGHBORHOOD, new GraphResult.SubGraph(new com.gamma.la.graph.GraphAlgorithms.Graph(ns, es)), 0, 1);
+    }
+
+    private static Request indexReq(GraphInput in) {
+        return new Request("alice", "inv-1", "index:ds:map", "scope-A", Algorithm.NEIGHBORHOOD, Map.of("node", "A"), "none", in, GraphBudget.UNSTATED);
+    }
+
+    @Test
+    void anIndexReferenceWhoseEstimateIsOverTheBudgetNeverReachesTheEngine() throws Exception {
+        Probe probe = new Probe(ctl -> subGraph(1, 0));
+        svc = new GraphRunService(probe, TIGHT);
+        RunView v = svc.submit(indexReq(indexRef(1, 1_001, 5)));                         // the probe would have answered
+        assertEquals(Status.BUDGET_EXCEEDED, v.status());
+        assertEquals(Exceeded.NODES, v.exceeded());
+        assertEquals(0, probe.calls.get(), "refused on the estimate, before the engine");
+        assertNull(v.result());
+        assertEquals(1_001, v.consumed().nodes(), "the estimate is what was consumed");
+        assertEquals(Exceeded.EDGES, svc.submit(indexReq(indexRef(1, 5, 10_001))).exceeded());
+    }
+
+    @Test
+    void anIndexRunWhoseMeasuredAnswerIsOverTheBudgetIsDiscardedWithTheMeasuredSize() throws Exception {
+        Probe probe = new Probe(ctl -> subGraph(1_500, 3));                              // the estimate said 10 - the walk found 1 500
+        svc = new GraphRunService(probe, TIGHT);
+        RunView v = settle(svc.submit(indexReq(indexRef(1, 10, 10))));
+        assertEquals(Status.BUDGET_EXCEEDED, v.status());
+        assertEquals(Exceeded.NODES, v.exceeded());
+        assertNull(v.result(), "no smaller answer shaped like a whole one");
+        assertEquals(1_500, v.consumed().nodes(), "the measured figure replaces the estimate");
+        assertEquals(1, probe.calls.get());
+        // and it was not cached: the same request runs the engine again
+        settle(svc.submit(indexReq(indexRef(1, 10, 10))));
+        assertEquals(2, probe.calls.get());
+    }
+
+    @Test
+    void anEngineThatReachesPastTheIndexCapEndsBudgetExceededNamingIt() throws Exception {
+        Probe probe = new Probe(ctl -> {
+            throw new IndexCapExceeded("frontier keys looked up per level", 26, 20);
+        });
+        svc = new GraphRunService(probe, TIGHT);
+        RunView v = settle(svc.submit(indexReq(indexRef(1, 10, 10))));
+        assertEquals(Status.BUDGET_EXCEEDED, v.status());
+        assertEquals(Exceeded.INDEX_CAP, v.exceeded());
+        assertTrue(v.exceededDetail().contains("26") && v.exceededDetail().contains("20"), v.exceededDetail());
+        assertNull(v.result());
+    }
+
+    @Test
+    void theCacheKeySeparatesIndexVersionsAndNeverCollidesWithTheWorkingSetKey() throws Exception {
+        Probe probe = new Probe(ctl -> subGraph(2, 1));
+        svc = new GraphRunService(probe, TIGHT);
+        settle(svc.submit(indexReq(indexRef(1, 10, 10))));
+        assertEquals(1, probe.calls.get());
+        RunView same = svc.submit(indexReq(indexRef(1, 10, 10)));
+        assertTrue(same.cached(), "same index version: a hit");
+        assertEquals(1, probe.calls.get());
+        RunView next = settle(svc.submit(indexReq(indexRef(2, 10, 10))));                // a newer version, everything else equal
+        assertFalse(next.cached(), "a new index version must not be answered from the old version's cache");
+        assertEquals(2, probe.calls.get());
+        // the seeds are part of the identity too
+        GraphInput.IndexRef other = new GraphInput.IndexRef(java.nio.file.Path.of("v1"), 1, "ds:map", List.of("B"), List.of(), 10, 10);
+        assertFalse(settle(svc.submit(indexReq(other))).cached());
+        // the Working Set key carries no identity suffix: its cache key is exactly what it was
+        assertEquals("", ring(3).cacheIdentity());
+    }
+
+    @Test
+    void aRunReportsTheEngineThatRanItAndTheInputKind() throws Exception {
+        GraphEngine routing = new GraphEngine() {
+            @Override public String engineId() { return "memory"; }
+            @Override public String engineIdFor(GraphInput in) { return in instanceof GraphInput.IndexRef ? "index" : "memory"; }
+            @Override public Set<Algorithm> supported() { return EnumSet.allOf(Algorithm.class); }
+            @Override public GraphResult run(Algorithm a, Map<String, Object> p, GraphInput in, RunControl ctl) { return subGraph(1, 0); }
+        };
+        svc = new GraphRunService(routing, TIGHT);
+        RunView idx = settle(svc.submit(indexReq(indexRef(7, 1, 1))));
+        assertEquals("index", idx.engine());
+        assertEquals("index", idx.inputKind());
+        assertEquals(7, idx.indexVersion());
+        RunView mem = settle(svc.submit(req("alice", ring(3))));
+        assertEquals("memory", mem.engine());
+        assertEquals("materialised", mem.inputKind());
+        assertEquals(0, mem.indexVersion());
+    }
 }

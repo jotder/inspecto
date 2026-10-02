@@ -19,6 +19,11 @@ public interface GraphEngine {
     /** The algorithms this engine can run. */
     Set<Algorithm> supported();
 
+    /** The id of the engine that will really run {@code input}: a routing engine names its delegate, any other names itself. */
+    default String engineIdFor(GraphInput input) {
+        return engineId();
+    }
+
     /**
      * Runs {@code algorithm}. {@code params} are validated first ({@link Algorithm#resolve}); a bad request throws
      * {@link InvalidGraphRequest} before any work. {@code ctl} (null = {@link RunControl#NONE}) carries cancellation, the

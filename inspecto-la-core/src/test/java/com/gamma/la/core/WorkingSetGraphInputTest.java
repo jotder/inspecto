@@ -38,7 +38,7 @@ class WorkingSetGraphInputTest {
 
     @Test
     void nodesAreTheEntitiesAndLabelsTheirId() {
-        GraphInput in = WorkingSetGraphInput.from(ENTITIES, List.of(), null);
+        GraphInput.Materialised in = WorkingSetGraphInput.from(ENTITIES, List.of(), null);
         assertEquals(List.of("A", "B", "C"), in.nodes().stream().map(GraphInput.Node::id).toList());
         assertEquals(List.of("A", "B", "C"), in.nodes().stream().map(GraphInput.Node::label).toList());
         assertEquals(0, in.droppedDangling());
@@ -46,7 +46,7 @@ class WorkingSetGraphInputTest {
 
     @Test
     void edgeIdsAreTheD_U9WireIdsAndWeightsTheLinkCount() {
-        GraphInput in = WorkingSetGraphInput.from(ENTITIES,
+        GraphInput.Materialised in = WorkingSetGraphInput.from(ENTITIES,
                 List.of(link("A", "B", "voice", 5L), link("A", "B", "sms", 2), link("B", "C", "voice", 0L), link("C", "A", null, null)), null);
         List<String> ids = in.edges().stream().map(GraphInput.Edge::id).toList();
         assertEquals(List.of(LinkIds.encode("A", "B", "voice"), LinkIds.encode("A", "B", "sms"),
@@ -63,7 +63,7 @@ class WorkingSetGraphInputTest {
     @Test
     void theKindsFilterKeepsOnlyThoseLinksWithoutCountingThemDropped() {
         List<Map<String, Object>> links = List.of(link("A", "B", "voice", 1L), link("A", "C", "sms", 1L), link("B", "C", "voice", 1L));
-        GraphInput voice = WorkingSetGraphInput.from(ENTITIES, links, List.of("voice"));
+        GraphInput.Materialised voice = WorkingSetGraphInput.from(ENTITIES, links, List.of("voice"));
         assertEquals(2, voice.edges().size());
         assertTrue(voice.edges().stream().allMatch(e -> !e.target().equals("C") || e.source().equals("B")));
         assertEquals(0, voice.droppedDangling(), "a filtered link was never asked for - it is not dropped");
@@ -74,7 +74,7 @@ class WorkingSetGraphInputTest {
 
     @Test
     void aLinkWhoseEndpointIsNotAnEntityIsDroppedAndCounted() {
-        GraphInput in = WorkingSetGraphInput.from(ENTITIES,
+        GraphInput.Materialised in = WorkingSetGraphInput.from(ENTITIES,
                 List.of(link("A", "B", "voice", 1L), link("A", "GHOST", "voice", 1L), link("GHOST", "B", "voice", 1L), link("X", "Y", "sms", 1L)),
                 List.of("voice"));
         assertEquals(1, in.edges().size());
@@ -84,7 +84,7 @@ class WorkingSetGraphInputTest {
 
     @Test
     void theAdapterFeedsTheEngineEndToEnd() {
-        GraphInput in = WorkingSetGraphInput.from(ENTITIES,
+        GraphInput.Materialised in = WorkingSetGraphInput.from(ENTITIES,
                 List.of(link("A", "B", "voice", 4L), link("B", "C", "voice", 1L), link("A", "C", "voice", 1L), link("A", "GHOST", "voice", 1L)), null);
         GraphResult r = new InMemoryGraphEngine().run(Algorithm.WEIGHTED_SHORTEST_PATH, Map.of("from", "A", "to", "C", "direction", "out"), in, null);
         var sel = ((GraphResult.OneSelection) r.payload()).selection();

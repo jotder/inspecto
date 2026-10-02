@@ -93,7 +93,7 @@ class GraphEngineRequestTest {
 
     @Test
     void theDroppedCountTravelsIntoTheResult() {
-        GraphInput in = GraphInput.of(List.of(new GraphInput.Node("a", "a"), new GraphInput.Node("b", "b")),
+        GraphInput.Materialised in = GraphInput.of(List.of(new GraphInput.Node("a", "a"), new GraphInput.Node("b", "b")),
                 List.of(new GraphInput.Edge("e1", "a", "b"), new GraphInput.Edge("e2", "a", "ghost"), new GraphInput.Edge("e3", "ghost", "b")),
                 Map.of());
         assertEquals(2, in.droppedDangling());

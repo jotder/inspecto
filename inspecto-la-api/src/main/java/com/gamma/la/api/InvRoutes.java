@@ -1238,7 +1238,7 @@ public final class InvRoutes implements RouteModule {
         return out;
     }
 
-    private static String ident(Map<String, Object> body, String key, boolean required) {
+    static String ident(Map<String, Object> body, String key, boolean required) {
         String v = ApiContext.str(body, key);
         if (v == null) {
             if (required) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include '" + key + "'");
