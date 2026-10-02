@@ -10,7 +10,14 @@
             "app/*": ["./src/app/*"],
             "environments/*": ["./src/environments/*"],
             "@gamma": ["./src/@gamma"],
-            "@gamma/*": ["./src/@gamma/*"]
+            "@gamma/*": ["./src/@gamma/*"],
+            // D-5 step 2 (la-separation-d5-design Decisions 3a/4): in-workspace libraries wired by `paths`, no ng-packagr.
+            // `@inspecto/core/*` is the shared core as it stands TODAY (`src/app/inspecto`, no file has moved); there is
+            // deliberately no bare `@inspecto/core` because that folder has no barrel. `@inspecto/link-analysis` is the
+            // library root step 3 populates (`projects/link-analysis/src`); until then it resolves to nothing.
+            "@inspecto/core/*": ["./src/app/inspecto/*"],
+            "@inspecto/link-analysis": ["./projects/link-analysis/src/index.ts"],
+            "@inspecto/link-analysis/*": ["./projects/link-analysis/src/*"]
         },
         "outDir": "./dist/out-tsc",
         "esModuleInterop": true,

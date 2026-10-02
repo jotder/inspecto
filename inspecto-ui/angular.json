@@ -112,7 +112,7 @@
             "tsConfig": "tsconfig.spec.json",
             "runner": "vitest",
             "setupFiles": ["src/app/inspecto/testing/vitest-setup.ts"],
-            "coverageInclude": ["src/app/inspecto/**", "src/app/modules/admin/**"],
+            "coverageInclude": ["src/app/inspecto/**", "src/app/modules/admin/**", "projects/**"],
             "coverageExclude": [
               "src/@gamma/**",
               "src/app/modules/auth/**",
@@ -127,7 +127,7 @@
         "lint": {
           "builder": "@angular-eslint/builder:lint",
           "options": {
-            "lintFilePatterns": ["src/**/*.ts", "src/**/*.html"]
+            "lintFilePatterns": ["src/**/*.ts", "src/**/*.html", "projects/**/*.ts", "projects/**/*.html"]
           }
         }
       }
