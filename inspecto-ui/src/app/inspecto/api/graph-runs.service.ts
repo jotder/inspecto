@@ -177,7 +177,7 @@ function errorCodeOf(err: HttpErrorResponse): string {
 
 /**
  * The sentence an analyst reads for a failed graph-run call. Each status means something specific on these routes:
- * 403 the capability (or, on cancel, somebody else's run), 404 an Investigation/run the caller cannot see, 409 a run
+ * 403 the capability, 404 an Investigation/run the caller cannot see (on cancel too: somebody else's run, or one whose Investigation they lost, answers like an unknown run), 409 a run
  * that already finished, 422 a request the server refused (its own words are the useful part), 503 either the
  * waiting line is full (`STORE_BUSY`) or server-side runs are not available here at all.
  */

@@ -51,7 +51,8 @@ import java.util.TreeSet;
  *       cache hit); {@code 202} + {@code Location} otherwise.</li>
  *   <li>{@code GET /inv/graph/runs/{id}}, {@code GET /inv/graph/runs?investigationId=} - read; the Investigation's own
  *       access is re-checked, and a run another caller started is absent (404).</li>
- *   <li>{@code POST /inv/graph/runs/{id}/cancel} - the run's starter or an administrator.</li>
+ *   <li>{@code POST /inv/graph/runs/{id}/cancel} - the run's starter or an administrator, and only while the
+ *       Investigation is still readable by the caller; anyone else gets the 404 of an unknown run.</li>
  * </ul>
  *
  * <p><b>Decision 7 - inline or job.</b> A run whose Working Set has at most {@link Algorithm#inlineNodeCeiling()} nodes is
@@ -206,6 +207,9 @@ public final class GraphRunRoutes implements RouteModule {
 
     // ── POST /inv/graph/runs ─────────────────────────────────────────────────────────────────────────────────
 
+    /** Stands in for a raw id sent while masking hides it: names no node (one per parameter, so from and to never coincide), so the engine answers as for any unknown id. */
+    private static final String ABSENT_NODE = " absent";
+
     private Object start(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "graph run");                      // 503
         for (String k : body.keySet())
@@ -223,7 +227,9 @@ public final class GraphRunRoutes implements RouteModule {
         InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, invId);        // 422 · 403 · 404 · PDP
         EntityMasking mask = EntityMasking.of(inv, List.of());
         for (String node : List.of(Algorithm.FROM, Algorithm.TO, Algorithm.NODE))            // a pseudonym the caller saw -> its entity
-            if (params.get(node) instanceof String s) params.put(node, mask.resolve(List.of(s)).get(0));
+            if (params.get(node) instanceof String s)
+                // a RAW id the masking hides is treated as a node that does not exist, so the answer cannot tell whether it is in the Working Set
+                params.put(node, mask.hidesRaw(s) ? ABSENT_NODE + node : mask.resolve(List.of(s)).get(0));
 
         boolean[] cached = {false};
         WorkingSetRoutes.Relation rel = WorkingSetRoutes.relation(inv, at, cached);
@@ -389,12 +395,16 @@ public final class GraphRunRoutes implements RouteModule {
         try {
             v = svc.get(id);
         } catch (GraphRunException e) {
-            throw map(e);
+            throw e.kind() == GraphRunException.Kind.NOT_FOUND ? absent(id) : map(e);
         }
         Optional<Subject> subject = ApiContext.subject(ex);
-        if (subject.isPresent() && !subject.get().id().equals(v.owner()))
-            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no graph run '" + id + "'");
+        if (subject.isPresent() && !subject.get().id().equals(v.owner())) throw absent(id);
         return v;
+    }
+
+    /** The one answer for a run that is unknown OR not this caller's: the same status AND message either way. */
+    private static ApiException absent(String id) {
+        return new ApiException(404, ErrorCodes.NOT_FOUND, "no graph run '" + id + "'");
     }
 
     // ── POST /inv/graph/runs/{id}/cancel ─────────────────────────────────────────────────────────────────────
@@ -403,9 +413,26 @@ public final class GraphRunRoutes implements RouteModule {
         Path writeRoot = WriteGates.requireWriteRoot(api, "graph run");
         Optional<Subject> subject = ApiContext.subject(ex);
         boolean admin = subject.isEmpty() || subject.get().capabilities().contains(Roles.CAN_ADMINISTER);
+        GraphRunService svc = service(writeRoot);
+        RunView known;
+        try {
+            known = svc.get(id);
+        } catch (GraphRunException e) {
+            throw e.kind() == GraphRunException.Kind.NOT_FOUND ? absent(id) : map(e);
+        }
+        // a run another caller started, or one whose Investigation this caller can no longer read, is absent - the same 404 as an unknown id
+        // (an administrator is not the Investigation's reader by right, and may stop any run)
+        if (!admin) {
+            if (!callerId(ex).equals(known.owner())) throw absent(id);
+            try {
+                InvestigationRoutes.openForRead(api, ex, known.investigationId());
+            } catch (ApiException lost) {
+                throw absent(id);
+            }
+        }
         RunView v;
         try {
-            v = service(writeRoot).cancel(id, callerId(ex), admin);
+            v = svc.cancel(id, callerId(ex), admin);
         } catch (GraphRunException e) {
             throw map(e);
         }

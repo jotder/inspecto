@@ -10571,7 +10571,7 @@
         "tags" : [ "inv" ],
         "summary" : "Cancel a graph run",
         "operationId" : "postInvGraphRunsByRunIdCancel",
-        "description" : "LA separation D-4. The run's starter or an administrator (canAdminister); the run ends CANCELLED at its next checkpoint (a queued run at once). No capability beyond that.",
+        "description" : "LA separation D-4. The run's starter or an administrator (canAdminister); the run ends CANCELLED at its next checkpoint (a queued run at once). No capability beyond that; the Investigation's read access is re-checked.",
         "parameters" : [ {
           "name" : "runId",
           "in" : "path",
@@ -10584,11 +10584,8 @@
           "202" : {
             "description" : "{runId, status, cancelRequested}."
           },
-          "403" : {
-            "description" : "Neither the starter nor an administrator."
-          },
           "404" : {
-            "description" : "No such run."
+            "description" : "No such run - and the same answer when the caller is neither the starter nor an administrator, or can no longer read the run's Investigation (no existence signal)."
           },
           "409" : {
             "description" : "The run already finished."

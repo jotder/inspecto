@@ -306,6 +306,11 @@ final class EntityMasking {
         return rawOf.get(token);
     }
 
+    /** True when {@code id} is a RAW id this masking hides (a pseudonym is not; nor is an id masking leaves in the clear). */
+    boolean hidesRaw(String id) {
+        return tokenOf.containsKey(id);
+    }
+
     /** True when at least one id is masked - false lets a caller skip masking work that would change nothing. */
     boolean masking() {
         return !tokenOf.isEmpty();

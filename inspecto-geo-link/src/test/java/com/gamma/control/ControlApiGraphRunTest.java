@@ -545,8 +545,12 @@ class ControlApiGraphRunTest {
             assertEquals(404, send(c, "GET", "/inv/graph/runs/" + id, null, OTHER).statusCode(), "not their run: absent, not 403");
             assertEquals(404, send(c, "GET", "/inv/graph/runs?investigationId=inv-g", null, OTHER).statusCode());
             assertEquals(0, ok(c, "GET", "/inv/graph/runs", null, OTHER).get("total").asInt(), "their own list holds none of yours");
-            assertEquals(403, send(c, "POST", "/inv/graph/runs/" + id + "/cancel", null, OTHER).statusCode(),
-                    "only the starter or an administrator may cancel");
+            HttpResponse<String> theirs = send(c, "POST", "/inv/graph/runs/" + id + "/cancel", null, OTHER);
+            HttpResponse<String> unknown = send(c, "POST", "/inv/graph/runs/gr-nope/cancel", null, OTHER);
+            assertEquals(404, theirs.statusCode(), "only the starter or an administrator may cancel; anyone else sees an unknown run");
+            assertEquals(unknown.statusCode(), theirs.statusCode());
+            assertEquals(noCorrelation(unknown.body()).replace("gr-nope", "ID"), noCorrelation(theirs.body()).replace(id, "ID"),
+                    "no existence oracle: the body is the unknown-run body modulo the id");
             assertTrue(Set.of("QUEUED", "RUNNING").contains(status(c, id, ANALYST)), "and it is still going");
             engine.release.countDown();
         }
@@ -684,6 +688,73 @@ class ControlApiGraphRunTest {
         List<String> out = new ArrayList<>();
         arr.forEach(x -> out.add(x.asText()));
         return out;
+    }
+
+    @Test
+    void aCallerWhoLostTheInvestigationCannotCancelItsRunEitherAndSeesTheUnknownRunAnswer(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        Blocking engine = new Blocking();
+        GraphRunRoutes.forTest(engine, 0);
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            investigation(c);
+            String id = data(start(c, run("degreeCentrality", ""), ANALYST), 202).get("runId").asText();
+            until(() -> "RUNNING".equals(status(c, id, ANALYST)));
+            new ComponentStore(root.resolve("registry")).write("dataset", "calls_ds",
+                    Map.of("view", "calls_view", "owner", "analyst-9", "shares", List.of()));
+            HttpResponse<String> lost = send(c, "POST", "/inv/graph/runs/" + id + "/cancel", null, ANALYST);
+            HttpResponse<String> unknown = send(c, "POST", "/inv/graph/runs/gr-nope/cancel", null, ANALYST);
+            assertEquals(404, lost.statusCode(), lost.body());
+            assertEquals(noCorrelation(unknown.body()).replace("gr-nope", "ID"), noCorrelation(lost.body()).replace(id, "ID"));
+            engine.release.countDown();
+        }
+    }
+
+    @Test
+    void underMaskingARawIdIsAnAbsentNodeAndAPseudonymOfTheSameNodeStillResolves(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+            investigation(c);
+            JsonNode entities = ok(c, "GET", INV + "/working-set?of=entities", null, ANALYST).get("rows");
+            List<String> pseudo = new ArrayList<>();
+            for (JsonNode e : entities) pseudo.add(e.get("entityId").asText());
+            pseudo.sort(null);
+            String p1 = pseudo.get(0), p2 = pseudo.get(pseudo.size() - 1);
+            // the probe that WOULD succeed: the same request by pseudonym finds a path
+            JsonNode good = ok(c, "POST", "/inv/graph/runs", run("neighborhood", "\"params\":{\"node\":\"" + p1 + "\",\"hops\":2}"), ANALYST);
+            assertFalse(good.get("result").toString().isBlank());
+            int found = good.get("result").get("nodes").size();
+            assertTrue(found >= 2, good.toString());
+            // a raw id of a real node is answered exactly as an id naming no node
+            for (String raw : NODES) {
+                String asRaw = ok(c, "POST", "/inv/graph/runs", run("neighborhood", "\"params\":{\"node\":\"" + raw + "\",\"hops\":2}"), ANALYST).toString();
+                String absent = ok(c, "POST", "/inv/graph/runs", run("neighborhood", "\"params\":{\"node\":\"zz-no-such-node\",\"hops\":2}"), ANALYST).toString();
+                assertEquals(strip(absent), strip(asRaw), "raw id " + raw + " is distinguishable from an absent node");
+            }
+            JsonNode rawPath = ok(c, "POST", "/inv/graph/runs", run("shortestPath", "\"params\":{\"from\":\"n1\",\"to\":\"n5\"}"), ANALYST);
+            JsonNode absentPath = ok(c, "POST", "/inv/graph/runs", run("shortestPath", "\"params\":{\"from\":\"zz1\",\"to\":\"zz2\"}"), ANALYST);
+            assertEquals(strip(absentPath.toString()), strip(rawPath.toString()));
+            JsonNode viaPseudonyms = ok(c, "POST", "/inv/graph/runs", run("shortestPath", "\"params\":{\"from\":\"" + p1 + "\",\"to\":\"" + p2 + "\"}"), ANALYST);
+            assertNotEquals(strip(absentPath.toString()), strip(viaPseudonyms.toString()), "the pseudonyms DO resolve");
+        }
+    }
+
+    @Test
+    void withMaskingOffARawIdStillResolves(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            investigation(c);
+            JsonNode path = ok(c, "POST", "/inv/graph/runs", run("shortestPath", "\"params\":{\"from\":\"n1\",\"to\":\"n5\"}"), ANALYST);
+            assertTrue(path.get("result").get("selection").get("nodeIds").size() >= 2, path.toString());
+        }
+    }
+
+    private static String noCorrelation(String body) {
+        return body.replaceAll("\"correlationId\":\"[^\"]*\"", "\"correlationId\":0");
+    }
+
+    /** A run view without what differs between two runs: its id, timestamps and measured durations. */
+    private static String strip(String json) {
+        return json.replaceAll("\"(runId|id|startedAt|finishedAt|createdAt|elapsedMs|queuedMs|runMs)\":(\"[^\"]*\"|[0-9.]+)", "\"$1\":0");
     }
 
     // ── audit ───────────────────────────────────────────────────────────────────────────────────────────────────
