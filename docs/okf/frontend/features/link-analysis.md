@@ -23,6 +23,16 @@ timestamp: 2026-07-07T00:00:00Z
 > `graph-export` and `unique-name` stay in core. ESLint enforces the arrow (core <- library <- shell); the Java parity tests read their
 > fixtures from the library. Design and as-built facts: `docs/superpower/la-separation-d5-design.md`.
 
+> **The second shell, `la-app` (D-5 step 6, 2026-10-02).** `inspecto-ui/projects/la-app/src` is a separate Angular application
+> (`ng build la-app` -> `dist/la-app/browser`; `gamma` is unchanged): a top bar (Link Analysis / Geo / Entity Lists, Space switcher, user
+> menu), a landing page, and the library's lazy routes. Sign-in is the CORE's OIDC code (`inspecto/auth`), not a second client. It
+> answers the ten `la-host` tokens in `la-host.providers.ts`; `LA_APP_TOKEN_PROVISION` lists them and a spec pins that the list is the
+> ten. **Six are real** (`LA_DATASETS` over the Component registry, `LA_CASES`, `LA_TAGS`, `LA_TRANSFER`, `LA_AI_ASSIST`, `LA_FEATURES`) and
+> **four are stubs** that report once on the console (`console.info`, never an error) and set `available: false` so the library hides the
+> affordance: `LA_WIDGETS` ("Pin to a Widget"), `LA_CATALOG` (the reuse-graph source), `LA_PIPELINE_GRAPH` (the provenance source) and
+> `LA_DASHBOARD_HEADER` (an empty header; la-app has no dashboards). Entity Lists get their own page there, which provides the empty
+> `InvestigationSessionStore` the section reads. The bundle choice (`package.ps1 -Ui`) is in `okf/backend/build-run/build-test.md`.
+
 The Builder-lens studio at `/studio/link-analysis` for graph investigation. Keep the four graph planes
 distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3 — Entity/Link graphs**
 (records as business entities), never on artifact/lineage graphs.

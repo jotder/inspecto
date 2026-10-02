@@ -78,6 +78,8 @@ export class LinkAnalysisInvestigationComponent {
     readonly store = inject(InvestigationSessionStore);
     private inv = inject(InvService);
     private widgets = inject(LA_WIDGETS);
+    /** The shell has a Widget library to pin into (la-app has none: the section is not offered). */
+    protected readonly canPin = this.widgets.available !== false;
 
     /** The last run's single Entity/Link mapping, or null when the query cannot bind an Investigation. */
     readonly projection = input<EntityProjection | null>(null);

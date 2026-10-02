@@ -111,7 +111,8 @@ export class GraphSourcesService {
     private pipelineGraph = inject(LA_PIPELINE_GRAPH);
     private inv = inject(InvService);
 
-    readonly sources: GraphSource[] = [
+    /** Every source, available or not: a saved view may name one, so `byId` resolves them all. */
+    private readonly all: GraphSource[] = [
         new EntityProjectionGraphSource(this.datasets, this.inv),
         new MultiProjectionGraphSource(this.inv),
         new LineageGraphSource(this.catalog),
@@ -119,7 +120,14 @@ export class GraphSourcesService {
         new PipelineGraphSource(this.pipelines, this.pipelineGraph),
     ];
 
+    /** What the picker offers: the reuse-graph and provenance sources need host services a shell may not have (`available: false`). */
+    readonly sources: GraphSource[] = this.all.filter(
+        (s) =>
+            !(s instanceof ComponentRegistryGraphSource && this.components.available === false) &&
+            !(s instanceof PipelineGraphSource && this.pipelineGraph.available === false),
+    );
+
     byId(id: string): GraphSource | undefined {
-        return this.sources.find((s) => s.id === id);
+        return this.all.find((s) => s.id === id);
     }
 }

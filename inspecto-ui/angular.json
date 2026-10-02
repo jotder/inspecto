@@ -132,6 +132,106 @@
           }
         }
       }
+    },
+    "la-app": {
+      "projectType": "application",
+      "schematics": {
+        "@schematics/angular:component": {
+          "style": "scss"
+        }
+      },
+      "root": "projects/la-app",
+      "sourceRoot": "projects/la-app/src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "outputPath": "dist/la-app",
+            "index": "projects/la-app/src/index.html",
+            "browser": "projects/la-app/src/main.ts",
+            "polyfills": ["zone.js"],
+            "tsConfig": "projects/la-app/tsconfig.app.json",
+            "inlineStyleLanguage": "scss",
+            "allowedCommonJsDependencies": ["alasql", "html2canvas", "svg-path-parser", "color-string"],
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "src/assets",
+                "output": "assets"
+              },
+              {
+                "glob": "**/*",
+                "input": "public"
+              },
+              {
+                "glob": "maplibre-gl-worker.mjs",
+                "input": "node_modules/maplibre-gl/dist",
+                "output": "assets/maplibre"
+              },
+              {
+                "glob": "maplibre-gl-shared.mjs",
+                "input": "node_modules/maplibre-gl/dist",
+                "output": "assets/maplibre"
+              }
+            ],
+            "stylePreprocessorOptions": {
+              "includePaths": ["src/@gamma/styles"]
+            },
+            "styles": [
+              "src/styles/inter.css",
+              "src/@gamma/styles/tailwind.scss",
+              "src/@gamma/styles/themes.scss",
+              "src/styles/vendors.scss",
+              "src/@gamma/styles/main.scss",
+              "src/styles/styles.scss",
+              "src/styles/tailwind.scss",
+              "node_modules/ngx-toastr/toastr.css",
+              "node_modules/maplibre-gl/dist/maplibre-gl.css"
+            ],
+            "scripts": []
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "3mb",
+                  "maximumError": "5mb"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "75kb",
+                  "maximumError": "90kb"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "options": {
+            "port": 4304,
+            "proxyConfig": "proxy.conf.json"
+          },
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "la-app:build:production"
+            },
+            "development": {
+              "buildTarget": "la-app:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        }
+      }
     }
   },
   "cli": {

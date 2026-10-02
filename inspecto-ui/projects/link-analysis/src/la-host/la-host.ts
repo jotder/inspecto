@@ -67,6 +67,8 @@ export interface LaWorkingSetWidget {
 }
 
 export interface LaWidgets {
+    /** `false` when the shell has no Widget library (la-app): the "Pin to a Widget" section is not offered. Absent = available. */
+    readonly available?: boolean;
     saveWorkingSetWidget(widget: LaWorkingSetWidget): Observable<unknown>;
 }
 
@@ -76,6 +78,8 @@ export const LA_WIDGETS = hostToken<LaWidgets>('LA_WIDGETS', 'the Widgets servic
 
 /** The reuse-graph's data source: the registry kinds and the stored Components of one kind. */
 export interface LaCatalog {
+    /** `false` when the shell has no Component catalog (la-app): the reuse-graph source is not offered. Absent = available. */
+    readonly available?: boolean;
     readonly kinds: readonly string[];
     list(kind: string): Promise<ModelComponent[]>;
 }
@@ -91,6 +95,8 @@ export interface LaProvenanceOverlay {
 
 /** The Pipelines editor's graph mapping, used by the provenance GraphSource. */
 export interface LaPipelineGraph {
+    /** `false` when the shell has no Pipelines editor mapping (la-app): the provenance graph source is not offered. Absent = available. */
+    readonly available?: boolean;
     toG6Data(g: PipelineGraph, counts?: Map<string, LaProvenanceOverlay>): G6GraphData;
     provenanceCounts(rows: ProvenanceCount[]): Map<string, LaProvenanceOverlay>;
 }

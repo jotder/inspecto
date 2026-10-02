@@ -1,0 +1,19 @@
+/* The la-app application (D-5 step 6). Same compiler settings as the gamma host (../../tsconfig.json carries the paths). */
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../out-tsc/la-app",
+    "rootDir": "../..",
+    "types": []
+  },
+  "files": ["src/main.ts"],
+  "include": ["../../src/**/*.d.ts", "src/**/*.d.ts"],
+  "angularCompilerOptions": {
+    "extendedDiagnostics": {
+      "checks": {
+        "nullishCoalescingNotNullable": "suppress",
+        "optionalChainNotNullable": "suppress"
+      }
+    }
+  }
+}
