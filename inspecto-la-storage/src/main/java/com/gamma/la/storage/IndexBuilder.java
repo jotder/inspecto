@@ -360,7 +360,7 @@ public final class IndexBuilder {
             long number = Long.parseLong(stage.getFileName().toString().replaceAll("\\D", ""));
             String zone = effectiveZone(m, types);
             IndexManifest man = new IndexManifest(number, Instant.now().toString(), IndexManifest.Builder.FULL, duck, BucketFunction.NAME, n,
-                    ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), sha256(req.relationSql()), req.baseFingerprint(), zone, stats, dropped, null, null, req.inputFiles());
+                    ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), relationSqlHash(req.relationSql()), req.baseFingerprint(), zone, stats, dropped, null, null, req.inputFiles());
             man.write(stage);
             check();
             close();   // release the files (Windows) and the spill directory before the stage is renamed
@@ -561,9 +561,19 @@ public final class IndexBuilder {
         }
     }
 
-    /** What the manifest records as {@code relationSqlHash}: the SHA-256 of the relation SQL text - the staleness probe compares it. */
+    /** The pinned file list a store read renders ({@code read_parquet(['a', 'b'], ...)}): the Dataset's INPUT, tracked by the input fingerprint, not part of its definition. */
+    private static final java.util.regex.Pattern PINNED_FILE_LIST = java.util.regex.Pattern.compile(
+            "(read_(?:parquet|csv)\\(\\s*)\\[\\s*'(?:[^']|'')*'(?:\\s*,\\s*'(?:[^']|'')*')*\\s*\\]");
+
+    /**
+     * What the manifest records as {@code relationSqlHash}: the SHA-256 of the relation SQL text with the pinned file list of
+     * a store read blanked out - the DEFINITION of the Dataset. An added or removed input file changes the list but not the
+     * definition (the input fingerprint tracks the files), so adding a file does not read as 'the relation SQL changed'.
+     * Only a list directly inside {@code read_parquet(} / {@code read_csv(} is blanked: a literal list elsewhere in the SQL
+     * (a filter) is part of the definition.
+     */
     public static String relationSqlHash(String relationSql) {
-        return sha256(relationSql);
+        return sha256(PINNED_FILE_LIST.matcher(relationSql).replaceAll("$1[<pinned files>]"));
     }
 
     private static volatile String duckdbVersion;

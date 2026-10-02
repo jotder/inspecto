@@ -5,7 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
+import com.gamma.la.api.InputFingerprintCache;
 import com.gamma.la.core.LinkEventTypes;
+import com.gamma.util.DuckDbUtil;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
@@ -28,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -444,5 +447,155 @@ class ControlApiInvIndexedTraversalTest {
             assertEquals("depth_over_index_cap", traversed.get(1).attributes().get("sourceReason"));
             assertNull(traversed.get(1).attributes().get("indexVersion"));
         }
+    }
+
+    // -- (3) staleness grounded in the Dataset's input files (D-3 design 5.3a / 5.4): ONE definition with GET /inv/index ---------
+
+    private static final long T0 = 1_700_000_000_000L;
+    private static final String FILES_BODY = "{\"dataset\":\"files_ds\",\"sourceCol\":\"who\",\"targetCol\":\"other\"}";
+    private static final String FILES_REQ = "{\"dataset\":\"files_ds\",\"sourceCol\":\"who\",\"targetCol\":\"other\",\"startNode\":\"alice\",\"maxDepth\":2}";
+
+    /** A Parquet file of {@code (who, other)} rows at {@code file} with a pinned mtime (no sleeps: the clock never decides). */
+    private static void parquet(Path file, long mtime, String values) throws Exception {
+        Files.createDirectories(file.getParent());
+        DuckDbUtil.loadDriver();
+        java.io.File db = DuckDbUtil.tempDbFile("idx_trav_");
+        try (java.sql.Connection conn = DuckDbUtil.openConnection(db); java.sql.Statement st = conn.createStatement()) {
+            st.execute("COPY (SELECT * FROM (VALUES " + values + ") t(who,other)) TO '" + file.toString().replace('\\', '/') + "' (FORMAT PARQUET)");
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+        Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(mtime));
+    }
+
+    private static void touch(Path file, long mtime) throws Exception {
+        Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(mtime));
+    }
+
+    private interface FilesBody {
+        void run(Ctx c, Path dir, AtomicLong now) throws Exception;
+    }
+
+    /** A file-backed Dataset {@code files_ds} (one Parquet file) under a legacy Space's relative {@code database/} root, and a fake fingerprint clock. */
+    private void withFiles(Path cfg, Path root, FilesBody body) throws Exception {
+        subjects();
+        String store = "idx_trav_" + System.nanoTime();
+        Path dir = Path.of("database").resolve(store);
+        boolean hadDatabase = Files.isDirectory(Path.of("database"));
+        AtomicLong now = new AtomicLong(1_000L);
+        InputFingerprintCache.forTest(now::get, 30_000L);
+        try (Ctx c = open(cfg, root, ENABLED)) {
+            new ComponentStore(root.resolve("registry")).write("dataset", "files_ds",
+                    Map.of("physicalRef", store, "owner", "analyst-1", "shares", List.of()));
+            parquet(dir.resolve("p1.parquet"), T0, "('alice','bob'),('bob','carol'),('alice','carol')");
+            build(c, FILES_BODY);
+            body.run(c, dir, now);
+        } finally {
+            InputFingerprintCache.forTest(null, 0);
+            if (Files.isDirectory(dir)) try (var w = Files.walk(dir)) {
+                w.sorted(java.util.Comparator.reverseOrder()).forEach(f -> f.toFile().delete());
+            }
+            if (!hadDatabase) Path.of("database").toFile().delete();
+        }
+    }
+
+    /** Lets the cached fingerprint expire, so the next request lists the files again. */
+    private static void expire(AtomicLong now) {
+        now.addAndGet(31_000L);
+    }
+
+    @Test
+    void anAddedFileIsServedFromTheIndexFlaggedStaleAndTheFlatPathHasMore(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        withFiles(cfg, root, (c, dir, now) -> {
+            JsonNode fresh = traverse(c, FILES_REQ);
+            assertEquals("index", fresh.at("/source/kind").asText());
+            assertFalse(fresh.at("/source/stale").asBoolean(), String.valueOf(fresh.get("source")));
+            assertEquals("known", fresh.at("/source/fingerprint").asText());
+
+            parquet(dir.resolve("p2.parquet"), T0 + 1_000, "('carol','dave')");                     // an ADDITION: removes nothing
+            expire(now);
+            JsonNode added = traverse(c, FILES_REQ);
+            assertEquals("index", added.at("/source/kind").asText(), "only additions: served, not refused: " + added.get("source"));
+            assertTrue(added.at("/source/stale").asBoolean());
+            assertTrue(added.at("/source/staleReason").asText().contains("input_files_changed: 1 files added since the build"),
+                    added.at("/source/staleReason").asText());
+            assertEquals("known", added.at("/source/fingerprint").asText());
+            // the documented difference: the index misses the new rows, so the flag is honest
+            settings(c, DISABLED);
+            JsonNode flat = traverse(c, FILES_REQ);
+            assertEquals(normalised(fresh), normalised(added), "the index still answers as of the build");
+            assertEquals(normalised(added).size() + 1, normalised(flat).size(), "the flat Dataset finds the path through the new file");
+            assertTrue(normalised(flat).contains("alice>carol>dave|2|-"), normalised(flat).toString());
+            assertFalse(normalised(added).contains("alice>carol>dave|2|-"));
+        });
+    }
+
+    @Test
+    void aTouchedOrDeletedFileRefusesTheIndexAndTheFlatAnswerIsComplete(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        withFiles(cfg, root, (c, dir, now) -> {
+            Path p1 = dir.resolve("p1.parquet");
+            List<String> built = normalised(traverse(c, FILES_REQ));
+            touch(p1, T0 + 5_000);                                                                    // TOUCHED: may have lost rows
+            expire(now);
+            JsonNode touched = traverse(c, FILES_REQ);
+            assertEquals("dataset", touched.at("/source/kind").asText());
+            assertEquals("index_stale_refused", touched.at("/source/reason").asText());
+            assertTrue(touched.at("/source/details").asText().contains("input files changed"), touched.get("source").toString());
+            assertEquals(built, normalised(touched), "the flat answer is complete");
+
+            touch(p1, T0);                                                                            // the twin: restored, served again
+            expire(now);
+            assertEquals("index", traverse(c, FILES_REQ).at("/source/kind").asText());
+
+            parquet(dir.resolve("p2.parquet"), T0 + 1_000, "('alice','zed')");                        // keeps the Dataset non-empty
+            Files.delete(p1);                                                                         // DELETED
+            expire(now);
+            JsonNode gone = traverse(c, FILES_REQ);
+            assertEquals("dataset", gone.at("/source/kind").asText());
+            assertEquals("index_stale_refused", gone.at("/source/reason").asText());
+            assertEquals(List.of("alice>zed|1|-"), normalised(gone), "the flat Dataset no longer has p1's rows: the index must not show them");
+        });
+    }
+
+    @Test
+    void aDatasetWithNoEnumerableFilesIsServedWithAnUnknownFingerprint(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        InputFingerprintCache.forTest(null, 0);
+        try (Ctx c = open(cfg, root, ENABLED)) {
+            buildCorpusIndexes(c);                                                                    // view-backed: nothing to list
+            JsonNode r = traverse(c, req("g_ds", "A", "\"maxDepth\":2"));
+            assertEquals("index", r.at("/source/kind").asText());
+            assertFalse(r.at("/source/stale").asBoolean());
+            assertEquals("unknown", r.at("/source/fingerprint").asText(), "currency is not knowable, and the response says so");
+        }
+    }
+
+    @Test
+    void theFingerprintIsCachedForTheTtlAndABuildCompletionInvalidatesIt(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        withFiles(cfg, root, (c, dir, now) -> {
+            long start = InputFingerprintCache.loads();
+            traverse(c, FILES_REQ);
+            assertEquals(start + 1, InputFingerprintCache.loads(), "the first request lists the files");
+            traverse(c, FILES_REQ);
+            traverse(c, FILES_REQ);
+            assertEquals(start + 1, InputFingerprintCache.loads(), "within the TTL nothing is listed again");
+
+            parquet(dir.resolve("p2.parquet"), T0 + 1_000, "('carol','dave')");
+            assertFalse(traverse(c, FILES_REQ).at("/source/stale").asBoolean(), "cached: the addition is not seen yet (stated trade-off)");
+            now.addAndGet(29_999L);
+            assertEquals(start + 1, InputFingerprintCache.loads());
+            now.addAndGet(1L);                                                                        // the TTL is up
+            assertTrue(traverse(c, FILES_REQ).at("/source/stale").asBoolean(), "expired: listed again, the addition is seen");
+            assertEquals(start + 2, InputFingerprintCache.loads());
+
+            build(c, FILES_BODY);                                                                     // a build completes: its entries are dropped
+            // the completion callback may land a moment after the status flips: wait on the state (a fresh listing), not a sleep
+            until(() -> {
+                traverse(c, FILES_REQ);
+                return InputFingerprintCache.loads() >= start + 3;
+            }, "the build completion to invalidate the cached fingerprint");
+            assertEquals(start + 3, InputFingerprintCache.loads(), "invalidated by the completion, not by the clock");
+            assertFalse(traverse(c, FILES_REQ).at("/source/stale").asBoolean(), "the new version covers both files");
+        });
     }
 }

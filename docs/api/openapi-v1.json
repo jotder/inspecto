@@ -6193,7 +6193,7 @@
         "tags" : [ "inv" ],
         "summary" : "Simple paths from a start node, walked server-side (from the edge index when it can answer exactly)",
         "operationId" : "postInvTraversalRecursivePaths",
-        "description" : "LA-11 / D-3 step 5. Body {dataset, sourceCol, targetCol, startNode, targetNode?, maxDepth?, direction?, weightCol?, temporalConstraint?, filter?, maxEdgeYield?, limit?}. Answers {paths:[{nodes,hops,weight}], truncated, edgeYieldCapped, fences, source}. `source` says where the answer came from: {kind:'index', version, stale, staleReason?} when it was read from the Dataset's edge index (needs the Space setting index.enabled, a published index for exactly the request's columns, maxDepth <= 2 and at most 20 distinct frontier keys per level); otherwise {kind:'dataset', reason} with reason one of index_disabled, no_index, mapping_not_indexed, column_not_indexed, time_zone_not_servable, filter_not_indexed, index_stale_refused, depth_over_index_cap, frontier_over_index_cap, index_read_failed - the unchanged flat read answered. A frontier found over the cap mid-walk discards the partial index answer and re-answers whole from the flat Dataset. The base-Dataset view gate runs first (a Dataset the caller cannot view is the same 404 whether or not an index exists).",
+        "description" : "LA-11 / D-3 step 5. Body {dataset, sourceCol, targetCol, startNode, targetNode?, maxDepth?, direction?, weightCol?, temporalConstraint?, filter?, maxEdgeYield?, limit?}. Answers {paths:[{nodes,hops,weight}], truncated, edgeYieldCapped, fences, source}. `source` says where the answer came from: {kind:'index', version, stale, staleReason?, fingerprint} when it was read from the Dataset's edge index (needs the Space setting index.enabled, a published index for exactly the request's columns, maxDepth <= 2 and at most 20 distinct frontier keys per level); otherwise {kind:'dataset', reason, details?} with reason one of index_disabled, no_index, mapping_not_indexed, column_not_indexed, time_zone_not_servable, filter_not_indexed, index_stale_refused, depth_over_index_cap, frontier_over_index_cap, index_read_failed - the unchanged flat read answered. A frontier found over the cap mid-walk discards the partial index answer and re-answers whole from the flat Dataset. The base-Dataset view gate runs first (a Dataset the caller cannot view is the same 404 whether or not an index exists).",
         "responses" : {
           "200" : {
             "description" : "Envelope data {paths, truncated, edgeYieldCapped, fences, source}.",
@@ -6213,7 +6213,9 @@
                         "kind" : { "type" : "string", "enum" : [ "index", "dataset" ] },
                         "version" : { "type" : "integer", "description" : "kind=index: the pinned index version." },
                         "stale" : { "type" : "boolean", "description" : "kind=index: the index is served but flagged (e.g. built with another DuckDB version)." },
-                        "staleReason" : { "type" : "string" },
+                        "staleReason" : { "type" : "string", "description" : "kind=index: why it is stale, e.g. 'input_files_changed: 2 files added since the build' (the index misses the new rows)." },
+                        "fingerprint" : { "type" : "string", "enum" : [ "known", "unknown" ], "description" : "kind=index: unknown = the Dataset's input files cannot be listed (view-backed, too many files), so currency is not knowable." },
+                        "details" : { "type" : "string", "description" : "kind=dataset with reason index_stale_refused: what changed (removed or replaced input file, relation SQL, bucket function)." },
                         "reason" : { "type" : "string", "description" : "kind=dataset: why the flat Dataset answered." }
                       }
                     }

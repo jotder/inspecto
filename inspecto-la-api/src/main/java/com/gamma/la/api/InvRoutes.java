@@ -943,7 +943,7 @@ public final class InvRoutes implements RouteModule {
 
         // D-3 step 5: answer from the edge index when - and only when - it can answer exactly (IndexedRecursivePaths). The view
         // gate above has run; a fallback below is the unchanged flat read, which then says why on `source`.
-        IndexedRecursivePaths.Outcome indexed = IndexedRecursivePaths.attempt(writeRoot, relationSql,
+        IndexedRecursivePaths.Outcome indexed = IndexedRecursivePaths.attempt(writeRoot, api.dataRoot(), relationSql,
                 new IndexedRecursivePaths.Request(datasetId, sourceCol, targetCol, weightCol, tsCol, body.get("filter"), startNode,
                         targetNode, direction.equals("UNDIRECTED"), maxDepth, maxEdges, limit, monotonic, maxHours),
                 traversalPolicy(), () -> refuseIfSensitive(writeRoot, "a traversal (maxDepth " + maxDepth + " × maxEdgeYield " + maxEdges + ")",
@@ -1089,8 +1089,14 @@ public final class InvRoutes implements RouteModule {
                     .attr("dataset", datasetId).attr("startNode", startNode).attr("maxDepth", maxDepth)
                     .attr("paths", paths).attr("truncated", truncated)
                     .attr("source", source.served() ? "index" : "dataset");
-            if (source.served()) b.attr("indexVersion", source.version()).attr("indexStale", source.stale());
-            else b.attr("sourceReason", source.reason().name());
+            if (source.served()) {
+                b.attr("indexVersion", source.version()).attr("indexStale", source.stale())
+                        .attr("fingerprint", source.fingerprintKnown() ? "known" : "unknown");
+                if (source.stale()) b.attr("indexStaleReasons", String.join(",", source.staleCodes()));
+            } else {
+                b.attr("sourceReason", source.reason().name());
+                if (!source.staleCodes().isEmpty()) b.attr("indexStaleReasons", String.join(",", source.staleCodes()));
+            }
             if (targetNode != null) b.attr("targetNode", targetNode);
             EventLog.current().emit(b);
         } catch (RuntimeException ignore) {

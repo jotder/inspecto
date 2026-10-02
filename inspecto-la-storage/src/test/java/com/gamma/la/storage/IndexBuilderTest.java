@@ -486,4 +486,15 @@ class IndexBuilderTest {
             throw new java.io.UncheckedIOException(e);
         }
     }
+
+    @Test
+    void theRelationHashIgnoresThePinnedFileListButNotTheDefinition() {
+        String one = "SELECT * FROM read_parquet(['/d/a.parquet'], union_by_name=true)";
+        String two = "SELECT * FROM read_parquet(['/d/a.parquet', '/d/b''s.parquet'], union_by_name=true)";
+        assertEquals(IndexBuilder.relationSqlHash(one), IndexBuilder.relationSqlHash(two), "an added file is not a definition change");
+        assertNotEquals(IndexBuilder.relationSqlHash(one), IndexBuilder.relationSqlHash(one + " WHERE who <> 'x'"));
+        String filterList = "SELECT * FROM read_parquet(['/d/a.parquet']) WHERE k IN ['a', 'b']";
+        assertNotEquals(IndexBuilder.relationSqlHash(filterList), IndexBuilder.relationSqlHash(filterList.replace("'b'", "'c'")),
+                "a literal list outside the read is part of the definition");
+    }
 }

@@ -2,6 +2,7 @@ package com.gamma.la.api;
 
 import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.la.core.DatasetProviders;
+import com.gamma.la.core.InputFingerprint;
 import com.gamma.la.storage.BucketFunction;
 import com.gamma.la.storage.IndexBuilder;
 import com.gamma.la.storage.IndexManifest;
@@ -48,9 +49,14 @@ final class IndexedRecursivePaths {
                    boolean monotonic, Double maxHours) { }
 
     /** Either the index answered ({@code result} set) or the flat path must ({@code reason} set). */
-    record Outcome(IndexedTraversal.Result result, long version, boolean stale, String staleReason, Reason reason) {
+    record Outcome(IndexedTraversal.Result result, long version, boolean stale, String staleReason, Reason reason,
+                   List<String> staleCodes, boolean fingerprintKnown, String details) {
         static Outcome flat(Reason r) {
-            return new Outcome(null, 0, false, null, r);
+            return new Outcome(null, 0, false, null, r, List.of(), true, null);
+        }
+
+        static Outcome refused(List<String> codes, String details) {
+            return new Outcome(null, 0, false, null, Reason.index_stale_refused, codes, true, details);
         }
 
         boolean served() {
@@ -65,9 +71,11 @@ final class IndexedRecursivePaths {
                 s.put("version", version);
                 s.put("stale", stale);
                 if (staleReason != null) s.put("staleReason", staleReason);
+                s.put("fingerprint", fingerprintKnown ? "known" : "unknown");
             } else {
                 s.put("kind", "dataset");
                 s.put("reason", reason.name());
+                if (details != null) s.put("details", details);
             }
             return s;
         }
@@ -79,7 +87,7 @@ final class IndexedRecursivePaths {
      * @param beforeRead runs once the request is known to be servable and before anything is read - the caller's four-eyes
      *                   refusal, so the index path never reads what the flat path would have refused
      */
-    static Outcome attempt(Path writeRoot, String relationSql, Request rq, SqlSandboxPolicy policy, Runnable beforeRead) {
+    static Outcome attempt(Path writeRoot, Path dataRoot, String relationSql, Request rq, SqlSandboxPolicy policy, Runnable beforeRead) {
         if (!LinkAnalysisSettings.forRoot(writeRoot).effectiveIndex().enabledInForce()) return Outcome.flat(Reason.index_disabled);
 
         Path root = writeRoot.resolve(IndexRoutes.INDEX_DIR);
@@ -89,14 +97,14 @@ final class IndexedRecursivePaths {
         } catch (IllegalArgumentException cannotNameADirectory) {
             return Outcome.flat(Reason.no_index);
         }
-        record Candidate(Path dir, IndexManifest manifest) { }
+        record Candidate(Path dir, IndexManifest manifest, String hash) { }
         List<Candidate> published = new ArrayList<>();
         for (String hash : hashes) {
             Optional<Path> current = new IndexStore(root, rq.datasetId(), hash).current();   // CURRENT is read ONCE: this is the pinned version
             if (current.isEmpty()) continue;
             try {
                 IndexManifest m = IndexManifest.read(current.get());
-                if (rq.datasetId().equals(m.dataset())) published.add(new Candidate(current.get(), m));
+                if (rq.datasetId().equals(m.dataset())) published.add(new Candidate(current.get(), m, hash));
             } catch (IOException | IllegalArgumentException unreadable) {
                 // an unreadable manifest is not an index
             }
@@ -132,19 +140,33 @@ final class IndexedRecursivePaths {
         if (chosen == null) return Outcome.flat(firstFailure == null ? Reason.mapping_not_indexed : firstFailure);
 
         IndexManifest manifest = chosen.manifest();
-        // Staleness (decision 6a): a Dataset DEFINITION that changed could expose rows the index no longer has ⇒ refuse.
-        // The function the bucket is computed with must be the one the index was written with, or Java would read the wrong
-        // bucket ⇒ refuse. A DuckDB version difference is served and flagged.
-        if (!IndexBuilder.relationSqlHash(relationSql).equals(manifest.relationSqlHash())
-                || !BucketFunction.NAME.equals(manifest.bucketFn()) || !manifest.deltas().isEmpty())
-            return Outcome.flat(Reason.index_stale_refused);
-        String staleReason = null;
+        // Staleness (decision 6a, ONE definition with GET /inv/index: IndexStaleness). Refuse when removed rows could be exposed:
+        // a removed / replaced input file, a changed relation SQL, a different bucket function (Java would read the wrong
+        // bucket) or unapplied deltas. Serve flagged when only files were ADDED (the index misses the new rows) or DuckDB differs.
+        String duck = null;
         try {
-            if (!IndexBuilder.duckdbVersion().equals(manifest.duckdbVersion()))
-                staleReason = "built with DuckDB " + manifest.duckdbVersion() + ", this server runs " + IndexBuilder.duckdbVersion();
+            duck = IndexBuilder.duckdbVersion();
         } catch (RuntimeException unknown) {
             // the server's own version could not be read: say nothing rather than guess
         }
+        String mappingHash = chosen.hash();
+        InputFingerprint input = InputFingerprintCache.get(writeRoot, rq.datasetId(), mappingHash,
+                () -> IndexRoutes.currentInput(dataRoot, writeRoot, rq.datasetId()));
+        IndexStaleness.Result st = IndexStaleness.compute(manifest, IndexBuilder.relationSqlHash(relationSql), input, BucketFunction.NAME, duck);
+        boolean refuse = st.removedInput() || !manifest.deltas().isEmpty()
+                || st.reasons().stream().anyMatch(r -> !r.equals(IndexStaleness.INPUT_FILES_CHANGED) && !r.equals(IndexStaleness.DUCKDB_VERSION_CHANGED));
+        if (refuse) return Outcome.refused(st.reasons(), st.details().isEmpty() ? "the index has unapplied changes" : String.join("; ", st.details()));
+        List<String> reasonText = new ArrayList<>();
+        for (int i = 0; i < st.reasons().size(); i++) {
+            String code = st.reasons().get(i);
+            if (code.equals(IndexStaleness.INPUT_FILES_CHANGED)) {
+                int recorded = manifest.inputFiles() == null ? 0 : manifest.inputFiles().size();
+                reasonText.add(code + ": " + Math.max(0, input.files().size() - recorded) + " files added since the build");
+            } else {
+                reasonText.add(st.details().get(i));
+            }
+        }
+        String staleReason = reasonText.isEmpty() ? null : String.join("; ", reasonText);
 
         if (rq.maxDepth() > IndexedTraversal.MAX_DEPTH) return Outcome.flat(Reason.depth_over_index_cap);
 
@@ -153,7 +175,7 @@ final class IndexedRecursivePaths {
                 rq.maxEdges(), rq.limit(), rq.tsCol() != null, rq.monotonic(), rq.maxHours(), filterSql);
         try (IndexReader reader = IndexReader.open(chosen.dir(), manifest, policy)) {
             IndexedTraversal.Result r = IndexedTraversal.walk(reader, p);
-            return new Outcome(r, manifest.version(), staleReason != null, staleReason, null);
+            return new Outcome(r, manifest.version(), staleReason != null, staleReason, null, st.reasons(), st.fingerprintKnown(), null);
         } catch (IndexedTraversal.FrontierOverCap over) {
             return Outcome.flat(Reason.frontier_over_index_cap);                             // the partial walk is discarded
         } catch (SQLException | IOException | RuntimeException unreadable) {

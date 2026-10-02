@@ -176,14 +176,23 @@ public final class IndexRoutes implements RouteModule {
     }
 
     private static InputFingerprint currentInput(ApiContext api, Path writeRoot, String dataset) {
+        return currentInput(api.dataRoot(), writeRoot, dataset);
+    }
+
+    /** The Dataset's input fingerprint now, or null when it cannot be taken - the ONE path the build, GET /inv/index and the traversal gate share. */
+    static InputFingerprint currentInput(Path dataRoot, Path writeRoot, String dataset) {
         DatasetProvider p = DatasetProviders.require();
-        return p.dataset(writeRoot, dataset).map(c -> currentInput(api, writeRoot, c)).orElse(null);
+        return p.dataset(writeRoot, dataset).map(c -> currentInput(dataRoot, writeRoot, c)).orElse(null);
     }
 
     /** The Dataset's input fingerprint now, or null when it cannot be taken. */
     private static InputFingerprint currentInput(ApiContext api, Path writeRoot, Map<String, Object> content) {
+        return currentInput(api.dataRoot(), writeRoot, content);
+    }
+
+    private static InputFingerprint currentInput(Path dataRoot, Path writeRoot, Map<String, Object> content) {
         try {
-            return DatasetProviders.require().inputFingerprint(content, api.dataRoot(), writeRoot);
+            return DatasetProviders.require().inputFingerprint(content, dataRoot, writeRoot);
         } catch (RuntimeException unresolvable) {
             return null;
         }
@@ -443,6 +452,7 @@ public final class IndexRoutes implements RouteModule {
                 case QUEUED, RUNNING -> null;
             };
             if (type == null) return;
+            if (type.equals(LinkEventTypes.LINK_INDEX_BUILD_COMPLETED)) InputFingerprintCache.invalidate(v.datasetId(), v.mappingHash());
             Event.Builder b = base(type, v, v.owner(), "user").attr("elapsedMs", v.elapsedMs());
             if (v.result() != null) {
                 IndexBuilder.Result r = v.result();
