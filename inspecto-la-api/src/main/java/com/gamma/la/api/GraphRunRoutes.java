@@ -426,7 +426,7 @@ public final class GraphRunRoutes implements RouteModule {
             if (!callerId(ex).equals(known.owner())) throw absent(id);
             try {
                 InvestigationRoutes.openForRead(api, ex, known.investigationId());
-            } catch (ApiException lost) {
+            } catch (ApiException | IOException lost) {      // unreadable is absent, as list() already treats it
                 throw absent(id);
             }
         }
