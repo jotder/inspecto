@@ -95,5 +95,14 @@ jsdom — which is why they are the natural scope of the real-browser pass in §
 
 - **Real-browser axe pass** (e.g. Playwright) to cover `color-contrast`, landmarks, full-page reflow — deliberately
   not added now (keeps CI browser-free per the project's lean-deps stance).
+  **Done once by hand, 2026-10-02** (backlog row `LA-A11Y-AUDIT-1`): axe-core 4.12.1 was injected into the running SPA
+  (dark scheme) over Link Analysis, Geo and Link Analysis settings; it found 7 rules, and the same day a second pass
+  fixed the cheap, clear-cut ones and re-ran axe against the real app: a `main` element around the routed content, an
+  accessible name on the shell loading bar, a lighter `text-warn` in the dark scheme (red-400, 4.7:1 on the panel
+  instead of 3.02:1; `--gamma-text-warn-rgb`, same mechanism as `text-primary`), no `listbox` / `menu` role
+  holding only an empty-state text (option picker dialog, saved-views menus), 24 px minimum height on the Communities /
+  Components / Cliques result buttons, and `aria-haspopup="dialog"` on the option picker trigger. Not fixed: the graph's
+  text alternative, the G6 canvas positive `tabindex`, the empty ag-Grid regions, dialog `aria-modal`. It is still a
+  manual, one-off pass, not a CI gate.
 - Vendored Fuse auth/error pages (`modules/auth/**`).
 - A formal third-party audit / VPAT.
