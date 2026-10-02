@@ -139,9 +139,17 @@ public final class IndexStore {
     public Path stage(Duration staleStageAge) throws IOException {
         Files.createDirectories(dir);
         deleteStaleStages(staleStageAge);
-        Path p = dir.resolve(String.format("v%06d.tmp", maxVersionNumber() + 1));
-        Files.createDirectory(p);
-        return p;
+        // createDirectory is the atomic claim: a concurrent stage() that took the same number makes this one lose
+        // with FileAlreadyExistsException, so recompute the next number and try again.
+        while (true) {
+            Path p = dir.resolve(String.format("v%06d.tmp", maxVersionNumber() + 1));
+            try {
+                Files.createDirectory(p);
+                return p;
+            } catch (java.nio.file.FileAlreadyExistsException lostRace) {
+                // another stage() won this number; the next maxVersionNumber() sees it
+            }
+        }
     }
 
     /** Marks {@code staged} alive now (its directory mtime): call it periodically while a build runs, so {@link #gc} spares it. */

@@ -28,6 +28,23 @@ class IndexStoreTest {
     }
 
     @Test
+    void concurrentStagesGetDistinctDirectories(@TempDir Path root) throws Exception {
+        IndexStore s = new IndexStore(root, "ds", "abc");
+        int n = 16;
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(n);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        List<java.util.concurrent.Future<Path>> out = new java.util.ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            out.add(pool.submit(() -> { start.await(); return s.stage(Duration.ofHours(1)); }));
+        }
+        start.countDown();
+        java.util.Set<Path> distinct = new java.util.HashSet<>();
+        for (var f : out) distinct.add(f.get(30, java.util.concurrent.TimeUnit.SECONDS));
+        pool.shutdown();
+        assertEquals(n, distinct.size());
+    }
+
+    @Test
     void emptyStoreHasNoCurrent(@TempDir Path root) {
         assertTrue(new IndexStore(root, "ds", "abc").current().isEmpty());
     }
