@@ -12,7 +12,8 @@ const CORE_GRAPH = 'src/app/inspecto/graph/entity-key.ts'; // a core-slice file 
 
 async function flags(code, filePath) {
     const [r] = await eslint.lintText(code, { filePath });
-    return r.messages.filter((m) => m.ruleId === 'no-restricted-imports').length;
+    // a library import is reported by TWO patterns (the alias ban and the folder-name ban): count "flagged", not messages
+    return Math.min(1, r.messages.filter((m) => m.ruleId === 'no-restricted-imports').length);
 }
 const imp = (spec) => `import { X } from '${spec}';\nexport const y = X;`;
 
@@ -27,6 +28,10 @@ for (const spec of [
     'app/modules/admin/studio/link-analysis/entity-projection',
     'app/modules/admin/studio/geo-map/geo-map.routes',
     '../../modules/admin/studio/link-analysis/x',
+    // D-5 step 3: the library lives in projects/link-analysis and is reached through its alias
+    '@inspecto/link-analysis',
+    '@inspecto/link-analysis/graph/graph-analysis',
+    '@inspecto/link-analysis/la-host',
 ]) {
     test(`core api file: flags import '${spec}'`, async () => {
         assert.equal(await flags(imp(spec), CORE_API), 1);
@@ -55,10 +60,21 @@ test('core slice of graph/: a library sibling is flagged, a core sibling is not'
     assert.equal(await flags(imp('../query/query-types'), CORE_GRAPH), 0);
 });
 
-test('does not apply to specs, to the library half of graph/, or to host code', async () => {
+test('core slice of graph/: the library alias is flagged too', async () => {
+    assert.equal(await flags(imp('@inspecto/link-analysis/graph/graph-analysis'), CORE_GRAPH), 1);
+    assert.equal(await flags(imp('@inspecto/link-analysis'), 'src/app/inspecto/viz/probe.ts'), 1);
+});
+
+test('does not apply to specs, to the library itself, or to host code', async () => {
     assert.equal(await flags(imp('app/inspecto/graph'), 'src/app/inspecto/api/probe.spec.ts'), 0);
-    assert.equal(await flags(imp('./graph-analysis'), 'src/app/inspecto/graph/graph-algorithms-probe.ts'), 0);
+    assert.equal(await flags(imp('@inspecto/link-analysis'), 'src/app/inspecto/api/probe.spec.ts'), 0);
+    assert.equal(await flags(imp('./graph-analysis'), 'projects/link-analysis/src/graph/probe.ts'), 0);
+    assert.equal(
+        await flags(imp('@inspecto/link-analysis/graph/graph-analysis'), 'projects/link-analysis/src/geo/probe.ts'),
+        0,
+    );
     assert.equal(await flags(imp('app/inspecto/graph'), 'src/app/modules/admin/catalog/probe.ts'), 0);
+    assert.equal(await flags(imp('@inspecto/link-analysis'), 'src/app/modules/admin/studio/probe.ts'), 0);
 });
 
 test('api/ must not import environments/* (D-5 step 2); host code and specs may', async () => {

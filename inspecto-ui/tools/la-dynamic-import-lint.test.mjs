@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import { ESLint } from 'eslint';
 
 const eslint = new ESLint({ cwd: process.cwd() });
-const LA_FILE = 'src/app/modules/admin/studio/link-analysis/probe.ts';
+// D-5 step 3: the library folder is where LA / Geo code lives; the legacy studio paths are probed in the last test.
+const LA_FILE = 'projects/link-analysis/src/link-analysis/probe.ts';
 
 async function lint(code, filePath = LA_FILE) {
     const [r] = await eslint.lintText(code, { filePath });
@@ -24,6 +25,12 @@ for (const spec of [
     'app/inspecto/api/objects.service',
     'app/inspecto/api/session.service',
     'src/app/inspecto/api/session.service',
+    // the spelling library files use since step 3
+    '@inspecto/core/tags',
+    '@inspecto/core/transfer/x',
+    '@inspecto/core/ai-assist',
+    '@inspecto/core/api/objects.service',
+    '@inspecto/core/api/session.service',
 ]) {
     test(`flags import('${spec}')`, async () => {
         assert.equal(await lint(`export const f = () => import('${spec}');`), 1);
@@ -39,6 +46,8 @@ for (const spec of [
     'app/inspecto/api',
     'app/inspecto/tagsx',
     'app/inspecto/api/session.servicex',
+    '@inspecto/core/api',
+    '@inspecto/core/tagsx',
 ]) {
     test(`allows import('${spec}')`, async () => {
         assert.equal(await lint(`export const f = () => import('${spec}');`), 0);
@@ -51,7 +60,16 @@ test('does not apply to specs or to host code', async () => {
     assert.equal(await lint(code, 'src/app/modules/admin/other/probe.ts'), 0);
 });
 
-test('applies to the library folder step 3 moves LA into (D-5 step 2: projects/ must not be an unlinted exemption)', async () => {
+test('applies to every folder of the library (D-5 step 3: projects/ must not be an unlinted exemption)', async () => {
     const code = `export const f = () => import('app/modules/x');`;
-    assert.equal(await lint(code, 'projects/link-analysis/src/probe.ts'), 1);
+    for (const dir of ['', 'graph/', 'geo/', 'geo-map/', 'link-analysis/', 'la-host/', 'api/', 'investigation/']) {
+        assert.equal(await lint(code, `projects/link-analysis/src/${dir}probe.ts`), 1, dir);
+    }
+});
+
+test('the legacy studio homes stay linted, so a file re-added there cannot dodge the rule', async () => {
+    const code = `export const f = () => import('app/modules/x');`;
+    for (const dir of ['link-analysis', 'geo-map']) {
+        assert.equal(await lint(code, `src/app/modules/admin/studio/${dir}/probe.ts`), 1, dir);
+    }
 });

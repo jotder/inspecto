@@ -111,6 +111,7 @@
           "options": {
             "tsConfig": "tsconfig.spec.json",
             "runner": "vitest",
+            "include": ["src/**/*.spec.ts", "../projects/**/*.spec.ts"],
             "setupFiles": ["src/app/inspecto/testing/vitest-setup.ts"],
             "coverageInclude": ["src/app/inspecto/**", "src/app/modules/admin/**", "projects/**"],
             "coverageExclude": [

@@ -21,11 +21,11 @@ import angular from 'angular-eslint';
 // ImportExpression). esquery regexes cannot hold `)` or groups, so every restricted module is written as
 // an exact match plus a `/`-prefix match. Keep these lists in step with that block's groups.
 const HOST_MSG =
-    'Link Analysis / Geo must not import host features (dynamic import): inject a token from app/inspecto/la-host instead (D-5 prep).';
+    'Link Analysis / Geo must not import host features (dynamic import): inject a token from @inspecto/link-analysis (la-host) instead (D-5 prep).';
 const EDGE_MSG =
-    'Tags / Transfer / AI assist / Cases are host edges (dynamic import): inject LA_TAGS / LA_TRANSFER / LA_AI_ASSIST / LA_CASES from app/inspecto/la-host instead (D-5 prep).';
+    'Tags / Transfer / AI assist / Cases are host edges (dynamic import): inject LA_TAGS / LA_TRANSFER / LA_AI_ASSIST / LA_CASES from @inspecto/link-analysis (la-host) instead (D-5 prep).';
 const FEATURES_MSG =
-    'Host module flags (ops / exchange / geoLink) are a host edge: inject LA_FEATURES from app/inspecto/la-host instead, not SessionService (D-5 prep).';
+    'Host module flags (ops / exchange / geoLink) are a host edge: inject LA_FEATURES from @inspecto/link-analysis (la-host) instead, not SessionService (D-5 prep).';
 const dynSel = (re, message) => ({ selector: `ImportExpression > Literal.source[value=${re}]`, message });
 const SL = String.raw`\/`; // an escaped slash inside the selector regex
 const exactOrUnder = (mod, message) => [
@@ -37,12 +37,14 @@ const laDynamicImportSelectors = [
     dynSel(String.raw`/^\.\.\//`, HOST_MSG),
     ...['app/modules', 'src/app/modules'].flatMap((m) => exactOrUnder(m, HOST_MSG)),
     ...['tags', 'transfer', 'ai-assist'].flatMap((m) =>
-        ['app', 'src/app'].flatMap((root) => exactOrUnder(`${root}/inspecto/${m}`, EDGE_MSG)),
+        ['app/inspecto', 'src/app/inspecto', '@inspecto/core'].flatMap((root) =>
+            exactOrUnder(`${root}/${m}`, EDGE_MSG),
+        ),
     ),
-    ...exactOrUnder('app/inspecto/api/objects.service', EDGE_MSG),
-    ...exactOrUnder('src/app/inspecto/api/objects.service', EDGE_MSG),
-    ...exactOrUnder('app/inspecto/api/session.service', FEATURES_MSG),
-    ...exactOrUnder('src/app/inspecto/api/session.service', FEATURES_MSG),
+    ...['app/inspecto', 'src/app/inspecto', '@inspecto/core'].flatMap((root) => [
+        ...exactOrUnder(`${root}/api/objects.service`, EDGE_MSG),
+        ...exactOrUnder(`${root}/api/session.service`, FEATURES_MSG),
+    ]),
     {
         selector: 'ImportExpression > :not(Literal).source',
         message:
@@ -52,7 +54,6 @@ const laDynamicImportSelectors = [
 
 // D-5 step 1: the folders under `app/inspecto` that ARE the Link Analysis / Geo library half, and the slice of
 // `graph/` that stays core (Decision 2a). `coreGraphFiles` is an ALLOW-list, so a new graph file defaults to library.
-const laOwnFolders = ['graph', 'geo', 'investigation', 'la-host'];
 const coreGraphFiles = [
     'graph-types',
     'graph-source',
@@ -64,9 +65,16 @@ const coreGraphFiles = [
 ];
 const CORE_MSG =
     'Core (app/inspecto/**) must not import Link Analysis / Geo library code: keep the type or function core needs in a core file, or inject it (D-5 step 1).';
+// D-5 step 3: the library now lives in projects/link-analysis and is reached through its alias; core must never use it.
+const LIB_ALIAS_MSG =
+    'Core (app/inspecto/**) must not import @inspecto/link-analysis: the arrow runs core <- library <- shells (D-5 step 3).';
 // ⚠ Two pattern objects on purpose: a gitignore-style `!` re-include does not work under an excluded PARENT directory,
 // so the bare folder names (the barrels: `app/inspecto/graph`) live apart from the `/**` group that carries the exceptions.
 const coreMustNotImportLa = [
+    {
+        group: ['@inspecto/link-analysis', '@inspecto/link-analysis/**', '**/projects/link-analysis/**'],
+        message: LIB_ALIAS_MSG,
+    },
     {
         // A bare folder specifier is a barrel import. (`group` cannot express "the folder only": gitignore semantics
         // make `**/graph` cover everything under it too, which would defeat the exceptions below - hence a regex.)
@@ -139,10 +147,11 @@ export default tseslint.config(
         // Specs are exempt (they may import host doubles). Dynamic `import()` is not seen by
         // `no-restricted-imports`, so `no-restricted-syntax` below applies the same restrictions to it.
         files: [
+            // D-5 step 3: the library folder the LA / Geo code now lives in.
+            'projects/link-analysis/**/*.ts',
+            // Legacy homes (before step 3), kept so a file re-added there is still linted.
             'src/app/modules/admin/studio/link-analysis/**/*.ts',
             'src/app/modules/admin/studio/geo-map/**/*.ts',
-            // D-5 step 2: the library folder step 3 moves them into, so the rules apply from the first moved file.
-            'projects/link-analysis/**/*.ts',
         ],
         ignores: ['**/*.spec.ts'],
         rules: {
@@ -153,7 +162,7 @@ export default tseslint.config(
                         {
                             group: ['app/modules/**', 'src/app/modules/**', '../**'],
                             message:
-                                'Link Analysis / Geo must not import host features: inject a token from app/inspecto/la-host instead (D-5 prep).',
+                                'Link Analysis / Geo must not import host features: inject a token from @inspecto/link-analysis (la-host) instead (D-5 prep).',
                         },
                         {
                             // The four `app/inspecto/**` host edges tokenised in D-5 prep part 2 (§7.12): Tags,
@@ -170,32 +179,46 @@ export default tseslint.config(
                                 'src/app/inspecto/transfer/**',
                                 'src/app/inspecto/ai-assist/**',
                                 'src/app/inspecto/api/objects.service',
+                                // the spelling library files use since step 3
+                                '@inspecto/core/tags',
+                                '@inspecto/core/tags/**',
+                                '@inspecto/core/transfer',
+                                '@inspecto/core/transfer/**',
+                                '@inspecto/core/ai-assist',
+                                '@inspecto/core/ai-assist/**',
+                                '@inspecto/core/api/objects.service',
                             ],
                             message:
-                                'Tags / Transfer / AI assist / Cases are host edges: inject LA_TAGS / LA_TRANSFER / LA_AI_ASSIST / LA_CASES from app/inspecto/la-host instead (D-5 prep).',
+                                'Tags / Transfer / AI assist / Cases are host edges: inject LA_TAGS / LA_TRANSFER / LA_AI_ASSIST / LA_CASES from @inspecto/link-analysis (la-host) instead (D-5 prep).',
                         },
                         {
                             // Host module flags are read through LA_FEATURES; `SessionService` is the host's.
-                            group: ['app/inspecto/api/session.service', 'src/app/inspecto/api/session.service'],
+                            group: [
+                                'app/inspecto/api/session.service',
+                                'src/app/inspecto/api/session.service',
+                                '@inspecto/core/api/session.service',
+                            ],
                             message:
-                                'Host module flags (ops / exchange / geoLink) are a host edge: inject LA_FEATURES from app/inspecto/la-host instead, not SessionService (D-5 prep).',
+                                'Host module flags (ops / exchange / geoLink) are a host edge: inject LA_FEATURES from @inspecto/link-analysis (la-host) instead, not SessionService (D-5 prep).',
                         },
                     ],
                     paths: [
-                        {
-                            // `ObjectsService` is also re-exported by the `api` barrel, which LA otherwise uses freely.
-                            name: 'app/inspecto/api',
-                            importNames: ['ObjectsService'],
-                            message:
-                                'Cases are a host edge: inject LA_CASES from app/inspecto/la-host instead (D-5 prep).',
-                        },
-                        {
-                            // Same barrel re-export: SessionService also comes out of `app/inspecto/api`.
-                            name: 'app/inspecto/api',
-                            importNames: ['SessionService'],
-                            message:
-                                'Host module flags (ops / exchange / geoLink) are a host edge: inject LA_FEATURES from app/inspecto/la-host instead, not SessionService (D-5 prep).',
-                        },
+                        ...['app/inspecto/api', '@inspecto/core/api'].flatMap((name) => [
+                            {
+                                // `ObjectsService` is also re-exported by the `api` barrel, which LA otherwise uses freely.
+                                name,
+                                importNames: ['ObjectsService'],
+                                message:
+                                    'Cases are a host edge: inject LA_CASES from @inspecto/link-analysis (la-host) instead (D-5 prep).',
+                            },
+                            {
+                                // Same barrel re-export: SessionService also comes out of `app/inspecto/api`.
+                                name,
+                                importNames: ['SessionService'],
+                                message:
+                                    'Host module flags (ops / exchange / geoLink) are a host edge: inject LA_FEATURES from @inspecto/link-analysis (la-host) instead, not SessionService (D-5 prep).',
+                            },
+                        ]),
                     ],
                 },
             ],
@@ -213,7 +236,7 @@ export default tseslint.config(
         // of `graph/` itself must not reach back into the library half. `coreGraphFiles` above is the allow-list.
         // Falsified by tools/core-no-la-imports-lint.test.mjs. Specs are exempt (they may import fixtures).
         files: ['src/app/inspecto/**/*.ts'],
-        ignores: ['**/*.spec.ts', ...laOwnFolders.map((f) => `src/app/inspecto/${f}/**`)],
+        ignores: ['**/*.spec.ts'],
         rules: { 'no-restricted-imports': ['error', { patterns: coreMustNotImportLa }] },
     },
     {
@@ -240,7 +263,8 @@ export default tseslint.config(
                         ...coreMustNotImportLa,
                         {
                             group: ['environments/**', '**/environments/**'],
-                            message: 'api/ must not import environments/*: inject APP_ENVIRONMENT (api/app-environment.ts) instead (D-5 step 2).',
+                            message:
+                                'api/ must not import environments/*: inject APP_ENVIRONMENT (api/app-environment.ts) instead (D-5 step 2).',
                         },
                     ],
                 },
