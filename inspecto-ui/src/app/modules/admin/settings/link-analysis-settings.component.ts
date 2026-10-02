@@ -6,7 +6,10 @@ import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
 
 import { LensService, apiErrorMessage } from 'app/inspecto/api';
-import { LinkAnalysisLimits, LinkAnalysisSettingsService } from '@inspecto/link-analysis';
+import {
+    LinkAnalysisLimits,
+    LinkAnalysisSettingsService,
+} from '@inspecto/link-analysis/link-analysis/link-analysis-settings.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 

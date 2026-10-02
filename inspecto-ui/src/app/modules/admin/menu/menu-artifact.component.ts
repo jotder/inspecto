@@ -13,7 +13,8 @@ import { DashboardFilterBarComponent } from 'app/modules/admin/studio/dashboards
 import { DashboardHeaderComponent } from 'app/modules/admin/studio/dashboards/dashboard-header.component';
 import { DashboardTileComponent } from 'app/modules/admin/studio/dashboards/dashboard-tile.component';
 import { DashboardViewStore } from 'app/modules/admin/studio/dashboards/dashboard-view.store';
-import { GeoViewWidgetComponent, LinkViewWidgetComponent } from '@inspecto/link-analysis';
+import { GeoViewWidgetComponent } from '@inspecto/link-analysis/geo-map/geo-view-widget.component';
+import { LinkViewWidgetComponent } from '@inspecto/link-analysis/link-analysis/link-view-widget.component';
 import { WidgetHostComponent } from 'app/modules/admin/studio/widgets/widget-host.component';
 import 'app/modules/admin/studio/widgets/widget.kind'; // side-effect: register viz plugins + geo/link view loaders
 
