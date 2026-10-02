@@ -1007,8 +1007,10 @@ betweenness and suspicion).
   maximum - a run that converges early finishes below 1 until it completes). **Louvain** (passes run to convergence) and the 11 algorithms
   without a `RunControl` overload report nothing. `known` is additive: a client that reads only `fraction` keeps working.
   The SPA prefers the server's `progress.fraction` and `consumed.elapsedMs` whenever they are > 0 and falls back to "N steps done" and a browser-measured wait otherwise.
-* Cancel on someone else's run is **403** (the service's FORBIDDEN) while a READ of it is **404** (a run id is an unguessable UUID);
-  cancel does not re-open the Investigation. Administrator = `Roles.CAN_ADMINISTER`, or no Subject at all.
+* Cancel on someone else's run is **404**, the answer of an unknown run (same status and body shape, no existence oracle), exactly as a
+  READ of it is; cancel also re-runs the Investigation read gate (`InvestigationRoutes.openForRead`), so a caller who lost access to the
+  Investigation gets that 404 too. The starter and an administrator (`Roles.CAN_ADMINISTER`, or no Subject at all) cancel as before; a
+  finished run is still **409**. (Operator-delegated decision 2026-10-02, fail-closed; the service still throws FORBIDDEN as a backstop.)
 * A server result for a node or link the canvas does not draw is dropped by the id map, and the toolbox says how many (see above).
 * With an Investigation open, the toolbox's browser-side runs and the From / To pickers use the Working Set canvas (`canvasData()`), the same graph server runs map onto; with none open they use the query graph (operator decision 2026-10-02).
 * **Service lifetime.** One `GraphRunService` per Space write root, held by `GraphRunServices` (la-api): created lazily, closed by
@@ -1032,10 +1034,12 @@ betweenness and suspicion).
   result with `truncated` shows a warning beside the not-drawn notice (`truncationNotice` in `graph-run-apply.ts`, toolbox
   `serverTruncated`), built from `lists`, e.g. "Showing the first 10,000 of 25,311 scores (the server cap is 10,000; raise
   graph_run.max_result_items in Settings)"; a nested cut reads "the first 2 of 5 members of group 1".
-* A raw id sent as `from` / `to` / `node` while masking is on is not refused.
+* **Masking oracle closed (2026-10-02).** While masking hides an entity, a RAW id of it sent as `from` / `to` / `node` is treated as a node
+  that does not exist (`GraphRunRoutes.ABSENT_NODE`, decided at the route): the run completes with the same empty answer an unknown id
+  gives, so the response cannot say whether the raw id is in the Working Set. A pseudonym still resolves; an id masking leaves in the
+  clear (typed masking) and every id with masking off are unchanged.
 
-**Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-GRAPH-RUN-MASK-ORACLE-1` ·
-`LA-GRAPH-RUN-CANCEL-GATE-1` · `LA-A11Y-AUDIT-1`. The remaining option-D phases are in
+**Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-A11Y-AUDIT-1`. The remaining option-D phases are in
 [`la-separation-feasibility-plan.md`](../../../superpower/la-separation-feasibility-plan.md) §7.8.
 
 ## Closed-plan record (2026-10-01)
