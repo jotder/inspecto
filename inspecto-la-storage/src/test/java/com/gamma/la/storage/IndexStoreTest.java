@@ -143,4 +143,138 @@ class IndexStoreTest {
         a.publish(stageWithFile(a));
         assertTrue(b.current().isEmpty());
     }
+
+    // ---- verifier hardening (D-3 step 3) -------------------------------------------------------------------------
+
+    @Test
+    void segmentRefusesColonWindowsDeviceNamesAndTrailingDotsOrSpaces(@TempDir Path root) {
+        for (String bad : new String[] {"a:b", "C:", "CON", "con", "Con", "PRN", "aux", "NUL", "nul.txt", "COM1", "com9", "LPT1", "lpt9.log",
+                "ds.", "ds ", "ds..", "a<b", "a>b", "a\"b", "a|b", "a?b", "a*b", "a\u0001b", "a\tb"})
+            assertThrows(IllegalArgumentException.class, () -> new IndexStore(root, bad, "abc"), "dataset id '" + bad + "'");
+        assertThrows(IllegalArgumentException.class, () -> new IndexStore(root, "ds", "a:b"));
+        assertThrows(IllegalArgumentException.class, () -> new IndexStore(root, "ds", "NUL"));
+        for (String ok : new String[] {"COM", "COM10", "CONSOLE", "LPT", "a.b", "a b", "con-tacts"})
+            assertDoesNotThrow(() -> new IndexStore(root, ok, "abc"), ok);
+    }
+
+    @Test
+    void idsThatDifferOnlyByCaseOrNormalisationAreOneIndexOnEveryFileSystem(@TempDir Path root) throws Exception {
+        IndexStore lower = new IndexStore(root, "ds", "abc");
+        IndexStore upper = new IndexStore(root, "Ds", "ABC");
+        assertEquals(lower.directory(), upper.directory(), "Ds/ds must be the same directory on Linux too");
+        assertEquals(new IndexStore(root, "DS", "abc").directory(), lower.directory());
+        Path v = lower.publish(stageWithFile(lower));
+        assertEquals(v, upper.current().orElseThrow());
+        // composed vs decomposed e-acute, and an upper-case non-ASCII id
+        assertEquals(new IndexStore(root, "café", "abc").directory(), new IndexStore(root, "café", "abc").directory());
+        assertEquals(new IndexStore(root, "Été", "abc").directory(), new IndexStore(root, "éTÉ", "abc").directory());
+        assertEquals(new IndexStore(root, "Größe", "abc").directory(), new IndexStore(root, "GRÖSSE", "abc").directory());
+        assertNotEquals(new IndexStore(root, "ds", "abc").directory(), new IndexStore(root, "ds2", "abc").directory());
+    }
+
+    @Test
+    void gcNeverDeletesAnInFlightStageEvenWithMinAgeZero(@TempDir Path root) throws Exception {
+        IndexStore s = new IndexStore(root, "ds", "abc");
+        Path building = stageWithFile(s);                 // a build in progress: written just now
+        assertEquals(List.of(), s.gc(Duration.ZERO));
+        assertTrue(Files.exists(building.resolve("edges.parquet")), "an in-flight stage survives gc(ZERO)");
+        assertEquals(List.of(), s.gc(Duration.ofSeconds(1)));
+        assertTrue(Files.isDirectory(building));
+        age(building, Duration.ofMinutes(4));              // quiet for 4 min: still inside the liveness window
+        assertEquals(List.of(), s.gc(Duration.ZERO));
+        age(building, Duration.ofHours(1));                // crashed: no heartbeat for an hour
+        assertEquals(List.of(building.getFileName().toString()), s.gc(Duration.ZERO));
+        assertFalse(Files.exists(building));
+    }
+
+    @Test
+    void aHeartbeatKeepsALongBuildAlive(@TempDir Path root) throws Exception {
+        IndexStore s = new IndexStore(root, "ds", "abc");
+        Path building = stageWithFile(s);
+        age(building, Duration.ofHours(2));
+        s.heartbeat(building);
+        assertEquals(List.of(), s.gc(Duration.ZERO));
+        assertTrue(Files.isDirectory(building));
+        assertEquals("v000002.tmp", s.stage(Duration.ZERO).getFileName().toString(), "stage(ZERO) spares the in-flight stage too");
+        assertTrue(Files.isDirectory(building));
+    }
+
+    @Test
+    void discardRemovesOnlyAStageOfThisStore(@TempDir Path root) throws Exception {
+        IndexStore s = new IndexStore(root, "ds", "abc");
+        Path st = stageWithFile(s);
+        s.discard(st);
+        assertFalse(Files.exists(st));
+        s.discard(st);                                     // already gone: fine
+        Path v = s.publish(stageWithFile(s));
+        assertThrows(IllegalArgumentException.class, () -> s.discard(v));
+        assertTrue(Files.isDirectory(v));
+    }
+
+    @Test
+    void gcRemovesOrphanCurrentTempFilesButNotAFreshOne(@TempDir Path root) throws Exception {
+        IndexStore s = new IndexStore(root, "ds", "abc");
+        s.publish(stageWithFile(s));
+        Path orphan = Files.writeString(s.directory().resolve("CURRENT.tmp-000007"), "v000007\n");
+        Path fresh = Files.writeString(s.directory().resolve("CURRENT.tmp-000008"), "v000008\n");
+        age(orphan, Duration.ofHours(1));
+        assertEquals(List.of("CURRENT.tmp-000007"), s.gc(Duration.ZERO));
+        assertFalse(Files.exists(orphan));
+        assertTrue(Files.exists(fresh), "a pointer written a moment ago may be mid-publish");
+        assertTrue(Files.exists(s.directory().resolve("CURRENT")));
+    }
+
+    @Test
+    void publishRefusesToMoveCurrentToALowerVersion(@TempDir Path root) throws Exception {
+        IndexStore s = new IndexStore(root, "ds", "abc");
+        Path older = stageWithFile(s);                     // v000001.tmp
+        Path newer = stageWithFile(s);                     // v000002.tmp
+        Path v2 = s.publish(newer);
+        var e = assertThrows(IllegalStateException.class, () -> s.publish(older));
+        assertTrue(e.getMessage().contains("v000001") && e.getMessage().contains("v000002"), e.getMessage());
+        assertEquals(v2, s.current().orElseThrow());
+        assertTrue(Files.isDirectory(older), "the refused stage is left for its owner to discard");
+        s.discard(older);
+        assertEquals("v000003.tmp", stageWithFile(s).getFileName().toString());
+    }
+
+    @Test
+    void concurrentPublishesNeverRegressCurrent(@TempDir Path root) throws Exception {
+        IndexStore s = new IndexStore(root, "ds", "abc");
+        List<Path> stages = new java.util.ArrayList<>();
+        for (int i = 0; i < 24; i++) stages.add(stageWithFile(s));
+        java.util.Collections.shuffle(stages, new java.util.Random(7));
+        AtomicBoolean stop = new AtomicBoolean();
+        AtomicReference<String> bad = new AtomicReference<>();
+        Thread reader = new Thread(() -> {
+            long last = 0;
+            while (!stop.get()) {
+                long now = s.current().map(p -> Long.parseLong(p.getFileName().toString().substring(1))).orElse(0L);
+                if (now < last) { bad.compareAndSet(null, "CURRENT went from " + last + " to " + now); return; }
+                last = now;
+            }
+        });
+        reader.start();
+        java.util.concurrent.ExecutorService ex = java.util.concurrent.Executors.newFixedThreadPool(8);
+        AtomicInteger published = new AtomicInteger();
+        List<java.util.concurrent.Future<?>> fs = new java.util.ArrayList<>();
+        for (Path st : stages)
+            fs.add(ex.submit(() -> {
+                try {
+                    s.publish(st);
+                    published.incrementAndGet();
+                } catch (IllegalStateException refused) {
+                    // an older stage that lost the race: refused, not applied
+                } catch (Exception e) {
+                    bad.compareAndSet(null, e.toString());
+                }
+            }));
+        for (var f : fs) f.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        ex.shutdown();
+        stop.set(true);
+        reader.join(10_000);
+        assertNull(bad.get());
+        assertEquals("v000024", s.current().orElseThrow().getFileName().toString(), "the highest stage always wins");
+        assertTrue(published.get() >= 1);
+    }
 }
