@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, firstValueFrom, map, Observable, of, tap } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { APP_ENVIRONMENT } from './app-environment';
 import { apiUrl } from './api-base';
 
 /**
@@ -93,6 +93,7 @@ export const RESUMABLE_KEY = 'inspecto.session.resumable';
 export class SessionService {
     private http = inject(HttpClient);
     private router = inject(Router);
+    private environment = inject(APP_ENVIRONMENT);
 
     /** 'none' (Personal / offline) or 'oidc' (Professional). Drives {@link loginRequired} + {@link authGuard}. */
     readonly authMode = signal<'none' | 'oidc'>('none');
@@ -233,11 +234,11 @@ export class SessionService {
         if (mode !== 'oidc') return; // Personal / offline — done, no login path.
 
         this.oidc = {
-            authorizeUrl: boot.auth?.authorizeUrl ?? environment.oidc?.authorizeUrl ?? '',
-            clientId: boot.auth?.clientId ?? environment.oidc?.clientId ?? '',
-            scopes: boot.auth?.scopes ?? environment.oidc?.scopes ?? 'openid profile',
-            endSessionUrl: boot.auth?.endSessionUrl ?? environment.oidc?.endSessionUrl ?? '',
-            mock: boot.auth?.mock ?? environment.oidc?.mock ?? false,
+            authorizeUrl: boot.auth?.authorizeUrl ?? this.environment.oidc?.authorizeUrl ?? '',
+            clientId: boot.auth?.clientId ?? this.environment.oidc?.clientId ?? '',
+            scopes: boot.auth?.scopes ?? this.environment.oidc?.scopes ?? 'openid profile',
+            endSessionUrl: boot.auth?.endSessionUrl ?? this.environment.oidc?.endSessionUrl ?? '',
+            mock: boot.auth?.mock ?? this.environment.oidc?.mock ?? false,
         };
         this.demoUsers.set(boot.auth?.demoUsers ?? []);
         // A returning user still holds the httpOnly refresh cookie — mint an access token from it. A 401

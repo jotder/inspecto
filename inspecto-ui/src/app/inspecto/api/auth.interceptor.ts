@@ -1,7 +1,7 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, switchMap, throwError } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { APP_ENVIRONMENT } from './app-environment';
 import { SessionService } from './session.service';
 
 /** The BFF session routes manage their own credential (a one-time code, or the httpOnly cookie), so
@@ -21,7 +21,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     const session = inject(SessionService);
     if (session.authMode() !== 'oidc') return next(req);
 
-    const base = environment.apiBaseUrl;
+    const base = inject(APP_ENVIRONMENT).apiBaseUrl;
     const isApi = req.url.startsWith(base + '/') || req.url.startsWith(base + '?') || req.url === base;
     const isSessionRoute = SESSION_PATHS.some((p) => req.url.includes(p));
     if (!isApi || isSessionRoute) return next(req);

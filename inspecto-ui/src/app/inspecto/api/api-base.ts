@@ -1,5 +1,5 @@
 import { HttpErrorResponse, HttpParams } from '@angular/common/http';
-import { environment } from '../../../environments/environment';
+import { appEnvironment } from './app-environment';
 
 /**
  * Prefix an API route path with the configured base ('' in prod, '/api' behind the dev proxy) plus
@@ -7,7 +7,7 @@ import { environment } from '../../../environments/environment';
  * the `v1Interceptor` unwraps, so callers still see plain DTOs).
  */
 export function apiUrl(path: string): string {
-    return `${environment.apiBaseUrl}/v1${path}`;
+    return `${appEnvironment().apiBaseUrl}/v1${path}`;
 }
 
 /**

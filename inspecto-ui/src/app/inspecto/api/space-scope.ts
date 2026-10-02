@@ -1,4 +1,4 @@
-import { environment } from '../../../environments/environment';
+import { appEnvironment } from './app-environment';
 
 /**
  * Server-global API paths that address the container/runtime, never a single space, so they must
@@ -42,7 +42,7 @@ export function spaceScopedUrl(url: string, spaceId: string | null | undefined):
     // W7: apiUrl() builds '/api/v1/…'; the space id goes AFTER the version segment (the backend
     // strips '/api/v1' at dispatch, then matches '/spaces/{id}/…'). Legacy '/api/…' callers keep
     // the unversioned rewrite.
-    let base = environment.apiBaseUrl; // '/api'
+    let base = appEnvironment().apiBaseUrl; // '/api'
     if (url.startsWith(base + '/v1/')) base += '/v1';
     else if (!url.startsWith(base + '/')) return url; // not a ControlApi call
 

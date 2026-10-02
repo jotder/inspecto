@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
-import { environment } from 'environments/environment';
+import { APP_ENVIRONMENT } from './app-environment';
 import { apiUrl } from './api-base';
 import { SpacesService } from './spaces.service';
 
@@ -16,13 +16,6 @@ export interface Branding {
     footerText: string | null;
 }
 
-/** The shipped defaults used whenever a branding field is unset. */
-const DEFAULTS = {
-    logoUrl: environment.appLogo,
-    caption: 'Unveil stories from your data',
-    footerText: environment.footerText,
-};
-
 /**
  * Holds the active space's branding as a signal and wraps the `/settings/branding` endpoint. The layout
  * header binds to the computed accessors ({@link logoUrl}/{@link caption}/{@link footerText}), which fall
@@ -34,12 +27,20 @@ const DEFAULTS = {
 export class BrandingService {
     private http = inject(HttpClient);
     private spaces = inject(SpacesService);
+    private environment = inject(APP_ENVIRONMENT);
+
+    /** The shipped defaults used whenever a branding field is unset. */
+    private readonly defaults = {
+        logoUrl: this.environment.appLogo,
+        caption: 'Unveil stories from your data',
+        footerText: this.environment.footerText,
+    };
 
     private brand = signal<Branding>({ logoDataUrl: null, caption: null, footerText: null });
 
-    readonly logoUrl = computed(() => this.brand().logoDataUrl || DEFAULTS.logoUrl);
-    readonly caption = computed(() => this.brand().caption || DEFAULTS.caption);
-    readonly footerText = computed(() => this.brand().footerText || DEFAULTS.footerText);
+    readonly logoUrl = computed(() => this.brand().logoDataUrl || this.defaults.logoUrl);
+    readonly caption = computed(() => this.brand().caption || this.defaults.caption);
+    readonly footerText = computed(() => this.brand().footerText || this.defaults.footerText);
 
     constructor() {
         // Reload branding when the active space changes (per-space document).

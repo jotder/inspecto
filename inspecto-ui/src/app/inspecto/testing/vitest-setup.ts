@@ -1,4 +1,10 @@
 import { vi } from 'vitest';
+import { environment } from '../../../environments/environment';
+import { setAppEnvironment } from '../api/app-environment';
+
+// Relative paths: a setup file bypasses the tsconfig `paths` (plain vite resolution).
+// D-5 step 2: `api/` has no import of `environments/*`; every spec file gets the same object the host app.config provides.
+setAppEnvironment(environment);
 
 // axe-core accessibility assertions (`expectNoA11yViolations`) run inside jsdom, which is slow.
 // Under the full suite's parallel load these a11y/init specs intermittently exceed vitest's default

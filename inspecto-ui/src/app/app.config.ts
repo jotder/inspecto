@@ -16,9 +16,14 @@ import { registerGeoMapViz } from './modules/admin/studio/geo-map/geo-map.viz';
 import { registerLinkAnalysisViz } from './modules/admin/studio/link-analysis/link-analysis.viz';
 import { provideLaHostServices } from './modules/admin/studio/la-host.providers';
 import { SessionService } from './inspecto/api/session.service';
+import { provideAppEnvironment } from './inspecto/api/app-environment';
+import { environment } from 'environments/environment';
 
 export const appConfig: ApplicationConfig = {
     providers: [
+        // D-5 step 2: `api/` reads the build-time environment only through this injected config, never by import.
+        provideAppEnvironment(environment),
+
         // Zone.js change detection (explicit opt-in for Angular 21). The zoneless flip was reverted:
         // it shipped without a component-by-component audit and froze eight surfaces whose state is a
         // plain field written from an async callback (sidebar, Connections Test, Spaces expand, …).
