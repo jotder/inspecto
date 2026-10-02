@@ -2,6 +2,8 @@ package com.gamma.la.storage;
 
 import com.gamma.la.storage.IndexManifest.TableStats;
 
+import com.gamma.util.DuckDbUtil;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -9,7 +11,6 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -434,7 +435,9 @@ public final class IndexBuilder {
     private static final String COPY_OPTIONS = "(FORMAT parquet, PARTITION_BY (bucket), ROW_GROUP_SIZE " + ROW_GROUP_SIZE + ", COMPRESSION zstd)";
 
     private static Connection open(String memoryLimit, Integer threads, Path spill) throws SQLException {
-        Connection c = DriverManager.getConnection("jdbc:duckdb:");
+        // DuckDbUtil.openInMemory caps memory and points the spill at a real directory (a raw in-memory open spills to .tmp
+        // in the process CWD, outside the Space - see NoRawInMemoryDuckDbOpenContractTest); the caller-given limits then override it.
+        Connection c = DuckDbUtil.openInMemory(spill);
         try (Statement s = c.createStatement()) {
             s.execute("SET TimeZone = 'UTC'");   // never the host zone
             if (memoryLimit != null) s.execute("SET memory_limit = '" + memoryLimit + "'");
