@@ -853,7 +853,8 @@ export class LinkAnalysisComponent implements OnInit {
             }));
     });
     readonly nodeOptions = computed(() => {
-        const g = this.displayed();
+        // What the canvas draws: over an Investigation that is its Working Set, whose ids the server run maps (serverIds).
+        const g = this.canvasData();
         return (g?.nodes ?? [])
             .map((n) => ({ id: n.id, label: n.data.label }))
             .sort((a, b) => a.label.localeCompare(b.label))

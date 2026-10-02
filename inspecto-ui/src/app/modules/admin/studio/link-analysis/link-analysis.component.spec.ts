@@ -878,6 +878,32 @@ describe('LinkAnalysisComponent', () => {
         expect(alert()).toBe(true);
         fixture.destroy();
     });
+    it('From / To pickers list the nodes the canvas draws: over an Investigation canvas every option resolves to a server id, on the query graph they are the query graph', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const queryLabels = c.nodeOptions().map((o) => o.label);
+        expect(queryLabels.length).toBeGreaterThan(0);
+
+        c.investigation.activeId.set('inv-1');
+        c.investigation.log.set({ header: { dataset: 'd', sourceCol: 's', targetCol: 't' }, entries: [] } as never);
+        c.investigation.workingSet.set({
+            entities: [{ id: 'ws-a' }, { id: 'ws-b' }],
+            links: [{ source: 'ws-a', target: 'ws-b', kind: 'k', count: 1 }],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        fixture.detectChanges();
+        // Reported: the options were the QUERY graph's, so a pick never resolved through the Working Set's ServerIdMap.
+        expect(c.nodeOptions().map((o) => o.label)).toEqual(['ws-a', 'ws-b']);
+        for (const o of c.nodeOptions()) expect(c.serverIds()!.serverNode(o.id)).toBeTruthy();
+
+        c.investigation.close();
+        fixture.detectChanges();
+        expect(c.nodeOptions().map((o) => o.label)).toEqual(queryLabels);
+        fixture.destroy();
+    });
     it('footer: a Working Set over the link render ceiling says how many links were left off; below it, nothing', async () => {
         const { fixture } = create();
         fixture.detectChanges();

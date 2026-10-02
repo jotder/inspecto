@@ -893,7 +893,7 @@
                              survive tab switches; emits emphasis for the canvas. -->
                         <inspecto-link-analysis-toolbox
                             [hidden]="toolboxTab() !== 'analysis'"
-                            [graph]="displayed()"
+                            [graph]="canvasData()"
                             [nodeOptions]="nodeOptions()"
                             [nodeKinds]="nodeKinds()"
                             [edgeKinds]="edgeKinds()"
