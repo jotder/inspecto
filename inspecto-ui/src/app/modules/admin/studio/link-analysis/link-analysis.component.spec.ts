@@ -876,7 +876,8 @@ describe('LinkAnalysisComponent', () => {
         expect(footer.textContent).not.toContain('render limit');
         expect(footer.textContent).toContain('40 links drawn');
         fixture.destroy();
-    });
+        // Builds and renders a 5,003-link Working Set; the CI runner under coverage took more than the default 5 s (run 36952537914).
+    }, 30_000);
     it('level of detail: drops labels above the cap while on, and the footer states the published caps', async () => {
         const big: G6GraphData = {
             nodes: Array.from({ length: 301 }, (_, i) => ({ id: `n${i}`, data: { label: `N${i}`, kind: 'entity' } })),
