@@ -94,6 +94,16 @@ Learned the hard way on 2026-10-01 (D-S4 + D-1: 6 lanes, 3 of them started from 
 10. **Check GitHub Actions after a push, not just the local gate.** CI was red on every master commit from 2026-09-30 and nobody
     saw it: the Linux-only failure in `inspecto-config` halts the reactor, so 28 of 41 modules were SKIPPED. `gh run list --limit 3`
     after every push; "BUILD FAILURE" early in the reactor hides everything after it.
+11. **Read `git cherry-pick`'s exit status before the fast-forward.** A conflict in the SECOND of two cherry-picked commits left the
+    worktree mid-pick; `git merge --ff-only` of that branch still succeeded with only the first commit, and removing the worktree hid
+    the conflict. Chain `cherry-pick ... && test -z "$(git status --short | grep -E '^(UU|AA)')"` and stop on failure.
+12. **A BACKLOG row's `→ owning-doc` pointer must resolve UNDER `docs/` (no `docs/` prefix) AND the target doc must name the row id**
+    — the pre-push `check-backlog-homes` guard refuses the push otherwise. Run the guard on a lane's BACKLOG edit before integrating.
+13. **After a push read BOTH CI and UI** (`gh run list --workflow UI`): the UI workflow is path-filtered, so it may not run on a
+    docs/Java-only commit and its last result can be an older commit's. A 5 s default test timeout also fails on the slower runner:
+    give a spec that builds thousands of links an explicit `}, 30_000);`.
+14. **An empty list inside `role=listbox` / `mat-menu` is an axe CRITICAL (`aria-required-children`)**: render the empty-state text
+    OUTSIDE the role container (or drop the role while empty, and the `aria-label` with it — a name on a role-less div is its own violation).
 
 ---
 
