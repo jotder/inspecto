@@ -33,6 +33,11 @@ public final class DatasetRead {
         return DatasetRelation.relationSql(dataset, dataRoot, new ViewStore(writeRoot.resolve("views")));
     }
 
+    /** The input files of a Dataset's relation (see {@link DatasetRelation#inputFiles}); empty when not enumerable. */
+    public static Optional<DatasetRelation.InputFiles> inputFiles(Map<String, Object> dataset, Path dataRoot, int limit) {
+        return DatasetRelation.inputFiles(dataset, dataRoot, limit);
+    }
+
     /** The component registry rooted at the Space write root (for non-Dataset component types a module owns). */
     public static ComponentStore registry(Path writeRoot) {
         return new ComponentStore(writeRoot.resolve("registry"));

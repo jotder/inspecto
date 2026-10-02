@@ -34,6 +34,20 @@ class IndexManifestTest {
     }
 
     @Test
+    void inputFilesRoundTripAndAnOlderManifestReadsAsNotRecorded() {
+        IndexManifest base = sample(mapping());
+        IndexManifest with = new IndexManifest(base.version(), base.builtAt(), base.builder(), base.duckdbVersion(), base.bucketFn(),
+                base.buckets(), base.rowGroupSize(), base.mapping(), base.mappingHash(), base.dataset(), base.relationSqlHash(),
+                base.baseFingerprint(), base.timeColZone(), base.tables(), base.droppedNull(), base.deltas(), base.parent(),
+                List.of(new IndexManifest.InputFile("orders/a.parquet", 10, 1000L)));
+        assertEquals(with, IndexManifest.fromJson(with.toJson()));
+        assertEquals(1, IndexManifest.fromJson(with.toJson()).inputFiles().size());
+        assertNull(base.inputFiles(), "not recorded");
+        assertNull(IndexManifest.fromJson(base.toJson()).inputFiles());
+        assertFalse(base.toJson().contains("inputFiles"), "an unrecorded list is omitted, an old reader sees nothing new");
+    }
+
+    @Test
     void nullableFieldsRoundTrip() {
         IndexMapping mp = new IndexMapping("s", "d", null, null, null, null, null);
         IndexManifest m = new IndexManifest(1, "x", IndexManifest.Builder.FULL, "1", "f", 1, 1, mp, mp.hash(), "d", "r", "b", "UTC", null, 0, null, null);

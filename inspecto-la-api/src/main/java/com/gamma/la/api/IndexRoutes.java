@@ -13,6 +13,7 @@ import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.DatasetProviders;
+import com.gamma.la.core.InputFingerprint;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.storage.BucketFunction;
 import com.gamma.la.storage.IndexBuildService;
@@ -68,9 +69,10 @@ import java.util.function.Function;
  * <p><b>Nothing reads the index yet.</b> {@code index.enabled} (default false) lands now and is echoed by {@code GET
  * /inv/index}; the read paths arrive in later steps (design 5).
  *
- * <p><b>The base fingerprint is not grounded in files.</b> {@code DatasetProvider} cannot enumerate a relation's input
- * files, and a {@code glob()} over paths scraped out of SQL text is neither cheap nor safe, so the fingerprint recorded is
- * the relation-SQL hash only: a Dataset whose DEFINITION changed reads stale; one that merely gained a file does not.
+ * <p><b>The base fingerprint is grounded in files</b> (design 5.3a): {@code DatasetProvider#inputFingerprint} lists the files
+ * the relation reads (the engine's own resolution, superseded files subtracted) and the build records the fingerprint plus, up
+ * to {@code IndexManifest.MAX_INPUT_FILES}, the file list. {@link IndexStaleness} compares it with the files now. A Dataset
+ * with nothing to list reports {@code fingerprint: unknown} - no currency is claimed.
  */
 public final class IndexRoutes implements RouteModule {
 
@@ -152,7 +154,7 @@ public final class IndexRoutes implements RouteModule {
         RunView v;
         try {
             v = service(writeRoot).submit(new IndexBuildService.Request(callerId(ex), dataset, mapping,
-                    ds -> new IndexBuildService.Relation(relationSql, fingerprint(relationSql)),
+                    ds -> relation(api, writeRoot, dataset, relationSql),
                     ix.maxDiskBytesInForce(), ix.keepVersionsInForce()));
         } catch (Refused refused) {
             throw map(refused);
@@ -164,12 +166,27 @@ public final class IndexRoutes implements RouteModule {
         return ApiContext.respondJson(ex, 202, view(v));
     }
 
-    /**
-     * The fingerprint of the base data recorded in the manifest. NOT grounded in files: the relation-SQL hash only (see the
-     * class doc), spelled so a reader of the manifest cannot mistake it for a file listing.
-     */
-    static String fingerprint(String relationSql) {
-        return "relation-sql-only:" + IndexBuilder.relationSqlHash(relationSql);
+    /** The relation to build over with its input fingerprint (and file list, when small enough to record). Runs on the submitting thread. */
+    private static IndexBuildService.Relation relation(ApiContext api, Path writeRoot, String dataset, String relationSql) {
+        InputFingerprint fp = currentInput(api, writeRoot, dataset);
+        List<IndexManifest.InputFile> files = null;
+        if (fp != null && fp.known() && fp.files().size() <= IndexManifest.MAX_INPUT_FILES)
+            files = fp.files().stream().map(f -> new IndexManifest.InputFile(f.path(), f.size(), f.mtimeMillis())).toList();
+        return new IndexBuildService.Relation(relationSql, fp == null ? "unknown" : fp.value(), files);
+    }
+
+    private static InputFingerprint currentInput(ApiContext api, Path writeRoot, String dataset) {
+        DatasetProvider p = DatasetProviders.require();
+        return p.dataset(writeRoot, dataset).map(c -> currentInput(api, writeRoot, c)).orElse(null);
+    }
+
+    /** The Dataset's input fingerprint now, or null when it cannot be taken. */
+    private static InputFingerprint currentInput(ApiContext api, Path writeRoot, Map<String, Object> content) {
+        try {
+            return DatasetProviders.require().inputFingerprint(content, api.dataRoot(), writeRoot);
+        } catch (RuntimeException unresolvable) {
+            return null;
+        }
     }
 
     private static String required(Map<String, Object> body, String key) {
@@ -210,8 +227,9 @@ public final class IndexRoutes implements RouteModule {
             }
             if (hashes.isEmpty()) continue;
             String currentSqlHash = currentRelationHash(api, c, writeRoot);
+            InputFingerprint input = currentInput(api, writeRoot, c.content());
             for (String hash : hashes) {
-                Map<String, Object> item = item(root, c.name(), hash, currentSqlHash);
+                Map<String, Object> item = item(root, c.name(), hash, currentSqlHash, input);
                 if (item != null) items.add(item);
             }
         }
@@ -232,7 +250,7 @@ public final class IndexRoutes implements RouteModule {
     }
 
     /** One index's summary, or null when it has no published version, or its manifest is unreadable, or it belongs to another Dataset. */
-    private static Map<String, Object> item(Path root, String dataset, String hash, String currentSqlHash) {
+    private static Map<String, Object> item(Path root, String dataset, String hash, String currentSqlHash, InputFingerprint input) {
         Optional<Path> current = new IndexStore(root, dataset, hash).current();
         if (current.isEmpty()) return null;
         IndexManifest m;
@@ -242,17 +260,13 @@ public final class IndexRoutes implements RouteModule {
             return null;
         }
         if (!dataset.equals(m.dataset())) return null;           // the directory is case-folded: another Dataset's index is not this one's
-        List<String> reasons = new ArrayList<>();
-        if (currentSqlHash == null) reasons.add("the Dataset's relation cannot be resolved now");
-        else if (!currentSqlHash.equals(m.relationSqlHash())) reasons.add("the Dataset's relation SQL changed since the index was built");
-        if (!BucketFunction.NAME.equals(m.bucketFn()))
-            reasons.add("the bucket function differs (index: " + m.bucketFn() + ", server: " + BucketFunction.NAME + ")");
+        String duck;
         try {
-            if (!IndexBuilder.duckdbVersion().equals(m.duckdbVersion()))
-                reasons.add("built with DuckDB " + m.duckdbVersion() + ", this server runs " + IndexBuilder.duckdbVersion());
+            duck = IndexBuilder.duckdbVersion();
         } catch (RuntimeException unknown) {
-            // the server's own DuckDB version could not be read: say nothing rather than guess
+            duck = null;                                          // the server's own DuckDB version could not be read: say nothing rather than guess
         }
+        IndexStaleness.Result st = IndexStaleness.compute(m, currentSqlHash, input, BucketFunction.NAME, duck);
         Map<String, Object> o = new LinkedHashMap<>();
         o.put("dataset", m.dataset());
         o.put("mappingHash", m.mappingHash());
@@ -273,8 +287,12 @@ public final class IndexRoutes implements RouteModule {
         o.put("bytes", m.tables().values().stream().mapToLong(IndexManifest.TableStats::bytes).sum());
         o.put("droppedNull", m.droppedNull());
         o.put("buckets", m.buckets());
-        o.put("stale", !reasons.isEmpty());
-        o.put("reason", reasons.isEmpty() ? null : String.join("; ", reasons));
+        o.put("stale", st.stale());
+        o.put("reason", st.stale() ? String.join("; ", st.details()) : null);
+        o.put("reasons", st.reasons());
+        o.put("removedInput", st.removedInput());
+        o.put("fingerprint", st.fingerprintKnown() ? "known" : "unknown");
+        if (input != null && input.known()) o.put("inputFiles", input.files().size());
         return o;
     }
 

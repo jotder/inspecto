@@ -112,20 +112,78 @@ public final class DatasetRelation {
                 + "SELECT * FROM (\n" + body + "\n) AS __virtual";
     }
 
-    /** The {@code physicalRef} read of one store ref (local, path-jailed; or a granted {@code shared/} snapshot). */
-    private static String storeRelationSql(String ref, Path dataRoot) {
-        // A shared/<owner>/<item> ref routes to the owner's Exchange snapshot (grant-checked, fail-closed)
-        // instead of this space's data root — everything downstream reads it as an ordinary Parquet glob.
-        // Only the shape is answerable for a shared ref; the local branch also gets containment, so the
-        // two readers of a physicalRef (here and ExpectationEvaluator) now apply one rule, not two.
+    /**
+     * The directory a store ref reads from. A shared/&lt;owner&gt;/&lt;item&gt; ref routes to the owner's Exchange
+     * snapshot (grant-checked, fail-closed) instead of this space's data root - everything downstream reads it as an
+     * ordinary Parquet glob. Only the shape is answerable for a shared ref; the local branch also gets containment, so
+     * the two readers of a physicalRef (here and ExpectationEvaluator) apply one rule, not two.
+     */
+    private static String storeReadRoot(String ref, Path dataRoot) {
         Path base = ref.startsWith(SHARED_PREFIX)
                 ? resolveShared(DataRef.requireShape(ref, REF_LABEL))
                 : DataRef.requireUnder(dataRoot, ref, REF_LABEL);
         String root = base.normalize().toString().replace('\\', '/');
         // Store-layout contract: a pipeline-shaped store (one with a database/ subtree) reads its
-        // mapped output only — quarantine/backup/nested trees stay out of the dataset. An explicit
+        // mapped output only - quarantine/backup/nested trees stay out of the dataset. An explicit
         // deeper ref (orders/database, orders/rollup) resolves as written.
         if (!ref.startsWith(SHARED_PREFIX)) root = SqlViews.storeReadRoot(root);
+        return root;
+    }
+
+    /** One input file of a Dataset's relation: path relative to the root the relation resolves against, size, mtime. */
+    public record FileStamp(String path, long size, long mtimeMillis) {}
+
+    /**
+     * The input files of a Dataset's relation.
+     *
+     * @param files     the stamps, sorted by path; empty when {@code overLimit}
+     * @param overLimit more than the requested limit of files exist (the listing stopped early)
+     */
+    public record InputFiles(List<FileStamp> files, boolean overLimit) {}
+
+    /**
+     * The files the relation of {@code datasetConfig} will read, through the SAME resolution {@link #relationSql} uses
+     * ({@link #storeReadRoot} for the root, {@code ConsignmentSelector} for the walk and the Consignment-catalog
+     * subtraction of superseded files) - never scraped back out of the SQL text. Paths are relative to the data root
+     * (a {@code shared/...} ref: prefixed with the ref, relative to the snapshot), so a moved Space root does not
+     * change them.
+     *
+     * @return empty when the relation has no enumerable files (a {@code view}-backed Dataset, or no {@code dataRoot}
+     *         for a store read, or the listing failed): 'cannot know' is not 'no files'
+     * @throws IllegalArgumentException on an unusable ref (the same refusals as {@link #relationSql})
+     */
+    public static Optional<InputFiles> inputFiles(Map<String, Object> datasetConfig, Path dataRoot, int limit) {
+        String userSql = Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("sql"));
+        String ref = userSql != null ? Values.trimToNull(datasetConfig.get("sourceName"))
+                : Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("physicalRef"));
+        if (ref == null) return Optional.empty();
+        boolean shared = ref.startsWith(SHARED_PREFIX);
+        if (!shared && dataRoot == null) return Optional.empty();
+        String root = storeReadRoot(ref, dataRoot);
+        Path rel = shared ? Path.of(root) : dataRoot.normalize();
+        String prefix = shared ? ref + "/" : "";
+        List<String> found = com.gamma.consignment.ConsignmentSelector.readableFiles(root, "parquet", limit + 1);
+        if (found == null) return Optional.empty();                 // the walk failed: unknown, not empty
+        if (found.size() > limit) return Optional.of(new InputFiles(List.of(), true));
+        List<FileStamp> out = new java.util.ArrayList<>();
+        for (String f : found) {
+            Path p = Path.of(f);
+            try {
+                java.nio.file.attribute.BasicFileAttributes a =
+                        java.nio.file.Files.readAttributes(p, java.nio.file.attribute.BasicFileAttributes.class);
+                String name = rel.relativize(p.normalize()).toString().replace('\\', '/');
+                out.add(new FileStamp(prefix + name, a.size(), a.lastModifiedTime().toMillis()));
+            } catch (java.io.IOException vanished) {
+                // listed a moment ago, gone now: it is not an input any more
+            }
+        }
+        out.sort(java.util.Comparator.comparing(FileStamp::path));
+        return Optional.of(new InputFiles(out, false));
+    }
+
+    /** The {@code physicalRef} read of one store ref (local, path-jailed; or a granted {@code shared/} snapshot). */
+    private static String storeRelationSql(String ref, Path dataRoot) {
+        String root = storeReadRoot(ref, dataRoot);
         // Addressing §7-A: the Consignment catalog subtracts files it has marked unreadable, and yields the
         // plain quoted glob when it has nothing to say. This is the only reader that sees a pipeline sink's
         // output, so it is the one that has to be filtered before a full recompute may leave an old

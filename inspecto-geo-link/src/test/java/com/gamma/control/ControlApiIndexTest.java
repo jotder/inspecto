@@ -12,6 +12,7 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.service.CollectorService;
+import com.gamma.util.DuckDbUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -307,6 +308,90 @@ class ControlApiIndexTest {
             assertEquals(0, ok(c, "GET", "/inv/index", null, VIEWER).get("total").asInt());
             assertEquals(404, send(c, "GET", "/inv/index/builds/" + id, null, OWNER).statusCode(), "and the Dataset's owner is not the starter");
             probe.release = true;
+        }
+    }
+
+    // -- staleness grounded in the Dataset's input files (D-3 design 5.3a) ----------------------------------------------------
+
+    /** A 3-edge Parquet file at {@code file} with a pinned mtime (no sleeps: the clock never decides). */
+    private static void parquet(Path file, long mtime) throws Exception {
+        Files.createDirectories(file.getParent());
+        DuckDbUtil.loadDriver();
+        java.io.File db = DuckDbUtil.tempDbFile("idx_fp_");
+        try (java.sql.Connection conn = DuckDbUtil.openConnection(db); java.sql.Statement st = conn.createStatement()) {
+            st.execute("COPY (SELECT * FROM (VALUES ('alice','bob','call'),('bob','carol','sms'),('alice','carol','call')) t(who,other,kind)) TO '"
+                    + file.toString().replace('\\', '/') + "' (FORMAT PARQUET)");
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+        Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(mtime));
+    }
+
+    private JsonNode indexOf(Ctx c, String dataset) throws Exception {
+        for (JsonNode ix : ok(c, "GET", "/inv/index", null, OWNER).get("indexes")) if (dataset.equals(ix.get("dataset").asText())) return ix;
+        throw new AssertionError("no index of " + dataset);
+    }
+
+    @Test
+    void anAddedFileMakesTheIndexStaleWithoutRemovedInputAndARemovedOrTouchedFileSetsIt(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        // a legacy Space's data root is the relative directory "database": a uniquely named store, removed at the end
+        String store = "idx_fp_" + System.nanoTime();
+        Path dir = Path.of("database").resolve(store);
+        boolean hadDatabase = Files.isDirectory(Path.of("database"));
+        try (Ctx c = open(cfg, root, "")) {
+            new ComponentStore(root.resolve("registry")).write("dataset", "files_ds",
+                    Map.of("physicalRef", store, "owner", "analyst-1", "shares", List.of()));
+            Path p1 = dir.resolve("p1.parquet");
+            parquet(p1, 1_700_000_000_000L);
+            String body = "{\"dataset\":\"files_ds\",\"sourceCol\":\"who\",\"targetCol\":\"other\"}";
+            awaitStatus(c, start(c, body, OWNER), OWNER, "COMPLETED");
+
+            JsonNode fresh = indexOf(c, "files_ds");
+            assertFalse(fresh.get("stale").asBoolean(), String.valueOf(fresh.get("reason")));
+            assertEquals("known", fresh.get("fingerprint").asText());
+            assertEquals(1, fresh.get("inputFiles").asInt());
+            assertFalse(fresh.get("removedInput").asBoolean());
+
+            Path p2 = dir.resolve("p2.parquet");                                                    // an ADDITION
+            parquet(p2, 1_700_000_001_000L);
+            JsonNode added = indexOf(c, "files_ds");
+            assertTrue(added.get("stale").asBoolean());
+            assertTrue(added.get("reasons").toString().contains("input_files_changed"), added.toString());
+            assertFalse(added.get("removedInput").asBoolean(), "additions only: nothing removed could be exposed");
+
+            Files.delete(p2);                                                                       // back to the built set
+            assertFalse(indexOf(c, "files_ds").get("stale").asBoolean());
+
+            Files.setLastModifiedTime(p1, java.nio.file.attribute.FileTime.fromMillis(1_700_000_002_000L));   // TOUCHED
+            JsonNode touched = indexOf(c, "files_ds");
+            assertTrue(touched.get("stale").asBoolean());
+            assertTrue(touched.get("removedInput").asBoolean(), "a replaced file may have dropped rows");
+            Files.setLastModifiedTime(p1, java.nio.file.attribute.FileTime.fromMillis(1_700_000_000_000L));
+            assertFalse(indexOf(c, "files_ds").get("stale").asBoolean());
+
+            Files.delete(p1);                                                                       // DELETED
+            JsonNode removed = indexOf(c, "files_ds");
+            assertTrue(removed.get("stale").asBoolean());
+            assertTrue(removed.get("removedInput").asBoolean());
+        } finally {
+            if (Files.isDirectory(dir)) try (var w = Files.walk(dir)) {
+                w.sorted(java.util.Comparator.reverseOrder()).forEach(f -> f.toFile().delete());
+            }
+            if (!hadDatabase) Path.of("database").toFile().delete();
+        }
+    }
+
+    @Test
+    void aDatasetWithNoEnumerableFilesReportsAnUnknownFingerprintAndIsNotStale(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "")) {
+            awaitStatus(c, start(c, PRIVATE_BUILD, OWNER), OWNER, "COMPLETED");
+            JsonNode ix = indexOf(c, "private_ds");                                                // a view-backed Dataset
+            assertFalse(ix.get("stale").asBoolean());
+            assertEquals("unknown", ix.get("fingerprint").asText(), "cannot tell: no currency is claimed");
+            assertFalse(ix.has("inputFiles"));
+            assertFalse(ix.get("removedInput").asBoolean());
         }
     }
 

@@ -105,9 +105,16 @@ public final class IndexBuilder {
      * @param datasetId       recorded in the manifest (the store's directory name is derived from it separately)
      * @param relationSql     TRUSTED relation SQL (a SELECT) - see the class doc
      * @param baseFingerprint the caller's fingerprint of the base data; the builder does not list files
+     * @param inputFiles      the caller's listing of those files, recorded in the manifest as given; null = not recorded
      */
     public record Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
-                          Options options) {
+                          Options options, List<IndexManifest.InputFile> inputFiles) {
+        public Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
+                       Options options) {
+            this(datasetId, mapping, relationSql, store, baseFingerprint, options, null);
+        }
+
+
         public Request {
             Objects.requireNonNull(datasetId, "datasetId");
             Objects.requireNonNull(mapping, "mapping");
@@ -353,7 +360,7 @@ public final class IndexBuilder {
             long number = Long.parseLong(stage.getFileName().toString().replaceAll("\\D", ""));
             String zone = effectiveZone(m, types);
             IndexManifest man = new IndexManifest(number, Instant.now().toString(), IndexManifest.Builder.FULL, duck, BucketFunction.NAME, n,
-                    ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), sha256(req.relationSql()), req.baseFingerprint(), zone, stats, dropped, null, null);
+                    ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), sha256(req.relationSql()), req.baseFingerprint(), zone, stats, dropped, null, null, req.inputFiles());
             man.write(stage);
             check();
             close();   // release the files (Windows) and the spill directory before the stage is renamed

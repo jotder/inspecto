@@ -163,20 +163,41 @@ public final class ConsignmentSelector {
     static List<String> select(String root, String ext) {
         Set<String> excluded = excluded();
         if (excluded == null) return null;
+        return walk(root, ext, excluded, Integer.MAX_VALUE);
+    }
 
+    /**
+     * The files a read of {@code root}'s {@code .ext} files would scan: the same walk and the same catalog
+     * subtraction as {@link #select(String, String)}, but answering even when there is no registry (then nothing is
+     * subtracted) and stopping once {@code limit} files are kept. For callers that must DESCRIBE the input rather than
+     * read it (the Link Analysis staleness fingerprint), so they share this class's idea of "the files" instead of
+     * re-deriving it.
+     *
+     * @return the kept files (at most {@code limit}; the caller detects "more than {@code limit}" by asking for
+     *         {@code limit + 1}), empty when {@code root} is not a directory (a store with nothing written yet), or
+     *         {@code null} when the walk itself failed
+     */
+    public static List<String> readableFiles(String root, String ext, int limit) {
+        Set<String> excluded = excluded();
+        if (!java.nio.file.Files.isDirectory(java.nio.file.Path.of(root))) return List.of();
+        return walk(root, ext, excluded == null ? Set.of() : excluded, limit);
+    }
+
+    private static List<String> walk(String root, String ext, Set<String> excluded, int limit) {
         java.nio.file.Path base = java.nio.file.Path.of(root);
         if (!java.nio.file.Files.isDirectory(base)) return null;
 
         List<String> kept = new ArrayList<>();
         int removed = 0;
         try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(base)) {
-            for (java.nio.file.Path p : walk.filter(java.nio.file.Files::isRegularFile).toList()) {
+            for (java.nio.file.Path p : (Iterable<java.nio.file.Path>) walk.filter(java.nio.file.Files::isRegularFile)::iterator) {
                 if (!p.getFileName().toString().endsWith("." + ext) || hasHiddenSegment(base, p)) continue;
                 String file = p.toString().replace("\\", "/");
                 if (excluded.contains(DbConsignmentOutputStore.norm(file))) removed++;
                 else kept.add(file);
+                if (kept.size() >= limit) break;
             }
-        } catch (java.io.IOException e) {
+        } catch (java.io.IOException | java.io.UncheckedIOException e) {
             log.warn("Consignment selector could not walk {} — reading it unfiltered: {}", root, e.getMessage());
             return null;
         }

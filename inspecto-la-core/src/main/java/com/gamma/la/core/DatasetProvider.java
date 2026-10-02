@@ -77,6 +77,18 @@ public interface DatasetProvider {
     /** The trusted relation SQL of a Dataset's configuration. */
     String relationSql(Map<String, Object> dataset, Path dataRoot, Path writeRoot);
 
+    /**
+     * The {@link InputFingerprint} of the INPUT FILES the Dataset's relation reads now (after superseded-file
+     * subtraction), or {@code null} when this provider cannot say ('unknown' - the default, so an existing implementer or
+     * test double keeps compiling and Link Analysis claims no currency it cannot know). An implementation returns
+     * {@code InputFingerprint.noFiles(sql)} for a relation with nothing to list and {@code InputFingerprint.tooMany(..)}
+     * above {@link InputFingerprint#MAX_FILES}; it throws {@link IllegalArgumentException} for an unusable Dataset.
+     * Cost is one directory listing (design 5.3a).
+     */
+    default InputFingerprint inputFingerprint(Map<String, Object> dataset, Path dataRoot, Path writeRoot) {
+        return null;
+    }
+
     /** Run a statement under the platform's default sandbox policy. */
     Result run(Request req) throws SQLException, IOException;
 

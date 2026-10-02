@@ -40,14 +40,21 @@ import java.util.Objects;
  * @param tables          per-table stats, keyed by table name (insertion order kept)
  * @param droppedNull     rows dropped because src or dst was null
  * @param parent          the version this one was appended to (null for a full build)
+ * @param inputFiles      the input files (path relative to the data root, size, mtime) the full build covered, sorted, or
+ *                        null when not recorded (an older manifest, an unenumerable Dataset, or more than
+ *                        {@link #MAX_INPUT_FILES} files - then only {@code baseFingerprint} remains). Optional and additive:
+ *                        {@link #FORMAT_VERSION} stays 1, an older reader ignores it, a missing field reads as null
  */
 public record IndexManifest(long version, String builtAt, Builder builder, String duckdbVersion, String bucketFn,
                             int buckets, int rowGroupSize, IndexMapping mapping, String mappingHash, String dataset,
                             String relationSqlHash, String baseFingerprint, String timeColZone,
-                            Map<String, TableStats> tables, long droppedNull, List<Delta> deltas, String parent) {
+                            Map<String, TableStats> tables, long droppedNull, List<Delta> deltas, String parent,
+                            List<InputFile> inputFiles) {
 
     public static final int FORMAT_VERSION = 1;
     public static final String FILE_NAME = "manifest.json";
+    /** Most input files a manifest lists; above this only the fingerprint hash is kept. */
+    public static final int MAX_INPUT_FILES = 5_000;
     private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
     public enum Builder { FULL, APPEND }
@@ -57,6 +64,18 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
     /** An append delta layered on the base: its directory name and size. */
     public record Delta(String dir, long rows, long bytes) { }
 
+    /** One input file the build read: path relative to the data root, size in bytes, mtime in epoch millis. */
+    public record InputFile(String path, long size, long mtimeMillis) { }
+
+    /** A manifest with no recorded input-file list (what every manifest written before the list existed reads as). */
+    public IndexManifest(long version, String builtAt, Builder builder, String duckdbVersion, String bucketFn, int buckets,
+                         int rowGroupSize, IndexMapping mapping, String mappingHash, String dataset, String relationSqlHash,
+                         String baseFingerprint, String timeColZone, Map<String, TableStats> tables, long droppedNull,
+                         List<Delta> deltas, String parent) {
+        this(version, builtAt, builder, duckdbVersion, bucketFn, buckets, rowGroupSize, mapping, mappingHash, dataset,
+                relationSqlHash, baseFingerprint, timeColZone, tables, droppedNull, deltas, parent, null);
+    }
+
     public IndexManifest {
         Objects.requireNonNull(builder, "builder");
         Objects.requireNonNull(mapping, "mapping");
@@ -64,6 +83,7 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
         if (!mapping.hash().equals(mappingHash)) throw new IllegalArgumentException("mappingHash does not match the mapping");
         tables = tables == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(tables));
         deltas = deltas == null ? List.of() : List.copyOf(deltas);
+        inputFiles = inputFiles == null ? null : List.copyOf(inputFiles);
     }
 
     public String toJson() {
@@ -96,6 +116,10 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
         ArrayNode d = n.putArray("deltas");
         deltas.forEach(x -> d.addObject().put("dir", x.dir()).put("rows", x.rows()).put("bytes", x.bytes()));
         if (parent == null) n.putNull("parent"); else n.put("parent", parent);
+        if (inputFiles != null) {
+            ArrayNode f = n.putArray("inputFiles");
+            inputFiles.forEach(x -> f.addObject().put("path", x.path()).put("size", x.size()).put("mtime", x.mtimeMillis()));
+        }
         try {
             return JSON.writeValueAsString(n);
         } catch (IOException e) {
@@ -124,6 +148,12 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
                 e.getValue().path("rows").asLong(), e.getValue().path("files").asLong(), e.getValue().path("bytes").asLong())));
         List<Delta> deltas = new ArrayList<>();
         n.path("deltas").forEach(x -> deltas.add(new Delta(x.path("dir").asText(), x.path("rows").asLong(), x.path("bytes").asLong())));
+        List<InputFile> inputFiles = null;                                    // absent in an older manifest: not recorded
+        if (n.path("inputFiles").isArray()) {
+            inputFiles = new ArrayList<>();
+            for (JsonNode x : n.get("inputFiles"))
+                inputFiles.add(new InputFile(x.path("path").asText(), x.path("size").asLong(), x.path("mtime").asLong()));
+        }
         Builder b;
         try {
             b = Builder.valueOf(req(n, "builder").asText().toUpperCase(Locale.ROOT));
@@ -134,7 +164,7 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
                 text(n, "bucketFn"), n.path("buckets").asInt(), n.path("rowGroupSize").asInt(), mapping,
                 req(n, "mappingHash").asText(), req(n, "dataset").asText(), text(n, "relationSqlHash"),
                 text(n, "baseFingerprint"), text(n, "timeColZone"), tables, n.path("droppedNull").asLong(), deltas,
-                text(n, "parent"));
+                text(n, "parent"), inputFiles);
     }
 
     public void write(Path dir) throws IOException {

@@ -1,9 +1,11 @@
 package com.gamma.geolink;
 
 import com.gamma.la.core.DatasetProvider;
+import com.gamma.la.core.InputFingerprint;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.query.ConditionSql;
 import com.gamma.query.DatasetRead;
+import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
 import com.gamma.sql.SqlSandboxPolicy;
@@ -41,6 +43,16 @@ public final class EngineDatasetProvider implements DatasetProvider {
     @Override
     public String relationSql(Map<String, Object> dataset, Path dataRoot, Path writeRoot) {
         return DatasetRead.relationSql(dataset, dataRoot, writeRoot);
+    }
+
+    @Override
+    public InputFingerprint inputFingerprint(Map<String, Object> dataset, Path dataRoot, Path writeRoot) {
+        // The engine's own resolution (DatasetRelation: store root, Consignment subtraction) - never paths scraped from SQL.
+        Optional<DatasetRelation.InputFiles> in = DatasetRead.inputFiles(dataset, dataRoot, InputFingerprint.MAX_FILES);
+        if (in.isEmpty()) return InputFingerprint.noFiles(relationSql(dataset, dataRoot, writeRoot));
+        if (in.get().overLimit()) return InputFingerprint.tooMany(InputFingerprint.MAX_FILES);
+        return InputFingerprint.ofFiles(in.get().files().stream()
+                .map(f -> new InputFingerprint.FileStamp(f.path(), f.size(), f.mtimeMillis())).toList());
     }
 
     @Override

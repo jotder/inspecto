@@ -69,9 +69,13 @@ public final class IndexBuildService implements AutoCloseable {
     }
 
     /** What the caller's gate resolved: the trusted relation SELECT and a fingerprint of the base data it reads. */
-    public record Relation(String relationSql, String baseFingerprint) {
+    public record Relation(String relationSql, String baseFingerprint, List<IndexManifest.InputFile> inputFiles) {
         public Relation {
             Objects.requireNonNull(relationSql, "relationSql");
+        }
+
+        public Relation(String relationSql, String baseFingerprint) {
+            this(relationSql, baseFingerprint, null);
         }
     }
 
@@ -305,7 +309,7 @@ public final class IndexBuildService implements AutoCloseable {
             IndexBuilder.Options opt = new IndexBuilder.Options(null, null, null, r.token,
                     p -> r.progress = new Progress(p.phase(), p.step(), p.steps()));
             IndexBuilder.Result result = builder.apply(new IndexBuilder.Request(r.datasetId, r.mapping, r.relation.relationSql(),
-                    store, r.relation.baseFingerprint(), opt));
+                    store, r.relation.baseFingerprint(), opt, r.relation.inputFiles()));
             try {
                 store.gc(GC_MIN_AGE);                                  // best effort: a failed sweep never fails a published build
             } catch (IOException | RuntimeException ignored) {
