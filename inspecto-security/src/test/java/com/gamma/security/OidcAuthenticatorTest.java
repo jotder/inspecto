@@ -205,7 +205,8 @@ class OidcAuthenticatorTest {
                 Roles.CAN_WORK_INCIDENTS, Roles.CAN_ADMINISTER, Roles.CAN_REVEAL_LINK_ENTITIES,
                 Roles.CAN_APPROVE_LINK_EXPANSIONS, Roles.CAN_APPROVE_CHANGES,
                 Roles.CAN_OFFER_SIGNALS,   // cross-Space consequence D7, 2026-09-28
-                Roles.CAN_RUN_LINK_GRAPH_ANALYSIS),   // LA separation D-4 step 6, 2026-10-01
+                Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,   // LA separation D-4 step 6, 2026-10-01
+                Roles.CAN_BUILD_LINK_INDEX),   // LA separation D-3 step 4, 2026-10-02
                 admin.capabilities());
         assertFalse(admin.capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH),
                 "canAuthorWorkbench stays Builder-only");
@@ -223,7 +224,8 @@ class OidcAuthenticatorTest {
         // what this role does — and canWorkIncidents 2026-09-26 (operator): working it to closure too.
         // The assertion still pins the CASE role as granting nothing of its own.
         assertEquals(Set.of(Roles.CAN_OPERATE_RUNS, Roles.CAN_REQUEST_SHARES, Roles.CAN_MANAGE_INCIDENTS,
-                        Roles.CAN_WORK_INCIDENTS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS),   // the last: LA separation D-4 step 6
+                        Roles.CAN_WORK_INCIDENTS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,   // LA separation D-4 step 6
+                        Roles.CAN_BUILD_LINK_INDEX),   // LA separation D-3 step 4
                 ana.capabilities(), "case role grants no capability");
 
         String plain = token(Instant.now().plusSeconds(60), List.of("operations"), RSA_KEY, ISSUER, AUDIENCE, "ops");
@@ -310,7 +312,8 @@ class OidcAuthenticatorTest {
                         Roles.CAN_WORK_INCIDENTS,    // operator, 2026-09-26
                         Roles.CAN_APPROVE_CHANGES,   // ASSURE-MAKER-CHECKER-1, 2026-09-26
                         Roles.CAN_OFFER_SIGNALS,     // cross-Space consequence D7, 2026-09-28
-                        Roles.CAN_RUN_LINK_GRAPH_ANALYSIS),   // LA separation D-4 step 6, 2026-10-01
+                        Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,   // LA separation D-4 step 6, 2026-10-01
+                        Roles.CAN_BUILD_LINK_INDEX),   // LA separation D-3 step 4, 2026-10-02
                 subject.get().capabilities());
     }
 
@@ -519,7 +522,8 @@ class OidcAuthenticatorTest {
                 Map.of("X-JWT-Assertion", assertion), null).orElseThrow();
         assertEquals("olly", olly.id());
         assertEquals(Set.of(Roles.CAN_OPERATE_RUNS, Roles.CAN_REQUEST_SHARES, Roles.CAN_MANAGE_INCIDENTS,
-                        Roles.CAN_WORK_INCIDENTS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS),   // the last: LA separation D-4 step 6
+                        Roles.CAN_WORK_INCIDENTS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,   // LA separation D-4 step 6
+                        Roles.CAN_BUILD_LINK_INDEX),   // LA separation D-3 step 4
                 olly.capabilities());
     }
 

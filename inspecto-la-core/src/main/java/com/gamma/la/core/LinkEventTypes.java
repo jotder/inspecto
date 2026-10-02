@@ -164,4 +164,19 @@ public final class LinkEventTypes {
 
     /** A graph run failed inside the engine. Adds {@code failure} (the exception CLASS name, never its message). */
     public static final String LINK_GRAPH_RUN_FAILED = "LINK_GRAPH_RUN_FAILED";
+
+    /** An edge/node index build was started ({@code POST /inv/index/builds}, LA separation D-3 step 4). {@code dataset},
+     *  {@code mappingHash} (the hash of the edge mapping - never the column names, which are the analyst's and can embed
+     *  data), {@code runId}. */
+    public static final String LINK_INDEX_BUILD_STARTED = "LINK_INDEX_BUILD_STARTED";
+
+    /** An index build published a version. Adds {@code version}, {@code rows} (rows of the relation), {@code edges}
+     *  (indexed edges per direction), {@code buckets} and {@code elapsedMs}. */
+    public static final String LINK_INDEX_BUILD_COMPLETED = "LINK_INDEX_BUILD_COMPLETED";
+
+    /** An index build was cancelled by its starter or an administrator; nothing was published. */
+    public static final String LINK_INDEX_BUILD_CANCELLED = "LINK_INDEX_BUILD_CANCELLED";
+
+    /** An index build failed; nothing was published. Adds {@code failure} (the exception CLASS name, never its message). */
+    public static final String LINK_INDEX_BUILD_FAILED = "LINK_INDEX_BUILD_FAILED";
 }

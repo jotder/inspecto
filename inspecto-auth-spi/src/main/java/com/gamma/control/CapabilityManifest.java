@@ -64,6 +64,9 @@ final class CapabilityManifest {
             // GraphRunRoutes (LA separation D-4 step 6) - starting a graph run spends compute; reading, listing and
             // cancelling one are not gated by a capability (they inherit the Investigation's access / the run's owner).
             new Entry("POST", "/inv/graph/runs", Roles.CAN_RUN_LINK_GRAPH_ANALYSIS),
+            // IndexRoutes (LA separation D-3 step 4) - a build spends compute and disk; listing the indexes, reading a build
+            // and cancelling one are not gated by a capability (they inherit the Dataset's view gate / the build's owner).
+            new Entry("POST", "/inv/index/builds", Roles.CAN_BUILD_LINK_INDEX),
             // ActionRequestRoutes (ASSURE-ACTION-REQUESTS-1) — proposing an outbound call from an Incident / Case is
             // working it; approving, declining and retrying one is oversight, the Pending Change capability reused
             // (four-eyes enforced in the handler, always).
@@ -401,6 +404,7 @@ final class CapabilityManifest {
             new Exemption("POST", "/pending-changes/([^/]+)/withdraw", "self-service", "only the AUTHOR of a Pending Change may withdraw it — the handler's author check is the gate (403 for anyone else, 403 with no Subject), so no capability could add anything; ASSURE-MAKER-CHECKER-RESIDUALS-1 (2) — pinned by ControlApiPendingChangesTest.onlyTheAuthorWithdrawsTheirOwnPendingChange"),
             new Exemption("PUT", "/notifications/preferences", "self-service", "writes the CALLER's own override in NotificationPreferenceOverrides, keyed by Subject id (the default is PUT /notifications/preferences/default, canAdminister); on Personal there is one user and it writes the single grid — pinned by ControlApiSubjectPreferencesTest.oneSubjectsPutNeverChangesAnotherSubjectsEffectiveGrid"),
             new Exemption("POST", "/inv/graph/runs/([^/]+)/cancel", "self-service", "stops a graph run only for its STARTER or an administrator - the route answers 404 (the same as an unknown run) to anyone else or to a caller who can no longer read the run's Investigation, 409 once finished, so no capability could add anything; a cancel frees compute and returns no data - pinned by ControlApiGraphRunTest.theStarterAndAnAdministratorCanCancelARunningJobAnd409AfterItFinished and anotherSubjectCannotStartReadListOrCancelYourRun"),
+            new Exemption("POST", "/inv/index/builds/([^/]+)/cancel", "self-service", "stops an index build only for its STARTER or an administrator - IndexBuildService.cancel is the gate (403 for anyone else, 409 once finished), and a build the caller cannot see (another starter's, or one whose Dataset is no longer viewable) is the 404 of an unknown id, so no capability could add anything; a cancel frees compute and disk and returns no data - pinned by ControlApiIndexTest.onlyTheStarterOrAnAdministratorCancelsAndANonStarterSeesTheNotFoundOfAnUnknownBuild"),
             // §4 read-shaped POST — a POST because the request carries a body, persists nothing. Reads are
             // open by design, so these are exempt AS READS (operator, 2026-09-15) — not "deferred".
             new Exemption("POST", "/components/transform/([^/]+)/test", "read-shaped", "dry-runs a saved component against sample rows"),

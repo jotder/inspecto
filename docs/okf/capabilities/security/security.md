@@ -268,9 +268,9 @@ existing-but-unreadable `roles.toon` suspends *all* role grants. `GET/PUT /acces
 `source: authored|seed` badges, a strike-through overlay for capabilities an Access Profile denies, and a
 Revert that removes the override.
 
-**The capability vocabulary is exactly eighteen names** — `Roles.KNOWN_CAPABILITIES`, derived from the
+**The capability vocabulary is exactly nineteen names** — `Roles.KNOWN_CAPABILITIES`, derived from the
 capabilities `CapabilityManifest` gates on (it said "eleven" until 2026-09-26, four additions after it was
-written; "fifteen" went stale too - 2026-10-01 it is eighteen with `canRunLinkGraphAnalysis`) — static across editions (a Standard-authored role file
+written; "fifteen" went stale too - 2026-10-01 it is eighteen with `canRunLinkGraphAnalysis`, 2026-10-02 nineteen with `canBuildLinkIndex`) — static across editions (a Standard-authored role file
 must validate on Personal — a per-edition validator was refused, `EDITIONS.md` SEC-10 note):
 
 | Capability | Gates |
@@ -291,6 +291,7 @@ must validate on Personal — a per-edition validator was refused, `EDITIONS.md`
 | `canRevealLinkEntities` | `POST /inv/investigations/{id}/reveal` — unmasking an entity id, per entity, audited (LA-19 / D-U6). ⛔ Deliberately not `canManageIncidents`, which every Investigation owner holds |
 | `canApproveLinkExpansions` | approving / denying a PENDING sensitive expand in someone else's Investigation — four-eyes; never makes self-approval legal (LA-19 / D-U7) |
 | `canRunLinkGraphAnalysis` | `POST /inv/graph/runs` — starting a server-side graph run over an Investigation's Working Set (LA separation D-4): a run spends compute, a read does not. Seeded to `operations`/`support`/`power`/`admin` (everyone who holds `canManageIncidents`); reads and list inherit the Investigation's access; cancel is the run's starter or an administrator and has no capability (a manifest `self-service` exemption) |
+| `canBuildLinkIndex` | `POST /inv/index/builds` — building a Link Analysis edge/node index over a Dataset (LA separation D-3 step 4): a build spends compute AND disk, a read does not. Seeded to the same roles as `canRunLinkGraphAnalysis`; listing indexes and reading a build inherit the Dataset's view gate; cancel is the build's starter or an administrator and has no capability (a manifest `self-service` exemption) |
 
 **Seed roles** (`Roles.java:121-131`): `pipeline-developer`, `app-developer`, `developer` (the builder set),
 `operations`, `power`, `admin` (`canOnboardConnections`, `canConfigureAccess`, `canApproveShares`,
