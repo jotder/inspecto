@@ -80,7 +80,7 @@ class ToolSchemaAdopterContractTest {
                     Map.of("dataset", "string", "name", "string")),
             new Payload("pipeline_author", "pipelines/pipeline-editor.component.ts (check topology)",
                     Map.of("pipeline", "object")),
-            new Payload("projection_author", "studio/link-analysis/link-analysis-query-panel.component.ts",
+            new Payload("projection_author", "inspecto-ui/projects/link-analysis/src/link-analysis/link-analysis-query-panel.component.ts",
                     // ⚠ string[], NOT {name,type}[] — this is the pair that was out of step.
                     Map.of("datasetId", "string", "columns", "array:string")),
             new Payload("suggest_expectations", "expectations/expectation-form.dialog.ts",

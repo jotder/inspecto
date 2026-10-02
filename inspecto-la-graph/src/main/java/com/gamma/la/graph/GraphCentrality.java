@@ -16,7 +16,7 @@ import java.util.Set;
 
 /**
  * Single-pass float centrality — a line-for-line port of the matching functions in
- * {@code inspecto-ui/src/app/inspecto/graph/graph-analysis.ts} (option D, spike D-S4): betweenness, closeness,
+ * {@code inspecto-ui/projects/link-analysis/src/graph/graph-analysis.ts} (option D, spike D-S4): betweenness, closeness,
  * Jaccard similarity and link prediction. The arithmetic runs in the browser's order, so the doubles agree to
  * rounding; {@code GraphCentralityParityTest} asserts them at 1e-9. Same deliberate differences as
  * {@link GraphAlgorithms}: no node cap, closed graphs (the tie-break is the shared {@code canonical-v1}).

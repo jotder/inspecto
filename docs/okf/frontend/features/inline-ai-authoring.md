@@ -80,7 +80,7 @@ sent, never by prompt inspection.
 | `expectations/expectation-form.dialog` | `suggest_expectations` | `target` + `column` controls | `schemaForm.form.patchValue(...)` + `markAsDirty()`; operator completes the two-step save |
 | `components/schema-editor.dialog` | `component_draft` (NL, `prompting`) | identity only: `{kind:'schema'}` | grid rows ← draft `raw.fields[]` + dirty; operator presses the existing Save (2026-09-25) |
 | `components/component-form.dialog` (**transform** kind only, 2026-09-25) | `component_draft` | the draft as Save writes it + the Test panel's `sampleRows` | `subtype` + `config` controls + `markAsDirty()`; operator presses the existing Save — see [*`transform` drafting*](#transform-drafting-shipped-2026-09-25) |
-| `studio/link-analysis` query panel | `projection_author` | `datasetId` + the panel's own `datasetColumns()` | `patchFormFromQuery(...)` + `markAsDirty()`; operator presses Run, then the host's Save |
+| `link-analysis` query panel (library) | `projection_author` | `datasetId` + the panel's own `datasetColumns()` | `patchFormFromQuery(...)` + `markAsDirty()`; operator presses Run, then the host's Save |
 
 ⚠ **The Link Analysis adopter is the one whose args the backend could not have resolved itself** — no tool
 or tool-layer route returns a Dataset's columns, so A3's "the pane's context *is* the args" is load-bearing

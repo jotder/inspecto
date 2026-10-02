@@ -23,8 +23,8 @@
         InMemoryGraphEngine calls it, so it is staged in the bundles beside inspecto-la-core.jar.
 
         Built only under the edition profiles (see the parent pom's profile-scoped modules), alongside
-        inspecto-geo-link. The parity tests read their fixtures from ../inspecto-ui/src/app/inspecto/graph,
-        where the TypeScript specs read them too.
+        inspecto-geo-link. The parity tests read their fixtures from ../inspecto-ui/projects/link-analysis/src/graph,
+        where the TypeScript specs read them too (D-5 step 3 moved them with the library).
     </description>
 
     <dependencies>

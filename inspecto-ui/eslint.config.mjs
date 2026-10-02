@@ -143,7 +143,7 @@ export default tseslint.config(
         // REVIEWED DECISION (D-5 prep, la-separation-feasibility-plan §7.5/§7.12): the Link Analysis and Geo
         // feature code is the future `projects/link-analysis` library. It must not import a host feature
         // (`app/modules/**`) nor escape its own folder with `../`; everything host-specific enters through the
-        // injected tokens in `app/inspecto/la-host`, provided by `modules/admin/studio/la-host.providers.ts`.
+        // injected tokens in `@inspecto/link-analysis` (`la-host`), provided by `modules/admin/studio/la-host.providers.ts`.
         // Specs are exempt (they may import host doubles). Dynamic `import()` is not seen by
         // `no-restricted-imports`, so `no-restricted-syntax` below applies the same restrictions to it.
         files: [

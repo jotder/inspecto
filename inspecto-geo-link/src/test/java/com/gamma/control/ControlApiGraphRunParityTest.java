@@ -45,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ControlApiGraphRunParityTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final Path FIXTURE = Path.of("..", "inspecto-ui", "src", "app", "inspecto", "graph", "graph-algorithms-parity.fixture.json");
+    private static final Path FIXTURE = Path.of("..", "inspecto-ui", "projects", "link-analysis", "src", "graph", "graph-algorithms-parity.fixture.json");
     private static final String TOKEN = "Bearer analyst", KIND = "k";
     private final HttpClient client = HttpClient.newHttpClient();
 

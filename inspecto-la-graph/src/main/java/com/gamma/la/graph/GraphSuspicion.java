@@ -12,7 +12,7 @@ import java.util.Map;
 
 /**
  * Composite suspicion score — a line-for-line port of {@code suspicionScore} in
- * {@code inspecto-ui/src/app/inspecto/graph/graph-analysis.ts} (option D, spike D-S4). It blends five normalised
+ * {@code inspecto-ui/projects/link-analysis/src/graph/graph-analysis.ts} (option D, spike D-S4). It blends five normalised
  * factors, each already ported and pinned by its own parity fixture: degree, betweenness, PageRank, k-core and
  * triangles. {@code GraphSuspicionParityTest} and {@code graph-suspicion-parity.spec.ts} assert the SAME fixture.
  * Differences from the browser: no node cap (the caller bounds the input); the tie-break is the shared {@code canonical-v1} (id, then label).

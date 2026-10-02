@@ -13,9 +13,9 @@ import java.util.Set;
 
 /**
  * Server-side graph algorithms — a line-for-line port of the matching functions in
- * {@code inspecto-ui/src/app/inspecto/graph/graph-analysis.ts} (option D, spike D-S4). Keep the two in step:
+ * {@code inspecto-ui/projects/link-analysis/src/graph/graph-analysis.ts} (option D, spike D-S4). Keep the two in step:
  * {@code GraphAlgorithmsParityTest} and {@code graph-algorithms-parity.spec.ts} assert the SAME hand-derived fixture
- * ({@code inspecto-ui/src/app/inspecto/graph/graph-algorithms-parity.fixture.json}).
+ * ({@code inspecto-ui/projects/link-analysis/src/graph/graph-algorithms-parity.fixture.json}).
  *
  * <p>Deliberate difference from the browser: no node cap (the caller bounds the input). Ties between equal scores break
  * by {@code canonical-v1} in BOTH languages (D-4 Decision 3): UTF-16 code-unit order on the normalised entity id, then

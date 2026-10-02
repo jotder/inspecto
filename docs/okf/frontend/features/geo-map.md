@@ -2,7 +2,7 @@
 type: Feature
 title: Geo Map Analysis
 description: The offline geographic investigation studio — GeoSource/GeoQuery over Datasets on a fully-bundled MapLibre basemap, with intelligence toolboxes and saved Geo Views.
-resource: inspecto-ui/src/app/modules/admin/studio/geo-map/
+resource: inspecto-ui/projects/link-analysis/src/geo-map/
 tags: [feature, studio, geo, maplibre, investigation]
 timestamp: 2026-07-07T00:00:00Z
 ---
@@ -21,7 +21,7 @@ The Builder-lens studio at `/studio/geo-map` for the *where* of an investigation
 [`GLOSSARY.md`](../../../GLOSSARY.md) §11-Geo (GeoSource, GeoQuery, GeoPoint/GeoRoute, Geo View, Layer,
 Geocoder — never "marker/pin" in model names).
 
-* **Fully offline** — MapLibre GL host (`src/app/inspecto/geo/`) over a bundled basemap
+* **Fully offline** — MapLibre GL host (`src/app/inspecto-ui/projects/link-analysis/src/geo/`) over a bundled basemap
   (`assets/basemap/`, ~2.7 MB). ⚠ **It is NOT PMTiles** (corrected 2026-09-08): a planet extract at z0–6
   would have been ~100 MB, so D2 took **four slimmed Natural Earth GeoJSON layers + glyph fonts**; the
   `pmtiles://` protocol was to stay registered for a customer archive and **no code references it today**.
@@ -34,7 +34,7 @@ Geocoder — never "marker/pin" in model names).
 * **Tools & layers** — measure / radius / polygon / notes-in-view; a layer manager with custom GeoJSON
   overlay upload; parallel-route bows.
 * **Saved investigations** — a **Geo View** (Component kind `geo-map-view`: GeoSource + GeoQuery +
-  display options + camera) via the shared `inspecto/investigation` lib (SavedViewStore, detail dialog,
+  display options + camera) via the library `investigation` folder (`inspecto-ui/projects/link-analysis/src/investigation/`) (SavedViewStore, detail dialog,
   `uniqueNameValidator`).
 * **Status** — UI shipped; the geo Widget via the `VizPlugin` seam shipped (Phase 4a). **Server-side
   projection shipped** — `GeoRoutes` (`POST /geo/projection`, `POST /geo/routes`) is the DuckDB-side
@@ -52,7 +52,7 @@ Geocoder — never "marker/pin" in model names).
   modest candidate then is worker-izing the O(n²) toolbox analyses, not binning. See `docs/BACKLOG.md`. **2026-07-24 SHIPPED the UI wiring**
   — `DatasetGeoSource`/`RouteProjectionGeoSource` (`geo-projection.ts`) are now **backend-first**,
   mirroring `EntityProjectionGraphSource`/`InvService`: each calls the new `GeoService`
-  (`inspecto/api/geo.service.ts`, `POST /geo/projection`|`/geo/routes`) first, folding the server's
+  (`inspecto-ui/projects/link-analysis/src/api/geo.service.ts`, `POST /geo/projection`|`/geo/routes`) first, folding the server's
   aggregated rows into the identical `GeoPoint`/`GeoRoute` shapes. ⚠ **A backend failure now SURFACES**
   — *(until 2026-09-08 this said it "falls back to the original client-side sample fold"; that arm went with
   the mock backend's deletion, and `projectPoints`/`projectRoutes` are retained as reference folds only,
@@ -71,7 +71,7 @@ case-study pack: [`geo-map-case-studies.md`](../../../archived-documents/plans-a
 Five deterministic, seeded case studies ship with the Geo Map studio — each an LCG-seeded generated
 dataset paired with a saved Dataset + Geo View, and each built to push one boundary (CS1: the
 `GEO_POINT_CAP = 5000` cap plus the 25-broken-row skip banner at 5,665 rows). Their invariants are pinned by
-`studio/geo-map/geo-case-studies.spec.ts`, so an edit cannot silently change what a case study demonstrates.
+`inspecto-ui/projects/link-analysis/src/geo-map/geo-case-studies.spec.ts`, so an edit cannot silently change what a case study demonstrates.
 The pack's original write-up (2026-08) is archived at
 [`archived-documents/plans-archive/geo-map-case-studies.md`](../../../archived-documents/plans-archive/geo-map-case-studies.md);
 the spec, not the write-up, is the source of truth for what each case shows.

@@ -2,7 +2,7 @@
 type: Feature
 title: Link Analysis
 description: The graph investigation studio — Entity Projection over Datasets rendered on the shared G6 host, with layout/algorithm toolboxes and saved Link-Analysis Views.
-resource: inspecto-ui/src/app/modules/admin/studio/link-analysis/
+resource: inspecto-ui/projects/link-analysis/src/link-analysis/
 tags: [feature, studio, graph, entity, link, g6, investigation]
 timestamp: 2026-07-07T00:00:00Z
 ---
@@ -27,7 +27,7 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
   Geo co-location bridge. Nodes are canvas-drawn — verify inspector logic in unit tests, not preview clicks.
 * **Toolboxes** — Layout (11 G6 layouts; tree shapes gated to acyclic data) and Algorithm, plus
   paths/neighborhood/centrality analysis. The **V2 algorithm depth** (2026-07-24) lives in the pure,
-  framework-free `inspecto/graph/graph-analysis.ts` library (the extension seam — a new algorithm is a
+  framework-free `inspecto-ui/projects/link-analysis/src/graph/graph-analysis.ts` library (the extension seam — a new algorithm is a
   pure `(g: G6GraphData, …) ⇒ result` drop-in) and is surfaced as accordion groups in
   `link-analysis-toolbox.component`:
   * *Advanced traversal* — `weightedShortestPath` (Dijkstra by tie strength, `edgeWeight` = folded
@@ -47,7 +47,7 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
     shared associates); packs whose shape isn't a path motif hint at the fitter tool (cycles/similarity).
   Guarded by `ANALYSIS_NODE_CAP` (2000) where super-linear; 53 pure unit tests + 11 toolbox specs.
 * **Saved investigations** — a **Link-Analysis View** (Component kind `link-analysis-view`) via the
-  shared `inspecto/investigation` lib; when its source is `entity-projection` it is renderable as a
+  shared `investigation` folder of the library (`inspecto-ui/projects/link-analysis/src/investigation/`); when its source is `entity-projection` it is renderable as a
   **Widget** (a Graph Visualization Type bound to a Dataset).
 * **Status** — UI shipped mock-first; the backend Entity Projection over real Datasets shipped
   (REQUIREMENTS INV-1, `POST /inv/projection`), including the full V1 slice (multi-mapping, multi-root,
@@ -369,7 +369,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   timestamp de-folds a projection into one edge per instant. Temporal matching is therefore honest at demo
   cardinality and needs the SQL compiler (LA-14b) at call-record scale. Comparing values within one
   dataset is unaffected by the host-timezone question, because every value is parsed the same way.
-* **A pattern can BRANCH** (LA-14b, browser half, 2026-09-23). `inspecto/graph/branching-pattern-engine.ts`
+* **A pattern can BRANCH** (LA-14b, browser half, 2026-09-23). `inspecto-ui/projects/link-analysis/src/graph/branching-pattern-engine.ts`
   (`matchBranchingPattern`) runs a motif of ordered **stages**, each a `fan-in` or `fan-out` with a minimum
   number of DISTINCT counterparties, an optional per-leg `threshold` band (`min` inclusive, `max` exclusive —
   a reporting threshold is crossed AT its value), an optional `windowHours`, and LA-14a's `afterPrevious` /

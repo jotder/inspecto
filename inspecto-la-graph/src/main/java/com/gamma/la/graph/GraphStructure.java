@@ -18,9 +18,9 @@ import java.util.Set;
 
 /**
  * Server-side graph STRUCTURE algorithms — a line-for-line port of the matching functions in
- * {@code inspecto-ui/src/app/inspecto/graph/graph-analysis.ts} (option D, spike D-S4, structure lane). Keep the two in
+ * {@code inspecto-ui/projects/link-analysis/src/graph/graph-analysis.ts} (option D, spike D-S4, structure lane). Keep the two in
  * step: {@code GraphStructureParityTest} and {@code graph-structure-parity.spec.ts} assert the SAME hand-derived fixture
- * ({@code inspecto-ui/src/app/inspecto/graph/graph-structure-parity.fixture.json}).
+ * ({@code inspecto-ui/projects/link-analysis/src/graph/graph-structure-parity.fixture.json}).
  *
  * <p>Same deliberate differences as {@link GraphAlgorithms}: no node cap ({@code cliques} does not throw), and every
  * algorithm assumes a closed graph. String compares are UTF-16 code-unit order, matching the browser's {@code canonical-v1}.

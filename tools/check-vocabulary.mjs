@@ -347,7 +347,14 @@ const CONFIG_ALLOW = {
 // Scope is `src/main/**` + the UI app, NOT test sources: test METHOD NAMES are a sentence
 // (`aFlowJobSuccessChainsADownstreamJob`), so they read as prose and carry no contract. Renaming them is
 // cosmetic and would have tripled this change for no reader benefit.
-const SOURCE_GLOBS = ['*/src/main/java/*.java', 'inspecto-ui/src/app/*.ts', 'inspecto-ui/src/app/*.html'];
+// D-5 step 3: `inspecto-ui/projects/` (the Link Analysis library) is in scope too - a scope that names only src/app would silently exempt every moved file.
+const SOURCE_GLOBS = [
+    '*/src/main/java/*.java',
+    'inspecto-ui/src/app/*.ts',
+    'inspecto-ui/src/app/*.html',
+    'inspecto-ui/projects/*.ts',
+    'inspecto-ui/projects/*.html',
+];
 /** `*.spec.ts` is the TS half of the "test names are prose" exclusion above — `src/main/**` does it for Java. */
 const SOURCE_SKIP = /\.spec\.ts$/;
 
@@ -525,7 +532,7 @@ const SOURCE_ALLOW = {
         'FLOW_KEYWORDS is the SQL **control-flow** keyword set (CASE/WHEN/…) — English sense, nothing to do with a Pipeline.',
     'inspecto-ui/src/app/modules/admin/studio/datasets/calculated-column-guard.ts::flow-identifier':
         'The TS twin of ExpressionGuard.FLOW_KEYWORDS — same SQL control-flow sense.',
-    'inspecto-ui/src/app/inspecto/graph/graph-analysis.ts::flow-identifier':
+    'inspecto-ui/projects/link-analysis/src/graph/graph-analysis.ts::flow-identifier':
         'maxFlow is the **max-flow/min-cut** graph algorithm — the mathematical sense, and the only correct name for it.',
     'inspecto-la-core/src/main/java/com/gamma/la/core/Algorithm.java::flow-identifier':
         'The catalogue entry for the max-flow/min-cut graph algorithm — the mathematical sense, kept under the name graph-analysis.ts exports so the id matches the browser.',
@@ -535,9 +542,9 @@ const SOURCE_ALLOW = {
         'Dispatches to GraphPaths.maxFlow — the max-flow/min-cut algorithm, the only correct name for it.',
     'inspecto-la-graph/src/main/java/com/gamma/la/graph/GraphPaths.java::flow-identifier':
         'The Java port of graph-analysis.ts maxFlow — the same **max-flow/min-cut** algorithm, kept under the same name so the parity fixture reads identically on both sides.',
-    'inspecto-ui/src/app/modules/admin/studio/link-analysis/link-analysis-toolbox.component.html::flow-identifier':
+    'inspecto-ui/projects/link-analysis/src/link-analysis/link-analysis-toolbox.component.html::flow-identifier':
         'The template half of the max-flow toolbox below (flowFrom/flowTo/runFlow) — same algorithmic sense.',
-    'inspecto-ui/src/app/modules/admin/studio/link-analysis/link-analysis-toolbox.component.ts::flow-identifier':
+    'inspecto-ui/projects/link-analysis/src/link-analysis/link-analysis-toolbox.component.ts::flow-identifier':
         'NOT a Pipeline: this is graph **max-flow** analysis (`flowFrom`/`flowTo`/`runFlow`), the sanctioned lowercase "flow of value" sense GLOSSARY permits — the same sense as the `circular-flow` motif pattern packs.',
 
     // ── flow-message: the word survives only where it is a CONTRACT or the max-flow sense ─────────
@@ -546,11 +553,11 @@ const SOURCE_ALLOW = {
     // 4xx body is never allowlisted: those got renamed when this rule landed.
 
     // ── the sanctioned lowercase "flow of value" sense: link-analysis max-flow, not a Pipeline ─────
-    'inspecto-ui/src/app/modules/admin/studio/link-analysis/link-analysis-toolbox.component.ts::flow-message':
+    'inspecto-ui/projects/link-analysis/src/link-analysis/link-analysis-toolbox.component.ts::flow-message':
         'User-facing labels of the max-flow/min-cut toolbox ("Flow & backbone", "No flow between the two") — the mathematical sense, same as this file\'s flow-identifier entry.',
-    'inspecto-ui/src/app/modules/admin/studio/link-analysis/link-analysis-toolbox.component.html::flow-message':
+    'inspecto-ui/projects/link-analysis/src/link-analysis/link-analysis-toolbox.component.html::flow-message':
         'The template half of the same toolbox ("Max flow / min cut", "circular flow, forwarding loops").',
-    'inspecto-ui/src/app/modules/admin/studio/link-analysis/pattern-packs.ts::flow-message':
+    'inspecto-ui/projects/link-analysis/src/link-analysis/pattern-packs.ts::flow-message':
         'The "Circular flow" MOTIF label — a money-movement pattern, the same sanctioned sense as the `circular-flow.toon` pattern packs (which CONFIG_PATH_RULES spares by name).',
 };
 

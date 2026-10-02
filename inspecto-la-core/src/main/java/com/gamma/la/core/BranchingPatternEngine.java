@@ -13,9 +13,9 @@ import java.util.Set;
 
 /**
  * The windowed search of a branching motif over the legs {@link PatternQueryCompiler} selected — a line-for-line
- * port of {@code matchBranchingPattern} in {@code inspecto-ui/src/app/inspecto/graph/branching-pattern-engine.ts}.
+ * port of {@code matchBranchingPattern} in {@code inspecto-ui/projects/link-analysis/src/graph/branching-pattern-engine.ts}.
  * Keep the two in step: {@code ControlApiInvPatternTest} and {@code branching-parity.spec.ts} assert the
- * SAME golden fixture ({@code inspecto-ui/src/app/modules/admin/studio/link-analysis/branching-parity.fixture.json}).
+ * SAME golden fixture ({@code inspecto-ui/projects/link-analysis/src/link-analysis/branching-parity.fixture.json}).
  *
  * <p>Differences from the browser, all deliberate: there is no node cap (the SQL prune bounds the input
  * instead), and the anchors of stage 0 are visited in key order rather than projection order — only which

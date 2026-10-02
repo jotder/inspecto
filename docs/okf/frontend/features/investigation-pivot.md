@@ -2,7 +2,7 @@
 type: Feature
 title: Investigation Pivot
 description: The shared contract for switching the investigation *view* (table/graph/map/timeline) on a selection without losing it — the R8 half of ui-design-review's investigation pivots.
-resource: inspecto-ui/src/app/inspecto/investigation/pivot.service.ts
+resource: inspecto-ui/projects/link-analysis/src/investigation/pivot.service.ts
 tags: [feature, investigation, link-analysis, geo-map, cross-cutting]
 timestamp: 2026-07-20T00:00:00Z
 ---
@@ -18,7 +18,7 @@ BACKLOG §4), wired into the two hosts that exist today. `table` was already cov
 `ElementDetailDialog`'s pre-existing "Open record" action (R8's first half); `timeline` has no host
 yet and was not invented.
 
-* **`PivotService`** (`inspecto/investigation/pivot.service.ts`, root-provided):
+* **`PivotService`** (`inspecto-ui/projects/link-analysis/src/investigation/pivot.service.ts`, root-provided):
   * `pivotTo(view, ref)` — navigates to the target host (`/studio/link-analysis` for `'graph'`,
     `/studio/geo-map` for `'map'`) carrying the selection's `ElementObjectRef` (Incident/Case id) as
     `pivotId`/`pivotType` query params.

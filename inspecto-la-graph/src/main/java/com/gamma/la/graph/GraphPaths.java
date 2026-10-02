@@ -18,9 +18,9 @@ import java.util.Set;
 
 /**
  * Server-side path and flow algorithms — a line-for-line port of the matching functions in
- * {@code inspecto-ui/src/app/inspecto/graph/graph-analysis.ts} (option D, spike D-S4, the paths-and-flow lane).
+ * {@code inspecto-ui/projects/link-analysis/src/graph/graph-analysis.ts} (option D, spike D-S4, the paths-and-flow lane).
  * {@code GraphPathsParityTest} and {@code graph-paths-parity.spec.ts} assert the SAME hand-derived fixture
- * ({@code inspecto-ui/src/app/inspecto/graph/graph-paths-parity.fixture.json}).
+ * ({@code inspecto-ui/projects/link-analysis/src/graph/graph-paths-parity.fixture.json}).
  *
  * <p>Same deliberate differences as {@link GraphAlgorithms}: no node cap, closed
  * graphs (id compares are UTF-16 code-unit order, the same {@code canonical-v1} as the browser). The browser reads an edge's weight from its {@code data}; {@link GraphAlgorithms.Edge} carries none, so the

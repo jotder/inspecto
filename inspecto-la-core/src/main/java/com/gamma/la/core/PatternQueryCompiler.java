@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 
 /**
  * <b>Branching pattern compiler (LA-14b, server half)</b> — compiles the SAME motif model the browser matcher
- * takes ({@code inspecto-ui/src/app/inspecto/graph/branching-pattern-engine.ts}: ordered {@code fan-in} /
+ * takes ({@code inspecto-ui/projects/link-analysis/src/graph/branching-pattern-engine.ts}: ordered {@code fan-in} /
  * {@code fan-out} stages, distinct-counterparty breadth, per-leg threshold band, window, LA-14a ordering) to
  * DuckDB SQL over a whole Dataset.
  *

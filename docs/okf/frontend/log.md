@@ -47,7 +47,7 @@
 * **R8 pivot-bar SHIPPED** (ui-design-review, BACKLOG §4 — was design-only "wait for two hosts"): the
   shared investigation-pivot contract, scoped exactly to the doc's one-line direction — switching the
   *view* (table/graph/map/timeline) over the same selection, no more. New `PivotService`
-  (`inspecto/investigation/pivot.service.ts`): `pivotTo(view, ref)` navigates to the target host with the
+  (`inspecto-ui/projects/link-analysis/src/investigation/pivot.service.ts`): `pivotTo(view, ref)` navigates to the target host with the
   selection's `ElementObjectRef` as query params (`pivotId`/`pivotType`); `readIncoming(route)` reads it
   back. `ElementDetailDialog` gained `pivotViews?: PivotView[]` and renders a button per offered view,
   calling the service directly and closing — hosts don't handle a new result kind. Wired into the two

@@ -46,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ControlApiInvPatternTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final Path FIXTURE = Path.of("..", "inspecto-ui", "src", "app", "modules", "admin", "studio",
+    private static final Path FIXTURE = Path.of("..", "inspecto-ui", "projects", "link-analysis", "src",
             "link-analysis", "branching-parity.fixture.json");
     private final HttpClient client = HttpClient.newHttpClient();
 

@@ -18,7 +18,7 @@ import java.util.TreeMap;
 /**
  * Server-side iterative-centrality and community algorithms — a line-for-line port of {@code pageRank},
  * {@code eigenvectorCentrality}, {@code katzCentrality}, {@code hits}, {@code detectCommunities} and
- * {@code louvainCommunities} in {@code inspecto-ui/src/app/inspecto/graph/graph-analysis.ts} (option D, spike D-S4).
+ * {@code louvainCommunities} in {@code inspecto-ui/projects/link-analysis/src/graph/graph-analysis.ts} (option D, spike D-S4).
  * {@code GraphIterativeParityTest} and {@code graph-iterative-parity.spec.ts} assert the SAME fixture
  * ({@code graph-iterative-parity.fixture.json}), scores to 1e-9.
  *

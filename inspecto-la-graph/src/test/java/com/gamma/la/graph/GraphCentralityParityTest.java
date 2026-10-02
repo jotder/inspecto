@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class GraphCentralityParityTest {
 
-    private static final Path FIXTURE = Path.of("..", "inspecto-ui", "src", "app", "inspecto", "graph",
+    private static final Path FIXTURE = Path.of("..", "inspecto-ui", "projects", "link-analysis", "src", "graph",
             "graph-centrality-parity.fixture.json");
 
     private static JsonNode fx;
