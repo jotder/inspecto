@@ -91,7 +91,7 @@ class IndexStalenessTest {
         InputFingerprint files = InputFingerprint.ofFiles(List.of(A));
         InputFingerprint none = InputFingerprint.noFiles("SELECT 1");
         for (IndexManifest m : List.of(manifest(none, false, "sql", "hash_mod", "1.4"), manifest(files, true, "sql", "hash_mod", "1.4"))) {
-            for (InputFingerprint now : new InputFingerprint[] {none, InputFingerprint.tooMany(100_000), null}) {
+            for (InputFingerprint now : new InputFingerprint[] {none, InputFingerprint.tooMany(InputFingerprint.MAX_FILES), null}) {
                 IndexStaleness.Result r = at(m, now);
                 assertFalse(r.stale(), String.valueOf(now));
                 assertFalse(r.fingerprintKnown(), String.valueOf(now));
@@ -107,6 +107,7 @@ class IndexStalenessTest {
     void theFingerprintIsOrderIndependentAndPathRelative() {
         assertEquals(InputFingerprint.ofFiles(List.of(A, B)).value(), InputFingerprint.ofFiles(List.of(B, A)).value());
         assertTrue(InputFingerprint.noFiles("x").value().startsWith("no-files:"));
-        assertEquals("too-many-files:100000", InputFingerprint.tooMany(InputFingerprint.MAX_FILES).value());
+        assertEquals(10_000, InputFingerprint.MAX_FILES);
+        assertEquals("too-many-files:10000", InputFingerprint.tooMany(InputFingerprint.MAX_FILES).value());
     }
 }

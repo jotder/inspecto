@@ -28,7 +28,7 @@ import java.util.List;
 public record InputFingerprint(String value, List<FileStamp> files) {
 
     /** Most files a fingerprint is taken over; above this the sentinel {@code too-many-files:<MAX_FILES>} is used. */
-    public static final int MAX_FILES = 100_000;
+    public static final int MAX_FILES = 10_000;
 
     public static final String FILES = "files:";
     public static final String NO_FILES = "no-files:";

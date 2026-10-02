@@ -173,7 +173,7 @@ final class IndexedRecursivePaths {
         beforeRead.run();                                                                    // four-eyes, exactly as the flat path
         IndexedTraversal.Params p = new IndexedTraversal.Params(rq.startNode(), rq.targetNode(), rq.undirected(), rq.maxDepth(),
                 rq.maxEdges(), rq.limit(), rq.tsCol() != null, rq.monotonic(), rq.maxHours(), filterSql);
-        try (IndexReader reader = IndexReader.open(chosen.dir(), manifest, policy)) {
+        try (IndexReader reader = IndexReader.borrow(chosen.dir(), manifest, policy)) {
             IndexedTraversal.Result r = IndexedTraversal.walk(reader, p);
             return new Outcome(r, manifest.version(), staleReason != null, staleReason, null, st.reasons(), st.fingerprintKnown(), null);
         } catch (IndexedTraversal.FrontierOverCap over) {

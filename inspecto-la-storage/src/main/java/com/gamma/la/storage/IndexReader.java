@@ -40,10 +40,65 @@ public final class IndexReader implements AutoCloseable {
 
     private final SqlSandbox sandbox;
     private final int buckets;
+    /** Non-null for a reader lent by {@link #borrow}: {@link #close()} then returns it to the pool instead of closing it. */
+    private Path pooledKey;
 
     private IndexReader(SqlSandbox sandbox, int buckets) {
         this.sandbox = sandbox;
         this.buckets = buckets;
+    }
+
+    // ── the pool: idle sealed readers per version directory (LA-INDEX-READER-POOL-1) ─────────────────────────────
+
+    private static final int MAX_IDLE_PER_VERSION = 4;
+    private static final Map<Path, java.util.ArrayDeque<IndexReader>> IDLE = new LinkedHashMap<>();
+    /** How many sealed connections were really opened (the pool test counts reuse by this). */
+    static final java.util.concurrent.atomic.AtomicLong OPENS = new java.util.concurrent.atomic.AtomicLong();
+
+    /**
+     * As {@link #open}, but reuses an idle sealed reader of the same version directory when there is one; {@link #close()}
+     * returns it. Borrowing a version closes the idle readers of every SIBLING version (same parent directory): CURRENT
+     * moved on, so the older version's handles are dead weight.
+     */
+    public static IndexReader borrow(Path versionDir, IndexManifest manifest, SqlSandboxPolicy policy) throws SQLException, IOException {
+        Path key = versionDir.toAbsolutePath().normalize();
+        List<IndexReader> evicted = new ArrayList<>();
+        IndexReader idle = null;
+        synchronized (IDLE) {
+            Path parent = key.getParent();
+            IDLE.entrySet().removeIf(e -> {
+                boolean sibling = !e.getKey().equals(key) && java.util.Objects.equals(e.getKey().getParent(), parent);
+                if (sibling) evicted.addAll(e.getValue());
+                return sibling;
+            });
+            java.util.ArrayDeque<IndexReader> q = IDLE.get(key);
+            if (q != null) idle = q.pollFirst();
+        }
+        evicted.forEach(IndexReader::closeNow);
+        if (idle == null) {
+            idle = open(key, manifest, policy);
+            OPENS.incrementAndGet();
+        }
+        idle.pooledKey = key;
+        return idle;
+    }
+
+    /** Closes every idle pooled reader (service shutdown, tests). */
+    public static void evictAll() {
+        List<IndexReader> all = new ArrayList<>();
+        synchronized (IDLE) {
+            IDLE.values().forEach(all::addAll);
+            IDLE.clear();
+        }
+        all.forEach(IndexReader::closeNow);
+    }
+
+    /** Idle readers currently pooled for {@code versionDir}. */
+    static int idleCount(Path versionDir) {
+        synchronized (IDLE) {
+            java.util.ArrayDeque<IndexReader> q = IDLE.get(versionDir.toAbsolutePath().normalize());
+            return q == null ? 0 : q.size();
+        }
     }
 
     /** Opens the views, then seals the connection to {@code versionDir}. */
@@ -114,6 +169,24 @@ public final class IndexReader implements AutoCloseable {
 
     @Override
     public void close() {
+        Path key = pooledKey;
+        if (key == null) {
+            sandbox.close();
+            return;
+        }
+        pooledKey = null;
+        synchronized (IDLE) {
+            // a superseded version's late return is re-pooled here and closed by the next borrow of a sibling version
+            java.util.ArrayDeque<IndexReader> q = IDLE.computeIfAbsent(key, k -> new java.util.ArrayDeque<>());
+            if (q.size() < MAX_IDLE_PER_VERSION) {
+                q.addFirst(this);
+                return;
+            }
+        }
+        sandbox.close();
+    }
+
+    private void closeNow() {
         sandbox.close();
     }
 }

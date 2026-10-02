@@ -268,4 +268,17 @@ class DatasetRelationTest {
                 "physicalRef", "cdr",
                 "columns", List.of("id", Map.of("name", "event_time", "role", "temporal")))));
     }
+
+    @Test
+    void inputFilesAtTheLimitAreListedAndOneOverIsFlagged(@TempDir Path root) throws Exception {
+        Path store = Files.createDirectories(root.resolve("orders"));
+        for (int i = 0; i < 3; i++) Files.writeString(store.resolve("p" + i + ".parquet"), "x");
+        Map<String, Object> ds = Map.of("physicalRef", "orders");
+        DatasetRelation.InputFiles atCap = DatasetRelation.inputFiles(ds, root, 3).orElseThrow();
+        assertFalse(atCap.overLimit());
+        assertEquals(3, atCap.files().size());
+        DatasetRelation.InputFiles over = DatasetRelation.inputFiles(ds, root, 2).orElseThrow();
+        assertTrue(over.overLimit());
+        assertTrue(over.files().isEmpty());
+    }
 }
