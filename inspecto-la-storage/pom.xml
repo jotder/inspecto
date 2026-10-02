@@ -33,6 +33,12 @@
             <artifactId>inspecto-la-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- The sealed read connection (SqlSandbox) and its policy; already in the allowed closure via la-core. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-sql</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
