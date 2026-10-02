@@ -84,3 +84,18 @@ test('the real ALLOWED table is internally consistent: no module may allow a hos
     const host = ['inspecto-processor', 'inspecto-engine', 'inspecto-etl', 'inspecto-acquire', 'inspecto-event'];
     for (const [m, ok] of Object.entries(ALLOWED)) for (const h of host) assert.ok(!ok.includes(h), `${m} must not allow ${h}`);
 });
+
+test('D-3: la-storage may reach la-core, but la-core reaching la-storage is RED and la-storage reaching the engine is RED', () => {
+    assert.ok(ALLOWED['inspecto-la-storage'].includes('inspecto-la-core'));
+    assert.ok(!ALLOWED['inspecto-la-core'].includes('inspecto-la-storage'));
+    const policy = { 'inspecto-la-core': ALLOWED['inspecto-la-core'], 'inspecto-la-storage': ALLOWED['inspecto-la-storage'] };
+    const ok = {
+        'inspecto-la-core': pom([], enforcer(ALLOWED['inspecto-la-core'])),
+        'inspecto-la-storage': pom([dep('inspecto-la-core')], enforcer(ALLOWED['inspecto-la-storage'])),
+    };
+    assert.deepEqual(run(ok, policy), []);
+    const back = { ...ok, 'inspecto-la-core': pom([dep('inspecto-la-storage')], enforcer(ALLOWED['inspecto-la-core'])) };
+    assert.match(run(back, policy).join(' '), /inspecto-la-core reaches inspecto-la-storage/);
+    const engine = { ...ok, 'inspecto-la-storage': pom([dep('inspecto-la-core'), dep('inspecto-engine')], enforcer(ALLOWED['inspecto-la-storage'])), 'inspecto-engine': pom([]) };
+    assert.match(run(engine, policy).join(' '), /inspecto-la-storage reaches inspecto-engine/);
+});
