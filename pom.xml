@@ -100,6 +100,7 @@
                 <module>inspecto-la-api</module>
                 <module>inspecto-geo-link</module>
                 <module>inspecto-la-graph</module>
+                <module>inspecto-la-storage</module>
                 <!-- EDG-01 cell 4 (2026-09-07): cross-space exchange / sharing. SEC-10 is "not for Personal";
                      the com.gamma.exchange domain + ExchangeRoutes lived in the core. -->
                 <module>inspecto-exchange</module>
@@ -137,6 +138,7 @@
                 <module>inspecto-la-api</module>
                 <module>inspecto-geo-link</module>
                 <module>inspecto-la-graph</module>
+                <module>inspecto-la-storage</module>
                 <module>inspecto-exchange</module>
                 <module>inspecto-metrics</module>
                 <module>inspecto-events</module>
@@ -165,6 +167,7 @@
                 <module>inspecto-la-api</module>
                 <module>inspecto-geo-link</module>
                 <module>inspecto-la-graph</module>
+                <module>inspecto-la-storage</module>
                 <module>inspecto-exchange</module>
                 <module>inspecto-metrics</module>
                 <module>inspecto-events</module>
@@ -186,6 +189,7 @@
                 <module>inspecto-la-api</module>
                 <module>inspecto-geo-link</module>
                 <module>inspecto-la-graph</module>
+                <module>inspecto-la-storage</module>
                 <module>inspecto-exchange</module>
                 <module>inspecto-metrics</module>
                 <module>inspecto-events</module>

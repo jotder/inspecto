@@ -23,6 +23,7 @@
 /inspecto-http-spi/target/
 /inspecto-entity-store/target/
 /inspecto-la-graph/target/
+/inspecto-la-storage/target/
 /inspecto-event/target/
 /inspecto-acquire/target/
 /inspecto-engine/target/
