@@ -126,24 +126,40 @@ if (wantBackend && csvs.length === 0 && explicit) {
 
 const perModule = [];
 const totals = { im: 0, ic: 0, bm: 0, bc: 0, lm: 0, lc: 0 };
+// ⚠ LA-COVERAGE-FLOOR-HOME-1 (2026-10-02). jacoco credits a class only to the module that OWNS it, but the Link
+// Analysis routes are tested in inspecto-geo-link (its real-HTTP tests need its fixtures), so inspecto-la-api read
+// 2.4% while its code was exercised. geo-link's coverage profile therefore also writes
+// `target/site/jacoco-aggregate/jacoco.csv` (its own execution data over its reactor dependencies' classes). Every
+// row from every report goes into ONE map keyed by package+class and the row with the most covered instructions
+// wins — so a class reported by two modules is counted once, at its best, and a class with no extra report is
+// unchanged. The per-module table below still reads each module's own report, for context only.
+const best = new Map();
+const keep = (head, f) => {
+    const col = (n) => Number(f[head.indexOf(n)] || 0);
+    const key = f[head.indexOf('PACKAGE')] + '|' + f[head.indexOf('CLASS')];
+    const row = { im: col('INSTRUCTION_MISSED'), ic: col('INSTRUCTION_COVERED'), bm: col('BRANCH_MISSED'), bc: col('BRANCH_COVERED'), lm: col('LINE_MISSED'), lc: col('LINE_COVERED') };
+    const old = best.get(key);
+    if (!old || row.ic > old.ic) best.set(key, row);
+    return row;
+};
 for (const csv of csvs) {
     const mod = csv.replace(repoRoot + sep, '').split(sep + 'target')[0];
     const lines = readFileSync(csv, 'utf8').trim().split(/\r?\n/);
     const head = splitCsvLine(lines[0]);
-    const idx = (n) => head.indexOf(n);
     const m = { im: 0, ic: 0, bm: 0, bc: 0, lm: 0, lc: 0 };
     for (const line of lines.slice(1)) {
-        const f = splitCsvLine(line);
-        m.im += Number(f[idx('INSTRUCTION_MISSED')] || 0);
-        m.ic += Number(f[idx('INSTRUCTION_COVERED')] || 0);
-        m.bm += Number(f[idx('BRANCH_MISSED')] || 0);
-        m.bc += Number(f[idx('BRANCH_COVERED')] || 0);
-        m.lm += Number(f[idx('LINE_MISSED')] || 0);
-        m.lc += Number(f[idx('LINE_COVERED')] || 0);
+        const r = keep(head, splitCsvLine(line));
+        for (const k of Object.keys(m)) m[k] += r[k];
     }
-    for (const k of Object.keys(totals)) totals[k] += m[k];
+    const agg = join(csv, '..', '..', 'jacoco-aggregate', 'jacoco.csv');
+    if (existsSync(agg)) {
+        const al = readFileSync(agg, 'utf8').trim().split(/\r?\n/);
+        const ah = splitCsvLine(al[0]);
+        for (const line of al.slice(1)) keep(ah, splitCsvLine(line));
+    }
     perModule.push({ mod, instr: pct(m.ic, m.im), branch: pct(m.bc, m.bm), size: m.ic + m.im });
 }
+for (const r of best.values()) for (const k of Object.keys(totals)) totals[k] += r[k];
 
 // null when there is no backend data at all — the shape `ui` already uses, so the report can skip a
 // half it does not have instead of formatting nulls.

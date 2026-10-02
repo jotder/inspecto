@@ -88,4 +88,28 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+    <!-- LA-COVERAGE-FLOOR-HOME-1: the Link Analysis routes are tested HERE (real-HTTP ControlApi tests need geo-link's
+         fixtures), but jacoco credits a class only to the module that owns it, so inspecto-la-api/-core/-graph/-storage
+         read near zero. This writes target/site/jacoco-aggregate/jacoco.csv covering those modules' classes with this
+         module's execution data; tools/check-coverage.mjs keeps the better row per class, so nothing double counts. -->
+    <profiles>
+        <profile>
+            <id>coverage</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>report-aggregate</id>
+                                <phase>test</phase>
+                                <goals><goal>report-aggregate</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
