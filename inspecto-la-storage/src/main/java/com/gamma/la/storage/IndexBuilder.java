@@ -191,12 +191,46 @@ public final class IndexBuilder {
      * estimate of {@link IndexBuildService} needs it BEFORE a build is queued.
      */
     public static long countRows(String relationSql) {
+        return countRows(relationSql, 0L);
+    }
+
+    private static final ScheduledExecutorService ESTIMATE_TIMER = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "la-index-estimate-timer");
+        t.setDaemon(true);
+        return t;
+    });
+
+    /** The count ran past its statement timeout and was cancelled; nothing about the relation is known. */
+    public static final class EstimateTimeoutException extends IndexBuildException {
+        public EstimateTimeoutException(long timeoutMs) {
+            super("counting the relation's rows did not finish within " + timeoutMs + " ms");
+        }
+    }
+
+    /**
+     * {@link #countRows(String)} bounded by a statement timeout: the running statement is cancelled from a timer after
+     * {@code timeoutMs} (0 = unbounded) and {@link EstimateTimeoutException} is thrown.
+     */
+    public static long countRows(String relationSql, long timeoutMs) {
         String inner = relationSql.strip().replaceAll(";+\\s*$", "");
-        try (Connection c = open(null, null, null); Statement s = c.createStatement();
-             ResultSet rs = s.executeQuery("SELECT count(*) FROM (" + inner + ") __la_count")) {
-            rs.next();
-            return rs.getLong(1);
+        java.util.concurrent.atomic.AtomicBoolean timedOut = new java.util.concurrent.atomic.AtomicBoolean();
+        try (Connection c = open(null, null, null); Statement s = c.createStatement()) {
+            java.util.concurrent.ScheduledFuture<?> guard = timeoutMs <= 0 ? null : ESTIMATE_TIMER.schedule(() -> {
+                timedOut.set(true);
+                try {
+                    s.cancel();
+                } catch (SQLException ignored) {
+                    // finished in the same instant
+                }
+            }, timeoutMs, TimeUnit.MILLISECONDS);
+            try (ResultSet rs = s.executeQuery("SELECT count(*) FROM (" + inner + ") __la_count")) {
+                rs.next();
+                return rs.getLong(1);
+            } finally {
+                if (guard != null) guard.cancel(false);
+            }
         } catch (SQLException e) {
+            if (timedOut.get()) throw new EstimateTimeoutException(timeoutMs);
             throw new IndexBuildException("cannot count the rows of the relation: " + e.getMessage(), e);
         }
     }

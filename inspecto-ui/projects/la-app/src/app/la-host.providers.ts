@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, Provider, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
-import { map, throwError } from 'rxjs';
+import { map, of } from 'rxjs';
 import { AiAssistComponent } from '@inspecto/core/ai-assist/ai-assist.component';
 import { AiExplainComponent } from '@inspecto/core/ai-assist/ai-explain.component';
 import { ComponentsService } from '@inspecto/core/api/components.service';
@@ -160,7 +160,10 @@ export function provideLaAppHostServices(): Provider[] {
                 reportAbsent('LA_WIDGETS');
                 return {
                     available: false,
-                    saveWorkingSetWidget: () => throwError(() => new Error('LA_WIDGETS: not available in la-app.')),
+                    saveWorkingSetWidget: () => {
+                        reportAbsent('LA_WIDGETS'); // absence is reported once, never thrown: the affordance is hidden by available:false
+                        return of(null);
+                    },
                 };
             },
         },

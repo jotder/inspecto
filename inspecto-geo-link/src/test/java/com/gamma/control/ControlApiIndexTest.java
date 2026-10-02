@@ -442,7 +442,9 @@ class ControlApiIndexTest {
             HttpResponse<String> dup = send(c, "POST", "/inv/index/builds", SHARED_BUILD, OWNER);
             assertEquals(409, dup.statusCode(), dup.body());
             assertTrue(dup.body().contains(id), "names the live build: " + dup.body());
-            assertEquals(409, send(c, "POST", "/inv/index/builds", SHARED_BUILD, VIEWER).statusCode(), "another caller starting the same index is the same duplicate");
+            HttpResponse<String> other = send(c, "POST", "/inv/index/builds", SHARED_BUILD, VIEWER);
+            assertEquals(409, other.statusCode(), "another caller starting the same index is the same duplicate");
+            assertFalse(other.body().contains(id), "another viewer does not learn the starter's build id: " + other.body());
             start(c, SHARED_BUILD_2, OWNER);                                                         // another mapping = another index
             probe.release = true;
             awaitStatus(c, id, OWNER, "COMPLETED");

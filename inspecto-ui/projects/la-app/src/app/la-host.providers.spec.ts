@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
+import { firstValueFrom } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import {
@@ -83,6 +84,13 @@ describe('la-app host provider set', () => {
             'LA_PIPELINE_GRAPH',
             'LA_DASHBOARD_HEADER',
         ]);
+    });
+
+    it('the absent Widgets stub reports absence and completes with a neutral value instead of erroring', async () => {
+        const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+        const widgets = TestBed.inject(LA_WIDGETS);
+        await expect(firstValueFrom(widgets.saveWorkingSetWidget({} as never))).resolves.toBeNull();
+        expect(info.mock.calls.length).toBeLessThanOrEqual(1);
     });
 
     it('LA_FEATURES is the live SessionService flags, not a copy', () => {

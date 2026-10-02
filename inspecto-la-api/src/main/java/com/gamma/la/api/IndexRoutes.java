@@ -422,8 +422,8 @@ public final class IndexRoutes implements RouteModule {
             case NOT_FOUND -> new ApiException(404, ErrorCodes.NOT_FOUND, e.getMessage());
             case FORBIDDEN -> new ApiException(403, ErrorCodes.PERMISSION_DENIED, e.getMessage());
             case TERMINAL, DUPLICATE -> new ApiException(409, ErrorCodes.CONFLICT, e.getMessage());
-            case OVER_BUDGET -> new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
-            case REJECTED -> new ApiException(503, ErrorCodes.STORE_BUSY, e.getMessage());
+            case OVER_BUDGET, ESTIMATE_TIMEOUT -> new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+            case REJECTED, ESTIMATE_BUSY -> new ApiException(503, ErrorCodes.STORE_BUSY, e.getMessage());
         };
     }
 

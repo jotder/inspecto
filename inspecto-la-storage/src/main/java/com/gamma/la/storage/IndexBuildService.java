@@ -39,6 +39,9 @@ import java.util.function.LongSupplier;
  * <p><b>Disk budget.</b> When {@link Request#maxDiskBytes()} is positive, {@link #submit} counts the relation's rows
  * ({@link IndexBuilder#countRows}) and refuses ({@link Refused.Kind#OVER_BUDGET}) an {@linkplain #estimateBytes estimate}
  * above it, with the estimate in the message, BEFORE a run exists or a byte is written. 0 = no limit and no extra pass.
+ * The duplicate check runs FIRST (no I/O); the count is bounded by {@link #ESTIMATE_TIMEOUT_MS} (a timeout refuses,
+ * {@link Refused.Kind#ESTIMATE_TIMEOUT} - the budget is never silently skipped) and at most {@link #MAX_CONCURRENT_ESTIMATES}
+ * run at once ({@link Refused.Kind#ESTIMATE_BUSY}), so parallel submits cannot pin every request thread.
  */
 public final class IndexBuildService implements AutoCloseable {
 
@@ -122,7 +125,7 @@ public final class IndexBuildService implements AutoCloseable {
 
     /** Why the service refused to do what was asked. The message is safe to show: it names no row value. */
     public static final class Refused extends RuntimeException {
-        public enum Kind { NOT_FOUND, FORBIDDEN, TERMINAL, REJECTED, DUPLICATE, OVER_BUDGET }
+        public enum Kind { NOT_FOUND, FORBIDDEN, TERMINAL, REJECTED, DUPLICATE, OVER_BUDGET, ESTIMATE_TIMEOUT, ESTIMATE_BUSY }
 
         private final Kind kind;
 
@@ -134,6 +137,23 @@ public final class IndexBuildService implements AutoCloseable {
         public Kind kind() {
             return kind;
         }
+    }
+
+    /** The longest a budget estimate (a full row count on the request thread) may run before the submit is refused. */
+    public static final long ESTIMATE_TIMEOUT_MS = 10_000L;
+    /** How many budget estimates may run at once in one service. */
+    public static final int MAX_CONCURRENT_ESTIMATES = 2;
+    private final java.util.concurrent.Semaphore estimates = new java.util.concurrent.Semaphore(MAX_CONCURRENT_ESTIMATES);
+    private volatile long estimateTimeoutMs = ESTIMATE_TIMEOUT_MS;
+
+    /** How many estimates are running right now (tests). */
+    int estimatesInFlight() {
+        return MAX_CONCURRENT_ESTIMATES - estimates.availablePermits();
+    }
+
+    /** Test seam: shortens the estimate timeout. */
+    void estimateTimeoutMs(long ms) {
+        this.estimateTimeoutMs = ms;
     }
 
     /** How long an idle worker thread lives before it ends (a new build starts a fresh one): an unused service holds no threads. */
@@ -226,8 +246,25 @@ public final class IndexBuildService implements AutoCloseable {
         Relation rel = req.source().resolve(req.datasetId());          // the caller's gate; throws for a dataset it may not build over
         String hash = req.mapping().hash();
         String key = new IndexStore(indexRoot, req.datasetId(), hash).directory().toString();   // the on-disk identity (case-folded, normalised)
+        synchronized (runs) {                                           // cheap and I/O-free, so a duplicate never pays for the count
+            sweepRuns(clock.getAsLong());
+            Run dup = liveRun(key);
+            if (dup != null) throw duplicate(dup, req.owner());
+        }
         if (req.maxDiskBytes() > 0) {
-            long rows = IndexBuilder.countRows(rel.relationSql());
+            if (!estimates.tryAcquire())
+                throw new Refused(Refused.Kind.ESTIMATE_BUSY, "too many index size estimates are running (" + MAX_CONCURRENT_ESTIMATES
+                        + ") - try again shortly");
+            long rows;
+            try {
+                rows = IndexBuilder.countRows(rel.relationSql(), estimateTimeoutMs);
+            } catch (IndexBuilder.EstimateTimeoutException e) {
+                throw new Refused(Refused.Kind.ESTIMATE_TIMEOUT, "the index size estimate timed out after " + estimateTimeoutMs
+                        + " ms, so index.max_disk_bytes = " + req.maxDiskBytes() + " cannot be checked; set index.max_disk_bytes to 0"
+                        + " (no limit) to build without a budget, or build over a smaller Dataset");
+            } finally {
+                estimates.release();
+            }
             long estimate = estimateBytes(rows);
             if (estimate > req.maxDiskBytes())
                 throw new Refused(Refused.Kind.OVER_BUDGET, "the index is estimated at " + estimate + " bytes (" + rows + " rows x "
@@ -238,10 +275,8 @@ public final class IndexBuildService implements AutoCloseable {
         Run run = new Run("ib-" + UUID.randomUUID(), req, rel, hash, key, now);
         synchronized (runs) {
             sweepRuns(now);
-            for (Run r : runs.values())
-                if (r.key.equals(key) && !r.status().terminal())
-                    throw new Refused(Refused.Kind.DUPLICATE, "an index build for this Dataset and mapping is already "
-                            + r.status().name().toLowerCase(java.util.Locale.ROOT) + " (" + r.id + ")");
+            Run dup = liveRun(key);
+            if (dup != null) throw duplicate(dup, req.owner());
             runs.put(run.id, run);
         }
         try {
@@ -254,6 +289,21 @@ public final class IndexBuildService implements AutoCloseable {
                     + limits.queue() + " waiting) - try again shortly");
         }
         return run.view();
+    }
+
+    /** The queued or running build of this index key, or null. Caller holds {@code runs}. */
+    private Run liveRun(String key) {
+        for (Run r : runs.values())
+            if (r.key.equals(key) && !r.status().terminal()) return r;
+        return null;
+    }
+
+    /** The build id and status are the starter's: another caller (both share one key) is told only that a build is running. */
+    private static Refused duplicate(Run r, String caller) {
+        String what = r.owner.equals(caller)
+                ? "an index build for this Dataset and mapping is already " + r.status().name().toLowerCase(java.util.Locale.ROOT) + " (" + r.id + ")"
+                : "a build of this index is already running";
+        return new Refused(Refused.Kind.DUPLICATE, what);
     }
 
     /** The build's current view. @throws Refused {@code NOT_FOUND} when it never existed or retention dropped it */

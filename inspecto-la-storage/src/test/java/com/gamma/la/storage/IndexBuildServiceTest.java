@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -24,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -165,13 +168,84 @@ class IndexBuildServiceTest {
         RunView first = s.submit(req("ana", "d", M1));
         Refused dup = assertThrows(Refused.class, () -> s.submit(req("bob", "d", M1)));
         assertEquals(Refused.Kind.DUPLICATE, dup.kind());
-        assertTrue(dup.getMessage().contains(first.id()), dup.getMessage());
+        assertFalse(dup.getMessage().contains(first.id()), "another viewer's build id is not leaked: " + dup.getMessage());
+        assertTrue(assertThrows(Refused.class, () -> s.submit(req("ana", "d", M1))).getMessage().contains(first.id()),
+                "the starter is told their own build id");
         assertDoesNotThrow(() -> s.submit(req("ana", "d", M2)), "another mapping is another index");
         assertDoesNotThrow(() -> s.submit(req("ana", "other", M1)), "another Dataset is another index");
         f.release = true;
         s.await(first.id(), 30_000);
         until(() -> s.active() == 0, "all builds finished");
         assertDoesNotThrow(() -> s.submit(req("ana", "d", M1)), "once the first finished, the same index may be built again");
+    }
+
+    private static final String SLOW_SQL = "SELECT CAST(a.range AS VARCHAR) AS s, CAST(b.range AS VARCHAR) AS t FROM range(100000000) a, "
+            + "range(100000000) b WHERE (a.range * 31 + b.range) % 1000003 = 0";
+
+    @Test
+    void theDuplicateIsRefusedBeforeTheEstimateRuns(@TempDir Path tmp) {
+        Fake f = new Fake();
+        IndexBuildService s = service(tmp, limits(2, 4), System::currentTimeMillis, null, f);
+        s.submit(req("ana", "d", M1));
+        AtomicInteger resolves = new AtomicInteger();
+        // a relation that cannot be counted: were the estimate to run first, this would fail with an IndexBuildException, not DUPLICATE
+        Relation broken = new Relation("SELECT * FROM no_such_relation_anywhere", "fp");
+        Refused dup = assertThrows(Refused.class, () -> s.submit(new IndexBuildService.Request("bob", "d", M1,
+                ds -> {
+                    resolves.incrementAndGet();
+                    return broken;
+                }, 1_000_000L, 2)));
+        assertEquals(Refused.Kind.DUPLICATE, dup.kind());
+        assertEquals(1, resolves.get(), "the gate ran, the count did not");
+    }
+
+    @Test
+    void anEstimateThatTimesOutRefusesAndNeverSilentlySkipsTheBudget(@TempDir Path tmp) {
+        Fake f = new Fake();
+        IndexBuildService s = service(tmp, limits(1, 2), System::currentTimeMillis, null, f);
+        s.estimateTimeoutMs(300);
+        Relation slow = new Relation(SLOW_SQL, "fp");
+        long t0 = System.nanoTime();
+        Refused r = assertTimeoutPreemptively(Duration.ofSeconds(30), () -> assertThrows(Refused.class,
+                () -> s.submit(new IndexBuildService.Request("ana", "big", M1, ds -> slow, 1_000_000L, 2))));
+        assertEquals(Refused.Kind.ESTIMATE_TIMEOUT, r.kind());
+        assertTrue(r.getMessage().contains("timed out") && r.getMessage().contains("max_disk_bytes to 0"), r.getMessage());
+        assertTrue((System.nanoTime() - t0) / 1_000_000L < 20_000L, "the statement was cancelled, not waited out");
+        assertEquals(0, s.active());
+        assertEquals(0, f.calls.get());
+        assertEquals(0, s.estimatesInFlight(), "the permit is released after a timeout");
+    }
+
+    @Test
+    void aBudgetOfZeroNeverCountsTheRelation(@TempDir Path tmp) {
+        IndexBuildService s = service(tmp, limits(1, 2), System::currentTimeMillis, null, new Fake());
+        Relation broken = new Relation("SELECT * FROM no_such_relation_anywhere", "fp");
+        assertDoesNotThrow(() -> s.submit(new IndexBuildService.Request("ana", "d", M1, ds -> broken)), "max_disk_bytes = 0: no count");
+    }
+
+    @Test
+    void estimatesAreCappedAndTheExtraCallerIsRefusedBusy(@TempDir Path tmp) throws Exception {
+        Fake f = new Fake();
+        IndexBuildService s = service(tmp, limits(1, 2), System::currentTimeMillis, null, f);
+        s.estimateTimeoutMs(4_000);
+        Relation slow = new Relation(SLOW_SQL, "fp");
+        List<Thread> held = new ArrayList<>();
+        for (int i = 0; i < IndexBuildService.MAX_CONCURRENT_ESTIMATES; i++) {
+            String ds = "held" + i;
+            Thread t = new Thread(() -> {
+                try {
+                    s.submit(new IndexBuildService.Request("ana", ds, M1, d -> slow, 1_000_000L, 2));
+                } catch (RuntimeException ignored) {
+                    // cancelled by close()
+                }
+            });
+            t.setDaemon(true);
+            t.start();
+            held.add(t);
+        }
+        until(() -> s.estimatesInFlight() == IndexBuildService.MAX_CONCURRENT_ESTIMATES, "both estimates running");
+        Refused busy = assertThrows(Refused.class, () -> s.submit(new IndexBuildService.Request("ana", "third", M1, d -> slow, 1_000_000L, 2)));
+        assertEquals(Refused.Kind.ESTIMATE_BUSY, busy.kind());
     }
 
     @Test
