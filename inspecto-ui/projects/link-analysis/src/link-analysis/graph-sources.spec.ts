@@ -1,13 +1,29 @@
+import { TestBed } from '@angular/core/testing';
 import { describe, expect, it } from 'vitest';
 import { of } from 'rxjs';
-import { MetadataEdge, MetadataNode, PipelineGraph, ProvenanceBatch, ProvenanceCount } from '@inspecto/core/api';
+import {
+    CatalogService,
+    MetadataEdge,
+    MetadataNode,
+    PipelineGraph,
+    PipelinesService,
+    ProvenanceBatch,
+    ProvenanceCount,
+} from '@inspecto/core/api';
 import { Component } from '@inspecto/core/component-model';
 import { deriveComponentGraph } from '@inspecto/core/component-model';
 import { toG6Data } from '@inspecto/core/graph/catalog-graph';
 import { provenanceCounts, toPipelineG6Data } from 'app/modules/admin/pipelines/pipeline-graph';
 import { REGISTRY_KINDS } from 'app/modules/admin/catalog/registry.component';
 import { mergeGraphs } from '@inspecto/link-analysis/graph/graph-analysis';
-import { ComponentRegistryGraphSource, LineageGraphSource, PipelineGraphSource } from './graph-sources';
+import { InvService } from '@inspecto/link-analysis/api/inv.service';
+import { LA_CATALOG, LA_DATASETS, LA_PIPELINE_GRAPH } from '@inspecto/link-analysis/la-host';
+import {
+    ComponentRegistryGraphSource,
+    GraphSourcesService,
+    LineageGraphSource,
+    PipelineGraphSource,
+} from './graph-sources';
 
 const hostGraph = { toG6Data: toPipelineG6Data, provenanceCounts };
 
@@ -165,5 +181,38 @@ describe('PipelineGraphSource', () => {
         const src = new PipelineGraphSource(pipelines as never, hostGraph);
         const out = await src.query({ roots: ['p1', 'p2'] });
         expect(out).toEqual(mergeGraphs([toPipelineG6Data(graph), toPipelineG6Data(graph2)]));
+    });
+});
+
+describe('GraphSourcesService - sources a shell does not have (available: false)', () => {
+    function service(catalogAvailable: boolean | undefined, pipelineAvailable: boolean | undefined) {
+        TestBed.configureTestingModule({
+            providers: [
+                { provide: CatalogService, useValue: {} },
+                { provide: PipelinesService, useValue: {} },
+                { provide: InvService, useValue: {} },
+                { provide: LA_DATASETS, useValue: { list: () => of([]), get: () => of({}) } },
+                { provide: LA_CATALOG, useValue: { available: catalogAvailable, kinds: [], list: async () => [] } },
+                {
+                    provide: LA_PIPELINE_GRAPH,
+                    useValue: { available: pipelineAvailable, toG6Data: toPipelineG6Data, provenanceCounts },
+                },
+            ],
+        });
+        return TestBed.inject(GraphSourcesService);
+    }
+
+    it('offers every source when the host says nothing (absent = available)', () => {
+        const ids = service(undefined, undefined).sources.map((s) => s.id);
+        expect(ids).toEqual(expect.arrayContaining(['component-registry', 'provenance']));
+        expect(ids).toHaveLength(5);
+    });
+
+    it('drops the reuse-graph and provenance sources from the picker, but byId still resolves them', () => {
+        const svc = service(false, false);
+        expect(svc.sources.map((s) => s.id)).not.toContain('component-registry');
+        expect(svc.sources.map((s) => s.id)).not.toContain('provenance');
+        expect(svc.sources).toHaveLength(3);
+        expect(svc.byId('provenance')).toBeTruthy(); // a saved view may still name it
     });
 });

@@ -11,7 +11,7 @@ import {
     WorkingSet,
 } from '@inspecto/link-analysis/api/inv.service';
 import { LensService } from '@inspecto/core/api';
-import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
+import { LA_FEATURES, LA_WIDGETS } from '@inspecto/link-analysis/la-host';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { EntityProjection } from '@inspecto/core/graph';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/grid';
@@ -107,7 +107,7 @@ const COVERAGE: InvestigationCoverage = {
 const refused = (message: string) =>
     throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message } } }));
 
-function create() {
+function create(opts: { noWidgetLibrary?: boolean } = {}) {
     const inv = {
         createInvestigation: vi.fn(() => of(LOG.header)),
         investigationLog: vi.fn(() => of(LOG)),
@@ -156,6 +156,10 @@ function create() {
             { provide: InvService, useValue: inv },
             { provide: WidgetsService, useValue: widgets },
             { provide: LA_FEATURES, useValue: { ops: signal(false), exchange: signal(false), geoLink: signal(true) } },
+            // la-app has no Widget library: its LA_WIDGETS says so and the pin section is not offered.
+            ...(opts.noWidgetLibrary
+                ? [{ provide: LA_WIDGETS, useValue: { available: false, saveWorkingSetWidget: vi.fn() } }]
+                : []),
             { provide: LensService, useValue: { canManageIncidents: signal(true) } },
             { provide: LinkAnalysisSettingsService, useValue: { limits: signal({ entityTypesInForce: [] }) } },
             // the data-table's real theme service walks up to GAMMA_APP_CONFIG — stub it, as its own spec does
@@ -234,6 +238,14 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', () => {
         button('Create fork').click();
         await fixture.whenStable();
         expect(inv.reorderInvestigation).toHaveBeenCalledWith('inv-1', { order: [2, 1] });
+    });
+
+    it('does not offer Pin to a Widget when the shell has no Widget library (LA_WIDGETS.available false)', async () => {
+        const { fixture, store, el } = create({ noWidgetLibrary: true });
+        await openInv(store);
+        fixture.detectChanges();
+        expect(el.querySelector('[aria-label="Pin to a Widget"]')).toBeNull();
+        expect(el.textContent).not.toContain('Save Widget');
     });
 
     it('LA-21: pins the Working Set to a Widget at the current head — Frozen by default, Live on request', async () => {
