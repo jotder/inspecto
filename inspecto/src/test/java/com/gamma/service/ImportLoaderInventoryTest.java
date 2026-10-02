@@ -88,6 +88,10 @@ class ImportLoaderInventoryTest {
         ALLOWED.put("audit-anchors.jsonl", "the signed audit anchors (AuditAnchors, ASSURE-AUDIT-CHAIN-1) in "
                 + "<config root>.secrets/ beside the Pending Change key — a SIBLING of the config tree, so no import "
                 + "reaches it; each line is MAC'd, so a planted one reads as integrity: invalid");
+        ALLOWED.put("manifest.json", "the LA index manifest (IndexManifest, D-3) in <write root>/la-index/<dataset>/<mappingHash>/"
+                + "vNNNNNN/ — a derived artefact written by the index builder, outside the config tree, under a path built "
+                + "from a validated dataset id and mapping hash; a planted file there is refused by the manifest's own "
+                + "format and mapping-hash checks, and no import lands outside <config>");
         ALLOWED.put("audit-anchoring.json", "the durable \"anchoring started\" record (AuditAnchors) in "
                 + "<config root>.secrets/ beside the key — a SIBLING of the config tree, so no import reaches it");
         for (String p : List.of("reference.key", "inspecto.idempotency.key"))
