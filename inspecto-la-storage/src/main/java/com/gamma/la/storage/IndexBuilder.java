@@ -179,6 +179,21 @@ public final class IndexBuilder {
         }
     }
 
+    /**
+     * The number of rows of {@code relationSql} (a trusted SELECT), on a short-lived connection of its own - the disk-budget
+     * estimate of {@link IndexBuildService} needs it BEFORE a build is queued.
+     */
+    public static long countRows(String relationSql) {
+        String inner = relationSql.strip().replaceAll(";+\\s*$", "");
+        try (Connection c = open(null, null, null); Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery("SELECT count(*) FROM (" + inner + ") __la_count")) {
+            rs.next();
+            return rs.getLong(1);
+        } catch (SQLException e) {
+            throw new IndexBuildException("cannot count the rows of the relation: " + e.getMessage(), e);
+        }
+    }
+
     /** Re-verifies a PUBLISHED (or staged) version directory against its own manifest; throws {@link IndexBuildException}. */
     public static IndexManifest verify(Path versionDir) {
         IndexManifest man;
@@ -537,6 +552,28 @@ public final class IndexBuilder {
         try (Stream<Path> w = Files.walk(spill)) {
             for (Path x : (Iterable<Path>) w.sorted(java.util.Comparator.reverseOrder())::iterator) Files.delete(x);
         }
+    }
+
+    /** What the manifest records as {@code relationSqlHash}: the SHA-256 of the relation SQL text - the staleness probe compares it. */
+    public static String relationSqlHash(String relationSql) {
+        return sha256(relationSql);
+    }
+
+    private static volatile String duckdbVersion;
+
+    /** The DuckDB version this JVM runs (what a build would record in its manifest); read once, on a short-lived connection. */
+    public static String duckdbVersion() {
+        String v = duckdbVersion;
+        if (v == null) {
+            try (Connection c = open(null, null, null); Statement st = c.createStatement(); ResultSet rs = st.executeQuery("SELECT version()")) {
+                rs.next();
+                v = rs.getString(1);
+            } catch (SQLException e) {
+                throw new IndexBuildException("cannot read the DuckDB version: " + e.getMessage(), e);
+            }
+            duckdbVersion = v;
+        }
+        return v;
     }
 
     private static String sha256(String s) {

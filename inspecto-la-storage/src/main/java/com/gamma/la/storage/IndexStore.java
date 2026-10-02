@@ -99,6 +99,20 @@ public final class IndexStore {
 
     public Path directory() { return dir; }
 
+    /**
+     * The mapping hashes that have a directory under {@code datasetId} in {@code root} (sorted; empty when the Dataset has
+     * none) - what {@code GET /inv/index} walks. A hash is hex, so each can be passed back to the constructor.
+     */
+    public static List<String> mappingHashes(Path root, String datasetId) {
+        Path datasetDir = new IndexStore(root, datasetId, "0").dir.getParent();
+        if (!Files.isDirectory(datasetDir)) return List.of();
+        try (Stream<Path> stream = Files.list(datasetDir)) {
+            return stream.filter(Files::isDirectory).map(p -> p.getFileName().toString()).sorted().toList();
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
     /** The live version directory, or empty when nothing is published. Reads CURRENT once. */
     public Optional<Path> current() {
         try {
