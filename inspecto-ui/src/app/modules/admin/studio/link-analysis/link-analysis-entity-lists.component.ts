@@ -5,7 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
 import { EntityListDetail, EntityListSummary, InvService, LensService, unmatchedCount } from 'app/inspecto/api';
-import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
+import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { LA_FEATURES } from 'app/inspecto/la-host';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';

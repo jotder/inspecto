@@ -50,6 +50,46 @@ const laDynamicImportSelectors = [
     },
 ];
 
+// D-5 step 1: the folders under `app/inspecto` that ARE the Link Analysis / Geo library half, and the slice of
+// `graph/` that stays core (Decision 2a). `coreGraphFiles` is an ALLOW-list, so a new graph file defaults to library.
+const laOwnFolders = ['graph', 'geo', 'investigation', 'la-host'];
+const coreGraphFiles = [
+    'graph-types',
+    'graph-source',
+    'entity-key',
+    'branching-stage',
+    'catalog-graph',
+    'graph-view.component',
+    'graph-export',
+];
+const CORE_MSG =
+    'Core (app/inspecto/**) must not import Link Analysis / Geo library code: keep the type or function core needs in a core file, or inject it (D-5 step 1).';
+// ⚠ Two pattern objects on purpose: a gitignore-style `!` re-include does not work under an excluded PARENT directory,
+// so the bare folder names (the barrels: `app/inspecto/graph`) live apart from the `/**` group that carries the exceptions.
+const coreMustNotImportLa = [
+    {
+        // A bare folder specifier is a barrel import. (`group` cannot express "the folder only": gitignore semantics
+        // make `**/graph` cover everything under it too, which would defeat the exceptions below - hence a regex.)
+        regex: '(^|/)(link-analysis|geo-map|la-host|geo|investigation|graph)$',
+        message: CORE_MSG,
+    },
+    {
+        group: [
+            '**/link-analysis/**',
+            '**/geo-map/**',
+            '**/la-host/**',
+            '**/geo/**',
+            '**/investigation/**',
+            '!**/investigation/unique-name',
+            '**/graph/**',
+            ...coreGraphFiles.map((f) => `!**/graph/${f}`),
+        ],
+        message: CORE_MSG,
+    },
+];
+// Inside the core slice of graph/ a sibling import is relative (`./x`): only the other core graph files are allowed.
+const coreGraphSiblingsOnly = [{ group: ['./*', ...coreGraphFiles.map((f) => `!./${f}`)], message: CORE_MSG }];
+
 export default tseslint.config(
     {
         // Same exclusions as .prettierignore: build output, the vendored gamma/Fuse template (the
@@ -98,7 +138,12 @@ export default tseslint.config(
         // injected tokens in `app/inspecto/la-host`, provided by `modules/admin/studio/la-host.providers.ts`.
         // Specs are exempt (they may import host doubles). Dynamic `import()` is not seen by
         // `no-restricted-imports`, so `no-restricted-syntax` below applies the same restrictions to it.
-        files: ['src/app/modules/admin/studio/link-analysis/**/*.ts', 'src/app/modules/admin/studio/geo-map/**/*.ts'],
+        files: [
+            'src/app/modules/admin/studio/link-analysis/**/*.ts',
+            'src/app/modules/admin/studio/geo-map/**/*.ts',
+            // D-5 step 2: the library folder step 3 moves them into, so the rules apply from the first moved file.
+            'projects/link-analysis/**/*.ts',
+        ],
         ignores: ['**/*.spec.ts'],
         rules: {
             'no-restricted-imports': [
@@ -157,6 +202,49 @@ export default tseslint.config(
             // Same restrictions for dynamic `import('...')` (lazy routes, `await import(...)`), which
             // `no-restricted-imports` ignores. Keep the two regexes in step with the groups above.
             'no-restricted-syntax': ['error', ...laDynamicImportSelectors],
+        },
+    },
+    {
+        // REVIEWED DECISION (D-5 step 1, la-separation-d5-design Decision 2a): the arrow runs core <- library <- shells,
+        // never the other way. `app/inspecto/**` is CORE: it must not import the Link Analysis / Geo library code
+        // (`link-analysis`, `geo-map`, `geo`, `la-host`, `investigation`, the graph barrel, the graph algorithms). The
+        // core slice of the shared folders stays importable: the graph canvas + its types, `entity-key`, the branching
+        // stage types, `unique-name`. Relative and `app/...` specifiers are both matched. Second block: the core slice
+        // of `graph/` itself must not reach back into the library half. `coreGraphFiles` above is the allow-list.
+        // Falsified by tools/core-no-la-imports-lint.test.mjs. Specs are exempt (they may import fixtures).
+        files: ['src/app/inspecto/**/*.ts'],
+        ignores: ['**/*.spec.ts', ...laOwnFolders.map((f) => `src/app/inspecto/${f}/**`)],
+        rules: { 'no-restricted-imports': ['error', { patterns: coreMustNotImportLa }] },
+    },
+    {
+        files: [
+            ...coreGraphFiles.map((f) => `src/app/inspecto/graph/${f}.ts`),
+            'src/app/inspecto/investigation/unique-name.ts',
+        ],
+        rules: {
+            'no-restricted-imports': ['error', { patterns: [...coreMustNotImportLa, ...coreGraphSiblingsOnly] }],
+        },
+    },
+    {
+        // REVIEWED DECISION (D-5 step 2): the shared API layer reads the build-time environment only through the injected
+        // APP_ENVIRONMENT (api/app-environment.ts, provided by the host app.config) - a library cannot import a host file.
+        // Falsified by tools/core-no-la-imports-lint.test.mjs. Specs are exempt (they read the same object directly).
+        files: ['src/app/inspecto/api/**/*.ts'],
+        ignores: ['**/*.spec.ts'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    // A later block REPLACES an earlier block's rule options, so the core guard is repeated here.
+                    patterns: [
+                        ...coreMustNotImportLa,
+                        {
+                            group: ['environments/**', '**/environments/**'],
+                            message: 'api/ must not import environments/*: inject APP_ENVIRONMENT (api/app-environment.ts) instead (D-5 step 2).',
+                        },
+                    ],
+                },
+            ],
         },
     },
     {

@@ -10,7 +10,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
 import { IdentityAssertion, IdentityGroup, InvService, LensService } from 'app/inspecto/api';
 import { LA_FEATURES } from 'app/inspecto/la-host';
-import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
+import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';

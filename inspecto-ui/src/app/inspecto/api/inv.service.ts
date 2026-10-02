@@ -3,7 +3,7 @@ import { HttpClient, HttpParameterCodec, HttpParams } from '@angular/common/http
 import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 import type { ConditionGroup } from '../query/query-types';
-import type { BranchStage } from '../graph/branching-pattern-engine';
+import type { BranchStage } from '../graph/branching-stage';
 import type { EntityTypeRef } from '../graph/entity-key';
 
 /** One aggregated projection triple: a distinct (source, target[, kind]) pair with its folded row count. */

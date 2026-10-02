@@ -5,7 +5,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { InvService } from 'app/inspecto/api';
-import { EntityTypeConfig } from 'app/inspecto/api/link-analysis-settings.service';
+import { EntityTypeConfig } from './link-analysis-settings.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { CreateEntityListDialog, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
 

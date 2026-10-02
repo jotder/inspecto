@@ -6,7 +6,10 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 
 import { LensService } from 'app/inspecto/api';
-import { LinkAnalysisLimits, LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
+import {
+    LinkAnalysisLimits,
+    LinkAnalysisSettingsService,
+} from 'app/modules/admin/studio/link-analysis/link-analysis-settings.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { LinkAnalysisSettingsComponent } from './link-analysis-settings.component';
 

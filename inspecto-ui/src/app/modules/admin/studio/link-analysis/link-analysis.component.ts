@@ -125,7 +125,7 @@ import {
     edgeLabelsHiddenByDensity,
     stableKey,
 } from 'app/inspecto/graph/graph-view.component';
-import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
+import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { ElementDetailDialog, ElementDetailResult, ElementObjectRef, PivotService } from 'app/inspecto/investigation';
 import type { LaDataset } from 'app/inspecto/la-host';
 import {

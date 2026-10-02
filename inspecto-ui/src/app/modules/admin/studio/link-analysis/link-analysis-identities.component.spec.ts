@@ -7,7 +7,7 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { IdentityGroup, InvService, LensService } from 'app/inspecto/api';
 import { LA_FEATURES } from 'app/inspecto/la-host';
-import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
+import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { identityKeyOf } from './investigation-state';
 import { LinkAnalysisIdentitiesComponent } from './link-analysis-identities.component';

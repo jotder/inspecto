@@ -9,7 +9,7 @@ import { ICON_COLOR_SWATCHES, NODE_KIND_COLORS, NODE_KIND_FALLBACK } from 'app/i
 // The G6 graph-data types now live in the shared `inspecto/graph` lib (so framework-agnostic libraries — the
 // component-model reuse-graph — can target the GraphViewComponent host without importing this feature).
 // Imported for this file's own mappers and re-exported so the existing catalog / pipeline importers stay unchanged.
-import type { G6Edge, G6GraphData, G6Node } from 'app/inspecto/graph';
+import type { G6Edge, G6GraphData, G6Node } from './graph-types';
 export type { G6Edge, G6GraphData, G6Node };
 
 export { ICON_COLOR_SWATCHES };

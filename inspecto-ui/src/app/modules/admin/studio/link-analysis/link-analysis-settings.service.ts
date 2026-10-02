@@ -1,8 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, effect, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
-import { apiUrl } from './api-base';
-import { SpacesService } from './spaces.service';
+import { SpacesService, apiUrl } from 'app/inspecto/api';
 import {
     ANALYSIS_NODE_CAP_DEFAULT,
     SUSPICION_NODE_CAP_DEFAULT,
@@ -17,7 +16,7 @@ import {
     configureProjectionLimits,
     projectionNodeCapValue,
     resetProjectionLimits,
-} from 'app/modules/admin/studio/link-analysis/entity-projection';
+} from './entity-projection';
 
 /**
  * Per-space Link Analysis tuning limits. Each field is `null` when unset, meaning **use the shipped

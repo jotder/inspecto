@@ -6,7 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { firstValueFrom } from 'rxjs';
 import { EntityListDetail, EntityListPurpose, InvService } from 'app/inspecto/api';
-import { EntityTypeConfig } from 'app/inspecto/api/link-analysis-settings.service';
+import { EntityTypeConfig } from './link-analysis-settings.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';

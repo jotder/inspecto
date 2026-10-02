@@ -6,7 +6,7 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { InvService, InvestigationCoverage, InvestigationLog, LensService, WorkingSet } from 'app/inspecto/api';
 import { LA_FEATURES } from 'app/inspecto/la-host';
-import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
+import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { EntityProjection } from 'app/inspecto/graph';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';

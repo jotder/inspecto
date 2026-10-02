@@ -1,4 +1,4 @@
-import { G6Edge, G6GraphData, G6Node } from 'app/inspecto/graph';
+import { G6Edge, G6GraphData, G6Node } from 'app/inspecto/graph/graph-types';
 import { Component } from './component-types';
 
 /**
