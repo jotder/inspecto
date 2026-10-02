@@ -499,4 +499,24 @@ describe('LinkAnalysisToolboxComponent', () => {
         expect(last()).toEqual(path);
         await expectNoA11yViolations(el);
     });
+
+    /** LA-A11Y-AUDIT-1 (WCAG 2.5.8): result buttons were 148x18 px; min-h-6 = 24 px. */
+    it('the Communities, Components and Cliques result buttons carry the 24 px minimum height', () => {
+        const { fixture, c } = make();
+        c.runCommunities();
+        c.runConnectedComponents();
+        c.cliquesResult.set([['a', 'b']]);
+        const el = fixture.nativeElement as HTMLElement;
+        for (const [tool, label] of [
+            ['communities', 'Communities'],
+            ['components', 'Connected components'],
+            ['cohesion', 'Cliques'],
+        ]) {
+            c.tab.set(tool as never);
+            fixture.detectChanges();
+            const btns = el.querySelectorAll(`ul[aria-label="${label}"] li > button`);
+            expect(btns.length, label).toBeGreaterThan(0);
+            btns.forEach((b) => expect(b.classList.contains('min-h-6'), label).toBe(true));
+        }
+    });
 });

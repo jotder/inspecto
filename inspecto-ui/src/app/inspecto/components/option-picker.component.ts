@@ -57,7 +57,12 @@ const SEARCH_THRESHOLD = 8;
                     placeholder="Filter…"
                 />
             }
-            <div role="listbox" tabindex="-1" [attr.aria-label]="data.title" (keydown)="onKeydown($event)">
+            <div
+                [attr.role]="shown().length ? 'listbox' : null"
+                tabindex="-1"
+                [attr.aria-label]="shown().length ? data.title : null"
+                (keydown)="onKeydown($event)"
+            >
                 @for (opt of shown(); track opt.value) {
                     <button
                         type="button"
@@ -82,10 +87,10 @@ const SEARCH_THRESHOLD = 8;
                         </span>
                     </button>
                 }
-                @if (!shown().length) {
-                    <p class="text-secondary m-0 px-2 py-3 text-sm">No choice matches “{{ filter() }}”.</p>
-                }
             </div>
+            @if (!shown().length) {
+                <p class="text-secondary m-0 px-2 py-3 text-sm">No choice matches “{{ filter() }}”.</p>
+            }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
             <button mat-stroked-button type="button" (click)="ref.close()">
@@ -173,6 +178,7 @@ export class OptionPickerDialog {
                     [disabled]="disabled()"
                     [attr.aria-labelledby]="labelId"
                     [attr.aria-describedby]="invalid() ? errorId : null"
+                    aria-haspopup="dialog"
                     (click)="open()"
                     (blur)="onTouched()"
                 >

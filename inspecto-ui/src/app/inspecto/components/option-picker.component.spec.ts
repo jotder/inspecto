@@ -57,6 +57,12 @@ function trigger(fixture: ComponentFixture<HostComponent>): HTMLButtonElement {
 }
 
 describe('InspectoOptionPickerComponent', () => {
+    /** LA-A11Y-AUDIT-1: the trigger opens a dialog, so it says so. */
+    it('the trigger announces that it opens a dialog', () => {
+        const { fixture } = create('json');
+        expect(trigger(fixture).getAttribute('aria-haspopup')).toBe('dialog');
+    });
+
     it('shows the chosen option’s LABEL, not its stored value', () => {
         const { fixture } = create('delimited');
         expect(trigger(fixture).textContent).toContain('Delimited text');
@@ -153,6 +159,20 @@ describe('OptionPickerDialog', () => {
         fixture.detectChanges();
         return { fixture, close };
     }
+
+    /** LA-A11Y-AUDIT-1: an empty role=listbox with text inside fails aria-required-children. */
+    it('an empty choice list has no listbox role and shows its empty text outside any listbox', () => {
+        const { fixture } = createDialog([]);
+        expect(fixture.nativeElement.querySelector('[role="listbox"]')).toBeNull();
+        // a name on a role-less div is itself an axe violation (aria-prohibited-attr)
+        expect(fixture.nativeElement.querySelector('mat-dialog-content [aria-label]')).toBeNull();
+        expect(fixture.nativeElement.textContent).toContain('No choice matches');
+    });
+
+    it('a non-empty choice list keeps the listbox role', () => {
+        const { fixture } = createDialog(OPTIONS);
+        expect(fixture.nativeElement.querySelector('[role="listbox"] button[role="option"]')).toBeTruthy();
+    });
 
     it('offers a filter box only once the list is long enough to need one', () => {
         const { fixture } = createDialog(OPTIONS);

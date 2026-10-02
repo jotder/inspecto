@@ -1,9 +1,7 @@
 const path = require('path');
 const colors = require('tailwindcss/colors');
 const defaultTheme = require('tailwindcss/defaultTheme');
-const generatePalette = require(
-    path.resolve(__dirname, 'src/@gamma/tailwind/utils/generate-palette')
-);
+const generatePalette = require(path.resolve(__dirname, 'src/@gamma/tailwind/utils/generate-palette'));
 
 /**
  * Custom palettes
@@ -108,6 +106,10 @@ const config = {
             textColor: {
                 primary: {
                     DEFAULT: 'rgba(var(--gamma-text-primary-rgb, var(--gamma-primary-rgb)), <alpha-value>)',
+                },
+                // Same idea for `text-warn`: warn-600 is 3.02:1 on the dark panel (#1e293b), warn-400 is 4.7:1.
+                warn: {
+                    DEFAULT: 'rgba(var(--gamma-text-warn-rgb, var(--gamma-warn-rgb)), <alpha-value>)',
                 },
             },
             flex: {
@@ -294,12 +296,8 @@ const config = {
     },
     plugins: [
         // Gamma - Tailwind plugins
-        require(
-            path.resolve(__dirname, 'src/@gamma/tailwind/plugins/utilities')
-        ),
-        require(
-            path.resolve(__dirname, 'src/@gamma/tailwind/plugins/icon-size')
-        ),
+        require(path.resolve(__dirname, 'src/@gamma/tailwind/plugins/utilities')),
+        require(path.resolve(__dirname, 'src/@gamma/tailwind/plugins/icon-size')),
         require(path.resolve(__dirname, 'src/@gamma/tailwind/plugins/theming'))({
             themes,
         }),

@@ -378,7 +378,7 @@
                                     @for (c of communities(); track c.id; let i = $index) {
                                         <li>
                                             <button
-                                                class="underline-offset-2 hover:underline"
+                                                class="min-h-6 px-1 text-left underline-offset-2 hover:underline"
                                                 (click)="focusCommunity(c.members)"
                                             >
                                                 Community {{ i + 1 }} — {{ c.members.length }} nodes
@@ -400,7 +400,7 @@
                                     @for (c of components(); track $index; let i = $index) {
                                         <li>
                                             <button
-                                                class="underline-offset-2 hover:underline"
+                                                class="min-h-6 px-1 text-left underline-offset-2 hover:underline"
                                                 (click)="focusComponent(c)"
                                             >
                                                 Component {{ i + 1 }} — {{ c.length }} nodes
@@ -560,7 +560,10 @@
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Cliques">
                                     @for (c of cliquesResult(); track $index; let i = $index) {
                                         <li>
-                                            <button class="underline-offset-2 hover:underline" (click)="focusClique(c)">
+                                            <button
+                                                class="min-h-6 px-1 text-left underline-offset-2 hover:underline"
+                                                (click)="focusClique(c)"
+                                            >
                                                 Clique {{ i + 1 }} ({{ c.length }}) — {{ cliqueLabel(c) }}
                                             </button>
                                         </li>

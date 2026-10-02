@@ -1000,4 +1000,17 @@ describe('LinkAnalysisComponent', () => {
         expect(c.emphasis()?.edgeIds[0]).toBe('entity:acme->entity:bob:link');
         expect(c.serverPaths()).toMatchObject({ edgeYieldCapped: true, depthLimit: 3, deepest: 2 });
     });
+
+    /** LA-A11Y-AUDIT-1: an empty role=menu panel (text only) breaks aria-required-children, so the empty text is a menuitem. */
+    it('the empty saved-views menu holds a (disabled) menu item, not bare text', () => {
+        const { fixture } = create({ views: [] });
+        fixture.detectChanges();
+        (fixture.nativeElement.querySelector('button[aria-label="Open saved views"]') as HTMLElement).click();
+        fixture.detectChanges();
+        const panel = document.querySelector('.mat-mdc-menu-panel') as HTMLElement;
+        expect(panel.getAttribute('role')).toBe('menu');
+        const item = panel.querySelector('[role="menuitem"]') as HTMLElement;
+        expect(item.textContent).toContain('Nothing saved yet.');
+        expect(item.hasAttribute('disabled')).toBe(true);
+    });
 });

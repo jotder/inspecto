@@ -145,12 +145,14 @@ body.light,
 .dark .light {
     --gamma-text-primary: var(--gamma-primary);
     --gamma-text-primary-rgb: var(--gamma-primary-rgb);
+    --gamma-text-warn-rgb: var(--gamma-warn-rgb);
 }
 body.dark,
 .dark,
 .light .dark {
     --gamma-text-primary: var(--gamma-primary-400);
     --gamma-text-primary-rgb: var(--gamma-primary-400-rgb);
+    --gamma-text-warn-rgb: var(--gamma-warn-400-rgb);
 }
 
 /* Material dialogs render with gamma's LIGHT Material theme even in dark mode (gamma's dark scheme is only
