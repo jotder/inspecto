@@ -1010,7 +1010,7 @@ betweenness and suspicion).
 * Cancel on someone else's run is **403** (the service's FORBIDDEN) while a READ of it is **404** (a run id is an unguessable UUID);
   cancel does not re-open the Investigation. Administrator = `Roles.CAN_ADMINISTER`, or no Subject at all.
 * A server result for a node or link the canvas does not draw is dropped by the id map, and the toolbox says how many (see above).
-* The toolbox's local runs still analyse the displayed query graph, not the Working Set, when an Investigation is open.
+* With an Investigation open, the toolbox's browser-side runs and the From / To pickers use the Working Set canvas (`canvasData()`), the same graph server runs map onto; with none open they use the query graph (operator decision 2026-10-02).
 * **Service lifetime.** One `GraphRunService` per Space write root, held by `GraphRunServices` (la-api): created lazily, closed by
   `ApiContext.onClose(Runnable)` (`ControlApi.close()` runs its hooks first), **or earlier** - closed and forgotten when unused for 1 h
   (`IDLE_TTL_MS`, the finished-run retention, so closing never shortens what an analyst can still read) with no run in flight AND no run finished within that hour (`GraphRunService.lastActivityMillis()` counts a finish as use, so a result that completed after the last poll is not discarded by another Space's sweep), or at once
@@ -1034,8 +1034,8 @@ betweenness and suspicion).
   graph_run.max_result_items in Settings)"; a nested cut reads "the first 2 of 5 members of group 1".
 * A raw id sent as `from` / `to` / `node` while masking is on is not refused.
 
-**Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-GRAPH-RUN-LOCAL-WORKING-SET-1` ·
-`LA-GRAPH-RUN-MASK-ORACLE-1` · `LA-GRAPH-RUN-CANCEL-GATE-1`. The remaining option-D phases are in
+**Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-GRAPH-RUN-MASK-ORACLE-1` ·
+`LA-GRAPH-RUN-CANCEL-GATE-1` · `LA-A11Y-AUDIT-1`. The remaining option-D phases are in
 [`la-separation-feasibility-plan.md`](../../../superpower/la-separation-feasibility-plan.md) §7.8.
 
 ## Closed-plan record (2026-10-01)
