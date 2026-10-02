@@ -84,6 +84,15 @@ Angular build), `-NoRuntime` (skip the embedded jlinked JVM), and **`-Edition Pe
 the Maven [edition](../editions/editions-model.md) profile + assembles the per-edition fat-JAR). Generated
 launch scripts embed the native-access flag and the key [`-D` flags](operations.md).
 
+**`-Ui gamma|la-app` (D-5 step 7, 2026-10-02; default `gamma`) picks WHICH single-page application `ui/` holds** - a UI flavor,
+not an edition ([`EDITIONS.md`](../../../EDITIONS.md)): any `-Edition` ships either. `gamma` is the Inspecto console and the bundle
+exactly as it always was; `la-app` is the Link Analysis application (`inspecto-ui/projects/la-app`). The script builds the chosen one
+(`npm run build -- <name>`) and copies `inspecto-ui/dist/<name>/` **by name**, never "the first `index.html` under `dist/`" (two
+applications mean two `index.html` files; "first" is whichever sorts first). A bundle's `ui/` never holds both, and `ControlApi` still
+has one `-Dui.dir`. An unknown value stops at parameter binding with PowerShell's `ValidateSet` message. ⚠ The IAM client id the
+chosen application signs in with (`AUTH_OIDC_CLIENT_ID`, `inspecto-ui` in the launchers) is a DEPLOYMENT decision: register a client
+for `la-app` in the customer's IAM and set it there; the packaging does not invent one.
+
 The SBOM step (`tools/sbom.mjs`) runs `mvn package dependency:list -DskipTests` over the edition's modules with
 `-am`, so reactor siblings (and their `tests` test-jars) resolve from `target/` outputs: **no prior `mvn install`
 into `~/.m2` is needed** (a bare `dependency:list -am` died "Could not find artifact ...inspecto-audit-spi" on a

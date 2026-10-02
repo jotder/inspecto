@@ -63,6 +63,15 @@ eventually lands (Personal/Professional/Enterprise).
 - See [`okf/backend/editions/local-testing-without-iam.md`](okf/backend/editions/local-testing-without-iam.md)
   for the companion no-IAM/no-Postgres local path (Demo User sign-in, an Enterprise-only demo build).
 
+## UI flavor — not an edition
+
+`package.ps1 -Ui gamma|la-app` (default `gamma`, since 2026-10-02) chooses which Angular application the bundle's `ui/` serves: the
+Inspecto console (`gamma`) or the Link Analysis application (`la-app`). It is orthogonal to `-Edition`: there is no fifth edition, no
+Maven profile and no edition branch for it, every edition can ship either, and the Link Analysis backend modules stay where the
+matrix puts them (Professional and above). A bundle holds exactly one application. An LA-only edition (only the Link Analysis
+modules plus security) remains a possible later promotion, not a decision taken. See
+[`okf/backend/build-run/build-test.md`](okf/backend/build-run/build-test.md) (*Packaging*).
+
 ## Assembly model (how an edition is produced)
 
 | Mechanism | Used for |

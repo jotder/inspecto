@@ -76,7 +76,7 @@ jobs:
       # has required all three for months ("`npm run build` covers only the app one"); nothing enforced it.
       # ⚠ The root config is a genuinely DIFFERENT gate, not a superset: it sets no `types`, so a spec using
       # a vitest-only matcher type-errors there while passing test:ci and both other configs.
-      - name: Typecheck (all three tsconfigs)
+      - name: Typecheck (all tsconfigs, la-app included)
         run: npm run typecheck
 
       # `test:coverage`, not `test:ci` (GUARD-SWEEP-1g, 2026-09-08): the UI had NO coverage
@@ -110,3 +110,7 @@ jobs:
       # No dev-only fileReplacements, so one configuration covers both.
       - name: Build (production)
         run: npm run build
+
+      # `npm run build` builds the default application (gamma) only; la-app (D-5 step 6) is its own application.
+      - name: Build la-app (production)
+        run: npm run build -- la-app

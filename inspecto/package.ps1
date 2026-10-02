@@ -89,6 +89,13 @@ param(
     # tools/check-demo-auth-isolation.mjs (CI) fails if the demo jar is named anywhere here outside an
     # `if ($DemoAuth)` block, or if the demo branch stops removing inspecto-security.jar.
     [switch]$DemoAuth,
+    # UI flavor (D-5 step 7, la-separation-d5-design Decisions 6/7): WHICH single-page application the bundle's ui/ holds.
+    # NOT an edition (EDITIONS.md): every edition can ship either. 'gamma' is the Inspecto console (the default, the
+    # bundle as it always was); 'la-app' is the Link Analysis application (inspecto-ui/projects/la-app). The two
+    # Angular applications build to inspecto-ui/dist/<name>/, and ONLY the chosen one is copied: ui/ never holds both.
+    # The IAM client id the chosen SPA signs in with is a DEPLOYMENT setting (AUTH_OIDC_CLIENT_ID), not decided here.
+    [ValidateSet('gamma', 'la-app')]
+    [string]$Ui = 'gamma',
     # ── release integrity (SOC 2 CC8-04) ──
     # SHA-256 checksums are ALWAYS written next to each artifact (no key needed). -Sign additionally
     # produces a GPG detached signature (.asc) per artifact so customers can verify AUTHENTICITY, not
@@ -227,13 +234,13 @@ $uiDir    = Join-Path $sandboxRoot 'inspecto-ui'
 $uiDistRoot = Join-Path $uiDir 'dist'
 $uiBuilt  = $false
 if (-not $NoUi -and (Test-Path (Join-Path $uiDir 'package.json'))) {
-    Write-Host "Building operator UI (inspecto-ui/)..." -ForegroundColor Cyan
+    Write-Host "Building operator UI (inspecto-ui/, application '$Ui')..." -ForegroundColor Cyan
     Push-Location $uiDir
     try {
         & npm ci
         if ($LASTEXITCODE -ne 0) { throw "npm ci failed in inspecto-ui/" }
-        & npm run build
-        if ($LASTEXITCODE -ne 0) { throw "ng build failed in inspecto-ui/" }
+        & npm run build -- $Ui
+        if ($LASTEXITCODE -ne 0) { throw "ng build $Ui failed in inspecto-ui/" }
         $uiBuilt = $true
         Write-Host "UI build complete." -ForegroundColor Green
     } finally { Pop-Location }
@@ -796,9 +803,14 @@ if ($DemoAuth) {
 # no -Dui.dir is passed, and every browser request falls through ControlApi's unversioned-path guard
 # to `{"error":"not found — API routes are served under /api/v1"}` while the API itself works fine.
 # -NoUi now means exactly "skip the npm build"; whatever dist/ exists is still bundled.
+#
+# D-5 step 7: the dist folder is picked BY NAME ($Ui), never by "the first index.html under dist/" - with two
+# Angular applications there are two index.html files under dist/ and "first" would be whichever sorts first,
+# i.e. the wrong SPA in the bundle whenever both have been built.
 $uiBundled = $false
-if (Test-Path $uiDistRoot) {
-    $indexHtml = Get-ChildItem -Path $uiDistRoot -Filter 'index.html' -Recurse -ErrorAction SilentlyContinue |
+$uiDist = Join-Path $uiDistRoot $Ui
+if (Test-Path $uiDist) {
+    $indexHtml = Get-ChildItem -Path $uiDist -Filter 'index.html' -Recurse -ErrorAction SilentlyContinue |
                  Select-Object -First 1
     if ($indexHtml) {
         $uiOut = "$bundleDir\ui"
@@ -808,8 +820,10 @@ if (Test-Path $uiDistRoot) {
         $stale = if ($uiBuilt) { '' } else { ' (pre-existing dist — NOT rebuilt this run)' }
         Write-Host "Bundled UI from $($indexHtml.DirectoryName) → $uiOut$stale" -ForegroundColor Green
     } else {
-        Write-Host "  (no index.html under $uiDistRoot — skipping UI bundle)" -ForegroundColor Yellow
+        Write-Host "  (no index.html under $uiDist — skipping UI bundle)" -ForegroundColor Yellow
     }
+} else {
+    Write-Host "  (no inspecto-ui/dist/$Ui - build it with 'npm run build -- $Ui' in inspecto-ui/; skipping UI bundle)" -ForegroundColor Yellow
 }
 
 # ── step 4: stage spaces/ — the Space-template gallery ONLY ───────────────────
@@ -2303,9 +2317,9 @@ if (-not (Test-Path (Join-Path $bundleDir 'ui\index.html'))) {
     Write-Warning "  serve.sh/serve.bat will start WITHOUT -Dui.dir, so http://<host>:<port>/ answers"
     Write-Warning "  404 {`"error`":`"not found - API routes are served under /api/v1`"} in the browser."
     Write-Warning "  The /api/v1 surface still works; only the SPA is missing."
-    if ($NoUi)             { Write-Warning "  Cause: -NoUi was passed and inspecto-ui/dist holds no index.html — build the UI first (npm run build in inspecto-ui/)." }
+    if ($NoUi)             { Write-Warning "  Cause: -NoUi was passed and inspecto-ui/dist holds no index.html — build the UI first (npm run build -- $Ui in inspecto-ui/)." }
     elseif (-not $uiBuilt) { Write-Warning "  Cause: no inspecto-ui/ project found in this checkout." }
-    else                   { Write-Warning "  Cause: the UI build produced no index.html under $uiDistRoot." }
+    else                   { Write-Warning "  Cause: the UI build produced no index.html under $uiDist." }
     Write-Host ""
 }
 
