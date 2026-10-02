@@ -104,6 +104,19 @@ Learned the hard way on 2026-10-01 (D-S4 + D-1: 6 lanes, 3 of them started from 
     give a spec that builds thousands of links an explicit `}, 30_000);`.
 14. **An empty list inside `role=listbox` / `mat-menu` is an axe CRITICAL (`aria-required-children`)**: render the empty-state text
     OUTSIDE the role container (or drop the role while empty, and the `aria-label` with it — a name on a role-less div is its own violation).
+15. **Never write a literal NUL byte into source** — a lane wrote `"\u0000absent"` as an actual 0x00 and the pre-push NUL-byte guard
+    refused the push. Use the `\u0000` escape; `node tools/check-nul-bytes.mjs` before committing.
+16. **A publish-then-write race needs a hook-based probe, not a loop.** `GraphRunService` published COMPLETED and wrote the cache
+    afterwards; 300 iterations never hit the window, but the terminal hook (fired between the two) reproduced it deterministically.
+    Make the second write part of the same commit, then assert from the hook.
+17. **Test helpers that assert the FIRST response of async work race on a slow runner** (200 vs 202 with an inline wait of 0):
+    accept either, then wait on the state (`until(...)`). Heavy UI specs get an explicit `, 30_000`.
+18. **A library barrel can silently move code into `main`** (MapLibre once): `npm run check:bundle-shape` (after
+    `ng build --stats-json`) now fails the build; angular.json budgets alone stayed silent because `main` shrank.
+19. **With a Consignment registry the relation SQL pins its file list**, so an added file changes the SQL hash too; hash the
+    Dataset's DEFINITION (`IndexBuilder.relationSqlHash` blanks the list) or "served stale on addition" is unreachable.
+20. **Check the cherry-pick conflict markers in docs both lanes append to** (OKF `link-analysis.md`, the D-3 design): two lanes
+    adding a section to the same file always collide; resolve by keeping both, never by taking one side.
 
 ---
 
