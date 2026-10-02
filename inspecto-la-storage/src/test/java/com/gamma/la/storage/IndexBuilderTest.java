@@ -336,6 +336,15 @@ class IndexBuilderTest {
 
     // ------------------------------------------------------------------------------------------------- failure
 
+    /** Bytes under the in-flight {@code .tmp} stage (spill and output), 0 when there is none yet. */
+    private static long stageBytes(Path indexDir) throws java.io.IOException {
+        try (Stream<Path> w = Files.walk(indexDir)) {
+            return w.filter(Files::isRegularFile)
+                    .filter(q -> indexDir.relativize(q).getName(0).toString().endsWith(".tmp"))
+                    .mapToLong(q -> q.toFile().length()).sum();
+        }
+    }
+
     @Test
     void cancelMidCopyStopsTheStatementDeletesTheStageAndLeavesCurrentAlone(@TempDir Path tmp) throws Exception {
         IndexMapping m = new IndexMapping("s", "t", null, null, null, null, null);
@@ -352,7 +361,9 @@ class IndexBuilderTest {
             Future<Result> f = ex.submit(() -> IndexBuilder.build(new Request("slow", m, slow, store, "fp1",
                     new Options(16, "256MB", 2, token, p -> { if (p.phase().equals("out")) inOut.countDown(); }))));
             assertTrue(inOut.await(120, TimeUnit.SECONDS), "the build never reached the out COPY");
-            Thread.sleep(1500);                                           // let the COPY get going
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);       // the COPY is under way once bytes land in the stage
+            while (stageBytes(store.directory()) == 0 && !f.isDone() && System.nanoTime() < deadline) Thread.sleep(50);
+            assertTrue(stageBytes(store.directory()) > 0, "no bytes were written to the stage within 60 s");
             assertFalse(f.isDone(), "the build finished before it could be cancelled - the corpus is too small");
             long t0 = System.nanoTime();
             token.cancel();
