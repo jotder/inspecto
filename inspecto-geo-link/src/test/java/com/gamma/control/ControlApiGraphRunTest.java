@@ -556,6 +556,28 @@ class ControlApiGraphRunTest {
         }
     }
 
+    /** LA-GRAPH-RUN-CANCEL-STARTER-COVERAGE-1: a Case-team member READS the Investigation, so only the starter clause stops their cancel. */
+    @Test
+    void aCaseTeamMemberWhoReadsTheInvestigationStillCannotCancelAnotherSubjectsRun(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        CaseTeamObjectEngine.arm().put("CASE-1", CaseTeamObjectEngine.caseOf("CASE-1", "lead-1", "analyst-2", false));   // analyst-2 is the OTHER subject
+        Blocking engine = new Blocking();
+        GraphRunRoutes.forTest(engine, 0);
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            investigation(c);
+            ok(c, "PUT", INV + "/case", "{\"caseRef\":\"CASE-1\"}", ANALYST);
+            assertEquals(200, send(c, "GET", INV + "/log", null, OTHER).statusCode(), "precondition: the Case member can read the Investigation");
+            String id = data(start(c, run("degreeCentrality", ""), ANALYST), 202).get("runId").asText();
+
+            assertEquals(404, send(c, "POST", "/inv/graph/runs/" + id + "/cancel", null, OTHER).statusCode(),
+                    "readable Investigation, but not the starter: the run is absent to them");
+            assertTrue(Set.of("QUEUED", "RUNNING").contains(status(c, id, ANALYST)), "and it is still going");
+            engine.release.countDown();
+        } finally {
+            CaseTeamObjectEngine.CASES = null;
+        }
+    }
+
     @Test
     void theStarterAndAnAdministratorCanCancelARunningJobAnd409AfterItFinished(@TempDir Path cfg, @TempDir Path root) throws Exception {
         subjects();
