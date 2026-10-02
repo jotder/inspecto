@@ -437,6 +437,27 @@ class IndexBuilderTest {
         IndexBuilder.verify(r.directory());
     }
 
+    @Test
+    void reVerifyCatchesAManifestThatNoLongerMatchesTheFiles(@TempDir Path tmp) throws Exception {
+        String rel = plant(tmp.resolve("corpus"), EDGES, "TIMESTAMP");
+        Result r = build(tmp.resolve("idx"), rel, MAPPING, Options.defaults());
+        IndexManifest m = r.manifest();
+        for (String table : List.of("out", "nodes")) {
+            Map<String, IndexManifest.TableStats> t = new java.util.LinkedHashMap<>(m.tables());
+            IndexManifest.TableStats real = t.get(table);
+            for (IndexManifest.TableStats lie : List.of(new IndexManifest.TableStats(real.rows() + 1, real.files(), real.bytes()),
+                    new IndexManifest.TableStats(real.rows(), real.files() + 1, real.bytes()))) {
+                t.put(table, lie);
+                new IndexManifest(m.version(), m.builtAt(), m.builder(), m.duckdbVersion(), m.bucketFn(), m.buckets(), m.rowGroupSize(), m.mapping(), m.mappingHash(),
+                        m.dataset(), m.relationSqlHash(), m.baseFingerprint(), m.timeColZone(), t, m.droppedNull(), m.deltas(), m.parent()).write(r.directory());
+                var e = assertThrows(IndexBuildException.class, () -> IndexBuilder.verify(r.directory()), table + " " + lie);
+                assertTrue(e.getMessage().contains("differs from its manifest"), e.getMessage());
+            }
+        }
+        m.write(r.directory());
+        IndexBuilder.verify(r.directory());
+    }
+
     // ------------------------------------------------------------------------------------------------- bench
 
     @Test
