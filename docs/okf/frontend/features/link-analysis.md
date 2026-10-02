@@ -1056,7 +1056,7 @@ betweenness and suspicion).
   gives, so the response cannot say whether the raw id is in the Working Set. A pseudonym still resolves; an id masking leaves in the
   clear (typed masking) and every id with masking off are unchanged.
 
-**Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-A11Y-AUDIT-1`. The remaining option-D phases are in
+**Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-A11Y-AUDIT-1`. Also: `LA-INDEX-STAGE-RACE-1` (concurrent `IndexStore.stage()`), `LA-INDEX-BUILDER-TEST-TIMING-1` (sleep- and spill-sensitive builder test), `LA-GRAPH-RUN-CANCEL-STARTER-COVERAGE-1` (starter clause of run cancel uncovered), `LA-APP-REAL-SIGNIN-1` (la-app OIDC never run against a real IAM), `LA-A11Y-LIVE-REVERIFY-1` (three accessibility fixes not re-run live). The remaining option-D phases are in
 [`la-separation-feasibility-plan.md`](../../../superpower/la-separation-feasibility-plan.md) §7.8.
 
 ## Index (D-3, as built 2026-10-02)

@@ -277,7 +277,7 @@ launcher can reach **no sidecar at all**. `serve.sh`/`serve.bat` were already on
 resolves collector connectors — were still on `-jar`. The connectors fix therefore worked for a served
 deployment and silently did nothing for a one-shot run. 🔴 The divergence is the lesson: two launchers
 with two different classpath rules meant fixing one looked like fixing both. All four now build the
-classpath the same way, each sidecar inert unless a config asks for it.
+classpath the same way, each sidecar inert unless a config asks for it. ⚠ `ura.sh`/`ura.bat` (the pre-ETL file utilities) are deliberately NOT among them: they run `-cp inspecto.jar` alone, with no sidecar of any kind (no connectors, exchange, ops or Link Analysis jars), because they never start the control plane; the Dockerfile, `inspecto.service` and `install-service.sh` all launch `serve.sh`, which carries the full list.
 
 ⚠ **`inspecto-security` ships SHADED too, for the same reason** (SEC-SIDECAR-BOOT-1, 2026-09-07). It is
 profile-gated (`-Pedition-standard` / `-Pedition-enterprise`), but until that date `package.ps1` staged its
