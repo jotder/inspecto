@@ -6,7 +6,7 @@ Option D's phase **D-3** ([`la-separation-feasibility-plan.md`](la-separation-fe
 (it is volume, not depth); D-4 shipped the engine SPI over the in-memory Working Set and left the seam. This file is the design the
 operator signs before any step. When this and the code disagree, the code wins — re-ground.
 
-**Status: 🟡 DRAFT 2026-10-02 — decisions 1–8 OPEN, nothing built.** Answers are left empty on purpose. Every claim cites a file read on
+**Status: 🟡 DRAFT 2026-10-02 — decisions 1–8 OPEN, nothing built except the test-only step 1 spike (results in §5.1).** Answers are left empty on purpose. Every claim cites a file read on
 2026-10-02 (`249e881b6`) or a spike number from §7.10.1; anything not grounded says so.
 
 ## 1. Grounded facts (2026-10-02, `249e881b6`)
@@ -44,7 +44,8 @@ partitioned layout was measured for a single-key probe with a literal `hash('nod
 frontier node is NOT a constant, so file-level pruning is probably lost there and only row-group skipping on the sorted key
 remains (the 97 ms row). Not grounded either way. (c) A bound `?` in `bucket = ?` (the route binds ids) versus a literal was not
 compared. (d) Build time and on-disk size of the index were not recorded. (e) Nothing was measured through the sandbox per-call
-path of fact 3. §5 step 1 makes these the first pass criteria.
+path of fact 3. §5 step 1 makes these the first pass criteria. **(a)–(e) were measured 2026-10-02 — see §5.1; (b) is now answered: file-level pruning
+survives for a bucket list, but row-group pruning only for equality on ONE key, not for a multi-key frontier.**
 
 ## 2. The index
 
@@ -79,7 +80,7 @@ for a derived, rebuildable artefact; `dataRoot` is the alternative. Decision 1 n
 
 * **Both directions cost** ≈ 2× the edge Parquet. From the plan's ≈ 20 GB per 10⁹-edge copy: ≈ 40 GB per index at 10⁹, plus the node table
   (≈ edges / 5 rows), and a **peak of ≈ 2× during a rebuild** (old and new version coexist, §2.6) — ≈ 80 GB at the D21 target.
-  Derived from one approximate figure; re-measure in step 1. A `max_disk_bytes` setting refuses a build whose estimate exceeds it.
+  Derived from one approximate figure; **grounded 2026-10-02 by step 1 (§5.1)**: out + in + nodes = 3.43 GB at 10⁸ edges (34 bytes per edge, 1.28× the 2.67 GB flat file, not 2×), so ≈ 34 GB at 10⁹ is an extrapolation of that ratio, not a measurement. A `max_disk_bytes` setting refuses a build whose estimate exceeds it.
 * **Time.** `ts` is the instant the Investigation's `timeCol` + `timeColZone` define (`InvestigationTime`), so the zone is part of the
   mapping hash; the session `TimeZone` of the host is never used (the host-zone trap, `QueryExecutor.run` takes an explicit zone). With no
   `timeCol`, `ts` is NULL and the sort is `(src)` only.
@@ -87,8 +88,8 @@ for a derived, rebuildable artefact; `dataRoot` is the alternative. Decision 1 n
 * **Bucket count `N`.** Fixed per version, recorded in the manifest, chosen at build as `clamp(pow2(ceil(edges / 4·10⁶)), 16, 1 024)` — the
   plan's "a bucket near 10⁶–10⁷ edges" (§7.10.1). 64 buckets at 10⁸ is ≈ 1.6 M per bucket as measured; 10⁹ implies 256. More buckets means
   more, smaller files (and `PARTITION_BY` fan-out cost at build — not measured). Decision 3.
-* **Bucket function.** The bench used DuckDB `hash(x) % N`. DuckDB does not document `hash()` as stable across versions (**not grounded**
-  either way), so the manifest records the function name AND `duckdb.version`; a mismatch at read time marks the index **stale**, never
+* **Bucket function.** The bench used DuckDB `hash(x) % N`. DuckDB does not document `hash()` as stable across versions (**grounded 2026-10-02 by step 1, partly**: deterministic across
+  connections, JVM processes and an index written two days earlier by another process; stability ACROSS DuckDB versions is **not proven** — one jar in `~/.m2`, §5.1 Q2), so the manifest records the function name AND `duckdb.version`; a mismatch at read time marks the index **stale**, never
   yields a wrong answer. Java does not reimplement the hash: the engine asks DuckDB for the bucket set of a frontier in the same
   connection (`SELECT DISTINCT hash(x) % N …`) and then issues the lookup with literal bucket values.
 * **Row group size** 100 000, as benched (`ROW_GROUP_SIZE 100000`). Sorting by `(entity, ts)` inside a bucket is what gives the
@@ -98,7 +99,7 @@ for a derived, rebuildable artefact; `dataRoot` is the alternative. Decision 1 n
   masked or pseudonymised value, so a mask-mode change needs no rebuild.
 * **No extensions.** Everything above is core DuckDB (Parquet read/write, hash, recursive CTE, hive partitioning); nothing is INSTALLed or
   LOADed, so an air-gapped install needs nothing extra and `autoinstall_known_extensions=false` is untouched (fact 3). The `json` functions
-  are NOT assumed; a frontier is passed as binds / literals, not parsed from JSON (**not grounded**: availability of `json` in the jar).
+  are NOT assumed; a frontier is passed as binds / literals, not parsed from JSON (**grounded 2026-10-02 by step 1**: `json` is built into the pinned jar and works on a sealed, autoload-off connection, §5.1 Q4; the design still does not need it).
 
 ### 2.3 Row scope and R3 — the hard part
 
@@ -119,8 +120,8 @@ manifest version (§2.5). Decision 2.
 * **Retention (D11, signed: "incremental append by partition; retention inherited, never longer than the raw data").** I found no
   Dataset row-retention mechanism to inherit from (fact 11). Practical reading: when the base Dataset's files shrink or are superseded
   (`DatasetRelation` already subtracts superseded files), the index is **stale and must be rebuilt**, never appended to. The manifest's
-  `baseFingerprint` (file list + sizes + mtimes of the relation's inputs, plus the relation-SQL hash) is compared on every read at
-  low cost (a directory listing, **cost not measured**).
+  `baseFingerprint` (file list + sizes + mtimes of the relation's inputs, plus the relation-SQL hash) is compared on every read
+  (**grounded 2026-10-02 by step 1**: ≈ 0.1 ms per file listed with size and mtime — 0.9 ms for 1 file, 110 ms for 1 000, 943 ms for 10 000; 16 ms for 64 files in 64 subdirectories — so "low cost" holds only for a Dataset with few files, §5.1 Q5).
 * **GC.** Keep the current version plus `keep_versions - 1` previous ones (default 2), never deleting a version younger than the longest
   Graph Run lifetime (`Limits` run TTL 1 h) so a run that started on version V can finish on V.
   A version cited in an Investigation's provenance (§2.5) is NOT protected — provenance, not a replay pin; a missing version reads as
@@ -172,9 +173,9 @@ itself**; the bridge contributes only a thin `JobTypeProvider` adapter (`la_inde
 4. Build `nodes` from `out` and `in`; **verify**: rows(out) = rows(in) = rows(relation) − droppedNull, per-bucket file presence, node count > 0; any mismatch fails the build and deletes the stage.
 5. Write `manifest.json`, rename `.tmp` → `v<id>`, switch `CURRENT`, GC.
 
-**Cost.** Not measured (the bench generated its partitioned copies but the plan records no build time or size). Order of magnitude: a global
-`ORDER BY bucket, k, ts` over 10⁸ rows per direction is a spilling sort bounded by `memory_limit` and `threads`. Step 1 pass criterion
-in §5 puts a number on it; until then no build time is promised.
+**Cost — grounded 2026-10-02 by step 1 (§5.1 Q3):** 1.7 s / 18.3 s / **368 s** (6.1 min) at 10⁶ / 10⁷ / 10⁸ edges for out + in + nodes on the
+reference laptop under the default `memory_limit` (25 GiB = 80 % of 32 GB), peak process working set 0.3 / 2.3 / **17.9 GB**. The 10⁹ build time is not
+measured (see §5.1 for what is extrapolated). Whether the global `ORDER BY bucket, k, ts` spilled to disk at 10⁸ was not checked; on a machine with less RAM it would, untested.
 
 ### 3.3 Incremental append (D11) and compaction
 
@@ -199,6 +200,8 @@ The multi-hop walk is **driven from Java, one statement per level**, not one rec
 the frontier, (2) runs `SELECT … FROM out WHERE bucket IN (<literals>) AND src IN (<frontier binds>) [AND ts / kind predicates]`
 with the per-level yield `LIMIT`, (3) builds the next frontier in Java. This is the only shape in which the bucket predicate is a constant
 the planner can prune on (§1.2 (b)), and it is the shape the plan's 10⁹ extrapolation assumed ("one bucket lookup per frontier node").
+⚠ **Measured 2026-10-02 (§5.1 Q1/Q3): the bucket predicate prunes FILES for a multi-key frontier, but a multi-key `src IN (…)` statement loses row-group pruning
+(≈ 72 % of 10⁸ rows scanned at 50 keys), so a level with ≥ 10 keys costs seconds at 10⁸; the 5-level Java walk measured 3.0–4.3 s p50 at 10⁸, not ≤ 1.5 s.**
 Fences keep their present meaning and names: `maxDepth`, per-level `maxEdgeYield` (setting `edgeYieldCapped`), `timeoutMs`, cycle refusal
 (a visited set in Java), and **never a silent cap** — a level at its yield, or a run past `maxNodes`/`maxEdges`, is reported, and a Graph
 Run ends `BUDGET_EXCEEDED` with the measured size, as `GraphRunService` does today.
@@ -250,6 +253,129 @@ Traps for every step: **a `-pl` or `-rf` run tests the STALE sibling jar** (inst
 a **hand-kept list mirrors real state and drifts** — `ALLOWED`, the enforcer lists, `bundle-modules.mjs`, `AbsentGeoLinkRoutes.SURFACE`
 and `openapi-v1.json` are five of them; surefire's "VM crash or System.exit called?"; `-Dtest=A,B` with commas, never `+`;
 never run a gate worktree under `%TEMP%`; a new Parquet fixture must be generated, not committed (no data in commits).
+
+### 5.1 Step 1 results — 2026-10-02 (test-only spike, nothing in main code)
+
+**Method.** `inspecto-geo-link/src/test/java/com/gamma/control/InvIndexSpikeBench.java` (new class beside `InvTraversalBench`; `@Tag("bench")`,
+skipped unless BOTH `-Dinspecto.bench=true` and `-Dinspecto.bench.dir=<dir>` are set — verified: without them all 7 tests report *skipped*).
+Corpus = the D-S1 corpus (`edges_<n>.parquet`, heavy-tailed, mean degree 5, no `kind` column, so the index here has no `kind`). Index built as §2.2 / §3.2:
+`bucket = hash(key) % N`, `N = clamp(pow2(ceil(edges / 4·10⁶)), 16, 1 024)` → **16 / 16 / 32** at 10⁶ / 10⁷ / 10⁸, `ORDER BY bucket, key, ts`, `PARTITION_BY (bucket)`,
+`ROW_GROUP_SIZE 100000`, `COMPRESSION zstd`, plus the `nodes` table. Reads go through a **sealed connection** replicating `SqlSandbox.sealAllowing`
+(`allowed_directories` = the index dir, `enable_external_access=false`, `lock_configuration=true`, autoload off, `threads=4` as `traversalPolicy()`), views over
+`read_parquet('<dir>/**/*.parquet', hive_partitioning=true)`, and every timing is **prepare + bind + drain through `PreparedStatement`** (the route's shape).
+Machine: i7-9850H (6 cores / 12 threads), 32 GB, Windows 11, JDK 27, jar `duckdb_jdbc` 1.5.2.1 (`SELECT version()` reports `v1.5.2`). Warm OS cache (no drop on
+Windows). ⚠ **Noise:** the machine was not otherwise idle — two peer `java.exe` processes were resident (about 0.4 GB and 0.2 GB working set, CPU not sampled); nothing of mine ran
+concurrently with a timed section. One-hop and level figures are p50 / p95 over **20 samples** (first of 21 dropped); frontier-10 000 levels over 8, walks over 7, the
+`frontier` shape sweep over 8 (4 at k = 1 000) — **p95 over 8 or fewer samples is effectively the maximum.** Generated index data stays under the shared bench dir (`d3idx_<n>`), never committed.
+
+**Pass / fail against the criteria §5 step 1 states.** The criterion text names no start node for the walk; I used the D-S3 start (p99-degree, the one the 3 091 ms figure was
+measured with) AND the median-degree start, and report both.
+
+| Criterion (§5 step 1) | Measured | Verdict |
+|---|---|---|
+| one hop p50 ≤ 100 ms at 10⁸ through the sandbox path | **43 ms** p50 (51 p95), bound `?` src + bound bucket, sealed | ✅ **PASS** |
+| 5-level walk p50 ≤ 1.5 s at 10⁸ (half the fence; vs 3 091 ms flat CTE) | **3 013 ms** p50 (median-degree start), **4 342 ms** (p99-degree start, the D-S3 start); 5 190 / 4 561 ms without a bucket predicate | ❌ **FAIL** — for the p99 start it is 1.4× SLOWER than the 3 091 ms recursive-CTE figure |
+| 10⁸ full build ≤ 30 min, default `memory_limit` | **368 s = 6.1 min** (out 66 s, in 84 s, nodes 218 s); peak working set 17.9 GB | ✅ **PASS** |
+| numbers written into feasibility §7.10.1 | not done in this change (design doc only) | ⏳ open |
+| (d) `EXPLAIN ANALYZE` isolating bloom filters on a non-sorted key | **not run** | not measured |
+
+Per the step's own rule, **FAIL ⇒ "revisit Decision 3 / §4.1 before any step below"** — nothing is decided here; the numbers are for the operator.
+The walk semantics differ from the CTE it is compared with: the CTE enumerates paths (`list_contains` cycle refusal), the Java walk is a BFS with a visited set and a per-level `LIMIT 10000`;
+the walks read 31 502 / 20 433 edges (p99 / p50 start) and reached 31 392 / 20 380 nodes, with frontiers 1 / 39 / 1 463 / 9 992 / 9 955 and 1 / 3 / 30 / 400 / 9 985.
+
+**The five questions.**
+
+| # | Question | Answer | Verdict |
+|---|---|---|---|
+| Q1 | Does a bound `bucket = ?` prune partition files like the literal? | **Yes**, and so does `bucket = hash(?) % N` computed in SQL, for one key | ✅ |
+| Q2 | Is `hash()` stable; can Java compute the bucket? | stable across connections, processes, and a 2-day-old persisted index; **not proven across versions**; **not reproducible in Java** (alternative measured) | ✅ partial |
+| Q3 | Build time, size, skew, lookup latency | measured to 10⁸; tables below | ✅ (a multi-key frontier is the weak point) |
+| Q4 | `json`, Parquet write options in the pinned jar | all present except `ROW_GROUP_SIZE_BYTES` (errored, not needed) | ✅ |
+| Q5 | Cost of the staleness fingerprint | negligible for the SQL hash; about 0.1 ms per file for the file listing | ✅ measured |
+
+**Q1 — pruning, bound vs literal (10⁸, N = 32, median-degree node, sealed).** `Total Files Read` from `EXPLAIN ANALYZE`
+(prepared, with the binds); the scan operator emitted **3 rows** of 10⁸, i.e. row-group skipping on the sorted key worked too.
+
+| Predicate shape | p50 / p95 (ms) at 10⁶ | at 10⁷ | at 10⁸ | Total Files Read at 10⁸ |
+|---|---|---|---|---|
+| literal `src` + literal bucket | 21.6 / 24.4 | 27.3 / 29.8 | 44.0 / 52.8 | 1 |
+| bound `src` + bound bucket, `setInt` | 17.6 / 24.0 | 29.1 / 33.3 | 43.1 / 51.4 | 1 |
+| bound `src` + bound bucket, `setLong` (BIGINT vs INTEGER column) | 18.3 / 23.5 | 25.2 / 35.6 | 50.4 / 54.6 | 1 |
+| bound `src` + `bucket = CAST(hash(CAST(? AS VARCHAR)) % N AS INTEGER)` in SQL | 20.8 / 21.9 | 24.7 / 28.9 | 45.1 / 68.2 | 1 |
+| `IN` of one literal + `bucket IN` one literal | 16.2 / 23.6 | 26.2 / 31.9 | 44.2 / 55.1 | 1 |
+| bound `src`, **no** bucket predicate | 21.0 / 23.7 | 29.7 / 33.2 | **83.9 / 99.7** | **32** (all) |
+| same bound/bucket shape, **unsealed**, default threads | 15.3 / 18.4 | 24.8 / 27.4 | 40.9 / 50.4 | not recorded |
+
+A bound parameter prunes exactly as the literal does; the seal costs about 2-3 ms at 10⁸ (within the p95 spread). The bucket predicate is worth 1.9× at 10⁸ (D-S1: 2.3×).
+
+**Q1 / Q3 — multi-key frontier (the case §1.2 (b) worried about; random frontier of existing nodes, 10⁸, sealed, p50 ms):**
+
+| frontier k | A `src IN (?…)` + `bucket IN` literals | B `OR` of `(src=? AND bucket=?)` | C `UNION ALL` of per-key equalities | D join `VALUES(src,bucket)` | E join `unnest(?)` | files read (A) | rows scanned of 10⁸ (A) |
+|---|---|---|---|---|---|---|---|
+| 1 | 30 | 25 | 26 | 26 | 27 | 1 | 2 (the result) |
+| 2 | 93 | 101 | **57** | 93 | 95 | 2 | 1.7 M |
+| 5 | 394 | 188 | **158** | 382 | 438 | 5 | 9.0 M |
+| 10 | 1 279 | 589 | **411** | 947 | 927 | 10 | 21 M |
+| 20 | 1 948 | 1 057 | **691** | 1 752 | 1 588 | 17 | 39 M |
+| 50 | 3 190 | 4 122 | **2 160** | 4 155 | 3 441 | 26 | 72 M |
+| 100 | 4 266 | not run | not run | 4 695 | 4 418 | 31 | 95 M |
+| 1 000 | 5 027 | not run | not run | 4 406 | 4 136 | 32 | 99.7 M |
+
+(At 10⁷ the same sweep: A 24 / 50 / 94 / 160 / 307 / 432 / 491 / 528 ms for k = 1 / 2 / 5 / 10 / 20 / 50 / 100 / 1 000; B and C reach 17.5 s and 24.8 s at k = 1 000; D / E plateau at 0.5-0.7 s.
+B and C at k of 100 or more at 10⁸ were skipped as already 17-25 s at 10⁷.) **Reading:** only an equality on ONE key reaches the scan as a zone-map filter. A multi-key `IN`, a join, and the `VALUES` / `unnest`
+forms read most row groups (the scan emits tens of millions of rows); the per-key `UNION ALL` form keeps pruning per key but its cost is linear in k and then worse than the scan. With
+100 000-row groups and about 1 100 row groups at 10⁸, a frontier of 50 or more random keys touches almost every group, so a level statement saturates at a 4-5 s near-full scan.
+The bucket predicate prunes FILES (A reads 17 of 32 files at k = 20) but gave no row-group benefit; at k = 100 / 10 000 a bucket-less statement was measured *no slower* (3.6 / 4.1 s vs 5.4 / 5.9 s with the bucket list at 10⁸; cause not investigated, p95 up to 8 s, so machine noise cannot be excluded).
+Untested: running several per-key equality statements in parallel on separate connections.
+
+Level statements as the route would issue them (`e_out WHERE bucket IN (…) AND src IN (…)`, 10⁸): **frontier 1 gives 35 ms** (81 ms without the bucket list); **100 gives 5 356 ms** (bound, p95 7 640); **10 000 gives 5 900 ms**, 56 508 rows (p95 7 060).
+The `SELECT DISTINCT hash(v) % N` round trip that supplies the bucket list costs 0.9 / 3.4 / 258 ms for 1 / 100 / 10 000 ids at 10⁸ (428 ms for 10 000 at 10⁶). It is paid per level, which is why the bucketed walk is slower than the bucket-less one on small data (10⁶, p99 start: 1 741 vs 790 ms).
+
+**Q2 — `hash()` stability and the Java bucket.**
+* Two separate in-memory DuckDB instances, one JVM: identical `hash()` over 1 004 ids (including the empty string, non-ASCII, and a `7:550123456789` typed key).
+* Two separate JVM processes (pids 16136 and 19396): identical MD5 over the 1 004 hash values (`d4736b35…`).
+* Persisted: the D-S1 `edges_<n>_b64` copies were written on 2026-09-30 by an earlier process; recomputing `hash(src) % 64` now matches the stored `bucket` on **every row: 0 mismatches of 10⁶, 10⁷ and 10⁸**.
+* ⚠ **Cross-version stability is NOT proven.** The writer's `created_by` and the runtime are the same build (`v1.5.2`, `8a5851971f`); only `duckdb_jdbc` 1.5.2.1 exists under `~/.m2`, and nothing was downloaded.
+* **Java cannot compute `hash()`.** I found no documented algorithm and did not reverse-engineer one; `String.hashCode() % 64` agrees with it on 19 of 1 004 ids (chance level, 1 / 64). So "the engine supplies the bucket predicate without a round trip" is **not available with `hash()`**; the round trip above (or a Java-reproducible function) is the choice.
+* **Measured alternative: `md5_number_lower(x) % N`** (returns `UBIGINT`). Java `MessageDigest` MD5 of the UTF-8 bytes, **bytes 8-15 read little-endian, `Long.remainderUnsigned(v, N)`, equals the SQL bucket on 1 004 / 1 004 ids**; the three other byte / endianness readings agree on about 1.7 % (chance). An index built with it: build 1.9 s / 21.2 s at 10⁶ / 10⁷ (vs 1.7 s / 18.3 s with `hash()`; one run each, so +16 % at 10⁷ is indicative); one-hop 19.0 / 22.3 ms p50, 1 file read; skew 1.12× at 10⁷ (max / median). It would remove the bucket round trip, but that round trip is small next to the scan-dominated levels above. MD5's output is fixed by the standard; that DuckDB keeps *this function's* byte order across versions is, like `hash()`, **not proven**, and the manifest check (function name + version) applies either way.
+
+**Q3 — build, size, skew (out + in + nodes; 10⁸ is measured, 10⁹ is not).**
+
+| | 10⁶ | 10⁷ | 10⁸ |
+|---|---|---|---|
+| buckets `N` | 16 | 16 | 32 |
+| build wall time: out / in / nodes / **total** | 0.6 / 0.6 / 0.6 / **1.7 s** | 5.3 / 5.7 / 7.3 / **18.3 s** | 65.6 / 84.4 / 217.8 / **367.9 s** |
+| peak process working set (`tasklist`, 2 s samples) | 0.32 GB | 2.28 GB | **17.9 GB** (DuckDB-accounted 18.2 GB; `memory_limit` 25 GiB, 12 threads) |
+| `out` / `in` / `nodes` bytes | 14.5 / 14.5 / 3.6 MB | 148.1 / 147.2 / 34.3 MB | 1 542.7 / 1 534.2 / 352.1 MB |
+| index total vs flat file | 32.6 MB vs 23.2 MB (1.40×) | 329.6 MB vs 249.1 MB (1.32×) | **3.43 GB vs 2.67 GB (1.28×)**; 34 bytes per edge |
+| files per table; row groups (out / in / nodes) | 16; 23 / 21 / 16 | 16; 120 / 122 / 32 | 32; 1 103 / 1 097 / 241 |
+| rows per bucket `out` min / median / max | 59 305 / 61 612 / 75 599 | 609 317 / 619 707 / 686 726 | 3 044 373 / 3 117 388 / 3 453 317 (max ÷ median 1.11) |
+| rows per bucket `in` min / median / max | 60 629 / 62 711 / 63 752 | 619 034 / 625 446 / 630 579 | 3 107 625 / 3 127 076 / 3 139 065 (1.00) |
+| verification (§3.2 step 4): rows(out) = rows(in) = rows(flat); node rows | pass; 199 182 | pass; 1 991 728 | pass; 19 917 017 |
+
+The skew is mild even with a hub carrying about 0.37 % of all edges (368 k at 10⁸): the largest `out` bucket is 11 % above the median. Build time is not linear (10× the rows took 11× then 20× the time): the 10⁸ nodes step (two `GROUP BY`s and a `FULL JOIN`) dominates, and the process held 17.9 GB.
+**Extrapolated, not measured:** at 10⁹ the on-disk size is about 34 GB (the bytes-per-edge ratio) against §2.2's 40 GB estimate. No build time or memory figure is extrapolated for 10⁹: the 10⁸ build already used 70 % of the default `memory_limit`, so a 10⁹ build would spill and its time is unknown.
+
+**Q4 — the pinned jar (`duckdb_jdbc` 1.5.2.1, runtime `v1.5.2`).**
+* `json` is **built in** (`duckdb_extensions()`: `json loaded=true installed=true`; nothing to INSTALL) and **works on a sealed connection with autoinstall / autoload off and `enable_external_access=false`**. `json_extract`, `json_extract_string`, `json_group_array`, `CAST(… AS JSON)`, `from_json` + `unnest`, `json_array`, `json_valid` all returned correct results.
+* `COPY … (FORMAT parquet, …)` accepted: `PARTITION_BY`, `ROW_GROUP_SIZE`, `COMPRESSION zstd` / `snappy` (files read back as ZSTD / SNAPPY — **the default with no COMPRESSION option was SNAPPY, so `zstd` must be stated**), `COMPRESSION_LEVEL`, `FILE_SIZE_BYTES`, `PER_THREAD_OUTPUT`, `OVERWRITE_OR_IGNORE`, `PARQUET_VERSION V2`, `bloom_filter_false_positive_ratio`; manual per-bucket files (one `COPY` per bucket, named by the caller) read back with a glob — 250 000 of 250 000 rows. **`ROW_GROUP_SIZE_BYTES '8MB'` errored** ("Attempting to execute an unsuccessful or closed pending query result"; not investigated, the design does not use it). A `PARTITION_BY` copy into a non-empty directory errors ("Directory … is not empty! Enable OVERWRITE option"), which the staged `.tmp` discipline of §2.4 avoids.
+* `parquet_metadata` shows a `bloom_filter_offset` on some columns of a default-written file, so DuckDB writes bloom filters without being asked; whether they help was **not isolated** (step (d) not run).
+
+**Q5 — staleness fingerprint cost (`baseFingerprint` = file list + sizes + mtimes of the relation's inputs, plus the relation-SQL hash).**
+
+| Part | p50 / p95 |
+|---|---|
+| SHA-256 of a 700-char relation SQL | 0.06 / 0.37 ms |
+| Java listing of N files (relative name, size, mtime) + SHA-256: 1 file | 0.9 / 1.1 ms |
+| 64 files | 10.4 / 14.0 ms |
+| 1 000 files | 110 / 133 ms |
+| 10 000 files | **943 / 1 152 ms** |
+| the 64-subdirectory bench dirs (`edges_<n>_b64`, recursive walk) | 15.6 / 21.2 ms |
+| DuckDB `glob()` count of 1 / 64 / 1 000 / 10 000 files (names only, no size or mtime; includes opening a fresh instance) | 1.0 / 1.8 / 7.4 / 66.7 ms (p95 1.1 / 2.3 / 9.6 / 81.6) |
+
+(20 samples each, synthetic files on local NTFS, warm.) The SQL hash is free; the file listing costs about 0.1 ms per file with `readAttributes`, so a Dataset of tens of thousands of files would spend seconds per read on it, more than a 43 ms hop, unless it is cached or sampled. The cheaper `glob()` probe sees only names (a file rewritten in place is invisible to it). How the Dataset's input files are enumerated in production (`DatasetRelation` consults the Consignment catalog for `physicalRef` Datasets) was not measured, and how often the fingerprint should be taken is a decision, not a fact.
+
+**Not measured / extrapolated, in one place.** 10⁹ (build time, memory, size beyond the 34 GB ratio); DuckDB cross-version `hash()` / `md5_number_lower`; bloom filters on a non-sorted key (step (d)); concurrent reads (D-S5); parallel per-key statements; a Dataset with many input files through the real `relationSql`; the build under a smaller `memory_limit`; cold disk cache. **Machine noise** is as stated in Method.
 
 ## 6. Risks
 
