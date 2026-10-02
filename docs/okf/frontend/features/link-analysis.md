@@ -16,6 +16,13 @@ timestamp: 2026-07-07T00:00:00Z
 > rather than a generic query failure. ⚠ The flag is derived server-side from what actually registered, never
 > guessed from the edition string.
 
+> **Where the code lives (D-5 steps 3-4, 2026-10-02).** The Link Analysis and Geo code is the in-workspace library
+> `inspecto-ui/projects/link-analysis/src/` (folders `link-analysis`, `geo-map`, `graph`, `geo`, `investigation`, `la-host`, `api`),
+> imported as `@inspecto/link-analysis` (only the `la-host` seam and the two viz registrations - see `public-api.ts`) or by deep path for
+> lazy routes; it reaches shared code as `@inspecto/core/*` (= `src/app/inspecto`). The canvas, `graph-types`, `graph-source`, `entity-key`,
+> `graph-export` and `unique-name` stay in core. ESLint enforces the arrow (core <- library <- shell); the Java parity tests read their
+> fixtures from the library. Design and as-built facts: `docs/superpower/la-separation-d5-design.md`.
+
 The Builder-lens studio at `/studio/link-analysis` for graph investigation. Keep the four graph planes
 distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3 — Entity/Link graphs**
 (records as business entities), never on artifact/lineage graphs.

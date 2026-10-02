@@ -117,3 +117,24 @@ Java parity fixtures (`graph/*.fixture.json`) are not moved by anything in D-5 s
 2. `graph-export` belongs to the canvas (§5). Decision 2 listed it with the library algorithms.
 3. Two CORE → LIBRARY edges exist *inside* `graph/` (§4 last paragraph) that "46 direct outside edges" cannot show.
 4. `LinkAnalysisSettingsService`: moving it (rather than inverting it) is the least invasive removal and is already step 3's end state.
+
+## 7. As built (steps 3 and 4, 2026-10-02)
+
+The classification above held: every CORE row stayed, and the library reaches core only through `@inspecto/core/*`.
+
+| Fact | As built |
+|---|---|
+| Files moved | 155 `git mv`s (85 non-spec: 72 `.ts`, 6 templates, 7 fixture JSON; 70 specs) into `inspecto-ui/projects/link-analysis/src/{link-analysis,geo-map,graph,geo,investigation,la-host,api}`; plus `public-api.ts` and the two library barrels (`graph/index.ts`, `investigation/index.ts`). The library is 18,455 non-spec lines. `la-host.providers.ts` stays in `modules/admin/studio` |
+| `api/` clients that moved | `inv.service` (+ `inv-identity` spec), `graph-runs.service`, `geo.service`, `geo-settings.service`, `notes.service` (the 7th, `link-analysis-settings`, moved in step 1). They left the `api` barrel; library files import them by deep path |
+| Core slice kept | `graph-types`, `graph-source`, `entity-key`, `branching-stage`, `catalog-graph`, `graph-view.component`, `graph-export`, `investigation/unique-name`, plus their specs; the core `graph/` and `investigation/` barrels now export only these |
+| Barrels split | the old `graph` barrel exported 12 modules: 5 stay (core `graph/index.ts`), 8 form the library `graph/index.ts` (`branching-pattern-engine` re-exports the core `branching-stage`); `investigation` keeps `unique-name` in core |
+| Fixtures | six `graph-*-parity.fixture.json` + `branching-parity.fixture.json` moved with the specs that read them; `entity-normaliser-parity.fixture.json` stayed in core (read by `entity-key.spec`) |
+| Public surface | `@inspecto/link-analysis` = `public-api.ts` = the `la-host` seam + `registerLinkAnalysisViz` + `registerGeoMapViz` and nothing else; routes, widget components, `MapViewComponent` and the two Settings clients are imported by deep path (`@inspecto/link-analysis/*`) so the lazy chunk boundary survives |
+
+### What the closure could not see (design corrections, continued from §6)
+
+5. **A core file that imports a moved file is invisible until the move.** Two such edges existed: `graph/graph-source` (core) used `MultiNodeMapping` / `MultiEdgeMapping` from `api/inv.service`; both interfaces now live in `graph-source` and `inv.service` re-exports them. And `api/notes.service` imported `ObjectNote` from `api/objects.service`, a path the LA lint restricts as the Cases edge; `ObjectNote` moved to `api/models` (re-exported through the `api` barrel as before).
+6. **A library barrel is not free.** The first `public-api.ts` also re-exported the two widget components and `MapViewComponent`; `app.config` imports it statically, esbuild keeps a source module's side effects, and MapLibre (1.2 MB) plus the LA widgets landed in `main` (1.88 to 1.42 MB, and a 1.48 MB lazy chunk). Only the `la-host` seam and the two (async-loader) registrations may be exported; this is pinned by the 2026-10-02 chunk comparison, not by a test (a size guard is a BACKLOG candidate).
+7. **`ng test` discovery is rooted at `src/`**: `include: ["../projects/**/*.spec.ts"]`; a bare `projects/**/*.spec.ts` silently matched nothing (395 of 465 files ran, 3,791 of 4,542 tests, all green).
+8. **The vocabulary guard's scope named only `inspecto-ui/src/app`**; moved files were silently unscanned until `inspecto-ui/projects` was added.
+9. Eight `check-vocabulary` exemptions are keyed by path and moved with their files; a planted `flow` identifier under `projects/` proves the scope.
