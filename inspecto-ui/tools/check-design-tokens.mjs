@@ -14,7 +14,8 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative, sep } from 'node:path';
 
-const uiRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+// DESIGN_TOKENS_ROOT lets tools/check-design-tokens.test.mjs aim the guard at a throwaway tree (and nothing else).
+const uiRoot = process.env.DESIGN_TOKENS_ROOT ?? join(dirname(fileURLToPath(import.meta.url)), '..');
 const toPosix = (p) => p.split(sep).join('/');
 
 // Directories that hold inspecto-authored, design-system-consuming code.
@@ -31,7 +32,11 @@ const toPosix = (p) => p.split(sep).join('/');
 // in-scope the default and out-of-scope the thing that needs a decision. No deny-list is needed to say
 // this, because nothing under src/app is vendored; do not add one speculatively. Widening cost nothing —
 // layout/** and core/** measured 0 violations at the time of the change.
-const ROOTS = ['src/app'];
+//
+// 'projects' (D-5 step 2, 2026-10-02): the in-workspace libraries (`projects/link-analysis`, step 3) are inspecto-authored
+// too. The walk below silently skips a root that does not exist, so a folder that is created LATER is guarded from
+// its first file ONLY if it is already listed here; tools/check-design-tokens.test.mjs proves it by planting a violation.
+const ROOTS = ['src/app', 'projects'];
 
 // The only files permitted to hardcode colors / own the status-color mapping. These are the
 // sanctioned design-system color owners: the chart palette, the status pill, the inline alert

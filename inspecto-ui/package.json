@@ -16,8 +16,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json && tsc -p tsconfig.json --noEmit",
     "lint": "ng lint",
     "lint:tokens": "node tools/check-design-tokens.mjs",
-    "format:check": "prettier --check \"src/**/*.{ts,html,scss,json}\"",
-    "format": "prettier --write \"src/**/*.{ts,html,scss,json}\""
+    "format:check": "prettier --check \"{src,projects}/**/*.{ts,html,scss,json}\"",
+    "format": "prettier --write \"{src,projects}/**/*.{ts,html,scss,json}\""
   },
   "dependencies": {
     "@angular/animations": "22.1.1",

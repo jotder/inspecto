@@ -50,3 +50,8 @@ test('does not apply to specs or to host code', async () => {
     assert.equal(await lint(code, LA_FILE.replace('probe.ts', 'probe.spec.ts')), 0);
     assert.equal(await lint(code, 'src/app/modules/admin/other/probe.ts'), 0);
 });
+
+test('applies to the library folder step 3 moves LA into (D-5 step 2: projects/ must not be an unlinted exemption)', async () => {
+    const code = `export const f = () => import('app/modules/x');`;
+    assert.equal(await lint(code, 'projects/link-analysis/src/probe.ts'), 1);
+});
