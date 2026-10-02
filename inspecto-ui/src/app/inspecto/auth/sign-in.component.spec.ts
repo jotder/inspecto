@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Router } from '@angular/router';
-import { DemoUser, SessionService } from 'app/inspecto/api';
+import { DemoUser, SessionService } from './session.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SignInComponent } from './sign-in.component';
@@ -17,7 +17,7 @@ const FAILED_KEY = 'inspecto.signInFailed';
  *
  * ⚠ The authorize vs. mock-code split is NOT here. `SignInComponent.signIn()` unconditionally
  * delegates to `SessionService.beginLogin()`, which is where that branch lives; it is asserted in
- * `inspecto/api/session.service.spec.ts`. There is likewise no `mockAuthMode` client-side dev
+ * `inspecto/auth/session.service.spec.ts`. There is likewise no `mockAuthMode` client-side dev
  * switch to test — `session.service.ts:64` says so explicitly; `auth.mock` arrives on `/bootstrap`.
  */
 function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[] } = {}) {

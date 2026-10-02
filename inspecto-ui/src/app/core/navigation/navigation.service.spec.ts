@@ -3,7 +3,7 @@ import { signal } from '@angular/core';
 import { firstValueFrom, of } from 'rxjs';
 import { NavMenusService } from 'app/inspecto/menu/menu-api';
 import { describe, expect, it } from 'vitest';
-import { SessionService } from 'app/inspecto/api/session.service';
+import { SessionService } from 'app/inspecto/auth/session.service';
 import { NavigationService } from './navigation.service';
 
 /**

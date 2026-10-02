@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { SessionService } from './session.service';
+import { SessionService } from '../auth/session.service';
 
 /** The three persona lenses over the one console (`docs/GLOSSARY.md` §1-A). Not a permission —
  *  under RBAC (Standard, R2) the subject's role grants constrain which lenses are selectable. */

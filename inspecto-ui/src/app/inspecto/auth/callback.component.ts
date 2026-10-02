@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, Input, OnInit, inject } from '@angular/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Router } from '@angular/router';
-import { SessionService } from 'app/inspecto/api';
+import { SessionService } from './session.service';
 
 /**
  * OIDC redirect landing (W6d): the IAM sends the browser back here with `?code=&state=`. This hands

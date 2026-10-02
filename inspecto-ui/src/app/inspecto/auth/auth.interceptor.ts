@@ -1,7 +1,7 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, switchMap, throwError } from 'rxjs';
-import { APP_ENVIRONMENT } from './app-environment';
+import { APP_ENVIRONMENT } from '../api/app-environment';
 import { SessionService } from './session.service';
 
 /** The BFF session routes manage their own credential (a one-time code, or the httpOnly cookie), so

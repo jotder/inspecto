@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Router } from '@angular/router';
-import { SessionService } from 'app/inspecto/api';
+import { SessionService } from './session.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { describe, expect, it, vi } from 'vitest';
 import { SignInComponent } from './sign-in.component';

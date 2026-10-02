@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { A2uiArtifact, isRecord } from 'app/inspecto/a2ui/a2ui-artifact';
 import { apiUrl } from './api-base';
 import { Finding } from './models';
-import { SessionService } from './session.service';
+import { SessionService } from '../auth/session.service';
 import { SpacesService } from './spaces.service';
 
 /** POST /agent/sessions result — a live multi-turn session on the deliberative loop. */

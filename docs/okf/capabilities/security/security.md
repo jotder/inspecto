@@ -245,7 +245,7 @@ serves `POST /auth/exchange | /auth/refresh | /auth/logout`, delegating to the `
   (`4x-public-pkce`, 2026-07-25: dead confidential-client code deleted, `appClientSecret` removed from source
   and all four environment files), the callback is parsed with `URLSearchParams` and **validates `state`**
   (`ce49a681` — the CSRF defence P1 only pretended to have);
-- `SessionService` (`inspecto-ui/src/app/inspecto/api/session.service.ts`) is an `APP_INITIALIZER` gate:
+- `SessionService` (`inspecto-ui/src/app/inspecto/auth/session.service.ts`) is an `APP_INITIALIZER` gate:
   `init()` reads `/bootstrap`, and on `authMode === 'oidc'` tries a silent `refresh()` from the cookie, then
   re-pulls `/bootstrap` with the bearer for effective capabilities; `auth.interceptor.ts` attaches
   `Authorization: Bearer` and does 401 → silent refresh → retry.
@@ -711,12 +711,12 @@ corrected with this spec.
 
 ### 8.4 UI specs — `inspecto-ui/src/app/` (vitest)
 
-Fourteen specs sit directly on this mechanism: `inspecto/api/session.service.spec.ts` (boot, refresh, the
+Fourteen specs sit directly on this mechanism: `inspecto/auth/session.service.spec.ts` (boot, refresh, the
 three-layer logout, `redirect()` seam), `lens.service.spec.ts` (identity vs lens-scoped, honor-system
 mode), `auth.interceptor.spec.ts` (Bearer + 401 refresh), `inspecto/access/access-catalog.spec.ts`,
 `layout/common/lens-switcher/lens-switcher.component.spec.ts`, `layout/common/user/user.component.spec.ts`
 (sign-out), `modules/admin/access/access.component.spec.ts`, `access-roles.component.spec.ts`,
-`access-policies.component.spec.ts`, `role-form.dialog.spec.ts`, `modules/admin/session/sign-in.a11y.spec.ts`
+`access-policies.component.spec.ts`, `role-form.dialog.spec.ts`, `inspecto/auth/sign-in.a11y.spec.ts`
 and `callback.a11y.spec.ts`, `core/navigation/navigation.service.spec.ts` (module-absent nav hiding),
 `inspecto/components/connectivity-banner.component.spec.ts`.
 

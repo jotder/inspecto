@@ -31,6 +31,9 @@ for (const spec of [
     '@inspecto/core/ai-assist',
     '@inspecto/core/api/objects.service',
     '@inspecto/core/api/session.service',
+    // D-5 step 5: SessionService moved to core `auth/`
+    'app/inspecto/auth/session.service',
+    '@inspecto/core/auth/session.service',
 ]) {
     test(`flags import('${spec}')`, async () => {
         assert.equal(await lint(`export const f = () => import('${spec}');`), 1);

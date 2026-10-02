@@ -753,9 +753,9 @@ in use. Look there before picking a class — do not invent a token.
   `authInterceptor` (attaches the bearer + does one silent `/auth/refresh` on 401 — **a pass-through unless
   `authMode()==='oidc'`**), and the `authGuard` on the shell route (**returns `true` unchanged unless
   `loginRequired()`**). The flow is **backend-mediated (BFF)**: the SPA never holds a refresh token — it does
-  Auth-Code+PKCE (`inspecto/api/pkce.ts`), then the backend `/auth/exchange|refresh|logout` routes keep the
+  Auth-Code+PKCE (`inspecto/auth/pkce.ts`), then the backend `/auth/exchange|refresh|logout` routes keep the
   refresh token in an httpOnly cookie and return only a short-lived access token (in memory). Guest screens:
-  `modules/admin/session/{sign-in,callback}.component`. Real deployments read
+  `inspecto/auth/{sign-in,callback}.component`. Real deployments read
   `bootstrap.auth` (or fall back to `environment.oidc`) for the authorize URL + public client id (no secret —
   public PKCE client). `/bootstrap` + `/auth` are server-global (exempt in `spaceInterceptor`).
 - **Downloads** (CSV/blob) go through `HttpClient` (responseType `blob`/`text`) + an object

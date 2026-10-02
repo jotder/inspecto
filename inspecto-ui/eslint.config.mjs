@@ -44,6 +44,8 @@ const laDynamicImportSelectors = [
     ...['app/inspecto', 'src/app/inspecto', '@inspecto/core'].flatMap((root) => [
         ...exactOrUnder(`${root}/api/objects.service`, EDGE_MSG),
         ...exactOrUnder(`${root}/api/session.service`, FEATURES_MSG),
+        // D-5 step 5: the OIDC client code (SessionService included) lives in `inspecto/auth`; the barrel still re-exports it.
+        ...exactOrUnder(`${root}/auth/session.service`, FEATURES_MSG),
     ]),
     {
         selector: 'ImportExpression > :not(Literal).source',
@@ -197,6 +199,9 @@ export default tseslint.config(
                                 'app/inspecto/api/session.service',
                                 'src/app/inspecto/api/session.service',
                                 '@inspecto/core/api/session.service',
+                                'app/inspecto/auth/session.service',
+                                'src/app/inspecto/auth/session.service',
+                                '@inspecto/core/auth/session.service',
                             ],
                             message:
                                 'Host module flags (ops / exchange / geoLink) are a host edge: inject LA_FEATURES from @inspecto/link-analysis (la-host) instead, not SessionService (D-5 prep).',

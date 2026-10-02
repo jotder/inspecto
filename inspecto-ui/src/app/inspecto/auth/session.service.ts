@@ -2,8 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, firstValueFrom, map, Observable, of, tap } from 'rxjs';
-import { APP_ENVIRONMENT } from './app-environment';
-import { apiUrl } from './api-base';
+import { APP_ENVIRONMENT } from '../api/app-environment';
+import { apiUrl } from '../api/api-base';
 
 /**
  * OIDC endpoint configuration for the Professional-edition login redirect. Comes from `bootstrap.auth`

@@ -3,9 +3,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Router } from '@angular/router';
-import { SessionService } from 'app/inspecto/api';
+import { SessionService } from './session.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
-import { environment } from 'environments/environment';
+import { APP_ENVIRONMENT } from '../api/app-environment';
 
 /**
  * Professional-edition sign-in screen (W6d). A single "Sign in with SSO" action that kicks off the
@@ -141,6 +141,7 @@ import { environment } from 'environments/environment';
 })
 export class SignInComponent implements OnInit {
     private session = inject(SessionService);
+    private env = inject(APP_ENVIRONMENT);
     private router = inject(Router);
 
     readonly busy = signal(false);
@@ -150,7 +151,7 @@ export class SignInComponent implements OnInit {
      *  would 401 here. Each falls back to the shipped default when the operator authored none. */
     readonly logo = computed(() => this.session.branding().logoDataUrl);
     readonly caption = computed(() => this.session.branding().caption);
-    readonly footer = computed(() => this.session.branding().footerText ?? environment.footerText);
+    readonly footer = computed(() => this.session.branding().footerText ?? this.env.footerText);
     /** HOME-VERSION-1: the version the backend reports — the field a support call reads aloud. Absent until known. */
     readonly version = computed(() => this.session.version());
     /** DEMO-AUTH-1: a demo build's Demo Users — non-empty replaces the SSO button with a picker. */

@@ -3,7 +3,7 @@ import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { EventRow, EventsService } from './events.service';
-import { SessionService } from './session.service';
+import { SessionService } from '../auth/session.service';
 import { SpacesService } from './spaces.service';
 import { environment } from '../../../environments/environment';
 

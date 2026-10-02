@@ -10,11 +10,11 @@ import { provideIcons } from 'app/core/icons/icons.provider';
 import { provideToastr } from 'ngx-toastr';
 import { errorInterceptor as inspectoErrorInterceptor } from './inspecto/api/error.interceptor';
 import { spaceInterceptor } from './inspecto/api/space.interceptor';
-import { authInterceptor } from './inspecto/api/auth.interceptor';
+import { authInterceptor } from './inspecto/auth/auth.interceptor';
 import { v1Interceptor } from './inspecto/api/v1.interceptor';
 import { registerGeoMapViz, registerLinkAnalysisViz } from '@inspecto/link-analysis';
 import { provideLaHostServices } from './modules/admin/studio/la-host.providers';
-import { SessionService } from './inspecto/api/session.service';
+import { SessionService } from './inspecto/auth/session.service';
 import { provideAppEnvironment } from './inspecto/api/app-environment';
 import { environment } from 'environments/environment';
 

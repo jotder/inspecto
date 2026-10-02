@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 import { spaceScopedUrl } from './space-scope';
-import { SessionService } from './session.service';
+import { SessionService } from '../auth/session.service';
 import { SpacesService } from './spaces.service';
 import type { Ref } from '../component-model/component-types';
 import { signalToEvent, type Signal, type SignalSeverity } from '../signal/signal';

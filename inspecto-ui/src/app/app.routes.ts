@@ -51,11 +51,11 @@ export const appRoutes: Route[] = [
     // never navigated to. sign-in kicks off Auth-Code+PKCE; auth/callback redeems the returned code.
     {
         path: 'sign-in',
-        loadComponent: () => import('app/modules/admin/session/sign-in.component').then((m) => m.SignInComponent),
+        loadComponent: () => import('app/inspecto/auth/sign-in.component').then((m) => m.SignInComponent),
     },
     {
         path: 'auth/callback',
-        loadComponent: () => import('app/modules/admin/session/callback.component').then((m) => m.CallbackComponent),
+        loadComponent: () => import('app/inspecto/auth/callback.component').then((m) => m.CallbackComponent),
     },
 
     // Public dashboard embed (BI-6) — the share token IS the credential; no shell, no guard, read-only.

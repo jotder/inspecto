@@ -7,7 +7,7 @@ import {
     futuristicNavigation,
     horizontalNavigation,
 } from 'app/core/navigation/navigation-data';
-import { SessionService } from 'app/inspecto/api/session.service';
+import { SessionService } from 'app/inspecto/auth/session.service';
 import { favoritesNavGroup, loadMenuFavorites, loadMenuTrees, menuTreeToNav, saveMenuTrees } from 'app/inspecto/menu';
 import { NavMenusService } from 'app/inspecto/menu/menu-api';
 import { cloneDeep } from 'lodash-es';

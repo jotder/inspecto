@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { LensService } from './lens.service';
-import { SessionService } from './session.service';
+import { SessionService } from '../auth/session.service';
 
 describe('LensService', () => {
     beforeEach(() => {

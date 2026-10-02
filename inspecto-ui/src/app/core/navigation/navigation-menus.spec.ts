@@ -4,7 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom, Observable, of, throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { SessionService } from 'app/inspecto/api/session.service';
+import { SessionService } from 'app/inspecto/auth/session.service';
 import { MENU_STORAGE_KEY } from 'app/inspecto/menu';
 import { NavMenusService } from 'app/inspecto/menu/menu-api';
 import { MenuTree } from 'app/inspecto/menu/menu-types';
