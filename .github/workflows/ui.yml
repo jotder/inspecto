@@ -109,8 +109,15 @@ jobs:
       # Production build is the green gate (AOT type-check + bundle + budgets).
       # No dev-only fileReplacements, so one configuration covers both.
       - name: Build (production)
-        run: npm run build
+        run: npm run build -- --stats-json
 
       # `npm run build` builds the default application (gamma) only; la-app (D-5 step 6) is its own application.
       - name: Build la-app (production)
-        run: npm run build -- la-app
+        run: npm run build -- la-app --stats-json
+
+      # Bundle-shape guard (inspecto-ui/tools/check-bundle-shape.mjs + bundle-budget.json). Angular budgets cap size;
+      # this reads the dist/<app>/stats.json the two builds above wrote (--stats-json) and fails when a heavy module
+      # (MapLibre, Link Analysis / Geo widgets) lands in main or an eagerly-imported chunk, main/initial grow past the
+      # ceiling, the link-analysis routes stop being a lazy chunk, or the chunk counts drift. Re-baseline: see the JSON's _doc.
+      - name: Bundle-shape guard
+        run: npm run check:bundle-shape

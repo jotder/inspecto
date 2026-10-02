@@ -68,8 +68,14 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "3mb",
-                  "maximumError": "5mb"
+                  "maximumWarning": "2.58mb",
+                  "maximumError": "2.65mb"
+                },
+                {
+                  "type": "bundle",
+                  "name": "main",
+                  "maximumWarning": "1.94mb",
+                  "maximumError": "2.0mb"
                 },
                 {
                   "type": "anyComponentStyle",
@@ -196,8 +202,14 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "3mb",
-                  "maximumError": "5mb"
+                  "maximumWarning": "2.68mb",
+                  "maximumError": "2.75mb"
+                },
+                {
+                  "type": "bundle",
+                  "name": "main",
+                  "maximumWarning": "2.04mb",
+                  "maximumError": "2.1mb"
                 },
                 {
                   "type": "anyComponentStyle",

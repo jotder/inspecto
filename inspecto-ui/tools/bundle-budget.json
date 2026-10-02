@@ -1,0 +1,41 @@
+{
+  "_doc": [
+    "Thresholds for tools/check-bundle-shape.mjs (reads dist/<app>/stats.json, written by `ng build --stats-json`). Complements the angular.json budgets (size only) with chunk PLACEMENT.",
+    "Re-baseline DELIBERATELY, in the same change that legitimately grows or reshapes a bundle: (1) `npm run build -- --stats-json` and `npm run build -- la-app --stats-json`; (2) `npm run check:bundle-shape` and read the FAIL lines; (3) if the move is intended, set maxMainBytes / maxInitialBytes to about +3% over the new measured size (the guard prints kB = 1000 B) and update the initialFiles / lazyChunks expected values; (4) put the new numbers in the commit message. Never raise a ceiling to silence an UNEXPLAINED jump - the FAIL line names the module that moved.",
+    "maxInitialBytes covers main + every chunk main imports STATICALLY + polyfills + styles. forbiddenInInitial patterns are regexes over metafile input paths (forward slashes), checked in main and in the statically-imported chunks. A static import of a library barrel evaluates everything it re-exports, so projects/link-analysis/src/public-api.ts must stay light (see its header).",
+    "Measured 2026-10-02 (production): gamma main 1877959 B, eager (main + static chunks + polyfills + styles) 4888709 B in 29 files, 114 lazy JS chunks; la-app main 1980572 B, eager 3037577 B in 8 files, 15 lazy JS chunks. NB the Angular CLI report counts only main+polyfills+styles as initial (2.50 MB for gamma); the guard also counts the chunks main imports statically."
+  ],
+  "apps": {
+    "gamma": {
+      "stats": "dist/gamma/stats.json",
+      "maxMainBytes": 1935000,
+      "maxInitialBytes": 5035000,
+      "initialFiles": { "expected": 29, "tolerance": 2 },
+      "lazyChunks": { "expected": 114, "tolerance": 10 },
+      "forbiddenInInitial": [
+        { "pattern": "node_modules/maplibre-gl/", "why": "MapLibre (1.2 MB) belongs in the lazy Geo chunk" },
+        { "pattern": "^projects/link-analysis/src/(?!la-host/|public-api\\.ts$|[a-z-]+/[a-z-]+\\.viz\\.ts$)", "why": "Link Analysis / Geo library code beyond the host seam and viz registration must stay lazy (public-api.ts barrel too heavy?)" }
+      ],
+      "requiredLazyEntries": [
+        "projects/link-analysis/src/link-analysis/link-analysis.routes.ts",
+        "projects/link-analysis/src/geo-map/geo-map.routes.ts"
+      ]
+    },
+    "la-app": {
+      "stats": "dist/la-app/stats.json",
+      "maxMainBytes": 2040000,
+      "maxInitialBytes": 3130000,
+      "initialFiles": { "expected": 8, "tolerance": 1 },
+      "lazyChunks": { "expected": 15, "tolerance": 4 },
+      "forbiddenInInitial": [
+        { "pattern": "node_modules/maplibre-gl/", "why": "MapLibre (1.2 MB) belongs in the lazy Geo chunk" },
+        { "pattern": "node_modules/@antv/g6/", "why": "G6 belongs in the lazy Link Analysis chunk (gamma main carries it for other features; la-app must not)" },
+        { "pattern": "^projects/link-analysis/src/(?!la-host/|public-api\\.ts$|[a-z-]+/[a-z-]+\\.viz\\.ts$)", "why": "Link Analysis / Geo library code beyond the host seam and viz registration must stay lazy (public-api.ts barrel too heavy?)" }
+      ],
+      "requiredLazyEntries": [
+        "projects/link-analysis/src/link-analysis/link-analysis.routes.ts",
+        "projects/link-analysis/src/geo-map/geo-map.routes.ts"
+      ]
+    }
+  }
+}

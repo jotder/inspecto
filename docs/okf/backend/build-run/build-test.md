@@ -93,6 +93,31 @@ has one `-Dui.dir`. An unknown value stops at parameter binding with PowerShell'
 chosen application signs in with (`AUTH_OIDC_CLIENT_ID`, `inspecto-ui` in the launchers) is a DEPLOYMENT decision: register a client
 for `la-app` in the customer's IAM and set it there; the packaging does not invent one.
 
+### UI bundle guard: `check-bundle-shape` plus `angular.json` budgets (2026-10-02)
+
+Angular budgets cap SIZE; they cannot see which module landed in which chunk. In D-5 step 3 a library barrel that re-exported
+widget components pulled MapLibre (1.2 MB) and the Link Analysis widgets into `main`, and only a manual `stats.json` comparison
+caught it. Two layers now pin the shape (both apply to `gamma` and `la-app`):
+
+- **`angular.json` budgets** (`initial` and `bundle` named `main`, warning then error). Initial 2.58 / 2.65 MB (gamma) and 2.68 / 2.75 MB
+  (la-app); `main` 1.94 / 2.0 MB (gamma) and 2.04 / 2.1 MB (la-app) (Angular's `mb` is decimal). The Angular CLI counts only `main` + `polyfills` + `styles`
+  as initial (gamma 2.50 MB measured).
+- **`inspecto-ui/tools/check-bundle-shape.mjs`**, thresholds in `inspecto-ui/tools/bundle-budget.json`. It reads the esbuild metafile
+  `dist/<app>/stats.json` (module names per chunk, not a grep of minified output), so a build must run with `--stats-json` first:
+  `npm run build -- --stats-json`, `npm run build -- la-app --stats-json`, then `npm run check:bundle-shape` (CI does exactly this in
+  `ui.yml`). It fails when: `main` or the eager set (main plus every chunk `main` imports statically, plus polyfills and styles)
+  exceeds its ceiling; `maplibre-gl`, or (la-app) `@antv/g6`, or any Link Analysis / Geo library module other than the `la-host` seam,
+  `public-api.ts` and the `*.viz.ts` registrations appears in `main` or an eagerly-imported chunk; the `link-analysis.routes.ts` or
+  `geo-map.routes.ts` entry is no longer its own lazy chunk; the eager-file or lazy-chunk count drifts past the stated tolerance.
+  The FAIL line names the module, the chunk and the sizes. Baseline 2026-10-02: gamma `main` 1,877,959 B, eager 4,888,709 B in 29 files,
+  114 lazy JS chunks; la-app `main` 1,980,572 B, eager 3,037,577 B in 8 files, 15 lazy JS chunks.
+- **Re-baseline deliberately**: a change that legitimately grows or reshapes a bundle edits `bundle-budget.json` (and the
+  `angular.json` budget if it trips) in the same change, ceilings about +3% over the new measured size, new numbers in the commit message.
+  The JSON's `_doc` field carries the procedure. Never raise a ceiling to silence an unexplained jump; find the module first.
+- Cannot catch: growth inside a chunk that stays under its ceiling, a heavy module moving between two lazy chunks, transfer-size
+  (gzip) regressions, runtime cost of a module that is legitimately eager, and anything a build without `--stats-json` skipped
+  (the guard fails loudly if the file is missing).
+
 The SBOM step (`tools/sbom.mjs`) runs `mvn package dependency:list -DskipTests` over the edition's modules with
 `-am`, so reactor siblings (and their `tests` test-jars) resolve from `target/` outputs: **no prior `mvn install`
 into `~/.m2` is needed** (a bare `dependency:list -am` died "Could not find artifact ...inspecto-audit-spi" on a
