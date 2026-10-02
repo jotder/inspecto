@@ -348,6 +348,31 @@ class ControlApiSettingsTest {
         }
     }
 
+    /** D-3 step 4: the index knobs are a nested block; absent = inherit, a stated block round-trips and a bad one is 422. */
+    @Test
+    void linkAnalysisIndexRoundTripsAndRefusesBadValues(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            assertTrue(json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("index").isNull(), "absent => inherit");
+            HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"index\":{\"enabled\":false,\"maxDiskBytes\":5000000000,\"keepVersions\":3,\"threads\":2}}");
+            assertEquals(200, put.statusCode(), put.body());
+            String toon = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
+            assertTrue(toon.contains("index") && toon.contains("max_disk_bytes: 5000000000") && toon.contains("keep_versions: 3")
+                    && toon.contains("enabled: false"), toon);
+            JsonNode got = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null)).get("index");
+            assertFalse(got.get("enabled").asBoolean(), "an explicit false survives the round trip");
+            assertEquals(5_000_000_000L, got.get("maxDiskBytes").asLong());
+            assertEquals(3, got.get("keepVersions").asInt());
+            assertEquals(2, got.get("threads").asInt());
+            assertTrue(got.get("queue").isNull(), "unstated knobs stay unstated");
+            assertEquals(200, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", "{\"index\":{\"maxDiskBytes\":0}}").statusCode(), "0 = no limit");
+            for (String bad : new String[] {"{\"index\":{\"keepVersions\":0}}", "{\"index\":{\"threads\":65}}", "{\"index\":{\"queue\":1001}}",
+                    "{\"index\":{\"maxDiskBytes\":-1}}", "{\"index\":{\"enabled\":\"yes\"}}", "{\"index\":{\"bogus\":1}}", "{\"index\":7}"})
+                assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", bad).statusCode(), bad);
+        }
+    }
+
     /** LA-17 step 2: per-Space Entity Types — inherit the seeded nine, a stated list replaces them, 422 on bad. */
     @Test
     void linkAnalysisEntityTypesRoundTripAndRefuseBadLists(@TempDir Path root) throws Exception {

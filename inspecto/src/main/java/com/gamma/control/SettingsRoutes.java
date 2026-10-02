@@ -15,7 +15,8 @@ import java.util.Map;
  *   PUT /settings/geo        replace the space's geo/tile-server config (same gates as branding)
  *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap, suspicionNodeCap,
  *                                 maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove, entityTypes,
- *                                 mergedDistinctCap, seedByDistinctCap, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue,maxResultItems}} (nulls = shipped defaults)
+ *                                 mergedDistinctCap, seedByDistinctCap, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue,maxResultItems},
+ *                                 index{enabled,maxDiskBytes,keepVersions,threads,queue}} (nulls = shipped defaults)
  *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding)
  *   GET /settings/pipeline-history   the space's {keep, effectiveKeep, defaultKeep, maxKeep} — Pipeline config
  *                                    versions kept per Pipeline (keep null = the shipped default)
@@ -46,6 +47,11 @@ final class SettingsRoutes implements RouteModule {
      *  a persisted setting an operator explicitly typed, so it must come back for them to fix. */
     private static final int MAX_NODE_CAP = 100_000;
     private static final int MAX_GRAPH_RUN = 10_000_000;
+    /** D-3 index limits: a petabyte budget, a hundred kept versions, 64 build workers, a 1 000-deep waiting line. */
+    private static final long MAX_INDEX_DISK_BYTES = 1_000_000_000_000_000L;
+    private static final int MAX_INDEX_KEEP = 100;
+    private static final int MAX_INDEX_THREADS = 64;
+    private static final int MAX_INDEX_QUEUE = 1_000;
     /** Reject an over-large inline logo (defence-in-depth; the UI already caps ~200 KB). */
     private static final int MAX_LOGO_CHARS = 512 * 1024;
 
@@ -151,7 +157,7 @@ final class SettingsRoutes implements RouteModule {
         LinkAnalysisSettings s = new LinkAnalysisSettings(nodeCap(body, "projectionNodeCap"),
                 nodeCap(body, "analysisNodeCap"), nodeCap(body, "suspicionNodeCap"), maskingMode(body),
                 nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"), entityTypes(body),
-                nodeCap(body, "mergedDistinctCap"), nodeCap(body, "seedByDistinctCap"), graphRun(body));
+                nodeCap(body, "mergedDistinctCap"), nodeCap(body, "seedByDistinctCap"), graphRun(body), index(body));
         s.write(root.resolve(LinkAnalysisSettings.FILE));
         return linkAnalysisShape(s);
     }
@@ -183,6 +189,17 @@ final class SettingsRoutes implements RouteModule {
             run.put("maxResultItems", g.maxResultItems());
         }
         m.put("graphRun", run);
+        LinkAnalysisSettings.Index x = s.index();
+        Map<String, Object> idx = null;   // D-3: null = every knob inherits the shipped default (enabled = false)
+        if (x != null) {
+            idx = new LinkedHashMap<>();
+            idx.put("enabled", x.enabled());
+            idx.put("maxDiskBytes", x.maxDiskBytes());
+            idx.put("keepVersions", x.keepVersions());
+            idx.put("threads", x.threads());
+            idx.put("queue", x.queue());
+        }
+        m.put("index", idx);
         return m;
     }
 
@@ -203,6 +220,51 @@ final class SettingsRoutes implements RouteModule {
                 boundedInt(g, "maxEdges", "graphRun.maxEdges"), boundedInt(g, "timeoutMs", "graphRun.timeoutMs"),
                 boundedInt(g, "threads", "graphRun.threads"), boundedInt(g, "queue", "graphRun.queue"),
                 boundedInt(g, "maxResultItems", "graphRun.maxResultItems"));
+    }
+
+    /** The edge/node index knobs (D-3): absent/null = inherit; {@code enabled} must be a JSON boolean, {@code maxDiskBytes}
+     *  0..{@code MAX_INDEX_DISK_BYTES} (0 = no limit), {@code keepVersions} 1..{@code MAX_INDEX_KEEP}, {@code threads}
+     *  1..{@code MAX_INDEX_THREADS}, {@code queue} 1..{@code MAX_INDEX_QUEUE}; each refused (422), never clamped. */
+    @SuppressWarnings("unchecked")
+    private static LinkAnalysisSettings.Index index(Map<String, Object> body) {
+        Object raw = body.get("index");
+        if (raw == null) return null;
+        if (!(raw instanceof Map<?, ?>))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "index must be an object, got '" + raw + "'");
+        Map<String, Object> g = (Map<String, Object>) raw;
+        for (String k : g.keySet())
+            if (!List.of("enabled", "maxDiskBytes", "keepVersions", "threads", "queue").contains(k))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "index has no key '" + k + "'");
+        Boolean enabled = null;
+        Object en = g.get("enabled");
+        if (en != null) {
+            if (!(en instanceof Boolean b))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "index.enabled must be true or false, got '" + en + "'");
+            enabled = b;
+        }
+        Long maxDisk = null;
+        Object md = g.get("maxDiskBytes");
+        if (md != null) {
+            long v;
+            try {
+                v = Long.parseLong(String.valueOf(md).trim());
+            } catch (NumberFormatException e) {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "index.maxDiskBytes must be an integer, got '" + md + "'");
+            }
+            if (v < 0 || v > MAX_INDEX_DISK_BYTES)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                        "index.maxDiskBytes must be 0.." + MAX_INDEX_DISK_BYTES + " (0 = no limit), got " + v);
+            maxDisk = v;
+        }
+        return new LinkAnalysisSettings.Index(enabled, maxDisk, rangedInt(g, "keepVersions", "index.keepVersions", MAX_INDEX_KEEP),
+                rangedInt(g, "threads", "index.threads", MAX_INDEX_THREADS), rangedInt(g, "queue", "index.queue", MAX_INDEX_QUEUE));
+    }
+
+    private static Integer rangedInt(Map<String, Object> g, String key, String label, int max) {
+        Integer v = boundedInt(g, key, label);
+        if (v != null && v > max)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, label + " must be 1.." + max + ", got " + v);
+        return v;
     }
 
     private static Integer boundedInt(Map<String, Object> g, String key, String label) {

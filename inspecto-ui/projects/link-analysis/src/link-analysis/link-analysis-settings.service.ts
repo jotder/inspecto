@@ -63,6 +63,17 @@ export interface LinkAnalysisLimits {
         /** Items per list a run's result may carry (absent/null = 10 000). */
         maxResultItems?: number | null;
     } | null;
+    /**
+     * D-3: the edge/node index knobs stated (`enabled` default false, `maxDiskBytes` 0 = no limit, versions kept, build
+     * workers, waiting line); `null` = every one inherits. No form field yet - round-tripped by a save, the PUT replaces.
+     */
+    index?: {
+        enabled: boolean | null;
+        maxDiskBytes: number | null;
+        keepVersions: number | null;
+        threads: number | null;
+        queue: number | null;
+    } | null;
 }
 
 /** LA-17: one Entity Type (entity-model design §4.1) — `classifications` are the Dataset column classifications it claims. */

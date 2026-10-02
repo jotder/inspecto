@@ -46,7 +46,7 @@ import java.util.Map;
 public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNodeCap, Integer suspicionNodeCap,
                                    String maskingMode, Integer fourEyesBudgetAbove, Integer fourEyesFanOutAbove,
                                    List<EntityTypes.EntityType> entityTypes, Integer mergedDistinctCap,
-                                   Integer seedByDistinctCap, GraphRun graphRun) {
+                                   Integer seedByDistinctCap, GraphRun graphRun, Index index) {
 
     /**
      * The graph-run service's per-Space knobs (LA separation D-4 step 6; {@code graph_run} in {@code link-analysis.toon}):
@@ -64,9 +64,48 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         }
     }
 
+    /**
+     * The edge/node index's per-Space knobs (LA separation D-3 step 4; {@code index} in {@code link-analysis.toon}):
+     * {@code enabled} - whether reads may use an index (default OFF, D-3 Decision 8; nothing reads one yet, the flag lands
+     * first); {@code maxDiskBytes} - the build refuses an estimate above it (0 or unstated = no limit);
+     * {@code keepVersions} - published versions kept per index (default 2); {@code threads} / {@code queue} - the build
+     * workers and waiting line. Every field is optional ({@code null} = the shipped default).
+     */
+    public record Index(Boolean enabled, Long maxDiskBytes, Integer keepVersions, Integer threads, Integer queue) {
+        public static final Index NONE = new Index(null, null, null, null, null);
+        public static final int DEFAULT_KEEP_VERSIONS = 2;
+        public static final int DEFAULT_THREADS = 1;
+        public static final int DEFAULT_QUEUE = 4;
+
+        boolean isNone() {
+            return enabled == null && maxDiskBytes == null && keepVersions == null && threads == null && queue == null;
+        }
+
+        /** Whether reads may use an index: only an explicit {@code true}. */
+        public boolean enabledInForce() {
+            return Boolean.TRUE.equals(enabled);
+        }
+
+        /** The disk budget in force in bytes; 0 = no limit. */
+        public long maxDiskBytesInForce() {
+            return maxDiskBytes != null ? maxDiskBytes : 0L;
+        }
+
+        public int keepVersionsInForce() {
+            return keepVersions != null ? keepVersions : DEFAULT_KEEP_VERSIONS;
+        }
+
+        public int threadsInForce() {
+            return threads != null ? threads : DEFAULT_THREADS;
+        }
+
+        public int queueInForce() {
+            return queue != null ? queue : DEFAULT_QUEUE;
+        }
+    }
 
     public static final String FILE = "link-analysis.toon";
-    static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null);
+    static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null);
 
     /** The shipped default of {@code merged_distinct_cap}. */
     public static final int DEFAULT_MERGED_DISTINCT_CAP = 20_000;
@@ -87,6 +126,11 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     /** The graph-run knobs in force: the stated ones; a field never stated is {@code null} inside (the service's default). */
     public GraphRun effectiveGraphRun() {
         return graphRun != null ? graphRun : GraphRun.NONE;
+    }
+
+    /** The index knobs in force: the stated ones; a field never stated is {@code null} inside (use the {@code *InForce} accessors). */
+    public Index effectiveIndex() {
+        return index != null ? index : Index.NONE;
     }
 
     /** The masking mode in force: the stated one, else the declared default ({@code typed}). */
@@ -121,6 +165,15 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             if (graphRun.maxResultItems() != null) g.put("max_result_items", graphRun.maxResultItems());
             m.put("graph_run", g);
         }
+        if (index != null && !index.isNone()) {
+            Map<String, Object> x = new LinkedHashMap<>();
+            if (index.enabled() != null) x.put("enabled", index.enabled());
+            if (index.maxDiskBytes() != null) x.put("max_disk_bytes", index.maxDiskBytes());
+            if (index.keepVersions() != null) x.put("keep_versions", index.keepVersions());
+            if (index.threads() != null) x.put("threads", index.threads());
+            if (index.queue() != null) x.put("queue", index.queue());
+            m.put("index", x);
+        }
         AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".link-analysis-");
     }
 
@@ -138,7 +191,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                     optInt(m, "suspicion_node_cap"), maskingMode(ToonHelper.opt(m, "masking_mode", "")),
                     optInt(m, "four_eyes_budget_above"), optInt(m, "four_eyes_fan_out_above"),
                     entityTypes(m.get("entity_types")), optInt(m, "merged_distinct_cap"),
-                    optInt(m, "seed_by_distinct_cap"), graphRun(m.get("graph_run")));
+                    optInt(m, "seed_by_distinct_cap"), graphRun(m.get("graph_run")), index(m.get("index")));
         } catch (Exception e) {
             return EMPTY;
         }
@@ -151,6 +204,27 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         Map<String, Object> g = (Map<String, Object>) raw;
         GraphRun r = new GraphRun(optInt(g, "max_nodes"), optInt(g, "max_edges"), optInt(g, "timeout_ms"),
                 optInt(g, "threads"), optInt(g, "queue"), optInt(g, "max_result_items"));
+        return r.isNone() ? null : r;
+    }
+
+    /** A stored {@code index} block, else {@code null} = every knob inherits; a bad value inside costs only that knob. */
+    @SuppressWarnings("unchecked")
+    private static Index index(Object raw) {
+        if (!(raw instanceof Map<?, ?>)) return null;
+        Map<String, Object> g = (Map<String, Object>) raw;
+        String en = ToonHelper.opt(g, "enabled", "").trim().toLowerCase(Locale.ROOT);
+        Boolean enabled = en.equals("true") ? Boolean.TRUE : en.equals("false") ? Boolean.FALSE : null;
+        Long maxDisk = null;
+        String d = ToonHelper.opt(g, "max_disk_bytes", "").trim();
+        if (!d.isEmpty()) {
+            try {
+                long v = Long.parseLong(d);
+                if (v >= 0) maxDisk = v;
+            } catch (NumberFormatException ignored) {
+                // unparseable = inherit
+            }
+        }
+        Index r = new Index(enabled, maxDisk, optInt(g, "keep_versions"), optInt(g, "threads"), optInt(g, "queue"));
         return r.isNone() ? null : r;
     }
 

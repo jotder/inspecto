@@ -94,6 +94,13 @@ describe('LinkAnalysisSettingsComponent', () => {
         expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ graphRun }));
     });
 
+    it('sends the index knobs back untouched, an explicit enabled=false included: the PUT replaces', () => {
+        const index = { enabled: false, maxDiskBytes: 5000000000, keepVersions: 3, threads: null, queue: null };
+        const { api, submit } = setup({ served: { index } });
+        submit();
+        expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ index }));
+    });
+
     it("shows a 422 inline in the server's words and a 503 as a writes-disabled notice", () => {
         const { el, api, submit } = setup({
             save: () =>

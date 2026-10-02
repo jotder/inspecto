@@ -89,13 +89,13 @@ class EntityTypesTest {
                 new EntityType("msisdn", "MSISDN", "e164", true, List.of("MSISDN")),
                 new EntityType("note", "Free text", "default", false, List.of()));
         Path f = dir.resolve(LinkAnalysisSettings.FILE);
-        new LinkAnalysisSettings(1200, null, null, "all", null, null, types, null, null, null).write(f);
+        new LinkAnalysisSettings(1200, null, null, "all", null, null, types, null, null, null, null).write(f);
         LinkAnalysisSettings back = LinkAnalysisSettings.read(f);
         assertEquals(types, back.entityTypes(), Files.readString(f));
         assertEquals(1200, back.projectionNodeCap());
         assertEquals("all", back.maskingMode());
 
-        new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null).write(f);
+        new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null).write(f);
         assertFalse(Files.readString(f).contains("entity_types"), "written only when stated");
         assertNull(LinkAnalysisSettings.read(f).entityTypes());
         assertEquals(EntityTypes.DEFAULTS, LinkAnalysisSettings.read(f).effectiveEntityTypes());
@@ -106,7 +106,7 @@ class EntityTypesTest {
     void anInvalidStoredListReadsAsInherit(@TempDir Path dir) throws Exception {
         Path f = dir.resolve(LinkAnalysisSettings.FILE);
         new LinkAnalysisSettings(700, null, null, null, null, null,
-                List.of(new EntityType("imsi", "IMSI", "digits", true, List.of("IMSI"))), null, null, null).write(f);
+                List.of(new EntityType("imsi", "IMSI", "digits", true, List.of("IMSI"))), null, null, null, null).write(f);
         Files.writeString(f, Files.readString(f).replace("digits", "rot13"));
         LinkAnalysisSettings s = LinkAnalysisSettings.read(f);
         assertNull(s.entityTypes());

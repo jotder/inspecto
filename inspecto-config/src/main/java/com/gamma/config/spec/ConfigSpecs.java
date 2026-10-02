@@ -1247,7 +1247,13 @@ public final class ConfigSpecs {
                                 + "GET /inv/graph/algorithms); {threads, queue} size the workers and the waiting line; "
                                 + "max_result_items caps each list of a run's result on the way out (cut lists say "
                                 + "truncated/total/limit; absent = 10000, hard ceiling 1000000); "
-                                + "every key absent = the shipped default.")
+                                + "every key absent = the shipped default."),
+                FieldSpec.of("index", "Edge/node index", FieldType.MAP,
+                        "The edge/node index (D-3): enabled = whether reads may use an index (absent = false, nothing "
+                                + "reads one yet); max_disk_bytes = a build whose estimate is above it is refused up front "
+                                + "(absent or 0 = no limit); keep_versions = published versions kept per index (absent = 2); "
+                                + "{threads, queue} size the build workers and the waiting line; every key absent = the "
+                                + "shipped default.")
         );
         return new ConfigSpec("link-analysis-settings", fields, List.of());
     }
