@@ -199,6 +199,10 @@ class DemoAuthHttpTest {
         assertEquals("u1", DemoTokens.verify('a', access, now).orElseThrow());
         assertTrue(DemoTokens.verify('r', access, now).isEmpty(), "an access token is not a refresh token");
         assertTrue(DemoTokens.verify('a', access, now + DemoTokens.ACCESS_SECONDS).isEmpty(), "expired");
-        assertTrue(DemoTokens.verify('a', access.substring(0, access.length() - 2) + "xx", now).isEmpty(), "tampered");
+        // Flip one character well inside the signature (not the tail: the last base64url char of an unpadded signature can
+        // differ only in padding bits and still decode to the same bytes, which made this assertion fail about 1 run in 1000).
+        int at = access.length() - 10;
+        char flipped = access.charAt(at) == 'A' ? 'B' : 'A';
+        assertTrue(DemoTokens.verify('a', access.substring(0, at) + flipped + access.substring(at + 1), now).isEmpty(), "tampered");
     }
 }

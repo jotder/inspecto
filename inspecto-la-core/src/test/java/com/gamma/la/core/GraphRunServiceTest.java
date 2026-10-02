@@ -627,4 +627,28 @@ class GraphRunServiceTest {
         until(() -> svc.active() == 0);          // (not settle(): with maxRuns = 1 a finished run is dropped as soon as the next is stored)
         assertTrue(svc.list("alice", null).size() <= 1, "finished runs are held to maxRuns");
     }
+
+    /**
+     * The terminal hook fires right after COMPLETED is published. A caller that reacts to COMPLETED by resubmitting at once
+     * (here: inside the hook, deterministically) must already find the cache entry, so the cache write is part of the
+     * completion commit - the old write-after-publish order came back QUEUED on a slow CI runner.
+     */
+    @Test
+    void aResubmitRightAfterCompletionIsAlwaysACacheHit() throws Exception {
+        java.util.concurrent.atomic.AtomicReference<GraphRunService> self = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<Request> request = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<RunView> resubmitted = new java.util.concurrent.atomic.AtomicReference<>();
+        GraphRunService s = new GraphRunService(new Probe(ctl -> answer()), TIGHT, System::currentTimeMillis, v -> {
+            if (v.status() == Status.COMPLETED && !v.cached() && resubmitted.get() == null)
+                resubmitted.set(self.get().submit(request.get()));
+        });
+        self.set(s);
+        svc = s;
+        Request r = req("alice", ring(4));
+        request.set(r);
+        settle(s.submit(r));
+        until(() -> resubmitted.get() != null);
+        assertEquals(Status.COMPLETED, resubmitted.get().status(), "a hit is terminal at submit");
+        assertTrue(resubmitted.get().cached());
+    }
 }

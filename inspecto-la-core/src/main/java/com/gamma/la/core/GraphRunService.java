@@ -293,8 +293,7 @@ public final class GraphRunService implements AutoCloseable {
                 end(r, Status.CANCELLED, null, null, null, elapsed, clock.getAsLong());
             else if (elapsed > r.budget.timeoutMs())
                 end(r, Status.BUDGET_EXCEEDED, Exceeded.TIMEOUT, null, null, elapsed, clock.getAsLong());   // finished late: still over budget
-            else if (end(r, Status.COMPLETED, null, null, result, elapsed, clock.getAsLong()))
-                putCache(r.cacheKey, result);
+            else end(r, Status.COMPLETED, null, null, result, elapsed, clock.getAsLong(), () -> putCache(r.cacheKey, result));
         } catch (GraphAborted a) {
             long elapsed = (System.nanoTime() - t0) / 1_000_000L;
             long now = clock.getAsLong();
@@ -312,7 +311,16 @@ public final class GraphRunService implements AutoCloseable {
 
     /** Moves {@code r} to a terminal state and, when this call did, tells the hook. */
     private boolean end(Run r, Status s, Exceeded ex, String fail, GraphResult res, long elapsed, long now) {
-        boolean moved = r.finish(s, ex, fail, res, elapsed, now);
+        return end(r, s, ex, fail, res, elapsed, now, null);
+    }
+
+    /**
+     * {@code commit} runs inside the transition, after the state is set and BEFORE waiters are released: a caller that saw
+     * COMPLETED (an {@code await} return, a poll) and resubmits at once must find the cache entry, so the cache write is part
+     * of the commit, not an afterthought (a resubmit raced the old write-after-publish order and came back QUEUED on CI).
+     */
+    private boolean end(Run r, Status s, Exceeded ex, String fail, GraphResult res, long elapsed, long now, Runnable commit) {
+        boolean moved = r.finish(s, ex, fail, res, elapsed, now, commit);
         if (moved) fire(r);
         return moved;
     }
@@ -445,7 +453,7 @@ public final class GraphRunService implements AutoCloseable {
                 throw new GraphRunException(GraphRunException.Kind.TERMINAL, "graph run " + id + " already finished (" + status + ")");
             cancelRequested = true;
             if (status == Status.QUEUED) {
-                finishLocked(Status.CANCELLED, null, null, null, 0, now);
+                finishLocked(Status.CANCELLED, null, null, null, 0, now, null);
                 input = null;
                 return true;
             }
@@ -455,18 +463,23 @@ public final class GraphRunService implements AutoCloseable {
 
         /** Moves to a terminal state unless already terminal; returns whether this call did. */
         synchronized boolean finish(Status s, Exceeded ex, String fail, GraphResult res, long elapsed, long now) {
+            return finish(s, ex, fail, res, elapsed, now, null);
+        }
+
+        synchronized boolean finish(Status s, Exceeded ex, String fail, GraphResult res, long elapsed, long now, Runnable commit) {
             if (status.terminal()) return false;
-            finishLocked(s, ex, fail, res, elapsed, now);
+            finishLocked(s, ex, fail, res, elapsed, now, commit);
             return true;
         }
 
-        private void finishLocked(Status s, Exceeded ex, String fail, GraphResult res, long elapsed, long now) {
+        private void finishLocked(Status s, Exceeded ex, String fail, GraphResult res, long elapsed, long now, Runnable commit) {
             status = s;
             exceeded = ex;
             failure = fail;
             result = s == Status.COMPLETED ? res : null;     // a result exists ONLY for COMPLETED
             elapsedMs = elapsed;
             finishedAt = now;
+            if (commit != null) commit.run();                // under this monitor, before any waiter is released
             done.countDown();
         }
 
