@@ -1,0 +1,446 @@
+package com.gamma.la.api;
+
+import com.gamma.control.ApiContext;
+import com.gamma.control.ApiException;
+import com.gamma.control.ComponentAccess;
+import com.gamma.control.ErrorCodes;
+import com.gamma.control.LinkAnalysisSettings;
+import com.gamma.control.Roles;
+import com.gamma.control.RouteModule;
+import com.gamma.control.Subject;
+import com.gamma.control.WriteGates;
+import com.gamma.event.Event;
+import com.gamma.event.EventLog;
+import com.gamma.la.core.DatasetProvider;
+import com.gamma.la.core.DatasetProviders;
+import com.gamma.la.core.LinkEventTypes;
+import com.gamma.la.storage.BucketFunction;
+import com.gamma.la.storage.IndexBuildService;
+import com.gamma.la.storage.IndexBuildService.Refused;
+import com.gamma.la.storage.IndexBuildService.RunView;
+import com.gamma.la.storage.IndexBuildService.Status;
+import com.gamma.la.storage.IndexBuilder;
+import com.gamma.la.storage.IndexManifest;
+import com.gamma.la.storage.IndexMapping;
+import com.gamma.la.storage.IndexStore;
+import com.sun.net.httpserver.HttpExchange;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.DateTimeException;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.function.Function;
+
+/**
+ * The edge/node index of a Dataset (LA separation D-3 step 4, design 3.1): build it, watch the build, list what exists.
+ *
+ * <ul>
+ *   <li>{@code POST /inv/index/builds} - start a build over a Dataset and an edge mapping {@code {dataset, sourceCol,
+ *       targetCol, kindCol?, timeCol?, timeColZone?, weightCol?, attrCols?}}. Gated by {@code canBuildLinkIndex} (a build
+ *       spends compute and disk). {@code 202} + {@code Location}; a build is never answered inline.</li>
+ *   <li>{@code GET /inv/index} - the indexes of the Datasets the caller may view: the current version's manifest summary
+ *       and a {@code stale} flag with its {@code reason}.</li>
+ *   <li>{@code GET /inv/index/builds/{id}} - one build; a build another caller started is absent (404).</li>
+ *   <li>{@code POST /inv/index/builds/{id}/cancel} - the build's starter or an administrator; anyone else gets the 404
+ *       of an unknown build.</li>
+ * </ul>
+ *
+ * <p><b>The Dataset gate (design Decision 2).</b> The index carries no row scope, so EVERY route first stands behind
+ * the base Dataset's view gate, exactly as {@link InvRoutes#relationFor} does: unknown Dataset, 404; a Dataset the
+ * caller may not view, the SAME 404; only then is the relation SQL read. A Dataset shared away reads as absent, and so
+ * does its index and every build over it. Build reads and cancels re-run the gate (a starter who lost the Dataset sees
+ * the 404 of an unknown build). <b>Valid only while a Dataset has no per-Subject row filter</b> (Decision 2): if the
+ * Dataset gains one, this gate no longer covers the index.
+ *
+ * <p><b>Where.</b> {@code <Space write root>/la-index} ({@link WriteGates#requireWriteRoot}: 503 when none). One
+ * {@link IndexBuildService} per Space, created on first use with that Space's {@code index.threads} / {@code index.queue}
+ * (applied when it is built), closed with the API or when idle ({@link IndexBuildServices}). The disk budget
+ * ({@code index.max_disk_bytes}) and {@code index.keep_versions} are read per request.
+ *
+ * <p><b>Nothing reads the index yet.</b> {@code index.enabled} (default false) lands now and is echoed by {@code GET
+ * /inv/index}; the read paths arrive in later steps (design 5).
+ *
+ * <p><b>The base fingerprint is not grounded in files.</b> {@code DatasetProvider} cannot enumerate a relation's input
+ * files, and a {@code glob()} over paths scraped out of SQL text is neither cheap nor safe, so the fingerprint recorded is
+ * the relation-SQL hash only: a Dataset whose DEFINITION changed reads stale; one that merely gained a file does not.
+ */
+public final class IndexRoutes implements RouteModule {
+
+    /** The directory under a Space's write root that holds every index. */
+    static final String INDEX_DIR = "la-index";
+    private static final int MAX_ATTR_COLS = 50;
+    private static final Set<String> BODY_KEYS = Set.of("dataset", "sourceCol", "targetCol", "kindCol", "timeCol", "timeColZone",
+            "weightCol", "attrCols");
+
+    /** Test seam (the {@code GraphRunRoutes.forTest} idiom): a builder for services created AFTER this call. */
+    private static volatile Function<IndexBuilder.Request, IndexBuilder.Result> builderOverride;
+
+    /** @param builder null = the real {@link IndexBuilder#build} */
+    public static void forTest(Function<IndexBuilder.Request, IndexBuilder.Result> builder) {
+        builderOverride = builder;
+    }
+
+    private final IndexBuildServices services = new IndexBuildServices(IndexRoutes::newService, System::currentTimeMillis,
+            IndexBuildServices.IDLE_TTL_MS);
+
+    @Override
+    public void register(ApiContext api) {
+        api.onClose(services::close);
+        // ⚠ String LITERAL on purpose - CapabilityManifestTest's scanner matches only a literal argument.
+        api.post("/inv/index/builds", ApiContext.withCapability("canBuildLinkIndex", (e, m) -> start(api, e, api.body(e))));
+        api.get("/inv/index", (e, m) -> list(api, e));
+        api.get("/inv/index/builds/([^/]+)", (e, m) -> get(api, e, m.group(1)));
+        api.post("/inv/index/builds/([^/]+)/cancel", (e, m) -> cancel(api, e, m.group(1)));
+    }
+
+    private static IndexBuildService newService(Path writeRoot) {
+        IndexBuildService.Limits std = IndexBuildService.Limits.standard();
+        LinkAnalysisSettings.Index ix = LinkAnalysisSettings.forRoot(writeRoot).effectiveIndex();
+        IndexBuildService.Limits limits = new IndexBuildService.Limits(ix.threadsInForce(), ix.queueInForce(), std.runTtlMs(), std.maxRuns());
+        Function<IndexBuilder.Request, IndexBuilder.Result> b = builderOverride != null ? builderOverride : IndexBuilder::build;
+        return new IndexBuildService(indexRoot(writeRoot), limits, System::currentTimeMillis, IndexRoutes::auditTerminal,
+                IndexBuildService.WORKER_KEEPALIVE_MS, b);
+    }
+
+    private static Path indexRoot(Path writeRoot) {
+        return writeRoot.resolve(INDEX_DIR);
+    }
+
+    // ── POST /inv/index/builds ────────────────────────────────────────────────────────────────────────────
+
+    private Object start(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "link index build");                // 503
+        for (String k : body.keySet())
+            if (!BODY_KEYS.contains(k))
+                throw bad("unknown field '" + k + "' (a build takes: " + String.join(", ", new TreeSet<>(BODY_KEYS)) + ")");
+        String dataset = required(body, "dataset");
+        String source = required(body, "sourceCol");
+        String target = required(body, "targetCol");
+        String kind = optional(body, "kindCol");
+        String time = optional(body, "timeCol");
+        String zone = optional(body, "timeColZone");
+        String weight = optional(body, "weightCol");
+        List<String> attrs = attrCols(body);
+        if (zone != null) {
+            if (time == null) throw bad("'timeColZone' needs a 'timeCol' to read in that zone");
+            try {
+                ZoneId.of(zone);
+            } catch (DateTimeException notAZone) {
+                throw bad("'timeColZone' is not a time zone id: '" + zone + "'");
+            }
+        }
+
+        String relationSql = InvRoutes.relationFor(api, ex, writeRoot, dataset);              // 404 · 404 · 422 - the Decision 2 gate
+        List<String> columns = InvRoutes.relationColumns(dataset, relationSql);              // 422
+        List<String> mapped = new ArrayList<>(List.of(source, target));
+        for (String c : new String[] {kind, time, weight}) if (c != null) mapped.add(c);
+        mapped.addAll(attrs);
+        for (String c : mapped)
+            if (columns.stream().noneMatch(x -> x.equalsIgnoreCase(c)))
+                throw bad("'" + c + "' is not a column of dataset '" + dataset + "'");
+
+        IndexMapping mapping = new IndexMapping(source, target, kind, time, zone, weight, attrs);
+        LinkAnalysisSettings.Index ix = LinkAnalysisSettings.forRoot(writeRoot).effectiveIndex();
+        RunView v;
+        try {
+            v = service(writeRoot).submit(new IndexBuildService.Request(callerId(ex), dataset, mapping,
+                    ds -> new IndexBuildService.Relation(relationSql, fingerprint(relationSql)),
+                    ix.maxDiskBytesInForce(), ix.keepVersionsInForce()));
+        } catch (Refused refused) {
+            throw map(refused);
+        } catch (IllegalArgumentException unsafe) {
+            throw bad("dataset '" + dataset + "' cannot name an index directory");
+        }
+        emitStarted(ex, v);
+        ex.getResponseHeaders().set("Location", "/api/v1/inv/index/builds/" + v.id());
+        return ApiContext.respondJson(ex, 202, view(v));
+    }
+
+    /**
+     * The fingerprint of the base data recorded in the manifest. NOT grounded in files: the relation-SQL hash only (see the
+     * class doc), spelled so a reader of the manifest cannot mistake it for a file listing.
+     */
+    static String fingerprint(String relationSql) {
+        return "relation-sql-only:" + IndexBuilder.relationSqlHash(relationSql);
+    }
+
+    private static String required(Map<String, Object> body, String key) {
+        String v = optional(body, key);
+        if (v == null) throw bad("body must include '" + key + "'");
+        return v;
+    }
+
+    /** A stated string, trimmed; absent or JSON null = null; a non-string or a blank one is refused. */
+    private static String optional(Map<String, Object> body, String key) {
+        Object raw = body.get(key);
+        if (raw == null) return null;
+        if (!(raw instanceof String s) || s.isBlank()) throw bad("'" + key + "' must be a non-blank string");
+        return s.trim();
+    }
+
+    private static List<String> attrCols(Map<String, Object> body) {
+        Object raw = body.get("attrCols");
+        if (raw == null) return List.of();
+        if (!(raw instanceof List<?> l) || l.size() > MAX_ATTR_COLS || l.stream().anyMatch(o -> !(o instanceof String s) || s.isBlank()))
+            throw bad("'attrCols' must be a list of at most " + MAX_ATTR_COLS + " non-blank column names");
+        return l.stream().map(o -> ((String) o).trim()).toList();
+    }
+
+    // ── GET /inv/index ────────────────────────────────────────────────────────────────────────────────────────
+
+    private Object list(ApiContext api, HttpExchange ex) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "link index");
+        Path root = indexRoot(writeRoot);
+        List<Object> items = new ArrayList<>();
+        for (DatasetProvider.Entry c : DatasetProviders.require().datasets(writeRoot)) {
+            if (!ComponentAccess.canView(ex, c.content())) continue;           // R3: a Dataset the caller may not view has no index, as far as they can tell
+            List<String> hashes;
+            try {
+                hashes = IndexStore.mappingHashes(root, c.name());
+            } catch (IllegalArgumentException cannotNameADirectory) {
+                continue;                                                      // such a Dataset can have no index
+            }
+            if (hashes.isEmpty()) continue;
+            String currentSqlHash = currentRelationHash(api, c, writeRoot);
+            for (String hash : hashes) {
+                Map<String, Object> item = item(root, c.name(), hash, currentSqlHash);
+                if (item != null) items.add(item);
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("enabled", LinkAnalysisSettings.forRoot(writeRoot).effectiveIndex().enabledInForce());
+        out.put("indexes", items);
+        out.put("total", items.size());
+        return out;
+    }
+
+    /** The hash of the Dataset's relation SQL now, or null when it cannot be resolved. */
+    private static String currentRelationHash(ApiContext api, DatasetProvider.Entry c, Path writeRoot) {
+        try {
+            return IndexBuilder.relationSqlHash(DatasetProviders.require().relationSql(c.content(), api.dataRoot(), writeRoot));
+        } catch (RuntimeException unresolvable) {
+            return null;
+        }
+    }
+
+    /** One index's summary, or null when it has no published version, or its manifest is unreadable, or it belongs to another Dataset. */
+    private static Map<String, Object> item(Path root, String dataset, String hash, String currentSqlHash) {
+        Optional<Path> current = new IndexStore(root, dataset, hash).current();
+        if (current.isEmpty()) return null;
+        IndexManifest m;
+        try {
+            m = IndexManifest.read(current.get());
+        } catch (IOException | IllegalArgumentException unreadable) {
+            return null;
+        }
+        if (!dataset.equals(m.dataset())) return null;           // the directory is case-folded: another Dataset's index is not this one's
+        List<String> reasons = new ArrayList<>();
+        if (currentSqlHash == null) reasons.add("the Dataset's relation cannot be resolved now");
+        else if (!currentSqlHash.equals(m.relationSqlHash())) reasons.add("the Dataset's relation SQL changed since the index was built");
+        if (!BucketFunction.NAME.equals(m.bucketFn()))
+            reasons.add("the bucket function differs (index: " + m.bucketFn() + ", server: " + BucketFunction.NAME + ")");
+        try {
+            if (!IndexBuilder.duckdbVersion().equals(m.duckdbVersion()))
+                reasons.add("built with DuckDB " + m.duckdbVersion() + ", this server runs " + IndexBuilder.duckdbVersion());
+        } catch (RuntimeException unknown) {
+            // the server's own DuckDB version could not be read: say nothing rather than guess
+        }
+        Map<String, Object> o = new LinkedHashMap<>();
+        o.put("dataset", m.dataset());
+        o.put("mappingHash", m.mappingHash());
+        Map<String, Object> mapping = new LinkedHashMap<>();
+        mapping.put("sourceCol", m.mapping().srcColumn());
+        mapping.put("targetCol", m.mapping().dstColumn());
+        mapping.put("kindCol", m.mapping().kindColumn());
+        mapping.put("timeCol", m.mapping().timeColumn());
+        mapping.put("timeColZone", m.mapping().timeColZone());
+        mapping.put("weightCol", m.mapping().weightColumn());
+        mapping.put("attrCols", m.mapping().attributeColumns());
+        o.put("mapping", mapping);
+        o.put("version", m.version());
+        o.put("builtAt", m.builtAt());
+        o.put("builder", m.builder().name().toLowerCase(Locale.ROOT));
+        o.put("rows", m.tables().containsKey("out") ? m.tables().get("out").rows() : 0L);
+        o.put("nodes", m.tables().containsKey("nodes") ? m.tables().get("nodes").rows() : 0L);
+        o.put("bytes", m.tables().values().stream().mapToLong(IndexManifest.TableStats::bytes).sum());
+        o.put("droppedNull", m.droppedNull());
+        o.put("buckets", m.buckets());
+        o.put("stale", !reasons.isEmpty());
+        o.put("reason", reasons.isEmpty() ? null : String.join("; ", reasons));
+        return o;
+    }
+
+    // ── GET /inv/index/builds/{id} ────────────────────────────────────────────────────────────────────────────
+
+    private Object get(ApiContext api, HttpExchange ex, String id) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "link index build");
+        return view(visible(service(writeRoot), api, ex, writeRoot, id));
+    }
+
+    /**
+     * The build if it exists, the caller started it AND the caller may still view its Dataset; otherwise ONE 404 (status and
+     * message) whichever of the three failed - the caller cannot tell an unknown build from another's, or from a Dataset
+     * shared away.
+     */
+    private RunView visible(IndexBuildService svc, ApiContext api, HttpExchange ex, Path writeRoot, String id) {
+        RunView v;
+        try {
+            v = svc.get(id);
+        } catch (Refused e) {
+            throw e.kind() == Refused.Kind.NOT_FOUND ? absent(id) : map(e);
+        }
+        Optional<Subject> subject = ApiContext.subject(ex);
+        if (subject.isPresent() && !subject.get().id().equals(v.owner())) throw absent(id);
+        if (!viewable(ex, writeRoot, v.datasetId())) throw absent(id);
+        return v;
+    }
+
+    /** The Dataset exists and the caller may view it - the gate of {@link InvRoutes#relationFor} without reading its SQL. */
+    private static boolean viewable(HttpExchange ex, Path writeRoot, String datasetId) {
+        Optional<Map<String, Object>> dataset = DatasetProviders.require().dataset(writeRoot, datasetId);
+        return dataset.isPresent() && ComponentAccess.canView(ex, dataset.get());
+    }
+
+    /** The one answer for a build that is unknown, not this caller's, or over a Dataset the caller can no longer view. */
+    private static ApiException absent(String id) {
+        return new ApiException(404, ErrorCodes.NOT_FOUND, "no index build '" + id + "'");
+    }
+
+    // ── POST /inv/index/builds/{id}/cancel ───────────────────────────────────────────────────────────────────
+
+    private Object cancel(ApiContext api, HttpExchange ex, String id) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "link index build");
+        Optional<Subject> subject = ApiContext.subject(ex);
+        boolean admin = subject.isEmpty() || subject.get().capabilities().contains(Roles.CAN_ADMINISTER);
+        IndexBuildService svc = service(writeRoot);
+        // an administrator may stop any build (not the Dataset's reader by right); anyone else only their own, over a Dataset still viewable
+        RunView known = admin ? knownTo(svc, id) : visible(svc, api, ex, writeRoot, id);
+        RunView v;
+        try {
+            v = svc.cancel(known.id(), callerId(ex), admin);
+        } catch (Refused e) {
+            throw map(e);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("buildId", v.id());
+        out.put("status", v.status().name());
+        out.put("cancelRequested", v.cancelRequested());
+        return ApiContext.respondJson(ex, 202, out);
+    }
+
+    private static RunView knownTo(IndexBuildService svc, String id) {
+        try {
+            return svc.get(id);
+        } catch (Refused e) {
+            throw e.kind() == Refused.Kind.NOT_FOUND ? absent(id) : map(e);
+        }
+    }
+
+    // ── the wire shape of one build ──────────────────────────────────────────────────────────────────────────
+
+    private static Map<String, Object> view(RunView v) {
+        Map<String, Object> o = new LinkedHashMap<>();
+        o.put("buildId", v.id());
+        o.put("status", v.status().name());
+        o.put("dataset", v.datasetId());
+        o.put("mappingHash", v.mappingHash());
+        Map<String, Object> progress = new LinkedHashMap<>();
+        progress.put("phase", v.progress().phase());
+        progress.put("step", v.progress().step());
+        progress.put("steps", v.progress().steps());
+        o.put("progress", progress);
+        o.put("cancelRequested", v.cancelRequested());
+        if (v.failure() != null) o.put("failure", v.failure());
+        o.put("createdAt", v.createdAt());
+        if (v.status().terminal()) {
+            o.put("finishedAt", v.finishedAt());
+            o.put("elapsedMs", v.elapsedMs());
+        }
+        if (v.status() == Status.COMPLETED && v.result() != null) {
+            IndexBuilder.Result r = v.result();
+            Map<String, Object> res = new LinkedHashMap<>();
+            res.put("version", r.version());
+            res.put("rows", r.rowsInRelation());
+            res.put("edges", r.edges());
+            res.put("droppedNull", r.droppedNull());
+            res.put("nodes", r.nodes());
+            res.put("buckets", r.buckets());
+            res.put("totalMs", r.totalMs());
+            if (r.manifest() != null) res.put("bytes", r.manifest().tables().values().stream().mapToLong(IndexManifest.TableStats::bytes).sum());
+            o.put("result", res);
+        }
+        return o;
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────────────────────────────────────
+
+    private IndexBuildService service(Path writeRoot) {
+        return services.get(writeRoot);
+    }
+
+    private static ApiException bad(String message) {
+        return new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, message);
+    }
+
+    private static ApiException map(Refused e) {
+        return switch (e.kind()) {
+            case NOT_FOUND -> new ApiException(404, ErrorCodes.NOT_FOUND, e.getMessage());
+            case FORBIDDEN -> new ApiException(403, ErrorCodes.PERMISSION_DENIED, e.getMessage());
+            case TERMINAL, DUPLICATE -> new ApiException(409, ErrorCodes.CONFLICT, e.getMessage());
+            case OVER_BUDGET -> new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+            case REJECTED -> new ApiException(503, ErrorCodes.STORE_BUSY, e.getMessage());
+        };
+    }
+
+    /** The caller as the build table knows them: the Subject's id, else the request's actor (nothing is enforced without a Subject). */
+    private static String callerId(HttpExchange ex) {
+        return ApiContext.subject(ex).map(Subject::id).orElseGet(() -> ApiContext.actor(ex));
+    }
+
+    // ── audit (best effort: an audit failure never fails the caller's request or a build) ────────────────────
+
+    private static void emitStarted(HttpExchange ex, RunView v) {
+        try {
+            EventLog.current().emit(base(LinkEventTypes.LINK_INDEX_BUILD_STARTED, v, ApiContext.actor(ex), ApiContext.actorType(ex)));
+        } catch (RuntimeException ignored) {
+            // best effort
+        }
+    }
+
+    /** The service's terminal hook: the END of a build, from whichever thread ended it. Never column names - they can embed data. */
+    private static void auditTerminal(RunView v) {
+        try {
+            String type = switch (v.status()) {
+                case COMPLETED -> LinkEventTypes.LINK_INDEX_BUILD_COMPLETED;
+                case CANCELLED -> LinkEventTypes.LINK_INDEX_BUILD_CANCELLED;
+                case FAILED -> LinkEventTypes.LINK_INDEX_BUILD_FAILED;
+                case QUEUED, RUNNING -> null;
+            };
+            if (type == null) return;
+            Event.Builder b = base(type, v, v.owner(), "user").attr("elapsedMs", v.elapsedMs());
+            if (v.result() != null) {
+                IndexBuilder.Result r = v.result();
+                b = b.attr("version", r.version()).attr("rows", r.rowsInRelation()).attr("edges", r.edges()).attr("buckets", r.buckets());
+            }
+            if (v.failure() != null) b = b.attr("failure", v.failure());
+            EventLog.current().emit(b);
+        } catch (RuntimeException ignored) {
+            // best effort
+        }
+    }
+
+    private static Event.Builder base(String type, RunView v, String actor, String actorType) {
+        String action = "link.index.build." + type.substring("LINK_INDEX_BUILD_".length()).toLowerCase(Locale.ROOT);
+        return Event.builder(type).source("inv").message(action + " - " + v.datasetId())
+                .actor(actor).actorType(actorType).action(action).actionCategory("analysis")
+                .attr("dataset", v.datasetId()).attr("mappingHash", v.mappingHash()).attr("runId", v.id());
+    }
+}

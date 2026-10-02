@@ -81,6 +81,10 @@ final class AbsentGeoLinkRoutes implements RouteModule {
             {"GET",  "/inv/graph/runs"},
             {"GET",  "/inv/graph/runs/([^/]+)"},
             {"POST", "/inv/graph/runs/([^/]+)/cancel"},
+            {"GET",  "/inv/index"},
+            {"POST", "/inv/index/builds"},
+            {"GET",  "/inv/index/builds/([^/]+)"},
+            {"POST", "/inv/index/builds/([^/]+)/cancel"},
     };
 
     @Override

@@ -37,6 +37,12 @@
             <artifactId>inspecto-la-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- D-3 step 4: the index build service and the manifest (la-core must NEVER depend on la-storage; only this module does). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-la-storage</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-entity-store</artifactId>
@@ -117,6 +123,7 @@
                                         <include>com.gamma.inspector:inspecto-http-spi</include>
                                         <include>com.gamma.inspector:inspecto-la-graph</include>
                                         <include>com.gamma.inspector:inspecto-la-core</include>
+                                        <include>com.gamma.inspector:inspecto-la-storage</include>
                                         <include>com.gamma.inspector:inspecto-sql</include>
                                         <include>com.gamma.inspector:inspecto-util</include>
                                     </includes>

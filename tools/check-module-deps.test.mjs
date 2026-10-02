@@ -99,3 +99,24 @@ test('D-3: la-storage may reach la-core, but la-core reaching la-storage is RED 
     const engine = { ...ok, 'inspecto-la-storage': pom([dep('inspecto-la-core'), dep('inspecto-engine')], enforcer(ALLOWED['inspecto-la-storage'])), 'inspecto-engine': pom([]) };
     assert.match(run(engine, policy).join(' '), /inspecto-la-storage reaches inspecto-engine/);
 });
+
+test('D-3 step 4: la-api -> la-storage is GREEN, la-storage -> la-api is RED, and la-core stays unable to reach la-storage', () => {
+    assert.ok(ALLOWED['inspecto-la-api'].includes('inspecto-la-storage'));
+    assert.ok(!ALLOWED['inspecto-la-storage'].includes('inspecto-la-api'));
+    assert.ok(!ALLOWED['inspecto-la-core'].includes('inspecto-la-storage'));
+    const policy = {
+        'inspecto-la-core': ALLOWED['inspecto-la-core'],
+        'inspecto-la-storage': ALLOWED['inspecto-la-storage'],
+        'inspecto-la-api': ALLOWED['inspecto-la-api'],
+    };
+    const ok = {
+        'inspecto-la-core': pom([], enforcer(ALLOWED['inspecto-la-core'])),
+        'inspecto-la-storage': pom([dep('inspecto-la-core')], enforcer(ALLOWED['inspecto-la-storage'])),
+        'inspecto-la-api': pom([dep('inspecto-la-core'), dep('inspecto-la-storage')], enforcer(ALLOWED['inspecto-la-api'])),
+    };
+    assert.deepEqual(run(ok, policy), []);
+    const back = { ...ok, 'inspecto-la-storage': pom([dep('inspecto-la-core'), dep('inspecto-la-api')], enforcer(ALLOWED['inspecto-la-storage'])) };
+    assert.match(run(back, policy).join(' '), /inspecto-la-storage reaches inspecto-la-api/);
+    const viaApi = { ...ok, 'inspecto-la-core': pom([dep('inspecto-la-storage')], enforcer(ALLOWED['inspecto-la-core'])) };
+    assert.match(run(viaApi, policy).join(' '), /inspecto-la-core reaches inspecto-la-storage/);
+});

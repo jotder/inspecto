@@ -1049,6 +1049,14 @@ betweenness and suspicion).
 **Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-A11Y-AUDIT-1`. The remaining option-D phases are in
 [`la-separation-feasibility-plan.md`](../../../superpower/la-separation-feasibility-plan.md) §7.8.
 
+## Index (D-3, as built 2026-10-02)
+
+The edge/node index of a Dataset ([`la-separation-d3-design.md`](../../../superpower/la-separation-d3-design.md) §5.2, §5.3): Parquet under `<Space write root>/la-index`, built by `IndexBuildService` (`inspecto-la-storage`) and exposed by `IndexRoutes` (`inspecto-la-api`).
+
+* **Routes.** `POST /inv/index/builds` (body `{dataset, sourceCol, targetCol, kindCol?, timeCol?, timeColZone?, weightCol?, attrCols?}`, 202 + Location, 409 for a second live build of the same Dataset + mapping, 422 for a bad column or an estimate over the budget), `GET /inv/index` (viewable Datasets' current versions with rows / bytes / builtAt and `stale` + `reason`), `GET /inv/index/builds/{id}`, `POST /inv/index/builds/{id}/cancel`. Every route runs the base-Dataset view gate first: a Dataset the caller may not view, and every build over it, is the same 404 as an absent one (design Decision 2: valid only while a Dataset has no per-Subject row filter).
+* **Capability and settings.** Starting needs `canBuildLinkIndex` (seeded like `canRunLinkGraphAnalysis`); cancel is the starter or an administrator. `link-analysis.toon` `index {enabled, max_disk_bytes, keep_versions, threads, queue}`; a build estimated above `max_disk_bytes` (rows x 34 bytes x 2; 0 = no limit) is refused up front with the estimate. Audit: `LINK_INDEX_BUILD_STARTED | _COMPLETED | _CANCELLED | _FAILED`.
+* **What it does NOT do yet.** No read path uses an index until step 5, and `index.enabled` defaults to false. The base fingerprint is the relation-SQL hash only (not grounded in input files), so a Dataset that merely gained a file is not flagged stale. Incremental append and compaction are step 8.
+
 ## Closed-plan record (2026-10-01)
 
 `link-analysis-backlog-plan.md` was the only open backlog for Link Analysis from 2026-09-22; it was retired
