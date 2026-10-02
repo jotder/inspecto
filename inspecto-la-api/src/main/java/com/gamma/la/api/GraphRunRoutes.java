@@ -208,7 +208,7 @@ public final class GraphRunRoutes implements RouteModule {
     // ── POST /inv/graph/runs ─────────────────────────────────────────────────────────────────────────────────
 
     /** Stands in for a raw id sent while masking hides it: names no node (one per parameter, so from and to never coincide), so the engine answers as for any unknown id. */
-    private static final String ABSENT_NODE = " absent";
+    private static final String ABSENT_NODE = "\u0000absent";
 
     private Object start(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "graph run");                      // 503
