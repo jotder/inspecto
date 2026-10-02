@@ -577,9 +577,12 @@ class ControlApiGraphRunTest {
             until(() -> "CANCELLED".equals(status(c, theirs, ANALYST)));
 
             engine.release.countDown();
-            JsonNode fin = ok(c, "POST", "/inv/graph/runs", run("bridges", ""), ANALYST);
-            assertEquals("COMPLETED", fin.get("status").asText());
-            assertEquals(409, send(c, "POST", "/inv/graph/runs/" + fin.get("runId").asText() + "/cancel", null, ADMIN).statusCode());
+            // The inline wait is 0, so whether the submit response is already terminal (200) or still QUEUED (202) is a race
+            // between the worker and the response: wait on the run's state, not on the first answer (CI run 36976094477).
+            HttpResponse<String> submitted = start(c, run("bridges", ""), ANALYST);
+            String finId = data(submitted, submitted.statusCode()).get("runId").asText();
+            until(() -> "COMPLETED".equals(status(c, finId, ANALYST)));
+            assertEquals(409, send(c, "POST", "/inv/graph/runs/" + finId + "/cancel", null, ADMIN).statusCode());
         }
     }
 
