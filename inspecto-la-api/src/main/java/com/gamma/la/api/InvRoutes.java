@@ -941,6 +941,33 @@ public final class InvRoutes implements RouteModule {
         boolean monotonic = monotonicIn;
         Double maxHours = maxHoursIn;
 
+        // D-3 step 5: answer from the edge index when - and only when - it can answer exactly (IndexedRecursivePaths). The view
+        // gate above has run; a fallback below is the unchanged flat read, which then says why on `source`.
+        IndexedRecursivePaths.Outcome indexed = IndexedRecursivePaths.attempt(writeRoot, relationSql,
+                new IndexedRecursivePaths.Request(datasetId, sourceCol, targetCol, weightCol, tsCol, body.get("filter"), startNode,
+                        targetNode, direction.equals("UNDIRECTED"), maxDepth, maxEdges, limit, monotonic, maxHours),
+                traversalPolicy(), () -> refuseIfSensitive(writeRoot, "a traversal (maxDepth " + maxDepth + " × maxEdgeYield " + maxEdges + ")",
+                        (long) maxDepth * maxEdges, maxEdges));
+        if (indexed.served()) {
+            List<Map<String, Object>> paths = new ArrayList<>(indexed.result().paths().size());
+            for (com.gamma.la.storage.IndexedTraversal.PathRow row : indexed.result().paths()) {
+                Map<String, Object> pathOut = new LinkedHashMap<>();
+                pathOut.put("nodes", row.nodes());
+                pathOut.put("hops", row.hops());
+                pathOut.put("weight", weightCol != null ? row.weight() : null);
+                paths.add(pathOut);
+            }
+            boolean truncated = indexed.result().limitTruncated() || indexed.result().yieldCapped();
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("paths", paths);
+            out.put("truncated", truncated);
+            out.put("edgeYieldCapped", indexed.result().yieldCapped());
+            out.put("fences", traversalFences(maxDepth, maxEdges));
+            out.put("source", indexed.source());
+            auditTraversal(ex, datasetId, startNode, targetNode, maxDepth, paths.size(), truncated, indexed);
+            return out;
+        }
+
         // Every identifier is checked against the REAL columns before any statement text is assembled. The
         // columns are probed in the SAME sandbox session the walk then runs in (G-R4, 2026-09-30): a separate
         // probe cost a second temp-DB open/register/close per request.
@@ -1009,21 +1036,27 @@ public final class InvRoutes implements RouteModule {
                 paths.add(out);
                 yieldCapped |= num(row.get("widest")) >= maxEdges;
             }
-            Map<String, Object> fences = new LinkedHashMap<>();
-            fences.put("maxDepth", maxDepth);
-            fences.put("maxEdgeYield", maxEdges);
-            fences.put("timeoutMs", TRAVERSAL_TIMEOUT_SECONDS * 1000);
+            Map<String, Object> fences = traversalFences(maxDepth, maxEdges);
             boolean truncated = r.truncated() || yieldCapped;
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("paths", paths);
             out.put("truncated", truncated);
             out.put("edgeYieldCapped", yieldCapped);
             out.put("fences", fences);
-            auditTraversal(ex, datasetId, startNode, targetNode, maxDepth, paths.size(), truncated);
+            out.put("source", indexed.source());
+            auditTraversal(ex, datasetId, startNode, targetNode, maxDepth, paths.size(), truncated, indexed);
             return out;
         } catch (SQLException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "traversal failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
+    }
+
+    private static Map<String, Object> traversalFences(int maxDepth, int maxEdges) {
+        Map<String, Object> fences = new LinkedHashMap<>();
+        fences.put("maxDepth", maxDepth);
+        fences.put("maxEdgeYield", maxEdges);
+        fences.put("timeoutMs", TRAVERSAL_TIMEOUT_SECONDS * 1000);
+        return fences;
     }
 
     /**
@@ -1044,7 +1077,7 @@ public final class InvRoutes implements RouteModule {
 
     /** Best-effort audit of one traversal (LA-04 pattern): a multi-hop walk is its own analytic act. */
     private static void auditTraversal(HttpExchange ex, String datasetId, String startNode, String targetNode,
-                                       int maxDepth, int paths, boolean truncated) {
+                                       int maxDepth, int paths, boolean truncated, IndexedRecursivePaths.Outcome source) {
         try {
             Event.Builder b = Event.builder(LinkEventTypes.LINK_TRAVERSED)
                     .source("inv")
@@ -1054,7 +1087,10 @@ public final class InvRoutes implements RouteModule {
                     .action("link.traversed").actionCategory("analysis")
                     .target("dataset", datasetId)
                     .attr("dataset", datasetId).attr("startNode", startNode).attr("maxDepth", maxDepth)
-                    .attr("paths", paths).attr("truncated", truncated);
+                    .attr("paths", paths).attr("truncated", truncated)
+                    .attr("source", source.served() ? "index" : "dataset");
+            if (source.served()) b.attr("indexVersion", source.version()).attr("indexStale", source.stale());
+            else b.attr("sourceReason", source.reason().name());
             if (targetNode != null) b.attr("targetNode", targetNode);
             EventLog.current().emit(b);
         } catch (RuntimeException ignore) {

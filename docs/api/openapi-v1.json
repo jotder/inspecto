@@ -6191,15 +6191,50 @@
     "/inv/traversal/recursive-paths" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/traversal/recursive-paths (generated skeleton)",
+        "summary" : "Simple paths from a start node, walked server-side (from the edge index when it can answer exactly)",
         "operationId" : "postInvTraversalRecursivePaths",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "LA-11 / D-3 step 5. Body {dataset, sourceCol, targetCol, startNode, targetNode?, maxDepth?, direction?, weightCol?, temporalConstraint?, filter?, maxEdgeYield?, limit?}. Answers {paths:[{nodes,hops,weight}], truncated, edgeYieldCapped, fences, source}. `source` says where the answer came from: {kind:'index', version, stale, staleReason?} when it was read from the Dataset's edge index (needs the Space setting index.enabled, a published index for exactly the request's columns, maxDepth <= 2 and at most 20 distinct frontier keys per level); otherwise {kind:'dataset', reason} with reason one of index_disabled, no_index, mapping_not_indexed, column_not_indexed, time_zone_not_servable, filter_not_indexed, index_stale_refused, depth_over_index_cap, frontier_over_index_cap, index_read_failed - the unchanged flat read answered. A frontier found over the cap mid-walk discards the partial index answer and re-answers whole from the flat Dataset. The base-Dataset view gate runs first (a Dataset the caller cannot view is the same 404 whether or not an index exists).",
         "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          "200" : {
+            "description" : "Envelope data {paths, truncated, edgeYieldCapped, fences, source}.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "paths" : { "type" : "array", "items" : { "type" : "object" } },
+                    "truncated" : { "type" : "boolean" },
+                    "edgeYieldCapped" : { "type" : "boolean" },
+                    "fences" : { "type" : "object" },
+                    "source" : {
+                      "type" : "object",
+                      "required" : [ "kind" ],
+                      "properties" : {
+                        "kind" : { "type" : "string", "enum" : [ "index", "dataset" ] },
+                        "version" : { "type" : "integer", "description" : "kind=index: the pinned index version." },
+                        "stale" : { "type" : "boolean", "description" : "kind=index: the index is served but flagged (e.g. built with another DuckDB version)." },
+                        "staleReason" : { "type" : "string" },
+                        "reason" : { "type" : "string", "description" : "kind=dataset: why the flat Dataset answered." }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "A sensitive read above the Space's four-eyes thresholds (the same refusal on either path)."
+          },
+          "404" : {
+            "description" : "Unknown Dataset, or one the caller may not view."
+          },
+          "422" : {
+            "description" : "A malformed field or an unknown column."
+          },
+          "503" : {
+            "description" : "No write root, or no Dataset provider."
           }
         },
-        "x-generated" : true,
         "x-optional-module" : true
       }
     },
@@ -10602,7 +10637,7 @@
         "tags" : [ "inv" ],
         "summary" : "List the edge/node indexes of the caller's viewable Datasets",
         "operationId" : "getInvIndex",
-        "description" : "LA separation D-3 step 4. {enabled, indexes, total}: `enabled` echoes the Space's index.enabled (default false - nothing reads an index yet). Each index: dataset, mappingHash, mapping {sourceCol,targetCol,kindCol,timeCol,timeColZone,weightCol,attrCols}, version (the CURRENT one), builtAt, builder, rows (edges per direction), nodes, bytes (all tables), droppedNull, buckets, and `stale` + `reason` (the Dataset's relation SQL changed, the bucket function differs, or DuckDB's version differs - a stale index is still listed). Only Datasets the caller may view are walked: an index over a Dataset the caller cannot view is absent from the answer. No capability.",
+        "description" : "LA separation D-3 step 4. {enabled, indexes, total}: `enabled` echoes the Space's index.enabled (default false; when true POST /inv/traversal/recursive-paths answers from a current index within the depth/frontier cap). Each index: dataset, mappingHash, mapping {sourceCol,targetCol,kindCol,timeCol,timeColZone,weightCol,attrCols}, version (the CURRENT one), builtAt, builder, rows (edges per direction), nodes, bytes (all tables), droppedNull, buckets, and `stale` + `reason` (the Dataset's relation SQL changed, the bucket function differs, or DuckDB's version differs - a stale index is still listed). Only Datasets the caller may view are walked: an index over a Dataset the caller cannot view is absent from the answer. No capability.",
         "responses" : {
           "200" : {
             "description" : "{enabled, indexes, total}."
