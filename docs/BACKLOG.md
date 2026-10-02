@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **63<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 43<!--count:backlog-p3--> × P3** —
+> **66<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 21<!--count:backlog-p2--> × P2 · 45<!--count:backlog-p3--> × P3** —
 > ⬆ **58 → 63 on 2026-10-02**: filed five P3 Link Analysis rows (§3.12) from the D-3 / D-5 verification — `LA-INDEX-STAGE-RACE-1`, `LA-INDEX-BUILDER-TEST-TIMING-1`, `LA-GRAPH-RUN-CANCEL-STARTER-COVERAGE-1`, `LA-APP-REAL-SIGNIN-1`, `LA-A11Y-LIVE-REVERIFY-1`.
 > ⬆ **60 → 61 on 2026-10-02**: filed P3 `LA-A11Y-AUDIT-1` (§3.12) — the first real-browser axe-core pass over Link Analysis, Geo and the Link Analysis settings; the findings are the row, nothing was fixed.
 > ⬇ **60 → 58 on 2026-10-02**: closed P3 `LA-GRAPH-RUN-MASK-ORACLE-1` (while masking hides an entity, a raw id sent as `from` / `to` / `node` is treated as a node that does not exist, so a run answers as for any unknown id and cannot probe the Working Set; a pseudonym still resolves) and `LA-GRAPH-RUN-CANCEL-GATE-1` (cancel by a non-starter non-administrator now answers 404, the unknown-run answer, and re-runs the Investigation read gate; starter / administrator unchanged, finished run still 409).
@@ -120,9 +120,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 43<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 63<!--count:backlog-rows--> as pending work overstates it.
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 45<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 66<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -436,6 +436,10 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 - **P3** · `LA-GRAPH-RUN-CANCEL-STARTER-COVERAGE-1` — **The starter-ownership clause in `GraphRunRoutes.cancel` is not independently covered.** A mutant removing it survives because the Investigation read gate refuses any non-owner first; the clause only matters for an Investigation-Case member who is not the starter, and testing it needs a `CasePort` in the test module. → `okf/frontend/features/link-analysis.md`
 - **P3** · `LA-APP-REAL-SIGNIN-1` — **la-app's OIDC sign-in has never run against a real IAM.** The core `inspecto/auth` sign-in is exercised only by specs and `authMode none`; a real sign-in (the local WSO2 runbook) is unverified, and the IAM client id for la-app is a deployment decision (`package.ps1 -Ui la-app` notes it; nothing invents one). → `okf/frontend/features/link-analysis.md`
 - **P3** · `LA-A11Y-LIVE-REVERIFY-1` — **Three 2026-10-02 accessibility fixes were proven by specs, not re-run live.** The loading-bar name, the Cliques result-button height and the light scheme (listed in `LA-A11Y-AUDIT-1`) should be re-checked in a second real-browser audit pass. → `okf/frontend/features/link-analysis.md`
+
+- **P3** · `LA-INDEX-FINGERPRINT-COST-1` — **The input fingerprint listing costs about 19 s on a cache miss at the 100,000-file cap.** `DatasetProvider.inputFingerprint` lists every input file; the 30 s cache hides repeats, not the first miss. Propose a cap of about 10,000 files (above it the index refuses to serve, stated). → `okf/frontend/features/link-analysis.md`
+- **P3** · `LA-INDEX-READER-POOL-1` — **The index reader is not pooled.** Each request pays a 100-200 ms sealed-connection open, so the index loses to the flat path at 10^6 edges and wins 2-5x only from 10^7. Pool a read-only connection per sealed version. → `okf/frontend/features/link-analysis.md`
+- **P2** · `LA-COVERAGE-FLOOR-HOME-1` — **CI is red on the backend coverage floor (77.56% vs 78.0%) because the LA API tests live in `inspecto-geo-link`, not `inspecto-la-api`.** The guard credits coverage per module, so `inspecto-la-api` reads 2.4% and `inspecto-la-core` 35.8% although their code is exercised. Move or add the tests into the owning modules; do not lower the floor. → `okf/frontend/features/link-analysis.md`
 
 ## 4. Engineering platform — build, test, CI & tooling
 
