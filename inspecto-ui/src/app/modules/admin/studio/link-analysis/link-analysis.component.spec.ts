@@ -846,6 +846,38 @@ describe('LinkAnalysisComponent', () => {
         expect(dataAt(2).graph).toBe(c.canvasData());
         expect(dataAt(2).graph.nodes).toHaveLength(5);
     });
+    it('the query graph "Truncated" alert shows on the query graph, not over an open Investigation canvas, and returns after', async () => {
+        const expand = vi.fn(async () => ({
+            nodes: [{ id: 'f', data: { label: 'F', kind: 'entity' } }],
+            edges: [{ id: 'c->f', source: 'c', target: 'f', data: { kind: 'link' } }],
+            truncated: true,
+        }));
+        const { fixture } = create({ expand: expand as unknown as GraphSource['expand'] });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        await c.expandNode('c', 'C');
+        const alert = () => (fixture.nativeElement as HTMLElement).textContent?.includes('projection hit the node cap');
+        fixture.detectChanges();
+        expect(alert()).toBe(true);
+
+        c.investigation.activeId.set('inv-1');
+        c.investigation.log.set({ header: { dataset: 'd', sourceCol: 's', targetCol: 't' }, entries: [] } as never);
+        c.investigation.workingSet.set({
+            entities: [{ id: 'a' }, { id: 'b' }],
+            links: [{ source: 'a', target: 'b', kind: 'k', count: 1 }],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        fixture.detectChanges();
+        expect(c.truncated()).toBe(true);
+        expect(alert()).toBe(false);
+
+        c.investigation.close();
+        fixture.detectChanges();
+        expect(alert()).toBe(true);
+        fixture.destroy();
+    });
     it('footer: a Working Set over the link render ceiling says how many links were left off; below it, nothing', async () => {
         const { fixture } = create();
         fixture.detectChanges();

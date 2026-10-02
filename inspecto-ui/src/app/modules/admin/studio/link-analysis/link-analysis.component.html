@@ -50,7 +50,7 @@
                 canvas draws the heaviest {{ (canvasData()?.edges?.length ?? 0).toLocaleString() }} (render limit).
             </inspecto-alert>
         }
-        @if (truncated()) {
+        @if (truncated() && !workingSetCanvas()) {
             <inspecto-alert variant="warning" title="Truncated">
                 The projection hit the node cap — narrow the dataset or filter to see everything.
             </inspecto-alert>
