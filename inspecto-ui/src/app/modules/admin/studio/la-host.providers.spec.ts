@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { describe, expect, it } from 'vitest';
 import { SessionService } from 'app/inspecto/api';
-import { LA_FEATURES } from 'app/inspecto/la-host';
+import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { provideLaHostServices } from './la-host.providers';
 
 /** The Inspecto host's side of LA_FEATURES: the flags ARE the SessionService signals, not copies of them. */

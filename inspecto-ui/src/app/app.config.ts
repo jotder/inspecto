@@ -12,8 +12,7 @@ import { errorInterceptor as inspectoErrorInterceptor } from './inspecto/api/err
 import { spaceInterceptor } from './inspecto/api/space.interceptor';
 import { authInterceptor } from './inspecto/api/auth.interceptor';
 import { v1Interceptor } from './inspecto/api/v1.interceptor';
-import { registerGeoMapViz } from './modules/admin/studio/geo-map/geo-map.viz';
-import { registerLinkAnalysisViz } from './modules/admin/studio/link-analysis/link-analysis.viz';
+import { registerGeoMapViz, registerLinkAnalysisViz } from '@inspecto/link-analysis';
 import { provideLaHostServices } from './modules/admin/studio/la-host.providers';
 import { SessionService } from './inspecto/api/session.service';
 import { provideAppEnvironment } from './inspecto/api/app-environment';

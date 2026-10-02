@@ -1,4 +1,4 @@
-import type { GraphDirection, MultiEdgeMapping, MultiNodeMapping } from 'app/inspecto/api';
+import type { GraphDirection } from 'app/inspecto/api';
 import type { G6GraphData } from './graph-types';
 import type { EntityTypeRef } from './entity-key';
 import type { ConditionGroup } from '../query/query-types';
@@ -105,4 +105,26 @@ export interface GraphSource {
      * X" notion (component-registry — a fully-loaded static graph) omit it, and the UI hides the action.
      */
     expand?(nodeId: string, nodeLabel: string, q: GraphSourceQuery): Promise<G6GraphData>;
+}
+
+/** LA-08: one node mapping of {@code POST /inv/projection/multi} — distinct `idColumn` values become Entities. */
+export interface MultiNodeMapping {
+    dataset: string;
+    idColumn: string;
+    labelColumn?: string;
+    /** A constant category stamped on every node this mapping yields. */
+    category?: string;
+    attributes?: string[];
+}
+
+/** LA-08: one edge mapping — the folded `(sourceColumn, targetColumn)` pairs of one Dataset. */
+export interface MultiEdgeMapping {
+    dataset: string;
+    sourceColumn: string;
+    targetColumn: string;
+    /** A constant link type for every edge this mapping yields (there is no per-row kind column here). */
+    type?: string;
+    attributes?: string[];
+    /** Narrows ONLY this mapping; the request's top-level `filter` applies to every edge mapping. */
+    filter?: ConditionGroup;
 }

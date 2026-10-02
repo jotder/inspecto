@@ -1,12 +1,7 @@
+// CORE slice of the graph code (D-5 step 3): types, source, canvas helpers, entity key. The Link Analysis algorithms,
+// history, snapshot, filter and branching engine live in the library: `@inspecto/link-analysis/graph`.
 export * from './graph-types';
 export * from './graph-source';
-export * from './graph-analysis';
 export * from './graph-export';
-export * from './graph-history';
-export * from './working-set-stats';
-export * from './domain-profile';
-export * from './graph-filter';
-export * from './graph-snapshot';
 export * from './entity-key';
-export * from './branching-pattern-engine';
-export * from './geo-link-brush';
+export * from './branching-stage';

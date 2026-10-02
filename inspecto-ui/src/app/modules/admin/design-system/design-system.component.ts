@@ -35,7 +35,7 @@ import {
 import { QuerySource } from 'app/inspecto/query';
 import { DataTableComponent, DataTableTier } from 'app/inspecto/data-table';
 import { TreeTableComponent, TreeNode, varianceCell } from 'app/inspecto/tree-table';
-import { GeoData, MapViewComponent } from 'app/inspecto/geo';
+import { GeoData, MapViewComponent } from '@inspecto/link-analysis';
 import { KpiComponent } from 'app/inspecto/viz/plugins/kpi.component';
 import { KpiTrendComponent } from 'app/inspecto/viz/plugins/kpi-trend.component';
 import { ProgressListComponent } from 'app/inspecto/viz/plugins/progress-list.component';

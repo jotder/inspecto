@@ -14,7 +14,7 @@ import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.serv
 import { DrillEvent, WidgetHostComponent } from 'app/modules/admin/studio/widgets/widget-host.component';
 import { Widget } from 'app/modules/admin/studio/widgets/widget-types';
 import { WidgetsService } from 'app/modules/admin/studio/widgets/widgets.service';
-import { LinkViewWidgetComponent } from 'app/modules/admin/studio/link-analysis/link-view-widget.component';
+import { LinkViewWidgetComponent } from '@inspecto/link-analysis/link-analysis/link-view-widget.component';
 import { MenuArtifactComponent } from './menu-artifact.component';
 
 /** Stands in for the real tile (whose chart host jsdom can't create) and records what the viewer passes it. */

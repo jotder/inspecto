@@ -1,5 +1,5 @@
 import { ControlValues, VizRenderOptions } from 'app/inspecto/viz';
-import type { WorkingSetBinding } from 'app/inspecto/la-host';
+import type { WorkingSetBinding } from '@inspecto/link-analysis';
 
 export type { WorkingSetBinding };
 

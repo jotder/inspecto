@@ -5,7 +5,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
-import { GeoSettingsService, apiErrorMessage } from 'app/inspecto/api';
+import { GeoSettingsService } from '@inspecto/link-analysis';
+import { apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 
 /** Empty is fine (bundled offline basemap); a value must be a {z}/{x}/{y} raster template or a pmtiles:// archive. */

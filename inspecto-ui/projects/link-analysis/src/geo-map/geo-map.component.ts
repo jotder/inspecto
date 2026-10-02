@@ -1,0 +1,1037 @@
+import {
+    ChangeDetectionStrategy,
+    Component,
+    OnDestroy,
+    OnInit,
+    ViewChild,
+    computed,
+    inject,
+    signal,
+} from '@angular/core';
+import { DecimalPipe } from '@angular/common';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
+import { MatSliderModule } from '@angular/material/slider';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { ActivatedRoute, Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+import { ToastrService } from 'ngx-toastr';
+
+import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
+import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-state.component';
+import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
+import { DataTableComponent } from '@inspecto/core/data-table';
+import {
+    GeoBBox,
+    GeoCamera,
+    GeoData,
+    GeoDisplayMode,
+    GeoEmphasis,
+    GeoPoint,
+    GeoQuery,
+    GeoLayerToggles,
+    GeoNote,
+    GeoSourceId,
+    MapViewComponent,
+    circleRing,
+    filterByKinds,
+    filterByTime,
+    formatDistance,
+    haversineMeters,
+    nearby,
+    pointInPolygon,
+    searchPoints,
+    timeExtent,
+    withinBBox,
+} from '@inspecto/link-analysis/geo';
+import type { Feature, FeatureCollection } from 'geojson';
+import { GeoLinkBrushService, pointIdsForNodes } from '@inspecto/link-analysis/graph/geo-link-brush';
+import {
+    ElementDetailDialog,
+    ElementDetailResult,
+    ElementDetailRow,
+    ElementObjectRef,
+} from '@inspecto/link-analysis/investigation/element-detail.dialog';
+import { PivotService } from '@inspecto/link-analysis/investigation/pivot.service';
+import { uniqueNameValidator } from '@inspecto/core/investigation';
+import { ComponentsService, apiErrorMessage } from '@inspecto/core/api';
+import { GeoSettingsService } from '@inspecto/link-analysis/api/geo-settings.service';
+import type { LaDataset } from '@inspecto/link-analysis/la-host';
+import { LA_DATASETS, LA_FEATURES, LA_TAGS, LA_TRANSFER, LaHostSlotComponent } from '@inspecto/link-analysis/la-host';
+import type { LaImportDraft } from '@inspecto/link-analysis/la-host';
+import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
+import { ICON_COLOR_SWATCHES } from '@inspecto/core/theme/chart-tokens';
+import { GeoSourcesService, ProjectedGeo } from './geo-projection';
+import { GeocoderService } from './geocoder.service';
+import { GeocodeResult } from '@inspecto/link-analysis/geo';
+
+/** Annotation accent — the amber chart-token swatch (visually distinct from data kinds). */
+const NOTE_ACCENT = ICON_COLOR_SWATCHES[3];
+import { GeoMapService, GeoMapView } from './geo-map.service';
+import { GeoAnalysisFocus, GeoAnalysisToolboxComponent } from './geo-analysis-toolbox.component';
+import { InspectoPageHeaderComponent } from '@inspecto/core/components/page-header.component';
+
+/** Investigation pivot (ui-design-review R8): recognize an Incident/Case reference on a point's row,
+ *  by convention — `caseId`/`incidentId`, or `objectId` (+ optional `objectType`). Most geo layers
+ *  carry no such column (their entities aren't operational objects); only then is this undefined. */
+function objectRefFromAttrs(attrs: Record<string, unknown> | undefined): ElementObjectRef | undefined {
+    if (!attrs) return undefined;
+    const caseId = attrs['caseId'];
+    if (caseId != null && String(caseId).trim()) return { id: String(caseId).trim(), type: 'CASE' };
+    const incidentId = attrs['incidentId'];
+    if (incidentId != null && String(incidentId).trim()) return { id: String(incidentId).trim(), type: 'INCIDENT' };
+    const objectId = attrs['objectId'];
+    if (objectId != null && String(objectId).trim()) {
+        return {
+            id: String(objectId).trim(),
+            type: String(attrs['objectType'] ?? '').toUpperCase() === 'CASE' ? 'CASE' : 'INCIDENT',
+        };
+    }
+    return undefined;
+}
+
+/** One row of the bottom Data panel (a point, flattened for the shared table). */
+interface PointRow {
+    id: string;
+    label: string;
+    kind: string;
+    lat: number;
+    lon: number;
+    time?: string;
+}
+
+/**
+ * **Geo Map Analysis Studio** (plan: docs/superpower/geo-map-analysis-plan.md §Phase 1) — pick a
+ * GeoSource, map a Dataset's lat/lon columns, render on the offline MapLibre host
+ * ({@link MapViewComponent}), investigate (search, kind filter, click-to-detail, nearby), and save
+ * the investigation as a `geo-map-view` Component. The *where* sibling of the Link Analysis studio.
+ */
+@Component({
+    selector: 'inspecto-geo-map',
+    standalone: true,
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [
+        InspectoPageHeaderComponent,
+        DecimalPipe,
+        FormsModule,
+        ReactiveFormsModule,
+        MatButtonModule,
+        MatButtonToggleModule,
+        MatCheckboxModule,
+        MatDialogModule,
+        MatFormFieldModule,
+        MatIconModule,
+        MatInputModule,
+        MatMenuModule,
+        MatSliderModule,
+        MatTooltipModule,
+        InspectoAlertComponent,
+        InspectoEmptyStateComponent,
+        InspectoOptionPickerComponent,
+        InspectoSkeletonComponent,
+        MapViewComponent,
+        DataTableComponent,
+        LaHostSlotComponent,
+        GeoAnalysisToolboxComponent,
+    ],
+    templateUrl: './geo-map.component.html',
+})
+export class GeoMapComponent implements OnInit, OnDestroy {
+    private fb = inject(FormBuilder);
+    /**
+     * `bootstrap.features.ops` — cross-entity tags and comments are
+     * operational-object edges, so they live in the optional inspecto-ops module
+     * (EDITIONS CP-11, EDG-01 cell 7). The menu action is HIDDEN when absent, the
+     * geoLink precedent: an affordance that can only 503 is worse than none.
+     */
+    readonly opsEnabled = inject(LA_FEATURES).ops;
+    private toastr = inject(ToastrService);
+    private dialog = inject(MatDialog);
+    private readonly tags = inject(LA_TAGS);
+    /** The host's Import/export menu + draft banner, rendered through `<inspecto-la-host-slot>`. */
+    readonly transfer = inject(LA_TRANSFER);
+    readonly transferMenuOutputs = {
+        draftImported: (d: LaImportDraft) => void this.onDraftImported(d),
+        changed: () => this.reloadViews(),
+    };
+    readonly transferBannerOutputs = { discard: () => void this.discardDraft() };
+    private router = inject(Router);
+    private route = inject(ActivatedRoute);
+    private pivotService = inject(PivotService);
+    private geoSources = inject(GeoSourcesService);
+    private datasetsService = inject(LA_DATASETS);
+    private viewsService = inject(GeoMapService);
+    private components = inject(ComponentsService);
+    /** LA-22: the shared Geo ↔ Link brush (keyed by `GeoPoint.key`, D-U3). */
+    private brush = inject(GeoLinkBrushService);
+    private geoSettings = inject(GeoSettingsService);
+    private geocoder = inject(GeocoderService);
+    private datasetRowsSvc = inject(DatasetRowsService);
+
+    /** Customer tile server (Settings → Map); `null` = the bundled offline basemap. */
+    readonly tileServerUrl = signal<string | null>(null);
+
+    // ── find place (geocoding seam, D4) ──
+    readonly placeQuery = signal('');
+    readonly placeResults = signal<GeocodeResult[]>([]);
+
+    @ViewChild(MapViewComponent) private mapView?: MapViewComponent;
+    @ViewChild('saveTrigger') private saveTrigger?: MatMenuTrigger;
+    @ViewChild(GeoAnalysisToolboxComponent) private analysis?: GeoAnalysisToolboxComponent;
+
+    readonly sources = this.geoSources.sources;
+
+    // ── query builder ──
+    readonly sourceId = signal<GeoSourceId>('dataset');
+    readonly datasets = signal<LaDataset[]>([]);
+    readonly datasetColumns = signal<string[]>([]);
+    /** Full query form vs its collapsed summary (auto-collapses after a run). */
+    readonly queryOpen = signal(true);
+    /** The Entity/Type/Time (and route-name) columns sit under ONE collapsed disclosure (plan UI-13). */
+    readonly optionalOpen = signal(false);
+    // Picker option lists — the pickers take {value,label}, the state stays the ids/column names above.
+    readonly sourceOptions: PickerOption[] = this.sources.map((s) => ({ value: s.id, label: s.label }));
+    readonly datasetOptions = computed<PickerOption[]>(() =>
+        this.datasets().map((d) => ({ value: d.id, label: d.name })),
+    );
+    readonly columnOptions = computed<PickerOption[]>(() => this.datasetColumns().map((c) => ({ value: c, label: c })));
+    /** A blank-valued option is the real "none" choice — the picker shows its label, not the placeholder. */
+    readonly optionalColumnOptions = computed<PickerOption[]>(() => [
+        { value: '', label: '—' },
+        ...this.columnOptions(),
+    ]);
+    // Column presence is validated by the projection folds (typed errors → the banner), so only
+    // the dataset itself is form-required — the fields differ per source.
+    readonly queryForm = this.fb.nonNullable.group({
+        datasetId: ['', Validators.required],
+        latCol: [''],
+        lonCol: [''],
+        entityCol: [''],
+        kindCol: [''],
+        timeCol: [''],
+        fromLatCol: [''],
+        fromLonCol: [''],
+        toLatCol: [''],
+        toLonCol: [''],
+        fromCol: [''],
+        toCol: [''],
+    });
+
+    // ── result state ──
+    readonly loading = signal(false);
+    readonly loadError = signal('');
+    readonly geo = signal<ProjectedGeo | null>(null);
+    readonly lastRun = signal<GeoQuery | null>(null);
+
+    // ── investigation state ──
+    readonly search = signal('');
+    readonly kindFilter = signal<string[]>([]);
+    readonly selectedId = signal<string | null>(null);
+    readonly dataOpen = signal(false);
+    /** Markers vs density heatmap (persisted with a saved view). */
+    readonly displayMode = signal<GeoDisplayMode>('markers');
+    /** Time window [from, to] in epoch millis; `null` = no time filter. */
+    readonly timeRange = signal<[number, number] | null>(null);
+    /** Region filter (the "filter to view" viewport box); `null` = everywhere. */
+    readonly viewBox = signal<GeoBBox | null>(null);
+
+    /** The [min, max] time extent of the loaded data (the slider's rail); `null` = untimed data. */
+    readonly extent = computed<[number, number] | null>(() => {
+        const g = this.geo();
+        return g ? timeExtent(g) : null;
+    });
+
+    // ── geo intelligence (Phase 3; the toolbox itself lives in GeoAnalysisToolboxComponent) ──
+    readonly analysisOpen = signal(false);
+    /** Analysis-result highlight (kept separate from search/selection emphasis). */
+    readonly resultEmphasis = signal<string[] | null>(null);
+
+    // ── playback (animates the time-window end across the extent) ──
+    readonly playing = signal(false);
+    private playTimer: ReturnType<typeof setInterval> | null = null;
+
+    // ── investigation tools (Phase 3b): measure / radius search / polygon filter / notes ──
+    readonly activeTool = signal<'measure' | 'radius' | 'polygon' | 'note' | null>(null);
+    readonly measureVertices = signal<{ lat: number; lon: number }[]>([]);
+    readonly radiusCenter = signal<{ lat: number; lon: number } | null>(null);
+    readonly searchRadiusM = signal(1000);
+    readonly polygonVertices = signal<{ lat: number; lon: number }[]>([]);
+    /** A closed [lon, lat] ring filtering the displayed subset; `null` = no polygon filter. */
+    readonly polygonFilter = signal<[number, number][] | null>(null);
+    readonly notes = signal<GeoNote[]>([]);
+    readonly noteText = signal('');
+    /** Layer-manager state + an uploaded custom GeoJSON overlay. */
+    readonly layerToggles = signal<GeoLayerToggles>({});
+    readonly customOverlay = signal<FeatureCollection | null>(null);
+
+    /** Template alias for the pure formatter. */
+    readonly fmtDistance = formatDistance;
+
+    readonly measureTotalM = computed<number>(() => {
+        const v = this.measureVertices();
+        let total = 0;
+        for (let i = 1; i < v.length; i++) total += haversineMeters(v[i - 1].lat, v[i - 1].lon, v[i].lat, v[i].lon);
+        return total;
+    });
+
+    /** Points within the radius-search circle, nearest first. */
+    readonly radiusHits = computed(() => {
+        const c = this.radiusCenter();
+        const d = this.displayed();
+        return c && d ? nearby(d.points, c.lat, c.lon, this.searchRadiusM()) : [];
+    });
+
+    /** Everything the map draws on top of the data plane (tools + notes + uploaded GeoJSON). */
+    readonly overlay = computed<FeatureCollection>(() => {
+        const features: Feature[] = [...(this.customOverlay()?.features ?? [])];
+        const line = (pts: { lat: number; lon: number }[], label?: string): void => {
+            if (pts.length > 1) {
+                features.push({
+                    type: 'Feature',
+                    geometry: { type: 'LineString', coordinates: pts.map((p) => [p.lon, p.lat]) },
+                    properties: {},
+                });
+            }
+            for (const [i, p] of pts.entries()) {
+                features.push({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+                    properties: label && i === pts.length - 1 ? { label } : {},
+                });
+            }
+        };
+        const m = this.measureVertices();
+        if (m.length) line(m, formatDistance(this.measureTotalM()));
+        const rc = this.radiusCenter();
+        if (rc) {
+            features.push({
+                type: 'Feature',
+                geometry: { type: 'Polygon', coordinates: [circleRing(rc.lat, rc.lon, this.searchRadiusM())] },
+                properties: {},
+            });
+            features.push({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [rc.lon, rc.lat] },
+                properties: { label: `${this.radiusHits().length} within ${formatDistance(this.searchRadiusM())}` },
+            });
+        }
+        const pv = this.polygonVertices();
+        if (pv.length) line(pv);
+        const ring = this.polygonFilter();
+        if (ring) {
+            features.push({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] }, properties: {} });
+        }
+        for (const n of this.notes()) {
+            features.push({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [n.lon, n.lat] },
+                properties: { label: n.text, color: NOTE_ACCENT },
+            });
+        }
+        return { type: 'FeatureCollection', features };
+    });
+
+    /** All point kinds present in the result (the filter menu's options). */
+    readonly pointKinds = computed<string[]>(() => [...new Set((this.geo()?.points ?? []).map((p) => p.kind))].sort());
+
+    /** The kind/time/region-filtered subset actually on the canvas. */
+    readonly displayed = computed<GeoData | null>(() => {
+        const g = this.geo();
+        if (!g) return null;
+        const kinds = this.kindFilter();
+        let d: GeoData = filterByKinds(g, kinds.length ? kinds : null);
+        const t = this.timeRange();
+        if (t) d = filterByTime(d, t[0], t[1]);
+        const box = this.viewBox();
+        if (box) {
+            const points = withinBBox(d.points, box);
+            const keep = new Set(points.map((p) => p.id));
+            d = { points, routes: d.routes.filter((r) => keep.has(r.from) && keep.has(r.to)) };
+        }
+        const ring = this.polygonFilter();
+        if (ring) {
+            const points = d.points.filter((p) => pointInPolygon(p.lat, p.lon, ring));
+            const keep = new Set(points.map((p) => p.id));
+            d = { points, routes: d.routes.filter((r) => keep.has(r.from) && keep.has(r.to)) };
+        }
+        return d;
+    });
+
+    /** Search / analysis-result / selection highlight: matches full-strength, the rest dimmed. */
+    readonly emphasis = computed<GeoEmphasis | null>(() => {
+        const d = this.displayed();
+        if (!d) return null;
+        const q = this.search();
+        if (q) return { pointIds: searchPoints(d, q) };
+        const result = this.resultEmphasis();
+        if (result) return { pointIds: result };
+        const b = this.brush.brush();
+        if (b?.origin === 'link') return { pointIds: pointIdsForNodes(d.points, new Set(b.nodeIds), b.mappings) };
+        const sel = this.selectedId();
+        return sel ? { pointIds: [sel] } : null;
+    });
+
+    /** The bottom Data panel rows (kind-filtered, search-narrowed to match the canvas emphasis). */
+    readonly rows = computed<PointRow[]>(() => {
+        const d = this.displayed();
+        if (!d) return [];
+        const em = this.search() ? new Set(this.emphasis()?.pointIds ?? []) : null;
+        return d.points
+            .filter((p) => !em || em.has(p.id))
+            .map((p) => ({
+                id: p.id,
+                label: p.label ?? p.id,
+                kind: p.kind,
+                lat: p.lat,
+                lon: p.lon,
+                time: p.time !== undefined ? new Date(p.time).toISOString() : undefined,
+            }));
+    });
+
+    // ── saved views ──
+    readonly views = signal<GeoMapView[]>([]);
+    readonly saving = signal(false);
+
+    /** The saved Geo Map views as transfer references — what the export/import menu offers. */
+    readonly transferItems = computed(() => this.views().map((v) => ({ kind: 'geo-map-view' as const, id: v.id })));
+    readonly saveForm = this.fb.nonNullable.group({
+        name: ['', [Validators.required, uniqueNameValidator(() => this.views().map((v) => v.name))]],
+        description: [''],
+    });
+
+    /** An imported draft this editor holds UNSAVED (Import as draft, D1–D8) — in memory only. */
+    readonly importDraft = signal<LaImportDraft | null>(null);
+    /** The stored copy the draft replaces (D6 diff baseline); null when the id is new here. */
+    readonly draftStored = signal<Record<string, unknown> | null>(null);
+    /** The stored copy's hash, sent as `If-Match` on the draft's Save so it cannot clobber a concurrent edit. */
+    private draftIfMatch: string | undefined;
+
+    /** An incoming investigation pivot (ui-design-review R8) awaiting a map load to resolve against —
+     *  cleared after the first query run, found or not. */
+    private pendingPivot?: ElementObjectRef;
+
+    ngOnInit(): void {
+        this.datasetsService.list().subscribe({ next: (d) => this.datasets.set(d), error: () => undefined });
+        this.viewsService.list().subscribe({ next: (v) => this.views.set(v), error: () => undefined });
+        this.geoSettings
+            .get()
+            .subscribe({ next: (s) => this.tileServerUrl.set(s.tileServerUrl), error: () => undefined });
+        this.queryForm.controls.datasetId.valueChanges.subscribe((id) => this.onDatasetPicked(id));
+        this.pendingPivot = this.pivotService.readIncoming(this.route);
+    }
+
+    /** Try to find the pivoted-in record among the just-loaded points; fly to it if present, else toast
+     *  that this view doesn't have it. Runs once, after the first query load. */
+    private resolvePendingPivot(g: ProjectedGeo): void {
+        const pivot = this.pendingPivot;
+        if (!pivot) return;
+        this.pendingPivot = undefined;
+        const point = g.points.find((p) => {
+            const ref = objectRefFromAttrs(p.attrs);
+            return ref?.id === pivot.id && ref.type === pivot.type;
+        });
+        if (point) {
+            this.selectedId.set(point.id);
+            this.mapView?.setCamera({ center: [point.lon, point.lat], zoom: 12 });
+        } else {
+            this.toastr.info('That record is not in this map.', 'Not found');
+        }
+    }
+
+    /** Re-fetch the saved views (after an import brought some in). */
+    reloadViews(): void {
+        this.viewsService.list().subscribe({ next: (v) => this.views.set(v), error: () => undefined });
+    }
+
+    /**
+     * Offer the picked Dataset's columns and preselect obvious coordinate columns by name. The columns
+     * come from the rows seam (declared, else a 1-row probe of the real store) — reading them out of the
+     * first *sample* row offered nothing at all for a store with no offline fixture, which is every store
+     * a live deployment has.
+     */
+    private async onDatasetPicked(id: string): Promise<void> {
+        const ds = this.datasets().find((d) => d.id === id);
+        const cols = ds ? (await this.datasetRowsSvc.columns(ds)).map((c) => c.name) : [];
+        this.datasetColumns.set(cols);
+        const guess = (re: RegExp): string => cols.find((c) => re.test(c)) ?? '';
+        this.queryForm.patchValue({
+            latCol: guess(/lat/i),
+            lonCol: guess(/lon|lng/i),
+            entityCol: '',
+            kindCol: '',
+            timeCol: guess(/time|date/i),
+            fromLatCol: guess(/(from|orig|src).*lat/i),
+            fromLonCol: guess(/(from|orig|src).*(lon|lng)/i),
+            toLatCol: guess(/(to|dest|dst).*lat/i),
+            toLonCol: guess(/(to|dest|dst).*(lon|lng)/i),
+            fromCol: '',
+            toCol: '',
+        });
+    }
+
+    private currentQuery(): GeoQuery {
+        const f = this.queryForm.getRawValue();
+        if (this.sourceId() === 'od-routes') {
+            return {
+                routes: {
+                    datasetId: f.datasetId,
+                    fromLatCol: f.fromLatCol,
+                    fromLonCol: f.fromLonCol,
+                    toLatCol: f.toLatCol,
+                    toLonCol: f.toLonCol,
+                    fromCol: f.fromCol || undefined,
+                    toCol: f.toCol || undefined,
+                    kindCol: f.kindCol || undefined,
+                    timeCol: f.timeCol || undefined,
+                },
+            };
+        }
+        return {
+            projection: {
+                datasetId: f.datasetId,
+                latCol: f.latCol,
+                lonCol: f.lonCol,
+                entityCol: f.entityCol || undefined,
+                kindCol: f.kindCol || undefined,
+                timeCol: f.timeCol || undefined,
+            },
+        };
+    }
+
+    async run(): Promise<void> {
+        if (this.queryForm.invalid) {
+            this.queryForm.markAllAsTouched();
+            return;
+        }
+        const query = this.currentQuery();
+        this.loading.set(true);
+        this.loadError.set('');
+        this.clearInvestigation();
+        try {
+            const source = this.sources.find((s) => s.id === this.sourceId()) ?? this.sources[0];
+            const out = await source.query(query);
+            this.geo.set(out as ProjectedGeo);
+            this.resolvePendingPivot(out as ProjectedGeo);
+            this.lastRun.set(query);
+            this.queryOpen.set(false);
+        } catch (err) {
+            this.geo.set(null);
+            // EDITIONS CP-09: a 503 means the backend module is absent in this bundle, not that the query
+            // was bad — say so, instead of a generic failure the user will retry (the assist-panel idiom).
+            // The nav entry is hidden on the same flag; this is the belt for a bookmarked/deep-linked URL.
+            this.loadError.set(
+                (err as { status?: number } | null)?.status === 503
+                    ? 'Geo map is not available in this edition — its backend module is not installed in this bundle.'
+                    : err instanceof Error
+                      ? err.message
+                      : apiErrorMessage(err, 'The query failed.'),
+            );
+        } finally {
+            this.loading.set(false);
+        }
+    }
+
+    /** The collapsed-query summary line (dataset + mapping). */
+    readonly querySummary = computed<string>(() => {
+        const run = this.lastRun();
+        const dsName = (id: string): string => this.datasets().find((d) => d.id === id)?.name ?? id;
+        if (run?.routes) {
+            const r = run.routes;
+            return `${dsName(r.datasetId)}: ${r.fromLatCol}/${r.fromLonCol} → ${r.toLatCol}/${r.toLonCol}`;
+        }
+        const q = run?.projection;
+        if (!q) return '';
+        const extras = [
+            q.entityCol && `entity ${q.entityCol}`,
+            q.kindCol && `kind ${q.kindCol}`,
+            q.timeCol && `time ${q.timeCol}`,
+        ]
+            .filter(Boolean)
+            .join(' · ');
+        return `${dsName(q.datasetId)}: ${q.latCol}/${q.lonCol}${extras ? ' · ' + extras : ''}`;
+    });
+
+    // ── investigation ──
+    onSearch(text: string): void {
+        this.search.set(text);
+    }
+
+    /** Geocode a place name through the pluggable seam (offline table by default) — populates candidates. */
+    onFindPlace(text: string): void {
+        this.placeQuery.set(text);
+        if (!text.trim()) {
+            this.placeResults.set([]);
+            return;
+        }
+        this.geocoder.geocode(text).then((results) => this.placeResults.set(results));
+    }
+
+    /** Fly the map to a chosen geocoding candidate (the point need not be in the data). */
+    goToPlace(result: GeocodeResult): void {
+        this.mapView?.flyToCoord(result.lat, result.lon);
+    }
+
+    kindOn(kind: string): boolean {
+        return this.kindFilter().includes(kind);
+    }
+
+    toggleKind(kind: string, on: boolean): void {
+        const cur = new Set(this.kindFilter());
+        if (on) cur.add(kind);
+        else cur.delete(kind);
+        this.kindFilter.set([...cur]);
+    }
+
+    clearInvestigation(): void {
+        this.search.set('');
+        this.kindFilter.set([]);
+        this.selectedId.set(null);
+        this.timeRange.set(null);
+        this.viewBox.set(null);
+        this.clearAnalysis();
+        this.clearTools(); // notes survive — they're annotations, cleared/saved with the view
+    }
+
+    fit(): void {
+        this.mapView?.fitToData();
+    }
+
+    toggleHeatmap(): void {
+        this.displayMode.set(this.displayMode() === 'heatmap' ? 'markers' : 'heatmap');
+    }
+
+    /** Region filter: keep only what the current viewport shows. */
+    filterToView(): void {
+        const b = this.mapView?.getViewBounds();
+        if (b) this.viewBox.set(b);
+    }
+
+    /** Time-slider thumbs (epoch millis). */
+    setTimeFrom(v: number): void {
+        const ext = this.extent();
+        if (ext) this.timeRange.set([v, this.timeRange()?.[1] ?? ext[1]]);
+    }
+
+    setTimeTo(v: number): void {
+        const ext = this.extent();
+        if (ext) this.timeRange.set([this.timeRange()?.[0] ?? ext[0], v]);
+    }
+
+    /** Short date-time label for the slider readout. */
+    timeLabel(t: number): string {
+        return new Date(t).toISOString().slice(0, 16).replace('T', ' ');
+    }
+
+    /** Event playback: sweep the time-window end across the extent (~30 steps). */
+    togglePlay(): void {
+        if (this.playing()) {
+            this.stopPlayback();
+            return;
+        }
+        const ext = this.extent();
+        if (!ext) return;
+        const [start, end] = ext;
+        const step = Math.max(1, (end - start) / 30);
+        let t = start;
+        this.playing.set(true);
+        this.timeRange.set([start, start]);
+        this.playTimer = setInterval(() => {
+            t = Math.min(end, t + step);
+            this.timeRange.set([start, t]);
+            if (t >= end) this.stopPlayback();
+        }, 400);
+    }
+
+    private stopPlayback(): void {
+        if (this.playTimer) clearInterval(this.playTimer);
+        this.playTimer = null;
+        this.playing.set(false);
+    }
+
+    ngOnDestroy(): void {
+        this.stopPlayback();
+    }
+
+    // ── geo intelligence (the toolbox owns the tools + results; the host owns the map + emphasis) ──
+    /** Result click from the toolbox: highlight the folded points and fly to the spot. */
+    focusResult(at: GeoAnalysisFocus): void {
+        this.search.set('');
+        this.selectedId.set(null);
+        this.resultEmphasis.set(at.pointIds);
+        this.mapView?.setCamera({ center: [at.lon, at.lat], zoom: 12 });
+    }
+
+    clearAnalysis(): void {
+        this.analysis?.reset();
+        this.resultEmphasis.set(null);
+    }
+
+    // ── investigation tools ──
+    /** Tool clicks land here (the map host emits every click; points also emit pointClick). */
+    onMapClick(at: { lat: number; lon: number }): void {
+        switch (this.activeTool()) {
+            case 'measure':
+                this.measureVertices.set([...this.measureVertices(), at]);
+                break;
+            case 'radius':
+                this.radiusCenter.set(at);
+                break;
+            case 'polygon':
+                this.polygonFilter.set(null);
+                this.polygonVertices.set([...this.polygonVertices(), at]);
+                break;
+            case 'note': {
+                const text = this.noteText().trim();
+                if (!text) return;
+                this.notes.set([...this.notes(), { id: `note-${Date.now()}`, lat: at.lat, lon: at.lon, text }]);
+                break;
+            }
+        }
+    }
+
+    setTool(tool: 'measure' | 'radius' | 'polygon' | 'note' | null): void {
+        this.activeTool.set(this.activeTool() === tool ? null : tool);
+    }
+
+    /** Close the in-progress polygon into a filter ring. */
+    closePolygon(): void {
+        const v = this.polygonVertices();
+        if (v.length < 3) return;
+        this.polygonFilter.set([...v, v[0]].map((p) => [p.lon, p.lat]));
+        this.polygonVertices.set([]);
+        this.activeTool.set(null);
+        // LA-22: the area selection brushes Link Analysis — by the key column only; unkeyed points never brush.
+        this.brush.fromGeo((this.displayed()?.points ?? []).map((p) => p.key ?? ''));
+    }
+
+    clearTools(): void {
+        this.activeTool.set(null);
+        this.measureVertices.set([]);
+        this.radiusCenter.set(null);
+        this.polygonVertices.set([]);
+        this.polygonFilter.set(null);
+        this.brush.clear();
+    }
+
+    /** Any tool artifact on the canvas (drives the clear-tools affordance). */
+    readonly toolsActive = computed<boolean>(
+        () =>
+            !!(
+                this.activeTool() ||
+                this.measureVertices().length ||
+                this.radiusCenter() ||
+                this.polygonVertices().length ||
+                this.polygonFilter()
+            ),
+    );
+
+    /** Custom GeoJSON overlay upload (layer manager). */
+    onOverlayFile(input: HTMLInputElement): void {
+        const file = input.files?.[0];
+        input.value = '';
+        if (!file) return;
+        file.text().then(
+            (text) => {
+                try {
+                    const fc = JSON.parse(text) as FeatureCollection;
+                    if (fc?.type !== 'FeatureCollection' || !Array.isArray(fc.features))
+                        throw new Error('not a FeatureCollection');
+                    this.customOverlay.set(fc);
+                    this.toastr.success(`Overlay loaded (${fc.features.length} features).`);
+                } catch {
+                    this.toastr.error('Not a valid GeoJSON FeatureCollection.');
+                }
+            },
+            () => this.toastr.error('Reading the file failed.'),
+        );
+    }
+
+    toggleLayer(key: keyof GeoLayerToggles, on: boolean): void {
+        this.layerToggles.set({ ...this.layerToggles(), [key]: on });
+    }
+
+    /** Canvas or data-row click → full details (attributes + the 3 nearest points). */
+    onPointClick(id: string): void {
+        if (this.activeTool()) return; // tool clicks own the canvas
+        const d = this.displayed();
+        const p = d?.points.find((x) => x.id === id);
+        if (!d || !p) return;
+        this.selectedId.set(id);
+        if (p.key) this.brush.fromGeo([p.key]);
+        const rows: ElementDetailRow[] = [{ label: 'Coordinates', value: `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}` }];
+        if (p.time !== undefined) rows.push({ label: 'Time', value: new Date(p.time).toISOString() });
+        for (const [k, v] of Object.entries(p.attrs ?? {})) {
+            if (rows.length >= 14) break;
+            rows.push({ label: k, value: String(v ?? '') });
+        }
+        for (const near of this.nearest(d.points, p, 3)) {
+            rows.push({
+                label: 'Nearby',
+                value: `${near.point.label ?? near.point.id} · ${formatDistance(near.distanceM)}`,
+            });
+        }
+        const objectRef = objectRefFromAttrs(p.attrs);
+        this.dialog
+            .open(ElementDetailDialog, {
+                data: {
+                    title: p.label ?? p.id,
+                    subtitle: p.kind,
+                    rows,
+                    objectRef,
+                    pivotViews: objectRef ? ['graph'] : undefined,
+                },
+                width: '26rem',
+            })
+            .afterClosed()
+            .subscribe((result: ElementDetailResult) => {
+                if (result === 'focus') this.mapView?.flyTo(id);
+                else if (result === 'open-record' && objectRef) {
+                    this.router.navigate(['/' + (objectRef.type === 'CASE' ? 'cases' : 'incidents'), objectRef.id]);
+                }
+            });
+    }
+
+    /** Route click → details with great-circle distance and folded movement count. */
+    onRouteClick(id: string): void {
+        const d = this.displayed();
+        const r = d?.routes.find((x) => x.id === id);
+        if (!d || !r) return;
+        const a = d.points.find((p) => p.id === r.from);
+        const b = d.points.find((p) => p.id === r.to);
+        if (!a || !b) return;
+        const rows: ElementDetailRow[] = [
+            { label: 'From', value: a.label ?? a.id },
+            { label: 'To', value: b.label ?? b.id },
+            { label: 'Distance', value: formatDistance(haversineMeters(a.lat, a.lon, b.lat, b.lon)) },
+            { label: 'Movements', value: String(r.weight ?? 1) },
+        ];
+        if (r.time !== undefined) rows.push({ label: 'Time', value: new Date(r.time).toISOString() });
+        this.dialog
+            .open(ElementDetailDialog, { data: { title: r.label ?? r.kind, subtitle: r.kind, rows }, width: '26rem' })
+            .afterClosed()
+            .subscribe((result: ElementDetailResult) => {
+                if (result === 'focus') this.mapView?.flyTo(r.from);
+            });
+    }
+
+    onRowClick(row: Record<string, unknown>): void {
+        const id = String(row['id'] ?? '');
+        if (!id) return;
+        this.mapView?.flyTo(id);
+        this.onPointClick(id);
+    }
+
+    private nearest(points: readonly GeoPoint[], from: GeoPoint, n: number): { point: GeoPoint; distanceM: number }[] {
+        return points
+            .filter((p) => p.id !== from.id)
+            .map((point) => ({ point, distanceM: haversineMeters(from.lat, from.lon, point.lat, point.lon) }))
+            .sort((a, b) => a.distanceM - b.distanceM)
+            .slice(0, n);
+    }
+
+    // ── saved views ──
+    async saveView(): Promise<void> {
+        if (this.saveForm.invalid) {
+            this.saveForm.markAllAsTouched();
+            return;
+        }
+        const { name, description } = this.saveForm.getRawValue();
+        const view = this.viewFromState(
+            name
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-|-$/g, ''),
+            name.trim(),
+            description.trim() || undefined,
+        );
+        if (!view) return;
+        this.saving.set(true);
+        try {
+            await firstValueFrom(this.viewsService.save(view, { update: this.views().some((v) => v.id === view.id) }));
+            this.views.set([...this.views().filter((v) => v.id !== view.id), view]);
+            this.saveForm.reset({ name: '', description: '' });
+            this.saveTrigger?.closeMenu();
+            this.toastr.success(`Saved view '${view.name}'.`);
+        } catch (err) {
+            this.toastr.error(apiErrorMessage(err, 'Saving the view failed.'));
+        } finally {
+            this.saving.set(false);
+        }
+    }
+
+    /** The last run and the map's state as a saved view under `id` — null when nothing has run yet. */
+    private viewFromState(id: string, name: string, description: string | undefined): GeoMapView | null {
+        const query = this.lastRun();
+        if (!query) return null;
+        return {
+            id,
+            name,
+            description,
+            sourceId: this.sourceId(),
+            query,
+            display: this.displayMode(),
+            camera: this.mapView?.getCamera() ?? undefined,
+            notes: this.notes().length ? this.notes() : undefined,
+        };
+    }
+
+    // ── Import as draft (operator decisions 2026-09-25; D5's Geo view slice) ──
+
+    /**
+     * Adopt the transfer menu's draft as UNSAVED work (D1): the view's state loads exactly as "Load view"
+     * does — re-running its read-only projection — and nothing is written until {@link saveDraft}. An
+     * existing id (D6) also reads the stored copy: the banner's diff baseline and the Save's `If-Match`.
+     */
+    async onDraftImported(draft: LaImportDraft): Promise<void> {
+        // `/bundle/preview` judges references only for the kinds ComponentIntegrity knows (dataset, query,
+        // widget, dashboard, reconciliation) — never a geo-map-view — so its list is ALWAYS empty here,
+        // which the banner would show as clean. Say "not checked" instead.
+        this.importDraft.set({ ...draft, integrity: null });
+        this.draftStored.set(null);
+        this.draftIfMatch = undefined;
+        if (draft.targetExists) {
+            this.components.get('geo-map-view', draft.id).subscribe({
+                next: (def) => {
+                    if (this.importDraft()?.id !== draft.id) return; // discarded or replaced meanwhile
+                    this.draftStored.set(def?.content ?? null);
+                    this.draftIfMatch = def?.contentHash;
+                },
+                error: (e) => this.toastr.error(apiErrorMessage(e, `Could not load view "${draft.id}"`)),
+            });
+        }
+        await this.loadView(this.viewsService.fromContent(draft.id, draft.content));
+    }
+
+    /** Save the draft through the pane's own route (D2): create for a new id, else an update carrying
+     *  `If-Match` (D6). A refused Save keeps the draft on the page. */
+    async saveDraft(): Promise<void> {
+        const draft = this.importDraft();
+        if (!draft) return;
+        if (draft.targetExists && !this.draftIfMatch) {
+            this.toastr.warning(`The stored "${draft.id}" has not loaded, so the draft cannot be saved safely.`);
+            return;
+        }
+        const incoming = this.viewsService.fromContent(draft.id, draft.content);
+        const view = this.viewFromState(draft.id, incoming.name, incoming.description);
+        if (!view) {
+            this.toastr.warning('Run the drafted query before saving it — a view saves the query that last ran.');
+            return;
+        }
+        this.saving.set(true);
+        try {
+            await firstValueFrom(
+                this.viewsService.save(view, { update: draft.targetExists, ifMatch: this.draftIfMatch }),
+            );
+            this.views.set([...this.views().filter((v) => v.id !== view.id), view]);
+            this.clearDraft();
+            this.toastr.success(`Saved view '${view.name}'.`);
+        } catch (err) {
+            this.toastr.error(apiErrorMessage(err, 'Saving the draft failed.'));
+        } finally {
+            this.saving.set(false);
+        }
+    }
+
+    /** Drop the draft, writing nothing: an existing id goes back to its stored view; a new one leaves the
+     *  map as unsaved exploration. */
+    async discardDraft(): Promise<void> {
+        const draft = this.importDraft();
+        const stored = this.draftStored();
+        this.clearDraft();
+        if (draft?.targetExists && stored) await this.loadView(this.viewsService.fromContent(draft.id, stored));
+    }
+
+    private clearDraft(): void {
+        this.importDraft.set(null);
+        this.draftStored.set(null);
+        this.draftIfMatch = undefined;
+    }
+
+    /** Per-view tags (D7) — labels the saved view in place, through the cross-entity assignment edges.
+     *  An annotation on the view, not an edit of it, so there is nothing to reload afterwards. */
+    openTags(view: GeoMapView): void {
+        this.tags.open({ targetKind: 'geo-map-view', targetId: view.id, label: view.name });
+    }
+
+    async loadView(view: GeoMapView): Promise<void> {
+        this.sourceId.set(view.sourceId);
+        this.displayMode.set(view.display ?? 'markers');
+        this.loadCamera = view.camera ?? null;
+        this.notes.set(view.notes ?? []);
+        const p = view.query.projection;
+        const r = view.query.routes;
+        // Resolve the dataset's columns BEFORE patching the saved mapping over them: the pick offers the
+        // column list and guesses coordinate columns, and it is async now, so letting the subscription
+        // fire would land those guesses *after* the saved values and blank them.
+        if (p) {
+            this.queryForm.patchValue({ datasetId: p.datasetId }, { emitEvent: false });
+            await this.onDatasetPicked(p.datasetId);
+            this.queryForm.patchValue({
+                latCol: p.latCol,
+                lonCol: p.lonCol,
+                entityCol: p.entityCol ?? '',
+                kindCol: p.kindCol ?? '',
+                timeCol: p.timeCol ?? '',
+            });
+        } else if (r) {
+            this.queryForm.patchValue({ datasetId: r.datasetId }, { emitEvent: false });
+            await this.onDatasetPicked(r.datasetId);
+            this.queryForm.patchValue({
+                fromLatCol: r.fromLatCol,
+                fromLonCol: r.fromLonCol,
+                toLatCol: r.toLatCol,
+                toLonCol: r.toLonCol,
+                fromCol: r.fromCol ?? '',
+                toCol: r.toCol ?? '',
+                kindCol: r.kindCol ?? '',
+                timeCol: r.timeCol ?? '',
+            });
+        } else {
+            return;
+        }
+        await this.run();
+        if (view.camera) this.mapView?.setCamera(view.camera);
+    }
+
+    /** A loaded view's saved camera — consumed by the map host on its next mount. */
+    loadCamera: GeoCamera | null = null;
+
+    // ── export ──
+    exportPng(): void {
+        const dataUri = this.mapView?.exportPng();
+        if (!dataUri) return;
+        this.download(dataUri, 'geo-map.png');
+    }
+
+    exportGeoJson(): void {
+        const d = this.displayed();
+        if (!d) return;
+        const fc = {
+            type: 'FeatureCollection',
+            features: d.points.map((p) => ({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+                properties: { id: p.id, kind: p.kind, label: p.label, time: p.time, ...p.attrs },
+            })),
+        };
+        const url = URL.createObjectURL(new Blob([JSON.stringify(fc)], { type: 'application/geo+json' }));
+        this.download(url, 'geo-map.geojson');
+        URL.revokeObjectURL(url);
+    }
+
+    private download(href: string, filename: string): void {
+        const a = document.createElement('a');
+        a.href = href;
+        a.download = filename;
+        a.click();
+    }
+}

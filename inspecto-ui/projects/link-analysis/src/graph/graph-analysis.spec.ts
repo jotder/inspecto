@@ -1,0 +1,877 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import type { G6GraphData } from '@inspecto/core/graph/graph-types';
+import {
+    allPaths,
+    articulationPoints,
+    betweennessCentrality,
+    bridges,
+    cliques,
+    closenessCentrality,
+    collapseBranches,
+    connectedComponents,
+    degreeCentrality,
+    descendants,
+    detectCommunities,
+    edgeWeight,
+    egoNetwork,
+    eigenvectorCentrality,
+    explainNode,
+    filterByKinds,
+    filterByTime,
+    findCycles,
+    hits,
+    isForest,
+    jaccardSimilarity,
+    kCore,
+    katzCentrality,
+    linkPrediction,
+    louvainCommunities,
+    matchPattern,
+    maxFlow,
+    maximumSpanningForest,
+    neighborhood,
+    pageRank,
+    searchNodes,
+    shortestPath,
+    suspicionScore,
+    triangleCount,
+    weightedShortestPath,
+    patternNeedsTime,
+    aggregateSuperNodes,
+    SUPER_NODE_KIND,
+    superNodeId,
+    ANALYSIS_NODE_CAP_DEFAULT,
+    analysisNodeCapValue,
+    configureGraphLimits,
+    resetGraphLimits,
+} from './graph-analysis';
+
+const node = (id: string, kind = 'entity', label = id): G6GraphData['nodes'][0] => ({ id, data: { label, kind } });
+const edge = (source: string, target: string, kind = 'link'): G6GraphData['edges'][0] => ({
+    id: `${source}->${target}:${kind}`,
+    source,
+    target,
+    data: { kind },
+});
+
+/** a→b→c→d with a shortcut a→c, plus an isolated island x→y and a cycle back d→a. */
+const g: G6GraphData = {
+    nodes: ['a', 'b', 'c', 'd', 'x', 'y'].map((id) => node(id)),
+    edges: [edge('a', 'b'), edge('b', 'c'), edge('a', 'c'), edge('c', 'd'), edge('d', 'a'), edge('x', 'y')],
+};
+
+describe('shortestPath', () => {
+    it('finds the shortest route, not the longer one', () => {
+        const p = shortestPath(g, 'a', 'd', 'out')!;
+        expect(p.nodeIds).toEqual(['a', 'c', 'd']);
+        expect(p.edgeIds).toEqual(['a->c:link', 'c->d:link']);
+    });
+
+    it('respects direction', () => {
+        expect(shortestPath(g, 'b', 'a', 'out')!.nodeIds).toEqual(['b', 'c', 'd', 'a']); // via the cycle
+        expect(shortestPath(g, 'b', 'a', 'in')!.nodeIds).toEqual(['b', 'a']);
+    });
+
+    it('returns null when disconnected and a trivial path for self', () => {
+        expect(shortestPath(g, 'a', 'x')).toBeNull();
+        expect(shortestPath(g, 'a', 'missing')).toBeNull();
+        expect(shortestPath(g, 'a', 'a')).toEqual({ nodeIds: ['a'], edgeIds: [] });
+    });
+});
+
+describe('allPaths', () => {
+    it('finds every simple path within the limit (cycle does not loop forever)', () => {
+        const paths = allPaths(g, 'a', 'd', { direction: 'out' });
+        expect(paths.map((p) => p.nodeIds)).toEqual(
+            expect.arrayContaining([
+                ['a', 'c', 'd'],
+                ['a', 'b', 'c', 'd'],
+            ]),
+        );
+        expect(paths).toHaveLength(2);
+    });
+
+    it('honors the path limit', () => {
+        expect(allPaths(g, 'a', 'd', { direction: 'out', limit: 1 })).toHaveLength(1);
+    });
+});
+
+describe('neighborhood', () => {
+    it('keeps only the N-hop ball plus interior edges', () => {
+        const nb = neighborhood(g, 'b', 1);
+        expect(nb.nodes.map((n) => n.id).sort()).toEqual(['a', 'b', 'c']);
+        expect(nb.edges.map((e) => e.id).sort()).toEqual(['a->b:link', 'a->c:link', 'b->c:link']);
+    });
+
+    it('2 hops reaches the whole cycle but never the island', () => {
+        const nb = neighborhood(g, 'a', 2);
+        expect(nb.nodes.map((n) => n.id).sort()).toEqual(['a', 'b', 'c', 'd']);
+    });
+});
+
+describe('explainNode', () => {
+    it('summarizes links grouped by kind and direction', () => {
+        const s = explainNode(g, 'a');
+        expect(s).toContain('a (entity)');
+        expect(s).toContain('→ link: b, c');
+        expect(s).toContain('← link: d');
+    });
+
+    it('handles unknown and isolated nodes', () => {
+        expect(explainNode(g, 'nope')).toBe('Unknown node.');
+        const lonely: G6GraphData = { nodes: [node('solo')], edges: [] };
+        expect(explainNode(lonely, 'solo')).toContain('no links');
+    });
+});
+
+describe('centrality', () => {
+    it('degree ranks the hub first', () => {
+        const scores = degreeCentrality(g);
+        expect(scores[0].id).toBe('a'); // a and c both have degree 3; the label tiebreak puts a first
+        expect(scores[0].score).toBe(3);
+    });
+
+    it('betweenness ranks the bridge node highest', () => {
+        // path graph p-q-r: q carries all shortest paths
+        const line: G6GraphData = { nodes: [node('p'), node('q'), node('r')], edges: [edge('p', 'q'), edge('q', 'r')] };
+        const scores = betweennessCentrality(line);
+        expect(scores[0].id).toBe('q');
+        expect(scores[0].score).toBe(1);
+    });
+
+    it('betweenness refuses graphs above the cap', () => {
+        const big: G6GraphData = {
+            nodes: Array.from({ length: analysisNodeCapValue() + 1 }, (_, i) => node(`n${i}`)),
+            edges: [],
+        };
+        expect(() => betweennessCentrality(big)).toThrow(/capped/);
+    });
+});
+
+describe('detectCommunities', () => {
+    it('separates two dense clusters joined by one bridge', () => {
+        const clusterEdges = (ids: string[]): G6GraphData['edges'] =>
+            ids.flatMap((s, i) => ids.slice(i + 1).map((t) => edge(s, t)));
+        const left = ['l1', 'l2', 'l3'];
+        const right = ['r1', 'r2', 'r3'];
+        const two: G6GraphData = {
+            nodes: [...left, ...right].map((id) => node(id)),
+            edges: [...clusterEdges(left), ...clusterEdges(right), edge('l1', 'r1')],
+        };
+        const c = detectCommunities(two);
+        expect(c.get('l2')).toBe(c.get('l3'));
+        expect(c.get('r2')).toBe(c.get('r3'));
+        expect(c.get('l2')).not.toBe(c.get('r2'));
+    });
+
+    it('is deterministic', () => {
+        const a = detectCommunities(g);
+        const b = detectCommunities(g);
+        expect([...a.entries()]).toEqual([...b.entries()]);
+    });
+});
+
+describe('connectedComponents', () => {
+    it('finds both components, largest first', () => {
+        const comps = connectedComponents(g);
+        expect(comps).toHaveLength(2);
+        expect(comps[0].sort()).toEqual(['a', 'b', 'c', 'd']);
+        expect(comps[1].sort()).toEqual(['x', 'y']);
+    });
+});
+
+describe('searchNodes / filterByKinds', () => {
+    const typed: G6GraphData = {
+        nodes: [
+            node('acc1', 'account', 'Account 1'),
+            node('dev1', 'device', 'Device 1'),
+            node('acc2', 'account', 'Account 2'),
+        ],
+        edges: [edge('acc1', 'dev1', 'uses'), edge('acc2', 'dev1', 'uses'), edge('acc1', 'acc2', 'calls')],
+    };
+
+    it('searches label and id case-insensitively; blank matches nothing', () => {
+        expect(searchNodes(typed, 'account')).toEqual(['acc1', 'acc2']);
+        expect(searchNodes(typed, 'DEV')).toEqual(['dev1']);
+        expect(searchNodes(typed, '  ')).toEqual([]);
+    });
+
+    it('filters nodes by kind and drops edges with a lost endpoint', () => {
+        const f = filterByKinds(typed, ['account'], []);
+        expect(f.nodes.map((n) => n.id)).toEqual(['acc1', 'acc2']);
+        expect(f.edges.map((e) => e.data.kind)).toEqual(['calls']);
+    });
+
+    it('filters edges by kind; empty filters are a no-op', () => {
+        expect(filterByKinds(typed, [], ['uses']).edges).toHaveLength(2);
+        expect(filterByKinds(typed, [], [])).toEqual(typed);
+    });
+});
+
+describe('filterByTime', () => {
+    const timed: G6GraphData = {
+        nodes: [node('a'), node('b'), node('c')],
+        edges: [
+            { ...edge('a', 'b', 'calls'), data: { kind: 'calls', attrs: { when: '2026-01-01T00:00:00Z' } } },
+            { ...edge('b', 'c', 'calls'), data: { kind: 'calls', attrs: { when: '2026-06-01T00:00:00Z' } } },
+            { ...edge('a', 'c', 'calls'), data: { kind: 'calls', attrs: { when: 'not-a-date' } } },
+            { ...edge('c', 'a', 'calls'), data: { kind: 'calls' } }, // no attrs at all
+        ],
+    };
+
+    it('keeps only edges whose attr column parses to a date on or before the cutoff', () => {
+        const cutoff = Date.parse('2026-03-01T00:00:00Z');
+        const f = filterByTime(timed, 'when', cutoff);
+        expect(f.nodes).toEqual(timed.nodes); // nodes untouched
+        expect(f.edges.map((e) => e.id)).toEqual([edge('a', 'b', 'calls').id]);
+    });
+
+    it('drops edges missing the column or with an unparseable value', () => {
+        const cutoff = Date.parse('2027-01-01T00:00:00Z');
+        const f = filterByTime(timed, 'when', cutoff);
+        expect(f.edges.map((e) => e.id)).toEqual([edge('a', 'b', 'calls').id, edge('b', 'c', 'calls').id]);
+    });
+
+    it('an empty attrCol is a no-op', () => {
+        expect(filterByTime(timed, '', Date.now())).toEqual(timed);
+    });
+});
+
+describe('isForest', () => {
+    /** A tree r→(b1,b2); b1→(l1,l2); b2→l3 — plus the island x→y. A forest (two trees). */
+    const forest: G6GraphData = {
+        nodes: ['r', 'b1', 'b2', 'l1', 'l2', 'l3', 'x', 'y'].map((id) => node(id)),
+        edges: [edge('r', 'b1'), edge('r', 'b2'), edge('b1', 'l1'), edge('b1', 'l2'), edge('b2', 'l3'), edge('x', 'y')],
+    };
+
+    it('accepts a forest of trees', () => {
+        expect(isForest(forest)).toBe(true);
+    });
+
+    it('rejects a node with two parents', () => {
+        const diamond: G6GraphData = {
+            nodes: ['a', 'b', 'c', 'd'].map((id) => node(id)),
+            edges: [edge('a', 'b'), edge('a', 'c'), edge('b', 'd'), edge('c', 'd')],
+        };
+        expect(isForest(diamond)).toBe(false); // d has two parents
+    });
+
+    it('rejects a cycle even when every node has one parent', () => {
+        expect(isForest(g)).toBe(false); // the d→a cycle
+        const pureCycle: G6GraphData = {
+            nodes: ['p', 'q', 'r'].map((id) => node(id)),
+            edges: [edge('p', 'q'), edge('q', 'r'), edge('r', 'p')],
+        };
+        expect(isForest(pureCycle)).toBe(false);
+    });
+
+    it('rejects the empty graph', () => {
+        expect(isForest({ nodes: [], edges: [] })).toBe(false);
+    });
+});
+
+describe('descendants / collapseBranches', () => {
+    /** A tree r→(b1,b2); b1→(l1,l2); b2→l3 — plus the island x→y. */
+    const tree: G6GraphData = {
+        nodes: ['r', 'b1', 'b2', 'l1', 'l2', 'l3', 'x', 'y'].map((id) => node(id)),
+        edges: [edge('r', 'b1'), edge('r', 'b2'), edge('b1', 'l1'), edge('b1', 'l2'), edge('b2', 'l3'), edge('x', 'y')],
+    };
+
+    it('descendants walks outgoing edges only, excluding the root', () => {
+        expect([...descendants(tree, 'b1')].sort()).toEqual(['l1', 'l2']);
+        expect([...descendants(tree, 'r')].sort()).toEqual(['b1', 'b2', 'l1', 'l2', 'l3']);
+        expect(descendants(tree, 'l1').size).toBe(0);
+        expect([...descendants(g, 'a')].sort()).toEqual(['b', 'c', 'd']); // survives the d→a cycle without looping
+    });
+
+    it('collapseBranches hides each root’s subtree but keeps the roots visible', () => {
+        const c = collapseBranches(tree, ['b1']);
+        expect(c.nodes.map((n) => n.id).sort()).toEqual(['b1', 'b2', 'l3', 'r', 'x', 'y']);
+        expect(c.edges.some((e) => e.source === 'b1')).toBe(false); // edges into the hidden subtree drop
+        expect(collapseBranches(tree, []).nodes).toHaveLength(8); // no-op without roots
+        // collapsing an ancestor keeps a collapsed descendant root visible too
+        expect(
+            collapseBranches(tree, ['r', 'b1'])
+                .nodes.map((n) => n.id)
+                .sort(),
+        ).toEqual(['b1', 'r', 'x', 'y']);
+    });
+});
+
+describe('louvainCommunities', () => {
+    /** All undirected pairs of a node set — a clique. */
+    const clique = (ids: string[]): G6GraphData['edges'] =>
+        ids.flatMap((s, i) => ids.slice(i + 1).map((t) => edge(s, t)));
+
+    it('separates two cliques joined by a single bridge, labelling each by its smallest member', () => {
+        const twoCliques: G6GraphData = {
+            nodes: ['a1', 'a2', 'a3', 'a4', 'b1', 'b2', 'b3', 'b4'].map((id) => node(id)),
+            edges: [...clique(['a1', 'a2', 'a3', 'a4']), ...clique(['b1', 'b2', 'b3', 'b4']), edge('a1', 'b1')],
+        };
+        const c = louvainCommunities(twoCliques);
+        expect(['a1', 'a2', 'a3', 'a4'].every((id) => c.get(id) === 'a1')).toBe(true);
+        expect(['b1', 'b2', 'b3', 'b4'].every((id) => c.get(id) === 'b1')).toBe(true);
+        expect(c.get('a1')).not.toBe(c.get('b1'));
+    });
+
+    it('keeps a single dense component as one community', () => {
+        const tri: G6GraphData = {
+            nodes: ['p', 'q', 'r'].map((id) => node(id)),
+            edges: [edge('p', 'q'), edge('q', 'r'), edge('r', 'p')],
+        };
+        const c = louvainCommunities(tri);
+        expect(new Set(c.values()).size).toBe(1);
+        expect(c.get('r')).toBe('p'); // smallest-member label
+    });
+
+    it('returns singletons when there are no edges, and is capped', () => {
+        expect(louvainCommunities({ nodes: ['m', 'n'].map((id) => node(id)), edges: [] })).toEqual(
+            new Map([
+                ['m', 'm'],
+                ['n', 'n'],
+            ]),
+        );
+        const big: G6GraphData = {
+            nodes: Array.from({ length: analysisNodeCapValue() + 1 }, (_, i) => node(`n${i}`)),
+            edges: [],
+        };
+        expect(() => louvainCommunities(big)).toThrow(/capped/);
+    });
+});
+
+describe('matchPattern', () => {
+    /** acc1 —transfer→ acc2 —transfer→ m1, plus acc1 —pay→ acc3. */
+    const fraud: G6GraphData = {
+        nodes: [node('acc1', 'account'), node('acc2', 'account'), node('m1', 'merchant'), node('acc3', 'account')],
+        edges: [edge('acc1', 'acc2', 'transfer'), edge('acc2', 'm1', 'transfer'), edge('acc1', 'acc3', 'pay')],
+    };
+
+    it('matches an ordered node/edge-kind path motif with its node+edge ids', () => {
+        const m = matchPattern(fraud, [
+            { nodeKind: 'account' },
+            { edgeKind: 'transfer', nodeKind: 'account' },
+            { edgeKind: 'transfer', nodeKind: 'merchant' },
+        ]);
+        expect(m).toHaveLength(1);
+        expect(m[0].nodeIds).toEqual(['acc1', 'acc2', 'm1']);
+        expect(m[0].edgeIds).toEqual(['acc1->acc2:transfer', 'acc2->m1:transfer']);
+    });
+
+    it('treats absent kinds as wildcards and follows the requested direction', () => {
+        expect(matchPattern(fraud, [{}, {}])).toHaveLength(3); // every out-edge = a 2-node path
+        expect(
+            matchPattern(fraud, [
+                { nodeKind: 'merchant' },
+                { nodeKind: 'account', edgeKind: 'transfer', direction: 'in' },
+            ])[0].nodeIds,
+        ).toEqual(['m1', 'acc2']);
+    });
+
+    it('returns no matches when the motif does not occur, and strips the folded-count edge suffix', () => {
+        expect(matchPattern(fraud, [{ nodeKind: 'account' }, { edgeKind: 'pay', nodeKind: 'merchant' }])).toHaveLength(
+            0,
+        );
+        const folded: G6GraphData = {
+            nodes: [node('p', 'account'), node('q', 'account')],
+            edges: [edge('p', 'q', 'transfer · 2')],
+        };
+        expect(
+            matchPattern(folded, [{ nodeKind: 'account' }, { edgeKind: 'transfer', nodeKind: 'account' }]),
+        ).toHaveLength(1);
+    });
+
+    it('caps the number of matches', () => {
+        const star: G6GraphData = {
+            nodes: ['c', 'm0', 'm1', 'm2'].map((id) => node(id)),
+            edges: ['m0', 'm1', 'm2'].map((t) => edge('c', t)),
+        };
+        expect(matchPattern(star, [{}, {}], { limit: 2 })).toHaveLength(2);
+    });
+});
+
+// ── V2: advanced traversal ──
+
+describe('edgeWeight', () => {
+    it('reads the folded-count suffix, the runtime count, or defaults to 1', () => {
+        expect(edgeWeight(edge('a', 'b'))).toBe(1);
+        expect(edgeWeight(edge('a', 'b', 'calls · 3'))).toBe(3);
+        expect(edgeWeight({ id: 'e', source: 'a', target: 'b', data: { kind: 'calls', count: 4 } as never })).toBe(4);
+    });
+});
+
+describe('weightedShortestPath', () => {
+    /** Direct a→c (weight 1) vs. the stronger two-hop a→b→c (weight 5 each). */
+    const wg: G6GraphData = {
+        nodes: ['a', 'b', 'c'].map((id) => node(id)),
+        edges: [edge('a', 'c', 'link'), edge('a', 'b', 'link · 5'), edge('b', 'c', 'link · 5')],
+    };
+
+    it('prefers the strongest-tie route over the fewest-hops route', () => {
+        expect(weightedShortestPathIds(wg, 'a', 'c')).toEqual(['a', 'b', 'c']);
+        expect(shortestPath(wg, 'a', 'c', 'out')!.nodeIds).toEqual(['a', 'c']); // fewest hops disagrees
+    });
+
+    it('returns null when disconnected and trivial for self', () => {
+        expect(weightedShortestPath(wg, 'a', 'zzz')).toBeNull();
+        expect(weightedShortestPath(wg, 'a', 'a')).toEqual({ nodeIds: ['a'], edgeIds: [] });
+    });
+
+    function weightedShortestPathIds(gr: G6GraphData, from: string, to: string): string[] | null {
+        return weightedShortestPath(gr, from, to, 'out')?.nodeIds ?? null;
+    }
+});
+
+describe('findCycles', () => {
+    it('finds each directed cycle once (canonicalized to its smallest member)', () => {
+        const cycles = findCycles(g); // a→b→c→d→a and a→c→d→a
+        expect(cycles).toHaveLength(2);
+        expect(cycles.every((c) => c.nodeIds.includes('a'))).toBe(true);
+        expect(cycles.every((c) => c.edgeIds.length === c.nodeIds.length)).toBe(true);
+    });
+
+    it('detects self-loops and honors the limit', () => {
+        const selfLoop: G6GraphData = { nodes: [node('s')], edges: [edge('s', 's', 'x')] };
+        expect(findCycles(selfLoop)).toEqual([{ nodeIds: ['s'], edgeIds: ['s->s:x'] }]);
+        expect(findCycles(g, { limit: 1 })).toHaveLength(1);
+    });
+});
+
+describe('articulationPoints / bridges', () => {
+    const line: G6GraphData = { nodes: ['p', 'q', 'r'].map((id) => node(id)), edges: [edge('p', 'q'), edge('q', 'r')] };
+    const tri: G6GraphData = {
+        nodes: ['p', 'q', 'r'].map((id) => node(id)),
+        edges: [edge('p', 'q'), edge('q', 'r'), edge('r', 'p')],
+    };
+
+    it('finds the cut vertex and cut edges of a path', () => {
+        expect(articulationPoints(line)).toEqual(['q']);
+        expect(bridges(line)).toEqual(['p->q:link', 'q->r:link']);
+    });
+
+    it('a cycle has no cut points', () => {
+        expect(articulationPoints(tri)).toEqual([]);
+        expect(bridges(tri)).toEqual([]);
+    });
+});
+
+describe('egoNetwork', () => {
+    it('is the 1-hop induced subgraph including neighbor-to-neighbor edges', () => {
+        const ego = egoNetwork(g, 'b');
+        expect(ego.nodes.map((n) => n.id).sort()).toEqual(['a', 'b', 'c']);
+        expect(ego.edges.map((e) => e.id).sort()).toEqual(['a->b:link', 'a->c:link', 'b->c:link']);
+    });
+});
+
+// ── V2: algorithm library ──
+
+describe('pageRank', () => {
+    it('ranks the well-cited sink highest and stays a distribution', () => {
+        const star: G6GraphData = {
+            nodes: ['hub', 'm0', 'm1', 'm2'].map((id) => node(id)),
+            edges: ['m0', 'm1', 'm2'].map((s) => edge(s, 'hub')),
+        };
+        const pr = pageRank(star);
+        expect(pr[0].id).toBe('hub');
+        expect(pr.reduce((s, x) => s + x.score, 0)).toBeCloseTo(1, 5);
+    });
+});
+
+describe('closenessCentrality', () => {
+    it('ranks the central node of a path highest', () => {
+        const line: G6GraphData = {
+            nodes: ['p', 'q', 'r'].map((id) => node(id)),
+            edges: [edge('p', 'q'), edge('q', 'r')],
+        };
+        expect(closenessCentrality(line)[0].id).toBe('q');
+    });
+});
+
+describe('eigenvector / katz centrality', () => {
+    const star: G6GraphData = {
+        nodes: ['c', 'l1', 'l2', 'l3'].map((id) => node(id)),
+        edges: ['l1', 'l2', 'l3'].map((l) => edge('c', l)),
+    };
+    it('both rank the hub of a star highest', () => {
+        expect(eigenvectorCentrality(star)[0].id).toBe('c');
+        expect(katzCentrality(star)[0].id).toBe('c');
+    });
+});
+
+describe('hits', () => {
+    it('separates hubs from authorities', () => {
+        const h: G6GraphData = {
+            nodes: ['h', 'h2', 'a1', 'a2'].map((id) => node(id)),
+            edges: [edge('h', 'a1'), edge('h', 'a2'), edge('h2', 'a1')],
+        };
+        const { hubs, authorities } = hits(h);
+        expect(authorities[0].id).toBe('a1'); // two in-links
+        expect(hubs[0].id).toBe('h'); // points at both authorities
+    });
+});
+
+describe('kCore / triangleCount', () => {
+    /** A 4-clique a1..a4 plus a pendant leaf p off a1. */
+    const clique4 = ['a1', 'a2', 'a3', 'a4'];
+    const cliqueEdges = (ids: string[]): G6GraphData['edges'] =>
+        ids.flatMap((s, i) => ids.slice(i + 1).map((t) => edge(s, t)));
+    const withLeaf: G6GraphData = {
+        nodes: [...clique4, 'p'].map((id) => node(id)),
+        edges: [...cliqueEdges(clique4), edge('a1', 'p')],
+    };
+
+    it('kCore gives the clique core 3 and the leaf core 1', () => {
+        const core = new Map(kCore(withLeaf).map((s) => [s.id, s.score]));
+        expect(clique4.every((id) => core.get(id) === 3)).toBe(true);
+        expect(core.get('p')).toBe(1);
+    });
+
+    it('triangleCount counts a triangle once per member', () => {
+        const tri: G6GraphData = {
+            nodes: ['p', 'q', 'r'].map((id) => node(id)),
+            edges: [edge('p', 'q'), edge('q', 'r'), edge('r', 'p')],
+        };
+        expect(triangleCount(tri).every((s) => s.score === 1)).toBe(true);
+    });
+});
+
+describe('cliques', () => {
+    it('finds maximal cliques of at least the requested size, largest first', () => {
+        const cliqueEdges = (ids: string[]): G6GraphData['edges'] =>
+            ids.flatMap((s, i) => ids.slice(i + 1).map((t) => edge(s, t)));
+        const two: G6GraphData = {
+            nodes: ['a1', 'a2', 'a3', 'a4', 'b1', 'b2', 'b3'].map((id) => node(id)),
+            edges: [...cliqueEdges(['a1', 'a2', 'a3', 'a4']), ...cliqueEdges(['b1', 'b2', 'b3'])],
+        };
+        const found = cliques(two);
+        expect(found[0]).toEqual(['a1', 'a2', 'a3', 'a4']);
+        expect(found).toContainEqual(['b1', 'b2', 'b3']);
+    });
+});
+
+describe('maxFlow', () => {
+    it('computes flow and returns the saturated min-cut', () => {
+        const net: G6GraphData = {
+            nodes: ['s', 'a', 'b', 't'].map((id) => node(id)),
+            edges: [edge('s', 'a', 'x · 2'), edge('a', 't', 'x · 2'), edge('s', 'b', 'x · 3'), edge('b', 't', 'x · 1')],
+        };
+        const { value, minCut } = maxFlow(net, 's', 't');
+        expect(value).toBe(3);
+        expect(minCut.edgeIds.length).toBeGreaterThan(0);
+    });
+
+    it('is empty for an absent or equal endpoint', () => {
+        const net: G6GraphData = { nodes: [node('s'), node('t')], edges: [edge('s', 't')] };
+        expect(maxFlow(net, 's', 's').value).toBe(0);
+        expect(maxFlow(net, 's', 'zzz').value).toBe(0);
+    });
+});
+
+describe('maximumSpanningForest', () => {
+    it('keeps the strongest edges without forming a cycle', () => {
+        const tri: G6GraphData = {
+            nodes: ['p', 'q', 'r'].map((id) => node(id)),
+            edges: [edge('p', 'q', 'w · 3'), edge('q', 'r', 'w · 2'), edge('r', 'p', 'w · 1')],
+        };
+        const msf = maximumSpanningForest(tri);
+        expect(msf.edgeIds).toEqual(['p->q:w · 3', 'q->r:w · 2']); // the weakest r→p edge is dropped
+    });
+});
+
+describe('jaccardSimilarity / linkPrediction', () => {
+    /** a and b both link to c and d, but not to each other. */
+    const shared: G6GraphData = {
+        nodes: ['a', 'b', 'c', 'd'].map((id) => node(id)),
+        edges: [edge('a', 'c'), edge('a', 'd'), edge('b', 'c'), edge('b', 'd')],
+    };
+
+    it('jaccard ranks the co-associated node highest', () => {
+        const sim = jaccardSimilarity(shared, 'a');
+        expect(sim[0].id).toBe('b');
+        expect(sim[0].score).toBe(1); // identical neighbor sets
+    });
+
+    it('link prediction proposes the missing a↔b edge', () => {
+        const pred = linkPrediction(shared, { method: 'common-neighbors' });
+        expect(pred[0]).toMatchObject({ source: 'a', target: 'b', score: 2 });
+    });
+});
+
+describe('suspicionScore', () => {
+    it('ranks a hub node highest with a 0–100 explainable score', () => {
+        const scores = suspicionScore(g);
+        expect(['a', 'c']).toContain(scores[0].id); // the two degree-3 hubs
+        expect(scores[0].score).toBeGreaterThan(0);
+        expect(scores[0].score).toBeLessThanOrEqual(100);
+        expect(scores[0].factors).toHaveProperty('betweenness');
+    });
+
+    it('honors custom factor weights and the node cap', () => {
+        const only = suspicionScore(g, { degree: 1, betweenness: 0, pageRank: 0, core: 0, triangles: 0 });
+        expect(only[0].factors.degree).toBeGreaterThan(0);
+        const big: G6GraphData = {
+            nodes: Array.from({ length: analysisNodeCapValue() + 1 }, (_, i) => node(`n${i}`)),
+            edges: [],
+        };
+        expect(() => suspicionScore(big)).toThrow(/capped/);
+    });
+});
+
+// ── LA-14a: temporal ordering. Without it `A→B→C` matched even when B paid C long before A paid B —
+// a topology claim in the language of a flow claim. Gate G-R5's "out-of-order timestamps rejected".
+describe('matchPattern temporal ordering (LA-14a)', () => {
+    /** a→b→c where the SECOND hop happens after the first — a genuine forwarding chain. */
+    const ordered: G6GraphData = {
+        nodes: ['a', 'b', 'c'].map((id) => ({ id, data: { label: id, kind: 'acct' } })) as G6GraphData['nodes'],
+        edges: [
+            { id: 'a->b', source: 'a', target: 'b', data: { kind: 'pays', attrs: { AT: '2026-09-01 10:00:00' } } },
+            { id: 'b->c', source: 'b', target: 'c', data: { kind: 'pays', attrs: { AT: '2026-09-01 12:00:00' } } },
+        ],
+    } as G6GraphData;
+
+    /** The SAME topology with the hops reversed in time — b paid c BEFORE a ever paid b. */
+    const backwards: G6GraphData = {
+        nodes: ordered.nodes,
+        edges: [
+            { id: 'a->b', source: 'a', target: 'b', data: { kind: 'pays', attrs: { AT: '2026-09-01 12:00:00' } } },
+            { id: 'b->c', source: 'b', target: 'c', data: { kind: 'pays', attrs: { AT: '2026-09-01 10:00:00' } } },
+        ],
+    } as G6GraphData;
+
+    const chain = [{}, { direction: 'out' as const }, { direction: 'out' as const, afterPrevious: true }];
+
+    it('patternNeedsTime is true only when a later step asks for ordering', () => {
+        expect(patternNeedsTime([{}, { direction: 'out' }])).toBe(false);
+        expect(patternNeedsTime(chain)).toBe(true);
+        // step 0 has no previous edge, so a flag there is not a temporal requirement
+        expect(patternNeedsTime([{ afterPrevious: true }, { direction: 'out' }])).toBe(false);
+    });
+
+    it('matches a chain whose hops are in time order', () => {
+        expect(matchPattern(ordered, chain, { timeAttr: 'AT' })).toHaveLength(1);
+    });
+
+    it('REJECTS the same chain when the timestamps run backwards', () => {
+        // The topology is identical - only the times differ. Before LA-14a this matched.
+        expect(matchPattern(backwards, chain, { timeAttr: 'AT' })).toHaveLength(0);
+        // ...and the proof that the shape itself is matchable: drop the constraint and it comes back.
+        expect(matchPattern(backwards, [{}, { direction: 'out' }, { direction: 'out' }])).toHaveLength(1);
+    });
+
+    it('rejects a hop that is simultaneous — a forwarding must be strictly later', () => {
+        const same = {
+            nodes: ordered.nodes,
+            edges: ordered.edges.map((e) => ({ ...e, data: { ...e.data, attrs: { AT: '2026-09-01 10:00:00' } } })),
+        } as G6GraphData;
+        expect(matchPattern(same, chain, { timeAttr: 'AT' })).toHaveLength(0);
+    });
+
+    it('FAILS CLOSED when a temporal motif is run with no time column', () => {
+        // Silently dropping the constraint would reproduce exactly the defect this change removes.
+        expect(matchPattern(ordered, chain)).toHaveLength(0);
+        expect(matchPattern(ordered, chain, { timeAttr: '' })).toHaveLength(0);
+    });
+
+    it('rejects an edge whose time is missing or unparseable, mirroring filterByTime', () => {
+        const noTime = {
+            nodes: ordered.nodes,
+            edges: [
+                ordered.edges[0],
+                { id: 'b->c', source: 'b', target: 'c', data: { kind: 'pays', attrs: { AT: 'not a date' } } },
+            ],
+        } as G6GraphData;
+        expect(matchPattern(noTime, chain, { timeAttr: 'AT' })).toHaveLength(0);
+    });
+
+    it('honours maxGapHours — an ordered hop far in the future is not a forwarding', () => {
+        const within = [
+            {},
+            { direction: 'out' as const },
+            { direction: 'out' as const, afterPrevious: true, maxGapHours: 48 },
+        ];
+        expect(matchPattern(ordered, within, { timeAttr: 'AT' })).toHaveLength(1); // 2h gap
+
+        const late = {
+            nodes: ordered.nodes,
+            edges: [
+                ordered.edges[0],
+                { id: 'b->c', source: 'b', target: 'c', data: { kind: 'pays', attrs: { AT: '2026-10-01 12:00:00' } } },
+            ],
+        } as G6GraphData;
+        expect(matchPattern(late, within, { timeAttr: 'AT' })).toHaveLength(0); // a month later
+        expect(matchPattern(late, chain, { timeAttr: 'AT' })).toHaveLength(1); // still ORDERED, just not close
+    });
+
+    it('rejects an ordered hop whose PREVIOUS hop has no time — unknown cannot be "before"', () => {
+        // a→b carries no time; b→c is ordered against it. `t <= NaN` is false, so this used to pass.
+        const unknownFirst = {
+            nodes: ordered.nodes,
+            edges: [{ id: 'a->b', source: 'a', target: 'b', data: { kind: 'pays', attrs: {} } }, ordered.edges[1]],
+        } as G6GraphData;
+        expect(matchPattern(unknownFirst, chain, { timeAttr: 'AT' })).toHaveLength(0);
+    });
+
+    it('leaves an untemporal motif behaving exactly as before, with or without a time column', () => {
+        const plain = [{}, { direction: 'out' as const }, { direction: 'out' as const }];
+        expect(matchPattern(backwards, plain)).toHaveLength(1);
+        expect(matchPattern(backwards, plain, { timeAttr: 'AT' })).toHaveLength(1);
+    });
+});
+
+// ── LA-06 clause 3: super-node aggregation. A legibility transform, not a performance one. ──
+describe('aggregateSuperNodes', () => {
+    /** One hub with `n` pendant leaves, plus a second real neighbour that is NOT a pendant. */
+    function hubWithLeaves(n: number): G6GraphData {
+        const nodes: G6GraphData['nodes'] = [
+            { id: 'hub', data: { label: 'Hub', kind: 'acct' } },
+            { id: 'peer', data: { label: 'Peer', kind: 'acct' } },
+        ] as G6GraphData['nodes'];
+        const edges: G6GraphData['edges'] = [
+            { id: 'hub->peer', source: 'hub', target: 'peer', data: { kind: 'pays' } },
+            { id: 'peer->x', source: 'peer', target: 'hub', data: { kind: 'pays' } },
+        ] as G6GraphData['edges'];
+        for (let i = 0; i < n; i++) {
+            nodes.push({ id: 'leaf' + i, data: { label: 'Leaf ' + i, kind: 'acct' } } as G6GraphData['nodes'][number]);
+            edges.push({
+                id: 'hub->leaf' + i,
+                source: 'hub',
+                target: 'leaf' + i,
+                data: { kind: 'pays' },
+            } as G6GraphData['edges'][number]);
+        }
+        return { nodes, edges };
+    }
+
+    it("folds a hub's pendant leaves into one stand-in once the threshold is met", () => {
+        const g = aggregateSuperNodes(hubWithLeaves(5), 5);
+        const ids = g.nodes.map((n) => n.id).sort();
+        expect(ids).toEqual(['__super__:hub', 'hub', 'peer']);
+        const sup = g.nodes.find((n) => n.id === superNodeId('hub'))!;
+        expect(sup.data.kind).toBe(SUPER_NODE_KIND);
+        expect(sup.data.label).toBe('5 more');
+        expect(sup.data.superMembers).toHaveLength(5);
+    });
+
+    it('⛔ never gives a stand-in an objectRef — it is not a record and must not open like one', () => {
+        const g = hubWithLeaves(5);
+        // even when every member carries one, the stand-in must not
+        for (const n of g.nodes) if (n.id.startsWith('leaf')) n.data.objectRef = { id: 'CASE-1', type: 'CASE' };
+        const out = aggregateSuperNodes(g, 5);
+        expect(out.nodes.find((n) => n.id === superNodeId('hub'))!.data.objectRef).toBeUndefined();
+    });
+
+    it('leaves the graph alone below the threshold, and when disabled', () => {
+        expect(aggregateSuperNodes(hubWithLeaves(4), 5).nodes).toHaveLength(6);
+        expect(aggregateSuperNodes(hubWithLeaves(9), 0).nodes).toHaveLength(11);
+        expect(aggregateSuperNodes(hubWithLeaves(9), 1).nodes).toHaveLength(11); // a group of one is not a group
+    });
+
+    it('NEVER folds a node that carries a second link — no path may be hidden', () => {
+        const g = hubWithLeaves(5);
+        // give one leaf a second link; it must survive as itself
+        g.edges.push({ id: 'leaf0->peer', source: 'leaf0', target: 'peer', data: { kind: 'pays' } } as never);
+        const out = aggregateSuperNodes(g, 5);
+        expect(out.nodes.map((n) => n.id)).toContain('leaf0');
+        // the remaining four are now below the threshold, so nothing folds at all
+        expect(out.nodes.some((n) => n.data.kind === SUPER_NODE_KIND)).toBe(false);
+    });
+
+    it('drops the folded members and their edges, and links the stand-in to its hub', () => {
+        const g = aggregateSuperNodes(hubWithLeaves(5), 5);
+        expect(g.nodes.some((n) => n.id.startsWith('leaf'))).toBe(false);
+        expect(g.edges.some((e) => e.target.startsWith('leaf'))).toBe(false);
+        const link = g.edges.find((e) => e.target === superNodeId('hub'))!;
+        expect(link.source).toBe('hub');
+    });
+
+    it('leaves an expanded hub un-folded, which is how the analyst opens one', () => {
+        const g = aggregateSuperNodes(hubWithLeaves(5), 5, ['hub']);
+        expect(g.nodes.some((n) => n.data.kind === SUPER_NODE_KIND)).toBe(false);
+        expect(g.nodes.filter((n) => n.id.startsWith('leaf'))).toHaveLength(5);
+    });
+
+    it('does not treat a self-loop as a pendant relationship', () => {
+        const g: G6GraphData = {
+            nodes: [{ id: 'a', data: { label: 'A', kind: 'acct' } }] as G6GraphData['nodes'],
+            edges: [{ id: 'a->a', source: 'a', target: 'a', data: { kind: 'pays' } }] as G6GraphData['edges'],
+        };
+        expect(aggregateSuperNodes(g, 2)).toEqual(g);
+    });
+});
+
+// ── Configurable limits. The shipped numbers were measured on one host with one synthetic graph
+// shape, so they are DEFAULTS; a deployment tunes them per space. ──
+describe('graph limits are configurable (D-S3)', () => {
+    afterEach(() => resetGraphLimits());
+
+    function ring(n: number): G6GraphData {
+        const nodes = Array.from({ length: n }, (_, i) => ({ id: 'n' + i, data: { label: 'n' + i, kind: 'acct' } }));
+        const edges = Array.from({ length: n }, (_, i) => ({
+            id: 'e' + i,
+            source: 'n' + i,
+            target: 'n' + ((i + 1) % n),
+            data: { kind: 'pays' },
+        }));
+        return { nodes, edges } as G6GraphData;
+    }
+
+    it('starts at the measured default', () => {
+        expect(analysisNodeCapValue()).toBe(ANALYSIS_NODE_CAP_DEFAULT);
+    });
+
+    // ⚠ These use closeness, not betweenness. Betweenness was the vehicle until 2026-09-23, when it moved
+    // onto the LOWER `suspicionNodeCap` — it is the one genuinely slow algorithm (9.8 s at 2 000 nodes,
+    // against 129 ms for every other component combined), so the shared cap never governed it well. The
+    // subject here is the SHARED cap being configurable, so the vehicle must be an algorithm still on it.
+    it('a deployment override takes effect, and the refusal names the NEW limit not the old one', () => {
+        configureGraphLimits({ analysisNodeCap: 10 });
+        expect(analysisNodeCapValue()).toBe(10);
+        expect(() => closenessCentrality(ring(20))).toThrowError(/capped at 10 nodes/);
+        // ...and a graph under the new limit still runs
+        expect(() => closenessCentrality(ring(5))).not.toThrow();
+    });
+
+    it('raising the cap lets a graph through that the default would have refused', () => {
+        const g = ring(30);
+        configureGraphLimits({ analysisNodeCap: 10 });
+        expect(() => closenessCentrality(g)).toThrow();
+        configureGraphLimits({ analysisNodeCap: 100 });
+        expect(() => closenessCentrality(g)).not.toThrow();
+    });
+
+    // And the counterpart: the shared cap must NOT govern betweenness any more.
+    it('the shared cap does not gate betweenness, which has its own lower ceiling', () => {
+        configureGraphLimits({ analysisNodeCap: 10, suspicionNodeCap: 1000 });
+
+        expect(() => closenessCentrality(ring(20))).toThrow();
+        expect(() => betweennessCentrality(ring(20))).not.toThrow();
+    });
+
+    it('⛔ REFUSES a nonsense cap and keeps the previous value', () => {
+        // A cap of 0 or NaN would put every graph over the limit and turn the whole toolbox off —
+        // far worse than ignoring a bad setting, so the setter fails closed.
+        configureGraphLimits({ analysisNodeCap: 50 });
+        for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+            configureGraphLimits({ analysisNodeCap: bad });
+            expect(analysisNodeCapValue(), `cap ${bad} must be refused`).toBe(50);
+        }
+    });
+
+    it('ignores an absent field and a null payload, so a partial response is safe', () => {
+        configureGraphLimits({ analysisNodeCap: 42 });
+        configureGraphLimits({});
+        configureGraphLimits(null);
+        configureGraphLimits(undefined);
+        expect(analysisNodeCapValue()).toBe(42);
+    });
+
+    it('floors a fractional cap rather than refusing it', () => {
+        configureGraphLimits({ analysisNodeCap: 12.9 });
+        expect(analysisNodeCapValue()).toBe(12);
+    });
+
+    it('reset restores the shipped default', () => {
+        configureGraphLimits({ analysisNodeCap: 7 });
+        resetGraphLimits();
+        expect(analysisNodeCapValue()).toBe(ANALYSIS_NODE_CAP_DEFAULT);
+    });
+});

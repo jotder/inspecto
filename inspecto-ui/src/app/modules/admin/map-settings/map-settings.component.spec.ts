@@ -3,7 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { GeoSettings, GeoSettingsService } from 'app/inspecto/api';
+import { GeoSettings, GeoSettingsService } from '@inspecto/link-analysis/api/geo-settings.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { MapSettingsComponent } from './map-settings.component';
 

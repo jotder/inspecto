@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
+import type { ObjectNote } from './models';
 
 /** A managed operational object (GET /objects) — ALERT / INCIDENT / CASE / TASK on one table. */
 export interface OperationalObject {
@@ -80,17 +81,6 @@ export interface ObjectGraph {
     depth: number;
     nodes: ObjectGraphNode[];
     edges: ObjectLink[];
-}
-
-/** An append-only note on an object — a comment or an attachment reference. */
-export interface ObjectNote {
-    id: string;
-    objectId: string;
-    kind: 'COMMENT' | 'ATTACHMENT' | string;
-    author: string;
-    body: string;
-    attributes?: Record<string, string>;
-    createdAt: number;
 }
 
 /** An RCA template (GET /rca/templates). */

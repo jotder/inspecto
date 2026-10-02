@@ -661,3 +661,14 @@ export interface ReadyStatus {
     status: 'READY' | 'INITIALIZING' | string;
     pipelines: number;
 }
+
+/** An append-only note on an object — a comment or an attachment reference. */
+export interface ObjectNote {
+    id: string;
+    objectId: string;
+    kind: 'COMMENT' | 'ATTACHMENT' | string;
+    author: string;
+    body: string;
+    attributes?: Record<string, string>;
+    createdAt: number;
+}

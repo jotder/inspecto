@@ -1,0 +1,432 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import { of, throwError } from 'rxjs';
+import { SAMPLE_SOURCES } from '@inspecto/core/fixtures/sample-sources';
+import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
+import {
+    EntityProjectionGraphSource,
+    ProjectedGraph,
+    isProjectionError,
+    mergeProjectedGraphs,
+    projectEntities,
+    projectTriples,
+    PROJECTION_NODE_CAP_DEFAULT,
+    configureProjectionLimits,
+    projectionNodeCapValue,
+    resetProjectionLimits,
+    resolveRunQuery,
+    withColumnTypes,
+} from './entity-projection';
+import { endpointId } from '@inspecto/core/graph';
+
+const rows = [
+    { source: 'sub-01', target: 'dev-01', link_type: 'shared_device', weight: 5 },
+    { source: 'sub-02', target: 'dev-01', link_type: 'shared_device', weight: 4 },
+    { source: 'sub-01', target: 'sub-02', link_type: 'calls', weight: 17 },
+    { source: 'sub-01', target: 'sub-02', link_type: 'calls', weight: 3 }, // duplicate link → folded count
+    { source: '', target: 'dev-01', link_type: 'calls' }, // blank endpoint → skipped
+];
+
+describe('projectEntities', () => {
+    it('folds rows into entities and typed, deduplicated links', () => {
+        const g = projectEntities(rows, {
+            datasetId: 'd',
+            sourceCol: 'source',
+            targetCol: 'target',
+            linkKindCol: 'link_type',
+        });
+        if (isProjectionError(g)) throw new Error(g.error);
+        expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:dev-01', 'entity:sub-01', 'entity:sub-02']);
+        expect(g.nodes[0].data.kind).toBe('entity');
+        expect(g.edges).toHaveLength(3);
+        const calls = g.edges.find((e) => e.id.includes('calls'))!;
+        expect(calls.data).toEqual({ kind: 'calls · 2', count: 2 });
+        expect(g.truncated).toBe(false);
+    });
+
+    it('defaults the link kind when no kind column is mapped', () => {
+        const g = projectEntities(rows.slice(0, 1), {
+            datasetId: 'd',
+            sourceCol: 'source',
+            targetCol: 'target',
+        }) as ProjectedGraph;
+        expect(g.edges[0].data.kind).toBe('link');
+    });
+
+    it('reports a bad mapping as a typed error, not a throw', () => {
+        const missing = projectEntities(rows, { datasetId: 'd', sourceCol: 'nope', targetCol: 'target' });
+        expect(isProjectionError(missing) && missing.error).toMatch(/'nope'/);
+        const blank = projectEntities(rows, { datasetId: 'd', sourceCol: '', targetCol: 'target' });
+        expect(isProjectionError(blank)).toBe(true);
+    });
+
+    it('truncates at the node cap and says so', () => {
+        const many = Array.from({ length: projectionNodeCapValue() + 50 }, (_, i) => ({ a: `s${i}`, b: `t${i}` }));
+        const g = projectEntities(many, { datasetId: 'd', sourceCol: 'a', targetCol: 'b' }) as ProjectedGraph;
+        expect(g.nodes).toHaveLength(projectionNodeCapValue());
+        expect(g.truncated).toBe(true);
+    });
+
+    it('attrCols join the fold key and round-trip onto the edge (differing values split a folded pair)', () => {
+        const mixed = [
+            { source: 's', target: 't', channel: 'sms' },
+            { source: 's', target: 't', channel: 'call' },
+        ];
+        const g = projectEntities(mixed, {
+            datasetId: 'd',
+            sourceCol: 'source',
+            targetCol: 'target',
+            attrCols: ['channel'],
+        }) as ProjectedGraph;
+        expect(g.edges).toHaveLength(2);
+        expect(g.edges.every((e) => (e.data as unknown as { count: number }).count === 1)).toBe(true);
+        const smsEdge = g.edges.find((e) => e.data.attrs?.channel === 'sms');
+        expect(smsEdge).toBeDefined();
+    });
+
+    it('tags nodes from a caseId/incidentId column with an objectRef; other columns get none (R8)', () => {
+        const g = projectEntities([{ caseId: 'case-7', msisdn: '555-0101' }], {
+            datasetId: 'd',
+            sourceCol: 'caseId',
+            targetCol: 'msisdn',
+        }) as ProjectedGraph;
+        expect(g.nodes.find((n) => n.id === 'entity:case-7')!.data.objectRef).toEqual({ id: 'case-7', type: 'CASE' });
+        expect(g.nodes.find((n) => n.id === 'entity:555-0101')!.data.objectRef).toBeUndefined();
+    });
+});
+
+// The four example graphs seeded for user testing (default-space.seed.ts): pin each one's
+// shape so a seed edit can't silently break a saved example view.
+describe('example graph sample sources (C5 user testing)', () => {
+    const CASES: Array<[source: string, nodes: number, links: number]> = [
+        ['graph_simple', 6, 5],
+        ['graph_moderate', 11, 13],
+        ['graph_mindmap', 20, 19],
+        ['graph_complex', 41, 57],
+    ];
+
+    it('each projects cleanly with the seeded mapping and stays under the node cap', () => {
+        for (const [source, nodes, links] of CASES) {
+            const g = projectEntities(SAMPLE_SOURCES[source], {
+                datasetId: source,
+                sourceCol: 'source',
+                targetCol: 'target',
+                linkKindCol: 'link_type',
+            });
+            if (isProjectionError(g)) throw new Error(`${source}: ${g.error}`);
+            expect(g.nodes, source).toHaveLength(nodes);
+            expect(g.edges, source).toHaveLength(links);
+            expect(g.truncated, source).toBe(false);
+        }
+    });
+});
+
+describe('EntityProjectionGraphSource', () => {
+    const ds: Dataset = {
+        id: 'links-ds',
+        name: 'Links',
+        kind: 'physical',
+        sourceName: 'links',
+        query: null,
+        physicalRef: null,
+        columns: [],
+        measures: [],
+        calculated: [],
+    };
+
+    /** An InvService stub whose backend call fails — the source must surface it, never fold locally. */
+    const failingInv = { project: () => throwError(() => new Error('backend down')) } as never;
+
+    it('surfaces a backend failure instead of substituting sample rows', async () => {
+        const src = new EntityProjectionGraphSource({ get: () => of(ds) } as never, failingInv);
+        await expect(
+            src.query({
+                projection: {
+                    datasetId: 'links-ds',
+                    sourceCol: 'source',
+                    targetCol: 'target',
+                    linkKindCol: 'link_type',
+                },
+            }),
+        ).rejects.toThrow(/backend down/);
+    });
+
+    it('requires a mapping before it asks the backend anything', async () => {
+        const src = new EntityProjectionGraphSource({ get: () => of(ds) } as never, failingInv);
+        await expect(src.query({})).rejects.toThrow(/mapping/);
+    });
+
+    it('multi-mapping: merges N mappings into one graph via q.projections, type-scoping node ids', async () => {
+        const inv = {
+            project: (req: { dataset: string }) => {
+                if (req.dataset === 'phones-ds') {
+                    return of({
+                        rows: [{ source: '555-0101', target: '555-0102', kind: null, count: 1 }],
+                        truncated: false,
+                    });
+                }
+                return of({ rows: [{ source: '555-0101', target: 'acct-9', kind: null, count: 1 }], truncated: false });
+            },
+        } as never;
+        const src = new EntityProjectionGraphSource({ get: () => of(ds) } as never, inv);
+        const g = await src.query({
+            projections: [
+                { datasetId: 'phones-ds', sourceCol: 'a', targetCol: 'b', entityType: 'phone' },
+                { datasetId: 'accounts-ds', sourceCol: 'a', targetCol: 'b', entityType: 'account' },
+            ],
+        });
+        // The same value '555-0101' surfaces under two entity types and stays two distinct nodes.
+        expect(g.nodes.map((n) => n.id).sort()).toEqual([
+            'entity:account:555-0101',
+            'entity:account:acct-9',
+            'entity:phone:555-0101',
+            'entity:phone:555-0102',
+        ]);
+    });
+
+    it('is backend-first: aggregated triples become the graph, no dataset row fetch (INV-1)', async () => {
+        const inv = {
+            project: (req: unknown) => {
+                expect(req).toEqual({
+                    dataset: 'links-ds',
+                    sourceCol: 'source',
+                    targetCol: 'target',
+                    linkKindCol: undefined,
+                });
+                return of({
+                    rows: [
+                        { source: 'alice', target: 'bob', kind: null, count: 3 },
+                        { source: 'bob', target: 'carol', kind: null, count: 1 },
+                    ],
+                    truncated: false,
+                });
+            },
+        } as never;
+        const datasets = {
+            get: () => {
+                throw new Error('must not fetch rows on the backend path');
+            },
+        } as never;
+        const src = new EntityProjectionGraphSource(datasets, inv);
+        const g = (await src.query({
+            projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' },
+        })) as ProjectedGraph;
+        expect(g.nodes.map((n) => n.id)).toEqual(['entity:alice', 'entity:bob', 'entity:carol']);
+        expect(g.edges[0].data.kind).toBe('link · 3');
+        expect(g.edges[1].data.kind).toBe('link');
+        expect(g.truncated).toBe(false);
+    });
+});
+
+describe('EntityProjectionGraphSource.expand (Phase E, incremental expand)', () => {
+    const ds: Dataset = {
+        id: 'links-ds',
+        name: 'Links',
+        kind: 'physical',
+        sourceName: 'links',
+        query: null,
+        physicalRef: null,
+        columns: [],
+        measures: [],
+        calculated: [],
+    };
+
+    it('calls /inv/projection/neighbors with the node label as value and folds the result', async () => {
+        const inv = {
+            neighbors: (req: { value: string }) => {
+                expect(req.value).toBe('bob');
+                return of({ rows: [{ source: 'alice', target: 'bob', kind: null, count: 1 }], truncated: false });
+            },
+        } as never;
+        const src = new EntityProjectionGraphSource({ get: () => of(ds) } as never, inv);
+        const g = (await src.expand('entity:bob', 'bob', {
+            projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' },
+        })) as ProjectedGraph;
+        expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:alice', 'entity:bob']);
+    });
+
+    it('refuses a multi-mapping query (no way to know which mapping owns the node)', async () => {
+        const src = new EntityProjectionGraphSource({ get: () => of(ds) } as never, {} as never);
+        await expect(
+            src.expand('entity:bob', 'bob', {
+                projections: [{ datasetId: 'links-ds', sourceCol: 'a', targetCol: 'b' }],
+            }),
+        ).rejects.toThrow(/single-mapping/);
+    });
+});
+
+describe('typed projection ids (LA-17 D-M6)', () => {
+    const msisdn = { id: 'msisdn', normaliser: 'e164' as const };
+
+    it('mints <type>:<key> with the type normaliser for a typed column, entity:<value> for an untyped one', () => {
+        const p = withColumnTypes({ datasetId: 'calls', sourceCol: 'a', targetCol: 'b' }, { a: msisdn });
+        const g = projectTriples(
+            [
+                { source: '0044 78', target: 'Bob', kind: 'call', count: 1 },
+                { source: '+44 78', target: 'bob', kind: 'call', count: 2 },
+            ],
+            false,
+            p,
+        );
+        expect(g.nodes.map((n) => n.id)).toEqual(['msisdn:+4478', 'entity:bob']);
+        expect(g.nodes[0].data.spellings).toEqual(['0044 78', '+44 78']);
+        expect(g.edges.map((e) => e.id)).toEqual(['msisdn:+4478->entity:bob:call']);
+        expect(endpointId(p, 'source', '0044 78')).toBe('msisdn:+4478');
+        expect(endpointId(p, 'target', 'Bob')).toBe('entity:bob');
+    });
+
+    it('a typed value whose key normalises to empty is skipped like a blank one: no node, no edge', () => {
+        const p = withColumnTypes({ datasetId: 'calls', sourceCol: 'a', targetCol: 'b' }, { a: msisdn });
+        const junk = ['N/A', 'unknown', '-'];
+        const g = projectTriples(
+            [
+                ...junk.map((v) => ({ source: v, target: 'Bob', kind: 'call', count: 1 })),
+                { source: '+44 78', target: 'Bob', kind: 'call', count: 1 },
+            ],
+            false,
+            p,
+        );
+        expect(g.nodes.map((n) => n.id)).toEqual(['msisdn:+4478', 'entity:bob']);
+        expect(g.edges).toHaveLength(1);
+        const rowsG = projectEntities(
+            [...junk.map((v) => ({ a: v, b: 'Bob' })), { a: '+44 78', b: 'Bob' }],
+            p,
+        ) as ProjectedGraph;
+        expect(rowsG.nodes.map((n) => n.id)).toEqual(['msisdn:+4478', 'entity:bob']);
+        expect(rowsG.edges).toHaveLength(1);
+        expect(endpointId(p, 'source', 'N/A')).toBeNull();
+    });
+
+    it('a column type wins over the free-text entityType scope; absent columnTypes leave the mapping untyped', () => {
+        const p = { datasetId: 'd', sourceCol: 'a', targetCol: 'b', entityType: 'person' };
+        expect(endpointId(withColumnTypes(p, { b: msisdn }), 'target', '0044 1')).toBe('msisdn:+441');
+        expect(withColumnTypes({ ...p, sourceType: msisdn }, undefined)).toEqual(p);
+        expect(endpointId(p, 'source', 'Bob')).toBe('entity:person:bob');
+    });
+
+    it('the source resolves the answer columnTypes onto the ids and records them as idMappings', async () => {
+        const inv = {
+            project: () =>
+                of({
+                    rows: [{ source: '0044 78', target: 'x', kind: null, count: 1 }],
+                    truncated: false,
+                    columnTypes: { a: msisdn },
+                }),
+        } as never;
+        const src = new EntityProjectionGraphSource({ get: () => of(null) } as never, inv);
+        const q = { projection: { datasetId: 'calls', sourceCol: 'a', targetCol: 'b' } };
+        const g = await src.query(q);
+        expect(g.nodes.map((n) => n.id)).toEqual(['msisdn:+4478', 'entity:x']);
+        expect(g.idMappings).toEqual([{ ...q.projection, sourceType: msisdn }]);
+        expect(resolveRunQuery(q, g).projection?.sourceType).toEqual(msisdn);
+    });
+});
+
+describe('projectTriples', () => {
+    it('folds triples with the same shapes as the client fold (ids, kind·count, cap)', () => {
+        const g = projectTriples(
+            [
+                { source: 'a', target: 'b', kind: 'sms', count: 2 },
+                { source: 'a', target: 'c', kind: 'call', count: 1 },
+                { source: ' ', target: 'x', kind: null, count: 5 }, // blank endpoint skipped
+            ],
+            false,
+        );
+        expect(g.nodes.map((n) => n.id)).toEqual(['entity:a', 'entity:b', 'entity:c']);
+        expect(g.nodes[0].data.kind).toBe('entity');
+        expect(g.edges.map((e) => e.id)).toEqual(['entity:a->entity:b:sms', 'entity:a->entity:c:call']);
+        expect(g.edges[0].data.kind).toBe('sms · 2');
+        expect(g.edges[1].data.kind).toBe('call');
+        expect(g.truncated).toBe(false);
+    });
+
+    it('caps nodes and carries server truncation through', () => {
+        const many = Array.from({ length: projectionNodeCapValue() + 50 }, (_, i) => ({
+            source: `s${i}`,
+            target: `t${i}`,
+            kind: null,
+            count: 1,
+        }));
+        const capped = projectTriples(many, false);
+        expect(capped.nodes.length).toBeLessThanOrEqual(projectionNodeCapValue());
+        expect(capped.truncated).toBe(true);
+
+        expect(projectTriples([{ source: 'a', target: 'b', kind: null, count: 1 }], true).truncated).toBe(true);
+    });
+
+    it('tags nodes with an objectRef when the projection column names an operational object (R8)', () => {
+        const g = projectTriples([{ source: 'inc-1', target: 'tower-9', kind: null, count: 1 }], false, {
+            datasetId: 'd',
+            sourceCol: 'incidentId',
+            targetCol: 'tower',
+        });
+        expect(g.nodes.find((n) => n.id === 'entity:inc-1')!.data.objectRef).toEqual({ id: 'inc-1', type: 'INCIDENT' });
+        expect(g.nodes.find((n) => n.id === 'entity:tower-9')!.data.objectRef).toBeUndefined();
+    });
+
+    it('carries the backend attrs through onto the edge data (Phase B, attrCols passthrough)', () => {
+        const g = projectTriples(
+            [{ source: 'a', target: 'b', kind: 'sms', count: 1, attrs: { channel: 'sms' } }],
+            false,
+        );
+        expect(g.edges[0].data.attrs).toEqual({ channel: 'sms' });
+    });
+});
+
+describe('mergeProjectedGraphs', () => {
+    it('dedups nodes by id, concatenates edges, and ORs truncation across mappings', () => {
+        const a: ProjectedGraph = {
+            nodes: [{ id: 'entity:x', data: { label: 'x', kind: 'entity' } }],
+            edges: [{ id: 'e1', source: 'entity:x', target: 'entity:y', data: { kind: 'link' } }],
+            truncated: true,
+        };
+        const b: ProjectedGraph = {
+            nodes: [
+                { id: 'entity:x', data: { label: 'stale', kind: 'entity' } },
+                { id: 'entity:z', data: { label: 'z', kind: 'entity' } },
+            ],
+            edges: [{ id: 'e2', source: 'entity:x', target: 'entity:z', data: { kind: 'link' } }],
+            truncated: false,
+        };
+        const merged = mergeProjectedGraphs([a, b]);
+        expect(merged.nodes.map((n) => n.id)).toEqual(['entity:x', 'entity:z']);
+        expect(merged.nodes.find((n) => n.id === 'entity:x')!.data.label).toBe('x'); // first mapping wins
+        expect(merged.edges.map((e) => e.id)).toEqual(['e1', 'e2']);
+        expect(merged.truncated).toBe(true);
+    });
+});
+
+describe('projection limit is configurable (D-S3)', () => {
+    afterEach(() => resetProjectionLimits());
+
+    it('starts at the measured default', () => {
+        expect(projectionNodeCapValue()).toBe(PROJECTION_NODE_CAP_DEFAULT);
+    });
+
+    it('a deployment override takes effect', () => {
+        configureProjectionLimits({ projectionNodeCap: 25 });
+        expect(projectionNodeCapValue()).toBe(25);
+    });
+
+    it('⛔ REFUSES a nonsense cap and keeps the previous value', () => {
+        // A cap of 0 would yield an empty graph for every query, which reads as "no data" rather than
+        // "misconfigured" — the worst possible failure for an investigative tool.
+        configureProjectionLimits({ projectionNodeCap: 25 });
+        for (const bad of [0, -5, Number.NaN]) {
+            configureProjectionLimits({ projectionNodeCap: bad });
+            expect(projectionNodeCapValue(), `cap ${bad} must be refused`).toBe(25);
+        }
+    });
+
+    it('ignores an absent field, so a partial response is safe', () => {
+        configureProjectionLimits({ projectionNodeCap: 33 });
+        configureProjectionLimits({});
+        configureProjectionLimits(null);
+        expect(projectionNodeCapValue()).toBe(33);
+    });
+
+    it('reset restores the shipped default', () => {
+        configureProjectionLimits({ projectionNodeCap: 9 });
+        resetProjectionLimits();
+        expect(projectionNodeCapValue()).toBe(PROJECTION_NODE_CAP_DEFAULT);
+    });
+});

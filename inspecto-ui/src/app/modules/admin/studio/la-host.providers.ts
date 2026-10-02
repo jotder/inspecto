@@ -25,7 +25,7 @@ import {
     LaPipelineGraph,
     LaTags,
     LaWidgets,
-} from 'app/inspecto/la-host';
+} from '@inspecto/link-analysis';
 import { ComponentsDataProvider } from 'app/modules/admin/catalog/components-data-provider';
 import { REGISTRY_KINDS } from 'app/modules/admin/catalog/registry.component';
 import { provenanceCounts, toPipelineG6Data } from 'app/modules/admin/pipelines/pipeline-graph';
