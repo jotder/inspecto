@@ -2,6 +2,7 @@ package com.gamma.la.api;
 
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.InvestigationEvaluator;
+import com.gamma.la.core.InvestigationMembers;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.AdmiraltyGrade;
@@ -95,11 +96,12 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
  * <p><b>Store (D-E2).</b> The log and every step's Working Set persist in {@link SnapshotStore} — the same
  * durable store as snapshots, under {@code audit/snapshots/investigations/<id>/}.
  *
- * <p><b>Access.</b> Owner-only: the creating Subject owns it, and anyone else gets a 404 indistinguishable from
- * absence (the R3 answer). ⚠ Grounded, not assumed: the only sharing model in the control plane is
- * {@code ComponentAccess}'s envelope on REGISTRY components, and snapshots — the nearest comparable object, in
- * the same store — have no owner or sharing model at all, so there is nothing to reuse and owner-only is the
- * fail-closed choice (consistent with D-E7's Professional answer). With no Subject attached nothing is enforced,
+ * <p><b>Access (D7-1, amends D-E7).</b> MEMBERS: the creating Subject is the implicit first {@code lead}, and a
+ * lead may grant {@code analyst} / {@code reviewer} / {@code lead} (see {@link InvestigationMembers} and
+ * {@link InvestigationMemberRoutes}). Every member READS; only a lead writes the main log (a lead-only {@link #open}).
+ * Anyone else gets a 404 indistinguishable from absence (the R3 answer). An Investigation with no
+ * {@code members.jsonl} behaves exactly as owner-only always did. The Enterprise PDP can only NARROW the member rule.
+ * With no Subject attached nothing is enforced,
  * as everywhere else in the control plane. Every route additionally applies the R3 Dataset gate: a bound
  * Dataset the caller can no longer view reads as absent, and every Dataset READ goes through the same
  * {@code ComponentAccess.canView} check {@code InvRoutes.relationFor} applies.
@@ -262,9 +264,10 @@ public final class InvestigationRoutes implements RouteModule {
             item.put("headStep", log.isEmpty() ? 0 : ((Number) parse(log.get(log.size() - 1)).get("step")).intValue());
             String caseRef = InvestigationCaseRoutes.caseRef(inv.store(), id);
             if (caseRef != null) item.put("caseRef", caseRef);
-            boolean owner = subject.isEmpty() || subject.get().id().equals(h.get("owner"));
-            item.put("access", owner ? "owner" : "case-member");
-            item.put("readOnly", !owner);
+            InvestigationMembers.Role role = subject.isEmpty() ? InvestigationMembers.Role.LEAD
+                    : InvestigationMemberStore.roles(inv.dir(), h.get("owner")).get(subject.get().id());
+            item.put("access", role == null ? "case-member" : role == InvestigationMembers.Role.LEAD ? "owner" : role.wire());
+            item.put("readOnly", role != InvestigationMembers.Role.LEAD);
             readable.add(item);
         }
         readable.sort(java.util.Comparator.comparing((Map<String, Object> m) -> String.valueOf(m.get("createdAt")))
@@ -574,7 +577,7 @@ public final class InvestigationRoutes implements RouteModule {
      * whether the fingerprint still matches — drift is reported, never silently served (G-E3).
      */
     private Object replay(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
-        Inv inv = open(api, ex, id);
+        Inv inv = openAsMember(api, ex, id);   // read-shaped (persists nothing): any member, not a Case member (LA-24 unchanged)
         int at = body.get("at") instanceof Number n ? n.intValue() : -1;
         boolean reread = Boolean.TRUE.equals(body.get("reread"));
         List<Map<String, Object>> log = readLog(inv);
@@ -1594,29 +1597,45 @@ public final class InvestigationRoutes implements RouteModule {
      * {@code /dossier} still served the same content and {@code /ops} still wrote.
      */
     public static Inv open(ApiContext api, HttpExchange ex, String id) throws IOException {
-        return open(api, ex, id, true);
+        return open(api, ex, id, Need.LEAD, false);
+    }
+
+    /** What the caller needs of the Investigation (D7-1; design §9). Every need still passes R3 and the Enterprise PDP. */
+    private enum Need {
+        /** Any member (lead, analyst, reviewer) reads. */
+        READ,
+        /** A lead: writes the main log and manages members; the only writer in D7-1. */
+        LEAD,
+        /** Decides a pending four-eyes expand (D-U7): a lead or reviewer; without a membership record, any Subject (legacy). */
+        APPROVE
     }
 
     /**
-     * {@code ownerOnly = false} is the four-eyes APPROVER exception (D-U7), and the only one: someone other than the
-     * owner must be able to reach a pending request to decide it. Everything else still applies — the R3 Dataset gate
-     * and the Enterprise PDP judge the approver exactly as they would the owner.
+     * The four-eyes APPROVER gate (D-U7): someone other than the owner must be able to reach a pending request to
+     * decide it. Where the Investigation has a membership record only a lead or reviewer may; without one, as before,
+     * any Subject holding {@code canApproveLinkExpansions}. R3 and the Enterprise PDP still judge the approver.
      */
-    private static Inv open(ApiContext api, HttpExchange ex, String id, boolean ownerOnly) throws IOException {
-        return open(api, ex, id, ownerOnly, false);
+    private static Inv openForApproval(ApiContext api, HttpExchange ex, String id) throws IOException {
+        return open(api, ex, id, Need.APPROVE, false);
     }
 
     /**
-     * LA-24: the READ gate — the owner, OR a member of the Investigation's linked Case
-     * ({@link InvestigationCaseRoutes#grants}, decided live on every read). Only the read routes (log, Working Set,
-     * Dossier, measures, coverage (A9), the Case link itself) open through this; every write stays on {@link #open}, owner-only.
+     * LA-24 + D7-1: the READ gate — any MEMBER of the Investigation (lead, analyst, reviewer; with no membership
+     * record the owner is the sole lead), OR a member of its linked Case ({@link InvestigationCaseRoutes#grants}, decided
+     * live on every read). Only the read routes (log, Working Set, Dossier, measures, coverage (A9), Graph Runs, the Case
+     * link itself) open through this; every write stays on {@link #open}, lead-only.
      * R3 and the Enterprise PDP below still judge a member, so they can only narrow the grant.
      */
     public static Inv openForRead(ApiContext api, HttpExchange ex, String id) throws IOException {
-        return open(api, ex, id, true, true);
+        return open(api, ex, id, Need.READ, true);
     }
 
-    private static Inv open(ApiContext api, HttpExchange ex, String id, boolean ownerOnly, boolean caseRead)
+    /** A read open to MEMBERS only (not Case members): the membership list. */
+    static Inv openAsMember(ApiContext api, HttpExchange ex, String id) throws IOException {
+        return open(api, ex, id, Need.READ, false);
+    }
+
+    private static Inv open(ApiContext api, HttpExchange ex, String id, Need need, boolean caseRead)
             throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis investigation");
         requireSafeId(id);
@@ -1626,26 +1645,49 @@ public final class InvestigationRoutes implements RouteModule {
         if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
         @SuppressWarnings("unchecked") Map<String, Object> header = ApiContext.JSON.readValue(raw, Map.class);
         Optional<Subject> subject = ApiContext.subject(ex);
-        if (ownerOnly && subject.isPresent() && !subject.get().id().equals(header.get("owner"))
-                && !(caseRead && InvestigationCaseRoutes.grants(api, ex, store, id, subject.get())))
-            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
+        Path dir = store.investigationDir(id);
+        Map<String, InvestigationMembers.Role> roles = InvestigationMemberStore.roles(dir, header.get("owner"));
+        ApiException roleRefusal = null;
+        if (subject.isPresent()) {
+            InvestigationMembers.Role role = roles.get(subject.get().id());
+            boolean admitted = switch (need) {
+                case LEAD -> role != null && role.canWriteMainLog();
+                case APPROVE -> !InvestigationMemberStore.explicit(dir) || role != null && role.canApprove();
+                case READ -> role != null && role.canRead()
+                        || caseRead && InvestigationCaseRoutes.grants(api, ex, store, id, subject.get());
+            };
+            // A MEMBER who may read but not do this already knows the Investigation exists, so say so (403); a
+            // non-member (and a Case member, who is not a member) keeps the 404 that reads as absence.
+            // The 403 waits until R3 and the PDP have had their say: a policy DENY hides the Investigation from a member too.
+            if (!admitted && role != null && need != Need.READ)
+                roleRefusal = new ApiException(403, ErrorCodes.PERMISSION_DENIED, "your role on investigation '" + id + "' is "
+                        + role.wire() + " — " + (need == Need.LEAD ? "only a lead changes it" : "only a lead or reviewer decides this"));
+            else if (!admitted) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
+        }
         String dataset = String.valueOf(header.get("dataset"));
         Optional<Map<String, Object>> ds = DatasetProviders.require().dataset(writeRoot, dataset);
         if (ds.isPresent() && !ComponentAccess.canView(ex, ds.get()))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + dataset + "'");
         Inv inv = new Inv(store, writeRoot, id, header);
-        if (!RowScope.visible(ex, "investigation", resource(inv)))   // Enterprise PDP (D-E7); a DENY reads as absence
+        if (!RowScope.visible(ex, "investigation", resource(inv, roles)))   // Enterprise PDP (D-E7); a DENY reads as absence
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
+        if (roleRefusal != null) throw roleRefusal;
         return inv;
     }
 
-    /** What the Enterprise PDP judges: the Investigation's id, owner, bound Dataset and (for a fork) parent. */
-    static Map<String, Object> resource(Inv inv) {
+    /**
+     * What the Enterprise PDP judges: the Investigation's id, owner, bound Dataset, (for a fork) parent, and
+     * {@code members} — the current role map {@code subject → lead|analyst|reviewer} (D7-1), so a policy can key on it.
+     * The PDP can only NARROW access: it is consulted after the member rule, a DENY hides the Investigation even from
+     * a lead, and an ALLOW or ABSTAIN grants nothing.
+     */
+    static Map<String, Object> resource(Inv inv, Map<String, InvestigationMembers.Role> roles) {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("id", inv.id());
         r.put("owner", inv.header().get("owner"));
         r.put("dataset", inv.dataset());
         if (inv.header().get("parent") instanceof Map<?, ?> p) r.put("parent", p.get("id"));
+        r.put("members", InvestigationMembers.asWire(roles));
         return r;
     }
 
@@ -1760,7 +1802,7 @@ public final class InvestigationRoutes implements RouteModule {
         if (subject.isEmpty())
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "four-eyes needs an authenticated Subject — without one, the requester and "
                     + "the approver cannot be told apart");
-        Inv inv = open(api, ex, id, false);
+        Inv inv = openForApproval(api, ex, id);
         if (!SnapshotStore.SAFE_ID.matcher(rid).matches())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "request id must match " + SnapshotStore.SAFE_ID.pattern() + ", got '" + rid + "'");
         String reason = ApiContext.str(body, "reason");
@@ -1943,7 +1985,7 @@ public final class InvestigationRoutes implements RouteModule {
         return v;
     }
 
-    private static Object lock(Path p) {
+    static Object lock(Path p) {
         return LOCKS.computeIfAbsent(p.toAbsolutePath().normalize(), k -> new Object());
     }
 

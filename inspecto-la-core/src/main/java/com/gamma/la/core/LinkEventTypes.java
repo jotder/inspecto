@@ -108,6 +108,14 @@ public final class LinkEventTypes {
      *  reference is a pointer, never dereferenced and never trusted. */
     public static final String LINK_INVESTIGATION_REFERENCE_ADDED = "LINK_INVESTIGATION_REFERENCE_ADDED";
 
+    /** A member was granted a role on an Investigation ({@code POST /inv/investigations/{id}/members}, D7-1) by a lead.
+     *  {@code investigationId}, {@code subject}, {@code role} and {@code actor} — structured attributes only. */
+    public static final String LINK_INV_MEMBER_GRANTED = "LINK_INV_MEMBER_GRANTED";
+
+    /** A member's role on an Investigation was revoked ({@code POST …/members/revoke}, D7-1) by a lead.
+     *  {@code investigationId}, {@code subject}, {@code role} (the role removed) and {@code actor}. */
+    public static final String LINK_INV_MEMBER_REVOKED = "LINK_INV_MEMBER_REVOKED";
+
     /** An Investigation's Working Set was read as a derived relation ({@code GET /inv/investigations/{id}/working-set},
      *  LA-20). {@code relation} (entities | links | excluded), {@code rows} served, {@code total},
      *  {@code truncated}, {@code cached} and the relation {@code key} (the sealed log's hash) — the LA-04

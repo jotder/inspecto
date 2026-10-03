@@ -167,9 +167,11 @@ public final class InvestigationCaseRoutes implements RouteModule {
         out.put("linkedBy", link == null ? null : link.get("linkedBy"));
         out.put("linkedAt", link == null ? null : link.get("linkedAt"));
         Optional<Subject> s = ApiContext.subject(ex);
-        boolean owner = s.isEmpty() || Objects.equals(s.get().id(), inv.header().get("owner"));
-        out.put("access", owner ? "owner" : "case-member");
-        out.put("readOnly", !owner);
+        com.gamma.la.core.InvestigationMembers.Role role = s.isEmpty() ? com.gamma.la.core.InvestigationMembers.Role.LEAD
+                : InvestigationMemberStore.roles(inv.dir(), inv.header().get("owner")).get(s.get().id());
+        out.put("access", role == null ? "case-member"
+                : role == com.gamma.la.core.InvestigationMembers.Role.LEAD ? "owner" : role.wire());
+        out.put("readOnly", role != com.gamma.la.core.InvestigationMembers.Role.LEAD);
         Optional<CasePort> cases = CasePorts.available(api);
         boolean ops = cases.isPresent();
         // plan §5.10: say what grants() will do — a closed, vanished or non-Case link shares nothing (fail closed).

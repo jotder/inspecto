@@ -13,3 +13,4 @@ com.gamma.la.api.InvestigationCaseRoutes
 com.gamma.la.api.EntityIdentityRoutes
 com.gamma.la.api.GraphRunRoutes
 com.gamma.la.api.IndexRoutes
+com.gamma.la.api.InvestigationMemberRoutes

@@ -47,6 +47,10 @@ final class CapabilityManifest {
             new Entry("DELETE", "/inv/investigations/([^/]+)/case", Roles.CAN_MANAGE_INCIDENTS),
             // InvestigationReferenceRoutes (D-6) — an external reference is appended beside the op log, so it is Case work too.
             new Entry("POST", "/inv/investigations/([^/]+)/references", Roles.CAN_MANAGE_INCIDENTS),
+            // InvestigationMemberRoutes (D7-1) — granting or revoking a member changes who may act on the evidence, so it is
+            // Case work like every Investigation write; the real gate is the handler's LEAD check (403 for a non-lead member).
+            new Entry("POST", "/inv/investigations/([^/]+)/members", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/inv/investigations/([^/]+)/members/revoke", Roles.CAN_MANAGE_INCIDENTS),
             // EntityListRoutes (LA-17) — an Entity List is appended to the Space's identity fact log, evidence
             // like the op log, so changing one is Case work. The two GETs are reads (Space access only).
             new Entry("POST", "/entity-lists", Roles.CAN_MANAGE_INCIDENTS),
