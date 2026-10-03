@@ -56,6 +56,33 @@ public final class DraftStore {
     public static final Mover ATOMIC = (from, to) -> Files.move(from, to, StandardCopyOption.ATOMIC_MOVE);
     public static volatile Mover mover = ATOMIC;
 
+    /** Bounded retries of a rename Windows refuses transiently (see {@link #moveRetrying}). */
+    static final int MOVE_ATTEMPTS = 20;
+
+    /**
+     * {@link #mover} with a bounded retry on {@link java.nio.file.AccessDeniedException}. On Windows a directory rename is refused
+     * while ANY handle is open inside the tree - here the just-written {@code header.json} being scanned by antivirus / the search
+     * indexer (our own writes close their handles). The D7-7 bench saw 4 of 50 concurrent forks hit it. Same stance as
+     * {@code IndexStore.moveCurrent}: retry with backoff (5 ms doubling to 80 ms, ~1.2 s in all), then rethrow the denial
+     * so the route answers 503. Never a copy fallback: the move is all-or-nothing.
+     */
+    static void moveRetrying(Path from, Path to) throws IOException {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                mover.move(from, to);
+                return;
+            } catch (java.nio.file.AccessDeniedException denied) {
+                if (attempt >= MOVE_ATTEMPTS) throw denied;
+                try {
+                    Thread.sleep(Math.min(80L, 5L << Math.min(attempt - 1, 4)));
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw denied;
+                }
+            }
+        }
+    }
+
     /** TEST SEAM (D7-5): called before each main-log append of a promote with the step about to be written; a test throws to prove the rollback. */
     public static volatile java.util.function.IntConsumer promoteHook = step -> { };
 
@@ -97,7 +124,7 @@ public final class DraftStore {
                 deleteTree(tmp);
                 return false;
             }
-            mover.move(tmp, target);
+            moveRetrying(tmp, target);
             return true;
         } catch (IOException | RuntimeException failed) {
             deleteTree(tmp);   // best effort: nothing was moved in, the scratch dir is all that exists
@@ -268,9 +295,9 @@ public final class DraftStore {
             Files.createDirectories(tmp.resolve("sets"));
             for (int i = 0; i < sets.size(); i++)
                 Files.writeString(tmp.resolve("sets").resolve(setSteps.get(i) + ".json"), sets.get(i), StandardCharsets.UTF_8);
-            mover.move(draftDir, old);
+            moveRetrying(draftDir, old);
             try {
-                mover.move(tmp, draftDir);
+                moveRetrying(tmp, draftDir);
             } catch (IOException | RuntimeException second) {
                 try {
                     Files.move(old, draftDir, StandardCopyOption.ATOMIC_MOVE);

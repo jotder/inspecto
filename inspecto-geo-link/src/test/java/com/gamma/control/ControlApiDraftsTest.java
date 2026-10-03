@@ -559,6 +559,26 @@ class ControlApiDraftsTest {
         }
     }
 
+    @Test
+    void aForkWhoseRenameStaysDeniedAnswers503AndLeavesNothing(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "masking_mode: none\nindex:\n  enabled: true\n")) {
+            team(c);
+            build(c);
+            DraftStore.mover = (from, to) -> { throw new java.nio.file.AccessDeniedException(from.toString()); };
+            HttpResponse<String> busy = send(c, "POST", DRAFTS, "{}", A);
+            assertEquals(503, busy.statusCode(), busy.body());
+            assertTrue(message(busy).contains("busy"), busy.body());
+            Path drafts = invDir(c).resolve("drafts");
+            try (Stream<Path> s = Files.isDirectory(drafts) ? Files.list(drafts) : Stream.<Path>empty()) {
+                assertEquals(0, s.count(), "no partial or scratch directory");
+            }
+            assertFalse(pinsText(c).contains("draft-"), "no pin: " + pinsText(c));
+            DraftStore.mover = DraftStore.ATOMIC;
+            fork(c, A, "{}");
+        }
+    }
+
     // -- concurrency and failed appends ---------------------------------------------------------------------------
 
     @Test

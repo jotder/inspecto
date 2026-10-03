@@ -1142,7 +1142,9 @@ Design and decisions D6-1…D6-7: [`la-separation-d6-design.md`](../../../archiv
   reads another's Draft (D7-Q8), an analyst gets the 404 of absence; only the ACTOR writes (a lead or reviewer gets 403); the actor or
   a lead discards (a reviewer 403). **Pins:** fork pins the CURRENT version of every index serving the bound columns
   (`IndexStore.pins().pin(version, draftId)`); none when there is no index (D7-Q2 - the Draft still works, reads are sealed at use);
-  discard unpins; fork is assembled in a scratch dir and renamed in (a failed rename leaves no directory and no pin). **Discard** keeps
+  discard unpins; fork is assembled in a scratch dir and renamed in (a failed rename leaves no directory and no pin). The rename (fork and both rebase renames, `DraftStore.moveRetrying`) retries a Windows
+  `AccessDeniedException` up to 20 times with 5-80 ms backoff (an antivirus / indexer handle on the fresh `header.json` blocks a
+  directory rename; the D7-7 bench saw 4 of 50 forks hit it); still denied, the fork answers **503 `STORE_BUSY`** and leaves nothing. **Discard** keeps
   `header.json` + `discarded.json` (who, when, head, log hash) and DELETES the log and sets (sealed rows may hold personal data); the
   per-step audit events keep the ops. No dossier, bundle or evidence route exists for a Draft (D20). Audit: `LINK_DRAFT_FORKED` /
   `_OP_APPENDED` / `_UNDONE` / `_DISCARDED` (ids, actor, steps - never rows).

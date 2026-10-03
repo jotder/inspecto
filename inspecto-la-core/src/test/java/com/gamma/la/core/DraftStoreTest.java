@@ -44,6 +44,32 @@ class DraftStoreTest {
     }
 
     @Test
+    void aForkRenameDeniedTransientlyIsRetriedAndOneDeniedForGoodLeavesNothing(@TempDir Path inv) throws Exception {
+        // Windows refuses a directory rename while a scanner holds a handle inside it (D7-7: 4 of 50 forks)
+        String id = DraftStore.newId();
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        DraftStore.mover = (from, to) -> {
+            if (calls.incrementAndGet() <= 3) throw new java.nio.file.AccessDeniedException(from.toString());
+            DraftStore.ATOMIC.move(from, to);
+        };
+        assertTrue(DraftStore.create(inv, id, "{\"draftId\":\"" + id + "\"}"));
+        assertEquals(4, calls.get());
+        assertEquals(List.of(id), DraftStore.listIds(inv));
+        assertEquals(1, entries(DraftStore.draftsDir(inv)), "no scratch directory remains");
+
+        String other = DraftStore.newId();
+        calls.set(0);
+        DraftStore.mover = (from, to) -> {
+            calls.incrementAndGet();
+            throw new java.nio.file.AccessDeniedException(from.toString());
+        };
+        assertThrows(java.nio.file.AccessDeniedException.class, () -> DraftStore.create(inv, other, "{}"));
+        assertEquals(DraftStore.MOVE_ATTEMPTS, calls.get(), "bounded");
+        assertNull(DraftStore.readHeader(inv, other));
+        assertEquals(1, entries(DraftStore.draftsDir(inv)), "no partial or scratch directory");
+    }
+
+    @Test
     void createStagesThenRenamesAndAFailedRenameLeavesNothing(@TempDir Path inv) throws Exception {
         String id = DraftStore.newId();
         DraftStore.mover = (from, to) -> { throw new IOException("injected rename failure"); };

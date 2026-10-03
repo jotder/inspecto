@@ -200,6 +200,10 @@ public final class DraftRoutes implements RouteModule {
                 header.put("pins", pins);
                 if (!DraftStore.create(inv.dir(), draftId, canonical(header)))
                     throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + draftId + "' already exists");
+            } catch (java.nio.file.AccessDeniedException busy) {
+                // the fork's rename stayed refused after DraftStore's bounded retries (a Windows transient lock): nothing was moved in
+                unpinAll(inv.writeRoot(), inv.dataset(), pinned, draftId);
+                throw new ApiException(503, ErrorCodes.STORE_BUSY, "the Draft store is busy - the fork was not made; retry");
             } catch (IOException | RuntimeException failed) {
                 unpinAll(inv.writeRoot(), inv.dataset(), pinned, draftId);   // a failed fork leaves no pin behind either
                 throw failed;

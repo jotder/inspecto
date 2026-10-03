@@ -335,6 +335,14 @@ flat edge file (D-3 step 1 measurement) — disk, not memory. §12 D7-Q3 decides
     think time they ran at the solo latency; the closed-loop rise is CPU saturation, which an admission queue would turn into waiting,
     not into speed. Still open: (2) the cap and idle periods as `link-analysis.toon` keys, and the promote cost (below), both in
     `LA-DRAFT-PROMOTE-COST-1`.
+  * **D7-7 note - fork rename denied on Windows (fixed 2026-10-03).** The bench saw 4 of 50 forks fail with
+    `AccessDeniedException` on `DraftStore.create`'s `ATOMIC_MOVE` of the `.fork-*` scratch dir. Not a leaked handle: every write
+    there closes its stream; Windows refuses a directory rename while ANY handle is open inside it, and the just-written `header.json`
+    is a transient antivirus / indexer target. Fix as `IndexStore.moveCurrent`: `DraftStore.moveRetrying` (fork + both rebase
+    renames) retries the denial 20 times, 5 ms doubling to 80 ms (~1.2 s), never a copy fallback; exhausted, the fork route answers
+    503 `STORE_BUSY` and unpins - no scratch, no Draft, no pin. Tests: `DraftStoreTest` (transient then permanent denial),
+    `ControlApiDraftsTest.aForkWhoseRenameStaysDeniedAnswers503AndLeavesNothing`; both mutation-checked. The bench retry is now
+    redundant.
 
 * **As built (D7-7, 2026-10-03) - `DraftConcurrencyBench` on real Draft state at 10^8 edges.** The bench now drives the shipped
   seams instead of plain JDBC: a real 32-bucket index from `IndexBuilder` (10^8 edges over 2x10^7 nodes, the D-S1 power law), read
