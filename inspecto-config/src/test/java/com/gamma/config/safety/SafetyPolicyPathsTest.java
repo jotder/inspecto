@@ -167,10 +167,7 @@ class SafetyPolicyPathsTest {
     @Test
     void aWorkerHandedTheRunWithPinnedSeesBothTheDenyRootsAndTheEgressTier() throws Exception {
         Path s1 = space(CurrentSpace.DEFAULT_SPACE_ID);
-        policy(s1, "deny:
-  roots[1]: " + fwd(s1.resolve("secrets")) + "
-  hosts[1]: bad.example
-");
+        policy(s1, "deny:\n  roots[1]: " + fwd(s1.resolve("secrets")) + "\n  hosts[1]: bad.example\n");
         Path target = s1.resolve("secrets").resolve("k");
 
         AtomicReference<Boolean> pathRefused = new AtomicReference<>();
