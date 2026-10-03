@@ -218,6 +218,30 @@ PDP resource gains `members` and, for Draft routes, `draftId` + `actor`. Non-mem
 direct writer of the main log becomes *promote*; `POST …/ops` on the main log stays lead-only. This **amends signed
 D-E7's Professional answer** (owner-only) — it must be recorded as an amendment, not done silently (D7-Q1).
 
+**As built (D7-1, 2026-10-03).** Recorded as an in-place amendment of the D-E7 row in
+`archived-documents/plans-archive/link-analysis-backlog-plan.md` (the only place that decision lives) and in the OKF
+`link-analysis.md` (*Investigation members*). What the code does, where it differs from the table above:
+
+| Route group | lead | analyst | reviewer | Case member | stranger |
+|---|---|---|---|---|---|
+| Read: `log`, `working-set`, `dossier` (+ `verify`, `bundle`, `bundle/verify`), `measures`, `coverage`, `references`, `case` (GET), the list | ✓ | ✓ | ✓ | ✓ (unchanged) | 404 |
+| `replay`, `members` (GET) | ✓ | ✓ | ✓ | 404 (replay was never open to them) | 404 |
+| Graph Run start / get / list / cancel (the Investigation's read gate; a run stays its starter's) | ✓ | ✓ | ✓ | ✓ | 404 |
+| Write the main log: `ops`, `undo`, `reorder` (fork), `template`, `alert-rules`, `case` PUT/DELETE, `references` POST, `reveal` | ✓ | 403 | 403 | 404 | 404 |
+| Grant / revoke (`members`, `members/revoke`) | ✓ | 403 | 403 | 404 | 404 |
+| Approve / deny a pending expand (D-U7) | ✓ | 403 | ✓ | 404 | 404 |
+
+* **No `members.jsonl` = legacy**: the owner is the sole lead; the four-eyes approver stays "any holder of
+  `canApproveLinkExpansions`" there (narrowing it would change every existing Investigation). Once the file exists, only a
+  lead or reviewer may decide.
+* A member refused a lead-only route gets **403** (the caller already knows the Investigation exists); a non-member and a Case
+  member keep the 404 that reads as absence. The 403 is raised only after R3 and the PDP, so a policy DENY still reads as 404.
+* `reveal` and `reorder` (fork) are LEAD-only here although the table above does not name them: unmasking and copying sealed
+  rows into a new Investigation are not reads of the Working Set. ⚠ If analysts must unmask, that is a decision (D7-3's Draft
+  gate is the natural home), not an accident of this step.
+* The last lead cannot be revoked or demoted (422); the owner is only the FIRST lead and can be revoked once another lead exists.
+* The PDP resource gained `members` (`subject → lead|analyst|reviewer`, the owner included as lead when no record exists).
+
 ## 10. Threat model
 
 | Threat | Control |
@@ -243,7 +267,7 @@ and `sets/` are never evicted.**
 
 | Step | Content | Verify |
 |---|---|---|
-| D7-1 | Membership: `members.jsonl`, roles, gate change in `open`/`openForRead`, PDP resource gains `members`; D-E7 amendment recorded | real-HTTP tests: each role × each route; non-member 404; PDP DENY still hides from a lead |
+| D7-1 ✅ **BUILT 2026-10-03** | Membership: `members.jsonl`, roles, gate change in `open`/`openForRead`, PDP resource gains `members`; D-E7 amendment recorded | real-HTTP tests: each role × each route; non-member 404; PDP DENY still hides from a lead (`ControlApiInvestigationMembersTest`, `InvestigationMembersTest`) |
 | D7-2 | **BUILT 2026-10-03** (section 5 "As built"). Version pins survive: `IndexStore.gc` honours a pin set; reader pool spares pinned siblings | unit test: publish 3 versions with one pinned → pinned survives gc and pool borrow of CURRENT |
 | D7-3 | Draft store + routes: fork (baseStep, baseLogHash, pins), append, undo, log, discard | Draft `/replay` equivalence green; fork writes nothing on failure (fault-injected rename) |
 | D7-4 | Checkpointed append (fold from latest `sets/`), main log and Drafts | equal state hashes vs full re-fold on a 500-step fixture; append latency flat in log length |

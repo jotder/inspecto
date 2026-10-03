@@ -795,9 +795,11 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   fixed columns carrying provenance (`opSeq`, `seedId`, `hop`, and `reason` for exclusions), bounded with the
   true `total` + `truncated`, evaluated from the sealed log alone. It is **cached** under the hash of the
   committed log bytes, so an op, an undo or a fork can never be answered from a stale entry — and the access gate
-  runs before the cache on every read. **Who may read it (D-E7):** the owner only on Professional and below (a
-  non-owner reads 404; no fallback to Dataset sharing); on Enterprise additionally the `PolicyEngine`'s row
-  verdict for `resourceKind: investigation`, which can hide it even from its owner but never widens it. ⛔ It is
+  runs before the cache on every read. **Who may read it (D-E7, amended 2026-10-03 by D19):** a MEMBER of the
+  Investigation (lead, analyst or reviewer; the creator is the implicit lead, see *Investigation members* below) or
+  a linked-Case member on Professional and below (anyone else reads 404; no fallback to Dataset sharing); on
+  Enterprise additionally the `PolicyEngine`'s row verdict for `resourceKind: investigation`, which can hide it even
+  from a lead but never widens it. ⛔ It is
   **not** a Dataset or DuckDB view — `/bi` and `/db` cannot reach it; binding it to a Widget is LA-21.
   **SPA half (2026-09-23):** *Working Set rows* in the Investigation panel pages it with true offsets (200 a page,
   *Load more* appends) in a `<inspecto-data-table>` keyed `la-working-set-<relation>`, and states `truncated`,
@@ -1108,6 +1110,21 @@ The edge/node index of a Dataset ([`la-separation-d3-design.md`](../../../archiv
 Design and decisions D6-1…D6-7: [`la-separation-d6-design.md`](../../../archived-documents/plans-archive/la-separation-d6-design.md). Integration by reference, never by trust.
 
 * **External references.** `GET` / `POST /inv/investigations/{id}/references`, body `{system, type, id, url?, label?}`. Stored append-only in `references.jsonl` beside the op log (`SnapshotStore.appendReference`), OUTSIDE the write-once header and the Dossier manifest, so adding one never invalidates an issued Dossier. No edit or delete; a duplicate `(system, type, id)` and the 201st reference are 409. `POST` is `canManageIncidents` and owner-only; `GET` is the read gate (owner or linked-Case member). 🔴 A reference is **never trusted**: `trusted:false` on every record, never dereferenced, never read by the analysis, and it grants no access (a reference naming a Case shares nothing; only `PUT …/case` does). `url` is absolute `http` / `https`, with a host and no credentials, else 422. Audited `LINK_INVESTIGATION_REFERENCE_ADDED`.
+* **Investigation members** (D7-1, 2026-10-03; D19, which amends D-E7; `InvestigationMembers` in `inspecto-la-core`,
+  `InvestigationMemberStore` + `InvestigationMemberRoutes` in `inspecto-la-api`). Roles `lead · analyst · reviewer`,
+  an append-only `members.jsonl` beside `header.json` (`{seq, ts, actor, subject, role, op: grant|revoke}`); the
+  current role is the FOLD (last op per Subject wins; a revoke removes it). The creator is the implicit first lead, so an
+  Investigation with NO `members.jsonl` is owner-only exactly as before (nothing is migrated). The last lead cannot be
+  revoked or demoted (422). `GET …/members` (any member), `POST …/members {subject, role}` and
+  `POST …/members/revoke {subject}` (lead only; `canManageIncidents` plus the lead check; a non-lead member 403, a
+  non-member the 404 an unknown id gets); audited `LINK_INV_MEMBER_GRANTED` / `LINK_INV_MEMBER_REVOKED`.
+  **The gate** is the one `InvestigationRoutes.open*`: every member READS (log, Working Set, Dossier and bundle,
+  measures, coverage, references, Case link, replay, Graph Runs, the list), only a lead WRITES the main log (ops, undo,
+  reorder, template, alert rules, Case link, references, reveal) and a member who may not gets 403; a Case member
+  (LA-24) still reads only, never replays; four-eyes approval (D-U7) is a lead or reviewer once the Investigation has a
+  members record (any holder of the capability before). R3 and the Enterprise PDP still judge every member and only
+  narrow: the PDP resource now carries `members` (`subject → role`), a DENY hides the Investigation even from a lead
+  and its 403s are withheld behind it. Analysts get their own Draft in D7-3; until then they read.
 * **Dossier bundle.** `GET /inv/investigations/{id}/dossier/bundle?at=&snapshots=` returns `inspecto-dossier-bundle/1`: the masked Dossier, the masked references, `custody {manifestRoot, referencesCount, referencesHash}` and a SHA-256 `seal` over the canonical JSON of everything but `seal` and `generatedAt`. `POST …/dossier/bundle/verify` (body a bundle, or `{bundle}`) answers `{verified, sealIntact, rootMatches, referencesIntact, referencesAddedSince, problems, custody}`: the seal, the embedded manifest root, that the bundle's references are still the first N of the store, then the SAME manifest comparison `/dossier/verify` runs (`DossierRoutes.verifyManifest`). A failure is a result, not an error. Audited `LINK_DOSSIER_EXPORTED` / `LINK_DOSSIER_BUNDLE_VERIFIED`.
 * **Masking, R3, four-eyes.** Masked per `maskingMode` as it leaves (references too); the manifest and `referencesHash` hash the RAW store, so the root is identical masked or not and a masked bundle verifies; the seal covers what shipped. Read gate = the Dossier's (owner or Case member, R3 on the Dataset and every snapshot, the Enterprise PDP). A pending sensitive expand is not in the sealed log, so it is not in the bundle.
 * **Gotchas.** The offline-checkable part is the seal and the manifest's own root; whether the store still agrees needs the verify route. `DossierRoutes` was split (`parseAt`, `parseSnapshotIds`, `maskedDossier`, `verifyManifest`) so the Dossier, its verify and the bundle share one build. The new `POST …/references` is a `CapabilityManifest` entry, the bundle verify a read-shaped exemption, all four routes are in `AbsentGeoLinkRoutes` and `openapi-v1.json`.
