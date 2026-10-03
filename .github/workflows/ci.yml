@@ -260,7 +260,7 @@ jobs:
       # compile that went green without recompiling the dependants). The fixture tests plant each blind spot and
       # were confirmed RED against the old behaviour. Pure Node, ~instant.
       - name: Tools — java-closure and compile-clean fixture tests
-        run: node --test tools/java-closure.test.mjs tools/compile-clean.test.mjs
+        run: node --test tools/java-closure.test.mjs tools/compile-clean.test.mjs tools/check-native-licences.test.mjs
 
       # Extracted-module dependency guard (LA separation D-1, Decision 5). The SPI modules and inspecto-la-graph exist so
       # Link Analysis can stand on a thin platform layer without the core; one convenient <dependency> on
@@ -296,7 +296,7 @@ jobs:
 
       # Native-licence guard (NATIVE-LICENCE-TEXTS-1, 2026-10-03): the GPL-3.0 / GCC exception / winpthreads
       # texts are verbatim (pinned sha256) and package.ps1 still stages them beside the intelligence sidecar.
-      - name: Guard — bundled native DLLs carry their licence texts
+      - name: Guard — bundled native libraries (.dll/.so/.dylib) carry licence texts and pinned hashes
         run: node tools/check-native-licences.mjs
 
       # Bundle-spaces guard (BUNDLE-UNTRACKED-SPACES-1, 2026-09-25). A demo bundle built in the shared

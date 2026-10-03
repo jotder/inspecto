@@ -712,7 +712,7 @@ if ($intelligenceJarSrc) {
     New-Item -ItemType Directory -Force "$bundleDir\licenses" | Out-Null
     Copy-Item "$licSrc\*" "$bundleDir\licenses\"
     & node (Join-Path $sandboxRoot 'tools\check-native-licences.mjs') --bundle $bundleDir
-    if ($LASTEXITCODE -ne 0) { throw "check-native-licences failed - a bundled native DLL lacks its licence text." }
+    if ($LASTEXITCODE -ne 0) { throw "check-native-licences failed - a bundled native library (.dll/.so/.dylib) is unclassified, unpinned, or lacks its licence text." }
 }
 # Every edition: remote acquisition is a core product capability (EDITIONS SP-ACQ-02 marks SFTP shipped in
 # all three), so the sidecar is NOT edition-gated. It is inert until a pipeline names a non-local

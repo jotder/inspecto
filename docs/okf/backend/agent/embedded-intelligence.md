@@ -409,6 +409,12 @@ UI half, result-shape adapters and the pane adoptions: [[inline-ai-authoring]].
   and `jnidispatch.dll` (JNA under its Apache option); the shade concatenates colliding `META-INF/LICENSE*`
   and merges `NOTICE*` (`NATIVE-LICENCE-SHADE-MERGE-1`). Every DLL ships a text; onnxruntime's own MIT text
   (`onnxruntime-MIT.txt`, fetched at tag `v1.20.0`) closed `NATIVE-LICENCE-ONNXRUNTIME-TEXT-1` on 2026-10-03.
+  **Linux/macOS natives (`NATIVE-LICENCE-LINUX-MACOS-1`, 2026-10-03):** the guard covers `.dll`, `.so`, `.dylib` and
+  `.jnilib`. Every native is classified by file name AND pinned by sha256 per jar entry (`natives.json` `pins`, computed
+  from the Maven Central jars); an unclassified or hash-mismatching native fails, and `artifacts` must equal the versions
+  in `tools/dependencies.lock`, so a bump of onnxruntime/tokenizers/JNA forces a re-pin. Fixture test:
+  `tools/check-native-licences.test.mjs` (run in CI). The Linux/macOS libs reuse their artifact's licence classification;
+  whether Linux `libtokenizers.so` statically links libstdc++ is NOT verified.
 
 ## Still open (parent plan archived 2026-07-25: `archived-documents/plans-archive/embedded-intelligence-plan.md`, §8)
 

@@ -1,5 +1,5 @@
 {
-  "_comment": "Every .dll inside the Enterprise intelligence sidecar (inspecto-intelligence.jar) must be listed here. 'texts' (required, non-empty, unless inJar names the licence notice inside the sidecar) are files in this directory that package.ps1 copies to the bundle's licenses/ dir; 'inJar' names a notice entry that must be present in the sidecar itself. NATIVE-LICENCE-TEXTS-1; see compliance/evidence/third-party-natives.md.",
+  "_comment": "Every native library (.dll, .so, .dylib, .jnilib) inside the Enterprise intelligence sidecar (inspecto-intelligence.jar) must be classified here by file name ('natives') AND pinned by sha256 per jar entry ('pins'); an unlisted or mismatching native fails tools/check-native-licences.mjs. 'texts' are files in this directory that package.ps1 copies to the bundle's licenses/ dir; 'inJar' names a notice entry that must be present in the sidecar itself. 'artifacts' ties the pins to the versions in tools/dependencies.lock - a version bump must re-pin. Pins were computed from the Maven Central jars of those versions (NATIVE-LICENCE-LINUX-MACOS-1, 2026-10-03). NATIVE-LICENCE-TEXTS-1; see compliance/evidence/third-party-natives.md.",
   "sha256": {
     "GPL-3.0.txt": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
     "GCC-exception-3.1.txt": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74",
@@ -7,7 +7,12 @@
     "Apache-2.0.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
     "onnxruntime-MIT.txt": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
   },
-  "dlls": {
+  "artifacts": {
+    "com.microsoft.onnxruntime:onnxruntime": "1.20.0",
+    "ai.djl.huggingface:tokenizers": "0.36.0",
+    "net.java.dev.jna:jna": "5.17.0"
+  },
+  "natives": {
     "libstdc++-6.dll": {
       "licence": "GPL-3.0-or-later WITH GCC-exception-3.1",
       "texts": [
@@ -58,6 +63,117 @@
       ],
       "inJar": "META-INF/AL2.0",
       "note": "net.java.dev.jna:jna ships no NOTICE file"
+    },
+    "libonnxruntime.so": {
+      "licence": "MIT",
+      "texts": [
+        "onnxruntime-MIT.txt"
+      ],
+      "inJar": "ThirdPartyNotices.txt",
+      "note": "onnxruntime's own LICENSE, fetched from github.com/microsoft/onnxruntime at tag v1.20.0 (operator-approved 2026-10-03); ThirdPartyNotices.txt in the jar covers its statically linked libraries"
+    },
+    "libonnxruntime.dylib": {
+      "licence": "MIT",
+      "texts": [
+        "onnxruntime-MIT.txt"
+      ],
+      "inJar": "ThirdPartyNotices.txt",
+      "note": "onnxruntime's own LICENSE, fetched from github.com/microsoft/onnxruntime at tag v1.20.0 (operator-approved 2026-10-03); ThirdPartyNotices.txt in the jar covers its statically linked libraries"
+    },
+    "libonnxruntime4j_jni.so": {
+      "licence": "MIT",
+      "texts": [
+        "onnxruntime-MIT.txt"
+      ],
+      "inJar": "ThirdPartyNotices.txt",
+      "note": "onnxruntime's own LICENSE, fetched from github.com/microsoft/onnxruntime at tag v1.20.0 (operator-approved 2026-10-03); ThirdPartyNotices.txt in the jar covers its statically linked libraries"
+    },
+    "libonnxruntime4j_jni.dylib": {
+      "licence": "MIT",
+      "texts": [
+        "onnxruntime-MIT.txt"
+      ],
+      "inJar": "ThirdPartyNotices.txt",
+      "note": "onnxruntime's own LICENSE, fetched from github.com/microsoft/onnxruntime at tag v1.20.0 (operator-approved 2026-10-03); ThirdPartyNotices.txt in the jar covers its statically linked libraries"
+    },
+    "libtokenizers.so": {
+      "licence": "Apache-2.0",
+      "texts": [
+        "Apache-2.0.txt"
+      ],
+      "note": "ai.djl.huggingface:tokenizers ships no NOTICE file"
+    },
+    "libtokenizers.dylib": {
+      "licence": "Apache-2.0",
+      "texts": [
+        "Apache-2.0.txt"
+      ],
+      "note": "ai.djl.huggingface:tokenizers ships no NOTICE file"
+    },
+    "libjnidispatch.so": {
+      "licence": "Apache-2.0 (JNA is LGPL-2.1-or-later OR Apache-2.0; Inspecto takes it under the Apache-2.0 option)",
+      "texts": [
+        "Apache-2.0.txt"
+      ],
+      "inJar": "META-INF/AL2.0",
+      "note": "net.java.dev.jna:jna ships no NOTICE file"
+    },
+    "libjnidispatch.jnilib": {
+      "licence": "Apache-2.0 (JNA is LGPL-2.1-or-later OR Apache-2.0; Inspecto takes it under the Apache-2.0 option)",
+      "texts": [
+        "Apache-2.0.txt"
+      ],
+      "inJar": "META-INF/AL2.0",
+      "note": "net.java.dev.jna:jna ships no NOTICE file"
     }
+  },
+  "pins": {
+    "ai/onnxruntime/native/linux-aarch64/libonnxruntime.so": "fd7ec997121748668da52a0ec76d1aa6a9096dbd598cad743d56a4fa37ee9f97",
+    "ai/onnxruntime/native/linux-aarch64/libonnxruntime4j_jni.so": "511f340ea2fcf0f5cfb6c7cda743331c6e03610ca515ea3f30f568f3b1126134",
+    "ai/onnxruntime/native/linux-x64/libonnxruntime.so": "6097fe8cedc8b5b3c8e107e9c2acf04eb50f58f0f045e3d7c5c50ead38112c72",
+    "ai/onnxruntime/native/linux-x64/libonnxruntime4j_jni.so": "d9633f11b90952a1323230279bf0e33677f1d9b0af0dca781113d808c1c0e76e",
+    "ai/onnxruntime/native/osx-aarch64/libonnxruntime.dylib": "0fa849531608a00c40d2b84d02b1a8615033a95fa2cee00b98943cf88f7ee9f6",
+    "ai/onnxruntime/native/osx-aarch64/libonnxruntime.dylib.dSYM/Contents/Resources/DWARF/libonnxruntime.dylib": "cb65effda6c833743f4a20b1ef7f61286dfa767503383bfb336e29a006b4d0e0",
+    "ai/onnxruntime/native/osx-aarch64/libonnxruntime4j_jni.dylib": "c5cf06301743911c3e5828a142f026a233f2d7318b38c4cd519f71e61f6c44c0",
+    "ai/onnxruntime/native/osx-aarch64/libonnxruntime4j_jni.dylib.dSYM/Contents/Resources/DWARF/libonnxruntime4j_jni.dylib": "fb6a3745b69db7d953cd89359fe3964e5a971199ee543df40434d401b55d32dd",
+    "ai/onnxruntime/native/osx-x64/libonnxruntime.dylib": "f42eb10cd3801e1e86f089016d517e788ee2b46d6227225a2ad46b0ce0593816",
+    "ai/onnxruntime/native/osx-x64/libonnxruntime.dylib.dSYM/Contents/Resources/DWARF/libonnxruntime.dylib": "73460f715e18dee0fff4eb343223c269ebfb8eceec36a12907a04d7dda33d7f3",
+    "ai/onnxruntime/native/osx-x64/libonnxruntime4j_jni.dylib": "65f09705c20e003ef1e98238efbb14c7e65e00a578aa1cc78e1b362c80484013",
+    "ai/onnxruntime/native/osx-x64/libonnxruntime4j_jni.dylib.dSYM/Contents/Resources/DWARF/libonnxruntime4j_jni.dylib": "9df055853bcc8e6edef0eb7249454667c777448a115508100daa3a059f238542",
+    "ai/onnxruntime/native/win-x64/onnxruntime.dll": "fc540584294ee523643b538de6a4573cda6f60a3f041f5e19c9a92ef1a21f856",
+    "ai/onnxruntime/native/win-x64/onnxruntime4j_jni.dll": "b19d869ebd53b688912e7624c88fd759d9ec5c2c650df6cf25c7344592cefaf8",
+    "com/sun/jna/darwin-aarch64/libjnidispatch.jnilib": "70c9af22ba3ce12128881b4654422ce69a6f96fc238333731cf718601b536245",
+    "com/sun/jna/darwin-x86-64/libjnidispatch.jnilib": "69cca8bbe2f0ff3fc412481e73333d5b49fc3a1ba2ff564a0af9495d7e6b531d",
+    "com/sun/jna/dragonflybsd-x86-64/libjnidispatch.so": "c0c6e64b476d726d86e996af1397491bbff9ccadcba1e0c4639a8f1ae5454062",
+    "com/sun/jna/freebsd-aarch64/libjnidispatch.so": "bca4aece4b834fd04301d5896482f657d06d6860e2d03089c0cc78eea65dd492",
+    "com/sun/jna/freebsd-x86-64/libjnidispatch.so": "3c4d14c74bb6798c76b43cad4395b8bdaa9181a7991e160a376f87bb1ab13ced",
+    "com/sun/jna/freebsd-x86/libjnidispatch.so": "784b2a955b1504dec96fa8b87972bcb2815ecfa818fe5c2e57ed9073cab0592c",
+    "com/sun/jna/linux-aarch64/libjnidispatch.so": "f18fa2c973b2b9ea2dfa6d36d397e0bb743aa2aa09876e2a3b8c87a5e67bf8b6",
+    "com/sun/jna/linux-arm/libjnidispatch.so": "b2a32135dea251fde4027f536345420001bc921e21baf82b2e01ce2753da2097",
+    "com/sun/jna/linux-armel/libjnidispatch.so": "d9db010b0336cdbf643c38921c1c04519f811bee0f45824b6872661a25d64ed2",
+    "com/sun/jna/linux-loongarch64/libjnidispatch.so": "6c55d9ec3efaaee1843795648246b3fe52de09d3990984c5b8a580cc803c6bc9",
+    "com/sun/jna/linux-mips64el/libjnidispatch.so": "0025cd4345faec5a7d9fc8c88f187016dbaf4a6ef411cd6c8907e199d952528d",
+    "com/sun/jna/linux-ppc/libjnidispatch.so": "fbde8c5b108934e75c7008562e95b209535bf4996b3bc246ec5e425a0757a903",
+    "com/sun/jna/linux-ppc64le/libjnidispatch.so": "aaa31a2220e270f69259d930540c5682b1bd662a6d774918605e62cd562d5d11",
+    "com/sun/jna/linux-riscv64/libjnidispatch.so": "f817ac611184e31fd84ac2d223ff8f9312300fbc025adfb5cadbfefb8d1a2c13",
+    "com/sun/jna/linux-s390x/libjnidispatch.so": "b31df7050aa22907e5caae2ef81db83e2900b7b6e683080f6f5681373a71e400",
+    "com/sun/jna/linux-x86-64/libjnidispatch.so": "ca07953d595210082339753d9e818a1fdb40509a17a41914d9a2cb0d2df6b6af",
+    "com/sun/jna/linux-x86/libjnidispatch.so": "546ec7cc6548de411cc52a1069295301308437080be014cda2346ccd0f99bf55",
+    "com/sun/jna/openbsd-x86-64/libjnidispatch.so": "d0eda029037f25c4b3d63923a3875345ecd1922de1e6e5df4162cc5631dc0deb",
+    "com/sun/jna/openbsd-x86/libjnidispatch.so": "c1837623157a7b51d586423b2500554634150d17a0b3f369ca9333af1189f9d4",
+    "com/sun/jna/sunos-sparc/libjnidispatch.so": "5ae26c1d50dd6836d0bafb1af2a6c39eb4084be42f0a05da0645d31feed1efad",
+    "com/sun/jna/sunos-sparcv9/libjnidispatch.so": "ccd720895968a885d423facf63615c7f16490f94d946ecb5fefdd4951c62297c",
+    "com/sun/jna/sunos-x86-64/libjnidispatch.so": "4a0b0b11369d4f88437700e8ee3557cb518ec017bfe2df3bd49faf82e60e8f8e",
+    "com/sun/jna/sunos-x86/libjnidispatch.so": "fdba3f2f4220fb407c7841b2f49efd4fe1c06dca26c9768513e13461ed1520c5",
+    "com/sun/jna/win32-aarch64/jnidispatch.dll": "b8f98be314234cf12b5b46c29652f70c0f6abb93ae19b63d3fe2692062aa699d",
+    "com/sun/jna/win32-x86-64/jnidispatch.dll": "5a7ff949f6d93d86491eb5b26b1cfc60051168a60622650224b89995ac420023",
+    "com/sun/jna/win32-x86/jnidispatch.dll": "752d597cee7e95cb517327146bf42f124c0d6c0bc48b3ecc3b1b3b0531a52f44",
+    "native/lib/linux-aarch64/cpu/libtokenizers.so": "80e06fa2788026051a8426899f21698de25326905112f487cc4132b6d664942c",
+    "native/lib/linux-x86_64/cpu/libtokenizers.so": "9cf6f9885eb5567c1fbcfa0ea87df5ddc5b8291ff9e85149d12de3f28210923a",
+    "native/lib/osx-aarch64/cpu/libtokenizers.dylib": "6e90a1774196d9d34526a5dea756ec3d2349a6b35b101bccddf59b9f619c27e7",
+    "native/lib/win-x86_64/cpu/libgcc_s_seh-1.dll": "32ce10abc802edc83c36d62e0e9f9389bab0c4bfeacf01cc98726da81094b80a",
+    "native/lib/win-x86_64/cpu/libstdc++-6.dll": "a0b8f623f0da655a30873ef7d6b6be0e6942c34535abcaecce142fa0ab1cef4f",
+    "native/lib/win-x86_64/cpu/libwinpthread-1.dll": "567ca7ae7ecdfb8799b28c41ac3d1a2cc46f4ee2e72c511f027c44250498e893",
+    "native/lib/win-x86_64/cpu/tokenizers.dll": "7590b1cfed9ec4b934c060ba7b2b5736b9b450e2b5255f28c0704a7d0f52eacb"
   }
 }

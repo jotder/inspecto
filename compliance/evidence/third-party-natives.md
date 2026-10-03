@@ -38,6 +38,13 @@ stages the sidecar. It then runs `tools/check-native-licences.mjs --bundle`, whi
 the jar is not classified, an `inJar` notice is missing, or a required text is absent. CI runs the same guard
 without `--bundle`, which checks the text hashes and the package.ps1 wiring.
 
+**Linux and macOS natives (`NATIVE-LICENCE-LINUX-MACOS-1`, 2026-10-03).** The same guard now covers every `.so`, `.dylib` and
+`.jnilib` in the sidecar (47 native jar entries across onnxruntime 1.20.0, tokenizers 0.36.0 and JNA 5.17.0, all
+platforms). Each is classified by file name to its artifact's licence and its sha256 is pinned per jar entry in `natives.json`
+(`pins`); an unclassified or mismatching native fails CI and `package.ps1`. `natives.json` `artifacts` is cross-checked against
+`tools/dependencies.lock`. **Not verified:** whether the Linux/macOS `libtokenizers` builds statically link GCC or other
+third-party runtimes needing their own texts (the Windows build visibly bundles MinGW DLLs; the others carry no such files).
+
 **Shade merge (`NATIVE-LICENCE-SHADE-MERGE-1`, shipped 2026-10-03).** `inspecto-intelligence/pom.xml` concatenates colliding `META-INF/LICENSE`, `LICENSE.txt` and `LICENSE.md` (`AppendingTransformer`) and merges `NOTICE*` (`ApacheNoticeResourceTransformer`), so no artifact's licence file is dropped first-wins. `check-native-licences` requires a shipped text for every DLL; the only exception is a `textPending` that names an open backlog row.
 
 **onnxruntime (`NATIVE-LICENCE-ONNXRUNTIME-TEXT-1`, shipped 2026-10-03).** Its own MIT `LICENSE` is in neither the jar nor
