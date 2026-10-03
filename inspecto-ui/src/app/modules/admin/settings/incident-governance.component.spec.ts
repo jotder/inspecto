@@ -72,6 +72,14 @@ describe('IncidentGovernanceComponent', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('draws the state diagram from the table and follows edits', () => {
+        const { c, fixture, el } = setup();
+        expect(el.querySelectorAll('svg[role="img"] rect')).toHaveLength(3);
+        c.transitions.at(0).patchValue({ to: 'LIMBO' });
+        fixture.detectChanges();
+        expect(el.querySelector('svg[role="img"]')?.getAttribute('aria-label')).toContain('IDENTIFIED to LIMBO');
+    });
+
     it('creates the workflow component when none is stored yet', () => {
         const { c, fixture, components, button } = setup();
         c.addTransition();

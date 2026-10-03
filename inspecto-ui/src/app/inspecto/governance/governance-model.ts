@@ -162,3 +162,70 @@ export function describeEscalationRule(c: Record<string, unknown>): string {
     const scope = c['priority'] ? ` ${String(c['priority'])}` : '';
     return `${String(c['objectType'] ?? '')}${scope} ${when}: ${does.join(', ')}`;
 }
+
+export interface DiagramNode {
+    id: string;
+    column: number;
+    row: number;
+    terminal: boolean;
+    initial: boolean;
+    /** Not reachable from the initial state (the server refuses this; the diagram shows it dashed). */
+    unreachable: boolean;
+}
+
+export interface DiagramEdge {
+    from: string;
+    to: string;
+    action: string;
+}
+
+export interface WorkflowDiagram {
+    nodes: DiagramNode[];
+    edges: DiagramEdge[];
+    columns: number;
+}
+
+/**
+ * The read-only state diagram's layout: a column per breadth-first distance from the initial state, unreachable
+ * states in a final column, rows in first-seen order. Pure — the SVG component only draws it.
+ */
+export function workflowDiagram(d: WorkflowDraft): WorkflowDiagram {
+    const content = workflowContent(d);
+    const initial = String(content['initial']);
+    const terminal = new Set(content['terminal'] as string[]);
+    const edges = (content['transitions'] as DiagramEdge[]).filter((e) => e.from && e.to);
+    const ids: string[] = [];
+    const add = (s: string): void => {
+        if (s && !ids.includes(s)) ids.push(s);
+    };
+    add(initial);
+    edges.forEach((e) => {
+        add(e.from);
+        add(e.to);
+    });
+    terminal.forEach(add);
+    const depth = new Map<string, number>();
+    if (initial) {
+        depth.set(initial, 0);
+        const queue = [initial];
+        while (queue.length) {
+            const s = queue.shift() as string;
+            for (const e of edges) {
+                if (e.from === s && !depth.has(e.to)) {
+                    depth.set(e.to, (depth.get(s) as number) + 1);
+                    queue.push(e.to);
+                }
+            }
+        }
+    }
+    const lost = ids.some((s) => !depth.has(s));
+    const lostColumn = Math.max(-1, ...depth.values()) + 1;
+    const rowsUsed = new Map<number, number>();
+    const nodes = ids.map((id) => {
+        const column = depth.get(id) ?? lostColumn;
+        const row = rowsUsed.get(column) ?? 0;
+        rowsUsed.set(column, row + 1);
+        return { id, column, row, terminal: terminal.has(id), initial: id === initial, unreachable: !depth.has(id) };
+    });
+    return { nodes, edges, columns: lost ? lostColumn + 1 : lostColumn };
+}

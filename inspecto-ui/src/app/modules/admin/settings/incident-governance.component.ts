@@ -20,6 +20,7 @@ import {
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { WorkflowDiagramComponent } from './workflow-diagram.component';
 import {
     EscalationRuleDraft,
     GOVERNED_OBJECT_TYPES,
@@ -31,6 +32,7 @@ import {
     slaDraft,
     workflowContent,
     workflowDraft,
+    WorkflowDraft,
 } from 'app/inspecto/governance/governance-model';
 
 /**
@@ -54,6 +56,7 @@ import {
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
         InspectoPageHeaderComponent,
+        WorkflowDiagramComponent,
     ],
     template: `
         <div class="flex flex-col gap-6 p-6">
@@ -97,57 +100,63 @@ import {
                             }
                         </mat-form-field>
                     </div>
-                    <table class="w-full max-w-200 text-sm">
-                        <caption class="sr-only">
-                            Transitions
-                        </caption>
-                        <thead>
-                            <tr class="text-secondary text-left">
-                                <th scope="col" class="py-1">From</th>
-                                <th scope="col">Action</th>
-                                <th scope="col">To</th>
-                                <th scope="col"><span class="sr-only">Remove</span></th>
-                            </tr>
-                        </thead>
-                        <tbody formArrayName="transitions">
-                            @for (row of transitions.controls; track row; let i = $index) {
-                                <tr [formGroupName]="i">
-                                    <td>
-                                        <input
-                                            class="w-full rounded border px-2 py-1"
-                                            formControlName="from"
-                                            [attr.aria-label]="'Transition ' + (i + 1) + ' from'"
-                                        />
-                                    </td>
-                                    <td>
-                                        <input
-                                            class="w-full rounded border px-2 py-1"
-                                            formControlName="action"
-                                            [attr.aria-label]="'Transition ' + (i + 1) + ' action'"
-                                        />
-                                    </td>
-                                    <td>
-                                        <input
-                                            class="w-full rounded border px-2 py-1"
-                                            formControlName="to"
-                                            [attr.aria-label]="'Transition ' + (i + 1) + ' to'"
-                                        />
-                                    </td>
-                                    <td>
-                                        <button
-                                            mat-icon-button
-                                            type="button"
-                                            [disabled]="!canEdit()"
-                                            (click)="transitions.removeAt(i)"
-                                            [attr.aria-label]="'Remove transition ' + (i + 1)"
-                                        >
-                                            <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
-                                        </button>
-                                    </td>
+                    <div class="flex flex-wrap items-start gap-6">
+                        <table class="w-full max-w-200 text-sm">
+                            <caption class="sr-only">
+                                Transitions
+                            </caption>
+                            <thead>
+                                <tr class="text-secondary text-left">
+                                    <th scope="col" class="py-1">From</th>
+                                    <th scope="col">Action</th>
+                                    <th scope="col">To</th>
+                                    <th scope="col"><span class="sr-only">Remove</span></th>
                                 </tr>
-                            }
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody formArrayName="transitions">
+                                @for (row of transitions.controls; track row; let i = $index) {
+                                    <tr [formGroupName]="i">
+                                        <td>
+                                            <input
+                                                class="w-full rounded border px-2 py-1"
+                                                formControlName="from"
+                                                [attr.aria-label]="'Transition ' + (i + 1) + ' from'"
+                                            />
+                                        </td>
+                                        <td>
+                                            <input
+                                                class="w-full rounded border px-2 py-1"
+                                                formControlName="action"
+                                                [attr.aria-label]="'Transition ' + (i + 1) + ' action'"
+                                            />
+                                        </td>
+                                        <td>
+                                            <input
+                                                class="w-full rounded border px-2 py-1"
+                                                formControlName="to"
+                                                [attr.aria-label]="'Transition ' + (i + 1) + ' to'"
+                                            />
+                                        </td>
+                                        <td>
+                                            <button
+                                                mat-icon-button
+                                                type="button"
+                                                [disabled]="!canEdit()"
+                                                (click)="transitions.removeAt(i)"
+                                                [attr.aria-label]="'Remove transition ' + (i + 1)"
+                                            >
+                                                <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        <div class="flex flex-col gap-1 overflow-x-auto">
+                            <h3 class="text-sm font-semibold">State diagram (read-only)</h3>
+                            <inspecto-workflow-diagram [draft]="workflowDraftView()" />
+                        </div>
+                    </div>
                     <div class="flex gap-2">
                         <button mat-stroked-button type="button" [disabled]="!canEdit()" (click)="addTransition()">
                             Add transition
@@ -378,6 +387,9 @@ export class IncidentGovernanceComponent implements OnInit {
         raisePriority: false,
     });
 
+    /** The workflow as currently edited — feeds the read-only state diagram. */
+    readonly workflowDraftView = signal<WorkflowDraft>({ objectType: '', initial: '', terminal: '', transitions: [] });
+
     get transitions(): FormArray<FormGroup> {
         return this.workflow.controls.transitions;
     }
@@ -386,11 +398,22 @@ export class IncidentGovernanceComponent implements OnInit {
         return this.sla.controls.targets;
     }
 
+    private syncDiagram(): void {
+        const v = this.workflow.getRawValue();
+        this.workflowDraftView.set({
+            objectType: this.type,
+            initial: v.initial,
+            terminal: v.terminal,
+            transitions: v.transitions as never,
+        });
+    }
+
     private get type(): string {
         return this.typeForm.controls.objectType.value;
     }
 
     ngOnInit(): void {
+        this.workflow.valueChanges.subscribe(() => this.syncDiagram());
         this.typeForm.controls.objectType.valueChanges.subscribe(() => this.load());
         this.load();
     }

@@ -468,6 +468,12 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
     and the detail header shows *Respond by* / *Due* while open and *Response breached* / *SLA breached* always;
     the Incident/Case list prefixes a breach badge to the Description cell (no new column, so the list's width
     floors hold). Specs `mail-model.spec.ts` (5) + `object-detail.component.spec.ts` (header + axe).
+    **Read-only state diagram (2026-10-03):** `settings/workflow-diagram.component.ts` draws the workflow beside the
+    transitions table from the form's live value (`workflowDraftView` signal, fed by `valueChanges`). Layout is the
+    pure `workflowDiagram()` in `governance-model.ts` (a column per BFS distance from the initial state; unreachable
+    states in a trailing dashed column; terminal = thick border; back-edges arc below, self-loops above). Design-token
+    colours only (`currentColor`). It is a described image (`role="img"` + a text alternative listing every move);
+    the table stays the accessible, editable equivalent. A full drag-and-drop editor is deliberately not built (P3).
   - **Tests:** `WorkflowValidationTest`, `SlaPolicyTest` (engine) · `GovernanceSweepTest` (ops: hot reload, a
     hand-planted bypass file is not served, the gate still holds on a custom terminal state, policy stamping,
     response breach, escalation once per breach, age + priority cap, the 50-rule bound) ·
