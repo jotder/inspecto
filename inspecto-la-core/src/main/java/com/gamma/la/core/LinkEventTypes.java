@@ -94,6 +94,20 @@ public final class LinkEventTypes {
      *  bytes differ) carry the custody verdict. */
     public static final String LINK_DOSSIER_VERIFIED = "LINK_DOSSIER_VERIFIED";
 
+    /** A Dossier was exported as a portable sealed bundle ({@code GET /inv/investigations/{id}/dossier/bundle},
+     *  D-6). {@code at}, the manifest {@code root}, the bundle {@code seal}, {@code references} included and
+     *  {@code masking} (the mode applied as it left) — handing evidence outside the system is an act the trail must show. */
+    public static final String LINK_DOSSIER_EXPORTED = "LINK_DOSSIER_EXPORTED";
+
+    /** A Dossier bundle was checked ({@code POST /inv/investigations/{id}/dossier/bundle/verify}, D-6).
+     *  {@code verified}, {@code sealIntact}, {@code referencesIntact} and the custody verdict's {@code changed} count. */
+    public static final String LINK_DOSSIER_BUNDLE_VERIFIED = "LINK_DOSSIER_BUNDLE_VERIFIED";
+
+    /** An external reference was appended to an Investigation ({@code POST /inv/investigations/{id}/references},
+     *  D-6) by its owner. {@code investigationId}, {@code system}, {@code type}, {@code id} and {@code seq}. The
+     *  reference is a pointer, never dereferenced and never trusted. */
+    public static final String LINK_INVESTIGATION_REFERENCE_ADDED = "LINK_INVESTIGATION_REFERENCE_ADDED";
+
     /** An Investigation's Working Set was read as a derived relation ({@code GET /inv/investigations/{id}/working-set},
      *  LA-20). {@code relation} (entities | links | excluded), {@code rows} served, {@code total},
      *  {@code truncated}, {@code cached} and the relation {@code key} (the sealed log's hash) — the LA-04

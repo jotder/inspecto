@@ -8549,6 +8549,96 @@
         "x-optional-module" : true
       }
     },
+    "/inv/investigations/{investigationId}/dossier/bundle" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "GET /inv/investigations/{investigationId}/dossier/bundle (generated skeleton)",
+        "operationId" : "getInvInvestigationsByInvestigationIdDossierBundle",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/inv/investigations/{investigationId}/dossier/bundle/verify" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "POST /inv/investigations/{investigationId}/dossier/bundle/verify (generated skeleton)",
+        "operationId" : "postInvInvestigationsByInvestigationIdDossierBundleVerify",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/inv/investigations/{investigationId}/references" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "GET /inv/investigations/{investigationId}/references (generated skeleton)",
+        "operationId" : "getInvInvestigationsByInvestigationIdReferences",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "POST /inv/investigations/{investigationId}/references (generated skeleton)",
+        "operationId" : "postInvInvestigationsByInvestigationIdReferences",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
     "/inv/value-measures" : {
       "get" : {
         "tags" : [ "inv" ],
