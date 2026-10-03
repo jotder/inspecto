@@ -71,14 +71,22 @@ public final class IndexBuildService implements AutoCloseable {
         }
     }
 
-    /** What the caller's gate resolved: the trusted relation SELECT and a fingerprint of the base data it reads. */
-    public record Relation(String relationSql, String baseFingerprint, List<IndexManifest.InputFile> inputFiles) {
+    /**
+     * What the caller's gate resolved: the trusted relation SELECT and a fingerprint of the base data it reads.
+     * {@code deltaSql} (APPEND only) maps the added input files to the relation over just them; null = this Dataset cannot be appended to.
+     */
+    public record Relation(String relationSql, String baseFingerprint, List<IndexManifest.InputFile> inputFiles,
+                           Function<List<String>, String> deltaSql) {
         public Relation {
             Objects.requireNonNull(relationSql, "relationSql");
         }
 
+        public Relation(String relationSql, String baseFingerprint, List<IndexManifest.InputFile> inputFiles) {
+            this(relationSql, baseFingerprint, inputFiles, null);
+        }
+
         public Relation(String relationSql, String baseFingerprint) {
-            this(relationSql, baseFingerprint, null);
+            this(relationSql, baseFingerprint, null, null);
         }
     }
 
@@ -97,8 +105,14 @@ public final class IndexBuildService implements AutoCloseable {
      * request, so a changed setting applies to the next build and not only to a freshly created service.
      */
     public record Request(String owner, String datasetId, IndexMapping mapping, RelationSource source, long maxDiskBytes,
-                          int keepVersions) {
+                          int keepVersions, IndexBuilder.Mode mode) {
+        /** A FULL build under the given policy. */
+        public Request(String owner, String datasetId, IndexMapping mapping, RelationSource source, long maxDiskBytes, int keepVersions) {
+            this(owner, datasetId, mapping, source, maxDiskBytes, keepVersions, IndexBuilder.Mode.FULL);
+        }
+
         public Request {
+            if (mode == null) mode = IndexBuilder.Mode.FULL;
             if (owner == null || owner.isBlank()) throw new IllegalArgumentException("a build needs an owner");
             if (datasetId == null || datasetId.isBlank()) throw new IllegalArgumentException("a build needs a dataset");
             Objects.requireNonNull(mapping, "mapping");
@@ -119,13 +133,13 @@ public final class IndexBuildService implements AutoCloseable {
      * An immutable view of one build. {@code result} is non-null only for {@code COMPLETED}; {@code failure} (an exception
      * CLASS name) only for {@code FAILED}.
      */
-    public record RunView(String id, String owner, String datasetId, String mappingHash, Status status, Progress progress,
+    public record RunView(String id, String owner, String datasetId, String mappingHash, IndexBuilder.Mode mode, Status status, Progress progress,
                           boolean cancelRequested, String failure, IndexBuilder.Result result, long createdAt, long finishedAt,
                           long elapsedMs) { }
 
     /** Why the service refused to do what was asked. The message is safe to show: it names no row value. */
     public static final class Refused extends RuntimeException {
-        public enum Kind { NOT_FOUND, FORBIDDEN, TERMINAL, REJECTED, DUPLICATE, OVER_BUDGET, ESTIMATE_TIMEOUT, ESTIMATE_BUSY }
+        public enum Kind { NOT_FOUND, FORBIDDEN, TERMINAL, REJECTED, DUPLICATE, OVER_BUDGET, ESTIMATE_TIMEOUT, ESTIMATE_BUSY, NOT_APPLICABLE }
 
         private final Kind kind;
 
@@ -251,13 +265,18 @@ public final class IndexBuildService implements AutoCloseable {
             Run dup = liveRun(key);
             if (dup != null) throw duplicate(dup, req.owner());
         }
-        if (req.maxDiskBytes() > 0) {
+        String estimateSql = rel.relationSql();
+        if (req.mode() != IndexBuilder.Mode.FULL) {
+            IndexPlan.Plan plan = precheck(req, rel);
+            if (req.mode() == IndexBuilder.Mode.APPEND) estimateSql = rel.deltaSql().apply(plan.added());
+        }
+        if (req.maxDiskBytes() > 0 && req.mode() != IndexBuilder.Mode.COMPACT) {
             if (!estimates.tryAcquire())
                 throw new Refused(Refused.Kind.ESTIMATE_BUSY, "too many index size estimates are running (" + MAX_CONCURRENT_ESTIMATES
                         + ") - try again shortly");
             long rows;
             try {
-                rows = IndexBuilder.countRows(rel.relationSql(), estimateTimeoutMs);
+                rows = IndexBuilder.countRows(estimateSql, estimateTimeoutMs);
             } catch (IndexBuilder.EstimateTimeoutException e) {
                 throw new Refused(Refused.Kind.ESTIMATE_TIMEOUT, "the index size estimate timed out after " + estimateTimeoutMs
                         + " ms, so index.max_disk_bytes = " + req.maxDiskBytes() + " cannot be checked; set index.max_disk_bytes to 0"
@@ -289,6 +308,43 @@ public final class IndexBuildService implements AutoCloseable {
                     + limits.queue() + " waiting) - try again shortly");
         }
         return run.view();
+    }
+
+    /**
+     * The submit-time gate of APPEND and COMPACT: the same {@link IndexPlan} the builder re-checks, so a request that cannot succeed
+     * is refused at once ({@link Refused.Kind#NOT_APPLICABLE}, with the reason and the way forward) instead of becoming a FAILED run.
+     * Returns the plan (null for COMPACT, which needs none).
+     */
+    private IndexPlan.Plan precheck(Request req, Relation rel) {
+        IndexStore store = new IndexStore(indexRoot, req.datasetId(), req.mapping().hash());
+        IndexManifest live;
+        try {
+            live = store.current().isEmpty() ? null : IndexManifest.read(store.current().get());
+        } catch (IOException | IllegalArgumentException unreadable) {
+            live = null;
+        }
+        if (live == null)
+            throw new Refused(Refused.Kind.NOT_APPLICABLE, "the index has no readable published version to " + req.mode().name().toLowerCase(java.util.Locale.ROOT)
+                    + " - run a full build first");
+        if (req.mode() == IndexBuilder.Mode.COMPACT) {
+            if (live.deltas().isEmpty()) throw new Refused(Refused.Kind.NOT_APPLICABLE, "the live version has no deltas to compact");
+            return null;
+        }
+        String duck;
+        try {
+            duck = IndexBuilder.duckdbVersion();
+        } catch (RuntimeException unknown) {
+            duck = null;
+        }
+        IndexPlan.Plan plan = IndexPlan.classify(live, rel.inputFiles(), IndexBuilder.relationSqlHash(rel.relationSql()), BucketFunction.NAME, duck);
+        if (!plan.appendable())
+            throw new Refused(Refused.Kind.NOT_APPLICABLE, "an append is not possible now ("
+                    + (plan.reasons().isEmpty() ? "no input file was added since the live version" : String.join(", ", plan.reasons())) + ") - "
+                    + (plan.recommended() == IndexPlan.Action.COMPACT ? "compact first" : plan.reasons().isEmpty() ? "the index covers the Dataset" : "run a full build"));
+        if (rel.deltaSql() == null)
+            throw new Refused(Refused.Kind.NOT_APPLICABLE, "this Dataset's relation is not row-wise over its input files, so its index cannot be appended to"
+                    + " - run a full build");
+        return plan;
     }
 
     /** The queued or running build of this index key, or null. Caller holds {@code runs}. */
@@ -359,7 +415,7 @@ public final class IndexBuildService implements AutoCloseable {
             IndexBuilder.Options opt = new IndexBuilder.Options(null, null, null, r.token,
                     p -> r.progress = new Progress(p.phase(), p.step(), p.steps()));
             IndexBuilder.Result result = builder.apply(new IndexBuilder.Request(r.datasetId, r.mapping, r.relation.relationSql(),
-                    store, r.relation.baseFingerprint(), opt, r.relation.inputFiles()));
+                    store, r.relation.baseFingerprint(), opt, r.relation.inputFiles(), r.mode, r.relation.deltaSql()));
             try {
                 store.gc(GC_MIN_AGE);                                  // best effort: a failed sweep never fails a published build
             } catch (IOException | RuntimeException ignored) {
@@ -417,6 +473,7 @@ public final class IndexBuildService implements AutoCloseable {
         final IndexMapping mapping;
         final Relation relation;
         final int keepVersions;
+        final IndexBuilder.Mode mode;
         final long createdAt;
         final IndexBuilder.CancelToken token = new IndexBuilder.CancelToken();
         final CountDownLatch done = new CountDownLatch(1);
@@ -435,6 +492,7 @@ public final class IndexBuildService implements AutoCloseable {
             this.mapping = req.mapping();
             this.relation = relation;
             this.keepVersions = req.keepVersions();
+            this.mode = req.mode();
             this.mappingHash = mappingHash;
             this.key = key;
             this.createdAt = now;
@@ -481,7 +539,7 @@ public final class IndexBuildService implements AutoCloseable {
         }
 
         synchronized RunView view() {
-            return new RunView(id, owner, datasetId, mappingHash, status, progress, cancelRequested, failure, result, createdAt,
+            return new RunView(id, owner, datasetId, mappingHash, mode, status, progress, cancelRequested, failure, result, createdAt,
                     status.terminal() ? finishedAt : 0, elapsedMs);
         }
     }

@@ -89,6 +89,16 @@ public interface DatasetProvider {
         return null;
     }
 
+    /**
+     * The Dataset's relation SQL over ONLY {@code relativePaths} (input-file paths as {@link #inputFingerprint} reports them),
+     * for an index APPEND of just the files added since the last build (D-3 step 8); {@code null} - the default - when the
+     * relation is not row-wise over its files (a virtual or view-backed Dataset) or the provider cannot say, in which case an
+     * index can only be rebuilt in full. Throws {@link IllegalArgumentException} for a path that is not an input file.
+     */
+    default String relationSqlOverFiles(Map<String, Object> dataset, Path dataRoot, Path writeRoot, List<String> relativePaths) {
+        return null;
+    }
+
     /** Run a statement under the platform's default sandbox policy. */
     Result run(Request req) throws SQLException, IOException;
 

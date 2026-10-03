@@ -205,8 +205,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/entity-identities/import` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java:90` |
 | POST | `/inv/graph/runs` | gated | `canRunLinkGraphAnalysis` | `inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java:115` |
 | POST | `/inv/graph/runs/([^/]+)/cancel` | exempt | self-service | `inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java:120` |
-| POST | `/inv/index/builds` | gated | `canBuildLinkIndex` | `inspecto-la-api/src/main/java/com/gamma/la/api/IndexRoutes.java:102` |
-| POST | `/inv/index/builds/([^/]+)/cancel` | exempt | self-service | `inspecto-la-api/src/main/java/com/gamma/la/api/IndexRoutes.java:105` |
+| POST | `/inv/index/builds` | gated | `canBuildLinkIndex` | `inspecto-la-api/src/main/java/com/gamma/la/api/IndexRoutes.java:103` |
+| POST | `/inv/index/builds/([^/]+)/cancel` | exempt | self-service | `inspecto-la-api/src/main/java/com/gamma/la/api/IndexRoutes.java:106` |
 | POST | `/inv/investigation-templates/([^/]+)/instantiate` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationTemplateRoutes.java:92` |
 | POST | `/inv/investigations` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:144` |
 | POST | `/inv/investigations/([^/]+)/alert-rules` | gated | `canAuthorAlertRules` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java:68` |

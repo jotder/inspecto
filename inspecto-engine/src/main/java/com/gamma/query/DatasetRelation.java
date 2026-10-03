@@ -181,6 +181,33 @@ public final class DatasetRelation {
         return Optional.of(new InputFiles(out, false));
     }
 
+    /**
+     * The relation of {@code datasetConfig} over ONLY {@code relativePaths} (paths as {@link #inputFiles} reports them, relative to
+     * the data root) - what an index APPEND (LA D-3 step 8) reads to build a delta from the files added since the last build.
+     * Sound only when the relation is row-wise over its files, so it exists for a plain local {@code physicalRef} Dataset
+     * (calculated columns are row-wise and are re-applied); a virtual ({@code sql}), {@code view}-backed, {@code shared/} or
+     * root-less Dataset returns {@code null} ('cannot be appended', never a guess). Every path is re-checked to sit under the
+     * store's read root.
+     *
+     * @throws IllegalArgumentException when a path is not an input file of this Dataset's store
+     */
+    public static String relationSqlOverFiles(Map<String, Object> datasetConfig, Path dataRoot, List<String> relativePaths) {
+        String view = Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("view"));
+        String userSql = Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("sql"));
+        String ref = Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("physicalRef"));
+        if (view != null || userSql != null || ref == null || ref.startsWith(SHARED_PREFIX) || dataRoot == null
+                || relativePaths == null || relativePaths.isEmpty()) return null;
+        Path root = Path.of(storeReadRoot(ref, dataRoot)).normalize();
+        List<String> abs = new java.util.ArrayList<>();
+        for (String rel : relativePaths) {
+            Path p = dataRoot.normalize().resolve(rel).normalize();
+            if (!p.startsWith(root) || !p.getFileName().toString().endsWith(".parquet"))
+                throw new IllegalArgumentException("'" + rel + "' is not an input file of this dataset's store");
+            abs.add(p.toString());
+        }
+        return withCalculated("SELECT * FROM " + SqlViews.readerOverLiteral("PARQUET", SqlViews.pathList(abs), false), datasetConfig);
+    }
+
     /** The {@code physicalRef} read of one store ref (local, path-jailed; or a granted {@code shared/} snapshot). */
     private static String storeRelationSql(String ref, Path dataRoot) {
         String root = storeReadRoot(ref, dataRoot);

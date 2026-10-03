@@ -167,7 +167,7 @@ final class IndexedRead {
         IndexManifest manifest = chosen.manifest();
         // Staleness (decision 6a, ONE definition with GET /inv/index: IndexStaleness). Refuse when removed rows could be exposed:
         // a removed / replaced input file, a changed relation SQL, a different bucket function (Java would read the wrong
-        // bucket) or unapplied deltas. Serve flagged when only files were ADDED (the index misses the new rows) or DuckDB differs.
+        // bucket). A delta of an appended version is read as part of it (step 8), so deltas are never a reason to refuse. Serve flagged when only files were ADDED (the index misses the new rows) or DuckDB differs.
         String duck = null;
         try {
             duck = IndexBuilder.duckdbVersion();
@@ -178,7 +178,7 @@ final class IndexedRead {
         InputFingerprint input = InputFingerprintCache.get(writeRoot, datasetId, mappingHash,
                 () -> IndexRoutes.currentInput(dataRoot, writeRoot, datasetId));
         IndexStaleness.Result st = IndexStaleness.compute(manifest, IndexBuilder.relationSqlHash(relationSql), input, BucketFunction.NAME, duck);
-        boolean refuse = st.removedInput() || !manifest.deltas().isEmpty()
+        boolean refuse = st.removedInput()
                 || st.reasons().stream().anyMatch(r -> !r.equals(IndexStaleness.INPUT_FILES_CHANGED) && !r.equals(IndexStaleness.DUCKDB_VERSION_CHANGED));
         if (refuse)
             return declined(Outcome.refused(st.reasons(), st.details().isEmpty() ? "the index has unapplied changes" : String.join("; ", st.details())));

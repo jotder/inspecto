@@ -38,6 +38,11 @@ public final class DatasetRead {
         return DatasetRelation.inputFiles(dataset, dataRoot, limit);
     }
 
+    /** The relation over only {@code relativePaths} (see {@link DatasetRelation#relationSqlOverFiles}); null when it cannot be appended. */
+    public static String relationSqlOverFiles(Map<String, Object> dataset, Path dataRoot, List<String> relativePaths) {
+        return DatasetRelation.relationSqlOverFiles(dataset, dataRoot, relativePaths);
+    }
+
     /** The component registry rooted at the Space write root (for non-Dataset component types a module owns). */
     public static ComponentStore registry(Path writeRoot) {
         return new ComponentStore(writeRoot.resolve("registry"));

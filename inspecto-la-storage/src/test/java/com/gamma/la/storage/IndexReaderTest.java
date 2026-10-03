@@ -140,17 +140,13 @@ class IndexReaderTest {
     }
 
     @Test
-    void anIndexWithAnotherBucketFunctionOrDeltasIsRefused(@TempDir Path tmp) throws Exception {
+    void anIndexWithAnotherBucketFunctionIsRefused(@TempDir Path tmp) throws Exception {
         IndexBuilder.Result built = build(tmp);
         IndexManifest m = built.manifest();
         IndexManifest otherFn = new IndexManifest(m.version(), m.builtAt(), m.builder(), m.duckdbVersion(), "hash", m.buckets(), m.rowGroupSize(),
                 m.mapping(), m.mappingHash(), m.dataset(), m.relationSqlHash(), m.baseFingerprint(), m.timeColZone(), m.tables(), m.droppedNull(),
                 m.deltas(), m.parent());
         assertThrows(IllegalArgumentException.class, () -> IndexReader.open(built.directory(), otherFn, SqlSandboxPolicy.defaultPolicy()));
-        IndexManifest withDelta = new IndexManifest(m.version(), m.builtAt(), m.builder(), m.duckdbVersion(), m.bucketFn(), m.buckets(), m.rowGroupSize(),
-                m.mapping(), m.mappingHash(), m.dataset(), m.relationSqlHash(), m.baseFingerprint(), m.timeColZone(), m.tables(), m.droppedNull(),
-                List.of(new IndexManifest.Delta("d1", 1, 1)), m.parent());
-        assertThrows(IllegalArgumentException.class, () -> IndexReader.open(built.directory(), withDelta, SqlSandboxPolicy.defaultPolicy()));
         // the positive twin: the untouched manifest opens
         try (IndexReader ok = IndexReader.open(built.directory(), m, SqlSandboxPolicy.defaultPolicy())) {
             assertTrue(ok.edges(List.of("A"), List.of(Side.OUT), null, 10).containsKey("A"));
