@@ -239,3 +239,27 @@ export function listableIds(node: G6Node | null): { ids: string[]; masked: numbe
     const ids = raw.filter((v) => !v.startsWith(MASKED_PREFIX));
     return { ids, masked: raw.length - ids.length };
 }
+
+const FALLBACK_TEXT: Record<string, string> = {
+    index_disabled: 'the edge index is switched off',
+    no_index: 'this Dataset has no edge index yet',
+    mapping_not_indexed: 'the index was built for different columns',
+    column_not_indexed: 'the index was not built with a column this read needs',
+    time_zone_not_servable: 'the index cannot answer in this time zone',
+    filter_not_indexed: 'the index cannot apply this filter',
+    index_stale_refused: 'the index is out of date for this Dataset',
+    depth_over_index_cap: 'the read is deeper than the index serves',
+    frontier_over_index_cap: 'too many entities were expanded at once for the index',
+    index_read_failed: 'the index could not be read',
+    rung_not_indexable: 'this kind of expand is not answered by the index',
+};
+
+/** One sentence for an expand the flat Dataset answered instead of the edge index, or null when there is nothing to say. */
+export function expandFallbackNote(
+    read: { fallback?: { reason: string; details?: string } } | undefined,
+): string | null {
+    const f = read?.fallback;
+    if (!f) return null;
+    const why = FALLBACK_TEXT[f.reason] ?? f.reason;
+    return `Answered from the Dataset, not the edge index: ${why}${f.details ? ` (${f.details})` : ''}. The result is the same, only slower.`;
+}

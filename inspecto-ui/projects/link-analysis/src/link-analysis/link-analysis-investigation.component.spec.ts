@@ -323,6 +323,38 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', () => {
         expect(el.querySelector('[aria-label="Notes on this entity"]')).toBeNull();
     });
 
+    it('an expand the flat Dataset answered says why, in text, without blocking', async () => {
+        const { fixture, store, el, inv } = create();
+        await openInv(store);
+        inv.appendInvestigationOp.mockReturnValue(
+            of({
+                step: 3,
+                op: 'expand',
+                truncated: false,
+                read: {
+                    rowCount: 1,
+                    fingerprint: 'f',
+                    readAt: '',
+                    fallback: { reason: 'rung_not_indexable', details: 'the rung has a window' },
+                },
+            }),
+        );
+        await store.apply({ op: 'expand' } as never);
+        fixture.detectChanges();
+        const note = el.querySelector('[data-testid="expand-fallback"]');
+        expect(note?.textContent).toContain('not the edge index');
+        expect(note?.textContent).toContain('the rung has a window');
+        expect(note?.getAttribute('role')).toBe('status');
+        await expectNoA11yViolations(el);
+
+        inv.appendInvestigationOp.mockReturnValue(
+            of({ step: 4, op: 'expand', truncated: false, read: { rowCount: 1 } }),
+        );
+        await store.apply({ op: 'expand' } as never);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="expand-fallback"]')).toBeNull();
+    });
+
     it('LA-19: a refused annotate (422) is surfaced with the server message, and nothing is rendered as saved', async () => {
         const { fixture, store, el, inv, button } = create();
         await openInv(store);

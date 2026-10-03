@@ -165,6 +165,9 @@
                 are complete.
             </inspecto-alert>
         }
+        @if (fallbackNote(); as note) {
+            <p class="text-secondary m-0 text-xs" role="status" data-testid="expand-fallback">{{ note }}</p>
+        }
         @if (store.lastStep()?.protected?.length) {
             <inspecto-alert variant="info" title="Kept entities were not excluded">
                 {{ store.lastStep()!.protected!.join(', ') }} — a keep step protects them.

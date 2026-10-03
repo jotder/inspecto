@@ -29,7 +29,7 @@ import { WORKING_SET_PLUGIN } from '@inspecto/core/viz/plugins/view.plugins';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
-import { idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
+import { expandFallbackNote, idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
 import { LA_WIDGETS } from '@inspecto/link-analysis/la-host';
 import { InvestigationExpandRungComponent } from './investigation-expand-rung.component';
@@ -179,6 +179,9 @@ export class LinkAnalysisInvestigationComponent {
         const ids = this.selectedInSet();
         return (this.store.workingSet()?.annotations ?? []).filter((a) => ids.includes(a.id));
     });
+
+    /** Why the last expand was answered by the flat Dataset instead of the edge index; null when it was not (or no step yet). */
+    readonly fallbackNote = computed(() => expandFallbackNote(this.store.lastStep()?.read));
 
     readonly counts = computed(() => {
         const ws = this.store.workingSet();

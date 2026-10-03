@@ -850,6 +850,7 @@ public final class InvestigationRoutes implements RouteModule {
                     // D-3 step 6: only an index-answered read says so (a Dataset-answered read keeps today's attributes)
                     if (read != null && read.get("index") instanceof Map<?, ?> ix)
                         b.attr("source", "index").attr("indexVersion", ix.get("version")).attr("indexStale", ix.get("stale"));
+                    if (read != null && read.get("fallback") instanceof Map<?, ?> fb) b.attr("fallbackReason", fb.get("reason"));
                     // LA-17: which list, at which fact — never its members (as ENTITY_LIST_CHANGED carries counts).
                     if (e.get("list") instanceof Map<?, ?> l) b.attr("listId", l.get("listId")).attr("atSeq", l.get("atSeq"));
                     // LA-17 slice 2: which fact seq was pinned and how many groups it sealed — never a key.
@@ -877,6 +878,7 @@ public final class InvestigationRoutes implements RouteModule {
             r.put("readAt", read.get("readAt"));
             r.put("fanOutCapped", read.get("fanOutCapped"));
             if (read.get("index") != null) r.put("index", read.get("index"));   // D-3 step 6: only when the index answered
+            if (read.get("fallback") != null) r.put("fallback", read.get("fallback"));   // only when it fell back, and why
             r.put("rung", read.get("query"));   // the rung as READ: window resolved, frontier and exclusions included
             out.put("read", r);
         }
@@ -1175,6 +1177,7 @@ public final class InvestigationRoutes implements RouteModule {
         read.put("fanOutCapped", capped);
         read.put("fingerprint", InvestigationEvaluator.sha256(canonical(rows)));   // rows ONLY: where they were read from never enters it
         if (indexed != null && indexed.served()) read.put("index", indexed.readIndex());
+        else if (indexed != null) read.put("fallback", indexed.readFallback());   // why the flat Dataset answered; never in the fingerprint
         return read;
     }
 

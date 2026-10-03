@@ -292,7 +292,13 @@ export interface InvestigationStepResult {
     truncated: boolean;
     /** On `exclude` / `excludeBy`: the ids a prior `keep` protected, so they were NOT excluded. */
     protected?: string[];
-    read?: { rowCount: number; fingerprint: string; readAt: string };
+    read?: {
+        rowCount: number;
+        fingerprint: string;
+        readAt: string;
+        /** Only when an expand was answered by the flat Dataset: the closed reason (never part of the fingerprint). */
+        fallback?: { reason: string; details?: string };
+    };
     workingSet: WorkingSetSummary;
     /** LA-17 `excludeBy` / `seedBy`: what the step resolved and did (§4.4.1). */
     list?: EntityListStepReport;

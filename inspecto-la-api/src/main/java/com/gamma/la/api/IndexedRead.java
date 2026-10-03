@@ -80,6 +80,14 @@ final class IndexedRead {
             s.put("fingerprint", fingerprintKnown ? "known" : "unknown");
             return s;
         }
+
+        /** The {@code read.fallback} object of an Investigation expand the flat Dataset answered: the closed {@link Reason}, never part of the fingerprint. */
+        Map<String, Object> readFallback() {
+            Map<String, Object> s = new LinkedHashMap<>();
+            s.put("reason", reason.name());
+            if (details != null) s.put("details", details);
+            return s;
+        }
     }
 
     /** A route's verdict on one candidate index: {@code failure} null = it fits, with {@code filterSql} the rendered request filter (or null). */

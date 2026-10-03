@@ -434,7 +434,85 @@ class ControlApiInvIndexedExpansionTest {
             // disabled: exactly today's step shape
             settings(c, DISABLED);
             JsonNode off = expand(c, "[\"A\"]", List.of(), "", "");
-            assertEquals(List.of("rowCount", "fingerprint", "readAt", "fanOutCapped", "rung"), fieldNames(off.get("read")));
+            assertEquals(List.of("rowCount", "fingerprint", "readAt", "fanOutCapped", "fallback", "rung"), fieldNames(off.get("read")));
+            assertEquals("index_disabled", off.at("/read/fallback/reason").asText());
+        }
+    }
+
+    private static String why(JsonNode step) {
+        return step.at("/read/fallback/reason").asText();
+    }
+
+    @Test
+    void anExpandThatFellBackToTheFlatDatasetNamesWhyAndTheIndexedTwinSaysNothing(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, ENABLED)) {
+            JsonNode none = expand(c, "[\"A\"]", List.of(), "", "");
+            assertEquals("no_index", why(none), none.get("read").toString());
+            build(c, FULL);
+            JsonNode served = expand(c, "[\"A\"]", List.of(), "", "");
+            assertTrue(served.at("/read/fallback").isMissingNode(), "the twin: served, so no fallback: " + served.get("read"));
+            // a rung the index cannot answer: the cause rides in details
+            JsonNode win = expand(c, "[\"A\"]", List.of(), "\"window\":{\"from\":\"2026-03-01T00:00:00Z\",\"to\":\"2026-03-03T00:00:00Z\"}",
+                    ",\"timeCol\":\"ts\",\"timeColZone\":\"UTC\"");
+            assertEquals("rung_not_indexable", why(win));
+            assertEquals("the rung has a window", win.at("/read/fallback/details").asText());
+            List<String> ids = new ArrayList<>();
+            for (int i = 1; i <= 21; i++) ids.add(String.format("\"h%02d\"", i));
+            JsonNode over = expand(c, "[" + String.join(",", ids) + "]", List.of(), "", "");
+            assertEquals("rung_not_indexable", why(over));
+            assertTrue(over.at("/read/fallback/details").asText().contains("21 entities"), over.get("read").toString());
+            // a kind column the index was not built with
+            String id = "k" + seq.incrementAndGet();
+            post(c, "/inv/investigations", "{\"purpose\":\"t\",\"id\":\"" + id + "\",\"dataset\":\"n_ds\",\"sourceCol\":\"s\",\"targetCol\":\"t\",\"linkKindCol\":\"c\"}");
+            post(c, "/inv/investigations/" + id + "/ops", "{\"op\":\"seed\",\"ids\":[\"A\"]}");
+            assertEquals("column_not_indexed", why(post(c, "/inv/investigations/" + id + "/ops", "{\"op\":\"expand\"}")));
+            // an index for another mapping only
+            String id2 = "m" + seq.incrementAndGet();
+            post(c, "/inv/investigations", "{\"purpose\":\"t\",\"id\":\"" + id2 + "\",\"dataset\":\"n_ds\",\"sourceCol\":\"t\",\"targetCol\":\"s\"}");
+            post(c, "/inv/investigations/" + id2 + "/ops", "{\"op\":\"seed\",\"ids\":[\"A\"]}");
+            assertEquals("mapping_not_indexed", why(post(c, "/inv/investigations/" + id2 + "/ops", "{\"op\":\"expand\"}")));
+            // a changed Dataset definition is refused, not served stale
+            new ViewStore(root.resolve("views")).write(new ViewDefinition("n_view", "flow-x", List.of(), view() + " WHERE NOT (s = 'E')", "2026-10-03T00:00:00Z"));
+            assertEquals("index_stale_refused", why(expand(c, "[\"A\"]", List.of(), "", "")));
+            new ViewStore(root.resolve("views")).write(new ViewDefinition("n_view", "flow-x", List.of(), view(), "2026-10-03T00:00:00Z"));
+            // the stepped audit event carries the reason, structured
+            List<Event> seen = new CopyOnWriteArrayList<>();
+            Consumer<Event> sub = seen::add;
+            EventLog.current().addSubscriber(sub);
+            try {
+                settings(c, DISABLED);
+                expand(c, "[\"A\"]", List.of(), "", "");
+            } finally {
+                EventLog.current().removeSubscriber(sub);
+            }
+            Event e = seen.stream().filter(x -> LinkEventTypes.LINK_INVESTIGATION_STEPPED.equals(x.type())
+                    && "expand".equals(x.attributes().get("op"))).findFirst().orElseThrow();
+            assertEquals("index_disabled", e.attributes().get("fallbackReason"));
+        }
+    }
+
+    @Test
+    void theFallbackNeverEntersTheSealedStateSoReplayIsUnchanged(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, ENABLED)) {
+            build(c, FULL);
+            JsonNode viaIndex = expand(c, "[\"A\",\"B\"]", List.of(), "", "");
+            String idx = lastId;
+            settings(c, DISABLED);
+            JsonNode viaFlat = expand(c, "[\"A\",\"B\"]", List.of(), "", "");
+            String flat = lastId;
+            assertEquals("index_disabled", why(viaFlat));
+            assertEquals(viaIndex.at("/read/fingerprint").asText(), viaFlat.at("/read/fingerprint").asText());
+            JsonNode a = data(send(c, "GET", "/inv/investigations/" + idx + "/log", null, OWNER), 200).get("entries");
+            JsonNode b = data(send(c, "GET", "/inv/investigations/" + flat + "/log", null, OWNER), 200).get("entries");
+            for (int i = 0; i < a.size(); i++)
+                assertEquals(a.get(i).get("workingSetHash"), b.get(i).get("workingSetHash"), "step " + (i + 1));
+            // a log sealed before this change has no read.fallback: a sealed index-served step has none either, and replay is equivalent
+            assertTrue(JSON.readTree(send(c, "POST", "/inv/investigations/" + idx + "/replay", "{}", OWNER).body()).at("/data/equivalent").asBoolean());
+            JsonNode re = data(send(c, "POST", "/inv/investigations/" + flat + "/replay", "{\"reread\":true}", OWNER), 200);
+            assertTrue(re.at("/equivalent").asBoolean());
+            assertFalse(re.get("diverged").asBoolean());
         }
     }
 
