@@ -252,6 +252,41 @@ export function isTargetOverdue(o: OperationalObject): boolean {
     return !Number.isNaN(due.getTime()) && due.getTime() < Date.now();
 }
 
+/** One SLA fact for a badge: `tone` is a status-badge token, `label` the visible phrase. */
+export interface SlaBadge {
+    tone: string;
+    label: string;
+    title: string;
+}
+
+const epoch = (v: string | undefined): number => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+};
+
+/**
+ * The server-stamped SLA (ASSURE-WORKFLOW-SLA-1) as badges — read only, never computed here: the SLA sweep stamps
+ * `responseDueAt` / `dueAt` from the Space's SLA policy and marks `slaResponseBreachedAt` / `slaBreachedAt` on a
+ * breach. A breach stays shown after resolution (it happened); a due date is shown only while the object is open.
+ */
+export function slaBadges(o: OperationalObject): SlaBadge[] {
+    const a = o.attributes ?? {};
+    const open = !['RESOLVED', 'CLOSED', 'ARCHIVED'].includes(displayStatus(o));
+    const when = (ms: number): string => new Date(ms).toLocaleString();
+    const out: SlaBadge[] = [];
+    const respBreach = epoch(a['slaResponseBreachedAt']);
+    const respDue = epoch(a['responseDueAt']);
+    if (respBreach)
+        out.push({ tone: 'CRITICAL', label: 'Response breached', title: `Response SLA breached ${when(respBreach)}` });
+    else if (open && respDue)
+        out.push({ tone: 'INFO', label: 'Respond by ' + when(respDue), title: 'Response SLA due' });
+    const breach = epoch(a['slaBreachedAt']);
+    const due = epoch(a['dueAt']);
+    if (breach) out.push({ tone: 'CRITICAL', label: 'SLA breached', title: `Resolution SLA breached ${when(breach)}` });
+    else if (open && due) out.push({ tone: 'INFO', label: 'Due ' + when(due), title: 'Resolution SLA due' });
+    return out;
+}
+
 // ── Folders (the mail metaphor's left nav) ────────────────────────────────────────────────────
 
 /** A left-nav folder: a named predicate over the loaded rows (`me` = {@link currentOperator}). */

@@ -449,7 +449,11 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
   - **UI:** Settings ▸ *Incident governance* (`settings/incident-governance.component.ts`, model
     `inspecto/governance/governance-model.ts`): the effective workflow as a list editor (initial, terminal,
     transition rows), the SLA policy form and the Escalation Rules list; read-only without `canAdminister`; a 422
-    refusal is shown inline, a held write says it was submitted for approval.
+    refusal is shown inline, a held write says it was submitted for approval. **SLA on the object (2026-10-03):**
+    `slaBadges()` (`modules/admin/objects/mail-model.ts`) reads the server stamps only — never computes a clock —
+    and the detail header shows *Respond by* / *Due* while open and *Response breached* / *SLA breached* always;
+    the Incident/Case list prefixes a breach badge to the Description cell (no new column, so the list's width
+    floors hold). Specs `mail-model.spec.ts` (5) + `object-detail.component.spec.ts` (header + axe).
   - **Tests:** `WorkflowValidationTest`, `SlaPolicyTest` (engine) · `GovernanceSweepTest` (ops: hot reload, a
     hand-planted bypass file is not served, the gate still holds on a custom terminal state, policy stamping,
     response breach, escalation once per breach, age + priority cap, the 50-rule bound) ·

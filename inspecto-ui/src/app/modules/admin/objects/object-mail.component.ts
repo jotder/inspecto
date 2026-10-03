@@ -53,6 +53,7 @@ import {
     objectCategory,
     objectTags,
     postmortemGaps,
+    slaBadges,
     stateLabel,
 } from './mail-model';
 import { CaseAnalyticsDialog } from './case-analytics.dialog';
@@ -428,7 +429,12 @@ export class ObjectMailComponent implements OnInit {
                 const o = p.data;
                 if (!o) return '';
                 const desc = o.description ? `<span class="text-secondary"> — ${esc(o.description)}</span>` : '';
-                return `<span class="font-semibold">${esc(o.title)}</span>${desc}`;
+                // Only a BREACH rides the list row (ASSURE-WORKFLOW-SLA-1) — due dates belong on the detail page.
+                const sla = slaBadges(o)
+                    .filter((b) => b.tone === 'CRITICAL')
+                    .map((b) => statusBadgeHtml(b.tone, b.label) + ' ')
+                    .join('');
+                return `${sla}<span class="font-semibold">${esc(o.title)}</span>${desc}`;
             },
         },
         {

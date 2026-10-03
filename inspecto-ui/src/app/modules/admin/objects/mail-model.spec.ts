@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OperationalObject } from 'app/inspecto/api';
-import { postmortemGaps } from './mail-model';
+import { postmortemGaps, slaBadges } from './mail-model';
 
 /** An Incident carrying `postmortem` (raw JSON) and `dueAt`. */
 function incident(postmortem: unknown, dueAt: string | undefined = '1790000000000'): OperationalObject {
@@ -39,5 +39,38 @@ describe('postmortemGaps mirrors the server resolution gate', () => {
 
     it('a blank dueAt is no SLA', () => {
         expect(postmortemGaps(incident(COMPLETE, '  '))).toEqual(['SLA']);
+    });
+});
+
+describe('slaBadges (ASSURE-WORKFLOW-SLA-1)', () => {
+    const obj = (status: string, attributes: Record<string, string>): OperationalObject =>
+        ({ id: 'INCIDENT-2', objectType: 'INCIDENT', status, attributes }) as OperationalObject;
+
+    it('an object with no SLA stamps shows nothing', () => {
+        expect(slaBadges(obj('IDENTIFIED', {}))).toEqual([]);
+    });
+
+    it('an open object shows its response and resolution due dates as info', () => {
+        const b = slaBadges(obj('IDENTIFIED', { responseDueAt: '1790000000000', dueAt: '1790003600000' }));
+        expect(b.map((x) => x.tone)).toEqual(['INFO', 'INFO']);
+        expect(b[0].label).toMatch(/^Respond by /);
+        expect(b[1].label).toMatch(/^Due /);
+    });
+
+    it('a breach marker wins over the due date and is critical', () => {
+        const b = slaBadges(
+            obj('DIAGNOSING', { responseDueAt: '1', slaResponseBreachedAt: '2', dueAt: '3', slaBreachedAt: '4' }),
+        );
+        expect(b.map((x) => x.label)).toEqual(['Response breached', 'SLA breached']);
+        expect(b.every((x) => x.tone === 'CRITICAL')).toBe(true);
+    });
+
+    it('a resolved object keeps its breach but drops its due dates', () => {
+        const b = slaBadges(obj('RESOLVED', { responseDueAt: '1790000000000', dueAt: '5', slaBreachedAt: '6' }));
+        expect(b.map((x) => x.label)).toEqual(['SLA breached']);
+    });
+
+    it('a blank or non-numeric stamp is no SLA', () => {
+        expect(slaBadges(obj('IDENTIFIED', { dueAt: '', slaBreachedAt: 'x' }))).toEqual([]);
     });
 });

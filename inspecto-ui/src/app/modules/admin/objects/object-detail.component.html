@@ -19,6 +19,11 @@
                 @if (obj()?.severity) {
                     <inspecto-status-badge [value]="obj()!.severity!" />
                 }
+                @for (b of sla(); track b.label) {
+                    <span class="ml-2" [attr.title]="b.title" data-testid="sla-badge">
+                        <inspecto-status-badge [value]="b.tone" [label]="b.label" />
+                    </span>
+                }
             </ng-container>
             <ng-container actions>
                 <!-- "Why is this red" (AGT-6a A4-status) — only when the Incident/Case carries a correlation

@@ -1,6 +1,7 @@
 import {
     ChangeDetectionStrategy,
     Component,
+    computed,
     DestroyRef,
     inject,
     OnInit,
@@ -48,7 +49,7 @@ import { ActionRequestsPanelComponent } from './action-requests-panel.component'
 import { ImpactPanelComponent } from './impact-panel.component';
 import { RiskScorePanelComponent } from 'app/inspecto/components/risk-score-panel.component';
 import { ResolveDialog, ResolveDialogData, ResolveResult } from './resolve.dialog';
-import { postmortemGaps } from './mail-model';
+import { postmortemGaps, slaBadges } from './mail-model';
 
 type TabKey = 'overview' | 'graph' | 'timeline' | 'events' | 'comments' | 'attachments';
 
@@ -122,6 +123,8 @@ export class ObjectDetailComponent implements OnInit {
 
     readonly id = signal('');
     readonly obj = signal<OperationalObject | null>(null);
+    /** The server-stamped SLA due / breached facts (ASSURE-WORKFLOW-SLA-1). */
+    readonly sla = computed(() => (this.obj() ? slaBadges(this.obj()!) : []));
     readonly loading = signal(false);
 
     readonly tabs: { id: TabKey; label: string }[] = [

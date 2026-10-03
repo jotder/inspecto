@@ -107,6 +107,15 @@ describe('ObjectDetailComponent', () => {
         expect(fixture.nativeElement.querySelector('inspecto-ai-status')).toBeNull();
     });
 
+    it('shows the server-stamped SLA breach in the header, with no axe violations', async () => {
+        const breached = { ...CASE, objectType: 'INCIDENT', attributes: { dueAt: '5', slaBreachedAt: '6' } };
+        const { fixture } = create({ get: () => of(breached) });
+        fixture.detectChanges();
+        const badges = [...fixture.nativeElement.querySelectorAll('[data-testid="sla-badge"]')] as HTMLElement[];
+        expect(badges.map((b) => b.textContent?.trim())).toEqual(['SLA breached']);
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
     it('a transition replaces the object in place', () => {
         const { fixture, api } = create();
         const c = fixture.componentInstance;
