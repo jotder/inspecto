@@ -446,6 +446,20 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
     notification) plus `OBJECT_ASSIGNED` on a reassign; `escalated=true` is set, so the Incident shows in the
     Escalated folder. Bounded: ≤ 50 rules loaded (`GovernanceRegistry.MAX_RULES`), ≤ 500 firings per sweep.
     Resolved / archived / terminal objects are never escalated.
+    **Cases (operator 2026-10-03):** a Case is swept by the SAME `sweepIncidentSla` — its own `CASE` policy stamps
+    `dueAt` / `responseDueAt`, a breach is raised once, `CASE` Escalation Rules fire once per breach, and a closed /
+    terminal Case's clock is stopped (`GovernanceSweepTest.aCaseIsStampedBreachedAndEscalatedByItsOwnPolicyAndRulesOnly`).
+    No separate Case sweep exists or is needed. **`reassign` vs the IAM (operator 2026-10-03):** `PrincipalDirectory`
+    (`inspecto-auth-spi`, an edition SPI) is asked on every write door (`ComponentRoutes.validateKind`, so the route,
+    a version restore and a Space-Template seed alike). With a directory registered, an unknown user id OR a lookup
+    that throws is refused 422 (fail closed); with none registered — the offline editions, Personal / Standard / the
+    demo build — the id-shape check alone applies, the same standing as `POST /objects/{id}/assign`. ⚠ The core ships
+    NO implementation: no SCIM / user-lookup client exists in `inspecto-security` (it only validates tokens), so on
+    every shipped edition today the check is the id shape. It is checked at SAVE time only: a user deleted from the
+    IAM later is still assigned by the sweep. **Examples per Space Template (operator 2026-10-03):** each template
+    carries `config/examples/sla-escalation-examples.md` — labelled, INERT markdown (an Incident and a Case policy
+    plus Escalation Rules) because a template can never carry live governance (`GOVERNANCE_ONLY`, refused on every
+    import a new Space's included); `TemplateGovernanceExamplesTest` runs every example through the real parsers.
   - **UI:** Settings ▸ *Incident governance* (`settings/incident-governance.component.ts`, model
     `inspecto/governance/governance-model.ts`): the effective workflow as a list editor (initial, terminal,
     transition rows), the SLA policy form and the Escalation Rules list; read-only without `canAdminister`; a 422

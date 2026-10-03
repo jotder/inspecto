@@ -860,7 +860,12 @@ final class ComponentRoutes implements RouteModule {
         // gate (Workflow.problems); an explicit IANA zone and sane targets; an Escalation Rule that does something.
         if (WORKFLOW.equals(type)) com.gamma.objects.Workflow.fromComponent(id, content);
         if (SLA_POLICY.equals(type)) com.gamma.objects.SlaPolicy.fromComponent(id, content);
-        if (ESCALATION_RULE.equals(type)) com.gamma.objects.EscalationRule.fromComponent(id, content);
+        if (ESCALATION_RULE.equals(type)) {
+            com.gamma.objects.EscalationRule rule = com.gamma.objects.EscalationRule.fromComponent(id, content);
+            // The IAM owns identities: a registered PrincipalDirectory vetoes an unknown (or unverifiable) assignee;
+            // an offline edition has none, so the id-shape check above is all it gets.
+            PrincipalDirectories.requireKnown(rule.reassign(), "escalation-rule.reassign");
+        }
 
         if (CENSUSED_COMPONENT_KINDS.contains(type)) refuseUnknownComponentKeys(type, content);
     }

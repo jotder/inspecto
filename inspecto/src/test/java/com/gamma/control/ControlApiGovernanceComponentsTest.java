@@ -179,6 +179,40 @@ class ControlApiGovernanceComponentsTest {
         }
     }
 
+    /** ASSURE-WORKFLOW-SLA-1: a registered IAM directory vetoes an unknown or unverifiable `reassign`; none = id shape only. */
+    @Test
+    void reassignIsCheckedAgainstTheIamWhenOneIsRegisteredAndFailsClosed(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp)) {
+            // No IAM (the offline editions): the id-shape check alone — the rule saves.
+            assertEquals(200, send(c, "POST", "/components/escalation-rule", RULE, "admin").statusCode());
+            assertEquals(200, send(c, "DELETE", "/components/escalation-rule/page-duty", null, "admin").statusCode());
+
+            PrincipalDirectories.forTest(id -> id.equals("duty-manager"));
+            try {
+                assertEquals(200, send(c, "POST", "/components/escalation-rule", RULE, "admin").statusCode(), "a known user");
+                HttpResponse<String> r = send(c, "POST", "/components/escalation-rule",
+                        RULE.replace("page-duty", "ghost").replace("duty-manager", "ghost-user"), "admin");
+                assertEquals(422, r.statusCode(), r.body());
+                assertTrue(r.body().contains("not a known user in the IAM"), r.body());
+                r = send(c, "PUT", "/components/escalation-rule/page-duty", RULE.replace("duty-manager", "ghost-user"), "admin");
+                assertEquals(422, r.statusCode(), "an edit is checked too");
+                // A rule that reassigns nobody needs no lookup.
+                assertEquals(200, send(c, "POST", "/components/escalation-rule",
+                        "{\"id\":\"just-notify\",\"objectType\":\"CASE\",\"on\":\"age\",\"afterMinutes\":60,\"notify\":true}",
+                        "admin").statusCode());
+                // The IAM cannot answer: fail closed, not "assume yes".
+                PrincipalDirectories.forTest(id -> { throw new java.io.IOException("directory down"); });
+                r = send(c, "POST", "/components/escalation-rule", RULE.replace("page-duty", "later"), "admin");
+                assertEquals(422, r.statusCode(), r.body());
+                assertTrue(r.body().contains("could not be verified"), r.body());
+            } finally {
+                PrincipalDirectories.forTest(null);
+            }
+            assertEquals(Set.of("page-duty", "just-notify"), new ComponentStore(c.root.resolve("registry"))
+                    .list("escalation-rule").stream().map(com.gamma.pipeline.ComponentRegistry.Component::name).collect(java.util.stream.Collectors.toSet()));
+        }
+    }
+
     @Test
     void historyAndRestoreWorkThroughTheComponentStore(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         try (Ctx c = open(cfg, tmp)) {

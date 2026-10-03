@@ -272,4 +272,45 @@ class GovernanceSweepTest {
             assertThrows(IllegalArgumentException.class, () -> com.gamma.objects.EscalationRule.fromComponent("x", new HashMap<>(bad)),
                     bad.toString());
     }
+
+    // ── Cases are swept like Incidents (operator 2026-10-03) ───────────────────────────────────────
+
+    private OperationalObject storedCase(String id, String status, String priority, long createdAt) {
+        return store.create(new OperationalObject(id, ObjectType.CASE, id, "d", status, "HIGH", priority, null,
+                "alice", "corr", Map.of(), createdAt, createdAt, 0L));
+    }
+
+    @Test
+    void aCaseIsStampedBreachedAndEscalatedByItsOwnPolicyAndRulesOnly() throws Exception {
+        components.write("sla-policy", "case", Map.of("objectType", "CASE",
+                "calendar", Map.of("zone", "Europe/London", "workingDays", List.of("MON", "TUE", "WED", "THU", "FRI"),
+                        "start", "09:00", "end", "17:00"),
+                "targets", List.of(Map.of("priority", "CRITICAL", "responseMinutes", 30, "resolutionMinutes", 120))));
+        components.write("escalation-rule", "case-late", Map.of("objectType", "CASE", "on", "breach",
+                "reassign", "lead", "notify", true, "raisePriority", true));
+        long created = at("2026-10-05T09:00");   // a Monday
+        storedCase("k1", "OPEN", "CRITICAL", created);
+        storedCase("done", "CLOSED", "CRITICAL", created);
+        stored("inc", "IDENTIFIED", "CRITICAL", created, Map.of());   // no INCIDENT policy or rule: untouched
+
+        svc.sweepIncidentSla(created + 60_000);
+        Map<String, String> a = store.get("k1").orElseThrow().attributes();
+        assertEquals(Long.toString(at("2026-10-05T11:00")), a.get(ObjectService.ATTR_DUE_AT));
+        assertEquals(Long.toString(at("2026-10-05T09:30")), a.get(ObjectService.ATTR_RESPONSE_DUE_AT));
+
+        svc.sweepIncidentSla(at("2026-10-05T09:45"));   // response breached: the Case still sits in OPEN
+        assertEquals(1, eventsFor(EventType.OBJECT_SLA_BREACH, "k1").size());
+        assertEquals("response", eventsFor(EventType.OBJECT_SLA_BREACH, "k1").get(0).attributes().get("target"));
+
+        int breached = svc.sweepIncidentSla(at("2026-10-05T12:00"));
+        svc.sweepIncidentSla(at("2026-10-05T12:05"));
+        assertEquals(1, breached, "the resolution breach, once");
+        assertEquals(2, eventsFor(EventType.OBJECT_SLA_BREACH, "k1").size(), "one response + one resolution, never repeated");
+        OperationalObject k1 = store.get("k1").orElseThrow();
+        assertEquals("lead", k1.assignee());
+        assertEquals("true", k1.attributes().get("escalated"));
+        assertEquals(1, eventsFor(EventType.OBJECT_ESCALATED, "k1").size(), "the rule fires once per breach");
+        assertEquals(0, eventsFor(EventType.OBJECT_SLA_BREACH, "done").size(), "a closed Case's clock is stopped");
+        assertNull(store.get("inc").orElseThrow().attributes().get(ObjectService.ATTR_DUE_AT));
+    }
 }
