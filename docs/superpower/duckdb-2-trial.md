@@ -52,3 +52,29 @@ Read from the v1.5.6 release notes only (v1.5.3 to v1.5.5 notes not read). Bugfi
 Extension staging: `tools/fetch-duckdb-extensions.mjs` and `inspecto/package.ps1` derive the ABI dir from the first three components of `duckdb.version`, so `1.5.6.0` maps to `v1.5.6`. No committed manifest lists per-version dirs, so nothing needs editing. The local `~/.duckdb/extensions` already holds `v1.5.6`. Extensions were not downloaded; the CI/bundle fetch must supply `v1.5.6` binaries (excel, ducklake, postgres_scanner, httpfs, aws).
 
 Pins aligned: `tools/templates/step/pom.xml` and `tools/templates/nodetype/pom.xml` test-scope DuckDB 1.5.2.1 -> 1.5.6.0 (`packs-dev/acme.redact` does not exist in this tree). Dated measurements "probed on 1.5.2.1" are left as history.
+
+## Update 2026-10-03: engine behaviour via the Python wheel (D-3 index design) - GO
+
+The Java 2.0 jar is still unavailable, so the ENGINE was checked through the Python wheel instead: `duckdb 2.0.0.dev2610011535`
+(`version()` = `v2.0.0-alpha43763`, `pip install duckdb --pre`) against `duckdb 1.5.6`, each in its own venv (scratchpad, discarded). This tests the
+SQL engine, NOT the JDBC driver, the Maven build or the LA modules' compile status; the Java driver surface stays unmeasured.
+Data: 3M generated edges (300k entities), `out/` and `in/` trees written exactly as `IndexBuilder` does
+(`COPY ... PARTITION_BY (bucket), ROW_GROUP_SIZE 122880, COMPRESSION zstd`, 128 buckets, `CAST(md5_number_lower(col) % 128 AS INTEGER)`).
+
+| Check | 1.5.6 | 2.0 alpha | Verdict |
+|---|---|---|---|
+| (a) `md5_number_lower` | 3 sample ids bucket 46/105/89; checksum over 300k ids, all 128 buckets hit | identical | Same as the Java `BucketFunction.bucketOf` (MD5 bytes 8..15, little-endian, unsigned), proven against a Python reference on 300k ids on BOTH versions |
+| (b) hive prune, single key (`WHERE bucket = 68 AND src = ?`) | `File Filters: bucket = 68`, `Scanning Files: 1/128` | same, plus `Row Groups Scanned: 1 / 1` | Prunes on both; 2.0 is ~3x faster (16 ms vs 47 ms) |
+| (b) per-key `UNION ALL` of N equality statements | 10 keys 387 ms, 100 keys 3.8 s, 500 keys 7.4 s | 10 keys 158 ms, 100 keys 1.6 s, 500 keys 8.2 s | 2.0 wins small frontiers, no gain at 500 (per-statement planning dominates); unchanged cap guidance |
+| (c) `hash()` | `hash('E1')` = 13919747865855153549, `hash(1)` = 4717996019076358352 | identical for text, int, double, timestamp | NOT refuted for this pair: `hash()` did not change 1.5.6 -> 2.0-alpha. The `md5_number_lower` decision stands anyway (no cross-version guarantee is documented); do not cite this as a measured instability |
+| (d) TimeZone / `strptime` | default = host (`Asia/Calcutta`); `strptime` naive, `%z` yields TIMESTAMPTZ rendered in session zone; TIMESTAMPTZ->TIMESTAMP shifts by zone | identical in UTC, Asia/Kolkata and America/New_York | The pinned-UTC design (`SET TimeZone='UTC'`) is still required and still sufficient; session zone is still the host's |
+| (e) syntax/functions | `struct_pack(n :=, k :=)`, `count(DISTINCT struct)`, `FULL JOIN ... USING`, `FILTER (WHERE)`, `DESCRIBE`, `parquet_file_metadata`, `read_parquet([list])`, `COPY PARTITION_BY` all fine | all fine, no error | None found |
+| cross-version files | 2.0 reads files 1.5.6 wrote, and the reverse (row counts, hive column, timestamps identical) | | Existing on-disk indexes stay readable |
+
+Python-wheel caveats: `TIMESTAMPTZ` fetch needs `pytz` (a client-side detail, avoided by casting to VARCHAR); `SET enable_external_access=false` /
+`lock_configuration=true` ran without error on both, but the Java `SqlSandbox` settings were not exercised.
+
+### Verdict: GO - the index design survives 2.0-alpha at the SQL-engine level
+
+No bucket-function, pruning, timezone or syntax regression. Still owed, and only a Java 2.0 jar can answer: JDBC driver API changes, the `SqlSandbox`
+behaviour, and the LA test suites on 2.0. Re-run this check on each new 2.0 build; the script is a ~60-line pure-SQL harness.
