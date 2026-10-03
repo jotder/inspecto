@@ -520,8 +520,12 @@ Step Processor and no new route.
   - A number inside a *malformed* row never reaches the scan. Since 2026-10-03 (never store values) its rejects
     sidecar keeps only line, columns, reason and a salted fingerprint
     (`aCardNumberInAMalformedRowIsNeverCopiedIntoTheRejectSidecar`, a byte-wise scan of the whole Space).
-  - ⚠ The raw SOURCE file itself is still kept: `all_or_nothing` quarantines it whole and `backup/` keeps every
-    raw file that landed (`INGEST-RAW-SOURCE-COPIES-RETENTION-1`).
+  - The raw SOURCE file itself is kept (`all_or_nothing` quarantines it whole; `backup/` keeps every raw file that
+    landed) until the opt-in `processing.raw_copy_retention_days` (>= 1; unset = kept forever) ages it out: after each
+    backup, `RawCopyRetention` deletes files older than the window under `backup/` and `quarantine/` - never
+    `backup/parked/` (awaits `drain`) nor the `.restricted` store (its own `refusal_retention_days`). The window is
+    also how long a reject stays replayable. Residual: inbox names still reach Collector discovery logs and the
+    acquisition ledger (`INGEST-RAW-SOURCE-COPIES-RETENTION-1`).
 - **Feature Datasets (WS-41).** Five `sql.template` Jobs run on an hourly cron. Thresholds are Job parameters. Every
   window is **rolling**, anchored on each attempt, and half-open: `(t − window, t]`, so a span of exactly the window
   is outside it.

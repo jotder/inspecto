@@ -1296,6 +1296,7 @@ public final class PipelineConfig {
     private final CommitRetryPolicy commitRetry;
     private final RejectMode     rejectMode;
     private final Refusal        refusal;
+    private final Integer        rawCopyRetentionDays;
     private final Unpack         unpack;
     private final FixedWidth     fixedWidth;
     private final Json           json;
@@ -1469,6 +1470,8 @@ public final class PipelineConfig {
     public RejectMode     rejectMode() { return rejectMode; }
     /** {@code processing.refusal} / {@code processing.refusal_retention_days}; never null — absent reads as off. */
     public Refusal        refusal() { return refusal; }
+    /** {@code processing.raw_copy_retention_days}: raw source copies in backup/ and quarantine older than this are deleted; null = kept. */
+    public Integer        rawCopyRetentionDays() { return rawCopyRetentionDays; }
     /** True when a file with any rejected record must land nothing ({@code reject_mode: all_or_nothing}). */
     public boolean        rejectsAllOrNothing() { return rejectMode == RejectMode.ALL_OR_NOTHING; }
     /** Never null — an absent {@code processing.unpack} block reads as {@link Unpack#defaults()}. */
@@ -1592,6 +1595,7 @@ public final class PipelineConfig {
         this.rejectMode = b.rejectMode == null ? RejectMode.EJECT : b.rejectMode;
         this.refusal = b.refusal == null ? Refusal.OFF : b.refusal;
         requireScanCoverage(this.refusal, this.schemas, b.name);
+        this.rawCopyRetentionDays = b.rawCopyRetentionDays;
         this.unpack = b.unpack;
         this.fixedWidth = b.fixedWidth;
         this.json = b.json;
@@ -1685,6 +1689,7 @@ public final class PipelineConfig {
         this.commitRetry = src.commitRetry;
         this.rejectMode = src.rejectMode;
         this.refusal = src.refusal;
+        this.rawCopyRetentionDays = src.rawCopyRetentionDays;
         this.unpack = src.unpack;
         this.fixedWidth = src.fixedWidth;
         this.json = src.json;
@@ -2243,6 +2248,7 @@ public final class PipelineConfig {
         CommitRetryPolicy commitRetry = null;   // absent block = inherit the -Dingest.retry.* globals whole
         RejectMode rejectMode    = RejectMode.EJECT;   // absent key = eject-and-continue
         Refusal    refusal       = Refusal.OFF;
+        Integer    rawCopyRetentionDays;
         Unpack unpack            = null;   // absent block = Unpack.defaults() (stage on, shipped caps)
         String batchesFilePath;
         String lineageFilePath;

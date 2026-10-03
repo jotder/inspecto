@@ -790,6 +790,7 @@ public final class ConsignmentIngestor {
         Path dst  = Paths.get(cfg.dirs().backup()).resolve(poll.relativize(file));
         Files.createDirectories(dst.getParent());
         Files.move(file, dst, StandardCopyOption.REPLACE_EXISTING);
+        RawCopyRetention.sweep(cfg);
     }
 
     // ── audit assembly ──────────────────────────────────────────────────────────

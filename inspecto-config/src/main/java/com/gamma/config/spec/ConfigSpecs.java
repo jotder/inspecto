@@ -374,6 +374,9 @@ public final class ConfigSpecs {
                                 + "Unset = none: every column is scanned."),
                 FieldSpec.of("processing.refusal_retention_days", "Restricted quarantine retention (days)", FieldType.INT,
                         "Optional: restricted-quarantine files older than this are deleted at the next refusal. Unset = kept."),
+                FieldSpec.of("processing.raw_copy_retention_days", "Raw source copy retention (days)", FieldType.INT,
+                        "Optional: raw source files kept in backup/ (not parked/) and quarantine older than this are deleted after each backup. "
+                                + "A reject quarantined or backed up is replayable only inside this window. Unset = kept forever."),
                 FieldSpec.withDefault("processing.streaming.large_file_bytes", "Streaming generation-mode threshold (bytes)",
                         FieldType.LONG, 268_435_456L,
                         "Plugin-ingester batches whose largest member is >= this run in bounded generation mode (huge files); smaller batches use union mode (many small files packed → one transform/write). 0 = always union."),
