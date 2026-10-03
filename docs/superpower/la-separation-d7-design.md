@@ -123,6 +123,32 @@ reader pool's sibling eviction must spare pinned versions (step D7-2). A hiberna
 or promoted one releases it. Bound: ≤ 50 Drafts (D21) × Datasets bound — in practice a handful of versions, each ≈ 1.28× the
 flat edge file (D-3 step 1 measurement) — disk, not memory. §12 D7-Q3 decides whether an old pin may force a rebase instead.
 
+**As built (D7-2, 2026-10-03).**
+
+* **The pin set lives with the index, not in Draft headers.** `IndexPins` (`inspecto-la-storage`) keeps `pins.json` in the index
+  directory: `{formatVersion:1, pins:[{pinId, version, pinnedAt, expiresAt}]}`. It is rewritten whole (temp name, fsync,
+  ATOMIC_MOVE) rather than appended, since unpin, expiry and moving a pin are removals and the set is tiny. D7-3's fork calls
+  `store.pins().pin(version, draftId)`; discard/promote call `unpin`; re-pinning an id moves it. `pin` refuses a version that is
+  not a published directory (a `.tmp` stage never is one).
+* **TTL (D7-Q3, signed).** `PIN_TTL_DAYS = 30`, `PIN_WARN_DAYS = 7` (the caller may pass another TTL). `expiresAt` is
+  exclusive: at exactly day 30 the pin no longer protects, and the version falls under the normal keep/minAge rules (it is not
+  deleted by expiry itself). `expiresSoon(now[, warnDays])` returns unexpired pins within the window for D7-3's admission to warn;
+  `expire(now)` drops expired entries from the file.
+* **gc.** `IndexStore.gc(minAge)` (signature unchanged, so `IndexBuildService` needed no edit) reads the pins and runs its whole
+  sweep under the per-directory pin lock (JVM monitor plus `.pins.lock` file lock): a pin granted before the sweep is honoured, a
+  pin after it is refused because the version is gone, and none can slip in between. An unreadable or truncated `pins.json`
+  THROWS and gc deletes nothing (fail closed). Pinned append versions stay whole after their parent is collected: append
+  versions are made of per-file hard links, so deleting the parent's directory removes only the parent's names (tested, plus
+  `IndexBuilder.verify` after several publish+gc cycles).
+* **Pool finding.** `IndexReader.borrow` kept only IDLE sealed readers per version directory and, on borrowing a version,
+  closed the idle readers of every sibling. That was never a correctness hazard (a reader is re-openable from the version
+  directory while it exists, and an in-use reader is not in the pool) but it thrashed: a Draft on v3 and CURRENT on v5 would evict
+  each other's connections on every borrow. Changed: pinned siblings are spared, and borrowing a pinned version evicts nothing.
+  An unreadable pin set spares everything. `evictAll()` is unchanged (shutdown closes all).
+* **Deviation from the text above:** pins are stored per index, not read from Draft headers, so gc needs no Draft store (which
+  would be a dependency from storage up to the investigation layer); the Draft records its own `pinId` and keeps the registry
+  in step. A Draft header that loses its pin is therefore recoverable only by the TTL, which is the intent of D7-Q3.
+
 ## 6. Evaluation and checkpoints
 
 - **Append on a Draft:** fold from the latest persisted Working Set (`sets/<step>.json`) instead of from step 0, then
@@ -218,7 +244,7 @@ and `sets/` are never evicted.**
 | Step | Content | Verify |
 |---|---|---|
 | D7-1 | Membership: `members.jsonl`, roles, gate change in `open`/`openForRead`, PDP resource gains `members`; D-E7 amendment recorded | real-HTTP tests: each role × each route; non-member 404; PDP DENY still hides from a lead |
-| D7-2 | Version pins survive: `IndexStore.gc` honours a pin set; reader pool spares pinned siblings | unit test: publish 3 versions with one pinned → pinned survives gc and pool borrow of CURRENT |
+| D7-2 | **BUILT 2026-10-03** (section 5 "As built"). Version pins survive: `IndexStore.gc` honours a pin set; reader pool spares pinned siblings | unit test: publish 3 versions with one pinned → pinned survives gc and pool borrow of CURRENT |
 | D7-3 | Draft store + routes: fork (baseStep, baseLogHash, pins), append, undo, log, discard | Draft `/replay` equivalence green; fork writes nothing on failure (fault-injected rename) |
 | D7-4 | Checkpointed append (fold from latest `sets/`), main log and Drafts | equal state hashes vs full re-fold on a 500-step fixture; append latency flat in log length |
 | D7-5 | Rebase + conflict report + promote (+ D-U7 approval when sensitive) | fixture with one op of each conflict kind → report lists all four; promote with moved head 409 |

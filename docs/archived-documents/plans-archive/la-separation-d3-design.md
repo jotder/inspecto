@@ -141,6 +141,7 @@ manifest version (§2.5). Decision 2.
   Graph Run lifetime (`Limits` run TTL 1 h) so a run that started on version V can finish on V.
   A version cited in an Investigation's provenance (§2.5) is NOT protected — provenance, not a replay pin; a missing version reads as
   "no longer available".
+  **D-7 (D7-2, built):** `gc` additionally never deletes a version held by an unexpired pin of `IndexPins` (`pins.json`, D-7 design 5), whatever `keepVersions` and `minAge` say; an unreadable pin file aborts the sweep.
 * **Disk budget.** A per-Space `max_disk_bytes`; the estimate is `rowCount × bytesPerEdge × 2 + nodes` (bytesPerEdge from step 1); a build
   over budget is refused up front with the estimate in the message. Staging is under the same root, so a failed or cancelled build
   leaves only an unreferenced `v<id>.tmp/` that the next run deletes (the `MaterializeTask` `.tmp` discipline).
