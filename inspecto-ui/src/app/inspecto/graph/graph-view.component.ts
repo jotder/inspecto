@@ -64,6 +64,24 @@ export interface GraphViewPlugins {
     behaviors?: ('brush-select' | 'lasso-select' | 'hover-activate')[];
 }
 
+/** The host's accessible name: the graph's size, so the canvas is not an unnamed blank to a screen reader. */
+export function graphSummaryLabel(data: G6GraphData | null): string {
+    const n = data?.nodes?.length ?? 0;
+    const e = data?.edges?.length ?? 0;
+    return `Graph, ${n} ${n === 1 ? 'node' : 'nodes'}, ${e} ${e === 1 ? 'link' : 'links'}`;
+}
+
+/**
+ * G6 creates its canvas layers with `tabindex="1"` — a positive tabindex that pulls them ahead of the
+ * page in the keyboard order (axe `tabindex`, LA-A11Y-AUDIT-1). Reset them to `0`: still focusable for
+ * G6's keyboard behaviours, but in document order.
+ */
+export function demotePositiveTabindex(root: HTMLElement): void {
+    root.querySelectorAll<HTMLElement>('[tabindex]').forEach((el) => {
+        if (el.tabIndex > 0) el.setAttribute('tabindex', '0');
+    });
+}
+
 /** The G6 plugin list for a {@link GraphViewPlugins} — pure, so the mapping is unit-testable without a canvas. */
 export function buildPluginList(p: GraphViewPlugins | null, swatches: readonly string[]): Record<string, unknown>[] {
     if (!p) return [];
@@ -308,6 +326,10 @@ export function stableKey(value: unknown): string {
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: {
         '[class]': `fill ? 'block w-full min-h-0 flex-auto' : 'block w-full min-h-96 h-[62vh]'`,
+        // The canvas has no accessible content (LA-A11Y-AUDIT-1, WCAG 1.1.1): a named figure gives a
+        // screen reader the graph's size. The textual route to the rows stays the host page's job.
+        role: 'figure',
+        '[attr.aria-label]': 'summaryLabel',
     },
 })
 export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
@@ -327,6 +349,10 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     @Output() edgeClick = new EventEmitter<string>();
 
     @ViewChild('host') private hostEl!: ElementRef<HTMLDivElement>;
+
+    get summaryLabel(): string {
+        return graphSummaryLabel(this.data);
+    }
     private graph: Graph | null = null;
     /** Edges whose label is revealed by hover (transient) / click (pinned until the next click). */
     private hoverLabelled: string[] = [];
@@ -769,7 +795,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         graph.on(EdgeEvent.POINTER_ENTER, (e) => this.revealEdgeLabels(targetId(e), 'edge', false));
         graph.on(NodeEvent.POINTER_LEAVE, () => this.revealEdgeLabels(undefined, 'node', false));
         graph.on(EdgeEvent.POINTER_LEAVE, () => this.revealEdgeLabels(undefined, 'edge', false));
-        void graph.render();
+        const host = this.hostEl.nativeElement;
+        void graph.render().then(() => demotePositiveTabindex(host));
         this.graph = graph;
         this.snapshotKeys();
     }

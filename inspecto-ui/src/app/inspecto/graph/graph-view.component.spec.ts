@@ -10,6 +10,8 @@ import {
     GraphDisplayOptions,
     GraphViewComponent,
     buildPluginList,
+    demotePositiveTabindex,
+    graphSummaryLabel,
     edgeLabelsHiddenByDensity,
     layoutConfig,
     stableKey,
@@ -300,5 +302,27 @@ describe('dense-graph link labels (telco demo ring, 2026-09-27)', () => {
         comp.display = null;
         comp.data = { nodes: [], edges: edges.slice(0, 20) } as unknown as G6GraphData;
         expect(comp.edgesToReveal('hub', 'node')).toEqual([]); // sparse: nothing hidden to reveal
+    });
+});
+
+describe('graph text alternative and canvas tabindex (LA-A11Y-AUDIT-1)', () => {
+    it('the host is a figure named by the graph size', () => {
+        const host: HTMLElement = create({ nodes: [], edges: [] }).nativeElement;
+        expect(host.getAttribute('role')).toBe('figure');
+        expect(host.getAttribute('aria-label')).toBe('Graph, 0 nodes, 0 links');
+        expect(graphSummaryLabel({ nodes: [{ id: 'a' }], edges: [] } as unknown as G6GraphData)).toBe(
+            'Graph, 1 node, 0 links',
+        );
+    });
+
+    it('demotes the positive tabindex G6 puts on its canvases and leaves others alone', async () => {
+        const root = document.createElement('div');
+        root.innerHTML = '<canvas tabindex="1"></canvas><canvas tabindex="1"></canvas><button tabindex="-1">x</button>';
+        document.body.appendChild(root);
+        demotePositiveTabindex(root);
+        const values = Array.from(root.querySelectorAll('[tabindex]')).map((el) => el.getAttribute('tabindex'));
+        expect(values).toEqual(['0', '0', '-1']);
+        await expectNoA11yViolations(root);
+        root.remove();
     });
 });
