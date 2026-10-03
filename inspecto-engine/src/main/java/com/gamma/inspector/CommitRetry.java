@@ -1,6 +1,8 @@
 package com.gamma.inspector;
 
 import com.gamma.etl.Consignment;
+import com.gamma.etl.FailureText;
+import com.gamma.etl.FileNames;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.QuarantineManager;
 import com.gamma.signal.PipelineConsignmentSignal;
@@ -120,7 +122,7 @@ public final class CommitRetry {
                 if (r.attempts >= policy.maxAttempts) {
                     QuarantineManager.quarantine(f, REASON_RETRY_EXHAUSTED, false, cfg);
                     Files.deleteIfExists(side);
-                    exhausted.add(f.getName());
+                    exhausted.add(FileNames.safe(cfg, f.getName()));
                     attemptsAtExhaustion = r.attempts;
                 } else {
                     r.nextRetryAt = Instant.now().plusMillis(policy.delayMs(r.attempts)).toString();
@@ -129,7 +131,7 @@ public final class CommitRetry {
                 }
             } catch (IOException | RuntimeException e) {
                 log.warn("Could not record COMMIT retry for {} of Consignment {}: {}",
-                        f.getName(), batch.batchId(), e.getMessage());
+                        FileNames.safe(cfg, f.getName()), batch.batchId(), FailureText.scrub(e.getMessage(), cfg));
             }
         }
         if (!exhausted.isEmpty()) {
@@ -152,7 +154,8 @@ public final class CommitRetry {
         try {
             Files.deleteIfExists(sidecar(root, file, cfg));
         } catch (IOException | RuntimeException e) {
-            log.debug("Could not clear retry record for {}: {}", file.getName(), e.getMessage());
+            log.debug("Could not clear retry record for {}: {}", FileNames.safe(cfg, file.getName()),
+                    FailureText.scrub(e.getMessage(), cfg));
         }
     }
 
@@ -174,7 +177,8 @@ public final class CommitRetry {
             try {
                 r = read(sidecar(root, f, cfg));
             } catch (RuntimeException e) {
-                log.debug("Unreadable retry record for {} — admitting it: {}", f.getName(), e.getMessage());
+                log.debug("Unreadable retry record for {} — admitting it: {}", FileNames.safe(cfg, f.getName()),
+                        FailureText.scrub(e.getMessage(), cfg));
             }
             if (r != null && r.nextRetryAt != null && !r.nextRetryAt.isBlank()) {
                 try {
@@ -307,7 +311,7 @@ public final class CommitRetry {
             Files.writeString(side, GSON.toJson(r), StandardCharsets.UTF_8);
             return new Outcome(Result.RESCHEDULED, r, null, null);
         } catch (IOException | RuntimeException e) {
-            return failed(file, e);
+            return failed(cfg, file, e);
         }
     }
 
@@ -326,10 +330,10 @@ public final class CommitRetry {
             QuarantineManager.quarantine(file, REASON_RETRY_CANCELLED, false, cfg);
             clear(file, cfg);
             log.warn("COMMIT retries of {} cancelled after {} attempt(s); quarantined under {}",
-                    file.getName(), r.attempts, REASON_RETRY_CANCELLED);
+                    FileNames.safe(cfg, file.getName()), r.attempts, REASON_RETRY_CANCELLED);
             return new Outcome(Result.CANCELLED, r, REASON_RETRY_CANCELLED, null);
         } catch (IOException | RuntimeException e) {
-            return failed(file, e);
+            return failed(cfg, file, e);
         }
     }
 
@@ -371,9 +375,11 @@ public final class CommitRetry {
         }
     }
 
-    private static Outcome failed(File file, Exception e) {
-        log.warn("Could not act on the COMMIT retry record for {}: {}", file.getName(), e.getMessage());
-        return new Outcome(Result.FAILED, null, null, "could not act on the retry record: " + e.getMessage());
+    private static Outcome failed(PipelineConfig cfg, File file, Exception e) {
+        log.warn("Could not act on the COMMIT retry record for {}: {}", FileNames.safe(cfg, file.getName()),
+                FailureText.scrub(e.getMessage(), cfg));
+        return new Outcome(Result.FAILED, null, null,
+                "could not act on the retry record: " + FailureText.scrub(e.getMessage(), cfg));
     }
 
     private static boolean isDue(Record r, Instant now) {

@@ -86,7 +86,7 @@ public final class QuarantineManager {
                 inputFile = last;
             } else {
                 // 1→1 STREAM: the original IS this file — quarantine it, drop the scratch copy.
-                com.gamma.etl.unpack.UnpackStage.cleanup(actual);
+                com.gamma.etl.unpack.UnpackStage.cleanup(cfg, actual);
                 inputFile = original;
             }
         }
@@ -122,7 +122,7 @@ public final class QuarantineManager {
 
         Path dst = qDir.resolve(targetName);
         Files.move(file.toPath(), dst, StandardCopyOption.REPLACE_EXISTING);
-        log.info("Quarantined [{}]: {} → {}", subDir, file.getName(), dst);
+        log.info("Quarantined [{}]: {} → {}", subDir, FileNames.safe(cfg, file.getName()), FileNames.safe(cfg, dst.toString()));
 
         if (includeErrorCsv) {
             String baseName = CsvIngester.stripExtensions(errorBase);

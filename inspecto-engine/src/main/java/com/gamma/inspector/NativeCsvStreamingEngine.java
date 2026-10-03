@@ -1,5 +1,6 @@
 package com.gamma.inspector;
 
+import com.gamma.etl.FileNames;
 import com.gamma.etl.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,7 +83,7 @@ final class NativeCsvStreamingEngine {
         int memberIdx = 0;
         for (Consignment.Member m : batch.members()) {
             IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
-                    m.file().getName(), ++memberIdx, batch.members().size());
+                    FileNames.safe(cfg, m.file().getName()), ++memberIdx, batch.members().size());
             LocalDateTime mStart = LocalDateTime.now();
             String view = "raw_m" + m.srcId();
 
@@ -192,7 +193,7 @@ final class NativeCsvStreamingEngine {
         List<String> partCols = partitionColumns(schema);
         String baseName = CsvIngester.stripExtensions(m.file().getName());
         IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
-                m.file().getName(), 1, 1);
+                FileNames.safe(cfg, m.file().getName()), 1, 1);
 
         // processing.refusal_scan: the platform card scan reads the file once, before anything is written.
         String scanned = RefusalQuarantine.scanFile(conn, m.file(), schema, cfg, m.srcId());
@@ -238,7 +239,7 @@ final class NativeCsvStreamingEngine {
         List<String> partCols = partitionColumns(schema);
         String baseName = CsvIngester.stripExtensions(m.file().getName());
         IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
-                m.file().getName(), 1, 1);
+                FileNames.safe(cfg, m.file().getName()), 1, 1);
 
         String scratch = scratchDir(cfg);
         Path chunkDir = Paths.get(scratch != null ? scratch : System.getProperty("java.io.tmpdir"));
@@ -314,7 +315,7 @@ final class NativeCsvStreamingEngine {
                     : unreadable;
             return empty(batch, batchStart, MemberAudit.rejected(m, MemberStatus.QUARANTINED_UNREADABLE, reason, mStart));
         }
-        log.info("[INGEST] [{}] streamed {} chunk(s): {} rows{}", m.file().getName(), chunkCount,
+        log.info("[INGEST] [{}] streamed {} chunk(s): {} rows{}", FileNames.safe(cfg, m.file().getName()), chunkCount,
                 String.format("%,d", parsedTotal), rejectTotal > 0 ? "  rejected=" + rejectTotal : "");
 
         return finishSingle(batch, m, cfg, batchStart, mStart, parsedTotal, rejectTotal, outputs, lineage,

@@ -35,6 +35,40 @@ class FileNamesTest {
     }
 
     @Test
+    void aValueSplitByDashesOrSpacesIsCaughtAndAgreesWithItsPlainSpelling(@TempDir Path dir) throws Exception {
+        PipelineConfig c = cfg(dir, "a");
+        String card = FileNames.safe(c, "pay_4111-1111-1111-1111.csv");
+        assertTrue(card.matches("pay_<fp:[0-9a-f]{16}>\\.csv"), card);
+        assertEquals(card, FileNames.safe(c, "pay_4111111111111111.csv"), "one value, one fingerprint");
+        assertTrue(FileNames.safe(c, "sub 91 98765 43210.csv").matches("sub <fp:[0-9a-f]{16}>\\.csv"));
+        // a date-led chain, dashed dates and ordinals are stamps, not values
+        for (String n : new String[]{"feed_2026-10-03.csv", "feed_2026-10-03-1.csv", "feed_2026-10-03 12-30-45.csv",
+                "part_0001_0002_0003.csv", "v1.2.3.4.csv"})
+            assertEquals(n, FileNames.safe(c, n));
+        // a date next to a value: only the value goes
+        String s = FileNames.safe(c, "cdr-20261003-919876543210.csv");
+        assertTrue(s.matches("cdr-20261003-<fp:[0-9a-f]{16}>\\.csv"), s);
+    }
+
+    @Test
+    void safeIsIdempotentSoAFingerprintIsNeverReFingerprinted(@TempDir Path dir) throws Exception {
+        PipelineConfig c = cfg(dir, "a");
+        for (int i = 0; i < 200; i++) {
+            String once = FileNames.safe(c, "in/x_" + (91987654000L + i) + "_" + (4111111111111000L + i) + ".csv");
+            assertEquals(once, FileNames.safe(c, once));
+        }
+    }
+
+    @Test
+    void aFileNameQuotedInFailureTextIsFingerprintedButAPlainCountIsNot(@TempDir Path dir) throws Exception {
+        PipelineConfig c = cfg(dir, "a");
+        String t = FailureText.scrub("DuckDB read_csv failed for sub_919876543210.csv: could not open; read 12345678 bytes", c);
+        assertFalse(t.contains("919876543210"), t);
+        assertTrue(t.contains("read 12345678 bytes"), t);
+        assertEquals("Empty file: plain.csv", FailureText.scrub("Empty file: plain.csv", c));
+    }
+
+    @Test
     void timestampsAndOrdinaryNamesAreUnchangedSoAnExistingLedgerStillMatches(@TempDir Path dir) throws Exception {
         PipelineConfig c = cfg(dir, "a");
         for (String n : new String[]{"a.csv", "feed_20261003.csv", "feed_202610031230.csv", "feed_20261003123045.csv",

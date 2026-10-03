@@ -130,11 +130,17 @@ public final class UnpackLedger {
      *                 archive outside it falls back to its filename
      */
     public static void flush(String runId, String ledgerPath, Path pollRoot) {
+        flush(runId, ledgerPath, pollRoot, null);
+    }
+
+    /** As {@link #flush(String, String, Path)}; with a {@code cfg} the archive name and the failure text are written
+     *  value-free (never store values: {@link com.gamma.etl.FileNames}, {@link com.gamma.etl.FailureText}). */
+    public static void flush(String runId, String ledgerPath, Path pollRoot, com.gamma.etl.PipelineConfig cfg) {
         Map<Path, Row> run = RUNS.remove(runId);
         if (run == null || run.isEmpty() || ledgerPath == null || ledgerPath.isBlank()) return;
         List<String> lines = new ArrayList<>(run.size());
         for (Row r : run.values()) {
-            synchronized (r) { lines.add(line(runId, r, pollRoot)); }
+            synchronized (r) { lines.add(line(runId, r, pollRoot, cfg)); }
         }
         new CsvLedger<String>(ledgerPath, HEADER, s -> s).appendAll(lines);
     }
@@ -145,7 +151,7 @@ public final class UnpackLedger {
     }
 
     /** One CSV line, index-aligned to {@link #COLUMNS} in the order declared there. */
-    private static String line(String runId, Row r, Path pollRoot) {
+    private static String line(String runId, Row r, Path pollRoot, com.gamma.etl.PipelineConfig cfg) {
         UnpackStatus status = UnpackStatus.verdict(
                 r.found, r.ingested, r.failed, r.skipped, r.expansionFailed);
         String rel = r.archive.getFileName().toString();
@@ -153,6 +159,7 @@ public final class UnpackLedger {
             if (pollRoot != null && r.archive.startsWith(pollRoot))
                 rel = pollRoot.relativize(r.archive).toString().replace('\\', '/');
         } catch (IllegalArgumentException ignored) { /* different root — keep the filename */ }
+        rel = com.gamma.etl.FileNames.safe(cfg, rel);
         return String.join(",",
                 CsvLedger.q(runId),
                 "\"" + CsvLedger.q(rel) + "\"",
@@ -164,7 +171,7 @@ public final class UnpackLedger {
                 String.valueOf(r.bytesIn),
                 String.valueOf(r.bytesOut),
                 status.name(),
-                "\"" + CsvLedger.q(r.error) + "\"",
+                "\"" + CsvLedger.q(com.gamma.etl.FailureText.scrub(r.error, cfg)) + "\"",
                 "\"" + CsvLedger.q(String.join(" ", r.consignmentIds)) + "\"");
     }
 

@@ -1,5 +1,6 @@
 package com.gamma.inspector;
 
+import com.gamma.etl.FileNames;
 import com.gamma.etl.*;
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
@@ -52,7 +53,7 @@ final class GenerationModeIngester {
                 int memberIdx = 0;
                 for (Consignment.Member m : batch.members()) {
                     IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
-                            m.file().getName(), ++memberIdx, batch.members().size());
+                            FileNames.safe(cfg, m.file().getName()), ++memberIdx, batch.members().size());
                     LocalDateTime mStart = LocalDateTime.now();
                     String stem = CsvIngester.stripExtensions(m.file().getName());
                     // lineageName: the ENTRY name for an unpack-expanded archive member, the plain
@@ -66,7 +67,7 @@ final class GenerationModeIngester {
                         } catch (SinkFlushException e) {
                             throw e;   // framework/schema fault → fail the batch (don't quarantine)
                         } catch (Exception e) {
-                            discardRevealed(sink, m);
+                            discardRevealed(cfg, sink, m);
                             QuarantineManager.quarantine(m.file(), "unreadable", false, cfg);
                             memberAudits.add(MemberAudit.rejected(m, MemberStatus.QUARANTINED_UNREADABLE, msg(e), mStart));
                             continue;
@@ -75,7 +76,7 @@ final class GenerationModeIngester {
                         long memberParsed = sink.parsedRows();
                         long memberErrors = sink.errorRows();
                         if (memberParsed == 0) {
-                            discardRevealed(sink, m);
+                            discardRevealed(cfg, sink, m);
                             QuarantineManager.quarantine(m.file(), "field_mismatch", memberErrors > 0, cfg);
                             memberAudits.add(MemberAudit.rejected(m, MemberStatus.QUARANTINED_MISMATCH,
                                     "0 valid rows across all segments", mStart));
@@ -92,7 +93,7 @@ final class GenerationModeIngester {
                         allLineage.addAll(sink.lineage());
                         memberAudits.add(MemberAudit.accepted(m, memberParsed, memberErrors, mStart));
                         log.info("[INGEST] [{}] streamed {} row(s) → {} output file(s){}",
-                                m.file().getName(), String.format("%,d", memberParsed),
+                                FileNames.safe(cfg, m.file().getName()), String.format("%,d", memberParsed),
                                 sink.outputs().size(),
                                 memberErrors > 0 ? "  rejected=" + memberErrors : "");
                     }
@@ -128,7 +129,7 @@ final class GenerationModeIngester {
      * <p>A delete that fails fails the <em>batch</em> ({@link SinkFlushException} propagates to
      * {@link #run}'s outer catch): an orphan we know about is worse than a batch an operator retries.
      */
-    private static void discardRevealed(DuckDbRecordSink sink, Consignment.Member m) {
+    private static void discardRevealed(PipelineConfig cfg, DuckDbRecordSink sink, Consignment.Member m) {
         List<PartitionOutput> revealed = sink.outputs();
         if (revealed.isEmpty()) return;
         for (PartitionOutput o : revealed) {
@@ -136,10 +137,10 @@ final class GenerationModeIngester {
                 Files.deleteIfExists(Paths.get(o.outputFile()));
             } catch (IOException e) {
                 throw new SinkFlushException("cannot discard revealed generation " + o.outputFile()
-                        + " for quarantined member " + m.file().getName(), e);
+                        + " for quarantined member " + FileNames.safe(cfg, m.file().getName()), e);
             }
         }
         log.warn("[INGEST] [{}] quarantined mid-file — discarded {} already-revealed generation file(s)",
-                m.file().getName(), revealed.size());
+                FileNames.safe(cfg, m.file().getName()), revealed.size());
     }
 }

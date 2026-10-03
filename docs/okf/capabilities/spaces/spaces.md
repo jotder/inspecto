@@ -531,8 +531,24 @@ Step Processor and no new route.
     unchanged), the `[DEDUP]` log line, and the remote-acquisition logs and `AcquisitionTelemetry` events. A name
     with no such run is returned unchanged, so an existing ledger still matches; losing the salt re-keys the
     value-bearing names once. Pinned by `FileNamesTest` and
-    `SourceConfigIntegrationTest.aValueInAnInboxNameIsNeverLedgeredButDedupIdentityHolds`. Residual: other
-    file-name log sites and a value split by separators (`INGEST-RAW-SOURCE-COPIES-RETENTION-1`).
+    `SourceConfigIntegrationTest.aValueInAnInboxNameIsNeverLedgeredButDedupIdentityHolds`.
+  - **Every other name that is only DISPLAYED or logged carries it too** (closed 2026-10-04): `CommitRetry`,
+    `UnpackStage`, `NativeCsvStreamingEngine`, the lane failure logs and ingest-progress names,
+    `QuarantineManager`, `DuckDbCsvIngester`, the status ledger's `filename` / `origin` / `logical_name` columns
+    (`ConsignmentIngestorTest.aValueInAFileNameIsNeverWrittenToTheStatusLedgerButTheRealFileStillLands`) and the
+    unpack ledger. `FailureText.scrub` (every stored or logged failure text) also runs `FileNames.safeText`, which
+    transforms a file-name-shaped token (long digit run plus an extension) in an exception message that quotes a
+    path - a plain count such as `12345678 bytes` is left alone. `safe` is idempotent: it skips an `<fp:...>`
+    span, because a 16-hex fingerprint can itself hold 8 decimal digits in a row.
+  - **Heuristic widened to dashes and spaces** (`4111-1111-1111-1111`, `91 98765 43210`: short groups, compacted
+    before fingerprinting so the dashed and the plain spelling agree). A chain that starts with a valid date
+    (`2026-10-03-1`) is a stamp, so a dated name keeps its ledger key. Measured over the 5428 tracked file names
+    of the repo: one extra hit (a font range), none among inbox-shaped names.
+  - **Residual, by design: names that RESOLVE a path stay real.** The per-Consignment manifest, `backup/` and
+    quarantine paths, markers, the lineage ledger (queried by input file), the `filename_column` data column and
+    the OUTPUT file name (it carries the source stem, and `OVERWRITE_OR_IGNORE` re-runs rely on it) hold the real
+    name; they are the raw-copy surface the retention window above governs. **Not caught, by choice:** a value
+    split by underscores or dots (those join ordinals and versions), and a value spelled in letters.
 - **Feature Datasets (WS-41).** Five `sql.template` Jobs run on an hourly cron. Thresholds are Job parameters. Every
   window is **rolling**, anchored on each attempt, and half-open: `(t − window, t]`, so a span of exactly the window
   is outside it.

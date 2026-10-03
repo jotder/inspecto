@@ -306,7 +306,7 @@ public class CollectorProcessor {
             log.info("dry run: would write the run-level unpack ledger to {}", cfg.dirs().unpackFilePath());
         } else {
             com.gamma.etl.unpack.UnpackLedger.flush(cfg.identity().runTimestamp(),
-                    cfg.dirs().unpackFilePath(), Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize());
+                    cfg.dirs().unpackFilePath(), Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize(), cfg);
         }
 
         // Sweep unpack-origin mappings left by batches that failed at COMMIT (neither the finalize nor

@@ -1,5 +1,6 @@
 package com.gamma.inspector;
 
+import com.gamma.etl.FileNames;
 import com.gamma.etl.*;
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
@@ -64,7 +65,7 @@ final class UnionModeIngester {
                 int memberIdx = 0;
                 for (Consignment.Member m : batch.members()) {
                     IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
-                            m.file().getName(), ++memberIdx, batch.members().size());
+                            FileNames.safe(cfg, m.file().getName()), ++memberIdx, batch.members().size());
                     LocalDateTime mStart = LocalDateTime.now();
                     String stem = CsvIngester.stripExtensions(m.file().getName());
                     long memberParsed = 0, memberErrors = 0;

@@ -61,6 +61,11 @@ public final class FailureText {
 
     /** {@code text} with every quoted literal and every echoed CSV line replaced by its fingerprint. */
     public static String scrub(String text, PipelineConfig cfg) {
+        // A file NAME quoted unquoted in the message (an exception that names its path) carries its values too.
+        return FileNames.safeText(cfg, scrubLiterals(text, cfg));
+    }
+
+    private static String scrubLiterals(String text, PipelineConfig cfg) {
         if (text == null || text.isEmpty()) return text;
         // A Binder / Catalog / Parser error is about the AUTHORED SQL (a missing column, a bad expression): data
         // never reaches binding, and its quoted identifiers are the whole diagnosis. Kept verbatim unless the text

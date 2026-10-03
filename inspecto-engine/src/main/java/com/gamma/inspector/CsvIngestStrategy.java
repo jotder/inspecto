@@ -1,5 +1,6 @@
 package com.gamma.inspector;
 
+import com.gamma.etl.FileNames;
 import com.gamma.consignment.EventTimeBounds;
 import com.gamma.etl.*;
 import com.gamma.signal.SchemaDriftSignal;
@@ -140,7 +141,7 @@ final class CsvIngestStrategy implements ConsignmentIngestStrategy {
                 StepProgress.track(cfg.identity().pipelineName(), batch.batchId(), "parse", 1, 3);
                 for (Consignment.Member m : batch.members()) {
                     IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
-                            m.file().getName(), ++memberIdx, batch.members().size());
+                            FileNames.safe(cfg, m.file().getName()), ++memberIdx, batch.members().size());
                     LocalDateTime mStart = LocalDateTime.now();
                     String tempTable = "raw_f" + m.srcId();
                     IngestResult ing;

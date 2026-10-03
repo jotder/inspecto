@@ -101,7 +101,7 @@ public final class ConsignmentIngestor {
                     batch.table(), outcome.status(), dry.parsedRows(), dry.wouldLandRows());
             for (PipelineTestRun.MemberOutcome m : dry.members()) {
                 log.info("dry run: consignment {} member {} → {} ({}): {} parsed, {} rejected row(s){}",
-                        batch.batchId(), m.filename(), m.kind(), m.status() == null ? "not reached" : m.status(),
+                        batch.batchId(), FileNames.safe(cfg, m.filename()), m.kind(), m.status() == null ? "not reached" : m.status(),
                         m.parsedRows(), m.errorRows(),
                         m.reason() == null || m.reason().isBlank() ? "" : " — " + com.gamma.etl.FailureText.scrub(m.reason(), cfg));
                 // X4: per-RECORD offsets + reasons, read from the reject sidecar before the scratch went.
@@ -109,7 +109,7 @@ public final class ConsignmentIngestor {
                     DryRunRejects.add(cfg.identity().pipelineName(), new DryRunRejects.MemberRejects(
                             batch.batchId(), m.filename(), m.rejectTotal(), m.rejects()));
                     log.info("dry run: consignment {} member {} rejected record(s), first {} of {}: {}",
-                            batch.batchId(), m.filename(), m.rejects().size(), m.rejectTotal(),
+                            batch.batchId(), FileNames.safe(cfg, m.filename()), m.rejects().size(), m.rejectTotal(),
                             m.rejects().stream().map(r -> "line " + r.line() + " (" + r.reason() + ")")
                                     .collect(java.util.stream.Collectors.joining("; ")));
                 }
@@ -631,7 +631,7 @@ public final class ConsignmentIngestor {
                     // tolerated: a genuine backup failure (unwritable destination, full disk) leaves the file in
                     // the inbox, where a FAILED batch is the honest answer and the rerun is idempotent.
                     log.warn("Consignment {} member {} vanished before backup; skipping its backup",
-                            batch.batchId(), m.file().getName());
+                            batch.batchId(), FileNames.safe(cfg, m.file().getName()));
                 }
             }
             recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.BACKED_UP);
@@ -690,7 +690,7 @@ public final class ConsignmentIngestor {
         // if a sibling member's batch fails, no marker exists and the next cycle re-expands it whole,
         // which the OVERWRITE_OR_IGNORE outputs make idempotent.
         for (Consignment.Member m : survivors) {
-            File original = com.gamma.etl.unpack.UnpackStage.cleanup(m.file());
+            File original = com.gamma.etl.unpack.UnpackStage.cleanup(cfg, m.file());
             if (original == null) continue;
             if (backup != null) {
                 try {
@@ -844,11 +844,11 @@ public final class ConsignmentIngestor {
                     outBySrc.getOrDefault(ma.srcId(), new LinkedHashSet<>()));
             fileRows.add(new ConsignmentAuditWriter.FileRow(
                     ma.start().format(DuckDbUtil.DT_FMT), end.format(DuckDbUtil.DT_FMT),
-                    ma.filename(), ma.status().name(), ma.parsedRows(), ma.errorRows(),
+                    FileNames.safe(cfg, ma.filename()), ma.status().name(), ma.parsedRows(), ma.errorRows(),
                     paths, paths.stream().map(pth -> bytesByOutput.getOrDefault(pth, -1L)).toList(),
                     Duration.between(ma.start(), end).toMillis(), com.gamma.etl.FailureText.scrub(ma.error(), cfg),
                     batch.batchId(),
-                    ma.origin(), logicalNameOf(ma, memberFiles, cfg)));
+                    FileNames.safe(cfg, ma.origin()), FileNames.safe(cfg, logicalNameOf(ma, memberFiles, cfg))));
         }
 
         long totalOutputRows  = lineage.stream().mapToLong(LineageRow::rowCount).sum();

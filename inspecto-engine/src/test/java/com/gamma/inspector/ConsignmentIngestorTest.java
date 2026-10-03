@@ -18,6 +18,31 @@ class ConsignmentIngestorTest {
         return new Consignment.Member(f, id, f.length(), sel);
     }
 
+    /** Never store values: a value in an inbox NAME never reaches the status ledger, while the real file is still
+     *  found, ingested and backed up under its real name (resolution is not touched). */
+    @Test
+    void aValueInAFileNameIsNeverWrittenToTheStatusLedgerButTheRealFileStillLands(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTestRef.writePipeline(dir, "").toString());
+        Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
+        String name = "sub_919876543210.csv";
+        Path f = inbox.resolve(name);
+        Files.writeString(f, "ID,AMT,EVENT_DATE\na1,1.0,2020-04-03\n");
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null,
+                List.of(member(cfg, f.toFile(), 0)));
+        ConsignmentIngestor.process(batch, cfg, new ConsignmentAuditWriter(
+                cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
+
+        String status = Files.readString(Path.of(cfg.dirs().statusFilePath()));
+        assertTrue(status.contains("SUCCESS"), status);
+        // the filename and logical_name columns are value-free; output_paths is the real output path (the output file
+        // is named after its source stem - a residual, see spaces.md 3.5.1), so only the name columns are judged
+        String row = status.lines().skip(1).findFirst().orElseThrow();
+        assertFalse(row.split(",")[2].contains("919876543210"), row);
+        assertFalse(row.substring(row.lastIndexOf(",\"")).contains("919876543210"), row);
+        assertTrue(status.contains(FileNames.safe(cfg, name)), status);
+        assertTrue(Files.exists(Path.of(cfg.dirs().backup(), name)), "resolution stays on the real name");
+    }
+
     @Test
     void consolidatesGoodFilesQuarantinesBadOne(@TempDir Path dir) throws Exception {
         Path toon = PipelineConfigBatchTestRef.writePipeline(dir, "");

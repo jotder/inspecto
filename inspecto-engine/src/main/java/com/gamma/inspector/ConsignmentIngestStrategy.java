@@ -1,5 +1,6 @@
 package com.gamma.inspector;
 
+import com.gamma.etl.FileNames;
 import com.gamma.consignment.ConsignmentOutputs;
 import com.gamma.consignment.EventTimeBounds;
 import com.gamma.etl.Consignment;
@@ -90,7 +91,7 @@ interface ConsignmentIngestStrategy {
                                               java.time.LocalDateTime mStart) throws java.io.IOException {
         QuarantineManager.quarantine(m.file(), QuarantineManager.REASON_REJECTS_ALL_OR_NOTHING, true, cfg);
         log.warn("[INGEST] [{}] reject_mode all_or_nothing: {} record(s) rejected — nothing landed, file quarantined",
-                m.file().getName(), rejects);
+                FileNames.safe(cfg, m.file().getName()), rejects);
         return MemberAudit.rejectedWithRejects(m, MemberStatus.QUARANTINED_MISMATCH,
                 QuarantineManager.REASON_REJECTS_ALL_OR_NOTHING + ": " + rejects
                         + " record(s) rejected, nothing landed (reject_mode all_or_nothing)", rejects, mStart);

@@ -148,14 +148,14 @@ public final class DuckDbCsvIngester {
             }
         } catch (Exception e) {
             // read_csv throws on an unreadable / nonexistent / undecodable file.
-            throw new IOException("DuckDB read_csv failed for " + file.getName() + ": " + e.getMessage(), e);
+            throw new IOException("DuckDB read_csv failed for " + FileNames.safe(cfg, file.getName()) + ": " + e.getMessage(), e);
         }
 
         long errors = drainRejects(conn, file, cfg);
 
         if (parsed > 0)
             log.info("[INGEST] [{}] {} rows (native read_csv){}",
-                    file.getName(), String.format("%,d", parsed),
+                    FileNames.safe(cfg, file.getName()), String.format("%,d", parsed),
                     errors > 0 ? "  rejected=" + errors : "");
 
         // junkCandidateRows is a Java-parser concept; the native path folds all
@@ -860,10 +860,10 @@ public final class DuckDbCsvIngester {
             // after a DuckDB upgrade) means rows WERE dropped by read_csv and we could not drain them;
             // reporting that at debug made a real failure indistinguishable from a clean file.
             if (isMissingRejectTable(e, rj)) {
-                log.debug("No reject_errors for {} ({})", file.getName(), e.getMessage());
+                log.debug("No reject_errors for {} ({})", FileNames.safe(cfg, file.getName()), FailureText.scrub(e.getMessage(), cfg));
             } else {
                 log.warn("Could not drain rejected rows for {} — the reject count below is NOT reliable: {}",
-                        file.getName(), e.getMessage());
+                        FileNames.safe(cfg, file.getName()), FailureText.scrub(e.getMessage(), cfg));
             }
         } finally {
             if (errOut != null) errOut.close();

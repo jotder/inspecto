@@ -1,5 +1,7 @@
 package com.gamma.etl.unpack;
 
+import com.gamma.etl.FailureText;
+import com.gamma.etl.FileNames;
 import com.gamma.etl.DuckDbCsvIngester;
 import com.gamma.etl.PipelineConfig;
 import org.slf4j.Logger;
@@ -69,7 +71,7 @@ public final class UnpackStage {
         // deterministic regardless of thread scheduling: `out` is assembled from `plans` in the
         // original candidate order, so the planner sees the same list every run.
         List<Plan> plans = new ArrayList<>(candidates.size());
-        for (File f : candidates) plans.add(plan(f, nativeLane));
+        for (File f : candidates) plans.add(plan(cfg, f, nativeLane));
 
         String runId = cfg.identity().runTimestamp();
         List<Plan> work = plans.stream().filter(p -> p.plugin != null).toList();
@@ -83,13 +85,14 @@ public final class UnpackStage {
     }
 
     /** Which plugin (if any) owns a candidate — the whole decision, made before any expansion. */
-    private static Plan plan(File f, boolean nativeLane) {
+    private static Plan plan(PipelineConfig cfg, File f, boolean nativeLane) {
         DecompressorPlugin plugin;
         try {
             plugin = Decompressors.forFile(f.toPath()).orElse(null);
         } catch (IOException e) {
-            log.warn("[UNPACK] Could not probe {} — leaving it to the engine: {}", f.getName(), e.getMessage());
-            return new Plan(f, null);
+            log.warn("[UNPACK] Could not probe {} — leaving it to the engine: {}", FileNames.safe(cfg, f.getName()),
+                    FailureText.scrub(e.getMessage(), cfg));
+            return new Plan(cfg, f, null);
         }
         // A format the lane decodes itself is left alone — but ONLY for stream kinds: a .zip the
         // Java lane "reads" is only ever its FIRST entry (Compression.firstEntry), so an archive
@@ -97,8 +100,8 @@ public final class UnpackStage {
         if (plugin == null
                 || (plugin.kind() == DecompressorPlugin.Kind.STREAM
                     && laneReadsItself(f.getName(), nativeLane)))
-            return new Plan(f, null);
-        return new Plan(f, plugin);
+            return new Plan(cfg, f, null);
+        return new Plan(cfg, f, plugin);
     }
 
     /**
@@ -141,11 +144,13 @@ public final class UnpackStage {
      * thread ({@link #run}), with {@link #result()} read only after every task has joined.
      */
     private static final class Plan {
+        private final PipelineConfig cfg;
         private final File source;
         private final DecompressorPlugin plugin;
         private List<File> expanded;
 
-        Plan(File source, DecompressorPlugin plugin) {
+        Plan(PipelineConfig cfg, File source, DecompressorPlugin plugin) {
+            this.cfg = cfg;
             this.source = source;
             this.plugin = plugin;
         }
@@ -165,7 +170,8 @@ public final class UnpackStage {
                     String name = p.getFileName().toString();
                     UnpackOrigins.register(p, source,
                             archive ? ArchiveDecompressorPlugin.entryName(name) : name);
-                    log.info("[UNPACK] {} original={} actual={}", plugin.id(), source.getName(), p);
+                    log.info("[UNPACK] {} original={} actual={}", plugin.id(), FileNames.safe(cfg, source.getName()),
+                            FileNames.safe(cfg, p.toString()));
                     files.add(p.toFile());
                 }
                 // Entries the walk had to skip (encrypted / unsupported method) are recorded against
@@ -185,7 +191,7 @@ public final class UnpackStage {
                 // Fail-open: the original flows on and fails in the engine, where the per-file
                 // status/quarantine machinery reports it (see the class comment).
                 log.warn("[UNPACK] {} failed for {} — handing the original to the engine: {}",
-                        plugin.id(), source.getName(), e.getMessage());
+                        plugin.id(), FileNames.safe(cfg, source.getName()), FailureText.scrub(e.getMessage(), cfg));
                 // ⚠ A NoUsableEntriesException is NOT an expansion failure: the archive opened
                 // cleanly and simply had nothing usable in it, which is EMPTY (zero entries) or
                 // UNREADABLE (entries existed, none decodable) — distinct statuses per §6 Q1, told
@@ -259,6 +265,11 @@ public final class UnpackStage {
      *         has committed: marking it earlier would strand the entries still to come.
      */
     public static File cleanup(File actual) {
+        return cleanup(null, actual);
+    }
+
+    /** As {@link #cleanup(File)}, with the Space whose salt keeps the logged path value-free. */
+    public static File cleanup(PipelineConfig cfg, File actual) {
         if (!UnpackOrigins.isExpanded(actual)) return null;
         File lastOfOriginal = UnpackOrigins.consume(actual);
         try {
@@ -266,7 +277,7 @@ public final class UnpackStage {
             Path dir = actual.toPath().toAbsolutePath().getParent();
             if (dir != null) Files.deleteIfExists(dir);   // the per-source dir; fails non-empty, fine
         } catch (IOException e) {
-            log.debug("[UNPACK] Could not clean {}: {}", actual, e.getMessage());
+            log.debug("[UNPACK] Could not clean {}: {}", FileNames.safe(cfg, actual.toString()), FailureText.scrub(e.getMessage(), cfg));
         }
         return lastOfOriginal;
     }
