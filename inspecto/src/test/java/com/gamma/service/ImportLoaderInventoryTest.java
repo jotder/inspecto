@@ -78,6 +78,8 @@ class ImportLoaderInventoryTest {
             ALLOWED.put(p, REPO);
         for (String p : List.of("registry", "registry/datasets", "jobs", "views", "schemas", "mappings"))
             ALLOWED.put(p, IMPORTABLE);
+        ALLOWED.put("parked", "backup/parked/ (RawCopyRetention) - unprocessed raw copies under the DATA backup root, "
+                + "outside the config tree; the sweep skips it and no import lands outside <config>");
         ALLOWED.put("archived-config", "ConfigMigrator's backup of a migrated config — written, never read back as "
                 + "live config, so a planted file there changes nothing");
         // AccessGrants.java:79-80 resolves these under a variable already holding <config>/registry — the literal

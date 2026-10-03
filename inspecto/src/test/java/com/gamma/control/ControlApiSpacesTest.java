@@ -180,6 +180,8 @@ class ControlApiSpacesTest {
                     "with a Space hosted, creating another is administration");
             assertEquals(403, send(c.port, "POST", "/spaces/import?id=delta", "", "Bearer plain").statusCode(),
                     "import is the same posture as create");
+            assertEquals(403, send(c.port, "POST", "/spaces/import", "", "Bearer plain").statusCode(),
+                    "the bare route is gated before the id is even read");
             // ...and canAdminister still creates, as it deletes
             assertEquals(200, authed(c.port, "POST", "/spaces", "{\"id\":\"delta\"}").statusCode());
             assertEquals(200, authed(c.port, "DELETE", "/spaces/delta", null).statusCode());

@@ -61,7 +61,7 @@ class ControlApiImportReservedPathsTest {
     /** Every spelling the verifiers used to reach a reserved file or directory, and the doors they tried. */
     static final List<String> ALIASES = List.of(
             "roles.toon", "roles.toon.", "roles.toon ", "ROLES~1.TOO", "Roles.Toon", "demo-users.toon",
-            "agent/policy.json", "agent/approvals.jsonl", "agent/policy.toon", "offers.toon", "grants.toon",
+            "agent/policy.json", "agent/approvals.jsonl", "agent/policy.toon", "offers.toon", "grants.toon", "safety-policy.toon", "SAFETY-POLICY.toon",
             "pending-changes./x.json", "pending-changes./x.toon", "PENDIN~1/x.json", "audit./x.json", "audit./x.toon",
             "registry/access-profiles./x.toon", "registry/access-profiles/x.toon", "registry/ACCESS~1/x.toon",
             "CON.toon", "nul/x_pipeline.toon", "orders/COM1.toon", "LPT9", "a:b_pipeline.toon");

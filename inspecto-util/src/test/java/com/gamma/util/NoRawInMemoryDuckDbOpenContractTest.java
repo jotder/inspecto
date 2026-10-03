@@ -37,7 +37,8 @@ class NoRawInMemoryDuckDbOpenContractTest {
     private static final Map<String, String> ALLOWED = Map.of(
             "DuckDbUtil.java", "the factory itself (openInMemory)",
             "OperationalDbReport.java", "a JDBC scheme allow-list, not an open",
-            "JdbcDrivers.java", "a URL-prefix driver dispatch, not an open");
+            "JdbcDrivers.java", "a URL-prefix driver dispatch, not an open",
+            "EgressGate.java", "a JDBC URL-prefix check (in-process engines dial nothing), not an open");
 
     @Test
     void noMainSourceOpensARawInMemoryDuckDb() throws IOException {
