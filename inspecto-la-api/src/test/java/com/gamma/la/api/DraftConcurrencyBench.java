@@ -67,7 +67,7 @@ class DraftConcurrencyBench {
     private SnapshotStore store;
     private InvestigationRoutes.Inv main;
     private List<Map<String, Object>> mainEntries;
-    private final AtomicLong forkRetries = new AtomicLong(), heavyRan = new AtomicLong(), heavyRefused = new AtomicLong();
+    private final AtomicLong heavyRan = new AtomicLong(), heavyRefused = new AtomicLong();
 
     @Test
     void realDraftsOverSharedPartitionedIndex() throws Exception {
@@ -138,8 +138,8 @@ class DraftConcurrencyBench {
         }
         long heap1 = heap(), commit1 = commit();
         Arrays.sort(openMs);
-        System.out.printf("D-S5R open: %d Drafts, open p50 %d ms p95 %d ms max %d ms (fork rename retries %d)%n", drafts, pct(openMs, 50),
-                pct(openMs, 95), openMs[drafts - 1], forkRetries.get());
+        System.out.printf("D-S5R open: %d Drafts, open p50 %d ms p95 %d ms max %d ms%n", drafts, pct(openMs, 50),
+                pct(openMs, 95), openMs[drafts - 1]);
         try {
             fork(m, version, baseHash);
             System.out.println("D-S5R cap: FAIL - fork " + (drafts + 1) + " was admitted");
@@ -228,17 +228,8 @@ class DraftConcurrencyBench {
             h.put("baseStep", mainEntries.size());
             h.put("baseLogHash", baseHash);
             h.put("pins", Map.of("indexes", List.of(Map.of("mappingHash", m.hash(), "version", version))));
-            boolean made = false;
-            for (int attempt = 0; !made; attempt++) {
-                try {
-                    made = DraftStore.create(main.dir(), id, canonical(h));
-                    if (!made) throw new IllegalStateException("fork failed");
-                } catch (java.nio.file.AccessDeniedException busy) {   // Windows: a scanner holding the fresh scratch dir
-                    if (attempt == 5) throw busy;
-                    forkRetries.incrementAndGet();
-                    Thread.sleep(50);
-                }
-            }
+            // DraftStore.create retries a transient Windows rename denial itself (DraftStore.moveRetrying).
+            if (!DraftStore.create(main.dir(), id, canonical(h))) throw new IllegalStateException("fork failed");
             d = DraftStore.draftDir(main.dir(), id);
         }
         new IndexStore(main.writeRoot().resolve(IndexRoutes.INDEX_DIR), DATASET, m.hash()).pins().pin(version, id);
