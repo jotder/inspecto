@@ -5,6 +5,8 @@ import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.control.Subject;
+import com.gamma.la.core.DraftIndex;
+import com.gamma.la.core.DraftLifecycle;
 import com.gamma.la.core.DraftStore;
 import com.gamma.la.core.InvestigationEvaluator;
 import com.gamma.la.core.InvestigationMembers.Role;
@@ -83,7 +85,8 @@ public final class DraftRoutes implements RouteModule {
     private enum Act { READ, WRITE, DISCARD, PROMOTE }
 
     /** An opened Draft: the Investigation view working on it, its parsed header, and whether the main prefix is still what it forked from. */
-    private record Opened(InvestigationRoutes.Inv view, Map<String, Object> header, boolean discarded, boolean baseIntact, int mainHead, Role role) {
+    private record Opened(InvestigationRoutes.Inv view, Map<String, Object> header, boolean discarded, boolean baseIntact, int mainHead, Role role,
+                          boolean rehydrated) {
         String draftId() { return view.draft().draftId(); }
     }
 
@@ -98,6 +101,7 @@ public final class DraftRoutes implements RouteModule {
     private static Opened openDraft(ApiContext api, HttpExchange ex, String invId, String draftId, Act act) throws IOException {
         InvestigationRoutes.Inv inv = InvestigationRoutes.openAsMember(api, ex, invId);
         Role role = roleOf(inv, ex);
+        DraftAdmission.maintain(inv);   // D7-6: lazy idle sweep - recover rebase leftovers, hibernate after 1 h, expire after 30 d
         if (!DraftStore.DRAFT_ID.matcher(draftId).matches())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "draft id must match " + DraftStore.DRAFT_ID.pattern() + ", got '" + draftId + "'");
         Path dir = DraftStore.draftDir(inv.dir(), draftId);
@@ -118,6 +122,12 @@ public final class DraftRoutes implements RouteModule {
             refusal = new ApiException(403, ErrorCodes.PERMISSION_DENIED, "your role on investigation '" + invId + "' is " + role.wire() + " - it does not write a draft");
         }
         if (refusal != null) throw refusal;
+        // D7-6: only an AUTHORISED access keeps a Draft alive and wakes it (a refused or absent probe touches nothing)
+        boolean rehydrated = false;
+        if (!DraftStore.isClosed(dir)) {
+            DraftLifecycle.touch(dir);
+            rehydrated = DraftLifecycle.rehydrate(dir);
+        }
         int baseStep = ((Number) header.get("baseStep")).intValue();
         // D7-4: the verdict is cached per main log file (size + mtime), so an unchanged main log is read and hashed once, not per call
         com.gamma.la.core.DraftCheckpoints.Base base = com.gamma.la.core.DraftCheckpoints.base(inv.dir().resolve("log.jsonl"), baseStep,
@@ -131,12 +141,13 @@ public final class DraftRoutes implements RouteModule {
         boolean intact = base.intact();
         InvestigationRoutes.Inv view = new InvestigationRoutes.Inv(inv.store(), inv.writeRoot(), inv.id(), inv.header(),
                 new InvestigationRoutes.Inv.DraftRef(draftId, baseStep, dir));
-        return new Opened(view, header, DraftStore.isClosed(dir), intact, base.mainSize(), role);
+        return new Opened(view, header, DraftStore.isClosed(dir), intact, base.mainSize(), role, rehydrated);
     }
 
     private static void requireLive(Opened o) {
         if (o.discarded()) throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + o.draftId() + "' was "
-                + (DraftStore.isPromoted(o.view().draft().dir()) ? "promoted" : "discarded"));
+                + (DraftStore.isPromoted(o.view().draft().dir()) ? "promoted"
+                : DraftLifecycle.wasExpired(o.view().draft().dir()) ? "expired after " + DraftLifecycle.expireAfter.toDays() + " days idle" : "discarded"));
     }
 
     /** A Draft whose main prefix no longer hashes to what it forked from is not evaluated: fail closed (the main log was rewritten). */
@@ -160,17 +171,19 @@ public final class DraftRoutes implements RouteModule {
         String draftId = DraftStore.newId();
         List<Map<String, Object>> pinned = new ArrayList<>();
         Map<String, Object> header = new LinkedHashMap<>();
-        synchronized (InvestigationRoutes.lock(DraftStore.draftsDir(inv.dir()))) {
+        DraftAdmission.maintain(inv);   // D7-6: an expired Draft no longer holds D17's one seat or D21's cap
+        synchronized (DraftAdmission.CAP) {   // the Space-wide cap is checked and taken as one step
+          synchronized (InvestigationRoutes.lock(DraftStore.draftsDir(inv.dir()))) {
             List<String> main = inv.store().readLog(invId);
             int head = main.size();
             int at = atRaw == null ? head : ((Number) atRaw).intValue();
             if (at < 0 || at > head)
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'at' must be between 0 and the head step " + head + ", got " + at);
-            for (String other : DraftStore.listIds(inv.dir())) {   // D17: ONE live Draft per member per Investigation
-                @SuppressWarnings("unchecked") Map<String, Object> h = ApiContext.JSON.readValue(DraftStore.readHeader(inv.dir(), other), LinkedHashMap.class);
-                if (me.equals(h.get("actor")) && !DraftStore.isClosed(DraftStore.draftDir(inv.dir(), other)))
-                    throw new ApiException(409, ErrorCodes.CONFLICT, "you already have a live draft on investigation '" + invId + "': " + other);
+            for (Map.Entry<String, Map<String, Object>> other : DraftIndex.headers(inv.dir()).entrySet()) {   // D17: ONE live Draft per member per Investigation
+                if (me.equals(other.getValue().get("actor")) && !DraftStore.isClosed(DraftStore.draftDir(inv.dir(), other.getKey())))
+                    throw new ApiException(409, ErrorCodes.CONFLICT, "you already have a live draft on investigation '" + invId + "': " + other.getKey());
             }
+            DraftAdmission.requireRoom(inv);   // D21: 409 beyond the cap of open Drafts per Space
             header.put("draftId", draftId);
             header.put("investigationId", invId);
             header.put("actor", me);
@@ -191,6 +204,8 @@ public final class DraftRoutes implements RouteModule {
                 unpinAll(inv.writeRoot(), inv.dataset(), pinned, draftId);   // a failed fork leaves no pin behind either
                 throw failed;
             }
+            DraftLifecycle.touch(DraftStore.draftDir(inv.dir(), draftId));
+          }
         }
         InvestigationRoutes.emit(ex, LinkEventTypes.LINK_DRAFT_FORKED, "link.draft.forked",
                 "link.draft.forked — " + draftId + " of " + invId + " at step " + header.get("baseStep"),
@@ -256,7 +271,7 @@ public final class DraftRoutes implements RouteModule {
         return out;
     }
 
-    private static int unpinAll(Path writeRoot, String dataset, List<Map<String, Object>> pinned, String draftId) {
+    static int unpinAll(Path writeRoot, String dataset, List<Map<String, Object>> pinned, String draftId) {
         int n = 0;
         Path root = writeRoot.resolve(IndexRoutes.INDEX_DIR);
         for (Map<String, Object> p : pinned) {
@@ -278,15 +293,19 @@ public final class DraftRoutes implements RouteModule {
         boolean withDiscarded = "true".equals(ApiContext.query(ex, "discarded")) || "true".equals(ApiContext.query(ex, "closed"));
         String me = ApiContext.actor(ex);
         List<Map<String, Object>> items = new ArrayList<>();
-        for (String id : DraftStore.listIds(inv.dir())) {
-            @SuppressWarnings("unchecked") Map<String, Object> h = ApiContext.JSON.readValue(DraftStore.readHeader(inv.dir(), id), LinkedHashMap.class);
+        DraftAdmission.maintain(inv);   // D7-6: lazy idle sweep
+        // D7-6: the listing reads the small rebuildable index (a stat per header), not every header; state comes from marker files
+        int mainHead = inv.store().readLog(invId).size();
+        for (Map.Entry<String, Map<String, Object>> entry : DraftIndex.headers(inv.dir()).entrySet()) {
+            String id = entry.getKey();
+            Map<String, Object> h = entry.getValue();
             if (enforced && !role.canReadAnyDraft() && !me.equals(h.get("actor"))) continue;   // an analyst sees only their own
             Path dir = DraftStore.draftDir(inv.dir(), id);
             boolean discarded = DraftStore.isClosed(dir);
             if (discarded && !withDiscarded) continue;
             InvestigationRoutes.Inv view = new InvestigationRoutes.Inv(inv.store(), inv.writeRoot(), inv.id(), inv.header(),
                     new InvestigationRoutes.Inv.DraftRef(id, ((Number) h.get("baseStep")).intValue(), dir));
-            items.add(describe(new Opened(view, h, discarded, true, inv.store().readLog(invId).size(), role), false));
+            items.add(describe(new Opened(view, h, discarded, true, mainHead, role, false), false));
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("investigationId", invId);
@@ -364,6 +383,8 @@ public final class DraftRoutes implements RouteModule {
         requireIntact(o);
         if (expiredPin(o.view(), o.header()))   // D7-Q3: a pin past its 30 days forces a rebase, which re-pins CURRENT
             throw new ApiException(409, ErrorCodes.CONFLICT, "must rebase: the index version draft '" + draftId + "' pinned expired - rebase it (POST .../rebase) to re-pin");
+        if ("expand".equals(body.get("op")))   // D7-6: an expand reads the index / Dataset - a heavy job, 429 when the cap is full
+            return withDraftId(DraftAdmission.heavy("expand on draft " + draftId, () -> investigations.appendOpOn(api, ex, o.view(), body)), draftId);
         return withDraftId(investigations.appendOpOn(api, ex, o.view(), body), draftId);
     }
 
@@ -406,7 +427,7 @@ public final class DraftRoutes implements RouteModule {
             marker.put("headStep", head);
             marker.put("logHash", DraftStore.prefixHash(own, own.size()));
             first = DraftStore.markDiscarded(v.draft().dir(), canonical(marker));
-            com.gamma.la.core.DraftCheckpoints.forget(v.draft().dir());
+            DraftAdmission.evictCaches(v.draft().dir());
         }
         int unpinned = unpinAll(v.writeRoot(), v.dataset(), pinsOf(o.header()), draftId);
         if (first) {
@@ -541,7 +562,7 @@ public final class DraftRoutes implements RouteModule {
     }
 
     @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> pinsOf(Map<String, Object> header) {
+    static List<Map<String, Object>> pinsOf(Map<String, Object> header) {
         if (header.get("pins") instanceof Map<?, ?> p && p.get("indexes") instanceof List<?> l) return (List<Map<String, Object>>) l;
         return List.of();
     }
@@ -553,7 +574,17 @@ public final class DraftRoutes implements RouteModule {
         for (String k : List.of("draftId", "investigationId", "actor", "createdAt", "baseStep")) out.put(k, o.header().get(k));
         int base = v.draft().baseStep();
         int own = o.discarded() ? 0 : SnapshotStore.readLogAt(v.draft().dir()).size();
-        out.put("state", DraftStore.isPromoted(v.draft().dir()) ? "promoted" : o.discarded() ? "discarded" : "open");
+        out.put("state", DraftLifecycle.state(v.draft().dir()));   // promoted > discarded > hibernated > open (D7-6 precedence)
+        if (o.discarded()) {
+            if (DraftLifecycle.wasExpired(v.draft().dir())) out.put("expired", true);
+        } else {
+            java.time.Instant last = DraftLifecycle.lastAccess(v.draft().dir());
+            java.time.Instant expiresAt = last.plus(DraftLifecycle.expireAfter);
+            out.put("lastAccessAt", last.toString());
+            out.put("expiresAt", expiresAt.toString());   // D7-Q5: the warning - from 7 days out the Draft says it is about to expire
+            out.put("expiryWarning", !expiresAt.isAfter(DraftLifecycle.now().plus(java.time.Duration.ofDays(PIN_WARN_DAYS))));
+            if (o.rehydrated()) out.put("rehydrated", true);   // this request woke it: the first read after was one cold fold
+        }
         out.put("steps", own);
         out.put("headStep", base + own);
         int behind = Math.max(0, o.mainHead() - base);

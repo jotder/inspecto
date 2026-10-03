@@ -206,6 +206,23 @@ public final class WorkingSetRoutes implements RouteModule {
                 return hit;
             }
         }
+        if (inv.draft() == null) return build(key, bytes, end, at);
+        final byte[] draftBytes = bytes;
+        final int draftEnd = end;
+        // D7-6: a Draft's cold relation build is a heavy job - admitted under the heavy-job cap (429 when it is full), never queued
+        return DraftAdmission.heavy("Working Set relation of draft " + inv.draft().draftId(), () -> build(key, draftBytes, draftEnd, at));
+    }
+
+    /** D7-6 (hibernate / expire): forget every cached relation of the log directory {@code logDir}. */
+    static void evict(Path logDir) {
+        String prefix = logDir.toAbsolutePath().normalize() + "\u0000";
+        synchronized (CACHE) {
+            CACHE.keySet().removeIf(k -> k.startsWith(prefix));
+        }
+    }
+
+    /** The cold path of {@link #relation}: evaluate the committed bytes and cache the relation under {@code key}. */
+    private static Relation build(String key, byte[] bytes, int end, int at) throws IOException {
         List<Map<String, Object>> log = new ArrayList<>();
         for (String line : new String(bytes, 0, end, StandardCharsets.UTF_8).split("\n")) {
             if (line.isBlank()) continue;

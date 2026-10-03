@@ -59,6 +59,9 @@ public final class DraftStore {
     /** TEST SEAM (D7-5): called before each main-log append of a promote with the step about to be written; a test throws to prove the rollback. */
     public static volatile java.util.function.IntConsumer promoteHook = step -> { };
 
+    /** TEST SEAM (D7-6): counts header files read, so a test can prove a listing reads none of them. */
+    public static final java.util.concurrent.atomic.AtomicLong headerReads = new java.util.concurrent.atomic.AtomicLong();
+
     public static String newId() {
         return "draft-" + UUID.randomUUID();
     }
@@ -105,7 +108,9 @@ public final class DraftStore {
     /** The header's raw JSON, or null when no such Draft exists. */
     public static String readHeader(Path investigationDir, String draftId) throws IOException {
         Path f = draftDir(investigationDir, draftId).resolve(HEADER);
-        return Files.isRegularFile(f) ? Files.readString(f, StandardCharsets.UTF_8) : null;
+        if (!Files.isRegularFile(f)) return null;
+        headerReads.incrementAndGet();
+        return Files.readString(f, StandardCharsets.UTF_8);
     }
 
     /** Every draft id with a header, sorted (discarded ones included: see {@link #isDiscarded}). */
@@ -121,6 +126,95 @@ public final class DraftStore {
         }
         out.sort(Comparator.naturalOrder());
         return out;
+    }
+
+    /** Ids of the Drafts that are not closed - directory names and marker checks only, no header is read (D7-6). */
+    public static List<String> openIds(Path investigationDir) {
+        Path root = draftsDir(investigationDir);
+        List<String> out = new ArrayList<>();
+        if (!Files.isDirectory(root)) return out;
+        try (var ds = Files.newDirectoryStream(root)) {
+            for (Path d : ds)
+                if (DRAFT_ID.matcher(d.getFileName().toString()).matches() && Files.isRegularFile(d.resolve(HEADER)) && !isClosed(d))
+                    out.add(d.getFileName().toString());
+        } catch (IOException unreadable) {
+            // an unreadable directory counts as empty here; the caller's own read of it fails loudly
+        }
+        return out;
+    }
+
+    /** Open Drafts across every Investigation under {@code investigationsDir} (one Space): the D21 cap's count. */
+    public static int countOpen(Path investigationsDir) {
+        int n = 0;
+        if (!Files.isDirectory(investigationsDir)) return 0;
+        try (var ds = Files.newDirectoryStream(investigationsDir, Files::isDirectory)) {
+            for (Path inv : ds) n += openIds(inv).size();
+        } catch (IOException unreadable) {
+            // see openIds
+        }
+        return n;
+    }
+
+    private static final Pattern OLD_ASIDE = Pattern.compile("\\.old-(" + DRAFT_ID.pattern() + ")-[0-9a-f-]{36}");
+
+    /**
+     * D7-6 crash sweep for the scratch directories a fork or a rebase leaves when the process dies mid-way. Deterministic, and it
+     * deletes only after verifying:
+     * <ul>
+     *   <li>{@code .old-<id>-*} with NO {@code <id>} directory: the crash fell between the two renames of a rebase. The aside is the
+     *       complete pre-rebase Draft; if its header names {@code <id>} it is moved back (the rebase simply did not happen).</li>
+     *   <li>{@code .old-<id>-*} WITH a {@code <id>} directory that has its header: the new Draft is in place, only the delete was
+     *       lost - the aside is deleted. Without a header the pair is left alone (counted as {@code held}).</li>
+     *   <li>{@code .rebase-*} / {@code .fork-*} older than {@code scratchGrace}: a stage nobody finished - deleted.</li>
+     * </ul>
+     * {@code lockFor} gives the monitor a rebase holds while it swaps, so a sweep cannot move a live rebase's aside.
+     *
+     * @return {@code {restored, removed, held}}
+     */
+    public static int[] recover(Path investigationDir, java.time.Instant now, java.time.Duration scratchGrace,
+                                java.util.function.Function<Path, Object> lockFor) throws IOException {
+        int restored = 0, removed = 0, held = 0;
+        Path root = draftsDir(investigationDir);
+        if (!Files.isDirectory(root)) return new int[] {0, 0, 0};
+        List<Path> entries = new ArrayList<>();
+        try (var ds = Files.newDirectoryStream(root)) {
+            for (Path d : ds) if (d.getFileName().toString().startsWith(".")) entries.add(d);
+        }
+        for (Path d : entries) {
+            String name = d.getFileName().toString();
+            var m = OLD_ASIDE.matcher(name);
+            if (m.matches()) {
+                String id = m.group(1);
+                Path live = draftDir(investigationDir, id);
+                synchronized (lockFor.apply(live)) {
+                    if (!Files.isDirectory(d)) continue;   // another sweep got it
+                    if (!Files.exists(live)) {
+                        if (headerNames(d, id)) {
+                            Files.move(d, live, StandardCopyOption.ATOMIC_MOVE);
+                            restored++;
+                        } else held++;
+                    } else if (Files.isRegularFile(live.resolve(HEADER))) {
+                        deleteTree(d);
+                        removed++;
+                    } else held++;
+                }
+            } else if ((name.startsWith(".rebase-") || name.startsWith(".fork-")) && Files.isDirectory(d)
+                    && Files.getLastModifiedTime(d).toInstant().plus(scratchGrace).isBefore(now)) {
+                deleteTree(d);
+                removed++;
+            }
+        }
+        return new int[] {restored, removed, held};
+    }
+
+    private static boolean headerNames(Path dir, String id) {
+        try {
+            Path h = dir.resolve(HEADER);
+            return Files.isRegularFile(h)
+                    && id.equals(InvestigationEvaluator.CANONICAL.readValue(Files.readString(h, StandardCharsets.UTF_8), java.util.Map.class).get("draftId"));
+        } catch (IOException | RuntimeException e) {
+            return false;
+        }
     }
 
     public static boolean isDiscarded(Path draftDir) {
@@ -155,6 +249,7 @@ public final class DraftStore {
         Files.deleteIfExists(draftDir.resolve("log.jsonl"));
         Path sets = draftDir.resolve("sets");
         if (Files.isDirectory(sets)) deleteTree(sets);
+        DraftLifecycle.closed(draftDir);
         return true;
     }
 
@@ -235,6 +330,7 @@ public final class DraftStore {
         Files.deleteIfExists(draftDir.resolve("log.jsonl"));
         Path sets = draftDir.resolve("sets");
         if (Files.isDirectory(sets)) deleteTree(sets);
+        DraftLifecycle.closed(draftDir);
         return true;
     }
 

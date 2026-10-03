@@ -1145,8 +1145,8 @@ Design and decisions D6-1…D6-7: [`la-separation-d6-design.md`](../../../archiv
   discard unpins; fork is assembled in a scratch dir and renamed in (a failed rename leaves no directory and no pin). **Discard** keeps
   `header.json` + `discarded.json` (who, when, head, log hash) and DELETES the log and sets (sealed rows may hold personal data); the
   per-step audit events keep the ops. No dossier, bundle or evidence route exists for a Draft (D20). Audit: `LINK_DRAFT_FORKED` /
-  `_OP_APPENDED` / `_UNDONE` / `_DISCARDED` (ids, actor, steps - never rows). Not yet: admission and
-  hibernate (D7-6). **Rebase and promote (D7-5, built 2026-10-03):** GET `.../drafts/{id}/conflicts` (report, writes nothing), POST
+  `_OP_APPENDED` / `_UNDONE` / `_DISCARDED` (ids, actor, steps - never rows).
+  **Rebase and promote (D7-5, built 2026-10-03):** GET `.../drafts/{id}/conflicts` (report, writes nothing), POST
   `/rebase` (`{confirm?, expectHead?}`, actor only) and POST `/promote` (`{expectHead?}`, the actor or a lead; a reviewer 403). Rebase
   replays the Draft's EFFECTIVE ops (undone ops and undo entries are compacted away, steps renumbered M+1..) over the current main
   head through the append validation, re-seals every expand against freshly pinned index versions and swaps the new Draft in
@@ -1163,7 +1163,15 @@ Design and decisions D6-1…D6-7: [`la-separation-d6-design.md`](../../../archiv
   (D7-4):** `DraftCheckpoints` keeps the last evaluated State per Draft (valid while `log.jsonl` keeps size + mtime) so an op is one
   `copy()` + `apply`, not a re-fold of main prefix + own log; an undo still folds. The verified `baseLogHash` verdict is cached per
   main log file (size + mtime), so an unchanged main log is not re-read or re-hashed; `/replay` clears it and re-verifies. Caches are
-  in memory (a restart = one cold fold). See `docs/superpower/la-separation-d7-design.md` section 12.
+  in memory (a restart = one cold fold). **Admission, hibernate, expiry (D7-6, built 2026-10-03):** at most 50 open Drafts per Space
+  (51st fork 409, hibernated ones count); heavy Draft jobs (rebase / conflict replay, a cold Working Set relation build, an `expand`
+  op) run under `min(4, cores/3)` permits and a full cap answers 429 at once, never queues. A Draft idle 1 h hibernates
+  (`hibernated.json`; checkpoint + cached relation released; log, sets, pins kept; the next authorised access wakes it with one cold
+  fold), idle 30 d it expires (a discard with `expired:true`, pins released, `LINK_DRAFT_EXPIRED`, `expiryWarning` from 7 days out).
+  Idle time = `DraftLifecycle.touch` (memory + `accessed.json` every 5 min); the sweep is lazy on list / open / fork (no scheduler).
+  `drafts/index.json` is a rebuildable listing index (header `size:mtime`) so a listing reads no header; `DraftStore.recover` restores
+  or deletes the `.old-<id>-*` a crashed rebase leaves, only after verifying the header. No per-Draft `draft.duckdb` exists (nothing
+  needs it yet). See `docs/superpower/la-separation-d7-design.md` sections 4 and 12.
 * **Dossier bundle.** `GET /inv/investigations/{id}/dossier/bundle?at=&snapshots=` returns `inspecto-dossier-bundle/1`: the masked Dossier, the masked references, `custody {manifestRoot, referencesCount, referencesHash}` and a SHA-256 `seal` over the canonical JSON of everything but `seal` and `generatedAt`. `POST …/dossier/bundle/verify` (body a bundle, or `{bundle}`) answers `{verified, sealIntact, rootMatches, referencesIntact, referencesAddedSince, problems, custody}`: the seal, the embedded manifest root, that the bundle's references are still the first N of the store, then the SAME manifest comparison `/dossier/verify` runs (`DossierRoutes.verifyManifest`). A failure is a result, not an error. Audited `LINK_DOSSIER_EXPORTED` / `LINK_DOSSIER_BUNDLE_VERIFIED`.
 * **Masking, R3, four-eyes.** Masked per `maskingMode` as it leaves (references too); the manifest and `referencesHash` hash the RAW store, so the root is identical masked or not and a masked bundle verifies; the seal covers what shipped. Read gate = the Dossier's (owner or Case member, R3 on the Dataset and every snapshot, the Enterprise PDP). A pending sensitive expand is not in the sealed log, so it is not in the bundle.
 * **Gotchas.** The offline-checkable part is the seal and the manifest's own root; whether the store still agrees needs the verify route. `DossierRoutes` was split (`parseAt`, `parseSnapshotIds`, `maskedDossier`, `verifyManifest`) so the Dossier, its verify and the bundle share one build. The new `POST …/references` is a `CapabilityManifest` entry, the bundle verify a read-shaped exemption, all four routes are in `AbsentGeoLinkRoutes` and `openapi-v1.json`.

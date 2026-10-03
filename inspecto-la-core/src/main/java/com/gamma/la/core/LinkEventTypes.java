@@ -132,6 +132,10 @@ public final class LinkEventTypes {
      *  {@code draftId}, {@code actor} (who discarded), {@code baseStep}, {@code step} (its head) and {@code unpinned}. */
     public static final String LINK_DRAFT_DISCARDED = "LINK_DRAFT_DISCARDED";
 
+    /** A Draft expired after 30 days idle (D7-6, D7-Q5): closed like a discard by the lazy sweep, actor {@code system}. {@code investigationId},
+     *  {@code draftId}, {@code draftActor} (who forked it), {@code baseStep}, {@code step} (its head), {@code idleDays} and {@code unpinned} - ids and counts only. */
+    public static final String LINK_DRAFT_EXPIRED = "LINK_DRAFT_EXPIRED";
+
     /** A Draft was rebased onto the main head ({@code POST .../drafts/{draftId}/rebase}, D7-5). {@code investigationId}, {@code draftId},
      *  {@code actor}, {@code fromBase}, {@code toBase}, {@code carried}, {@code dropped} and the conflict counts per kind - ids and counts only. */
     public static final String LINK_DRAFT_REBASED = "LINK_DRAFT_REBASED";

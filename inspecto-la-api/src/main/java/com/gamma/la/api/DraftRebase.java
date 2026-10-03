@@ -90,6 +90,11 @@ final class DraftRebase {
 
     /** Compute the rebase of {@code view}'s Draft onto the main log's current head. Reads (re-seals) but writes nothing. */
     static Plan compute(InvestigationRoutes routes, ApiContext api, HttpExchange ex, InvestigationRoutes.Inv view) throws IOException {
+        // D7-6: the replay re-reads the index / Dataset - a heavy job, admitted under the heavy-job cap (429 when full)
+        return DraftAdmission.heavy("rebase replay of draft " + view.draft().draftId(), () -> computeHeavy(routes, api, ex, view));
+    }
+
+    private static Plan computeHeavy(InvestigationRoutes routes, ApiContext api, HttpExchange ex, InvestigationRoutes.Inv view) throws IOException {
         Path draftDir = view.draft().dir();
         List<String> mainLines = view.store().readLog(view.id());
         List<String> ownLines = SnapshotStore.readLogAt(draftDir);

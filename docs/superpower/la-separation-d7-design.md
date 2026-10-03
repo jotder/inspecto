@@ -279,6 +279,53 @@ flat edge file (D-3 step 1 measurement) — disk, not memory. §12 D7-Q3 decides
 - **Graph in memory / long jobs:** reuse Graph Run (D-4) unchanged; a Draft-scoped run writes its result into
   `draft.duckdb`, keyed by the Draft step it ran on, so a later step invalidates it by key, not by deletion.
 
+* **As built (D7-6, 2026-10-03) - admission, idle policy, listing, crash sweep** (`DraftAdmission`, `DraftLifecycle`, `DraftIndex`,
+  `DraftStore.recover`; no new route, so none of the four route gates moved).
+  * **Open-Draft cap (D21).** 50 open Drafts per **Space** (the design said "per installation"; one write root is one Space, and the count
+    is across all its Investigations by directory names + marker files, no header read). The 51st fork answers **409** with the way out
+    ("discard or promote one, or wait for an idle one to expire"), as the design table says - 409 not 429/503, because the condition is
+    the Space's state, not load. At the cap the Space's other Investigations are swept first so an expired Draft never holds a seat. A
+    hibernated Draft still counts. Check + seat are one step under a Space-wide monitor (`DraftAdmission.CAP`).
+  * **Heavy-job cap (D7-Q6).** `min(4, cores/3)`, at least 1 (`-Dinspecto.la.draft.heavy=N` or `DraftAdmission.setHeavyLimit`). A permit is
+    `tryAcquire`d, never waited for: full = **429 RATE_LIMITED** with a sentence. Heavy here = the rebase / conflict-report replay
+    (`DraftRebase.compute`), a Draft's COLD Working Set relation build (`WorkingSetRoutes.relation`, cache miss) and a Draft `expand`
+    op. The warm relation cache and checkpointed ops are light and not admitted (D-S5 reading 2).
+  * **No `draft.duckdb`.** The design reserved a per-Draft derived DuckDB file; nothing needs it today. A Draft's derived state is the
+    in-memory checkpoint (D7-4) plus the shared Working Set relation LRU, both keyed by the log bytes, so there is no file to open, to
+    evict or to rebuild and no `NoRawInMemoryDuckDbOpen` question. If D7-7's 10^9-edge run shows the cold fold is the cost, that file is
+    where the derived tables would live; hibernate/rehydrate already has the right shape for it (release on idle, rebuild by replay).
+  * **Hibernate (1 h idle) / rehydrate.** `hibernated.json` marker + `DraftCheckpoints.forget` + `WorkingSetRoutes.evict` (the Draft's
+    cached relations). Log, sets, pins stay. Any AUTHORISED access (a read or write of that Draft; not a list, not a refused or absent
+    probe) deletes the marker and the first read is one cold fold - tested as `foldCount` +1 and a replay equal to the pre-sleep set.
+    `state: hibernated` in list and describe; the waking describe also says `rehydrated: true`.
+  * **Expire (30 d idle).** A discard with `expired:true` and `discardedBy: system:expiry` (log + sealed rows deleted, header + marker
+    kept, pins released) and `LINK_DRAFT_EXPIRED` (actor `system`; `draftActor`, `step`, `idleDays`, `unpinned`). describe carries
+    `lastAccessAt`, `expiresAt`, `expiryWarning` (true from 7 days out: the D7-Q5 "warn first" is this field, nothing is pushed). A
+    GET on an expired Draft's log/working-set answers 409 "expired after 30 days idle".
+  * **Idle clock.** `DraftLifecycle.touch`: memory at once, `accessed.json` at most every 5 min (a read must not cost a write), so a
+    restart still knows the idleness; a Draft with neither falls back to its header file's time. `DraftLifecycle.clock` is the test seam
+    (no test sleeps). Unreadable idleness reads as "just now": never expire on a read failure.
+  * **Where the sweep runs.** Lazily, in `DraftAdmission.maintain`, on every Draft list / open / fork of an Investigation. **No scheduler
+    was added**: the engine has `ScheduledExecutorService`s (`ControlApi`, `OpsMonitor`) but wiring one from a `RouteModule` would be a new
+    framework seam; an idle Draft that nobody touches stays until someone lists its Investigation, which is harmless (it holds only
+    disk) except for the cap, which sweeps the whole Space when it is reached.
+  * **Marker precedence** (`DraftLifecycle.state`): `promoted` > `discarded` (an expiry is a discard) > `hibernated` > `open`. Closing
+    deletes `hibernated.json` / `accessed.json`, and the order of checks hides a leftover marker after a crash anyway.
+  * **Listing reads no header.** `drafts/index.json` = per draft id a compact header copy (no `baseLogHash`, no `rebases[]`) plus the
+    header file's `size:mtime`. A listing stats each header and re-reads only the one whose identity changed (a rebase rewrites it),
+    rebuilds a missing/corrupt index, drops vanished ids; state comes from marker files. Counted by `DraftStore.headerReads` (test seam).
+    The D17 one-per-member check at fork uses it too.
+  * **Crash sweep** (`DraftStore.recover`, run by `maintain`, under the same monitor a rebase holds while it swaps): `.old-<id>-*` with no
+    `<id>` directory = crashed between the renames, so the aside (the complete pre-rebase Draft) is moved back **only if its header names
+    that id** (the rebase "did not happen"); `.old-<id>-*` beside a live `<id>` that has its header = the delete was lost, the aside is
+    deleted; any pair that fails verification is left alone and counted `held`; `.rebase-*` / `.fork-*` older than 1 h are deleted.
+  * **Allow-list.** `ImportLoaderInventoryTest`: `hibernated.json`, `accessed.json`. Tests: `DraftLifecycleTest` (10, fixtures),
+    `ControlApiDraftAdmissionTest` (10, real HTTP, armed Authenticator).
+  * **Left open for D7-7 / later.** (1) The heavy cap is not yet applied to Graph Run (it has its own `Limits.threads`); the two pools
+    are separate. (2) The cap and idle periods are static settings (`DraftLifecycle`), not yet keys in `link-analysis.toon`. (3) Expiry
+    notifies only through the `expiryWarning` field. (4) A pending promote on the four-eyes queue does not stop an expiry; approve then
+    answers 409 (the Draft is closed). (5) Light reads are still unadmitted by design; D7-7 measures them with real Drafts.
+
 ## 7. Admission control (numbers from D-S5)
 
 D-S5 (feasibility §7.10.2) measured, at 5×10⁶ edges: open 54 ms p50; **3.8 MB process commit per open Draft**; one-hop
@@ -390,7 +437,7 @@ and `sets/` are never evicted.**
 | D7-3 ✅ **BUILT 2026-10-03** (section 4 "As built") | Draft store + routes: fork (baseStep, baseLogHash, pins), append, undo, log, discard | Draft `/replay` equivalence green; fork writes nothing on failure (fault-injected rename) |
 | D7-4 | Checkpointed append (fold from latest `sets/`), main log and Drafts | equal state hashes vs full re-fold on a 500-step fixture; append latency flat in log length |
 | D7-5 ✅ **BUILT 2026-10-03** (section 4 "As built (D7-5)") | Rebase + conflict report + promote (+ D-U7 approval when sensitive) | fixture with one op of each conflict kind → report lists all four; promote with moved head 409 |
-| D7-6 | Admission + `draft.duckdb` derived tables + hibernate/rehydrate | 51st open 409; full heavy queue 429; evicted file rebuilds to identical result hashes |
+| D7-6 ✅ **BUILT 2026-10-03** (section 4 "As built (D7-6)"; no `draft.duckdb` was needed) | Admission + hibernate/rehydrate + expiry | 51st open 409; full heavy queue 429; evicted file rebuilds to identical result hashes |
 | D7-7 | Re-run `DraftConcurrencyBench` with real Drafts, think time, and the 10⁹ (or largest feasible) partitioned index | D-S5 pass condition on real state; §7 numbers confirmed or replaced in this file |
 
 ## 13. Operator decisions owed
