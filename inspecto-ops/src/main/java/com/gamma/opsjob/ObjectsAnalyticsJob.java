@@ -267,7 +267,7 @@ public final class ObjectsAnalyticsJob implements Job {
     private static void writeLedger(Path parquet, Instant sampledAt, List<LedgerRow> rows) throws Exception {
         com.gamma.util.DuckDbUtil.loadDriver();
         // Spill under the Space data root (null ⇒ java.io.tmpdir).
-        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()))) {
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()), java.util.List.of(parquet.toAbsolutePath().getParent()))) {
             try (Statement st = conn.createStatement()) {
                 st.execute("CREATE TABLE impact_ledger (sampled_at TIMESTAMP, object_id VARCHAR, object_type VARCHAR, "
                         + "status VARCHAR, disposition VARCHAR, category VARCHAR, created_at TIMESTAMP, "
@@ -312,7 +312,7 @@ public final class ObjectsAnalyticsJob implements Job {
     private static void writeParquet(Path parquet, Instant sampledAt, List<Object[]> rows) throws Exception {
         com.gamma.util.DuckDbUtil.loadDriver();
         // Spill under the Space data root (null ⇒ java.io.tmpdir).
-        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()))) {
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()), java.util.List.of(parquet.toAbsolutePath().getParent()))) {
             try (Statement st = conn.createStatement()) {
                 st.execute("CREATE TABLE analytics_sample (sampled_at TIMESTAMP, object_type VARCHAR, "
                         + "axis VARCHAR, \"key\" VARCHAR, value DOUBLE)");

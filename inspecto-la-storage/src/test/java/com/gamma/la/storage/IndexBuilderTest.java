@@ -508,4 +508,33 @@ class IndexBuilderTest {
         assertNotEquals(IndexBuilder.relationSqlHash(filterList), IndexBuilder.relationSqlHash(filterList.replace("'b'", "'c'")),
                 "a literal list outside the read is part of the definition");
     }
+
+    /**
+     * ENGINE-INMEMORY-UNSEALED-1: the builder takes the named file-access opt-in — its trusted relation reads a local
+     * file it was never told about (twin), while a URL still never reaches the network (autoload stays off).
+     */
+    @Test
+    void theFileAccessOptInReadsLocalFilesButNeverTheNetwork(@TempDir Path tmp) throws Exception {
+        String f = tmp.resolve("edges.parquet").toAbsolutePath().toString().replace('\\', '/');
+        try (Connection w = com.gamma.util.DuckDbUtil.openInMemory(null, List.of(tmp)); Statement st = w.createStatement()) {
+            st.execute("COPY (SELECT 'a' AS src, 'b' AS dst) TO '" + f + "' (FORMAT PARQUET)");
+        }
+        assertEquals(1, IndexBuilder.countRows("SELECT * FROM read_parquet('" + f + "')", 0));
+        java.util.concurrent.atomic.AtomicInteger hits = new java.util.concurrent.atomic.AtomicInteger();
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext("/x.csv", ex -> {
+            hits.incrementAndGet();
+            ex.sendResponseHeaders(200, -1);
+            ex.close();
+        });
+        server.start();
+        try {
+            String url = "SELECT * FROM read_csv('http://127.0.0.1:" + server.getAddress().getPort() + "/x.csv')";
+            assertThrows(IndexBuildException.class, () -> IndexBuilder.countRows(url, 0));
+        } finally {
+            server.stop(0);
+        }
+        assertEquals(0, hits.get(), "the index builder's connection reached the network");
+    }
 }

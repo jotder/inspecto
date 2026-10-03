@@ -60,9 +60,8 @@ public final class PipelineDocumentXlsx {
         Path parent = target.toAbsolutePath().getParent();
         Files.createDirectories(parent);
         // No Space context: memory-capped, spills under java.io.tmpdir (never the CWD).
-        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(null);
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(null, java.util.List.of(parent), ExcelExtension::ensureLoaded);
              Statement st = conn.createStatement()) {
-            ExcelExtension.ensureLoaded(conn);
 
             Set<String> taken = new java.util.LinkedHashSet<>();
             List<String> bodies = new ArrayList<>();

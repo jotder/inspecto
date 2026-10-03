@@ -258,7 +258,14 @@ public final class PostgresPublishJobType implements JobTypeProvider {
 
             List<Plan> plans = new ArrayList<>();
             Set<String> tables = new HashSet<>();
-            try (Connection duck = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)))) {
+            // The sealed connection reaches only what the Datasets' relations read (ENGINE-INMEMORY-UNSEALED-1);
+            // a Dataset the author may not view contributes nothing — the loop below refuses it as before.
+            List<Path> readRoots = new ArrayList<>(List.of(Path.of(dataDir)));
+            for (String id : datasets) {
+                Map<String, Object> ds = store.get("dataset", id).map(ComponentRegistry.Component::content).orElse(null);
+                if (ds != null && canView(author, ds)) readRoots.addAll(DatasetRelation.readRoots(ds, Path.of(dataDir)));
+            }
+            try (Connection duck = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)), readRoots)) {
                 for (String id : datasets) {
                     Map<String, Object> ds = store.get("dataset", id).map(ComponentRegistry.Component::content)
                             .orElse(null);

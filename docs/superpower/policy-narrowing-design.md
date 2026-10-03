@@ -382,6 +382,26 @@ with it). Open for S5: every other `openInMemory` caller is unsealed — filed a
 (BACKLOG §3.8), with the harden-by-default remedy and the `DuckDbExtension` / DuckLake host gate; T9, T10
 still owed. `allowed_directories` alone (external access on) is still unmeasured.
 
+**S5 — DuckDB, second half (2026-10-03): `openInMemory` sealed by default (`ENGINE-INMEMORY-UNSEALED-1`, narrowed).**
+`DuckDbUtil.openInMemory(spill[, dirs[, beforeSeal]])` now turns autoinstall + autoload off, runs the caller's
+trusted `beforeSeal` (the two excel writers `LOAD` the bundled extension there), sets `allowed_directories` to the
+declared dirs and `enable_external_access=false`. It does **not** lock the configuration — measured on DuckDB
+1.5.6: once external access is off, `allowed_directories` and `enable_external_access` refuse to change and `LOAD`
+is refused even with autoload switched back on, while `threads` / `TimeZone` / `memory_limit` stay settable (the
+LA builder and the event store set them after open). Callers running authored text add
+`DuckDbUtil.lockConfiguration` (`sql.template`, `ReportXlsx`, `SqlGuard`'s parser). Ground (2026-10-03, 20 callers):
+authored text reaches `MaterializeTask`, `PostgresPublishJobType`, `ExchangeSnapshotWriter` (Dataset relations —
+a hand-authored view passes through unguarded), `SqlTemplateJob`, `IndexBuilder` (LA relation), `TypeFlow`
+(authored cast/expression DDL, no files); the rest run engine-built SQL. **The probe was positive**: a view
+reading `http://` made the materialize connection hit a loopback stub 4 times; sealed, 0 and the run fails
+(`MaterializeTaskTest.anAuthoredViewThatReadsAUrlNeverReachesTheNetwork`, mutation-checked by skipping the seal).
+Relation readers declare `DatasetRelation.readRoots` (data root + a `shared/` ref's Exchange snapshot). No caller
+needed `httpfs`, so no object-store opt-in exists; the one opt-in is `openInMemoryWithFileAccess(spill, why)`
+(autoload off, local files open) for `IndexBuilder`, pinned by `NoRawInMemoryDuckDbOpenContractTest`.
+⚠ **Measured gotcha:** the `temp_directory` subtree is implicitly readable AND writable under the seal — the
+`null` spill default (all of `java.io.tmpdir`) let a sealed connection write any temp sibling, so it moved to
+`<tmpdir>/.duckdb_tmp`. Still owed: T9, T10 and the `DuckDbExtension` / DuckLake host gate.
+
 ---
 
 ## 7. Test plan

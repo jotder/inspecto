@@ -50,7 +50,7 @@ final class EntityListSidecar {
             if (!dir.startsWith(dataRoot.normalize())) throw new IllegalStateException("sidecar escapes the data root");
             claim(dir, l.id());
             Path tmp = dir.resolve(FILE + ".tmp");
-            try (Connection c = DuckDbUtil.openInMemory(DuckDbUtil.spillDirUnder(dataRoot));
+            try (Connection c = DuckDbUtil.openInMemory(DuckDbUtil.spillDirUnder(dataRoot), java.util.List.of(dir));
                  Statement st = c.createStatement()) {
                 st.execute("CREATE TABLE e (list_id VARCHAR, purpose VARCHAR, entity_type VARCHAR, match VARCHAR, "
                         + "entry VARCHAR, lo VARCHAR, hi VARCHAR, expires_at TIMESTAMP, added_at TIMESTAMP, added_by VARCHAR, reason VARCHAR)");

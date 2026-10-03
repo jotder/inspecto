@@ -437,7 +437,8 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                         "consignment_id", consignmentId);
                 return;
             }
-            try (java.sql.Connection scratch = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(java.nio.file.Path.of(dataDir)))) {
+            try (java.sql.Connection scratch = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(java.nio.file.Path.of(dataDir)),
+                    java.util.List.of(java.nio.file.Path.of(summariesRoot(dataDir))))) {
                 List<ConsignmentOutput> written =
                         SummaryWriter.write(scratch, summariesRoot(dataDir), consignmentId, ctx.runId(),
                                 rows, processorId);

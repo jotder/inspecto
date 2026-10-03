@@ -177,7 +177,7 @@ public final class RiskScoreEvaluator {
         String stamp = scoredAt.toEpochMilli() + "-" + runId.replaceAll("[^A-Za-z0-9_-]", "_");
         Path histTmp = history.resolve("scores-" + stamp + ".parquet.tmp");
         Path latestTmp = latest.resolve("scores-" + stamp + ".parquet.tmp");
-        try (Connection c = DuckDbUtil.openInMemory(DuckDbUtil.spillDirUnder(dataDir));
+        try (Connection c = DuckDbUtil.openInMemory(DuckDbUtil.spillDirUnder(dataDir), java.util.List.of(history, latest));
              Statement st = c.createStatement()) {
             st.execute("CREATE TABLE s (model VARCHAR, entity_type VARCHAR, entity_key VARCHAR, score DOUBLE, "
                     + "high BOOLEAN, factors VARCHAR, model_version VARCHAR, run_id VARCHAR, scored_at TIMESTAMP)");

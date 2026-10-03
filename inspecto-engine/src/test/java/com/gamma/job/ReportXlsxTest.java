@@ -36,15 +36,16 @@ class ReportXlsxTest {
     }
 
     private static void requireExcel() throws Exception {
-        try (Connection c = DuckDbUtil.openInMemory(null)) {
-            Assumptions.assumeTrue(ExcelExtension.tryLoad(c), "no excel extension loadable on this host");
+        boolean[] loaded = {false};
+        try (Connection c = DuckDbUtil.openInMemory(null, List.of(), conn -> loaded[0] = ExcelExtension.tryLoad(conn))) {
+            Assumptions.assumeTrue(loaded[0], "no excel extension loadable on this host");
         }
     }
 
     private static List<List<String>> readBack(Path xlsx) throws Exception {
         List<List<String>> out = new ArrayList<>();
-        try (Connection c = DuckDbUtil.openInMemory(null); Statement st = c.createStatement()) {
-            ExcelExtension.ensureLoaded(c);
+        try (Connection c = DuckDbUtil.openInMemory(null, List.of(xlsx.getParent()), ExcelExtension::ensureLoaded);
+             Statement st = c.createStatement()) {
             ResultSet rs = st.executeQuery("SELECT * FROM read_xlsx('"
                     + xlsx.toString().replace('\\', '/') + "', header = false, all_varchar = true)");
             int n = rs.getMetaData().getColumnCount();

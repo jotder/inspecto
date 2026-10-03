@@ -84,7 +84,8 @@ final class MaterializeTask {
 
         long rows;
         List<ResultSetDescriptor.Column> derived;
-        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(dataRoot));
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(dataRoot),
+                     DatasetRelation.readRoots(dataset, dataRoot));
              Statement st = conn.createStatement()) {
             st.execute("CREATE VIEW " + q(source) + " AS " + relationSql);
             st.execute("COPY (" + sql + ") TO " + sqlStr(tmp.toString().replace('\\', '/')) + " (FORMAT PARQUET)");

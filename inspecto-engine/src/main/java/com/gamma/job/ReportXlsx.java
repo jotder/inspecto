@@ -1,7 +1,6 @@
 package com.gamma.job;
 
 import com.gamma.etl.ExcelExtension;
-import com.gamma.sql.SqlSandbox;
 import com.gamma.util.DuckDbUtil;
 import com.gamma.util.SqlIdent;
 
@@ -68,9 +67,7 @@ final class ReportXlsx {
         List<String> kinds = new ArrayList<>(keys.size());   // BIGINT | DOUBLE | VARCHAR per column
         for (String k : keys) kinds.add(kind(rows, k));
 
-        try (Connection conn = DuckDbUtil.openInMemory(null)) {
-            SqlSandbox.disableExtensionAutoload(conn);
-            ExcelExtension.ensureLoaded(conn);
+        try (Connection conn = DuckDbUtil.openInMemory(null, List.of(dir), ExcelExtension::ensureLoaded)) {
             try (Statement st = conn.createStatement()) {
                 List<String> cols = new ArrayList<>();
                 Set<String> taken = new LinkedHashSet<>();
@@ -96,7 +93,7 @@ final class ReportXlsx {
                 }
                 if (!rows.isEmpty()) ins.executeBatch();
             }
-            SqlSandbox.sealAllowing(conn, List.of(dir));
+            DuckDbUtil.lockConfiguration(conn);
             try (Statement st = conn.createStatement()) {
                 st.execute("COPY report_out TO '" + target.toAbsolutePath().toString().replace('\\', '/').replace("'", "''")
                         + "' (FORMAT xlsx, HEADER true, SHEET '" + sheetName(sheet).replace("'", "''") + "')");

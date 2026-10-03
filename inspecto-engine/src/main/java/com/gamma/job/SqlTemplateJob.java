@@ -6,7 +6,6 @@ import com.gamma.pipeline.exec.SourceStoreReader;
 import com.gamma.signal.Severity;
 import com.gamma.config.spec.Finding;
 import com.gamma.sql.SqlGuard;
-import com.gamma.sql.SqlSandbox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,16 +100,16 @@ final class SqlTemplateJob implements Job {
 
         long rows;
         ResultSetMeta meta;
-        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)));
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)),
+                     List.of(Path.of(dataDir)));
              Statement st = conn.createStatement()) {
-            // The connection half, behind the lexical guard: nothing auto-installs/-loads, and once the
-            // trusted views are registered the connection may reach only the data root — the sources it
-            // reads and the sink/route/quarantine dirs it writes all live there — with the config locked.
-            SqlSandbox.disableExtensionAutoload(conn);
+            // The connection half, behind the lexical guard: openInMemory seals it (nothing auto-installs/
+            // -loads; it may reach only the data root — the sources it reads and the sink/route/quarantine
+            // dirs it writes all live there), and the config is locked before the authored SQL runs.
             for (String store : sources)
                 PipelineJobRunner.reportSources(ctx, store,
                         SourceStoreReader.registerView(conn, safe(store, "source store"), dataDir, store, "PARQUET"));
-            SqlSandbox.sealAllowing(conn, List.of(Path.of(dataDir)));
+            com.gamma.util.DuckDbUtil.lockConfiguration(conn);
             st.execute("CREATE TABLE " + OUT_TABLE + " AS " + sql);
             // Decision Rules targeting this job check the materialized result before it becomes the
             // snapshot (tag/route/quarantine/drop): route lands as a snapshot Parquet Dataset under

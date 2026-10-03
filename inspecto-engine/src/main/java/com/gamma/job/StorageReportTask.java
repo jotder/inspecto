@@ -120,7 +120,7 @@ final class StorageReportTask {
             Files.createDirectories(storeDir);
             Path parquet = storeDir.resolve("storage_" + now.toEpochMilli() + "_out.parquet");
             com.gamma.util.DuckDbUtil.loadDriver();
-            try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)))) {
+            try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)), java.util.List.of(storeDir))) {
                 try (Statement st = conn.createStatement()) {
                     st.execute("CREATE TABLE storage_sample (created VARCHAR, created_ms BIGINT, "
                             + "axis VARCHAR, files BIGINT, bytes BIGINT)");

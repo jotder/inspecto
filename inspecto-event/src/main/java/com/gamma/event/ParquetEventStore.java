@@ -128,7 +128,7 @@ public final class ParquetEventStore implements EventStore {
         try {
             Files.createDirectories(root);
             DuckDbUtil.loadDriver();
-            this.conn = DuckDbUtil.openInMemory(null);   // in-memory scratch + reader; no Space context: capped, spills under java.io.tmpdir
+            this.conn = DuckDbUtil.openInMemory(null, java.util.List.of(root));   // in-memory scratch + reader; no Space context: capped, spills under java.io.tmpdir
             try (Statement st = conn.createStatement()) {
                 // DuckDB caches file contents keyed by path + modification time. This store must re-read a file that
                 // was rewritten in place with its size and mtime restored (a repaired or forged Parquet file), so a

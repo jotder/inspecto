@@ -77,7 +77,7 @@ class DuckDbSettingsTest {
     void openInMemoryWithoutASpaceSpillsUnderJavaIoTmpdir() throws Exception {
         try (Connection conn = DuckDbUtil.openInMemory(null)) {
             Path temp = Path.of(currentSetting(conn, "temp_directory")).toAbsolutePath().normalize();
-            assertEquals(Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize(), temp);
+            assertEquals(Path.of(System.getProperty("java.io.tmpdir"), DuckDbUtil.SPILL_DIR_NAME).toAbsolutePath().normalize(), temp);
             assertNotEquals(Path.of(".tmp").toAbsolutePath().normalize(), temp, "never the CWD-relative .tmp");
             assertFalse(currentSetting(conn, "memory_limit").isBlank());
         }

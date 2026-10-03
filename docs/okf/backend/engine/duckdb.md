@@ -345,6 +345,23 @@ views on a scratch DuckDB. The same authored SQL as the dry run runs there (`fn:
   sealed run still joins its `path:` reference but not a sibling of it. All three go red with the `seal(...)` call
   removed; the existing DuckLake-registration and join tests in that class cover the positive paths.
 
+## Every in-memory scratch connection is sealed by default (`ENGINE-INMEMORY-UNSEALED-1`, 2026-10-03)
+
+- `DuckDbUtil.openInMemory(spill[, dirs[, beforeSeal]])` turns autoinstall + autoload off, runs the trusted
+  `beforeSeal` (e.g. `ExcelExtension::ensureLoaded`), then `allowed_directories` = `dirs` and
+  `enable_external_access=false`. No dirs ⇒ no file at all. Each caller declares what it touches; a Dataset
+  relation reader declares `DatasetRelation.readRoots` (data root + a `shared/` ref's Exchange snapshot).
+- **Not locked by default** — measured: after the seal, `allowed_directories` / `enable_external_access` cannot
+  be changed and `LOAD` is refused even with autoload re-enabled; other settings stay settable. Authored-text
+  callers add `DuckDbUtil.lockConfiguration`.
+- ⚠ The `temp_directory` subtree is **implicitly reachable** (read + write) under the seal: a spill dir must be
+  dedicated (`.duckdb_tmp`), never a temp or data root. The `null` default is `<java.io.tmpdir>/.duckdb_tmp`.
+- The one opt-in, `openInMemoryWithFileAccess(spill, why)` (autoload off, local files open), is held by
+  `IndexBuilder` only and pinned by `NoRawInMemoryDuckDbOpenContractTest.theFileAccessOptInSpreadsOnlyByDecision`.
+- Tests: `DuckDbInMemorySealTest` (stub-counted network refusal with a bare-connection twin; declared vs sibling
+  dir), `MaterializeTaskTest.anAuthoredViewThatReadsAUrlNeverReachesTheNetwork`,
+  `IndexBuilderTest.theFileAccessOptInReadsLocalFilesButNeverTheNetwork`.
+
 ## The source time zone for temporal data
 
 **SHIPPED 2026-08-29** (engine + config `44ecef76`, surfaces `dd02d377`). Plan + the full live-probe

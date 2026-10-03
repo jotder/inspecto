@@ -686,7 +686,10 @@ public final class IndexBuilder {
     private static Connection open(String memoryLimit, Integer threads, Path spill) throws SQLException {
         // DuckDbUtil.openInMemory caps memory and points the spill at a real directory (a raw in-memory open spills to .tmp
         // in the process CWD, outside the Space - see NoRawInMemoryDuckDbOpenContractTest); the caller-given limits then override it.
-        Connection c = DuckDbUtil.openInMemory(spill);
+        // ⚠ The named file-access opt-in (ENGINE-INMEMORY-UNSEALED-1): the TRUSTED relation reads Dataset files whose
+        // roots the builder is never told (see the class doc), so it cannot declare them; autoload stays off.
+        Connection c = DuckDbUtil.openInMemoryWithFileAccess(spill,
+                "LA index build: the trusted relation reads Dataset roots the builder is not given");
         try (Statement s = c.createStatement()) {
             s.execute("SET TimeZone = 'UTC'");   // never the host zone
             if (memoryLimit != null) s.execute("SET memory_limit = '" + memoryLimit + "'");

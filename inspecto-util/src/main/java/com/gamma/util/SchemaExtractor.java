@@ -91,7 +91,7 @@ public class SchemaExtractor {
         try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(new FileInputStream(inputFile), StandardCharsets.UTF_8));
         // No Space context: memory-capped, spills under java.io.tmpdir (never the CWD).
-             Connection conn = DuckDbUtil.openInMemory(null);
+             Connection conn = DuckDbUtil.openInMemory(null, java.util.List.of(java.nio.file.Path.of(System.getProperty("java.io.tmpdir"))));
              Statement stmt = conn.createStatement()) {
 
             // Skip junk lines that appear before the header

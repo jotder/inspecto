@@ -64,7 +64,9 @@ public final class ExchangeSnapshotWriter {
         long rows;
         List<Map<String, Object>> columns;
         // No Space context: memory-capped, spills under java.io.tmpdir (never the CWD).
-        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(null);
+        List<Path> roots = new ArrayList<>(DatasetRelation.readRoots(dataset, ownerDataRoot));
+        roots.add(verDir);
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(null, roots);
              Statement st = conn.createStatement()) {
             st.execute("CREATE VIEW __src AS " + relationSql);
             st.execute("COPY (SELECT * FROM __src) TO " + sqlStr(unix(tmp)) + " (FORMAT PARQUET)");

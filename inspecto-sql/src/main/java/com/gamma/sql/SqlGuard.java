@@ -424,8 +424,7 @@ public final class SqlGuard {
         // No Space context: memory-capped, spills under java.io.tmpdir (never the CWD).
         var c = com.gamma.util.DuckDbUtil.openInMemory(null);
         try {
-            SqlSandbox.disableExtensionAutoload(c);
-            SqlSandbox.sealAllowing(c, List.of());
+            com.gamma.util.DuckDbUtil.lockConfiguration(c);
             return c;
         } catch (Exception e) {
             c.close();

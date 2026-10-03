@@ -175,7 +175,7 @@ class EntityListEntriesTest {
         assertEquals("written", EntityListSidecar.write(data, l, head.facts()));
         String rel = "(" + DatasetRelation.relationSql(Map.of("physicalRef", "entity_list_ip-block"), data, null) + ")";
         DuckDbUtil.loadDriver();
-        try (Connection c = DuckDbUtil.openInMemory(null); Statement st = c.createStatement()) {
+        try (Connection c = DuckDbUtil.openInMemory(null, List.of(data)); Statement st = c.createStatement()) {
             List<String> rows = new ArrayList<>();
             try (ResultSet rs = st.executeQuery("SELECT match, entry, added_by, reason, expires_at IS NOT NULL FROM " + rel
                     + " ORDER BY entry")) {
@@ -204,7 +204,7 @@ class EntityListEntriesTest {
         head = log.append(head, "a1", "done", "list.retired", "ip-block", Map.of());
         assertEquals("written", EntityListSidecar.write(data, EntityRegistry.fold(head.facts(), head.headSeq()).get("ip-block"),
                 head.facts()));
-        try (Connection c = DuckDbUtil.openInMemory(null); Statement st = c.createStatement();
+        try (Connection c = DuckDbUtil.openInMemory(null, List.of(data)); Statement st = c.createStatement();
              ResultSet rs = st.executeQuery("SELECT count(*) FROM " + rel)) {
             rs.next();
             assertEquals(0, rs.getInt(1), "a retired list writes no rows");

@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * Shared DuckDB JDBC utilities used by {@link ParquetSummarizer},
@@ -178,11 +179,94 @@ public final class DuckDbUtil {
      * {@link #memoryLimit} and {@code temp_directory} set to {@code spillDir}
      * (DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1). ⚠ An in-memory database otherwise spills to {@code .tmp}
      * relative to the CWD, which is why {@link #applyGlobalDuckDbSettings} is not used here.
-     * {@code spillDir == null} ⇒ {@code java.io.tmpdir}. The directory is created up front so DuckDB treats it
+     * {@code spillDir == null} ⇒ {@code <java.io.tmpdir>/}{@value #SPILL_DIR_NAME} — a dedicated directory, never the temp root itself (see the seal note below). The directory is created up front so DuckDB treats it
      * as pre-existing and never removes it on close under a concurrent connection sharing it.
+     *
+     * <p><b>Sealed by default ({@code ENGINE-INMEMORY-UNSEALED-1}).</b> Nothing auto-installs or auto-loads
+     * (so {@code read_csv('http://…')} cannot pull in {@code httpfs}), and external access is off: this
+     * overload reaches NO file at all — use {@link #openInMemory(Path, List)} to declare the directories the
+     * caller reads/writes. ⚠ Measured (DuckDB 1.5.6): the {@code temp_directory} subtree is IMPLICITLY
+     * readable and writable under the seal, so the spill must be a dedicated directory — never a temp root
+     * or a data root itself (hence the {@value #SPILL_DIR_NAME} default). Once sealed, neither {@code allowed_directories} nor external access can be widened
+     * again and {@code LOAD} of an extension is refused, even without {@code lock_configuration}; other
+     * settings ({@code threads}, {@code TimeZone}, …) stay settable. A caller running authored text may add
+     * {@link #lockConfiguration}.
      */
     public static Connection openInMemory(Path spillDir) throws SQLException {
-        Path dir = spillDir != null ? spillDir : Path.of(System.getProperty("java.io.tmpdir"));
+        return openInMemory(spillDir, List.of(), null);
+    }
+
+    /** {@link #openInMemory(Path)} sealed to {@code dirs}: each an absolute, normalised prefix with a trailing {@code /}. */
+    public static Connection openInMemory(Path spillDir, List<Path> dirs) throws SQLException {
+        return openInMemory(spillDir, dirs, null);
+    }
+
+    /** Trusted setup run on the connection BEFORE the seal (e.g. {@code LOAD} a bundled extension). */
+    @FunctionalInterface
+    public interface BeforeSeal {
+        void run(Connection conn) throws SQLException;
+    }
+
+    /** As {@link #openInMemory(Path, List)}, running {@code beforeSeal} (trusted, engine-owned) before the seal. */
+    public static Connection openInMemory(Path spillDir, List<Path> dirs, BeforeSeal beforeSeal) throws SQLException {
+        Connection conn = openUnsealed(spillDir);
+        try {
+            disableAutoload(conn);
+            if (beforeSeal != null) beforeSeal.run(conn);
+            try (Statement st = conn.createStatement()) {
+                if (!dirs.isEmpty()) {
+                    StringBuilder list = new StringBuilder("[");
+                    for (Path d : dirs) {
+                        String dir = d.toAbsolutePath().normalize().toString().replace('\\', '/');
+                        if (!dir.endsWith("/")) dir += "/";
+                        if (list.length() > 1) list.append(", ");
+                        list.append('\'').append(dir.replace("'", "''")).append('\'');
+                    }
+                    st.execute("SET allowed_directories=" + list.append(']'));
+                }
+                st.execute("SET enable_external_access=false");
+            }
+        } catch (SQLException | RuntimeException e) {
+            conn.close();
+            throw e;
+        }
+        return conn;
+    }
+
+    /**
+     * ⚠ The named OPT-IN to local file access beyond declared directories: autoload stays OFF (no network
+     * extension can be pulled in, so an {@code http://} or {@code s3://} read still fails), but every local
+     * path is reachable. {@code why} is the caller's reason; the callers are pinned by
+     * {@code NoRawInMemoryDuckDbOpenContractTest} so the opt-in cannot spread silently.
+     */
+    public static Connection openInMemoryWithFileAccess(Path spillDir, String why) throws SQLException {
+        if (why == null || why.isBlank()) throw new IllegalArgumentException("openInMemoryWithFileAccess needs a reason");
+        Connection conn = openUnsealed(spillDir);
+        try {
+            disableAutoload(conn);
+        } catch (SQLException | RuntimeException e) {
+            conn.close();
+            throw e;
+        }
+        return conn;
+    }
+
+    /** {@code lock_configuration=true}: no further {@code SET} on this connection. */
+    public static void lockConfiguration(Connection conn) throws SQLException {
+        try (Statement st = conn.createStatement()) {
+            st.execute("SET lock_configuration=true");
+        }
+    }
+
+    private static void disableAutoload(Connection conn) throws SQLException {
+        try (Statement st = conn.createStatement()) {
+            st.execute("SET autoinstall_known_extensions=false");
+            st.execute("SET autoload_known_extensions=false");
+        }
+    }
+
+    private static Connection openUnsealed(Path spillDir) throws SQLException {
+        Path dir = spillDir != null ? spillDir : Path.of(System.getProperty("java.io.tmpdir"), SPILL_DIR_NAME);
         try {
             loadDriver();
             Files.createDirectories(dir);

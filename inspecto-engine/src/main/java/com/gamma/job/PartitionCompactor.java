@@ -78,7 +78,7 @@ final class PartitionCompactor {
         int dirsCompacted = 0, filesMerged = 0;
         DuckDbUtil.loadDriver();
         // Spill under the Space data root, not the walked store dir (null ⇒ java.io.tmpdir).
-        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()));
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()), java.util.List.of(root));
              Stream<Path> walk = Files.walk(root)) {
             for (Path dir : (Iterable<Path>) walk.filter(Files::isDirectory)::iterator) {
                 heal(dir);

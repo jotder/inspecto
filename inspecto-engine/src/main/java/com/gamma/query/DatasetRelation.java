@@ -61,6 +61,21 @@ public final class DatasetRelation {
         return withCalculated(baseRelationSql(datasetConfig, dataRoot, views), datasetConfig);
     }
 
+    /**
+     * The directories a {@link #relationSql} read may touch — the data root, plus the owner's Exchange snapshot
+     * for a {@code shared/<owner>/<item>} store ref (as {@code physicalRef} or a virtual Dataset's
+     * {@code sourceName}). The roots a sealed connection declares (ENGINE-INMEMORY-UNSEALED-1).
+     */
+    public static List<Path> readRoots(Map<String, Object> datasetConfig, Path dataRoot) {
+        List<Path> roots = new java.util.ArrayList<>(List.of(dataRoot));
+        for (String key : List.of("physicalRef", "sourceName")) {
+            String ref = Values.trimToNull(datasetConfig == null ? null : datasetConfig.get(key));
+            if (ref != null && ref.startsWith(SHARED_PREFIX))
+                roots.add(Path.of(storeReadRoot(ref, dataRoot)));
+        }
+        return roots;
+    }
+
     private static String baseRelationSql(Map<String, Object> datasetConfig, Path dataRoot, ViewStore views) {
         String view = Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("view"));
         String userSql = Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("sql"));

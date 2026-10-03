@@ -184,4 +184,52 @@ class MaterializeTaskTest {
             System.clearProperty("assist.write.root");
         }
     }
+
+    /**
+     * ENGINE-INMEMORY-UNSEALED-1 probe: a hand-authored view is AUTHORED text that reaches the materialize
+     * connection with no guard in between. The twin on a bare connection MUST reach the loopback stub; the job's
+     * run must leave it at 0 and fail. Mutation: an unsealed openInMemory turns this red with the stub hit.
+     */
+    @Test
+    void anAuthoredViewThatReadsAUrlNeverReachesTheNetwork(@TempDir Path writeRoot, @TempDir Path dataDir) throws Exception {
+        java.util.concurrent.atomic.AtomicInteger hits = new java.util.concurrent.atomic.AtomicInteger();
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext("/x.csv", ex -> {
+            hits.incrementAndGet();
+            byte[] body = ("region,amount" + (char) 10 + "EU,1" + (char) 10).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            ex.getResponseHeaders().add("Content-Type", "text/csv");
+            ex.sendResponseHeaders(200, "HEAD".equals(ex.getRequestMethod()) ? -1 : body.length);
+            try (var os = ex.getResponseBody()) { if (!"HEAD".equals(ex.getRequestMethod())) os.write(body); }
+        });
+        server.start();
+        System.setProperty("assist.write.root", writeRoot.toString());
+        try {
+            String read = "SELECT * FROM read_csv('http://127.0.0.1:" + server.getAddress().getPort() + "/x.csv')";
+            com.gamma.util.DuckDbUtil.loadDriver();
+            try (java.sql.Connection c = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+                 java.sql.Statement st = c.createStatement(); var rs = st.executeQuery(read)) {
+                assertTrue(rs.next(), "twin: a bare connection reads the stub");
+            }
+            assertTrue(hits.get() > 0, "twin: the probe must reach the stub on a bare connection");
+            hits.set(0);
+            new ViewStore(writeRoot.resolve("views")).write(new ViewDefinition("remote_view", "flow-x", List.of(),
+                    read, "2026-10-03T00:00:00Z"));
+            new ComponentStore(writeRoot.resolve("registry")).write("dataset", "remote_ds", Map.of("view", "remote_view"));
+            JobConfig cfg = job(Map.of("task", "materialize", "dataset", "remote_ds",
+                    "target", "remote_by_region", "measures", "count", "group_by", "region"));
+            Exception refused = null;
+            try {
+                new MaintenanceJob(cfg, dataDir.toString()).run();
+            } catch (Exception e) {
+                refused = e;
+            }
+            assertEquals(0, hits.get(), "the materialize connection reached the network");
+            assertNotNull(refused, "the run must fail, not materialize remote rows");
+            assertTrue(parquetFiles(dataDir.resolve("remote_by_region")).isEmpty());
+        } finally {
+            System.clearProperty("assist.write.root");
+            server.stop(0);
+        }
+    }
 }

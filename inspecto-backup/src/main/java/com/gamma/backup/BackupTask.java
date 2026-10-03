@@ -365,7 +365,7 @@ final class BackupTask {
             Files.createDirectories(storeDir);
             Path parquet = storeDir.resolve("backup_" + stamp + "_out.parquet");
             com.gamma.util.DuckDbUtil.loadDriver();
-            try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)))) {
+            try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)), java.util.List.of(storeDir))) {
                 try (Statement st = conn.createStatement()) {
                     st.execute("CREATE TABLE catalog_row (created VARCHAR, archive VARCHAR, archive_sha256 VARCHAR,"
                             + " source VARCHAR, file_count INTEGER, total_bytes BIGINT)");

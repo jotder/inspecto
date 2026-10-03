@@ -524,6 +524,9 @@ was **hit twice**. The fix reuses both existing layers, it invents neither:
    then **`SqlSandbox.sealAllowing(conn, [dataDir])`**: `allowed_directories` = the data root (trailing `/`,
    so `data-other` is not admitted), `enable_external_access=false`, `lock_configuration=true`. The sink,
    Decision Rule route and quarantine writes all land under the data root, so they still work.
+   *(Since `ENGINE-INMEMORY-UNSEALED-1`, 2026-10-03: the autoload-off + `allowed_directories` half is done by
+   `DuckDbUtil.openInMemory(spill, [dataDir])` itself, and the job adds `DuckDbUtil.lockConfiguration` before the
+   authored SQL — see `okf/backend/engine/duckdb.md`.)*
 
 Both layers are mutation-checked independently in `SqlTemplateJobSandboxTest`: removing the guard turns
 `aFileLiteralInsideTheDataRootIsStillRefusedByTheGuard` red (the seal admits that file), and removing the

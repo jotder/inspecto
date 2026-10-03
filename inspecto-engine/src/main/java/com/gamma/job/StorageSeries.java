@@ -68,7 +68,7 @@ final class StorageSeries {
         List<AxisTrend> axes = new ArrayList<>();
         com.gamma.util.DuckDbUtil.loadDriver();
         // Spill under the Space data root (null ⇒ java.io.tmpdir).
-        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()));
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()), java.util.List.of(storeDir));
              Statement st = conn.createStatement()) {
             try (ResultSet rs = st.executeQuery("SELECT created_ms, CAST(sum(bytes) AS BIGINT) FROM read_parquet("
                     + glob + ") WHERE created_ms >= " + cutoffMs + " GROUP BY created_ms ORDER BY created_ms")) {

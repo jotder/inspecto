@@ -128,7 +128,7 @@ public final class ReferenceCompactor {
 
         DuckDbUtil.loadDriver();
         // Spill under the Space data root, not the walked store dir (null ⇒ java.io.tmpdir).
-        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()))) {
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()), java.util.List.of(root))) {
 
             long retained = stageRetained(conn, root, historyDays);
             int dirsCompacted = 0, filesMerged = 0;

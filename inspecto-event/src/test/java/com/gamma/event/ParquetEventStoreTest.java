@@ -467,7 +467,7 @@ class ParquetEventStoreTest {
         long offset;
         long length;
         com.gamma.util.DuckDbUtil.loadDriver();
-        try (java.sql.Connection c = com.gamma.util.DuckDbUtil.openInMemory(null);
+        try (java.sql.Connection c = com.gamma.util.DuckDbUtil.openInMemory(null, java.util.List.of(f.getParent()));
              java.sql.PreparedStatement ps = c.prepareStatement("SELECT data_page_offset, total_compressed_size FROM "
                      + "parquet_metadata(?) WHERE path_in_schema = ?")) {
             ps.setString(1, f.toString().replace('\\', '/'));
@@ -519,7 +519,7 @@ class ParquetEventStoreTest {
             last = w.filter(p -> p.toString().endsWith(".parquet")).sorted().toList().get(2);   // holds seq 21..30
         }
         corruptColumn(last, "payload");
-        try (java.sql.Connection c = com.gamma.util.DuckDbUtil.openInMemory(null);
+        try (java.sql.Connection c = com.gamma.util.DuckDbUtil.openInMemory(null, java.util.List.of(last.getParent()));
              java.sql.Statement st = c.createStatement()) {
             String f = "read_parquet('" + last.toString().replace(java.io.File.separatorChar, '/') + "')";
             st.executeQuery("SELECT COUNT(*), MAX(ts_ms), MAX(json_extract_string(attributes, '$.audit_seq')), "
