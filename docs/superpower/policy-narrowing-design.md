@@ -353,6 +353,8 @@ S1 → S2 are the spine; S3–S6 are independent once S2 lands.
   pinned by `ControlApiCrossSpaceJailTest`. That is D4's default, so D4's precondition is met; §1.1's union
   describes the pre-fix code.
 
+**S2a — loading + refusal (2026-10-03).** `SafetyPolicyFiles.effective(serverDir, spaceBase, id, defaultRoots)` loads both files strictly (unknown key, bad value, relative root, `mode`/`require_spaces` in a Space file, stat/IO failure, TOON damage → `SafetyPolicyUnreadableException`, `ERR_SAFETY_POLICY_UNREADABLE`), D7 via server-file `require_spaces`, (mtime,size) cache, and `SafetyPolicy.forSpace` applies the fold to roots/caps/formats (server dir = `-Dsystem.config.dir`). Tests `SafetyPolicyFilesTest` (13; the unknown-key guard mutation-checked). Owed for S2: 422 mapping at the gates, failed-Run refusal, per-run pin, `/health`; `deny.roots` waits for S3.
+
 **S1 — model** (`inspecto-config/.../config/safety/`). `SafetyPolicyTier` is one tier (every field `null` =
 absent) and, after `fold(server, space)`, the effective policy: permits AND, allow-sets intersect through a
 covers-matcher (`PathJail::contains` for roots, `HostPattern::covers` for hosts), denies union, caps MIN,

@@ -102,9 +102,18 @@ public record SafetyPolicy(
         for (String s : prop.split(";")) {
             if (!s.isBlank()) roots.add(Paths.get(s.trim()).toAbsolutePath().normalize());
         }
-        DiscoveredRoots.baseOf(spaceId).ifPresent(roots::add);
-        return new SafetyPolicy(roots, Runtime.getRuntime().availableProcessors(),
-                1_000_000, Long.MAX_VALUE, DEFAULT_FORMATS, DEFAULT_COMPRESSION);
+        Path base = DiscoveredRoots.baseOf(spaceId).orElse(null);
+        if (base != null) roots.add(base);
+        // Safety Policy tiers (policy-narrowing-design S2): the server + Space files can only NARROW these
+        // defaults; an unreadable file throws SafetyPolicyUnreadableException instead of reading as "none".
+        String serverDir = System.getProperty("system.config.dir");
+        SafetyPolicyTier t = SafetyPolicyFiles.effective(
+                serverDir == null || serverDir.isBlank() ? null : Paths.get(serverDir.trim()), base, spaceId, roots);
+        Set<String> formats = new java.util.LinkedHashSet<>(DEFAULT_FORMATS);
+        if (t.allowFormats() != null) formats.retainAll(t.allowFormats());
+        return new SafetyPolicy(t.allowRoots(), t.capThreads(Runtime.getRuntime().availableProcessors()),
+                t.capBatchFiles(1_000_000), t.capBatchBytes(Long.MAX_VALUE), formats.isEmpty() ? Set.of("-") : formats,
+                DEFAULT_COMPRESSION);
     }
 
     /** A policy rooted at the given dirs (the skill's workspace, or a test temp dir). */

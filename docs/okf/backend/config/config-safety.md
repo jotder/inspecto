@@ -874,3 +874,10 @@ Decline, with an optional reason, show only with `LensService.canApproveChanges`
 `changes.approve`); a server refusal — four-eyes, a stale base, the route's own 403/422 — is shown in place.
 **Withdraw** shows only to the change's author (`SessionService.actor` equals `author`) while it waits,
 behind `confirmDestructive`; a refusal toasts the server's message.
+
+## Safety Policy tier files — loading and the unreadable refusal (2026-10-03, `DUCKLE-C6-POLICY-NARROWING-1` S2a)
+
+Design: [`policy-narrowing-design.md`](../../../superpower/policy-narrowing-design.md). `SafetyPolicyFiles` (`inspecto-config`, `config/safety/`) reads `safety-policy.toon` from `-Dsystem.config.dir` (server tier) and `<space>/config/` (Space tier), strictly, and folds them through `SafetyPolicyTier.fold`. `SafetyPolicy.forSpace` — hence `defaultPolicy()` and all 15 `ConfigSafetyValidator.check` callers — now takes its roots, thread/batch caps and formats from that effective tier, so a Space file can only narrow the operator-declared roots + the Space base.
+- 🔴 **Unreadable ⇒ throws, never "no policy".** TOON damage, a stat/IO failure (a *directory* named `safety-policy.toon` forces it), an unknown key (a mistyped `alow:` would otherwise silently drop the narrowing), a bad value, a relative root, `mode` or `require_spaces` in a Space file → `SafetyPolicyUnreadableException` (`ERR_SAFETY_POLICY_UNREADABLE`). `require_spaces[n]` in the server file (D7) makes a named Space with no file unreadable too; an un-named absent file narrows nothing.
+- Parsed files are cached by (mtime, size); a failure is cached too and re-evaluated when the stamp changes.
+- ⚠ **Not yet done (slice S2b onward):** the exception currently propagates as a 500 from the callers — mapping it to a 422 finding at every plan-time gate, the failed-Run refusal, `/health` degraded, the per-run pinned snapshot, and `deny.roots` at PathJail (S3) are open. The sentinel format set `{"-"}` stands for "allow.formats ∩ defaults is empty" because the record constructor treats an empty set as "use defaults".
