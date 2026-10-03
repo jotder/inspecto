@@ -1327,7 +1327,19 @@ As-built facts are in the two blockquotes at the top of this concept; the retire
   `check-launchers`, `check-bundle-platform` and `bundle-modules.mjs` needed no change (none names the UI folder). The IAM client id for
   la-app (`AUTH_OIDC_CLIENT_ID`; the launchers default to `inspecto-ui`) is a deployment decision, written in `docs/EDITIONS.md`.
 
-**Not built (D-5).** Real OIDC sign-in for la-app against an IAM (the path is covered by the moved specs and `authMode: none`); the
+**la-app signs in over Demo User auth (driven live 2026-10-03, no IAM).** `-Dauth.mode=demo` (module `inspecto-demo-auth`,
+[local-testing-without-iam.md](../../backend/editions/local-testing-without-iam.md)) is a token relay behind `/auth/exchange`, NOT an OIDC provider:
+there is no discovery, authorize or JWKS endpoint, so the IdP redirect, `state`/PKCE round trip and ID-token validation are NOT exercised.
+Recipe (test-only; no client id is involved): run a Demo-build backend (`inspecto-demo` bundle jars, `serve-demo.bat` flags, a Space with
+`config/demo-users.toon`, `-Dcontrol.port=<free>`), `npx ng build la-app --configuration development`, copy `dist/la-app/browser/*` into the
+backend's `-Dui.dir`, open `/`. Proven: unauthenticated `/` and `/link-analysis` bounce to `/sign-in` (guard); the Demo User picker sends
+`POST /auth/exchange` 200 and lands on the landing page; Space-scoped calls are 200 with the Bearer (401 without or with a forged one); a full
+reload on `/link-analysis` resumes via `POST /auth/refresh` 200; *Sign out* posts `/auth/logout` 200, clears `inspecto.session.resumable`, and a
+reload goes to `/sign-in` with no refresh attempt. Not driven live: token expiry (15 min access token) and the interceptor's 401-then-refresh retry
+(covered by `auth.interceptor.spec.ts`). No defects found; no automated la-app-over-demo-auth test exists (the repo has no browser e2e harness; the
+backend half is `DemoAuthHttpTest`).
+
+**Not built (D-5).** Real OIDC sign-in for la-app against a real IAM (the Demo User path above and the moved specs cover the SPA half); the
 "licence text" item (nothing in the bundle names the UI flavor to attach it to); `/bootstrap` was proven on a scratch Standard backend,
 not by calling the packaged zip's server; a fifth `LA` edition; module federation (signed no); a second `-Dui.dir`; renaming `gamma`; a mobile or SSR
 build. Filed: `LA-APP-REAL-SIGNIN-1`.
