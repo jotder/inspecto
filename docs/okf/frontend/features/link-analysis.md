@@ -702,7 +702,16 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   already admitted — earlier sealed reads are evidence as made. Templates carry the whole rung; a `window`
   becomes a parameter (`kind: "window"`) whose default is the authored window. ⏳ `threshold`, `annotate`,
   `snapshot`, calendar exclusions, comparison mode and time-respecting paths remain
-  deferred; the SPA types still say `limit` and offer no rung fields. `seedBy` / `excludeBy` shipped 2026-09-26
+  deferred. **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
+  settings* (`investigation-expand-rung.component`) sends `budget` (1–20 000; the server CLAMPS above, so the SPA
+  refuses) · `direction` · rung `window` (`inherit`/`full` only — no override object) · `minEvents` ·
+  `minDistinctDays` · `candidateDegreeMin/Max` (min ≤ max) · `maxFanOut`, only the fields set (blank = server
+  default), to BOTH expand buttons; per-rung `truncated` stays the existing *Incomplete Working Set* alert. The
+  *Time window* form (`investigation-window-op.component`) appends a `window` op: ISO instants WITH offset/Z,
+  an `HH:mm` slot (a crossing-midnight note), a day mask, an IANA zone from `time-zones.ts` — required with a slot
+  or mask, client-side as on the server — or *All time* (`'full'`). Bounds live in `investigation-rung-form.ts`;
+  a server 422 still renders verbatim in each form. ⏳ Not wired: rung `linkKinds`, a rung window override object.
+  `seedBy` / `excludeBy` shipped 2026-09-26
   over Entity Lists (`LA-17`, design §4.4) — see the Entity Lists paragraph below.
 * **The Investigation tab drives it** (LA-10 SPA half, 2026-09-23): the right dock's third tab
   (`link-analysis-investigation.component` over the pane-provided `InvestigationSessionStore`, so the session
@@ -827,8 +836,10 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   `from`/`to`/`timezone`; no picker asks for them yet), and names every day with zero rows in the window's zone,
   or says every day has data; it always states that per-Collector coverage is not assessed
   (`collectors.assessed:false`). A result is shown only while its Investigation is the open one. ⚠ The route
-  needs a `timeCol` in the header and a bounded window, and *Start Investigation* sends no `timeCol` — so an
-  Investigation started from this panel answers coverage with a 422, shown verbatim.
+  needs a `timeCol` in the header and a bounded window: *Start Investigation* sends `timeCol` (since 2026-10-03)
+  from its optional *Time column* field, else the canvas time slider's column (`[timeCol]` input); `timeColZone`
+  is not asked (a naive TIMESTAMP is recorded as UTC). Without either, or before a `window` op bounds the
+  window, coverage still answers 422, shown verbatim.
 * **Purpose, masking, four-eyes** (LA-19 operator decisions 2026-09-24, D-U5/D-U6/D-U7 — decision record in
   `docs/archived-documents/plans-archive/link-analysis-backlog-plan.md` §4). *Start Investigation* now REQUIRES a *Purpose / legal
   basis* field (the server answers 422 without one) and the template *Instantiate* form carries the same required

@@ -82,6 +82,15 @@
                     <mat-error>At most 1000 characters.</mat-error>
                 }
             </mat-form-field>
+            <mat-form-field class="w-full" subscriptSizing="dynamic">
+                <mat-label>Time column (optional)</mat-label>
+                <input matInput [formControl]="timeColumn" [placeholder]="timeCol()" />
+                <mat-hint
+                    >The event time windows and the coverage check read{{
+                        timeCol() ? ' — blank uses ' + timeCol() : ''
+                    }}.</mat-hint
+                >
+            </mat-form-field>
             <button
                 mat-flat-button
                 color="primary"
@@ -243,7 +252,10 @@
             >
                 Expand the whole Working Set
             </button>
+            <inspecto-la-expand-rung></inspecto-la-expand-rung>
         </section>
+
+        <inspecto-la-window-op></inspecto-la-window-op>
 
         <!-- ── the op log ── -->
         <section aria-label="Op log">

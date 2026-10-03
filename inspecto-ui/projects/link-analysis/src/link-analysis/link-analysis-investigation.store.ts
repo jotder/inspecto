@@ -101,8 +101,9 @@ export class InvestigationSessionStore {
         this.refs.update((all) => all.filter((r) => r.id !== id));
     }
 
-    /** Create an Investigation over the projection's Dataset + columns and open it. */
-    async start(p: EntityProjection, purpose: string, title?: string): Promise<boolean> {
+    /** Create an Investigation over the projection's Dataset + columns and open it. `timeCol` binds the event time
+     *  windows and the coverage read use — without it `GET …/coverage` answers 422. */
+    async start(p: EntityProjection, purpose: string, title?: string, timeCol?: string): Promise<boolean> {
         return this.run('Could not start the Investigation.', async () => {
             const h = await firstValueFrom(
                 this.inv.createInvestigation({
@@ -112,6 +113,7 @@ export class InvestigationSessionStore {
                     sourceCol: p.sourceCol,
                     targetCol: p.targetCol,
                     linkKindCol: p.linkKindCol || undefined,
+                    timeCol: timeCol || undefined,
                 }),
             );
             this.refs.update((all) => [

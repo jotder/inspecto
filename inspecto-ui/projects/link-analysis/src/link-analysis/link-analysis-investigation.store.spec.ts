@@ -103,6 +103,12 @@ const step = (n: number, op: string) => ({
 });
 
 describe('InvestigationSessionStore (LA-10)', () => {
+    it('start sends the time column, so the coverage read has one (LA-SPA-OWED-SURFACES-1 defect)', async () => {
+        const { store, inv } = setup();
+        expect(await store.start(P, 'warrant 7', '', 'call_ts')).toBe(true);
+        expect((inv.createInvestigation.mock.calls[0] as unknown[])[0]).toMatchObject({ timeCol: 'call_ts' });
+    });
+
     it('start → seed → undo: the op log and the Working Set follow each step', async () => {
         const { store, inv, logs, sets } = setup();
 

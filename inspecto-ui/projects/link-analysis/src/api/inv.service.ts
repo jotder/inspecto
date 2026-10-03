@@ -218,6 +218,10 @@ export interface InvestigationCreateRequest {
     sourceCol: string;
     targetCol: string;
     linkKindCol?: string;
+    /** LA-13: the event-time column every window (and the coverage read) uses; absent = a timeless Investigation. */
+    timeCol?: string;
+    /** The zone a naive TIMESTAMP `timeCol` is in (UTC when absent); refused for a TIMESTAMPTZ column. */
+    timeColZone?: string;
 }
 
 /** A fork's parent (D-E4): the Investigation it was re-ordered from, the order, and the parent's log length. */

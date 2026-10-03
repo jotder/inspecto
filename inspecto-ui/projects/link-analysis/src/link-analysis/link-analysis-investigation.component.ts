@@ -32,6 +32,8 @@ import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
 import { LA_WIDGETS } from '@inspecto/link-analysis/la-host';
+import { InvestigationExpandRungComponent } from './investigation-expand-rung.component';
+import { InvestigationWindowOpComponent } from './investigation-window-op.component';
 import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component';
 import { LinkAnalysisEntityListsComponent } from './link-analysis-entity-lists.component';
 import { LinkAnalysisIdentitiesComponent } from './link-analysis-identities.component';
@@ -64,6 +66,8 @@ import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set
         MatTooltipModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
+        InvestigationExpandRungComponent,
+        InvestigationWindowOpComponent,
         LinkAnalysisDossierComponent,
         LinkAnalysisEntityListsComponent,
         LinkAnalysisIdentitiesComponent,
@@ -87,6 +91,10 @@ export class LinkAnalysisInvestigationComponent {
     readonly projection = input<EntityProjection | null>(null);
     /** Why `projection` is null, in the analyst's words. */
     readonly projectionIssue = input('');
+    /** The canvas's time column (the time slider's), the default event time of a new Investigation. */
+    readonly timeCol = input('');
+    /** LA-13: the Investigation's event-time column — windows and the coverage read need one (else 422). */
+    readonly timeColumn = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] });
 
     readonly title = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] });
     /** D-U5: the stated purpose / legal basis — required by the server, recorded and shown in the Dossier, not enforced. */
@@ -196,7 +204,9 @@ export class LinkAnalysisInvestigationComponent {
     async start(): Promise<void> {
         const p = this.projection();
         if (!p || this.title.invalid || this.purpose.invalid) return;
-        if (await this.store.start(p, this.purpose.value.trim(), this.title.value.trim())) {
+        const timeCol = this.timeColumn.value.trim() || this.timeCol();
+        if (await this.store.start(p, this.purpose.value.trim(), this.title.value.trim(), timeCol)) {
+            this.timeColumn.reset('');
             this.title.reset('');
             this.purpose.reset('');
         }
@@ -216,8 +226,17 @@ export class LinkAnalysisInvestigationComponent {
         this.store.apply({ op: 'seed', ids: rawIdsOf(n), ...(entityType ? { entityType } : {}) });
     }
 
-    expand(all = false): void {
-        this.store.apply(all ? { op: 'expand' } : { op: 'expand', ids: this.selectedInSet() });
+    /** The expand form's Advanced rung fields (LA-SPA-OWED-SURFACES-1). */
+    private readonly rungForm = viewChild(InvestigationExpandRungComponent);
+
+    async expand(all = false): Promise<void> {
+        const form = this.rungForm();
+        const rung = form ? form.rung() : {};
+        if (!rung) return;
+        const ok = await this.store.apply(
+            all ? { op: 'expand', ...rung } : { op: 'expand', ids: this.selectedInSet(), ...rung },
+        );
+        if (!ok) form?.fail(this.store.error());
     }
 
     mark(op: 'hide' | 'keep'): void {
