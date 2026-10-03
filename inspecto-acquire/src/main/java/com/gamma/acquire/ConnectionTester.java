@@ -66,6 +66,7 @@ public final class ConnectionTester {
         int timeout = timeoutMs(p);
         long start = System.nanoTime();
         try (Socket socket = new Socket()) {
+            com.gamma.config.safety.EgressGate.current().require(host, port, "connection test '" + p.id() + "'");
             socket.connect(new InetSocketAddress(host, port), timeout);
             long ms = (System.nanoTime() - start) / 1_000_000L;
             return new Result(p.id(), p.connector(), endpoint, true, ms, secrets, "TCP connect ok" + hop);

@@ -1,6 +1,8 @@
 package com.gamma.acquire.connectors;
 
 import com.gamma.acquire.AcquisitionException;
+import com.gamma.config.safety.EgressGate;
+import com.gamma.config.safety.EgressRefusedException;
 import com.gamma.pipeline.exec.EgressAllowlist;
 import com.gamma.pipeline.exec.EgressPolicy;
 
@@ -52,6 +54,9 @@ abstract class AbstractHttpObjectStoreConnector {
 
     /** Provider name as it appears in error messages ({@code "S3"}, {@code "GCS"}, {@code "Azure"}). */
     private final String provider;
+
+    /** The Safety Policy gate, built on the planning thread that built the connector (a worker does not see the run pin). */
+    private final EgressGate gate = EgressGate.current();
 
     /** {@code scheme://host[:port]}, no path. */
     protected final URI endpoint;
@@ -107,6 +112,11 @@ abstract class AbstractHttpObjectStoreConnector {
             throw new IOException("egress refused: '" + req.uri() + "' has no plain host");
         String bare = host.startsWith("[") && host.endsWith("]") ? host.substring(1, host.length() - 1) : host;
         InetAddress to;
+        try {
+            gate.require(bare, req.uri().getPort(), provider);
+        } catch (EgressRefusedException refused) {
+            throw new IOException(refused.getMessage(), refused);
+        }
         try {
             EgressPolicy.checkHost(bare);
             to = EgressPolicy.resolve(bare, allowlist.get(), resolver);

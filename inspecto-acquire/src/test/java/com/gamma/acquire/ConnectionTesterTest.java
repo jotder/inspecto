@@ -28,6 +28,22 @@ class ConnectionTesterTest {
         }
     }
 
+    /** S4 N7: the probe's own dial passes the Safety Policy first; a refused host is "unreachable" with the reason. */
+    @Test
+    void aProbeOfAHostThePolicyDoesNotAllowDialsNothing(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        java.nio.file.Files.writeString(dir.resolve("safety-policy.toon"), "allow:\n  hosts[1]: elsewhere.test\n");
+        System.setProperty("system.config.dir", dir.toString());
+        try (ServerSocket ss = new ServerSocket(0)) {
+            ConnectionTester.Result r = ConnectionTester.test(remote("127.0.0.1", ss.getLocalPort(), null));
+            assertFalse(r.reachable());
+            assertTrue(r.detail().contains("Safety Policy"), r.detail());
+            java.nio.file.Files.writeString(dir.resolve("safety-policy.toon"), "allow:\n  hosts[1]: 127.0.0.1\n");
+            assertTrue(ConnectionTester.test(remote("127.0.0.1", ss.getLocalPort(), null)).reachable(), "the allowed twin dials");
+        } finally {
+            System.clearProperty("system.config.dir");
+        }
+    }
+
     @Test
     void closedPortIsUnreachable() throws Exception {
         int port;

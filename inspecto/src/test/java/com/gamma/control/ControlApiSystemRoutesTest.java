@@ -43,7 +43,7 @@ class ControlApiSystemRoutesTest {
     /** Every property these tests set, RESTORED after each so one test cannot colour the next. */
     private static final List<String> TOUCHED = List.of(
             "inspecto.db", "inspecto.db.url", "inspecto.db.user", "jobs.backend", "jobs.db.url",
-            "objects.backend", "objects.db.url", "status.backend");
+            "objects.backend", "objects.db.url", "status.backend", "system.config.dir");
 
     // ⚠ Restore, never clear (TEST-CWD-DB-1): surefire pins -Dstatus.backend=jdbc:duckdb: for the whole
     // forked JVM, and a blanket clearProperty here erased it — so every class that ran AFTER this one in
@@ -251,6 +251,24 @@ class ControlApiSystemRoutesTest {
             String outcome = json(r).get("outcome").asText();
             assertTrue(List.of("UNREACHABLE", "AUTH_FAILED", "DRIVER_MISSING").contains(outcome),
                     "a named outcome, got: " + r.body());
+        }
+    }
+
+    /** S4 / D16: the server tier's host gate runs before the dial - a refused URL is a 422 and nothing is opened. */
+    @Test
+    void aJdbcHostTheServerPolicyDoesNotAllowIs422BeforeAnythingIsDialled(@TempDir Path dir) throws Exception {
+        Path server = java.nio.file.Files.createDirectories(dir.resolve("server-policy"));
+        java.nio.file.Files.writeString(server.resolve("safety-policy.toon"), "allow:\n  hosts[1]: db.allowed.test\n");
+        System.setProperty("system.config.dir", server.toString());
+        try (Ctx c = open(dir)) {
+            HttpResponse<String> r = post(c.port, "/system/operational-db/test",
+                    "{\"url\":\"jdbc:postgresql://127.0.0.1:1/nothing_here\"}");
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("Safety Policy"), r.body());
+            // the twin: the same URL with its host allowed is dialled (and fails to connect - a named outcome, not a 422)
+            java.nio.file.Files.writeString(server.resolve("safety-policy.toon"), "allow:\n  hosts[1]: 127.0.0.1\n");
+            assertEquals(200, post(c.port, "/system/operational-db/test",
+                    "{\"url\":\"jdbc:postgresql://127.0.0.1:1/nothing_here\"}").statusCode());
         }
     }
 

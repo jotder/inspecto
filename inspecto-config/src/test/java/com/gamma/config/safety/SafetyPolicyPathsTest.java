@@ -163,4 +163,51 @@ class SafetyPolicyPathsTest {
         assertThrows(SafetyPolicyUnreadableException.class, () -> SafetyPolicy.forSpace("s1"));
         assertEquals(List.of(s1.toAbsolutePath().normalize()), SafetyPolicy.baseRoots("s1"));
     }
+
+    @Test
+    void aWorkerHandedTheRunWithPinnedSeesBothTheDenyRootsAndTheEgressTier() throws Exception {
+        Path s1 = space(CurrentSpace.DEFAULT_SPACE_ID);
+        policy(s1, "deny:
+  roots[1]: " + fwd(s1.resolve("secrets")) + "
+  hosts[1]: bad.example
+");
+        Path target = s1.resolve("secrets").resolve("k");
+
+        AtomicReference<Boolean> pathRefused = new AtomicReference<>();
+        AtomicReference<Boolean> hostRefused = new AtomicReference<>();
+        AtomicReference<Boolean> okHostPasses = new AtomicReference<>();
+        SafetyPolicy.pinnedForRun(() -> {
+            var pin = SafetyPolicy.pinned().orElseThrow();
+            try {
+                Files.delete(s1.resolve("config").resolve(SafetyPolicyFiles.FILE));     // loosened mid-run
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            Thread handed = Thread.ofVirtual().unstarted(() -> SafetyPolicy.runWithPinned(pin, () -> {
+                pathRefused.set(denied(target));
+                hostRefused.set(refusesHost("bad.example"));
+                okHostPasses.set(!refusesHost("good.example"));
+                return null;
+            }));
+            try {
+                handed.start();
+                handed.join();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            return null;
+        });
+        assertEquals(Boolean.TRUE, pathRefused.get(), "deny roots survive on the worker");
+        assertEquals(Boolean.TRUE, hostRefused.get(), "the egress tier survives on the worker");
+        assertEquals(Boolean.TRUE, okHostPasses.get(), "twin: an unlisted host still passes");
+    }
+
+    private static boolean refusesHost(String host) {
+        try {
+            EgressGate.current().require(host, 443, "t");
+            return false;
+        } catch (EgressRefusedException e) {
+            return true;
+        }
+    }
 }

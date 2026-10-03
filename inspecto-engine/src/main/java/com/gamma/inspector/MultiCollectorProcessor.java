@@ -206,7 +206,7 @@ public final class MultiCollectorProcessor {
      * failure accounting are identical to {@code runAll}.
      */
     /** Runs {@code body} on this worker under the planning thread's pinned Safety Policy, when it had one. */
-    private static <T> T underPin(java.util.Optional<com.gamma.config.safety.SafetyPolicy> pin,
+    private static <T> T underPin(java.util.Optional<com.gamma.config.safety.SafetyPolicy.Pin> pin,
                                   java.util.concurrent.Callable<T> body) throws Exception {
         if (pin.isEmpty()) return body.call();
         try {

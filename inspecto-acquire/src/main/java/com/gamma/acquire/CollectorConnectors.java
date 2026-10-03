@@ -1,5 +1,6 @@
 package com.gamma.acquire;
 
+import com.gamma.config.safety.EgressGate;
 import com.gamma.etl.PipelineConfig;
 
 import java.nio.file.Path;
@@ -43,12 +44,32 @@ public final class CollectorConnectors {
         ConnectionProfile profile = cfg.collector().hasConnection()
                 ? ConnectionRegistry.find(cfg.collector().connection()).orElse(null)
                 : null;
+        if (profile != null) requireEgress(EgressGate.current(), profile);
         for (CollectorConnectorFactory f : ServiceLoader.load(CollectorConnectorFactory.class)) {
             if (f.scheme().equalsIgnoreCase(scheme)) return f.create(cfg, profile);
         }
         throw new IllegalArgumentException(
                 "No source connector registered for connector '" + scheme + "' (built-in: local). "
                         + "Remote connectors ship in the optional connector module (Data Acquisition roadmap Phase E).");
+    }
+
+    /**
+     * The act-time network gate for a remote connector build (policy-narrowing-design N1, T14): every hop the
+     * profile names - target, SSH bastion, proxy, the host inside {@code options.jdbc_url}, every broker in
+     * {@code options.bootstrap_servers} - passes the Safety Policy before any connector exists. This is the act
+     * seam, so a pipeline file placed on disk without the save gate is refused here.
+     */
+    static void requireEgress(EgressGate gate, ConnectionProfile p) {
+        String what = p.connector() + " connection '" + p.id() + "'";
+        if (p.host() != null && !p.host().isBlank()) gate.require(p.host(), p.port(), what);
+        if (p.tunnel() != null && p.tunnel().host() != null && !p.tunnel().host().isBlank())
+            gate.require(p.tunnel().host(), p.tunnel().port(), what + " bastion");
+        if (p.proxy() != null && p.proxy().host() != null && !p.proxy().host().isBlank())
+            gate.require(p.proxy().host(), p.proxy().port(), what + " proxy");
+        String jdbc = p.options().get("jdbc_url");
+        if (jdbc != null && !jdbc.isBlank()) gate.requireJdbcUrl(jdbc, what);
+        String brokers = p.options().get("bootstrap_servers");
+        if (brokers != null && !brokers.isBlank()) gate.requireHostList(brokers, what + " bootstrap");
     }
 
     /**

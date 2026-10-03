@@ -95,23 +95,25 @@ public record SafetyPolicy(
         return forSpace(space);
     }
 
-    /** The policy this thread's run pinned, if any - capture it before fanning out to a worker pool. */
-    public static java.util.Optional<SafetyPolicy> pinned() {
+    /** The policy and folded tier this thread's run pinned, if any - capture it before fanning out to a worker pool. */
+    public static java.util.Optional<Pin> pinned() {
         return PINNED.isBound() && PINNED.get().space().equals(CurrentSpace.id())
-                ? java.util.Optional.of(PINNED.get().policy()) : java.util.Optional.empty();
+                ? java.util.Optional.of(PINNED.get()) : java.util.Optional.empty();
     }
 
     /**
-     * Re-binds an already-resolved {@code policy} for {@code run} on the calling (worker) thread. The pin is a
-     * {@link ScopedValue}: it does not follow a task onto an executor, so a worker that makes act-time path
-     * decisions is handed the planning thread's {@link #pinned()} snapshot explicitly - it must not re-read the
-     * files (a different answer mid-run) nor fall back to the {@code default} Space when its MDC is empty.
+     * Re-binds an already-resolved {@code pin} (policy <b>and</b> tier) for {@code run} on the calling (worker)
+     * thread. The pin is a {@link ScopedValue}: it does not follow a task onto an executor, so a worker that makes
+     * act-time decisions (path jail, {@link EgressGate}) is handed the planning thread's {@link #pinned()} snapshot
+     * explicitly - it must not re-read the files (a different answer mid-run) nor fall back to the {@code default}
+     * Space when its MDC is empty.
      */
-    public static <T> T runWithPinned(SafetyPolicy policy, java.util.function.Supplier<T> run) {
-        return ScopedValue.where(PINNED, new Pin(CurrentSpace.id(), policy)).call(run::get);
+    public static <T> T runWithPinned(Pin pin, java.util.function.Supplier<T> run) {
+        return ScopedValue.where(PINNED, new Pin(CurrentSpace.id(), pin.policy(), pin.tier())).call(run::get);
     }
 
-    private record Pin(String space, SafetyPolicy policy) {}
+    /** One run's pinned snapshot: the Space it was resolved for, its policy, and the folded tier it came from. */
+    public record Pin(String space, SafetyPolicy policy, SafetyPolicyTier tier) {}
 
     /** The policy a run planned with, visible to {@link #defaultPolicy()} for the rest of that run. */
     private static final ScopedValue<Pin> PINNED = ScopedValue.newInstance();
@@ -126,8 +128,9 @@ public record SafetyPolicy(
      * the run fans out to; an act-time gate that runs on such a thread must be handed the policy explicitly.
      */
     public static <T> T pinnedForRun(java.util.function.Supplier<T> run) {
-        SafetyPolicy p = forSpace(CurrentSpace.id());
-        return ScopedValue.where(PINNED, new Pin(CurrentSpace.id(), p)).call(run::get);
+        String space = CurrentSpace.id();
+        SafetyPolicyTier t = tierForSpace(space);
+        return ScopedValue.where(PINNED, new Pin(space, toPolicy(t), t)).call(run::get);
     }
 
     /**
@@ -156,6 +159,20 @@ public record SafetyPolicy(
      * {@link #defaultPolicy()}.
      */
     public static SafetyPolicy forSpace(String spaceId) {
+        return toPolicy(tierForSpace(spaceId));
+    }
+
+    /**
+     * The folded Safety Policy tier the calling thread's Space runs under: the run's pinned snapshot when one is
+     * bound on this thread, else resolved now. Act-time gates ({@link EgressGate}) read it.
+     */
+    public static SafetyPolicyTier effectiveTier() {
+        String space = CurrentSpace.id();
+        if (PINNED.isBound() && PINNED.get().space().equals(space)) return PINNED.get().tier();
+        return tierForSpace(space);
+    }
+
+    private static SafetyPolicyTier tierForSpace(String spaceId) {
         List<Path> roots = baseRoots(spaceId);
         Path base = DiscoveredRoots.baseOf(spaceId).orElse(null);
         // Safety Policy tiers (policy-narrowing-design S2): the server + Space files can only NARROW these
@@ -163,6 +180,10 @@ public record SafetyPolicy(
         String serverDir = System.getProperty("system.config.dir");
         SafetyPolicyTier t = SafetyPolicyFiles.effective(
                 serverDir == null || serverDir.isBlank() ? null : Paths.get(serverDir.trim()), base, spaceId, roots);
+        return t;
+    }
+
+    private static SafetyPolicy toPolicy(SafetyPolicyTier t) {
         Set<String> formats = new java.util.LinkedHashSet<>(DEFAULT_FORMATS);
         if (t.allowFormats() != null) formats.retainAll(t.allowFormats());
         return new SafetyPolicy(t.allowRoots(), t.denyRoots(), t.capThreads(Runtime.getRuntime().availableProcessors()),

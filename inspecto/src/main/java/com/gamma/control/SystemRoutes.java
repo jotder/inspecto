@@ -51,6 +51,12 @@ final class SystemRoutes implements RouteModule {
                     + String.join(" or ", OperationalDbReport.allowedSchemes())
                     + " — this endpoint opens the connection for real, so it dials nothing else");
 
+        try {   // D16: the operational-DB test is an operator act, gated by the SERVER tier, before any password is resolved
+            com.gamma.config.safety.EgressGate.server().requireJdbcUrl(url, "operational DB test");
+        } catch (com.gamma.config.safety.EgressRefusedException refused) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, refused.getMessage());
+        }
+
         String password = Values.trimOrEmpty(body == null ? null : body.get("password"));
         if (!password.isBlank() && !password.startsWith("${"))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "password must be a secret reference (${ENV:…}, ${KEYSTORE:…} "

@@ -9,6 +9,7 @@ import com.gamma.acquire.RemoteFile;
 import com.gamma.acquire.SecretResolver;
 import com.gamma.acquire.CollectorConnector;
 import com.gamma.metrics.MetricRegistry;
+import com.gamma.config.safety.EgressGate;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -95,6 +96,9 @@ public final class KafkaConnector implements CollectorConnector {
     private final boolean startLatest;
     private final String ext;
 
+    /** The Safety Policy gate, built with the connector on the planning thread (a worker does not see the run pin). */
+    private final EgressGate gate = EgressGate.current();
+
     private Consumer<byte[], byte[]> consumer;   // one per connector lifetime (= one scan cycle)
 
     public KafkaConnector(ConnectionProfile profile, Function<Properties, Consumer<byte[], byte[]>> consumerFactory) {
@@ -136,6 +140,7 @@ public final class KafkaConnector implements CollectorConnector {
         try {
             Consumer<byte[], byte[]> c = ensureConsumer();
             List<PartitionInfo> parts = c.partitionsFor(topic);
+            requireLeaders(parts);
             if (parts == null || parts.isEmpty()) return List.of();   // topic not created yet: nothing, quietly
             List<TopicPartition> tps = parts.stream().map(p -> new TopicPartition(topic, p.partition())).toList();
             Map<TopicPartition, Long> begin = c.beginningOffsets(tps);
@@ -180,6 +185,7 @@ public final class KafkaConnector implements CollectorConnector {
         try {
             Consumer<byte[], byte[]> c = ensureConsumer();
             List<PartitionInfo> parts = c.partitionsFor(topic);
+            requireLeaders(parts);
             if (parts == null || parts.isEmpty()) return 0;
             List<TopicPartition> tps = parts.stream().map(p -> new TopicPartition(topic, p.partition())).toList();
             Map<TopicPartition, Long> begin = c.beginningOffsets(tps);
@@ -233,6 +239,7 @@ public final class KafkaConnector implements CollectorConnector {
         try {
             if (dest.getParent() != null) Files.createDirectories(dest.getParent());
             Consumer<byte[], byte[]> c = ensureConsumer();
+            requireLeaders(c.partitionsFor(topic));
             c.assign(List.of(tp));
             c.seek(tp, from);
             long pos = from;
@@ -333,6 +340,17 @@ public final class KafkaConnector implements CollectorConnector {
             }
         }
         return b.toString();
+    }
+
+    /**
+     * The client dials every partition leader the cluster metadata names, not just the bootstrap broker, so each
+     * leader host passes the Safety Policy before the first offset lookup or fetch of a call (D12).
+     */
+    private void requireLeaders(List<PartitionInfo> parts) {
+        if (parts == null) return;
+        for (PartitionInfo p : parts)
+            if (p.leader() != null && !p.leader().isEmpty())
+                gate.require(p.leader().host(), p.leader().port(), "kafka partition leader");
     }
 
     // ── client construction ───────────────────────────────────────────────────
