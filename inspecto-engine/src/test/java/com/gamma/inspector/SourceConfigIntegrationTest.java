@@ -222,6 +222,38 @@ class SourceConfigIntegrationTest {
         }
     }
 
+    /** Never store values: a name embedding an MSISDN is ledgered as its salted fingerprint, and dedup still holds. */
+    @Test
+    void aValueInAnInboxNameIsNeverLedgeredButDedupIdentityHolds(@TempDir Path dir) throws Exception {
+        InMemoryAcquisitionLedger ledger = new InMemoryAcquisitionLedger();
+        AcquisitionLedgers.use(ledger);
+        try {
+            PipelineConfig cfg = PipelineConfig.load(writePipeline(dir, """
+                collector:
+                  id: NAMEFP_SRC
+                  duplicate:
+                    mode: METADATA
+                """).toString());
+            Path inbox = Path.of(cfg.dirs().poll());
+            Files.createDirectories(inbox);
+            String name = "sub_919876543210_20261003.csv";
+            Files.writeString(inbox.resolve(name), "ID,AMT,EVENT_DATE\nr,1,2020-04-03\n");
+
+            CollectorProcessor.run(cfg);
+
+            assertTrue(ledger.find("NAMEFP_SRC", name).isEmpty(), "the raw name is not the ledger key");
+            LedgerEntry e = ledger.find("NAMEFP_SRC", com.gamma.etl.FileNames.safe(cfg, name)).orElseThrow();
+            assertFalse((e.relativePath() + e.name()).contains("919876543210"), e.toString());
+            assertTrue(e.name().startsWith("sub_<fp:") && e.name().endsWith(">_20261003.csv"), e.name());
+            // the same file again is a DUPLICATE: the key is stable, so nothing is reprocessed
+            Files.writeString(inbox.resolve(name), "ID,AMT,EVENT_DATE\nr,1,2020-04-03\n");
+            Files.setLastModifiedTime(inbox.resolve(name), java.nio.file.attribute.FileTime.fromMillis(e.lastModified()));
+            assertTrue(CollectorProcessor.collectCandidates(cfg).isEmpty(), "dedup identity survives the fingerprinting");
+        } finally {
+            AcquisitionLedgers.use(new InMemoryAcquisitionLedger());
+        }
+    }
+
     @Test
     void checksumFullRunRecordsTheContentHash(@TempDir Path dir) throws Exception {
         InMemoryAcquisitionLedger ledger = new InMemoryAcquisitionLedger();

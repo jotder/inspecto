@@ -705,13 +705,15 @@ public class CollectorProcessor {
             // fallback that keeps every pre-existing row honoured, so switching keys never re-ingests
             // the backlog. The checksum still decides DUPLICATE vs CHANGED, so a logical hit against
             // genuinely different bytes reprocesses — the safe direction.
-            String logical = com.gamma.etl.unpack.LogicalNames.logicalName(rf.relativePath(), cfg);
+            // Never store values: the ledger holds the FileNames.safe form of every key, so look up the same form.
+            String logical = FileNames.safe(cfg, com.gamma.etl.unpack.LogicalNames.logicalName(rf.relativePath(), cfg));
+            String verbatim = FileNames.safe(cfg, rf.relativePath());
             LedgerEntry prior = ledger.find(src.id(), logical)
-                    .or(() -> ledger.find(src.id(), rf.relativePath())).orElse(null);
-            boolean viaAlias = prior != null && !prior.relativePath().equals(rf.relativePath());
+                    .or(() -> ledger.find(src.id(), verbatim)).orElse(null);
+            boolean viaAlias = prior != null && !prior.relativePath().equals(verbatim);
             if (viaAlias)
                 log.info("[DEDUP] {} matches previously processed '{}' under its logical name '{}'",
-                        rf.relativePath(), prior.name(), logical);
+                        verbatim, prior.name(), logical);
 
             // CHECKSUM hashes only on the run path; countPending falls back to a cheap metadata approximation.
             String cs = null;

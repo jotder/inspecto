@@ -10,6 +10,7 @@ import com.gamma.acquire.RemoteFile;
 import com.gamma.acquire.CollectorConnector;
 import com.gamma.acquire.CollectorConnectors;
 import com.gamma.acquire.retry.RetryPolicy;
+import com.gamma.etl.FileNames;
 import com.gamma.etl.MarkerManager;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.event.EventType;
@@ -95,7 +96,7 @@ final class RemoteAcquisitionHandler {
         // emitted for every listed file; only the survivors are fetched.
         List<RemoteFile> toFetch = new ArrayList<>(ready.size());
         for (RemoteFile rf : ready) {
-            AcquisitionTelemetry.emitFileEvent(cfg, EventType.FILE_DISCOVERED, "File discovered: " + rf.relativePath(), rf.relativePath());
+            AcquisitionTelemetry.emitFileEvent(cfg, EventType.FILE_DISCOVERED, "File discovered: " + FileNames.safe(cfg, rf.relativePath()), FileNames.safe(cfg, rf.relativePath()));
             AcquisitionTelemetry.incDiscovered(cfg);
             if (isKnownDuplicate(cfg, rf, pollRoot)) { AcquisitionTelemetry.incDuplicatesSkipped(cfg); continue; }
             toFetch.add(rf);
@@ -188,7 +189,7 @@ final class RemoteAcquisitionHandler {
         if (part.startsWith(stagingRoot.resolve(SliceFrontiers.DIR))) {   // reserved: the durable frontier records
             AcquisitionTelemetry.incDownloadsFailed(cfg);
             log.warn("Remote listing on {} offered a path inside the reserved {} tree: {} — skipping",
-                    cfg.identity().pipelineName(), SliceFrontiers.DIR, rf.relativePath());
+                    cfg.identity().pipelineName(), SliceFrontiers.DIR, FileNames.safe(cfg, rf.relativePath()));
             return;
         }
 
@@ -252,9 +253,9 @@ final class RemoteAcquisitionHandler {
         if (resolved.startsWith(root)) return resolved;
         AcquisitionTelemetry.incDownloadsFailed(cfg);
         AcquisitionTelemetry.emitFileEvent(cfg, EventType.FILE_FETCH_FAILED,
-                "Rejected path escaping " + root + ": " + relativePath, rf.relativePath());
+                "Rejected path escaping " + root + ": " + FileNames.safe(cfg, relativePath), FileNames.safe(cfg, rf.relativePath()));
         log.warn("Remote listing on {} offered a path escaping {}: {} — skipping",
-                cfg.identity().pipelineName(), root, relativePath);
+                cfg.identity().pipelineName(), root, FileNames.safe(cfg, relativePath));
         return null;
     }
 
@@ -282,7 +283,7 @@ final class RemoteAcquisitionHandler {
             } catch (AtomicMoveNotSupportedException e) {
                 log.warn("Atomic rename unavailable for {} on {} — staging_dir and dirs.poll are on different "
                                 + "filesystems; falling back to a copy, which is briefly visible half-written",
-                        rf.relativePath(), cfg.identity().pipelineName());
+                        FileNames.safe(cfg, rf.relativePath()), cfg.identity().pipelineName());
                 Files.move(staged, target, StandardCopyOption.REPLACE_EXISTING);
             }
             frontier.ifPresent(wm -> com.gamma.acquire.AcquisitionLedgers.stashDbWatermark(target, wm.key(), wm.value()));
@@ -293,10 +294,10 @@ final class RemoteAcquisitionHandler {
             SliceFrontiers.delete(cfg, target);
             AcquisitionTelemetry.incDownloadsFailed(cfg);
             AcquisitionTelemetry.emitFileEvent(cfg, EventType.FILE_FETCH_FAILED,
-                    "Could not land " + rf.relativePath() + " in the inbox (" + e.getMessage() + ")",
-                    rf.relativePath());
+                    "Could not land " + FileNames.safe(cfg, rf.relativePath()) + " in the inbox (" + e.getMessage() + ")",
+                    FileNames.safe(cfg, rf.relativePath()));
             log.warn("Could not land {} in the inbox on {}: {} — the bytes stay staged for the next cycle",
-                    rf.relativePath(), cfg.identity().pipelineName(), e.getMessage());
+                    FileNames.safe(cfg, rf.relativePath()), cfg.identity().pipelineName(), e.getMessage());
             return null;
         }
     }
@@ -360,7 +361,7 @@ final class RemoteAcquisitionHandler {
         if (action == null) return;
         if (skipPostAction) {
             log.info("dry run: would apply post-action {} to {} on {} — connector.post() skipped",
-                    action.kind(), rf.relativePath(), cfg.identity().pipelineName());
+                    action.kind(), FileNames.safe(cfg, rf.relativePath()), cfg.identity().pipelineName());
             return;
         }
         try {
@@ -369,7 +370,7 @@ final class RemoteAcquisitionHandler {
         } catch (Exception e) {
             AcquisitionTelemetry.incPostActionsFailed(cfg);
             log.warn("Post-action {} failed for {} on {}: {} — file already staged, continuing",
-                    action.kind(), rf.relativePath(), cfg.identity().pipelineName(), e.getMessage());
+                    action.kind(), FileNames.safe(cfg, rf.relativePath()), cfg.identity().pipelineName(), e.getMessage());
         }
     }
 
@@ -389,12 +390,12 @@ final class RemoteAcquisitionHandler {
         DuplicatePolicy.Mode mode = DuplicatePolicy.Mode.from(dup.mode());
         boolean hasMetadata = rf.hasSize() && rf.lastModified() != null;
         if (mode == DuplicatePolicy.Mode.METADATA && hasMetadata) {
-            LedgerEntry prior = AcquisitionLedgers.shared().find(cfg.collector().id(), rf.relativePath()).orElse(null);
+            LedgerEntry prior = AcquisitionLedgers.shared().find(cfg.collector().id(), FileNames.safe(cfg, rf.relativePath())).orElse(null);
             return DuplicatePolicy.decide(DuplicatePolicy.Mode.METADATA, prior, rf.size(),
                     rf.lastModified().toEpochMilli(), null) == DuplicatePolicy.Decision.DUPLICATE;
         }
         if (mode == DuplicatePolicy.Mode.ETAG && (rf.etag() != null || rf.version() != null || hasMetadata)) {
-            LedgerEntry prior = AcquisitionLedgers.shared().find(cfg.collector().id(), rf.relativePath()).orElse(null);
+            LedgerEntry prior = AcquisitionLedgers.shared().find(cfg.collector().id(), FileNames.safe(cfg, rf.relativePath())).orElse(null);
             long mtime = rf.lastModified() != null ? rf.lastModified().toEpochMilli() : Long.MIN_VALUE;
             return DuplicatePolicy.decide(DuplicatePolicy.Mode.ETAG, prior, rf.size(), mtime,
                     null, rf.etag(), rf.version()) == DuplicatePolicy.Decision.DUPLICATE;
@@ -425,22 +426,22 @@ final class RemoteAcquisitionHandler {
             if (!r.ok()) {
                 AcquisitionTelemetry.incDownloadsFailed(cfg);
                 AcquisitionTelemetry.emitFileEvent(cfg, EventType.FILE_FETCH_FAILED,
-                        "Integrity check failed: " + rf.relativePath() + " (" + r.detail() + ")", rf.relativePath());
+                        "Integrity check failed: " + FileNames.safe(cfg, rf.relativePath()) + " (" + r.detail() + ")", FileNames.safe(cfg, rf.relativePath()));
                 log.warn("Integrity check failed for {} on {}: {} — quarantining (dead-letter)",
-                        rf.relativePath(), cfg.identity().pipelineName(), r.detail());
+                        FileNames.safe(cfg, rf.relativePath()), cfg.identity().pipelineName(), r.detail());
                 quarantineCorrupt(cfg, got, rf);   // dead-letter (Phase F): preserve the corrupt bytes for inspection
                 return null;
             }
             AcquisitionTelemetry.incDownloaded(cfg);
-            AcquisitionTelemetry.emitFileEvent(cfg, EventType.FILE_VALIDATED, "File validated: " + rf.relativePath(), rf.relativePath());
+            AcquisitionTelemetry.emitFileEvent(cfg, EventType.FILE_VALIDATED, "File validated: " + FileNames.safe(cfg, rf.relativePath()), FileNames.safe(cfg, rf.relativePath()));
             return got;
         } catch (Exception e) {
             // AcquisitionException (an IOException) from fetchTo, or a wrapped retry failure: skip this cycle.
             AcquisitionTelemetry.incDownloadsFailed(cfg);
             AcquisitionTelemetry.emitFileEvent(cfg, EventType.FILE_FETCH_FAILED,
-                    "Fetch failed: " + rf.relativePath() + " (" + e.getMessage() + ")", rf.relativePath());
+                    "Fetch failed: " + FileNames.safe(cfg, rf.relativePath()) + " (" + e.getMessage() + ")", FileNames.safe(cfg, rf.relativePath()));
             log.warn("Failed to fetch {} on {} after retries: {} — skipping this cycle",
-                    rf.relativePath(), cfg.identity().pipelineName(), e.getMessage());
+                    FileNames.safe(cfg, rf.relativePath()), cfg.identity().pipelineName(), e.getMessage());
             return null;
         }
     }
@@ -456,7 +457,7 @@ final class RemoteAcquisitionHandler {
             com.gamma.etl.QuarantineManager.quarantine(
                     got.toFile(), com.gamma.etl.QuarantineManager.REASON_CORRUPT_DOWNLOAD, false, cfg);
         } catch (java.io.IOException q) {
-            log.warn("Could not quarantine corrupt download {} ({}) — deleting", rf.relativePath(), q.getMessage());
+            log.warn("Could not quarantine corrupt download {} ({}) — deleting", FileNames.safe(cfg, rf.relativePath()), q.getMessage());
             try { Files.deleteIfExists(got); } catch (java.io.IOException ignore) { /* best-effort */ }
         }
     }

@@ -35,8 +35,8 @@ final class AcquisitionTelemetry {
         EventLog.current().emit(Event.builder(EventType.FILE_CHANGED)
                 .source(SOURCE)
                 .pipeline(cfg.identity().pipelineName())
-                .message("File changed: " + f.relativePath())
-                .attr("file", f.relativePath()));
+                .message("File changed: " + com.gamma.etl.FileNames.safe(cfg, f.relativePath()))
+                .attr("file", com.gamma.etl.FileNames.safe(cfg, f.relativePath())));
     }
 
     /** Emit the {@link EventType#SEQUENCE_GAP} fact for one missing key in the configured series (Phase D). */
@@ -78,8 +78,8 @@ final class AcquisitionTelemetry {
         EventLog.current().emit(Event.builder(EventType.FILE_STABLE)
                 .source(SOURCE)
                 .pipeline(cfg.identity().pipelineName())
-                .message("File stable: " + f.relativePath())
-                .attr("file", f.relativePath()));
+                .message("File stable: " + com.gamma.etl.FileNames.safe(cfg, f.relativePath()))
+                .attr("file", com.gamma.etl.FileNames.safe(cfg, f.relativePath())));
     }
 
     /** Emit a remote-acquisition lifecycle fact (DISCOVERED/VALIDATED/FETCH_FAILED) carrying the relative path (Phase E). */
@@ -96,8 +96,8 @@ final class AcquisitionTelemetry {
         EventLog.current().emit(Event.builder(EventType.FILE_FETCHED)
                 .source(SOURCE)
                 .pipeline(cfg.identity().pipelineName())
-                .message("File fetched: " + f.relativePath())
-                .attr("file", f.relativePath())
+                .message("File fetched: " + com.gamma.etl.FileNames.safe(cfg, f.relativePath()))
+                .attr("file", com.gamma.etl.FileNames.safe(cfg, f.relativePath()))
                 .attr("bytes", Long.toString(bytes)));
     }
 
@@ -145,8 +145,8 @@ final class AcquisitionTelemetry {
         EventLog.current().emit(Event.builder(EventType.FILE_ARCHIVED)
                 .source(SOURCE)
                 .pipeline(cfg.identity().pipelineName())
-                .message("Source file finalized (" + action + "): " + f.relativePath())
-                .attr("file", f.relativePath())
+                .message("Source file finalized (" + action + "): " + com.gamma.etl.FileNames.safe(cfg, f.relativePath()))
+                .attr("file", com.gamma.etl.FileNames.safe(cfg, f.relativePath()))
                 .attr("action", action));
     }
 

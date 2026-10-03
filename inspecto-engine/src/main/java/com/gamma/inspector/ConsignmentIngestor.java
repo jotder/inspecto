@@ -510,7 +510,11 @@ public final class ConsignmentIngestor {
                     // actual spelling either way, which is what the alias-hit log line reports.
                     String ledgerKey = com.gamma.etl.unpack.LogicalNames.involvesCompression(srcFile.getName())
                             ? com.gamma.etl.unpack.LogicalNames.logicalName(rel, cfg) : rel;
-                    ledgerEntries.add(new LedgerEntry(sourceId, ledgerKey, srcFile.getName(),
+                    // Never store values: a name that embeds a digit-form value is recorded as its salted
+                    // fingerprint form (FileNames) — key AND name, the same transform CollectorProcessor's
+                    // lookup applies, so dedup identity is unchanged.
+                    ledgerEntries.add(new LedgerEntry(sourceId, FileNames.safe(cfg, ledgerKey),
+                            FileNames.safe(cfg, srcFile.getName()),
                             Files.size(filePath), checksum,
                             listing != null ? listing.etag() : null, listing != null ? listing.version() : null,
                             Files.getLastModifiedTime(filePath).toMillis(),

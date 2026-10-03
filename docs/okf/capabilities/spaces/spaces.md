@@ -524,8 +524,15 @@ Step Processor and no new route.
     landed) until the opt-in `processing.raw_copy_retention_days` (>= 1; unset = kept forever) ages it out: after each
     backup, `RawCopyRetention` deletes files older than the window under `backup/` and `quarantine/` - never
     `backup/parked/` (awaits `drain`) nor the `.restricted` store (its own `refusal_retention_days`). The window is
-    also how long a reject stays replayable. Residual: inbox names still reach Collector discovery logs and the
-    acquisition ledger (`INGEST-RAW-SOURCE-COPIES-RETENTION-1`).
+    also how long a reject stays replayable. A file NAME can embed a value and is recorded at discovery, before the name check:
+    `FileNames.safe` (inspecto-etl) replaces every non-timestamp run of 8+ digits with its salted
+    fingerprint (`FailureText.fingerprint`, same per-Space salt). It is applied to the acquisition ledger's key AND
+    name (`CollectorProcessor` lookup and `ConsignmentIngestor` record use the same transform, so dedup identity is
+    unchanged), the `[DEDUP]` log line, and the remote-acquisition logs and `AcquisitionTelemetry` events. A name
+    with no such run is returned unchanged, so an existing ledger still matches; losing the salt re-keys the
+    value-bearing names once. Pinned by `FileNamesTest` and
+    `SourceConfigIntegrationTest.aValueInAnInboxNameIsNeverLedgeredButDedupIdentityHolds`. Residual: other
+    file-name log sites and a value split by separators (`INGEST-RAW-SOURCE-COPIES-RETENTION-1`).
 - **Feature Datasets (WS-41).** Five `sql.template` Jobs run on an hourly cron. Thresholds are Job parameters. Every
   window is **rolling**, anchored on each attempt, and half-open: `(t − window, t]`, so a span of exactly the window
   is outside it.
