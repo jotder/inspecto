@@ -117,6 +117,20 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             capability: 'canRunLinkGraphAnalysis',
             label: 'Run graph analysis on the server (above the browser cap)',
         },
+        {
+            // The Investigation oversight panel: denying it hides Reveal; the server gates the route on it.
+            id: 'linkgraph.reveal',
+            kind: 'action',
+            capability: 'canRevealLinkEntities',
+            label: 'Reveal link entities (masked values, audited)',
+        },
+        {
+            // Four-eyes: denying it hides Approve / Deny on a pending expand; the server gates both routes on it.
+            id: 'linkgraph.approve',
+            kind: 'action',
+            capability: 'canApproveLinkExpansions',
+            label: 'Approve link expansions (four-eyes, never your own)',
+        },
     ],
     settings: [
         {
@@ -155,7 +169,7 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
 /**
  * A Capability id's human label, for surfaces that list grants (Home's "Your access here", R2-16): its
  * {@link ACCESS_ACTION_NODES} label without the trailing "(…)" detail, so the catalog stays the one label
- * source. A Capability no action node carries (a backend-only gate such as `canRevealLinkEntities`) is
+ * source. A Capability no action node carries (a backend-only gate) is
  * humanised from its id — "Reveal link entities" — so a new grant never renders blank.
  */
 export function capabilityLabel(capability: string): string {
