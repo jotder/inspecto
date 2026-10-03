@@ -558,8 +558,12 @@ are the values four-eyes approved (below).
   bulk import cannot be approved (`ImportCapabilityGuard`, 409).
 - ⚠ On a server with no Authenticator every caller is the same anonymous actor, so four-eyes can never be met and
   such a Job cannot be created through the API.
-- ⚠ The zero-Space recovery create (`TemplateSeedGate` with `checkCapability` false) skips the import gate. A Job it
-  seeds still has no approval, so it cannot run. That is P3 `TEMPLATE-RECOVERY-IMPORT-GATE-1`.
+- The zero-Space recovery create runs the import gate like every other create (closed 2026-10-03,
+  `TEMPLATE-RECOVERY-IMPORT-GATE-1`). By operator decision `POST /spaces` needs `canAdminister` even when no Space
+  is hosted. On a fresh install the IdP's `admin` role grants it: with no Space hosted `ControlApi.authenticate`
+  binds no roles root, so `Roles.effective` serves the seed table. `TemplateSeedGate.require` no longer takes a
+  `checkCapability` flag. ⚠ `POST /spaces/import` keeps its conditional posture (no capability while zero Spaces
+  are hosted), but it always runs `ImportCapabilityGuard.checkFiles`.
 - ⚠ Deleting a Job leaves its approval record. A Job re-created with the same name and identical content (only
   possible by writing the file directly, since every API create is held) would run on it.
 

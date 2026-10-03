@@ -124,7 +124,7 @@
         "tags" : [ "spaces" ],
         "summary" : "Create a Space, optionally seeded from a Space Template",
         "operationId" : "postSpaces",
-        "description" : "Body {id, display_name?, description?, template?}. Gated in the handler: canAdminister whenever at least one Space is hosted (the zero-Space recovery create asks none; CapabilityManifest recovery-route). A template carrying a KPI pack (config/registry/kpis/) also needs canAuthorWorkbench, and each KPI meets the /components/kpi save gate against the template's own Datasets; the first refusal creates no Space (ASSURE-KPI-DEFINITIONS-RESIDUALS-1).",
+        "description" : "Body {id, display_name?, description?, template?}. Requires canAdminister, the zero-Space recovery create included (there the IdP admin role resolves through the seeded roles; TEMPLATE-RECOVERY-IMPORT-GATE-1). A template's carried kinds meet the same capability table as /spaces/import; a KPI pack (config/registry/kpis/) also needs canAuthorWorkbench, and each KPI meets the /components/kpi save gate against the template's own Datasets; the first refusal creates no Space (ASSURE-KPI-DEFINITIONS-RESIDUALS-1).",
         "responses" : {
           "200" : {
             "description" : "The created Space manifest (id, displayName, description)."

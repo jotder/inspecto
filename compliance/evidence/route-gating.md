@@ -333,10 +333,10 @@ system: the evidence cannot say something the code does not.
 | PUT | `/settings/scheduler` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java:77` |
 | PUT | `/settings/timezone` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:76` |
 | POST | `/space-comparisons` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceComparisonRoutes.java:42` |
-| POST | `/spaces` | exempt | recovery-route | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:72` |
-| DELETE | `/spaces/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:79` |
-| PUT | `/spaces/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:76` |
-| POST | `/spaces/import` | exempt | recovery-route | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:74` |
+| POST | `/spaces` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:70` |
+| DELETE | `/spaces/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:77` |
+| PUT | `/spaces/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:74` |
+| POST | `/spaces/import` | exempt | recovery-route | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:72` |
 | POST | `/streams/([^/]+)/records` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/StreamPushRoutes.java:84` |
 | POST | `/system/operational-db/test` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/SystemRoutes.java:40` |
 | PUT | `/system/scheduler` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java:74` |

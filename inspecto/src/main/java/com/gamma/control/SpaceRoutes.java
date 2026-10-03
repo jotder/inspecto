@@ -63,13 +63,11 @@ final class SpaceRoutes implements RouteModule {
         // gallery there, and an empty list is the honest capability answer either way.
         api.get("/spaces/templates", (e, m) -> HostContext.of(api).spaces().templates());
 
-        // ⛔ NOT gated on canAdminister, and that is a DECISION (2026-09-15). This is the
-        // RECOVERY route: deleting the last Space leaves a server hosting none, and a capability
-        // gate here would brick it exactly as the writeRoot() resolution once did - every route
-        // failing, including the one that would recover it. Pinned by
-        // ControlApiSpacesTest.authenticatedCreateSucceedsWhenNoSpaceIsHostedYet, whose subject
-        // holds NO capabilities. Creating a Space is additive; PUT and DELETE below are not.
-        api.post("/spaces", (e, m) -> createSpace(api, e, api.body(e)));
+        // canAdminister ALWAYS, the zero-Space recovery create included (TEMPLATE-RECOVERY-IMPORT-GATE-1,
+        // operator 2026-10-03; it replaces the 2026-09-15 "recovery needs no capability" decision). Recovery is
+        // not bricked: with no Space hosted ControlApi.authenticate binds no roles root, so Roles.effective serves
+        // the SEED table and an IdP subject in the `admin` role holds canAdminister (the bootstrap admin).
+        api.post("/spaces", ApiContext.withCapability("canAdminister", (e, m) -> createSpace(api, e, api.body(e))));
 
         api.post("/spaces/import", (e, m) -> importSpace(api, e));
 
@@ -105,8 +103,6 @@ final class SpaceRoutes implements RouteModule {
      *  seeds the new space from {@code spaces/_templates/<template>/} (400 when no such template ships). */
     private Object createSpace(ApiContext api, HttpExchange e, Map<String, Object> body) throws IOException {
         requireMultiSpace(api);
-        boolean recovering = HostContext.of(api).spaces().size() == 0;
-        requireAdministerUnlessRecovering(api, e);
         String id = ApiContext.str(body, "id");
         if (id == null || !SpaceId.isValid(id))
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include a valid 'id' ([a-z0-9-], 1-63 chars, not starting with '-')");
@@ -117,7 +113,7 @@ final class SpaceRoutes implements RouteModule {
                             ApiContext.str(body, "display_name"), ApiContext.str(body, "description"))
                     : HostContext.of(api).spaces().createFromTemplate(SpaceId.of(id),
                             ApiContext.str(body, "display_name"), ApiContext.str(body, "description"), template,
-                            base -> TemplateSeedGate.require(e, base, !recovering));   // every seeded kind meets its own route
+                            base -> TemplateSeedGate.require(e, base));   // every seeded kind meets its own route
             return manifest(ctx);
         } catch (IllegalArgumentException badTemplate) { // unknown template id
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, badTemplate.getMessage());
@@ -162,6 +158,8 @@ final class SpaceRoutes implements RouteModule {
      * is exactly "nothing is hosted": there, no capability is asked (nobody could have been granted one on a
      * container with no Spaces); everywhere else creation is administration like the rest of the family.
      * Recorded in {@code CapabilityManifest.EXEMPTIONS} as {@code recovery-route} with this condition named.
+     * ⚠ Since 2026-10-03 only {@code /spaces/import} uses it: {@code POST /spaces} is {@code canAdminister} always
+     * ({@code TEMPLATE-RECOVERY-IMPORT-GATE-1}).
      */
     private static void requireAdministerUnlessRecovering(ApiContext api, HttpExchange e) {
         if (HostContext.of(api).spaces().size() > 0) ApiContext.requireCapability(e, Roles.CAN_ADMINISTER);

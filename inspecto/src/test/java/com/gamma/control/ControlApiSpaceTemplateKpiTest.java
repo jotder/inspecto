@@ -157,7 +157,7 @@ class ControlApiSpaceTemplateKpiTest {
     void aTemplateKpiPackNeedsTheComponentsKpiCapability(@TempDir Path root) throws Exception {
         seedTemplate(root, VALID_KPI);
         try (Ctx c = open(root)) {
-            // a hosted Space first: the zero-Space recovery create asks no capability at all
+            // a hosted Space first (canAdminister alone suffices for a plain create)
             assertEquals(200, send(c, "POST", "/spaces", "{\"id\":\"first\"}", OPS).statusCode());
             HttpResponse<String> denied = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"kpi-pack\"}", OPS);
             assertEquals(403, denied.statusCode(), denied.body());

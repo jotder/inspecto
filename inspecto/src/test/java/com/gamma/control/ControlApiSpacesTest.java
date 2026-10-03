@@ -185,11 +185,13 @@ class ControlApiSpacesTest {
             assertEquals(200, authed(c.port, "DELETE", "/spaces/delta", null).statusCode());
 
             // and deregistering back down to zero leaves the server recoverable rather than bricked -
-            // by ANY authenticated caller, capability or not: that is the recovery route
+            // - but by an administrator only (TEMPLATE-RECOVERY-IMPORT-GATE-1, operator 2026-10-03)
             assertEquals(200, authed(c.port, "DELETE", "/spaces/acme", null).statusCode());
             assertEquals(0, c.spaces.size());
-            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"gamma\"}", "Bearer plain").statusCode(),
-                    "on an empty container creation needs no capability - it is the recovery route");
+            assertEquals(403, send(c.port, "POST", "/spaces", "{\"id\":\"gamma\"}", "Bearer plain").statusCode(),
+                    "on an empty container creation is still administration");
+            assertEquals(200, authed(c.port, "POST", "/spaces", "{\"id\":\"gamma\"}").statusCode(),
+                    "canAdminister recovers an empty container");
 
         } finally {
             Authenticators.forTest(null);

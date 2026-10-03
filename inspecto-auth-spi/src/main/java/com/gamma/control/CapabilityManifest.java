@@ -328,9 +328,11 @@ final class CapabilityManifest {
             // ⛔ These were reachable by ANY authenticated caller: `DELETE /spaces/{id}` checked only that
             // more than one Space existed. They were not merely un-gated but INEXPRESSIBLE — no capability
             // meant "administrator" until `canAdminister`.
-            // ⚠ `POST /spaces` / `/spaces/import` carry NO withCapability wrapper: the gate is IN the handler,
-            // conditional on the container hosting at least one Space (SpaceRoutes.requireAdministerUnlessRecovering).
-            // They stay in EXEMPTIONS as `recovery-route` because the manifest can express only all-or-nothing.
+            // `POST /spaces` is canAdminister ALWAYS since 2026-10-03 (TEMPLATE-RECOVERY-IMPORT-GATE-1): on a
+            // zero-Space server the seeded `admin` role holds it (Roles.effective serves SEED with no roles root).
+            // ⚠ `/spaces/import` carries NO withCapability wrapper: the gate is IN the handler, conditional on the
+            // container hosting at least one Space (SpaceRoutes.requireAdministerUnlessRecovering) — an EXEMPTION.
+            new Entry("POST", "/spaces", Roles.CAN_ADMINISTER),
             new Entry("PUT", "/spaces/([^/]+)", Roles.CAN_ADMINISTER),
             new Entry("DELETE", "/spaces/([^/]+)", Roles.CAN_ADMINISTER),
             // SpaceComparisonRoutes — a cross-Space AGGREGATE read (space-comparison design §5 Q2, decided
@@ -489,7 +491,6 @@ final class CapabilityManifest {
             new Exemption("POST", "/agent/tools/(.+)/derive", "self-limiting", "derives tool arguments, gated per tool like /agent/tools/(.+)"),
             new Exemption("POST", "/assist/(.+)", "self-limiting", "the skill-intent catch-all; dispatch only, the skill's own tools gate"),
             // grounded one at a time 2026-09-15 (audit §5 GROUNDED)
-            new Exemption("POST", "/spaces", "recovery-route", "gated IN the handler: canAdminister whenever at least one Space is hosted; a server hosting zero Spaces must still answer it without one or recovery is bricked — pinned by ControlApiSpacesTest.authenticatedCreateSucceedsWhenNoSpaceIsHostedYet (2026-09-17: the unconditional form let any authenticated caller create Spaces on a populated server); a template carrying a KPI pack additionally needs canAuthorWorkbench on the same condition, and each KPI meets the /components/kpi save gate (403/422, nothing created — ControlApiSpaceTemplateKpiTest)"),
             new Exemption("POST", "/recon/run", "stateless-compute", "triggers nothing: computes and returns, persists nothing, dispatches no job — recording the run is the separate canOperateRuns POST /recon/{id}/record (R2-03)"),
             new Exemption("POST", "/tags/assignments/([^/]+)/([^/]+)", "target-visibility-gated", "gated per TARGET via AnnotationTargets: 'can tag' must not become independent of 'can see' (TagRoutes)"),
             new Exemption("DELETE", "/tags/assignments/([^/]+)/([^/]+)/([^/]+)", "target-visibility-gated", "same comment as the assignment POST"),

@@ -192,13 +192,12 @@ final class KpiRoutes implements RouteModule {
     /**
      * A Space Template's KPI pack ({@code ASSURE-KPI-DEFINITIONS-RESIDUALS-1} (1)): every {@code kpi} the template
      * seeds into the new Space at {@code spaceBase} meets the {@code /components/kpi} door — its capability,
-     * {@code canAuthorWorkbench} (asked only when {@code checkCapability}: the zero-Space recovery create asks
-     * none), and {@link #requireMeasure} against the new Space's own registry and data, so the template's Datasets
+     * {@code canAuthorWorkbench}, and {@link #requireMeasure} against the new Space's own registry and data, so the template's Datasets
      * (copied with it) are the ones a KPI must find. Run by {@code SpaceManager.createFromTemplate} after the copy and
      * before boot; the first refusal refuses the whole template (403 / 422) and the Space is not created. A
      * {@code .toon} under {@code kpis/} the registry cannot read is refused too — never seeded unchecked.
      */
-    static void requireTemplateKpis(HttpExchange ex, Path spaceBase, boolean checkCapability) {
+    static void requireTemplateKpis(HttpExchange ex, Path spaceBase) {
         Path config = spaceBase.resolve("config");
         Path dir = config.resolve("registry").resolve(ComponentRegistry.dirForType(TYPE).orElseThrow());
         if (!java.nio.file.Files.isDirectory(dir)) return;
@@ -209,13 +208,11 @@ final class KpiRoutes implements RouteModule {
             throw new java.io.UncheckedIOException(e);
         }
         if (files.isEmpty()) return;
-        if (checkCapability) {
-            try {
-                ApiContext.requireCapability(ex, Roles.CAN_AUTHOR_WORKBENCH);
-            } catch (ApiException denied) {
-                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "a template carrying a 'kpi' item needs "
-                        + "capability '" + Roles.CAN_AUTHOR_WORKBENCH + "' — the same gate as /components/kpi; nothing was created");
-            }
+        try {
+            ApiContext.requireCapability(ex, Roles.CAN_AUTHOR_WORKBENCH);
+        } catch (ApiException denied) {
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "a template carrying a 'kpi' item needs "
+                    + "capability '" + Roles.CAN_AUTHOR_WORKBENCH + "' — the same gate as /components/kpi; nothing was created");
         }
         List<ComponentRegistry.Component> kpis = new ComponentStore(config.resolve("registry")).list(TYPE);
         Path data = spaceBase.resolve("data");
@@ -226,7 +223,7 @@ final class KpiRoutes implements RouteModule {
             try {
                 // The authoring door answers an unreadable Dataset exactly as an absent one (no existence leak).
                 // A template's Datasets are the server's own shipped content, so here the refusal says which it is.
-                // With no Subject (Personal; an unauthenticated recovery create) ComponentAccess is fail-open.
+                // With no Subject (Personal) ComponentAccess is fail-open.
                 String ds = KpiDefinition.fromMap(k.name(), k.content()).dataset();
                 ComponentStore seeded = new ComponentStore(config.resolve("registry"));
                 if (readableDataset(ex, seeded, ds) == null && seeded.exists("dataset", ds))

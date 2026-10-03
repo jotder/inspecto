@@ -29,7 +29,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ControlApiSpaceTemplateSeedGateTest {
 
-    private static final String ADMIN = "Bearer admin", OPS = "Bearer ops";
+    private static final String ADMIN = "Bearer admin", OPS = "Bearer ops", NOBODY = "Bearer nobody",
+            SEEDED_ADMIN = "Bearer seeded-admin", NO_WORK = "Bearer no-work";
     private final HttpClient client = HttpClient.newHttpClient();
 
     private record Ctx(SpaceManager spaces, ControlApi api, int port) implements AutoCloseable {
@@ -49,6 +50,12 @@ class ControlApiSpaceTemplateSeedGateTest {
                     Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_ONBOARD_CONNECTIONS, Roles.CAN_MANAGE_INCIDENTS,
                     "canWorkIncidents")));
             case OPS -> Optional.of(new Subject("ops-1", Set.of(Roles.CAN_ADMINISTER)));
+            case NO_WORK -> Optional.of(new Subject("no-work-1", Set.of(Roles.CAN_ADMINISTER, Roles.CAN_AUTHOR_WORKBENCH,
+                    Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_ONBOARD_CONNECTIONS, Roles.CAN_MANAGE_INCIDENTS)));
+            case NOBODY ->Optional.of(new Subject("nobody-1", Set.of()));
+            // the fresh-install bootstrap: an IdP subject in the `admin` role, granted through Roles.effective —
+            // which serves the SEED table while no Space is hosted (ControlApi binds no roles root then)
+            case SEEDED_ADMIN -> Optional.of(new Subject("bootstrap-1", Roles.effective(ex).get("admin").capabilities()));
             default -> Optional.empty();
         });
     }
@@ -202,10 +209,42 @@ class ControlApiSpaceTemplateSeedGateTest {
     void theRecoveryCreateStillAsksTheInvokeApiCapability(@TempDir Path root) throws Exception {
         seedInvokeApiTemplate(root);
         try (Ctx c = open(root, false)) {
-            HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"actions\"}", OPS);
+            HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"actions\"}", NO_WORK);
             assertEquals(403, r.statusCode(), r.body());
             assertTrue(r.body().contains("canWorkIncidents"), r.body());
             assertFalse(Files.exists(root.resolve("acme")));
+        }
+    }
+
+    /**
+     * {@code TEMPLATE-RECOVERY-IMPORT-GATE-1} (operator 2026-10-03): the zero-Space recovery create is Space
+     * governance — it needs {@code canAdminister}, and a template it applies meets the same import gate as any
+     * other create. Where no admin exists yet, the IdP's {@code admin} role resolves through the seeded roles.
+     */
+    @Test
+    void theZeroSpaceRecoveryCreateNeedsCanAdministerAndRunsTheImportGate(@TempDir Path root) throws Exception {
+        seedAlertTemplate(root, VALID_ALERT);
+        try (Ctx c = open(root, false)) {
+            assertEquals(0, c.spaces.size(), "precondition: zero Spaces hosted");
+            HttpResponse<String> denied = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"alerting\"}", NOBODY);
+            assertEquals(403, denied.statusCode(), denied.body());
+            assertTrue(denied.body().contains(Roles.CAN_ADMINISTER), denied.body());
+            assertEquals(403, send(c, "POST", "/spaces", "{\"id\":\"acme\"}", NOBODY).statusCode(),
+                    "a plain recovery create is administration too");
+            assertEquals(401, send(c, "POST", "/spaces", "{\"id\":\"acme\"}", null).statusCode());
+            // canAdminister alone no longer slips a template's other kinds past the import gate
+            HttpResponse<String> gated = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"alerting\"}", OPS);
+            assertEquals(403, gated.statusCode(), gated.body());
+            assertTrue(gated.body().contains(Roles.CAN_AUTHOR_ALERT_RULES), gated.body());
+            assertFalse(Files.exists(root.resolve("acme")), "a refused recovery create leaves no Space directory");
+            assertEquals(0, c.spaces.size());
+            // the seeded `admin` role (fresh install, no authored roles anywhere) recovers the server
+            HttpResponse<String> boot = send(c, "POST", "/spaces", "{\"id\":\"boot\"}", SEEDED_ADMIN);
+            assertEquals(200, boot.statusCode(), boot.body());
+            assertEquals(200, send(c, "DELETE", "/spaces/boot", null, ADMIN).statusCode());
+            assertEquals(0, c.spaces.size());
+            HttpResponse<String> ok = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"alerting\"}", ADMIN);
+            assertEquals(200, ok.statusCode(), ok.body());
         }
     }
 

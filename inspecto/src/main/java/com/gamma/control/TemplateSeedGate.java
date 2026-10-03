@@ -34,9 +34,9 @@ import java.util.stream.Stream;
  *       (template content is not a record of who made it);</li>
  *   <li>{@code kpi} — {@link KpiRoutes#requireTemplateKpis} (its capability and Measure check).</li>
  * </ol>
- * {@code checkCapability} false (the zero-Space recovery create) skips step 1 and the KPI capability. It does NOT
- * skip a Decision Rule's {@code canWorkIncidents} (asked by {@link DecisionRuleGuard#checkInvokeApi}): a rule that
- * sends outbound calls always needs it, whoever applies it — with no Subject that check is a no-op anyway.
+ * Every step runs on every create, the zero-Space recovery create included ({@code TEMPLATE-RECOVERY-IMPORT-GATE-1},
+ * operator 2026-10-03: that create is Space governance and needs {@code canAdminister} like the rest, so there is
+ * no capability-less applier left to exempt). With no Subject (Personal) every capability check is a no-op.
  * ⚠ Not gated here: a template's non-registry configs (Pipelines, Connections', Jobs' content) are not run through
  * {@code SaveGate} — only their capability.
  */
@@ -44,15 +44,13 @@ final class TemplateSeedGate {
 
     private TemplateSeedGate() {}
 
-    static void require(HttpExchange ex, Path spaceBase, boolean checkCapability) {
+    static void require(HttpExchange ex, Path spaceBase) {
         Path config = spaceBase.resolve("config");
-        if (checkCapability) {
-            try {
-                ImportCapabilityGuard.checkFiles(ex, configEntries(config), true);
-            } catch (ApiException denied) {
-                throw new ApiException(denied.status, denied.errorCode, "template refused: " + denied.getMessage()
-                        + "; nothing was created");
-            }
+        try {
+            ImportCapabilityGuard.checkFiles(ex, configEntries(config), true);
+        } catch (ApiException denied) {
+            throw new ApiException(denied.status, denied.errorCode, "template refused: " + denied.getMessage()
+                    + "; nothing was created");
         }
         Path data = spaceBase.resolve("data");
         Supplier<Path> dataRoot = () -> data;
@@ -78,7 +76,7 @@ final class TemplateSeedGate {
                 }
             }
         }
-        KpiRoutes.requireTemplateKpis(ex, spaceBase, checkCapability);
+        KpiRoutes.requireTemplateKpis(ex, spaceBase);
     }
 
     /** What {@code ComponentRoutes.writeComponent} runs before its write, over the content as stored. */

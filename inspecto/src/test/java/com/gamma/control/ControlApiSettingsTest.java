@@ -451,13 +451,13 @@ class ControlApiSettingsTest {
                 ? Optional.of(new Subject("jdoe", Set.of("canAuthorWorkbench")))
                 : "Bearer plain".equals(ex.getRequestHeaders().getFirst("Authorization"))
                 ? Optional.of(new Subject("nobody", Set.of()))
+                : "Bearer admin".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? Optional.of(new Subject("root", Set.of("canAdminister")))
                 : Optional.empty());
         try (Ctx c = open(root)) {
-            // ⚠ The setup call needs a credential too. Installing a fake Authenticator makes EVERY route
-            // outside ControlApi.PUBLIC_PATHS demand one, and /spaces is not in that set — so a credential-less
-            // setup call 401s before the test reaches what it means to assert. (Being exempt from the
-            // canAdminister CAPABILITY while no space exists is a different gate, and does not waive AuthN.)
-            assertEquals(200, sendAs(c.port, "POST", "/spaces", "{\"id\":\"acme\"}", "Bearer valid").statusCode());
+            // ⚠ The setup call needs a credential too, and canAdminister: POST /spaces is administration even
+            // while no Space is hosted (TEMPLATE-RECOVERY-IMPORT-GATE-1, 2026-10-03).
+            assertEquals(200, sendAs(c.port, "POST", "/spaces", "{\"id\":\"acme\"}", "Bearer admin").statusCode());
             String body = "{\"projectionNodeCap\":600}";
 
             assertEquals(401, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", body).statusCode(),
