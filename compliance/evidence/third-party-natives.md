@@ -40,6 +40,10 @@ without `--bundle`, which checks the text hashes and the package.ps1 wiring.
 
 **Shade merge (`NATIVE-LICENCE-SHADE-MERGE-1`, shipped 2026-10-03).** `inspecto-intelligence/pom.xml` concatenates colliding `META-INF/LICENSE`, `LICENSE.txt` and `LICENSE.md` (`AppendingTransformer`) and merges `NOTICE*` (`ApacheNoticeResourceTransformer`), so no artifact's licence file is dropped first-wins. `check-native-licences` requires a shipped text for every DLL; the only exception is a `textPending` that names an open backlog row.
 
+**onnxruntime (`NATIVE-LICENCE-ONNXRUNTIME-TEXT-1`, shipped 2026-10-03).** Its own MIT `LICENSE` is in neither the jar nor
+the sources jar, so it was fetched from `github.com/microsoft/onnxruntime` at tag `v1.20.0` (operator-approved) and ships as
+`onnxruntime-MIT.txt` (1073 bytes, sha256 `2f07c727…922c`, pinned in `natives.json`); the jar's `ThirdPartyNotices.txt`
+covers its statically linked libraries.
+
 **Open:**
-1. onnxruntime's own MIT `LICENSE` text (`NATIVE-LICENCE-ONNXRUNTIME-TEXT-1`).
-2. Trim the non-target-platform natives if the size matters (macOS and aarch64 are about 90 MB uncompressed).
+1. Trim the non-target-platform natives if the size matters (macOS and aarch64 are about 90 MB uncompressed).

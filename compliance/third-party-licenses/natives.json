@@ -4,7 +4,8 @@
     "GPL-3.0.txt": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
     "GCC-exception-3.1.txt": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74",
     "mingw-w64-winpthreads-COPYING.txt": "63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177",
-    "Apache-2.0.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    "Apache-2.0.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "onnxruntime-MIT.txt": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
   },
   "dlls": {
     "libstdc++-6.dll": {
@@ -36,15 +37,19 @@
     },
     "onnxruntime.dll": {
       "licence": "MIT",
-      "texts": [],
+      "texts": [
+        "onnxruntime-MIT.txt"
+      ],
       "inJar": "ThirdPartyNotices.txt",
-      "textPending": "NATIVE-LICENCE-ONNXRUNTIME-TEXT-1: onnxruntime own MIT LICENSE is not in the artifact or any offline copy; ThirdPartyNotices.txt covers only its statically linked libraries"
+      "note": "onnxruntime's own LICENSE, fetched from github.com/microsoft/onnxruntime at tag v1.20.0 (operator-approved 2026-10-03); ThirdPartyNotices.txt in the jar covers its statically linked libraries"
     },
     "onnxruntime4j_jni.dll": {
       "licence": "MIT",
-      "texts": [],
+      "texts": [
+        "onnxruntime-MIT.txt"
+      ],
       "inJar": "ThirdPartyNotices.txt",
-      "textPending": "NATIVE-LICENCE-ONNXRUNTIME-TEXT-1: onnxruntime own MIT LICENSE is not in the artifact or any offline copy; ThirdPartyNotices.txt covers only its statically linked libraries"
+      "note": "onnxruntime's own LICENSE, fetched from github.com/microsoft/onnxruntime at tag v1.20.0 (operator-approved 2026-10-03); ThirdPartyNotices.txt in the jar covers its statically linked libraries"
     },
     "jnidispatch.dll": {
       "licence": "Apache-2.0 (JNA is LGPL-2.1-or-later OR Apache-2.0; Inspecto takes it under the Apache-2.0 option)",

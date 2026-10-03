@@ -407,8 +407,8 @@ UI half, result-shape adapters and the pane adoptions: [[inline-ai-authoring]].
   --bundle`. **A new native DLL in the sidecar fails packaging until it is classified in `natives.json`.**
   Per-DLL licences: root `compliance/evidence/third-party-natives.md`. Apache-2.0 covers `tokenizers.dll`
   and `jnidispatch.dll` (JNA under its Apache option); the shade concatenates colliding `META-INF/LICENSE*`
-  and merges `NOTICE*` (`NATIVE-LICENCE-SHADE-MERGE-1`). Every DLL needs a text; onnxruntime's own MIT text
-  is pending (`NATIVE-LICENCE-ONNXRUNTIME-TEXT-1`).
+  and merges `NOTICE*` (`NATIVE-LICENCE-SHADE-MERGE-1`). Every DLL ships a text; onnxruntime's own MIT text
+  (`onnxruntime-MIT.txt`, fetched at tag `v1.20.0`) closed `NATIVE-LICENCE-ONNXRUNTIME-TEXT-1` on 2026-10-03.
 
 ## Still open (parent plan archived 2026-07-25: `archived-documents/plans-archive/embedded-intelligence-plan.md`, §8)
 
