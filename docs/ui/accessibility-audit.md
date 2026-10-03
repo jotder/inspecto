@@ -103,8 +103,12 @@ jsdom — which is why they are the natural scope of the real-browser pass in §
   holding only an empty-state text (option picker dialog, saved-views menus), 24 px minimum height on the Communities /
   Components / Cliques result buttons, and `aria-haspopup="dialog"` on the option picker trigger. A third pass on 2026-10-03 re-ran it in both schemes
   (loading-bar name, result-button height and the light scheme hold) and fixed `region` (`<footer>`, a named nav
-  landmark, `role="status"` loading bar), dialog `aria-modal` and the light heading contrast. Not fixed: the graph's
-  text alternative, the G6 canvas positive `tabindex`, the empty ag-Grid regions. It is still a manual, one-off
-  pass, not a CI gate.
+  landmark, `role="status"` loading bar), dialog `aria-modal` and the light heading contrast. A fourth pass on 2026-10-03 built the two
+  operator decisions and re-ran axe 4.12.1 live (dark scheme, 0 violations on the idle page, the three toolbox tabs,
+  a 320-node graph, the list view, the list with a selected node, and the list over an open Investigation): the graph
+  canvas has a text alternative, a *Show as list* toggle that swaps it for a keyboard-navigable grid of the nodes it
+  draws (Enter selects through the same path as a canvas click) with the selected node's links beneath, and the
+  Analysis / View / Investigation switch is a `tablist` with `tabpanel` panes. The G6 canvas `tabindex` is `0` live.
+  Not fixed: the empty ag-Grid regions (vendor). It is still a manual, one-off pass, not a CI gate.
 - Vendored Fuse auth/error pages (`modules/auth/**`).
 - A formal third-party audit / VPAT.
