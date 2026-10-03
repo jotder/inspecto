@@ -101,8 +101,10 @@ jsdom — which is why they are the natural scope of the real-browser pass in §
   accessible name on the shell loading bar, a lighter `text-warn` in the dark scheme (red-400, 4.7:1 on the panel
   instead of 3.02:1; `--gamma-text-warn-rgb`, same mechanism as `text-primary`), no `listbox` / `menu` role
   holding only an empty-state text (option picker dialog, saved-views menus), 24 px minimum height on the Communities /
-  Components / Cliques result buttons, and `aria-haspopup="dialog"` on the option picker trigger. Not fixed: the graph's
-  text alternative, the G6 canvas positive `tabindex`, the empty ag-Grid regions, dialog `aria-modal`. It is still a
-  manual, one-off pass, not a CI gate.
+  Components / Cliques result buttons, and `aria-haspopup="dialog"` on the option picker trigger. A third pass on 2026-10-03 re-ran it in both schemes
+  (loading-bar name, result-button height and the light scheme hold) and fixed `region` (`<footer>`, a named nav
+  landmark, `role="status"` loading bar), dialog `aria-modal` and the light heading contrast. Not fixed: the graph's
+  text alternative, the G6 canvas positive `tabindex`, the empty ag-Grid regions. It is still a manual, one-off
+  pass, not a CI gate.
 - Vendored Fuse auth/error pages (`modules/auth/**`).
 - A formal third-party audit / VPAT.
