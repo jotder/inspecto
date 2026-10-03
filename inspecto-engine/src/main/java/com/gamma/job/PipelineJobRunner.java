@@ -376,7 +376,8 @@ public final class PipelineJobRunner implements Job {
             // PIPELINE-DRYRUN-1: manual-trigger dry run (POST /jobs/{name}/trigger?dryRun=true), never cron/event.
             boolean dryRun = ctx != null && ctx.dryRun();
             PartitionSinkWriter realWriter = dryRun ? null : new PartitionSinkWriter(
-                    conn, dir, sinkBase, batchId, ctx == null ? null : ctx.runId(), pipelineId);
+                    conn, dir, sinkBase, batchId, ctx == null ? null : ctx.runId(), pipelineId)
+                    .beforeRegister(() -> fence(ctx));
             PipelineExecutor.SinkWriter writer = dryRun
                     ? new DryRunSinkWriter(conn, batchId, ctx == null ? null : ctx.runId(), pipelineId)
                     : realWriter;
@@ -419,12 +420,14 @@ public final class PipelineJobRunner implements Job {
                 return JobResult.ok("dry run: pipeline '" + pipelineId + "' validated, nothing written", ms);
             }
 
+            fence(ctx);   // LEASE-TAKEOVER-JOB-RUNS-1: no watermark/supersede/view/artifact write once taken over
             if (incremental) advanceWatermarks(conn, watermarks, pipelineId, seeds, seedViews, incCol);
             else supersedeEarlierRevisions(g, batchId);
 
             List<String> parts = realWriter.outputs().stream().map(PartitionOutput::partition).distinct().toList();
             registerViews(g, pipelineId, srcStores, dir);              // T32 Phase C — sink.view → durable definition
             recordStoreArtifacts(artifacts, g, realWriter.rowsByStore());
+            fence(ctx);                                                       // LEASE-TAKEOVER-JOB-RUNS-1
             registerInLakehouse(realWriter, batchId);                         // DUCKLAKE-GRAPH-LANE-1 (scale-out §5.4)
             bus.publish(new ConsignmentEvent(cfg.name(), batchId, "SUCCESS", parts, realWriter.totalRows(), ms, 0));
             log.info("[PIPELINEJOB] {} ran pipeline '{}' (source_store(s) {}): {} file(s), {} row(s) → {}",
@@ -440,6 +443,16 @@ public final class PipelineJobRunner implements Job {
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────
+
+    /**
+     * LEASE-TAKEOVER-JOB-RUNS-1: refuse a registration once this run's lease was taken over. {@code JobService}
+     * holds the run's claims in {@code CommitFence} under {@code Scope.JOB} by Run id; a run with no Run id or
+     * no hold (CLI, tests) has nothing to lose and passes.
+     */
+    private static void fence(JobContext ctx) {
+        if (ctx != null && ctx.runId() != null)
+            com.gamma.inspector.CommitFence.check(com.gamma.inspector.CommitFence.Scope.JOB, ctx.runId());
+    }
 
     /**
      * <b>SEC-ATREST-PIPELINE-UNSEALED-1</b> — seal the run's connection after the source-store views exist and

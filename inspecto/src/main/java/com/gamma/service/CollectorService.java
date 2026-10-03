@@ -1551,7 +1551,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     private static com.gamma.job.RunClaims claimsOver(RunLease lease) {
         return key -> {
             RunLease.Claim claim = lease.tryAcquire(key);
-            return claim == null ? null : claim::close;
+            if (claim == null) return null;
+            return new com.gamma.job.RunClaims.Claim() {   // LEASE-TAKEOVER-JOB-RUNS-1: validity delegates to the lease
+                @Override public void close() { claim.close(); }
+                @Override public com.gamma.inspector.CommitFence.State state() { return claim.state(); }
+            };
         };
     }
 

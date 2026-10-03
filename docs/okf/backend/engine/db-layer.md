@@ -275,8 +275,15 @@ skipped in the lake and keeps the first run's rows (logged at WARN); pinned by
 `registerInto_skipsARerunWithTheSamePinnedIdEvenWhenTheDataChanged`.
 ⚠ A long lease-table outage makes every run refuse each cycle ("lease unverifiable"), with no attempt spent and
 nothing quarantined; nothing raises a Signal for it, so the symptom is files not draining and the log line.
-Job / authored-Pipeline runs hold `SCOPE_JOB` / `SCOPE_AUTHORED` claims through `RunClaims`, which has no validity
-check yet, so they can double-register (`LEASE-TAKEOVER-JOB-RUNS-1`, P2); `commitRetryAct` needs none — it holds
+Job / authored-Pipeline runs hold `SCOPE_JOB` / `SCOPE_AUTHORED` claims through `RunClaims`, whose `Claim.state()` /
+`isValid()` delegates to the lease (`CollectorService.claimsOver`). `JobService.runJob` holds the weaker of the two in
+`CommitFence` under `Scope.JOB`, keyed by **Run id**, and `PipelineJobRunner` checks it immediately before each
+§11.3 output-registry row (`PartitionSinkWriter.beforeRegister`), before the watermark / supersede / view / artifact
+writes, and again before `registerInLakehouse`; a taken-over run ends FAILED "lease lost" with nothing registered and
+its branch uncommitted, so the new holder's run registers once (`LEASE-TAKEOVER-JOB-RUNS-1`, shipped 2026-10-03;
+`JobServiceTest.aPipelineRunWhoseLeaseWasTakenOverRegistersNothingAndTheNewHolderRegistersOnce`). ⚠ Parquet bytes
+are written before the fence (batch-derived names, so the new holder overwrites them); only registration is fenced.
+`commitRetryAct` needs none — it holds
 its claim for one operator act, to exclude a running cycle, and commits no run output.
 
 **Selected by `-Drun.lease.backend`** (`heap` default · `db` · `postgres` · a raw `jdbc:` URL), with

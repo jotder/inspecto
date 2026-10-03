@@ -1391,6 +1391,56 @@ class JobServiceTest {
         }
     }
 
+    /**
+     * LEASE-TAKEOVER-JOB-RUNS-1: a pipeline run whose authored claim another node takes over mid-run must not
+     * register its outputs (the §11.3 output registry, and so nothing after it either); it fails naming the lost
+     * lease, and the new holder's run of the same Consignment then registers exactly once.
+     */
+    @Test
+    void aPipelineRunWhoseLeaseWasTakenOverRegistersNothingAndTheNewHolderRegistersOnce(@TempDir Path dir)
+            throws Exception {
+        String dataDir = dir.resolve("data").toString();
+        seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
+        PipelineStore store = new PipelineStore(dir.resolve("flows"));
+        writeRollupFlow(store, "evt_rollup");
+        // The lease store's view: granted, but another owner may take it over while the run is in flight.
+        java.util.concurrent.atomic.AtomicBoolean takenOver = new java.util.concurrent.atomic.AtomicBoolean(true);
+        RunClaims takeover = key -> new RunClaims.Claim() {
+            @Override public void close() { }
+            @Override public com.gamma.inspector.CommitFence.State state() {
+                return takenOver.get() ? com.gamma.inspector.CommitFence.State.LOST
+                        : com.gamma.inspector.CommitFence.State.HELD;
+            }
+        };
+        try (var registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:");
+             Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString(), null, store, dataDir)) {
+            com.gamma.consignment.ConsignmentOutputStores.use(registry);
+            js.authoredClaims(takeover);
+            js.start();
+            js.upsertJob(new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "b1")));
+
+            assertTrue(js.trigger("nightly"));
+            JobRun lost = await(() -> js.lastRunOf("nightly").orElse(null));
+            assertEquals("FAILED", lost.status(), "a run that lost its lease must not report success");
+            assertTrue(lost.message().contains("lease lost"), lost.message());
+            assertEquals(List.of(), registry.outputs("b1"),
+                    "a taken-over run must register nothing - the new holder owns this Consignment now");
+
+            takenOver.set(false);   // the new holder's run
+            assertTrue(js.trigger("nightly"));
+            JobRun held = await(() -> js.lastRunOf("nightly")
+                    .filter(r -> !r.runId().equals(lost.runId())).orElse(null));
+            assertEquals("SUCCESS", held.status(), held.message());
+            assertEquals(1, registry.outputs("b1").size(),
+                    "the new holder's output is registered exactly once");
+        } finally {
+            com.gamma.consignment.ConsignmentOutputStores.use(null);
+        }
+    }
+
     @Test
     void aNonPipelineJobIsNeverGatedByTheAuthoredClaim(@TempDir Path dir) throws Exception {
         // authoredPipelineKey() returns null for every other type, so a deny-everything flow lease is inert for them.

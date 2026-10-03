@@ -1385,7 +1385,10 @@ public final class JobService implements AutoCloseable {
                                     + (others.isEmpty() ? "" : " — may be held by " + others));
                     return;
                 }
-                try {
+                // LEASE-TAKEOVER-JOB-RUNS-1: a claim taken over mid-run fences the run's output registration
+                // (PipelineJobRunner checks Scope.JOB by Run id before each registry/lakehouse write).
+                try (com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
+                        com.gamma.inspector.CommitFence.Scope.JOB, runId, () -> worst(arming, authored))) {
                     executeRun(job, cfg, runId, name, trigger, start, correlationId, causationId,
                             chainDepth, firing);
                 } finally {
@@ -1396,6 +1399,13 @@ public final class JobService implements AutoCloseable {
             }
         }, () ->   // a previous run on THIS pod is still in flight — don't overlap
             recordSkip(runId, name, job, trigger, start, "previous run still in flight"));
+    }
+
+    /** The weaker of the run's claims: a run holds its lease only while it holds both. */
+    private static com.gamma.inspector.CommitFence.State worst(RunClaims.Claim arming, RunClaims.Claim authored) {
+        com.gamma.inspector.CommitFence.State a = arming.state();
+        if (a != com.gamma.inspector.CommitFence.State.HELD || authored == null) return a;
+        return authored.state();
     }
 
     /** Record a {@code SKIPPED} run — one of the three exclusions in {@link #runJob} turned this firing away. */

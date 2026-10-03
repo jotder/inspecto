@@ -108,6 +108,17 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
         this.producer = producer;
     }
 
+    private Runnable beforeRegister = () -> { };
+
+    /**
+     * Run {@code check} immediately before each §11.3 output-registry write; it throws to refuse the write. A
+     * Job run passes its lease fence here (LEASE-TAKEOVER-JOB-RUNS-1); the default checks nothing.
+     */
+    public PartitionSinkWriter beforeRegister(Runnable check) {
+        this.beforeRegister = check == null ? () -> { } : check;
+        return this;
+    }
+
     @Override
     public void write(PipelineNode sink, String inputTable) throws Exception {
         // sink.webhook: no bytes and no store — the branch POSTs its rows (WebhookSink). Its rows are not
@@ -153,6 +164,7 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
         rowsByStore.merge(store, branchRows, Long::sum);
         // Same merge semantics and the same reason: two sinks may target one store.
         outputsByStore.computeIfAbsent(store, k -> new ArrayList<>()).addAll(outs);
+        beforeRegister.run();   // LEASE-TAKEOVER-JOB-RUNS-1: a taken-over Job run registers nothing
         if (consignmentId != null)
             ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
                     consignmentId, runId, store, outs, rowsByPartition,

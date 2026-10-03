@@ -27,6 +27,18 @@ public interface RunClaims {
     /** A held claim. Released exactly once, in a {@code finally} — by whichever thread ran the work. */
     interface Claim extends AutoCloseable {
         @Override void close();
+
+        /**
+         * Whether this claim is still ours (LEASE-TAKEOVER-JOB-RUNS-1): {@code LOST} once another node has taken it
+         * over, {@code UNREADABLE} when the lease table cannot be read. The host delegates to its lease's claim;
+         * the default, a claim nothing can take over, is always {@code HELD}. {@link JobService} hands it to
+         * {@link com.gamma.inspector.CommitFence} for the run, so a pipeline run refuses to register outputs it
+         * no longer owns.
+         */
+        default com.gamma.inspector.CommitFence.State state() { return com.gamma.inspector.CommitFence.State.HELD; }
+
+        /** {@link #state()} is {@code HELD}. */
+        default boolean isValid() { return state() == com.gamma.inspector.CommitFence.State.HELD; }
     }
 
     /**

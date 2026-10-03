@@ -23,8 +23,8 @@ public final class CommitFence {
 
     private static final Logger log = LoggerFactory.getLogger(CommitFence.class);
 
-    /** Which lease the check belongs to — a run's, or a remote acquisition's. */
-    public enum Scope { RUN, ACQUIRE }
+    /** Which lease the check belongs to — an ingest run's, a remote acquisition's, or a Job run's (keyed by Run id). */
+    public enum Scope { RUN, ACQUIRE, JOB }
 
     /** What a lease check found. UNREADABLE is not a verdict — the commit is refused, the claim is not written off. */
     public enum State { HELD, LOST, UNREADABLE }
