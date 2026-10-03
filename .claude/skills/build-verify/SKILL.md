@@ -49,7 +49,7 @@ main context.
 
 ```powershell
 mvn -o clean test -Pedition-enterprise -B > build.log 2>&1     # -B, NEVER -q
-node tools/check-reactor-verdict.mjs build.log --expect-modules 33
+node tools/check-reactor-verdict.mjs build.log --expect-modules 42   # the enterprise reactor has 42 modules (inspecto-la-storage added 2026-10-02); the count moves with every new module
 ```
 
 `tools/check-reactor-verdict.mjs` is the only thing in this file that can actually *refuse* a verdict.
