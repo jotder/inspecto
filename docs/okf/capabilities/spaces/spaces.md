@@ -372,7 +372,7 @@ corpus CTE. A template's runbooks live at `config/runbooks/<pack>-runbooks.md` (
 pins it. There is still no runbook component kind.
 
 **The telecom fraud pack — `spaces/_templates/telco-fraud/`** (`ASSURE-PACK-TELCO-FRAUD-1`, wave 5.1 of
-`superpower/assurance-capability-plan.md`, BUILT 2026-09-30, not closed). Three feed Pipelines + schemas (`cdr`,
+`superpower/assurance-capability-plan.md`, BUILT 2026-09-30, verified 2026-10-03, not closed). Three feed Pipelines + schemas (`cdr`,
 `subscriber_events`, `payments`; each schema needs a `mapping:` — a `raw:`-only schema fails every file on the
 Consignment path with "a mapping with neither fields[] nor rules[]"); ten detection windows as `sql.template` Jobs
 (`config/jobs/fraud_<typology>_job.toon`: IRSF, Wangiri, SIM-box, premium-rate, roaming high usage, SIM-swap,
@@ -383,8 +383,11 @@ over every retained window, `stormCap: 500`. No new Step Processor. **Thresholds
 counts (`irsf_prefixes`, `premium_prefixes`, `home_cc`, `max_ring_seconds`, `callback_hours`, `max_cells`,
 `exempt_msisdns`, `exempt_doc_prefixes`, `window_hours`, `traffic_grace_hours`, `window_start` / `window_end`,
 `retention_days`) and the Alert Rule's `threshold` (`gt`) says how much is too much. Also: four KPIs + tiles, one
-dashboard (`telco_fraud_overview`), and `config/runbooks/telco-fraud-runbooks.md` (plain Markdown: there is no
-runbook component kind), which names the known false-positive sources that have no defence.
+dashboard (`telco_fraud_overview`: the four KPI tiles plus one bar Widget per typology over its sink Dataset,
+keyed on the offender — the golden test renders every tile through `/kpis/{id}/value` and `/bi/query`), and `config/runbooks/telco-fraud-runbooks.md` (plain Markdown: there is no
+runbook component kind), which names the known false-positive sources that have no defence. Known limits (not product gaps): thresholds are generic defaults (the vendor-specific half
+stays parked); each run reads and rewrites the whole retained sink, and the identity / dealer / voucher / reversal
+sinks keep every entity, so they grow with the subscriber base.
 
 Detection semantics worth knowing: dialled numbers are normalised to one E.164-digit format (`+` / `00` stripped,
 national `0…` → `home_cc` + NSN) before a prefix list is matched with `starts_with`, entries of any length; a prefix

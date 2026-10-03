@@ -206,6 +206,76 @@ class TelcoFraudTemplateGoldenTest {
         }
     }
 
+    /**
+     * Every tile on {@code telco_fraud_overview} renders after the golden run, through the routes the SPA uses:
+     * a KPI tile through {@code GET /kpis/{id}/value}, a bar Widget through {@code POST /bi/query} grouped by its
+     * x field — and each typology's bar shows every planted offender with a positive value.
+     */
+    @Test
+    void everyDashboardTileRendersThePlantedOffendersAfterTheGoldenRun(@TempDir Path root) throws Exception {
+        Path space = createSpace(root);
+        Path data = space.resolve("data"), config = space.resolve("config");
+        ingest(space);
+        List<JobConfig> jobs = jobs(config);
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(jobs, new ConsignmentEventBus(), s, null,
+                     root.resolve("audit").toString(), null, null, data.toString())) {
+            js.start();
+            for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), Map.of()).status(), j.name());
+        }
+        TelcoFraudCorpus corpus = new TelcoFraudCorpus().generate();
+        com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
+        SpaceManager spaces = SpaceManager.discover(root);
+        ControlApi api = new ControlApi(spaces, 0);
+        try {
+            api.start();
+            String base = "http://localhost:" + api.port() + "/api/v1/spaces/fraud";
+            com.fasterxml.jackson.databind.JsonNode dash = V1Body.of(
+                    call(base + "/components/dashboard/telco_fraud_overview", null)).get("content");
+            Set<String> typologiesShown = new TreeSet<>();
+            int tiles = 0;
+            for (com.fasterxml.jackson.databind.JsonNode tile : dash.get("tiles")) {
+                tiles++;
+                String id = tile.get("widgetId").asText();
+                int span = tile.get("span").asInt();
+                assertTrue(span == 1 || span == 2, id + ": a tile spans 1 or 2");
+                com.fasterxml.jackson.databind.JsonNode w = V1Body.of(call(base + "/components/widget/" + id, null)).get("content");
+                if ("kpi".equals(w.get("vizType").asText())) {
+                    String kpi = w.get("options").get("kpi").get("kpiId").asText();
+                    com.fasterxml.jackson.databind.JsonNode v = V1Body.of(call(base + "/kpis/" + kpi + "/value?asOf=2026-07-01", null));
+                    assertTrue(v.get("value").asDouble() > 0, id + ": the KPI tile has a value: " + v);
+                    continue;
+                }
+                assertEquals("bar", w.get("vizType").asText(), id);
+                String dataset = w.get("datasetId").asText();
+                String x = w.get("controls").get("x").get(0).get("field").asText();
+                com.fasterxml.jackson.databind.JsonNode y = w.get("controls").get("y").get(0);
+                String agg = y.get("agg").asText(), field = y.get("field").asText();
+                String body = json.writeValueAsString(Map.of("dataset", dataset, "groupBy", List.of(x),
+                        "measures", List.of(Map.of("agg", agg, "field", field))));
+                com.fasterxml.jackson.databind.JsonNode rows = V1Body.of(call(base + "/bi/query", body)).get("rows");
+                Map<String, Double> bars = new TreeMap<>();
+                for (com.fasterxml.jackson.databind.JsonNode r : rows) bars.put(r.get(x).asText(), r.get(agg + "_" + field).asDouble());
+                for (String offender : corpus.offenders.get(dataset))
+                    assertTrue(bars.getOrDefault(offender, 0.0) > 0, id + ": planted offender " + offender + " has a bar: " + bars);
+                typologiesShown.add(dataset);
+            }
+            assertEquals(14, tiles, "four KPI tiles and ten typology Widgets");
+            assertEquals(EXPECTED.keySet(), typologiesShown, "every typology has a Widget on the dashboard");
+        } finally {
+            api.close();
+            spaces.close();
+        }
+    }
+
+    private static String call(String url, String jsonBody) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url)).header("Authorization", "Bearer admin");
+        if (jsonBody != null) b.header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(jsonBody));
+        HttpResponse<String> r = HttpClient.newHttpClient().send(b.build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, r.statusCode(), url + " -> " + r.body());
+        return r.body();
+    }
+
     /** A malformed prefix list fails the run instead of silently matching nothing. */
     @Test
     void aMalformedPrefixListFailsTheRun(@TempDir Path root) throws Exception {

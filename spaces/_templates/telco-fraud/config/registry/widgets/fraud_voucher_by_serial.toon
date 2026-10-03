@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: fraud_voucher
+controls:
+  x[1]{field}:
+    voucher_serial
+  y[1]{field,agg}:
+    redemptions,max
+options:
+  title: Redemptions by voucher serial

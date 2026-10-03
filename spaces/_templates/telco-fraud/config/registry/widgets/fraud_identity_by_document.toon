@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: fraud_identity
+controls:
+  x[1]{field}:
+    id_doc
+  y[1]{field,agg}:
+    lines_on_document,max
+options:
+  title: Lines on one identity document
