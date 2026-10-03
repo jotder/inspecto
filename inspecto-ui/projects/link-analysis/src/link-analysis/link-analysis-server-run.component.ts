@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { DecimalPipe } from '@angular/common';
 import {
     ChangeDetectionStrategy,
@@ -20,9 +21,12 @@ import {
     GraphRunResult,
     GraphRunView,
     GraphRunsService,
+    LinkIndexSummary,
     graphRunErrorMessage,
+    indexRefusalMessage,
     isTerminalGraphRun,
 } from '@inspecto/link-analysis/api/graph-runs.service';
+import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { BudgetNextAction, budgetNextAction } from './graph-run-apply';
 
@@ -44,17 +48,61 @@ import { BudgetNextAction, budgetNextAction } from './graph-run-apply';
     selector: 'inspecto-link-analysis-server-run',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, MatButtonModule, MatIconModule, InspectoAlertComponent],
+    imports: [DecimalPipe, MatButtonModule, MatIconModule, InspectoAlertComponent, ChipComponent],
     template: `
         @if (note()) {
             <p class="text-secondary mt-1 text-sm">{{ note() }}</p>
         }
         <div class="mt-1 flex flex-wrap items-center gap-2">
             @if (!active()) {
-                <button mat-stroked-button data-testid="run-on-server" [disabled]="!!blockedReason()" (click)="start()">
-                    <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
-                    Run on server
-                </button>
+                @if (!indexOnly()) {
+                    <button
+                        mat-stroked-button
+                        data-testid="run-on-server"
+                        [disabled]="!!blockedReason()"
+                        (click)="start()"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
+                        Run on server
+                    </button>
+                }
+                @if (index(); as ix) {
+                    @if (indexChoices().length > 1) {
+                        <label class="text-secondary text-sm">
+                            Index
+                            <select
+                                class="ml-1 rounded border px-1"
+                                data-testid="index-pick"
+                                (change)="pickIndex($any($event.target).value)"
+                            >
+                                @for (c of indexChoices(); track c.dataset) {
+                                    <option [value]="c.dataset" [selected]="c.dataset === ix.dataset">
+                                        {{ c.dataset }}
+                                    </option>
+                                }
+                            </select>
+                        </label>
+                    }
+                    <button
+                        mat-stroked-button
+                        data-testid="run-on-index"
+                        [disabled]="!!indexBlockedReason()"
+                        (click)="start(undefined, 'index')"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
+                        Run on index
+                    </button>
+                    @if (ix.stale) {
+                        <inspecto-chip
+                            variant="soft"
+                            tone="warning"
+                            data-testid="index-stale-chip"
+                            [title]="ix.reason ?? ''"
+                        >
+                            Index stale
+                        </inspecto-chip>
+                    }
+                }
             } @else {
                 <button
                     mat-stroked-button
@@ -69,6 +117,9 @@ import { BudgetNextAction, budgetNextAction } from './graph-run-apply';
         </div>
         @if (blockedReason(); as why) {
             <p class="text-secondary mt-1 text-sm" role="status" data-testid="blocked-reason">{{ why }}</p>
+        }
+        @if (index() && indexBlockedReason(); as why) {
+            <p class="text-secondary mt-1 text-sm" role="status" data-testid="index-blocked-reason">{{ why }}</p>
         }
         @if (error()) {
             <inspecto-alert variant="error" title="Server run">{{ error() }}</inspecto-alert>
@@ -94,6 +145,29 @@ import { BudgetNextAction, budgetNextAction } from './graph-run-apply';
                                 v.cached ? ' (cached answer)' : ''
                             }}.
                         </p>
+                        @if (v.source; as src) {
+                            <p class="mt-1 flex flex-wrap items-center gap-2 text-sm" data-testid="index-source">
+                                Answered from the edge index, version {{ src.version }}.
+                                @if (src.stale) {
+                                    <inspecto-chip variant="soft" tone="warning" data-testid="source-stale-chip">
+                                        Index stale
+                                    </inspecto-chip>
+                                    <span class="text-secondary">
+                                        {{ src.staleReason ?? 'Rows were added to the Dataset after the build.' }}
+                                    </span>
+                                }
+                            </p>
+                            @if (indexSummary(); as sum) {
+                                <p class="mt-1 text-sm" data-testid="index-summary">{{ sum.headline }}</p>
+                                @if (sum.lines.length) {
+                                    <ol class="mt-1 list-inside list-decimal text-sm" data-testid="index-lines">
+                                        @for (l of sum.lines; track $index) {
+                                            <li>{{ l }}</li>
+                                        }
+                                    </ol>
+                                }
+                            }
+                        }
                     }
                     @case ('BUDGET_EXCEEDED') {
                         <inspecto-alert variant="warning" title="Over budget - no result">
@@ -162,8 +236,71 @@ export class LinkAnalysisServerRunComponent {
     /** Why the browser did not run it: the cap and the size. */
     readonly note = input('');
 
-    /** Emitted once for a COMPLETED run, never for any other state. */
+    /** Hide the Working Set button: the host offers only the index run here (the algorithm has no over-cap server run). */
+    readonly indexOnly = input(false);
+    /** `degreeCentrality` from the index scores these node ids (1..20) and nothing else. */
+    readonly seeds = input<string[]>([]);
+
+    /** Emitted once for a COMPLETED Working Set run, never for any other state; an index run is summarised in this control instead. */
     readonly completed = output<GraphRunResult>();
+
+    /** The Dataset picked when the Space has several indexes; '' = the first. */
+    private readonly pickedDataset = signal('');
+    /** What the last started run read from, so a raised-budget retry and the error text keep the same input. */
+    private lastInput: 'workingSet' | 'index' = 'workingSet';
+
+    readonly supportsIndex = computed(
+        () =>
+            !!this.runs
+                .catalogue()
+                ?.algorithms?.find((a) => a.id === this.algorithm())
+                ?.engines?.includes('index'),
+    );
+    /** The indexes this algorithm may run on: only when the catalogue says `index` AND the Space serves indexes AND one exists. */
+    readonly indexChoices = computed<LinkIndexSummary[]>(() => {
+        const l = this.runs.indexes();
+        return this.supportsIndex() && l?.enabled ? l.indexes : [];
+    });
+    readonly index = computed<LinkIndexSummary | null>(() => {
+        const all = this.indexChoices();
+        return all.find((i) => i.dataset === this.pickedDataset()) ?? all[0] ?? null;
+    });
+    /** Why Run on index cannot be pressed, stated - or ''. */
+    readonly indexBlockedReason = computed(() => {
+        if (!this.allowed())
+            return 'Running on the index needs the Run link graph analysis capability, which your role does not hold.';
+        if (!this.investigationId())
+            return 'Running on the index starts from an Investigation - open or start an Investigation first.';
+        const hops = this.params()['hops'];
+        if (this.algorithm() === 'neighborhood' && typeof hops === 'number' && hops > 2)
+            return 'The index answers at most 2 hops. Lower the hops, or run it on the Working Set.';
+        if (this.algorithm() === 'degreeCentrality') {
+            if (!this.seeds().length)
+                return 'Pick 1 to 20 nodes to score: from the index, degree centrality scores only the nodes you pick.';
+            if (this.seeds().length > 20)
+                return `${this.seeds().length} nodes are picked; the index scores at most 20 at a time.`;
+        }
+        return this.hold();
+    });
+    /** What an index run answered, in words (the canvas has no apply path for these results). */
+    readonly indexSummary = computed<{ headline: string; lines: string[] } | null>(() => {
+        const v = this.view();
+        const r = v?.result;
+        if (!r || !v.source) return null;
+        if (r.scores)
+            return {
+                headline: `${r.scores.length} node${r.scores.length === 1 ? '' : 's'} scored by in plus out links.`,
+                lines: (r.scores as { label: string; score: number }[])
+                    .slice(0, 10)
+                    .map((x) => `${x.label}: ${x.score}`),
+            };
+        const nodes = r.nodes ?? [];
+        const links = r.edges ?? [];
+        return {
+            headline: `${nodes.length} node${nodes.length === 1 ? '' : 's'} and ${links.length} link${links.length === 1 ? '' : 's'} reached${r.truncated ? ' (the server cut the list)' : ''}.`,
+            lines: nodes.slice(0, 10).map((n) => n.label),
+        };
+    });
 
     readonly view = signal<GraphRunView | null>(null);
     readonly error = signal('');
@@ -205,6 +342,7 @@ export class LinkAnalysisServerRunComponent {
     constructor() {
         inject(DestroyRef).onDestroy(() => this.sub?.unsubscribe());
         this.runs.loadCatalogue();
+        this.runs.loadIndexes();
         // A different algorithm is a different question: drop the previous run (and stop polling it).
         let first = true;
         effect(() => {
@@ -225,15 +363,33 @@ export class LinkAnalysisServerRunComponent {
         this.waitedMs.set(0);
     }
 
-    start(budget?: Partial<GraphBudgetView>): void {
+    pickIndex(dataset: string): void {
+        this.pickedDataset.set(dataset);
+    }
+
+    start(budget?: Partial<GraphBudgetView>, via?: 'workingSet' | 'index'): void {
         const investigationId = this.investigationId();
-        if (this.blockedReason() || !investigationId) return;
+        const input = via ?? this.lastInput;
+        const ix = input === 'index' ? this.index() : null;
+        if (input === 'index' ? !ix || !!this.indexBlockedReason() : !!this.blockedReason()) return;
+        if (!investigationId) return;
+        this.lastInput = input;
         this.reset();
         this.starting.set(true);
         this.startedAt = Date.now();
         const req: GraphRunRequest = {
             investigationId,
             algorithm: this.algorithm(),
+            ...(ix
+                ? {
+                      input: 'index' as const,
+                      dataset: ix.dataset,
+                      sourceCol: ix.mapping.sourceCol,
+                      targetCol: ix.mapping.targetCol,
+                      ...(ix.mapping.kindCol ? { linkKindCol: ix.mapping.kindCol } : {}),
+                      ...(this.algorithm() === 'degreeCentrality' ? { seeds: this.seeds() } : {}),
+                  }
+                : {}),
             ...(Object.keys(this.params()).length ? { params: this.params() } : {}),
             ...(budget ? { budget } : {}),
         };
@@ -243,11 +399,18 @@ export class LinkAnalysisServerRunComponent {
                 this.waitedMs.set(Date.now() - this.startedAt);
                 this.view.set(v);
                 // The ONE place a server answer reaches the canvas: a COMPLETED run, and only that.
-                if (v.status === 'COMPLETED' && v.result) this.completed.emit(v.result);
+                if (v.status === 'COMPLETED' && v.result && !v.source) this.completed.emit(v.result);
             },
             error: (err) => {
                 this.starting.set(false);
-                this.error.set(graphRunErrorMessage(err, 'The server run could not be started.'));
+                // An index run is NEVER retried on the Working Set: say exactly why it was refused.
+                this.error.set(
+                    this.lastInput === 'index' && err instanceof HttpErrorResponse && err.status === 422
+                        ? indexRefusalMessage(
+                              graphRunErrorMessage(err, '').replace(/^The server refused the run: /, ''),
+                          )
+                        : graphRunErrorMessage(err, 'The server run could not be started.'),
+                );
             },
         });
     }

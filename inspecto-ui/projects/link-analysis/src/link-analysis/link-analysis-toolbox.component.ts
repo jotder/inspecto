@@ -327,6 +327,14 @@ export class LinkAnalysisToolboxComponent {
     ]);
     readonly explainFor = signal('');
     readonly explainHops = signal(1);
+    /** The server's id for the Explain node (the index run walks from it), or null when the graph carries no id map. */
+    private readonly explainServerNode = computed(() => this.serverIds()?.serverNode(this.explainFor()) ?? null);
+    /** `neighborhood` params for a run on the index; hops are sent as picked - the server's 2-hop fence is stated, not clamped. */
+    readonly explainIndexParams = computed<Record<string, unknown>>(() => {
+        const node = this.explainServerNode();
+        return node ? { node, hops: this.explainHops() } : {};
+    });
+    readonly explainIndexHold = computed(() => (this.explainServerNode() ? '' : 'Pick a node first.'));
     readonly centralityMetric = signal<CentralityMetric>('degree');
     readonly analysisError = signal('');
     readonly pathResult = signal<{ hops: string[] } | null>(null);

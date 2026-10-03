@@ -98,6 +98,14 @@ export interface GraphRunResult {
     edges?: { id: string; source: string; target: string }[];
 }
 
+export interface GraphRunSource {
+    kind: 'index';
+    version: number;
+    stale: boolean;
+    staleReason?: string;
+    fingerprint?: string;
+}
+
 export interface GraphRunView {
     runId: string;
     status: GraphRunStatus;
@@ -117,8 +125,19 @@ export interface GraphRunView {
     failure?: string;
     createdAt: string;
     finishedAt?: string;
-    /** Absent on the list; `at` is the log step the run read. */
-    input?: { nodes: number; edges: number; hiddenEntities: number; droppedDangling: number; at: number };
+    /** Absent on the list; `at` is the log step the run read. An index run has no `at`, and its counts are ESTIMATES (`estimated`). */
+    input?: {
+        nodes: number;
+        edges: number;
+        hiddenEntities: number;
+        droppedDangling: number;
+        at?: number;
+        kind?: 'index';
+        version?: number;
+        estimated?: boolean;
+    };
+    /** An index run only (a Working Set run has no such key): which index version answered, and whether it was stale. */
+    source?: GraphRunSource;
     /** ONLY on a COMPLETED run - a BUDGET_EXCEEDED / CANCELLED / FAILED run has no such key. */
     result?: GraphRunResult;
     masking?: Record<string, unknown>;
@@ -126,6 +145,15 @@ export interface GraphRunView {
 
 export interface GraphRunRequest {
     investigationId: string;
+    /** Where the graph is read from: the Investigation's Working Set (default) or a published edge index (D-3 step 7). */
+    input?: 'workingSet' | 'index';
+    /** `input: 'index'` only: the indexed Dataset and the index's own edge mapping. A 422 on a Working Set run. */
+    dataset?: string;
+    sourceCol?: string;
+    targetCol?: string;
+    linkKindCol?: string;
+    /** `input: 'index'` + `degreeCentrality` only: the 1..20 node ids to score. */
+    seeds?: string[];
     /** Log step to read; absent = the committed head (what the canvas shows). */
     at?: number;
     algorithm: string;
@@ -156,6 +184,23 @@ export interface GraphAlgorithm {
     needsTarget: boolean;
     needsNode: boolean;
     resultKind: GraphResultKind;
+    /** The engines that can run it: always `memory`, plus `index` for neighborhood, egoNetwork and a seeds-only degreeCentrality. */
+    engines?: string[];
+}
+
+/** One index as `GET /inv/index` lists it (the fields the Run panel reads). */
+export interface LinkIndexSummary {
+    dataset: string;
+    mapping: { sourceCol: string; targetCol: string; kindCol: string | null };
+    version: number;
+    stale: boolean;
+    reason: string | null;
+}
+
+export interface LinkIndexList {
+    /** `index.enabled` of the Space: while false the server refuses every index run (`index_disabled`). */
+    enabled: boolean;
+    indexes: LinkIndexSummary[];
 }
 
 export interface GraphAlgorithmCatalogue {
@@ -173,6 +218,46 @@ export interface GraphAlgorithmCatalogue {
 function errorCodeOf(err: HttpErrorResponse): string {
     const c = (err.error as { error?: { errorCode?: unknown } } | null)?.error?.errorCode;
     return typeof c === 'string' ? c : '';
+}
+
+/**
+ * The sentence an analyst reads for a refused `input: 'index'` run (a 422): the closed reason codes and the fences the server
+ * names, in plain words - and ALWAYS the server's own sentence after them, so no cause is lost. Never a hint that the Working
+ * Set was used instead: it was not.
+ */
+export function indexRefusalMessage(serverMessage: string): string {
+    const m = serverMessage;
+    const rules: [RegExp, string][] = [
+        [/index_disabled/, 'The edge index is switched off for this Space (index.enabled is false).'],
+        [/no_index/, 'No edge index has been built for this Dataset yet.'],
+        [
+            /index_stale_refused/,
+            'The index is stale and rows it still holds may have been removed from the Dataset, so it was refused. Rebuild the index.',
+        ],
+        [
+            /mapping_not_indexed|column_not_indexed/,
+            'The index was built over different columns than this run asked for.',
+        ],
+        [
+            /depth_over_index_cap|hops \d+ is over/,
+            'The index answers at most 2 hops. Run it on the Working Set for a deeper walk.',
+        ],
+        [
+            /frontier_over_index_cap|index cap is 20|lists \d+ nodes/,
+            'The index looks up at most 20 nodes per step. Pick fewer nodes, or run it on the Working Set.',
+        ],
+        [
+            /'at' cannot be combined/,
+            'The index holds the Dataset as built, so a past step of the Investigation cannot be read from it.',
+        ],
+        [
+            /hides entities/,
+            'This Investigation hides entities, which the index cannot honour. Run it on the Working Set.',
+        ],
+        [/cannot run from the index/, 'This algorithm cannot run from the index. Run it on the Working Set.'],
+    ];
+    const hit = rules.find(([re]) => re.test(m));
+    return hit ? `${hit[1]} (Server: ${m})` : `The index run was refused: ${m}`;
 }
 
 /**
@@ -213,6 +298,21 @@ export class GraphRunsService {
 
     /** The catalogue once `loadCatalogue` has answered; null until then (and when the server cannot answer). */
     readonly catalogue = signal<GraphAlgorithmCatalogue | null>(null);
+
+    /** The Space's indexes, once {@link loadIndexes} has answered; null until then (and when the server cannot answer). */
+    readonly indexes = signal<LinkIndexList | null>(null);
+    private loadingIndexes = false;
+
+    /** `GET /inv/index`: whether the Space serves indexes and which exist. A failure leaves it null - no index is offered. */
+    loadIndexes(): void {
+        if (this.indexes() || this.loadingIndexes) return;
+        this.loadingIndexes = true;
+        this.http.get<LinkIndexList>(apiUrl('/inv/index')).subscribe({
+            next: (l) => this.indexes.set(l),
+            error: () => (this.loadingIndexes = false),
+            complete: () => (this.loadingIndexes = false),
+        });
+    }
 
     algorithms(): Observable<GraphAlgorithmCatalogue> {
         return this.http.get<GraphAlgorithmCatalogue>(apiUrl('/inv/graph/algorithms'));

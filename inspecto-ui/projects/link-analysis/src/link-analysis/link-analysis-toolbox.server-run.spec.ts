@@ -108,6 +108,8 @@ function make(
                 useValue: {
                     catalogue: signal<GraphAlgorithmCatalogue | null>(null),
                     loadCatalogue: vi.fn(),
+                    indexes: signal(null),
+                    loadIndexes: vi.fn(),
                     run,
                     cancel: vi.fn(),
                 },
