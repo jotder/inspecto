@@ -137,6 +137,26 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         expect(revoke).toHaveBeenCalledWith('blob:x');
     });
 
+    it('downloads the printable HTML rendering through the same Blob path, saved as .html', async () => {
+        const { c, inv, f, el } = create();
+        const createUrl = vi.fn(() => 'blob:h');
+        Object.assign(URL, { createObjectURL: createUrl, revokeObjectURL: vi.fn() });
+        const names: string[] = [];
+        const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+            names.push(this.download);
+        });
+        await c.build();
+        f.detectChanges();
+        const button = Array.from((el as HTMLElement).querySelectorAll('button')).find(
+            (b) => b.textContent?.trim() === 'Download HTML',
+        );
+        expect(button).toBeTruthy();
+        await c.download('html');
+        expect(inv.dossierRendering).toHaveBeenCalledWith('inv-1', 'html', { at: 2, snapshots: [] });
+        expect(names).toEqual(['inv-1-html.html']);
+        click.mockRestore();
+    });
+
     it('verifies the issued manifest and reports changed / added / content changed honestly', async () => {
         const { f, c, el, inv } = create();
         await c.build();

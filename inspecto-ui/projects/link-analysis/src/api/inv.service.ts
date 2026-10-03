@@ -1004,7 +1004,7 @@ export class InvService {
     }
 
     /** LA-12: one rendering as a file — a Blob through HttpClient, so the bearer travels (never a bare href). */
-    dossierRendering(id: string, format: 'steps' | 'method', q: DossierQuery = {}): Observable<Blob> {
+    dossierRendering(id: string, format: 'steps' | 'method' | 'html', q: DossierQuery = {}): Observable<Blob> {
         return this.http.get(invPath(id, 'dossier'), { params: dossierParams(q, format), responseType: 'blob' });
     }
 

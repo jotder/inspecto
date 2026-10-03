@@ -328,6 +328,54 @@ class ControlApiDossierTest {
         }
     }
 
+    /** LA-DOSSIER-OUTPUT-1: format=html is one self-contained printable page, every analyst/data value escaped. */
+    @Test
+    void theHtmlDossierIsSelfContainedAndEscapesEveryValue(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String payload = "<script>alert(1)</script>\"' onmouseover=\"x\" &amp;";
+        try (Ctx c = open(cfg, root)) {
+            Files.writeString(c.root().resolve("link-analysis.toon"), "masking_mode: none\n");
+            ObjectNode create = (ObjectNode) JSON.readTree(CREATE);
+            create.put("title", "T" + payload);
+            data(post(c, "/inv/investigations", create.toString()));
+            data(post(c, "/inv/investigations/case-a/ops", "{\"op\":\"seed\",\"ids\":[\"alice\"],\"entityType\":\"subscriber\"}"));
+            ObjectNode annotate = JSON.createObjectNode().put("op", "annotate").put("note", "N" + payload);
+            annotate.putArray("ids").add("alice");
+            data(post(c, "/inv/investigations/case-a/ops", annotate.toString()));
+
+            HttpResponse<String> r = get(c, "/inv/investigations/case-a/dossier?format=html");
+            assertEquals(200, r.statusCode(), r.body());
+            assertEquals("text/html; charset=utf-8", r.headers().firstValue("Content-Type").orElse(""));
+            assertEquals("default-src 'none'; style-src 'unsafe-inline'",
+                    r.headers().firstValue("Content-Security-Policy").orElse(""));
+            String h = r.body();
+            assertTrue(h.startsWith("<!DOCTYPE html>"), h);
+            assertTrue(h.contains("@media print"), "a print stylesheet");
+            for (String section : List.of("Summary", "Steps", "Method", "Ledger", "Negative space", "Integrity", "Manifest"))
+                assertTrue(h.contains(">" + section + "</h2>"), section);
+            JsonNode d = data(get(c, "/inv/investigations/case-a/dossier"));
+            assertTrue(h.contains(d.at("/manifest/root").asText()), "the manifest root is printed");
+            assertFalse(h.contains("<script"), "no raw script tag");
+            assertFalse(h.contains("onmouseover=\""), "no attribute break-out");
+            assertTrue(h.contains("T&lt;script&gt;alert(1)&lt;/script&gt;&quot;&#39; onmouseover=&quot;x&quot; &amp;amp;"),
+                    "the title is escaped");
+            assertTrue(h.contains("N&lt;script&gt;alert(1)&lt;/script&gt;"), "the note is escaped");
+            assertFalse(h.matches("(?s).*\\b(src|href|url)\\s*[=(].*"), "no external fetch");
+            assertFalse(h.contains("<script") || h.contains("<link"), "no scripts, no linked resources");
+        }
+    }
+
+    /** The html rendering masks exactly as json does (D-U6). */
+    @Test
+    void theHtmlDossierIsMaskedLikeTheJson(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            build(c);
+            Files.writeString(c.root().resolve("link-analysis.toon"), "masking_mode: all\n");
+            String h = get(c, "/inv/investigations/case-a/dossier?format=html").body();
+            for (String raw : List.of("alice", "bob", "carol")) assertFalse(h.contains(raw), raw + " must leave masked");
+            assertTrue(h.contains("masked:"), h);
+        }
+    }
+
     /** D-U9 remainder: a link annotation in the dossier's log rendering carries the same wire id the Working Set serves. */
     @Test
     void aLinkAnnotationInTheDossierCarriesItsLinkId(@TempDir Path cfg, @TempDir Path root) throws Exception {

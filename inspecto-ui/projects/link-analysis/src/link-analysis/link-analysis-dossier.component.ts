@@ -170,6 +170,7 @@ function saveBlob(blob: Blob, name: string): void {
                 <div class="flex flex-wrap gap-1">
                     <button mat-stroked-button [disabled]="busy()" (click)="download('steps')">Download steps</button>
                     <button mat-stroked-button [disabled]="busy()" (click)="download('method')">Download method</button>
+                    <button mat-stroked-button [disabled]="busy()" (click)="download('html')">Download HTML</button>
                     <button mat-stroked-button (click)="downloadManifest()">Download manifest</button>
                 </div>
             }
@@ -272,12 +273,12 @@ export class LinkAnalysisDossierComponent {
     }
 
     /** The rendering at the SAME step and snapshots as the dossier on screen, so the file and the view agree. */
-    download(format: 'steps' | 'method'): Promise<void> {
+    download(format: 'steps' | 'method' | 'html'): Promise<void> {
         const d = this.dossier();
         const q: DossierQuery = { at: d?.summary.at, snapshots: d?.summary.snapshots };
         return this.run(`Could not download the ${format} rendering.`, async () => {
             const blob = await firstValueFrom(this.inv.dossierRendering(this.investigationId(), format, q));
-            saveBlob(blob, `${this.investigationId()}-${format}.txt`);
+            saveBlob(blob, `${this.investigationId()}-${format}.${format === 'html' ? 'html' : 'txt'}`);
         });
     }
 

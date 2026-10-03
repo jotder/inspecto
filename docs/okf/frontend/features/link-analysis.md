@@ -730,7 +730,16 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   chronological ledger, centrality/risk tables, **negative space**, an integrity report and the three
   renderings: the re-runnable JSON log, numbered plain-language steps, and a method statement that cites the
   custody hash. Every exclusion, with its id, step, author and reason, appears in **all three** (G-E10).
-  `format=steps|method` answer `text/plain`. The **manifest** hashes the raw stored bytes of `header.json`,
+  `format=steps|method` answer `text/plain`. **`format=html`** (LA-DOSSIER-OUTPUT-1, 2026-10-03) answers ONE
+  self-contained printable page (`DossierHtml`): inline CSS with an `@media print` sheet, no scripts, no links,
+  no external fetch, so a browser *Save as PDF* gives the usable PDF. It renders the SAME already-masked map the
+  json answers (masking applied once, in `maskedDossier`): summary, masking, steps, method, ledger, negative space,
+  topology, scores, working set, integrity and the manifest with its root. ⛔ Every interpolated value goes
+  through `DossierHtml.esc` (`& < > " '`) — titles, notes and masked keys are analyst/data-controlled — and the
+  response carries `Content-Type: text/html; charset=utf-8` plus `Content-Security-Policy: default-src 'none';
+  style-src 'unsafe-inline'` as a second line of defence. Pinned (and mutation-checked) by
+  `ControlApiDossierTest.theHtmlDossierIsSelfContainedAndEscapesEveryValue` / `…IsMaskedLikeTheJson`. No server
+  PDF: no PDF library is in the dependency set. The **manifest** hashes the raw stored bytes of `header.json`,
   every log line (`log.jsonl#<step>`), every `sets/<step>.json` and every included snapshot, plus the canonical
   entities, links, exclusions and score vectors (G-R6); its `root` is SHA-256 over the manifest body and does
   not depend on when the dossier was built. `POST …/dossier/verify` rebuilds the manifest from the store and
@@ -760,7 +769,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   to seal and says why, never falling back to a weaker digest. The server stores `manifestHash` verbatim and
   never recomputes it — the Dossier manifest remains the custody root.
   **SPA half (2026-09-23):** the Investigation panel's *Dossier* section (`link-analysis-dossier.component`)
-  renders the json dossier, downloads `steps`/`method` as Blobs through HttpClient at the dossier's own `at`
+  renders the json dossier, downloads `steps`/`method` (and, since 2026-10-03, *Download HTML* → `<id>-html.html`) as Blobs through HttpClient at the dossier's own `at`
   (never a bare href — it would skip the bearer), and verifies either the manifest just issued or an uploaded
   file holding a manifest or a whole dossier. A failed verify names *why*: an edited manifest
   (`selfConsistent:false`), a store whose own hashes disagree (`intact:false`), a moved root, and every changed,

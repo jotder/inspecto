@@ -29,9 +29,9 @@ import java.util.function.UnaryOperator;
  * built by {@link GraphDossierBuilder} from what {@link SnapshotStore} holds, and verifiable later against the store.
  *
  * <ul>
- *   <li>{@code GET /inv/investigations/{id}/dossier?at=&snapshots=a,b&format=json|steps|method} — the dossier.
+ *   <li>{@code GET /inv/investigations/{id}/dossier?at=&snapshots=a,b&format=json|steps|method|html} — the dossier.
  *       {@code json} (default) answers the whole dossier in the envelope, all three renderings included;
- *       {@code steps} and {@code method} answer that one rendering as {@code text/plain}, ready to hand over.</li>
+ *       {@code steps} and {@code method} answer that one rendering as {@code text/plain}, ready to hand over; {@code html} answers one self-contained printable page ({@link DossierHtml}).</li>
  *   <li>{@code POST /inv/investigations/{id}/dossier/verify} — body {@code {manifest}} (or a whole dossier): rebuilds
  *       the manifest from the store NOW and names every artefact whose bytes changed, went missing or appeared.</li>
  * </ul>
@@ -114,8 +114,8 @@ public final class DossierRoutes implements RouteModule {
     private Object dossier(ApiContext api, HttpExchange ex, String id) throws IOException {
         Opened inv = open(api, ex, id);
         String format = Optional.ofNullable(ApiContext.query(ex, "format")).orElse("json");
-        if (!List.of("json", "steps", "method").contains(format))
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "format must be json, steps or method, got '" + format + "'");
+        if (!List.of("json", "steps", "method", "html").contains(format))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "format must be json, steps, method or html, got '" + format + "'");
         List<String> log = inv.store().readLog(id);
         int at = parseAt(ex, log);
         List<String> snapshotIds = parseSnapshotIds(ex);
@@ -143,6 +143,12 @@ public final class DossierRoutes implements RouteModule {
                     String.join("\n", castStrings(renderings.get("steps"))) + "\n", "text/plain; charset=utf-8");
             case "method" -> ApiContext.respondText(ex, String.valueOf(renderings.get("method")),
                     "text/plain; charset=utf-8");
+            case "html" -> {
+                // LA-DOSSIER-OUTPUT-1: printable, self-contained; the CSP forbids any fetch or script even if an
+                // escaping bug ever let markup through.
+                ex.getResponseHeaders().set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'");
+                yield ApiContext.respondText(ex, DossierHtml.render(out), "text/html; charset=utf-8");
+            }
             default -> out;
         };
     }
