@@ -546,7 +546,8 @@ Step Processor and no new route.
     of the repo: one extra hit (a font range), none among inbox-shaped names.
   - **Residual, by design: names that RESOLVE a path stay real.** The per-Consignment manifest, `backup/` and
     quarantine paths, markers, the lineage ledger (queried by input file), the `filename_column` data column and
-    the OUTPUT file name (it carries the source stem, and `OVERWRITE_OR_IGNORE` re-runs rely on it) hold the real
+    the OUTPUT file name (it carries the source stem, and `OVERWRITE_OR_IGNORE` re-runs rely on it; the one place a
+    value can still reach disk - filed as `INGEST-OUTPUT-NAME-EMBEDS-SOURCE-STEM-1`) hold the real
     name; they are the raw-copy surface the retention window above governs. **Not caught, by choice:** a value
     split by underscores or dots (those join ordinals and versions), and a value spelled in letters.
 - **Feature Datasets (WS-41).** Five `sql.template` Jobs run on an hourly cron. Thresholds are Job parameters. Every
