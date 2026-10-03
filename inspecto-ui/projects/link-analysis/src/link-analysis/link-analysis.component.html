@@ -894,12 +894,7 @@
                         style="border-color: var(--gamma-border)"
                     >
                         <h2 class="text-xs font-semibold uppercase tracking-wide text-secondary">Toolbox</h2>
-                        <div
-                            class="ml-2 flex"
-                            role="tablist"
-                            aria-label="Toolbox tab"
-                            (keydown)="onToolboxTabKey($event)"
-                        >
+                        <div class="ml-2 flex" role="tablist" aria-label="Toolbox tab">
                             @for (t of toolboxTabs; track t.id) {
                                 <button
                                     type="button"
@@ -919,6 +914,7 @@
                                     "
                                     [attr.tabindex]="toolboxTab() === t.id ? 0 : -1"
                                     (click)="toolboxTab.set(t.id)"
+                                    (keydown)="onToolboxTabKey($event)"
                                 >
                                     {{ t.label }}
                                 </button>

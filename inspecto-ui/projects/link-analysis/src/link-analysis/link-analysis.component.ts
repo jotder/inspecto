@@ -1394,7 +1394,9 @@ export class LinkAnalysisComponent implements OnInit {
         if (to < 0) return;
         ev.preventDefault();
         this.toolboxTab.set(tabs[to].id);
-        (ev.currentTarget as HTMLElement).querySelector<HTMLElement>(`#la-toolbox-tab-${tabs[to].id}`)?.focus();
+        (ev.currentTarget as HTMLElement).parentElement
+            ?.querySelector<HTMLElement>(`#la-toolbox-tab-${tabs[to].id}`)
+            ?.focus();
     }
 
     onNodeClick(id: string): void {

@@ -69,7 +69,7 @@ export const NODE_LIST_PAGE = 500;
                             <th scope="col" class="py-1 font-semibold">Links</th>
                         </tr>
                     </thead>
-                    <tbody (keydown)="onKeydown($event)">
+                    <tbody>
                         @for (n of pageNodes(); track n.id; let i = $index) {
                             <tr
                                 class="cursor-pointer border-t"
@@ -81,6 +81,7 @@ export const NODE_LIST_PAGE = 500;
                                 [class.font-semibold]="n.id === picked()"
                                 [style.boxShadow]="n.id === picked() ? 'inset 3px 0 0 var(--gamma-primary)' : null"
                                 (click)="select(n.id, i)"
+                                (keydown)="onKeydown($event)"
                             >
                                 <td class="py-1 pr-2">{{ n.data.label }}</td>
                                 <td class="py-1 pr-2">{{ n.data.kind }}</td>
@@ -213,12 +214,12 @@ export class LinkAnalysisNodeListComponent {
     }
 
     onKeydown(ev: KeyboardEvent): void {
-        const body = ev.currentTarget as HTMLElement;
+        const grid = (ev.currentTarget as HTMLElement).closest('tbody') as HTMLElement;
         const row = (ev.target as HTMLElement).closest<HTMLElement>('tr[data-index]');
         if (!row) return;
-        const rows = Array.from(body.querySelectorAll<HTMLElement>('tr[data-index]'));
+        const rows = Array.from(grid.querySelectorAll<HTMLElement>('tbody tr[data-index]'));
         const at = Number(row.dataset['index']);
-        let to = at;
+        let to: number;
         switch (ev.key) {
             case 'ArrowDown':
                 to = Math.min(at + 1, rows.length - 1);
