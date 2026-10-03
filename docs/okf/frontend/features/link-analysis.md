@@ -1517,7 +1517,7 @@ Harness `InvTraversalBench` (`@Tag("bench")`, skipped unless `-Dinspecto.bench.d
 
 **Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-SPA-OWED-SURFACES-1` ·
 `LA-INVESTIGATION-OPS-DEFERRED-1` · `LA-LIVE-DETECTION-1` · `LA-DOSSIER-OUTPUT-1` · `LA-COLLECTOR-COVERAGE-1` ·
-`LA-SEP-SPIKES-1`. Standing refusals with reopen triggers are in §6 under *Link Analysis & Geo*.
+`LA-DRAFT-PROMOTE-COST-1` (filed 2026-10-03 when `LA-SEP-SPIKES-1` closed: spike `D-S5` re-ran on real Draft state at 10^8 edges, D-7 step D7-7). Standing refusals with reopen triggers are in §6 under *Link Analysis & Geo*.
 
 Design (archived): [`link-analysis-and-graphsource.md`](../../../archived-documents/plans-archive/link-analysis-and-graphsource.md)
 · [`link-analysis-projection-authoring-plan.md`](../../../archived-documents/plans-archive/link-analysis-projection-authoring-plan.md)

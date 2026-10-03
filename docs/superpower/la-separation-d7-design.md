@@ -45,7 +45,7 @@ Draft reads whatever the index serves).
 | `IndexReader` reads ONE pinned version on a connection sealed to that directory | `inspecto-la-storage/src/main/java/com/gamma/la/storage/IndexReader.java` l.19–21, l.108–125 |
 | The reader pool **closes idle readers of every sibling version** on borrow ("CURRENT moved on") | `IndexReader.java` l.59–72 |
 | Graph Run: a fixed `ThreadPoolExecutor(threads, threads)` over a bounded `ArrayBlockingQueue(queue)`, `AbortPolicy`; budgets resolved against defaults and ceilings, over-budget ends `BUDGET_EXCEEDED` before the engine runs | `inspecto-la-core/src/main/java/com/gamma/la/core/GraphRunService.java` l.63, l.142–147, l.192–199 |
-| D-S5 harness: each Draft is its own DuckDB file, `memory_limit` + `threads` per connection (default 1), base read through `read_parquet` | `inspecto-la-storage/src/test/java/com/gamma/la/storage/DraftConcurrencyBench.java` l.51, l.81–86 |
+| D-S5 harness (first run): each Draft its own DuckDB file over a `read_parquet` base. **Re-run in D7-7 on real Draft state** - the file moved to `inspecto-la-api`, because it now calls `DraftAdmission` and `DraftPromote`, which `inspecto-la-storage` cannot see | `inspecto-la-api/src/test/java/com/gamma/la/api/DraftConcurrencyBench.java` |
 
 **Plan vs code (code wins):**
 
@@ -325,6 +325,56 @@ flat edge file (D-3 step 1 measurement) — disk, not memory. §12 D7-Q3 decides
     are separate. (2) The cap and idle periods are static settings (`DraftLifecycle`), not yet keys in `link-analysis.toon`. (3) Expiry
     notifies only through the `expiryWarning` field. (4) A pending promote on the four-eyes queue does not stop an expiry; approve then
     answers 409 (the Draft is closed). (5) Light reads are still unadmitted by design; D7-7 measures them with real Drafts.
+  * **Settled by D7-7 (2026-10-03).** (1) **Separate budgets, kept.** Graph Run's pool (`Limits.standard()`: threads 2, queue 16) runs
+    the in-memory engine over a materialised Working Set; the Draft heavy permit guards index walks, the cold relation build and the
+    rebase. Different work, different bound; together at most 4 + 2 = 6, half the 12 hardware threads, and D7-7 measured the light
+    reads holding with all 4 heavy permits busy (below). One shared pool would let a long Graph Run starve a rebase. (3) The
+    `expiryWarning` field is the D7-Q5 warning, by design (there is no push channel for it). (4) An expiry closing a Draft that has a
+    pending four-eyes promote is accepted: the approve answers 409 and the request is made again from a new fork; a Draft idle for 30
+    days with a pending approval is a process failure that the 7-day warning already shows. (5) **Light reads stay unadmitted**: with
+    think time they ran at the solo latency; the closed-loop rise is CPU saturation, which an admission queue would turn into waiting,
+    not into speed. Still open: (2) the cap and idle periods as `link-analysis.toon` keys, and the promote cost (below), both in
+    `LA-DRAFT-PROMOTE-COST-1`.
+
+* **As built (D7-7, 2026-10-03) - `DraftConcurrencyBench` on real Draft state at 10^8 edges.** The bench now drives the shipped
+  seams instead of plain JDBC: a real 32-bucket index from `IndexBuilder` (10^8 edges over 2x10^7 nodes, the D-S1 power law), read
+  through the pooled `IndexReader.borrow`; a real Investigation in a `SnapshotStore` (20-step main log); each Draft forked through
+  `DraftAdmission.requireRoom` under `DraftAdmission.CAP`, with a version pin, a base fold and a first index touch; analysts that
+  read one hop (`fold`) and append it as a sealed `expand` op through the checkpoint (`DraftCheckpoints.after` / `remember`);
+  3-hop walks under `DraftAdmission.heavy`; `DraftLifecycle.hibernate` + `evictCaches`, then a rehydrate with one cold fold; and
+  `DraftPromote.execute`. Manual and opt-in as before (`@Tag("bench")`, not named `*Test`, gated on `-Dinspecto.bench.dir`). Same box
+  as D-S5 (i7-9850H, 6 cores / 12 threads, 32 GB, Windows 11, JDK 27); 50 Drafts open, 20 active, 30 s per phase, think time
+  exponential with a 2 s mean. One run.
+
+  | Measure (10^8 edges) | Result |
+  |---|---|
+  | Index build (`buildMemory 8GB`) | 1 463 s (24 min), 2.2 GB |
+  | Open a Draft (cap check + seat + pin + base fold + first index touch) | p50 **37 ms**, p95 92 ms, max 576 ms |
+  | 51st fork | **409 CONFLICT** (the D21 cap) |
+  | Memory per open Draft | heap **0.02 MB** at open, **0.40 MB** after ~160 own steps each (the checkpointed state); process commit +0.21 MB per Draft at open |
+  | One-hop read, solo | p50 16, p95 **28**, p99 36 ms |
+  | 20 active, closed loop (no think time) | p50 47, p95 **815**, p99 1 573 ms |
+  | 20 active, 2 s think time | p50 16, p95 **28**, p99 33 ms |
+  | 20 active closed loop + 6 heavy callers (limit 4) | p50 52, p95 804, p99 1 386 ms; 35 walks ran (p50 70 ms), 852 refused 429 |
+  | 20 active, 2 s think time + heavy limit saturated | p50 24, p95 **43**, p99 87 ms |
+  | Append (checkpointed): solo / think / think + heavy | p50 32 / 21 / 40 ms; p95 70 / 55 / 89 ms |
+  | Hibernate (marker + cache eviction) | p50 0.4 ms, max 5.4 ms; 19 MB heap released for 50 Drafts |
+  | Rehydrate (one cold fold) | p50 < 1 ms, max 71 ms (the 796-step Draft); state hash equal to the pre-sleep one for 50 of 50 |
+  | Promote | 796 steps in **25.1 s** (235 steps in 3.0 s in a 10^6 trial run), holding the main and Draft locks throughout |
+
+  **Verdict.** The **50-Draft cap holds** and is not a memory bound (50 Drafts cost about 20 MB of heap); it stays the D21 governance
+  cap. **`min(4, cores/3)` holds** (4 on this box): with analysts thinking, four heavy walks in flight moved the light p95 from 28 to
+  43 ms and the p99 to 87 ms, and every refusal was an immediate 429, never a wait. The **one number that does not hold is promote**:
+  it grows faster than linearly in the Draft's steps (3.0 s at 235, 25.1 s at 796; cause not isolated - the per-step re-hash and set
+  document over a growing state is the hypothesis) while holding the main log's lock, so a long Draft's promote stalls every writer
+  of that Investigation. Filed `LA-DRAFT-PROMOTE-COST-1`.
+
+  **Scale reached: 10^8, not 10^9.** The 10^8 index build alone took 24 min under the 8 GB build memory cap (the D-3 spike's uncapped
+  build took 6.1 min at a 17.9 GB peak); 10^9 is at least ten times that, over 4 h capped or a peak beyond this 32 GB box uncapped, so
+  it fails the "10^8 well under an hour" condition. Disk was not the limit (231 GB free; 10^9 is about 22-34 GB). The Draft-side numbers
+  depend on edge count only through the one-hop read, which D-S1 / D-3 already bound (43 ms at 10^8 through the sealed path); the
+  10^9 run stays with `LA-INDEX-SCALE-MEASURE-1` (3). Closed-loop numbers are the worst case: 20 threads on 12 hardware threads, with
+  the bench JVM and DuckDB sharing them.
 
 ## 7. Admission control (numbers from D-S5)
 
@@ -333,15 +383,15 @@ p95 66 ms with 20 active of 50 open vs 13 ms solo; one heavy 5-hop walk did not 
 
 | Knob | Value | Derivation |
 |---|---|---|
-| Open Drafts per installation | **50 hard cap** (D21), 409 beyond | 50 × 3.8 MB ≈ 190 MB — not the constraint |
+| Open Drafts per Space | **50 hard cap** (D21), 409 beyond - **confirmed by D7-7** | D7-7: 0.4 MB heap per Draft with ~160 steps, about 20 MB for 50 — not the constraint |
 | Per-Draft DuckDB `memory_limit` | 256 MB, `threads 1` (light ops) | the D-S5 setting; 50 × 256 MB = 12.8 GB is a *ceiling*, not use — idle Drafts hibernate (§8) |
-| Concurrent **heavy** jobs (Graph Run, multi-hop expand) | `min(4, cores/3)`; 2 on the 6-core test box | reuses `GraphRunService.Limits.threads` (l.63, l.142); a heavy job gets `threads ≥ 2` and up to 4 GB |
+| Concurrent **heavy** jobs (multi-hop expand, cold relation build, rebase; Graph Run keeps its own pool, D7-7) | `min(4, cores/3)`; 4 on the 6-core / 12-thread test box (`availableProcessors` counts hardware threads) - **confirmed by D7-7** | reuses `GraphRunService.Limits.threads` (l.63, l.142); a heavy job gets `threads ≥ 2` and up to 4 GB |
 | Heavy-job queue | `GraphRunService.Limits.queue`; beyond it 429 with a retry hint (today `AbortPolicy`, l.147) | fail loudly, never silently slow |
 | Light reads | not admitted — CPU-bound only (D-S5 reading 2) | 20 closed-loop threads on 12 HW threads gave the 7× rise |
 
-⚠ **Unproven, owed before D-7 closes** (D-S5's own list): the heavy-job cap at 10⁹ edges, real Draft state under
-contention, analysts with think time. Step D7-7 re-runs `DraftConcurrencyBench` with real Drafts; the numbers above are
-starting values, not a verdict.
+✅ **D7-7 (2026-10-03) re-ran `DraftConcurrencyBench` on real Draft state, with think time, at 10⁸ edges** (section 6, "As
+built (D7-7)"): the cap and the heavy limit hold; the per-Draft DuckDB `memory_limit` row is moot (D7-6 built no `draft.duckdb`).
+The 10⁹ axis was not run (build time; `LA-INDEX-SCALE-MEASURE-1`).
 
 ## 8. Promote, rebase and the conflict report
 
@@ -438,7 +488,7 @@ and `sets/` are never evicted.**
 | D7-4 | Checkpointed append (fold from latest `sets/`), main log and Drafts | equal state hashes vs full re-fold on a 500-step fixture; append latency flat in log length |
 | D7-5 ✅ **BUILT 2026-10-03** (section 4 "As built (D7-5)") | Rebase + conflict report + promote (+ D-U7 approval when sensitive) | fixture with one op of each conflict kind → report lists all four; promote with moved head 409 |
 | D7-6 ✅ **BUILT 2026-10-03** (section 4 "As built (D7-6)"; no `draft.duckdb` was needed) | Admission + hibernate/rehydrate + expiry | 51st open 409; full heavy queue 429; evicted file rebuilds to identical result hashes |
-| D7-7 | Re-run `DraftConcurrencyBench` with real Drafts, think time, and the 10⁹ (or largest feasible) partitioned index | D-S5 pass condition on real state; §7 numbers confirmed or replaced in this file |
+| D7-7 ✅ **BUILT 2026-10-03** (section 6 "As built (D7-7)"; 10⁸ edges, not 10⁹) | Re-run `DraftConcurrencyBench` with real Drafts, think time, and the 10⁹ (or largest feasible) partitioned index | D-S5 pass condition on real state; §7 numbers confirmed or replaced in this file |
 
 ## 13. Operator decisions owed
 
