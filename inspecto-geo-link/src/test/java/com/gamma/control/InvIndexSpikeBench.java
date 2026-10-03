@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * MEASUREMENT harness, not a test: D-3 step 1 spike ({@code docs/superpower/la-separation-d3-design.md} §5 step 1 and its
+ * MEASUREMENT harness, not a test: D-3 step 1 spike ({@code docs/archived-documents/plans-archive/la-separation-d3-design.md} §5 step 1 and its
  * "Step 1 results" section). TEST-ONLY — it measures the proposed edge/node index layout; nothing here is main code.
  *
  * <p>Never runs in the default suite: it needs BOTH {@code -Dinspecto.bench=true} and {@code -Dinspecto.bench.dir=<dir>}

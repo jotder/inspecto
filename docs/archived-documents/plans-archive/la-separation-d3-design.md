@@ -1,6 +1,7 @@
+<!-- ARCHIVED 2026-10-03 — shipped (D-3 Path A, steps 1-8 built). Durable facts: docs/okf/frontend/features/link-analysis.md §Index (D-3, as built) and §Index design record; unbuilt remainder: docs/BACKLOG.md §3.12 (`LA-INDEX-SPA-SURFACES-1`, `LA-INDEX-SCALE-MEASURE-1`). Kept for provenance (decisions 1-8, §5.1 spike tables, per-step as-built notes); never maintained. -->
 # LA separation — D-3 design (the edge/node index, its builder, and the index-backed engine)
 
-Option D's phase **D-3** ([`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md) §7.4, §7.8, §7.10.1): an LA-owned
+Option D's phase **D-3** ([`la-separation-feasibility-plan.md`](../../superpower/la-separation-feasibility-plan.md) §7.4, §7.8, §7.10.1): an LA-owned
 **edge/node index** (Parquet, queried by DuckDB, in an LA-specific partitioning scheme), the **builder** that produces it, and an
 **index-backed `GraphEngine`** — so traversal and graph runs stop re-scanning a flat Dataset per level. D-S1 and D-S3 measured the gap
 (it is volume, not depth); D-4 shipped the engine SPI over the in-memory Working Set and left the seam. This file is the design the
@@ -534,7 +535,7 @@ Retracts deviation (1) of 5.3; signed decisions are untouched (6a: serve stale f
 
 ## 9. References
 
-* [`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md) §7.4 (data and graph layer), §7.8 (phases), §7.9 (D9–D11, D21), §7.10.1 (D-S1, D-S3 results).
-* [`la-separation-d1-design.md`](la-separation-d1-design.md) — module and dependency rule; [`la-separation-d4-design.md`](../archived-documents/plans-archive/la-separation-d4-design.md) — the engine SPI and budget semantics this builds on.
-* [`okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md) §*Graph Run*.
+* [`la-separation-feasibility-plan.md`](../../superpower/la-separation-feasibility-plan.md) §7.4 (data and graph layer), §7.8 (phases), §7.9 (D9–D11, D21), §7.10.1 (D-S1, D-S3 results).
+* [`la-separation-d1-design.md`](../../superpower/la-separation-d1-design.md) — module and dependency rule; [`la-separation-d4-design.md`](la-separation-d4-design.md) — the engine SPI and budget semantics this builds on.
+* [`okf/frontend/features/link-analysis.md`](../../okf/frontend/features/link-analysis.md) §*Graph Run*.
 * Code: `inspecto-la-core/src/main/java/com/gamma/la/core/` (`DatasetProvider`, `DatasetProviders`, `GraphEngine`, `GraphInput`, `GraphBudget`, `GraphRunService`, `InvestigationEvaluator`), `inspecto-la-api/src/main/java/com/gamma/la/api/` (`InvRoutes`, `InvestigationRoutes`, `WorkingSetRoutes`, `GraphRunRoutes`), `inspecto-geo-link/src/main/java/com/gamma/geolink/EngineDatasetProvider.java`, `inspecto-geo-link/src/test/java/com/gamma/control/InvTraversalBench.java`, `inspecto-engine/src/main/java/com/gamma/query/` (`DatasetRelation`, `QueryExecutor`), `inspecto-sql/src/main/java/com/gamma/sql/SqlSandbox.java`, `inspecto-engine/src/main/java/com/gamma/job/` (`JobTypeProvider`, `MaterializeTask`), `tools/check-module-deps.mjs`, `tools/bundle-modules.mjs`.

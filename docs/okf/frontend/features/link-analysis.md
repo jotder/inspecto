@@ -21,7 +21,7 @@ timestamp: 2026-07-07T00:00:00Z
 > imported as `@inspecto/link-analysis` (only the `la-host` seam and the two viz registrations - see `public-api.ts`) or by deep path for
 > lazy routes; it reaches shared code as `@inspecto/core/*` (= `src/app/inspecto`). The canvas, `graph-types`, `graph-source`, `entity-key`,
 > `graph-export` and `unique-name` stay in core. ESLint enforces the arrow (core <- library <- shell); the Java parity tests read their
-> fixtures from the library. Design and as-built facts: `docs/superpower/la-separation-d5-design.md`.
+> fixtures from the library. Design and as-built facts: `docs/archived-documents/plans-archive/la-separation-d5-design.md` (archived).
 
 > **The second shell, `la-app` (D-5 step 6, 2026-10-02).** `inspecto-ui/projects/la-app/src` is a separate Angular application
 > (`ng build la-app` -> `dist/la-app/browser`; `gamma` is unchanged): a top bar (Link Analysis / Geo / Entity Lists, Space switcher, user
@@ -1091,26 +1091,214 @@ betweenness and suspicion).
 
 ## Index (D-3, as built 2026-10-02)
 
-The edge/node index of a Dataset ([`la-separation-d3-design.md`](../../../superpower/la-separation-d3-design.md) §5.2, §5.3): Parquet under `<Space write root>/la-index`, built by `IndexBuildService` (`inspecto-la-storage`) and exposed by `IndexRoutes` (`inspecto-la-api`).
+The edge/node index of a Dataset ([`la-separation-d3-design.md`](../../../archived-documents/plans-archive/la-separation-d3-design.md) §5.2, §5.3): Parquet under `<Space write root>/la-index`, built by `IndexBuildService` (`inspecto-la-storage`) and exposed by `IndexRoutes` (`inspecto-la-api`).
 
 * **Routes.** `POST /inv/index/builds` (body `{dataset, sourceCol, targetCol, kindCol?, timeCol?, timeColZone?, weightCol?, attrCols?}`, 202 + Location, 409 for a second live build of the same Dataset + mapping, 422 for a bad column or an estimate over the budget), `GET /inv/index` (viewable Datasets' current versions with rows / bytes / builtAt and `stale` + `reason` + `reasons` codes + `removedInput` + `fingerprint: known|unknown` + `inputFiles`), `GET /inv/index/builds/{id}`, `POST /inv/index/builds/{id}/cancel`. Every route runs the base-Dataset view gate first: a Dataset the caller may not view, and every build over it, is the same 404 as an absent one (design Decision 2: valid only while a Dataset has no per-Subject row filter).
 * **Capability and settings.** Starting needs `canBuildLinkIndex` (seeded like `canRunLinkGraphAnalysis`); cancel is the starter or an administrator. `link-analysis.toon` `index {enabled, max_disk_bytes, keep_versions, threads, queue}`; a build estimated above `max_disk_bytes` (rows x 34 bytes x 2; 0 = no limit) is refused up front with the estimate; the duplicate check runs first, the count is bounded (10 s statement timeout, at most 2 at once; a timeout refuses 422 and a busy cap 503, never skipping the budget), and a 409 duplicate names the build id only to its starter. Audit: `LINK_INDEX_BUILD_STARTED | _COMPLETED | _CANCELLED | _FAILED`.
 * **What is served from the index (step 5, as built 2026-10-02).** `POST /inv/traversal/recursive-paths`, and ONLY it, answers from the index when the Space setting `index.enabled` is true (default false: nothing changes) AND a published index matches the request's source / target column AND covers its weight column, temporal column and every `filter` field (kind, attribute, source, target columns; NOT the weight column) AND `maxDepth` <= 2 AND no level has more than 20 distinct frontier keys. Otherwise the flat Dataset answers exactly as before. Every answer carries `source`: `{kind:'index', version, stale, staleReason?, fingerprint: 'known'|'unknown'}` or `{kind:'dataset', reason, details?}` (reasons: `index_disabled`, `no_index`, `mapping_not_indexed`, `column_not_indexed`, `time_zone_not_servable`, `filter_not_indexed`, `index_stale_refused`, `depth_over_index_cap`, `frontier_over_index_cap`, `index_read_failed`). A frontier found over the cap mid-walk discards the partial index answer and re-answers whole from the flat Dataset. Staleness is the SAME computation as `GET /inv/index` (`IndexStaleness`, grounded in the Dataset's input files): a REMOVED or replaced input file, a changed relation SQL, a different bucket function or unapplied delta files is refused (`index_stale_refused`, with `details`) because removed rows could be exposed; files only ADDED is served with `stale: true` and a `staleReason` (the index misses the new rows); a DuckDB version difference is served with `stale: true`; a Dataset whose files cannot be listed (view-backed, too many files) is served with `fingerprint: 'unknown'`. The current fingerprint is cached per (Dataset, mapping) for 30 s and dropped when a build completes. The view gate runs first, so a shared-away Dataset is the same 404 whether or not an index exists. The audit event `link.traversed` gains `source`, `indexVersion` / `indexStale` / `fingerprint` / `indexStaleReasons` or `sourceReason`. Design 5.4 has the as-built notes and timings.
 * **Neighbours and Investigation `expand` (step 6, as built 2026-10-03).** Same switch, same view gate, same staleness gate (`IndexedRead.select`, shared with `recursive-paths`). `POST /inv/projection/neighbors` folds the value's rows on the `out` copy (as source) and the `in` copy (as target), counting a self-loop once, in the flat order `cnt DESC, source, target`, cut at `limit` (`truncated` as before); it needs the `linkKindCol`, every `attrCols` entry and every `filter` field to be indexed columns, and adds `source` (`{kind:'index',...}` or `{kind:'dataset', reason}`) to the body. An Investigation `expand` is answered from the index only for a SIMPLE rung (no `window`, `minDistinctDays`, candidate degree bound or merged traversal; at most 20 distinct frontier entities): it reproduces the CTE's fold per (source, target, kind), `excluded`, `linkKinds`, direction (incl. `reciprocal`), `minEvents`, per-anchor `maxFanOut` rank with `fanOutCapped`, and the budget cut, so the sealed `fingerprint` (`sha256(canonical(rows))`) is identical on both paths. When the index answered, the sealed read carries `read.index = {version, stale, fingerprint}` BESIDE the fingerprint, never inside it; a non-simple rung (`rung_not_indexable`) or any failure keeps the flat CTE. `replay` is unchanged; `replay` with `reread` adds `indexVersionSealed` / `indexVersionNow` to a drift row (only when either is set) and `diverged` stays about the fingerprint alone. Audit: `link.expanded` and `link.investigation.stepped` gain `source` / `indexVersion` / `indexStale` (stepped only when the index answered).
-* **Graph Run from the index (step 7, as built 2026-10-03).** `POST /inv/graph/runs` takes `input: "workingSet"` (default, byte-identical to before) or `"index"`. With `index` the body adds `dataset`, `sourceCol`, `targetCol`, `linkKindCol?` and, for `degreeCentrality`, `seeds` (1..20); only `neighborhood` (hops <= 2), `egoNetwork` and a SEEDS-ONLY `degreeCentrality` run (engine id `index`, `GET /inv/graph/algorithms` lists `engines` per algorithm). `GraphInput` is sealed (`Materialised` | `IndexRef`); `RoutingGraphEngine` routes by input type, never as a fallback. Every case the index cannot serve exactly is a stated 422 (`index_disabled`, `no_index`, unfit mapping / column, `index_stale_refused`, non-native algorithm, hops > 2, seeds > 20, `at`, an Investigation that hides entities); a walk past 20 looked-up keys per level (the final induced-edge pass included) ends `BUDGET_EXCEEDED` / `INDEX_CAP` naming the cap. The pre-work size check uses the seeds' degrees; the answer is measured afterwards against the same budget. The response adds `source` and `input.kind: "index"` (estimated sizes); the cache key carries the index version; audit `link.graph.run.*` gains `source` / `indexVersion`. Result order is canonical-v1 (nodes and edges by id). Detail and deferrals: `superpower/la-separation-d3-design.md` section 5.6.
+* **Graph Run from the index (step 7, as built 2026-10-03).** `POST /inv/graph/runs` takes `input: "workingSet"` (default, byte-identical to before) or `"index"`. With `index` the body adds `dataset`, `sourceCol`, `targetCol`, `linkKindCol?` and, for `degreeCentrality`, `seeds` (1..20); only `neighborhood` (hops <= 2), `egoNetwork` and a SEEDS-ONLY `degreeCentrality` run (engine id `index`, `GET /inv/graph/algorithms` lists `engines` per algorithm). `GraphInput` is sealed (`Materialised` | `IndexRef`); `RoutingGraphEngine` routes by input type, never as a fallback. Every case the index cannot serve exactly is a stated 422 (`index_disabled`, `no_index`, unfit mapping / column, `index_stale_refused`, non-native algorithm, hops > 2, seeds > 20, `at`, an Investigation that hides entities); a walk past 20 looked-up keys per level (the final induced-edge pass included) ends `BUDGET_EXCEEDED` / `INDEX_CAP` naming the cap. The pre-work size check uses the seeds' degrees; the answer is measured afterwards against the same budget. The response adds `source` and `input.kind: "index"` (estimated sizes); the cache key carries the index version; audit `link.graph.run.*` gains `source` / `indexVersion`. Result order is canonical-v1 (nodes and edges by id). Detail and deferrals: `archived-documents/plans-archive/la-separation-d3-design.md` section 5.6.
 * **SPA: Run on index (as built 2026-10-03).** `LinkAnalysisServerRunComponent` offers **Run on index** only when the catalogue `engines` of its algorithm include `index` AND `GET /inv/index` (`GraphRunsService.loadIndexes`, signal `indexes`) says `enabled` with at least one index; otherwise the button is absent, never disabled-with-a-fallback. It sends `input: "index"` with the index's OWN `dataset` / `mapping.sourceCol` / `targetCol` / `kindCol` (as `linkKindCol`) and `seeds` for `degreeCentrality` only; several indexes give an Index picker. Client-side fences state themselves before sending (hops > 2, seeds 0 or > 20, no Investigation, no capability). The Explain tab of the toolbox hosts it for `neighborhood` (`indexOnly`: no Working Set button). An index answer is NOT applied to the canvas (no apply path for GRAPH / seeds scores): the control states the version (`source.version`), a stale chip when `source.stale` (and beside the button when the listed index is stale), and a node / link or top-score summary. A 422 is put in words by `indexRefusalMessage` (reason codes, hops, seeds, `at`, hidden entities) followed by the server's own sentence, and the run is never repeated on the Working Set. Specs: `link-analysis-server-run.index.spec.ts`.
 * **Incremental append, compaction and the plan (step 8, as built 2026-10-03).** `POST /inv/index/builds` takes `mode`: `full` (default), `append` or `compact`. `append` indexes ONLY the input files added since the live version, as a delta sorted within itself, and publishes the NEXT immutable version (the parent's files hard-linked in, the delta in the same bucket directories, manifest `builder: append`, `parent`, `deltas[]`); reads union main + deltas through the reader's own glob, so every read path (fold, edges, degree, traversal, neighbours, expand, `SqlGraphEngine`) answers exactly what a full rebuild answers, and each answer carries the version that produced it. It is sound only for pure additions: a removed, superseded or rewritten file, a changed relation SQL, a different bucket function or DuckDB version, a Dataset that is not a plain local store read (virtual, view-backed, shared), no new file, or 8 deltas already (compact first) is a 409 naming why, and a full build is the way. `compact` merges the deltas into one sorted main by reading the INDEX (not the Dataset), restoring one file per bucket and carrying the coverage record over unchanged. `GET /inv/index` items gain `deltas` and `plan {recommended: none|append|full|compact, appendable, reasons, added, removed, changed, samples}`: advice only - nothing appends, compacts or switches a version unless asked, and an index with added files is still served stale-flagged meanwhile. The per-append `nodes` rows are per-file partial folds (nothing reads them; compaction recomputes). See design §5.7.
 * **What it does NOT do yet.** `index.enabled` defaults to false. Staleness is grounded in the Dataset's input files (`DatasetProvider.inputFingerprint`, design 5.3a): an added file reads `input_files_changed` with `removedInput: false`, a deleted or touched one `removedInput: true`; a Dataset with nothing to list (a view, too many files) reports `fingerprint: unknown` and is never claimed current.
 
 ## External references and the Dossier bundle (D-6, as built 2026-10-03)
 
-Design and decisions D6-1…D6-7: [`la-separation-d6-design.md`](../../../superpower/la-separation-d6-design.md). Integration by reference, never by trust.
+Design and decisions D6-1…D6-7: [`la-separation-d6-design.md`](../../../archived-documents/plans-archive/la-separation-d6-design.md). Integration by reference, never by trust.
 
 * **External references.** `GET` / `POST /inv/investigations/{id}/references`, body `{system, type, id, url?, label?}`. Stored append-only in `references.jsonl` beside the op log (`SnapshotStore.appendReference`), OUTSIDE the write-once header and the Dossier manifest, so adding one never invalidates an issued Dossier. No edit or delete; a duplicate `(system, type, id)` and the 201st reference are 409. `POST` is `canManageIncidents` and owner-only; `GET` is the read gate (owner or linked-Case member). 🔴 A reference is **never trusted**: `trusted:false` on every record, never dereferenced, never read by the analysis, and it grants no access (a reference naming a Case shares nothing; only `PUT …/case` does). `url` is absolute `http` / `https`, with a host and no credentials, else 422. Audited `LINK_INVESTIGATION_REFERENCE_ADDED`.
 * **Dossier bundle.** `GET /inv/investigations/{id}/dossier/bundle?at=&snapshots=` returns `inspecto-dossier-bundle/1`: the masked Dossier, the masked references, `custody {manifestRoot, referencesCount, referencesHash}` and a SHA-256 `seal` over the canonical JSON of everything but `seal` and `generatedAt`. `POST …/dossier/bundle/verify` (body a bundle, or `{bundle}`) answers `{verified, sealIntact, rootMatches, referencesIntact, referencesAddedSince, problems, custody}`: the seal, the embedded manifest root, that the bundle's references are still the first N of the store, then the SAME manifest comparison `/dossier/verify` runs (`DossierRoutes.verifyManifest`). A failure is a result, not an error. Audited `LINK_DOSSIER_EXPORTED` / `LINK_DOSSIER_BUNDLE_VERIFIED`.
 * **Masking, R3, four-eyes.** Masked per `maskingMode` as it leaves (references too); the manifest and `referencesHash` hash the RAW store, so the root is identical masked or not and a masked bundle verifies; the seal covers what shipped. Read gate = the Dossier's (owner or Case member, R3 on the Dataset and every snapshot, the Enterprise PDP). A pending sensitive expand is not in the sealed log, so it is not in the bundle.
 * **Gotchas.** The offline-checkable part is the seal and the manifest's own root; whether the store still agrees needs the verify route. `DossierRoutes` was split (`parseAt`, `parseSnapshotIds`, `maskedDossier`, `verifyManifest`) so the Dossier, its verify and the bundle share one build. The new `POST …/references` is a `CapabilityManifest` entry, the bundle verify a read-shaped exemption, all four routes are in `AbsentGeoLinkRoutes` and `openapi-v1.json`.
 * **Not built.** The embeddable view (URL + scoped token): `LA-EMBED-VIEW-1`. Trust between installations (I1): no live call exists to need it.
+
+## Index design record (D-3: scope, decisions, measurements, seams)
+
+The as-built behaviour is in *Index (D-3, as built)* above; this section keeps what the retired design
+([archived](../../../archived-documents/plans-archive/la-separation-d3-design.md), provenance only) decided and measured, so the
+reasons survive. Steps 1-8 are built; step 1 was a test-only spike (`InvIndexSpikeBench`, a gated harness, not a test).
+
+**Scope: Path A (operator 2026-10-02), set by the step 1 spike.** Measured at 10^8 edges on one laptop (i7-9850H, 32 GB, DuckDB 1.5.2,
+warm cache, heavy-tailed corpus, mean degree 5): one hop through the sealed path **43 ms** (flat unsorted file 1,031 ms), full build
+**368 s** (6.1 min, peak working set 17.9 GB), but the Java-driven 5-level walk **3.0 s / 4.3 s p50 against a 1.5 s criterion: FAIL**. Only
+an equality on ONE key reaches the scan as a zone-map filter; a multi-key `IN`, an `OR`, a join on `VALUES` and `unnest` read most row groups
+(about 72 % of the rows at 50 keys), and one equality statement per key joined by `UNION ALL` is linear in the key count (0.7 s at 20
+keys, 2.2 s at 50). So the index serves single-entity lookups, a one-hop read both ways, **bounded neighbourhoods of depth <= 2 and
+<= 20 keys per level** (`IndexedTraversal.MAX_DEPTH` / `FRONTIER_CAP`, the same 20 in `SqlGraphEngine`), and a seeds-only
+`degreeCentrality`. It does NOT serve deep or wide multi-hop (`allPaths`, `shortestPath` / `descendants` over a large frontier, every
+global or iterative algorithm, the bidirectional BFS): those stay on the flat recursive-CTE path and the in-memory engine. Depth 3 is
+derived (about 1.4 s, no margin), never measured, so it is out; a wider cap needs a new measurement first.
+⚠ **Where the index loses.** Through the real route every request pays a fresh sealed connection (about 100-200 ms): at 10^6 edges the
+index is NOT faster (one hop 209-466 ms against 293-373 ms flat; a 20-key depth-2 walk loses about 3x), from 10^7 it wins 2-5x for a
+hop and 1.5-3x at depth 2; at 10^8 it was not re-run through the route. That is why `index.enabled` defaults to false.
+
+**Layout and seams.** `<Space write root>/la-index/<dataset>/<mappingHash>/CURRENT` (one-line atomic pointer, temp file `force`d then
+`ATOMIC_MOVE`) and immutable `v<n>/` directories holding `manifest.json` and Parquet `out/` (edges by source), `in/` (the mirror by
+target) and `nodes/` (folded counts), each `bucket=<0..N-1>/`, rows sorted by (entity, ts), row group 100,000, zstd. Ids are the RAW
+column values cast to VARCHAR (masking stays at the route, after the caches, so a mask-mode change needs no rebuild); a NULL endpoint is
+dropped and counted (`droppedNull`); `ts` is a NAIVE UTC timestamp (a TIMESTAMPTZ column refuses a zone, the effective zone is in the
+manifest, never the host's). `N = clamp(pow2(ceil(edges / 4e6)), 16, 1024)`, fixed per version. Size is 34 bytes per edge for all three
+tables (3.43 GB at 10^8, 1.28x the flat file), so the disk estimate is `rows x 34 x 2` with no separate node term. Modules and classes:
+
+| Where | What |
+|---|---|
+| `inspecto-la-storage` (host-free; DuckDB JDBC is its only non-`inspecto-*` need) | `BucketFunction`, `IndexMapping`, `IndexManifest`, `IndexStore`, `IndexBuilder`, `IndexBuildService`, `IndexPlan`, `IndexReader`, `IndexedTraversal`, `SqlGraphEngine`, `RoutingGraphEngine` |
+| `inspecto-la-core` | the ports: `DatasetProvider` (`relationSql`, `inputFingerprint`, `relationSqlOverFiles`), `InputFingerprint`, sealed `GraphInput` (`Materialised` / `IndexRef`), `IndexCapExceeded` |
+| `inspecto-la-api` | `IndexRoutes`, `IndexedRead` (the ONE gate: setting, choice of index, staleness, closed `Reason` enum), `IndexedRecursivePaths`, `IndexedNeighbors`, `IndexedExpand`, `IndexStaleness`, `InputFingerprintCache`, `IndexBuildServices` |
+
+`ALLOWED` in `tools/check-module-deps.mjs` and each pom's enforcer list agree (la-storage -> la-api and la-core -> la-storage stay red in
+the module-deps test); `tools/bundle-modules.mjs` stages la-storage `from: 'professional'`. `IndexReader` opens ONE `SqlSandbox` per
+request, binds views over the pinned version's Parquet, and seals it (`sealAllowing` = that version directory only,
+`enable_external_access=false`, configuration locked); `borrow` reuses idle connections per version directory (max 4). The builder runs
+its OWN non-sandboxed DuckDB (the sandbox forbids `COPY ... TO`), takes only a trusted relation SQL from the port AFTER the caller's view
+gate and never sees a Subject.
+
+**Signed decisions (1-8, operator 2026-10-02, all recommendations; 3 carries one amendment).**
+1. One index per (Dataset, edge mapping), under the Space write root. A cross-Dataset index and a per-Investigation index are different
+   products (cross-Dataset hops, D-7 Drafts).
+2. **Row scope (R3) is Dataset-level**: every index read first runs the base-Dataset view gate (same 404 as an absent Dataset), so a
+   revoked share bites on the next read; the manifest's `relationSqlHash` marks any Dataset-definition change stale. Invariant, stated:
+   valid ONLY while a Dataset has no per-Subject row filter; the day one lands the design becomes a per-scope index.
+3. Entity-hash buckets, sort (entity, ts). **Amendment (assistant, from step 1 data): the bucket function is `md5_number_lower(entity) % N`,
+   not DuckDB `hash()`.** `hash()` is deterministic across connections and processes but not reproducible in Java and not proven stable
+   across DuckDB versions; MD5 matches Java `MessageDigest` (digest bytes 8-15 little-endian, `Long.remainderUnsigned`) on 1,004 of 1,004
+   ids in the spike and on 4,000+ in `BucketFunctionTest`, builds about 16 % slower, looks up at the same speed. The engine computes the bucket
+   in Java with no round trip and a DuckDB upgrade cannot make an index silently stale through it; the manifest records `bucketFn` and
+   `duckdb.version`, a mismatch is stale, and a bucket-function change can only be deliberate. MD5 byte order inside DuckDB across versions
+   is still not proven.
+4. The builder is an LA-owned `IndexBuildService` with its own routes (la-* cannot import the engine's `JobService`); no `IndexBuildPort`.
+   A `JobTypeProvider` adapter for scheduling is "later" and not built.
+5. Full build first, incremental append and compaction after, only on explicit request - staleness is reported, never silently acted on.
+6. Serve a stale index flagged, pin the version at Graph Run submit, record `read.index` BESIDE the sealed fingerprint; refuse only when
+   removed rows could be exposed. `datasetVersion` stays `null` and `read.index` is provenance, NOT a replay pin (promoting it needs a decision).
+7. One module, `inspecto-la-storage`.
+8. Selection is automatic for the read routes when `index.enabled` is on (default OFF), always echoing `source`; a Graph Run needs an
+   explicit `input: "index"` and never falls back to the Working Set.
+
+**Gotchas worth keeping.**
+* **Fingerprint cost.** Listing a Dataset's input files costs about 0.19 ms per file (1 file 3 ms, 1,000 files 182 ms, 10,000 files 1.9 s;
+  Windows laptop, warm), and `GET /inv/index` pays one listing per indexed Dataset per call. The cap `InputFingerprint.MAX_FILES` is
+  10,000 (above it the `too-many-files:` sentinel claims nothing); `InputFingerprintCache` holds a result 30 s per (Dataset, mapping), at
+  most 256 entries, dropped when a build for it completes. The manifest records at most `IndexManifest.MAX_INPUT_FILES` = 5,000 files; over
+  that only the hash is kept, so such a Dataset can only be rebuilt in full.
+* **Consignment SQL hash.** With a Consignment registry a `physicalRef` relation SQL pins the file list, so an added file would change
+  `relationSqlHash` and read as a definition change, which the traversal gate must refuse. `IndexBuilder.relationSqlHash` therefore
+  blanks the pinned list inside `read_parquet(` / `read_csv(` before hashing: the hash is the DEFINITION, files are tracked only by the
+  input fingerprint. Manifests written before that fix read once as `relation_sql_changed`.
+* **Two copies of the data.** The index is a second copy, so the disk estimate is a budget (`index.max_disk_bytes`) and a rebuild peaks at
+  about 2x (old and new version coexist until GC; `keep_versions` default 2, a stage touched in the last 5 minutes is never collected).
+  Extrapolating to 10^9 edges (about 34 GB per index) is NOT measured; D-3 claims <= 10^8.
+* A non-UTC `timeColZone` makes a temporal constraint non-servable (`time_zone_not_servable`): the flat path compares raw wall-clock
+  values and DST changes durations, the index stores UTC instants. A filter on the weight column is not servable (stored as DOUBLE).
+* `neighbors` and `expand` fold EVERY row of a value (a count is exact only over all of them), so a node of millions of rows is bounded only
+  by the 5 s statement timeout, after which `index_read_failed` and the flat path answers. When the per-level `LIMIT` yield fence fires the
+  rows differ from the flat path's (its `LIMIT` has no `ORDER BY`); only the flag is comparable.
+* An `egoNetwork` of a node with more than 19 distinct neighbours ends `BUDGET_EXCEEDED` / `INDEX_CAP` although the expansion was one
+  lookup: the final induced-edge pass looks up one key per kept node. Exactness over reach; a hub is a Working Set job.
+* `nodes` after an append is per-file partial folds (a node can appear once per file group, degree sums stay exact); nothing reads it and
+  compaction recomputes it, so `tables.nodes.rows` of an appended version counts rows, not distinct nodes.
+* Pinned by mutation tests (each red): the Java bucket shifted by one, partial walk served instead of fallback, view gate removed, frontier
+  cap check disabled, version missing from the cache key, `index` silently rerouted to `workingSet`, the "removed file forces a full build"
+  line in `IndexPlan`, the reader glob narrowed to the main files (ignores deltas).
+
+**Not built (D-3).** The SPA hosts for `egoNetwork` and seeds-only `degreeCentrality` (the control supports them, no toolbox tab
+hosts them), and any `mode` (append / compact) control; the Investigation response naming WHY it fell back (only `neighbors` shows
+`rung_not_indexable` and the rest); `window` / `at`, hidden entities and `merged` rungs on the index; a scheduler or auto-compact; the
+`JobTypeProvider` adapter; `IndexSubgraph` and deep multi-hop (Path A); `K = 8` deltas and latency at 10^8 through the route, both
+unmeasured; cross-Dataset graphs. Filed: `LA-INDEX-SPA-SURFACES-1`, `LA-INDEX-SCALE-MEASURE-1`.
+
+## SPA separation record (D-5: library, second shell, packaging)
+
+As-built facts are in the two blockquotes at the top of this concept; the retired design and its edge-classification companion are
+[archived](../../../archived-documents/plans-archive/la-separation-d5-design.md) (provenance). Steps 1-7 are built.
+
+**Signed decisions (1-7, operator 2026-10-02, all recommendations).**
+1. Shared API clients STAY in core behind the `@inspecto/core/*` alias (`src/app/inspecto`); only the LA-only clients (`inv.service`,
+   `graph-runs.service`, `link-analysis-settings.service`, `geo.service`, `geo-settings.service`, `notes.service`, `inv-identity.service`;
+   1,678 lines) moved. Moving the whole `api/` was rejected: its closure leaves the directory (94 files), and the closure through the `api`
+   barrel lies (40 LA imports of the barrel close over all 72 clients) - measure the injected set.
+2. The canvas (`graph-view.component`), `catalog-graph`, `graph-types`, `graph-source`, `entity-key`, `graph-export` and `unique-name`
+   stay in core (14 host files use the canvas, 14 dialogs `unique-name`); the library holds the algorithms, brush, snapshot, filter,
+   history, branching engine and `geo`. Two core edges the closure could not see (`MultiNodeMapping` / `MultiEdgeMapping`, `ObjectNote`) moved to core.
+3. In-workspace libraries wired by `tsconfig` `paths`, NO ng-packagr (offline-safe, one `npm ci`); boundaries are ESLint rules (core <- library <- shell; core bans `@inspecto/link-analysis`).
+4. Names `@inspecto/core`, `@inspecto/link-analysis`, apps `gamma` (rename deferred) and `la-app`.
+5. The OIDC client code moved to core (`inspecto/auth`: `SessionService`, guard, interceptor, `pkce`, sign-in and callback pages) - one PKCE
+   implementation, one security review. `SessionService` needed no split.
+6. The LA product flavor is a UI flavor, not an edition: `package.ps1 -Ui gamma|la-app` (default `gamma`). A fifth edition is the promotion path
+   when a customer needs a bundle without the other Professional modules; no `-Pedition-la` exists.
+7. One bundle ships exactly one SPA (`ui/`); `package.ps1` copies `inspecto-ui/dist/<Ui>` BY NAME and empties the bundle directory first
+   (the old "first `index.html` under dist" became ambiguous with two applications).
+
+**Gotchas worth keeping.**
+* **The barrel/MapLibre trap and the bundle-shape guard.** `public-api.ts` is deliberately tiny (the `la-host` seam plus
+  `registerLinkAnalysisViz` / `registerGeoMapViz`). A first version also re-exported the widget components and `MapViewComponent`; a static
+  import from `app.config` then dragged MapLibre (1.2 MB) and the LA widgets into `main` (1.42 to 1.88 MB), because esbuild keeps a source
+  module's side effects. Lazy consumers import deep paths. `inspecto-ui/tools/check-bundle-shape.mjs` + `bundle-budget.json` (a `ui.yml`
+  step, plus `angular.json` `initial` / `bundle main` budgets) pin chunk placement and size.
+* **Lint scope followed the move or it would have silently stopped.** The restricted-import and dynamic-import rules were keyed to
+  `studio/{link-analysis,geo-map}/**`; they now name `projects/link-analysis/**` and `@inspecto/core/*`, and also forbid `SessionService` at its
+  new path `inspecto/auth/session.service`. Mutations (re-add a forbidden import) go red; `tools/la-dynamic-import-lint.test.mjs` and
+  `la-static-import-lint.test.mjs` pin the regexes. The design-token guard `ROOTS` and the Prettier / typecheck globs had to gain `projects`;
+  `vitest` discovery needs `../projects/**/*.spec.ts` (a bare `projects/**` matched nothing), and `tailwind.config.js` `content` had to scan
+  `./projects/**` or the utility classes used only by the library were purged from the stylesheet.
+* **Hand-kept mirrors named SPA paths** (9 Java parity tests, `check-vocabulary.mjs` path keys and `SOURCE_GLOBS`, doc citations): the six
+  `graph-*-parity` fixtures and `branching-parity.fixture.json` MOVED with their specs; `entity-normaliser-parity.fixture.json` STAYED in core
+  because `entity-key.spec` reads it.
+* **`la-app` token provision** (`LA_APP_TOKEN_PROVISION`, pinned by spec; a token not provided throws by design, only `LA_FEATURES` has a
+  safe default):
+
+  | Token | la-app | Behaviour |
+  |---|---|---|
+  | `LA_DATASETS` | real | Component registry `dataset` kind, no Studio code |
+  | `LA_CASES` | real | core `ObjectsService`; `available` follows the `ops` flag |
+  | `LA_TAGS`, `LA_TRANSFER`, `LA_AI_ASSIST` | real | core dialogs / components |
+  | `LA_FEATURES` | real | live `SessionService` signals from `/bootstrap` |
+  | `LA_WIDGETS`, `LA_CATALOG`, `LA_PIPELINE_GRAPH` | stub, `available: false` | one `console.info` per page load; the affordance is hidden (`GraphSourcesService.sources` filters, `byId` still resolves) |
+  | `LA_DASHBOARD_HEADER` | stub | empty component; the Link view widget is never embedded |
+
+  A STRING asset entry in `angular.json` resolves against the PROJECT root and silently copied nothing for la-app: use `{glob, input, output}`.
+  The Entity Lists page must provide the empty `InvestigationSessionStore` (NG0201 found only by driving the route).
+* **Packaging proof.** `-Ui la-app` and `-Ui gamma`, each with `-Edition Professional`, exited 0 with the boot smoke; the la-app zip's
+  index page is titled `Inspecto Link Analysis`, the gamma zip's UI folder is file-for-file `dist/gamma/browser`. `check-sbom-modules`,
+  `check-launchers`, `check-bundle-platform` and `bundle-modules.mjs` needed no change (none names the UI folder). The IAM client id for
+  la-app (`AUTH_OIDC_CLIENT_ID`; the launchers default to `inspecto-ui`) is a deployment decision, written in `docs/EDITIONS.md`.
+
+**Not built (D-5).** Real OIDC sign-in for la-app against an IAM (the path is covered by the moved specs and `authMode: none`); the
+"licence text" item (nothing in the bundle names the UI flavor to attach it to); `/bootstrap` was proven on a scratch Standard backend,
+not by calling the packaged zip's server; a fifth `LA` edition; module federation (signed no); a second `-Dui.dir`; renaming `gamma`; a mobile or SSR
+build. Filed: `LA-APP-REAL-SIGNIN-1`.
+
+## Integration design record (D-6: decisions and the deferral)
+
+The behaviour is in *External references and the Dossier bundle* above; the retired design is
+[archived](../../../archived-documents/plans-archive/la-separation-d6-design.md). Integration is BY REFERENCE: no installation trusts another, and
+a live call (and so the trust relationship I1) is needed only by a feature that makes one - none of the three D-6 items does.
+
+* **D6-1** storage: an append-only `references.jsonl` under `audit/` (a reserved import path, so an imported bundle cannot plant one), not a
+  header field (the header is write-once; a reference is a relationship, not evidence), hence outside the Dossier manifest; at most 200 per
+  Investigation (the check-and-append is one locked step), a fork or an instantiated template starts with none.
+* **D6-2** never trusted: caller text, never dereferenced, never merged into the Working Set or the log, grants nothing, `trusted:false`;
+  `url` must be absolute `http` / `https` with a host and no credentials (`javascript:` / `file:` / `ftp:` would be an XSS or local-read vector).
+* **D6-3** gates: `POST` is `canManageIncidents` (Case work, no new capability) and owner-only; `GET` is the read gate.
+* **D6-4 / D6-5** the bundle is sealed (SHA-256 over canonical JSON, keys sorted, `generatedAt` outside) and verifiable (custody: manifest
+  root and a references prefix hash; later additions are reported, a rewritten one fails; re-sealing an edited bundle is caught by custody);
+  masked per `maskingMode` as it leaves, while the manifest and `referencesHash` hash the RAW store so the root is identical masked or not.
+  Four-eyes holds by construction (a pending expand is not in the sealed log). The export persists nothing, so it takes no capability.
+  Accepted trade-off: a read-only Case member can export what they can already read.
+* **D6-6 deferred, on purpose (`LA-EMBED-VIEW-1`).** An embeddable view needs a NEW principal type in `inspecto-auth-spi` (a token scoped to one
+  Investigation: read-only, expiring, revocable, with a token store, mint and revoke routes, an expiry sweep and an exemption in
+  `ComponentAccess` / the PDP / R3 for a caller who is not a user), `frame-ancestors` / CSP and cross-origin cookie decisions, and a read-only SPA
+  shell; a leaked URL would hand masked evidence to a holder with no audit identity. These are decisions for the operator, not ones to
+  take silently; the bundle covers the sharing need that exists today. Build only when a consumer needs a live, revocable view.
+* **D6-7** no trust between installations (I1) is unbuilt: a reference is a pointer, a bundle a file, verification local.
+* Proof: `ControlApiDossierBundleTest` (real HTTP, armed Authenticator), key negatives mutation-checked (seal always true, references
+  unmasked, references prefix unchecked, POST not owner-only, URL scheme and credential checks removed, `trusted` flipped). The route table:
+  `POST …/references` is a `CapabilityManifest` entry, the bundle verify a read-shaped exemption, all four routes in `AbsentGeoLinkRoutes`
+  and `openapi-v1.json`.
+
+**Still open - filed on the board (`docs/BACKLOG.md` §3.12), separation phases.** `LA-INDEX-SPA-SURFACES-1` · `LA-INDEX-SCALE-MEASURE-1` ·
+`LA-EMBED-VIEW-1` · `LA-APP-REAL-SIGNIN-1`. The remaining option-D phase (D-7, Drafts) is active in
+[`la-separation-d7-design.md`](../../../superpower/la-separation-d7-design.md).
 
 ## Closed-plan record (2026-10-01)
 

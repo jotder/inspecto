@@ -1,13 +1,8 @@
-<!--
-  ACTIVE PLAN — docs/superpower/
-  Created 2026-10-03 (operator away; decisions made rationally and recorded below, none irreversible).
-  Retire per the three-tier lifecycle in CLAUDE.md when the embeddable view (`LA-EMBED-VIEW-1`) ships or is declined:
-  distil into `okf/frontend/features/link-analysis.md` §*External references and the Dossier bundle*, then archive.
--->
+<!-- ARCHIVED 2026-10-03 — shipped (D-6 references + Dossier bundle built; embeddable view deferred). Durable facts: docs/okf/frontend/features/link-analysis.md §External references and the Dossier bundle and §Integration design record; unbuilt remainder: docs/BACKLOG.md §3.12 (`LA-EMBED-VIEW-1`). Kept for provenance (decisions D6-1…D6-7); never maintained. -->
 
 # LA separation — D-6 design (integration: references, Dossier bundle, embeddable view)
 
-Option D's phase **D-6** ([`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md) §7.6, §7.8): let an
+Option D's phase **D-6** ([`la-separation-feasibility-plan.md`](../../superpower/la-separation-feasibility-plan.md) §7.6, §7.8): let an
 Investigation point at things in other systems and hand its evidence to someone outside — without any installation
 trusting another. Integration is **by reference first**; a live call (and so the trust relationship I1) is needed
 only by features that make live calls, and none of the three below does.

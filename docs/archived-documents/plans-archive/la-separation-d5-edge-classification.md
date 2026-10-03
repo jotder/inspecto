@@ -1,8 +1,4 @@
-<!--
-  ACTIVE PLAN — docs/superpower/
-  Working artifact of D-5 step 1 (la-separation-d5-design.md §5). Created 2026-10-02. Retire with the D-5 design when D-5 ships
-  (distil the as-built facts into okf/frontend/features/link-analysis.md first).
--->
+<!-- ARCHIVED 2026-10-03 — working artifact of D-5 step 1, retired with its design (la-separation-d5-design.md). Durable facts: docs/okf/frontend/features/link-analysis.md §SPA separation record. Kept for provenance; never maintained. -->
 
 # LA separation — D-5 step 1: edge classification (core / library / LA-only)
 

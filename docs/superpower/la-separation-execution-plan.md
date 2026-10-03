@@ -41,7 +41,7 @@ Question: can the browser algorithms run server side with identical results?
 
 ## Stage 3 — decide D-1 (planning only, no code)
 
-✅ DESIGN WRITTEN 2026-10-01 — [`la-separation-d1-design.md`](la-separation-d1-design.md); the five decisions in its §5 were SIGNED 2026-10-01 (all recommendations). Next: D-1 step 1 (`la-graph`) and step 2 (`inspecto-audit-spi`), independent lanes.
+✅ DONE — design written and signed 2026-10-01 ([`la-separation-d1-design.md`](la-separation-d1-design.md), decisions 1–5); D-1 steps 1–7 are built (verified at `ab36c6e9c`).
 
 Using Stage 2's findings, write the D-1 design (`http-spi`, `auth-spi` + OIDC move, `audit-spi` cutting the ETL edge,
 the `la-inspecto` bridge) with a module dependency guard, the order of extraction, and what proves Inspecto's behaviour
@@ -51,5 +51,5 @@ is unchanged. The operator signs it before any extraction starts.
 
 - **D-S5** concurrency rig — needed only when D-7 (Drafts) is near.
 - **D-S2** DuckPGQ — dropped 2026-10-01 (operator); DuckDB 2.0's own graph features are assessed when the pin moves.
-- **D-3 / D-4 / D-7** — depend on Stage 3.
+- **D-3 / D-4 / D-5 / D-6** — SHIPPED after Stage 3 (as-built: `docs/okf/frontend/features/link-analysis.md`; designs archived in `docs/archived-documents/plans-archive/`). **D-7** (Drafts) — design active in [`la-separation-d7-design.md`](la-separation-d7-design.md), unbuilt.
 - **Vocabulary:** the per-analyst working copy is a **Draft** (D16) — enter it in `docs/GLOSSARY.md` §13 before any code uses the word.

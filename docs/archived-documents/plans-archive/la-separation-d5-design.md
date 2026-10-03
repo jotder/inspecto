@@ -1,11 +1,8 @@
-<!--
-  ACTIVE PLAN — docs/superpower/
-  Created 2026-10-02 (D-5 design of la-separation-execution-plan.md). DECISIONS 1–7 SIGNED 2026-10-02. STEPS 3–7 BUILT 2026-10-02 (as-built notes in section 5). Retire per the three-tier lifecycle in CLAUDE.md when D-5 ships (or is declined).
--->
+<!-- ARCHIVED 2026-10-03 — shipped (D-5 steps 1-7 built). Durable facts: docs/okf/frontend/features/link-analysis.md §SPA separation record and the two blockquotes at its top; unbuilt remainder: docs/BACKLOG.md §3.12 (`LA-APP-REAL-SIGNIN-1`). Kept for provenance (decisions 1-7, the closure inventory, per-step as-built notes); never maintained. -->
 
 # LA separation — D-5 design (SPA separation: `la-app`, `link-analysis` library, LA product flavor)
 
-Option D's phase **D-5** ([`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md) §7.8: "`la-app` host +
+Option D's phase **D-5** ([`la-separation-feasibility-plan.md`](../../superpower/la-separation-feasibility-plan.md) §7.8: "`la-app` host +
 `projects/la-app` shell + LA product flavor (bundle, boot smoke, licence text)", depends on D-1 and SEP-03…06 — both done).
 This file is the design the operator signs before any move. ⛔ Grounding method: a transitive import closure over
 `inspecto-ui/src/app/**/*.ts` (relative imports + the `tsconfig.json` `paths` `app/*`, `environments/*`, `@gamma`) computed
@@ -167,9 +164,9 @@ Sizes are relative: S < 1 day, M 1–3, L 3+.
 
 ## 9. References
 
-- [`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md) §1.5, §7.5, §7.8, §7.9 (D8–D21), §7.12
-- [`la-separation-d1-design.md`](la-separation-d1-design.md) — the signed-design style this file follows
-- [`la-separation-execution-plan.md`](la-separation-execution-plan.md)
-- [`../archived-documents/plans-archive/la-separation-d4-design.md`](../archived-documents/plans-archive/la-separation-d4-design.md)
-- [`../okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md)
-- [`../EDITIONS.md`](../EDITIONS.md)
+- [`la-separation-feasibility-plan.md`](../../superpower/la-separation-feasibility-plan.md) §1.5, §7.5, §7.8, §7.9 (D8–D21), §7.12
+- [`la-separation-d1-design.md`](../../superpower/la-separation-d1-design.md) — the signed-design style this file follows
+- [`la-separation-execution-plan.md`](../../superpower/la-separation-execution-plan.md)
+- [`../archived-documents/plans-archive/la-separation-d4-design.md`](la-separation-d4-design.md)
+- [`../okf/frontend/features/link-analysis.md`](../../okf/frontend/features/link-analysis.md)
+- [`../EDITIONS.md`](../../EDITIONS.md)
