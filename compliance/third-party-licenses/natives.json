@@ -1,0 +1,17 @@
+{
+  "_comment": "Every .dll inside the Enterprise intelligence sidecar (inspecto-intelligence.jar) must be listed here. 'texts' are files in this directory that package.ps1 copies to the bundle's licenses/ dir; 'inJar' names a notice entry that must be present in the sidecar itself. NATIVE-LICENCE-TEXTS-1; see compliance/evidence/third-party-natives.md.",
+  "sha256": {
+    "GPL-3.0.txt": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+    "GCC-exception-3.1.txt": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74",
+    "mingw-w64-winpthreads-COPYING.txt": "63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177"
+  },
+  "dlls": {
+    "libstdc++-6.dll": { "licence": "GPL-3.0-or-later WITH GCC-exception-3.1", "texts": ["GPL-3.0.txt", "GCC-exception-3.1.txt"] },
+    "libgcc_s_seh-1.dll": { "licence": "GPL-3.0-or-later WITH GCC-exception-3.1", "texts": ["GPL-3.0.txt", "GCC-exception-3.1.txt"] },
+    "libwinpthread-1.dll": { "licence": "MIT-style (mingw-w64 winpthreads)", "texts": ["mingw-w64-winpthreads-COPYING.txt"] },
+    "tokenizers.dll": { "licence": "Apache-2.0", "texts": [], "note": "ai.djl.huggingface:tokenizers POM licence; recorded in the SBOM" },
+    "onnxruntime.dll": { "licence": "MIT", "texts": [], "inJar": "ThirdPartyNotices.txt" },
+    "onnxruntime4j_jni.dll": { "licence": "MIT", "texts": [], "inJar": "ThirdPartyNotices.txt" },
+    "jnidispatch.dll": { "licence": "LGPL-2.1-or-later OR Apache-2.0", "texts": [], "note": "net.java.dev.jna:jna POM licence; recorded in the SBOM" }
+  }
+}

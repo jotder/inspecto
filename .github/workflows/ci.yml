@@ -294,6 +294,11 @@ jobs:
       - name: Guard — the bundle's platform is read from the embedded runtime, never hard-coded
         run: node tools/check-bundle-platform.mjs
 
+      # Native-licence guard (NATIVE-LICENCE-TEXTS-1, 2026-10-03): the GPL-3.0 / GCC exception / winpthreads
+      # texts are verbatim (pinned sha256) and package.ps1 still stages them beside the intelligence sidecar.
+      - name: Guard — bundled native DLLs carry their licence texts
+        run: node tools/check-native-licences.mjs
+
       # Bundle-spaces guard (BUNDLE-UNTRACKED-SPACES-1, 2026-09-25). A demo bundle built in the shared
       # checkout shipped a git-excluded client working set and a peer's untracked pilot Space, because
       # step 4 copied the working-tree spaces/ listing. Staging now reads `git ls-tree HEAD` only

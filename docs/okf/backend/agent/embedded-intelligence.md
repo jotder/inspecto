@@ -400,6 +400,12 @@ UI half, result-shape adapters and the pane adoptions: [[inline-ai-authoring]].
 - **Two parallel bus systems stay separate**: the canonical Signal bus (`EventLog`, `EventType.SIGNAL`)
   vs. the legacy `ConsignmentEventBus` (`FailureReactor`) — no migration, per the standing run-claim
   decision.
+- **Native licence texts ship beside the sidecar** (`NATIVE-LICENCE-TEXTS-1`, 2026-10-03): the shaded
+  `inspecto-intelligence.jar` carries the MinGW-w64 GCC runtime and winpthreads DLLs (via DJL tokenizers)
+  with no licence text. `package.ps1` copies `compliance/third-party-licenses/` (GPL-3.0, GCC exception 3.1,
+  winpthreads `COPYING`, sha256-pinned) to `<bundle>/licenses/` and runs `tools/check-native-licences.mjs
+  --bundle`. **A new native DLL in the sidecar fails packaging until it is classified in `natives.json`.**
+  Per-DLL licences: root `compliance/evidence/third-party-natives.md`.
 
 ## Still open (parent plan archived 2026-07-25: `archived-documents/plans-archive/embedded-intelligence-plan.md`, §8)
 

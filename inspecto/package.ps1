@@ -705,6 +705,14 @@ if ($intelligenceJarSrc) {
         if ($intelZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/org.slf4j.spi.SLF4JServiceProvider' }) { throw "inspecto-intelligence.jar registers a second SLF4J binding - the shade excludes were dropped." }
         Write-Host "  verified: IntelligenceAgent registration + onnxruntime natives present, core excluded, no duplicate SLF4J binding" -ForegroundColor DarkGray
     } finally { $intelZip.Dispose() }
+    # NATIVE-LICENCE-TEXTS-1: the sidecar's MinGW-w64 GCC runtime + winpthreads DLLs ship with no licence text;
+    # stage GPL-3.0, the GCC Runtime Library Exception 3.1 and winpthreads COPYING beside the jar, then refuse
+    # the bundle if any DLL in the jar is unclassified in natives.json or lacks its text.
+    $licSrc = Join-Path $sandboxRoot 'compliance\third-party-licenses'
+    New-Item -ItemType Directory -Force "$bundleDir\licenses" | Out-Null
+    Copy-Item "$licSrc\*" "$bundleDir\licenses\"
+    & node (Join-Path $sandboxRoot 'tools\check-native-licences.mjs') --bundle $bundleDir
+    if ($LASTEXITCODE -ne 0) { throw "check-native-licences failed - a bundled native DLL lacks its licence text." }
 }
 # Every edition: remote acquisition is a core product capability (EDITIONS SP-ACQ-02 marks SFTP shipped in
 # all three), so the sidecar is NOT edition-gated. It is inert until a pipeline names a non-local
