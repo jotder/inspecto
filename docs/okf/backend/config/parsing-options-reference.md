@@ -133,7 +133,7 @@ Two consequences worth knowing:
 
 ## 3. Corrected & extended DuckDB `read_csv` parameter reference
 
-Supersedes the PDF's §1–§5 tables. Verified against DuckDB 1.x (the engine bundles 1.5.2).
+Supersedes the PDF's §1–§5 tables. Verified against DuckDB 1.x (the engine bundles 1.5.6; measurements below were probed on 1.5.2.1).
 
 ### 3.1 Dialect & structure
 | Param | Type | Default | Notes |
