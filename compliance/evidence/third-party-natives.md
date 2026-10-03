@@ -11,11 +11,11 @@ so those terms are recorded here instead.
 
 | Shipped inside the sidecar | Comes from (Maven artifact) | Licence | How it was established |
 |---|---|---|---|
-| `ai/onnxruntime/native/*/` — `onnxruntime` + `onnxruntime4j_jni` for win-x64, linux-x64/aarch64, osx-x64/aarch64 | `com.microsoft.onnxruntime:onnxruntime:1.20.0` | MIT | the artifact's POM; the artifact's own `ThirdPartyNotices.txt` (345 KB, covering the libraries statically linked into the natives) is **retained at the sidecar root** |
-| `native/lib/*/cpu/tokenizers` (Hugging Face tokenizers, Rust) | `ai.djl.huggingface:tokenizers:0.36.0` | Apache-2.0 | the artifact's POM |
+| `ai/onnxruntime/native/*/` — `onnxruntime` + `onnxruntime4j_jni` for win-x64, linux-x64/aarch64, osx-x64/aarch64 | `com.microsoft.onnxruntime:onnxruntime:1.20.0` | MIT | the artifact's POM; the artifact's own `ThirdPartyNotices.txt` (345 KB, covering the libraries statically linked into the natives) is **retained at the sidecar root**. ⚠ Its own MIT `LICENSE` text is not in the artifact and not available offline: pending under `NATIVE-LICENCE-ONNXRUNTIME-TEXT-1` |
+| `native/lib/*/cpu/tokenizers` (Hugging Face tokenizers, Rust) | `ai.djl.huggingface:tokenizers:0.36.0` | Apache-2.0 | the artifact's POM; `Apache-2.0.txt` ships in the bundle's `licenses/` dir (the artifact carries no NOTICE) |
 | `native/lib/win-x86_64/cpu/libstdc++-6.dll`, `libgcc_s_seh-1.dll` (GCC runtime, win-x64 only) | the same `tokenizers` artifact | **GPL-3.0-or-later WITH GCC-exception-3.1** (the GCC Runtime Library Exception) | the file names identify them as the MinGW-w64 GCC runtime. The artifact ships no licence text for them. The exception permits distributing them with a program that was compiled by GCC (here, `tokenizers.dll`) without GPL obligations on that program. The GPL-3.0 and exception texts ship in the bundle's `licenses/` dir (see below). |
 | `native/lib/win-x86_64/cpu/libwinpthread-1.dll` (win-x64 only) | the same `tokenizers` artifact | MIT-style (mingw-w64 winpthreads `COPYING`) | the file name identifies the library; no licence text ships in the artifact, so the `COPYING` text ships in the bundle's `licenses/` dir |
-| `com/sun/jna/*/jnidispatch` (JNA natives) | `net.java.dev.jna:jna:5.17.0` | LGPL-2.1-or-later **or** Apache-2.0 (dual; the recipient may choose) | the artifact's POM and its `META-INF/LICENSE`. ⚠ In the sidecar that file name collides with others (the sidecar keeps one `META-INF/LICENSE`), so JNA's own copy is **not reliably retained** |
+| `com/sun/jna/*/jnidispatch` (JNA natives) | `net.java.dev.jna:jna:5.17.0` | LGPL-2.1-or-later **or** Apache-2.0 (dual; the recipient may choose). **Inspecto takes it under the Apache-2.0 option.** | the artifact's POM and its `META-INF/LICENSE`, which the shade now concatenates into the sidecar's `META-INF/LICENSE` (beside JNA's `META-INF/AL2.0` and `LGPL2.1`); `Apache-2.0.txt` ships in `licenses/` (no NOTICE in the artifact) |
 | `all-minilm-l6-v2.onnx` (90 MB sentence-embedding model) and its tokenizer | `dev.langchain4j:langchain4j-embeddings-all-minilm-l6-v2:1.16.3-beta26` | Apache-2.0 (the jar); the model is `sentence-transformers/all-MiniLM-L6-v2`, Apache-2.0 | the jar's POM; the model's licence comes from its upstream model card and **could not be checked offline** |
 
 **Extraction at run time.** None of these libraries is downloaded. Each is extracted from the jar the first time
@@ -31,14 +31,15 @@ package licence directories installed with the Windows Git client (`mingw64/shar
 - `GPL-3.0.txt` is the current gnu.org `gpl-3.0.txt` (sha256 `3972dc97…6986`, the https revision), from `xz/COPYING.GPLv3`.
 - `GCC-exception-3.1.txt` is GCC's `COPYING.RUNTIME`, from `gcc-libs/`.
 - `mingw-w64-winpthreads-COPYING.txt` is the winpthreads `COPYING`, from `libwinpthread/`.
+- `Apache-2.0.txt` is the standard apache.org `LICENSE-2.0.txt` (11358 bytes, sha256 `cfc7749b…3d30`), from `META-INF/LICENSE.txt` in the local `commons-lang3-3.12.0.jar` (added 2026-10-03, `NATIVE-LICENCE-SHADE-MERGE-1`).
 
 `inspecto/package.ps1` copies the directory to `<bundle>/licenses/`, next to `inspecto-intelligence.jar`, when it
 stages the sidecar. It then runs `tools/check-native-licences.mjs --bundle`, which fails the package if a DLL in
 the jar is not classified, an `inJar` notice is missing, or a required text is absent. CI runs the same guard
 without `--bundle`, which checks the text hashes and the package.ps1 wiring.
 
-**Open (owed before an external licence review; tracked as `NATIVE-LICENCE-SHADE-MERGE-1`):**
-1. Make the shade step merge `META-INF/LICENSE*` / `NOTICE*` (for example with an
-   `ApacheNoticeResourceTransformer` plus per-artifact renames), so JNA's licence and every other
-   colliding licence survive shading.
+**Shade merge (`NATIVE-LICENCE-SHADE-MERGE-1`, shipped 2026-10-03).** `inspecto-intelligence/pom.xml` concatenates colliding `META-INF/LICENSE`, `LICENSE.txt` and `LICENSE.md` (`AppendingTransformer`) and merges `NOTICE*` (`ApacheNoticeResourceTransformer`), so no artifact's licence file is dropped first-wins. `check-native-licences` requires a shipped text for every DLL; the only exception is a `textPending` that names an open backlog row.
+
+**Open:**
+1. onnxruntime's own MIT `LICENSE` text (`NATIVE-LICENCE-ONNXRUNTIME-TEXT-1`).
 2. Trim the non-target-platform natives if the size matters (macOS and aarch64 are about 90 MB uncompressed).

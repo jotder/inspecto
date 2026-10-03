@@ -9,7 +9,7 @@
 //
 // WHAT IT DOES.
 //   (a) every text named in compliance/third-party-licenses/natives.json exists and matches its pinned
-//       sha256 (a hand-edited or truncated licence text fails);
+//       sha256 (a hand-edited or truncated licence text fails), and every DLL names at least one text;
 //   (b) package.ps1 still copies that directory into the bundle (text check);
 //   (c) with --jar <path> (a sidecar jar) or --bundle <dir> (a staged bundle): every *.dll entry in the
 //       jar is listed in natives.json, its `inJar` notice is present, and (with --bundle) every text it
@@ -35,7 +35,15 @@ for (const [file, want] of Object.entries(manifest.sha256)) {
 }
 for (const [dll, e] of Object.entries(manifest.dlls)) {
   for (const t of e.texts) if (!(t in manifest.sha256)) errors.push(`${dll}: text ${t} has no pinned sha256`);
-  if (e.texts.length === 0 && !e.inJar && !e.note) errors.push(`${dll}: no texts, inJar or note`);
+  // NATIVE-LICENCE-SHADE-MERGE-1: every classified DLL needs a shipped licence TEXT - an SBOM entry or a
+  // free-text note is not a licence text.
+  // The one exception is a `textPending` naming an OPEN backlog row id, so the gap stays on the board.
+  if (e.texts.length === 0) {
+    const row = /^([A-Z0-9-]+-\d+):/.exec(e.textPending ?? '')?.[1];
+    const board = readFileSync(join(root, 'docs', 'BACKLOG.md'), 'utf8');
+    if (!row || !board.includes(`\`${row}\` —`)) errors.push(`${dll}: no licence text - every native DLL must ship one (textPending must name an open BACKLOG row)`);
+    else console.warn(`check-native-licences: WARNING ${dll}: licence text pending under ${row}`);
+  }
 }
 
 const pkg = readFileSync(join(root, 'inspecto', 'package.ps1'), 'utf8');

@@ -123,6 +123,21 @@
                             <transformers>
                                 <!-- MERGE the ServiceLoader registrations, or the IntelligenceAgent entry is lost. -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <!-- NATIVE-LICENCE-SHADE-MERGE-1: colliding licence/notice files are CONCATENATED,
+                                     never first-wins - JNA's META-INF/LICENSE (its LGPL/Apache dual-licence
+                                     statement) was being dropped by a later artifact's copy. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                    <resource>META-INF/LICENSE</resource>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                    <resource>META-INF/LICENSE.txt</resource>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                    <resource>META-INF/LICENSE.md</resource>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer">
+                                    <addHeader>false</addHeader>
+                                </transformer>
                             </transformers>
                             <filters>
                                 <filter>
