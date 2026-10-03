@@ -532,7 +532,12 @@ public final class ControlApi implements AutoCloseable, HostContext {
     // ── routes ───────────────────────────────────────────────────────────────────
 
     private void registerRoutes() {
-        get ("/health", (e, m) -> Map.of("status", "UP"));
+        // D6 (policy-narrowing-design): an unreadable Safety Policy file keeps the control plane serving (the UI that
+        // shows why must stay up) but is reported here - 200 + DEGRADED, the files named.
+        get ("/health", (e, m) -> {
+            List<String> bad = com.gamma.config.safety.SafetyPolicy.unreadable();
+            return bad.isEmpty() ? Map.of("status", "UP") : Map.of("status", "DEGRADED", "safetyPolicy", bad);
+        });
         // MNT-15: per-subsystem health — deeper than the liveness probe, auth-gated (not a public path).
         get ("/health/details", (e, m) -> HealthDetails.of(this));
         // Zero Spaces is still READY: the server must take traffic so a Space can be created (POST /spaces).
@@ -773,6 +778,14 @@ public final class ControlApi implements AutoCloseable, HostContext {
         } catch (ApiException ae) {
             if (ae.errorCode != null) ApiContext.attr(ex, ApiContext.ATTR_ERROR_CODE, ae.errorCode);
             respond(ex, ae.status, Map.of("error", ae.getMessage()));
+        } catch (com.gamma.config.safety.SafetyPolicyUnreadableException unreadable) {
+            // A Safety Policy file in scope cannot be read (policy-narrowing-design §5.1): EVERY gate that asks for
+            // the effective policy fails closed as a 422 finding naming the file - never a 500, never "no policy".
+            ApiContext.attr(ex, ApiContext.ATTR_ERROR_CODE, ErrorCodes.SAFETY_POLICY_UNREADABLE);
+            respond(ex, 422, Map.of("error", unreadable.getMessage(), "findings", List.of(
+                    new com.gamma.config.spec.Finding(com.gamma.config.spec.Severity.ERROR, unreadable.file(),
+                            unreadable.getMessage(), ErrorCodes.SAFETY_POLICY_UNREADABLE,
+                            "fix or remove the Safety Policy file, then retry"))));
         } catch (SpaceManager.NoSpaceHostedException none) {
             // Zero Spaces is a normal state (bundles ship none): a clear 503, never a 500 + stack per request.
             log.debug("{} {} needs a Space and none is attached", ex.getRequestMethod(), path(ex));
@@ -823,6 +836,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
      *  (a client disconnect is not a server fault). Kept beside the boundary so the two cannot drift apart. */
     private static int failureStatus(Throwable t) {
         if (t instanceof SpaceManager.NoSpaceHostedException) return 503;
+        if (t instanceof com.gamma.config.safety.SafetyPolicyUnreadableException) return 422;
         if (t instanceof Exception && isClientDisconnect(t)) return 0;
         return 500;
     }

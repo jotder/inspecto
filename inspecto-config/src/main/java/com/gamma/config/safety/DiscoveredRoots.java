@@ -56,6 +56,11 @@ public final class DiscoveredRoots {
     }
 
     /** The base registered for {@code spaceId}, for {@link SafetyPolicy#forSpace(String)}. */
+    /** The ids of every Space whose base is registered. */
+    public static java.util.Set<String> ids() {
+        return java.util.Set.copyOf(ROOTS.keySet());
+    }
+
     static Optional<Path> baseOf(String spaceId) {
         return spaceId == null ? Optional.empty() : Optional.ofNullable(ROOTS.get(spaceId));
     }

@@ -400,8 +400,10 @@ final class PipelineScheduler {
                     activeRuns.incrementAndGet());
             PollState poll = pollStates.computeIfAbsent(due.id(), k -> new PollState());
             try {
-                MultiCollectorProcessor.RunResult r =
-                        MultiCollectorProcessor.runConfigs(List.of(due.cfg()), 1, bus.sink(), acquireFirst);
+                // policy-narrowing-design S2b (D8): pinned once per run; an unreadable Safety Policy file throws
+                // here, BEFORE any file is touched, and lands in the RuntimeException arm below (poll failed).
+                MultiCollectorProcessor.RunResult r = com.gamma.config.safety.SafetyPolicy.pinnedForRun(() ->
+                        MultiCollectorProcessor.runConfigs(List.of(due.cfg()), 1, bus.sink(), acquireFirst));
                 // DUCKLE-C9: stamped for EVERY dispatched poll, including one that found nothing — a quiet
                 // poll is exactly the case that previously left no trace anywhere.
                 poll.polled(System.currentTimeMillis());

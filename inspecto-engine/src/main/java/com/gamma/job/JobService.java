@@ -1389,8 +1389,20 @@ public final class JobService implements AutoCloseable {
                 // (PipelineJobRunner checks Scope.JOB by Run id before each registry/lakehouse write).
                 try (com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
                         com.gamma.inspector.CommitFence.Scope.JOB, runId, () -> worst(arming, authored))) {
-                    executeRun(job, cfg, runId, name, trigger, start, correlationId, causationId,
-                            chainDepth, firing);
+                    // policy-narrowing-design S2b (D8): the Space's effective Safety Policy is resolved ONCE here,
+                    // before anything starts, and pinned for the run. An unreadable policy file refuses the run
+                    // as a FAILED Run naming the file - never started under "no policy".
+                    try {
+                        com.gamma.config.safety.SafetyPolicy.pinnedForRun(() -> {
+                            executeRun(job, cfg, runId, name, trigger, start, correlationId, causationId,
+                                    chainDepth, firing);
+                            return null;
+                        });
+                    } catch (com.gamma.config.safety.SafetyPolicyUnreadableException refused) {
+                        log.warn("job run '{}' ({}) refused: {}", name, runId, refused.getMessage());
+                        record(new JobRun(runId, name, job.type(), trigger, start,
+                                LocalDateTime.now().format(TS), "FAILED", 0L, refused.getMessage()));
+                    }
                 } finally {
                     if (authored != null) authored.close();
                 }

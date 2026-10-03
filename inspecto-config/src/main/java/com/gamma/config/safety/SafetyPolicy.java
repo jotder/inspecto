@@ -86,7 +86,46 @@ public record SafetyPolicy(
      * until later the same day — the claim is now true.)
      */
     public static SafetyPolicy defaultPolicy() {
-        return forSpace(CurrentSpace.id());
+        String space = CurrentSpace.id();
+        if (PINNED.isBound() && PINNED.get().space().equals(space)) return PINNED.get().policy();
+        return forSpace(space);
+    }
+
+    private record Pin(String space, SafetyPolicy policy) {}
+
+    /** The policy a run planned with, visible to {@link #defaultPolicy()} for the rest of that run. */
+    private static final ScopedValue<Pin> PINNED = ScopedValue.newInstance();
+
+    /**
+     * Plan-time pin of one run ({@code policy-narrowing-design.md} §5.3, D8): resolves the calling Space's
+     * effective policy <b>once</b> and runs {@code run} with that snapshot, so a file tightened mid-run applies to
+     * the next run. Throws {@link SafetyPolicyUnreadableException} <b>before</b> {@code run} starts when a policy
+     * file in scope is unreadable - the run is refused, never started under "no policy".
+     *
+     * <p>⚠ The pin rides a {@link ScopedValue}, so it is visible on the planning thread and not on a worker pool
+     * the run fans out to; an act-time gate that runs on such a thread must be handed the policy explicitly.
+     */
+    public static <T> T pinnedForRun(java.util.function.Supplier<T> run) {
+        SafetyPolicy p = forSpace(CurrentSpace.id());
+        return ScopedValue.where(PINNED, new Pin(CurrentSpace.id(), p)).call(run::get);
+    }
+
+    /**
+     * Every Safety Policy file problem in scope right now: the server file and each hosted Space's file, one
+     * message each (distinct). Empty when every file in scope is readable. Backs {@code /health} (D6).
+     */
+    public static List<String> unreadable() {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        java.util.Set<String> ids = new java.util.TreeSet<>(DiscoveredRoots.ids());
+        if (ids.isEmpty()) ids.add(CurrentSpace.DEFAULT_SPACE_ID);
+        for (String id : ids) {
+            try {
+                forSpace(id);
+            } catch (SafetyPolicyUnreadableException e) {
+                out.add(e.getMessage());
+            }
+        }
+        return List.copyOf(out);
     }
 
     /**

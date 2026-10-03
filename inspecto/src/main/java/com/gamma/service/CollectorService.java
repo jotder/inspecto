@@ -1833,7 +1833,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             java.util.function.Consumer<List<com.gamma.inspector.DryRunRejects.MemberRejects>> dryRunRejects) {
         refuseIfTemplate(pipelineName);
         return underSpace(() -> {
-            Optional<MultiCollectorProcessor.RunResult> result = pathFor(pipelineName).map(p -> {
+            // policy-narrowing-design S2b (D8): the Space's effective Safety Policy is resolved once, before the
+            // run claims anything, and pinned for the run; an unreadable policy file refuses the run (it throws
+            // here, so an async trigger records a FAILED Run naming the file and a sync one answers 422).
+            Optional<MultiCollectorProcessor.RunResult> result = pathFor(pipelineName).map(p -> com.gamma.config.safety.SafetyPolicy.pinnedForRun(() -> {
                 // Block until THIS pipeline is free (a cycle run of it, or another trigger, may be in flight);
                 // unrelated pipelines are unaffected. See PipelineRunGuard for why blocking is right here.
                 try (RunLease.Claim claim = runGuard.acquire(pipelineName);
@@ -1859,7 +1862,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                         running.remove(pipelineName);
                     }
                 }
-            });
+            }));
             // After the run, and after the claim is released: the audit is on disk, so the projection can
             // read it, and a DB hiccup cannot hold the pipeline's lock. No-op for the file store.
             // Nothing to re-project after a dry run — the audit on disk is byte-for-byte unchanged.

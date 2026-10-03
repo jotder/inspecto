@@ -36,6 +36,8 @@ public final class ErrorCodes {
     /** 500 — stored evidence disagrees with its own recorded hashes (e.g. a broken identity fact chain, LA-17);
      *  the store is refused rather than silently read. */
     public static final String INTEGRITY_VIOLATION      = "INTEGRITY_VIOLATION";
+    /** 422 — a Safety Policy file in scope exists but cannot be read as a valid policy; every gate and run in scope fails closed. */
+    public static final String SAFETY_POLICY_UNREADABLE = "ERR_SAFETY_POLICY_UNREADABLE";
 
     /** The contract's default code for a status ({@code errorCode} is never absent on a v1 error). */
     static String defaultFor(int status) {

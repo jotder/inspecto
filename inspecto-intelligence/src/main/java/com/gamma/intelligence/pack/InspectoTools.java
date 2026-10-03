@@ -816,7 +816,13 @@ final class InspectoTools {
             List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(cfgSpec, draft));
             // Agent drafts must clear the security boundary before a human ever sees them (plan §6.4):
             // the safety gate is always applied here, not opt-in as on the /validate route.
-            findings.addAll(ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy()));
+            try {
+                findings.addAll(ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy()));
+            } catch (com.gamma.config.safety.SafetyPolicyUnreadableException unreadable) {
+                // fail closed - an unreadable Safety Policy file is an ERROR finding, never "no policy"
+                findings.add(new Finding(com.gamma.config.spec.Severity.ERROR, unreadable.file(),
+                        unreadable.getMessage(), com.gamma.config.safety.SafetyPolicyUnreadableException.CODE, null));
+            }
             // A component kind's spec is thin by design (D7), so its TRUTH is the production preview: a
             // draft is clean only when that preview ran and passed (D6), never from a vacuous spec check.
             // Skipped over a spec ERROR, which already says the draft names no runnable operator.

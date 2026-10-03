@@ -52,7 +52,12 @@ public final class ComponentActions {
         if (id == null || id.isBlank()) return error("id is required");
         if (config == null) return error("config is required and must be an object");
 
-        List<Finding> unsafe = ConfigSafetyValidator.check(configType(type), config, SafetyPolicy.defaultPolicy());
+        List<Finding> unsafe;
+        try {
+            unsafe = ConfigSafetyValidator.check(configType(type), config, SafetyPolicy.defaultPolicy());
+        } catch (com.gamma.config.safety.SafetyPolicyUnreadableException unreadable) {
+            return error("refused: " + unreadable.getMessage());   // fail closed - never "no policy"
+        }
         if (!unsafe.isEmpty()) {
             return error("refused: config does not clear the safety gate — " + summarize(unsafe)
                     + " (fix via component_draft, then re-apply)");
@@ -136,7 +141,14 @@ public final class ComponentActions {
         Optional<Map<String, Object>> current = currentContent(components, type, id);
         p.put("willCreate", current.isEmpty());
         p.put("diff", diff(current.orElse(Map.of()), config));
-        List<Finding> unsafe = ConfigSafetyValidator.check(configType(type), config, SafetyPolicy.defaultPolicy());
+        List<Finding> unsafe;
+        try {
+            unsafe = ConfigSafetyValidator.check(configType(type), config, SafetyPolicy.defaultPolicy());
+        } catch (com.gamma.config.safety.SafetyPolicyUnreadableException unreadable) {
+            p.put("safe", false);
+            p.put("error", unreadable.getMessage());   // fail closed - never "no policy"
+            return p;
+        }
         p.put("safe", unsafe.isEmpty());
         if (!unsafe.isEmpty()) p.put("safetyFindings", unsafe.stream().map(ComponentActions::findingMap).toList());
         return p;

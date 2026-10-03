@@ -171,4 +171,42 @@ class SafetyPolicyFilesTest {
         write(base.resolve("config"), "caps:\n  max_threads: x\n");
         assertThrows(SafetyPolicyUnreadableException.class, () -> SafetyPolicy.forSpace("s1"));
     }
+
+    @Test
+    void aRunPinsItsPolicyAtPlanTimeAndTheNextRunSeesTheTightenedFile() throws IOException {
+        Path base = spaceBase("s1");
+        DiscoveredRoots.register("default", base);
+        Path cfg = base.resolve("config");
+        write(cfg, "caps:\n  max_threads: 4\n");
+        int[] seen = new int[2];
+        {
+            SafetyPolicy.pinnedForRun(() -> {
+                seen[0] = SafetyPolicy.defaultPolicy().maxThreads();
+                try { write(cfg, "caps:\n  max_threads: 1\n"); } catch (IOException e) { throw new RuntimeException(e); }
+                seen[1] = SafetyPolicy.defaultPolicy().maxThreads();   // mid-run: still the plan-time snapshot (D8)
+                return null;
+            });
+            assertEquals(4, seen[0]);
+            assertEquals(4, seen[1]);
+            assertEquals(1, SafetyPolicy.defaultPolicy().maxThreads());   // the NEXT run applies the tightened file
+        }
+    }
+
+    @Test
+    void anUnreadableFileRefusesTheRunBeforeItsBodyStartsAndIsListedForHealth() throws IOException {
+        Path base = spaceBase("s1");
+        DiscoveredRoots.register("default", base);
+        write(base.resolve("config"), "mode: audit\n");
+        boolean[] started = {false};
+        {
+            assertThrows(SafetyPolicyUnreadableException.class, () -> SafetyPolicy.pinnedForRun(() -> {
+                started[0] = true;
+                return null;
+            }));
+        }
+        assertFalse(started[0], "the run body never starts under an unreadable policy");
+        assertEquals(1, SafetyPolicy.unreadable().size());
+        write(base.resolve("config"), "caps:\n  max_threads: 2\n");
+        assertTrue(SafetyPolicy.unreadable().isEmpty());
+    }
 }

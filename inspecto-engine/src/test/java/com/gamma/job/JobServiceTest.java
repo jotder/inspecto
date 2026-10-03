@@ -216,6 +216,37 @@ class JobServiceTest {
         }
     }
 
+    /**
+     * DUCKLE-C6-POLICY-NARROWING-1 S2b: a Safety Policy file in the Space's scope that cannot be read refuses the
+     * Run as a FAILED Run naming the file and the stable code - the job body never starts; the fixed file runs.
+     */
+    @Test
+    void anUnreadableSafetyPolicyFileRefusesTheRunAsAFailedRun(@TempDir Path dir) throws Exception {
+        Path base = Files.createDirectories(dir.resolve("base").resolve("config")).getParent();
+        com.gamma.config.safety.DiscoveredRoots.register("default", base);
+        Path policy = base.resolve("config").resolve("safety-policy.toon");
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(maintenance("hb", null, null, Map.of("task", "heartbeat"))),
+                     new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
+            js.start();
+            Files.writeString(policy, "mode: audit\n");   // legal in the server file only
+            assertTrue(js.trigger("hb"));
+            JobRun refused = await(() -> js.lastRunOf("hb").orElse(null));
+            assertEquals("FAILED", refused.status());
+            assertTrue(refused.message().contains("ERR_SAFETY_POLICY_UNREADABLE"), refused.message());
+            assertTrue(refused.message().contains("safety-policy.toon"), refused.message());
+
+            Files.writeString(policy, "caps:\n  max_threads: 2\n");
+            assertTrue(js.trigger("hb"));
+            long deadline = System.nanoTime() + 10_000_000_000L;
+            while (!"SUCCESS".equals(js.lastRunOf("hb").map(JobRun::status).orElse("")) && System.nanoTime() < deadline)
+                Thread.sleep(50);
+            assertEquals("SUCCESS", js.lastRunOf("hb").orElseThrow().status(), "the fixed file runs");
+        } finally {
+            com.gamma.config.safety.DiscoveredRoots.clear();
+        }
+    }
+
     @Test
     void manualTriggerRunsRecordsAndAudits(@TempDir Path dir) throws Exception {
         JobConfig hb = maintenance("hb", null, null, Map.of("task", "heartbeat"));

@@ -1,6 +1,6 @@
 # Safety Policy narrowing — design
 
-**Status: IN FLIGHT (2026-09-28). D1–D16 answered — every recommendation accepted (§8). S0 probes recorded (§6.1); S1 built (`SafetyPolicyTier`, `HostPattern`). S2–S7 open.**
+**Status: IN FLIGHT (2026-09-28). D1–D16 answered — every recommendation accepted (§8). S0 probes recorded (§6.1); S1 built (`SafetyPolicyTier`, `HostPattern`). S2a + S2b built (2026-10-03/04). S3–S7 open.**
 Row: `docs/BACKLOG.md` §3.8 `DUCKLE-C6-POLICY-NARROWING-1` (P3, adopted 2026-09-15 from duckle §1 C6 —
 `archived-documents/plans-archive/duckle-concepts-candidates.md` row C6). Owner concept once built:
 [`okf/backend/config/config-safety.md`](../okf/backend/config/config-safety.md).
@@ -354,6 +354,8 @@ S1 → S2 are the spine; S3–S6 are independent once S2 lands.
   describes the pre-fix code.
 
 **S2a — loading + refusal (2026-10-03).** `SafetyPolicyFiles.effective(serverDir, spaceBase, id, defaultRoots)` loads both files strictly (unknown key, bad value, relative root, `mode`/`require_spaces` in a Space file, stat/IO failure, TOON damage → `SafetyPolicyUnreadableException`, `ERR_SAFETY_POLICY_UNREADABLE`), D7 via server-file `require_spaces`, (mtime,size) cache, and `SafetyPolicy.forSpace` applies the fold to roots/caps/formats (server dir = `-Dsystem.config.dir`). Tests `SafetyPolicyFilesTest` (13; the unknown-key guard mutation-checked). Owed for S2: 422 mapping at the gates, failed-Run refusal, per-run pin, `/health`; `deny.roots` waits for S3.
+
+**S2b — refusal surfaces (2026-10-04).** `ControlApi.errorBoundary` maps the exception to a 422 + `errorCode ERR_SAFETY_POLICY_UNREADABLE` + an ERROR finding naming the file, covering every route-borne `ConfigSafetyValidator.check` caller (the agent-tool callers catch it themselves). `SafetyPolicy.pinnedForRun` resolves the effective policy once before a run claims anything, refuses when unreadable and pins the snapshot in a `ScopedValue` (D8); wired at `CollectorService.runPipeline`, `PipelineScheduler.runOne`, `JobService.runJob` (a `FAILED` Run with the reason). `GET /health` reports `DEGRADED` + the files (D6) and keeps serving. T5/T6 at run level + the gate over HTTP: `SafetyPolicyUnreadableRoutesTest`, `JobServiceTest`, `SafetyPolicyFilesTest`. Found on the way: `PathJail.defaultRoots()` also calls `defaultPolicy()`, so an unreadable file stops a pipeline from *loading* (S3 will own that consumer). T14 (act-time host gate on a pipeline placed without the save gate) needs S4's `EgressGate` and stays with S4.
 
 **S1 — model** (`inspecto-config/.../config/safety/`). `SafetyPolicyTier` is one tier (every field `null` =
 absent) and, after `fold(server, space)`, the effective policy: permits AND, allow-sets intersect through a
