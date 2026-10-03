@@ -24,6 +24,7 @@ import com.gamma.la.storage.IndexBuildService.Status;
 import com.gamma.la.storage.IndexBuilder;
 import com.gamma.la.storage.IndexManifest;
 import com.gamma.la.storage.IndexMapping;
+import com.gamma.la.storage.IndexPlan;
 import com.gamma.la.storage.IndexStore;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -81,7 +82,7 @@ public final class IndexRoutes implements RouteModule {
     static final String INDEX_DIR = "la-index";
     private static final int MAX_ATTR_COLS = 50;
     private static final Set<String> BODY_KEYS = Set.of("dataset", "sourceCol", "targetCol", "kindCol", "timeCol", "timeColZone",
-            "weightCol", "attrCols");
+            "weightCol", "attrCols", "mode");
 
     /** Test seam (the {@code GraphRunRoutes.forTest} idiom): a builder for services created AFTER this call. */
     private static volatile Function<IndexBuilder.Request, IndexBuilder.Result> builderOverride;
@@ -133,6 +134,7 @@ public final class IndexRoutes implements RouteModule {
         String zone = optional(body, "timeColZone");
         String weight = optional(body, "weightCol");
         List<String> attrs = attrCols(body);
+        IndexBuilder.Mode mode = mode(body);
         if (zone != null) {
             if (time == null) throw bad("'timeColZone' needs a 'timeCol' to read in that zone");
             try {
@@ -157,7 +159,7 @@ public final class IndexRoutes implements RouteModule {
         try {
             v = service(writeRoot).submit(new IndexBuildService.Request(callerId(ex), dataset, mapping,
                     ds -> relation(api, writeRoot, dataset, relationSql),
-                    ix.maxDiskBytesInForce(), ix.keepVersionsInForce()));
+                    ix.maxDiskBytesInForce(), ix.keepVersionsInForce(), mode));
         } catch (Refused refused) {
             throw map(refused);
         } catch (IllegalArgumentException unsafe) {
@@ -174,7 +176,22 @@ public final class IndexRoutes implements RouteModule {
         List<IndexManifest.InputFile> files = null;
         if (fp != null && fp.known() && fp.files().size() <= IndexManifest.MAX_INPUT_FILES)
             files = fp.files().stream().map(f -> new IndexManifest.InputFile(f.path(), f.size(), f.mtimeMillis())).toList();
-        return new IndexBuildService.Relation(relationSql, fp == null ? "unknown" : fp.value(), files);
+        // APPEND reads only the added files: the provider renders the relation over them (null = not row-wise, never appendable)
+        Function<List<String>, String> deltaSql = added -> DatasetProviders.require().dataset(writeRoot, dataset)
+                .map(c -> DatasetProviders.require().relationSqlOverFiles(c, api.dataRoot(), writeRoot, added)).orElse(null);
+        return new IndexBuildService.Relation(relationSql, fp == null ? "unknown" : fp.value(), files, deltaSql);
+    }
+
+    /** The body's {@code mode}: {@code full} (default), {@code append} (only the files added since the live version) or {@code compact} (merge the deltas). */
+    private static IndexBuilder.Mode mode(Map<String, Object> body) {
+        String m = optional(body, "mode");
+        if (m == null) return IndexBuilder.Mode.FULL;
+        return switch (m.toLowerCase(Locale.ROOT)) {
+            case "full" -> IndexBuilder.Mode.FULL;
+            case "append" -> IndexBuilder.Mode.APPEND;
+            case "compact" -> IndexBuilder.Mode.COMPACT;
+            default -> throw bad("'mode' must be full, append or compact");
+        };
     }
 
     private static InputFingerprint currentInput(ApiContext api, Path writeRoot, String dataset) {
@@ -302,10 +319,37 @@ public final class IndexRoutes implements RouteModule {
         o.put("reason", st.stale() ? String.join("; ", st.details()) : null);
         o.put("reasons", st.reasons());
         o.put("removedInput", st.removedInput());
+        o.put("deltas", m.deltas().size());
+        o.put("plan", plan(m, currentSqlHash, input, duck));
         o.put("fingerprint", st.fingerprintKnown() ? "known" : "unknown");
         if (input != null && input.known()) o.put("inputFiles", input.files().size());
         return o;
     }
+
+    /**
+     * The staleness probe's advice (D-3 step 8): what differs between the live version and the Dataset now, and which build would
+     * close the gap - {@code append} (only new files), {@code full} (anything removed, rewritten or redefined), {@code compact}
+     * (the delta cap), {@code none}. It only REPORTS; nothing is ever built or switched by looking.
+     */
+    private static Map<String, Object> plan(IndexManifest m, String currentSqlHash, InputFingerprint input, String duck) {
+        List<IndexManifest.InputFile> now = input != null && input.known()
+                ? input.files().stream().map(f -> new IndexManifest.InputFile(f.path(), f.size(), f.mtimeMillis())).toList() : null;
+        IndexPlan.Plan p = IndexPlan.classify(m, now, currentSqlHash, BucketFunction.NAME, duck);
+        Map<String, Object> o = new LinkedHashMap<>();
+        o.put("recommended", p.recommended().name().toLowerCase(Locale.ROOT));
+        o.put("appendable", p.appendable());
+        o.put("reasons", p.reasons());
+        o.put("added", p.added().size());
+        o.put("removed", p.removed().size());
+        o.put("changed", p.changed().size());
+        o.put("addedSample", p.added().stream().limit(PLAN_SAMPLE).toList());
+        o.put("removedSample", p.removed().stream().limit(PLAN_SAMPLE).toList());
+        o.put("changedSample", p.changed().stream().limit(PLAN_SAMPLE).toList());
+        return o;
+    }
+
+    /** How many file paths of each kind the probe lists (the counts are exact). */
+    private static final int PLAN_SAMPLE = 20;
 
     // ── GET /inv/index/builds/{id} ────────────────────────────────────────────────────────────────────────────
 
@@ -381,6 +425,7 @@ public final class IndexRoutes implements RouteModule {
         o.put("status", v.status().name());
         o.put("dataset", v.datasetId());
         o.put("mappingHash", v.mappingHash());
+        o.put("mode", v.mode().name().toLowerCase(Locale.ROOT));
         Map<String, Object> progress = new LinkedHashMap<>();
         progress.put("phase", v.progress().phase());
         progress.put("step", v.progress().step());
@@ -403,6 +448,11 @@ public final class IndexRoutes implements RouteModule {
             res.put("nodes", r.nodes());
             res.put("buckets", r.buckets());
             res.put("totalMs", r.totalMs());
+            if (r.manifest() != null) {
+                res.put("builder", r.manifest().builder().name().toLowerCase(Locale.ROOT));
+                res.put("indexEdges", r.manifest().tables().containsKey("out") ? r.manifest().tables().get("out").rows() : 0L);
+                res.put("deltas", r.manifest().deltas().size());
+            }
             if (r.manifest() != null) res.put("bytes", r.manifest().tables().values().stream().mapToLong(IndexManifest.TableStats::bytes).sum());
             o.put("result", res);
         }
@@ -423,7 +473,7 @@ public final class IndexRoutes implements RouteModule {
         return switch (e.kind()) {
             case NOT_FOUND -> new ApiException(404, ErrorCodes.NOT_FOUND, e.getMessage());
             case FORBIDDEN -> new ApiException(403, ErrorCodes.PERMISSION_DENIED, e.getMessage());
-            case TERMINAL, DUPLICATE -> new ApiException(409, ErrorCodes.CONFLICT, e.getMessage());
+            case TERMINAL, DUPLICATE, NOT_APPLICABLE -> new ApiException(409, ErrorCodes.CONFLICT, e.getMessage());
             case OVER_BUDGET, ESTIMATE_TIMEOUT -> new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
             case REJECTED, ESTIMATE_BUSY -> new ApiException(503, ErrorCodes.STORE_BUSY, e.getMessage());
         };
@@ -463,6 +513,7 @@ public final class IndexRoutes implements RouteModule {
                 IndexBuilder.Result r = v.result();
                 b = b.attr("version", r.version()).attr("rows", r.rowsInRelation()).attr("edges", r.edges()).attr("buckets", r.buckets());
             }
+            b = b.attr("mode", v.mode().name().toLowerCase(Locale.ROOT));
             if (v.failure() != null) b = b.attr("failure", v.failure());
             EventLog.current().emit(b);
         } catch (RuntimeException ignored) {

@@ -101,11 +101,13 @@ public final class IndexReader implements AutoCloseable {
         }
     }
 
-    /** Opens the views, then seals the connection to {@code versionDir}. */
+    /**
+     * Opens the views, then seals the connection to {@code versionDir}. A delta (D-3 step 8) lives as extra files inside the same
+     * bucket directories, so the {@code out/*&#47;*.parquet} glob IS the union of the main and every delta: no read path needs to know.
+     */
     public static IndexReader open(Path versionDir, IndexManifest manifest, SqlSandboxPolicy policy) throws SQLException, IOException {
         if (!BucketFunction.NAME.equals(manifest.bucketFn()))
             throw new IllegalArgumentException("index bucket function '" + manifest.bucketFn() + "' is not '" + BucketFunction.NAME + "'");
-        if (!manifest.deltas().isEmpty()) throw new IllegalArgumentException("an index with delta files cannot be read yet");
         SqlSandbox sandbox = SqlSandbox.open(policy);
         try {
             try (Statement st = sandbox.connection().createStatement()) {

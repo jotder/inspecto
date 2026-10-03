@@ -46,6 +46,11 @@ public final class EngineDatasetProvider implements DatasetProvider {
     }
 
     @Override
+    public String relationSqlOverFiles(Map<String, Object> dataset, Path dataRoot, Path writeRoot, List<String> relativePaths) {
+        return DatasetRead.relationSqlOverFiles(dataset, dataRoot, relativePaths);
+    }
+
+    @Override
     public InputFingerprint inputFingerprint(Map<String, Object> dataset, Path dataRoot, Path writeRoot) {
         // The engine's own resolution (DatasetRelation: store root, Consignment subtraction) - never paths scraped from SQL.
         Optional<DatasetRelation.InputFiles> in = DatasetRead.inputFiles(dataset, dataRoot, InputFingerprint.MAX_FILES);

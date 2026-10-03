@@ -101,14 +101,26 @@ public final class IndexBuilder {
         public static Options defaults() { return new Options(null, null, null, null, null); }
     }
 
+    /** What a build does: FULL rebuilds from the relation; APPEND adds a delta of new files to the live version; COMPACT merges deltas into one sorted main. */
+    public enum Mode { FULL, APPEND, COMPACT }
+
     /**
      * @param datasetId       recorded in the manifest (the store's directory name is derived from it separately)
      * @param relationSql     TRUSTED relation SQL (a SELECT) - see the class doc
      * @param baseFingerprint the caller's fingerprint of the base data; the builder does not list files
      * @param inputFiles      the caller's listing of those files, recorded in the manifest as given; null = not recorded
+     * @param mode            what to do; APPEND and COMPACT build on the store's CURRENT version
+     * @param deltaSql        APPEND only: the relation SQL over just the given (added) input files, null = the Dataset cannot be
+     *                        appended to (its relation is not row-wise over its files)
      */
     public record Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
-                          Options options, List<IndexManifest.InputFile> inputFiles) {
+                          Options options, List<IndexManifest.InputFile> inputFiles, Mode mode,
+                          java.util.function.Function<List<String>, String> deltaSql) {
+        public Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
+                       Options options, List<IndexManifest.InputFile> inputFiles) {
+            this(datasetId, mapping, relationSql, store, baseFingerprint, options, inputFiles, Mode.FULL, null);
+        }
+
         public Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
                        Options options) {
             this(datasetId, mapping, relationSql, store, baseFingerprint, options, null);
@@ -121,6 +133,7 @@ public final class IndexBuilder {
             Objects.requireNonNull(relationSql, "relationSql");
             Objects.requireNonNull(store, "store");
             if (options == null) options = Options.defaults();
+            if (mode == null) mode = Mode.FULL;
         }
     }
 
@@ -132,6 +145,11 @@ public final class IndexBuilder {
         public IndexBuildException(String message) { super(message); }
 
         public IndexBuildException(String message, Throwable cause) { super(message, cause); }
+    }
+
+    /** An APPEND or COMPACT that is not sound or not possible now; the message says why and that a FULL rebuild is the way forward. */
+    public static final class NotApplicableException extends IndexBuildException {
+        public NotApplicableException(String message) { super(message); }
     }
 
     public static final class CancelledException extends IndexBuildException {
@@ -171,8 +189,11 @@ public final class IndexBuilder {
                     // the stage is gone (build ended); nothing to keep alive
                 }
             }, 30, 30, TimeUnit.SECONDS);
-            Result r = run.execute(t0);
-            return r;
+            return switch (req.mode()) {
+                case FULL -> run.execute(t0);
+                case APPEND -> run.executeAppend(t0);
+                case COMPACT -> run.executeCompact(t0);
+            };
         } catch (CancelledException | IllegalArgumentException e) {
             run.abandon(stage);
             throw e;
@@ -334,18 +355,15 @@ public final class IndexBuilder {
             }
         }
 
-        Result execute(long t0) throws Exception {
-            IndexMapping m = req.mapping();
-            Path spill = stage.resolve(".spill");
-            conn = open(opt.memoryLimit(), opt.threads(), spill);
+        /** The relation's columns and the quoted mapped endpoint columns, once the relation and edge views exist. */
+        record Edges(String srcQ, String dstQ, Map<String, String> types) { }
 
-            // -- estimate -------------------------------------------------------------------------------------
-            long t = System.nanoTime();
-            progress("estimate", 1);
-            exec("CREATE TEMP VIEW " + REL + " AS " + req.relationSql().strip().replaceAll(";+\\s*$", ""));
+        /** Defines the temp views over {@code relationSql}: the relation, then the edges (ids cast to VARCHAR, NULL endpoints dropped). */
+        Edges defineEdges(String relationSql) throws SQLException {
+            IndexMapping m = req.mapping();
+            exec("CREATE TEMP VIEW " + REL + " AS " + relationSql.strip().replaceAll(";+\\s*$", ""));
             Map<String, String> types = columnTypes();
             String ts = timeExpr(m, types);
-            String edgeCols = "src, dst, kind, ts, w" + attrAliases(m);
             String srcQ = column(m.srcColumn(), types), dstQ = column(m.dstColumn(), types);
             exec("CREATE TEMP VIEW " + EDGES + " AS SELECT CAST(" + srcQ + " AS VARCHAR) AS src, CAST(" + dstQ + " AS VARCHAR) AS dst, "
                     + (m.kindColumn() == null ? "CAST(NULL AS VARCHAR)" : "CAST(" + column(m.kindColumn(), types) + " AS VARCHAR)") + " AS kind, "
@@ -353,21 +371,24 @@ public final class IndexBuilder {
                     + (m.weightColumn() == null ? "CAST(NULL AS DOUBLE)" : "CAST(" + column(m.weightColumn(), types) + " AS DOUBLE)") + " AS w"
                     + attrSelect(m, types)
                     + " FROM " + REL + " WHERE " + srcQ + " IS NOT NULL AND " + dstQ + " IS NOT NULL");
-            Object[] counts = rows("SELECT count(*), count(*) FILTER (WHERE " + srcQ + " IS NOT NULL AND " + dstQ + " IS NOT NULL) FROM " + REL).get(0);
-            long total = ((Number) counts[0]).longValue();
-            long kept = ((Number) counts[1]).longValue();
-            long dropped = total - kept;
-            if (kept == 0) throw new IndexBuildException("the relation has no edge with both endpoints set (" + total + " rows, " + dropped + " with a NULL endpoint)");
-            int n = opt.buckets() != null ? opt.buckets() : BucketFunction.bucketsFor(total);
-            timings.put("estimate", ms(t));
+            return new Edges(srcQ, dstQ, types);
+        }
 
-            // -- out / in / nodes ---------------------------------------------------------------------------------
-            int step = 2;
+        /** {@code {rows in the relation, rows with both endpoints}} of the relation view. */
+        long[] countEdges(Edges ed) throws SQLException {
+            Object[] counts = rows("SELECT count(*), count(*) FILTER (WHERE " + ed.srcQ() + " IS NOT NULL AND " + ed.dstQ() + " IS NOT NULL) FROM " + REL).get(0);
+            return new long[] {((Number) counts[0]).longValue(), ((Number) counts[1]).longValue()};
+        }
+
+        /** COPYs out, in and nodes of the EDGES view into {@code root}, sorted and bucketed; {@code step} is the first progress step. */
+        void copyTables(Path root, int n, int step) throws SQLException {
+            String edgeCols = "src, dst, kind, ts, w" + attrAliases(req.mapping());
+            long t;
             for (String[] d : new String[][] {{"out", "src"}, {"in", "dst"}}) {
                 t = System.nanoTime();
                 progress(d[0], step++);
                 exec("COPY (SELECT " + BucketFunction.sql(d[1], n) + " AS bucket, " + edgeCols + " FROM " + EDGES
-                        + " ORDER BY bucket, " + d[1] + ", ts) TO '" + sqlPath(stage.resolve(d[0])) + "' " + COPY_OPTIONS);
+                        + " ORDER BY bucket, " + d[1] + ", ts) TO '" + sqlPath(root.resolve(d[0])) + "' " + COPY_OPTIONS);
                 timings.put(d[0], ms(t));
             }
             t = System.nanoTime();
@@ -376,8 +397,30 @@ public final class IndexBuilder {
                     + " coalesce(o.ol, 0) AS out_links, coalesce(i.il, 0) AS in_links, least(o.f, i.f) AS first_ts, greatest(o.l, i.l) AS last_ts FROM"
                     + " (SELECT src AS id, count(*) AS oe, count(DISTINCT struct_pack(n := dst, k := kind)) AS ol, min(ts) AS f, max(ts) AS l FROM " + EDGES + " GROUP BY src) o"
                     + " FULL JOIN (SELECT dst AS id, count(*) AS ie, count(DISTINCT struct_pack(n := src, k := kind)) AS il, min(ts) AS f, max(ts) AS l FROM " + EDGES + " GROUP BY dst) i USING (id)"
-                    + " ORDER BY bucket, id) TO '" + sqlPath(stage.resolve("nodes")) + "' " + COPY_OPTIONS);
+                    + " ORDER BY bucket, id) TO '" + sqlPath(root.resolve("nodes")) + "' " + COPY_OPTIONS);
             timings.put("nodes", ms(t));
+        }
+
+        Result execute(long t0) throws Exception {
+            IndexMapping m = req.mapping();
+            Path spill = stage.resolve(".spill");
+            conn = open(opt.memoryLimit(), opt.threads(), spill);
+
+            // -- estimate -------------------------------------------------------------------------------------
+            long t = System.nanoTime();
+            progress("estimate", 1);
+            Edges ed = defineEdges(req.relationSql());
+            Map<String, String> types = ed.types();
+            long[] counts = countEdges(ed);
+            long total = counts[0];
+            long kept = counts[1];
+            long dropped = total - kept;
+            if (kept == 0) throw new IndexBuildException("the relation has no edge with both endpoints set (" + total + " rows, " + dropped + " with a NULL endpoint)");
+            int n = opt.buckets() != null ? opt.buckets() : BucketFunction.bucketsFor(total);
+            timings.put("estimate", ms(t));
+
+            // -- out / in / nodes ---------------------------------------------------------------------------------
+            copyTables(stage, n, 2);
 
             // -- verify ---------------------------------------------------------------------------------------------
             t = System.nanoTime();
@@ -395,16 +438,166 @@ public final class IndexBuilder {
             String zone = effectiveZone(m, types);
             IndexManifest man = new IndexManifest(number, Instant.now().toString(), IndexManifest.Builder.FULL, duck, BucketFunction.NAME, n,
                     ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), relationSqlHash(req.relationSql()), req.baseFingerprint(), zone, stats, dropped, null, null, req.inputFiles());
+            return publish(man, spill, number, total, kept, dropped, stats, n, t0);
+        }
+
+        /** Writes the manifest, releases the files, deletes the scratch directories and publishes the stage. */
+        Result publish(IndexManifest man, Path spill, long number, long total, long kept, long dropped, Map<String, TableStats> stats,
+                       int n, long t0) throws Exception {
             man.write(stage);
             check();
             close();   // release the files (Windows) and the spill directory before the stage is renamed
             deleteSpill(spill);
-            t = System.nanoTime();
+            deleteSpill(stage.resolve(".delta"));
+            long t = System.nanoTime();
             if (opt.progress() != null) opt.progress().accept(new Progress("publish", STEPS, STEPS));
             Path published = req.store().publish(stage);
             stage = null;
             timings.put("publish", ms(t));
             return new Result(number, published, man, total, kept, dropped, stats.get("nodes").rows(), n, timings, ms(t0));
+        }
+
+        /** The live version and its manifest, for an APPEND or COMPACT; refused when there is none or it is another mapping's. */
+        IndexManifest parentManifest(Path[] dirOut) throws IOException {
+            Path dir = req.store().current().orElseThrow(() -> new NotApplicableException("the index has no published version to build on - run a full build first"));
+            IndexManifest parent;
+            try {
+                parent = IndexManifest.read(dir);
+            } catch (IllegalArgumentException e) {
+                throw new NotApplicableException("the live version's manifest cannot be read - run a full build");
+            }
+            if (!parent.mappingHash().equals(req.mapping().hash()) || !parent.dataset().equals(req.datasetId()))
+                throw new NotApplicableException("the live version belongs to another Dataset or mapping - run a full build");
+            dirOut[0] = dir;
+            return parent;
+        }
+
+        /**
+         * APPEND (design 3.3): the new files only, as a delta sorted within itself, layered onto a hard-linked copy of the live
+         * version, published as the NEXT immutable version. The gate is {@link IndexPlan#classify}; a version is complete before it
+         * is named, exactly as for a full build, and a cancel or failure deletes the stage (the links, not the parent's files).
+         */
+        Result executeAppend(long t0) throws Exception {
+            IndexMapping m = req.mapping();
+            Path[] pd = new Path[1];
+            IndexManifest parent = parentManifest(pd);
+            Path parentDir = pd[0];
+            String duck = duckdbVersion();
+            IndexPlan.Plan plan = IndexPlan.classify(parent, req.inputFiles(), relationSqlHash(req.relationSql()), BucketFunction.NAME, duck);
+            if (!plan.appendable())
+                throw new NotApplicableException("an append is not possible now (" + (plan.reasons().isEmpty() ? "no input file was added" : String.join(", ", plan.reasons()))
+                        + ") - " + (plan.recommended() == IndexPlan.Action.COMPACT ? "compact first" : "run a full build"));
+            String deltaSql = req.deltaSql() == null ? null : req.deltaSql().apply(plan.added());
+            if (deltaSql == null)
+                throw new NotApplicableException("this Dataset's relation is not row-wise over its input files, so its index cannot be appended to - run a full build");
+            Path spill = stage.resolve(".spill");
+            conn = open(opt.memoryLimit(), opt.threads(), spill);
+
+            long t = System.nanoTime();
+            progress("estimate", 1);
+            Edges ed = defineEdges(deltaSql);
+            String zone = effectiveZone(m, ed.types());
+            if (!Objects.equals(zone, parent.timeColZone()))
+                throw new NotApplicableException("the new files read the time column differently from the index (zone " + zone + ", index " + parent.timeColZone() + ") - run a full build");
+            long[] counts = countEdges(ed);
+            long total = counts[0], kept = counts[1], dropped = total - kept;
+            int n = parent.buckets();
+            timings.put("estimate", ms(t));
+
+            String prefix = String.format("d%03d", parent.deltas().size() + 1);
+            long deltaBytes = 0;
+            if (kept > 0) {
+                Path delta = Files.createDirectories(stage.resolve(".delta"));
+                copyTables(delta, n, 2);
+                for (String table : new String[] {"out", "in", "nodes"}) linkTree(parentDir.resolve(table), stage.resolve(table));
+                deltaBytes = mergeDelta(delta, prefix);
+            } else {
+                for (String table : new String[] {"out", "in", "nodes"}) linkTree(parentDir.resolve(table), stage.resolve(table));
+            }
+
+            t = System.nanoTime();
+            progress("verify", 6);
+            Map<String, TableStats> stats = scan(conn, stage, n, token);
+            long wantEdges = parent.tables().get("out").rows() + kept;
+            if (stats.get("out").rows() != wantEdges || stats.get("in").rows() != wantEdges)
+                throw new IndexBuildException("verification failed: the index and the delta hold " + wantEdges + " edges, but out holds "
+                        + stats.get("out").rows() + " rows and in holds " + stats.get("in").rows());
+            invariants(conn, stage, stats, token);
+            timings.put("verify", ms(t));
+
+            long number = Long.parseLong(stage.getFileName().toString().replaceAll("\\D", ""));
+            List<IndexManifest.Delta> deltas = new ArrayList<>(parent.deltas());
+            deltas.add(new IndexManifest.Delta(prefix, kept, deltaBytes));
+            IndexManifest man = new IndexManifest(number, Instant.now().toString(), IndexManifest.Builder.APPEND, duck, BucketFunction.NAME, n,
+                    ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), parent.relationSqlHash(), req.baseFingerprint(), parent.timeColZone(), stats,
+                    parent.droppedNull() + dropped, deltas, parentDir.getFileName().toString(), req.inputFiles());
+            return publish(man, spill, number, total, kept, dropped, stats, n, t0);
+        }
+
+        /**
+         * COMPACT (design 3.3): merges the live version's main and deltas into ONE sorted main, reading the INDEX's own files (never
+         * the Dataset), so it neither needs nor changes what the index covers - the fingerprint, file list and null count carry over,
+         * and the version is published as the next one. Nodes are recomputed, which also folds the per-delta node rows.
+         */
+        Result executeCompact(long t0) throws Exception {
+            IndexMapping m = req.mapping();
+            Path[] pd = new Path[1];
+            IndexManifest parent = parentManifest(pd);
+            Path parentDir = pd[0];
+            if (parent.deltas().isEmpty()) throw new NotApplicableException("the live version has no deltas to compact");
+            Path spill = stage.resolve(".spill");
+            conn = open(opt.memoryLimit(), opt.threads(), spill);
+
+            long t = System.nanoTime();
+            progress("estimate", 1);
+            exec("CREATE TEMP VIEW " + EDGES + " AS SELECT src, dst, kind, ts, w" + attrAliases(m) + " FROM read_parquet('"
+                    + sqlPath(parentDir) + "/out/*/*.parquet', hive_partitioning = true)");
+            long kept = ((Number) rows("SELECT count(*) FROM " + EDGES).get(0)[0]).longValue();
+            if (kept != parent.tables().get("out").rows())
+                throw new IndexBuildException("the live version's out table holds " + kept + " rows, its manifest says " + parent.tables().get("out").rows());
+            int n = parent.buckets();
+            timings.put("estimate", ms(t));
+
+            copyTables(stage, n, 2);
+
+            t = System.nanoTime();
+            progress("verify", 6);
+            Map<String, TableStats> stats = scan(conn, stage, n, token);
+            if (stats.get("out").rows() != kept || stats.get("in").rows() != kept)
+                throw new IndexBuildException("verification failed: compaction read " + kept + " edges, but out holds "
+                        + stats.get("out").rows() + " rows and in holds " + stats.get("in").rows());
+            invariants(conn, stage, stats, token);
+            timings.put("verify", ms(t));
+            String duck = rows("SELECT version()").get(0)[0].toString();
+
+            long number = Long.parseLong(stage.getFileName().toString().replaceAll("\\D", ""));
+            IndexManifest man = new IndexManifest(number, Instant.now().toString(), IndexManifest.Builder.COMPACT, duck, BucketFunction.NAME, n,
+                    ROW_GROUP_SIZE, m, m.hash(), req.datasetId(), parent.relationSqlHash(), parent.baseFingerprint(), parent.timeColZone(), stats,
+                    parent.droppedNull(), null, parentDir.getFileName().toString(), parent.inputFiles());
+            return publish(man, spill, number, kept, kept, 0, stats, n, t0);
+        }
+
+        /** Moves the delta's bucket files into the stage's bucket directories as {@code <prefix>-<n>.parquet}; returns their bytes. */
+        long mergeDelta(Path delta, String prefix) throws IOException {
+            long bytes = 0;
+            for (String table : new String[] {"out", "in", "nodes"}) {
+                Path from = delta.resolve(table);
+                if (!Files.isDirectory(from)) continue;
+                try (Stream<Path> dirs = Files.list(from)) {
+                    for (Path d : (Iterable<Path>) dirs.sorted()::iterator) {
+                        Path to = stage.resolve(table).resolve(d.getFileName().toString());
+                        Files.createDirectories(to);
+                        int i = 0;
+                        try (Stream<Path> fs = Files.list(d)) {
+                            for (Path f : (Iterable<Path>) fs.filter(x -> x.getFileName().toString().endsWith(".parquet")).sorted()::iterator) {
+                                bytes += Files.size(f);
+                                Files.move(f, to.resolve(prefix + "-" + i++ + ".parquet"));
+                            }
+                        }
+                    }
+                }
+            }
+            return bytes;
         }
 
         Map<String, String> columnTypes() throws SQLException {
@@ -586,6 +779,24 @@ public final class IndexBuilder {
     /** Forward slashes (valid on Windows too) and single quotes doubled, for use inside a SQL string literal. */
     private static String sqlPath(Path p) {
         return p.toAbsolutePath().toString().replace('\\', '/').replace("'", "''");
+    }
+
+    /** A copy of the tree {@code from} at {@code to} made of hard links (the files are immutable), falling back to a byte copy where links are not available. */
+    private static void linkTree(Path from, Path to) throws IOException {
+        try (Stream<Path> w = Files.walk(from)) {
+            for (Path p : (Iterable<Path>) w::iterator) {
+                Path t = to.resolve(from.relativize(p).toString());
+                if (Files.isDirectory(p)) {
+                    Files.createDirectories(t);
+                } else {
+                    try {
+                        Files.createLink(t, p);
+                    } catch (IOException | UnsupportedOperationException | SecurityException noLinks) {
+                        Files.copy(p, t);
+                    }
+                }
+            }
+        }
     }
 
     private static void deleteSpill(Path spill) throws IOException {

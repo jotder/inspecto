@@ -10639,7 +10639,7 @@
         "tags" : [ "inv" ],
         "summary" : "List the edge/node indexes of the caller's viewable Datasets",
         "operationId" : "getInvIndex",
-        "description" : "LA separation D-3 step 4. {enabled, indexes, total}: `enabled` echoes the Space's index.enabled (default false; when true POST /inv/traversal/recursive-paths answers from a current index within the depth/frontier cap). Each index: dataset, mappingHash, mapping {sourceCol,targetCol,kindCol,timeCol,timeColZone,weightCol,attrCols}, version (the CURRENT one), builtAt, builder, rows (edges per direction), nodes, bytes (all tables), droppedNull, buckets, and `stale` + `reason` (the Dataset's relation SQL changed, the bucket function differs, or DuckDB's version differs - a stale index is still listed). Only Datasets the caller may view are walked: an index over a Dataset the caller cannot view is absent from the answer. No capability.",
+        "description" : "LA separation D-3 step 4. {enabled, indexes, total}: `enabled` echoes the Space's index.enabled (default false; when true POST /inv/traversal/recursive-paths answers from a current index within the depth/frontier cap). Each index: dataset, mappingHash, mapping {sourceCol,targetCol,kindCol,timeCol,timeColZone,weightCol,attrCols}, version (the CURRENT one), builtAt, builder, rows (edges per direction), nodes, bytes (all tables), droppedNull, buckets, deltas (appended file groups the version carries), a `plan` (D-3 step 8: {recommended: none|append|full|compact, appendable, reasons, added, removed, changed + a sample of up to 20 paths each} - what differs between the version and the Dataset now and which build would close the gap; advice only, nothing is built by reading it), and `stale` + `reason` (the Dataset's relation SQL changed, the bucket function differs, or DuckDB's version differs - a stale index is still listed). Only Datasets the caller may view are walked: an index over a Dataset the caller cannot view is absent from the answer. No capability.",
         "responses" : {
           "200" : {
             "description" : "{enabled, indexes, total}."
@@ -10656,7 +10656,7 @@
         "tags" : [ "inv" ],
         "summary" : "Start an edge/node index build over a Dataset",
         "operationId" : "postInvIndexBuilds",
-        "description" : "LA separation D-3 step 4. Body {dataset, sourceCol, targetCol, kindCol?, timeCol?, timeColZone?, weightCol?, attrCols?}. Gated on canBuildLinkIndex (a build spends compute and disk). The Dataset gate runs first, exactly as for a projection: an unknown Dataset is 404 and a Dataset the caller may not view is the SAME 404. A build whose estimate (rows x 34 bytes x 2) is above the Space's index.max_disk_bytes (0 or unset = no limit) is refused up front with the estimate in the message. One live build per (Dataset, mapping): a second start is 409. Always 202 with a Location to poll; the build runs on its own DuckDB connection and publishes an immutable version under <Space write root>/la-index.",
+        "description" : "LA separation D-3 step 4. Body {dataset, sourceCol, targetCol, kindCol?, timeCol?, timeColZone?, weightCol?, attrCols?, mode?}. `mode` (D-3 step 8) is `full` (default; rebuild from the Dataset), `append` (add ONLY the input files added since the live version, as a delta, published as the NEXT immutable version; refused 409 when a covered file was removed, superseded or rewritten, the relation SQL or bucket function changed, nothing was added, the Dataset is not a plain row-wise store read, or the version already carries 8 deltas) or `compact` (merge the live version's deltas into one sorted main; refused 409 when it has none). Nothing appends or compacts on its own: GET /inv/index only advises. Gated on canBuildLinkIndex (a build spends compute and disk). The Dataset gate runs first, exactly as for a projection: an unknown Dataset is 404 and a Dataset the caller may not view is the SAME 404. A build whose estimate (rows x 34 bytes x 2) is above the Space's index.max_disk_bytes (0 or unset = no limit) is refused up front with the estimate in the message. One live build per (Dataset, mapping): a second start is 409. Always 202 with a Location to poll; the build runs on its own DuckDB connection and publishes an immutable version under <Space write root>/la-index.",
         "responses" : {
           "202" : {
             "description" : "Accepted; poll the build at the Location header. {buildId, status, dataset, mappingHash, progress, ...}."
@@ -10668,10 +10668,10 @@
             "description" : "No such Dataset, or not viewable by the caller (the same answer)."
           },
           "409" : {
-            "description" : "The same index (Dataset + mapping) is already building."
+            "description" : "The same index (Dataset + mapping) is already building, or an `append` / `compact` is not applicable now (the message names why and the way forward)."
           },
           "422" : {
-            "description" : "Unknown or missing field, a column the Dataset does not have, a bad time zone, or an estimate over index.max_disk_bytes."
+            "description" : "Unknown or missing field, an unknown mode, a column the Dataset does not have, a bad time zone, or an estimate over index.max_disk_bytes."
           },
           "503" : {
             "description" : "No write root, or the build queue is full (STORE_BUSY)."

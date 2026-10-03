@@ -57,7 +57,7 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
     public static final int MAX_INPUT_FILES = 5_000;
     private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
-    public enum Builder { FULL, APPEND }
+    public enum Builder { FULL, APPEND, COMPACT }
 
     public record TableStats(long rows, long files, long bytes) { }
 
@@ -158,7 +158,7 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
         try {
             b = Builder.valueOf(req(n, "builder").asText().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("manifest builder is not full|append: " + n.get("builder").asText());
+            throw new IllegalArgumentException("manifest builder is not full|append|compact: " + n.get("builder").asText());
         }
         return new IndexManifest(req(n, "version").asLong(), text(n, "builtAt"), b, text(req(n, "duckdb"), "version"),
                 text(n, "bucketFn"), n.path("buckets").asInt(), n.path("rowGroupSize").asInt(), mapping,

@@ -281,4 +281,34 @@ class DatasetRelationTest {
         assertTrue(over.overLimit());
         assertTrue(over.files().isEmpty());
     }
+
+    @Test
+    void relationOverFilesReadsOnlyThoseFilesAndKeepsCalculatedColumns(@TempDir Path root) throws Exception {
+        Path store = root.resolve("orders");
+        writeParquet(store, "p1.parquet", "SELECT 1 AS id, 10 AS qty");
+        writeParquet(store, "p2.parquet", "SELECT 2 AS id, 20 AS qty");
+        Map<String, Object> ds = Map.of("physicalRef", "orders", "calculated", List.of(Map.of("name", "dbl", "expr", "qty * 2")));
+        String sql = DatasetRelation.relationSqlOverFiles(ds, root, List.of("orders/p2.parquet"));
+        assertNotNull(sql);
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:"); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            assertTrue(rs.next());
+            assertEquals(2, rs.getInt("id"));
+            assertEquals(40, rs.getInt("dbl"));
+            assertFalse(rs.next(), "only the named file");
+        }
+    }
+
+    @Test
+    void relationOverFilesIsNullWhenTheRelationIsNotRowWiseOverItsFilesAndRefusesAFileOutsideTheStore(@TempDir Path root) throws Exception {
+        writeParquet(root.resolve("orders"), "p1.parquet", "SELECT 1 AS id");
+        writeParquet(root.resolve("other"), "q1.parquet", "SELECT 1 AS id");
+        List<String> files = List.of("orders/p1.parquet");
+        assertNull(DatasetRelation.relationSqlOverFiles(Map.of("sql", "SELECT 1", "sourceName", "orders"), root, files), "a virtual Dataset may aggregate");
+        assertNull(DatasetRelation.relationSqlOverFiles(Map.of("view", "v"), root, files), "a view-backed Dataset has no files");
+        assertNull(DatasetRelation.relationSqlOverFiles(Map.of("physicalRef", "shared/o/i"), root, files), "a shared snapshot is not appended");
+        assertNull(DatasetRelation.relationSqlOverFiles(Map.of("physicalRef", "orders"), null, files));
+        assertNull(DatasetRelation.relationSqlOverFiles(Map.of("physicalRef", "orders"), root, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> DatasetRelation.relationSqlOverFiles(Map.of("physicalRef", "orders"), root, List.of("other/q1.parquet")));
+        assertThrows(IllegalArgumentException.class, () -> DatasetRelation.relationSqlOverFiles(Map.of("physicalRef", "orders"), root, List.of("orders/../other/q1.parquet")));
+    }
 }
