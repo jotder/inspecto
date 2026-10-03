@@ -473,6 +473,68 @@ export interface InvestigationLog {
     /** The TRUE number of log entries; `entries` may be capped (`truncated`). */
     total: number;
     truncated: boolean;
+    /** D-U7: every four-eyes request on this Investigation (pending and decided), oldest first. */
+    pending?: PendingExpansion[];
+}
+
+/** D-U7: why an expand was held — the Space thresholds it crossed (`InvestigationRoutes.sensitivity`). */
+export interface ExpansionSensitivity {
+    /** Plain-language reasons, e.g. `budget 500 > 100`. */
+    exceeded: string[];
+    budget: number;
+    maxFanOut: number | null;
+    fourEyesBudgetAbove: number | null;
+    fourEyesFanOutAbove: number | null;
+}
+
+/** D-U7: a held sensitive expand (`SnapshotStore.writePending`). At most one is `pending` at a time. */
+export interface PendingExpansion {
+    id: string;
+    investigationId: string;
+    op: 'expand';
+    params: Record<string, unknown>;
+    sensitivity: ExpansionSensitivity;
+    status: 'pending' | 'approved' | 'denied';
+    requestedBy: string | null;
+    requestedAt: string;
+    decidedBy?: string;
+    decidedAt?: string;
+    /** On a deny, when one was given. */
+    reason?: string;
+    /** On an approve: the log step the expand ran as. */
+    step?: number;
+}
+
+/** `POST /ops` with a sensitive expand answers this instead of a step (D-U7): nothing ran. */
+export interface PendingExpansionAnswer {
+    status: 'pending';
+    pending: PendingExpansion;
+    workingSet: WorkingSetSummary;
+}
+
+/** `POST …/pending/{rid}/approve` — the expand ran as the requester's op, sealed with the approval. */
+export interface ExpansionApproval {
+    request: string;
+    requestedBy: string | null;
+    requestedAt: string;
+    approvedBy: string;
+    approvedAt: string;
+}
+export type ApproveExpansionResult = InvestigationStepResult & { approval: ExpansionApproval };
+
+/** `POST …/pending/{rid}/deny` — nothing is read; who denied and why are recorded. */
+export interface DenyExpansionResult {
+    id: string;
+    pending: PendingExpansion;
+}
+
+/** `POST …/reveal` (D-U6) — per entity; the server audits `LINK_ENTITY_REVEALED` with the tokens only. */
+export interface RevealResult {
+    id: string;
+    revealed: { token: string; id: string }[];
+    /** Tokens this Investigation never issued — never guessed. */
+    unknown: string[];
+    masking: Record<string, unknown>;
 }
 
 /** LA-20's three relations of a Working Set. */
@@ -964,6 +1026,28 @@ export class InvService {
 
     investigationLog(id: string, limit?: number): Observable<InvestigationLog> {
         return this.http.get<InvestigationLog>(invPath(id, 'log'), { params: toParams({ limit }) });
+    }
+
+    /** D-U7: `canApproveLinkExpansions`; 403 also when the caller requested it themselves or has no Subject,
+     *  404 unknown request, 409 already decided (or nothing left to expand). */
+    approveExpansion(id: string, rid: string): Observable<ApproveExpansionResult> {
+        return this.http.post<ApproveExpansionResult>(
+            invPath(id, 'pending/' + encodeURIComponent(rid) + '/approve'),
+            {},
+        );
+    }
+
+    /** D-U7: the same gates as approve; `reason` ≤ 200 chars (422 beyond). */
+    denyExpansion(id: string, rid: string, reason?: string): Observable<DenyExpansionResult> {
+        return this.http.post<DenyExpansionResult>(
+            invPath(id, 'pending/' + encodeURIComponent(rid) + '/deny'),
+            reason ? { reason } : {},
+        );
+    }
+
+    /** D-U6: `canRevealLinkEntities` (403), owner-only (404), 1..N tokens (422). */
+    revealEntities(id: string, tokens: string[]): Observable<RevealResult> {
+        return this.http.post<RevealResult>(invPath(id, 'reveal'), { tokens });
     }
 
     /** LA-20/21: the Working Set as a relation. Owner-only (a 404 for anyone else — indistinguishable from absence). */

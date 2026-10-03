@@ -551,6 +551,12 @@
 
         @if (store.activeId(); as activeId) {
             <!-- ── LA-20 rows · LA-23 measures + templates · LA-12 dossier ── -->
+            <inspecto-link-analysis-oversight
+                [investigationId]="activeId"
+                [log]="store.log()"
+                [workingSet]="store.workingSet()"
+                (decided)="store.open(activeId)"
+            ></inspecto-link-analysis-oversight>
             <inspecto-link-analysis-working-set-rows
                 [investigationId]="activeId"
                 [version]="store.log()"

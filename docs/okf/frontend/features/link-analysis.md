@@ -837,8 +837,16 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   ids whose Entity Type is `masked` — seeded with such an `entityType` or one naming no type in force, on or matched
   by an Entity List of such a type, or every id when a bound Dataset column's classification maps to such a type;
   LA-17 step 5, 2026-09-26); the panel shows the pseudonym as given and may send it back in an op's `ids` — the server resolves it.
-  ⚠ The panel has NO UI yet for `POST …/reveal`, for approving/denying a pending expand, or for rendering an expand
-  answered `{status:"pending"}` (only reachable when a Space sets a four-eyes threshold).
+  **Oversight surface** (`link-analysis-oversight.component`, 2026-10-03, `LA-SPA-OWED-SURFACES-1` slice): lists
+  `GET …/log`'s `pending[]` — each request's requester, the thresholds it crossed (`sensitivity.exceeded` and the
+  Space's `fourEyes*Above`) and its status; a holder of `canApproveLinkExpansions` gets **Approve / Deny** (optional
+  deny reason ≤ 200) over `POST …/pending/{rid}/approve | deny`; a holder of `canRevealLinkEntities` gets per-entity
+  **Reveal** over `POST …/reveal` for each `masked:` id of the Working Set, showing the value and that it was audited.
+  Both gates are `LensService` identity capabilities (no Access-Catalog node carries them yet). ⚠ The server is the
+  boundary: self-approval and a Subject-less approve are **403** even WITH the capability, 404/409/422 likewise —
+  every refusal renders in place verbatim, and nothing is re-read until a decision succeeds (`(decided)` → the
+  store re-opens the Investigation). A pending expand's own `POST …/ops` answer is not rendered as a step; the
+  re-read log's `pending[]` is what shows it.
   ⚠ When a Space sets a four-eyes threshold, every stateless graph read — the projection that loads the canvas
   (`/inv/projection`, `/inv/projection/multi`), *expand node* (`/inv/projection/neighbors`) and the traversal
   (`/inv/traversal/recursive-paths`) — is **refused with 403** above it, because a stateless read has nothing that

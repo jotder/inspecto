@@ -242,6 +242,21 @@ export class LensService {
         this.identityCapability('canRunLinkGraphAnalysis', 'linkgraph.run'),
     );
 
+    /** May approve / deny a held sensitive Investigation expand (D-U7, `POST /inv/investigations/{id}/pending/{rid}/
+     *  approve | deny`). {@link identityCapability}, as {@link canRunLinkGraphAnalysis} is. The server adds
+     *  four-eyes (the requester cannot decide their own request) — this only decides whether the buttons show. No Access-Catalog action node carries it yet
+     *  (a backend-only gate), so `allows` answers true for the node id. */
+    readonly canApproveLinkExpansions = computed(() =>
+        this.identityCapability('canApproveLinkExpansions', 'linkgraph.approve-expansions'),
+    );
+
+    /** May reveal a masked entity of an Investigation, one at a time (D-U6, `POST /inv/investigations/{id}/reveal`).
+     *  {@link identityCapability}; the server gates the route and audits each reveal. Like
+     *  {@link canApproveLinkExpansions}, no Access-Catalog node carries it yet. */
+    readonly canRevealLinkEntities = computed(() =>
+        this.identityCapability('canRevealLinkEntities', 'linkgraph.reveal-entities'),
+    );
+
     /** May decide a Pending Change — approve or decline a held config change (`ASSURE-MAKER-CHECKER-1`,
      *  `POST /pending-changes/{id}/approve | decline`). RBAC: Admin, Super. {@link identityCapability}: the
      *  `admin` seed holds it and qualifies for no non-Business lens. The server adds the kind's own

@@ -36,6 +36,7 @@ import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component'
 import { LinkAnalysisEntityListsComponent } from './link-analysis-entity-lists.component';
 import { LinkAnalysisIdentitiesComponent } from './link-analysis-identities.component';
 import { LinkAnalysisInvestigationCaseComponent } from './link-analysis-investigation-case.component';
+import { LinkAnalysisOversightComponent } from './link-analysis-oversight.component';
 import { LinkAnalysisTemplateMeasuresComponent } from './link-analysis-template-measures.component';
 import { LinkAnalysisValueMeasuresComponent } from './link-analysis-value-measures.component';
 import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set-rows.component';
@@ -67,6 +68,7 @@ import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set
         LinkAnalysisEntityListsComponent,
         LinkAnalysisIdentitiesComponent,
         LinkAnalysisInvestigationCaseComponent,
+        LinkAnalysisOversightComponent,
         LinkAnalysisTemplateMeasuresComponent,
         LinkAnalysisValueMeasuresComponent,
         LinkAnalysisWorkingSetRowsComponent,
