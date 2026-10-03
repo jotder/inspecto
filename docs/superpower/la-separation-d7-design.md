@@ -1,7 +1,7 @@
 <!--
   ACTIVE PLAN — docs/superpower/
-  Created 2026-10-03 (D-7 design of la-separation-feasibility-plan.md). DESIGN ONLY — nothing built, no decision in
-  section 12 signed. Retire per the three-tier lifecycle once D-7 ships.
+  Created 2026-10-03 (D-7 design of la-separation-feasibility-plan.md). DESIGN ONLY — nothing built. Decisions D7-Q1…Q8
+  SIGNED 2026-10-03 (section 13). Retire per the three-tier lifecycle once D-7 ships.
 -->
 
 # LA separation — D-7 design (Drafts: parallel analyst working copies)
@@ -237,3 +237,16 @@ and `sets/` are never evicted.**
 | D7-Q6 | Heavy-job cap default | (a) `min(4, cores/3)` · (b) operator-set only | **(a)**, overridable in config |
 | D7-Q7 | `superseded` conflicts on accept | (a) drop automatically · (b) analyst confirms each | **(b)** — nothing leaves the record silently |
 | D7-Q8 | Who may read another analyst's Draft? | (a) lead + reviewer · (b) actor only · (c) all members | **(a)** — supervision without peer exposure |
+
+**Answers — operator 2026-10-03 (every recommendation accepted; the build is unblocked, start at D7-1 and D7-2):**
+
+| Id | Answer |
+|---|---|
+| D7-Q1 | **(a)** Amend D-E7 in the LA decision record, citing D19 — one decision, one history. |
+| D7-Q2 | **(a)** A Draft may bind a Dataset with no index (D-E3 seal-at-use). |
+| D7-Q3 | **(b)** A pinned index version expires after N = 30 days (warning at N − 7), then the Draft must rebase. |
+| D7-Q4 | **(a)** A checkpoint at every step, until a measured cost says otherwise. |
+| D7-Q5 | **(b) + (c)** Hibernate after 1 h idle; expire (discard) after 30 d idle, warning the actor and the lead first. |
+| D7-Q6 | **(a)** Heavy-job cap default `min(4, cores/3)`, overridable in config. |
+| D7-Q7 | **(b)** The analyst confirms each `superseded` conflict on accept; nothing leaves the record silently. |
+| D7-Q8 | **(a)** The lead and the reviewer may read another analyst's Draft. |
