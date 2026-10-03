@@ -393,6 +393,36 @@ public final class InvestigationEvaluator {
         public String hash() {
             return sha256(canonical(toMap()));
         }
+
+        /**
+         * An independent copy (D7-4): {@link #apply} on the copy never shows in this state. The collections are copied; the
+         * map VALUES ({@code window}, {@code resolution}, group maps, {@code lastMerged}) are shared because {@code apply}
+         * only ever REPLACES them, never edits one in place.
+         */
+        public State copy() {
+            State c = new State();
+            c.entities.putAll(entities);
+            c.links.putAll(links);
+            c.excluded.putAll(excluded);
+            c.hidden.addAll(hidden);
+            c.kept.addAll(kept);
+            annotations.forEach((k, v) -> c.annotations.put(k, new ArrayList<>(v)));
+            linkAnnotations.forEach((k, v) -> c.linkAnnotations.put(k, new ArrayList<>(v)));
+            c.window = window;
+            excludedKeys.forEach((k, v) -> c.excludedKeys.put(k, new TreeMap<>(v)));
+            c.resolution = resolution;
+            c.resolvedBy = resolvedBy;
+            c.excludedGroups.putAll(excludedGroups);
+            c.lastMerged = lastMerged;
+            return c;
+        }
+    }
+
+    private static final java.util.concurrent.atomic.AtomicLong FOLDS = new java.util.concurrent.atomic.AtomicLong();
+
+    /** How many whole-log folds this JVM ran (D7-4 test seam: an incremental append must not add to it). */
+    public static long foldCount() {
+        return FOLDS.get();
     }
 
     /** What one step changed — the incremental response the SPA applies to its canvas. */
@@ -451,7 +481,7 @@ public final class InvestigationEvaluator {
             prefix.add(e);
         }
         if (hashesOut == null) return fold(prefix);
-        State s = new State();
+        State s = new State();   // replay: ops fold incrementally, so only an undo counts as a fold
         for (int k = 0; k < prefix.size(); k++) {
             Map<String, Object> e = prefix.get(k);
             if ("op".equals(e.get("kind"))) apply(s, e);
@@ -463,6 +493,7 @@ public final class InvestigationEvaluator {
 
     /** One whole log, its undos resolved within it. */
     private static State fold(List<Map<String, Object>> log) {
+        FOLDS.incrementAndGet();
         State s = new State();
         Set<Integer> undone = undone(log);
         for (Map<String, Object> e : log)

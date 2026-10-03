@@ -113,11 +113,19 @@ public final class DraftRoutes implements RouteModule {
         }
         if (refusal != null) throw refusal;
         int baseStep = ((Number) header.get("baseStep")).intValue();
-        List<String> main = inv.store().readLog(invId);
-        boolean intact = main.size() >= baseStep && DraftStore.prefixHash(main, baseStep).equals(header.get("baseLogHash"));
+        // D7-4: the verdict is cached per main log file (size + mtime), so an unchanged main log is read and hashed once, not per call
+        com.gamma.la.core.DraftCheckpoints.Base base = com.gamma.la.core.DraftCheckpoints.base(inv.dir().resolve("log.jsonl"), baseStep,
+                String.valueOf(header.get("baseLogHash")), () -> {
+                    try {
+                        return inv.store().readLog(invId);
+                    } catch (IOException e) {
+                        throw new java.io.UncheckedIOException(e);
+                    }
+                });
+        boolean intact = base.intact();
         InvestigationRoutes.Inv view = new InvestigationRoutes.Inv(inv.store(), inv.writeRoot(), inv.id(), inv.header(),
                 new InvestigationRoutes.Inv.DraftRef(draftId, baseStep, dir));
-        return new Opened(view, header, DraftStore.isDiscarded(dir), intact, main.size(), role);
+        return new Opened(view, header, DraftStore.isDiscarded(dir), intact, base.mainSize(), role);
     }
 
     private static void requireLive(Opened o) {
@@ -290,6 +298,7 @@ public final class DraftRoutes implements RouteModule {
      * ({@code mismatches}), and each own step's persisted {@code sets/<step>.json} hash with the fold ({@code setMismatches}).
      */
     private Object replay(ApiContext api, HttpExchange ex, String invId, String draftId) throws IOException {
+        com.gamma.la.core.DraftCheckpoints.forgetBases();   // the audit never trusts a cached verdict: it re-hashes the main prefix
         Opened o = openDraft(api, ex, invId, draftId, Act.READ);
         requireLive(o);
         requireIntact(o);
@@ -372,6 +381,7 @@ public final class DraftRoutes implements RouteModule {
             marker.put("headStep", head);
             marker.put("logHash", DraftStore.prefixHash(own, own.size()));
             first = DraftStore.markDiscarded(v.draft().dir(), canonical(marker));
+            com.gamma.la.core.DraftCheckpoints.forget(v.draft().dir());
         }
         int unpinned = unpinAll(v.writeRoot(), v.dataset(), pinsOf(o.header()), draftId);
         if (first) {

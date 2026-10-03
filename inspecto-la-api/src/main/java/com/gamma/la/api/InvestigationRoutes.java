@@ -346,7 +346,7 @@ public final class InvestigationRoutes implements RouteModule {
 
         synchronized (lock(inv.logDir())) {
             List<Map<String, Object>> log = readLog(inv);
-            InvestigationEvaluator.State before = evaluate(log, -1, null);
+            InvestigationEvaluator.State before = stateBefore(inv, log);
             List<String> ids = strings(params.get("ids"));
             if (op.equals("hide") || op.equals("keep") || op.equals("annotate") || (op.equals("expand") && !ids.isEmpty()))
                 for (String i : ids)
@@ -409,7 +409,7 @@ public final class InvestigationRoutes implements RouteModule {
             if (target < 0) throw new ApiException(409, ErrorCodes.CONFLICT, "nothing to undo");
             Map<String, Object> entry = entry(log.size() + 1, "undo", ex);
             entry.put("undoes", target);
-            return masked(inv, commit(ex, inv, log, entry, evaluate(log, -1, null)));
+            return masked(inv, commit(ex, inv, log, entry, stateBefore(inv, log)));
         }
     }
 
@@ -754,10 +754,13 @@ public final class InvestigationRoutes implements RouteModule {
         Map<String, Object> e = roundTrip(entry);
         List<Map<String, Object>> next = new ArrayList<>(log);
         next.add(e);
-        InvestigationEvaluator.State after = evaluate(next, -1, null);
+        // D7-4: a Draft resumes from its last checkpoint (one apply for an op) instead of folding main prefix + own log again
+        InvestigationEvaluator.State after = inv.draft() == null ? evaluate(next, -1, null)
+                : com.gamma.la.core.DraftCheckpoints.after(before, log, e);
         e.put("workingSetHash", after.hash());
         int step = ((Number) e.get("step")).intValue();
         inv.appendStep(step, canonical(e), canonical(setDoc(step, after)));
+        if (inv.draft() != null) com.gamma.la.core.DraftCheckpoints.remember(inv.draft().dir(), next.size(), after);
 
         String op = "undo".equals(e.get("kind")) ? "undo" : String.valueOf(e.get("op"));
         @SuppressWarnings("unchecked") Map<String, Object> read = (Map<String, Object>) e.get("read");
@@ -1894,7 +1897,7 @@ public final class InvestigationRoutes implements RouteModule {
 
             Map<String, Object> params = (Map<String, Object>) rec.get("params");
             List<Map<String, Object>> log = readLog(inv);
-            InvestigationEvaluator.State before = evaluate(log, -1, null);
+            InvestigationEvaluator.State before = stateBefore(inv, log);
             List<String> named = strings(params.get("ids"));
             List<String> frontier = new ArrayList<>();
             for (String n : named.isEmpty() ? before.entities.keySet() : sorted(named))
@@ -1974,6 +1977,11 @@ public final class InvestigationRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "cannot read the columns of dataset '" + datasetId + "': "
                     + unusable.getMessage());
         }
+    }
+
+    /** The state of {@code log} before the next step: the main log folds; a Draft resumes from its checkpoint (D7-4). */
+    private static InvestigationEvaluator.State stateBefore(Inv inv, List<Map<String, Object>> log) {
+        return inv.draft() == null ? evaluate(log, -1, null) : com.gamma.la.core.DraftCheckpoints.stateOf(inv.draft().dir(), log);
     }
 
     private static List<Map<String, Object>> readLog(Inv inv) throws IOException {

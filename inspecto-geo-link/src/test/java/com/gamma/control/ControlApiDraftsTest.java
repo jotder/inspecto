@@ -394,6 +394,59 @@ class ControlApiDraftsTest {
         }
     }
 
+    // -- D7-4: checkpointed append ----------------------------------------------------------------------------------
+
+    @Test
+    void aDraftAppendResumesFromItsCheckpointAndDoesNotRefoldTheLog(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root)) {
+            team(c);
+            String da = fork(c, A, "{}");
+            ok(c, "POST", d(da, "/ops"), SEED_E, A);                       // the first write may take the one cold fold
+            ok(c, "POST", INV + "/ops", "{\"op\":\"hide\",\"ids\":[\"bob-002\"]}", L);   // the MAIN log moves (its own folds are not under test): the Draft's base is re-verified, not re-folded
+            long folds = InvestigationEvaluator.foldCount();
+            ok(c, "POST", d(da, "/ops"), "{\"op\":\"expand\",\"ids\":[\"erin-005\"]}", A);
+            ok(c, "POST", d(da, "/ops"), "{\"op\":\"hide\",\"ids\":[\"carol-003\"]}", A);
+            ok(c, "POST", d(da, "/ops"), "{\"op\":\"exclude\",\"ids\":[\"bob-002\"],\"reason\":\"not relevant\"}", A);
+            ok(c, "POST", d(da, "/ops"), "{\"op\":\"keep\",\"ids\":[\"alice-001\"]}", A);
+            assertEquals(folds, InvestigationEvaluator.foldCount(), "four Draft appends fold nothing: they resume from the last checkpoint");
+            // equivalence: the incremental state IS the independent full re-fold, and replay agrees
+            assertEquals(refold(c, da, 2), ok(c, "GET", d(da, "/working-set"), null, A).get("head").get("workingSetHash").asText());
+            JsonNode replay = ok(c, "GET", d(da, "/replay"), null, A);
+            assertTrue(replay.get("equivalent").asBoolean(), replay.toString());
+            assertEquals(refold(c, da, 2), replay.get("workingSet").get("hash").asText());
+            // an undo cannot pop an incremental state: it folds, re-seeds the checkpoint, and the next op resumes from it
+            ok(c, "POST", d(da, "/undo"), "{}", A);
+            long afterUndo = InvestigationEvaluator.foldCount();
+            ok(c, "POST", d(da, "/ops"), "{\"op\":\"hide\",\"ids\":[\"erin-005\"]}", A);
+            assertEquals(afterUndo, InvestigationEvaluator.foldCount());
+            assertEquals(refold(c, da, 2), ok(c, "GET", d(da, "/working-set"), null, A).get("head").get("workingSetHash").asText());
+        }
+    }
+
+    @Test
+    void aWarmCheckpointNeverHidesATamperedMainPrefixOrDraftLog(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root)) {
+            team(c);
+            String da = fork(c, A, "{}");
+            ok(c, "POST", d(da, "/ops"), SEED_E, A);
+            ok(c, "POST", d(da, "/ops"), "{\"op\":\"hide\",\"ids\":[\"carol-003\"]}", A);   // base verdict and state checkpoint are both warm
+            Path main = invDir(c).resolve("log.jsonl");
+            String log = Files.readString(main);
+            Files.writeString(main, log.replaceFirst("alice-001", "alice-0011"));   // a prefix rewrite that changes the file
+            assertEquals(409, status(c, "POST", d(da, "/ops"), "{\"op\":\"hide\",\"ids\":[\"dave-004\"]}", A));
+            assertEquals(409, status(c, "GET", d(da, "/replay"), null, A));
+            Files.writeString(main, log);                                           // restored: the Draft works again and is still equivalent
+            ok(c, "POST", d(da, "/ops"), "{\"op\":\"keep\",\"ids\":[\"alice-001\"]}", A);
+            assertTrue(ok(c, "GET", d(da, "/replay"), null, A).get("equivalent").asBoolean());
+            // a Draft log edited behind the checkpoint's back is a miss, not a stale hit: replay sees the tamper
+            Path own = invDir(c).resolve("drafts").resolve(da).resolve("log.jsonl");
+            Files.writeString(own, Files.readString(own).replaceFirst("carol-003", "carol-0033"));
+            assertFalse(ok(c, "GET", d(da, "/replay"), null, A).get("equivalent").asBoolean(), "the tampered Draft log no longer replays to its recorded hashes");
+        }
+    }
+
     // -- fork atomicity, pins -------------------------------------------------------------------------------------
 
     private static final String BUILD = "{\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"kindCol\":\"channel\"}";

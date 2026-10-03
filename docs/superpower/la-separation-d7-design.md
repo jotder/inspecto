@@ -156,9 +156,20 @@ itself; index reads go through `IndexReader` (sealed to the pinned version direc
   Listing hides discarded Drafts unless `?discarded=true`. (6) No Draft cap (D21) or idle policy yet: D7-6.
 * **Left open for D7-4..D7-7.** A Draft's `expand` still reads CURRENT and seals the rows (D-E3): the pin keeps the old version on
   disk but nothing reads it - D7-5's rebase needs a version-addressable `IndexedRead.select`, and the pin TTL (D7-Q3) has no
-  "must rebase" refusal yet (it is reported as `pinWarning` / `pinExpiry` only). A Draft append still re-folds main prefix + own
-  log from step 0 on every write (D7-4). The 50-Draft cap and the hibernate marker need a place in `drafts/` listing that does not
-  read every header (D7-6).
+  "must rebase" refusal yet (it is reported as `pinWarning` / `pinExpiry` only). The 50-Draft cap and the hibernate marker need a
+  place in `drafts/` listing that does not read every header (D7-6).
+* **As built (D7-4) - checkpointed append (Q4 (a), every step).** `DraftCheckpoints` (inspecto-la-core) holds two in-memory
+  accelerators; a miss recomputes exactly the old path, so neither can change an answer. (1) The evaluated State after each step,
+  valid only while the Draft's `log.jsonl` keeps its size + mtime and entry count: an op resumes by `State.copy()` + `apply` (the
+  same incremental rule replay uses, so replay == incremental by construction) - zero whole-log folds; an undo still folds (an
+  incremental state cannot pop) and re-seeds the checkpoint. (2) The verified-base verdict (main prefix hashes to `baseLogHash`),
+  keyed by the main log file and valid while its size + mtime hold: any main append/rewrite forces one re-hash, an unchanged one
+  none. The replay route clears the base cache first - the audit never trusts it. Deviations: the on-disk `sets/<step>.json` is
+  a response-shaped view, NOT a restorable State, so the checkpoint is in memory and a restart takes one cold fold; Draft writes
+  still READ and parse the main prefix + own log (linear parse, no fold/hash) - a parse-free path is left open; a same-size,
+  same-mtime in-place tamper of the main log is only caught by replay (or the next main change). Test seam
+  `InvestigationEvaluator.foldCount()`; `DraftCheckpointsTest` + `ControlApiDraftsTest` (fold count 0 over 4 appends; mutation
+  of `stateBefore` back to a fold fails it 80 vs 84).
 
 ## 5. Baseline pinning
 
