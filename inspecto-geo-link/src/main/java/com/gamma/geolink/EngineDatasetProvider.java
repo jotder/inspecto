@@ -1,6 +1,8 @@
 package com.gamma.geolink;
 
+import com.gamma.consignment.ConsignmentSelector;
 import com.gamma.la.core.DatasetProvider;
+import com.gamma.la.core.FingerprintBudget;
 import com.gamma.la.core.InputFingerprint;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.query.ConditionSql;
@@ -52,8 +54,19 @@ public final class EngineDatasetProvider implements DatasetProvider {
 
     @Override
     public InputFingerprint inputFingerprint(Map<String, Object> dataset, Path dataRoot, Path writeRoot) {
+        return inputFingerprint(dataset, dataRoot, writeRoot, FingerprintBudget.forListing());
+    }
+
+    @Override
+    public InputFingerprint inputFingerprint(Map<String, Object> dataset, Path dataRoot, Path writeRoot, FingerprintBudget budget) {
+        if (budget.exhausted()) return InputFingerprint.unknown(InputFingerprint.BUDGET);
         // The engine's own resolution (DatasetRelation: store root, Consignment subtraction) - never paths scraped from SQL.
-        Optional<DatasetRelation.InputFiles> in = DatasetRead.inputFiles(dataset, dataRoot, InputFingerprint.MAX_FILES);
+        Optional<DatasetRelation.InputFiles> in;
+        try {
+            in = DatasetRead.inputFiles(dataset, dataRoot, InputFingerprint.MAX_FILES, budget.listingExpiry());
+        } catch (ConsignmentSelector.WalkTimeoutException slow) {
+            return InputFingerprint.unknown(InputFingerprint.TIMEOUT);
+        }
         if (in.isEmpty()) return InputFingerprint.noFiles(relationSql(dataset, dataRoot, writeRoot));
         if (in.get().overLimit()) return InputFingerprint.tooMany(InputFingerprint.MAX_FILES);
         return InputFingerprint.ofFiles(in.get().files().stream()

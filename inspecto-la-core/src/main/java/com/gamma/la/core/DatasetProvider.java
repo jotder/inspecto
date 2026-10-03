@@ -90,6 +90,15 @@ public interface DatasetProvider {
     }
 
     /**
+     * {@link #inputFingerprint(Map, Path, Path)} under a time {@code budget}: a listing that runs out of it answers
+     * {@code InputFingerprint.unknown("timeout")}, one that starts with the budget spent {@code unknown("budget")}. The default
+     * ignores the budget (a provider that cannot list files has nothing to bound).
+     */
+    default InputFingerprint inputFingerprint(Map<String, Object> dataset, Path dataRoot, Path writeRoot, FingerprintBudget budget) {
+        return inputFingerprint(dataset, dataRoot, writeRoot);
+    }
+
+    /**
      * The Dataset's relation SQL over ONLY {@code relativePaths} (input-file paths as {@link #inputFingerprint} reports them),
      * for an index APPEND of just the files added since the last build (D-3 step 8); {@code null} - the default - when the
      * relation is not row-wise over its files (a virtual or view-backed Dataset) or the provider cannot say, in which case an

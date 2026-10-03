@@ -153,6 +153,16 @@ public final class DatasetRelation {
      * @throws IllegalArgumentException on an unusable ref (the same refusals as {@link #relationSql})
      */
     public static Optional<InputFiles> inputFiles(Map<String, Object> datasetConfig, Path dataRoot, int limit) {
+        return inputFiles(datasetConfig, dataRoot, limit, () -> false);
+    }
+
+    /**
+     * {@link #inputFiles(Map, Path, int)} whose walk is abandoned when {@code expired} turns true.
+     *
+     * @throws com.gamma.consignment.ConsignmentSelector.WalkTimeoutException when it does
+     */
+    public static Optional<InputFiles> inputFiles(Map<String, Object> datasetConfig, Path dataRoot, int limit,
+                                                  java.util.function.BooleanSupplier expired) {
         String userSql = Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("sql"));
         String ref = userSql != null ? Values.trimToNull(datasetConfig.get("sourceName"))
                 : Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("physicalRef"));
@@ -162,7 +172,7 @@ public final class DatasetRelation {
         String root = storeReadRoot(ref, dataRoot);
         Path rel = shared ? Path.of(root) : dataRoot.normalize();
         String prefix = shared ? ref + "/" : "";
-        List<String> found = com.gamma.consignment.ConsignmentSelector.readableFiles(root, "parquet", limit + 1);
+        List<String> found = com.gamma.consignment.ConsignmentSelector.readableFiles(root, "parquet", limit + 1, expired);
         if (found == null) return Optional.empty();                 // the walk failed: unknown, not empty
         if (found.size() > limit) return Optional.of(new InputFiles(List.of(), true));
         List<FileStamp> out = new java.util.ArrayList<>();

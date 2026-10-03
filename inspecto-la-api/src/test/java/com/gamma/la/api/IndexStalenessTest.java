@@ -91,7 +91,8 @@ class IndexStalenessTest {
         InputFingerprint files = InputFingerprint.ofFiles(List.of(A));
         InputFingerprint none = InputFingerprint.noFiles("SELECT 1");
         for (IndexManifest m : List.of(manifest(none, false, "sql", "hash_mod", "1.4"), manifest(files, true, "sql", "hash_mod", "1.4"))) {
-            for (InputFingerprint now : new InputFingerprint[] {none, InputFingerprint.tooMany(InputFingerprint.MAX_FILES), null}) {
+            for (InputFingerprint now : new InputFingerprint[] {none, InputFingerprint.tooMany(InputFingerprint.MAX_FILES),
+                    InputFingerprint.unknown(InputFingerprint.TIMEOUT), InputFingerprint.unknown(InputFingerprint.BUDGET), null}) {
                 IndexStaleness.Result r = at(m, now);
                 assertFalse(r.stale(), String.valueOf(now));
                 assertFalse(r.fingerprintKnown(), String.valueOf(now));

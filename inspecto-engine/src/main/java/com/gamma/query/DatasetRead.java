@@ -38,6 +38,12 @@ public final class DatasetRead {
         return DatasetRelation.inputFiles(dataset, dataRoot, limit);
     }
 
+    /** {@link #inputFiles(Map, Path, int)} abandoned (ConsignmentSelector.WalkTimeoutException) when {@code expired} turns true. */
+    public static Optional<DatasetRelation.InputFiles> inputFiles(Map<String, Object> dataset, Path dataRoot, int limit,
+                                                                  java.util.function.BooleanSupplier expired) {
+        return DatasetRelation.inputFiles(dataset, dataRoot, limit, expired);
+    }
+
     /** The relation over only {@code relativePaths} (see {@link DatasetRelation#relationSqlOverFiles}); null when it cannot be appended. */
     public static String relationSqlOverFiles(Map<String, Object> dataset, Path dataRoot, List<String> relativePaths) {
         return DatasetRelation.relationSqlOverFiles(dataset, dataRoot, relativePaths);

@@ -13,6 +13,7 @@ import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.DatasetProviders;
+import com.gamma.la.core.FingerprintBudget;
 import com.gamma.la.core.InputFingerprint;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.storage.BucketFunction;
@@ -41,6 +42,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * The edge/node index of a Dataset (LA separation D-3 step 4, design 3.1): build it, watch the build, list what exists.
@@ -217,6 +219,23 @@ public final class IndexRoutes implements RouteModule {
         }
     }
 
+    /** Test seam: the per-request listing budget of {@code GET /inv/index}; null = {@link FingerprintBudget#forRequest()}. */
+    private static volatile Supplier<FingerprintBudget> requestBudgetOverride;
+
+    public static void forTestRequestBudget(Supplier<FingerprintBudget> budget) {
+        requestBudgetOverride = budget;
+    }
+
+    /** As the unbudgeted form but listing under the request's shared {@code budget}: spent = not listed at all ({@code unknown:budget}). */
+    private static InputFingerprint currentInput(ApiContext api, Path writeRoot, Map<String, Object> content, FingerprintBudget budget) {
+        if (budget.exhausted()) return InputFingerprint.unknown(InputFingerprint.BUDGET);
+        try {
+            return DatasetProviders.require().inputFingerprint(content, api.dataRoot(), writeRoot, budget);
+        } catch (RuntimeException unresolvable) {
+            return null;
+        }
+    }
+
     private static String required(Map<String, Object> body, String key) {
         String v = optional(body, key);
         if (v == null) throw bad("body must include '" + key + "'");
@@ -245,6 +264,8 @@ public final class IndexRoutes implements RouteModule {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link index");
         Path root = indexRoot(writeRoot);
         List<Object> items = new ArrayList<>();
+        Supplier<FingerprintBudget> override = requestBudgetOverride;
+        FingerprintBudget budget = override == null ? FingerprintBudget.forRequest() : override.get();   // ONE budget for every Dataset listed
         for (DatasetProvider.Entry c : DatasetProviders.require().datasets(writeRoot)) {
             if (!ComponentAccess.canView(ex, c.content())) continue;           // R3: a Dataset the caller may not view has no index, as far as they can tell
             List<String> hashes;
@@ -255,7 +276,7 @@ public final class IndexRoutes implements RouteModule {
             }
             if (hashes.isEmpty()) continue;
             String currentSqlHash = currentRelationHash(api, c, writeRoot);
-            InputFingerprint input = currentInput(api, writeRoot, c.content());
+            InputFingerprint input = currentInput(api, writeRoot, c.content(), budget);
             for (String hash : hashes) {
                 Map<String, Object> item = item(root, c.name(), hash, currentSqlHash, input);
                 if (item != null) items.add(item);
@@ -322,6 +343,7 @@ public final class IndexRoutes implements RouteModule {
         o.put("deltas", m.deltas().size());
         o.put("plan", plan(m, currentSqlHash, input, duck));
         o.put("fingerprint", st.fingerprintKnown() ? "known" : "unknown");
+        o.put("fingerprintReason", st.fingerprintKnown() ? null : InputFingerprint.unknownReason(input));   // no-files, too-many-files, timeout, budget, unavailable
         if (input != null && input.known()) o.put("inputFiles", input.files().size());
         return o;
     }

@@ -6,6 +6,10 @@ import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.la.api.IndexRoutes;
+import com.gamma.la.core.DatasetProvider;
+import com.gamma.la.core.DatasetProviders;
+import com.gamma.la.core.FingerprintBudget;
+import com.gamma.la.core.InputFingerprint;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.storage.IndexBuilder;
 import com.gamma.pipeline.ComponentStore;
@@ -73,6 +77,8 @@ class ControlApiIndexTest {
     void reset() {
         Authenticators.forTest(null);
         IndexRoutes.forTest(null);
+        IndexRoutes.forTestRequestBudget(null);
+        DatasetProviders.forTest(null);
     }
 
     private static void subjects() {
@@ -599,5 +605,46 @@ class ControlApiIndexTest {
         assertNotEquals(0, Roles.SEED.get("admin").capabilities().stream().filter(Roles.CAN_BUILD_LINK_INDEX::equals).count());
         assertFalse(Roles.SEED.get("business").capabilities().contains(Roles.CAN_BUILD_LINK_INDEX));
         assertFalse(Roles.SEED.get("developer").capabilities().contains(Roles.CAN_BUILD_LINK_INDEX));
+    }
+
+    // -- the per-request listing budget of GET /inv/index (the seam is IndexRoutes.forTestRequestBudget) ---------------------
+
+    @Test
+    void oneSlowListingSpendsTheRequestBudgetAndTheRestAreNotListedAtAll(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, "")) {
+            awaitStatus(c, start(c, PRIVATE_BUILD, OWNER), OWNER, "COMPLETED");
+            awaitStatus(c, start(c, SHARED_BUILD, OWNER), OWNER, "COMPLETED");
+
+            java.util.concurrent.atomic.AtomicLong clock = new java.util.concurrent.atomic.AtomicLong();
+            java.util.concurrent.atomic.AtomicInteger listings = new java.util.concurrent.atomic.AtomicInteger();
+            DatasetProvider real = DatasetProviders.require();
+            DatasetProviders.forTest((DatasetProvider) java.lang.reflect.Proxy.newProxyInstance(DatasetProvider.class.getClassLoader(),
+                    new Class<?>[] {DatasetProvider.class}, (proxy, m, args) -> {
+                        if (m.getName().equals("inputFingerprint") && args.length == 4) {
+                            listings.incrementAndGet();
+                            clock.addAndGet(10_000_000_000L);                       // this listing "took" 10 s: the 5 s request budget is gone
+                            return InputFingerprint.noFiles("slow");
+                        }
+                        try {
+                            return m.invoke(real, args);
+                        } catch (java.lang.reflect.InvocationTargetException e) {
+                            throw e.getCause();
+                        }
+                    }));
+            IndexRoutes.forTestRequestBudget(() -> new FingerprintBudget(FingerprintBudget.REQUEST_NANOS, clock::get));
+
+            JsonNode list = ok(c, "GET", "/inv/index", null, OWNER);
+            assertEquals(2, list.get("total").asInt());
+            assertEquals(1, listings.get(), "the second Dataset was never listed");
+            List<String> reasons = new java.util.ArrayList<>();
+            for (JsonNode ix : list.get("indexes")) {
+                assertEquals("unknown", ix.get("fingerprint").asText(), "unknown, never claimed current");
+                assertFalse(ix.get("stale").asBoolean());
+                reasons.add(ix.get("fingerprintReason").asText());
+            }
+            java.util.Collections.sort(reasons);
+            assertEquals(List.of("budget", "no-files"), reasons);
+        }
     }
 }

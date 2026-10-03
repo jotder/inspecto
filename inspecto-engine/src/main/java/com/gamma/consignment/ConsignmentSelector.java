@@ -178,19 +178,42 @@ public final class ConsignmentSelector {
      *         {@code null} when the walk itself failed
      */
     public static List<String> readableFiles(String root, String ext, int limit) {
+        return readableFiles(root, ext, limit, () -> false);
+    }
+
+    /** The walk gave up: its time budget ran out before it finished (it visited too many entries, or the disk is slow). */
+    public static final class WalkTimeoutException extends RuntimeException {
+        public WalkTimeoutException(String root) {
+            super("walk of " + root + " exceeded its time budget");
+        }
+    }
+
+    /**
+     * {@link #readableFiles(String, String, int)} that checks {@code expired} on EVERY directory entry visited (kept or not, so a
+     * tree of millions of hidden or other-extension entries is bounded as well as one of many kept files).
+     *
+     * @throws WalkTimeoutException when {@code expired} turns true mid-walk
+     */
+    public static List<String> readableFiles(String root, String ext, int limit, java.util.function.BooleanSupplier expired) {
         Set<String> excluded = excluded();
         if (!java.nio.file.Files.isDirectory(java.nio.file.Path.of(root))) return List.of();
-        return walk(root, ext, excluded == null ? Set.of() : excluded, limit);
+        return walk(root, ext, excluded == null ? Set.of() : excluded, limit, expired);
     }
 
     private static List<String> walk(String root, String ext, Set<String> excluded, int limit) {
+        return walk(root, ext, excluded, limit, () -> false);
+    }
+
+    private static List<String> walk(String root, String ext, Set<String> excluded, int limit, java.util.function.BooleanSupplier expired) {
         java.nio.file.Path base = java.nio.file.Path.of(root);
         if (!java.nio.file.Files.isDirectory(base)) return null;
 
         List<String> kept = new ArrayList<>();
         int removed = 0;
         try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(base)) {
-            for (java.nio.file.Path p : (Iterable<java.nio.file.Path>) walk.filter(java.nio.file.Files::isRegularFile)::iterator) {
+            for (java.nio.file.Path p : (Iterable<java.nio.file.Path>) walk.peek(e -> {
+                if (expired.getAsBoolean()) throw new WalkTimeoutException(root);
+            }).filter(java.nio.file.Files::isRegularFile)::iterator) {
                 if (!p.getFileName().toString().endsWith("." + ext) || hasHiddenSegment(base, p)) continue;
                 String file = p.toString().replace("\\", "/");
                 if (excluded.contains(DbConsignmentOutputStore.norm(file))) removed++;

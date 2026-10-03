@@ -115,6 +115,60 @@ class EngineDatasetProviderFingerprintTest {
         assertNotEquals(f.value(), provider.inputFingerprint(Map.of("view", "v"), root, root).value(), "carries the SQL hash");
     }
 
+    private static void emptyFiles(Path dataRoot, int count) throws Exception {
+        Path dir = Files.createDirectories(dataRoot.resolve("orders"));
+        for (int i = 0; i < count; i++) Files.createFile(dir.resolve(String.format("f%05d.parquet", i)));
+    }
+
+    @Test
+    void theCapIsExactlyMaxFilesOneMoreIsTheTooManySentinel(@TempDir Path root) throws Exception {
+        assertEquals(10_000, InputFingerprint.MAX_FILES);
+        emptyFiles(root, InputFingerprint.MAX_FILES);
+        InputFingerprint atCap = fp(root);
+        assertTrue(atCap.known(), atCap.value());
+        assertEquals(InputFingerprint.MAX_FILES, atCap.files().size());
+        Files.createFile(root.resolve("orders").resolve("one-more.parquet"));
+        InputFingerprint over = fp(root);
+        assertFalse(over.known());
+        assertEquals("too-many-files:10000", over.value());
+        assertEquals("too-many-files", InputFingerprint.unknownReason(over));
+    }
+
+    /** A clock that moves {@code tickNanos} on every read: the budget runs out after a fixed NUMBER of entries, whatever the disk does. */
+    private static com.gamma.la.core.FingerprintBudget budgetTicking(long tickNanos) {
+        java.util.concurrent.atomic.AtomicLong now = new java.util.concurrent.atomic.AtomicLong();
+        return new com.gamma.la.core.FingerprintBudget(com.gamma.la.core.FingerprintBudget.LISTING_NANOS, () -> now.getAndAdd(tickNanos));
+    }
+
+    @Test
+    void aWalkThatRunsOutOfTimeAnswersUnknownTimeoutNeverACurrentFingerprint(@TempDir Path root) throws Exception {
+        emptyFiles(root, 50);
+        InputFingerprint slow = provider.inputFingerprint(DS, root, root, budgetTicking(100_000_000L));   // 0.1 s per entry, 2 s budget
+        assertEquals("unknown:timeout", slow.value());
+        assertFalse(slow.known());
+        assertEquals("timeout", InputFingerprint.unknownReason(slow));
+        InputFingerprint fast = provider.inputFingerprint(DS, root, root, budgetTicking(1L));            // same files, a fast disk
+        assertTrue(fast.known(), fast.value());
+        assertEquals(50, fast.files().size());
+    }
+
+    @Test
+    void entriesThatAreNotKeptCountAgainstTheTimeBudgetToo(@TempDir Path root) throws Exception {
+        Path hidden = Files.createDirectories(root.resolve("orders").resolve(".staging"));       // never kept (hidden), still walked
+        for (int i = 0; i < 50; i++) Files.createFile(hidden.resolve("x" + i + ".parquet"));
+        assertEquals("unknown:timeout", provider.inputFingerprint(DS, root, root, budgetTicking(100_000_000L)).value());
+        assertTrue(provider.inputFingerprint(DS, root, root, budgetTicking(1L)).known());
+    }
+
+    @Test
+    void aSpentBudgetIsNotListedAtAll(@TempDir Path root) throws Exception {
+        emptyFiles(root, 3);
+        java.util.concurrent.atomic.AtomicLong now = new java.util.concurrent.atomic.AtomicLong();
+        com.gamma.la.core.FingerprintBudget b = new com.gamma.la.core.FingerprintBudget(1_000L, now::get);
+        now.set(5_000L);
+        assertEquals("unknown:budget", provider.inputFingerprint(DS, root, root, b).value());
+    }
+
     @Test
     void aVirtualDatasetListsItsSourceStoresFiles(@TempDir Path root) throws Exception {
         file(root, "a.parquet", 10, 1_000_000L);

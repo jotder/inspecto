@@ -12,7 +12,7 @@ import java.util.List;
  * A stable fingerprint of the INPUT FILES a Dataset's relation reads (LA separation D-3, design 2.4 / 5.3a) - what an
  * index records at build time and compares with the files now, to tell a stale index from a current one.
  *
- * <p>Three shapes, told apart by prefix so that 'cannot know' is never mistaken for 'unchanged':
+ * <p>Four shapes, told apart by prefix so that 'cannot know' is never mistaken for 'unchanged':
  * <ul>
  *   <li>{@code files:<sha256>} - sha256 over the files sorted by path, one line each:
  *       {@code path TAB size TAB mtimeMillis LF}. Paths are RELATIVE to the root the relation resolves against (never
@@ -20,19 +20,28 @@ import java.util.List;
  *   <li>{@code no-files:<sha256 of the relation SQL>} - the relation has no enumerable files (a view over other views, a
  *       Postgres-backed store, inline VALUES). Comparing two of these says nothing about the data.</li>
  *   <li>{@code too-many-files:<n>} - more than {@code n} files (the cap); not listed, so not compared.</li>
+ *   <li>{@code unknown:<reason>} - the listing was not taken: {@code timeout} (it ran past its {@link FingerprintBudget}) or
+ *       {@code budget} (the request's budget was already spent). Never read as 'unchanged'.</li>
  * </ul>
  *
- * @param value the fingerprint text (one of the three shapes)
+ * @param value the fingerprint text (one of the four shapes)
  * @param files the stamps behind a {@code files:} fingerprint, sorted by path; empty for the sentinels
  */
 public record InputFingerprint(String value, List<FileStamp> files) {
 
-    /** Most files a fingerprint is taken over; above this the sentinel {@code too-many-files:<MAX_FILES>} is used. */
+    /**
+     * Most files a fingerprint is taken over; above this the sentinel {@code too-many-files:<MAX_FILES>} is used. The cap bounds
+     * memory AND latency (a listing costs about 0.19 ms per file, so 10,000 files is about 2 s); the walk is separately bounded
+     * by time ({@link FingerprintBudget}).
+     */
     public static final int MAX_FILES = 10_000;
 
     public static final String FILES = "files:";
     public static final String NO_FILES = "no-files:";
     public static final String TOO_MANY = "too-many-files:";
+    public static final String UNKNOWN = "unknown:";
+    public static final String TIMEOUT = "timeout";
+    public static final String BUDGET = "budget";
 
     /** One input file: path relative to the root the relation resolves against, size in bytes, mtime in epoch millis. */
     public record FileStamp(String path, long size, long mtimeMillis) { }
@@ -59,6 +68,21 @@ public record InputFingerprint(String value, List<FileStamp> files) {
     /** More than {@code cap} files exist: {@code too-many-files:<cap>}. */
     public static InputFingerprint tooMany(int cap) {
         return new InputFingerprint(TOO_MANY + cap, List.of());
+    }
+
+    /** The listing was not taken: {@code unknown:<reason>} ({@link #TIMEOUT} or {@link #BUDGET}). */
+    public static InputFingerprint unknown(String reason) {
+        return new InputFingerprint(UNKNOWN + reason, List.of());
+    }
+
+    /** Why a fingerprint is not {@link #known()}: {@code no-files}, {@code too-many-files}, {@code timeout}, {@code budget}, or {@code unavailable} for null / anything else. */
+    public static String unknownReason(InputFingerprint f) {
+        if (f == null || f.value() == null) return "unavailable";
+        String v = f.value();
+        if (v.startsWith(NO_FILES)) return "no-files";
+        if (v.startsWith(TOO_MANY)) return "too-many-files";
+        if (v.startsWith(UNKNOWN)) return v.substring(UNKNOWN.length());
+        return "unavailable";
     }
 
     /** Whether this is a real file fingerprint, i.e. comparing it with another one says something about the data. */
