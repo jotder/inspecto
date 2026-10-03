@@ -217,6 +217,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/investigations/([^/]+)/drafts` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:61` |
 | POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/discard` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:72` |
 | POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/ops` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:68` |
+| POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/promote` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:77` |
+| POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/rebase` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:75` |
 | POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/undo` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:70` |
 | POST | `/inv/investigations/([^/]+)/members` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationMemberRoutes.java:49` |
 | POST | `/inv/investigations/([^/]+)/members/revoke` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationMemberRoutes.java:51` |

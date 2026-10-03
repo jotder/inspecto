@@ -1145,8 +1145,21 @@ Design and decisions D6-1…D6-7: [`la-separation-d6-design.md`](../../../archiv
   discard unpins; fork is assembled in a scratch dir and renamed in (a failed rename leaves no directory and no pin). **Discard** keeps
   `header.json` + `discarded.json` (who, when, head, log hash) and DELETES the log and sets (sealed rows may hold personal data); the
   per-step audit events keep the ops. No dossier, bundle or evidence route exists for a Draft (D20). Audit: `LINK_DRAFT_FORKED` /
-  `_OP_APPENDED` / `_UNDONE` / `_DISCARDED` (ids, actor, steps - never rows). Not yet: rebase and promote (D7-5), admission and
-  hibernate (D7-6), reading the PINNED index version (a Draft's expand still reads CURRENT and seals it, D-E3). **Checkpointed append
+  `_OP_APPENDED` / `_UNDONE` / `_DISCARDED` (ids, actor, steps - never rows). Not yet: admission and
+  hibernate (D7-6). **Rebase and promote (D7-5, built 2026-10-03):** GET `.../drafts/{id}/conflicts` (report, writes nothing), POST
+  `/rebase` (`{confirm?, expectHead?}`, actor only) and POST `/promote` (`{expectHead?}`, the actor or a lead; a reviewer 403). Rebase
+  replays the Draft's EFFECTIVE ops (undone ops and undo entries are compacted away, steps renumbered M+1..) over the current main
+  head through the append validation, re-seals every expand against freshly pinned index versions and swaps the new Draft in
+  (`DraftStore.replaceRebased`, two renames, old restored if the second fails). Each op is classed `no-op` / `changed` (re-sealed
+  fingerprint differs, both counts) / `superseded` (a no-op AND main holds the same op) / `blocked` (refused on the new base); the
+  last two are never carried and must be named in `confirm` (D7-Q7), else 409. A Draft's expand reads ITS pinned version
+  (`IndexStore.version(n)`, `IndexedRead.select(..., pinned)`; a version no longer published falls back to the flat Dataset); a pin
+  past 30 days refuses ops and promote with 409 "must rebase", and a rebase (even at the current head) re-pins. Promote needs base ==
+  main head and an undo-free Draft (the state records admission steps, so promoting a compacted log would not reproduce it), re-verifies
+  both under the main then Draft lock, appends each step with `draft{id, actor, baseStep, step, promotedBy}` provenance, rolls the main
+  log back if any append or the `promoted.json` marker fails, then closes the Draft (log and sets deleted, header + marker kept, pins
+  released). A promote carrying an expand that is sensitive under the thresholds NOW in force is held as a pending request (202) on the
+  four-eyes queue and decided by the existing approve / deny routes. Audit `LINK_DRAFT_REBASED` / `_PROMOTED`. **Checkpointed append
   (D7-4):** `DraftCheckpoints` keeps the last evaluated State per Draft (valid while `log.jsonl` keeps size + mtime) so an op is one
   `copy()` + `apply`, not a re-fold of main prefix + own log; an undo still folds. The verified `baseLogHash` verdict is cached per
   main log file (size + mtime), so an unchanged main log is not re-read or re-hashed; `/replay` clears it and re-verifies. Caches are

@@ -122,6 +122,15 @@ final class IndexedRead {
      */
     static Selection select(Path writeRoot, Path dataRoot, String relationSql, String datasetId, String sourceCol, String targetCol,
                             BiFunction<IndexMapping, Boolean, Fitted> fit) {
+        return select(writeRoot, dataRoot, relationSql, datasetId, sourceCol, targetCol, fit, null);
+    }
+
+    /**
+     * D7-5 - the version-addressable read: {@code pinned} maps a mapping hash to the version a Draft pinned; an index named there is
+     * read at THAT version (a version no longer published reads as unpublished, so the flat Dataset answers), every other index at CURRENT.
+     */
+    static Selection select(Path writeRoot, Path dataRoot, String relationSql, String datasetId, String sourceCol, String targetCol,
+                            BiFunction<IndexMapping, Boolean, Fitted> fit, Map<String, Long> pinned) {
         if (!LinkAnalysisSettings.forRoot(writeRoot).effectiveIndex().enabledInForce()) return declined(Outcome.flat(Reason.index_disabled));
 
         Path root = writeRoot.resolve(IndexRoutes.INDEX_DIR);
@@ -134,7 +143,8 @@ final class IndexedRead {
         record Candidate(Path dir, IndexManifest manifest, String hash) { }
         List<Candidate> published = new ArrayList<>();
         for (String hash : hashes) {
-            Optional<Path> current = new IndexStore(root, datasetId, hash).current();        // CURRENT is read ONCE: this is the pinned version
+            IndexStore st0 = new IndexStore(root, datasetId, hash);
+            Optional<Path> current = pinned != null && pinned.containsKey(hash) ? st0.version(pinned.get(hash)) : st0.current();   // CURRENT is read ONCE
             if (current.isEmpty()) continue;
             try {
                 IndexManifest m = IndexManifest.read(current.get());

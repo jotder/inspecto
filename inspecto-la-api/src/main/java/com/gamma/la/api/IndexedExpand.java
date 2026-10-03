@@ -67,12 +67,18 @@ final class IndexedExpand {
     }
 
     static Outcome<Result> attempt(Path writeRoot, Path dataRoot, String relationSql, Request rq, SqlSandboxPolicy policy) {
+        return attempt(writeRoot, dataRoot, relationSql, rq, policy, null);
+    }
+
+    /** D7-5: as above, reading each index a Draft pinned ({@code mappingHash -> version}) at that version. */
+    static Outcome<Result> attempt(Path writeRoot, Path dataRoot, String relationSql, Request rq, SqlSandboxPolicy policy,
+                                   java.util.Map<String, Long> pinned) {
         String why = notIndexable(rq);
         Selection sel = IndexedRead.select(writeRoot, dataRoot, relationSql, rq.datasetId(), rq.sourceCol(), rq.targetCol(), (m, utc) -> {
             if (why != null) return Fitted.no(Reason.rung_not_indexable);
             if (rq.kindCol() != null && !rq.kindCol().equalsIgnoreCase(m.kindColumn())) return Fitted.no(Reason.column_not_indexed);
             return Fitted.ok(null);
-        });
+        }, pinned);
         if (!sel.usable()) {
             Outcome<Result> o = sel.flat();
             return o.reason() == Reason.rung_not_indexable ? Outcome.flat(Reason.rung_not_indexable, why) : o;

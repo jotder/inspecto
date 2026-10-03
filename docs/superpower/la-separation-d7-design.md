@@ -171,6 +171,59 @@ itself; index reads go through `IndexReader` (sealed to the pinned version direc
   `InvestigationEvaluator.foldCount()`; `DraftCheckpointsTest` + `ControlApiDraftsTest` (fold count 0 over 4 appends; mutation
   of `stateBefore` back to a fold fails it 80 vs 84).
 
+* **As built (D7-5, 2026-10-03) - rebase, conflict report, promote** (`DraftRebase`, `DraftPromote`, `DraftRoutes`).
+  * **Routes.** GET `.../drafts/{id}/conflicts` (the report; writes nothing; actor, lead, reviewer read), POST `.../rebase`
+    (`{confirm?: [step], expectHead?}`; the actor only, 403 for a lead/reviewer, 404 for a peer), POST `.../promote` (`{expectHead?}`;
+    the actor if lead/analyst, or a lead for any Draft; reviewer 403; peer analyst / stranger 404). Capability literal
+    `canManageIncidents` on the two POSTs; the GET has none (a read, like the other Draft reads).
+  * **Rebase carries EFFECTIVE ops only.** Undone ops and undo entries are compacted away (their history is in the per-step audit
+    events; the old log is not kept - sealed rows may be personal data). Steps are renumbered M+1.. over the current main head M, each
+    carries `rebasedFrom: <old step>`, and the header is REWRITTEN (not write-once any more): new `baseStep` / `baseLogHash` / `pins`,
+    plus a `rebases[]` history. Replay goes through `InvestigationRoutes.replayOp` = the append validation (ids still in the Working Set,
+    merged exclude re-resolved, expand re-sealed; list / resolution / seedBy payloads kept as a fork does). Rebase at the current head is
+    legal - that is how an expired pin is renewed.
+  * **Conflict kinds as implemented** (per op: did it change the old Working Set, does it change the new one): `blocked` = the append
+    validation refuses it on the new base; `superseded` = it changed the old base, changes nothing now, and an effective op with the
+    same `op` + canonical params exists on main since the fork; `no-op` = changed old, changes nothing now, no such twin (kept, reported);
+    `changed` = an expand whose re-sealed fingerprint differs (both row counts reported; kept). A report carries steps, kinds, counts -
+    no id, no row. **Q7:** `superseded` AND `blocked` are never carried and must be listed in `confirm` (409 naming the missing steps; 422
+    for a step with nothing to confirm); `blocked` can only be dropped - there is no way to force-carry it.
+  * **Optimistic commit.** The expensive replay (it re-reads) runs with no lock; commit takes the main lock THEN the Draft lock (promote's
+    order) and re-verifies that main still has exactly `M` entries hashing to the plan's `toBaseHash` and the Draft log is byte-identical,
+    else 409 "read the conflict report again"; it also re-folds main ++ carried and checks every recorded hash. The swap
+    (`DraftStore.replaceRebased`) stages `.rebase-*`, moves the Draft aside, moves the stage in, deletes the aside; if the second move
+    fails the old one is moved back (fault-injected through `mover`). New pins are taken first and restored on failure.
+  * **Version-addressable read (D7-3 open item, closed).** `IndexStore.version(n)`; `IndexedRead.select(..., pinned)` and
+    `IndexedExpand.attempt(..., pinned)` take `mappingHash -> version`. A Draft's `expand` now reads its header's pinned versions
+    (`InvestigationRoutes.draftPins`); a rebase resolves CURRENT once and reads exactly those versions, then pins them. A pinned version
+    that is no longer published reads as "no index" and the flat Dataset answers (existing fall-through) - the staleness gate still applies.
+  * **Q3 expiry.** A Draft with an expired pin refuses `ops` and `promote` with 409 `must rebase`; undo (reads nothing), reads and
+    rebase still work; `pinWarning` / `pinExpiry` were already reported (warn from day 23).
+  * **Promote** (`DraftPromote.execute`): under main lock then Draft lock re-verifies open, `baseStep == main head`, the main prefix hash,
+    no expired pin, **no undo entry in the Draft** (the Working Set records the step an entity was admitted at, so a log compacted without
+    renumbering is not the state the Draft showed - such a Draft rebases first, which compacts it; found when the equivalence check
+    caught it), then folds the new entries over main and requires the Draft's own state hash (500 if not). Entries are appended one by
+    one with `draft{id, actor, baseStep, step, promotedBy}` (the state hash is unaffected: it folds only op fields); any failure
+    truncates `log.jsonl` back and deletes the new `sets/` files, so main gains every step or none (`DraftStore.promoteHook` seam).
+    Then `promoted.json` (CREATE_NEW; log + sets deleted, header + marker kept, as a discard), pins released. A promoted Draft is closed
+    like a discarded one (`DraftStore.isClosed`; not counted by D17; listing `?closed=true`; state `promoted`; discard 409).
+  * **Four-eyes - the recorded call.** A Draft cannot hold a sensitive expand (D7-3 422), but thresholds can fall after the op was taken.
+    Sensitivity is judged at PROMOTE against the thresholds then in force. If any carried expand is sensitive nothing is appended: the
+    promote is HELD as a pending request (`kind: "promote"`, 202) on the main log's one-at-a-time pending queue, decided through the
+    EXISTING `approve` / `deny` routes (lead or reviewer, never the requester; needs an authenticated Subject, else 403). Approve re-checks
+    that the Draft log hash and main head are what was requested (409 "deny and request again"), then runs the same atomic promote with
+    `approval{request, requestedBy, approvedBy, ...}` on the sensitive entries. Rebase itself re-reads without approval: a Draft's reads
+    are private to it; D-U7 governs what enters the main log.
+  * **Gates.** `CapabilityManifest` x2, `AbsentGeoLinkRoutes.SURFACE` x3, `openapi-v1.json` (+3 paths, verified inside `paths`), route-gating
+    report regenerated, `ImportLoaderInventoryTest` allow-list (`promoted.json`), audit `LINK_DRAFT_REBASED` / `LINK_DRAFT_PROMOTED`
+    (ids, steps, counts - never rows). Tests: `ControlApiDraftRebasePromoteTest` (13, real HTTP, armed Authenticator, six Subjects).
+  * **Left open for D7-6 / D7-7.** (1) `drafts/` listing still reads every header; a rebase appends to `rebases[]` so headers grow slowly.
+    (2) A crash between the two renames of a rebase leaves `.old-<draftId>-*` and no Draft directory (data intact in the aside; no
+    recovery sweep exists - D7-6's listing work is the natural home). (3) The pending promote does not freeze the Draft: a later Draft
+    write only makes the approval 409. (4) Promote by an analyst on a NON-sensitive Investigation appends with no second person (design
+    section 9 as signed); say so if that is not wanted. (5) The conflict report recomputes (re-reads) on every GET; no cache.
+    (6) Rebase does not carry a Draft's `annotate`-only or other no-effect ops specially: a no-effect op both before and after is carried unreported.
+
 ## 5. Baseline pinning
 
 At fork the Draft header records:
@@ -336,7 +389,7 @@ and `sets/` are never evicted.**
 | D7-2 | **BUILT 2026-10-03** (section 5 "As built"). Version pins survive: `IndexStore.gc` honours a pin set; reader pool spares pinned siblings | unit test: publish 3 versions with one pinned → pinned survives gc and pool borrow of CURRENT |
 | D7-3 ✅ **BUILT 2026-10-03** (section 4 "As built") | Draft store + routes: fork (baseStep, baseLogHash, pins), append, undo, log, discard | Draft `/replay` equivalence green; fork writes nothing on failure (fault-injected rename) |
 | D7-4 | Checkpointed append (fold from latest `sets/`), main log and Drafts | equal state hashes vs full re-fold on a 500-step fixture; append latency flat in log length |
-| D7-5 | Rebase + conflict report + promote (+ D-U7 approval when sensitive) | fixture with one op of each conflict kind → report lists all four; promote with moved head 409 |
+| D7-5 ✅ **BUILT 2026-10-03** (section 4 "As built (D7-5)") | Rebase + conflict report + promote (+ D-U7 approval when sensitive) | fixture with one op of each conflict kind → report lists all four; promote with moved head 409 |
 | D7-6 | Admission + `draft.duckdb` derived tables + hibernate/rehydrate | 51st open 409; full heavy queue 429; evicted file rebuilds to identical result hashes |
 | D7-7 | Re-run `DraftConcurrencyBench` with real Drafts, think time, and the 10⁹ (or largest feasible) partitioned index | D-S5 pass condition on real state; §7 numbers confirmed or replaced in this file |
 

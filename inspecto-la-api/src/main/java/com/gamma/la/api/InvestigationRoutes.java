@@ -194,8 +194,8 @@ public final class InvestigationRoutes implements RouteModule {
         void appendStep(int step, String lineJson, String workingSetJson) throws IOException {
             if (draft == null) store.appendStep(id, step, lineJson, workingSetJson);
             else {
-                if (com.gamma.la.core.DraftStore.isDiscarded(draft.dir()))   // discarded between the gate and the lock
-                    throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + draft.draftId() + "' was discarded");
+                if (com.gamma.la.core.DraftStore.isClosed(draft.dir()))   // discarded or promoted between the gate and the lock
+                    throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + draft.draftId() + "' was closed (discarded or promoted)");
                 com.gamma.la.core.DraftStore.appendStep(draft.dir(), step, lineJson, workingSetJson);
             }
         }
@@ -393,6 +393,75 @@ public final class InvestigationRoutes implements RouteModule {
             }
             return masked(inv, commit(ex, inv, log, entry, before));
         }
+    }
+
+    /**
+     * D7-5 - re-apply one recorded op over {@code state} (the new base plus the ops carried so far), with the SAME validation an append
+     * runs, returning the entry's op fields. List / resolution / seedBy payloads keep what they sealed (as a fork does); a merged
+     * exclude re-seals its groups; an expand is RE-SEALED, reading {@code pins} (mappingHash to version). A refusal is an
+     * {@link ApiException} 422 - the caller reports it as a {@code blocked} conflict.
+     */
+    @SuppressWarnings("unchecked")
+    Map<String, Object> replayOp(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> orig,
+                                 InvestigationEvaluator.State state, Map<String, Long> pins) {
+        String op = String.valueOf(orig.get("op"));
+        Map<String, Object> params = (Map<String, Object>) orig.get("params");
+        List<String> ids = strings(params.get("ids"));
+        if (op.equals("hide") || op.equals("keep") || op.equals("annotate") || (op.equals("expand") && !ids.isEmpty()))
+            for (String i : ids)
+                if (!state.entities.containsKey(i))
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an entity this op names is no longer in the Working Set");
+        if (params.get("links") instanceof List<?> ls)
+            for (Object o : ls) {
+                Map<?, ?> l = (Map<?, ?>) o;
+                if (!state.links.containsKey(LinkIds.key(String.valueOf(l.get("source")), String.valueOf(l.get("target")), String.valueOf(l.get("kind")))))
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a link this op names is no longer in the Working Set");
+            }
+        Map<String, Object> e = new LinkedHashMap<>();
+        e.put("op", op);
+        e.put("params", params);
+        if (orig.get("list") != null) e.put("list", orig.get("list"));
+        if ("seedBy".equals(op) && orig.get("read") != null) e.put("read", orig.get("read"));
+        if (orig.get("resolution") != null) e.put("resolution", orig.get("resolution"));
+        if (op.equals("exclude") && Boolean.TRUE.equals(params.get("merged"))) {
+            requireResolution(state, "");
+            List<Object> groups = new ArrayList<>(state.groupsHit(ids).values());
+            if (groups.isEmpty())
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a merged exclude's identity group no longer resolves");
+            e.put("groups", groups);
+        }
+        if (op.equals("expand")) {
+            List<String> frontier = ids.isEmpty() ? new ArrayList<>(state.entities.keySet()) : sorted(ids);
+            if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "nothing to expand - the Working Set is empty");
+            if (frontier.size() > MAX_FRONTIER)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + MAX_FRONTIER + " entities");
+            e.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, frontier, state, ""), pins == null ? Map.of() : pins));
+        }
+        return e;
+    }
+
+    /** D7-5: whether an expand with these params is four-eyes sensitive under the Space's CURRENT thresholds (D-U7), or null. */
+    static Map<String, Object> sensitivityOf(Inv inv, Map<String, Object> params) {
+        return sensitivity(inv, params);
+    }
+
+    /** D7-5: hold a promote that carries a sensitive expand as a PENDING request on the main log's four-eyes queue (one at a time). */
+    static Map<String, Object> requestPromote(HttpExchange ex, Inv inv, Map<String, Object> rec) throws IOException {
+        List<String> existing = inv.store().listPending(inv.id());
+        for (String raw : existing)
+            if ("pending".equals(parse(raw).get("status")))
+                throw new ApiException(409, ErrorCodes.CONFLICT, "a request is already pending approval (" + parse(raw).get("id")
+                        + ") - it must be approved or denied before another is requested");
+        String rid = "p" + (existing.size() + 1);
+        rec.put("id", rid);
+        rec.put("status", "pending");
+        rec.put("requestedBy", ApiContext.actor(ex));
+        rec.put("requestedAt", Instant.now().toString());
+        inv.store().writePending(inv.id(), rid, canonical(rec));
+        emit(ex, LinkEventTypes.LINK_EXPANSION_REQUESTED, "link.expansion.requested",
+                "link.expansion.requested - " + inv.id() + " " + rid + " promote of " + rec.get("draftId"),
+                b -> b.attr("investigationId", inv.id()).attr("requestId", rid).attr("draftId", rec.get("draftId")));
+        return rec;
     }
 
     /** {@code POST /inv/investigations/{id}/undo} — revert the latest effective op; 409 when there is none. */
@@ -938,6 +1007,28 @@ public final class InvestigationRoutes implements RouteModule {
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> read(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> query) {
+        return read(api, ex, inv, query, null);
+    }
+
+    /** The versions a Draft pinned ({@code mappingHash -> version}), from its header; null for the main log (CURRENT). D7-5: a Draft's expand reads these. */
+    static Map<String, Long> draftPins(Inv inv) {
+        if (inv.draft() == null) return null;
+        try {
+            String raw = com.gamma.la.core.DraftStore.readHeader(inv.dir(), inv.draft().draftId());
+            Map<String, Long> out = new LinkedHashMap<>();
+            if (raw != null && ApiContext.JSON.readValue(raw, Map.class).get("pins") instanceof Map<?, ?> p && p.get("indexes") instanceof List<?> l)
+                for (Object o : l)
+                    if (o instanceof Map<?, ?> m && m.get("mappingHash") != null && m.get("version") instanceof Number n)
+                        out.put(String.valueOf(m.get("mappingHash")), n.longValue());
+            return out;
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> read(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> query, Map<String, Long> pinsOverride) {
+        Map<String, Long> pins = pinsOverride != null ? pinsOverride : draftPins(inv);
         String dataset = inv.dataset();
         String relationSql = InvRoutes.relationFor(api, ex, inv.writeRoot(), dataset);   // R3 gate on EVERY read
         List<String> frontier = strings(query.get("frontier"));
@@ -967,7 +1058,7 @@ public final class InvestigationRoutes implements RouteModule {
                     String.valueOf(hdr.get("sourceCol")), String.valueOf(hdr.get("targetCol")),
                     hdr.get("linkKindCol") == null ? null : String.valueOf(hdr.get("linkKindCol")), frontier, excluded, kinds,
                     direction, ((Number) query.get("minEvents")).longValue(), fanOut, budget, window != null, minDays != null,
-                    degMin != null || degMax != null, query.get("merged") != null), InvRoutes.traversalPolicy());
+                    degMin != null || degMax != null, query.get("merged") != null), InvRoutes.traversalPolicy(), pins);
             if (indexed.served()) {
                 rows = new ArrayList<>(indexed.result().rows());
                 truncated = indexed.result().truncated();
@@ -1895,6 +1986,20 @@ public final class InvestigationRoutes implements RouteModule {
                 return masked(inv, Map.of("id", id, "pending", rec));
             }
 
+            if ("promote".equals(rec.get("kind"))) {   // D7-5: a held promote of a Draft carrying a sensitive expand
+                Map<String, Object> approval = new LinkedHashMap<>();
+                approval.put("request", rid);
+                approval.put("requestedBy", rec.get("requestedBy"));
+                approval.put("requestedAt", rec.get("requestedAt"));
+                approval.put("approvedBy", by);
+                approval.put("approvedAt", at);
+                Map<String, Object> out = DraftPromote.executeApproved(api, ex, inv, rec, approval);
+                rec.put("status", "approved");
+                rec.put("step", out.get("toStep"));
+                inv.store().writePending(inv.id(), rid, canonical(rec));
+                out.put("approval", approval);
+                return masked(inv, out);
+            }
             Map<String, Object> params = (Map<String, Object>) rec.get("params");
             List<Map<String, Object>> log = readLog(inv);
             InvestigationEvaluator.State before = stateBefore(inv, log);
@@ -1964,7 +2069,7 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> parse(String raw) throws IOException {
+    static Map<String, Object> parse(String raw) throws IOException {
         return ApiContext.JSON.readValue(raw, LinkedHashMap.class);
     }
 
@@ -2003,11 +2108,11 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> roundTrip(Map<String, Object> entry) throws IOException {
+    static Map<String, Object> roundTrip(Map<String, Object> entry) throws IOException {
         return ApiContext.JSON.readValue(canonical(entry), LinkedHashMap.class);
     }
 
-    private static Map<String, Object> setDoc(int step, InvestigationEvaluator.State s) {
+    static Map<String, Object> setDoc(int step, InvestigationEvaluator.State s) {
         Map<String, Object> doc = new LinkedHashMap<>();
         doc.put("step", step);
         doc.put("hash", s.hash());

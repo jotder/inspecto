@@ -45,6 +45,7 @@ public final class DraftStore {
     public static final String DRAFTS = "drafts";
     public static final String HEADER = "header.json";
     public static final String DISCARDED = "discarded.json";
+    public static final String PROMOTED = "promoted.json";
 
     /** How a staged directory is moved into place: a TEST SEAM (a test substitutes one that throws); production is one atomic rename. */
     @FunctionalInterface
@@ -54,6 +55,9 @@ public final class DraftStore {
 
     public static final Mover ATOMIC = (from, to) -> Files.move(from, to, StandardCopyOption.ATOMIC_MOVE);
     public static volatile Mover mover = ATOMIC;
+
+    /** TEST SEAM (D7-5): called before each main-log append of a promote with the step about to be written; a test throws to prove the rollback. */
+    public static volatile java.util.function.IntConsumer promoteHook = step -> { };
 
     public static String newId() {
         return "draft-" + UUID.randomUUID();
@@ -121,6 +125,70 @@ public final class DraftStore {
 
     public static boolean isDiscarded(Path draftDir) {
         return Files.isRegularFile(draftDir.resolve(DISCARDED));
+    }
+
+    public static boolean isPromoted(Path draftDir) {
+        return Files.isRegularFile(draftDir.resolve(PROMOTED));
+    }
+
+    /** A closed Draft (discarded or promoted) takes no more reads of its log and no writes, and does not count against D17. */
+    public static boolean isClosed(Path draftDir) {
+        return isDiscarded(draftDir) || isPromoted(draftDir);
+    }
+
+    public static String readPromoted(Path draftDir) throws IOException {
+        Path f = draftDir.resolve(PROMOTED);
+        return Files.isRegularFile(f) ? Files.readString(f, StandardCharsets.UTF_8) : null;
+    }
+
+    /**
+     * D7-5 promote: write {@code promoted.json} (CREATE_NEW; false when already promoted) and delete the log and {@code sets/} - the
+     * rows now live in the main log, so the Draft keeps only its header and this marker (as a discard does).
+     */
+    public static boolean markPromoted(Path draftDir, String markerJson) throws IOException {
+        try {
+            Files.writeString(draftDir.resolve(PROMOTED), markerJson, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+        } catch (java.nio.file.FileAlreadyExistsException already) {
+            return false;
+        }
+        Files.deleteIfExists(draftDir.resolve("log.jsonl"));
+        Path sets = draftDir.resolve("sets");
+        if (Files.isDirectory(sets)) deleteTree(sets);
+        return true;
+    }
+
+    /**
+     * D7-5 rebase: stage a whole replacement (header, log, sets) beside the Draft and swap it in with two renames (old aside, new in,
+     * old deleted); if the second rename fails the old Draft is moved back, so a failed rebase leaves the Draft as it was. Both
+     * moves go through {@link #mover} (the fault-injection seam).
+     */
+    public static void replaceRebased(Path draftDir, String headerJson, List<String> lines, List<String> sets, List<Integer> setSteps) throws IOException {
+        Path root = draftDir.getParent();
+        Path tmp = Files.createTempDirectory(root, ".rebase-");   // a leading '.' never matches DRAFT_ID
+        Path old = root.resolve(".old-" + draftDir.getFileName() + "-" + UUID.randomUUID());
+        try {
+            Files.writeString(tmp.resolve(HEADER), headerJson, StandardCharsets.UTF_8);
+            if (!lines.isEmpty()) Files.writeString(tmp.resolve("log.jsonl"), String.join("\n", lines) + "\n", StandardCharsets.UTF_8);
+            Files.createDirectories(tmp.resolve("sets"));
+            for (int i = 0; i < sets.size(); i++)
+                Files.writeString(tmp.resolve("sets").resolve(setSteps.get(i) + ".json"), sets.get(i), StandardCharsets.UTF_8);
+            mover.move(draftDir, old);
+            try {
+                mover.move(tmp, draftDir);
+            } catch (IOException | RuntimeException second) {
+                try {
+                    Files.move(old, draftDir, StandardCopyOption.ATOMIC_MOVE);
+                } catch (IOException restoreFailed) {
+                    second.addSuppressed(restoreFailed);
+                }
+                throw second;
+            }
+        } catch (IOException | RuntimeException failed) {
+            deleteTree(tmp);
+            throw failed;
+        }
+        deleteTree(old);
     }
 
     /** The marker's raw JSON, or null when the Draft was not discarded. */

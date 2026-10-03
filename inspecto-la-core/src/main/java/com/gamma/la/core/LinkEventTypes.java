@@ -132,6 +132,15 @@ public final class LinkEventTypes {
      *  {@code draftId}, {@code actor} (who discarded), {@code baseStep}, {@code step} (its head) and {@code unpinned}. */
     public static final String LINK_DRAFT_DISCARDED = "LINK_DRAFT_DISCARDED";
 
+    /** A Draft was rebased onto the main head ({@code POST .../drafts/{draftId}/rebase}, D7-5). {@code investigationId}, {@code draftId},
+     *  {@code actor}, {@code fromBase}, {@code toBase}, {@code carried}, {@code dropped} and the conflict counts per kind - ids and counts only. */
+    public static final String LINK_DRAFT_REBASED = "LINK_DRAFT_REBASED";
+
+    /** A Draft was promoted into the main log ({@code POST .../drafts/{draftId}/promote}, or the approval of a pending promote, D7-5).
+     *  {@code investigationId}, {@code draftId}, {@code actor} (the Draft's), {@code promotedBy}, {@code fromStep}, {@code toStep}, {@code steps}
+     *  and, when four-eyes applied, {@code approvedBy} - ids only, never rows. */
+    public static final String LINK_DRAFT_PROMOTED = "LINK_DRAFT_PROMOTED";
+
     /** An Investigation's Working Set was read as a derived relation ({@code GET /inv/investigations/{id}/working-set},
      *  LA-20). {@code relation} (entities | links | excluded), {@code rows} served, {@code total},
      *  {@code truncated}, {@code cached} and the relation {@code key} (the sealed log's hash) — the LA-04

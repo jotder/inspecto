@@ -71,11 +71,16 @@ public final class DraftRoutes implements RouteModule {
                 (e, m) -> undo(api, e, m.group(1), m.group(2))));
         api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/discard", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> discard(api, e, m.group(1), m.group(2))));
+        api.get("/inv/investigations/([^/]+)/drafts/([^/]+)/conflicts", (e, m) -> conflicts(api, e, m.group(1), m.group(2)));
+        api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/rebase", ApiContext.withCapability("canManageIncidents",
+                (e, m) -> rebase(api, e, m.group(1), m.group(2), api.body(e))));
+        api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/promote", ApiContext.withCapability("canManageIncidents",
+                (e, m) -> promote(api, e, m.group(1), m.group(2), api.body(e))));
     }
 
     // ── the gate ───────────────────────────────────────────────────────────────────────────────────────
 
-    private enum Act { READ, WRITE, DISCARD }
+    private enum Act { READ, WRITE, DISCARD, PROMOTE }
 
     /** An opened Draft: the Investigation view working on it, its parsed header, and whether the main prefix is still what it forked from. */
     private record Opened(InvestigationRoutes.Inv view, Map<String, Object> header, boolean discarded, boolean baseIntact, int mainHead, Role role) {
@@ -108,7 +113,8 @@ public final class DraftRoutes implements RouteModule {
             if (act == Act.WRITE) refusal = new ApiException(403, ErrorCodes.PERMISSION_DENIED, "draft '" + draftId + "' belongs to '" + header.get("actor")
                     + "' - only its actor writes it");
             if (act == Act.DISCARD && role != Role.LEAD) refusal = new ApiException(403, ErrorCodes.PERMISSION_DENIED, "only the actor or a lead discards a draft");
-        } else if (act == Act.WRITE && !role.canWriteDraft()) {
+            if (act == Act.PROMOTE && role != Role.LEAD) refusal = new ApiException(403, ErrorCodes.PERMISSION_DENIED, "only the actor or a lead promotes a draft");
+        } else if ((act == Act.WRITE || act == Act.PROMOTE) && !role.canWriteDraft()) {
             refusal = new ApiException(403, ErrorCodes.PERMISSION_DENIED, "your role on investigation '" + invId + "' is " + role.wire() + " - it does not write a draft");
         }
         if (refusal != null) throw refusal;
@@ -125,11 +131,12 @@ public final class DraftRoutes implements RouteModule {
         boolean intact = base.intact();
         InvestigationRoutes.Inv view = new InvestigationRoutes.Inv(inv.store(), inv.writeRoot(), inv.id(), inv.header(),
                 new InvestigationRoutes.Inv.DraftRef(draftId, baseStep, dir));
-        return new Opened(view, header, DraftStore.isDiscarded(dir), intact, base.mainSize(), role);
+        return new Opened(view, header, DraftStore.isClosed(dir), intact, base.mainSize(), role);
     }
 
     private static void requireLive(Opened o) {
-        if (o.discarded()) throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + o.draftId() + "' was discarded");
+        if (o.discarded()) throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + o.draftId() + "' was "
+                + (DraftStore.isPromoted(o.view().draft().dir()) ? "promoted" : "discarded"));
     }
 
     /** A Draft whose main prefix no longer hashes to what it forked from is not evaluated: fail closed (the main log was rewritten). */
@@ -161,7 +168,7 @@ public final class DraftRoutes implements RouteModule {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'at' must be between 0 and the head step " + head + ", got " + at);
             for (String other : DraftStore.listIds(inv.dir())) {   // D17: ONE live Draft per member per Investigation
                 @SuppressWarnings("unchecked") Map<String, Object> h = ApiContext.JSON.readValue(DraftStore.readHeader(inv.dir(), other), LinkedHashMap.class);
-                if (me.equals(h.get("actor")) && !DraftStore.isDiscarded(DraftStore.draftDir(inv.dir(), other)))
+                if (me.equals(h.get("actor")) && !DraftStore.isClosed(DraftStore.draftDir(inv.dir(), other)))
                     throw new ApiException(409, ErrorCodes.CONFLICT, "you already have a live draft on investigation '" + invId + "': " + other);
             }
             header.put("draftId", draftId);
@@ -201,16 +208,36 @@ public final class DraftRoutes implements RouteModule {
      */
     private static void pinIndexes(InvestigationRoutes.Inv inv, String draftId, List<Map<String, Object>> pinned) throws IOException {
         Path root = inv.writeRoot().resolve(IndexRoutes.INDEX_DIR);
+        for (Map<String, Object> cur : currentIndexes(inv)) {
+            IndexStore store = new IndexStore(root, inv.dataset(), String.valueOf(cur.get("mappingHash")));
+            IndexPins.Pin p;
+            try {
+                p = store.pins().pin(((Number) cur.get("version")).longValue(), draftId);
+            } catch (IllegalArgumentException vanished) {
+                throw new ApiException(409, ErrorCodes.CONFLICT, "the index version to pin is gone (" + vanished.getMessage() + "); retry");
+            }
+            Map<String, Object> entry = new LinkedHashMap<>(cur);
+            entry.put("pinnedAt", p.pinnedAt().toString());
+            pinned.add(entry);
+        }
+    }
+
+    /**
+     * The CURRENT version of every index that serves this Investigation's bound columns (a Dataset may hold several, one per
+     * mapping), as {@code {dataset, mappingHash, version}}; empty without an index (D7-Q2). D7-5's rebase pins and reads these.
+     */
+    static List<Map<String, Object>> currentIndexes(InvestigationRoutes.Inv inv) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        Path root = inv.writeRoot().resolve(IndexRoutes.INDEX_DIR);
         List<String> hashes;
         try {
             hashes = IndexStore.mappingHashes(root, inv.dataset());
         } catch (IllegalArgumentException cannotNameADirectory) {
-            return;
+            return out;
         }
         String src = String.valueOf(inv.header().get("sourceCol")), dst = String.valueOf(inv.header().get("targetCol"));
         for (String hash : hashes) {
-            IndexStore store = new IndexStore(root, inv.dataset(), hash);
-            Optional<Path> current = store.current();
+            Optional<Path> current = new IndexStore(root, inv.dataset(), hash).current();
             if (current.isEmpty()) continue;
             IndexManifest m;
             try {
@@ -220,19 +247,13 @@ public final class DraftRoutes implements RouteModule {
             }
             if (!inv.dataset().equals(m.dataset()) || !m.mapping().srcColumn().equalsIgnoreCase(src)
                     || !m.mapping().dstColumn().equalsIgnoreCase(dst)) continue;
-            IndexPins.Pin p;
-            try {
-                p = store.pins().pin(m.version(), draftId);
-            } catch (IllegalArgumentException vanished) {
-                throw new ApiException(409, ErrorCodes.CONFLICT, "the index version to pin is gone (" + vanished.getMessage() + "); retry the fork");
-            }
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("dataset", inv.dataset());
             entry.put("mappingHash", hash);
             entry.put("version", m.version());
-            entry.put("pinnedAt", p.pinnedAt().toString());
-            pinned.add(entry);
+            out.add(entry);
         }
+        return out;
     }
 
     private static int unpinAll(Path writeRoot, String dataset, List<Map<String, Object>> pinned, String draftId) {
@@ -254,14 +275,14 @@ public final class DraftRoutes implements RouteModule {
         InvestigationRoutes.Inv inv = InvestigationRoutes.openAsMember(api, ex, invId);
         Role role = roleOf(inv, ex);
         boolean enforced = ApiContext.subject(ex).isPresent();
-        boolean withDiscarded = "true".equals(ApiContext.query(ex, "discarded"));
+        boolean withDiscarded = "true".equals(ApiContext.query(ex, "discarded")) || "true".equals(ApiContext.query(ex, "closed"));
         String me = ApiContext.actor(ex);
         List<Map<String, Object>> items = new ArrayList<>();
         for (String id : DraftStore.listIds(inv.dir())) {
             @SuppressWarnings("unchecked") Map<String, Object> h = ApiContext.JSON.readValue(DraftStore.readHeader(inv.dir(), id), LinkedHashMap.class);
             if (enforced && !role.canReadAnyDraft() && !me.equals(h.get("actor"))) continue;   // an analyst sees only their own
             Path dir = DraftStore.draftDir(inv.dir(), id);
-            boolean discarded = DraftStore.isDiscarded(dir);
+            boolean discarded = DraftStore.isClosed(dir);
             if (discarded && !withDiscarded) continue;
             InvestigationRoutes.Inv view = new InvestigationRoutes.Inv(inv.store(), inv.writeRoot(), inv.id(), inv.header(),
                     new InvestigationRoutes.Inv.DraftRef(id, ((Number) h.get("baseStep")).intValue(), dir));
@@ -341,6 +362,8 @@ public final class DraftRoutes implements RouteModule {
         Opened o = openDraft(api, ex, invId, draftId, Act.WRITE);
         requireLive(o);
         requireIntact(o);
+        if (expiredPin(o.view(), o.header()))   // D7-Q3: a pin past its 30 days forces a rebase, which re-pins CURRENT
+            throw new ApiException(409, ErrorCodes.CONFLICT, "must rebase: the index version draft '" + draftId + "' pinned expired - rebase it (POST .../rebase) to re-pin");
         return withDraftId(investigations.appendOpOn(api, ex, o.view(), body), draftId);
     }
 
@@ -368,6 +391,8 @@ public final class DraftRoutes implements RouteModule {
      */
     private Object discard(ApiContext api, HttpExchange ex, String invId, String draftId) throws IOException {
         Opened o = openDraft(api, ex, invId, draftId, Act.DISCARD);
+        if (DraftStore.isPromoted(o.view().draft().dir()))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + draftId + "' was promoted - there is nothing to discard");
         InvestigationRoutes.Inv v = o.view();
         boolean first;
         int head;
@@ -400,7 +425,120 @@ public final class DraftRoutes implements RouteModule {
         return out;
     }
 
+    // ── rebase and promote (D7-5) ──────────────────────────────────────────────────────────────────────
+
+    private static List<Integer> steps(Map<String, Object> body, String key) {
+        List<Integer> out = new ArrayList<>();
+        if (body.get(key) == null) return out;
+        if (!(body.get(key) instanceof List<?> l)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + key + "' must be a list of step numbers");
+        for (Object o : l) {
+            if (!(o instanceof Number n)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + key + "' entries must be step numbers");
+            out.add(n.intValue());
+        }
+        return out;
+    }
+
+    private static Map<String, Object> reportOf(Opened o, DraftRebase.Plan plan) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("investigationId", o.view().id());
+        out.put("draftId", o.draftId());
+        out.put("baseStep", plan.fromBase());
+        out.put("mainHead", plan.toBase());
+        out.put("behind", Math.max(0, plan.toBase() - plan.fromBase()));
+        out.put("effectiveOps", plan.effective());
+        out.put("carried", plan.lines().size());
+        out.put("conflicts", plan.conflicts().stream().map(DraftRebase.Conflict::wire).toList());
+        out.put("requiresConfirm", plan.required());
+        return out;
+    }
+
+    /** {@code GET .../drafts/{draftId}/conflicts} - the conflict report a rebase onto the current head would produce; writes nothing. */
+    private Object conflicts(ApiContext api, HttpExchange ex, String invId, String draftId) throws IOException {
+        Opened o = openDraft(api, ex, invId, draftId, Act.READ);
+        requireLive(o);
+        requireIntact(o);
+        return reportOf(o, DraftRebase.compute(investigations, api, ex, o.view()));
+    }
+
+    /**
+     * {@code POST .../drafts/{draftId}/rebase} - body {@code {confirm?: [step...], expectHead?: n}}. The actor only. Replays the Draft's
+     * effective ops over the current main head, re-pins the index versions and swaps the result in. 409 when {@code expectHead} is not
+     * the head, when a superseded or blocked conflict is not in {@code confirm} (D7-Q7), or when the log moved while it was computed.
+     */
+    private Object rebase(ApiContext api, HttpExchange ex, String invId, String draftId, Map<String, Object> body) throws IOException {
+        Opened o = openDraft(api, ex, invId, draftId, Act.WRITE);
+        requireLive(o);
+        requireIntact(o);
+        List<Integer> confirm = steps(body, "confirm");
+        if (body.get("expectHead") != null && !(body.get("expectHead") instanceof Number))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'expectHead' must be a step number");
+        DraftRebase.Plan plan = DraftRebase.compute(investigations, api, ex, o.view());
+        if (body.get("expectHead") instanceof Number n && n.intValue() != plan.toBase())
+            throw new ApiException(409, ErrorCodes.CONFLICT, "the main log is at step " + plan.toBase() + ", not " + n.intValue() + " - read the conflict report again");
+        List<Integer> missing = DraftRebase.unconfirmed(plan, confirm);
+        if (!missing.isEmpty())
+            throw new ApiException(409, ErrorCodes.CONFLICT, "confirm each superseded or blocked conflict (D7-Q7): steps " + missing
+                    + " are not in 'confirm'; GET .../conflicts lists them");
+        Map<String, Object> out = DraftRebase.commit(api, ex, o.view(), o.header(), plan, confirm);
+        Map<String, Integer> kinds = new LinkedHashMap<>();
+        for (DraftRebase.Conflict c : plan.conflicts()) kinds.merge(c.kind(), 1, Integer::sum);
+        InvestigationRoutes.emit(ex, LinkEventTypes.LINK_DRAFT_REBASED, "link.draft.rebased",
+                "link.draft.rebased - " + draftId + " of " + invId + " " + plan.fromBase() + " -> " + plan.toBase(),
+                b -> b.attr("investigationId", invId).attr("draftId", draftId).attr("actor", ApiContext.actor(ex))
+                        .attr("fromBase", plan.fromBase()).attr("toBase", plan.toBase()).attr("carried", plan.lines().size())
+                        .attr("dropped", confirm.size()).attr("conflicts", kinds).attr("pins", plan.targetPins().size()));
+        return InvestigationRoutes.masked(o.view(), out);
+    }
+
+    /**
+     * {@code POST .../drafts/{draftId}/promote} - body {@code {expectHead?: n}}. The actor (a lead or an analyst) or a lead. Appends the Draft's
+     * effective ops to the main log, atomically, only when the Draft is based on the CURRENT head (409 "must rebase" otherwise, also for an expired
+     * pin). A promote carrying an expand that is sensitive under the thresholds now in force is HELD as a pending four-eyes request (202) and decided
+     * through the existing approve / deny routes. See {@link DraftPromote}.
+     */
+    private Object promote(ApiContext api, HttpExchange ex, String invId, String draftId, Map<String, Object> body) throws IOException {
+        Opened o = openDraft(api, ex, invId, draftId, Act.PROMOTE);
+        requireLive(o);
+        requireIntact(o);
+        InvestigationRoutes.Inv v = o.view();
+        InvestigationRoutes.Inv main = new InvestigationRoutes.Inv(v.store(), v.writeRoot(), v.id(), v.header());
+        if (body.get("expectHead") != null && !(body.get("expectHead") instanceof Number))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'expectHead' must be a step number");
+        int head = v.store().readLog(invId).size();
+        if (body.get("expectHead") instanceof Number n && n.intValue() != head)
+            throw new ApiException(409, ErrorCodes.CONFLICT, "the main log is at step " + head + ", not " + n.intValue());
+        if (v.draft().baseStep() != head)
+            throw new ApiException(409, ErrorCodes.CONFLICT, "must rebase: the draft is based on step " + v.draft().baseStep() + " and the main log is at " + head
+                    + " - rebase it onto the current head, then promote");
+        if (expiredPin(v, o.header()))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "must rebase: the index version this draft pinned expired - rebase it to re-pin");
+        List<Map<String, Object>> effective = DraftRebase.effectiveOps(DraftRebase.parseAll(SnapshotStore.readLogAt(v.draft().dir())));
+        if (effective.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the draft has no ops to promote");
+        List<Map<String, Object>> sensitive = DraftPromote.sensitiveSteps(main, effective);
+        if (!sensitive.isEmpty()) {
+            Map<String, Object> rec = DraftPromote.hold(ex, main, draftId, o.header(), sensitive);
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("status", "pending");
+            out.put("pending", rec);
+            return ApiContext.respondJson(ex, 202, InvestigationRoutes.masked(main, out));
+        }
+        Map<String, Object> out = DraftPromote.execute(main, draftId, ApiContext.actor(ex), null, null);
+        DraftPromote.audit(ex, main, out, String.valueOf(o.header().get("actor")), null);
+        return InvestigationRoutes.masked(main, out);
+    }
+
     // ── shape ──────────────────────────────────────────────────────────────────────────────────────────
+
+    /** True when any index pin this Draft holds has expired (D7-Q3): the Draft must rebase before it writes or promotes. */
+    static boolean expiredPin(InvestigationRoutes.Inv v, Map<String, Object> header) throws IOException {
+        Path root = v.writeRoot().resolve(IndexRoutes.INDEX_DIR);
+        Instant now = Instant.now();
+        String draftId = String.valueOf(header.get("draftId"));
+        for (Map<String, Object> p : pinsOf(header))
+            for (IndexPins.Pin pin : new IndexStore(root, v.dataset(), String.valueOf(p.get("mappingHash"))).pins().listPins())
+                if (pin.pinId().equals(draftId) && !pin.expiresAt().isAfter(now)) return true;
+        return false;
+    }
 
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> pinsOf(Map<String, Object> header) {
@@ -415,7 +553,7 @@ public final class DraftRoutes implements RouteModule {
         for (String k : List.of("draftId", "investigationId", "actor", "createdAt", "baseStep")) out.put(k, o.header().get(k));
         int base = v.draft().baseStep();
         int own = o.discarded() ? 0 : SnapshotStore.readLogAt(v.draft().dir()).size();
-        out.put("state", o.discarded() ? "discarded" : "open");
+        out.put("state", DraftStore.isPromoted(v.draft().dir()) ? "promoted" : o.discarded() ? "discarded" : "open");
         out.put("steps", own);
         out.put("headStep", base + own);
         int behind = Math.max(0, o.mainHead() - base);
@@ -448,7 +586,10 @@ public final class DraftRoutes implements RouteModule {
             if (o.discarded()) {
                 String marker = DraftStore.readDiscarded(v.draft().dir());
                 if (marker != null) out.put("discarded", ApiContext.JSON.readValue(marker, LinkedHashMap.class));
+                String promoted = DraftStore.readPromoted(v.draft().dir());
+                if (promoted != null) out.put("promoted", ApiContext.JSON.readValue(promoted, LinkedHashMap.class));
             }
+            if (o.header().get("rebases") instanceof List<?> rb) out.put("rebases", rb);
         }
         return out;
     }

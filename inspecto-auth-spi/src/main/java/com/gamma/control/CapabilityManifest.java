@@ -58,6 +58,8 @@ final class CapabilityManifest {
             new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/ops", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/undo", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/discard", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/rebase", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/promote", Roles.CAN_MANAGE_INCIDENTS),
             // EntityListRoutes (LA-17) — an Entity List is appended to the Space's identity fact log, evidence
             // like the op log, so changing one is Case work. The two GETs are reads (Space access only).
             new Entry("POST", "/entity-lists", Roles.CAN_MANAGE_INCIDENTS),

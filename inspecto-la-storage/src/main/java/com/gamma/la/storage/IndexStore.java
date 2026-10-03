@@ -127,6 +127,13 @@ public final class IndexStore {
         }
     }
 
+    /** D7-5: the published directory of version {@code n} (a Draft's pinned version), or empty when it is not published (any more). */
+    public Optional<Path> version(long n) {
+        if (n < 1) return Optional.empty();
+        Path v = dir.resolve(String.format("v%06d", n));
+        return Files.isDirectory(v) ? Optional.of(v) : Optional.empty();
+    }
+
     /** Creates the next {@code vNNNNNN.tmp}; first removes crashed stages older than one hour. */
     public Path stage() throws IOException {
         return stage(Duration.ofHours(1));

@@ -1,0 +1,236 @@
+package com.gamma.la.api;
+
+import com.gamma.control.ApiContext;
+import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
+import com.gamma.la.core.DraftCheckpoints;
+import com.gamma.la.core.DraftStore;
+import com.gamma.la.core.InvestigationEvaluator;
+import com.gamma.la.core.LinkEventTypes;
+import com.gamma.la.core.SnapshotStore;
+import com.gamma.la.storage.IndexStore;
+import com.sun.net.httpserver.HttpExchange;
+
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static com.gamma.la.core.InvestigationEvaluator.canonical;
+
+/**
+ * D7-5 - promote: append a Draft's accepted (effective) ops to the MAIN log as new steps (design section 8).
+ *
+ * <p>Atomic and fail closed. Under the main lock THEN the Draft lock it re-verifies, from the files, that the Draft is open, that
+ * its base IS the main head (it was rebased onto the current head) and that the main prefix still hashes to {@code baseLogHash}; the
+ * new entries are folded over the main log and must reproduce the Draft's own state hash; they are then appended one by one
+ * and, if any append or the {@code promoted.json} marker fails, the main log is truncated back to its old length and the new set
+ * files removed - the main log either gains every step or none. Each appended entry gains
+ * {@code draft{id, actor, baseStep, step, promotedBy}} provenance (the state hash is unaffected: it folds only op fields).
+ *
+ * <p><b>Four-eyes (D-U7), the call recorded in the design note:</b> a Draft cannot HOLD a sensitive expand (D7-3 refuses it), but the
+ * Space's thresholds can fall after the op was taken. Sensitivity is therefore judged at PROMOTE against the thresholds then in
+ * force: when any carried expand is sensitive nothing is appended - the promote is held as a PENDING request on the main log's
+ * four-eyes queue and decided through the existing approve / deny routes by a lead or reviewer who is not the requester; approval
+ * runs the same atomic promote and records {@code approval} on the sensitive entries.
+ */
+final class DraftPromote {
+
+    private DraftPromote() { }
+
+    /** The sensitive carried expands: {@code [{step, exceeded}]} judged against the thresholds in force now. */
+    static List<Map<String, Object>> sensitiveSteps(InvestigationRoutes.Inv inv, List<Map<String, Object>> effective) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> e : effective) {
+            if (!"expand".equals(e.get("op"))) continue;
+            @SuppressWarnings("unchecked") Map<String, Object> s = InvestigationRoutes.sensitivityOf(inv, (Map<String, Object>) e.get("params"));
+            if (s == null) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("step", DraftRebase.step(e));
+            m.put("exceeded", s.get("exceeded"));
+            out.add(m);
+        }
+        return out;
+    }
+
+    /** Hold the promote as a pending four-eyes request (nothing is appended). */
+    static Map<String, Object> hold(HttpExchange ex, InvestigationRoutes.Inv main, String draftId, Map<String, Object> header,
+                                    List<Map<String, Object>> sensitive) throws IOException {
+        if (ApiContext.subject(ex).isEmpty())
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "four-eyes needs an authenticated Subject - without one, the requester and "
+                    + "the approver cannot be told apart");
+        Path draftDir = DraftStore.draftDir(main.dir(), draftId);
+        List<String> mainLines = main.store().readLog(main.id()), own = SnapshotStore.readLogAt(draftDir);
+        Map<String, Object> rec = new LinkedHashMap<>();
+        rec.put("kind", "promote");
+        rec.put("op", "promote");
+        rec.put("investigationId", main.id());
+        rec.put("draftId", draftId);
+        rec.put("draftActor", header.get("actor"));
+        rec.put("baseStep", header.get("baseStep"));
+        rec.put("mainHead", mainLines.size());
+        rec.put("draftLogHash", DraftStore.prefixHash(own, own.size()));
+        rec.put("sensitivity", sensitive);
+        return InvestigationRoutes.requestPromote(ex, main, rec);
+    }
+
+    /** The approval of a held promote: run it, after checking the Draft and the main log are exactly what was requested. */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> executeApproved(ApiContext api, HttpExchange ex, InvestigationRoutes.Inv main, Map<String, Object> rec,
+                                               Map<String, Object> approval) throws IOException {
+        String draftId = String.valueOf(rec.get("draftId"));
+        if (!DraftStore.DRAFT_ID.matcher(draftId).matches())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the request names no valid draft");
+        Map<String, Object> out = execute(main, draftId, String.valueOf(rec.get("requestedBy")), approval, rec);
+        audit(ex, main, out, String.valueOf(rec.get("draftActor")), approval.get("approvedBy"));
+        return out;
+    }
+
+    /** Promote {@code draftId} (see the class note). {@code request}, when set, is the held request being approved. */
+    static Map<String, Object> execute(InvestigationRoutes.Inv main, String draftId, String promotedBy, Map<String, Object> approval,
+                                       Map<String, Object> request) throws IOException {
+        Path draftDir = DraftStore.draftDir(main.dir(), draftId);
+        List<Map<String, Object>> sensitiveNow;
+        int from, to;
+        String actor;
+        Path root = main.writeRoot().resolve(IndexRoutes.INDEX_DIR);
+        List<Map<String, Object>> pins;
+        synchronized (InvestigationRoutes.lock(main.dir())) {
+            synchronized (InvestigationRoutes.lock(draftDir)) {
+                String rawHeader = DraftStore.readHeader(main.dir(), draftId);
+                if (rawHeader == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no draft '" + draftId + "'");
+                @SuppressWarnings("unchecked") Map<String, Object> header = ApiContext.JSON.readValue(rawHeader, LinkedHashMap.class);
+                if (DraftStore.isClosed(draftDir)) throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + draftId + "' was closed (discarded or promoted)");
+                actor = String.valueOf(header.get("actor"));
+                int base = ((Number) header.get("baseStep")).intValue();
+                List<String> mainLines = main.store().readLog(main.id());
+                if (base != mainLines.size())
+                    throw new ApiException(409, ErrorCodes.CONFLICT, "must rebase: the draft is based on step " + base + " and the main log is at "
+                            + mainLines.size() + " - rebase it onto the current head, then promote");
+                if (!DraftStore.prefixHash(mainLines, base).equals(String.valueOf(header.get("baseLogHash"))))
+                    throw new ApiException(409, ErrorCodes.CONFLICT, "the main log changed under the draft's base - it cannot be promoted");
+                if (DraftRoutes.expiredPin(main, header))
+                    throw new ApiException(409, ErrorCodes.CONFLICT, "must rebase: the index version this draft pinned expired");
+                List<String> ownLines = SnapshotStore.readLogAt(draftDir);
+                if (request != null && (!DraftStore.prefixHash(ownLines, ownLines.size()).equals(String.valueOf(request.get("draftLogHash")))
+                        || !String.valueOf(mainLines.size()).equals(String.valueOf(request.get("mainHead")))))
+                    throw new ApiException(409, ErrorCodes.CONFLICT, "the draft or the main log changed since the promote was requested - deny it and request again");
+                List<Map<String, Object>> mainEntries = DraftRebase.parseAll(mainLines), own = DraftRebase.parseAll(ownLines);
+                // an undo (or an undone op) would renumber the steps the state records, so the promoted entries could not reproduce
+                // the Draft's state: such a Draft rebases first (a rebase compacts them away)
+                for (Map<String, Object> e : own)
+                    if (!"op".equals(e.get("kind")))
+                        throw new ApiException(409, ErrorCodes.CONFLICT, "must rebase: the draft holds undone steps - rebase it (which compacts them away), then promote");
+                List<Map<String, Object>> effective = DraftRebase.effectiveOps(own);
+                if (effective.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the draft has no ops to promote");
+                sensitiveNow = sensitiveSteps(main, effective);
+                if (!sensitiveNow.isEmpty() && approval == null)
+                    throw new ApiException(409, ErrorCodes.CONFLICT, "this promote carries a sensitive expand " + sensitiveNow + " - it needs four-eyes approval");
+
+                // re-fold: the new entries over the main log must reproduce the Draft's own state (undone ops compacted away)
+                List<Map<String, Object>> all = new ArrayList<>(mainEntries);
+                all.addAll(own);
+                String draftState = InvestigationEvaluator.evaluate(all, -1, null).hash();
+                InvestigationEvaluator.State state = InvestigationEvaluator.evaluate(mainEntries, -1, null);
+                List<String> lines = new ArrayList<>(), sets = new ArrayList<>();
+                int step = mainLines.size();
+                for (Map<String, Object> o : effective) {
+                    Map<String, Object> e = new LinkedHashMap<>(o);
+                    e.put("step", ++step);
+                    Map<String, Object> prov = new LinkedHashMap<>();
+                    prov.put("id", draftId);
+                    prov.put("actor", actor);
+                    prov.put("baseStep", base);
+                    prov.put("step", o.get("step"));
+                    prov.put("promotedBy", promotedBy);
+                    e.put("draft", prov);
+                    boolean sensitive = sensitiveNow.stream().anyMatch(s -> s.get("step").equals(DraftRebase.step(o)));
+                    if (sensitive) e.put("approval", approval);
+                    e.remove("workingSetHash");
+                    e = InvestigationRoutes.roundTrip(e);
+                    InvestigationEvaluator.apply(state, e);
+                    e.put("workingSetHash", state.hash());
+                    lines.add(canonical(e));
+                    sets.add(canonical(InvestigationRoutes.setDoc(step, state)));
+                }
+                if (!state.hash().equals(draftState))
+                    throw new IllegalStateException("promote equivalence failed: the appended entries do not reproduce the draft's state");
+
+                Path log = main.dir().resolve("log.jsonl");
+                long before = Files.isRegularFile(log) ? Files.size(log) : 0;
+                from = mainLines.size();
+                int written = 0;
+                try {
+                    for (int i = 0; i < lines.size(); i++) {
+                        DraftStore.promoteHook.accept(from + i + 1);
+                        main.store().appendStep(main.id(), from + i + 1, lines.get(i), sets.get(i));
+                        written++;
+                    }
+                    Map<String, Object> marker = new LinkedHashMap<>();
+                    marker.put("draftId", draftId);
+                    marker.put("promotedBy", promotedBy);
+                    marker.put("promotedAt", Instant.now().toString());
+                    marker.put("fromStep", from);
+                    marker.put("toStep", from + lines.size());
+                    marker.put("steps", lines.size());
+                    if (approval != null) marker.put("approvedBy", approval.get("approvedBy"));
+                    if (!DraftStore.markPromoted(draftDir, canonical(marker)))
+                        throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + draftId + "' was already promoted");
+                } catch (IOException | RuntimeException failed) {
+                    rollback(log, before, main.dir().resolve("sets"), from, lines.size());
+                    throw failed;
+                }
+                to = from + lines.size();
+                DraftCheckpoints.forget(draftDir);
+                pins = DraftRebase.pinsOf(header);
+            }
+        }
+        for (Map<String, Object> p : pins)
+            try {
+                new IndexStore(root, main.dataset(), String.valueOf(p.get("mappingHash"))).pins().unpin(draftId);
+            } catch (IOException | RuntimeException ignored) {
+                // bounded by its TTL (D7-Q3)
+            }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("investigationId", main.id());
+        out.put("draftId", draftId);
+        out.put("promoted", true);
+        out.put("fromStep", from);
+        out.put("toStep", to);
+        out.put("steps", to - from);
+        return out;
+    }
+
+    /** Put the main log back as it was: truncate to its old length and remove the set files of the steps this attempt wrote. */
+    private static void rollback(Path log, long before, Path sets, int from, int count) {
+        try (FileChannel ch = FileChannel.open(log, StandardOpenOption.WRITE)) {
+            ch.truncate(before);
+        } catch (IOException ignored) {
+            // the caller reports the original failure
+        }
+        for (int i = 1; i <= count; i++)
+            try {
+                Files.deleteIfExists(sets.resolve((from + i) + ".json"));
+            } catch (IOException ignored) {
+                // best effort
+            }
+    }
+
+    static void audit(HttpExchange ex, InvestigationRoutes.Inv main, Map<String, Object> out, String actor, Object approvedBy) {
+        InvestigationRoutes.emit(ex, LinkEventTypes.LINK_DRAFT_PROMOTED, "link.draft.promoted",
+                "link.draft.promoted - " + out.get("draftId") + " of " + main.id() + " steps " + out.get("fromStep") + ".." + out.get("toStep"),
+                b -> {
+                    b.attr("investigationId", main.id()).attr("draftId", out.get("draftId")).attr("actor", actor)
+                            .attr("promotedBy", ApiContext.actor(ex)).attr("fromStep", out.get("fromStep"))
+                            .attr("toStep", out.get("toStep")).attr("steps", out.get("steps"));
+                    if (approvedBy != null) b.attr("approvedBy", approvedBy);
+                    return b;
+                });
+    }
+}
