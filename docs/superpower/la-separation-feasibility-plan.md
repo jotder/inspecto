@@ -450,7 +450,7 @@ This is **L–XL** on its own and depends on: versioned inputs (§7.4 index mani
 |---|---|---|---|
 | **D-0** | ✅ **DONE 2026-10-01** (SEP-01…06 and SEP-08; SEP-07 not needed — one SKU, D2). §4 Phase 0 (SEP-01…06) — shared with A/B | M–L | — |
 | **D-1** | ✅ **DONE 2026-10-01** (steps 1–7; as-built in `la-separation-d1-design.md`). Extract the shared platform layer: `http-spi`, `auth-spi` (+ move OIDC), `audit-spi` (cut the ETL edge); move LA onto them; `la-inspecto` bridge; Inspecto behaviour unchanged | L | D-0 |
-| **D-2** | 🟡 **MOSTLY MEASURED** — D-S1 ✅ pass, D-S3 ✅ curve (the gap is volume), D-S4 ✅ pass, D-S2 ⛔ dropped 2026-10-01, D-S5 ⏸ not run (§7.10.1). Spikes D-S1…D-S4 (§7.10) — decide storage and engine from measurements | M | — (parallel) |
+| **D-2** | 🟡 **MOSTLY MEASURED** — D-S1 ✅ pass, D-S3 ✅ curve (the gap is volume), D-S4 ✅ pass, D-S2 ⛔ dropped 2026-10-01, D-S5 ✅ run at reduced scale 2026-10-03 (§7.10.2). Spikes D-S1…D-S4 (§7.10) — decide storage and engine from measurements | M | — (parallel) |
 | **D-3** | 🟡 **PATH A, STEPS 1–7 BUILT 2026-10-03** (`la-separation-d3-design.md`; decisions 1–8 signed; step 1 spike, 2 skeleton, 3 builder, 4 build service + routes, 5 `recursive-paths` from the index within depth 2 / 20 keys; 6 `neighbors` + simple-rung Investigation `expand` from the index (design §5.5); 7 `SqlGraphEngine` + `RoutingGraphEngine` + sealed `GraphInput` + Graph Run `input: "index"` for neighborhood / egoNetwork / seeds-only degreeCentrality (design §5.6); step 8 open: incremental append). `la-storage` edge/node index + builder (both hosts); `la-data` providers | L | D-1, D-2 |
 | **D-4** | ✅ **DONE 2026-10-01** (built ahead of D-3 over the in-memory Working Set; as-built in `okf/frontend/features/link-analysis.md` §*Graph Run*; open remainder `LA-GRAPH-RUN-*` on the board). `la-graph`: GraphEngine SPI, server-side algorithms with parity fixtures, async jobs; optional graph / vector engines | L–XL | D-3 |
 | **D-5** | ✅ **STEPS 1–7 BUILT 2026-10-02** (`la-separation-d5-design.md`, decisions 1–7 signed: LA/Geo code in `projects/link-analysis`, `@inspecto/core/*` + `@inspecto/link-analysis` aliases, OIDC client code in core, the `la-app` application, `package.ps1 -Ui gamma|la-app`; bundle-shape guard in CI; real OIDC sign-in unverified: `LA-APP-REAL-SIGNIN-1`). `la-app` host + `projects/la-app` shell + LA product flavor (bundle, boot smoke, licence text) | M–L | D-1, SEP-03…06 |
@@ -556,7 +556,47 @@ Windows), so "cold" means a fresh engine, not a cold disk.
 | **D-S3** depth × volume | ✅ **curve measured — the gap is VOLUME, not depth** | Route-shaped recursive CTE, p99-degree start, yield fence 10 000 (100 000), p50 ms at depth 2 / 4 / 6 / 8. **10⁶:** 61 / 133 / 134 / 172 (56 / 123 / 196 / 286). **10⁷:** 306 / 392 / 467 / 438 (286 / 471 / 594 / 656). **10⁸:** 2 698 / 3 087 / 3 091 / 3 340 (3 110 / 6 115 / 6 087 / 6 347). Depth costs ≈ linear in rows walked (bounded by depth × yield); volume costs ≈ linear in edges scanned, because a flat Dataset is re-scanned per level. Materialising the edge CTE is 1.5–2× faster at 10⁶–10⁷ and **2× slower at 10⁸** (4 966 – 17 223 ms), so it is not the fix. |
 | **D-S4** algorithm parity | ✅ **PASS 2026-10-01 — all 28 algorithms of classes A, A′, B, B′ ported (17 + 5 + 4 + 2 — an earlier version of this row said 34, an addition error); the 11 class-C transforms stay in the browser by design (§7.13)** | Grounded only: `graph-analysis.ts` exports ~40 algorithms; exactly one (branching pattern) has a Java port with a shared golden fixture, green in both languages. Iterative ones (PageRank, eigenvector, Katz, HITS, Louvain) will need tolerance-based parity, not equality. |
 | **D-3 step 1** (index spike) | ⚠ **MIXED 2026-10-02 — one hop PASS, build PASS, 5-level walk FAIL ⇒ D-3 narrowed to Path A (operator)** | 10⁸ edges, sealed connection, `out` + `in` + `nodes`, N = 32: one hop p50 **43 ms** (p95 51) vs 1 031 ms flat — PASS (≤ 100 ms); full build **368 s** (6.1 min, peak 17.9 GB), index 3.43 GB = 1.28× the flat file — PASS (≤ 30 min); Java-driven 5-level walk p50 **3 013 ms** (median-degree start) / **4 342 ms** (p99 start, the D-S3 start) vs the 1.5 s criterion — **FAIL**, 1.4× slower than the 3 091 ms recursive CTE. Only an equality on ONE key prunes row groups; frontier of 50 keys: `IN` 3.2 s, join on `VALUES` 4.2 s, per-key `UNION ALL` 2.2 s (0.7 s at 20 keys). `hash()` is deterministic across connections, processes and a two-day-old index but not reproducible in Java and not proven across versions; `md5_number_lower(x) % N` matches Java MD5 on 1 004 / 1 004 ids, builds about 16 % slower at 10⁷, same lookup speed. Detail: `la-separation-d3-design.md` §5.1. |
-| **D-S5** concurrency | ⏸ **NOT RUN** | Not cheap on one laptop; left for D-2 proper. |
+| **D-S5** concurrency | ✅ **RUN 2026-10-03 at reduced SCALE — the per-Draft DuckDB-file model is viable at the D21 envelope on the Draft-count axis; the 10⁹-edge axis is NOT tested (§7.10.2)** | 50 Drafts open, 20 active at once, 5×10⁶-edge shared Parquet base: open p50 54 ms; **3.8 MB process commit per open Draft**; one-hop read p95 66 ms / p99 104 ms contended vs 13 ms solo; one heavy 5-hop walk beside them moved the others' p95 62 ms vs 66 ms (no measurable shift). Detail, caveats and the recommendation in §7.10.2. |
+
+#### 7.10.2 D-S5 — Draft concurrency, 2026-10-03
+
+**Method.** Harness `inspecto-la-storage/src/test/java/com/gamma/la/storage/DraftConcurrencyBench.java`
+(`@Tag("bench")`, not named `*Test`, gated on `-Dinspecto.bench.dir`; plain JDBC, so it touches neither
+`IndexBuilder` nor `IndexReader`; run with `-Dtest=DraftConcurrencyBench -Dsurefire.failIfNoSpecifiedTests=false`).
+Shared base = one Parquet edge file sorted by `src` (row groups of 100 000), the D-S1 layout, read-only through
+`read_parquet`; each Draft = its own DuckDB file (`memory_limit 256MB`, `threads 1`) holding a 50-row exclusion
+table. Light query = one-hop lookup of a pseudo-random key with the Draft's exclusions anti-joined; analysts run a
+closed loop with **no think time** (worst case). Same machine as §7.10.1 (i7-9850H, 6 cores / 12 threads, 32 GB,
+DuckDB 1.5.2, JDK 27); the harness JVM and the engine share it.
+
+**Scale, stated honestly.** Base **5×10⁶ edges (1×10⁶ nodes), not 10⁹** (200× smaller); Draft state is a 12 KB file, not
+a real op log with checkpoints; phases 15 s each, one run (a 10 s / 10⁶-edge run gave the same shape: p95 29 ms
+contended vs 7 ms solo). The envelope's Draft **count** (50 open, 20 active) is tested at full size; its **data
+size** is not.
+
+| Measure | Result |
+|---|---|
+| Open one Draft (connect + settings + create table + first touch of the base), 50 Drafts | p50 **54 ms**, p95 64 ms, max 75 ms |
+| Memory per open Draft | **3.8 MB** process commit each (+188 MB for 50; DuckDB's own tracker shows only 1.1 MB total — the rest is native per-connection overhead) |
+| Disk per Draft file | 12 KB at birth |
+| Read, 1 active analyst | p50 5 ms, p95 13 ms (n = 2 055) |
+| Read, 20 active of 50 open | p50 35 ms, p95 **66 ms**, p99 104 ms (n = 7 713) |
+| Read, same, plus one Draft looping a 5-level recursive walk | light analysts p50 37 ms, p95 **62 ms**, p99 94 ms (n = 6 925) — no shift beyond noise |
+
+**Reading it.** (1) Isolation costs almost nothing: opening a Draft is tens of milliseconds and a few MB, so 50 open
+Drafts are a rounding error against the 32 GB box; idle Drafts add no read latency (the 20-of-50 phase is CPU-bound,
+not Draft-count-bound). (2) The 7× rise from solo to contended is 20 closed-loop threads on 12 hardware threads, i.e.
+CPU saturation, not a Draft artefact; real analysts think between queries. (3) The one heavy job did not move the
+light analysts' p95 here, but it ran `threads 1` over a 5×10⁶-edge base, so it is a weak test of §7.7.3's
+admission controller; the heavy job's own latency was not recorded.
+
+**Recommendation.** **Adopt the per-Draft DuckDB-file model for D-7** — nothing measured argues against it at 50
+Drafts / 20 analysts. Keep the **admission controller** (global cap on concurrent heavy jobs) as designed: the
+evidence is silent, not favourable, on heavy jobs at 10⁹. **Not proven, still owed before D-7 closes:** (a) the same
+rig against a real 10⁹-edge partitioned index (read cost is a property of the shared base, D-S1 / D-3 — not of the Draft
+count, which only adds CPU contention); (b) Drafts carrying real state (op log, checkpoints, result tables) and the
+cost of a checkpoint / promote under contention; (c) analysts with think time. Harness knobs for (a)–(c) are the
+`inspecto.bench.*` properties; (b) needs D-7 code.
 
 **Extrapolation to 10⁹ edges (D21).** Flat layout: one hop scales ≈ linearly (20 → 126 → 1 031 ms per decade), so
 ≈ 10 s per hop at 10⁹ — unusable, and a 5-hop walk would breach the 5 s fence at 10⁸ already. Partitioned
