@@ -1161,9 +1161,10 @@ Design and decisions D6-1…D6-7: [`la-separation-d6-design.md`](../../../archiv
   both under the main then Draft lock, appends each step with `draft{id, actor, baseStep, step, promotedBy}` provenance, rolls the main
   log back if any append or the `promoted.json` marker fails, then closes the Draft. Each promoted step reuses the Draft's own sealed
   `workingSetHash` and hard-links its set file (byte copy where links are unsupported) - the step numbers coincide and provenance is
-  not folded, so it is the same output; a set file that is missing or does not begin with that hash and step is re-sealed from the
-  fold, and the fold's final hash must still equal the Draft's. That made promote linear in steps (it re-serialised the whole state
-  per step: 800 steps 34.9 s before, 1.2 s after; `LA-DRAFT-PROMOTE-COST-1`, pinned by `DraftPromoteCostTest` against the old
+  not folded, so it is the same output. Nothing unverified reaches main: a set file is reused only when its head carries that hash
+  and step AND its working-set bytes SHA-256 to that hash (one read + hash per file); a missing, foreign or tampered one is re-sealed
+  from the fold, and the fold's final hash must still equal the Draft's. That removed the per-step re-serialisation of the whole state
+  (800 steps 34.9 s before, 3.3 s after warm, 8.3 s cold; linear in the bytes the sets hold; `LA-DRAFT-PROMOTE-COST-1`, pinned by `DraftPromoteCostTest` against the old
   algorithm) (log and sets deleted, header + marker kept, pins
   released). A promote carrying an expand that is sensitive under the thresholds NOW in force is held as a pending request (202) on the
   four-eyes queue and decided by the existing approve / deny routes. Audit `LINK_DRAFT_REBASED` / `_PROMOTED`. **Checkpointed append

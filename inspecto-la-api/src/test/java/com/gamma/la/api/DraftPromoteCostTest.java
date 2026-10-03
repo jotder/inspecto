@@ -51,6 +51,24 @@ class DraftPromoteCostTest {
         assertPromoted(f, want);
     }
 
+    /** A mid-log set file with an intact head but altered working-set bytes is verified, refused for reuse and re-sealed. */
+    @Test
+    void aTamperedSetFileWithAnIntactHeadIsNotCarriedOntoMain() throws Exception {
+        Fixture f = fixture(tmp, 30);
+        Expected want = legacy(f);
+        Path set = DraftStore.draftDir(f.main.dir(), f.draftId).resolve("sets").resolve("15.json");
+        String raw = Files.readString(set, StandardCharsets.UTF_8);
+        int at = raw.indexOf("\"workingSet\":") + 13;
+        String tampered = raw.substring(0, at) + raw.substring(at).replaceFirst("x", "y");
+        org.junit.jupiter.api.Assertions.assertNotEquals(raw, tampered);
+        assertEquals(raw.length(), tampered.length());
+        Files.writeString(set, tampered, StandardCharsets.UTF_8);
+        long before = DraftPromote.resealed.get();
+        DraftPromote.execute(f.main, f.draftId, "promoter", APPROVAL, null);
+        assertEquals(1, DraftPromote.resealed.get() - before);
+        assertPromoted(f, want);
+    }
+
     /** The cost guard, as an operation count: no step of a well-formed Draft costs a full-state serialisation, at any length. */
     @Test
     void noStepCostsAFullStateSerialisationWhateverTheLength() throws Exception {
@@ -73,7 +91,7 @@ class DraftPromoteCostTest {
             long legacyMs = (System.nanoTime() - t) / 1_000_000;
             // a real Draft's set files were written over its life; the FIRST open of a file written a moment ago costs ~6 ms on
             // Windows (the on-access scan), so read them once here as that life would have
-            try (var w = Files.list(DraftStore.draftDir(f.main.dir(), f.draftId).resolve("sets"))) {
+            if (!Boolean.getBoolean("inspecto.bench.promote.cold")) try (var w = Files.list(DraftStore.draftDir(f.main.dir(), f.draftId).resolve("sets"))) {
                 for (Path p : w.toList()) Files.readAllBytes(p);
             }
             t = System.nanoTime();

@@ -381,27 +381,33 @@ flat edge file (D-3 step 1 measurement) — disk, not memory. §12 D7-Q3 decides
   `DraftPromoteCostTest` (a 5-step main log, then a Draft of one seed and expands admitting 20 fresh links each, an exclude every 7th
   and a hide every 11th step), phase timers around `DraftPromote.execute`:
 
-  | Draft steps | promote before (total / per-step `state.hash()` / `setDoc` + canonical / write) | promote after |
+  | Draft steps | promote before (total / per-step `state.hash()` / `setDoc` + canonical / write) | after, warm / cold |
   |---|---|---|
-  | 100 | 686 ms / 172 / 303 / 147 | 169 ms |
-  | 200 | 2 215 ms / 674 / 1 159 / 314 | 296 ms |
-  | 400 | 8 248 ms / 2 621 / 4 694 / 831 | 584 ms |
-  | 800 | 34 915 ms / 10 728 / 19 000 / 4 998 | 1 171 ms |
+  | 100 | 686 ms / 172 / 303 / 147 | 189 / 805 ms |
+  | 200 | 2 215 ms / 674 / 1 159 / 314 | 433 / 1 781 ms |
+  | 400 | 8 248 ms / 2 621 / 4 694 / 831 | 1 102 / 3 607 ms |
+  | 800 | 34 915 ms / 10 728 / 19 000 / 4 998 | 3 346 / 8 303 ms |
 
   The hypothesis held: reading and parsing both logs, the two folds and `apply` were under 0.2 s at 800 steps; 85% was serialising the
   whole Working Set per step - `state.hash()` for the line, then `setDoc` hashing it again and writing it out - O(state) per step,
   so quadratic in steps, plus writing those full-state set files. **Fix:** an undo-free Draft based at the main head numbers its steps
   exactly as they land on main and the added provenance is not folded, so the state after promoted step i IS the Draft's state after
   its step i: promote takes the Draft's own sealed `workingSetHash` per step and lands its set file by hard link
-  (`SnapshotStore.appendStepSharingSet`; a byte copy where links are unsupported), O(1) per step. A set file is reused only if its
-  head is exactly `{"hash":"<that hash>","step":<step>,"workingSet":` (the canonical, key-sorted form); a missing or foreign one is
-  re-sealed from the fold as before, and the fold's final hash must equal both the Draft's fresh fold and the last line's hash.
+  (`SnapshotStore.appendStepSharingSet`; a byte copy where links are unsupported). **Nothing unverified reaches main (operator,
+  2026-10-03):** a set file is reused only if its head is exactly `{"hash":"<that hash>","step":<step>,"workingSet":` (the canonical,
+  key-sorted form) AND the bytes between that head and the closing brace - which are `canonical(state.toMap())`, exactly what
+  `State.hash()` hashed - SHA-256 to the step's sealed `workingSetHash`: one read and one hash per file, no parse, fold or
+  canonicalisation. A missing, foreign or tampered one is re-sealed from the fold as before (the oracle test proves the re-seal is
+  today's bytes, so no 409 is needed), and the fold's final hash must equal both the Draft's fresh fold and the last line's hash.
+  The verify reads every set file, so promote is linear in the BYTES the Draft's sets hold (which grow with its state), not strictly
+  in steps - still about 10x under the old cost at 800 steps, with no serialisation.
   Output is unchanged: `DraftPromoteCostTest` keeps the pre-fix loop as an oracle and compares the promoted lines and every set file
-  byte for byte (also with one set deleted and one replaced), and counts re-sealed steps (0 at 25 and 100 steps) as the deterministic
-  guard against a return to per-step serialisation; three mutants (off-by-one set, no head check, no reuse) each fail it. The "after"
-  column warms the Draft's set files first: on Windows the first open of a file written a moment ago costs about 6 ms (the on-access
+  byte for byte (also with one set deleted, one replaced by the previous step's, and one with an intact head but an altered byte in
+  its working set - re-sealed, never carried), and counts re-sealed steps (0 at 25 and 100 steps) as the deterministic guard against a
+  return to per-step serialisation; four mutants (off-by-one set, no head check, no reuse, no content verify) each fail it. "Warm"
+  warms the Draft's set files first: on Windows the first open of a file written a moment ago costs about 6 ms (the on-access
   scan, measured: a second open costs 0.1 ms), which a real Draft written over its life does not pay. **Lock:** what remains under the
-  main lock is about 1.5 ms per step, nearly all of it the appends (log line + link + marker), which must be under the lock; the
+  main lock is the verify (one read + SHA-256 per set file) and the appends (log line + link + marker); the
   reads and folds (under 0.1 s at 800 steps) were left where they were rather than adding an optimistic pre-lock phase. The 10^8 bench
   was not re-run. **Still open in the row:** the Draft cap and idle periods as `link-analysis.toon` keys. Rebase (`DraftRebase.plan`)
   still hashes per step and was not in scope.

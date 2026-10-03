@@ -48,16 +48,25 @@ final class DraftPromote {
     static final java.util.concurrent.atomic.AtomicLong resealed = new java.util.concurrent.atomic.AtomicLong();
 
     /**
-     * The Draft's sealed set file of {@code step} when it is the one today's writer produces for that step and hash - its canonical
-     * form (keys sorted) begins {@code {"hash":"<hash>","step":<step>,"workingSet":} - else null. Reads only that head.
+     * The Draft's sealed set file of {@code step} when it is the one today's writer produces for that step and hash, VERIFIED - its canonical
+     * form (keys sorted) begins {@code {"hash":"<hash>","step":<step>,"workingSet":} and its working-set bytes hash to that hash - else null.
      */
     static Path sealedSet(Path draftDir, int step, Object hash) throws IOException {
         if (!(hash instanceof String h)) return null;
         Path f = draftDir.resolve("sets").resolve(step + ".json");
         if (!Files.isRegularFile(f)) return null;
         byte[] want = ("{\"hash\":\"" + h + "\",\"step\":" + step + ",\"workingSet\":").getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        try (java.io.InputStream in = Files.newInputStream(f)) {
-            return java.util.Arrays.equals(in.readNBytes(want.length), want) ? f : null;
+        byte[] b = Files.readAllBytes(f);
+        if (b.length <= want.length || b[b.length - 1] != '}' || !java.util.Arrays.equals(b, 0, want.length, want, 0, want.length))
+            return null;
+        // verify, never trust: the bytes between the head and the closing brace are canonical(state.toMap()) - exactly what the seal
+        // hashed into workingSetHash (State.hash() = sha256(canonical(toMap()))) - so they must hash to the step's sealed hash
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            md.update(b, want.length, b.length - 1 - want.length);
+            return ("sha256:" + java.util.HexFormat.of().formatHex(md.digest())).equals(h) ? f : null;
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
         }
     }
 
@@ -159,7 +168,7 @@ final class DraftPromote {
                 // the provenance added here is not folded - so the state after promoted step i IS the Draft's own state after its step i.
                 // Its own sealed workingSetHash and set file are therefore today's output byte for byte, and are reused instead of
                 // re-serialising the whole state per step (O(state) per step - quadratic in the Draft's steps). A step whose set file is
-                // missing or does not carry that hash and step is re-sealed from the fold, as before; the final hash is checked below.
+                // missing, or whose bytes do not hash to that hash, is re-sealed from the fold, as before; the final hash is checked below.
                 List<String> lines = new ArrayList<>(), sets = new ArrayList<>();
                 List<Path> shared = new ArrayList<>();
                 String lastHash = null;
