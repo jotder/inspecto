@@ -1,10 +1,11 @@
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { of } from 'rxjs';
 
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { DbBrowserService } from 'app/inspecto/api';
+import { DbBrowserService, LensService } from 'app/inspecto/api';
 import { DataBrowserComponent } from './data-browser.component';
 
 describe('DataBrowserComponent', () => {
@@ -17,6 +18,13 @@ describe('DataBrowserComponent', () => {
                         label: 'Data Stores',
                         kind: 'parquet',
                         tables: [{ name: 'orders', format: 'PARQUET', dataset: 'orders_ds' }],
+                    },
+                    {
+                        id: 'ops:objects',
+                        label: 'Operational · Objects',
+                        kind: 'operational',
+                        live: true,
+                        tables: [{ name: 'inspecto_ops_objects' }],
                     },
                 ],
             }),
@@ -32,11 +40,30 @@ describe('DataBrowserComponent', () => {
         query: () => of({ columns: [], rows: [], statistics: { rowCount: 0, elapsedMs: 1, truncated: false } }),
     };
 
+    const canAuthor = signal(true);
+
     beforeEach(() => {
+        canAuthor.set(true);
         TestBed.configureTestingModule({
             imports: [DataBrowserComponent],
-            providers: [provideNoopAnimations(), { provide: DbBrowserService, useValue: svc }],
+            providers: [
+                provideNoopAnimations(),
+                { provide: DbBrowserService, useValue: svc },
+                { provide: LensService, useValue: { canAuthorWorkbench: canAuthor } },
+            ],
         });
+    });
+
+    it('hides operational groups from a caller without canAuthorWorkbench (DB-QUERY-UNGATED-1)', () => {
+        const fixture = TestBed.createComponent(DataBrowserComponent);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.textContent).toContain('inspecto_ops_objects');
+        canAuthor.set(false);
+        fixture.detectChanges();
+        expect(el.textContent).not.toContain('inspecto_ops_objects');
+        expect(el.textContent).toContain('orders');
+        expect(fixture.componentInstance.storeCount()).toBe(1);
     });
 
     it('lists the catalog stores', () => {

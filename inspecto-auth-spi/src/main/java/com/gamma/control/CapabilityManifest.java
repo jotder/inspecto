@@ -379,7 +379,9 @@ final class CapabilityManifest {
      * {@code identity-flow} · {@code self-verifying-public} · {@code self-service} · {@code read-shaped} ·
      * {@code self-limiting} · {@code recovery-route} · {@code target-visibility-gated} ·
      * {@code stateless-compute} · {@code collaboration} · {@code provenance-gated} (gated in the handler by where the
-     * addressed component came from — a Job Pack parser, operator D4 2026-09-25). Together with {@link #ENTRIES} and
+     * addressed component came from — a Job Pack parser, operator D4 2026-09-25) · {@code group-gated} (a read
+     * gated in the handler by the addressed store group — operational {@code ops:*} rows, DB-QUERY-UNGATED-1,
+     * operator 2026-10-03; not audited, like {@code read-shaped}). Together with {@link #ENTRIES} and
      * {@link #PENDING_OPERATOR_CALLS} this makes "ungated" a RECORDED state rather than an absence:
      * {@code CapabilityManifestTest} scans every {@code api.post|put|patch|delete} registration in every
      * module and fails the build on a mutating route that is in none of the three tables.
@@ -439,7 +441,11 @@ final class CapabilityManifest {
             // beside the point — /connections/test dials any host:port in the body from the server's network
             // position, and /{id}/probe reads through a SAVED credential the caller was never granted. They now
             // demand canOnboardConnections, the capability that already guards the same credential's CRUD.
-            new Exemption("POST", "/db/query", "read-shaped", "read-only SQL behind SqlGuard"),
+            // DB-QUERY-UNGATED-1, operator 2026-10-03 (option A): the gate depends on the GROUP, so it lives IN
+            // the handler. ⚠ route-gating-report / check-authgate-coverage do NOT see it (they scan withCapability
+            // literals only); ControlApiDbBrowserTest pins it. AuditTrail treats group-gated like read-shaped.
+            new Exemption("POST", "/db/query", "group-gated",
+                    "gated IN the handler: canAuthorWorkbench for an operational (ops:*) group — the control-plane DB, the rows the anomaly_scan / suggest_expectations agent tools read; business-store SQL stays open as read-shaped (SqlGuard-checked) because Viewer dashboards read Dataset rows through it. GET /db/table carries the same in-handler gate. Invisible to the route-gating scanners — pinned by ControlApiDbBrowserTest"),
             new Exemption("POST", "/bi/query", "read-shaped", "a Measure query; the body is the query spec"),
             // Operator D4 2026-09-25 (parser-plugins-trust-design.md slice P4): the gate depends on the PARSER, so
             // it lives IN the handler and the manifest (all-or-nothing per route) records it here, as /spaces does.

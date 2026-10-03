@@ -20,13 +20,14 @@ import java.util.Set;
  */
 public final class ToolCapabilities {
 
-    /** The capability that gates Workbench authoring, and store-row reads until {@code /db/query} is gated. */
+    /** The capability that gates Workbench authoring and operational-store row reads (incl. {@code ops:*} {@code /db/query}). */
     public static final String AUTHOR = "canAuthorWorkbench";
 
     /**
      * Tools that declare only a metadata read but in fact read STORE ROWS (SQL over a DB-backed operational
-     * store). They take the same capability as authoring. {@code POST /db/query}, the equivalent read route,
-     * is itself ungated, and that inconsistency is recorded as a BACKLOG row.
+     * store). They take the same capability as authoring, as do the equivalent route reads of an operational
+     * ({@code ops:*}) group through {@code POST /db/query} and {@code GET /db/table} (DB-QUERY-UNGATED-1,
+     * operator 2026-10-03). ToolCapabilitiesCoverageTest pins the two together so they cannot drift.
      */
     static final Set<String> ROW_READERS = Set.of("anomaly_scan", "suggest_expectations");
 

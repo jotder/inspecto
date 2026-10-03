@@ -15,7 +15,7 @@
                 <inspecto-skeleton [lines]="6" />
             } @else if (catalogError()) {
                 <inspecto-alert variant="error" title="Catalog unavailable">{{ catalogError() }}</inspecto-alert>
-            } @else if (groups().length === 0) {
+            } @else if (visibleGroups().length === 0) {
                 <inspecto-empty-state title="No data" message="This space has no browsable stores yet." />
             } @else {
                 <mat-form-field class="gamma-mat-dense mb-2 w-full" subscriptSizing="dynamic">

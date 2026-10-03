@@ -7,6 +7,8 @@ import com.eoiagent.tool.Tool;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -50,5 +52,22 @@ class ToolCapabilitiesCoverageTest {
             }
             assertTrue(seen.containsAll(UNGATED), "a listed ungated tool left the belt: " + seen);
         }
+    }
+
+    /**
+     * DB-QUERY-UNGATED-1 (operator 2026-10-03, option A): the row-reading tools and the operational-group reads of
+     * {@code POST /db/query} / {@code GET /db/table} take ONE capability. This module cannot see the control-plane
+     * route class, so this reads its source and fails if either side moves alone.
+     */
+    @Test
+    void rowReadersShareTheOperationalRowReadCapability() throws Exception {
+        String src = Files.readString(Path.of("..", "inspecto", "src", "main", "java", "com", "gamma", "control",
+                "DbBrowserRoutes.java"));
+        assertTrue(src.contains("ApiContext.requireCapability(ex, \"" + ToolCapabilities.AUTHOR + "\")"),
+                "DbBrowserRoutes' operational-row gate must be " + ToolCapabilities.AUTHOR);
+        assertEquals(2, src.split(java.util.regex.Pattern.quote("requireOperationalRead(ex)"), -1).length - 1,
+                "the gate is called by both /db/table and /db/query");
+        assertEquals(Set.of("anomaly_scan", "suggest_expectations"), ToolCapabilities.ROW_READERS,
+                "a new row-reading tool must take the /db/query operational-row capability; update both together");
     }
 }

@@ -7,7 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
 import { ColDef } from 'ag-grid-community';
 
-import { apiErrorMessage, DbBrowserService, DbGroup, DbResult, DbTable } from 'app/inspecto/api';
+import { apiErrorMessage, DbBrowserService, DbGroup, DbResult, DbTable, LensService } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
@@ -43,6 +43,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
 })
 export class DataBrowserComponent {
     private api = inject(DbBrowserService);
+    private lens = inject(LensService);
     private destroyRef = inject(DestroyRef);
 
     private static readonly PAGE = 200;
@@ -52,16 +53,21 @@ export class DataBrowserComponent {
     private lastSql: string | null = null;
 
     readonly groups = signal<DbGroup[]>([]);
+    /** Operational ({@code ops:*}) rows need `canAuthorWorkbench` server-side (DB-QUERY-UNGATED-1, operator
+     *  2026-10-03), so those groups are hidden from a caller without it instead of failing 403 on click. */
+    readonly visibleGroups = computed<DbGroup[]>(() =>
+        this.lens.canAuthorWorkbench() ? this.groups() : this.groups().filter((g) => g.kind !== 'operational'),
+    );
     /** Type-to-narrow over the store names (UIB-12: 30+ stores ran off the bottom of the page with no filter). */
     readonly storeFilter = signal('');
     readonly filteredGroups = computed<DbGroup[]>(() => {
         const q = this.storeFilter().trim().toLowerCase();
-        if (!q) return this.groups();
-        return this.groups()
+        if (!q) return this.visibleGroups();
+        return this.visibleGroups()
             .map((g) => ({ ...g, tables: g.tables.filter((t) => t.name.toLowerCase().includes(q)) }))
             .filter((g) => g.tables.length > 0);
     });
-    readonly storeCount = computed(() => this.groups().reduce((n, g) => n + g.tables.length, 0));
+    readonly storeCount = computed(() => this.visibleGroups().reduce((n, g) => n + g.tables.length, 0));
     readonly shownStoreCount = computed(() => this.filteredGroups().reduce((n, g) => n + g.tables.length, 0));
     readonly loadingCatalog = signal(true);
     readonly catalogError = signal<string | null>(null);

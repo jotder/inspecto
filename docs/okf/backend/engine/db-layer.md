@@ -1191,6 +1191,19 @@ The **Data Browser** pane (a per-space DB client) browses these stores live. Bac
   a mismatched name, a string literal, an unrelated path — still gets rejected exactly as before. This
   closed a real gap: Link Analysis's own SQL editor couldn't query a dataset whose registered name
   contained a slash (`"mule_transfers/database"`), because the guard rejected its own FROM target.
+- **Who may read which rows — SHIPPED 2026-10-03 (`DB-QUERY-UNGATED-1`, operator decision, option A).**
+  Reading an **operational** group (`ops:*`, the control-plane DB) through `POST /db/query` or
+  `GET /db/table` requires `canAuthorWorkbench` — the same capability the row-reading agent tools
+  `anomaly_scan` / `suggest_expectations` carry through `POST /agent/tools/{name}`
+  (`ToolCapabilities.ROW_READERS`; `ToolCapabilitiesCoverageTest` reads `DbBrowserRoutes.java` and fails if
+  the two drift). **Business-store reads stay open** (Viewer dashboards read Dataset rows through these
+  routes, via the SPA's `DatasetRowsService`), and `GET /db/catalog` (names only) stays open. The check runs
+  **in the handler** (`DbBrowserRoutes.requireOperationalRead`), before `SqlGuard` or any read, because the
+  gate depends on the request's group. ⚠ So `route-gating-report.mjs` and `check-authgate-coverage.mjs`,
+  which see only `withCapability` literals, do **not** count it as gated: `CapabilityManifest` records
+  `/db/query` as a `group-gated` exemption (unaudited, like `read-shaped`, via `AuditTrail`), and the real-HTTP
+  `ControlApiDbBrowserTest.operationalRowReadsRequireCanAuthorWorkbench` is what pins it. The Data Browser
+  pane hides operational groups from a caller without `canAuthorWorkbench` instead of letting a click 403.
 - **Operational tables** (§3) browse through each store's own `ConnectionSource` via
   [`util/BrowsableStore.java`](../../../../inspecto-util/src/main/java/com/gamma/util/BrowsableStore.java) —
   a browse read borrows like any other operation and appears only when that capability runs on

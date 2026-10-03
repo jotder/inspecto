@@ -8,6 +8,7 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
 import com.gamma.service.SpaceManager;
 import com.gamma.util.DuckDbUtil;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -24,6 +25,8 @@ import java.sql.Connection;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -93,6 +96,64 @@ class ControlApiDbBrowserTest {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .header("Content-Type", "application/json")
                 .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
+    }
+
+    /** A no-capability reader and a {@code canAuthorWorkbench} builder (with no Subject the gate is a no-op). */
+    private static final Authenticator FAKE = ex -> {
+        String auth = ex.getRequestHeaders().getFirst("Authorization");
+        if ("Bearer reader".equals(auth)) return Optional.of(new Subject("reader", Set.of()));
+        if ("Bearer builder".equals(auth)) return Optional.of(new Subject("builder", Set.of(Roles.CAN_AUTHOR_WORKBENCH)));
+        return Optional.empty();
+    };
+
+    @AfterEach
+    void clearAuthenticator() { Authenticators.forTest(null); }
+
+    private HttpResponse<String> as(String who, int port, String method, String path, String body) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("Content-Type", "application/json");
+        if (who != null) b.header("Authorization", "Bearer " + who);
+        b.method(method, body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(body));
+        return client.send(b.build(), BodyHandlers.ofString());
+    }
+
+    /**
+     * DB-QUERY-UNGATED-1, operator decision 2026-10-03 (option A): reading OPERATIONAL-store rows ({@code ops:*})
+     * through {@code /db/query} or {@code /db/table} takes {@code canAuthorWorkbench}, the capability the
+     * row-reading agent tools carry. Business-store reads stay open (Viewer dashboards read Dataset rows here),
+     * and so does the catalog. The gate lives in the handler, so the route-gating scanners cannot see it — this
+     * test is what pins it.
+     */
+    @Test
+    void operationalRowReadsRequireCanAuthorWorkbench(@TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(root)) {
+            String opsSql = "{\"group\":\"ops:status\",\"sql\":\"SELECT 1 AS a\"}";
+            String storeSql = "{\"table\":\"orders\",\"sql\":\"SELECT * FROM \\\"orders\\\"\"}";
+            String opsTable = "/spaces/s1/db/table?group=ops:status&name=" + firstOpsTable(c.port);
+
+            assertEquals(403, as("reader", c.port, "POST", "/spaces/s1/db/query", opsSql).statusCode());
+            assertEquals(403, as("reader", c.port, "GET", opsTable, null).statusCode());
+            assertEquals(401, as(null, c.port, "POST", "/spaces/s1/db/query", opsSql).statusCode());
+
+            HttpResponse<String> q = as("builder", c.port, "POST", "/spaces/s1/db/query", opsSql);
+            assertEquals(200, q.statusCode(), q.body());
+            HttpResponse<String> t = as("builder", c.port, "GET", opsTable, null);
+            assertEquals(200, t.statusCode(), t.body());
+
+            HttpResponse<String> rq = as("reader", c.port, "POST", "/spaces/s1/db/query", storeSql);
+            assertEquals(200, rq.statusCode(), "business-store SQL stays open: " + rq.body());
+            assertEquals(200, as("reader", c.port, "GET", "/spaces/s1/db/table?name=orders", null).statusCode());
+            assertEquals(200, as("reader", c.port, "GET", "/spaces/s1/db/catalog", null).statusCode());
+        }
+    }
+
+    private String firstOpsTable(int port) throws Exception {
+        JsonNode groups = V1Body.of(as("builder", port, "GET", "/spaces/s1/db/catalog", null).body())
+                .get("groups");
+        for (JsonNode g : groups)
+            if ("ops:status".equals(g.get("id").asText())) return g.get("tables").get(0).get("name").asText();
+        throw new AssertionError("no ops:status group in " + groups);
     }
 
     @Test

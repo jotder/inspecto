@@ -135,8 +135,10 @@ final class DbBrowserRoutes implements RouteModule {
         int offset = Math.max(0, ApiContext.parseIntOr(ApiContext.query(ex, "offset"), 0));
         List<QueryExecutor.Sort> sort = parseSort(ApiContext.query(ex, "sort"));
 
-        if (group.startsWith("ops:"))
+        if (group.startsWith("ops:")) {
+            requireOperationalRead(ex);
             return browseOperational(api, group, name, null, limit, offset);
+        }
         if (!STORES_GROUP.equals(group))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown group '" + group + "'");
         return browseStore(api, name, null, limit, offset, sort);
@@ -150,6 +152,7 @@ final class DbBrowserRoutes implements RouteModule {
         String tableName = ApiContext.str(body, "table");
         String sql = ApiContext.str(body, "sql");
         if (sql == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "missing 'sql'");
+        if (group.startsWith("ops:")) requireOperationalRead(ex);
 
         // A store id may itself contain path-like characters (e.g. "mule_transfers/database") without
         // being a smuggled file reference — SqlGuard's PATH_LIKE check can't tell those apart from the
@@ -171,6 +174,19 @@ final class DbBrowserRoutes implements RouteModule {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown group '" + group + "'");
         if (tableName == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "missing 'table' (the store the SQL reads from)");
         return browseStore(api, tableName, sql, limit, offset, List.of());
+    }
+
+    /**
+     * DB-QUERY-UNGATED-1, operator decision 2026-10-03 (option A): reading OPERATIONAL-store rows (the
+     * {@code ops:*} groups — the control-plane DB) takes {@code canAuthorWorkbench}, the capability the
+     * row-reading agent tools carry ({@code ToolCapabilities.ROW_READERS}, pinned by
+     * {@code ToolCapabilitiesCoverageTest}). Business-store reads stay open: Viewer dashboards read Dataset
+     * rows through these routes. Checked in the handler, before any SQL check or read, so the route-gating
+     * scanners (which see only {@code withCapability} literals) do not count it — the manifest records it as
+     * {@code group-gated}, and {@code ControlApiDbBrowserTest} pins it over real HTTP.
+     */
+    private static void requireOperationalRead(HttpExchange ex) {
+        ApiContext.requireCapability(ex, "canAuthorWorkbench");
     }
 
     // ── shared Parquet/CSV store read ──────────────────────────────────────────────
