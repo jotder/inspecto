@@ -290,6 +290,64 @@
                                 [investigationId]="investigationId()"
                                 [allowed]="canRunOnServer()"
                             />
+                            <h4 class="mt-2 text-sm font-medium">Ego network from the index</h4>
+                            <inspecto-link-analysis-server-run
+                                algorithm="egoNetwork"
+                                [indexOnly]="true"
+                                [params]="egoIndexParams()"
+                                [hold]="explainIndexHold()"
+                                [investigationId]="investigationId()"
+                                [allowed]="canRunOnServer()"
+                            />
+                            <h4 class="mt-2 text-sm font-medium">Degree of chosen nodes from the index</h4>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <inspecto-option-picker
+                                    class="w-56"
+                                    label="Node to score"
+                                    [options]="pathNodeOptions()"
+                                    [ngModel]="scoreSeedPick()"
+                                    (ngModelChange)="scoreSeedPick.set($any($event))"
+                                />
+                                <button
+                                    mat-stroked-button
+                                    data-testid="add-score-seed"
+                                    [disabled]="!scoreSeedPick()"
+                                    (click)="addScoreSeed()"
+                                >
+                                    Add node
+                                </button>
+                            </div>
+                            @if (scoreSeeds().length) {
+                                <ul
+                                    class="flex flex-wrap gap-1 text-sm"
+                                    aria-label="Nodes to score"
+                                    data-testid="score-seeds"
+                                >
+                                    @for (id of scoreSeeds(); track id) {
+                                        <li class="flex items-center gap-1 rounded border px-2">
+                                            {{ label(id) }}
+                                            <button
+                                                type="button"
+                                                class="min-h-6 px-1"
+                                                [attr.aria-label]="'Remove ' + label(id) + ' from the nodes to score'"
+                                                (click)="removeScoreSeed(id)"
+                                            >
+                                                &times;
+                                            </button>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                            <inspecto-link-analysis-server-run
+                                algorithm="degreeCentrality"
+                                [indexOnly]="true"
+                                [seeds]="scoreSeedIds()"
+                                [investigationId]="investigationId()"
+                                [allowed]="canRunOnServer()"
+                            />
+                        }
+                        @case ('index-build') {
+                            <inspecto-link-analysis-index-build [allowed]="canBuildIndex()" />
                         }
                         @case ('centrality') {
                             <div class="flex flex-wrap items-center gap-2">

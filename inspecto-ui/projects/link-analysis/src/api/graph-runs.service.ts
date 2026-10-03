@@ -191,10 +191,59 @@ export interface GraphAlgorithm {
 /** One index as `GET /inv/index` lists it (the fields the Run panel reads). */
 export interface LinkIndexSummary {
     dataset: string;
-    mapping: { sourceCol: string; targetCol: string; kindCol: string | null };
+    mapping: {
+        sourceCol: string;
+        targetCol: string;
+        kindCol: string | null;
+        timeCol?: string | null;
+        timeColZone?: string | null;
+        weightCol?: string | null;
+        attrCols?: string[] | null;
+    };
     version: number;
     stale: boolean;
     reason: string | null;
+    /** Appended file groups the version carries (an append is refused at 8: compact first). */
+    deltas?: number;
+    /** Advice only (D-3 step 8): what differs between the version and the Dataset now, and which build closes the gap. */
+    plan?: LinkIndexPlan;
+}
+
+export type LinkIndexBuildMode = 'full' | 'append' | 'compact';
+
+export interface LinkIndexPlan {
+    recommended: 'none' | LinkIndexBuildMode;
+    appendable: boolean;
+    reasons: string[];
+    added: number;
+    removed: number;
+    changed: number;
+    samples?: { added?: string[]; removed?: string[]; changed?: string[] };
+}
+
+/** `POST /inv/index/builds` body: the index's own mapping plus the `mode`. */
+export interface LinkIndexBuildRequest {
+    dataset: string;
+    sourceCol: string;
+    targetCol: string;
+    kindCol?: string;
+    timeCol?: string;
+    timeColZone?: string;
+    weightCol?: string;
+    attrCols?: string[];
+    mode: LinkIndexBuildMode;
+}
+
+export type LinkIndexBuildStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'CANCELLED' | 'FAILED';
+
+export interface LinkIndexBuildView {
+    buildId: string;
+    status: LinkIndexBuildStatus;
+    dataset?: string;
+    progress?: { phase: string; step: number; steps: number };
+    cancelRequested?: boolean;
+    failure?: string;
+    result?: { version: number; rows: number; edges: number; nodes: number; bytes: number; totalMs: number };
 }
 
 export interface LinkIndexList {
@@ -312,6 +361,27 @@ export class GraphRunsService {
             error: () => (this.loadingIndexes = false),
             complete: () => (this.loadingIndexes = false),
         });
+    }
+
+    /** `POST /inv/index/builds`: always 202; poll {@link watchBuild}. */
+    startBuild(req: LinkIndexBuildRequest): Observable<LinkIndexBuildView> {
+        return this.http.post<LinkIndexBuildView>(apiUrl('/inv/index/builds'), req);
+    }
+
+    /** Re-read a build every {@link pollMs} until it is terminal (the terminal view last), then refresh {@link indexes}. */
+    watchBuild(buildId: string): Observable<LinkIndexBuildView> {
+        return timer(this.pollMs, this.pollMs).pipe(
+            exhaustMap(() =>
+                this.http.get<LinkIndexBuildView>(apiUrl(`/inv/index/builds/${encodeURIComponent(buildId)}`)),
+            ),
+            takeWhile((v) => v.status === 'QUEUED' || v.status === 'RUNNING', true),
+        );
+    }
+
+    /** Re-ask `GET /inv/index` (after a build the version, the stale flag and the plan all changed). */
+    reloadIndexes(): void {
+        this.indexes.set(null);
+        this.loadIndexes();
     }
 
     algorithms(): Observable<GraphAlgorithmCatalogue> {

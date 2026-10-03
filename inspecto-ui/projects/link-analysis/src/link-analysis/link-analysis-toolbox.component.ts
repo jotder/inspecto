@@ -63,6 +63,7 @@ import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { FormsModule } from '@angular/forms';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { ServerPathsState, ServerPatternState } from './entity-projection';
+import { LinkAnalysisIndexBuildComponent } from './link-analysis-index-build.component';
 import { LinkAnalysisServerRunComponent } from './link-analysis-server-run.component';
 import {
     ServerIdMap,
@@ -109,7 +110,8 @@ type AnalysisTab =
     | 'cohesion'
     | 'similarity'
     | 'flow'
-    | 'scoring';
+    | 'scoring'
+    | 'index-build';
 
 /** The tool groups that can hand an over-cap run to the server (D-4 step 7). */
 type ServerTool =
@@ -171,6 +173,7 @@ type CentralityMetric =
         FormsModule,
         RiskScorePanelComponent,
         LinkAnalysisServerRunComponent,
+        LinkAnalysisIndexBuildComponent,
     ],
     templateUrl: './link-analysis-toolbox.component.html',
 })
@@ -284,6 +287,8 @@ export class LinkAnalysisToolboxComponent {
      */
     readonly serverCeilings = input<Record<string, number> | null>(null);
     readonly canRunOnServer = input(true);
+    /** Does the Subject hold `canBuildLinkIndex`? */
+    readonly canBuildIndex = input(true);
 
     /** A selection to emphasize on the canvas (`null` clears). */
     readonly emphasisChange = output<GraphEmphasis | null>();
@@ -308,6 +313,7 @@ export class LinkAnalysisToolboxComponent {
         { id: 'flow', label: 'Flow & backbone', icon: 'heroicons_outline:beaker' },
         { id: 'scoring', label: 'Suspicion score', icon: 'heroicons_outline:shield-exclamation' },
         { id: 'pattern', label: 'Pattern match', icon: 'heroicons_outline:magnifying-glass-circle' },
+        { id: 'index-build', label: 'Edge index', icon: 'heroicons_outline:server-stack' },
     ];
 
     /** The open tool group (accordion: one open at a time; `null` = all collapsed). */
@@ -335,6 +341,31 @@ export class LinkAnalysisToolboxComponent {
         return node ? { node, hops: this.explainHops() } : {};
     });
     readonly explainIndexHold = computed(() => (this.explainServerNode() ? '' : 'Pick a node first.'));
+    /** `egoNetwork` params for a run on the index: the same Node as Explain; no hops (an ego network is one hop). */
+    readonly egoIndexParams = computed<Record<string, unknown>>(() => {
+        const node = this.explainServerNode();
+        return node ? { node } : {};
+    });
+    /** Canvas ids picked to score from the index (`degreeCentrality` scores only the nodes named, 1..20). */
+    readonly scoreSeeds = signal<string[]>([]);
+    readonly scoreSeedPick = signal('');
+    /** The picked seeds as the server's node ids; a node the id map does not know is left out and stated by the hold. */
+    readonly scoreSeedIds = computed(() => {
+        const map = this.serverIds();
+        return this.scoreSeeds()
+            .map((id) => map?.serverNode(id))
+            .filter((id): id is string => !!id);
+    });
+
+    addScoreSeed(): void {
+        const id = this.scoreSeedPick();
+        if (id && !this.scoreSeeds().includes(id)) this.scoreSeeds.update((s) => [...s, id]);
+        this.scoreSeedPick.set('');
+    }
+
+    removeScoreSeed(id: string): void {
+        this.scoreSeeds.update((s) => s.filter((x) => x !== id));
+    }
     readonly centralityMetric = signal<CentralityMetric>('degree');
     readonly analysisError = signal('');
     readonly pathResult = signal<{ hops: string[] } | null>(null);
@@ -598,6 +629,8 @@ export class LinkAnalysisToolboxComponent {
             }
             case 'explain':
                 return this.explainText() ? this.label(this.explainFor()) : '';
+            case 'index-build':
+                return '';
             case 'centrality':
                 return this.ranking().length ? `top ${this.ranking().length}` : '';
             case 'communities':

@@ -759,6 +759,7 @@ export class LinkAnalysisComponent implements OnInit {
         return this.investigation.canvas() && ws ? ws.entities.filter((e) => !e.hidden).length : null;
     });
     readonly canRunGraphOnServer = computed(() => this.lens.canRunLinkGraphAnalysis());
+    readonly canBuildLinkIndex = computed(() => this.lens.canBuildLinkIndex());
     /** The server's node/edge ids translated to the canvas's, rebuilt whenever the Working Set changes. */
     readonly serverIds = computed(() => {
         const ws = this.investigation.workingSet();

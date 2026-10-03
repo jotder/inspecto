@@ -242,6 +242,11 @@ export class LensService {
         this.identityCapability('canRunLinkGraphAnalysis', 'linkgraph.run'),
     );
 
+    /** May build, append to or compact an edge/node index (`POST /inv/index/builds`, D-3). {@link identityCapability};
+     *  a build spends compute and disk, so it is its own question. No Access-Catalog node carries it yet (a
+     *  backend-only gate), so `allows` answers true for the node id. */
+    readonly canBuildLinkIndex = computed(() => this.identityCapability('canBuildLinkIndex', 'linkgraph.build-index'));
+
     /** May approve / deny a held sensitive Investigation expand (D-U7, `POST /inv/investigations/{id}/pending/{rid}/
      *  approve | deny`). {@link identityCapability}, as {@link canRunLinkGraphAnalysis} is. The server adds
      *  four-eyes (the requester cannot decide their own request) — this only decides whether the buttons show. No Access-Catalog action node carries it yet
