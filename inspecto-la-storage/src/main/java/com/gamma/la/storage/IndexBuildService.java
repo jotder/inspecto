@@ -391,7 +391,15 @@ public final class IndexBuildService implements AutoCloseable {
 
     @Override
     public void close() {
+        // record every cancel BEFORE shutdownNow interrupts the workers: a builder that throws on interrupt (an interrupted
+        // DuckDB call) must reach execute's catch with cancelRequested already set, or the close lands it FAILED. The second
+        // pass ends a build submitted between the first pass and the shutdown, which the pool then dropped.
+        cancelLive();
         pool.shutdownNow();
+        cancelLive();
+    }
+
+    private void cancelLive() {
         List<Run> live = new ArrayList<>();
         synchronized (runs) {
             for (Run r : runs.values()) if (!r.status().terminal()) live.add(r);

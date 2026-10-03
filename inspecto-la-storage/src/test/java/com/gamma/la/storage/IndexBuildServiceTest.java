@@ -50,7 +50,7 @@ class IndexBuildServiceTest {
     }
 
     /** A builder that blocks until released or cancelled (like the real one), then answers a canned result. */
-    private final class Fake implements Function<IndexBuilder.Request, IndexBuilder.Result> {
+    private class Fake implements Function<IndexBuilder.Request, IndexBuilder.Result> {
         final AtomicInteger calls = new AtomicInteger();
         volatile boolean release;
         volatile RuntimeException failWith;
@@ -443,5 +443,45 @@ class IndexBuildServiceTest {
         assertEquals(Status.CANCELLED, s.await(a.id(), 30_000).status());
         assertEquals(Status.CANCELLED, s.await(b.id(), 30_000).status());
         until(() -> terminals.size() == 2, "both terminal calls");
+    }
+
+    /**
+     * A builder that fails as soon as its thread is interrupted (as an interrupted DuckDB call does) must still end
+     * CANCELLED at close(): the cancel must be recorded BEFORE the pool interrupts the worker. Deterministic: once close()
+     * starts, the clock (read by close() before each cancel) stalls until the worker has reacted to its interrupt, so an
+     * interrupt-first close() always loses the race this test pins.
+     */
+    @Test
+    void closeRecordsTheCancelBeforeInterruptingSoAnInterruptFailureStillEndsCancelled(@TempDir Path tmp) throws Exception {
+        java.util.concurrent.atomic.AtomicBoolean closing = new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.CountDownLatch reacted = new java.util.concurrent.CountDownLatch(1);
+        Fake f = new Fake() {
+            @Override
+            public IndexBuilder.Result apply(IndexBuilder.Request req) {
+                try {
+                    return super.apply(req);
+                } finally {
+                    reacted.countDown();
+                }
+            }
+        };
+        IndexBuildService s = service(tmp, limits(1, 2), () -> {
+            if (closing.get() && Thread.currentThread().getName().equals("closer")) {
+                try {
+                    reacted.await(2, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            return System.currentTimeMillis();
+        }, null, f);
+        RunView a = s.submit(req("ana", "a", M1));
+        running(s, a.id());
+        closing.set(true);
+        Thread closer = new Thread(s::close, "closer");
+        closer.start();
+        closer.join(30_000);
+        RunView end = s.await(a.id(), 30_000);
+        assertEquals(Status.CANCELLED, end.status(), "failure=" + end.failure());
     }
 }
