@@ -2,6 +2,7 @@ package com.gamma.service;
 
 import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
+import com.gamma.util.StoreHealth;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,6 +112,8 @@ final class DbRunLease implements RunLease, AutoCloseable {
      */
     private final Map<String, Long> lost = new ConcurrentHashMap<>();
     private final ScheduledExecutorService heartbeat;
+    /** What {@link #renewAll} last learned about the lease database — logged only when it flips. */
+    private volatile Boolean reachable;
 
     DbRunLease(Connection conn, String space, String scope, String owner, Duration ttl) {
         this(JdbcDrivers.source(conn), space, scope, owner, ttl);
@@ -289,7 +292,20 @@ final class DbRunLease implements RunLease, AutoCloseable {
 
     /** Extend every claim this process holds. Fenced identically: a stale owner cannot extend. */
     private void renewAll() {
-        if (held.isEmpty()) return;
+        if (held.isEmpty()) {
+            // Nothing to extend, but the tick still proves the database answers: an idle passive-side or
+            // between-runs node must report a partition too, or GET /ready keeps routing to it.
+            try {
+                src.run(conn -> {
+                    try (Statement st = conn.createStatement()) { st.execute("SELECT 1"); }
+                });
+                reportLive(null);
+            } catch (SQLException | RuntimeException ex) {
+                reportLive(String.valueOf(ex.getMessage()));
+            }
+            return;
+        }
+        String failure = null;
         long until = System.currentTimeMillis() + ttlMs;
         String sql = "UPDATE " + TABLE + " SET expires_at = ? "
                 + "WHERE space = ? AND scope = ? AND pipeline = ? AND owner = ? AND epoch = ?";
@@ -313,10 +329,33 @@ final class DbRunLease implements RunLease, AutoCloseable {
                         }
                     }
                 });
-            } catch (SQLException ex) {
+            } catch (SQLException | RuntimeException ex) {
+                failure = String.valueOf(ex.getMessage());
                 log.warn("Could not renew the run lease for '{}': {}", e.getKey(), ex.getMessage());
             }
         }
+        reportLive(failure);
+    }
+
+    /**
+     * Publish this tick's verdict as a LIVE health entry (ASSURE-OPERABILITY-1): {@code GET /ready} answers 503
+     * while any is DEGRADED, so a load balancer stops routing to a node cut off from its shared state, and
+     * routes back on the first good tick (at most TTL/3 later). {@code failure == null} means reachable.
+     */
+    private void reportLive(String failure) {
+        boolean up = failure == null;
+        StoreHealth.live(space, liveFamily(), up, null,
+                up ? "lease database answered" : "lease database unreachable: " + failure);
+        Boolean was = reachable;
+        reachable = up;
+        if (was != null && was != up) {
+            if (up) log.info("Run lease database ({}) reachable again", scope);
+            else log.warn("Run lease database ({}) unreachable - /ready now reports NOT READY: {}", scope, failure);
+        }
+    }
+
+    private String liveFamily() {
+        return "runLease." + scope;
     }
 
     /**
@@ -453,6 +492,7 @@ final class DbRunLease implements RunLease, AutoCloseable {
     @Override
     public void close() {
         heartbeat.shutdownNow();
+        StoreHealth.forgetLive(space, liveFamily());
         try {
             src.close();
         } catch (RuntimeException e) {

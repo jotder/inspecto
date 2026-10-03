@@ -135,4 +135,37 @@ class StoreHealthTest {
         assertEquals(Map.of(), StoreHealth.of("s"));
         assertEquals(Map.of(), StoreHealth.of(null));
     }
+
+    // ---- live probes (ASSURE-OPERABILITY-1) -------------------------------------------------------------
+
+    /** A heartbeat thread records here: a DEGRADED live probe must NOT throw under partitioned (it would cancel the renewer). */
+    @Test
+    void liveProbeNeverThrowsAndIsKeptApartFromOpenTimeRecords() {
+        System.setProperty(Topology.PROPERTY, "partitioned");
+        try {
+            StoreHealth.live("s", "runLease.run", false, null, "unreachable: refused");
+        } finally {
+            System.clearProperty(Topology.PROPERTY);
+        }
+        assertEquals(StoreHealth.Status.DEGRADED, StoreHealth.liveOf("s").get("runLease.run").status());
+        assertEquals(Map.of(), StoreHealth.of("s"), "a live verdict is not an open-time record");
+        assertFalse(StoreHealth.anyDegraded("s"));
+    }
+
+    @Test
+    void liveDownSpansSpacesAndClearsOnRecoveryForgetAndClear() {
+        StoreHealth.live("a", "runLease.run", false, null, "x");
+        StoreHealth.live("b", "runLease.job", false, null, "y");
+        StoreHealth.live("b", "runLease.run", true, null, "ok");
+        assertEquals(List.of("a/runLease.run", "b/runLease.job"), List.copyOf(StoreHealth.liveDown().keySet()));
+
+        StoreHealth.live("a", "runLease.run", true, null, "ok");
+        StoreHealth.forgetLive("b", "runLease.job");
+        assertEquals(Map.of(), StoreHealth.liveDown());
+
+        StoreHealth.live("c", "runLease.run", false, null, "z");
+        StoreHealth.clear("c");
+        assertEquals(Map.of(), StoreHealth.liveDown());
+        assertEquals(Map.of(), StoreHealth.liveOf(null));
+    }
 }

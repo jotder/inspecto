@@ -119,13 +119,58 @@ public final class StoreHealth {
         return of(spaceId).values().stream().anyMatch(r -> r.status() == Status.DEGRADED);
     }
 
+    /**
+     * space id → (family → LIVE reachability), written by a store's own periodic probe (today the shared run
+     * lease's heartbeat) rather than by its opener. Kept apart from {@link #SPACES} on purpose (ASSURE-OPERABILITY-1):
+     * <ul>
+     *   <li>⛔ {@link #record} throws on DEGRADED under a partitioned topology — right at boot, fatal on a
+     *       heartbeat thread, where it would cancel the very renewer reporting the outage;</li>
+     *   <li>an open-time fallback is permanent until restart, so letting it drive {@code GET /ready} would
+     *       strand a pod unready after its database came back; a live entry recovers on the next probe.</li>
+     * </ul>
+     * Only {@link Status#UP} and {@link Status#DEGRADED} are recorded here.
+     */
+    private static final Map<String, Map<String, Resolved>> LIVE = new ConcurrentHashMap<>();
+
+    /** Record the latest live probe of {@code family} in {@code spaceId}; never throws. */
+    public static void live(String spaceId, String family, boolean reachable, String target, String detail) {
+        if (spaceId == null || family == null) return;
+        LIVE.computeIfAbsent(spaceId, k -> new ConcurrentHashMap<>())
+            .put(family, new Resolved(family, reachable ? Status.UP : Status.DEGRADED, target, detail));
+    }
+
+    /** Drop one live entry — when the store that probes it closes, so a stale verdict never outlives it. */
+    public static void forgetLive(String spaceId, String family) {
+        Map<String, Resolved> byFamily = (spaceId == null) ? null : LIVE.get(spaceId);
+        if (byFamily != null && family != null) byFamily.remove(family);
+    }
+
+    /** Every live probe recorded for {@code spaceId}, ordered by family name; empty when none. */
+    public static Map<String, Resolved> liveOf(String spaceId) {
+        Map<String, Resolved> byFamily = (spaceId == null) ? null : LIVE.get(spaceId);
+        return (byFamily == null) ? Map.of() : new TreeMap<>(byFamily);
+    }
+
+    /** Every live probe currently DEGRADED, across all spaces, as {@code "<space>/<family>"} → entry. */
+    public static Map<String, Resolved> liveDown() {
+        Map<String, Resolved> out = new TreeMap<>();
+        LIVE.forEach((space, fams) -> fams.forEach((f, r) -> {
+            if (r.status() == Status.DEGRADED) out.put(space + "/" + f, r);
+        }));
+        return out;
+    }
+
     /** Drop everything recorded for {@code spaceId} — on space deletion, and for test hygiene. */
     public static void clear(String spaceId) {
-        if (spaceId != null) SPACES.remove(spaceId);
+        if (spaceId != null) {
+            SPACES.remove(spaceId);
+            LIVE.remove(spaceId);
+        }
     }
 
     /** ⚠ Test hygiene only: drop every space's record. Static state outlives a test class otherwise. */
     public static void clearAll() {
         SPACES.clear();
+        LIVE.clear();
     }
 }

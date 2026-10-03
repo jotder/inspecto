@@ -661,4 +661,50 @@ class DbRunLeaseTest {
             assertEquals(6_000L, pod.lastRunAt("orders"));
         }
     }
+
+    /**
+     * ASSURE-OPERABILITY-1: the heartbeat publishes a LIVE verdict on the lease database — DEGRADED while it
+     * cannot be reached (idle or holding), UP again on the first good tick, and gone once the lease closes.
+     */
+    @Test
+    void heartbeatPublishesLiveReachabilityAndForgetsItOnClose(@TempDir Path dir) throws Exception {
+        java.util.concurrent.atomic.AtomicBoolean cut = new java.util.concurrent.atomic.AtomicBoolean();
+        com.gamma.util.ConnectionSource real = JdbcDrivers.source(urlIn(dir), null, null, "t");
+        com.gamma.util.ConnectionSource flaky = new com.gamma.util.ConnectionSource() {
+            @Override public <T> T with(SqlFunction<T> body) throws java.sql.SQLException {
+                if (cut.get()) throw new java.sql.SQLException("connection refused (test partition)");
+                return real.with(body);
+            }
+            @Override public boolean isPostgres() { return false; }
+            @Override public void close() { real.close(); }
+        };
+        String space = "live-" + System.nanoTime();
+        try (DbRunLease lease = new DbRunLease(flaky, space, DbRunLease.SCOPE_RUN, "pod-a", TTL)) {
+            awaitLive(space, com.gamma.util.StoreHealth.Status.UP);
+            cut.set(true);
+            awaitLive(space, com.gamma.util.StoreHealth.Status.DEGRADED);
+            assertTrue(com.gamma.util.StoreHealth.liveDown().containsKey(space + "/runLease.run"));
+            cut.set(false);
+            awaitLive(space, com.gamma.util.StoreHealth.Status.UP);
+
+            RunLease.Claim c = lease.tryAcquire("orders");   // the HOLDING path reports too
+            assertNotNull(c);
+            cut.set(true);
+            awaitLive(space, com.gamma.util.StoreHealth.Status.DEGRADED);
+            cut.set(false);
+            awaitLive(space, com.gamma.util.StoreHealth.Status.UP);
+            c.close();
+        }
+        assertNull(com.gamma.util.StoreHealth.liveOf(space).get("runLease.run"), "a closed lease leaves no verdict");
+    }
+
+    private static void awaitLive(String space, com.gamma.util.StoreHealth.Status want) throws InterruptedException {
+        long deadline = System.nanoTime() + 10_000_000_000L;
+        while (System.nanoTime() < deadline) {
+            var r = com.gamma.util.StoreHealth.liveOf(space).get("runLease.run");
+            if (r != null && r.status() == want) return;
+            Thread.sleep(50);
+        }
+        fail("live runLease.run never became " + want + ": " + com.gamma.util.StoreHealth.liveOf(space));
+    }
 }

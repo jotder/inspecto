@@ -67,6 +67,23 @@ and matches every Maven coordinate against an **OSV-format snapshot** at `$VULN_
 5. Point `VULN_DB_DIR` at it and run `node tools/vuln-scan.mjs`. Refresh at least every 30 days — older
    snapshots are refused.
 
+## Readiness follows the shared run lease (ASSURE-OPERABILITY-1, 2026-10-03)
+
+`GET /ready` answers **503 `CAPABILITY_UNAVAILABLE` "NOT READY - unreachable: <space>/runLease.<scope> (...)"** while
+any LIVE store probe is down, and 200 again on the first good probe. Today the one live probe is the shared
+run lease (`-Drun.lease.backend=postgres|db|jdbc:`): `DbRunLease`'s heartbeat (every TTL/3 = 20 s) records
+its verdict via `StoreHealth.live` — a `SELECT 1` when idle, the fenced renewals when holding. So a node
+partitioned from its lease database drops out of the LB / `readinessProbe` within about 20 s and comes back by
+itself; `GET /health` (liveness) is unaffected, so nothing restarts it. `GET /health/details` shows the same
+verdicts as `live.runLease.<scope>`.
+
+- ⛔ Live verdicts are a **separate map** from the open-time records: `StoreHealth.record` throws on DEGRADED
+  under `-Dinspecto.topology=partitioned`, which on the heartbeat thread would cancel the renewer itself.
+- Deliberately **not** on `/ready`: an open-time fallback (a store that could not open and degraded to
+  memory/heap). It lasts until restart, and readiness never restarts a pod — it would strand the node unready
+  after the database came back. Those stay DOWN on `/health/details` (and fatal at boot when partitioned).
+- The heap lease (the default) registers no probe, so Personal and single-node installs see no change.
+
 ## Kubernetes: single-replica Helm chart (ASSURE-OPERABILITY-1, 2026-09-29)
 
 `deploy/helm/inspecto/` is a StatefulSet pinned to **`replicas: 1`** in the template (no value can change

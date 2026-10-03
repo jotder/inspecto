@@ -86,6 +86,10 @@ final class HealthDetails {
             subs.put("store." + family, sub(status, detail));
         });
 
+        // Live probes (ASSURE-OPERABILITY-1) — what GET /ready answers on, shown here with their detail.
+        StoreHealth.liveOf(HostContext.of(api).service().spaceId()).forEach((family, r) ->
+                subs.put("live." + family, sub(r.status() == StoreHealth.Status.UP ? "UP" : "DOWN", r.detail())));
+
         boolean down = subs.values().stream()
                 .anyMatch(s -> "DOWN".equals(((Map<?, ?>) s).get("status")));
         Map<String, Object> out = new LinkedHashMap<>();
