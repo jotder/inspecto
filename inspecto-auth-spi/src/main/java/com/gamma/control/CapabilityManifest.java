@@ -508,9 +508,9 @@ final class CapabilityManifest {
      * ✅ <b>EMPTY since 2026-09-16 — all four calls were answered in one sitting</b> (route-gating plan §2a):
      * {@code POST /recon/promote} and {@code POST /objects} now share the NEW {@link Roles#CAN_MANAGE_INCIDENTS}
      * (both are the one act of opening an Incident, so neither borrows a neighbouring capability);
-     * {@code POST /spaces/import} inherits the {@code POST /spaces} additive/recovery posture and
-     * {@code POST /tags/rules/{id}/apply} is a collaboration act like assignments — both recorded as
-     * EXEMPTIONS with the decision on the line, not left absent.
+     * {@code POST /spaces/import} was exempted then, and is {@code canAdminister} ALWAYS since 2026-10-03
+     * (it left EXEMPTIONS; see its {@link Entry}), and {@code POST /tags/rules/{id}/apply} is a collaboration act
+     * like assignments, recorded as an EXEMPTION with the decision on the line, not left absent.
      *
      * <p>⛔ Keep this table and its test: "ungated" must stay a RECORDED state. The next unlisted mutating
      * route belongs here, not nowhere.

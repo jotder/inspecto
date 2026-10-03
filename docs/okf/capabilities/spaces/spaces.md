@@ -306,7 +306,7 @@ exists (§2, §5).
 2026-09-28). `SpaceRoutes.createSpace` hands `createFromTemplate` a seed gate
 (`KpiRoutes.requireTemplateKpis`) that runs after the WHOLE tree is copied — so the template's Datasets are on
 disk — and before boot: the caller needs `canAuthorWorkbench` (the `/components/kpi` door's capability; the
-zero-Space recovery create asks none, as it asks no `canAdminister`), and each KPI meets
+zero-Space recovery create asks it too, since `POST /spaces` is `canAdminister` always), and each KPI meets
 `KpiRoutes.requireMeasure` against the NEW Space's registry and `data/`. The first refusal is a 403 / 422, the
 half-made tree is deleted and nothing is registered; a `kpis/*.toon` the registry cannot read is refused,
 never seeded unchecked. The tree is seeded in a unique `_staging/<id>-<nanos>/` (discovery never boots it) and
@@ -434,8 +434,8 @@ fresh offenders at the corpus rate — 640 Alerts, every offender its own, no st
 (1) **capability** — `ImportCapabilityGuard.checkFiles(…, newSpace=true)` over the staged `config/`, the same
 kind→capability table `/spaces/import` and `/components/{kind}` use (`connection` → `canOnboardConnections`,
 `alert-rule` → `canAuthorAlertRules`, `findings-spec` → `canManageIncidents`, an `event_prune`/`restore` Job →
-`canAdminister`; a `registry/` file whose kind cannot be told is refused); skipped on the zero-Space recovery
-create, like the KPI capability; (2) **save validation** — every `ComponentStore.WRITABLE_TYPES` component meets
+`canAdminister`; a `registry/` file whose kind cannot be told is refused); run on the zero-Space recovery
+create too (`TEMPLATE-RECOVERY-IMPORT-GATE-1`, 2026-10-03); (2) **save validation** — every `ComponentStore.WRITABLE_TYPES` component meets
 what `ComponentRoutes.writeComponent` runs before its write: `validateKind(api, …)`, `AlertRoutes.parse` for an
 `alert-rule` (edition feature, Investigation refusal, `by` Schema check), `DecisionRuleGuard.prepare` for a
 `decision-rule` (the invoke-api gate, with the template's own `*_connection.toon` Connections counted as carried,

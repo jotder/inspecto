@@ -298,8 +298,10 @@ undeclared service invisible, ceiling and unknown id, the lease), `PipelineNodeT
 
 ## 8. What is still open
 
-Stage 2 is built through S2-3. S2-4 (`graphLaneCarries` admits intervening nodes) and S2-5 (recipe
-spelling and catalog visibility) remain, as does Stage 3 (pack-contributed services). The open items
+Stage 2 is built through S2-3. S2-4 is closed as a no-op (D-11, operator 2026-10-04): a config-derived
+chain executes on the at-rest path (`output_store:`), so `graphLaneCarries` is not widened and ELT Phase 6
+Row 15 is discharged there. S2-5 (recipe spelling and catalog visibility) remains, as does Stage 3
+(pack-contributed services). The open items
 live in [`BACKLOG.md`](../../../BACKLOG.md) §4 under *Platform Services*. A Job-side watchdog is still a
 recorded gap; the Step watchdog is §7c.
 

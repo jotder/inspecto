@@ -118,6 +118,33 @@ class IngestLaneFlagTest {
         return PipelineConfig.load(toon.toString());
     }
 
+    /**
+     * Platform Services D-11 (operator, option a, 2026-10-04): a config-derived chain (dedup / summarize ...
+     * beside an authored {@code output_store:}) runs on the at-rest path, so the ingest graph lane NEVER
+     * carries it - it stays flat, and the flag names why instead of calling it Stage-2 work.
+     */
+    @Test
+    void anOutputStoreChainStaysFlatAndGraphRefusesByName(@TempDir Path dir) throws Exception {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("name", "CHAIN_ETL");
+        m.put("dirs", java.util.Map.of("poll", dir + "/in", "database", dir + "/out", "temp", dir + "/temp"));
+        m.put("processing", java.util.Map.of("threads", 1));
+        m.put("output_store", "shaped");
+        m.put("steps", List.of(
+                java.util.Map.of("dedup", java.util.Map.of("keys", List.of("k"))),
+                java.util.Map.of("summarize", java.util.Map.of("group_by", List.of("d"), "measures", List.of("count")))));
+        PipelineConfig cfg = PipelineConfig.fromMap(m);
+
+        assertNull(ConsignmentIngestStrategy.admittedLift(cfg, NO_RULES), "auto: stays flat");
+        String reason = ConsignmentIngestStrategy.flatReason(cfg, NO_RULES);
+        assertTrue(reason.contains("at-rest path") && !reason.contains("Stage-2"), reason);
+
+        System.setProperty(ConsignmentIngestStrategy.LANE_PROPERTY, "graph");
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> ConsignmentIngestStrategy.admittedLift(cfg, NO_RULES));
+        assertTrue(ex.getMessage().contains("chain_etl") && ex.getMessage().contains("at-rest path"), ex.getMessage());
+    }
+
     @Test
     void autoIsTheAdmissionAsDesigned(@TempDir Path dir) throws Exception {
         assertNotNull(ConsignmentIngestStrategy.admittedLift(config(dir.resolve("a"), true), NO_RULES),

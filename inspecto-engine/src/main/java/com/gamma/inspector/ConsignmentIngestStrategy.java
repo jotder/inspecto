@@ -285,7 +285,8 @@ interface ConsignmentIngestStrategy {
         // cannot run on this lane keeps the graph fork closed.
         if (!"transform.sql".equals(seedType))
             return "a node between the projection and the write (" + seedType
-                    + ") would have to EXECUTE at rest — Stage-2 work";
+                    + ") would have to EXECUTE at rest — the config-derived chain runs on the at-rest path "
+                    + "(output_store:), not this lane (Platform Services D-11, 2026-10-04)";
         return "a sink is fed through another node rather than directly off map";
     }
 
