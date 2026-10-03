@@ -87,6 +87,7 @@ import {
 } from '@inspecto/link-analysis/graph/graph-filter';
 import { ConditionGroup, emptyGroup } from '@inspecto/core/query/query-types';
 import { LinkAnalysisFilterComponent, LocalMatch } from './link-analysis-filter.component';
+import { LinkAnalysisNodeListComponent } from './link-analysis-node-list.component';
 import {
     LinkAnalysisAdvancedSearchDialog,
     LinkAnalysisAdvancedSearchData,
@@ -245,6 +246,7 @@ const SERVER_PATH_LIMIT = 100;
         LinkAnalysisQueryPanelComponent,
         LinkAnalysisLegendComponent,
         LinkAnalysisWorkingSetComponent,
+        LinkAnalysisNodeListComponent,
         LinkAnalysisFilterComponent,
         InspectoSplitDirective,
         InspectoOptionPickerComponent,
@@ -336,6 +338,14 @@ export class LinkAnalysisComponent implements OnInit {
     /** The right dock (Analysis | View toolbox); collapses to an icon rail. */
     readonly toolboxDockOpen = signal(true);
     readonly toolboxTab = signal<'analysis' | 'view' | 'investigation'>('analysis');
+    /** The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels). */
+    readonly toolboxTabs: readonly { id: 'analysis' | 'view' | 'investigation'; label: string }[] = [
+        { id: 'analysis', label: 'Analysis' },
+        { id: 'view', label: 'View' },
+        { id: 'investigation', label: 'Investigation' },
+    ];
+    /** The graph canvas's text alternative: the displayed graph as a keyboard-navigable node / link list. */
+    readonly listMode = signal(false);
     /** LA-10: the open Investigation (op log + Working Set); the Investigation tab renders it. */
     readonly investigation = inject(InvestigationSessionStore);
     private readonly graphRuns = inject(GraphRunsService);
@@ -1366,6 +1376,26 @@ export class LinkAnalysisComponent implements OnInit {
     }
 
     // ── element details (canvas click → full-detail popup) ──
+
+    /** WAI-ARIA tabs: ArrowLeft/Right (wrapping), Home, End move AND activate; focus follows (roving tabindex). */
+    onToolboxTabKey(ev: KeyboardEvent): void {
+        const tabs = this.toolboxTabs;
+        const at = tabs.findIndex((t) => t.id === this.toolboxTab());
+        const to =
+            ev.key === 'ArrowRight'
+                ? (at + 1) % tabs.length
+                : ev.key === 'ArrowLeft'
+                  ? (at - 1 + tabs.length) % tabs.length
+                  : ev.key === 'Home'
+                    ? 0
+                    : ev.key === 'End'
+                      ? tabs.length - 1
+                      : -1;
+        if (to < 0) return;
+        ev.preventDefault();
+        this.toolboxTab.set(tabs[to].id);
+        (ev.currentTarget as HTMLElement).querySelector<HTMLElement>(`#la-toolbox-tab-${tabs[to].id}`)?.focus();
+    }
 
     onNodeClick(id: string): void {
         // A super-node exists only in `displayed()`, so the lookup below would miss it and the click

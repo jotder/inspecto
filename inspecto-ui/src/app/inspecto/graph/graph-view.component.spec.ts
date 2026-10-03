@@ -313,6 +313,9 @@ describe('graph text alternative and canvas tabindex (LA-A11Y-AUDIT-1)', () => {
         expect(graphSummaryLabel({ nodes: [{ id: 'a' }], edges: [] } as unknown as G6GraphData)).toBe(
             'Graph, 1 node, 0 links',
         );
+        expect(graphSummaryLabel({ nodes: [], edges: [] }, 'Use Show as list for a text version.')).toBe(
+            'Graph, 0 nodes, 0 links. Use Show as list for a text version.',
+        );
     });
 
     it('demotes the positive tabindex G6 puts on its canvases and leaves others alone', async () => {

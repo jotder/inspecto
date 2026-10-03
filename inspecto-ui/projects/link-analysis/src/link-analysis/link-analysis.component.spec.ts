@@ -1,3 +1,4 @@
+import { Component, Input } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -15,6 +16,7 @@ import { G6GraphData, GraphSource } from '@inspecto/core/graph';
 import { GeoLinkBrushService } from '@inspecto/link-analysis/graph/geo-link-brush';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
+import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisComponent } from './link-analysis.component';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
@@ -46,6 +48,19 @@ const GRAPH: G6GraphData = {
     ],
 };
 
+/** Stands in for the G6 host (which cannot instantiate in jsdom) — same selector and inputs. */
+@Component({ selector: 'inspecto-graph-view', standalone: true, template: '' })
+class StubGraphView {
+    @Input() data: G6GraphData | null = null;
+    @Input() fill = false;
+    @Input() emphasis: unknown;
+    @Input() display: unknown;
+    @Input() tooltips = false;
+    @Input() textHint = '';
+    @Input() layout: unknown;
+    @Input() plugins: unknown;
+}
+
 function create(
     opts: {
         fail?: boolean;
@@ -57,6 +72,8 @@ function create(
         queryParams?: Record<string, string>;
         /** LA-11: a stand-in for the traversal route (the real service is used when absent). */
         inv?: Partial<InvService>;
+        /** Swap the G6 host for an inert stand-in, so the template can render with a graph in jsdom. */
+        stubGraph?: boolean;
     } = {},
 ) {
     const queried: unknown[] = [];
@@ -103,6 +120,12 @@ function create(
             },
         ],
     });
+    if (opts.stubGraph) {
+        TestBed.overrideComponent(LinkAnalysisComponent, {
+            remove: { imports: [GraphViewComponent] },
+            add: { imports: [StubGraphView] },
+        });
+    }
     return { fixture: TestBed.createComponent(LinkAnalysisComponent), queried, save };
 }
 
@@ -1014,5 +1037,170 @@ describe('LinkAnalysisComponent', () => {
         const item = panel.querySelector('[role="menuitem"]') as HTMLElement;
         expect(item.textContent).toContain('Nothing saved yet.');
         expect(item.hasAttribute('disabled')).toBe(true);
+    });
+    describe('toolbox tablist (LA-A11Y-AUDIT-1: the Analysis / View / Investigation switch)', () => {
+        const open = () => {
+            const { fixture } = create();
+            fixture.detectChanges();
+            const el = fixture.nativeElement as HTMLElement;
+            const tabs = (): HTMLElement[] => Array.from(el.querySelectorAll<HTMLElement>('[role="tab"]'));
+            const press = (k: string): void => {
+                tabs()
+                    .find((t) => t.tabIndex === 0)!
+                    .dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+                fixture.detectChanges();
+            };
+            return { fixture, c: fixture.componentInstance, el, tabs, press };
+        };
+
+        it('is a tablist of three tabs, one tab stop, whose panes are tabpanels labelled by their tab', () => {
+            const { el, tabs } = open();
+            const list = el.querySelector('[role="tablist"]') as HTMLElement;
+            expect(list.getAttribute('aria-label')).toBe('Toolbox tab');
+            expect(tabs().map((t) => t.textContent?.trim())).toEqual(['Analysis', 'View', 'Investigation']);
+            expect(tabs().map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false']);
+            expect(tabs().map((t) => t.tabIndex)).toEqual([0, -1, -1]);
+            expect(list.parentElement!.querySelector('[role="radio"], [role="radiogroup"]')).toBeNull(); // the old switch
+            const panel = el.querySelector('#la-toolbox-panel-analysis') as HTMLElement;
+            expect(panel.getAttribute('role')).toBe('tabpanel');
+            expect(panel.getAttribute('aria-labelledby')).toBe('la-toolbox-tab-analysis');
+            expect(tabs()[0].getAttribute('aria-controls')).toBe('la-toolbox-panel-analysis');
+            const view = el.querySelector('[data-toolbox-view]') as HTMLElement;
+            expect(view.getAttribute('role')).toBe('tabpanel');
+            expect(view.getAttribute('aria-labelledby')).toBe('la-toolbox-tab-view');
+            // the Investigation pane is only mounted while it is the tab: no dangling aria-controls
+            expect(el.querySelector('#la-toolbox-panel-investigation')).toBeNull();
+            expect(tabs()[2].hasAttribute('aria-controls')).toBe(false);
+        });
+
+        it('click and arrow keys select (automatic activation), wrap, and Home / End jump; the tab stop roves', () => {
+            const { fixture, c, tabs, press } = open();
+            const state = () => [c.toolboxTab(), tabs().findIndex((t) => t.tabIndex === 0)];
+            tabs()[1].click();
+            fixture.detectChanges();
+            expect(state()).toEqual(['view', 1]);
+            press('ArrowRight');
+            expect(state()).toEqual(['investigation', 2]);
+            expect(document.activeElement).toBe(tabs()[2]);
+            press('ArrowRight'); // wraps
+            expect(state()).toEqual(['analysis', 0]);
+            press('ArrowLeft'); // wraps back
+            expect(state()).toEqual(['investigation', 2]);
+            press('Home');
+            expect(state()).toEqual(['analysis', 0]);
+            press('End');
+            expect(state()).toEqual(['investigation', 2]);
+            press('a'); // any other key is left alone
+            expect(state()).toEqual(['investigation', 2]);
+        });
+
+        it('the Investigation pane mounts as a labelled tabpanel on its tab, and selecting a tab does not move focus into a panel', () => {
+            const { fixture, el, tabs, press } = open();
+            tabs()[0].focus();
+            press('End');
+            const panel = el.querySelector('#la-toolbox-panel-investigation') as HTMLElement;
+            expect(panel.getAttribute('role')).toBe('tabpanel');
+            expect(panel.getAttribute('aria-labelledby')).toBe('la-toolbox-tab-investigation');
+            expect(tabs()[2].getAttribute('aria-controls')).toBe('la-toolbox-panel-investigation');
+            expect(document.activeElement).toBe(tabs()[2]);
+            expect(panel.contains(document.activeElement)).toBe(false);
+            expect(fixture.componentInstance.toolboxTab()).toBe('investigation');
+        });
+
+        it('the collapsed rail still switches the tab (openInvestigation unchanged)', () => {
+            const { fixture, c, el } = open();
+            c.openInvestigation();
+            fixture.detectChanges();
+            expect(c.toolboxTab()).toBe('investigation');
+            expect(el.querySelector('#la-toolbox-tab-investigation')!.getAttribute('aria-selected')).toBe('true');
+        });
+    });
+
+    describe('graph as a list (LA-A11Y-AUDIT-1: the canvas text alternative)', () => {
+        const ready = async () => {
+            const { fixture } = create({ stubGraph: true });
+            fixture.detectChanges();
+            await runQuery(fixture);
+            fixture.detectChanges();
+            const el = fixture.nativeElement as HTMLElement;
+            const toggle = (): HTMLButtonElement =>
+                el.querySelector('[data-testid="graph-list-toggle"]') as HTMLButtonElement;
+            const rowIds = (): (string | undefined)[] =>
+                Array.from(el.querySelectorAll<HTMLElement>('table[role="grid"] tbody tr')).map(
+                    (r) => r.dataset['nodeId'],
+                );
+            return { fixture, c: fixture.componentInstance, el, toggle, rowIds };
+        };
+        const openWorkingSet = (c: LinkAnalysisComponent, ids: string[]): void => {
+            c.investigation.activeId.set('inv-9');
+            c.investigation.log.set({
+                header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+                entries: [],
+            } as never);
+            c.investigation.workingSet.set({
+                entities: ids.map((id) => ({ id })),
+                links: ids.length > 1 ? [{ source: ids[0], target: ids[1], kind: 'k', count: 1 }] : [],
+                excluded: [],
+                hash: 'h',
+            } as never);
+        };
+
+        it('the toggle is a pressed button that swaps the canvas for the list and keeps focus on itself', async () => {
+            const { fixture, el, toggle, rowIds } = await ready();
+            expect(toggle().getAttribute('aria-pressed')).toBe('false');
+            expect(toggle().getAttribute('aria-label')).toBe('Show as list');
+            expect(el.querySelector('inspecto-link-analysis-node-list')).toBeNull();
+            toggle().focus();
+            toggle().click();
+            fixture.detectChanges();
+            expect(toggle().getAttribute('aria-pressed')).toBe('true');
+            expect(toggle().getAttribute('aria-label')).toBe('Show graph');
+            expect(document.activeElement).toBe(toggle());
+            expect(rowIds()).toEqual(['a', 'b', 'c', 'd', 'e']);
+            // the canvas behind the list is out of the tab order and the accessibility tree
+            expect(el.querySelector('inspecto-graph-view')!.hasAttribute('inert')).toBe(true);
+            toggle().click();
+            fixture.detectChanges();
+            expect(el.querySelector('inspecto-link-analysis-node-list')).toBeNull();
+            expect(el.querySelector('inspecto-graph-view')!.hasAttribute('inert')).toBe(false);
+            expect(document.activeElement).toBe(toggle());
+        });
+
+        it('the canvas figure points to the list for a text version', async () => {
+            const { fixture } = await ready();
+            const view = fixture.debugElement.query(By.directive(StubGraphView)).componentInstance as StubGraphView;
+            expect(view.textHint).toBe('Use Show as list for a text version.');
+        });
+
+        it('lists what the canvas draws: over an open Investigation that is the Working Set, not the query graph', async () => {
+            const { fixture, c, toggle, rowIds } = await ready();
+            openWorkingSet(c, ['****0001', '****0002']);
+            toggle().click();
+            fixture.detectChanges();
+            expect(rowIds()).toEqual(c.canvasData()!.nodes.map((n) => n.id));
+            expect(rowIds()).not.toEqual(['a', 'b', 'c', 'd', 'e']);
+            expect(rowIds()).toHaveLength(2);
+            expect((fixture.nativeElement as HTMLElement).textContent).toContain('****0001'); // masked as drawn
+        });
+
+        it('activating a row takes the same path as a canvas click', async () => {
+            const { fixture, c, el, toggle } = await ready();
+            const click = vi.spyOn(c, 'onNodeClick').mockImplementation(() => undefined);
+            toggle().click();
+            fixture.detectChanges();
+            const row = el.querySelector('table[role="grid"] tbody tr[data-node-id="c"]') as HTMLElement;
+            row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+            fixture.detectChanges();
+            expect(click).toHaveBeenCalledWith('c');
+        });
+
+        it('carries the Working Set render-limit notice into the list', async () => {
+            const { fixture, c, el, toggle } = await ready();
+            openWorkingSet(c, ['x']);
+            vi.spyOn(c, 'omittedLinks').mockReturnValue(40);
+            toggle().click();
+            fixture.detectChanges();
+            expect(el.querySelector('[data-testid="node-list-omitted"]')?.textContent).toContain('40 more links');
+        });
     });
 });

@@ -65,10 +65,10 @@ export interface GraphViewPlugins {
 }
 
 /** The host's accessible name: the graph's size, so the canvas is not an unnamed blank to a screen reader. */
-export function graphSummaryLabel(data: G6GraphData | null): string {
+export function graphSummaryLabel(data: G6GraphData | null, hint = ''): string {
     const n = data?.nodes?.length ?? 0;
     const e = data?.edges?.length ?? 0;
-    return `Graph, ${n} ${n === 1 ? 'node' : 'nodes'}, ${e} ${e === 1 ? 'link' : 'links'}`;
+    return `Graph, ${n} ${n === 1 ? 'node' : 'nodes'}, ${e} ${e === 1 ? 'link' : 'links'}${hint ? '. ' + hint : ''}`;
 }
 
 /**
@@ -341,6 +341,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     @Input() display: GraphDisplayOptions | null = null;
     /** Enable hover tooltips with short node/edge details (Link Analysis). */
     @Input() tooltips = false;
+    /** Appended to the figure's accessible name: where the text alternative of the canvas is (Link Analysis list view). */
+    @Input() textHint = '';
     /** Graph layout; `null` = the default LR layered layout (the 4 existing hosts). */
     @Input() layout: GraphLayoutId | null = null;
     /** Opt-in canvas plugins/behaviors (Link Analysis View toolbox); `null` = the four existing hosts' defaults. */
@@ -351,7 +353,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     @ViewChild('host') private hostEl!: ElementRef<HTMLDivElement>;
 
     get summaryLabel(): string {
-        return graphSummaryLabel(this.data);
+        return graphSummaryLabel(this.data, this.textHint);
     }
     private graph: Graph | null = null;
     /** Edges whose label is revealed by hover (transient) / click (pinned until the next click). */

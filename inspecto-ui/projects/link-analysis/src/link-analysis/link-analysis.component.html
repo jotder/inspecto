@@ -602,6 +602,18 @@
                 </button>
                 <button
                     mat-icon-button
+                    (click)="listMode.set(!listMode())"
+                    [attr.aria-pressed]="listMode()"
+                    [matTooltip]="listMode() ? 'Show graph' : 'Show as list'"
+                    [attr.aria-label]="listMode() ? 'Show graph' : 'Show as list'"
+                    data-testid="graph-list-toggle"
+                >
+                    <mat-icon
+                        [svgIcon]="listMode() ? 'heroicons_outline:share' : 'heroicons_outline:queue-list'"
+                    ></mat-icon>
+                </button>
+                <button
+                    mat-icon-button
                     (click)="toggleFullscreen('graph')"
                     [matTooltip]="
                         fullscreen() === 'graph' ? 'Exit full screen' : 'Full screen (browser-level, canvas only)'
@@ -777,6 +789,8 @@
                             [emphasis]="emphasis() ?? geoBrushEmphasis()"
                             [display]="displayOptions()"
                             [tooltips]="true"
+                            textHint="Use Show as list for a text version."
+                            [attr.inert]="listMode() ? '' : null"
                             [layout]="layoutId()"
                             [plugins]="canvasPlugins()"
                             (nodeClick)="onNodeClick($event)"
@@ -785,6 +799,7 @@
                         <!-- overlays: legend (top-left) and working set (top-right), each minimisable -->
                         <inspecto-link-analysis-legend
                             class="absolute left-2 top-2 z-10"
+                            [attr.inert]="listMode() ? '' : null"
                             [items]="legendItems()"
                             [edgeKinds]="edgeKinds()"
                             [open]="legendOpen()"
@@ -822,6 +837,7 @@
                         </div>
                         <inspecto-link-analysis-working-set
                             class="absolute right-2 top-2 z-10"
+                            [attr.inert]="listMode() ? '' : null"
                             [stats]="workingSet()"
                             [truncated]="truncated()"
                             [splitIdentityCount]="splitIdentities().length"
@@ -830,6 +846,16 @@
                             [open]="workingSetOpen()"
                             (openChange)="workingSetOpen.set($event)"
                         ></inspecto-link-analysis-working-set>
+                        <!-- The text alternative of the canvas: the SAME canvasData(), as a keyboard-navigable list. -->
+                        @if (listMode()) {
+                            <inspecto-link-analysis-node-list
+                                class="absolute inset-0 z-20 overflow-auto p-2"
+                                style="background: var(--gamma-bg-default)"
+                                [graph]="canvasData()"
+                                [omittedLinks]="omittedLinks()"
+                                (nodeSelect)="onNodeClick($event)"
+                            ></inspecto-link-analysis-node-list>
+                        }
                     </div>
                 } @else if (loading()) {
                     <inspecto-skeleton [lines]="6" height="2rem"></inspecto-skeleton>
@@ -868,16 +894,36 @@
                         style="border-color: var(--gamma-border)"
                     >
                         <h2 class="text-xs font-semibold uppercase tracking-wide text-secondary">Toolbox</h2>
-                        <mat-button-toggle-group
-                            class="ml-2"
-                            [value]="toolboxTab()"
-                            (change)="toolboxTab.set($event.value)"
+                        <div
+                            class="ml-2 flex"
+                            role="tablist"
                             aria-label="Toolbox tab"
+                            (keydown)="onToolboxTabKey($event)"
                         >
-                            <mat-button-toggle value="analysis">Analysis</mat-button-toggle>
-                            <mat-button-toggle value="view">View</mat-button-toggle>
-                            <mat-button-toggle value="investigation">Investigation</mat-button-toggle>
-                        </mat-button-toggle-group>
+                            @for (t of toolboxTabs; track t.id) {
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    class="border px-3 py-1 text-xs"
+                                    style="border-color: var(--gamma-border)"
+                                    [id]="'la-toolbox-tab-' + t.id"
+                                    [class.font-semibold]="toolboxTab() === t.id"
+                                    [style.boxShadow]="
+                                        toolboxTab() === t.id ? 'inset 0 -2px 0 var(--gamma-primary)' : null
+                                    "
+                                    [attr.aria-selected]="toolboxTab() === t.id"
+                                    [attr.aria-controls]="
+                                        t.id === 'investigation' && toolboxTab() !== 'investigation'
+                                            ? null
+                                            : 'la-toolbox-panel-' + t.id
+                                    "
+                                    [attr.tabindex]="toolboxTab() === t.id ? 0 : -1"
+                                    (click)="toolboxTab.set(t.id)"
+                                >
+                                    {{ t.label }}
+                                </button>
+                            }
+                        </div>
                         <button
                             class="ml-auto"
                             mat-icon-button
@@ -893,6 +939,9 @@
                              survive tab switches; emits emphasis for the canvas. -->
                         <inspecto-link-analysis-toolbox
                             [hidden]="toolboxTab() !== 'analysis'"
+                            role="tabpanel"
+                            id="la-toolbox-panel-analysis"
+                            aria-labelledby="la-toolbox-tab-analysis"
                             [graph]="canvasData()"
                             [nodeOptions]="nodeOptions()"
                             [nodeKinds]="nodeKinds()"
@@ -919,6 +968,9 @@
                         <!-- Investigation (LA-10) — state lives in the pane-provided store, so the dock may collapse -->
                         @if (toolboxTab() === 'investigation') {
                             <inspecto-link-analysis-investigation
+                                role="tabpanel"
+                                id="la-toolbox-panel-investigation"
+                                aria-labelledby="la-toolbox-tab-investigation"
                                 [projection]="investigationProjection()"
                                 [projectionIssue]="investigationIssue()"
                                 [timeCol]="timeColumn()"
@@ -928,7 +980,14 @@
                         <!-- View — layouts and canvas overlays. `[class.hidden]`, never `[hidden]`: Tailwind's `.flex`
                              sets display:flex, which beats the [hidden] attribute, so the View tools rendered under
                              every tab. Still mounted, like the Analysis toolbox above. -->
-                        <div [class.hidden]="toolboxTab() !== 'view'" class="flex flex-col gap-3" data-toolbox-view>
+                        <div
+                            [class.hidden]="toolboxTab() !== 'view'"
+                            class="flex flex-col gap-3"
+                            data-toolbox-view
+                            role="tabpanel"
+                            id="la-toolbox-panel-view"
+                            aria-labelledby="la-toolbox-tab-view"
+                        >
                             <section aria-label="Layout">
                                 <h3 class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
                                     Layout
