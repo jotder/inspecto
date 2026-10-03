@@ -221,7 +221,7 @@ final class RunRoutes implements RouteModule {
     /**
      * {@code POST /runs/{name}/replay-rejects {file}} — {@link com.gamma.inspector.RecordReplay}. Gates, in order:
      * unknown pipeline 404 · template 409 · missing {@code file} 400 · a path, not a bare name, 403 (never
-     * resolved) · no reject sidecar 404 · not replayable (non-CSV frontend, no {@code raw_line}, possibly
+     * resolved) · no reject sidecar 404 · source file gone 410 / changed 409 · not replayable (non-CSV frontend, no source columns, possibly
      * truncated) 422 · already replayed from this sidecar 409. A replay whose Consignment did not complete is a
      * 200 with {@code status: FAILED} — nothing landed and the claim was released, so it may be retried.
      */
@@ -243,6 +243,10 @@ final class RunRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, unreplayable.getMessage());
         } catch (IllegalStateException twice) {
             throw new ApiException(409, ErrorCodes.CONFLICT, twice.getMessage());
+        } catch (com.gamma.inspector.RecordReplay.SourceUnavailable src) {
+            // Values are never stored: the replay re-reads the source, so a gone source is 410, a changed one 409.
+            throw src.gone() ? new ApiException(410, ErrorCodes.NOT_FOUND, src.getMessage())
+                             : new ApiException(409, ErrorCodes.CONFLICT, src.getMessage());
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("pipeline", name);
@@ -370,7 +374,7 @@ final class RunRoutes implements RouteModule {
     /**
      * {@code GET /runs/{name}/errors?file=<name>} — the rejected ROWS behind a file's
      * {@code error_rows} count, from its companion {@code <base>_errors.csv}
-     * ({@code line_number,column,reason,raw_line}, written by {@code DuckDbCsvIngester.writeRejects}).
+     * ({@code line_number,columns,reason,value_fingerprint,source_*}, written by {@code DuckDbCsvIngester.writeRejects}; never a value).
      *
      * <p><b>Why a bare file NAME is the key.</b> Both surfaces that need this — the Files tab (a file
      * accepted with rejects, whose errors file stays in {@code dirs.errors()}) and the Quarantine tab

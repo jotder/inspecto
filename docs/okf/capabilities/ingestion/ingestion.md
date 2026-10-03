@@ -322,9 +322,20 @@ default (added 2026-09-30, `RefusalQuarantine`). With it on, a file can be refus
 - **File name and header line.** With the mode on, a file whose name or header line holds a card-number candidate
   is refused before any lane reads it (`CARD_NUMBER_IN_FILE_NAME` / `CARD_NUMBER_IN_HEADER`). The check uses the
   same brand/length regex as the SQL scan (`CardNumbers.IIN_REGEX`).
-- 🔴 **Pre-existing, outside this seam: `INGEST-FAILURE-TEXT-QUOTES-VALUE-1`.** An ordinary transform failure, one
-  that is not a refusal, still records DuckDB's error text, which quotes the offending cell, into
-  `status/*_batches_*.csv` and `status/retries/*.retry.json`. `RefusalQuarantineTest` pins it as evidence.
+- ✅ **Failure text never stores a value (2026-10-03, was `INGEST-FAILURE-TEXT-QUOTES-VALUE-1`).** Engine error
+  text quotes the offending cell (`Could not convert string '…'`, strptime's `"…"`), echoes it under a caret
+  line, or repeats the CSV line (`Original Line: …`). `FailureText.scrub` (inspecto-etl) replaces every quoted
+  literal (greedy to the last same quote on the line, since engines print an embedded quote unescaped), every
+  caret-pointed line and every `Original Line:` tail with a salted fingerprint — generically, never by searching
+  for the value. A Binder / Catalog / Parser error (authored SQL, which data never reaches) is kept verbatim
+  unless the same text also carries a data-shaped error. ⚠ The price elsewhere: a quoted identifier in a data
+  error is fingerprinted too. It runs once in
+  `ConsignmentIngestor.process` before the batch ledger, the retry record and the event, on every member's
+  error in the file ledger, and in the CSV / union / generation lanes' failure log lines (which no longer log
+  the stack trace). The fingerprint is HMAC-SHA256 under a 32-byte random per-Space salt at
+  `<space>/.inspecto/value-fingerprint.salt` (Space = nearest ancestor of the status dir holding `config/`).
+  Pinned by `FailureTextTest` (six real DuckDB error shapes) and `RefusalQuarantineTest`, which scans the whole
+  Space byte-wise.
 - ⚠ **Not covered:** the Collector's discovery logs and its acquisition ledger see the inbox name before the
   check runs.
 - It replaced the 2026-09-30 purge seam (`PURGED_REFUSED`). Data content could trigger that seam, it applied to

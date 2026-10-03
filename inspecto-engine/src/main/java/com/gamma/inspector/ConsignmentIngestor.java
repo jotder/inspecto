@@ -103,7 +103,7 @@ public final class ConsignmentIngestor {
                 log.info("dry run: consignment {} member {} → {} ({}): {} parsed, {} rejected row(s){}",
                         batch.batchId(), m.filename(), m.kind(), m.status() == null ? "not reached" : m.status(),
                         m.parsedRows(), m.errorRows(),
-                        m.reason() == null || m.reason().isBlank() ? "" : " — " + m.reason());
+                        m.reason() == null || m.reason().isBlank() ? "" : " — " + com.gamma.etl.FailureText.scrub(m.reason(), cfg));
                 // X4: per-RECORD offsets + reasons, read from the reject sidecar before the scratch went.
                 if (m.rejectTotal() > 0) {
                     DryRunRejects.add(cfg.identity().pipelineName(), new DryRunRejects.MemberRejects(
@@ -186,6 +186,10 @@ public final class ConsignmentIngestor {
                 }
             }
         }
+        // Never store values (2026-10-03, INGEST-FAILURE-TEXT-QUOTES-VALUE-1): an engine's failure text quotes the
+        // offending cell (DuckDB: "Could not convert string '...'") or echoes the line ("Original Line: ..."). This is
+        // the one gate before the batch ledger, the retry record and the event: quoted literals become fingerprints.
+        error = com.gamma.etl.FailureText.scrub(error, cfg);
         try {   // audit is always written — even when commit failed above
             writeAudit(batch, cfg, audit, outcome, status, error);
         } catch (Exception e) {
@@ -837,7 +841,8 @@ public final class ConsignmentIngestor {
                     ma.start().format(DuckDbUtil.DT_FMT), end.format(DuckDbUtil.DT_FMT),
                     ma.filename(), ma.status().name(), ma.parsedRows(), ma.errorRows(),
                     paths, paths.stream().map(pth -> bytesByOutput.getOrDefault(pth, -1L)).toList(),
-                    Duration.between(ma.start(), end).toMillis(), ma.error(), batch.batchId(),
+                    Duration.between(ma.start(), end).toMillis(), com.gamma.etl.FailureText.scrub(ma.error(), cfg),
+                    batch.batchId(),
                     ma.origin(), logicalNameOf(ma, memberFiles, cfg)));
         }
 

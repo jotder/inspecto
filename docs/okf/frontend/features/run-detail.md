@@ -58,8 +58,10 @@ action needs an explicit step, unlike the read-only tabs.
   file holds them. A `200 status: FAILED` is **not stored**: the server released its claim, so a warning toast
   says nothing landed and the button stays usable.
 - Refusals go through `replayRejectsErrorMessage(err, file)` (`inspecto/api/runs.service.ts`), which prefixes the
-  next step to the server's reason: **409** already replayed / still in flight, **422** cannot be replayed
-  (non-CSV, no `raw_line`, possibly truncated at `rejects_limit`), **403** needs `canOperateRuns` and a bare file
+  next step to the server's reason: **409** already replayed / still in flight — or, when the reason says
+  *changed*, the source file changed since the rejects were recorded — **410** the source file is gone (values
+  are never stored, so replay re-reads the source), **422** cannot be replayed
+  (non-CSV, no source columns, possibly truncated at `rejects_limit`), **403** needs `canOperateRuns` and a bare file
   name; anything else falls back to `apiErrorMessage`. Pinned by `rejected-rows.dialog.spec.ts`.
 
 **Commit retries tab (X1 UI, shipped 2026-09-25).** `CommitRetriesPanelComponent`

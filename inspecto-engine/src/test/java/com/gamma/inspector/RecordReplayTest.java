@@ -116,9 +116,44 @@ class RecordReplayTest {
         List<java.util.Map<String, String>> rejects = new ArrayList<>();
         com.gamma.util.Csv.readInto(sidecar, rejects);
         assertEquals(2, rejects.size(), rejects.toString());
-        assertEquals("short1,3.0,2020-04-03", rejects.get(0).get("raw_line"));
-        // 🔴 The raw line must survive byte-exact — a quote rewritten to an apostrophe splits the value.
-        assertEquals("\"short,2\",4.0,2020-04-03", rejects.get(1).get("raw_line"), "quotes are preserved");
+        // Never store values (2026-10-03): the PHYSICAL line number and a salted fingerprint, never the line itself.
+        assertEquals("3", rejects.get(0).get("line_number"), rejects.toString());
+        assertEquals("5", rejects.get(1).get("line_number"), rejects.toString());
+        assertNull(rejects.get(0).get("raw_line"), rejects.toString());
+        assertEquals(com.gamma.etl.FailureText.fingerprint(cfg, "short1,3.0,2020-04-03"),
+                rejects.get(0).get("value_fingerprint"));
+        assertEquals(com.gamma.etl.FailureText.fingerprint(cfg, "\"short,2\",4.0,2020-04-03"),
+                rejects.get(1).get("value_fingerprint"));
+        assertEquals("feed.csv", rejects.get(0).get("source_file"));
+        assertFalse(Files.readString(sidecar).contains("short1"), "no value at rest");
+    }
+
+    // ── the source is the only copy: replay refuses when it is gone or changed ────────────
+
+    @ParameterizedTest
+    @ValueSource(strings = {"java", "duckdb"})
+    void replayRefusesWhenTheSourceFileIsGone(String engine, @TempDir Path dir) throws Exception {
+        PipelineConfig cfg = ingestOnce(dir, engine);
+        Files.delete(Path.of(cfg.dirs().backup(), "feed.csv"));
+        RecordReplay.SourceUnavailable e = assertThrows(RecordReplay.SourceUnavailable.class,
+                () -> RecordReplay.replay(cfg, "feed.csv", null));
+        assertTrue(e.gone(), e.getMessage());
+        assertTrue(e.getMessage().contains("no longer on disk"), e.getMessage());
+        assertFalse(Files.isDirectory(Path.of(cfg.dirs().manifestsDir()).resolveSibling("replays"))
+                && Files.list(Path.of(cfg.dirs().manifestsDir()).resolveSibling("replays")).findAny().isPresent(),
+                "nothing claimed");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"java", "duckdb"})
+    void replayRefusesWhenTheSourceFileChanged(String engine, @TempDir Path dir) throws Exception {
+        PipelineConfig cfg = ingestOnce(dir, engine);
+        Path backup = Path.of(cfg.dirs().backup(), "feed.csv");
+        Files.writeString(backup, Files.readString(backup).replace("short1", "SHORT1"));   // same size, new bytes
+        RecordReplay.SourceUnavailable e = assertThrows(RecordReplay.SourceUnavailable.class,
+                () -> RecordReplay.replay(cfg, "feed.csv", null));
+        assertFalse(e.gone(), e.getMessage());
+        assertTrue(e.getMessage().contains("CHANGED"), e.getMessage());
     }
 
     // ── the replay ───────────────────────────────────────────────────────────────────

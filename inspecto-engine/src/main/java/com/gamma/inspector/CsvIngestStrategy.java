@@ -241,8 +241,8 @@ final class CsvIngestStrategy implements ConsignmentIngestStrategy {
             }
         } catch (Exception e) {
             batchStatus = "FAILED";
-            batchError  = msg(e);
-            log.error("Consignment {} failed during CSV processing", batch.batchId(), e);
+            batchError  = com.gamma.etl.FailureText.render(e, cfg);   // never store values (2026-10-03)
+            log.error("Consignment {} failed during CSV processing: {} ({})", batch.batchId(), batchError, e.getClass().getSimpleName());
         } finally {
             if (tempDb != null) DuckDbUtil.deleteTempDb(tempDb);
         }

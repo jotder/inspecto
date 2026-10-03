@@ -37,7 +37,8 @@ import java.util.stream.Stream;
  * eject-and-continue, are not touched.
  *
  * <ul>
- *   <li><b>Input</b> — the sidecar's {@code raw_line} column, verbatim, written as a UTF-8 file of bare data
+ *   <li><b>Input</b> — each rejected record RE-READ from the original source file by the sidecar's
+ *       {@code line_number} (values are never stored, 2026-10-03; see {@link #sourceLines}), written as a UTF-8 file of bare data
  *       lines into the poll root under {@code <stem>__replay_<sha8>.<ext>} and parsed with
  *       {@link PipelineConfig#forRecordReplay()} (no header / pre-header / junk / footer framing).</li>
  *   <li><b>Lane</b> — the normal flat ingest over exactly that one file ({@link CollectorProcessor#ingestCandidates}),
@@ -77,7 +78,7 @@ public final class RecordReplay {
     private RecordReplay() {}
 
     public static Result replay(PipelineConfig cfg, String file, Consumer<ConsignmentEvent> onCommit)
-            throws Exception {
+            throws Exception {   // + SourceUnavailable: the source file is gone (410) or changed (409)
         if (file == null || file.isBlank() || file.contains("/") || file.contains("\\") || file.contains(".."))
             throw new IllegalArgumentException("file must be a bare file name, not a path: " + file);
         if (cfg.schemas().ingesterClass() != null || cfg.fixedWidth() != null || cfg.json() != null
@@ -101,16 +102,14 @@ public final class RecordReplay {
         List<Map<String, String>> rows = new ArrayList<>();
         com.gamma.util.Csv.readInto(sidecar, rows);
         if (rows.isEmpty()) throw new IllegalArgumentException("the reject sidecar for '" + file + "' holds no records");
-        List<String> lines = new ArrayList<>();
         List<Long> lineNumbers = new ArrayList<>();
         for (Map<String, String> r : rows) {
-            String raw = r.get("raw_line");
-            if (raw == null || raw.isEmpty())
+            if (r.get("source_sha256") == null || r.get("value_fingerprint") == null)
                 throw new IllegalArgumentException("sidecar record at line " + r.get("line_number")
-                        + " carries no raw_line — nothing to replay");
-            lines.add(raw);
+                        + " names no source file — nothing to replay from");
             lineNumbers.add(Long.parseLong(r.get("line_number").trim()));
         }
+        List<String> lines = sourceLines(cfg, file, rows, lineNumbers);
         Integer cap = cfg.csv().rejects().limit();
         if (cap != null && cap > 0 && rows.size() >= cap)
             throw new IllegalArgumentException("the sidecar holds " + rows.size() + " records = rejects_limit "
@@ -192,7 +191,7 @@ public final class RecordReplay {
             // release the claim so the operator can replay again once the cause is fixed.
             Files.deleteIfExists(input);
             Files.deleteIfExists(claim);
-            String why = thrown != null ? String.valueOf(thrown.getMessage())
+            String why = thrown != null ? com.gamma.etl.FailureText.render(thrown, cfg)
                     : ev == null ? "the replay Consignment reported no terminal status" : ev.error();
             log.warn("[REPLAY] {} — replay of {} record(s) did not complete; claim released: {}", file, lines.size(), why);
             return new Result(file, replayName, ev == null ? null : ev.batchId(), "FAILED", lines.size(),
@@ -208,6 +207,61 @@ public final class RecordReplay {
                 file, lines.size(), ev.batchId(), ev.status(), ev.outputRows(), ev.errorRows());
         return new Result(file, replayName, ev.batchId(), ev.status(), lines.size(), ev.outputRows(),
                 ev.errorRows(), ev.error(), claim.toString());
+    }
+
+    /**
+     * The replay or its source refused: the source file the sidecar names is GONE ({@link #gone}: 410), or present
+     * but CHANGED since the rejects were recorded (409). Values are never stored, so the source is the only copy.
+     */
+    public static final class SourceUnavailable extends RuntimeException {
+        private final boolean gone;
+        SourceUnavailable(boolean gone, String message) { super(message); this.gone = gone; }
+        public boolean gone() { return gone; }
+    }
+
+    /**
+     * ⛔ Never store values (2026-10-03): the sidecar holds each rejected record's line number and salted
+     * fingerprint, never the record. Re-read every record from the ORIGINAL source file (still in the inbox, in
+     * backup, or beside the sidecar in the quarantine tree), accepted only when its size + sha256 match what the
+     * sidecar recorded and each re-read record matches its recorded fingerprint.
+     */
+    private static List<String> sourceLines(PipelineConfig cfg, String file, List<Map<String, String>> rows,
+                                            List<Long> lineNumbers) throws IOException, SourceUnavailable {
+        Map<String, String> first = rows.get(0);
+        String name = first.getOrDefault("source_file", file);
+        long size = Long.parseLong(first.get("source_size").trim());
+        String sha = first.get("source_sha256").trim();
+        List<Path> candidates = new ArrayList<>();
+        if (cfg.dirs().poll() != null) candidates.add(Paths.get(cfg.dirs().poll()).resolve(name));
+        if (cfg.dirs().backup() != null) candidates.add(Paths.get(cfg.dirs().backup()).resolve(name));
+        Path inQuarantine = locateInQuarantine(cfg, name);
+        if (inQuarantine != null) candidates.add(inQuarantine);
+        Path source = null;
+        boolean any = false;
+        for (Path c : candidates) {
+            if (!Files.isRegularFile(c)) continue;
+            any = true;
+            if (Files.size(c) == size && sha.equals(CsvIngester.SourceId.of(c.toFile()).sha256())) { source = c; break; }
+        }
+        if (!any)
+            throw new SourceUnavailable(true, "the source file '" + name + "' of the rejects of '" + file
+                    + "' is no longer on disk (inbox, backup or quarantine), and rejected values are never stored"
+                    + " — nothing to replay from");
+        if (source == null)
+            throw new SourceUnavailable(false, "the source file '" + name + "' of the rejects of '" + file
+                    + "' has CHANGED since its rejects were recorded (size/sha256 differ) — its line numbers no"
+                    + " longer point at the rejected records");
+        Map<Long, String> read = CsvIngester.recordsAt(source.toFile(), lineNumbers, cfg);
+        List<String> lines = new ArrayList<>();
+        for (int i = 0; i < rows.size(); i++) {
+            String rec = read.get(lineNumbers.get(i));
+            String want = rows.get(i).get("value_fingerprint");
+            if (rec == null || !com.gamma.etl.FailureText.fingerprint(cfg, rec).equals(want))
+                throw new SourceUnavailable(false, "line " + lineNumbers.get(i) + " of the source file '" + name
+                        + "' does not match the rejected record's fingerprint — refusing to replay it");
+            lines.add(rec);
+        }
+        return lines;
     }
 
     private static Map<String, Object> baseRecord(String file, Path sidecar, String hash, String replayName,
@@ -271,6 +325,10 @@ public final class RecordReplay {
             Path direct = Paths.get(cfg.dirs().errors()).toAbsolutePath().normalize().resolve(wanted);
             if (Files.isRegularFile(direct)) return direct;
         }
+        return locateInQuarantine(cfg, wanted);
+    }
+
+    private static Path locateInQuarantine(PipelineConfig cfg, String wanted) throws IOException {
         if (cfg.dirs().quarantine() == null) return null;
         Path qRoot = Paths.get(cfg.dirs().quarantine()).toAbsolutePath().normalize();
         if (!Files.isDirectory(qRoot)) return null;

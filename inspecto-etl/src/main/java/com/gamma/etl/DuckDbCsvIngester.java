@@ -771,7 +771,7 @@ public final class DuckDbCsvIngester {
      */
     /**
      * One errors-CSV row for one bad input line: the offending columns as a RANGE, the distinct
-     * reasons, and the raw line once.
+     * reasons, and the line's salted fingerprint once (never the line, 2026-10-03).
      *
      * <p>\u26a0 The range is rendered {@code first..last (N)} rather than a list, because the shape that
      * motivated this was 9 consecutive columns of one truncated record; a list would reproduce the
@@ -780,14 +780,16 @@ public final class DuckDbCsvIngester {
      * verbatim, so a header-named column reads correctly too.
      */
     private static void writeRejectLine(PrintWriter errOut, long line, List<String> columns,
-                                        LinkedHashSet<String> reasons, String raw) {
+                                        LinkedHashSet<String> reasons, String raw, PipelineConfig cfg,
+                                        CsvIngester.SourceId src) {
         String cols = columns.size() == 1
                 ? columns.get(0)
                 : columns.get(0) + ".." + columns.get(columns.size() - 1) + " (" + columns.size() + ")";
-        errOut.printf("%d,\"%s\",\"%s\",\"%s\"%n",
-                line, cols, String.join("; ", reasons),
-                // RFC-4180 doubling, not quote→apostrophe: raw_line is the replay input (X4).
-                raw == null ? "" : raw.replace("\"", "\"\""));
+        // ⛔ Never store values (2026-10-03): the raw line is NOT kept — only its salted fingerprint; replay
+        // re-reads the line from the source file, verified by the source's size + sha256 recorded here.
+        errOut.printf("%d,\"%s\",\"%s\",%s,%s%n",
+                line, FailureText.scrub(cols, cfg), FailureText.scrub(String.join("; ", reasons), cfg),
+                FailureText.fingerprint(cfg, raw), src.csv());
     }
 
     private static long writeRejects(Connection conn, File file, String filePath,
@@ -825,17 +827,19 @@ public final class DuckDbCsvIngester {
              ResultSet rs = st.executeQuery(sql)) {
             long line = -1;
             String raw = null;
+            CsvIngester.SourceId src = null;
             List<String> columns = new ArrayList<>();
             LinkedHashSet<String> reasons = new LinkedHashSet<>();
             while (rs.next()) {
                 if (errOut == null) {
                     Files.createDirectories(errorDir);
                     errOut = new PrintWriter(Files.newBufferedWriter(errorFilePath));
-                    errOut.println("line_number,columns,reason,raw_line");
+                    errOut.println("line_number,columns,reason," + CsvIngester.SourceId.HEADER);
+                    src = CsvIngester.SourceId.of(file);
                 }
                 long thisLine = rs.getLong("line");
                 if (thisLine != line && !columns.isEmpty()) {
-                    writeRejectLine(errOut, line, columns, reasons, raw);
+                    writeRejectLine(errOut, line, columns, reasons, raw, cfg, src);
                     count++;
                     columns = new ArrayList<>();
                     reasons = new LinkedHashSet<>();
@@ -846,7 +850,7 @@ public final class DuckDbCsvIngester {
                 reasons.add(nz(rs.getString("error_type")));
             }
             if (!columns.isEmpty()) {
-                writeRejectLine(errOut, line, columns, reasons, raw);
+                writeRejectLine(errOut, line, columns, reasons, raw, cfg, src);
                 count++;
             }
         } catch (Exception e) {

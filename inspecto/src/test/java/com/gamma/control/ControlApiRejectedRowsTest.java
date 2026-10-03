@@ -92,12 +92,12 @@ class ControlApiRejectedRowsTest {
         return data;
     }
 
-    /** The real writer's shape (`DuckDbCsvIngester.writeRejects`), verbatim. */
+    /** The real writer's shape (`DuckDbCsvIngester.writeRejects`): never a value, only its fingerprint (2026-10-03). */
     private static String errorsCsv() {
         return """
-            line_number,column,reason,raw_line
-            7,AMT,"CAST","a,notanumber,2020-04-03"
-            9,,"TOO MANY COLUMNS","a,1.5,2020-04-03,extra"
+            line_number,column,reason,value_fingerprint,source_file,source_size,source_sha256
+            7,AMT,"CAST",fp:00112233aabbccdd,"feed.csv",120,ab12
+            9,,"TOO MANY COLUMNS",fp:44556677eeff0011,"feed.csv",120,ab12
             """;
     }
 
@@ -157,7 +157,7 @@ class ControlApiRejectedRowsTest {
             assertEquals("7", first.get("line_number").asText());
             assertEquals("AMT", first.get("column").asText());
             assertEquals("CAST", first.get("reason").asText());
-            assertEquals("a,notanumber,2020-04-03", first.get("raw_line").asText());
+            assertEquals("fp:00112233aabbccdd", first.get("value_fingerprint").asText());
         }
     }
 
@@ -192,8 +192,8 @@ class ControlApiRejectedRowsTest {
     @Test
     void aHugeRejectFileIsCappedAndFlagged(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            StringBuilder csv = new StringBuilder("line_number,column,reason,raw_line\n");
-            for (int i = 1; i <= 600; i++) csv.append(i).append(",AMT,\"CAST\",\"x\"\n");
+            StringBuilder csv = new StringBuilder("line_number,column,reason,value_fingerprint\n");
+            for (int i = 1; i <= 600; i++) csv.append(i).append(",AMT,\"CAST\",fp:0\n");
             Files.createDirectories(dir.resolve("errors"));
             Files.writeString(dir.resolve("errors/big_errors.csv"), csv.toString());
 

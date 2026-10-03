@@ -29,7 +29,12 @@ export function replayRejectsErrorMessage(err: unknown, file: string): string {
     const why = reason ? ` (${reason})` : '';
     switch (status) {
         case 409:
+            // Rejected values are never stored: replay re-reads the source, so a changed source is a 409 too.
+            if (/changed/i.test(reason))
+                return `Not replayed: the source file of "${file}" changed since its records were rejected, so its line numbers no longer point at them${why}.`;
             return `Not replayed: the rejected records of "${file}" were already replayed from this reject file, or a replay is still running — replaying again would land them twice${why}.`;
+        case 410:
+            return `Not replayed: the source file of "${file}" is no longer on disk, and rejected records are only re-read from it${why}.`;
         case 422:
             return `The rejected records of "${file}" cannot be replayed${why}.`;
         case 403:

@@ -19,8 +19,8 @@ const REJECTS = {
     rowCount: 2,
     truncated: false,
     rows: [
-        { line_number: '3', reason: 'column count', raw_line: 'short1,3.0' },
-        { line_number: '5', reason: 'column count', raw_line: 'short2,4.0' },
+        { line_number: '3', reason: 'column count', value_fingerprint: 'fp:0011223344556677' },
+        { line_number: '5', reason: 'column count', value_fingerprint: 'fp:8899aabbccddeeff' },
     ],
 };
 const REPLAYED = {
@@ -153,5 +153,12 @@ describe('replayRejectsErrorMessage', () => {
             'bare file name',
         );
         expect(replayRejectsErrorMessage(httpError(500, 'boom'), 'f.csv')).toBe('boom');
+    });
+
+    it('tells a gone (410) or changed (409) source apart from an already-replayed one', () => {
+        expect(replayRejectsErrorMessage(httpError(410, 'no longer on disk'), 'f.csv')).toContain('no longer on disk');
+        const changed = replayRejectsErrorMessage(httpError(409, 'the source file has CHANGED'), 'f.csv');
+        expect(changed).toContain('source file');
+        expect(changed).not.toContain('already replayed');
     });
 });

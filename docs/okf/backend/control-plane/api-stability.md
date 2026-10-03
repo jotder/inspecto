@@ -375,7 +375,13 @@ above the generated commit list.
   `all_or_nothing` a file with a rejected record is quarantined whole under the new reason
   `rejects_all_or_nothing`, and `POST /runs/{name}/replay-rejects` for it is a **422**.
   [execution-lanes](../pipeline-graph/execution-lanes.md)
-- **Behaviour change — the reject sidecar's `raw_line` is now byte-exact** (2026-09-25): both CSV ingesters
+- **Breaking — the reject sidecar no longer holds `raw_line`** (2026-10-03, never store values): its columns are
+  `line_number,columns,reason,value_fingerprint,source_file,source_size,source_sha256`, so
+  `GET /runs/{name}/errors?file=` rows carry a fingerprint, not the line; `line_number` is now the PHYSICAL start
+  line on both engines. `POST /runs/{name}/replay-rejects` re-reads the source and adds **410** (source gone)
+  and a second **409** cause (source changed). Ledger / retry / event failure text fingerprints every quoted
+  value. [execution-lanes](../pipeline-graph/execution-lanes.md)
+- **Behaviour change — the reject sidecar's `raw_line` is now byte-exact** (2026-09-25, superseded 2026-10-03): both CSV ingesters
   escape an embedded `"` RFC-4180-style (`""`) in `<errors>/<file>_errors.csv` instead of rewriting it to
   `'`, so `GET /runs/{name}/errors?file=` now shows the line's real quotes. A reader that split the column
   itself on `'` must use an RFC-4180 reader. Sidecars written before the change keep the apostrophes.

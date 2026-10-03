@@ -343,7 +343,8 @@ public final class PipelineTestRun {
             raw = ScopedValue.where(com.gamma.event.EventLog.CONTAINED, com.gamma.event.EventLog.create())
                     .call(() -> strategy.ingest(contained, s));
         } catch (Exception e) {
-            log.warn("dry run: consignment {} faulted before its ingest pass finished", batch.batchId(), e);
+            log.warn("dry run: consignment {} faulted before its ingest pass finished: {}", batch.batchId(),
+                    com.gamma.etl.FailureText.render(e, cfg));
             raw = new IngestOutcome(start, "FAILED", ConsignmentIngestStrategy.msg(e), List.of(), List.of(),
                     List.of(), List.of(), 0L, batch.schemaName());
         } finally {

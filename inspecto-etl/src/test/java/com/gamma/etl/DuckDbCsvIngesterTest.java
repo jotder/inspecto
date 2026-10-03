@@ -157,7 +157,7 @@ class DuckDbCsvIngesterTest {
             assertTrue(Files.exists(errCsv), "an errors report must be written for the short line");
             List<String> lines = Files.readAllLines(errCsv);
 
-            assertEquals("line_number,columns,reason,raw_line", lines.get(0),
+            assertEquals("line_number,columns,reason,value_fingerprint,source_file,source_size,source_sha256", lines.get(0),
                     "the header names COLUMNS (a range), not a single column");
             assertEquals(2, lines.size(),
                     "ONE data row for ONE bad line — a row per missing column is the defect this fixes. Got:\n"

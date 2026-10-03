@@ -132,7 +132,8 @@ members report `rejectTotal = 0`. **Decided 2026-09-25 (operator):** the replay 
 
 **Record-level replay (X4, first slice, 2026-09-25).** ✅ **Eject-and-continue was already the live
 behaviour** for a delimited file, on both CSV engines — nothing had to change to make it the default: a
-record that fails the column count goes to the sidecar (`line_number`, `reason`, `raw_line`), the file's
+record that fails the column count goes to the sidecar (`line_number`, `columns`, `reason`, `value_fingerprint`,
+`source_file`, `source_size`, `source_sha256` — never the record itself, see below), the file's
 other records land, and the file commits `SUCCESS` with `error_rows > 0` (pinned by
 `RecordReplayTest.ejectAndContinueIsTheLiveBehaviour…`, `java` + `duckdb`). Two edges are not "eject":
 a file with **zero** valid records is quarantined whole as `QUARANTINED_MISMATCH` (its sidecar moves with
@@ -140,14 +141,21 @@ it), and a failed type **coercion** nulls the value and KEEPS the row (counted i
 sidecar row). What was missing was only the replay, now `POST /runs/{name}/replay-rejects {file}`
 (`canOperateRuns`) → `CollectorService.replayRejects` → `RecordReplay.replay`. Its choices:
 
-- **Input = the sidecar's `raw_line`**, verbatim, in file order, written as a UTF-8 file of bare data lines
+- **Input = each rejected record RE-READ from the original source file** (⛔ *never store values*, operator
+  decision 2026-10-03 — `INGEST-REJECT-SIDECAR-RAW-PAN-1`). The sidecar keeps only the record's **physical**
+  start line (1-based, header included; both engines agree — the Java ingester reads through a
+  `LineNumberReader`, DuckDB's `reject_errors.line` already is one), its columns, reason and a salted
+  `value_fingerprint`, plus the source's name, size and sha256 (`CsvIngester.SourceId`). Replay looks for the
+  source in the inbox, `backup/` and the quarantine tree (never `.restricted`), accepts it only when size +
+  sha256 match, reads the records at those lines with the ingest's own decompression and quoted-field
+  continuation (`CsvIngester.recordsAt`), and checks each against its fingerprint. A **gone** source file **→ 410**,
+  source **changed** (size/sha or a fingerprint differs) **→ 409**, both before anything is claimed
+  (`RecordReplay.SourceUnavailable`). The records are then written as a UTF-8 file of bare data lines
   into the poll root as `<stem>__replay_<sha8>.<ext>` and parsed with `PipelineConfig.forRecordReplay()`,
   which switches off every line-framing knob that described the ORIGINAL file (`skip_header_lines`,
   `has_header`, `skip_junk_lines`, `skip_tail_lines`, encoding, compression) and keeps everything that
-  decides what a record means. Safe because fields map by selector index, never by header name. 🔴 This
-  forced one fix: both ingesters used to rewrite an embedded `"` in `raw_line` to `'`, which on replay
-  splits a quoted value into two columns and lands a **wrong row silently** (the mutant proves it); they now
-  double it (`""`). Sidecars written before 2026-09-25 still carry the apostrophes.
+  decides what a record means. Safe because fields map by selector index, never by header name.
+  Sidecars written before 2026-10-03 (with `raw_line`) are refused 422: no source columns.
 - **Lane = the ordinary flat ingest over exactly that one file** — `CollectorProcessor.ingestCandidates`,
   the post-discovery half of `ingest` — so the replay is a real Consignment with the whole commit tail
   (outputs, manifest, backup, marker, audit, provenance, terminal event). Discovery is bypassed, so the name
@@ -180,7 +188,7 @@ sidecar row). What was missing was only the replay, now `POST /runs/{name}/repla
   commit tail itself) is not covered here. ⚠ A whole-Consignment `reprocess` of the original rewrites the
   same sidecar with the same content, so its replay stays refused — correctly, since the earlier replay's
   rows were not superseded.
-- **Refused (422):** a non-delimited frontend or plugin decoder, a sidecar row with no `raw_line`, and a
+- **Refused (422):** a non-delimited frontend or plugin decoder, a sidecar row with no source columns, and a
   sidecar whose row count reaches `rejects_limit` (it may be truncated).
 
 ✅ **`processing.reject_mode: all_or_nothing` (built 2026-09-28, operator ask).** Absent or `eject` is the

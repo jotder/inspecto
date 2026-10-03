@@ -208,9 +208,13 @@ start_time,end_time,filename,status,parsed_rows,error_rows,output_paths,output_s
 When rows are rejected during ingestion, a per-file error CSV is written to `errors/<source>/<basename>_errors.csv`. The file is **only created when at least one row is rejected** — no file is written for clean inputs, keeping the directory uncluttered.
 
 ```csv
-line_number,reason,raw_line
-42,"Insufficient columns (expected >477, found 3)","some,short,line"
+line_number,columns,reason,value_fingerprint,source_file,source_size,source_sha256
+42,"","Insufficient columns (expected >477, found 3)",fp:3f9a0c1d2e4b5a69,"feed.csv",18422,9c1e…
 ```
+
+Values are never stored (2026-10-03): `line_number` is the record's physical start line in the source,
+`value_fingerprint` a salted per-Space hash of the record. `POST /runs/{name}/replay-rejects` re-reads the
+records from the source file (inbox, `backup/` or quarantine) and refuses 410 when it is gone, 409 when it changed.
 
 ### Quarantine
 

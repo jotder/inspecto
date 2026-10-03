@@ -469,8 +469,8 @@ Step Processor and no new route.
     `refusal_scan_exempt`.
   - **The scan fails CLOSED.** If it cannot run (a read or SQL error), the file is restricted with
     `INGEST_REFUSE:SCAN_FAILED`, never landed. Restricting is chosen over failing the batch because a failed batch
-    leaves the unscanned file in the inbox, re-polled every cycle, and the batch error text quotes cell values
-    (`INGEST-FAILURE-TEXT-QUOTES-VALUE-1`).
+    leaves the unscanned file in the inbox, re-polled every cycle. (The batch error text no longer quotes cell
+    values since 2026-10-03: [Ingestion](../ingestion/ingestion.md).)
   - **The exempt list cannot switch the scan off.** A list covering every raw field is refused at load. A name that
     is no raw field is warned. Every control-plane write that changes a refusal key emits `pipeline.refusal.changed`
     (AUDIT, before / after).
@@ -514,11 +514,11 @@ Step Processor and no new route.
     a prefix or length outside the list; an unfolded digit script; anything in an exempt column.
 - **File name and header line** are checked by the refusal mode itself (`CARD_NUMBER_IN_FILE_NAME` /
   `CARD_NUMBER_IN_HEADER`). The restricted row records a generated name that carries the code.
-  - 🔴 **Known gap `INGEST-REJECT-SIDECAR-RAW-PAN-1`:** a number inside a *malformed* row never reaches the scan.
-    `all_or_nothing` quarantines the raw file and a rejects sidecar that holds it
-    (`knownGapACardNumberInAMalformedRowIsKeptInQuarantine`).
-  - ⚠ `backup/` keeps every raw file that landed.
-  - ⚠ The ordinary transform-failure path quotes values into the batch ledger (`INGEST-FAILURE-TEXT-QUOTES-VALUE-1`).
+  - A number inside a *malformed* row never reaches the scan. Since 2026-10-03 (never store values) its rejects
+    sidecar keeps only line, columns, reason and a salted fingerprint
+    (`aCardNumberInAMalformedRowIsNeverCopiedIntoTheRejectSidecar`, a byte-wise scan of the whole Space).
+  - ⚠ The raw SOURCE file itself is still kept: `all_or_nothing` quarantines it whole and `backup/` keeps every
+    raw file that landed (`INGEST-RAW-SOURCE-COPIES-RETENTION-1`).
 - **Feature Datasets (WS-41).** Five `sql.template` Jobs run on an hourly cron. Thresholds are Job parameters. Every
   window is **rolling**, anchored on each attempt, and half-open: `(t − window, t]`, so a span of exactly the window
   is outside it.

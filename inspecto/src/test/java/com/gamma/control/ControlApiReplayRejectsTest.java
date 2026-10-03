@@ -69,14 +69,38 @@ class ControlApiReplayRejectsTest {
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
-    /** A sidecar as the Java ingester writes it: two records that parse under the (fixed) mini schema. */
+    /**
+     * A sidecar as the ingesters write it — values are never stored (2026-10-03), so it names the two records by
+     * line + fingerprint and the source file (committed to backup) by size + sha256; replay re-reads them from it.
+     */
     private static void sidecar(Path dir) throws Exception {
+        Path source = Files.createDirectories(dir.resolve("backup")).resolve("feed.csv");
+        Files.writeString(source, "ID,AMT,TXN_DATE\ng1,1.0,2020-04-03\nr1,1.5,2020-04-03\ng2,2.0,2020-04-03\n"
+                + "r2,2.5,2020-04-03\n");
+        com.gamma.etl.PipelineConfig cfg = com.gamma.etl.PipelineConfig.load(dir.resolve("mini_pipeline.toon").toString());
+        com.gamma.etl.CsvIngester.SourceId id = com.gamma.etl.CsvIngester.SourceId.of(source.toFile());
+        String tail = ",\"feed.csv\"," + id.size() + "," + id.sha256();
         Files.createDirectories(dir.resolve("errors"));
-        Files.writeString(dir.resolve("errors/feed_errors.csv"), """
-                line_number,reason,raw_line
-                3,"Insufficient columns (expected >3, found 3)","r1,1.5,2020-04-03"
-                5,"Insufficient columns (expected >3, found 3)","r2,2.5,2020-04-03"
-                """);
+        Files.writeString(dir.resolve("errors/feed_errors.csv"),
+                "line_number,columns,reason," + com.gamma.etl.CsvIngester.SourceId.HEADER + "\n"
+                + "3,\"\",\"Insufficient columns\"," + com.gamma.etl.FailureText.fingerprint(cfg, "r1,1.5,2020-04-03") + tail + "\n"
+                + "5,\"\",\"Insufficient columns\"," + com.gamma.etl.FailureText.fingerprint(cfg, "r2,2.5,2020-04-03") + tail + "\n");
+    }
+
+    @Test
+    void aGoneSourceIs410AndAChangedOneIs409(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            sidecar(dir);
+            Path source = dir.resolve("backup/feed.csv");
+            Files.writeString(source, Files.readString(source).replace("r1", "R1"));
+            HttpResponse<String> changed = replay(c.port, "mini_etl", fileBody("feed.csv"), "operator");
+            assertEquals(409, changed.statusCode(), changed.body());
+            assertTrue(changed.body().contains("CHANGED"), changed.body());
+            Files.delete(source);
+            HttpResponse<String> gone = replay(c.port, "mini_etl", fileBody("feed.csv"), "operator");
+            assertEquals(410, gone.statusCode(), gone.body());
+            assertTrue(gone.body().contains("no longer on disk"), gone.body());
+        }
     }
 
     private static String fileBody(String file) { return "{\"file\":\"" + file + "\"}"; }
@@ -126,7 +150,7 @@ class ControlApiReplayRejectsTest {
     }
 
     @Test
-    void aSidecarWithoutRawLinesIs422(@TempDir Path dir) throws Exception {
+    void aSidecarWithoutSourceColumnsIs422(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             Files.createDirectories(dir.resolve("errors"));
             Files.writeString(dir.resolve("errors/feed_errors.csv"), "line_number,reason\n3,\"bad\"\n");

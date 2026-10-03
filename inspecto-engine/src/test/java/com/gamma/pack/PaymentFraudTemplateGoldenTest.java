@@ -380,22 +380,33 @@ class PaymentFraudTemplateGoldenTest {
     }
 
     /**
-     * 🔴 KNOWN GAP, pinned as evidence for {@code INGEST-REJECT-SIDECAR-RAW-PAN-1}: a card number inside a MALFORMED
+     * {@code INGEST-REJECT-SIDECAR-RAW-PAN-1} (fixed 2026-10-03, never store values): a card number inside a MALFORMED
      * row (a field-count reject) never reaches the mapping, so the tripwire cannot see it — {@code all_or_nothing}
-     * quarantines the raw file and writes a rejects sidecar holding the row verbatim. When the platform fixes it,
-     * this test goes red: flip it to the restricted-quarantine assertions above.
+     * quarantines the raw file whole, but its rejects sidecar keeps only line, column, reason and a salted fingerprint.
      */
     @Test
-    void knownGapACardNumberInAMalformedRowIsKeptInQuarantine(@TempDir Path tmp) throws Exception {
+    void aCardNumberInAMalformedRowIsNeverCopiedIntoTheRejectSidecar(@TempDir Path tmp) throws Exception {
         PipelineConfig pc = plant(tmp, "OUTCOME", "APPROVED," + TEST_PAN);   // one extra field → a parse reject
         assertEquals(0, count(Path.of(pc.dirs().database())));
-        StringBuilder kept = new StringBuilder();
-        for (String dir : new String[]{pc.dirs().quarantine(), pc.dirs().errors()})
-            if (Files.isDirectory(Path.of(dir)))
-                try (Stream<Path> w = Files.walk(Path.of(dir))) {
-                    for (Path f : w.filter(Files::isRegularFile).toList()) kept.append(Files.readString(f));
-                }
-        assertTrue(kept.toString().contains(TEST_PAN), "the gap is real: the raw value is kept at rest");
+        Path sidecar;
+        try (Stream<Path> w = Files.walk(Path.of(pc.dirs().quarantine()))) {
+            sidecar = w.filter(f -> f.getFileName().toString().endsWith("_errors.csv")).findFirst().orElseThrow();
+        }
+        String rejects = Files.readString(sidecar);
+        assertTrue(rejects.startsWith("line_number,columns,reason,value_fingerprint,source_file,source_size,"
+                + "source_sha256"), rejects);
+        assertTrue(rejects.contains("fp:"), rejects);
+        assertFalse(LEAKED_PAN.matcher(rejects).find(), "the sidecar keeps no value: " + rejects);
+        // The whole Space, byte-wise: only the quarantined source file itself still holds the number
+        // (INGEST-RAW-SOURCE-COPIES-RETENTION-1 tracks the raw copies' own retention).
+        // The template's own shipped samples hold the test PAN by design (they are fixtures, not ingest copies).
+        Path samples = tmp.resolve("spaces/payment-fraud/data/samples");
+        try (Stream<Path> w = Files.walk(samples)) {
+            for (Path p : w.sorted(java.util.Comparator.reverseOrder()).toList()) Files.delete(p);
+        }
+        String source = HEADER + "\n" + CLEAN_ROW + "\n" + row("OUTCOME", "APPROVED," + TEST_PAN) + "\n";
+        com.gamma.inspector.SpaceScan.assertNoValueOutsideSources(tmp.resolve("spaces"),
+                source.getBytes(java.nio.charset.StandardCharsets.UTF_8), TEST_PAN);
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────────────────────────────────────

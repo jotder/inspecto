@@ -64,7 +64,8 @@ export interface InboxStatus {
 
 /**
  * The rejected ROWS behind a file's `error_rows` count (GET /runs/{n}/errors?file=). Rows are the
- * companion `_errors.csv`'s own columns (`line_number`, `column`, `reason`, `raw_line`);
+ * companion `_errors.csv`'s own columns (`line_number`, `columns`, `reason`, `value_fingerprint`, `source_*`; never
+ * the value itself);
  * `rowCount` is the TRUE total even when `truncated` caps what was sent.
  */
 export interface RejectedRows {

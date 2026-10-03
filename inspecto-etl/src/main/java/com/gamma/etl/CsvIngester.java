@@ -91,13 +91,16 @@ public final class CsvIngester {
 
         // Opened lazily on the first rejected row — no file is created when there are no errors.
         PrintWriter errOut = null;
+        SourceId src = null;
 
         try (InputStream rawIs = new FileInputStream(file);
              // For compressed files (.gz/.bz2/.zip): buffer 8 MB of compressed data before the decompressor
              // so it reads in large chunks instead of 512-byte syscall bursts. Plain files pass through.
              InputStream is    = Compression.decompress(file, rawIs, 8 * 1024 * 1024);
              // 2 MB char buffer: ~500 refill calls per GB vs ~125,000 with the default 8 KB.
-             BufferedReader br = new BufferedReader(
+             // LineNumberReader: the reject sidecar records each record's PHYSICAL start line, the key replay
+             // re-reads it from the source by (2026-10-03: never store values).
+             java.io.LineNumberReader br = new java.io.LineNumberReader(
                      new InputStreamReader(is, StandardCharsets.UTF_8), 2 * 1024 * 1024)) {
 
             // ── skip pre-header lines ─────────────────────────────────────────
@@ -127,6 +130,7 @@ public final class CsvIngester {
 
             // ── adaptive junk / echo-line detection ───────────────────────────
             String firstDataLine = null;
+            long firstDataPhys = 0;
             if (maxJunkLines > 0) {
                 int junkCount = 0;
                 String peekLine;
@@ -148,6 +152,7 @@ public final class CsvIngester {
                         }
                         if (!isEchoLine) {
                             firstDataLine = peekLine;
+                            firstDataPhys = br.getLineNumber();
                             junkCandidateRows--;  // it's data, not junk
                             break;
                         }
@@ -165,14 +170,17 @@ public final class CsvIngester {
 
                 while (true) {
                     String rawLine;
+                    long phys;
                     if (hasPending) {
                         rawLine   = firstDataLine;
+                        phys      = firstDataPhys;
                         hasPending = false;
                     } else {
+                        phys = br.getLineNumber() + 1L;
                         rawLine = readRecord(br, cfg.csv().delimiter().charAt(0), quoteChar(cfg.csv()));
                         if (rawLine == null) break;
                     }
-                    lineNum++;
+                    lineNum = phys;
                     if (rawLine.trim().isEmpty()) continue;
 
                     // Tail-buffer gate
@@ -207,15 +215,16 @@ public final class CsvIngester {
                             Files.createDirectories(errorDir);
                             errOut = new PrintWriter(new FileWriter(errorFilePath.toFile(),
                                     java.nio.charset.StandardCharsets.UTF_8));
-                            errOut.println("line_number,reason,raw_line");
+                            errOut.println("line_number,columns,reason," + SourceId.HEADER);
+                            src = SourceId.of(file);
                         }
                         String reason = String.format(
                                 "Insufficient columns (expected >%d, found %d)",
                                 maxSelector, row.length);
-                        // raw_line is the replay input (X4): RFC-4180 quote doubling keeps it byte-exact,
-                        // where the old quote→apostrophe rewrite split a quoted value on replay.
-                        errOut.printf("%d,\"%s\",\"%s\"%n",
-                                procLineNum, reason, line.replace("\"", "\"\""));
+                        // ⛔ Never store values (2026-10-03): the line's salted fingerprint, never the line;
+                        // replay re-reads it from the source by its physical line number.
+                        errOut.printf("%d,\"\",\"%s\",%s,%s%n",
+                                procLineNum, reason, FailureText.fingerprint(cfg, line), src.csv());
                         errorRows++;
                         continue;
                     }
@@ -278,6 +287,34 @@ public final class CsvIngester {
      *
      * @return the joined record, or {@code null} at end of input
      */
+    /**
+     * The records that START at the given physical lines (1-based, ascending) of {@code file}, decompressed as the
+     * ingest reads it and continued across lines while a quoted field is open: what a reject sidecar's
+     * {@code line_number} points at. A line past the end yields no entry, so callers compare sizes.
+     */
+    public static Map<Long, String> recordsAt(File file, List<Long> lines, PipelineConfig cfg) throws IOException {
+        Map<Long, String> out = new java.util.LinkedHashMap<>();
+        java.util.TreeSet<Long> wanted = new java.util.TreeSet<>(lines);
+        char delim = cfg.csv().delimiter().charAt(0), quote = quoteChar(cfg.csv());
+        try (InputStream raw = new FileInputStream(file);
+             InputStream is = Compression.decompress(file, raw, 1 << 16);
+             java.io.LineNumberReader br = new java.io.LineNumberReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            while (!wanted.isEmpty()) {
+                long next = br.getLineNumber() + 1L;
+                if (next == wanted.first()) {
+                    String rec = readRecord(br, delim, quote);
+                    if (rec == null) break;
+                    out.put(wanted.pollFirst(), rec);
+                } else if (next > wanted.first()) {
+                    wanted.pollFirst();               // inside a multi-line record already read: not a record start
+                } else if (br.readLine() == null) {
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
     private static String readRecord(BufferedReader br, char delimiter, char quote) throws IOException {
         String first = br.readLine();
         if (first == null) return null;
@@ -359,6 +396,32 @@ public final class CsvIngester {
      */
     public static Path rejectSidecar(File file, PipelineConfig cfg) {
         return ParserSpec.errorFile(file, cfg);
+    }
+
+    /**
+     * The identity of the file a reject sidecar was written for: the trailing columns of every sidecar row. Replay
+     * re-reads each rejected line from this file by line number and refuses unless its size and sha256 still match.
+     */
+    public record SourceId(String name, long size, String sha256) {
+        public static final String HEADER = "value_fingerprint,source_file,source_size,source_sha256";
+
+        public static SourceId of(File f) throws IOException {
+            java.security.MessageDigest md;
+            try {
+                md = java.security.MessageDigest.getInstance("SHA-256");
+            } catch (java.security.NoSuchAlgorithmException e) {
+                throw new IllegalStateException(e);
+            }
+            try (InputStream in = new java.security.DigestInputStream(new FileInputStream(f), md)) {
+                in.transferTo(java.io.OutputStream.nullOutputStream());
+            }
+            return new SourceId(f.getName(), f.length(), java.util.HexFormat.of().formatHex(md.digest()));
+        }
+
+        /** {@code "name",size,sha256}: the name quoted RFC-4180. */
+        String csv() {
+            return "\"" + name.replace("\"", "\"\"") + "\"," + size + "," + sha256;
+        }
     }
 
     /** Strips a compression suffix ({@code .gz}/{@code .bz2}/{@code .zip}/{@code .Z}) then the remaining

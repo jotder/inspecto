@@ -75,17 +75,24 @@ class RefusalQuarantineTest {
             assertFalse(Files.exists(RefusalQuarantine.dir(pc)), on + ": nothing is restricted");
             String status = Files.exists(Path.of(pc.dirs().statusFilePath())) ? Files.readString(Path.of(pc.dirs().statusFilePath())) : "";
             assertFalse(status.contains("QUARANTINED_RESTRICTED"), status);
-            if (!on) knownGap = pc;
+            if (!on) { knownGap = pc; knownGapSpace = space; knownGapSource = Files.readAllBytes(f); }
         }
-        // 🔴 KNOWN GAP, pinned as evidence for INGEST-FAILURE-TEXT-QUOTES-VALUE-1 (pre-existing, not this seam): the
-        // ordinary transform-failure path writes DuckDB's error text — which quotes the offending cell — into the batch
-        // ledger and the retry record. When the platform stops copying it, this goes red: flip it.
+        // INGEST-FAILURE-TEXT-QUOTES-VALUE-1 (fixed 2026-10-03, never store values): the transform-failure text — DuckDB
+        // quotes the offending cell — reaches the batch ledger and the retry record with the value FINGERPRINTED.
         StringBuilder kept = new StringBuilder(Files.readString(Path.of(knownGap.dirs().batchesFilePath())));
         Path retries = Path.of(knownGap.dirs().statusFilePath()).getParent().resolve("retries");
-        if (Files.isDirectory(retries))
-            try (Stream<Path> r = Files.list(retries)) { for (Path p : r.toList()) kept.append(Files.readString(p)); }
-        assertTrue(kept.toString().contains("SECRETVAL"), "the gap is real: the value is quoted at rest: " + kept);
+        assertTrue(Files.isDirectory(retries), "the failed batch left a retry record");
+        try (Stream<Path> r = Files.list(retries)) { for (Path p : r.toList()) kept.append(Files.readString(p)); }
+        assertFalse(kept.toString().contains("SECRETVAL"), "no value at rest: " + kept);
+        assertFalse(kept.toString().contains("4111111111111111"), kept.toString());
+        assertTrue(kept.toString().contains("fp:"), "the value's fingerprint is kept instead: " + kept);
+        assertTrue(kept.toString().contains("Could not convert"), "the reason survives: " + kept);
+        // And nothing anywhere under the Space but the source file itself (inbox) holds it.
+        SpaceScan.assertNoValueOutsideSources(knownGapSpace, knownGapSource, "SECRETVAL", "4111111111111111");
     }
+
+    private static Path knownGapSpace;
+    private static byte[] knownGapSource;
 
     private static PipelineConfig knownGap;
 

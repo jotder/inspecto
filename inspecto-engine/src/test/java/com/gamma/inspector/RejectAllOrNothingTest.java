@@ -100,8 +100,10 @@ class RejectAllOrNothingTest {
 
         Path home = Path.of(cfg.dirs().quarantine(), "rejects_all_or_nothing");
         assertTrue(Files.exists(home.resolve("bad.csv")), path + ": quarantined under rejects_all_or_nothing");
+        String sidecar = Files.readString(home.resolve("bad_errors.csv"));
+        assertFalse(sidecar.contains("short,9.0"), "never store values: the raw line is NOT kept: " + sidecar);
+        assertTrue(sidecar.contains("fp:") && sidecar.contains("bad.csv"), "its fingerprint and source are: " + sidecar);
         assertTrue(Files.exists(home.resolve("bad_errors.csv")), path + ": the sidecar is kept beside it");
-        assertTrue(Files.readString(home.resolve("bad_errors.csv")).contains("short,9.0"), "the raw line is kept");
         assertFalse(Files.exists(Path.of(cfg.dirs().poll(), "bad.csv")), "the file left the inbox");
         assertFalse(Files.exists(Path.of(cfg.dirs().backup(), "bad.csv")), "never committed");
 
