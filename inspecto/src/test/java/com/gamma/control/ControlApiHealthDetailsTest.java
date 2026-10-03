@@ -107,6 +107,44 @@ class ControlApiHealthDetailsTest {
         }
     }
 
+    /**
+     * ASSURE-OPERABILITY-1 (operator 2026-10-03): a shared lease-DB outage must NOT drain the node — /ready and
+     * /health stay 200 — and shows on /health/details as live.runLease.run DOWN with since + last error; cleared
+     * on recovery.
+     */
+    @Test
+    void leaseDbOutageShowsHereButKeepsReady(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root.toString(), List.of())) {
+            String bound = c.svc().spaceId();
+            try {
+                com.gamma.util.StoreHealth.live(bound, "runLease.run", false, null,
+                        "lease database unreachable since 2026-10-03T00:00:00Z - last error: refused");
+                assertEquals(200, status(c.port, "/ready"), "no drain on a lease-DB outage");
+                assertEquals(200, status(c.port, "/health"));
+                JsonNode body = details(c.port);
+                JsonNode live = body.get("subsystems").get("live.runLease.run");
+                assertNotNull(live, body.toString());
+                assertEquals("DOWN", live.get("status").asText(), body.toString());
+                assertTrue(live.get("detail").asText().contains("since 2026-10-03T00:00:00Z"), live.toString());
+                assertTrue(live.get("detail").asText().contains("last error: refused"), live.toString());
+                assertEquals("DOWN", body.get("status").asText());
+
+                com.gamma.util.StoreHealth.live(bound, "runLease.run", true, null, "lease database answered");
+                JsonNode back = details(c.port);
+                assertEquals("UP", back.get("subsystems").get("live.runLease.run").get("status").asText());
+                assertEquals("UP", back.get("status").asText(), back.toString());
+                assertEquals(200, status(c.port, "/ready"));
+            } finally {
+                com.gamma.util.StoreHealth.forgetLive(bound, "runLease.run");
+            }
+        }
+    }
+
+    private int status(int port, String path) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
+                BodyHandlers.ofString()).statusCode();
+    }
+
     // ---- store families (scale-out phase A, VER-3) -------------------------------------------------
     // Before these, thirteen openers could catch an open failure, log WARN and hand back an in-memory or
     // null store with nothing above ever learning of it. VER-3 asserts the opposite — "every intended

@@ -684,6 +684,8 @@ class DbRunLeaseTest {
             cut.set(true);
             awaitLive(space, com.gamma.util.StoreHealth.Status.DEGRADED);
             assertTrue(com.gamma.util.StoreHealth.liveDown().containsKey(space + "/runLease.run"));
+            String detail = com.gamma.util.StoreHealth.liveOf(space).get("runLease.run").detail();
+            assertTrue(detail.contains("unreachable since ") && detail.contains("last error: connection refused"), detail);
             cut.set(false);
             awaitLive(space, com.gamma.util.StoreHealth.Status.UP);
 

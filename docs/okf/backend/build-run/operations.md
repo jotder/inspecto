@@ -67,22 +67,23 @@ and matches every Maven coordinate against an **OSV-format snapshot** at `$VULN_
 5. Point `VULN_DB_DIR` at it and run `node tools/vuln-scan.mjs`. Refresh at least every 30 days — older
    snapshots are refused.
 
-## Readiness follows the shared run lease (ASSURE-OPERABILITY-1, 2026-10-03)
+## Run-lease database reachability (ASSURE-OPERABILITY-1, 2026-10-03)
 
-`GET /ready` answers **503 `CAPABILITY_UNAVAILABLE` "NOT READY - unreachable: <space>/runLease.<scope> (...)"** while
-any LIVE store probe is down, and 200 again on the first good probe. Today the one live probe is the shared
-run lease (`-Drun.lease.backend=postgres|db|jdbc:`): `DbRunLease`'s heartbeat (every TTL/3 = 20 s) records
-its verdict via `StoreHealth.live` — a `SELECT 1` when idle, the fenced renewals when holding. So a node
-partitioned from its lease database drops out of the LB / `readinessProbe` within about 20 s and comes back by
-itself; `GET /health` (liveness) is unaffected, so nothing restarts it. `GET /health/details` shows the same
-verdicts as `live.runLease.<scope>`.
+With a shared run lease (`-Drun.lease.backend=postgres|db|jdbc:`), `DbRunLease`'s heartbeat (every TTL/3 =
+20 s) checks the lease database — a `SELECT 1` when idle, the fenced renewals when holding — and publishes the
+verdict three ways: `GET /health/details` → `live.runLease.<scope>` (`DOWN`, detail `unreachable since <instant> -
+last error: <msg>`; it also makes the overall status `DOWN`), the gauge `inspecto_run_lease_db_reachable{space,scope}`
+(1/0, alertable), and a WARN/INFO log line on each flip. It clears by itself on the first good tick.
 
-- ⛔ Live verdicts are a **separate map** from the open-time records: `StoreHealth.record` throws on DEGRADED
-  under `-Dinspecto.topology=partitioned`, which on the heartbeat thread would cancel the renewer itself.
-- Deliberately **not** on `/ready`: an open-time fallback (a store that could not open and degraded to
-  memory/heap). It lasts until restart, and readiness never restarts a pod — it would strand the node unready
-  after the database came back. Those stay DOWN on `/health/details` (and fatal at boot when partitioned).
-- The heap lease (the default) registers no probe, so Personal and single-node installs see no change.
+- ⛔ **`GET /ready` deliberately ignores it (operator 2026-10-03).** A lease-DB outage hits every node at once;
+  draining them all would also stop read-only serving (dashboards, Investigations), which needs no lease. Starting
+  a run already fails closed without the lease, so readiness stays 200 and the outage is an alert, not a drain.
+  (A first cut on 2026-10-03 made `/ready` 503 — reverted the same day by this decision.)
+- ⛔ Live verdicts are a **separate map** from the open-time records (`StoreHealth.live`): `StoreHealth.record`
+  throws on DEGRADED under `-Dinspecto.topology=partitioned`, which on the heartbeat thread would cancel the renewer.
+- The heap lease (the default) registers no check, so Personal and single-node installs see no change.
+- Not built: telling a node-local partition (this node can't reach the DB while other holders keep renewing) from
+  a shared outage — a follow-up on the `ASSURE-OPERABILITY-1` row.
 
 ## Kubernetes: single-replica Helm chart (ASSURE-OPERABILITY-1, 2026-09-29)
 

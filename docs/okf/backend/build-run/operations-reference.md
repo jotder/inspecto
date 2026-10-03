@@ -418,8 +418,8 @@ and unversioned.
 
 | Method & path | Purpose |
 |---|---|
-| `GET /health`, `GET /ready` | liveness / readiness (open); `/ready` is 503 while a live store probe (the shared run lease) is down — `okf/backend/build-run/operations.md` (2026-10-03) |
-| `GET /health/details` | per-subsystem UP/DOWN/NOT_CONFIGURED (MNT-15) — **auth-gated**, not a public path (row added 2026-09-08) |
+| `GET /health`, `GET /ready` | liveness / readiness (open); `/ready` stays 200 when the shared run lease's database is unreachable, by decision (operator 2026-10-03) — `okf/backend/build-run/operations.md` |
+| `GET /health/details` | per-subsystem UP/DOWN/NOT_CONFIGURED (MNT-15) — **auth-gated**, not a public path (row added 2026-09-08); includes `live.runLease.<scope>` (down since + last error) when a shared run lease is configured (2026-10-03) |
 | `GET /audit/search`, `GET /audit/export?format=csv` | the who-did-what trail, core in every edition since EDG-01 cell 6 (row added 2026-09-08; `okf/capabilities/observability/observability.md` §3.3) |
 | `GET /pipelines` | list pipelines + paused state + commit count |
 | `POST /pipelines` | body `{"configPath":"…"}` — register a new pipeline live from a config under `-Dassist.write.root`, no restart (v4.1) |

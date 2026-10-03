@@ -86,7 +86,8 @@ final class HealthDetails {
             subs.put("store." + family, sub(status, detail));
         });
 
-        // Live probes (ASSURE-OPERABILITY-1) — what GET /ready answers on, shown here with their detail.
+        // Live probes (ASSURE-OPERABILITY-1): the shared run lease's heartbeat. DOWN here makes the overall status
+        // DOWN; GET /ready deliberately ignores it (see ControlApi). The detail carries "since" and the last error.
         StoreHealth.liveOf(HostContext.of(api).service().spaceId()).forEach((family, r) ->
                 subs.put("live." + family, sub(r.status() == StoreHealth.Status.UP ? "UP" : "DOWN", r.detail())));
 

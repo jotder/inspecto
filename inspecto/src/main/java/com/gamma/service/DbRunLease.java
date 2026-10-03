@@ -114,6 +114,8 @@ final class DbRunLease implements RunLease, AutoCloseable {
     private final ScheduledExecutorService heartbeat;
     /** What {@link #renewAll} last learned about the lease database — logged only when it flips. */
     private volatile Boolean reachable;
+    /** When the current outage began (first failed tick), or null while reachable. */
+    private volatile java.time.Instant downSince;
 
     DbRunLease(Connection conn, String space, String scope, String owner, Duration ttl) {
         this(JdbcDrivers.source(conn), space, scope, owner, ttl);
@@ -338,19 +340,26 @@ final class DbRunLease implements RunLease, AutoCloseable {
     }
 
     /**
-     * Publish this tick's verdict as a LIVE health entry (ASSURE-OPERABILITY-1): {@code GET /ready} answers 503
-     * while any is DEGRADED, so a load balancer stops routing to a node cut off from its shared state, and
-     * routes back on the first good tick (at most TTL/3 later). {@code failure == null} means reachable.
+     * Publish this tick's verdict (ASSURE-OPERABILITY-1) as a LIVE health entry shown on {@code /health/details}
+     * ({@code live.runLease.<scope>}: down, since, last error), the {@code inspecto_run_lease_db_reachable} gauge,
+     * and a log line on each flip. ⛔ Not on {@code /ready} (operator 2026-10-03): a shared-DB outage would drain
+     * every node, and read-only serving needs no lease. {@code failure == null} means reachable.
      */
     private void reportLive(String failure) {
         boolean up = failure == null;
+        if (up) downSince = null;
+        else if (downSince == null) downSince = java.time.Instant.now();
         StoreHealth.live(space, liveFamily(), up, null,
-                up ? "lease database answered" : "lease database unreachable: " + failure);
+                up ? "lease database answered"
+                   : "lease database unreachable since " + downSince + " - last error: " + failure);
+        com.gamma.metrics.MetricRegistry.global().setGauge("inspecto_run_lease_db_reachable",
+                "1 when the shared run lease database answered the last heartbeat, else 0",
+                Map.of("space", space, "scope", scope), up ? 1 : 0);
         Boolean was = reachable;
         reachable = up;
         if (was != null && was != up) {
             if (up) log.info("Run lease database ({}) reachable again", scope);
-            else log.warn("Run lease database ({}) unreachable - /ready now reports NOT READY: {}", scope, failure);
+            else log.warn("Run lease database ({}) unreachable - new runs cannot claim a lease: {}", scope, failure);
         }
     }
 

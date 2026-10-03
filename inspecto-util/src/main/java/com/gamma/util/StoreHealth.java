@@ -125,8 +125,8 @@ public final class StoreHealth {
      * <ul>
      *   <li>⛔ {@link #record} throws on DEGRADED under a partitioned topology — right at boot, fatal on a
      *       heartbeat thread, where it would cancel the very renewer reporting the outage;</li>
-     *   <li>an open-time fallback is permanent until restart, so letting it drive {@code GET /ready} would
-     *       strand a pod unready after its database came back; a live entry recovers on the next probe.</li>
+     *   <li>an open-time fallback is permanent until restart; a live entry recovers on the next probe. Shown on
+     *       {@code /health/details} only — {@code GET /ready} ignores both (operator 2026-10-03).</li>
      * </ul>
      * Only {@link Status#UP} and {@link Status#DEGRADED} are recorded here.
      */

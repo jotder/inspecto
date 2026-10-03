@@ -76,7 +76,7 @@ and start a clock.
 | D1 | Process kill | on A: `kill -9 $(systemctl show -p MainPID --value inspecto)` | systemd restarts it (`Restart=on-failure`, 5 s); `/ready` 200 again; no file processed twice (provenance) |
 | D2 | Host reboot | on A: `systemctl reboot` | A comes back, service starts (`WantedBy=multi-user.target`), resumes the inbox |
 | D3 | Node loss (promote B) | power off A. Then the T4 order: stop A if alive → `pg_ctl promote` (or `SELECT pg_promote()`) on the standby → restore the last `spaces/` sync on B → `systemctl start inspecto` on B → repoint LB/DNS → run the acceptance block | B serves `/ready` 200, Pipelines run under `owner=node-b` with a higher `epoch` |
-| D4 | Network partition | on A: `iptables -A OUTPUT -d <pg-host> -j DROP` for > 60 s, then remove it | A logs `Could not renew the run lease`; B (if started) takes the lease after 60 s with a higher epoch; after heal A logs `was stolen while we still believed we held it`. A's `GET /ready` turns **503** within about 20 s of the cut (the lease heartbeat's live probe) and back to 200 within about 20 s of the heal — time both. A run already in flight on A must **not** commit after the steal (`LEASE-TAKEOVER-INFLIGHT-1`, fixed 2026-09-30): expect `Run lease lost for '<pipeline>'` on A and its Consignment audited FAILED with the reason `lease lost: …` (not `commit failed`, and no COMMIT-retry attempt is spent), its files left in the inbox for B; check provenance shows each file committed once |
+| D4 | Network partition | on A: `iptables -A OUTPUT -d <pg-host> -j DROP` for > 60 s, then remove it | A logs `Could not renew the run lease`; B (if started) takes the lease after 60 s with a higher epoch; after heal A logs `was stolen while we still believed we held it`. A's `GET /health/details` shows `live.runLease.run` **DOWN** (with `since`) within about 20 s of the cut and UP within about 20 s of the heal — time both; `GET /ready` stays 200 by design (operator 2026-10-03), so it is NOT the RTO signal here. A run already in flight on A must **not** commit after the steal (`LEASE-TAKEOVER-INFLIGHT-1`, fixed 2026-09-30): expect `Run lease lost for '<pipeline>'` on A and its Consignment audited FAILED with the reason `lease lost: …` (not `commit failed`, and no COMMIT-retry attempt is spent), its files left in the inbox for B; check provenance shows each file committed once |
 | D5 | Split brain guard | start B while A is healthy | B acquires nothing A holds (rows keep `owner=node-a`) |
 | D6 | Fail back | reverse D3 once A is rebuilt as the new standby | same pass criteria, roles swapped |
 
@@ -85,6 +85,9 @@ and start a clock.
 - **RTO** = time from the fault (the `kill`/power-off timestamp) to the first `200` from `GET /ready` via the
   LB **and** the first Pipeline run completing on the surviving node. Poll once a second:
   `while ! curl -fsS https://lb/ready >/dev/null; do sleep 1; done; date -u +%FT%TZ`.
+  ⚠ `/ready` proves only that a process serves — it stays 200 through a lease-DB outage by design (operator
+  2026-10-03). The failover is complete at the **first Pipeline run on the survivor**; for a partition (D4) time
+  `live.runLease.run` on `GET /health/details` (DOWN with `since`, then UP), not `/ready`.
 - **RPO** = work lost. Two parts, report both:
   1. Postgres: bytes/transactions not replicated at the fault —
      `SELECT pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) FROM pg_stat_replication;` sampled before

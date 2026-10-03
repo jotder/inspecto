@@ -536,20 +536,12 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // MNT-15: per-subsystem health — deeper than the liveness probe, auth-gated (not a public path).
         get ("/health/details", (e, m) -> HealthDetails.of(this));
         // Zero Spaces is still READY: the server must take traffic so a Space can be created (POST /spaces).
-        // ASSURE-OPERABILITY-1: NOT READY (503) while any LIVE store probe is down — today the shared run
-        // lease's heartbeat — so an LB / readinessProbe stops routing to a node partitioned from its shared
-        // state and routes back on recovery. Open-time fallbacks stay on /health/details only: they last until
-        // restart, and readiness never restarts a pod.
-        get ("/ready",  (e, m) -> {
-            var down = com.gamma.util.StoreHealth.liveDown();
-            if (!down.isEmpty()) {
-                throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "NOT READY - unreachable: "
-                        + down.entrySet().stream().map(d -> d.getKey() + " (" + d.getValue().detail() + ")")
-                              .collect(java.util.stream.Collectors.joining("; ")));
-            }
-            return Map.of("status", "READY",
-                    "pipelines", spaces.size() == 0 ? 0 : service().pipelines().size());
-        });
+        // ⛔ Deliberately blind to the shared run lease's database (operator 2026-10-03, ASSURE-OPERABILITY-1): a
+        // lease-DB outage hits every node at once, and read-only serving (dashboards, Investigations) does not
+        // need the lease — run-starting paths already fail closed without it. The outage is reported on
+        // /health/details (live.runLease.<scope>), in the log, and as the inspecto_run_lease_db_reachable gauge.
+        get ("/ready",  (e, m) -> Map.of("status", "READY",
+                "pipelines", spaces.size() == 0 ? 0 : service().pipelines().size()));
         // ⚠ GET /metrics moved to the optional inspecto-metrics module (EDG-01 cell 5, EDITIONS CP-13).
         // Only the EXPOSITION moved — MetricRegistry is called by nine classes across three modules and stays
         // core. It remains in PUBLIC_PATHS and isInfraRoute below so the module's route is reachable

@@ -135,26 +135,6 @@ class ControlApiTest {
         }
     }
 
-    /** ASSURE-OPERABILITY-1: a DOWN live store probe turns /ready 503 (LB drains the node); recovery restores 200. */
-    @Test
-    void readyIs503WhileALiveStoreProbeIsDownAndRecovers(@TempDir Path dir) throws Exception {
-        String space = "ready-probe-" + System.nanoTime();
-        try (Ctx c = open(dir)) {
-            com.gamma.util.StoreHealth.live(space, "runLease.run", false, null, "lease database unreachable: refused");
-            HttpResponse<String> down = send(c.port, "GET", "/ready", null);
-            assertEquals(503, down.statusCode());
-            assertTrue(down.body().contains(space + "/runLease.run"), down.body());
-            assertEquals(200, send(c.port, "GET", "/health", null).statusCode(), "liveness is unaffected");
-
-            com.gamma.util.StoreHealth.live(space, "runLease.run", true, null, "lease database answered");
-            HttpResponse<String> up = send(c.port, "GET", "/ready", null);
-            assertEquals(200, up.statusCode());
-            assertEquals("READY", json(up).get("status").asText());
-        } finally {
-            com.gamma.util.StoreHealth.clear(space);
-        }
-    }
-
     @Test
     void pipelinesAreListed(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
