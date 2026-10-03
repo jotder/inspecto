@@ -562,8 +562,8 @@ are the values four-eyes approved (below).
   `TEMPLATE-RECOVERY-IMPORT-GATE-1`). By operator decision `POST /spaces` needs `canAdminister` even when no Space
   is hosted. On a fresh install the IdP's `admin` role grants it: with no Space hosted `ControlApi.authenticate`
   binds no roles root, so `Roles.effective` serves the seed table. `TemplateSeedGate.require` no longer takes a
-  `checkCapability` flag. ⚠ `POST /spaces/import` keeps its conditional posture (no capability while zero Spaces
-  are hosted), but it always runs `ImportCapabilityGuard.checkFiles`.
+  `checkCapability` flag. `POST /spaces/import` is `canAdminister` always too (operator 2026-10-03) and
+  always runs `ImportCapabilityGuard.checkFiles`.
 - ⚠ Deleting a Job leaves its approval record. A Job re-created with the same name and identical content (only
   possible by writing the file directly, since every API create is held) would run on it.
 

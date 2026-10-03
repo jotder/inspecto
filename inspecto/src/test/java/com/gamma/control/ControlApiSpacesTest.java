@@ -193,6 +193,14 @@ class ControlApiSpacesTest {
             assertEquals(200, authed(c.port, "POST", "/spaces", "{\"id\":\"gamma\"}").statusCode(),
                     "canAdminister recovers an empty container");
 
+            // POST /spaces/import is the same: canAdminister even with zero Spaces (operator 2026-10-03)
+            assertEquals(200, authed(c.port, "DELETE", "/spaces/gamma", null).statusCode());
+            assertEquals(0, c.spaces.size());
+            assertEquals(403, send(c.port, "POST", "/spaces/import?id=eps", "", "Bearer plain").statusCode(),
+                    "on an empty container import is still administration");
+            assertEquals(400, authed(c.port, "POST", "/spaces/import?id=eps", "").statusCode(),
+                    "canAdminister passes the gate (an empty body is then a malformed bundle)");
+
         } finally {
             Authenticators.forTest(null);
         }

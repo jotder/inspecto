@@ -330,9 +330,9 @@ final class CapabilityManifest {
             // meant "administrator" until `canAdminister`.
             // `POST /spaces` is canAdminister ALWAYS since 2026-10-03 (TEMPLATE-RECOVERY-IMPORT-GATE-1): on a
             // zero-Space server the seeded `admin` role holds it (Roles.effective serves SEED with no roles root).
-            // ⚠ `/spaces/import` carries NO withCapability wrapper: the gate is IN the handler, conditional on the
-            // container hosting at least one Space (SpaceRoutes.requireAdministerUnlessRecovering) — an EXEMPTION.
+            // `POST /spaces/import` is canAdminister ALWAYS too (operator 2026-10-03; it left EXEMPTIONS).
             new Entry("POST", "/spaces", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/spaces/import", Roles.CAN_ADMINISTER),
             new Entry("PUT", "/spaces/([^/]+)", Roles.CAN_ADMINISTER),
             new Entry("DELETE", "/spaces/([^/]+)", Roles.CAN_ADMINISTER),
             // SpaceComparisonRoutes — a cross-Space AGGREGATE read (space-comparison design §5 Q2, decided
@@ -471,8 +471,6 @@ final class CapabilityManifest {
             new Exemption("POST", "/recon/columns", "read-shaped", "lists comparable columns for a draft"),
             new Exemption("POST", "/recon/breaks", "read-shaped", "computes breaks for a draft; persists nothing"),
             new Exemption("POST", "/recon/rows", "read-shaped", "lists the raw rows behind one key (RECON-CARDINALITY-2); persists nothing"),
-            new Exemption("POST", "/spaces/import", "recovery-route",
-                    "gated IN the handler: canAdminister whenever at least one Space is hosted; open only on an empty container, where recovery needs it (SpaceRoutes.requireAdministerUnlessRecovering, 2026-09-17)"),
             new Exemption("POST", "/tags/rules/([^/]+)/apply", "collaboration",
                     "operator 2026-09-16: applying a tag rule is a collaboration act like assignments, not run operation"),
             new Exemption("POST", "/queries/([^/]+)/run", "read-shaped", "runs a saved read query"),

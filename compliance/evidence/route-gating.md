@@ -65,11 +65,10 @@ it deployed. The evidence cites both deliberately.
 3. **Compare boots.** The `route.inventory.snapshot` audit event records that digest once per boot; a digest
    that changes between boots means the route surface moved.
 
-⚠ **`POST /spaces` is `exempt | recovery-route` and gated IN its handler** — `canAdminister` whenever a Space is
-hosted; with a `template` that carries a KPI pack it also needs `canAuthorWorkbench` on the same condition, and each
-KPI meets the `/components/kpi` save gate: 403 / 422, and nothing is created (`ControlApiSpaceTemplateKpiTest`,
-2026-09-28). The table's posture column cannot show an in-handler condition; `CapabilityManifest`'s exemption reason
-names it.
+⚠ **`POST /spaces` and `POST /spaces/import` are `canAdminister` always, zero Spaces included** (operator 2026-10-03: the
+bootstrap admin holds it through `Roles.SEED`). With a `template` that carries a KPI pack `POST /spaces` also needs
+`canAuthorWorkbench` and each KPI meets the `/components/kpi` save gate: 403 / 422, and nothing is created
+(`ControlApiSpaceTemplateKpiTest`, 2026-09-28).
 
 ## The mutating-route inventory
 
@@ -336,7 +335,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/spaces` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:70` |
 | DELETE | `/spaces/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:77` |
 | PUT | `/spaces/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:74` |
-| POST | `/spaces/import` | exempt | recovery-route | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:72` |
+| POST | `/spaces/import` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:72` |
 | POST | `/streams/([^/]+)/records` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/StreamPushRoutes.java:84` |
 | POST | `/system/operational-db/test` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/SystemRoutes.java:40` |
 | PUT | `/system/scheduler` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java:74` |

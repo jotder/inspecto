@@ -69,7 +69,7 @@ final class SpaceRoutes implements RouteModule {
         // the SEED table and an IdP subject in the `admin` role holds canAdminister (the bootstrap admin).
         api.post("/spaces", ApiContext.withCapability("canAdminister", (e, m) -> createSpace(api, e, api.body(e))));
 
-        api.post("/spaces/import", (e, m) -> importSpace(api, e));
+        api.post("/spaces/import", ApiContext.withCapability("canAdminister", (e, m) -> importSpace(api, e)));
 
         api.put("/spaces/([^/]+)", ApiContext.withCapability("canAdminister",
                 (e, m) -> updateSpace(api, api.body(e), ApiContext.name(m))));
@@ -81,7 +81,6 @@ final class SpaceRoutes implements RouteModule {
     /** Create + boot a new space seeded from an uploaded bundle zip; the new id comes from {@code ?id=}. */
     private Object importSpace(ApiContext api, HttpExchange e) throws IOException {
         requireMultiSpace(api);
-        requireAdministerUnlessRecovering(api, e);
         String id = ApiContext.query(e, "id");
         if (id == null || !SpaceId.isValid(id))
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "query param 'id' is required and must be a valid space id ([a-z0-9-], 1-63 chars)");
@@ -148,21 +147,6 @@ final class SpaceRoutes implements RouteModule {
         if (!HostContext.of(api).spaces().delete(SpaceId.of(id), purge))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + id + "'");
         return Map.of("id", id, "deleted", true, "purged", purge);
-    }
-
-    /**
-     * The recovery posture, made CONDITIONAL (2026-09-17). {@code POST /spaces} and {@code /spaces/import}
-     * were exempt from any capability so that a server hosting ZERO Spaces can still be recovered — but the
-     * exemption was unconditional, so on a populated server any authenticated caller could create or import
-     * Spaces while {@code PUT}/{@code DELETE /spaces/{id}} demanded {@code canAdminister}. The recovery case
-     * is exactly "nothing is hosted": there, no capability is asked (nobody could have been granted one on a
-     * container with no Spaces); everywhere else creation is administration like the rest of the family.
-     * Recorded in {@code CapabilityManifest.EXEMPTIONS} as {@code recovery-route} with this condition named.
-     * ⚠ Since 2026-10-03 only {@code /spaces/import} uses it: {@code POST /spaces} is {@code canAdminister} always
-     * ({@code TEMPLATE-RECOVERY-IMPORT-GATE-1}).
-     */
-    private static void requireAdministerUnlessRecovering(ApiContext api, HttpExchange e) {
-        if (HostContext.of(api).spaces().size() > 0) ApiContext.requireCapability(e, Roles.CAN_ADMINISTER);
     }
 
     private static void requireMultiSpace(ApiContext api) {
