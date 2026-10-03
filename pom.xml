@@ -257,7 +257,7 @@
         <jtoon.version>1.0.9</jtoon.version>
         <jackson.version>2.21.3</jackson.version>
         <!-- Shared by core + fp-util since the WS-D split (DuckDB access / CSV / tar-gzip / gson). -->
-        <duckdb.version>1.5.2.1</duckdb.version>
+        <duckdb.version>1.5.6.0</duckdb.version>
         <univocity.version>2.9.1</univocity.version>
         <commons-compress.version>1.28.0</commons-compress.version>
         <!-- Pinned to what commons-compress 1.28.0 needs at RUNTIME (BZip2CompressorInputStream calls

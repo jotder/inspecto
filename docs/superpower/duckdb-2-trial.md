@@ -4,7 +4,7 @@ Trial only, never for master. Worktree fast-forwarded to `1da0ad734`.
 
 ## Verdict: the snapshot cannot be consumed. No compile or test result exists.
 
-- `2.0-2848c61d-SNAPSHOT` is NOT in the local `~/.m2` (only `1.5.2.1` and `1.5.6` are).
+- `2.0-2848c61d-SNAPSHOT` is NOT in the local `~/.m2` (`1.5.2.1`, `1.5.6.0` (trial-downloaded) and a stray `1.5.6` are).
 - It IS listed online. `https://central.sonatype.com/repository/maven-snapshots/org/duckdb/duckdb_jdbc/maven-metadata.xml`
   names it as `latest`, so the repository was reachable. It was added through a throwaway `-s` settings file, nothing committed.
 - The version's own `maven-metadata.xml` publishes exactly ONE artifact: classifier `windows_arm64`,
@@ -33,3 +33,7 @@ Re-run recipe: a settings file adding `https://central.sonatype.com/repository/m
 snapshots enabled, then `-Dduckdb.version=<ver>`. In PowerShell, quote every dotted `-D` argument or it is split.
 
 ## Recommendation: NO-GO for now. Not a regression finding, an availability one. Retry when a full 2.0 artifact is published.
+
+## Update 2026-10-03: the 1.5.6.0 bump
+
+JDBC `1.5.6.0` (four-part Maven version) resolved and the DuckDB-touching reactor (26 modules, -Pedition-enterprise) passed with it; `duckdb.version` is now `1.5.6.0` in the root pom. 2.0 remains blocked as above.

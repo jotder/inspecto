@@ -345,7 +345,7 @@ both the TS spec and the Java test
 (`inspecto-ui/src/app/modules/admin/studio/link-analysis/branching-parity.fixture.json`). Long runs are
 **asynchronous jobs** with progress, cancel and a stated budget — never a silent cap.
 
-⚠ **"DuckDB 2.0" is not verified.** The repo pins DuckDB **1.5.2.1** (`pom.xml`, 2026-09-27). Treat the target
+⚠ **"DuckDB 2.0" is not verified.** The repo pinned DuckDB **1.5.2.1** (now **1.5.6.0**, 2026-10-03) (`pom.xml`, 2026-09-27). Treat the target
 as "the DuckDB major that is current when option D starts"; spike D-S1 confirms the version and that
 partition, row-group and bloom-filter pruning actually happen for entity-key lookups (measured, not assumed).
 
