@@ -36,6 +36,21 @@ test('--only + --platform select exactly one file, and nothing else is touched',
     }
 });
 
+test('--verify fails OFFLINE naming the missing file when the cache lacks the pom ABI (pom bumped, cache not)', () => {
+    const out = mkdtempSync(join(tmpdir(), 'duckdb-ext-'));
+    try {
+        const r = run('--verify', '--out', out, '--only', 'excel', '--platform', 'linux_amd64');
+        assert.equal(r.status, 1, r.output);
+        assert.match(r.output, /linux_amd64\/excel — not cached/);
+        const dest = join(out, pomAbi(), 'linux_amd64', 'excel.duckdb_extension');
+        mkdirSync(dirname(dest), { recursive: true });
+        writeFileSync(dest, 'seeded');
+        assert.equal(run('--verify', '--out', out, '--only', 'excel', '--platform', 'linux_amd64').status, 0);
+    } finally {
+        rmSync(out, { recursive: true, force: true });
+    }
+});
+
 test('an unknown extension exits 2 naming what package.ps1 stages — never a green empty run', () => {
     const r = run('--check', '--only', 'exel');
     assert.equal(r.status, 2, r.output);

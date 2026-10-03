@@ -18,7 +18,7 @@
 // does the staging — so a name added there is fetched here automatically and the two cannot drift. This
 // repo has already shipped one defect from a list that existed in two places (see tools/bundle-modules.mjs).
 //
-//   node tools/fetch-duckdb-extensions.mjs [--out <dir>] [--check] [--only excel,...] [--platform linux_amd64,...]
+//   node tools/fetch-duckdb-extensions.mjs [--out <dir>] [--check | --verify] [--only excel,...] [--platform linux_amd64,...]
 //
 // Writes <dir>/v<version>/<platform>/<name>.duckdb_extension, which is DuckDB's own cache layout and what
 // package.ps1's recursive glob expects. Default <dir> is <repo>/.duckdb-extension-cache, one of the
@@ -96,6 +96,11 @@ const extVersion = 'v' + driverVersion.split('.').slice(0, 3).join('.');
 // loop variable, or a duckdb bump whose extensions are not published for that ABI would otherwise surface
 // during a release rather than on the push that caused it.
 const checkOnly = process.argv.includes('--check');
+// --verify is the OFFLINE twin of --check: does a LOCAL cache already hold every file for the pom's ABI?
+// A duckdb.version bump leaves an existing cache keyed under the OLD v<x.y.z> directory or partly filled
+// (1.5.6.0 bump, 2026-10-03: the desk cache had v1.5.6/windows_amd64 minus `aws` and no linux_amd64 at
+// all), and package.ps1 only WARNS per missing file — this fails by name before a package run.
+const verifyOnly = process.argv.includes('--verify');
 
 const outDir = arg('--out', join(repoRoot, '.duckdb-extension-cache'));
 
@@ -111,6 +116,11 @@ for (const platform of platforms) {
     for (const name of names) {
         const url = `http://extensions.duckdb.org/${extVersion}/${platform}/${name}.duckdb_extension.gz`;
         const dest = join(outDir, extVersion, platform, `${name}.duckdb_extension`);
+        if (verifyOnly) {
+            if (existsSync(dest)) console.log(`  ✓ ${platform}/${name} cached`);
+            else { console.error(`  ✖ ${platform}/${name} — not cached at ${dest}`); failed++; }
+            continue;
+        }
         if (checkOnly) {
             try {
                 const res = await fetch(url, { method: 'HEAD' });
@@ -150,7 +160,12 @@ if (failed) {
     console.error(`✖ ${failed} extension(s) could not be fetched. The bundle would ship without them, and`);
     console.error('  an air-gapped install would reach for a network INSTALL at run time instead —');
     console.error('  which is fatal on a partitioned topology (D10). Refusing to continue quietly.');
+    if (verifyOnly) console.error(`  Populate it: node tools/fetch-duckdb-extensions.mjs --out ${outDir}`);
     process.exit(1);
+}
+if (verifyOnly) {
+    console.log(`✓ DuckDB extension cache complete for ${extVersion} under ${outDir}.`);
+    process.exit(0);
 }
 if (checkOnly) {
     console.log(`✓ DuckDB extension check: ${names.length * platforms.length} file(s) published for `

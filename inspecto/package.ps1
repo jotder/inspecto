@@ -1898,7 +1898,10 @@ if ($duckdbExtCacheDir) {
     foreach ($plat in @('windows_amd64', 'linux_amd64')) {
         foreach ($extName in $duckdbExtNames) {
             $extFile = "$extName.duckdb_extension"
-            $found = Get-ChildItem -Path $duckdbExtCacheDir -Recurse -Filter $extFile -ErrorAction SilentlyContinue |
+            # Search EVERY existing candidate, not just the first: ~/.duckdb/extensions (DuckDB's own
+            # autoinstall cache, host platform only) otherwise shadows the repo cache that
+            # tools/fetch-duckdb-extensions.mjs fills, so fetching never fixed a missing linux_amd64 set.
+            $found = Get-ChildItem -Path @($duckdbExtCandidates | Where-Object { Test-Path $_ }) -Recurse -Filter $extFile -ErrorAction SilentlyContinue |
                      Where-Object { $_.FullName -match ('[\\/]' + [regex]::Escape($duckdbAbi) + '[\\/]' + [regex]::Escape($plat) + '[\\/]') } |
                      Select-Object -First 1
             if ($found) {

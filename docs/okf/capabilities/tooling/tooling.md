@@ -132,6 +132,15 @@ summarised. ⚠ **And it drifted again**: it read "twelve" until 2026-09-14, hav
 extension guard wired on 2026-09-14 (`fetch-duckdb-extensions --check`). ⛔ Wiring a `ci.yml` guard step
 is not done until it has a row here — the roster is the artifact, not the wiring.
 
+⚠ **A `duckdb.version` bump leaves every LOCAL extension cache stale** (1.5.6.0, 2026-10-03: the desk's
+`~/.duckdb/extensions/v1.5.6` held four Windows files, no `aws`, no `linux_amd64`). Every *code* path already
+derives the ABI dir from the pom (`package.ps1` `$duckdbAbi`, the fetch tool), and `release.yml` fetches both
+platforms and packages with `-RequireExtensions` — so this is a local-cache gap, not a CI one. Two seams
+closed: `node tools/fetch-duckdb-extensions.mjs --verify [--out <dir>]` is the **offline** check that a cache
+holds all 10 files for the pom's ABI (exit 1, by name); and `package.ps1` now searches **every** existing cache
+candidate per file — before, the first hit (`~/.duckdb/extensions`, DuckDB's host-only autoinstall cache)
+shadowed `.duckdb-extension-cache`, so running the fetch tool never cured a missing `linux_amd64` set.
+
 🔴 **Each deployment zip carries ONLY its own platform's DuckDB extensions** (`AIRGAP-CROSSPLAT-DEADWEIGHT-1`,
 built and closed 2026-09-15). `package.ps1` step 8 cuts each zip through `Compress-BundleForPlatform`, which
 parks the *other* platform's `duckdb-extensions/<plat>/` directory, zips, and restores it in a `finally` — so
