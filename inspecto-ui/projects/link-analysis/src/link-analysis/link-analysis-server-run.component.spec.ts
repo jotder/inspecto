@@ -48,6 +48,8 @@ function make(opts: { allowed?: boolean; investigationId?: string | null; ceilin
             opts.ceilings === false ? null : ({ ceilings: CEILINGS } as GraphAlgorithmCatalogue),
         ),
         loadCatalogue: vi.fn(),
+        indexes: signal(null),
+        loadIndexes: vi.fn(),
         run: vi.fn(() => stream),
         cancel: vi.fn(() => of({ runId: 'r1', status: 'RUNNING' as GraphRunStatus, cancelRequested: true })),
     };

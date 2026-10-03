@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { GraphRunStatus, GraphRunView, GraphRunsService, graphRunErrorMessage } from './graph-runs.service';
+import {
+    GraphRunStatus,
+    GraphRunView,
+    GraphRunsService,
+    graphRunErrorMessage,
+    indexRefusalMessage,
+} from './graph-runs.service';
 import { environment } from 'environments/environment';
 
 const base = environment.apiBaseUrl + '/v1';
@@ -138,6 +144,17 @@ describe('GraphRunsService', () => {
         expect(http.match(`${base}/inv/graph/runs/r1`)).toHaveLength(0);
     });
 
+    it('loadIndexes(): reads GET /inv/index once and swallows a failure', () => {
+        svc.loadIndexes();
+        svc.loadIndexes();
+        http.expectOne(`${base}/inv/index`).flush({ enabled: true, indexes: [], total: 0 });
+        expect(svc.indexes()?.enabled).toBe(true);
+        svc.indexes.set(null);
+        svc.loadIndexes();
+        http.expectOne(`${base}/inv/index`).flush('', { status: 503, statusText: 'Service Unavailable' });
+        expect(svc.indexes()).toBeNull();
+    });
+
     it('loadCatalogue(): fills the signal once and swallows a failure', () => {
         svc.loadCatalogue();
         svc.loadCatalogue(); // a second asker while the first is in flight does not send a second request
@@ -157,6 +174,25 @@ describe('GraphRunsService', () => {
         other.loadCatalogue();
         http.expectOne(`${base}/inv/graph/algorithms`).flush('', { status: 503, statusText: 'Service Unavailable' });
         expect(other.catalogue()).toBeNull();
+    });
+});
+
+describe('indexRefusalMessage', () => {
+    it.each([
+        ['the edge index cannot serve this run (index_disabled)', /switched off/],
+        ['the edge index cannot serve this run (no_index)', /No edge index/],
+        ['the edge index cannot serve this run (index_stale_refused: removed)', /stale/],
+        ['hops 3 is over the index cap of 2 hops', /at most 2 hops/],
+        ["'seeds' lists 21 nodes; the index cap is 20 keys per level", /at most 20/],
+        ['\'at\' cannot be combined with input "index"', /past step/],
+        ['the Investigation hides entities, which the index cannot honour', /hides entities/],
+    ])('%s is put in words and keeps the server sentence', (server, words) => {
+        const msg = indexRefusalMessage(server);
+        expect(msg).toMatch(words);
+        expect(msg).toContain(server);
+    });
+    it('an unknown cause still shows the server sentence', () => {
+        expect(indexRefusalMessage('something new')).toBe('The index run was refused: something new');
     });
 });
 

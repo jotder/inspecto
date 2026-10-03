@@ -282,6 +282,14 @@
                             @if (explainText()) {
                                 <p class="mt-1 text-sm" role="status">{{ explainText() }}</p>
                             }
+                            <inspecto-link-analysis-server-run
+                                algorithm="neighborhood"
+                                [indexOnly]="true"
+                                [params]="explainIndexParams()"
+                                [hold]="explainIndexHold()"
+                                [investigationId]="investigationId()"
+                                [allowed]="canRunOnServer()"
+                            />
                         }
                         @case ('centrality') {
                             <div class="flex flex-wrap items-center gap-2">
