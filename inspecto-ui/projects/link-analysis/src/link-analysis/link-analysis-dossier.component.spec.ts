@@ -142,7 +142,9 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         const createUrl = vi.fn(() => 'blob:h');
         Object.assign(URL, { createObjectURL: createUrl, revokeObjectURL: vi.fn() });
         const names: string[] = [];
-        const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+        const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+            this: HTMLAnchorElement,
+        ) {
             names.push(this.download);
         });
         await c.build();
