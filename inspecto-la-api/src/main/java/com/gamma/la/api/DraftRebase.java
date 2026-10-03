@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import static com.gamma.la.core.InvestigationEvaluator.canonical;
+import static com.gamma.la.core.InvestigationEvaluator.sha256;
 
 /**
  * D7-5 - rebase a Draft onto the CURRENT main head and report what that did (design {@code la-separation-d7-design.md} section 8).
@@ -95,6 +96,16 @@ final class DraftRebase {
     }
 
     private static Plan computeHeavy(InvestigationRoutes routes, ApiContext api, HttpExchange ex, InvestigationRoutes.Inv view) throws IOException {
+        return plan(view, (orig, state, pins) -> routes.replayOp(api, ex, view, orig, state, pins));
+    }
+
+    /** One op re-applied on the new base: the entry fields {@link InvestigationRoutes#replayOp} returns, or an {@link ApiException} when refused. */
+    interface Replay {
+        Map<String, Object> op(Map<String, Object> orig, InvestigationEvaluator.State state, Map<String, Long> pins);
+    }
+
+    /** {@link #compute} with the replay as a seam (the cost test replays the sealed reads instead of re-reading an index). */
+    static Plan plan(InvestigationRoutes.Inv view, Replay replay) throws IOException {
         Path draftDir = view.draft().dir();
         List<String> mainLines = view.store().readLog(view.id());
         List<String> ownLines = SnapshotStore.readLogAt(draftDir);
@@ -114,7 +125,7 @@ final class DraftRebase {
             if ("op".equals(e.get("kind")) && step(e) > k && !mainUndone.contains(step(e)))
                 mainSigs.add(e.get("op") + "|" + canonical(e.get("params")));
 
-        String emptyHash = new InvestigationEvaluator.State().hash();
+        String emptyHash = sha256(canonical(new InvestigationEvaluator.State().toMap()));
         Map<Integer, String> prevHash = new LinkedHashMap<>();
         String prev = k == 0 ? emptyHash : String.valueOf(main.get(k - 1).get("workingSetHash"));
         for (Map<String, Object> e : own) {
@@ -126,12 +137,17 @@ final class DraftRebase {
         List<String> lines = new ArrayList<>(), sets = new ArrayList<>();
         List<Integer> steps = new ArrayList<>();
         int next = m;
+        // LA-DRAFT-REBASE-COST-1: a rebased step's state differs from its sealed one (main's steps renumber every admittedBy), so nothing
+        // sealed is reusable - but each state is serialised ONCE: its canonical bytes give both the workingSetHash (State.hash() =
+        // sha256(canonical(toMap()))) and the set file, whose canonical form is exactly {"hash":..,"step":..,"workingSet":<those bytes>}.
+        // The pre-fix loop serialised the whole state five times per step (state.hash(), after.hash() twice, setDoc's hash + toMap).
+        String stateHash = sha256(canonical(state.toMap()));
         for (Map<String, Object> orig : effectiveOps(own)) {
             int os = step(orig);
             String op = String.valueOf(orig.get("op"));
             Map<String, Object> fields;
             try {
-                fields = routes.replayOp(api, ex, view, orig, state, pins);
+                fields = replay.op(orig, state, pins);
             } catch (ApiException refused) {
                 conflicts.add(new Conflict(os, op, "blocked", refused.getMessage(), null, null));
                 continue;
@@ -146,7 +162,8 @@ final class DraftRebase {
             e = InvestigationRoutes.roundTrip(e);
             InvestigationEvaluator.State after = state.copy();
             InvestigationEvaluator.apply(after, e);
-            boolean newChanged = !after.hash().equals(state.hash());
+            String afterWs = canonical(after.toMap()), afterHash = sha256(afterWs);
+            boolean newChanged = !afterHash.equals(stateHash);
             boolean oldChanged = !String.valueOf(orig.get("workingSetHash")).equals(prevHash.get(os));
             if (oldChanged && !newChanged) {
                 if (mainSigs.contains(op + "|" + canonical(orig.get("params")))) {
@@ -161,14 +178,31 @@ final class DraftRebase {
                             ((Number) oldRead.get("rowCount")).intValue(), ((Number) newRead.get("rowCount")).intValue()));
             }
             next++;
-            e.put("workingSetHash", after.hash());
+            e.put("workingSetHash", afterHash);
             lines.add(canonical(e));
-            sets.add(canonical(InvestigationRoutes.setDoc(next, after)));
+            sets.add("{\"hash\":\"" + afterHash + "\",\"step\":" + next + ",\"workingSet\":" + afterWs + "}");
             steps.add(next);
             state = after;
+            stateHash = afterHash;
         }
         return new Plan(k, m, DraftStore.prefixHash(mainLines, m), DraftStore.prefixHash(ownLines, ownLines.size()), conflicts, lines, sets,
-                steps, state.hash(), target, effectiveOps(own).size());
+                steps, stateHash, target, effectiveOps(own).size());
+    }
+
+    /**
+     * Fail closed: the carried log over {@code mainLines} must fold to exactly the hashes the plan sealed and to its final state. Run by
+     * {@link #commit} BEFORE it takes the main lock (it is one full-state serialisation per step); under the lock the main log and the Draft's
+     * log are then checked byte-identical to the ones the plan - and this check - ran over.
+     */
+    static void verify(List<String> mainLines, Plan plan) throws IOException {
+        List<Map<String, Object>> all = new ArrayList<>(parseAll(mainLines));
+        all.addAll(parseAll(plan.lines()));
+        List<String> hashes = new ArrayList<>();
+        InvestigationEvaluator.State folded = InvestigationEvaluator.evaluate(all, -1, hashes);
+        for (int i = 0; i < hashes.size(); i++)
+            if (!hashes.get(i).equals(all.get(i).get("workingSetHash")))
+                throw new IllegalStateException("rebase equivalence failed at step " + (i + 1));
+        if (!folded.hash().equals(plan.finalHash())) throw new IllegalStateException("rebase equivalence failed: final state differs");
     }
 
     /** The steps the analyst must confirm (superseded and blocked) that {@code confirm} does not name; 422 for a step with nothing to confirm. */
@@ -191,6 +225,11 @@ final class DraftRebase {
                                       List<Integer> confirmed) throws IOException {
         Path draftDir = view.draft().dir();
         String draftId = view.draft().draftId();
+        List<String> verifiedMain = view.store().readLog(view.id());
+        if (verifiedMain.size() != plan.toBase() || !DraftStore.prefixHash(verifiedMain, verifiedMain.size()).equals(plan.toBaseHash()))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "the main log moved while the rebase was computed (head " + verifiedMain.size()
+                    + ", was " + plan.toBase() + ") - read the conflict report again");
+        verify(verifiedMain, plan);
         synchronized (InvestigationRoutes.lock(view.dir())) {
             synchronized (InvestigationRoutes.lock(draftDir)) {
                 if (DraftStore.isClosed(draftDir)) throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + draftId + "' was closed");
@@ -202,15 +241,7 @@ final class DraftRebase {
                 if (!DraftStore.prefixHash(ownLines, ownLines.size()).equals(plan.draftLogHash()))
                     throw new ApiException(409, ErrorCodes.CONFLICT, "the draft changed while the rebase was computed - read the conflict report again");
 
-                // fail closed: the carried log must fold to exactly the state the plan reached
-                List<Map<String, Object>> all = new ArrayList<>(parseAll(mainLines));
-                all.addAll(parseAll(plan.lines()));
-                List<String> hashes = new ArrayList<>();
-                InvestigationEvaluator.State folded = InvestigationEvaluator.evaluate(all, -1, hashes);
-                for (int i = 0; i < hashes.size(); i++)
-                    if (!hashes.get(i).equals(all.get(i).get("workingSetHash")))
-                        throw new IllegalStateException("rebase equivalence failed at step " + (i + 1));
-                if (!folded.hash().equals(plan.finalHash())) throw new IllegalStateException("rebase equivalence failed: final state differs");
+                // the plan was verified (above, outside the lock) over exactly these main bytes and this Draft log
 
                 Path root = view.writeRoot().resolve(IndexRoutes.INDEX_DIR);
                 List<Map<String, Object>> oldPins = pinsOf(header), newPins = new ArrayList<>();

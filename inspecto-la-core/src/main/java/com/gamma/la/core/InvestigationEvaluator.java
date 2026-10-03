@@ -296,6 +296,7 @@ public final class InvestigationEvaluator {
 
         /** The canonical, response-shaped view of this state. */
         public Map<String, Object> toMap() {
+            SERIALISED.incrementAndGet();
             Map<String, String> resolvedTo = new TreeMap<>();
             Map<String, Object> view = resolutionView(resolvedTo);
             List<Map<String, Object>> es = new ArrayList<>();
@@ -419,6 +420,12 @@ public final class InvestigationEvaluator {
     }
 
     private static final java.util.concurrent.atomic.AtomicLong FOLDS = new java.util.concurrent.atomic.AtomicLong();
+    private static final java.util.concurrent.atomic.AtomicLong SERIALISED = new java.util.concurrent.atomic.AtomicLong();
+
+    /** How many full-state serialisations ({@link State#toMap}, which {@link State#hash} runs) this JVM did - the Draft rebase cost test seam. */
+    public static long serialisationCount() {
+        return SERIALISED.get();
+    }
 
     /** How many whole-log folds this JVM ran (D7-4 test seam: an incremental append must not add to it). */
     public static long foldCount() {

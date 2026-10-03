@@ -409,8 +409,36 @@ flat edge file (D-3 step 1 measurement) — disk, not memory. §12 D7-Q3 decides
   scan, measured: a second open costs 0.1 ms), which a real Draft written over its life does not pay. **Lock:** what remains under the
   main lock is the verify (one read + SHA-256 per set file) and the appends (log line + link + marker); the
   reads and folds (under 0.1 s at 800 steps) were left where they were rather than adding an optimistic pre-lock phase. The 10^8 bench
-  was not re-run. **Still open in the row:** the Draft cap and idle periods as `link-analysis.toon` keys. Rebase (`DraftRebase.plan`)
-  still hashes per step and was not in scope.
+  was not re-run. **Still open in the row:** the Draft cap and idle periods as `link-analysis.toon` keys. Rebase was not in scope here; see the
+  next bullet.
+
+* **As built (2026-10-03) - rebase profiled and cut 4x (`LA-DRAFT-REBASE-COST-1`, no row: fixed in the same change).** Profiled with
+  `DraftRebaseCostTest` (the promote fixture, then main moves 3 steps - one of them seeds `hub`, so the Draft's first op is
+  `superseded`; the replay stands in the sealed read for the index read, which is per-step and does not grow with the state):
+
+  | Draft steps | plan before (total / replay / copy+apply / 2x hash for the no-op test / line + hash / `setDoc`) | plan after | commit fold |
+  |---|---|---|---|
+  | 100 | 572 ms / 3 / 4 / 231 / 119 / 201 | 127 ms | 117 ms |
+  | 200 | 2 226 ms / 7 / 18 / 905 / 472 / 806 | 567 ms | 488 ms |
+  | 400 | 9 070 ms / 17 / 57 / 3 757 / 1 902 / 3 306 | 2 011 ms | 1 894 ms |
+  | 800 | 36 706 ms / 31 / 229 / 15 259 / 7 645 / 13 493 | 8 424 ms | 7 901 ms |
+
+  **Quadratic, confirmed** (4x per doubling): 99% was serialising the whole Working Set FIVE times per step (`state.hash()` and
+  `after.hash()` for the no-op test, `after.hash()` again for the line, `setDoc`'s hash plus its `toMap`). **Reuse is not valid
+  here**, unlike promote: main's new steps renumber the carried steps, and every entity / link records the step that admitted it, so
+  each rebased state differs from its sealed one (only a rebase onto an unmoved, undo-free base would match, and that is not a case
+  worth a path). **Fix:** each rebased state is serialised ONCE - `canonical(after.toMap())` gives the `workingSetHash` (`State.hash()`
+  is `sha256` of exactly those bytes) and the set file, whose canonical form is `{"hash":..,"step":..,"workingSet":<those bytes>}`;
+  the previous state's hash is carried instead of recomputed. Nothing is reused from disk, so nothing needs verifying beyond what
+  already ran. The commit's fail-closed fold (one hash per step over main + carried lines) moved OUT of the main lock to
+  `DraftRebase.verify`, run before `commit` locks over a fresh read of main checked against the plan's `toBaseHash`; under the lock
+  the existing byte checks (main == the plan's main, Draft log == the plan's) prove the verified inputs are the committed ones. The
+  conflict report is untouched. It stays O(state) per step - the set files the rebase must write hold Σ state bytes, so linear in
+  steps is impossible without changing the set-file format - but 4.4x cheaper, and the main lock no longer holds an O(steps x state)
+  fold (7.9 s at 800 steps). **Equivalence:** `DraftRebaseCostTest` keeps the pre-fix loop as an oracle and compares the conflict
+  report, every line, every set file, the steps and the final hash byte for byte at 1 / 2 / 30 / 60 steps; the guard counts
+  full-state serialisations (`InvestigationEvaluator.serialisationCount`, every `toMap`) and requires exactly one per replayed op
+  plus two. Mutants: a set file one step off fails the oracle; restoring `state.hash()` in the no-op test fails the guard (52 vs 27).
 
   **Scale reached: 10^8, not 10^9.** The 10^8 index build alone took 24 min under the 8 GB build memory cap (the D-3 spike's uncapped
   build took 6.1 min at a 17.9 GB peak); 10^9 is at least ten times that, over 4 h capped or a peak beyond this 32 GB box uncapped, so
