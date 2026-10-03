@@ -1126,7 +1126,27 @@ Design and decisions D6-1…D6-7: [`la-separation-d6-design.md`](../../../archiv
   (LA-24) still reads only, never replays; four-eyes approval (D-U7) is a lead or reviewer once the Investigation has a
   members record (any holder of the capability before). R3 and the Enterprise PDP still judge every member and only
   narrow: the PDP resource now carries `members` (`subject → role`), a DENY hides the Investigation even from a lead
-  and its 403s are withheld behind it. Analysts get their own Draft in D7-3; until then they read.
+  and its 403s are withheld behind it. Analysts write their own Draft (next bullet), never the main log.
+* **Drafts (D-7, D7-3 built 2026-10-03; D16-D21; `DraftStore` + `InvestigationMembers.Role` in `inspecto-la-core`, `DraftRoutes` in
+  `inspecto-la-api`).** A Draft is a member's working copy of ONE Investigation, forked from the main log at `baseStep k`; ONE
+  live Draft per member (D17: a second fork is 409 naming the first). Storage: `investigations/<id>/drafts/<draftId>/{header.json,
+  log.jsonl, sets/<step>.json}` (+ `discarded.json` once discarded); the writer is the main log's own (`SnapshotStore.appendStepAt`),
+  the Draft's steps CONTINUE the numbering (k+1 ...). **Base-state rule:** the Draft's state = the evaluator over (main log entries
+  1..k + the Draft's own entries) as one list - nothing is copied, so a later main step never changes it (`behind` / `stale` report
+  how far main moved) and `baseLogHash` (sha256 of the main log's first k lines) fails a Draft CLOSED (409) if the main prefix was
+  rewritten. Routes `.../drafts` (POST fork, GET list), `.../drafts/{draftId}` (+ `/log`, `/working-set` over the same cached relation
+  function and masking-after-cache, `/replay` = full re-fold equivalence incl. the persisted `sets/` hashes), POST `/ops` and `/undo`
+  (the SAME validation, sealing and rules as the main log; a Draft undoes only its OWN ops; a four-eyes-sensitive expand is refused
+  422 - the pending queue is the main log's) and POST `/discard`. Gate: the D7-1 member gate, then the Draft rule - a lead or reviewer
+  reads another's Draft (D7-Q8), an analyst gets the 404 of absence; only the ACTOR writes (a lead or reviewer gets 403); the actor or
+  a lead discards (a reviewer 403). **Pins:** fork pins the CURRENT version of every index serving the bound columns
+  (`IndexStore.pins().pin(version, draftId)`); none when there is no index (D7-Q2 - the Draft still works, reads are sealed at use);
+  discard unpins; fork is assembled in a scratch dir and renamed in (a failed rename leaves no directory and no pin). **Discard** keeps
+  `header.json` + `discarded.json` (who, when, head, log hash) and DELETES the log and sets (sealed rows may hold personal data); the
+  per-step audit events keep the ops. No dossier, bundle or evidence route exists for a Draft (D20). Audit: `LINK_DRAFT_FORKED` /
+  `_OP_APPENDED` / `_UNDONE` / `_DISCARDED` (ids, actor, steps - never rows). Not yet: rebase and promote (D7-5), admission and
+  hibernate (D7-6), reading the PINNED index version (a Draft's expand still reads CURRENT and seals it, D-E3). See
+  `docs/superpower/la-separation-d7-design.md` section 12.
 * **Dossier bundle.** `GET /inv/investigations/{id}/dossier/bundle?at=&snapshots=` returns `inspecto-dossier-bundle/1`: the masked Dossier, the masked references, `custody {manifestRoot, referencesCount, referencesHash}` and a SHA-256 `seal` over the canonical JSON of everything but `seal` and `generatedAt`. `POST …/dossier/bundle/verify` (body a bundle, or `{bundle}`) answers `{verified, sealIntact, rootMatches, referencesIntact, referencesAddedSince, problems, custody}`: the seal, the embedded manifest root, that the bundle's references are still the first N of the store, then the SAME manifest comparison `/dossier/verify` runs (`DossierRoutes.verifyManifest`). A failure is a result, not an error. Audited `LINK_DOSSIER_EXPORTED` / `LINK_DOSSIER_BUNDLE_VERIFIED`.
 * **Masking, R3, four-eyes.** Masked per `maskingMode` as it leaves (references too); the manifest and `referencesHash` hash the RAW store, so the root is identical masked or not and a masked bundle verifies; the seal covers what shipped. Read gate = the Dossier's (owner or Case member, R3 on the Dataset and every snapshot, the Enterprise PDP). A pending sensitive expand is not in the sealed log, so it is not in the bundle.
 * **Gotchas.** The offline-checkable part is the seal and the manifest's own root; whether the store still agrees needs the verify route. `DossierRoutes` was split (`parseAt`, `parseSnapshotIds`, `maskedDossier`, `verifyManifest`) so the Dossier, its verify and the bundle share one build. The new `POST …/references` is a `CapabilityManifest` entry, the bundle verify a read-shaped exemption, all four routes are in `AbsentGeoLinkRoutes` and `openapi-v1.json`.
