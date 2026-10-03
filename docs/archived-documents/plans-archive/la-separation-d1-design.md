@@ -7,7 +7,7 @@
 
 # LA separation — D-1 design (extract the shared platform layer)
 
-Option D's phase **D-1** ([`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md) §7.8): give Link
+Option D's phase **D-1** ([`la-separation-feasibility-plan.md`](../../superpower/la-separation-feasibility-plan.md) §7.8): give Link
 Analysis (LA) a thin shared platform to stand on, so it no longer needs `inspecto-processor` (the control plane),
 `inspecto-etl` or `inspecto-engine`. This file is the design the operator signs before any extraction.
 ⛔ Grounding method: transitive import closures computed over `src/main/java` on 2026-10-01 (scripts in the
@@ -197,7 +197,7 @@ in the lower layer (see §2); 462 tests green across the 50 test classes that to
 
 ## 6. References
 
-[`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md) §7.3 (target architecture), §7.8 (phases), §7.11 and
+[`la-separation-feasibility-plan.md`](../../superpower/la-separation-feasibility-plan.md) §7.3 (target architecture), §7.8 (phases), §7.11 and
 §7.12 (the grounded edges this design starts from) · [`la-separation-execution-plan.md`](la-separation-execution-plan.md)
-Stage 3 · [`../okf/backend/editions/editions-model.md`](../okf/backend/editions/editions-model.md) (the static profile
+Stage 3 · [`../okf/backend/editions/editions-model.md`](../../okf/backend/editions/editions-model.md) (the static profile
 module list that must stay in step).

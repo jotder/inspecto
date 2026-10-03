@@ -13,7 +13,7 @@ the domain-specific parts separated from the core. It folds the 2026-10-01 requi
 (§4)** and one **ranked priority list (§5)**, so the design is not re-opened after the build starts.
 
 It extends — and must not contradict — the signed option-D work: [`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md)
-(D1–D21, signed 2026-09-30) and [`la-separation-d1-design.md`](la-separation-d1-design.md) (D-1 decisions 1–5, signed
+(D1–D21, signed 2026-09-30) and [`la-separation-d1-design.md`](../archived-documents/plans-archive/la-separation-d1-design.md) (D-1 decisions 1–5, signed
 2026-10-01). Where this plan challenges a signed answer it says so and files a decision (§3, §8) instead of overriding it.
 
 ## 0. Read this first (two minutes)
@@ -635,8 +635,8 @@ Owned by the data engineers; queries in Appendix A. Answers go into a "data prof
 ## 15. References
 
 [`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md) (§7.3 architecture, §7.4 data and graph layer, §7.9
-decisions, §7.10 spikes) · [`la-separation-execution-plan.md`](la-separation-execution-plan.md) ·
-[`la-separation-d1-design.md`](la-separation-d1-design.md) · [`link-analysis-entity-model-design.md`](link-analysis-entity-model-design.md) ·
+decisions, §7.10 spikes) · [`la-separation-execution-plan.md`](../archived-documents/plans-archive/la-separation-execution-plan.md) ·
+[`la-separation-d1-design.md`](../archived-documents/plans-archive/la-separation-d1-design.md) · [`link-analysis-entity-model-design.md`](link-analysis-entity-model-design.md) ·
 [`assurance-capability-plan.md`](assurance-capability-plan.md) (D-P10, Entity Lists in assurance) ·
 [`../okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md) ·
 [`../okf/frontend/features/geo-map.md`](../okf/frontend/features/geo-map.md) ·

@@ -165,8 +165,8 @@ Sizes are relative: S < 1 day, M 1–3, L 3+.
 ## 9. References
 
 - [`la-separation-feasibility-plan.md`](../../superpower/la-separation-feasibility-plan.md) §1.5, §7.5, §7.8, §7.9 (D8–D21), §7.12
-- [`la-separation-d1-design.md`](../../superpower/la-separation-d1-design.md) — the signed-design style this file follows
-- [`la-separation-execution-plan.md`](../../superpower/la-separation-execution-plan.md)
+- [`la-separation-d1-design.md`](la-separation-d1-design.md) — the signed-design style this file follows
+- [`la-separation-execution-plan.md`](la-separation-execution-plan.md)
 - [`../archived-documents/plans-archive/la-separation-d4-design.md`](la-separation-d4-design.md)
 - [`../okf/frontend/features/link-analysis.md`](../../okf/frontend/features/link-analysis.md)
 - [`../EDITIONS.md`](../../EDITIONS.md)

@@ -11,7 +11,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <!-- LA separation D-1 step 3 (docs/superpower/la-separation-d1-design.md): the LOWER half of the control contract —
+    <!-- LA separation D-1 step 3 (docs/archived-documents/plans-archive/la-separation-d1-design.md): the LOWER half of the control contract —
          RequestAttrs, WriteRootProvider, ApiException, ErrorCodes, SpiSlot, WriteGates, Subject, Roles, ComponentAccess, RowScope,
          AccessDecider(s), AccessPolicies, AuditTrail, AccessGrants, Authenticator(s), CapabilityManifest, GeoCountryResolver(s),
          and com.gamma.service.OptionalSpi (the fail-soft ServiceLoader seam SpiSlot uses; a split package with inspecto-processor).

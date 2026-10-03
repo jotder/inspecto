@@ -11,7 +11,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <!-- LA separation D-1 step 2 (docs/superpower/la-separation-d1-design.md): the audit SPI — Event,
+    <!-- LA separation D-1 step 2 (docs/archived-documents/plans-archive/la-separation-d1-design.md): the audit SPI — Event,
          EventLog, EventType and the transitive closure they need (AuditAttrs, AuditChain, EventLevel,
          EventQuery, EventStore, InMemoryEventStore, SecretScrubber, plus metrics.MetricRegistry, which
          EventLog calls and which calls EventLog back). A pure move out of inspecto-event: packages

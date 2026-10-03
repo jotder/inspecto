@@ -1376,6 +1376,50 @@ a live call (and so the trust relationship I1) is needed only by a feature that 
 `LA-EMBED-VIEW-1` · `LA-APP-REAL-SIGNIN-1`. The remaining option-D phase (D-7, Drafts) is active in
 [`la-separation-d7-design.md`](../../../superpower/la-separation-d7-design.md).
 
+## Platform-layer record (D-1: module carve-out, as built 2026-10-01)
+
+Option D's phase D-1 gave Link Analysis a thin shared platform so it no longer needs `inspecto-processor`, `inspecto-etl`
+or `inspecto-engine`. Built in seven steps, verified at `ab36c6e9c` (full reactor, 41 modules, 7319 tests green). The
+design is archived ([`la-separation-d1-design.md`](../../../archived-documents/plans-archive/la-separation-d1-design.md);
+its execution order in [`la-separation-execution-plan.md`](../../../archived-documents/plans-archive/la-separation-execution-plan.md)).
+
+| Module | Holds |
+|---|---|
+| `inspecto-audit-spi` | `Event` `EventLog` `EventType` (+ `MetricRegistry`, which `EventLog` calls back); cuts the old `inspecto-event` → `inspecto-etl` edge (`ParquetEventStore` stays in `inspecto-event`) |
+| `inspecto-auth-spi` | the LOWER half of the control contract: `RequestAttrs` `WriteRootProvider` `ApiException` `ErrorCodes` `SpiSlot` `WriteGates` `Subject` `Roles` `ComponentAccess` `RowScope` `AccessDecider(s)` `AccessPolicies` `AuditTrail` `AccessGrants` `Authenticator(s)` `CapabilityManifest` `GeoCountryResolver(s)`, plus the OIDC helpers of `inspecto-security` |
+| `inspecto-http-spi` | the UPPER half, depends on auth-spi: `ApiContext` (extends `WriteRootProvider`) `RouteModule` `Handler` `Envelope` `Idempotency` |
+| `inspecto-la-graph` | the six `Graph*` algorithm classes — JDK only |
+| `inspecto-la-core` | model, evaluator, pattern engine, Snapshot store, `LinkEventTypes`, and the ports `DatasetProvider` / `CasePort` |
+| `inspecto-la-api` | the LA routes over http-spi/auth-spi, plus `GraphDossierBuilder` `ValueMeasures` `EntityMasking` (they call route statics) |
+| `inspecto-geo-link` | the **bridge** (artifactId unchanged): `EngineDatasetProvider`, `HostCasePort`, and the Alert-Rule-bound `InvestigationMeasureRoutes` / `WorkingSetMeasures` |
+
+**Decisions (operator, 2026-10-01).** (1) `ApiContext` is the SPI; host services (`service()`, `spaces()`, `sseStreams()`)
+moved to `HostContext extends ApiContext` in the core, reached by `HostContext.of(ctx)`; LA-owned ports only for LA's real
+needs. (2) Package names kept (`com.gamma.control`, `com.gamma.event`) — a pure move. (3) The 27 `LINK_*` event types moved to
+`com.gamma.la.core.LinkEventTypes`, values unchanged (they are persisted in the audit trail). (4) Entity List routes went to
+core (SEP-08) before LA left; host-free statics live in `inspecto-entity-store` as `EntityListFacts`. (5) The dependency rule —
+`la-*` may not reach `inspecto-processor`, `-etl`, `-engine` or `-acquire` — is enforced twice: a `maven-enforcer` rule in
+each governed pom AND `tools/check-module-deps.mjs` (policy table `ALLOWED`, derived from the poms, mutation-checked).
+(6) The HTTP and auth contracts were mutually dependent; the cycle was broken (not merged into one module) because the auth
+classes used `ApiContext` only through static request-attribute helpers — now `RequestAttrs` + a one-method
+`WriteRootProvider`, with `ApiContext` keeping delegating aliases so no call site changed.
+
+**Seams.** Two ports, not the three designed: `AlertPort` was dropped because nothing in `la-*` calls the Alert service —
+Alert-Rule code is bridge code by nature. An unbound port makes its feature report itself absent (`DatasetProviders.require()`
+→ `503 CAPABILITY_UNAVAILABLE`; unbound `CasePort` = the "ops not installed" behaviour), never half-working; both `*Ports`
+have `forTestAbsent`. Routes, URLs and `openapi-v1.json` did not change. `PendingChanges` stays host-side.
+
+**Gotchas.**
+* A new module is one more place the hand-kept mirrors (`AbsentGeoLinkRoutes.SURFACE`, `CapabilityManifest`, the bundle
+  module lists) must agree: add it to `tools/bundle-modules.mjs` and the static profile list in `pom.xml` in the SAME commit.
+* An import closure is a prediction, not proof. The first closure script treated a `/*` inside a string literal as a
+  comment and undercounted 46 → 20 classes; it also could not see fully-qualified inline references, which the compiler
+  found. Re-ground with a string-aware tokenizer and prove with `mvn clean test-compile` of a clean checkout.
+
+**Deliberately deferred.** The split package `com.gamma.control` across `inspecto-http-spi`, `inspecto-auth-spi` and
+`inspecto-processor` works on the classpath but forbids JPMS; a rename to `com.gamma.spi.*` is a separate mechanical change,
+done only if JPMS or a clean public surface is wanted.
+
 ## Closed-plan record (2026-10-01)
 
 `link-analysis-backlog-plan.md` was the only open backlog for Link Analysis from 2026-09-22; it was retired

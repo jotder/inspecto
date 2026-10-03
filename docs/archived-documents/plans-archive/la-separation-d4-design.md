@@ -331,6 +331,6 @@ slightly pessimistic. Allocation is worker-thread allocated MB, not peak heap.
 
 ## 8. References
 
-[`la-separation-feasibility-plan.md`](../../superpower/la-separation-feasibility-plan.md) §7.2–§7.4, §7.10–§7.13 · [`la-separation-d1-design.md`](../../superpower/la-separation-d1-design.md) (module layout, ports, dependency
+[`la-separation-feasibility-plan.md`](../../superpower/la-separation-feasibility-plan.md) §7.2–§7.4, §7.10–§7.13 · [`la-separation-d1-design.md`](la-separation-d1-design.md) (module layout, ports, dependency
 rule, Decision 3) · [`../okf/frontend/features/link-analysis.md`](../../okf/frontend/features/link-analysis.md) (the SPA caps and the browser algorithms) ·
 [`../GLOSSARY.md`](../../GLOSSARY.md).

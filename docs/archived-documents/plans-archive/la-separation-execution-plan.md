@@ -7,7 +7,7 @@
 
 # LA separation — execution plan (Stages 1–3)
 
-Decisions, options and spike data live in [`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md)
+Decisions, options and spike data live in [`la-separation-feasibility-plan.md`](../../superpower/la-separation-feasibility-plan.md)
 (⛔ when the two disagree, re-ground in the code). This file only orders the next work. Each stage is a
 separate session; stop at each gate.
 
@@ -51,5 +51,5 @@ is unchanged. The operator signs it before any extraction starts.
 
 - **D-S5** concurrency rig — needed only when D-7 (Drafts) is near.
 - **D-S2** DuckPGQ — dropped 2026-10-01 (operator); DuckDB 2.0's own graph features are assessed when the pin moves.
-- **D-3 / D-4 / D-5 / D-6** — SHIPPED after Stage 3 (as-built: `docs/okf/frontend/features/link-analysis.md`; designs archived in `docs/archived-documents/plans-archive/`). **D-7** (Drafts) — design active in [`la-separation-d7-design.md`](la-separation-d7-design.md), unbuilt.
+- **D-3 / D-4 / D-5 / D-6** — SHIPPED after Stage 3 (as-built: `docs/okf/frontend/features/link-analysis.md`; designs archived in `docs/archived-documents/plans-archive/`). **D-7** (Drafts) — design active in [`la-separation-d7-design.md`](../../superpower/la-separation-d7-design.md), unbuilt.
 - **Vocabulary:** the per-analyst working copy is a **Draft** (D16) — enter it in `docs/GLOSSARY.md` §13 before any code uses the word.

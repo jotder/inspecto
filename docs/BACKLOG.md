@@ -143,7 +143,7 @@ number** — rows moved between sections in this consolidation, and older docs c
 | [3.9](#39-cases-incidents--assistant) | Cases, Incidents & Assistant | [findings-spec-authoring-ui-design.md](archived-documents/plans-archive/findings-spec-authoring-ui-design.md) (archived) | AGT-6b |
 | [3.10](#310-deployment-packaging--scale-out) | Deployment, Packaging & Scale-out | [enterprise-scale-out-plan.md](superpower/enterprise-scale-out-plan.md) | Deployment topology live validation · `SPACES-FROM-PARTITION-MAP-1` · E1 |
 | [3.11](#311-web-ui--spa-wide-hygiene) | Web UI — SPA-wide hygiene | — | — |
-| [3.12](#312-link-analysis--geo) | Link Analysis & Geo | [la-separation-execution-plan.md](superpower/la-separation-execution-plan.md) — option-D stages (the Link Analysis backlog plan was retired 2026-10-01) | — |
+| [3.12](#312-link-analysis--geo) | Link Analysis & Geo | [la-separation-feasibility-plan.md](superpower/la-separation-feasibility-plan.md) — option-D phases (the Link Analysis backlog plan and the option-D execution plan were retired 2026-10-01 / 2026-10-03) | — |
 | [4](#4-engineering-platform--build-test-ci--tooling) | Engineering platform — build, test, CI & tooling | — | — |
 | [5](#5-docs--board-hygiene) | Docs & board hygiene | — | — |
 

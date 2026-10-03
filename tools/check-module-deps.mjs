@@ -3,7 +3,7 @@
 //
 //   node tools/check-module-deps.mjs [--root .]
 //
-// LA-separation D-1 (docs/superpower/la-separation-d1-design.md, Decision 5): the SPI modules and the LA graph module
+// LA-separation D-1 (docs/archived-documents/plans-archive/la-separation-d1-design.md, Decision 5): the SPI modules and the LA graph module
 // exist so that Link Analysis can stand on a thin platform layer WITHOUT the whole core. That only holds while nobody adds
 // `inspecto-processor`, `-engine`, `-etl`, `-acquire` or `-event` to one of them — one convenient `<dependency>` undoes the
 // extraction silently, and nothing fails until the standalone product is built. This guard makes it fail the day it happens.
