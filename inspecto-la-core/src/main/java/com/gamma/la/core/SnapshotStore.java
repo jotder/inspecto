@@ -254,6 +254,26 @@ public final class SnapshotStore {
     }
 
     /**
+     * {@link #appendStep} whose Working Set is an EXISTING sealed set file (a Draft's, at promote - LA-DRAFT-PROMOTE-COST-1): the
+     * set lands as a hard link to {@code sealedSet} (O(1) - a Draft's sets grow with its state, so copying them all is quadratic in
+     * its steps), or as a byte copy where links are unsupported. Same order and same CREATE_NEW refusal as {@link #appendStep}.
+     */
+    public void appendStepSharingSet(String id, int step, String lineJson, Path sealedSet) throws IOException {
+        Path d = investigationDir(id);
+        Files.writeString(d.resolve("log.jsonl"), lineJson + "\n", StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        Files.createDirectories(d.resolve("sets"));
+        Path target = d.resolve("sets").resolve(step + ".json");
+        try {
+            Files.createLink(target, sealedSet);
+        } catch (java.nio.file.FileAlreadyExistsException taken) {
+            throw taken;
+        } catch (IOException | UnsupportedOperationException noLink) {
+            Files.copy(sealedSet, target);
+        }
+    }
+
+    /**
      * Write a whole fork (header, log and sets) into a scratch directory, then MOVE it into place in one rename,
      * so a failed fork leaves nothing half-written under a real id. False when the id is already taken.
      */

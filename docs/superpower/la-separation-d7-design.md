@@ -377,6 +377,35 @@ flat edge file (D-3 step 1 measurement) — disk, not memory. §12 D7-Q3 decides
   document over a growing state is the hypothesis) while holding the main log's lock, so a long Draft's promote stalls every writer
   of that Investigation. Filed `LA-DRAFT-PROMOTE-COST-1`.
 
+* **As built (2026-10-03) - promote made linear (`LA-DRAFT-PROMOTE-COST-1`, promote half).** Profiled with
+  `DraftPromoteCostTest` (a 5-step main log, then a Draft of one seed and expands admitting 20 fresh links each, an exclude every 7th
+  and a hide every 11th step), phase timers around `DraftPromote.execute`:
+
+  | Draft steps | promote before (total / per-step `state.hash()` / `setDoc` + canonical / write) | promote after |
+  |---|---|---|
+  | 100 | 686 ms / 172 / 303 / 147 | 169 ms |
+  | 200 | 2 215 ms / 674 / 1 159 / 314 | 296 ms |
+  | 400 | 8 248 ms / 2 621 / 4 694 / 831 | 584 ms |
+  | 800 | 34 915 ms / 10 728 / 19 000 / 4 998 | 1 171 ms |
+
+  The hypothesis held: reading and parsing both logs, the two folds and `apply` were under 0.2 s at 800 steps; 85% was serialising the
+  whole Working Set per step - `state.hash()` for the line, then `setDoc` hashing it again and writing it out - O(state) per step,
+  so quadratic in steps, plus writing those full-state set files. **Fix:** an undo-free Draft based at the main head numbers its steps
+  exactly as they land on main and the added provenance is not folded, so the state after promoted step i IS the Draft's state after
+  its step i: promote takes the Draft's own sealed `workingSetHash` per step and lands its set file by hard link
+  (`SnapshotStore.appendStepSharingSet`; a byte copy where links are unsupported), O(1) per step. A set file is reused only if its
+  head is exactly `{"hash":"<that hash>","step":<step>,"workingSet":` (the canonical, key-sorted form); a missing or foreign one is
+  re-sealed from the fold as before, and the fold's final hash must equal both the Draft's fresh fold and the last line's hash.
+  Output is unchanged: `DraftPromoteCostTest` keeps the pre-fix loop as an oracle and compares the promoted lines and every set file
+  byte for byte (also with one set deleted and one replaced), and counts re-sealed steps (0 at 25 and 100 steps) as the deterministic
+  guard against a return to per-step serialisation; three mutants (off-by-one set, no head check, no reuse) each fail it. The "after"
+  column warms the Draft's set files first: on Windows the first open of a file written a moment ago costs about 6 ms (the on-access
+  scan, measured: a second open costs 0.1 ms), which a real Draft written over its life does not pay. **Lock:** what remains under the
+  main lock is about 1.5 ms per step, nearly all of it the appends (log line + link + marker), which must be under the lock; the
+  reads and folds (under 0.1 s at 800 steps) were left where they were rather than adding an optimistic pre-lock phase. The 10^8 bench
+  was not re-run. **Still open in the row:** the Draft cap and idle periods as `link-analysis.toon` keys. Rebase (`DraftRebase.plan`)
+  still hashes per step and was not in scope.
+
   **Scale reached: 10^8, not 10^9.** The 10^8 index build alone took 24 min under the 8 GB build memory cap (the D-3 spike's uncapped
   build took 6.1 min at a 17.9 GB peak); 10^9 is at least ten times that, over 4 h capped or a peak beyond this 32 GB box uncapped, so
   it fails the "10^8 well under an hour" condition. Disk was not the limit (231 GB free; 10^9 is about 22-34 GB). The Draft-side numbers

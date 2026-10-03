@@ -1159,7 +1159,12 @@ Design and decisions D6-1…D6-7: [`la-separation-d6-design.md`](../../../archiv
   past 30 days refuses ops and promote with 409 "must rebase", and a rebase (even at the current head) re-pins. Promote needs base ==
   main head and an undo-free Draft (the state records admission steps, so promoting a compacted log would not reproduce it), re-verifies
   both under the main then Draft lock, appends each step with `draft{id, actor, baseStep, step, promotedBy}` provenance, rolls the main
-  log back if any append or the `promoted.json` marker fails, then closes the Draft (log and sets deleted, header + marker kept, pins
+  log back if any append or the `promoted.json` marker fails, then closes the Draft. Each promoted step reuses the Draft's own sealed
+  `workingSetHash` and hard-links its set file (byte copy where links are unsupported) - the step numbers coincide and provenance is
+  not folded, so it is the same output; a set file that is missing or does not begin with that hash and step is re-sealed from the
+  fold, and the fold's final hash must still equal the Draft's. That made promote linear in steps (it re-serialised the whole state
+  per step: 800 steps 34.9 s before, 1.2 s after; `LA-DRAFT-PROMOTE-COST-1`, pinned by `DraftPromoteCostTest` against the old
+  algorithm) (log and sets deleted, header + marker kept, pins
   released). A promote carrying an expand that is sensitive under the thresholds NOW in force is held as a pending request (202) on the
   four-eyes queue and decided by the existing approve / deny routes. Audit `LINK_DRAFT_REBASED` / `_PROMOTED`. **Checkpointed append
   (D7-4):** `DraftCheckpoints` keeps the last evaluated State per Draft (valid while `log.jsonl` keeps size + mtime) so an op is one
@@ -1519,7 +1524,7 @@ Harness `InvTraversalBench` (`@Tag("bench")`, skipped unless `-Dinspecto.bench.d
 
 **Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-SPA-OWED-SURFACES-1` ·
 `LA-INVESTIGATION-OPS-DEFERRED-1` · `LA-LIVE-DETECTION-1` · `LA-DOSSIER-OUTPUT-1` · `LA-COLLECTOR-COVERAGE-1` ·
-`LA-DRAFT-PROMOTE-COST-1` (filed 2026-10-03 when `LA-SEP-SPIKES-1` closed: spike `D-S5` re-ran on real Draft state at 10^8 edges, D-7 step D7-7). Standing refusals with reopen triggers are in §6 under *Link Analysis & Geo*.
+`LA-DRAFT-PROMOTE-COST-1` (filed 2026-10-03 when `LA-SEP-SPIKES-1` closed: spike `D-S5` re-ran on real Draft state at 10^8 edges, D-7 step D7-7; the promote-cost half fixed the same day, the Draft cap and idle periods as settings keys remain). Standing refusals with reopen triggers are in §6 under *Link Analysis & Geo*.
 
 Design (archived): [`link-analysis-and-graphsource.md`](../../../archived-documents/plans-archive/link-analysis-and-graphsource.md)
 · [`link-analysis-projection-authoring-plan.md`](../../../archived-documents/plans-archive/link-analysis-projection-authoring-plan.md)
