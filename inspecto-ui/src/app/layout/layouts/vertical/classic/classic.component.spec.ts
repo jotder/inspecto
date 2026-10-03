@@ -35,5 +35,11 @@ describe('ClassicLayoutComponent', () => {
         const main = (fixture.nativeElement as HTMLElement).querySelector('main');
         expect(main).toBeTruthy();
         expect(main?.querySelector('router-outlet')).toBeTruthy();
+        // The rest of the shell is landmarked too (axe `region`): footer, named navigation, status loading bar.
+        const root = fixture.nativeElement as HTMLElement;
+        expect(root.querySelector('footer')).toBeTruthy();
+        expect(root.querySelector('gamma-vertical-navigation')?.getAttribute('role')).toBe('navigation');
+        expect(root.querySelector('gamma-vertical-navigation')?.getAttribute('aria-label')).toBe('Main');
+        expect(root.querySelector('gamma-loading-bar')?.getAttribute('role')).toBe('status');
     });
 });

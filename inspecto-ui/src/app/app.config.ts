@@ -2,6 +2,7 @@ import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/ht
 import { ApplicationConfig, inject, provideAppInitializer, provideZoneChangeDetection } from '@angular/core';
 import { LuxonDateAdapter } from '@angular/material-luxon-adapter';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
+import { MAT_DIALOG_DEFAULT_OPTIONS, MatDialogConfig } from '@angular/material/dialog';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
 import { provideGamma } from '@gamma';
@@ -77,6 +78,12 @@ export const appConfig: ApplicationConfig = {
         }),
         // D-5 prep: the host services the Link Analysis / Geo features reach only through tokens (inspecto/la-host).
         ...provideLaHostServices(),
+
+        // Every Material dialog is modal behind a backdrop: say so to assistive tech (Material's own default is
+        // aria-modal="false", which leaves the page behind a dialog readable) — LA-A11Y-AUDIT-1.
+        // ⚠ The provided options REPLACE `new MatDialogConfig()` rather than merge with it, so the defaults
+        // (role, hasBackdrop, …) must be spread in.
+        { provide: MAT_DIALOG_DEFAULT_OPTIONS, useFactory: () => ({ ...new MatDialogConfig(), ariaModal: true }) },
 
         // Gamma
         // provideAuth(),

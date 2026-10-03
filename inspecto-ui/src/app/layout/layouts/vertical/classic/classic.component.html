@@ -1,8 +1,10 @@
 <!-- Loading bar -->
-<gamma-loading-bar></gamma-loading-bar>
+<gamma-loading-bar role="status"></gamma-loading-bar>
 
 <!-- Navigation -->
 <gamma-vertical-navigation
+    role="navigation"
+    aria-label="Main"
     class="dark bg-gray-900 print:hidden"
     [mode]="isScreenSmall() ? 'over' : 'side'"
     [name]="'mainNavigation'"
@@ -90,11 +92,11 @@
     </main>
 
     <!-- Footer -->
-    <div
+    <footer
         class="bg-card relative z-49 flex h-14 w-full flex-0 items-center justify-start border-t px-4 dark:bg-transparent md:px-6 print:hidden"
     >
         <span class="text-secondary font-medium">{{ branding.footerText() }} {{ currentYear }}</span>
-    </div>
+    </footer>
 </div>
 
 <!-- Quick chat -->

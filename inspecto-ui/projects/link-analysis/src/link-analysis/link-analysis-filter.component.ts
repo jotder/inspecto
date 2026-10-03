@@ -31,7 +31,7 @@ export interface LocalMatch {
     host: { class: 'block' },
     template: `
         <div class="mb-1 flex items-center gap-2">
-            <h3 class="text-xs font-semibold uppercase tracking-wide opacity-60">Filter predicate</h3>
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-secondary">Filter predicate</h3>
             <inspecto-chip
                 class="whitespace-nowrap"
                 variant="soft"
