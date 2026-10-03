@@ -385,6 +385,43 @@ public final class SnapshotStore {
         return Files.deleteIfExists(investigationDir(investigationId).resolve("case-link.json"));
     }
 
+    // ── External references (D-6) — append-only pointers OUTSIDE the sealed header ──────────────────────────
+    //   investigations/<id>/references.jsonl   one JSON line per reference; only ever appended, never rewritten.
+    // A pointer to something in another system, not evidence: it is not in the header (write-once) nor in the
+    // Dossier manifest, so adding one never invalidates an issued Dossier.
+
+    /** Outcomes of {@link #appendReference}. */
+    public enum Appended { ADDED, DUPLICATE, FULL }
+
+    private static final Object REFERENCES_LOCK = new Object();
+
+    /**
+     * Append one reference line unless its {@code key} is already present (DUPLICATE) or {@code maxCount} lines
+     * exist (FULL). The line must start {@code {"key":<key>,}}. Check and append happen under one lock, so two
+     * racing callers cannot both pass the limit.
+     */
+    public Appended appendReference(String investigationId, String key, String lineJson, int maxCount) throws IOException {
+        synchronized (REFERENCES_LOCK) {
+            List<String> have = readReferences(investigationId);
+            if (have.size() >= maxCount) return Appended.FULL;
+            String prefix = "{\"key\":" + quote(key) + ",";
+            for (String line : have) if (line.startsWith(prefix)) return Appended.DUPLICATE;
+            Files.createDirectories(investigationDir(investigationId));
+            Files.writeString(investigationDir(investigationId).resolve("references.jsonl"), lineJson + "\n",
+                    StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            return Appended.ADDED;
+        }
+    }
+
+    /** The Investigation's reference lines, raw, in the order they were added (empty when none). */
+    public List<String> readReferences(String investigationId) throws IOException {
+        Path f = investigationDir(investigationId).resolve("references.jsonl");
+        if (!Files.isRegularFile(f)) return List.of();
+        List<String> out = new ArrayList<>();
+        for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) if (!line.isBlank()) out.add(line);
+        return out;
+    }
+
     private static void deleteTree(Path p) throws IOException {
         try (var s = Files.walk(p)) {
             for (Path q : s.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(q);

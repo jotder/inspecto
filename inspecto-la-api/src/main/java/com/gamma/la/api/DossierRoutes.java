@@ -56,8 +56,8 @@ import java.util.function.UnaryOperator;
  */
 public final class DossierRoutes implements RouteModule {
 
-    private static final int MAX_STEPS = 5_000;
-    private static final int MAX_SNAPSHOTS = 20;
+    static final int MAX_STEPS = 5_000;
+    static final int MAX_SNAPSHOTS = 20;
 
     @Override
     public void register(ApiContext api) {
@@ -65,15 +65,13 @@ public final class DossierRoutes implements RouteModule {
         api.post("/inv/investigations/([^/]+)/dossier/verify", (e, m) -> verify(api, e, m.group(1), api.body(e)));
     }
 
-    private record Opened(InvestigationRoutes.Inv inv, SnapshotStore store, Path writeRoot, String id, String headerRaw) {}
+    record Opened(InvestigationRoutes.Inv inv, SnapshotStore store, Path writeRoot, String id, String headerRaw) {}
 
-    /** {@code GET /inv/investigations/{id}/dossier}. Gates: 503 → 422 id → 404 absent/not owner/R3 → 422 params. */
-    private Object dossier(ApiContext api, HttpExchange ex, String id) throws IOException {
-        Opened inv = open(api, ex, id);
-        String format = Optional.ofNullable(ApiContext.query(ex, "format")).orElse("json");
-        if (!List.of("json", "steps", "method").contains(format))
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "format must be json, steps or method, got '" + format + "'");
-        List<String> log = inv.store().readLog(id);
+    /** A built Dossier, already masked as it leaves, with the masking that was applied. */
+    record Masked(Map<String, Object> dossier, EntityMasking mask) {}
+
+    /** The {@code at} query parameter: a step count in {@code [0, log.size()]}, default the whole log; 422 otherwise. */
+    static int parseAt(HttpExchange ex, List<String> log) {
         int at = log.size();
         String rawAt = ApiContext.query(ex, "at");
         if (rawAt != null && !rawAt.isBlank()) {
@@ -87,17 +85,43 @@ public final class DossierRoutes implements RouteModule {
         }
         if (at > MAX_STEPS)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a dossier covers at most " + MAX_STEPS + " steps; pass 'at'");
+        return at;
+    }
+
+    /** The {@code snapshots} query parameter, comma separated. */
+    static List<String> parseSnapshotIds(HttpExchange ex) {
         List<String> snapshotIds = new ArrayList<>();
         String rawSnaps = ApiContext.query(ex, "snapshots");
         if (rawSnaps != null)
             for (String s : rawSnaps.split(",")) if (!s.isBlank()) snapshotIds.add(s.trim());
+        return snapshotIds;
+    }
 
+    /** Build the Dossier at {@code at} over the given snapshots and mask it per the Space's {@code maskingMode} (D-U6). */
+    @SuppressWarnings("unchecked")
+    static Masked maskedDossier(HttpExchange ex, Opened inv, List<String> log, int at, List<String> snapshotIds)
+            throws IOException {
         GraphDossierBuilder.Input in = input(inv, log, at, snapshots(ex, inv, snapshotIds, true));
         Map<String, Object> built = GraphDossierBuilder.build(in);
         // D-U6: the dossier is masked as it leaves — the manifest (hashes only) is unaffected, and custody is
         // verified against the store by /dossier/verify, which never sees a pseudonym.
         EntityMasking mask = EntityMasking.of(inv.inv(), snapshotEntityIds(in.snapshots()));
-        @SuppressWarnings("unchecked") Map<String, Object> dossier = (Map<String, Object>) LinkIds.stamp(mask.apply(built));   // D-U9: link ids minted from what the caller sees
+        Map<String, Object> dossier = (Map<String, Object>) LinkIds.stamp(mask.apply(built));   // D-U9: link ids minted from what the caller sees
+        return new Masked(dossier, mask);
+    }
+
+    /** {@code GET /inv/investigations/{id}/dossier}. Gates: 503 → 422 id → 404 absent/not owner/R3 → 422 params. */
+    private Object dossier(ApiContext api, HttpExchange ex, String id) throws IOException {
+        Opened inv = open(api, ex, id);
+        String format = Optional.ofNullable(ApiContext.query(ex, "format")).orElse("json");
+        if (!List.of("json", "steps", "method").contains(format))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "format must be json, steps or method, got '" + format + "'");
+        List<String> log = inv.store().readLog(id);
+        int at = parseAt(ex, log);
+        List<String> snapshotIds = parseSnapshotIds(ex);
+        Masked built = maskedDossier(ex, inv, log, at, snapshotIds);
+        EntityMasking mask = built.mask();
+        Map<String, Object> dossier = built.dossier();
         @SuppressWarnings("unchecked") Map<String, Object> manifest = (Map<String, Object>) dossier.get("manifest");
         @SuppressWarnings("unchecked") Map<String, Object> integrity = (Map<String, Object>) dossier.get("integrity");
         int stepsAt = at;
@@ -134,6 +158,26 @@ public final class DossierRoutes implements RouteModule {
         Opened inv = open(api, ex, id);
         Object raw = body.get("manifest") instanceof Map<?, ?> m ? m : body;
         Map<String, Object> submitted = (Map<String, Object>) raw;
+        Map<String, Object> result = verifyManifest(ex, inv, id, submitted);
+        emit(ex, LinkEventTypes.LINK_DOSSIER_VERIFIED, "link.dossier.verified",
+                "link.dossier.verified — " + id + (Boolean.TRUE.equals(result.get("verified")) ? "" : " (FAILED)"),
+                b -> b.attr("investigationId", id).attr("verified", result.get("verified"))
+                        .attr("submittedRoot", result.get("submittedRoot")).attr("currentRoot", result.get("currentRoot"))
+                        .attr("changed", ((List<?>) result.get("changed")).size()));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", id);
+        out.putAll(result);
+        return out;
+    }
+
+    /**
+     * Rebuild the manifest for the submitted position and snapshots from the store as it is NOW and compare it entry by
+     * entry. 422 when the body is not a manifest for this Investigation. Shared by {@code /dossier/verify} and the
+     * bundle's custody check, so the two cannot disagree about what "verified" means.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> verifyManifest(HttpExchange ex, Opened inv, String id, Map<String, Object> submitted)
+            throws IOException {
         if (!(submitted.get("root") instanceof String) || !(submitted.get("artefacts") instanceof List<?>)
                 || !(submitted.get("at") instanceof Number n))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must carry a dossier manifest {root, at, artefacts, ...}");
@@ -152,20 +196,12 @@ public final class DossierRoutes implements RouteModule {
         Map<String, Object> result = GraphDossierBuilder.verify(submitted,
                 (Map<String, Object>) dossier.get("manifest"), intact);
         result.put("integrity", dossier.get("integrity"));
-        emit(ex, LinkEventTypes.LINK_DOSSIER_VERIFIED, "link.dossier.verified",
-                "link.dossier.verified — " + id + (Boolean.TRUE.equals(result.get("verified")) ? "" : " (FAILED)"),
-                b -> b.attr("investigationId", id).attr("verified", result.get("verified"))
-                        .attr("submittedRoot", result.get("submittedRoot")).attr("currentRoot", result.get("currentRoot"))
-                        .attr("changed", ((List<?>) result.get("changed")).size()));
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("id", id);
-        out.putAll(result);
-        return out;
+        return result;
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────────────────────────────
 
-    private static GraphDossierBuilder.Input input(Opened inv, List<String> log, int at,
+    static GraphDossierBuilder.Input input(Opened inv, List<String> log, int at,
                                                    List<GraphDossierBuilder.Snapshot> snaps) throws IOException {
         Map<Integer, String> sets = new HashMap<>();
         for (int step = 1; step <= at; step++) sets.put(step, inv.store().readSet(inv.id(), step));
@@ -176,7 +212,7 @@ public final class DossierRoutes implements RouteModule {
      * The included snapshots, each: a safe id (422), sealed (404 — or, when {@code strict} is false, silently left
      * out so verification reports it missing), anchored to this Investigation (422) and over a viewable Dataset (404).
      */
-    private static List<GraphDossierBuilder.Snapshot> snapshots(HttpExchange ex, Opened inv, List<String> ids,
+    static List<GraphDossierBuilder.Snapshot> snapshots(HttpExchange ex, Opened inv, List<String> ids,
                                                                 boolean strict) throws IOException {
         if (ids.size() > MAX_SNAPSHOTS) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_SNAPSHOTS + " snapshots");
         List<GraphDossierBuilder.Snapshot> out = new ArrayList<>();
@@ -205,7 +241,7 @@ public final class DossierRoutes implements RouteModule {
 
     /** Through the ONE Investigation gate ({@link InvestigationRoutes#open}: 503 → 422 unsafe id → 403 → 404 absent,
      *  not the owner, R3 or an Enterprise policy DENY), keeping the header's raw bytes for the manifest. */
-    private static Opened open(ApiContext api, HttpExchange ex, String id) throws IOException {
+    static Opened open(ApiContext api, HttpExchange ex, String id) throws IOException {
         InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, id);
         String raw = inv.store().readInvestigation(id);
         if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
@@ -214,7 +250,7 @@ public final class DossierRoutes implements RouteModule {
 
     /** The node ids an included snapshot carries (its {@code nodes[].id} and score-vector keys) — so that
      *  {@code maskingMode all} masks them in the score tables too, not only the ids the log names. */
-    private static List<String> snapshotEntityIds(List<GraphDossierBuilder.Snapshot> snaps) throws IOException {
+    static List<String> snapshotEntityIds(List<GraphDossierBuilder.Snapshot> snaps) throws IOException {
         List<String> out = new ArrayList<>();
         for (GraphDossierBuilder.Snapshot s : snaps) {
             @SuppressWarnings("unchecked") Map<String, Object> snap = ApiContext.JSON.readValue(s.raw(), Map.class);
@@ -233,7 +269,7 @@ public final class DossierRoutes implements RouteModule {
     }
 
     /** Best-effort audit (LA-04 pattern): an audit failure never fails the dossier. */
-    private static void emit(HttpExchange ex, String type, String action, String message,
+    static void emit(HttpExchange ex, String type, String action, String message,
                              UnaryOperator<Event.Builder> attrs) {
         try {
             Event.Builder b = Event.builder(type).source("inv").message(message)

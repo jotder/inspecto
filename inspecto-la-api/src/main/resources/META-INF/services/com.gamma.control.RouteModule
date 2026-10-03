@@ -4,6 +4,8 @@ com.gamma.la.api.PatternRoutes
 com.gamma.la.api.ValueMeasureRoutes
 com.gamma.la.api.InvestigationRoutes
 com.gamma.la.api.DossierRoutes
+com.gamma.la.api.DossierBundleRoutes
+com.gamma.la.api.InvestigationReferenceRoutes
 com.gamma.la.api.WorkingSetRoutes
 com.gamma.la.api.InvestigationTemplateRoutes
 com.gamma.la.api.InvestigationCoverageRoutes

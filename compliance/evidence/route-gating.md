@@ -212,10 +212,12 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/investigations/([^/]+)/alert-rules` | gated | `canAuthorAlertRules` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java:68` |
 | DELETE | `/inv/investigations/([^/]+)/case` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationCaseRoutes.java:60` |
 | PUT | `/inv/investigations/([^/]+)/case` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationCaseRoutes.java:58` |
+| POST | `/inv/investigations/([^/]+)/dossier/bundle/verify` | exempt | read-shaped | `inspecto-la-api/src/main/java/com/gamma/la/api/DossierBundleRoutes.java:63` |
 | POST | `/inv/investigations/([^/]+)/dossier/verify` | exempt | read-shaped | `inspecto-la-api/src/main/java/com/gamma/la/api/DossierRoutes.java:65` |
 | POST | `/inv/investigations/([^/]+)/ops` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:147` |
 | POST | `/inv/investigations/([^/]+)/pending/([^/]+)/approve` | gated | `canApproveLinkExpansions` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:157` |
 | POST | `/inv/investigations/([^/]+)/pending/([^/]+)/deny` | gated | `canApproveLinkExpansions` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:159` |
+| POST | `/inv/investigations/([^/]+)/references` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationReferenceRoutes.java:61` |
 | POST | `/inv/investigations/([^/]+)/reorder` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:151` |
 | POST | `/inv/investigations/([^/]+)/replay` | exempt | read-shaped | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:153` |
 | POST | `/inv/investigations/([^/]+)/reveal` | gated | `canRevealLinkEntities` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:155` |
