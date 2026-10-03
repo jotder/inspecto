@@ -1315,7 +1315,18 @@ final class PipelineConfigParser {
             return resolveSchemaRef("registry/schemas/" + id + ".toon", configDir, field);
         }
         Path resolved = PathJail.resolveConfigRef(configDir, ref, field);
-        return PathJail.requireUnderAny(PathJail.allowedRoots(), resolved.toString(), field);
+        try {
+            return PathJail.requireUnderAny(PathJail.allowedRoots(), resolved.toString(), field);
+        } catch (com.gamma.config.safety.SafetyPolicyUnreadableException unreadable) {
+            // LOADING is not running (policy-narrowing S3): an unreadable Safety Policy file must not make the
+            // Pipeline vanish from the registry (the old behaviour: the load threw and the config was dropped
+            // with only a log line). Judge the ref against the roots as they stood BEFORE any policy file
+            // narrowed them - never wider than that - and let the RUN be refused: pinnedForRun throws the same
+            // error, a failed Run records it, and /health reports DEGRADED.
+            log.warn("{} - judging '{}' against the un-narrowed roots; runs stay refused", unreadable.getMessage(), field);
+            return PathJail.requireUnderAny(com.gamma.config.safety.SafetyPolicy.baseRoots(
+                    com.gamma.util.CurrentSpace.id()), List.of(), resolved.toString(), field);
+        }
     }
 
     // ── sibling Structure CSV (STRUCTURE-CSV-1, 2026-09-06) ───────────────────

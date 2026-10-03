@@ -612,7 +612,15 @@ public final class ConfigSafetyValidator {
             out.add(Finding.error(field, "path '" + s + "' is not a valid path: " + ex.getMessage()));
             return;
         }
-        if (underAnyRoot(norm, p.allowedRoots())) return;
+        if (underAnyRoot(norm, p.allowedRoots())) {
+            for (Path d : p.denyRoots())
+                if (PathJail.contains(d, norm)) {
+                    out.add(Finding.error(field, "path '" + s + "' resolves to " + norm
+                            + ", under the denied root " + d + " (deny.roots of the Safety Policy)"));
+                    return;
+                }
+            return;
+        }
 
         // Say WHICH failure it was: a path that looks contained but is not has escaped through a link,
         // and telling an operator "outside the allowed roots" for a path that visibly is not would

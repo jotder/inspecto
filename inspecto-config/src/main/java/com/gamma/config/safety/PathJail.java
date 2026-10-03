@@ -130,15 +130,43 @@ public final class PathJail {
     public static Path requireUnderAny(List<Path> roots, String value, String field) {
         if (roots == null || roots.isEmpty())
             throw new IllegalArgumentException("no allowed roots configured for '" + field + "'");
+        return requireUnderAny(roots, deniedRoots(), value, field);
+    }
+
+    /**
+     * The {@code deny.roots} of the calling thread's effective Safety Policy: paths no run may touch even
+     * under an allowed root. ⚠ Resolved through {@link SafetyPolicy#defaultPolicy()}, so it sees the run's pin on
+     * the planning thread; a worker pool must be handed the policy ({@link SafetyPolicy#runWithPinned}) or use
+     * the explicit-deny overload of {@link #requireUnderAny}.
+     */
+    public static List<Path> deniedRoots() {
+        return SafetyPolicy.defaultPolicy().denyRoots();
+    }
+
+    /**
+     * {@link #requireUnderAny(List, String, String)} with the deny set stated by the caller: the contained path
+     * is refused when it also lies under any {@code deny} root (deny beats allow, design 3.1).
+     */
+    public static Path requireUnderAny(List<Path> roots, List<Path> deny, String value, String field) {
+        if (roots == null || roots.isEmpty())
+            throw new IllegalArgumentException("no allowed roots configured for '" + field + "'");
         Escape first = null;
+        Path hit = null;
         for (Path root : roots) {
             try {
-                return require(root, value, field);
+                hit = require(root, value, field);
+                break;
             } catch (Escape e) {
                 if (first == null) first = e;   // report against the first root, the usual one
             }
         }
-        throw first;
+        if (hit == null) throw first;
+        if (deny != null)
+            for (Path d : deny)
+                if (contains(d, hit))
+                    throw new Escape(field, value, "resolves under the denied root " + d.toAbsolutePath().normalize()
+                            + " (deny.roots of the Safety Policy)");
+        return hit;
     }
 
     /**

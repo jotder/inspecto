@@ -159,6 +159,36 @@ class SafetyPolicyUnreadableRoutesTest {
         assertEquals("SUCCESS", runOnce(dir.resolve("ok"), () -> write(cfg, "allow:\n  hosts[1]: a.example\n")).status());
     }
 
+    // ── S3: an unreadable file at LOAD time must not make the Pipeline vanish ─────────
+
+    @Test
+    void s3_aPipelineLoadedOverAnUnreadablePolicyStillRegistersAndItsRunIsTheVisibleRefusal() throws Exception {
+        Path base = defaultBase();
+        Path cfg = base.resolve("config");
+        write(cfg, "alow:\n  hosts[1]: a.example\n");                   // broken BEFORE the service loads the pipeline
+        Path toon = pipeline(dir.resolve("boot"));
+        try (CollectorService svc = new CollectorService(List.of(toon), 3600, 1)) {
+            assertTrue(svc.pipelineLoadFailures().isEmpty(), "loading is not running: no load failure, no vanished pipeline: "
+                    + svc.pipelineLoadFailures());
+            assertTrue(svc.configFor("safety_probe").isPresent(), "the pipeline is registered");
+            String id = svc.triggerRunAsync("safety_probe").orElseThrow();
+            PipelineRun r;
+            int i = 0;
+            while ("RUNNING".equals((r = svc.pipelineRunById(id).orElseThrow()).status()) && i++ < 400) Thread.sleep(50);
+            assertRefused(r);
+        }
+        // twin: the same pipeline over a valid file registers AND runs
+        write(cfg, "allow:\n  hosts[1]: a.example\n");
+        try (CollectorService svc = new CollectorService(List.of(pipeline(dir.resolve("boot2"))), 3600, 1)) {
+            assertTrue(svc.pipelineLoadFailures().isEmpty());
+            String id = svc.triggerRunAsync("safety_probe").orElseThrow();
+            PipelineRun r;
+            int i = 0;
+            while ("RUNNING".equals((r = svc.pipelineRunById(id).orElseThrow()).status()) && i++ < 400) Thread.sleep(50);
+            assertEquals("SUCCESS", r.status());
+        }
+    }
+
     // ── the plan-time gates, over HTTP ──────────────────────────────────────────────
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {

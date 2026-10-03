@@ -153,6 +153,8 @@ public final class MultiCollectorProcessor {
         Semaphore permits   = new Semaphore(Math.max(1, maxConcurrent));
         AtomicInteger failed = new AtomicInteger();
         Map<String, String> mdc = MDC.getCopyOfContextMap();   // propagate the caller's space (MDC) onto each worker
+        // The run's pinned Safety Policy is a ScopedValue: not visible on these workers unless handed over.
+        var pin = com.gamma.config.safety.SafetyPolicy.pinned();
 
         try (ExecutorService exec = Executors.newVirtualThreadPerTaskExecutor()) {
             List<Future<?>> futures = new ArrayList<>();
@@ -162,8 +164,11 @@ public final class MultiCollectorProcessor {
                     try {
                         permits.acquire();
                         try {
-                            PipelineConfig cfg = PipelineConfig.load(cfgPath.toString());
-                            CollectorProcessor.run(cfg, onCommit, skipPostAction, dryRun);
+                            PipelineConfig cfg = underPin(pin, () -> {
+                                PipelineConfig c = PipelineConfig.load(cfgPath.toString());
+                                CollectorProcessor.run(c, onCommit, skipPostAction, dryRun);
+                                return c;
+                            });
                             log.info("Source '{}' completed", cfg.identity().pipelineName());
                         } catch (CollectorProcessor.ConsignmentProcessingException e) {
                             failed.incrementAndGet();
@@ -200,6 +205,26 @@ public final class MultiCollectorProcessor {
      * already carry its own per-run timestamp (see {@link PipelineConfig#forNewRun()}); isolation and
      * failure accounting are identical to {@code runAll}.
      */
+    /** Runs {@code body} on this worker under the planning thread's pinned Safety Policy, when it had one. */
+    private static <T> T underPin(java.util.Optional<com.gamma.config.safety.SafetyPolicy> pin,
+                                  java.util.concurrent.Callable<T> body) throws Exception {
+        if (pin.isEmpty()) return body.call();
+        try {
+            return com.gamma.config.safety.SafetyPolicy.runWithPinned(pin.get(), () -> {
+                try {
+                    return body.call();
+                } catch (RuntimeException e) {
+                    throw e;
+                } catch (Exception e) {
+                    throw new java.util.concurrent.CompletionException(e);
+                }
+            });
+        } catch (java.util.concurrent.CompletionException e) {
+            if (e.getCause() instanceof Exception cause) throw cause;
+            throw e;
+        }
+    }
+
     public static RunResult runConfigs(List<PipelineConfig> configs, int maxConcurrent,
                                        java.util.function.Consumer<com.gamma.etl.ConsignmentEvent> onCommit) {
         return runConfigs(configs, maxConcurrent, onCommit, true);
@@ -218,6 +243,8 @@ public final class MultiCollectorProcessor {
         Semaphore permits    = new Semaphore(Math.max(1, maxConcurrent));
         AtomicInteger failed = new AtomicInteger();
         Map<String, String> mdc = MDC.getCopyOfContextMap();   // propagate the caller's space (MDC) onto each worker
+        // The run's pinned Safety Policy is a ScopedValue: not visible on these workers unless handed over.
+        var pin = com.gamma.config.safety.SafetyPolicy.pinned();
 
         try (ExecutorService exec = Executors.newVirtualThreadPerTaskExecutor()) {
             List<Future<?>> futures = new ArrayList<>();
@@ -227,8 +254,11 @@ public final class MultiCollectorProcessor {
                     try {
                         permits.acquire();
                         try {
-                            if (acquireFirst) CollectorProcessor.run(cfg, onCommit);
-                            else CollectorProcessor.ingest(cfg, onCommit);
+                            underPin(pin, () -> {
+                                if (acquireFirst) CollectorProcessor.run(cfg, onCommit);
+                                else CollectorProcessor.ingest(cfg, onCommit);
+                                return null;
+                            });
                             log.info("Source '{}' completed", cfg.identity().pipelineName());
                         } catch (CollectorProcessor.ConsignmentProcessingException e) {
                             failed.incrementAndGet();
