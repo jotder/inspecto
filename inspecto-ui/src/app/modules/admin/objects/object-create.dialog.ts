@@ -16,6 +16,8 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { INCIDENT_TAXONOMY, joinCategory } from './incident-taxonomy';
 import { currentOperator, INCIDENT_PRIORITIES } from './mail-model';
 import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
+import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { Router } from '@angular/router';
 
 /**
  * Create dialog for an operator-created object (an INCIDENT or a CASE) — POST /objects.
@@ -28,6 +30,7 @@ import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/compo
     selector: 'app-object-create-dialog',
     standalone: true,
     imports: [
+        InspectoEmptyStateComponent,
         InspectoOptionPickerComponent,
         ReactiveFormsModule,
         MatAutocompleteModule,
@@ -160,14 +163,27 @@ import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/compo
                         @if (form.controls.links.hasError('required') && form.controls.links.touched) {
                             <mat-error>Link at least one existing entity.</mat-error>
                         }
-                        @if (!candidates().length) {
-                            <mat-hint
-                                >No existing objects to link to yet — one must exist before a new {{ data.label }} can
-                                be created.</mat-hint
-                            >
-                        }
                     </mat-form-field>
                 </div>
+                @if (candidatesError()) {
+                    <inspecto-empty-state
+                        icon="heroicons_outline:exclamation-triangle"
+                        title="Could not load objects to link"
+                        [message]="candidatesError()"
+                        actionLabel="Retry"
+                        (action)="loadCandidates()"
+                    />
+                } @else if (candidatesLoaded() && !candidates().length) {
+                    <!-- CASE-FIRST-OBJECT-DEAD-END-1: the ≥1-link rule stays; say where the first object comes from. -->
+                    <inspecto-empty-state
+                        title="Nothing to link yet"
+                        message="Every {{
+                            data.label
+                        }} must link to an existing Alert, Incident or Case. Incidents are raised by a Decision Rule with a create-incident action when an Alert matches it. Set one up, then come back."
+                        actionLabel="Open Decision Rules"
+                        (action)="openDecisionRules()"
+                    />
+                }
                 <mat-form-field subscriptSizing="dynamic">
                     <mat-label>SLA (minutes)</mat-label>
                     <input matInput type="number" formControlName="dueInMinutes" placeholder="optional" />
@@ -187,6 +203,7 @@ export class ObjectCreateDialog {
     private toastr = inject(ToastrService);
     private fb = inject(FormBuilder);
     private session = inject(SessionService);
+    private router = inject(Router);
     readonly data = inject<{ type: string; label: string; assignees?: string[] }>(MAT_DIALOG_DATA);
 
     readonly isIncident = this.data.type === 'INCIDENT';
@@ -225,6 +242,10 @@ export class ObjectCreateDialog {
 
     /** Existing objects the new one can be linked to (the mandatory ≥1-link contract). */
     readonly candidates = signal<OperationalObject[]>([]);
+    /** True once the candidate list answered — the empty state must not flash before it does. */
+    readonly candidatesLoaded = signal(false);
+    /** A failed candidate load is shown in place, never as "nothing to link". */
+    readonly candidatesError = signal('');
 
     /** Suggestions: registry tags not yet chosen, narrowed by the input's text. */
     readonly tagSuggestions = (): string[] => {
@@ -247,10 +268,27 @@ export class ObjectCreateDialog {
             next: (t) => this.registry.set(t.map((x) => x.name)),
             error: () => undefined,
         });
+        this.loadCandidates();
+    }
+
+    loadCandidates(): void {
+        this.candidatesError.set('');
         this.api.list({ limit: 200 }).subscribe({
-            next: (os) => this.candidates.set(os),
-            error: () => this.candidates.set([]),
+            next: (os) => {
+                this.candidates.set(os);
+                this.candidatesLoaded.set(true);
+            },
+            error: (e) => {
+                this.candidates.set([]);
+                this.candidatesError.set(apiErrorMessage(e, 'The object list did not load.'));
+            },
         });
+    }
+
+    /** The empty state's way out: Incidents (the first linkable object) come from Decision Rules. */
+    openDecisionRules(): void {
+        this.ref.close();
+        void this.router.navigate(['/decision-rules']);
     }
 
     addTag(event: MatChipInputEvent): void {

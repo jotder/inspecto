@@ -2,7 +2,9 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { describe, expect, it, vi } from 'vitest';
-import { of } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
+import { provideRouter, Router } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ToastrService } from 'ngx-toastr';
 import { ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -11,17 +13,18 @@ import { ObjectCreateDialog } from './object-create.dialog';
 const CREATED = { id: 'OBJ-1', objectType: 'INCIDENT', title: 'Late feed' } as OperationalObject;
 const CANDIDATE = { id: 'OBJ-9', objectType: 'ALERT', title: 'disk full', status: 'OPEN' } as OperationalObject;
 
-function create() {
+function create(list: () => Observable<OperationalObject[]> = () => of([CANDIDATE])) {
     const ref = { close: vi.fn() };
     const api = {
         create: vi.fn(() => of(CREATED)),
         tags: vi.fn(() => of([{ name: 'network' }, { name: 'urgent' }])),
-        list: vi.fn(() => of([CANDIDATE])),
+        list: vi.fn(list),
     };
     TestBed.configureTestingModule({
         imports: [ObjectCreateDialog],
         providers: [
             provideNoopAnimations(),
+            provideRouter([]),
             { provide: MAT_DIALOG_DATA, useValue: { type: 'INCIDENT', label: 'Incident', assignees: ['dana'] } },
             { provide: MatDialogRef, useValue: ref },
             { provide: ObjectsService, useValue: api },
@@ -81,6 +84,46 @@ describe('ObjectCreateDialog', () => {
         expect(c.assigneeOptions()).toEqual(['ana', 'dana']);
         TestBed.inject(SessionService).actor.set(null); // Personal: no session identity
         expect(c.assigneeOptions()).toEqual(['dana', 'operator']);
+    });
+
+    // CASE-FIRST-OBJECT-DEAD-END-1: with zero objects the ≥1-link rule stays, but the dialog must say where the
+    // first object comes from and offer the way there — not a bare "one must exist".
+    it('in an empty Space, points at Decision Rules and navigates there', () => {
+        const { fixture, ref } = create(() => of([]));
+        const el: HTMLElement = fixture.nativeElement;
+        const empty = el.querySelector('inspecto-empty-state');
+        expect(empty?.textContent).toContain('Decision Rule');
+        const nav = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        (empty!.querySelector('button') as HTMLButtonElement).click();
+        expect(ref.close).toHaveBeenCalled();
+        expect(nav).toHaveBeenCalledWith(['/decision-rules']);
+    });
+
+    it('shows no empty state when objects exist', () => {
+        const { fixture } = create();
+        expect(fixture.nativeElement.querySelector('inspecto-empty-state')).toBeNull();
+    });
+
+    it('shows a failed object load in place with Retry, never as "nothing to link"', () => {
+        let fail = true;
+        const { fixture, api } = create(() =>
+            fail
+                ? throwError(() => new HttpErrorResponse({ status: 500, error: { error: 'db down' } }))
+                : of([CANDIDATE]),
+        );
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.textContent).toContain('Could not load objects to link');
+        expect(el.textContent).not.toContain('Nothing to link yet');
+        fail = false;
+        (el.querySelector('inspecto-empty-state button') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(api.list).toHaveBeenCalledTimes(2);
+        expect(el.querySelector('inspecto-empty-state')).toBeNull();
+    });
+
+    it('renders the empty state with no a11y violations', async () => {
+        const { fixture } = create(() => of([]));
+        await expectNoA11yViolations(fixture.nativeElement);
     });
 
     it('renders with no a11y violations', async () => {

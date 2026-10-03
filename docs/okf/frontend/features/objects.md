@@ -319,7 +319,7 @@ lead would not find). Conditional Notes: **PASS**. Preview: **PASS**. Open a Cas
 | # | Finding | Severity | Row |
 |---|---|---|---|
 | 1 | Text typed into a choice box that was on screen before a later *Add choice* is silently lost; the dialog reports "a choice with no name" while the box shows text | **P2** (blocks) | `FINDINGS-EDITOR-CHOICE-BINDING-1` |
-| 2 | Neither New case nor New incident can be created in a Space with no objects (mandatory link); the only guidance is "one must exist" | P3 (product decision; blocked the proxy) | `CASE-FIRST-OBJECT-DEAD-END-1` |
+| 2 | Neither New case nor New incident can be created in a Space with no objects (mandatory link); the only guidance is "one must exist" | P3 (product decision; blocked the proxy) | `CASE-FIRST-OBJECT-DEAD-END-1` — ✅ shipped 2026-10-03: the rule stays; the create dialog's empty state names Decision Rules (create-incident action) as where the first Incident comes from and opens them |
 | 3 | One Findings form for every Case, so a "SIM-box" form has no home; loss can only be a plain Number and is separate from *Impact* | P3 (concept / wording) | `FINDINGS-PER-CASE-TYPE-1` |
 | 4 | *Add choice* leaves focus in *Name*, so the next keystrokes rename the field | P3 | `FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1` |
 | 5 | Radios are announced as "required"/"optional"; the condition word is truncated to "i."; *Technical details* (regex) stays open across fields | P3 (wording / a11y) | `FINDINGS-EDITOR-WORDING-1` — closed 2026-09-30 |
