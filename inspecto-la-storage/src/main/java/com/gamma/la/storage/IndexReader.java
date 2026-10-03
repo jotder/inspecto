@@ -66,8 +66,13 @@ public final class IndexReader implements AutoCloseable {
         IndexReader idle = null;
         synchronized (IDLE) {
             Path parent = key.getParent();
+            // D7-2: a pinned version's idle readers are spared (a Draft reads it), and borrowing a PINNED version evicts nothing
+            // (it is not "the newer one"). An unreadable pin set spares everything.
+            java.util.Set<Path> pinned = IndexPins.pinnedDirectories(parent, java.time.Clock.systemUTC());
+            boolean keepAll = pinned == null || pinned.contains(key);
             IDLE.entrySet().removeIf(e -> {
-                boolean sibling = !e.getKey().equals(key) && java.util.Objects.equals(e.getKey().getParent(), parent);
+                boolean sibling = !keepAll && !e.getKey().equals(key) && java.util.Objects.equals(e.getKey().getParent(), parent)
+                        && !pinned.contains(e.getKey());
                 if (sibling) evicted.addAll(e.getValue());
                 return sibling;
             });

@@ -231,19 +231,31 @@ public final class IndexStore {
     public List<String> gc(Duration minAge) throws IOException {
         List<String> deleted = new ArrayList<>();
         if (!Files.isDirectory(dir)) return deleted;
-        Instant cutoff = clock.instant().minus(minAge);
-        String live = current().map(p -> p.getFileName().toString()).orElse(null);
-        List<Path> versions = list(VERSION);
-        versions.sort(Comparator.comparingLong(IndexStore::number).reversed());
-        for (int i = keepVersions; i < versions.size(); i++) {
-            Path v = versions.get(i);
-            if (v.getFileName().toString().equals(live)) continue;
-            if (Files.getLastModifiedTime(v).toInstant().isAfter(cutoff)) continue;
-            deleteTree(v);
-            deleted.add(v.getFileName().toString());
-        }
-        deleted.addAll(deleteStaleStages(minAge));
-        return deleted;
+        // The whole sweep runs under the pin lock, so a pin cannot land between reading the set and deleting; an unreadable
+        // pin file throws here and NOTHING is deleted (fail closed).
+        IndexPins pins = pins();
+        return pins.locked(() -> {
+            Set<Long> pinned = pins.pinnedLocked(clock.instant());
+            Instant cutoff = clock.instant().minus(minAge);
+            String live = current().map(p -> p.getFileName().toString()).orElse(null);
+            List<Path> versions = list(VERSION);
+            versions.sort(Comparator.comparingLong(IndexStore::number).reversed());
+            for (int i = keepVersions; i < versions.size(); i++) {
+                Path v = versions.get(i);
+                if (v.getFileName().toString().equals(live)) continue;
+                if (pinned.contains(number(v))) continue;
+                if (Files.getLastModifiedTime(v).toInstant().isAfter(cutoff)) continue;
+                deleteTree(v);
+                deleted.add(v.getFileName().toString());
+            }
+            deleted.addAll(deleteStaleStages(minAge));
+            return deleted;
+        });
+    }
+
+    /** The pin registry of this index (D-7): a version pinned here survives {@link #gc} until the pin is released or expires. */
+    public IndexPins pins() {
+        return new IndexPins(dir, clock);
     }
 
     private List<String> deleteStaleStages(Duration age) throws IOException {
