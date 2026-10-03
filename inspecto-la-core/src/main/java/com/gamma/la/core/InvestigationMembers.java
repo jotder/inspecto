@@ -47,6 +47,12 @@ public final class InvestigationMembers {
 
         /** The four-eyes decision on a pending expand: a lead or a reviewer (the requester still never decides own). */
         public boolean canApprove() { return this == LEAD || this == REVIEWER; }
+
+        /** D7-3: a lead or an analyst forks and writes a Draft of their own; a reviewer never writes (design section 9). */
+        public boolean canWriteDraft() { return this == LEAD || this == ANALYST; }
+
+        /** D7-3 (D7-Q8, signed): a lead or a reviewer reads ANOTHER member's Draft; an analyst reads only their own. */
+        public boolean canReadAnyDraft() { return this == LEAD || this == REVIEWER; }
     }
 
     public enum Op { GRANT, REVOKE;

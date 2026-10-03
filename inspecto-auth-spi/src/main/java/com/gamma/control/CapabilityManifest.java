@@ -51,6 +51,13 @@ final class CapabilityManifest {
             // Case work like every Investigation write; the real gate is the handler's LEAD check (403 for a non-lead member).
             new Entry("POST", "/inv/investigations/([^/]+)/members", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/investigations/([^/]+)/members/revoke", Roles.CAN_MANAGE_INCIDENTS),
+            // DraftRoutes (D7-3) - forking, writing, undoing and discarding a Draft change an analyst's working copy of the evidence,
+            // so they are Case work like every Investigation write. NOT self-service-exempt: the capability is the precedent and the
+            // handler's actor / role check (the Draft's actor writes; the actor or a lead discards; a reviewer never writes) is the real gate.
+            new Entry("POST", "/inv/investigations/([^/]+)/drafts", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/ops", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/undo", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/discard", Roles.CAN_MANAGE_INCIDENTS),
             // EntityListRoutes (LA-17) — an Entity List is appended to the Space's identity fact log, evidence
             // like the op log, so changing one is Case work. The two GETs are reads (Space access only).
             new Entry("POST", "/entity-lists", Roles.CAN_MANAGE_INCIDENTS),

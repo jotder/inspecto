@@ -116,6 +116,22 @@ public final class LinkEventTypes {
      *  {@code investigationId}, {@code subject}, {@code role} (the role removed) and {@code actor}. */
     public static final String LINK_INV_MEMBER_REVOKED = "LINK_INV_MEMBER_REVOKED";
 
+    /** A Draft was forked from an Investigation ({@code POST /inv/investigations/{id}/drafts}, D7-3).
+     *  {@code investigationId}, {@code draftId}, {@code actor}, {@code baseStep} and {@code pins} (how many index versions it pinned). */
+    public static final String LINK_DRAFT_FORKED = "LINK_DRAFT_FORKED";
+
+    /** One op was appended to a Draft ({@code POST .../drafts/{draftId}/ops}). {@code investigationId}, {@code draftId},
+     *  {@code actor}, {@code baseStep}, {@code step}, {@code op}, and for a read-backed op its {@code dataset}, {@code rows}
+     *  and {@code fingerprint} - structured attributes only, never row content. */
+    public static final String LINK_DRAFT_OP_APPENDED = "LINK_DRAFT_OP_APPENDED";
+
+    /** The latest op of a Draft was undone ({@code POST .../drafts/{draftId}/undo}). Same attributes, {@code undoes} added. */
+    public static final String LINK_DRAFT_UNDONE = "LINK_DRAFT_UNDONE";
+
+    /** A Draft was discarded ({@code POST .../drafts/{draftId}/discard}) by its actor or a lead. {@code investigationId},
+     *  {@code draftId}, {@code actor} (who discarded), {@code baseStep}, {@code step} (its head) and {@code unpinned}. */
+    public static final String LINK_DRAFT_DISCARDED = "LINK_DRAFT_DISCARDED";
+
     /** An Investigation's Working Set was read as a derived relation ({@code GET /inv/investigations/{id}/working-set},
      *  LA-20). {@code relation} (entities | links | excluded), {@code rows} served, {@code total},
      *  {@code truncated}, {@code cached} and the relation {@code key} (the sealed log's hash) — the LA-04

@@ -163,9 +163,42 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     /** One opened Investigation: its store, write root and parsed header. Package-private for {@link WorkingSetRoutes}. */
-    public record Inv(SnapshotStore store, Path writeRoot, String id, Map<String, Object> header) {
+    public record Inv(SnapshotStore store, Path writeRoot, String id, Map<String, Object> header, DraftRef draft) {
+        /** An Investigation as opened for the MAIN log (no Draft). */
+        public Inv(SnapshotStore store, Path writeRoot, String id, Map<String, Object> header) {
+            this(store, writeRoot, id, header, null);
+        }
+
+        /** D7-3: the Draft this view is working on - its id, the main step it forked from, and its own directory. */
+        public record DraftRef(String draftId, int baseStep, Path dir) { }
+
         public String dataset() { return String.valueOf(header.get("dataset")); }
+        /** The INVESTIGATION's directory, also for a Draft view (members, the masking key and the Case link live here). */
         Path dir() { return store.investigationDir(id); }
+        /** The directory whose {@code log.jsonl} this view appends to - the Investigation's, or the Draft's. */
+        Path logDir() { return draft == null ? dir() : draft.dir(); }
+
+        /**
+         * The log this view evaluates: the main log, or - for a Draft - the main log's first {@code baseStep} entries
+         * followed by the Draft's own (D7-3). One list, because the Draft's steps continue the numbering.
+         */
+        List<String> logLines() throws IOException {
+            if (draft == null) return store.readLog(id);
+            List<String> main = store.readLog(id);
+            List<String> out = new ArrayList<>(main.subList(0, Math.min(draft.baseStep(), main.size())));
+            out.addAll(SnapshotStore.readLogAt(draft.dir()));
+            return out;
+        }
+
+        /** Append one step through the writer that matches this view: the main log's, or the Draft's. */
+        void appendStep(int step, String lineJson, String workingSetJson) throws IOException {
+            if (draft == null) store.appendStep(id, step, lineJson, workingSetJson);
+            else {
+                if (com.gamma.la.core.DraftStore.isDiscarded(draft.dir()))   // discarded between the gate and the lock
+                    throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + draft.draftId() + "' was discarded");
+                com.gamma.la.core.DraftStore.appendStep(draft.dir(), step, lineJson, workingSetJson);
+            }
+        }
     }
 
     // ── routes ─────────────────────────────────────────────────────────────────────────────────────────
@@ -295,7 +328,11 @@ public final class InvestigationRoutes implements RouteModule {
 
     /** {@code POST /inv/investigations/{id}/ops} — body {@code {op, ...params}}. See the class note for gates. */
     private Object appendOp(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
-        Inv inv = open(api, ex, id);
+        return appendOpOn(api, ex, open(api, ex, id), body);
+    }
+
+    /** The append, over an already-opened view: the main log's, or (D7-3) a Draft's - the SAME validation, sealing and rules. */
+    Object appendOpOn(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> body) throws IOException {
         String op = ApiContext.str(body, "op");
         if (op == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'op'");
         if (DEFERRED.contains(op))
@@ -307,7 +344,7 @@ public final class InvestigationRoutes implements RouteModule {
         if (params.get("links") != null) resolveLinkPseudonyms(inv, params);
         requireBindings(inv.header(), op, params, "");
 
-        synchronized (lock(inv.dir())) {
+        synchronized (lock(inv.logDir())) {
             List<Map<String, Object>> log = readLog(inv);
             InvestigationEvaluator.State before = evaluate(log, -1, null);
             List<String> ids = strings(params.get("ids"));
@@ -348,6 +385,9 @@ public final class InvestigationRoutes implements RouteModule {
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + MAX_FRONTIER
                             + " entities; name them with 'ids'");
                 Map<String, Object> sensitive = sensitivity(inv, params);
+                if (sensitive != null && inv.draft() != null)   // D7-3: the four-eyes queue belongs to the main log (D-U7); promote (D7-5) is where it meets a Draft
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "this expand is sensitive " + sensitive.get("exceeded")
+                            + " - four-eyes approval applies to the main log, so a Draft cannot hold it; lower the budget / fan-out or ask a lead to expand");
                 if (sensitive != null) return masked(inv, requestExpansion(ex, inv, params, sensitive, before));
                 entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, frontier, before, "")));
             }
@@ -357,10 +397,15 @@ public final class InvestigationRoutes implements RouteModule {
 
     /** {@code POST /inv/investigations/{id}/undo} — revert the latest effective op; 409 when there is none. */
     private Object undo(ApiContext api, HttpExchange ex, String id) throws IOException {
-        Inv inv = open(api, ex, id);
-        synchronized (lock(inv.dir())) {
+        return undoOn(ex, open(api, ex, id));
+    }
+
+    /** The undo, over an opened view. A Draft undoes only its OWN ops: the main prefix it forked from is not its to revert. */
+    Object undoOn(HttpExchange ex, Inv inv) throws IOException {
+        synchronized (lock(inv.logDir())) {
             List<Map<String, Object>> log = readLog(inv);
-            int target = InvestigationEvaluator.undoTarget(log);
+            int own = inv.draft() == null ? 0 : inv.draft().baseStep();
+            int target = InvestigationEvaluator.undoTarget(log.subList(Math.min(own, log.size()), log.size()));
             if (target < 0) throw new ApiException(409, ErrorCodes.CONFLICT, "nothing to undo");
             Map<String, Object> entry = entry(log.size() + 1, "undo", ex);
             entry.put("undoes", target);
@@ -640,7 +685,12 @@ public final class InvestigationRoutes implements RouteModule {
 
     /** {@code GET /inv/investigations/{id}/log?limit=n} — bounded; the TRUE total ships beside it. */
     private Object log(ApiContext api, HttpExchange ex, String id) throws IOException {
-        Inv inv = openForRead(api, ex, id);
+        return logOf(ex, openForRead(api, ex, id));
+    }
+
+    /** The log answer over an opened view; for a Draft (D7-3) only its OWN entries (steps after {@code baseStep}) are listed. */
+    Object logOf(HttpExchange ex, Inv inv) throws IOException {
+        int skip = inv.draft() == null ? 0 : inv.draft().baseStep();
         int limit = LOG_DEFAULT;
         String raw = ApiContext.query(ex, "limit");
         if (raw != null && !raw.isBlank()) {
@@ -662,7 +712,7 @@ public final class InvestigationRoutes implements RouteModule {
                 ? InvestigationEvaluator.entityCounts(log) : List.of();
         // ...and so is what each merged exclude actually removed (plan §5.10: the line never claims more).
         Map<Integer, Map<String, List<String>>> merged = InvestigationEvaluator.mergedExcludeOutcomes(log);
-        for (Map<String, Object> e : log.subList(0, Math.min(limit, log.size()))) {
+        for (Map<String, Object> e : log.subList(Math.min(skip, log.size()), Math.min(skip + limit, log.size()))) {
             int step = ((Number) e.get("step")).intValue();
             Map<String, Object> out = new LinkedHashMap<>(e);
             if (e.get("read") instanceof Map<?, ?> r) {
@@ -683,11 +733,15 @@ public final class InvestigationRoutes implements RouteModule {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("header", inv.header());
         out.put("entries", entries);
-        out.put("total", log.size());
-        out.put("truncated", log.size() > entries.size());
+        out.put("total", log.size() - Math.min(skip, log.size()));
+        out.put("truncated", log.size() - Math.min(skip, log.size()) > entries.size());
         List<Map<String, Object>> pending = new ArrayList<>();
-        for (String rec : inv.store().listPending(inv.id())) pending.add(parse(rec));
+        if (inv.draft() == null) for (String rec : inv.store().listPending(inv.id())) pending.add(parse(rec));   // the four-eyes queue is the main log's
         out.put("pending", pending);
+        if (inv.draft() != null) {
+            out.put("draftId", inv.draft().draftId());
+            out.put("baseStep", inv.draft().baseStep());
+        }
         return masked(inv, out);
     }
 
@@ -703,15 +757,22 @@ public final class InvestigationRoutes implements RouteModule {
         InvestigationEvaluator.State after = evaluate(next, -1, null);
         e.put("workingSetHash", after.hash());
         int step = ((Number) e.get("step")).intValue();
-        inv.store().appendStep(inv.id(), step, canonical(e), canonical(setDoc(step, after)));
+        inv.appendStep(step, canonical(e), canonical(setDoc(step, after)));
 
         String op = "undo".equals(e.get("kind")) ? "undo" : String.valueOf(e.get("op"));
         @SuppressWarnings("unchecked") Map<String, Object> read = (Map<String, Object>) e.get("read");
         boolean truncated = read != null && Boolean.TRUE.equals(read.get("truncated"));
-        emit(ex, LinkEventTypes.LINK_INVESTIGATION_STEPPED, "link.investigation.stepped",
-                "link.investigation.stepped — " + inv.id() + " step " + step + " " + op,
+        Inv.DraftRef draft = inv.draft();
+        boolean undo = "undo".equals(op);
+        emit(ex, draft == null ? LinkEventTypes.LINK_INVESTIGATION_STEPPED : undo ? LinkEventTypes.LINK_DRAFT_UNDONE : LinkEventTypes.LINK_DRAFT_OP_APPENDED,
+                draft == null ? "link.investigation.stepped" : undo ? "link.draft.undone" : "link.draft.op_appended",
+                (draft == null ? "link.investigation.stepped — " : "link.draft.step — " + draft.draftId() + " of ") + inv.id() + " step " + step + " " + op,
                 b -> {
                     b.attr("investigationId", inv.id()).attr("step", step).attr("op", op);
+                    if (draft != null) {   // D7-3: structured attributes only - which Draft, whose, forked from where
+                        b.attr("draftId", draft.draftId()).attr("actor", ApiContext.actor(ex)).attr("baseStep", draft.baseStep());
+                        if (undo) b.attr("undoes", e.get("undoes"));
+                    }
                     if (read != null) b.attr("dataset", read.get("dataset")).attr("rows", read.get("rowCount"))
                             .attr("truncated", truncated).attr("fingerprint", read.get("fingerprint"));
                     // D-3 step 6: only an index-answered read says so (a Dataset-answered read keeps today's attributes)
@@ -1706,7 +1767,7 @@ public final class InvestigationRoutes implements RouteModule {
 
     /** The response, masked per the Space's {@code maskingMode}, with a {@code masking} note saying what was (D-U6). */
     @SuppressWarnings("unchecked")
-    private static Object masked(Inv inv, Object out) throws IOException {
+    static Object masked(Inv inv, Object out) throws IOException {
         EntityMasking mask = EntityMasking.of(inv, List.of());
         Object masked = LinkIds.stamp(mask.apply(out));   // D-U9: link ids minted from what the caller sees
         if (!(masked instanceof Map<?, ?> m)) return masked;
@@ -1917,7 +1978,7 @@ public final class InvestigationRoutes implements RouteModule {
 
     private static List<Map<String, Object>> readLog(Inv inv) throws IOException {
         List<Map<String, Object>> out = new ArrayList<>();
-        for (String line : inv.store().readLog(inv.id())) {
+        for (String line : inv.logLines()) {
             @SuppressWarnings("unchecked") Map<String, Object> m = ApiContext.JSON.readValue(line, Map.class);
             out.add(m);
         }
@@ -1990,7 +2051,7 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     /** Best-effort audit (LA-04 pattern), emitted only AFTER the act succeeded so the trail never over-claims. */
-    private static void emit(HttpExchange ex, String type, String action, String message,
+    static void emit(HttpExchange ex, String type, String action, String message,
                              UnaryOperator<Event.Builder> attrs) {
         try {
             Event.Builder b = Event.builder(type).source("inv").message(message)

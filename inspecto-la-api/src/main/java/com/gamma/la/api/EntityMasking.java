@@ -91,7 +91,7 @@ final class EntityMasking {
     /** The masking in force for one Investigation, from its sealed log (read here) plus any {@code extraIds}. */
     static EntityMasking of(InvestigationRoutes.Inv inv, Collection<String> extraIds) throws IOException {
         List<Map<String, Object>> log = new ArrayList<>();
-        for (String line : inv.store().readLog(inv.id())) {
+        for (String line : inv.logLines()) {
             @SuppressWarnings("unchecked") Map<String, Object> m = com.gamma.control.ApiContext.JSON.readValue(line, Map.class);
             log.add(m);
         }

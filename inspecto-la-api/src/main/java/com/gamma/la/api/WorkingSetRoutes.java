@@ -102,8 +102,15 @@ public final class WorkingSetRoutes implements RouteModule {
     }
 
     private Object workingSet(ApiContext api, HttpExchange ex, String id) throws IOException {
-        InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, id);   // 503 · 422 · 403 · 404 owner-or-Case-member/R3/PDP
+        return serve(ex, InvestigationRoutes.openForRead(api, ex, id));   // 503 · 422 · 403 · 404 owner-or-Case-member/R3/PDP
+    }
 
+    /**
+     * The relation answer over an OPENED view: the main log's (above) or a Draft's ({@link DraftRoutes}, D7-3). The caller
+     * has already passed its gate; everything below - the cache, the masking after it - is the same for both.
+     */
+    static Object serve(HttpExchange ex, InvestigationRoutes.Inv inv) throws IOException {
+        String id = inv.id();
         String of = ApiContext.query(ex, "of");
         if (of == null || of.isBlank()) of = "entities";
         if (!COLUMNS.containsKey(of))
@@ -121,15 +128,20 @@ public final class WorkingSetRoutes implements RouteModule {
         boolean truncated = (long) offset + rows.size() < all.size();
 
         String relation = of;
-        emit(ex, id, b -> b.attr("investigationId", id).attr("relation", relation).attr("rows", rows.size())
-                .attr("total", all.size()).attr("truncated", truncated).attr("cached", cached[0])
-                .attr("key", rel.key()).attr("at", at < 0 ? null : at));
+        emit(ex, id, b -> {
+            b.attr("investigationId", id).attr("relation", relation).attr("rows", rows.size())
+                    .attr("total", all.size()).attr("truncated", truncated).attr("cached", cached[0])
+                    .attr("key", rel.key()).attr("at", at < 0 ? null : at);
+            if (inv.draft() != null) b.attr("draftId", inv.draft().draftId());
+            return b;
+        });
 
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("step", rel.headStep());
         head.put("workingSetHash", rel.workingSetHash());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
+        if (inv.draft() != null) out.put("draftId", inv.draft().draftId());
         out.put("relation", of);
         out.put("columns", COLUMNS.get(of));
         out.put("rows", rows);
@@ -173,11 +185,20 @@ public final class WorkingSetRoutes implements RouteModule {
      * the step, so it shares the cache without ever answering for the head, and vice versa.
      */
     static Relation relation(InvestigationRoutes.Inv inv, int at, boolean[] cachedOut) throws IOException {
-        Path logFile = inv.dir().resolve("log.jsonl");
-        byte[] bytes = Files.isRegularFile(logFile) ? Files.readAllBytes(logFile) : new byte[0];
+        Path logFile = inv.logDir().resolve("log.jsonl");
+        byte[] own = Files.isRegularFile(logFile) ? Files.readAllBytes(logFile) : new byte[0];
+        byte[] bytes = own;
+        if (inv.draft() != null) {   // D7-3: the main prefix the Draft forked from, then the Draft's own lines - the key hashes BOTH
+            java.io.ByteArrayOutputStream joined = new java.io.ByteArrayOutputStream();
+            List<String> main = inv.store().readLog(inv.id());
+            for (String line : main.subList(0, Math.min(inv.draft().baseStep(), main.size())))
+                joined.writeBytes((line + "\n").getBytes(StandardCharsets.UTF_8));
+            joined.writeBytes(own);
+            bytes = joined.toByteArray();
+        }
         int end = bytes.length;
         while (end > 0 && bytes[end - 1] != '\n') end--;   // a line being appended right now is not committed yet
-        String key = inv.dir().toAbsolutePath().normalize() + "\u0000" + sha256(bytes, end) + (at < 0 ? "" : "@" + at);
+        String key = inv.logDir().toAbsolutePath().normalize() + "\u0000" + sha256(bytes, end) + (at < 0 ? "" : "@" + at);
         synchronized (CACHE) {
             Relation hit = CACHE.get(key);
             if (hit != null) {

@@ -214,7 +214,12 @@ public final class SnapshotStore {
 
     /** The log's lines, in step order (empty for a fresh Investigation). */
     public List<String> readLog(String id) throws IOException {
-        Path f = investigationDir(id).resolve("log.jsonl");
+        return readLogAt(investigationDir(id));
+    }
+
+    /** The log lines of whatever directory holds a {@code log.jsonl} - an Investigation's, or a Draft's (D7-3). */
+    public static List<String> readLogAt(Path dir) throws IOException {
+        Path f = dir.resolve("log.jsonl");
         if (!Files.isRegularFile(f)) return List.of();
         List<String> out = new ArrayList<>();
         for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) if (!line.isBlank()) out.add(line);
@@ -236,7 +241,11 @@ public final class SnapshotStore {
      * recompute, never a set with no step behind it.
      */
     public void appendStep(String id, int step, String lineJson, String workingSetJson) throws IOException {
-        Path d = investigationDir(id);
+        appendStepAt(investigationDir(id), step, lineJson, workingSetJson);
+    }
+
+    /** {@link #appendStep} over any directory holding a log and {@code sets/} - the ONE writer a Draft (D7-3) shares with the main log. */
+    public static void appendStepAt(Path d, int step, String lineJson, String workingSetJson) throws IOException {
         Files.writeString(d.resolve("log.jsonl"), lineJson + "\n", StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         Files.createDirectories(d.resolve("sets"));
