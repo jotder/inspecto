@@ -130,6 +130,7 @@ public final class RecipeCompiler {
                 case "summarize" -> nodes.add(summarize(id, cfg, refusals));
                 case "profile" -> nodes.add(profile(id, cfg, refusals));
                 case "webhook" -> nodes.add(webhook(id, cfg, refusals));
+                case "step" -> nodes.add(contributedStep(id, cfg, refusals));
                 default -> refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
                         "unknown step verb '" + verb + "'"));
             }
@@ -343,6 +344,28 @@ public final class RecipeCompiler {
             refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id, e.getMessage()));
         }
         return PipelineNode.of(id, BuiltinNodeType.SINK_WEBHOOK.type(), new LinkedHashMap<>(cfg));
+    }
+
+    /**
+     * {@code step: {kind: acme.score, …config}} (Stage 2 S2-5, D-5) → a node of a pack-CONTRIBUTED type
+     * {@code transform.<kind>}, config verbatim minus {@code kind}. One generic verb keeps the verb set
+     * closed: a pack cannot shadow a built-in verb, and a built-in kind is refused here (it has its own verb).
+     */
+    private static PipelineNode contributedStep(String id, Map<String, Object> cfg,
+                                                List<PipelineCompileException.Refusal> refusals) {
+        Map<String, Object> rest = new LinkedHashMap<>(cfg);
+        String kind = str(rest.remove("kind"));
+        if (kind == null || kind.isBlank()) {
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "step needs a kind: naming a pack-contributed step kind, e.g. `- step: {kind: acme.score}`"));
+            return PipelineNode.of(id, "transform.unknown", rest);
+        }
+        String type = "transform." + kind;
+        boolean contributed = PipelineNodeTypes.get(type).filter(d -> !(d instanceof BuiltinNodeType)).isPresent();
+        if (!contributed || PipelineEditable.stepKindOf(type) == null)
+            refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
+                    "step kind '" + kind + "' is not a loaded pack-contributed step (a built-in kind uses its own verb)"));
+        return PipelineNode.of(id, type, rest);
     }
 
     /** {@code sink} → persistent sink node (keys pass verbatim: table/format/compression/database/…). */

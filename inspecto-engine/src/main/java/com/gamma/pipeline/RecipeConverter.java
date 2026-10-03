@@ -176,7 +176,16 @@ public final class RecipeConverter {
                     }
                     // an unmodelled kind travels VERBATIM so compile() names it in an UNSUPPORTED_STEP
                     // refusal — a projection must never quietly shorten the chain
-                    default -> steps.add(step(kind, cfg));
+                    default -> {
+                        if (PipelineNodeTypes.get("transform." + kind).filter(d -> !(d instanceof BuiltinNodeType)).isPresent()
+                                && PipelineEditable.stepKindOf("transform." + kind) != null) {
+                            // S2-5 (D-5): a pack-contributed kind speaks the generic step: verb
+                            Map<String, Object> spelled = new LinkedHashMap<>();
+                            spelled.put("kind", kind);
+                            spelled.putAll(cfg);
+                            steps.add(step("step", spelled));
+                        } else steps.add(step(kind, cfg));
+                    }
                 }
             }
         } else {

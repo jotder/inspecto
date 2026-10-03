@@ -300,8 +300,11 @@ undeclared service invisible, ceiling and unknown id, the lease), `PipelineNodeT
 
 Stage 2 is built through S2-3. S2-4 is closed as a no-op (D-11, operator 2026-10-04): a config-derived
 chain executes on the at-rest path (`output_store:`), so `graphLaneCarries` is not widened and ELT Phase 6
-Row 15 is discharged there. S2-5 (recipe spelling and catalog visibility) remains, as does Stage 3
-(pack-contributed services). The open items
+Row 15 is discharged there. S2-5 shipped 2026-10-04: a pack kind is spelled by the generic `- step: {kind: <suffix>, …}` recipe verb (D-5;
+`RecipeCompiler` compiles it to `transform.<kind>` and `RecipeConverter` projects it back; a built-in, unloaded or
+kind-less step is refused) and stays out of `ProcessorCatalog` (D-6). ⚠ It also fixed two latent save-path defects:
+`PipelineEditable.lower` gated on the closed `LOWERABLE` set, and `isLegacyShaped` NPE'd on a contributed kind, so a
+contributed step could not be saved at all before. Stage 3 (pack-contributed services) remains. The open items
 live in [`BACKLOG.md`](../../../BACKLOG.md) §4 under *Platform Services*. A Job-side watchdog is still a
 recorded gap; the Step watchdog is §7c.
 

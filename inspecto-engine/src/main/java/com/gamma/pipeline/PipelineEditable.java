@@ -754,7 +754,9 @@ public final class PipelineEditable {
         LinkedHashMap<String, PipelineNode> destByDatabase = new LinkedHashMap<>();
         for (PipelineNode n : g.nodes()) {
             String t = n.type();
-            if (!LOWERABLE.contains(t)) {
+            // isLowerable, not LOWERABLE: a pack-contributed step has a steps: home (S2-5 found this gate
+            // still read the closed built-in set, so the palette offered a type save then refused)
+            if (!isLowerable(t)) {
                 refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_NODE, n.id(),
                         "the flat pipeline config has no home for a '" + t + "' node"));
                 continue;
@@ -1217,6 +1219,7 @@ public final class PipelineEditable {
             // cannot hold a step type they have never heard of. Such a chain must take `steps:`.
             // `sql` IS in KINDS (the parser accepts it standalone) but has no singular block either.
             String kind = STEP_KIND.get(n.type());
+            if (kind == null) return false;   // contributed: List.indexOf(null) NPEs on an immutable list
             if (PipelineConfig.Step.SQL.equals(kind) || PipelineConfig.Step.LOOKUP.equals(kind)) return false;
             int position = PipelineConfig.Step.KINDS.indexOf(kind);
             if (position <= previous) return false;
