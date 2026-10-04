@@ -73,6 +73,17 @@ separate `URLClassLoader`, filtering to providers that actually came from it. Co
    `Skipped: N` *with the reason*. `PostgresStateStoreTest` is the reference — 11 skipped, each naming the
    property that turns it back on. Absent coverage you can see is a decision; absent coverage you cannot
    is the disease.
+
+   **Register of tests that legitimately skip (audited 2026-10-04, full reactor).** None runs in CI.
+   | Test | Gate to turn it on |
+   |---|---|
+   | `PartitionWriterObjectStoreTest` (4, per-test) | `INSPECTO_TEST_S3_ENDPOINT`, `_KEY`, `_SECRET` (or `-Dinspecto.test.s3.endpoint/.key/.secret`) + bucket `inspecto-lakehouse` |
+   | `OidcAgainstRealProviderTest` (3) | `INSPECTO_TEST_OIDC_ISSUER`, `_CLIENT_ID`, `_CLIENT_SECRET` (+ `_USERNAME`, `_PASSWORD` for the role-mapping test) |
+   | `KafkaRealBrokerTest` (1) | a broker at `-Dkafka.it.bootstrap` (default `localhost:9092`) |
+   | `RealGrammarsTest`, `ParityCheckTest` | `-Dasn.corpus.tests=true` plus the corpus files |
+   | `IndexBuilderTest` bench, `DraftPromoteCostTest`, `DraftRebaseCostTest` | `-Dinspecto.bench=true` / `-Dinspecto.bench.promote=true` / `-Dinspecto.bench.rebase=true` |
+   | `*JailTest` symlink cases | OS symlink privilege (Windows without Developer Mode skips) |
+   | `FixedWidthTest.shippedSubscriberPipeline…`, `DelimitedGrammarTest.shippedVoucherPipeline…` | ⛔ **never run** — `config/subscriber|voucher/*` does not exist under `inspecto-etl`; dead guards, not gates |
 5. **Check the STAGED artifact — and where the risk is "does it work", RUN it.** `package.ps1` verifies
    the staged connector sidecar (8 factories, sshj, javax.mail) and the security sidecar (Nimbus + 3 SPI
    registrations); those are the only checks in the repo that inspect a packaged artifact. But

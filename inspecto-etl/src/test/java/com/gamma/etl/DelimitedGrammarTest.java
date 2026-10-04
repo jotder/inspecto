@@ -96,7 +96,9 @@ class DelimitedGrammarTest {
     void shippedVoucherPipelineResolvesGrammar() throws Exception {
         Path pipeline = Path.of("config/voucher/voucher_pipeline.toon");
         org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(pipeline),
-                "shipped voucher pipeline present (module CWD)");
+                "SKIPPED: config/voucher/voucher_pipeline.toon does not exist under the module CWD (the pipeline "
+                        + "now lives at spaces/ucc/config/voucher and its grammar path is CWD-relative, so the "
+                        + "test cannot simply be repointed) — this guard has never run; see guard-coverage.md");
         // fromMap is a pure parse (no status-dir creation) but still resolves processing.grammar.
         PipelineConfig cfg = PipelineConfig.fromMap(
                 com.gamma.util.ToonHelper.load(pipeline.toString()));

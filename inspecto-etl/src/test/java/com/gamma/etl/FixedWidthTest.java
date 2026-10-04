@@ -114,7 +114,8 @@ class FixedWidthTest {
     void shippedSubscriberPipelineResolvesFixedWidthGrammar() throws Exception {
         Path pipeline = Path.of("config/subscriber/subscriber_pipeline.toon");
         org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(pipeline),
-                "shipped subscriber pipeline present (module CWD)");
+                "SKIPPED: config/subscriber/subscriber_pipeline.toon does not exist in this repo (no copy anywhere) "
+                        + "— this guard has never run; supply the file or delete the test");
         // fromMap is a pure parse (no dir creation) but still resolves the grammar + schema files.
         PipelineConfig cfg = PipelineConfig.fromMap(
                 com.gamma.util.ToonHelper.load(pipeline.toString()));
