@@ -5,5 +5,6 @@ job:
   sources: balance_ledger
   sink_dataset: ra_rollforward_findings
   tolerance: "0.05"
-  cron: "15 5 * * *"
+  on_signal: job.run.completed
+  when: "$signal.job == ra_rerating && $signal.outcome == SUCCESS"
   enabled: true

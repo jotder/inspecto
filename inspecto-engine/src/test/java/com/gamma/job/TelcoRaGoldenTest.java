@@ -165,6 +165,43 @@ class TelcoRaGoldenTest {
         assertEquals(brokenXdrs, column(dataDir, "ra_xdr_lost", "ITEM_KEY"), "the lost-xDR Dataset counts xDRs, not Breaks");
     }
 
+    /**
+     * The findings Jobs are chained with {@code on_signal}, not cron-staggered: one trigger of {@code ra_rerating}
+     * runs rollforward, settlement, then leakage and data quality, each only after its predecessor SUCCEEDED.
+     */
+    @Test
+    void theFindingsJobsChainOnSignalFromOneTrigger(@TempDir Path dir) throws Exception {
+        Path dataDir = dir.resolve("data");
+        loadCorpus(dataDir);
+        List<JobConfig> jobs = new ArrayList<>();
+        for (String j : List.of("ra_rerating", "ra_rollforward", "ra_settlement", "ra_leakage", "ra_data_quality"))
+            jobs.add(JobConfig.load(templateJob(j).toString()));
+        assertTrue(jobs.get(0).hasCron(), "the head of the chain keeps its cron");
+        for (JobConfig j : jobs.subList(1, jobs.size()))
+            assertTrue(j.hasSignal() && !j.hasCron(), j.name() + " is signal-triggered, never cron-staggered");
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(jobs, new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString(), null, null, dataDir.toString())) {
+            js.eventLog(com.gamma.event.EventLog.global());
+            js.start();
+            assertTrue(js.triggerRun("ra_rerating", null).isPresent());
+            for (String j : List.of("ra_rerating", "ra_rollforward", "ra_settlement", "ra_leakage", "ra_data_quality")) {
+                // a SKIPPED run is the when guard turning an earlier link's completion away — wait it out
+                JobRun run = await(() -> js.runsFor(j).stream().filter(r -> !"SKIPPED".equals(r.status())).findFirst().orElse(null));
+                assertEquals("SUCCESS", run.status(), j + ": " + run.message());
+            }
+        }
+        Set<String> dq = Set.of("ambiguous_tariff", "no_tariff", "null_value", "missing_statement", "split_statement");
+        long total = 0, plantedDq = 0;
+        for (String control : List.of("ra_rerating", "ra_rollforward", "ra_settlement")) {
+            total += CORPUS.planted.get(control).size();
+            plantedDq += CORPUS.planted.get(control).stream()
+                    .filter(k -> dq.contains(k.substring(k.lastIndexOf('|') + 1))).count();
+        }
+        assertEquals(total - plantedDq, rows(dataDir, "ra_leakage", "CONTROL").size(), "leakage rows via the chain");
+        assertEquals(plantedDq, rows(dataDir, "ra_data_quality", "CONTROL").size(), "data-quality rows via the chain");
+    }
+
     /** The golden counts, pinned: a corpus change that moves them must be deliberate. */
     @Test
     void theGoldenCountsArePinned() {

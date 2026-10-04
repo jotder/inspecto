@@ -5,5 +5,6 @@ job:
   sources: "ic_statement,ic_rates,switch_xdr"
   sink_dataset: ra_settlement_findings
   tolerance_pct: "1.0"
-  cron: "20 5 * * *"
+  on_signal: job.run.completed
+  when: "$signal.job == ra_rollforward && $signal.outcome == SUCCESS"
   enabled: true

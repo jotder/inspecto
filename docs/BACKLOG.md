@@ -350,7 +350,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
     - (3) The golden test loads the CSVs straight into the stores, never through the 8 Pipelines. It also
       never evaluates the Alert Rules or Expectations.
     - (4) ~~closed 2026-10-01~~ the runbook now lives at `config/runbooks/telco-ra-runbooks.md`, so it reaches the created Space (linking an Alert Rule to it stays a product call, see the runbook component kind).
-    - (5) The Jobs are cron-staggered, not chained with `on_signal`.
+    - (5) ~~closed 2026-10-04~~ the findings Jobs are chained with `on_signal: job.run.completed` (rerating → rollforward → settlement → leakage + data quality), pinned by `TelcoRaGoldenTest`. `ra_xdr_lost`, the two recon Jobs and `ra_recovery` stay on their own cron.
     - (6) The Alert Rules raise one Alert per rule, not per control: `by: CONTROL` would fail the seed
       gate's Schema check over an empty Dataset.
     - (7) Vendor-specific halves stay parked (plan §4).

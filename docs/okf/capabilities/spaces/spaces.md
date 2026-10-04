@@ -214,6 +214,12 @@ exists (§2, §5).
   - Since `fix(recon)` in the same lane, the run message, Signal and Incident count the Breaks of **every**
     pair. Before that they counted A↔B only, from the run summary's `byType`.
 - **`sql.template` control Jobs.**
+  - **Chained, not staggered (2026-10-04).** `ra_rerating` keeps its cron; `ra_rollforward` →
+    `ra_settlement` → `ra_leakage` and `ra_data_quality` each use `on_signal: job.run.completed` with
+    `when: "$signal.job == <previous> && $signal.outcome == SUCCESS"` (halt-on-failure by guard), so the union
+    Jobs never read a half-written findings Dataset. ⚠ Every completion also records a SKIPPED run on the
+    other links (guard false) — a test waiting for a link must ignore SKIPPED
+    (`TelcoRaGoldenTest.theFindingsJobsChainOnSignalFromOneTrigger`).
   - `ra_xdr_lost`: distinct lost or short xDRs.
   - `ra_rerating`: the tariff row in force at the call **start**. It emits one row per call, and a
     duplicate or overlapping row becomes an `ambiguous_tariff` data-quality finding, never a fan-out.
