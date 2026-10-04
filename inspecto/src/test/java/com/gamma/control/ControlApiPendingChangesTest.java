@@ -1080,4 +1080,43 @@ class ControlApiPendingChangesTest {
             System.clearProperty("data.dir");
         }
     }
+
+    // ── approver check (ASSURE-ENTITY-LISTS-RESIDUALS-1 (4)) ────────────────────────────────────────
+
+    /** Re-arm with an Authenticator that, like Demo sign-in, can enumerate its principals (id → roles). */
+    private static void enumerating(Authenticator base, Map<String, List<String>> principals) {
+        Authenticators.forTest(new Authenticator() {
+            @Override public Optional<Subject> authenticate(com.sun.net.httpserver.HttpExchange ex) { return base.authenticate(ex); }
+            @Override public Optional<Map<String, List<String>>> principals(Path configRoot) { return Optional.of(principals); }
+        });
+    }
+
+    @Test
+    void aHeldChangeSaysWhetherAnyoneCouldApproveIt(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Ctx c = open(cfg, root)) {
+            policy(c, PACK_POLICY);
+            String id = propose(c, "p1");
+            Authenticator base = Authenticators.active().orElseThrow();
+
+            assertEquals("unknown", data(send(c, "GET", "/pending-changes/" + id, null, AUTHOR), 200)
+                    .get("approverCheck").asText(), "an IdP that cannot enumerate its principals cannot say");
+
+            enumerating(base, Map.of("author-1", List.of("admin"), "dev-2", List.of("pipeline-developer")));
+            assertEquals("none-eligible", data(send(c, "GET", "/pending-changes/" + id, null, AUTHOR), 200)
+                    .get("approverCheck").asText(), "the only approver is the author, and four-eyes bars them");
+            assertEquals("none-eligible", data(send(c, "GET", "/pending-changes", null, AUTHOR), 200)
+                    .get("items").get(0).get("approverCheck").asText());
+            assertEquals("pending", data(send(c, "GET", "/pending-changes/" + id, null, AUTHOR), 200)
+                    .get("status").asText(), "informational: never auto-declined");
+
+            enumerating(base, Map.of("author-1", List.of("admin"), "checker-1", List.of("admin")));
+            assertEquals("ok", data(send(c, "GET", "/pending-changes/" + id, null, AUTHOR), 200)
+                    .get("approverCheck").asText(), "computed live: a non-maker approver now exists");
+
+            data(send(c, "POST", "/pending-changes/" + id + "/decline", "{}", CHECKER), 200);
+            assertFalse(data(send(c, "GET", "/pending-changes/" + id, null, AUTHOR), 200).has("approverCheck"),
+                    "only a pending change carries it");
+        }
+    }
 }

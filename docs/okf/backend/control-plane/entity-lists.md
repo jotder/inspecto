@@ -144,4 +144,8 @@ The seam is `com.gamma.risk.WatchListFeed`, an engine SPI that `inspecto-entity-
 - There is no SPA authoring for ranges or expiry. The Investigation tab's Entity Lists section edits exact keys,
   and the Pending Change diff is the only view of a held list change.
 - A Dataset over a sidecar is not registered automatically. Author `physicalRef: entity_list_<id>`.
-- `approverCheck` / eligibility warnings (as Action Requests have) are not computed for a held list change.
+- ~~`approverCheck` for a held list change~~ shipped 2026-10-04: every *pending* Pending Change (any kind, so a held
+  list change too) carries `approverCheck: none-eligible | unknown | ok` on `GET /pending-changes[/{id}]`, computed live by
+  `ActionRequestRoutes.check` over the change's own `approverCapability` with its author out when `fourEyes`. It is
+  informational (never auto-declines) and, unlike an Action Request's, ignores data scope: a Pending Change's approve
+  gate is the capability alone. Raising it emits no audit row.

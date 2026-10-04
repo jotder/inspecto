@@ -215,30 +215,35 @@ final class ActionRequestRoutes implements RouteModule {
         Set<Object> makers = new java.util.HashSet<>();
         makers.add(rec.get("author"));
         if (rec.get("coAuthors") instanceof List<?> co) makers.addAll(co);
-        return memo.computeIfAbsent(makers, m -> {
-            try {
-                return compute(root, m);
-            } catch (RuntimeException e) {   // an unreadable directory (a corrupt demo-users.toon) is "cannot tell"
-                long now = System.currentTimeMillis();
-                Long last = CHECK_FAILURE_LOGGED.get(root);
-                if ((last == null || now - last >= FAILURE_LOG_EVERY_MS)
-                        && (last == null ? CHECK_FAILURE_LOGGED.putIfAbsent(root, now) == null
-                                         : CHECK_FAILURE_LOGGED.replace(root, last, now)))
-                    org.slf4j.LoggerFactory.getLogger(ActionRequestRoutes.class)
-                            .warn("action request approver check failed, reporting 'unknown': {}", e.toString());
-                return UNKNOWN;
-            }
-        });
+        return memo.computeIfAbsent(makers, m -> check(root, m, Roles.CAN_APPROVE_CHANGES, true));
+    }
+
+    /** {@link #compute} that never throws: an unreadable directory (a corrupt demo-users.toon) is "cannot tell". */
+    static String check(Path root, Set<Object> makers, String capability, boolean needsVisible) {
+        try {
+            return compute(root, makers, capability, needsVisible);
+        } catch (RuntimeException e) {
+            long now = System.currentTimeMillis();
+            Long last = CHECK_FAILURE_LOGGED.get(root);
+            if ((last == null || now - last >= FAILURE_LOG_EVERY_MS)
+                    && (last == null ? CHECK_FAILURE_LOGGED.putIfAbsent(root, now) == null
+                                     : CHECK_FAILURE_LOGGED.replace(root, last, now)))
+                org.slf4j.LoggerFactory.getLogger(ActionRequestRoutes.class)
+                        .warn("approver check failed, reporting 'unknown': {}", e.toString());
+            return UNKNOWN;
+        }
     }
 
     /** {@code root} is the request's bound Space root: the one {@code ControlApi.dispatch} hands the Authenticator
-     *  as {@code Roles.configRoot(ex)}, so the roles read here are the ones the approve gate's Subject was built from. */
-    private static String compute(Path root, Set<Object> makers) {
+     *  as {@code Roles.configRoot(ex)}, so the roles read here are the ones the approve gate's Subject was built from.
+     *  {@code needsVisible}: deciding also needs the linked object visible to the approver (an Action Request does;
+     *  a Pending Change's approve gate is the capability alone). */
+    private static String compute(Path root, Set<Object> makers, String capability, boolean needsVisible) {
         // No Authenticator (Personal) => no Subject is ever attached => deciding is always 403.
         Authenticator auth = Authenticators.active().orElse(null);
         if (auth == null) return NONE_ELIGIBLE;
         boolean anyRole = Roles.effective(root).keySet().stream()
-                .anyMatch(r -> JobAuthority.capabilitiesNow(List.of(r), root).contains(Roles.CAN_APPROVE_CHANGES));
+                .anyMatch(r -> JobAuthority.capabilitiesNow(List.of(r), root).contains(capability));
         if (!anyRole) return NONE_ELIGIBLE;
         Map<String, List<String>> who = auth.principals(root).orElse(null);
         if (who == null) return UNKNOWN;
@@ -252,7 +257,8 @@ final class ActionRequestRoutes implements RouteModule {
         boolean scopedHolder = false;
         for (Map.Entry<String, List<String>> p : who.entrySet()) {
             if (makers.contains(p.getKey())
-                    || !JobAuthority.capabilitiesNow(p.getValue(), root).contains(Roles.CAN_APPROVE_CHANGES)) continue;
+                    || !JobAuthority.capabilitiesNow(p.getValue(), root).contains(capability)) continue;
+            if (!needsVisible) return OK;
             boolean scoped = rowPolicies || p.getValue().stream().anyMatch(r -> r.startsWith("case:")
                     || (defs.get(r) != null && defs.get(r).dataScopes() != null));
             if (!scoped) return OK;

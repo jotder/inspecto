@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The Pending Change inbox and the approval policy (`ASSURE-MAKER-CHECKER-1` S1/S3) — see {@link PendingChanges}
@@ -163,13 +164,14 @@ final class PendingChangeRoutes implements RouteModule {
         int total = 0;
         if (root != null) {
             int[] n = {0};
+            Map<List<Object>, String> memo = new java.util.HashMap<>();
             PendingChanges.underStoreLock(root, () -> {
                 for (Map<String, Object> rec : PendingChanges.list(root)) {
                     PendingChanges.expireIfDue(ex, root, rec);
                     if (status != null && !status.isBlank() && !status.equals(rec.get("status"))) continue;
                     if (kind != null && !kind.isBlank() && !kind.equals(rec.get("kind"))) continue;
                     n[0]++;
-                    if (items.size() < LIST_CAP) items.add(PendingChanges.summary(rec));
+                    if (items.size() < LIST_CAP) items.add(withApproverCheck(root, rec, PendingChanges.summary(rec), memo));
                 }
                 return null;
             });
@@ -191,7 +193,22 @@ final class PendingChangeRoutes implements RouteModule {
             r.put("path", req.get("path"));
             out.put("request", r);   // the raw body is the author's request, not the reviewer's business
         }
-        return out;
+        return withApproverCheck(api.writeRoot(), rec, out, new java.util.HashMap<>());
+    }
+
+    /**
+     * Whether anyone could approve this pending change (ASSURE-ENTITY-LISTS-RESIDUALS-1 (4)), for every kind: the
+     * same {@code none-eligible | unknown | ok} reading an Action Request carries, over the change's own
+     * {@code approverCapability}, with its author out when {@code fourEyes}. Computed live, informational only.
+     */
+    static Map<String, Object> withApproverCheck(Path root, Map<String, Object> rec, Map<String, Object> view,
+                                                 Map<List<Object>, String> memo) {
+        if (!"pending".equals(rec.get("status")) || root == null) return view;
+        String cap = String.valueOf(rec.get("approverCapability"));
+        Set<Object> makers = Boolean.TRUE.equals(rec.get("fourEyes")) ? Set.<Object>of(String.valueOf(rec.get("author"))) : Set.<Object>of();
+        view.put("approverCheck", memo.computeIfAbsent(List.of(cap, makers),
+                k -> ActionRequestRoutes.check(root, makers, cap, false)));
+        return view;
     }
 
     @SuppressWarnings("unchecked")
