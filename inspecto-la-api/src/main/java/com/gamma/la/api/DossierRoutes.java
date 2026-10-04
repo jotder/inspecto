@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.LinkIds;
@@ -65,7 +66,7 @@ public final class DossierRoutes implements RouteModule {
         api.post("/inv/investigations/([^/]+)/dossier/verify", (e, m) -> verify(api, e, m.group(1), api.body(e)));
     }
 
-    record Opened(InvestigationRoutes.Inv inv, SnapshotStore store, Path writeRoot, String id, String headerRaw) {}
+    record Opened(InvestigationRoutes.Inv inv, InvestigationStore store, Path writeRoot, String id, String headerRaw) {}
 
     /** A built Dossier, already masked as it leaves, with the masking that was applied. */
     record Masked(Map<String, Object> dossier, EntityMasking mask) {}
@@ -116,7 +117,7 @@ public final class DossierRoutes implements RouteModule {
         String format = Optional.ofNullable(ApiContext.query(ex, "format")).orElse("json");
         if (!List.of("json", "steps", "method", "html").contains(format))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "format must be json, steps, method or html, got '" + format + "'");
-        List<String> log = inv.store().readLog(id);
+        List<String> log = inv.store().log(InvestigationStore.Scope.main(id));
         int at = parseAt(ex, log);
         List<String> snapshotIds = parseSnapshotIds(ex);
         Masked built = maskedDossier(ex, inv, log, at, snapshotIds);
@@ -190,7 +191,7 @@ public final class DossierRoutes implements RouteModule {
         if (!id.equals(submitted.get("investigation")))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the manifest is for investigation '" + submitted.get("investigation")
                     + "', not '" + id + "'");
-        List<String> log = inv.store().readLog(id);
+        List<String> log = inv.store().log(InvestigationStore.Scope.main(id));
         int at = Math.max(0, Math.min(n.intValue(), Math.min(log.size(), MAX_STEPS)));
         List<String> ids = new ArrayList<>();
         if (submitted.get("snapshots") instanceof List<?> l) for (Object o : l) ids.add(String.valueOf(o));
@@ -210,7 +211,7 @@ public final class DossierRoutes implements RouteModule {
     static GraphDossierBuilder.Input input(Opened inv, List<String> log, int at,
                                                    List<GraphDossierBuilder.Snapshot> snaps) throws IOException {
         Map<Integer, String> sets = new HashMap<>();
-        for (int step = 1; step <= at; step++) sets.put(step, inv.store().readSet(inv.id(), step));
+        for (int step = 1; step <= at; step++) sets.put(step, inv.store().set(inv.id(), step).orElse(null));
         return new GraphDossierBuilder.Input(inv.id(), inv.headerRaw(), log, sets, snaps, at);
     }
 
@@ -225,7 +226,7 @@ public final class DossierRoutes implements RouteModule {
         for (String sid : new LinkedHashSet<>(ids)) {
             if (!SnapshotStore.SAFE_ID.matcher(sid).matches())
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "snapshot id must match " + SnapshotStore.SAFE_ID.pattern() + ", got '" + sid + "'");
-            String raw = inv.store().read(sid);
+            String raw = new SnapshotStore(inv.writeRoot()).read(sid);   // a snapshot, not an Investigation record
             if (raw == null) {
                 if (strict) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no sealed snapshot '" + sid + "'");
                 continue;
@@ -249,7 +250,7 @@ public final class DossierRoutes implements RouteModule {
      *  not the owner, R3 or an Enterprise policy DENY), keeping the header's raw bytes for the manifest. */
     static Opened open(ApiContext api, HttpExchange ex, String id) throws IOException {
         InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, id);
-        String raw = inv.store().readInvestigation(id);
+        String raw = inv.store().header(id).orElse(null);
         if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
         return new Opened(inv, inv.store(), inv.writeRoot(), id, raw);
     }

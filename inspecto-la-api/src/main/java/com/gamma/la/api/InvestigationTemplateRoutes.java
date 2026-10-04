@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.InvestigationStore;
+import com.gamma.la.core.InvestigationStores;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.InvestigationEvaluator;
 import com.gamma.la.core.SnapshotStore;
@@ -106,10 +108,9 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         String given = ApiContext.str(body, "id");
         String id = given != null ? given : "tpl-" + UUID.randomUUID();
         requireSafeId(id);
-        jail(inv.store(), id);
 
         List<Map<String, Object>> log = new ArrayList<>();
-        for (String line : inv.store().readLog(invId)) log.add(ApiContext.JSON.readValue(line, Map.class));
+        for (String line : inv.store().log(InvestigationStore.Scope.main(invId))) log.add(ApiContext.JSON.readValue(line, Map.class));
         Set<Integer> undone = InvestigationEvaluator.undone(log);
         InvestigationEvaluator.State state = new InvestigationEvaluator.State();   // the effective log, in order
         List<Map<String, Object>> ops = new ArrayList<>(), parameters = new ArrayList<>();
@@ -174,7 +175,13 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         doc.put("ops", ops);
         doc.put("dropped", dropped);
         doc.put("generalised", generalised);
-        if (!inv.store().createTemplate(id, canonical(doc)))
+        boolean created;
+        try {
+            created = inv.store().createTemplate(id, canonical(doc));
+        } catch (IllegalArgumentException escape) {   // the store refuses an id that would leave its template area
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "investigation template id escapes the template store");
+        }
+        if (!created)
             throw new ApiException(409, ErrorCodes.CONFLICT, "investigation template '" + id + "' already exists");
         emit(ex, LinkEventTypes.LINK_INVESTIGATION_TEMPLATE_SAVED, "link.investigation.template.saved",
                 "link.investigation.template.saved — " + invId + " → " + id,
@@ -256,9 +263,8 @@ public final class InvestigationTemplateRoutes implements RouteModule {
     private static Template openTemplate(ApiContext api, HttpExchange ex, String id) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis investigation template");
         requireSafeId(id);
-        SnapshotStore store = new SnapshotStore(writeRoot);
-        jail(store, id);
-        String raw = store.readTemplate(id);
+        InvestigationStore store = InvestigationStores.of(writeRoot);
+        String raw = store.template(id).orElse(null);
         if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation template '" + id + "'");
         Map<String, Object> doc = ApiContext.JSON.readValue(raw, Map.class);
         Optional<Subject> subject = ApiContext.subject(ex);
@@ -271,13 +277,6 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         if (id == null || !SnapshotStore.SAFE_ID.matcher(id).matches())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "investigation template id must match " + SnapshotStore.SAFE_ID.pattern()
                     + ", got '" + id + "'");
-    }
-
-    private static void jail(SnapshotStore store, String id) {
-        Path root = store.templateDirectory().normalize();
-        Path target = root.resolve(id + ".json").normalize();
-        if (!target.startsWith(root) || target.getParent() == null || !target.getParent().equals(root))
-            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "investigation template id escapes the template store");
     }
 
     /** {@code s} cut to at most {@code max} chars with an ellipsis — keeps a generated reason inside its 200-char cap

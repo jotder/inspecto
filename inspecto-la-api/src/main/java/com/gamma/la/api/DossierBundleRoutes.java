@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
@@ -67,14 +68,14 @@ public final class DossierBundleRoutes implements RouteModule {
     @SuppressWarnings("unchecked")
     private static Object export(ApiContext api, HttpExchange ex, String id) throws IOException {
         DossierRoutes.Opened inv = DossierRoutes.open(api, ex, id);
-        List<String> log = inv.store().readLog(id);
+        List<String> log = inv.store().log(InvestigationStore.Scope.main(id));
         int at = DossierRoutes.parseAt(ex, log);
         List<String> snapshotIds = DossierRoutes.parseSnapshotIds(ex);
         DossierRoutes.Masked built = DossierRoutes.maskedDossier(ex, inv, log, at, snapshotIds);
         Map<String, Object> dossier = built.dossier();
         Map<String, Object> manifest = (Map<String, Object>) dossier.get("manifest");
 
-        List<String> rawRefs = inv.store().readReferences(id);
+        List<String> rawRefs = inv.store().references(id);
         List<Map<String, Object>> refs = InvestigationReferenceRoutes.parse(rawRefs);
 
         Map<String, Object> bundle = new LinkedHashMap<>();
@@ -123,7 +124,7 @@ public final class DossierBundleRoutes implements RouteModule {
         boolean sealIntact = String.valueOf(((Map<String, Object>) seal(bundle)).get("value")).equals(String.valueOf(sealed.get("value")));
         boolean rootMatches = String.valueOf(custody.get("manifestRoot")).equals(String.valueOf(mf.get("root")));
 
-        List<String> rawRefs = inv.store().readReferences(id);
+        List<String> rawRefs = inv.store().references(id);
         int had = custody.get("referencesCount") instanceof Number n ? n.intValue() : -1;
         boolean referencesIntact = had >= 0 && had <= rawRefs.size()
                 && sha256(canonical(InvestigationReferenceRoutes.parse(rawRefs.subList(0, had))))

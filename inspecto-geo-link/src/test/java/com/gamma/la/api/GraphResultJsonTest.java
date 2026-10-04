@@ -5,7 +5,7 @@ import com.gamma.la.core.GraphInput;
 import com.gamma.la.core.GraphResult;
 import com.gamma.la.core.InMemoryGraphEngine;
 import com.gamma.la.core.LinkIds;
-import com.gamma.la.core.SnapshotStore;
+import com.gamma.la.core.InvestigationStores;
 import com.gamma.la.graph.GraphAlgorithms.Score;
 import com.gamma.la.graph.GraphAlgorithms.Selection;
 import org.junit.jupiter.api.Test;
@@ -53,7 +53,7 @@ class GraphResultJsonTest {
 
     private static EntityMasking maskAll(Path root) throws Exception {
         Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: all\n");
-        InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(new SnapshotStore(root), root, "case-a",
+        InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(InvestigationStores.of(root), root, "case-a",
                 Map.of("dataset", "calls_ds", "sourceCol", "caller", "targetCol", "callee"));
         Files.createDirectories(inv.dir());
         return EntityMasking.of(inv, List.of(Map.of("op", "seed", "params", Map.of("ids", RAW))), List.of(KIND));
@@ -153,7 +153,7 @@ class GraphResultJsonTest {
     @Test
     void withNothingMaskedTheSerializerIsTheIdentity(@TempDir Path root) throws Exception {
         Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: none\n");
-        InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(new SnapshotStore(root), root, "case-a",
+        InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(InvestigationStores.of(root), root, "case-a",
                 Map.of("dataset", "calls_ds"));
         Files.createDirectories(inv.dir());
         assertSame(GraphResultJson.Ids.NONE, GraphResultJson.Ids.of(EntityMasking.of(inv, List.of(), List.of())));

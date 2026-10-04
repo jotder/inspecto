@@ -1,6 +1,6 @@
 package com.gamma.la.api;
 
-import com.gamma.la.core.SnapshotStore;
+import com.gamma.la.core.InvestigationStores;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -24,7 +24,7 @@ class EntityMaskingTest {
     private static final String MEMBER = "+447700900123", RAW_FORM = "0044 7700-900123";
 
     private static InvestigationRoutes.Inv inv(Path root) throws Exception {
-        InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(new SnapshotStore(root), root, "case-a",
+        InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(InvestigationStores.of(root), root, "case-a",
                 Map.of("dataset", "calls_ds", "sourceCol", "caller", "targetCol", "callee"));
         Files.createDirectories(inv.dir());
         return inv;

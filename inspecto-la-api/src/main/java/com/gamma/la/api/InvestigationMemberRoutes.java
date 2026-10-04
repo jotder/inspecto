@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.InvestigationVersionConflictException;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
@@ -65,14 +66,21 @@ public final class InvestigationMemberRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'subject', a single-line Subject id of 1..200 characters");
         Role role = Role.parse(ApiContext.str(body, "role")).orElseThrow(() ->
                 new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'role' must be one of lead, analyst, reviewer"));
-        synchronized (InvestigationRoutes.lock(inv.dir())) {
-            Map<String, Role> current = InvestigationMemberStore.roles(inv.dir(), inv.header().get("owner"));
+        for (int attempt = 1; ; attempt++) {   // the last-lead check and the append are one decision over ONE read of the list
+            List<Entry> seen = InvestigationMemberStore.read(inv.store(), inv.id());
+            Map<String, Role> current = InvestigationMemberStore.fold(inv.header().get("owner"), seen);
             requireLead(ex, current);
             if (current.get(subject) == role) return describe(inv, ex);   // already so: nothing to record
             refuseLastLead(current, Op.GRANT, subject, role);
-            Entry e = InvestigationMemberStore.append(inv.dir(), Instant.now().toString(), ApiContext.actor(ex), subject, role, Op.GRANT);
-            emit(ex, LinkEventTypes.LINK_INV_MEMBER_GRANTED, "link.investigation.member.granted",
-                    "link.investigation.member.granted — " + id + " " + subject + " " + role.wire(), id, e);
+            try {
+                Entry e = InvestigationMemberStore.append(inv.store(), inv.id(), seen.size(), Instant.now().toString(), ApiContext.actor(ex), subject, role, Op.GRANT);
+                emit(ex, LinkEventTypes.LINK_INV_MEMBER_GRANTED, "link.investigation.member.granted",
+                        "link.investigation.member.granted — " + id + " " + subject + " " + role.wire(), id, e);
+                break;
+            } catch (InvestigationVersionConflictException lost) {
+                if (attempt >= InvestigationMemberStore.MAX_ATTEMPTS)
+                    throw new ApiException(409, ErrorCodes.CONFLICT_STALE_VERSION, lost.getMessage());
+            }
         }
         return describe(inv, ex);
     }
@@ -83,15 +91,22 @@ public final class InvestigationMemberRoutes implements RouteModule {
         String subject = ApiContext.str(body, "subject");
         if (!InvestigationMembers.validSubject(subject))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'subject', a single-line Subject id of 1..200 characters");
-        synchronized (InvestigationRoutes.lock(inv.dir())) {
-            Map<String, Role> current = InvestigationMemberStore.roles(inv.dir(), inv.header().get("owner"));
+        for (int attempt = 1; ; attempt++) {
+            List<Entry> seen = InvestigationMemberStore.read(inv.store(), inv.id());
+            Map<String, Role> current = InvestigationMemberStore.fold(inv.header().get("owner"), seen);
             requireLead(ex, current);
             Role held = current.get(subject);
             if (held == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "'" + subject + "' is not a member of investigation '" + id + "'");
             refuseLastLead(current, Op.REVOKE, subject, held);
-            Entry e = InvestigationMemberStore.append(inv.dir(), Instant.now().toString(), ApiContext.actor(ex), subject, held, Op.REVOKE);
-            emit(ex, LinkEventTypes.LINK_INV_MEMBER_REVOKED, "link.investigation.member.revoked",
-                    "link.investigation.member.revoked — " + id + " " + subject + " " + held.wire(), id, e);
+            try {
+                Entry e = InvestigationMemberStore.append(inv.store(), inv.id(), seen.size(), Instant.now().toString(), ApiContext.actor(ex), subject, held, Op.REVOKE);
+                emit(ex, LinkEventTypes.LINK_INV_MEMBER_REVOKED, "link.investigation.member.revoked",
+                        "link.investigation.member.revoked — " + id + " " + subject + " " + held.wire(), id, e);
+                break;
+            } catch (InvestigationVersionConflictException lost) {
+                if (attempt >= InvestigationMemberStore.MAX_ATTEMPTS)
+                    throw new ApiException(409, ErrorCodes.CONFLICT_STALE_VERSION, lost.getMessage());
+            }
         }
         return describe(inv, ex);
     }
@@ -103,7 +118,7 @@ public final class InvestigationMemberRoutes implements RouteModule {
 
     /** Every membership change is a lead's; an authenticated member who is not a lead is told so (403), not hidden. */
     private static void requireLead(HttpExchange ex, InvestigationRoutes.Inv inv) throws IOException {
-        requireLead(ex, InvestigationMemberStore.roles(inv.dir(), inv.header().get("owner")));
+        requireLead(ex, InvestigationMemberStore.roles(inv.store(), inv.id(), inv.header().get("owner")));
     }
 
     private static void requireLead(HttpExchange ex, Map<String, Role> roles) {
@@ -113,7 +128,7 @@ public final class InvestigationMemberRoutes implements RouteModule {
     }
 
     private static Map<String, Object> describe(InvestigationRoutes.Inv inv, HttpExchange ex) throws IOException {
-        List<Entry> history = InvestigationMemberStore.read(inv.dir());
+        List<Entry> history = InvestigationMemberStore.read(inv.store(), inv.id());
         Map<String, Role> roles = InvestigationMembers.fold(String.valueOf(inv.header().get("owner")), history);
         List<Map<String, Object>> members = new ArrayList<>();
         roles.forEach((s, r) -> members.add(row("subject", s, "role", r.wire())));

@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.InvestigationStore;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
@@ -93,7 +94,7 @@ public final class DraftRoutes implements RouteModule {
     private static Role roleOf(InvestigationRoutes.Inv inv, HttpExchange ex) throws IOException {
         Optional<Subject> s = ApiContext.subject(ex);
         if (s.isEmpty()) return Role.LEAD;   // no Subject attached: nothing is enforced, as everywhere in the control plane
-        Role r = InvestigationMemberStore.roles(inv.dir(), inv.header().get("owner")).get(s.get().id());
+        Role r = InvestigationMemberStore.roles(inv.store(), inv.id(), inv.header().get("owner")).get(s.get().id());
         if (r == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + inv.id() + "'");   // revoked between the gate and here
         return r;
     }
@@ -133,7 +134,7 @@ public final class DraftRoutes implements RouteModule {
         com.gamma.la.core.DraftCheckpoints.Base base = com.gamma.la.core.DraftCheckpoints.base(inv.dir().resolve("log.jsonl"), baseStep,
                 String.valueOf(header.get("baseLogHash")), () -> {
                     try {
-                        return inv.store().readLog(invId);
+                        return inv.store().log(InvestigationStore.Scope.main(invId));
                     } catch (IOException e) {
                         throw new java.io.UncheckedIOException(e);
                     }
@@ -174,7 +175,7 @@ public final class DraftRoutes implements RouteModule {
         DraftAdmission.maintain(inv);   // D7-6: an expired Draft no longer holds D17's one seat or D21's cap
         synchronized (DraftAdmission.CAP) {   // the Space-wide cap is checked and taken as one step
           synchronized (InvestigationRoutes.lock(DraftStore.draftsDir(inv.dir()))) {
-            List<String> main = inv.store().readLog(invId);
+            List<String> main = inv.store().log(InvestigationStore.Scope.main(invId));
             int head = main.size();
             int at = atRaw == null ? head : ((Number) atRaw).intValue();
             if (at < 0 || at > head)
@@ -299,7 +300,7 @@ public final class DraftRoutes implements RouteModule {
         List<Map<String, Object>> items = new ArrayList<>();
         DraftAdmission.maintain(inv);   // D7-6: lazy idle sweep
         // D7-6: the listing reads the small rebuildable index (a stat per header), not every header; state comes from marker files
-        int mainHead = inv.store().readLog(invId).size();
+        int mainHead = inv.store().log(InvestigationStore.Scope.main(invId)).size();
         for (Map.Entry<String, Map<String, Object>> entry : DraftIndex.headers(inv.dir()).entrySet()) {
             String id = entry.getKey();
             Map<String, Object> h = entry.getValue();
@@ -529,7 +530,7 @@ public final class DraftRoutes implements RouteModule {
         InvestigationRoutes.Inv main = new InvestigationRoutes.Inv(v.store(), v.writeRoot(), v.id(), v.header());
         if (body.get("expectHead") != null && !(body.get("expectHead") instanceof Number))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'expectHead' must be a step number");
-        int head = v.store().readLog(invId).size();
+        int head = v.store().log(InvestigationStore.Scope.main(invId)).size();
         if (body.get("expectHead") instanceof Number n && n.intValue() != head)
             throw new ApiException(409, ErrorCodes.CONFLICT, "the main log is at step " + head + ", not " + n.intValue());
         if (v.draft().baseStep() != head)

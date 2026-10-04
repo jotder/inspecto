@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.InvestigationEvaluator;
 import com.gamma.la.core.LinkIds;
@@ -13,7 +14,6 @@ import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -185,19 +185,17 @@ public final class WorkingSetRoutes implements RouteModule {
      * the step, so it shares the cache without ever answering for the head, and vice versa.
      */
     static Relation relation(InvestigationRoutes.Inv inv, int at, boolean[] cachedOut) throws IOException {
-        Path logFile = inv.logDir().resolve("log.jsonl");
-        byte[] own = Files.isRegularFile(logFile) ? Files.readAllBytes(logFile) : new byte[0];
-        byte[] bytes = own;
+        // The store hands back COMMITTED lines only (a line being appended right now is not one), each followed by one '\n':
+        // exactly the bytes the log file holds for them, so the key is the same on every backend.
+        java.io.ByteArrayOutputStream joined = new java.io.ByteArrayOutputStream();
         if (inv.draft() != null) {   // D7-3: the main prefix the Draft forked from, then the Draft's own lines - the key hashes BOTH
-            java.io.ByteArrayOutputStream joined = new java.io.ByteArrayOutputStream();
-            List<String> main = inv.store().readLog(inv.id());
+            List<String> main = inv.store().log(InvestigationStore.Scope.main(inv.id()));
             for (String line : main.subList(0, Math.min(inv.draft().baseStep(), main.size())))
                 joined.writeBytes((line + "\n").getBytes(StandardCharsets.UTF_8));
-            joined.writeBytes(own);
-            bytes = joined.toByteArray();
         }
+        for (String line : inv.store().log(inv.scope())) joined.writeBytes((line + "\n").getBytes(StandardCharsets.UTF_8));
+        byte[] bytes = joined.toByteArray();
         int end = bytes.length;
-        while (end > 0 && bytes[end - 1] != '\n') end--;   // a line being appended right now is not committed yet
         String key = inv.logDir().toAbsolutePath().normalize() + "\u0000" + sha256(bytes, end) + (at < 0 ? "" : "@" + at);
         synchronized (CACHE) {
             Relation hit = CACHE.get(key);

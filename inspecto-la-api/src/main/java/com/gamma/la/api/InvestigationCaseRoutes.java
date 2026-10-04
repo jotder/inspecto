@@ -3,7 +3,7 @@ package com.gamma.la.api;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.CasePort;
 import com.gamma.la.core.CasePorts;
-import com.gamma.la.core.SnapshotStore;
+import com.gamma.la.core.InvestigationStore;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
@@ -119,7 +119,7 @@ public final class InvestigationCaseRoutes implements RouteModule {
     }
 
     /** Store a validated link record and audit it. */
-    static void write(HttpExchange ex, SnapshotStore store, String id, Map<String, Object> record) throws IOException {
+    static void write(HttpExchange ex, InvestigationStore store, String id, Map<String, Object> record) throws IOException {
         store.writeCaseLink(id, ApiContext.JSON.writeValueAsString(record));
         Object caseRef = record.get("caseRef");
         emit(ex, LinkEventTypes.LINK_INVESTIGATION_CASE_LINKED, "link.investigation.case.linked",
@@ -133,7 +133,7 @@ public final class InvestigationCaseRoutes implements RouteModule {
      * (fail closed) with no link, no ops seam, an unknown/non-Case/closed Case, a Case the subject cannot see, or a
      * subject who is neither the Case's owner nor its assignee. Never throws on a bad link file.
      */
-    static boolean grants(ApiContext api, HttpExchange ex, SnapshotStore store, String id, Subject subject) {
+    static boolean grants(ApiContext api, HttpExchange ex, InvestigationStore store, String id, Subject subject) {
         try {
             String caseRef = caseRef(store, id);
             if (caseRef == null) return false;
@@ -148,8 +148,8 @@ public final class InvestigationCaseRoutes implements RouteModule {
         }
     }
 
-    static String caseRef(SnapshotStore store, String id) throws IOException {
-        String raw = store.readCaseLink(id);
+    static String caseRef(InvestigationStore store, String id) throws IOException {
+        String raw = store.caseLink(id).orElse(null);
         if (raw == null) return null;
         @SuppressWarnings("unchecked") Map<String, Object> m = ApiContext.JSON.readValue(raw, Map.class);
         Object ref = m.get("caseRef");
@@ -161,14 +161,14 @@ public final class InvestigationCaseRoutes implements RouteModule {
             throws IOException {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("investigationId", inv.id());
-        String raw = inv.store().readCaseLink(inv.id());
+        String raw = inv.store().caseLink(inv.id()).orElse(null);
         @SuppressWarnings("unchecked") Map<String, Object> link = raw == null ? null : ApiContext.JSON.readValue(raw, Map.class);
         out.put("caseRef", link == null ? null : link.get("caseRef"));
         out.put("linkedBy", link == null ? null : link.get("linkedBy"));
         out.put("linkedAt", link == null ? null : link.get("linkedAt"));
         Optional<Subject> s = ApiContext.subject(ex);
         com.gamma.la.core.InvestigationMembers.Role role = s.isEmpty() ? com.gamma.la.core.InvestigationMembers.Role.LEAD
-                : InvestigationMemberStore.roles(inv.dir(), inv.header().get("owner")).get(s.get().id());
+                : InvestigationMemberStore.roles(inv.store(), inv.id(), inv.header().get("owner")).get(s.get().id());
         out.put("access", role == null ? "case-member"
                 : role == com.gamma.la.core.InvestigationMembers.Role.LEAD ? "owner" : role.wire());
         out.put("readOnly", role != com.gamma.la.core.InvestigationMembers.Role.LEAD);

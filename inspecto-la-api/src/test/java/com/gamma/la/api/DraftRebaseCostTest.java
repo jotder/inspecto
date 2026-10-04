@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.InvestigationStore;
+import com.gamma.la.core.FsInvestigationStore;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.la.core.DraftStore;
@@ -44,7 +46,7 @@ class DraftRebaseCostTest {
             assertEquals(want.steps(), got.steps());
             assertEquals(want.finalHash(), got.finalHash());
             assertEquals(1 + MAIN, got.required().get(0), "the Draft's seed of hub is superseded by main's");
-            DraftRebase.verify(view.store().readLog(view.id()), got);
+            DraftRebase.verify(view.store().log(InvestigationStore.Scope.main(view.id())), got);
         }
     }
 
@@ -57,7 +59,7 @@ class DraftRebaseCostTest {
         lines.set(4, lines.get(4).replaceFirst("\"workingSetHash\":\"sha256:.", "\"workingSetHash\":\"sha256:Z"));
         DraftRebase.Plan bad = new DraftRebase.Plan(p.fromBase(), p.toBase(), p.toBaseHash(), p.draftLogHash(), p.conflicts(), lines, p.sets(),
                 p.steps(), p.finalHash(), p.targetPins(), p.effective());
-        IllegalStateException e = assertThrows(IllegalStateException.class, () -> DraftRebase.verify(view.store().readLog(view.id()), bad));
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> DraftRebase.verify(view.store().log(InvestigationStore.Scope.main(view.id())), bad));
         assertTrue(e.getMessage().contains("rebase equivalence failed at step"), e.getMessage());
     }
 
@@ -79,7 +81,7 @@ class DraftRebaseCostTest {
     void profileCurve() throws Exception {
         for (int n : new int[] {100, 100, 200, 400, 800}) {
             InvestigationRoutes.Inv view = moved(tmp.resolve("p" + n + "_" + System.nanoTime()), n);
-            List<String> mainLines = view.store().readLog(view.id());
+            List<String> mainLines = view.store().log(InvestigationStore.Scope.main(view.id()));
             phase = new long[5];
             long t = System.nanoTime();
             legacy(view);
@@ -121,7 +123,7 @@ class DraftRebaseCostTest {
 
     private static DraftRebase.Plan legacy(InvestigationRoutes.Inv view) throws Exception {
         Path draftDir = view.draft().dir();
-        List<String> mainLines = view.store().readLog(view.id());
+        List<String> mainLines = view.store().log(InvestigationStore.Scope.main(view.id()));
         List<String> ownLines = SnapshotStore.readLogAt(draftDir);
         int m = mainLines.size(), k = view.draft().baseStep();
         List<Map<String, Object>> main = DraftRebase.parseAll(mainLines), own = DraftRebase.parseAll(ownLines);
@@ -211,7 +213,7 @@ class DraftRebaseCostTest {
     static InvestigationRoutes.Inv moved(Path writeRoot, int n) throws Exception {
         DraftPromoteCostTest.Fixture f = DraftPromoteCostTest.fixture(writeRoot, n);
         InvestigationRoutes.Inv main = f.main();
-        InvestigationEvaluator.State s = InvestigationEvaluator.evaluate(DraftRebase.parseAll(main.store().readLog(main.id())), -1, null);
+        InvestigationEvaluator.State s = InvestigationEvaluator.evaluate(DraftRebase.parseAll(main.store().log(InvestigationStore.Scope.main(main.id()))), -1, null);
         String[] seeds = {"hub", "m6", "m7"};
         for (int i = 0; i < MOVED; i++) {
             int step = MAIN + i + 1;
@@ -224,7 +226,7 @@ class DraftRebaseCostTest {
             e = InvestigationRoutes.roundTrip(e);
             InvestigationEvaluator.apply(s, e);
             e.put("workingSetHash", s.hash());
-            main.store().appendStep(main.id(), step, canonical(e), canonical(InvestigationRoutes.setDoc(step, s)));
+            main.store().append(InvestigationStore.Scope.main(main.id()), step - 1, step, canonical(e), canonical(InvestigationRoutes.setDoc(step, s)));
         }
         return new InvestigationRoutes.Inv(main.store(), main.writeRoot(), main.id(), main.header(),
                 new InvestigationRoutes.Inv.DraftRef(f.draftId(), MAIN, DraftStore.draftDir(main.dir(), f.draftId())));

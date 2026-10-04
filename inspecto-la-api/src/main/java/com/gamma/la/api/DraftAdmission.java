@@ -126,7 +126,7 @@ public final class DraftAdmission {
             for (Path d : ds) {
                 String id = d.getFileName().toString();
                 if (!SnapshotStore.SAFE_ID.matcher(id).matches() || !Files.isDirectory(DraftStore.draftsDir(d))) continue;
-                String raw = inv.store().readInvestigation(id);
+                String raw = inv.store().header(id).orElse(null);
                 if (raw == null) continue;
                 @SuppressWarnings("unchecked") Map<String, Object> header = ApiContext.JSON.readValue(raw, Map.class);
                 maintain(new InvestigationRoutes.Inv(inv.store(), inv.writeRoot(), id, header));

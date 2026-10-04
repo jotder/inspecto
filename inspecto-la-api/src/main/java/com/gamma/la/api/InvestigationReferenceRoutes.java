@@ -2,7 +2,7 @@ package com.gamma.la.api;
 
 import com.gamma.la.core.InvestigationEvaluator;
 import com.gamma.la.core.LinkEventTypes;
-import com.gamma.la.core.SnapshotStore;
+import com.gamma.la.core.InvestigationStore;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
@@ -41,7 +41,7 @@ import java.util.regex.Pattern;
  * credentials (a {@code javascript:} or {@code file:} URL would be an XSS or local-read vector in any UI that
  * renders it as a link).
  *
- * <p><b>Append-only, outside the sealed header</b> ({@code references.jsonl}, {@link SnapshotStore#appendReference}):
+ * <p><b>Append-only, outside the sealed header</b> ({@code references.jsonl}, {@link InvestigationStore#appendReference}):
  * the header is write-once, and a reference is a relationship, not evidence — so adding one never invalidates an issued
  * Dossier. There is no edit and no delete; a wrong reference is superseded by a new one. A duplicate
  * {@code (system, type, id)} is a 409, and an Investigation holds at most {@link #MAX} references (409).
@@ -65,7 +65,7 @@ public final class InvestigationReferenceRoutes implements RouteModule {
     /** {@code GET …/references} — gates: write root 503 → 422 id → 403 → 404 absent / not owner / R3. */
     private static Object list(ApiContext api, HttpExchange ex, String id) throws IOException {
         InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, id);
-        return describe(inv.id(), parse(inv.store().readReferences(id)));
+        return describe(inv.id(), parse(inv.store().references(id)));
     }
 
     /**
@@ -89,13 +89,13 @@ public final class InvestigationReferenceRoutes implements RouteModule {
         if (label != null) rec.put("label", label);
         rec.put("addedBy", ApiContext.actor(ex));
         rec.put("addedAt", Instant.now().toString());
-        SnapshotStore.Appended r = inv.store().appendReference(id, String.valueOf(rec.get("key")),
+        InvestigationStore.Appended r = inv.store().appendReference(id, String.valueOf(rec.get("key")),
                 ApiContext.JSON.writeValueAsString(rec), MAX);
-        if (r == SnapshotStore.Appended.DUPLICATE)
+        if (r == InvestigationStore.Appended.DUPLICATE)
             throw new ApiException(409, ErrorCodes.CONFLICT, "reference " + system + "/" + type + "/" + refId + " is already recorded");
-        if (r == SnapshotStore.Appended.FULL)
+        if (r == InvestigationStore.Appended.FULL)
             throw new ApiException(409, ErrorCodes.CONFLICT, "an investigation holds at most " + MAX + " external references");
-        List<Map<String, Object>> all = parse(inv.store().readReferences(id));
+        List<Map<String, Object>> all = parse(inv.store().references(id));
         int seq = all.size();
         emit(ex, LinkEventTypes.LINK_INVESTIGATION_REFERENCE_ADDED, "link.investigation.reference.added",
                 "link.investigation.reference.added — " + id + " ← " + system + "/" + type,

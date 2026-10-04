@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.InvestigationStore;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
@@ -92,7 +93,7 @@ final class DraftPromote {
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "four-eyes needs an authenticated Subject - without one, the requester and "
                     + "the approver cannot be told apart");
         Path draftDir = DraftStore.draftDir(main.dir(), draftId);
-        List<String> mainLines = main.store().readLog(main.id()), own = SnapshotStore.readLogAt(draftDir);
+        List<String> mainLines = main.store().log(InvestigationStore.Scope.main(main.id())), own = SnapshotStore.readLogAt(draftDir);
         Map<String, Object> rec = new LinkedHashMap<>();
         rec.put("kind", "promote");
         rec.put("op", "promote");
@@ -135,7 +136,7 @@ final class DraftPromote {
                 if (DraftStore.isClosed(draftDir)) throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + draftId + "' was closed (discarded or promoted)");
                 actor = String.valueOf(header.get("actor"));
                 int base = ((Number) header.get("baseStep")).intValue();
-                List<String> mainLines = main.store().readLog(main.id());
+                List<String> mainLines = main.store().log(InvestigationStore.Scope.main(main.id()));
                 if (base != mainLines.size())
                     throw new ApiException(409, ErrorCodes.CONFLICT, "must rebase: the draft is based on step " + base + " and the main log is at "
                             + mainLines.size() + " - rebase it onto the current head, then promote");
@@ -211,8 +212,8 @@ final class DraftPromote {
                 try {
                     for (int i = 0; i < lines.size(); i++) {
                         DraftStore.promoteHook.accept(from + i + 1);
-                        if (shared.get(i) != null) main.store().appendStepSharingSet(main.id(), from + i + 1, lines.get(i), shared.get(i));
-                        else main.store().appendStep(main.id(), from + i + 1, lines.get(i), sets.get(i));
+                        if (shared.get(i) != null) main.fs().appendStepSharingSet(main.id(), from + i + 1, lines.get(i), shared.get(i));
+                        else main.store().append(InvestigationStore.Scope.main(main.id()), from + i, from + i + 1, lines.get(i), sets.get(i));
                         written++;
                     }
                     Map<String, Object> marker = new LinkedHashMap<>();

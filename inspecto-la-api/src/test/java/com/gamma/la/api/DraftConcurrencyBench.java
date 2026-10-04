@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.InvestigationStore;
+import com.gamma.la.core.FsInvestigationStore;
 import com.gamma.control.ApiException;
 import com.gamma.control.ApiExceptionPeek;
 import com.gamma.la.core.DraftCheckpoints;
@@ -64,7 +66,7 @@ class DraftConcurrencyBench {
     private Path versionDir;
     private IndexManifest manifest;
     private long nodes;
-    private SnapshotStore store;
+    private FsInvestigationStore store;
     private InvestigationRoutes.Inv main;
     private List<Map<String, Object>> mainEntries;
     private final AtomicLong heavyRan = new AtomicLong(), heavyRefused = new AtomicLong();
@@ -101,7 +103,7 @@ class DraftConcurrencyBench {
         long version = manifest.version();
 
         // ── a fresh Investigation with a 20-step main log ──
-        store = new SnapshotStore(writeRoot);
+        store = new FsInvestigationStore(writeRoot);
         Path prior = store.investigationDir(INV).getParent();   // an earlier run's Drafts would hold the Space's seats
         if (Files.isDirectory(prior))
             try (var w = Files.walk(prior)) {
@@ -112,17 +114,17 @@ class DraftConcurrencyBench {
         header.put("dataset", DATASET);
         header.put("sourceCol", "s");
         header.put("targetCol", "t");
-        store.createInvestigation(INV, canonical(header));
+        store.create(INV, canonical(header));
         main = new InvestigationRoutes.Inv(store, writeRoot, INV, header);
         InvestigationEvaluator.State ms = new InvestigationEvaluator.State();
         for (int i = 1; i <= 20; i++) {
             Map<String, Object> e = op(i, "seed", Map.of("ids", List.of("n" + (i * 7))));
             InvestigationEvaluator.apply(ms, e);
             e.put("workingSetHash", ms.hash());
-            store.appendStep(INV, i, canonical(e), canonical(InvestigationRoutes.setDoc(i, ms)));
+            store.append(InvestigationStore.Scope.main(INV), i - 1, i, canonical(e), canonical(InvestigationRoutes.setDoc(i, ms)));
         }
-        mainEntries = DraftRebase.parseAll(store.readLog(INV));
-        String baseHash = DraftStore.prefixHash(store.readLog(INV), mainEntries.size());
+        mainEntries = DraftRebase.parseAll(store.log(InvestigationStore.Scope.main(INV)));
+        String baseHash = DraftStore.prefixHash(store.log(InvestigationStore.Scope.main(INV)), mainEntries.size());
         System.out.printf("D-S5R config: edges=%,d nodes=%,d buckets=%d drafts=%d active=%d seconds/phase=%d thinkMs=%d heavyLimit=%d cores=%d%n",
                 edges, nodes, manifest.buckets(), drafts, active, seconds, thinkMs, DraftAdmission.heavyLimit(),
                 Runtime.getRuntime().availableProcessors());

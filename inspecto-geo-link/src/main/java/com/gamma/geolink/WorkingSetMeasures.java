@@ -4,6 +4,8 @@ import com.gamma.la.api.InvestigationRoutes;
 import com.gamma.la.api.ValueMeasures;
 import com.gamma.la.api.WorkingSetRoutes;
 import com.gamma.la.core.InvestigationEvaluator;
+import com.gamma.la.core.InvestigationStore;
+import com.gamma.la.core.InvestigationStores;
 import com.gamma.la.core.SnapshotStore;
 import com.gamma.alert.AlertRule;
 import com.gamma.alert.InvestigationMeasureProbe;
@@ -165,13 +167,13 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
         try {
             if (id == null || !SnapshotStore.SAFE_ID.matcher(id).matches()
                     || !SnapshotStore.SAFE_ID.matcher(rule.name()).matches()) return Reading.of(OptionalDouble.empty());
-            SnapshotStore store = new SnapshotStore(writeRoot);
-            String rawHeader = store.readInvestigation(id);
+            InvestigationStore store = InvestigationStores.of(writeRoot);
+            String rawHeader = store.header(id).orElse(null);
             if (rawHeader == null) {
                 log.warn("alert rule '{}': no investigation '{}' — not evaluated", rule.name(), id);
                 return Reading.of(OptionalDouble.empty());
             }
-            String rawBinding = store.readAlertRuleBinding(id, rule.name());
+            String rawBinding = store.alertRuleBinding(id, rule.name()).orElse(null);
             Map<String, Object> header = ApiContext.JSON.readValue(rawHeader, Map.class);
             Map<String, Object> binding = rawBinding == null ? null : ApiContext.JSON.readValue(rawBinding, Map.class);
             if (binding == null || !ruleHash(rule).equals(binding.get("ruleHash"))

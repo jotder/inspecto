@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.InvestigationStore;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
@@ -107,7 +108,7 @@ final class DraftRebase {
     /** {@link #compute} with the replay as a seam (the cost test replays the sealed reads instead of re-reading an index). */
     static Plan plan(InvestigationRoutes.Inv view, Replay replay) throws IOException {
         Path draftDir = view.draft().dir();
-        List<String> mainLines = view.store().readLog(view.id());
+        List<String> mainLines = view.store().log(InvestigationStore.Scope.main(view.id()));
         List<String> ownLines = SnapshotStore.readLogAt(draftDir);
         int m = mainLines.size(), k = view.draft().baseStep();
         List<Map<String, Object>> main = parseAll(mainLines), own = parseAll(ownLines);
@@ -225,7 +226,7 @@ final class DraftRebase {
                                       List<Integer> confirmed) throws IOException {
         Path draftDir = view.draft().dir();
         String draftId = view.draft().draftId();
-        List<String> verifiedMain = view.store().readLog(view.id());
+        List<String> verifiedMain = view.store().log(InvestigationStore.Scope.main(view.id()));
         if (verifiedMain.size() != plan.toBase() || !DraftStore.prefixHash(verifiedMain, verifiedMain.size()).equals(plan.toBaseHash()))
             throw new ApiException(409, ErrorCodes.CONFLICT, "the main log moved while the rebase was computed (head " + verifiedMain.size()
                     + ", was " + plan.toBase() + ") - read the conflict report again");
@@ -233,7 +234,7 @@ final class DraftRebase {
         synchronized (InvestigationRoutes.lock(view.dir())) {
             synchronized (InvestigationRoutes.lock(draftDir)) {
                 if (DraftStore.isClosed(draftDir)) throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + draftId + "' was closed");
-                List<String> mainLines = view.store().readLog(view.id());
+                List<String> mainLines = view.store().log(InvestigationStore.Scope.main(view.id()));
                 if (mainLines.size() != plan.toBase() || !DraftStore.prefixHash(mainLines, mainLines.size()).equals(plan.toBaseHash()))
                     throw new ApiException(409, ErrorCodes.CONFLICT, "the main log moved while the rebase was computed (head " + mainLines.size()
                             + ", was " + plan.toBase() + ") - read the conflict report again");

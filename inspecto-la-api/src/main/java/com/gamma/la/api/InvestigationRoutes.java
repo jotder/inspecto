@@ -1,5 +1,8 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.InvestigationStore;
+import com.gamma.la.core.InvestigationStores;
+import com.gamma.la.core.InvestigationVersionConflictException;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.InvestigationEvaluator;
 import com.gamma.la.core.InvestigationMembers;
@@ -43,7 +46,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 
@@ -137,9 +139,6 @@ public final class InvestigationRoutes implements RouteModule {
     private static final int LIST_DEFAULT = 100;
     private static final int LIST_MAX = 1_000;
 
-    /** Writers to one Investigation (or to the investigations root) are serialised within this JVM. */
-    private static final ConcurrentHashMap<Path, Object> LOCKS = new ConcurrentHashMap<>();
-
     @Override
     public void register(ApiContext api) {
         // ⚠ String LITERALS on purpose — CapabilityManifestTest's scanner matches only a literal argument.
@@ -163,10 +162,24 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     /** One opened Investigation: its store, write root and parsed header. Package-private for {@link WorkingSetRoutes}. */
-    public record Inv(SnapshotStore store, Path writeRoot, String id, Map<String, Object> header, DraftRef draft) {
+    public record Inv(InvestigationStore store, Path writeRoot, String id, Map<String, Object> header, DraftRef draft) {
         /** An Investigation as opened for the MAIN log (no Draft). */
-        public Inv(SnapshotStore store, Path writeRoot, String id, Map<String, Object> header) {
+        public Inv(InvestigationStore store, Path writeRoot, String id, Map<String, Object> header) {
             this(store, writeRoot, id, header, null);
+        }
+
+        /**
+         * TRANSITIONAL (Draft vertical): the filesystem implementation, for the still Path-keyed Draft code. Fails loudly
+         * when another backend is plugged in, which is exactly the signal that the Draft vertical has not been ported.
+         */
+        com.gamma.la.core.FsInvestigationStore fs() {
+            if (store instanceof com.gamma.la.core.FsInvestigationStore fs) return fs;
+            throw new IllegalStateException("Drafts are not ported to the InvestigationStore port yet: " + store.getClass().getName());
+        }
+
+        /** The scope this view reads and appends: the main log, or its Draft's own log. */
+        public InvestigationStore.Scope scope() {
+            return draft == null ? InvestigationStore.Scope.main(id) : InvestigationStore.Scope.draft(id, draft.draftId());
         }
 
         /** D7-3: the Draft this view is working on - its id, the main step it forked from, and its own directory. */
@@ -174,7 +187,7 @@ public final class InvestigationRoutes implements RouteModule {
 
         public String dataset() { return String.valueOf(header.get("dataset")); }
         /** The INVESTIGATION's directory, also for a Draft view (members, the masking key and the Case link live here). */
-        Path dir() { return store.investigationDir(id); }
+        Path dir() { return fs().investigationDir(id); }
         /** The directory whose {@code log.jsonl} this view appends to - the Investigation's, or the Draft's. */
         Path logDir() { return draft == null ? dir() : draft.dir(); }
 
@@ -183,20 +196,25 @@ public final class InvestigationRoutes implements RouteModule {
          * followed by the Draft's own (D7-3). One list, because the Draft's steps continue the numbering.
          */
         List<String> logLines() throws IOException {
-            if (draft == null) return store.readLog(id);
-            List<String> main = store.readLog(id);
+            if (draft == null) return store.log(scope());
+            List<String> main = store.log(InvestigationStore.Scope.main(id));
             List<String> out = new ArrayList<>(main.subList(0, Math.min(draft.baseStep(), main.size())));
-            out.addAll(SnapshotStore.readLogAt(draft.dir()));
+            out.addAll(store.log(scope()));
             return out;
         }
 
-        /** Append one step through the writer that matches this view: the main log's, or the Draft's. */
-        void appendStep(int step, String lineJson, String workingSetJson) throws IOException {
-            if (draft == null) store.appendStep(id, step, lineJson, workingSetJson);
-            else {
-                if (com.gamma.la.core.DraftStore.isClosed(draft.dir()))   // discarded or promoted between the gate and the lock
-                    throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + draft.draftId() + "' was closed (discarded or promoted)");
-                com.gamma.la.core.DraftStore.appendStep(draft.dir(), step, lineJson, workingSetJson);
+        /**
+         * Append one step through the writer that matches this view: the main log's, or the Draft's. {@code logSize} is the
+         * length of the {@link #logLines} the caller evaluated against; the store verifies that the scope's own log still holds
+         * exactly the entries that list implies, so a writer that lost a race is refused
+         * ({@link InvestigationVersionConflictException}), never interleaved.
+         */
+        void appendStep(int logSize, int step, String lineJson, String workingSetJson) throws IOException {
+            long own = draft == null ? logSize : logSize - draft.baseStep();
+            try {
+                store.append(scope(), own, step, lineJson, workingSetJson);
+            } catch (InvestigationStore.DraftClosedException closed) {   // discarded or promoted between the gate and the write
+                throw new ApiException(409, ErrorCodes.CONFLICT, closed.getMessage());
             }
         }
     }
@@ -234,8 +252,7 @@ public final class InvestigationRoutes implements RouteModule {
         // LA-24: an optional Case link, checked BEFORE anything is written; stored outside the sealed header.
         Map<String, Object> caseLink = InvestigationCaseRoutes.linkRecord(api, ex, ApiContext.str(body, "caseRef"));
 
-        SnapshotStore store = new SnapshotStore(writeRoot);
-        jail(store, id);
+        InvestigationStore store = InvestigationStores.of(writeRoot);
         Map<String, Object> header = new LinkedHashMap<>();
         header.put("id", id);
         header.put("title", ApiContext.str(body, "title"));
@@ -253,10 +270,8 @@ public final class InvestigationRoutes implements RouteModule {
         // D-E3: no version-addressable read exists, so nothing is pinned — reads are sealed at use instead.
         header.put("datasetVersion", null);
         header.put("parent", null);
-        synchronized (lock(store.directory().resolve("investigations"))) {
-            if (!store.createInvestigation(id, canonical(header)))
-                throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
-        }
+        if (!createChecked(store, id, canonical(header)))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
         if (caseLink != null) InvestigationCaseRoutes.write(ex, store, id, caseLink);
         emit(ex, LinkEventTypes.LINK_INVESTIGATION_CREATED, "link.investigation.created",
                 "link.investigation.created — " + id + " over " + dataset,
@@ -279,7 +294,7 @@ public final class InvestigationRoutes implements RouteModule {
         if (offset < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "offset must be >= 0");
         Optional<Subject> subject = ApiContext.subject(ex);
         List<Map<String, Object>> readable = new ArrayList<>();
-        for (String id : new SnapshotStore(writeRoot).listInvestigations()) {
+        for (String id : InvestigationStores.of(writeRoot).ids()) {
             Inv inv;
             try {
                 inv = openForRead(api, ex, id);
@@ -293,12 +308,12 @@ public final class InvestigationRoutes implements RouteModule {
             item.put("dataset", h.get("dataset"));
             item.put("owner", h.get("owner"));
             item.put("createdAt", h.get("createdAt"));
-            List<String> log = inv.store().readLog(id);
+            List<String> log = inv.store().log(InvestigationStore.Scope.main(id));
             item.put("headStep", log.isEmpty() ? 0 : ((Number) parse(log.get(log.size() - 1)).get("step")).intValue());
             String caseRef = InvestigationCaseRoutes.caseRef(inv.store(), id);
             if (caseRef != null) item.put("caseRef", caseRef);
             InvestigationMembers.Role role = subject.isEmpty() ? InvestigationMembers.Role.LEAD
-                    : InvestigationMemberStore.roles(inv.dir(), h.get("owner")).get(subject.get().id());
+                    : InvestigationMemberStore.roles(inv.store(), inv.id(), h.get("owner")).get(subject.get().id());
             item.put("access", role == null ? "case-member" : role == InvestigationMembers.Role.LEAD ? "owner" : role.wire());
             item.put("readOnly", role != InvestigationMembers.Role.LEAD);
             readable.add(item);
@@ -344,7 +359,7 @@ public final class InvestigationRoutes implements RouteModule {
         if (params.get("links") != null) resolveLinkPseudonyms(inv, params);
         requireBindings(inv.header(), op, params, "");
 
-        synchronized (lock(inv.logDir())) {
+        return untilWon(() -> {
             List<Map<String, Object>> log = readLog(inv);
             InvestigationEvaluator.State before = stateBefore(inv, log);
             List<String> ids = strings(params.get("ids"));
@@ -392,7 +407,7 @@ public final class InvestigationRoutes implements RouteModule {
                 entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, frontier, before, "")));
             }
             return masked(inv, commit(ex, inv, log, entry, before));
-        }
+        });
     }
 
     /**
@@ -471,7 +486,7 @@ public final class InvestigationRoutes implements RouteModule {
 
     /** The undo, over an opened view. A Draft undoes only its OWN ops: the main prefix it forked from is not its to revert. */
     Object undoOn(HttpExchange ex, Inv inv) throws IOException {
-        synchronized (lock(inv.logDir())) {
+        return untilWon(() -> {
             List<Map<String, Object>> log = readLog(inv);
             int own = inv.draft() == null ? 0 : inv.draft().baseStep();
             int target = InvestigationEvaluator.undoTarget(log.subList(Math.min(own, log.size()), log.size()));
@@ -479,7 +494,7 @@ public final class InvestigationRoutes implements RouteModule {
             Map<String, Object> entry = entry(log.size() + 1, "undo", ex);
             entry.put("undoes", target);
             return masked(inv, commit(ex, inv, log, entry, stateBefore(inv, log)));
-        }
+        });
     }
 
     /**
@@ -513,8 +528,7 @@ public final class InvestigationRoutes implements RouteModule {
         String forkId = ApiContext.str(body, "id");
         if (forkId == null) forkId = "inv-" + UUID.randomUUID();
         requireSafeId(forkId);
-        jail(parent.store(), forkId);
-        if (parent.store().readInvestigation(forkId) != null)
+        if (parent.store().header(forkId).orElse(null) != null)
             throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + forkId + "' already exists");
 
         Map<String, Object> header = new LinkedHashMap<>(parent.header());
@@ -566,10 +580,8 @@ public final class InvestigationRoutes implements RouteModule {
             lines.add(canonical(e));
             sets.add(canonical(setDoc(step, state)));
         }
-        synchronized (lock(parent.store().directory().resolve("investigations"))) {
-            if (!parent.store().createFork(forkId, canonical(header), lines, sets))
-                throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + forkId + "' already exists");
-        }
+        if (!forkChecked(parent.store(), forkId, canonical(header), lines, sets))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + forkId + "' already exists");
         String fid = forkId;
         emit(ex, LinkEventTypes.LINK_INVESTIGATION_FORKED, "link.investigation.forked",
                 "link.investigation.forked — " + parent.id() + " → " + fid,
@@ -610,9 +622,8 @@ public final class InvestigationRoutes implements RouteModule {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + dataset + "'");
         String timeCol = ident(header, "timeCol", false);
         String timeColZone = timeColZone(dataset, relationSql, timeCol, ApiContext.str(header, "timeColZone"));
-        SnapshotStore store = new SnapshotStore(writeRoot);
-        jail(store, id);
-        if (store.readInvestigation(id) != null) throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
+        InvestigationStore store = InvestigationStores.of(writeRoot);
+        if (store.header(id).isPresent()) throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
 
         Map<String, Object> h = new LinkedHashMap<>(header);
         h.put("purpose", purpose(header));   // D-U5: an instantiated Investigation states its purpose like a created one
@@ -671,10 +682,8 @@ public final class InvestigationRoutes implements RouteModule {
             lines.add(canonical(e));
             sets.add(canonical(setDoc(step, state)));
         }
-        synchronized (lock(store.directory().resolve("investigations"))) {
-            if (!store.createFork(id, canonical(h), lines, sets))
-                throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
-        }
+        if (!forkChecked(store, id, canonical(h), lines, sets))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
         out.put("header", h);
@@ -828,7 +837,7 @@ public final class InvestigationRoutes implements RouteModule {
                 : com.gamma.la.core.DraftCheckpoints.after(before, log, e);
         e.put("workingSetHash", after.hash());
         int step = ((Number) e.get("step")).intValue();
-        inv.appendStep(step, canonical(e), canonical(setDoc(step, after)));
+        inv.appendStep(log.size(), step, canonical(e), canonical(setDoc(step, after)));
         if (inv.draft() != null) com.gamma.la.core.DraftCheckpoints.remember(inv.draft().dir(), next.size(), after);
 
         String op = "undo".equals(e.get("kind")) ? "undo" : String.valueOf(e.get("op"));
@@ -1797,20 +1806,18 @@ public final class InvestigationRoutes implements RouteModule {
             throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis investigation");
         requireSafeId(id);
-        SnapshotStore store = new SnapshotStore(writeRoot);
-        jail(store, id);
-        String raw = store.readInvestigation(id);
+        InvestigationStore store = InvestigationStores.of(writeRoot);
+        String raw = store.header(id).orElse(null);
         if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
         @SuppressWarnings("unchecked") Map<String, Object> header = ApiContext.JSON.readValue(raw, Map.class);
         Optional<Subject> subject = ApiContext.subject(ex);
-        Path dir = store.investigationDir(id);
-        Map<String, InvestigationMembers.Role> roles = InvestigationMemberStore.roles(dir, header.get("owner"));
+        Map<String, InvestigationMembers.Role> roles = InvestigationMemberStore.roles(store, id, header.get("owner"));
         ApiException roleRefusal = null;
         if (subject.isPresent()) {
             InvestigationMembers.Role role = roles.get(subject.get().id());
             boolean admitted = switch (need) {
                 case LEAD -> role != null && role.canWriteMainLog();
-                case APPROVE -> !InvestigationMemberStore.explicit(dir) || role != null && role.canApprove();
+                case APPROVE -> !InvestigationMemberStore.explicit(store, id) || role != null && role.canApprove();
                 case READ -> role != null && role.canRead()
                         || caseRead && InvestigationCaseRoutes.grants(api, ex, store, id, subject.get());
             };
@@ -1966,7 +1973,7 @@ public final class InvestigationRoutes implements RouteModule {
         String reason = ApiContext.str(body, "reason");
         if (reason != null && reason.length() > 200) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'reason' is at most 200 chars");
         synchronized (lock(inv.dir())) {
-            String raw = inv.store().readPending(inv.id(), rid);
+            String raw = inv.store().pending(inv.id(), rid).orElse(null);
             if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no pending request '" + rid + "' on investigation '" + id + "'");
             Map<String, Object> rec = parse(raw);
             if (!"pending".equals(rec.get("status")))
@@ -2144,11 +2151,26 @@ public final class InvestigationRoutes implements RouteModule {
                     + ", got '" + id + "'");
     }
 
-    private static void jail(SnapshotStore store, String id) {
-        Path root = store.directory().resolve("investigations").normalize();
-        Path target = store.investigationDir(id).normalize();
-        if (!target.startsWith(root) || target.equals(root))
-            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "investigation id escapes the investigation store");
+    /** The store refuses an id that would escape it; the route answers 403, as its own jail check did before the port. */
+    private static ApiException escapes() {
+        return new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "investigation id escapes the investigation store");
+    }
+
+    private static boolean createChecked(InvestigationStore store, String id, String headerJson) throws IOException {
+        try {
+            return store.create(id, headerJson);
+        } catch (IllegalArgumentException escape) {
+            throw escapes();
+        }
+    }
+
+    private static boolean forkChecked(InvestigationStore store, String id, String headerJson, List<String> lines, List<String> sets)
+            throws IOException {
+        try {
+            return store.createFork(id, headerJson, lines, sets);
+        } catch (IllegalArgumentException escape) {
+            throw escapes();
+        }
     }
 
     private static String ident(Map<String, Object> body, String key, boolean required) {
@@ -2162,8 +2184,36 @@ public final class InvestigationRoutes implements RouteModule {
         return v;
     }
 
+    /**
+     * TRANSITIONAL (Draft vertical): the monitor the filesystem store itself serialises its writers on, so the still Path-keyed
+     * compound critical sections (decide, promote, rebase, Draft admission and discard) keep excluding the port's own writers.
+     */
     static Object lock(Path p) {
-        return LOCKS.computeIfAbsent(p.toAbsolutePath().normalize(), k -> new Object());
+        return com.gamma.la.core.FsInvestigationStore.monitor(p);
+    }
+
+    /** How many times an op or undo re-reads, re-evaluates and retries after another writer moved the log under it. */
+    static final int MAX_APPEND_ATTEMPTS = 20;
+
+    /** One evaluate-then-append over the CURRENT log; run again from a fresh read whenever it loses the race. */
+    @FunctionalInterface
+    private interface Attempt<T> {
+        T run() throws IOException;
+    }
+
+    /**
+     * Run {@code attempt}; if its append finds the log moved ({@link InvestigationVersionConflictException}), run it again from
+     * a fresh read, so concurrent writers each land in turn exactly as they did under the old per-log monitor. A writer that
+     * keeps losing is refused {@code 409 CONFLICT_STALE_VERSION}.
+     */
+    private static <T> T untilWon(Attempt<T> attempt) throws IOException {
+        for (int n = 1; ; n++) {
+            try {
+                return attempt.run();
+            } catch (InvestigationVersionConflictException lost) {
+                if (n >= MAX_APPEND_ATTEMPTS) throw new ApiException(409, ErrorCodes.CONFLICT_STALE_VERSION, lost.getMessage());
+            }
+        }
     }
 
     /** Best-effort audit (LA-04 pattern), emitted only AFTER the act succeeded so the trail never over-claims. */

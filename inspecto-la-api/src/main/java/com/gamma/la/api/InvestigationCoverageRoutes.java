@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.DatasetProvider;
@@ -75,7 +76,7 @@ public final class InvestigationCoverageRoutes implements RouteModule {
             window = InvestigationTime.window(raw, "coverage");
         } else {
             List<Map<String, Object>> log = new ArrayList<>();
-            for (String line : inv.store().readLog(id)) log.add(ApiContext.JSON.readValue(line, Map.class));
+            for (String line : inv.store().log(InvestigationStore.Scope.main(id))) log.add(ApiContext.JSON.readValue(line, Map.class));
             window = InvestigationEvaluator.evaluate(log, -1, null).window;
         }
         if (window == null || window.get("from") == null || window.get("to") == null)

@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.InvestigationStore;
+import com.gamma.la.core.FsInvestigationStore;
 import com.gamma.la.core.DraftStore;
 import com.gamma.la.core.InvestigationEvaluator;
 import com.gamma.la.core.SnapshotStore;
@@ -111,7 +113,7 @@ class DraftPromoteCostTest {
                 DraftStore.readHeader(main.dir(), f.draftId), LinkedHashMap.class);
         String actor = String.valueOf(header.get("actor"));
         int base = ((Number) header.get("baseStep")).intValue();
-        List<String> mainLines = main.store().readLog(main.id());
+        List<String> mainLines = main.store().log(InvestigationStore.Scope.main(main.id()));
         List<Map<String, Object>> mainEntries = DraftRebase.parseAll(mainLines);
         List<Map<String, Object>> effective = DraftRebase.effectiveOps(DraftRebase.parseAll(SnapshotStore.readLogAt(draftDir)));
         List<Map<String, Object>> sensitiveNow = DraftPromote.sensitiveSteps(main, effective);
@@ -141,7 +143,7 @@ class DraftPromoteCostTest {
     }
 
     private static void assertPromoted(Fixture f, Expected want) throws Exception {
-        List<String> log = f.main.store().readLog(f.main.id());
+        List<String> log = f.main.store().log(InvestigationStore.Scope.main(f.main.id()));
         assertEquals(MAIN + want.lines.size(), log.size());
         assertEquals(want.lines, log.subList(MAIN, log.size()));
         Path sets = f.main.dir().resolve("sets");
@@ -160,22 +162,22 @@ class DraftPromoteCostTest {
      * expands admitting 20 fresh links each (so the state grows with the steps), with an exclude every 7th step and a hide every 11th.
      */
     static Fixture fixture(Path writeRoot, int steps) throws Exception {
-        SnapshotStore store = new SnapshotStore(writeRoot);
+        FsInvestigationStore store = new FsInvestigationStore(writeRoot);
         Map<String, Object> header = new LinkedHashMap<>();
         header.put("id", "inv1");
         header.put("dataset", "ds");
         header.put("sourceCol", "s");
         header.put("targetCol", "t");
-        store.createInvestigation("inv1", canonical(header));
+        store.create("inv1", canonical(header));
         InvestigationRoutes.Inv main = new InvestigationRoutes.Inv(store, writeRoot, "inv1", header);
         InvestigationEvaluator.State s = new InvestigationEvaluator.State();
         for (int i = 1; i <= MAIN; i++) {
             Map<String, Object> e = op(i, "seed", Map.of("ids", List.of("m" + i)));
             InvestigationEvaluator.apply(s, e);
             e.put("workingSetHash", s.hash());
-            store.appendStep("inv1", i, canonical(e), canonical(InvestigationRoutes.setDoc(i, s)));
+            store.append(InvestigationStore.Scope.main("inv1"), i - 1, i, canonical(e), canonical(InvestigationRoutes.setDoc(i, s)));
         }
-        List<String> mainLines = store.readLog("inv1");
+        List<String> mainLines = store.log(InvestigationStore.Scope.main("inv1"));
         String id = DraftStore.newId();
         Map<String, Object> h = new LinkedHashMap<>();
         h.put("draftId", id);
