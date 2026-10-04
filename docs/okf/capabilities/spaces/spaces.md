@@ -196,7 +196,8 @@ two-step ask-the-minimum and renders whatever the server publishes. **What is pu
 exists (§2, §5).
 
 **`telco-ra` — the telecom revenue-assurance pack** (`ASSURE-PACK-TELCO-RA-1`, wave 5.2 of the assurance plan,
-2026-09-30).
+2026-09-30). ✅ **SHIPPED — row closed 2026-10-04**: items (1)-(6) done or decided; the vendor-specific half is
+parked in the plan's §4 (needs real feeds).
 
 - **What it is.** Configuration only: no new Step Processor.
   - The vendor feed mapping stays parked.
