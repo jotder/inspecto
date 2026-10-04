@@ -460,6 +460,10 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
     carries `config/examples/sla-escalation-examples.md` — labelled, INERT markdown (an Incident and a Case policy
     plus Escalation Rules) because a template can never carry live governance (`GOVERNANCE_ONLY`, refused on every
     import a new Space's included); `TemplateGovernanceExamplesTest` runs every example through the real parsers.
+    **Closed 2026-10-04 (operator):** `ASSURE-WORKFLOW-SLA-1` is closed. Residuals are P3 (`ASSURE-WORKFLOW-SLA-RESIDUALS-1`): the
+    sweep-time deleted-assignee recheck (recommended policy when built: skip the reassign, still notify / raise priority, one
+    WARN per breach) waits for an IAM customer and a real `PrincipalDirectory`; a full state-diagram *editor* (the read-only
+    diagram ships); and a live-preview verification pass of Settings ▸ Incident governance (verification, not a build).
   - **UI:** Settings ▸ *Incident governance* (`settings/incident-governance.component.ts`, model
     `inspecto/governance/governance-model.ts`): the effective workflow as a list editor (initial, terminal,
     transition rows), the SLA policy form and the Escalation Rules list; read-only without `canAdminister`; a 422
