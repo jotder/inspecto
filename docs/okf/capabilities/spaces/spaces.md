@@ -255,7 +255,7 @@ exists (§2, §5).
   - ⚠ **Breaks are not xDRs.** On the golden corpus, 15 completeness Breaks are **9** distinct lost or short
     xDRs, because a record lost at mediation breaks both pairs. The dashboard shows the xDR count
     (`ra_xdr_lost`).
-- **Golden test.** `inspecto-engine/src/test/java/com/gamma/job/TelcoRaGoldenTest.java` runs the template's
+- **Golden test.** `inspecto/src/test/java/com/gamma/job/TelcoRaGoldenTest.java` runs the template's
   own Jobs and Reconciliations over `TelcoRaCorpus` (seed `20260930`, 600 xDRs). It asserts the exact
   `key|reason` set per control, and one row per finding:
 
@@ -273,6 +273,14 @@ exists (§2, §5).
 
   - It also checks that leakage amounts are never NULL, that they are DECIMAL, and that the committed samples
     are byte-identical to the generator (`-Dtelcora.regenerate=true`).
+  - **End to end (2026-10-04).** `theTemplateIngestsEvaluatesAndAlertsEndToEnd` creates a Space from the template,
+    drops each feed's CSV in `data/inbox/<feed>`, ingests it through the template's own 8 Pipelines
+    (`CollectorService.runPipeline`), runs the Jobs (the `on_signal` chain included), evaluates the Alert Rules and
+    the Expectations, and asserts the same pinned rows (17 + 17). Exactly two Alerts fire, one per rule
+    (`ra_leakage_found` CRITICAL, `ra_data_quality` WARNING; never per control); both shipped Expectations PASS the
+    clean corpus, and a `non_null` probe on the NULL opening balance proves an Expectation can fail. The test moved
+    from `inspecto-engine` to `inspecto` because Expectations and the Space bootstrap live there. No Pipeline
+    needed a fix to ingest its feed. The direct-load tests stay as the fast unit-level pin.
   - The benign look-alikes are real **boundary** cases:
     - a call spanning the tariff change;
     - one cent under the re-rating tolerance;

@@ -252,6 +252,87 @@ class TelcoRaGoldenTest {
         assertEquals(Set.of("8.000000"), column(dataDir, "ra_recovery", "CAST(recovered AS VARCHAR)"));
     }
 
+    /**
+     * The REAL path ({@code ASSURE-PACK-TELCO-RA-1} (3)): a Space created from the template, the corpus dropped into
+     * each feed's inbox and ingested by the template's own eight Pipelines, then the template's Jobs, Alert Rules and
+     * Expectations — no store is loaded by hand. Same pinned findings as the direct-load test, plus the outcomes.
+     */
+    @Test
+    void theTemplateIngestsEvaluatesAndAlertsEndToEnd(@TempDir Path root) throws Exception {
+        com.gamma.etl.EditionFeatures.overrideForTest(Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
+        copyTree(TEMPLATE, root.resolve("_templates").resolve("telco-ra"));
+        Path samples = TEMPLATE.resolve("data").resolve("samples");
+        try (com.gamma.service.SpaceManager spaces = com.gamma.service.SpaceManager.discover(root)) {
+            com.gamma.service.SpaceContext space = spaces.createFromTemplate(
+                    com.gamma.service.SpaceId.of("ra"), null, null, "telco-ra");
+            Path base = space.root().base();
+            Path dataDir = base.resolve("data");
+            com.gamma.service.CollectorService svc = space.service();
+
+            // ── ingest: every feed through its own Pipeline ──
+            for (String file : CORPUS.files.keySet()) {
+                String feed = file.substring(0, file.indexOf('/'));
+                Files.createDirectories(dataDir.resolve("inbox").resolve(feed));
+                Files.copy(samples.resolve(file), dataDir.resolve("inbox").resolve(file), StandardCopyOption.REPLACE_EXISTING);
+            }
+            for (String feed : List.of("switch_xdr", "mediated_xdr", "rated_usage", "billed_invoice", "tariff",
+                    "balance_ledger", "ic_rates", "ic_statement")) {
+                var r = svc.runPipeline(feed);
+                assertTrue(r.isPresent(), feed + ": the Pipeline is registered in the created Space");
+                assertEquals(new com.gamma.inspector.MultiCollectorProcessor.RunResult(1, 0), r.get(), feed + " ingests its one file");
+            }
+
+            // ── Jobs ──
+            com.gamma.job.JobService js = svc.jobService().orElseThrow();
+            js.eventLog(com.gamma.event.EventLog.global());
+            for (String j : List.of("ra_xdr_lost", "ra_xdr_completeness", "ra_rated_vs_billed", "ra_rerating")) {
+                assertTrue(js.triggerRun(j, null).isPresent(), j);
+                JobRun run = await(() -> js.runsFor(j).stream().filter(r -> !"SKIPPED".equals(r.status())).findFirst().orElse(null));
+                assertEquals("SUCCESS", run.status(), j + ": " + run.message());
+            }
+            for (String j : List.of("ra_rollforward", "ra_settlement", "ra_leakage", "ra_data_quality")) {   // the on_signal chain
+                JobRun run = await(() -> js.runsFor(j).stream().filter(r -> !"SKIPPED".equals(r.status())).findFirst().orElse(null));
+                assertEquals("SUCCESS", run.status(), j + ": " + run.message());
+            }
+            assertEquals(17, rows(dataDir, "ra_leakage", "CONTROL").size(), "leakage rows, ingested end to end");
+            assertEquals(17, rows(dataDir, "ra_data_quality", "CONTROL").size(), "data-quality rows, ingested end to end");
+            for (String control : List.of("ra_xdr_lost", "ra_rerating", "ra_rollforward", "ra_settlement")) {
+                String store = "ra_xdr_lost".equals(control) ? control : control + "_findings";
+                assertEquals(new TreeSet<>(CORPUS.planted.get(control)),
+                        new TreeSet<>(rows(dataDir, store, "ITEM_KEY || '|' || REASON")), control);
+            }
+            for (String recon : List.of("ra_xdr_completeness", "ra_rated_vs_billed")) {
+                Set<String> flagged = new TreeSet<>();
+                for (ReconBreaks.Break b : new ReconStateStore(base.resolve("config")).read(recon).breaks())
+                    flagged.add(b.pair() + "|" + b.type() + "|" + b.key());
+                assertEquals(new TreeSet<>(CORPUS.planted.get(recon)), flagged, recon);
+            }
+
+            // ── Alert Rules: one Alert per rule, never per control or entity (G-42) ──
+            List<com.gamma.alert.Alert> alerts = svc.alertService().orElseThrow().evaluateRules();
+            Map<String, String> bySeverity = alerts.stream().collect(Collectors.toMap(
+                    com.gamma.alert.Alert::rule, com.gamma.alert.Alert::severity));
+            assertEquals(Map.of("ra_leakage_found", "CRITICAL", "ra_data_quality", "WARNING"), bySeverity,
+                    "exactly the two rules fire, once each: " + alerts);
+            assertEquals(2, alerts.size());
+            assertEquals(Set.of(17.0), alerts.stream().map(com.gamma.alert.Alert::value).collect(Collectors.toSet()));
+
+            // ── Expectations: the shipped two pass the clean corpus; a probe that would otherwise fail proves they can ──
+            for (String name : List.of("ra_switch_xdr_id_non_null", "ra_rated_charge_non_negative")) {
+                var exp = com.gamma.expectation.Expectation.fromMap(
+                        com.gamma.util.ToonHelper.load(base.resolve("config/registry/expectations/" + name + ".toon").toString()));
+                var res = com.gamma.expectation.ExpectationEvaluator.evaluate(exp, dataDir);
+                assertEquals("PASSED", res.status(), name + " violations=" + res.violations());
+            }
+            var nullOpening = com.gamma.expectation.Expectation.fromMap(Map.of("name", "probe", "targetType", "pipeline",
+                    "target", "balance_ledger", "column", "OPENING", "kind", "non_null", "severity", "MAJOR"));
+            assertEquals(1, com.gamma.expectation.ExpectationEvaluator.evaluate(nullOpening, dataDir).violations(),
+                    "the planted blank opening balance is a violation, so a non_null Expectation does fire");
+        } finally {
+            com.gamma.etl.EditionFeatures.overrideForTest(null);
+        }
+    }
+
     // ── helpers ──
 
     private static Path templateJob(String name) {
