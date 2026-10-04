@@ -22,6 +22,16 @@
       "port": 8090
     },
     {
+      "name": "inspecto-demo",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd inspecto-demo && set PORT=%PORT% && call .\\serve-demo.bat"
+      ],
+      "autoPort": true,
+      "port": 8095
+    },
+    {
       "name": "inspecto-backend",
       "runtimeExecutable": "cmd",
       "runtimeArgs": [
