@@ -87,9 +87,6 @@ class ControlApiDraftAdmissionTest {
         AccessDeciders.forTest(null);
         DraftStore.mover = DraftStore.ATOMIC;
         DraftLifecycle.clock = Clock.systemUTC();
-        DraftLifecycle.maxOpenDrafts = 50;
-        DraftLifecycle.hibernateAfter = Duration.ofHours(1);
-        DraftLifecycle.expireAfter = Duration.ofDays(30);
         DraftAdmission.setHeavyLimit(Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 3)));
     }
 
@@ -187,8 +184,7 @@ class ControlApiDraftAdmissionTest {
     @Test
     void theNextForkBeyondTheCapIs409WithAWayOutAndADiscardFreesASeat(@TempDir Path cfg, @TempDir Path root) throws Exception {
         subjects();
-        DraftLifecycle.maxOpenDrafts = 2;
-        try (Ctx c = open(cfg, root)) {
+        try (Ctx c = open(cfg, root, "masking_mode: none\ndrafts:\n  max_open: 2\n")) {
             team(c);
             String da = fork(c, A);
             fork(c, A2);
@@ -207,14 +203,27 @@ class ControlApiDraftAdmissionTest {
     void theCapCountsAHibernatedDraftButNotAnExpiredOne(@TempDir Path cfg, @TempDir Path root) throws Exception {
         subjects();
         DraftLifecycle.clock = tick;
-        DraftLifecycle.maxOpenDrafts = 1;
-        try (Ctx c = open(cfg, root)) {
+        try (Ctx c = open(cfg, root, "masking_mode: none\ndrafts:\n  max_open: 1\n")) {
             team(c);
             fork(c, A);
             tick.advance(Duration.ofHours(2));
             assertEquals(409, send(c, "POST", DRAFTS, "{}", L).statusCode(), "hibernated is still open");
             tick.advance(Duration.ofDays(31));
             assertEquals(201, send(c, "POST", DRAFTS, "{}", L).statusCode(), "the idle Draft expired and freed its seat");
+        }
+    }
+
+    @Test
+    void theSpacesExpiryAndHibernationPeriodsComeFromItsSettings(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        DraftLifecycle.clock = tick;
+        try (Ctx c = open(cfg, root, "masking_mode: none\ndrafts:\n  max_open: 1\n  hibernate_after_minutes: 600\n  expire_after_days: 2\n")) {
+            team(c);
+            fork(c, A);
+            tick.advance(Duration.ofHours(10));
+            assertEquals(409, send(c, "POST", DRAFTS, "{}", L).statusCode(), "hibernated is still open and holds the one seat");
+            tick.advance(Duration.ofDays(3));   // inside the 30 d default, past the stated 2 d
+            assertEquals(201, send(c, "POST", DRAFTS, "{}", L).statusCode(), "expired after the stated 2 days and freed its seat");
         }
     }
 

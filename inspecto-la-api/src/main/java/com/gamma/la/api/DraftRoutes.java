@@ -4,6 +4,7 @@ import com.gamma.la.core.InvestigationStore;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
+import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.control.RouteModule;
 import com.gamma.control.Subject;
 import com.gamma.la.core.DraftLifecycle;
@@ -150,7 +151,7 @@ public final class DraftRoutes implements RouteModule {
         String id = o.view().id();
         if (o.discarded()) throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + o.draftId() + "' was "
                 + (s.draftState(id, o.draftId()) == InvestigationStore.DraftState.PROMOTED ? "promoted"
-                : s.draftExpired(id, o.draftId()) ? "expired after " + DraftLifecycle.expireAfter.toDays() + " days idle" : "discarded"));
+                : s.draftExpired(id, o.draftId()) ? "expired after " + LinkAnalysisSettings.forRoot(o.view().writeRoot()).effectiveDrafts().expireAfterInForce().toDays() + " days idle" : "discarded"));
     }
 
     /** A Draft whose main prefix no longer hashes to what it forked from is not evaluated: fail closed (the main log was rewritten). */
@@ -180,7 +181,7 @@ public final class DraftRoutes implements RouteModule {
         int at = atRaw == null ? head : ((Number) atRaw).intValue();
         if (at < 0 || at > head)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'at' must be between 0 and the head step " + head + ", got " + at);
-        int cap = DraftLifecycle.maxOpenDrafts;
+        int cap = LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveDrafts().maxOpenInForce();
         if (inv.store().openDraftCount() >= cap) DraftAdmission.maintainSpace(inv);   // idle Drafts that no longer count go first
         header.put("draftId", draftId);
         header.put("investigationId", invId);
@@ -585,7 +586,7 @@ public final class DraftRoutes implements RouteModule {
             if (v.store().draftExpired(v.id(), o.draftId())) out.put("expired", true);
         } else {
             java.time.Instant last = v.store().draftLastAccess(v.id(), o.draftId());
-            java.time.Instant expiresAt = last.plus(DraftLifecycle.expireAfter);
+            java.time.Instant expiresAt = last.plus(LinkAnalysisSettings.forRoot(v.writeRoot()).effectiveDrafts().expireAfterInForce());
             out.put("lastAccessAt", last.toString());
             out.put("expiresAt", expiresAt.toString());   // D7-Q5: the warning - from 7 days out the Draft says it is about to expire
             out.put("expiryWarning", !expiresAt.isAfter(DraftLifecycle.now().plus(java.time.Duration.ofDays(PIN_WARN_DAYS))));

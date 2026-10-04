@@ -70,6 +70,9 @@ class DraftConcurrencyBench {
     private List<Map<String, Object>> mainEntries;
     private final AtomicLong heavyRan = new AtomicLong(), heavyRefused = new AtomicLong();
 
+    /** The open-Draft cap this bench passes to the store (the route reads it from the Space's link-analysis.toon). */
+    private static volatile int benchCap = 50;
+
     @Test
     void realDraftsOverSharedPartitionedIndex() throws Exception {
         Path dir = Path.of(System.getProperty("inspecto.bench.dir")).toAbsolutePath();
@@ -82,7 +85,7 @@ class DraftConcurrencyBench {
         nodes = Math.max(1000, edges / 5);
         Path writeRoot = dir.resolve("space-" + edges);
         Files.createDirectories(writeRoot);
-        DraftLifecycle.maxOpenDrafts = drafts;
+        benchCap = drafts;
 
         // ── the shared index (real IndexBuilder output, partitioned into buckets) ──
         IndexMapping m = new IndexMapping("s", "t", "k", "ts", null, null, List.of());
@@ -227,7 +230,7 @@ class DraftConcurrencyBench {
             h.put("baseLogHash", baseHash);
             h.put("pins", Map.of("indexes", List.of(Map.of("mappingHash", m.hash(), "version", version))));
             // the store checks the cap and creates in one act; it retries a transient Windows rename denial itself
-            if (store.createDraft(INV, id, canonical(h), String.valueOf(h.get("actor")), DraftLifecycle.maxOpenDrafts).outcome() != InvestigationStore.DraftCreation.Created.CREATED) throw new IllegalStateException("fork failed");
+            if (store.createDraft(INV, id, canonical(h), String.valueOf(h.get("actor")), benchCap).outcome() != InvestigationStore.DraftCreation.Created.CREATED) throw new IllegalStateException("fork failed");
         new IndexStore(main.writeRoot().resolve(IndexRoutes.INDEX_DIR), DATASET, m.hash()).pins().pin(version, id);
         store.touchDraft(INV, id);
         stateOf(id);

@@ -373,6 +373,39 @@ class ControlApiSettingsTest {
         }
     }
 
+    /** LA-DRAFT-PROMOTE-COST-1: the Draft lifecycle knobs are a nested block; absent = inherit, refusals are 422 and leave the file as it was. */
+    @Test
+    void linkAnalysisDraftsRoundTripAndRefuseBadValues(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            String path = "/spaces/acme/settings/link-analysis";
+            JsonNode def = json(send(c.port, "GET", path, null));
+            assertTrue(def.get("drafts").isNull(), "absent => inherit");
+            assertEquals(50, def.get("draftsInForce").get("maxOpen").asInt());
+            assertEquals(60, def.get("draftsInForce").get("hibernateAfterMinutes").asInt());
+            assertEquals(30, def.get("draftsInForce").get("expireAfterDays").asInt());
+            HttpResponse<String> put = send(c.port, "PUT", path, "{\"drafts\":{\"maxOpen\":8,\"hibernateAfterMinutes\":30,\"expireAfterDays\":14}}");
+            assertEquals(200, put.statusCode(), put.body());
+            String file = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
+            assertTrue(file.contains("max_open: 8") && file.contains("hibernate_after_minutes: 30") && file.contains("expire_after_days: 14"), file);
+            JsonNode got = json(send(c.port, "GET", path, null));
+            assertEquals(8, got.get("drafts").get("maxOpen").asInt());
+            assertEquals(14, got.get("draftsInForce").get("expireAfterDays").asInt());
+            // each refusal states ONE bad value next to values that would otherwise be accepted
+            for (String bad : new String[] {"{\"drafts\":{\"maxOpen\":0}}", "{\"drafts\":{\"maxOpen\":1001}}",
+                    "{\"drafts\":{\"hibernateAfterMinutes\":10081}}", "{\"drafts\":{\"expireAfterDays\":3651}}",
+                    "{\"drafts\":{\"maxOpen\":5,\"expireAfterDays\":0}}", "{\"drafts\":{\"maxOpen\":\"many\"}}",
+                    "{\"drafts\":{\"maxOpen\":5,\"bogus\":1}}", "{\"drafts\":7}",
+                    "{\"drafts\":{\"hibernateAfterMinutes\":10080,\"expireAfterDays\":7}}"})
+                assertEquals(422, send(c.port, "PUT", path, bad).statusCode(), bad);
+            assertEquals(file, Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon")), "a refusal changes nothing");
+            // positive controls: the same shapes one step inside the limit are accepted
+            assertEquals(200, send(c.port, "PUT", path, "{\"drafts\":{\"hibernateAfterMinutes\":10080,\"expireAfterDays\":8}}").statusCode());
+            assertEquals(200, send(c.port, "PUT", path, "{\"drafts\":{\"maxOpen\":1000,\"expireAfterDays\":3650}}").statusCode());
+            assertTrue(json(send(c.port, "PUT", path, "{}")).get("drafts").isNull(), "an unstated block reads back as inherit");
+        }
+    }
+
     /** LA-17 step 2: per-Space Entity Types — inherit the seeded nine, a stated list replaces them, 422 on bad. */
     @Test
     void linkAnalysisEntityTypesRoundTripAndRefuseBadLists(@TempDir Path root) throws Exception {

@@ -16,7 +16,8 @@ import java.util.Map;
  *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap, suspicionNodeCap,
  *                                 maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove, entityTypes,
  *                                 mergedDistinctCap, seedByDistinctCap, graphRun{maxNodes,maxEdges,timeoutMs,threads,queue,maxResultItems},
- *                                 index{enabled,maxDiskBytes,keepVersions,threads,queue}} (nulls = shipped defaults)
+ *                                 index{enabled,maxDiskBytes,keepVersions,threads,queue},
+ *                                 drafts{maxOpen,hibernateAfterMinutes,expireAfterDays}} (nulls = shipped defaults)
  *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding)
  *   GET /settings/pipeline-history   the space's {keep, effectiveKeep, defaultKeep, maxKeep} — Pipeline config
  *                                    versions kept per Pipeline (keep null = the shipped default)
@@ -52,6 +53,10 @@ final class SettingsRoutes implements RouteModule {
     private static final int MAX_INDEX_KEEP = 100;
     private static final int MAX_INDEX_THREADS = 64;
     private static final int MAX_INDEX_QUEUE = 1_000;
+    /** Draft lifecycle limits: a thousand open Drafts, a week to hibernate, ten years to expire. */
+    private static final int MAX_DRAFTS_OPEN = 1_000;
+    private static final int MAX_DRAFTS_HIBERNATE_MINUTES = 10_080;
+    private static final int MAX_DRAFTS_EXPIRE_DAYS = 3_650;
     /** Reject an over-large inline logo (defence-in-depth; the UI already caps ~200 KB). */
     private static final int MAX_LOGO_CHARS = 512 * 1024;
 
@@ -157,7 +162,7 @@ final class SettingsRoutes implements RouteModule {
         LinkAnalysisSettings s = new LinkAnalysisSettings(nodeCap(body, "projectionNodeCap"),
                 nodeCap(body, "analysisNodeCap"), nodeCap(body, "suspicionNodeCap"), maskingMode(body),
                 nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"), entityTypes(body),
-                nodeCap(body, "mergedDistinctCap"), nodeCap(body, "seedByDistinctCap"), graphRun(body), index(body));
+                nodeCap(body, "mergedDistinctCap"), nodeCap(body, "seedByDistinctCap"), graphRun(body), index(body), drafts(body));
         s.write(root.resolve(LinkAnalysisSettings.FILE));
         return linkAnalysisShape(s);
     }
@@ -200,6 +205,21 @@ final class SettingsRoutes implements RouteModule {
             idx.put("queue", x.queue());
         }
         m.put("index", idx);
+        LinkAnalysisSettings.Drafts dr = s.drafts();
+        Map<String, Object> drafts = null;   // LA-DRAFT-PROMOTE-COST-1: null = every knob inherits the shipped default
+        if (dr != null) {
+            drafts = new LinkedHashMap<>();
+            drafts.put("maxOpen", dr.maxOpen());
+            drafts.put("hibernateAfterMinutes", dr.hibernateAfterMinutes());
+            drafts.put("expireAfterDays", dr.expireAfterDays());
+        }
+        m.put("drafts", drafts);
+        LinkAnalysisSettings.Drafts inForce = s.effectiveDrafts();
+        Map<String, Object> draftsInForce = new LinkedHashMap<>();
+        draftsInForce.put("maxOpen", inForce.maxOpenInForce());
+        draftsInForce.put("hibernateAfterMinutes", inForce.hibernateAfterInForce().toMinutes());
+        draftsInForce.put("expireAfterDays", inForce.expireAfterInForce().toDays());
+        m.put("draftsInForce", draftsInForce);
         return m;
     }
 
@@ -258,6 +278,28 @@ final class SettingsRoutes implements RouteModule {
         }
         return new LinkAnalysisSettings.Index(enabled, maxDisk, rangedInt(g, "keepVersions", "index.keepVersions", MAX_INDEX_KEEP),
                 rangedInt(g, "threads", "index.threads", MAX_INDEX_THREADS), rangedInt(g, "queue", "index.queue", MAX_INDEX_QUEUE));
+    }
+
+    /** The Draft lifecycle knobs (LA-DRAFT-PROMOTE-COST-1): absent/null = inherit; {@code maxOpen} 1..{@code MAX_DRAFTS_OPEN},
+     *  {@code hibernateAfterMinutes} 1..{@code MAX_DRAFTS_HIBERNATE_MINUTES}, {@code expireAfterDays} 1..{@code MAX_DRAFTS_EXPIRE_DAYS};
+     *  each refused (422), never clamped, and the expiry in force must be longer than the hibernation in force. */
+    @SuppressWarnings("unchecked")
+    private static LinkAnalysisSettings.Drafts drafts(Map<String, Object> body) {
+        Object raw = body.get("drafts");
+        if (raw == null) return null;
+        if (!(raw instanceof Map<?, ?>))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "drafts must be an object, got '" + raw + "'");
+        Map<String, Object> g = (Map<String, Object>) raw;
+        for (String k : g.keySet())
+            if (!List.of("maxOpen", "hibernateAfterMinutes", "expireAfterDays").contains(k))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "drafts has no key '" + k + "'");
+        LinkAnalysisSettings.Drafts d = new LinkAnalysisSettings.Drafts(rangedInt(g, "maxOpen", "drafts.maxOpen", MAX_DRAFTS_OPEN),
+                rangedInt(g, "hibernateAfterMinutes", "drafts.hibernateAfterMinutes", MAX_DRAFTS_HIBERNATE_MINUTES),
+                rangedInt(g, "expireAfterDays", "drafts.expireAfterDays", MAX_DRAFTS_EXPIRE_DAYS));
+        if (!d.ordered())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "drafts.expireAfterDays (" + d.expireAfterInForce().toDays()
+                    + " days in force) must be longer than drafts.hibernateAfterMinutes (" + d.hibernateAfterInForce().toMinutes() + " minutes in force)");
+        return d;
     }
 
     private static Integer rangedInt(Map<String, Object> g, String key, String label, int max) {

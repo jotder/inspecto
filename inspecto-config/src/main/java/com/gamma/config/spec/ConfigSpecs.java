@@ -1263,7 +1263,12 @@ public final class ConfigSpecs {
                                 + "reads one yet); max_disk_bytes = a build whose estimate is above it is refused up front "
                                 + "(absent or 0 = no limit); keep_versions = published versions kept per index (absent = 2); "
                                 + "{threads, queue} size the build workers and the waiting line; every key absent = the "
-                                + "shipped default.")
+                                + "shipped default."),
+                FieldSpec.of("drafts", "Draft lifecycle", FieldType.MAP,
+                        "The Draft lifecycle (D21, D7-Q5): max_open = the most open Drafts one Space holds (1..1000; absent = 50); "
+                                + "hibernate_after_minutes = idle minutes before a Draft hibernates (1..10080; absent = 60); "
+                                + "expire_after_days = idle days before it expires and is closed like a discard (1..3650; absent = 30), "
+                                + "always longer than the hibernation; every key absent = the shipped default.")
         );
         return new ConfigSpec("link-analysis-settings", fields, List.of());
     }

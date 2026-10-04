@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * D7-6 - when a Draft was last used, and the two idle states that follow (design {@code la-separation-d7-design.md} sections 7, 11;
- * decisions D7-Q5: hibernate after 1 h idle, expire after 30 d idle). Host-free; the policy that ACTS on these facts
+ * decisions D7-Q5: hibernate after 1 h idle, expire after 30 d idle by default; both and the open-Draft cap are per-Space {@code drafts} keys of {@code link-analysis.toon}, read where the policy acts). Host-free; the policy that ACTS on these facts
  * (release caches, close like a discard, audit) lives in {@code inspecto-la-api} {@code DraftAdmission}.
  *
  * <ul>
@@ -35,10 +35,6 @@ public final class DraftLifecycle {
 
     /** TEST SEAM: the time source. */
     public static volatile Clock clock = Clock.systemUTC();
-    public static volatile Duration hibernateAfter = Duration.ofHours(1);
-    public static volatile Duration expireAfter = Duration.ofDays(30);
-    /** The most open Drafts one Space holds (D21). */
-    public static volatile int maxOpenDrafts = 50;
     static final Duration PERSIST_EVERY = Duration.ofMinutes(5);
 
     private static final Map<Path, Instant> ACCESS = new ConcurrentHashMap<>();
