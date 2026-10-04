@@ -45,6 +45,8 @@ export interface AlertRule {
     by?: string[] | null;
     /** With `by`: above this many breaching keys one storm Alert replaces the per-key ones (server default 100). */
     stormCap?: number | null;
+    /** Measure rule: consecutive healthy sweeps before its Alert is cleared (server default 1, at most 1000). */
+    healAfterSweeps?: number | null;
     /** Freshness rule (DUCKLE-C1): the Dataset must have published within this (`Ns|Nm|Nh|Nd`). */
     maximumAge?: string | null;
     /** Investigation rule (LA-23): the Investigation whose Working Set `relation` the `measure` reads. */

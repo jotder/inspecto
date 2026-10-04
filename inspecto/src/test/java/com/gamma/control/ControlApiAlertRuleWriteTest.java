@@ -298,6 +298,12 @@ class ControlApiAlertRuleWriteTest {
             AlertRule onDisk = AlertRule.fromMap(store(root).get("alert-rule", "spend").orElseThrow().content());
             assertEquals(List.of("msisdn", "region"), onDisk.by());
             assertEquals(AlertRule.DEFAULT_STORM_CAP, onDisk.stormCap());
+            assertEquals(AlertRule.DEFAULT_HEAL_AFTER_SWEEPS, onDisk.healAfterSweeps(), "default: heal on the first healthy sweep");
+
+            HttpResponse<String> damped = send(c.port, "POST", "/alerts/rules",
+                    "{\"name\":\"damped\",\"dataset\":\"usage\",\"measure\":\"count\",\"threshold\":1,\"healAfterSweeps\":3}");
+            assertEquals(200, damped.statusCode(), damped.body());
+            assertEquals(3, AlertRule.fromMap(store(root).get("alert-rule", "damped").orElseThrow().content()).healAfterSweeps());
         }
     }
 
@@ -319,6 +325,9 @@ class ControlApiAlertRuleWriteTest {
         invalid.put("measure rule with a window", "{\"name\":\"bad\",\"dataset\":\"usage\",\"measure\":\"count\",\"threshold\":1,\"window\":\"1h\"}");
         invalid.put("unknown aggregation", "{\"name\":\"bad\",\"dataset\":\"usage\",\"measure\":\"median(amount)\",\"threshold\":1}");
         invalid.put("stormCap without by", "{\"name\":\"bad\",\"dataset\":\"usage\",\"measure\":\"count\",\"threshold\":1,\"stormCap\":5}");
+        invalid.put("healAfterSweeps below 1", "{\"name\":\"bad\",\"dataset\":\"usage\",\"measure\":\"count\",\"threshold\":1,\"healAfterSweeps\":0}");
+        invalid.put("healAfterSweeps absurdly high", "{\"name\":\"bad\",\"dataset\":\"usage\",\"measure\":\"count\",\"threshold\":1,\"healAfterSweeps\":100000}");
+        invalid.put("healAfterSweeps on a ledger rule", "{\"name\":\"bad\",\"metric\":\"error_rate\",\"threshold\":1,\"window\":\"1h\",\"healAfterSweeps\":2}");
         invalid.put("by on a ledger rule", "{\"name\":\"bad\",\"metric\":\"error_rate\",\"threshold\":1,\"window\":\"1h\",\"by\":[\"msisdn\"]}");
         invalid.put("by column not in the Schema", byRule("bad", "usage", "[\"imsi\"]"));
         invalid.put("Investigation rule", "{\"name\":\"bad\",\"investigation\":\"inv-42\",\"measure\":\"count\",\"threshold\":3}");

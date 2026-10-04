@@ -221,4 +221,76 @@ class MeasureAlertTest {
         assertEquals("ds", ok.toMap().get("dataset"));
         assertNull(ok.toMap().get("window"));
     }
+
+    // ── heal hysteresis — ALERT-HEAL-FLAP-1 ───────────────────────────────────────────────
+
+    private static AlertRule dampedRule(Integer healAfterSweeps) {
+        Map<String, Object> m = new java.util.HashMap<>(Map.of("name", "low-revenue", "dataset", "flap_ds",
+                "measure", "sum(amount)", "comparator", "lt", "threshold", 1000, "severity", "WARNING"));
+        if (healAfterSweeps != null) m.put("healAfterSweeps", healAfterSweeps);
+        return AlertRule.fromMap(m);
+    }
+
+    @Test
+    void aScalarRuleOscillatingAroundItsThresholdStaysOneOpenAlertUntilNHealthySweeps(@TempDir Path dir)
+            throws Exception {
+        List<Event> seen = new CopyOnWriteArrayList<>();
+        subscribe(seen::add);
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        AlertService svc = new AlertService(List.of(dampedRule(3)), configs(cfg), emptyStore());
+        AtomicReference<OptionalDouble> value = new AtomicReference<>(OptionalDouble.of(750.0));
+        svc.measureProbe((d, m) -> value.get());
+
+        assertEquals(1, svc.evaluate(null, 0).size(), "breach");
+        int fired = 0;
+        for (int sweep = 1; sweep <= 6; sweep++) {              // flap: healthy, breach, healthy, breach, ...
+            value.set(OptionalDouble.of(sweep % 2 == 1 ? 1500.0 : 750.0));
+            fired += svc.evaluate(null, sweep * 1000L).size();
+        }
+        assertEquals(0, fired, "a relapse inside the streak raises no fresh Alert");
+        assertTrue(cleared(seen, "flap_ds").isEmpty(), "and no all-clear/Alert pair per sweep");
+
+        value.set(OptionalDouble.of(1500.0));                   // three healthy sweeps in a row
+        svc.evaluate(null, 7000);
+        svc.evaluate(null, 8000);
+        assertTrue(cleared(seen, "flap_ds").isEmpty(), "two of three: still open");
+        svc.evaluate(null, 9000);
+        assertEquals(1, cleared(seen, "flap_ds").size(), "the third consecutive healthy sweep clears, once");
+
+        value.set(OptionalDouble.of(10.0));
+        assertEquals(1, svc.evaluate(null, 10000).size(), "after the heal a relapse fires at once, as before");
+    }
+
+    @Test
+    void theDefaultHealsOnTheFirstHealthySweepExactlyAsBefore(@TempDir Path dir) throws Exception {
+        List<Event> seen = new CopyOnWriteArrayList<>();
+        subscribe(seen::add);
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        AlertRule rule = dampedRule(null);
+        assertEquals(1, rule.healAfterSweeps());
+        assertFalse(rule.toMap().containsKey("healAfterSweeps"), "the default is not written");
+        AlertService svc = new AlertService(List.of(rule), configs(cfg), emptyStore());
+        AtomicReference<OptionalDouble> value = new AtomicReference<>(OptionalDouble.of(750.0));
+        svc.measureProbe((d, m) -> value.get());
+
+        assertEquals(1, svc.evaluate(null, 0).size());
+        value.set(OptionalDouble.of(1500.0));
+        svc.evaluate(null, 1000);
+        assertEquals(1, cleared(seen, "flap_ds").size(), "cleared on the first healthy sweep");
+        value.set(OptionalDouble.of(10.0));
+        assertEquals(1, svc.evaluate(null, 2000).size(), "and the relapse fires at once");
+    }
+
+    @Test
+    void healAfterSweepsFailsClosed() {
+        for (Object bad : new Object[]{0, -1, 1.5, "x", 1001})
+            assertThrows(IllegalArgumentException.class, () -> AlertRule.fromMap(Map.of("name", "x", "dataset", "ds",
+                    "measure", "count", "comparator", "gt", "threshold", 5, "severity", "INFO",
+                    "healAfterSweeps", bad)), "healAfterSweeps " + bad);
+        assertThrows(IllegalArgumentException.class, () -> AlertRule.fromMap(Map.of("name", "x",
+                "metric", "error_rate", "window", "1h", "comparator", "gt", "threshold", 5, "severity", "INFO",
+                "healAfterSweeps", 3)), "a ledger rule has no Measure to heal");
+        assertEquals(1000, AlertRule.fromMap(Map.of("name", "x", "dataset", "ds", "measure", "count",
+                "comparator", "gt", "threshold", 5, "severity", "INFO", "healAfterSweeps", 1000)).healAfterSweeps());
+    }
 }

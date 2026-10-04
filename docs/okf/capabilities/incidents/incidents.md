@@ -231,9 +231,21 @@ links the new ALERT `ESCALATED_FROM` it either way (`promoteToIncident`, measure
 neither fires nor heals; a never-breached rule is never "cleared". A re-save over another Dataset or Measure retires
 the old ALERT (actor `alert-rule:<name>:rule-changed`) and — as a delete does — clears its cooldown, so a
 re-created rule still breaching fires at once; the edge opens only when an Alert actually fired, so a heal never
-clears an Alert that was never raised. The Incident stays with triage. Flapping (heal-then-relapse per sweep) has
-no hysteresis on either path — `ALERT-HEAL-FLAP-1`. Ledger-metric and
-Investigation rules still have no heal. Tests: `MeasureAlertTest` (engine), `ScalarMeasureAlertObjectsTest`
+clears an Alert that was never raised. The Incident stays with triage. Ledger-metric and
+Investigation rules still have no heal.
+
+**Heal hysteresis** (`ALERT-HEAL-FLAP-1`, operator decision 2026-10-04: option A). A Dataset Measure rule (scalar or
+`by`) takes an optional **`healAfterSweeps`** (`alert.healAfterSweeps`, whole number 1–1000; default 1 = heal on the
+first healthy sweep, exactly the behaviour above, and not written back by `toMap`). With N > 1 the rule heals only
+after N *consecutive* healthy sweeps: `AlertService.healthyStreak` counts them per `rule|dataset` (scalar) or per
+`rule|dataset|<keyId>` (one `by` key, the storm included — damping is per rule or key, never per entity, G-42). A
+breach resets the streak; until it completes the Alert stays open, so a relapse raises nothing new (the scalar
+cooldown, or the key's open edge, still holds) and no all-clear is emitted. A storm sweep clears every streak of the
+rule (a capped read is not "healthy"); a delete or re-save over other keys retires them (`retireKeys`). Streaks are
+in memory — a restart re-seeds the open Alert and restarts the count. Fail closed: <1, non-integer, >1000, or on a
+ledger / freshness / Investigation rule → 422. Authored on the Alert Rule dialog (*Heal after sweeps*, Measure kind);
+tests `MeasureAlertTest`, `PerEntityAlertTest`, `ControlApiAlertRuleWriteTest`. Deferred: a value re-arm margin
+(option C), only if value-oscillation noise persists after this. Tests: `MeasureAlertTest` (engine), `ScalarMeasureAlertObjectsTest`
 (`inspecto-ops`, the real workflow).
 
 **Evaluation.** `AlertService` polls on a window-derived floor of 1 min, default 10 min

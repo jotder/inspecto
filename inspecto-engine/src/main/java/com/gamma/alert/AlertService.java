@@ -90,6 +90,10 @@ public final class AlertService {
      * object ({@link #measureOpen}), so a restart does not forget to heal it.
      */
     private final Map<String, Boolean> openMeasures = new ConcurrentHashMap<>();
+    /** Consecutive healthy sweeps of a breached subject — a scalar rule's {@code rule|dataset} or a {@code by} rule's
+     *  {@code rule|dataset|<keyId>} — held until {@link AlertRule#healAfterSweeps} are reached (ALERT-HEAL-FLAP-1).
+     *  Per rule or per key, never per entity of a wider set; absent means zero. */
+    private final Map<String, Integer> healthyStreak = new ConcurrentHashMap<>();
     /** The object attribute that dedupes a per-key Alert / Incident: {@code <rule>|<key>}. */
     static final String ALERT_KEY = "alertKey";
     /** The pseudo-key of a {@code by} rule's storm Alert. A real key always reads {@code col=value}, so never this. */
@@ -242,6 +246,7 @@ public final class AlertService {
      */
     private void retireKeys(AlertRule old) {
         openKeys.remove(old.name());
+        healthyStreak.keySet().removeIf(k -> k.startsWith(old.name() + "|"));
         if (old.isMeasureRule() && !old.isGrouped()) {
             // The scalar Measure rule's one "key": its edge state goes and its still-active ALERT resolves, as a
             // `by` rule's per-key ALERTs do below. Its Incident, likewise, stays with triage.
@@ -403,7 +408,9 @@ public final class AlertService {
                 // Open only once an Alert was actually raised — a heal must never clear an Alert that never fired.
                 if (fire(rule, rule.dataset(), rule.dataset(), value.getAsDouble(), nowMs, out))
                     openMeasures.put(measureKey, Boolean.TRUE);
+                healthyStreak.remove(measureKey);   // a relapse inside the streak restarts it
             } else if (measureOpen(rule, measureKey)) {
+                if (!healed(measureKey, rule.healAfterSweeps())) continue;
                 openMeasures.put(measureKey, Boolean.FALSE);
                 healMeasure(rule, measureKey, value.getAsDouble(), nowMs);
             }
@@ -556,6 +563,18 @@ public final class AlertService {
 
     // ── scalar Measure rule heal — ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1 (2) ──────────────
 
+    /**
+     * One more healthy sweep for {@code streakKey}; true once {@code healAfterSweeps} consecutive ones have passed
+     * (the streak is then spent). Below that the subject stays open, so a relapse raises nothing new — its cooldown
+     * (scalar) or open-key edge ({@code by}) still holds (ALERT-HEAL-FLAP-1).
+     */
+    private boolean healed(String streakKey, int healAfterSweeps) {
+        int n = healthyStreak.merge(streakKey, 1, Integer::sum);
+        if (n < healAfterSweeps) return false;
+        healthyStreak.remove(streakKey);
+        return true;
+    }
+
     /** Whether the scalar Measure rule was breached at its last readable sweep; on its first sweep in this
      *  instance, whether it left an ALERT open (the restart case — see {@link #openMeasures}). */
     private boolean measureOpen(AlertRule rule, String measureKey) {
@@ -639,20 +658,31 @@ public final class AlertService {
         java.util.Set<String> open = openKeys.computeIfAbsent(rule.name(), n -> seedOpenKeys(rule));
         ObjectIndex index = new ObjectIndex(rule.dataset());
         if (breaches.total() > rule.stormCap()) {
+            healthyStreak.keySet().removeIf(k -> k.startsWith(streakPrefix(rule)));   // a capped read is not "healthy"
             if (open.add(STORM_KEY)) fireKey(rule, STORM_KEY, Map.of(), breaches.total(), nowMs, out, index);
             return;
         }
-        if (open.remove(STORM_KEY)) healKey(rule, STORM_KEY, nowMs, index);
+        if (open.contains(STORM_KEY) && healed(streakPrefix(rule) + STORM_KEY, rule.healAfterSweeps())) {
+            open.remove(STORM_KEY);
+            healKey(rule, STORM_KEY, nowMs, index);
+        }
         Map<String, DatasetMeasureProbe.Breach> now = new LinkedHashMap<>();
         for (DatasetMeasureProbe.Breach b : breaches.keys()) now.put(keyId(b.key()), b);
-        for (Map.Entry<String, DatasetMeasureProbe.Breach> e : now.entrySet())
+        for (Map.Entry<String, DatasetMeasureProbe.Breach> e : now.entrySet()) {
+            healthyStreak.remove(streakPrefix(rule) + e.getKey());
             if (open.add(e.getKey()))
                 fireKey(rule, e.getKey(), e.getValue().key(), e.getValue().value(), nowMs, out, index);
+        }
         for (String key : List.copyOf(open)) {
-            if (now.containsKey(key)) continue;
+            if (now.containsKey(key) || STORM_KEY.equals(key)) continue;
+            if (!healed(streakPrefix(rule) + key, rule.healAfterSweeps())) continue;
             open.remove(key);
             healKey(rule, key, nowMs, index);
         }
+    }
+
+    private static String streakPrefix(AlertRule rule) {
+        return rule.name() + "|" + rule.dataset() + "|";
     }
 
     /** {@code msisdn=4471, region=EU} — the key as an operator READS it (titles, the {@code key} attribute). Not

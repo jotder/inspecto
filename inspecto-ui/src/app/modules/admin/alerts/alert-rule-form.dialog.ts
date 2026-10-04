@@ -65,7 +65,7 @@ function authoredKind(r: AlertRule | undefined): AuthoredKind | null {
 }
 
 /** The keys only one kind writes. All of them count as "edited", so switching kind drops the other's. */
-const KIND_KEYS = ['metric', 'window', 'when', 'dataset', 'measure', 'by', 'stormCap'];
+const KIND_KEYS = ['metric', 'window', 'when', 'dataset', 'measure', 'by', 'stormCap', 'healAfterSweeps'];
 
 /** `measure` as `AlertRule` accepts it (`count | agg(column)`), via the shared, contract-pinned grammar. */
 const measureValidator: ValidatorFn = (c: AbstractControl) => {
@@ -77,7 +77,7 @@ const measureValidator: ValidatorFn = (c: AbstractControl) => {
 const wholeNumberValidator: ValidatorFn = (c: AbstractControl) =>
     c.value === null || c.value === '' || Number.isInteger(Number(c.value))
         ? null
-        : { message: 'Storm cap must be a whole number' };
+        : { message: 'Must be a whole number' };
 
 /** `threshold` must be > 0 (`AlertRule`: "alert.threshold must be a positive number") — `min` would allow 0. */
 const positiveValidator: ValidatorFn = (c: AbstractControl) =>
@@ -271,6 +271,7 @@ export class AlertRuleFormDialog implements AfterViewInit {
         measure: [measureValidator],
         by: [groupByValidator()],
         stormCap: [wholeNumberValidator],
+        healAfterSweeps: [wholeNumberValidator],
         threshold: [positiveValidator],
     };
 
@@ -382,6 +383,8 @@ export class AlertRuleFormDialog implements AfterViewInit {
         // The list control holds null when cleared and [] when "explicitly none" — both mean no `by`.
         const by = Array.isArray(v.by) ? v.by : [];
         const stormCap = v.stormCap === null || v.stormCap === undefined ? null : Number(v.stormCap);
+        const healAfterSweeps =
+            v.healAfterSweeps === null || v.healAfterSweeps === undefined ? null : Number(v.healAfterSweeps);
         const body: AlertRuleUpsert = {
             ...kept,
             name: this.isEdit ? this.data.rule!.name : String(this.saveForm.getRawValue().name ?? '').trim(),
@@ -392,6 +395,7 @@ export class AlertRuleFormDialog implements AfterViewInit {
                       measure: String(v.measure ?? '').trim(),
                       // The engine refuses `stormCap` without `by`, so it travels only with one.
                       ...(by.length ? { by, ...(stormCap !== null ? { stormCap } : {}) } : {}),
+                      ...(healAfterSweeps !== null ? { healAfterSweeps } : {}),
                   }
                 : {}),
             // A freshness rule's comparator/threshold are not form fields (hidden ⇒ absent from `v`): stored values.

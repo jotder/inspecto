@@ -801,7 +801,12 @@ public final class ConfigSpecs {
                                 + "must exist in the Dataset's Schema."),
                 FieldSpec.of("alert.stormCap", "Storm cap", FieldType.INT,
                         "With alert.by: above this many breaching keys, one storm Alert replaces the per-key "
-                                + "Alerts. Default 100.")
+                                + "Alerts. Default 100."),
+                // ALERT-HEAL-FLAP-1: hysteresis on the heal of a Dataset measure rule (scalar or by).
+                FieldSpec.of("alert.healAfterSweeps", "Heal after sweeps", FieldType.INT,
+                        "A Dataset measure rule only: how many consecutive healthy sweeps before its Alert is "
+                                + "cleared (the all-clear). Until then a relapse raises nothing new. Default 1 "
+                                + "(clear on the first healthy sweep); at most 1000.")
         );
         List<CrossFieldRule> rules = List.of(
                 new CrossFieldRule(

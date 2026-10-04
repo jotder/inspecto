@@ -336,4 +336,35 @@ class PerEntityAlertTest {
         assertTrue(objects.linked.stream().anyMatch(l -> l.fromId().equals(incident) && l.toId().equals(newAlert)),
                 "the new Alert is linked to the Incident still being worked");
     }
+
+
+    // ── heal hysteresis — ALERT-HEAL-FLAP-1 ───────────────────────────────────────────────
+
+    @Test
+    void aFlappingKeyIsHealedOnlyAfterNConsecutiveHealthySweepsAndRaisesNoFreshAlert(@TempDir Path root)
+            throws Exception {
+        AlertRule rule = AlertRule.fromMap(Map.of("name", "high-spend", "dataset", "usage", "measure", "sum(amount)",
+                "by", List.of("msisdn", "region"), "comparator", "gt", "threshold", 500, "severity", "CRITICAL",
+                "healAfterSweeps", 2));
+        plantUsage(root, OFFENDERS, Set.of());
+        FakeObjectAccess objects = new FakeObjectAccess();
+        AlertService svc = service(root, rule, objects);
+        assertEquals(OFFENDERS, svc.evaluateRules().size());
+
+        int alerts = opened(objects, ObjectType.ALERT).size();
+        for (int i = 0; i < 4; i++) {                                    // m7 flaps: healthy, breaching, healthy, ...
+            plantUsage(root, OFFENDERS, i % 2 == 0 ? Set.of(7) : Set.of());
+            assertEquals(0, svc.evaluateRules().size(), "a relapse of an open key raises nothing");
+        }
+        assertEquals(alerts, opened(objects, ObjectType.ALERT).size(), "no fresh Alert per relapse");
+        assertTrue(objects.transitioned.stream().noneMatch(t -> "resolve".equals(t.action())),
+                "the alternating key never reached 2 healthy sweeps in a row");
+
+        plantUsage(root, OFFENDERS, Set.of(7));                          // healthy twice running
+        svc.evaluateRules();
+        assertTrue(objects.transitioned.stream().noneMatch(t -> "resolve".equals(t.action())), "one healthy sweep");
+        svc.evaluateRules();
+        assertEquals(1, objects.transitioned.stream().filter(t -> "resolve".equals(t.action())).count(),
+                "the second consecutive healthy sweep resolves exactly m7's Alert");
+    }
 }

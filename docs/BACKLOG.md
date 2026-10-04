@@ -13,13 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **54<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 40<!--count:backlog-p3--> × P3** —
-> ⬇ **55 → 55 (P2 15 → 14, P3 40 → 41) on 2026-10-04**: closed P2 `ASSURE-WORKFLOW-SLA-1`; residuals filed as P3 `ASSURE-WORKFLOW-SLA-RESIDUALS-1`.
-> ⬇ **57 → 56 on 2026-10-04**: closed P2 `INGEST-OUTPUT-NAME-EMBEDS-SOURCE-STEM-1` — the output file stem is `FileNames.outputStem` (a value run becomes `fp-<16 hex>`, stable per name and Space, so `OVERWRITE_OR_IGNORE` re-runs keep their file), and `output_paths` is value-free with it.
-> ⬇ **56 → 55 (P3 41 → 40) on 2026-10-04**: closed `ENGINE-INMEMORY-UNSEALED-1` — the LA index build runs sealed to its declared read roots and `openInMemoryWithFileAccess` is gone.
-> ⬇ **57 → 56 on 2026-10-04**: closed P2 `INGEST-RAW-SOURCE-COPIES-RETENTION-1` — every remaining file-name log site (`CommitRetry`, `UnpackStage`, `NativeCsvStreamingEngine`, the lane failure logs, `QuarantineManager`, `DuckDbCsvIngester`), the status ledger's file / origin / logical-name columns and the unpack ledger now carry `FileNames.safe`; `FailureText.scrub` fingerprints a file-name-shaped token in any failure text; the heuristic also catches a value split by dashes or spaces. The raw-copy default stays kept-forever (decided). Residuals recorded in `okf/capabilities/spaces/spaces.md` §3.5.1.
-> ⬆ **56 → 57 on 2026-10-04**: filed P2 `INGEST-OUTPUT-NAME-EMBEDS-SOURCE-STEM-1` — the one place a value in an inbox name can still reach disk (the output file name and the status row's `output_paths`).
-> ⬆ **56 → 57 on 2026-10-04**: filed P3 `NATIVE-LICENCE-LINUX-MACOS-1` (Linux natives never exercised by a test; libtokenizers static-runtime licences unverified offline).
+> **53<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 39<!--count:backlog-p3--> × P3** —
+> ⬇ **55 → 53 (P2 15 → 14, P3 40 → 39) on 2026-10-04** (integration of the 2026-10-04 lanes; the per-lane ⬇/⬆ lines were folded into this one): closed P2 `INGEST-OUTPUT-NAME-EMBEDS-SOURCE-STEM-1`, P2 `INGEST-RAW-SOURCE-COPIES-RETENTION-1` (its filing and closure net out), P2 `ASSURE-WORKFLOW-SLA-1`, P3 `TESTCONFIGS-PREFIX-SUFFIX-TRAP-1` and P3 `ALERT-HEAL-FLAP-1`; filed P3 `ASSURE-WORKFLOW-SLA-RESIDUALS-1` and P3 `NATIVE-LICENCE-LINUX-MACOS-1`; retitled `SCHEDULE-EXPORT-DIALOG-DEAD-1` to `SCHEDULE-EXPORT-DASHBOARD-SCOPE-1`.
 > ⬇ **57 → 56 on 2026-10-03**: closed P3 `ENGINE-INMEMORY-UNSEALED-1` — the LA index build no longer takes the unsealed file-access opt-in: `DatasetProvider.readRoots` → `IndexBuildService.Relation` → `IndexBuilder.Request` declare the Dataset roots, the connection is sealed to them plus the store directory, and `openInMemoryWithFileAccess` is deleted (no caller left); the `DuckDbExtension` / DuckLake host gate and T9/T10 are tracked by `DUCKLE-C6-POLICY-NARROWING-1` (S5).
 > ⬇ **57 → 56 on 2026-10-03**: closed P3 `NATIVE-LICENCE-ONNXRUNTIME-TEXT-1` — onnxruntime's own MIT `LICENSE` (fetched at tag `v1.20.0`, operator-approved) ships as `onnxruntime-MIT.txt` beside the sidecar; every native DLL now has its licence text.
 > ⬇ **58 → 57 on 2026-10-03**: closed P2 `INGEST-REJECT-SIDECAR-RAW-PAN-1` and P2 `INGEST-FAILURE-TEXT-QUOTES-VALUE-1` — operator decision 2026-10-03, never store values: reject sidecars keep line, columns, reason and a salted per-Space `value_fingerprint` (no `raw_line`); ledger / retry / event / log failure text fingerprints every quoted literal, caret-pointed echo and `Original Line:` tail (`FailureText`); replay re-reads the records from the source file and refuses 410 (gone) / 409 (changed). Filed P2 `INGEST-RAW-SOURCE-COPIES-RETENTION-1` for the residual: the raw source file itself (backup, whole-file quarantine) and inbox names in discovery logs.
@@ -145,10 +140,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 40<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 39<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 40<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 54<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 39<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 53<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -362,7 +357,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 #### Alerting & freshness
 
 - **P2** · **Completeness KPI (when the hold lifts)** — K1 (`DbConsignmentOutputStore.dailyVolume()`) and K2 (`FileSequenceGaps`; `SeqScope` already ships) are unwired — `VolumeBaseline`/`FileSequenceGaps` have no production caller; **K4**, a `kpi.completeness` job type (`JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, one config per pipeline, a Signal plus a deduped Incident on breach, refusing loudly when `-Dconsignment.outputs.backend=none`), is designed but unbuilt (`superpower/completeness-kpi-k4-design.md`); K3, the baseline-window default as a job parameter. K5 shipped. Open inside the design: `kpi.completeness.*` is a **Signal** type and there is no `SignalType` home (the dotted literals are scattered) — whether to create one; `KPI-UNKNOWN-1` — a null-`bounds` sink's daily count is **unknown, not zero**, end to end; and where the sequence template comes from (the Collector's, a job parameter, or the Collector's with an override). Held by the §2 *Completeness KPI hold*. → `okf/capabilities/observability/observability.md` §3.9 · `archived-documents/plans-archive/completeness-kpi-plan.md`
-- **P3** · `ALERT-HEAL-FLAP-1` — **a flapping Measure rule raises a fresh Alert on every relapse.** Both heal paths (a `by` key, and since 2026-09-28 a scalar Measure rule — `okf/capabilities/incidents/incidents.md` §3.2) heal on the first healthy sweep and fire again on the next breach with the cooldown reset, so a value oscillating around its threshold emits an Alert + all-clear pair per sweep (the Incident dedupes, the Alert feed and notifications do not). Needs hysteresis — a minimum healthy duration (or N healthy sweeps) before a heal, and/or a re-arm margin — on both paths alike. Build when someone reports the noise.
 
 #### Signals, decisions & notifications
 

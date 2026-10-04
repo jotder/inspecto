@@ -118,6 +118,17 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         help: 'With One Alert per: above this many breaching keys, one storm Alert replaces them (default 100).',
     },
     {
+        key: 'healAfterSweeps',
+        label: 'Heal after sweeps',
+        type: 'number',
+        tier: 'optional',
+        required: false,
+        min: 1,
+        dependsOn: { key: 'kind', equals: 'measure' },
+        placeholder: '1',
+        help: 'Healthy sweeps in a row before the Alert is cleared; a value that keeps crossing its threshold stays one open Alert (default 1).',
+    },
+    {
         key: 'onPipeline',
         label: 'Pipeline scope',
         type: 'autocomplete',

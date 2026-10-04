@@ -262,6 +262,20 @@ describe('AlertRuleFormDialog', () => {
         expect(body).not.toHaveProperty('stormCap');
     });
 
+    it('Heal after sweeps travels with a Measure rule (scalar too), is seeded on edit, and is omitted when blank', () => {
+        const { c, save } = create({ rule: { ...MEASURE_RULE, healAfterSweeps: 3 } as AlertRule });
+        expect(c.schemaForm.form.get('healAfterSweeps')?.value).toBe(3);
+        c.save();
+        let [, body] = save.mock.lastCall as unknown as [string, Record<string, unknown>];
+        expect(body).toEqual(expect.objectContaining({ healAfterSweeps: 3 }));
+        expect(body).not.toHaveProperty('by');
+
+        c.schemaForm.form.patchValue({ healAfterSweeps: null });
+        c.save();
+        [, body] = save.mock.lastCall as unknown as [string, Record<string, unknown>];
+        expect(body).not.toHaveProperty('healAfterSweeps');
+    });
+
     it('round-trips a per-entity rule: by/stormCap seeded on edit, edited, and removed once by is cleared', () => {
         const { c, save } = create({
             rule: { ...MEASURE_RULE, by: ['msisdn', 'region'], stormCap: 50 } as AlertRule,

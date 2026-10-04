@@ -111,10 +111,15 @@ public record AlertRule(String name, String metric, String comparator, double th
                         String window, String severity, String onPipeline,
                         String dataset, String measure, Object when, String maximumAge,
                         String investigation, String relation, String description,
-                        List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure) {
+                        List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure,
+                        int healAfterSweeps) {
 
     /** The {@code stormCap} a {@code by} rule takes when it declares none. */
     public static final int DEFAULT_STORM_CAP = 100;
+    /** The {@code healAfterSweeps} a Measure rule takes when it declares none: heal on the first healthy sweep. */
+    public static final int DEFAULT_HEAL_AFTER_SWEEPS = 1;
+    /** The most consecutive healthy sweeps a rule may demand before healing (ALERT-HEAL-FLAP-1). */
+    public static final int MAX_HEAL_AFTER_SWEEPS = 1000;
     /** A {@code by} key column: a plain identifier (it is still quoted wherever it reaches SQL). */
     private static final java.util.regex.Pattern KEY_COLUMN = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
@@ -144,6 +149,16 @@ public record AlertRule(String name, String metric, String comparator, double th
     public static final Set<String> VALUE_MEASURES = Set.of("passThrough", "velocity", "timeToCashOut",
             "cashOutConcentration", "structuring", "benefitTransfer");
 
+    /** Every pre-{@code healAfterSweeps} caller of the full shape (the default: heal on the first healthy sweep). */
+    public AlertRule(String name, String metric, String comparator, double threshold,
+                     String window, String severity, String onPipeline,
+                     String dataset, String measure, Object when, String maximumAge,
+                     String investigation, String relation, String description,
+                     List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure) {
+        this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, maximumAge,
+                investigation, relation, description, by, stormCap, owner, valueMeasure, 0);
+    }
+
     /** Every pre-{@code valueMeasure} (pre-LA-18) caller of the full shape. */
     public AlertRule(String name, String metric, String comparator, double threshold,
                      String window, String severity, String onPipeline,
@@ -151,7 +166,7 @@ public record AlertRule(String name, String metric, String comparator, double th
                      String investigation, String relation, String description,
                      List<String> by, int stormCap, String owner) {
         this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, maximumAge,
-                investigation, relation, description, by, stormCap, owner, null);
+                investigation, relation, description, by, stormCap, owner, null, 0);
     }
 
     /** The historic ledger-metric rule shape (every pre-BI-5 caller). */
@@ -290,6 +305,14 @@ public record AlertRule(String name, String metric, String comparator, double th
         onPipeline = (onPipeline == null || onPipeline.isBlank()) ? null : onPipeline.trim();
         by = by == null ? List.of() : by.stream().map(c -> c == null ? "" : c.trim()).filter(c -> !c.isEmpty())
                 .distinct().toList();
+        if (healAfterSweeps != 0) {
+            require(dataset != null && maximumAge == null && investigation == null,
+                    "alert.healAfterSweeps applies to a Dataset measure rule (dataset: + measure:); this rule is not one");
+            require(healAfterSweeps >= 1 && healAfterSweeps <= MAX_HEAL_AFTER_SWEEPS,
+                    "alert.healAfterSweeps must be a whole number from 1 to " + MAX_HEAL_AFTER_SWEEPS);
+        } else {
+            healAfterSweeps = DEFAULT_HEAL_AFTER_SWEEPS;
+        }
         if (by.isEmpty()) {
             require(stormCap == 0, "alert.stormCap requires alert.by");
         } else {
@@ -374,7 +397,9 @@ public record AlertRule(String name, String metric, String comparator, double th
                 columns(alert.get("by")),
                 alert.get("stormCap") == null ? 0 : wholeNumber(alert.get("stormCap"), "alert.stormCap"),
                 str(alert.get("owner")),
-                valueMeasureBlock(alert.get("valueMeasure")));
+                valueMeasureBlock(alert.get("valueMeasure")),
+                alert.get("healAfterSweeps") == null ? 0
+                        : wholeNumber(alert.get("healAfterSweeps"), "alert.healAfterSweeps"));
     }
 
     /**
@@ -446,6 +471,7 @@ public record AlertRule(String name, String metric, String comparator, double th
             m.put("by", by);
             m.put("stormCap", stormCap);
         }
+        if (healAfterSweeps > DEFAULT_HEAL_AFTER_SWEEPS) m.put("healAfterSweeps", healAfterSweeps);
         // Only a real owner is written: this map is also the stored component, whose `owner` key is the R3
         // sharing envelope's (ComponentAccess) - persisting the appUser placeholder there would make it look
         // claimed, and R3 lets only an owner or an access admin change a claimed envelope.
