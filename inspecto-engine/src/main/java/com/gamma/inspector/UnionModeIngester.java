@@ -67,7 +67,7 @@ final class UnionModeIngester {
                     IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                             FileNames.safe(cfg, m.file().getName()), ++memberIdx, batch.members().size());
                     LocalDateTime mStart = LocalDateTime.now();
-                    String stem = CsvIngester.stripExtensions(m.file().getName());
+                    String stem = FileNames.outputStem(cfg, m.file().getName());
                     long memberParsed = 0, memberErrors = 0;
                     Map<String, String> rawTables = Map.of();
                     boolean quarantined = false;
@@ -160,7 +160,7 @@ final class UnionModeIngester {
                         // ledger keeps each segment's sinks distinct (see the chunked path's note).
                         var written = writeAndTrace(conn, destTable, partitionColumns(segSchema),
                                 cfg, Paths.get(cfg.dirs().database(), segKey).toString(),
-                                consolidatedBaseName(survivors, batch),
+                                consolidatedBaseName(survivors, batch, cfg),
                                 batch.batchId(), segSrcToFile, segKey);
 
                         allOutputs.addAll(written.outputs());

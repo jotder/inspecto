@@ -34,11 +34,14 @@ class ConsignmentIngestorTest {
 
         String status = Files.readString(Path.of(cfg.dirs().statusFilePath()));
         assertTrue(status.contains("SUCCESS"), status);
-        // the filename and logical_name columns are value-free; output_paths is the real output path (the output file
-        // is named after its source stem - a residual, see spaces.md 3.5.1), so only the name columns are judged
-        String row = status.lines().skip(1).findFirst().orElseThrow();
-        assertFalse(row.split(",")[2].contains("919876543210"), row);
-        assertFalse(row.substring(row.lastIndexOf(",\"")).contains("919876543210"), row);
+        // the filename and logical_name columns AND output_paths are value-free (INGEST-OUTPUT-NAME-EMBEDS-SOURCE-STEM-1)
+        assertFalse(status.contains("919876543210"), status);
+        try (var walk = Files.walk(Path.of(cfg.dirs().database()))) {
+            var outs = walk.filter(Files::isRegularFile).map(x -> x.getFileName().toString()).toList();
+            assertFalse(outs.isEmpty());
+            assertTrue(outs.stream().noneMatch(n -> n.contains("919876543210")), outs.toString());
+            assertTrue(outs.stream().anyMatch(n -> n.contains("fp-")), outs.toString());
+        }
         assertTrue(status.contains(FileNames.safe(cfg, name)), status);
         assertTrue(Files.exists(Path.of(cfg.dirs().backup(), name)), "resolution stays on the real name");
     }

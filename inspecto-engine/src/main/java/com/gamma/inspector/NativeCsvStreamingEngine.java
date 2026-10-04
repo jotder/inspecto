@@ -154,7 +154,7 @@ final class NativeCsvStreamingEngine {
         long castFailures = DataTransformer.countCastFailures(conn, schema, cfg, "raw_input");
 
         var written = writeAndTrace(conn, "transformed", partitionColumns(schema),
-                cfg, databaseDir(batch, cfg), consolidatedBaseName(survivors, batch),
+                cfg, databaseDir(batch, cfg), consolidatedBaseName(survivors, batch, cfg),
                 batch.batchId(), srcIdToFile, "",   // union streaming: the batch's ONE write
                 batch.members().get(0).selection().table());
 
@@ -191,7 +191,7 @@ final class NativeCsvStreamingEngine {
         LocalDateTime mStart = LocalDateTime.now();
         String dbDir = databaseDir(batch, cfg);
         List<String> partCols = partitionColumns(schema);
-        String baseName = CsvIngester.stripExtensions(m.file().getName());
+        String baseName = FileNames.outputStem(cfg, m.file().getName());
         IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                 FileNames.safe(cfg, m.file().getName()), 1, 1);
 
@@ -237,7 +237,7 @@ final class NativeCsvStreamingEngine {
         LocalDateTime mStart = LocalDateTime.now();
         String dbDir = databaseDir(batch, cfg);
         List<String> partCols = partitionColumns(schema);
-        String baseName = CsvIngester.stripExtensions(m.file().getName());
+        String baseName = FileNames.outputStem(cfg, m.file().getName());
         IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                 FileNames.safe(cfg, m.file().getName()), 1, 1);
 

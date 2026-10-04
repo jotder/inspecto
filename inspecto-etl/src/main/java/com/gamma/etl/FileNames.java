@@ -30,6 +30,7 @@ public final class FileNames {
     /** A contiguous digit run, or an already-fingerprinted span (skipped, so {@link #safe} is idempotent: a 16-hex
      *  fingerprint can itself hold 8 decimal digits in a row). */
     private static final Pattern RUN = Pattern.compile("<fp:[0-9a-f]{16}>|\\d{" + MIN_RUN + ",}");
+    private static final Pattern FP_SPAN = Pattern.compile("<fp:([0-9a-f]{16})>");
     /** Short digit groups joined by single dashes or spaces ({@code 4111-1111-1111-1111}, {@code 91 98765 43210}). */
     private static final Pattern SPLIT = Pattern.compile("(?<!\\d)\\d{1,7}(?!\\d)(?:[ -]\\d{1,7}(?!\\d))+");
     /** A file-name-shaped token (an extension) that holds a long digit run, inside free text. */
@@ -40,6 +41,14 @@ public final class FileNames {
     public static String safe(PipelineConfig cfg, String name) {
         if (name == null || cfg == null) return name;
         return split(cfg, contiguous(cfg, name));
+    }
+
+    /** The OUTPUT-file stem of an inbox file ({@code INGEST-OUTPUT-NAME-EMBEDS-SOURCE-STEM-1}): the name without its
+     *  extensions, {@link #safe}, with each {@code <fp:X>} span spelled {@code fp-X} because {@code <}, {@code >} and
+     *  {@code :} are not legal in a file name. Stable per name and salt, so an {@code OVERWRITE_OR_IGNORE} re-run
+     *  lands on the same file; a name with no value run is unchanged. */
+    public static String outputStem(PipelineConfig cfg, String fileName) {
+        return FP_SPAN.matcher(safe(cfg, CsvIngester.stripExtensions(fileName))).replaceAll("fp-$1");
     }
 
     /** {@code text} with {@link #safe} applied to every file-name-shaped token that holds a long digit run. */

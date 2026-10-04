@@ -544,10 +544,15 @@ Step Processor and no new route.
     before fingerprinting so the dashed and the plain spelling agree). A chain that starts with a valid date
     (`2026-10-03-1`) is a stamp, so a dated name keeps its ledger key. Measured over the 5428 tracked file names
     of the repo: one extra hit (a font range), none among inbox-shaped names.
+  - **The OUTPUT file name is value-free too** (closed 2026-10-04, `INGEST-OUTPUT-NAME-EMBEDS-SOURCE-STEM-1`):
+    `FileNames.outputStem` renders the source stem through `safe`, spelling each `<fp:X>` span `fp-X` (`<`, `>`
+    and `:` are not legal in a file name). It is stable per name and Space, so an `OVERWRITE_OR_IGNORE` re-run lands
+    on the same file; a name with no value run is unchanged. The status row's `output_paths` is value-free with it
+    (`ConsignmentIngestorTest.aValueInAFileNameIsNeverWrittenToTheStatusLedgerButTheRealFileStillLands`). ⚠ Losing
+    the salt renames those outputs once.
   - **Residual, by design: names that RESOLVE a path stay real.** The per-Consignment manifest, `backup/` and
-    quarantine paths, markers, the lineage ledger (queried by input file), the `filename_column` data column and
-    the OUTPUT file name (it carries the source stem, and `OVERWRITE_OR_IGNORE` re-runs rely on it; the one place a
-    value can still reach disk - filed as `INGEST-OUTPUT-NAME-EMBEDS-SOURCE-STEM-1`) hold the real
+    quarantine paths, markers, the lineage ledger (queried by input file) and the `filename_column` data column
+    hold the real
     name; they are the raw-copy surface the retention window above governs. **Not caught, by choice:** a value
     split by underscores or dots (those join ordinals and versions), and a value spelled in letters.
 - **Feature Datasets (WS-41).** Five `sql.template` Jobs run on an hourly cron. Thresholds are Job parameters. Every

@@ -55,7 +55,7 @@ final class GenerationModeIngester {
                     IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                             FileNames.safe(cfg, m.file().getName()), ++memberIdx, batch.members().size());
                     LocalDateTime mStart = LocalDateTime.now();
-                    String stem = CsvIngester.stripExtensions(m.file().getName());
+                    String stem = FileNames.outputStem(cfg, m.file().getName());
                     // lineageName: the ENTRY name for an unpack-expanded archive member, the plain
                     // filename otherwise — the temp name is workspace bookkeeping, never DATA.
                     try (DuckDbRecordSink sink = new DuckDbRecordSink(

@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **57<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 41<!--count:backlog-p3--> × P3** —
+> **56<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 41<!--count:backlog-p3--> × P3** —
+> ⬇ **57 → 56 on 2026-10-04**: closed P2 `INGEST-OUTPUT-NAME-EMBEDS-SOURCE-STEM-1` — the output file stem is `FileNames.outputStem` (a value run becomes `fp-<16 hex>`, stable per name and Space, so `OVERWRITE_OR_IGNORE` re-runs keep their file), and `output_paths` is value-free with it.
 > ⬇ **57 → 56 on 2026-10-04**: closed P2 `INGEST-RAW-SOURCE-COPIES-RETENTION-1` — every remaining file-name log site (`CommitRetry`, `UnpackStage`, `NativeCsvStreamingEngine`, the lane failure logs, `QuarantineManager`, `DuckDbCsvIngester`), the status ledger's file / origin / logical-name columns and the unpack ledger now carry `FileNames.safe`; `FailureText.scrub` fingerprints a file-name-shaped token in any failure text; the heuristic also catches a value split by dashes or spaces. The raw-copy default stays kept-forever (decided). Residuals recorded in `okf/capabilities/spaces/spaces.md` §3.5.1.
 > ⬆ **56 → 57 on 2026-10-04**: filed P2 `INGEST-OUTPUT-NAME-EMBEDS-SOURCE-STEM-1` — the one place a value in an inbox name can still reach disk (the output file name and the status row's `output_paths`).
 > ⬆ **56 → 57 on 2026-10-04**: filed P3 `NATIVE-LICENCE-LINUX-MACOS-1` (Linux natives never exercised by a test; libtokenizers static-runtime licences unverified offline).
@@ -139,11 +140,11 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 41<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 41<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 57<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 56<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -399,7 +400,6 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 - **P3** · `ENGINE-INMEMORY-UNSEALED-1` — **narrowed 2026-10-03: `DuckDbUtil.openInMemory` is sealed by default; one caller holds the file-access opt-in.** Shipped: `openInMemory(spill)` / `(spill, dirs)` / `(spill, dirs, beforeSeal)` turn autoload + autoinstall off and set `enable_external_access=false` with `allowed_directories` = the caller's declared dirs; every caller now declares its own (data root / store dir / Exchange snapshot via `DatasetRelation.readRoots`); the excel writers load the extension in `beforeSeal`. Probe (MaterializeTask): a hand-authored view reading `http://` DID reach a loopback stub (4 requests) on the old connection — now 0, pinned by `MaterializeTaskTest.anAuthoredViewThatReadsAUrlNeverReachesTheNetwork`. No caller needed object-store/`httpfs` (the `DuckDbExtension` users open their own connections). **Open:** (a) `IndexBuilder` takes the named `openInMemoryWithFileAccess` opt-in (autoload off, so no network, but every local path) because its trusted relation reads Dataset roots it is never given — thread the roots through `IndexBuilder.Request` and drop the opt-in; (b) the `DuckDbExtension` / DuckLake host gate and T9/T10 of `superpower/policy-narrowing-design.md` S5. ⚠ Measured: the `temp_directory` subtree is implicitly reachable under the seal, so a spill dir must stay a dedicated `.duckdb_tmp` (the `null` default moved from `java.io.tmpdir` itself to `<tmpdir>/.duckdb_tmp`).
 - **P3** · `NATIVE-LICENCE-LINUX-MACOS-1` — **Linux / macOS native licences are checked by hash, but not exercised or fully verified.** `check-native-licences` covers `.so` / `.dylib` / `.jnilib` and pins every native's sha256 (`4bf70068c`). Open: (1) CI loads the Linux natives, yet no test embeds a string through `OnnxEmbeddingAdapter` (the eoiagent seam), so a Linux onnxruntime that loads but fails to run would go unseen; (2) the statically-linked runtime licences inside `libtokenizers` cannot be verified offline - fetch and record them when a networked shift is available. → `compliance/` native-licence inventory · `tools/check-native-licences.mjs`
-- **P2** · `INGEST-OUTPUT-NAME-EMBEDS-SOURCE-STEM-1` — **an ingest output file name embeds the source file stem, so a value in an inbox name still reaches disk.** Found 2026-10-04 closing `INGEST-RAW-SOURCE-COPIES-RETENTION-1`: ledger keys, logs and status-ledger names now carry a salted fingerprint (`FileNames.safe`), but the output file name is built from the source stem (for example `sub_<value>_out.csv`) and the status row's `output_paths` column shows it. `OVERWRITE_OR_IGNORE` re-runs rely on that name, so changing it is an output-naming redesign: derive the stem from the fingerprint (stable per name and salt) and keep re-run identity. Operator rule: never store values at rest. → `okf/capabilities/spaces/spaces.md` §3.5.1
 
 Ongoing, not a row: the **compliance repo-side artifacts** — the customer verification runbook (G2 half), the
 CI-evidence doc, a recorded restore drill (G6 — `compliance/evidence/rto-rpo-statement.md` has operator-fill

@@ -141,7 +141,7 @@ public final class DrainCommand {
         }
         Consignment batch = new Consignment(batchId, m.schemaName, m.outputTable, List.copyOf(survivors));
 
-        String baseName = ConsignmentIngestStrategy.consolidatedBaseName(survivors, batch);
+        String baseName = ConsignmentIngestStrategy.consolidatedBaseName(survivors, batch, cfg);
         // Each parked sink is written where ITS schema's write put it: a segment's under database/<segKey>
         // with that segment's partitions (UnionModeIngester's home), a selector/single-schema batch's under
         // the batch's own table dir. The sink node names its schema (lift config `table` / `schema`).

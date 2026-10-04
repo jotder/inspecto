@@ -4,7 +4,6 @@ import com.gamma.etl.FileNames;
 import com.gamma.consignment.ConsignmentOutputs;
 import com.gamma.consignment.EventTimeBounds;
 import com.gamma.etl.Consignment;
-import com.gamma.etl.CsvIngester;
 import com.gamma.etl.MemberStatus;
 import com.gamma.etl.QuarantineManager;
 import com.gamma.query.DecisionRuleApplier;
@@ -748,9 +747,9 @@ interface ConsignmentIngestStrategy {
      * Consolidated-output base name: a single surviving member keeps its file stem (legacy
      * {@code <basename>_out.<ext>} naming); a multi-member batch is named by its batch id.
      */
-    static String consolidatedBaseName(List<Consignment.Member> survivors, Consignment batch) {
+    static String consolidatedBaseName(List<Consignment.Member> survivors, Consignment batch, PipelineConfig cfg) {
         return survivors.size() == 1
-                ? CsvIngester.stripExtensions(survivors.get(0).file().getName())
+                ? FileNames.outputStem(cfg, survivors.get(0).file().getName())
                 : batch.batchId();
     }
 
