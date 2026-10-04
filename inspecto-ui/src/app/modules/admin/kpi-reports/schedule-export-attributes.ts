@@ -1,9 +1,10 @@
 import { AttributeSpec } from 'app/inspecto/component-model';
 
 /**
- * Attribute declarations for scheduling a Dashboard export (C6) — drives `<inspecto-schema-form>` in
- * {@link ScheduleExportDialog}. A scheduled export IS a Job (`type: 'report'`); no new entity —
- * `dashboardId` and `format`/`recipients` live in the job's `params`.
+ * Attribute declarations for scheduling a Dataset export — drives `<inspecto-schema-form>` in
+ * {@link ScheduleExportDialog}. A scheduled export IS a Job (`type: 'report'`, `scope: dataset`); no new
+ * entity — `dataset`, `format` and `recipients` live in the job's `params`. (SCHEDULE-EXPORT-DIALOG-DEAD-1:
+ * `ReportJob` has no dashboard scope, so the old dashboard payload delivered nothing.)
  */
 export const SCHEDULE_EXPORT_ATTRIBUTES: AttributeSpec[] = [
     {
@@ -16,16 +17,22 @@ export const SCHEDULE_EXPORT_ATTRIBUTES: AttributeSpec[] = [
         help: 'Letters, digits, dot, dash, underscore; start alphanumeric.',
     },
     {
+        key: 'dataset',
+        label: 'Dataset',
+        type: 'autocomplete',
+        tier: 'required',
+        placeholder: 'e.g. cdr_daily',
+        help: 'The Dataset whose rows are exported (up to 10,000).',
+    },
+    {
         key: 'format',
         label: 'Export format',
         type: 'select',
         tier: 'required',
         default: 'csv',
         options: [
-            { value: 'csv', label: 'CSV (tile data)' },
-            { value: 'xlsx', label: 'Excel workbook (tile data)' },
-            { value: 'pdf', label: 'PDF (snapshot)' },
-            { value: 'png', label: 'PNG (snapshot)' },
+            { value: 'csv', label: 'CSV' },
+            { value: 'xlsx', label: 'Excel workbook' },
         ],
     },
     {
@@ -56,15 +63,7 @@ export const SCHEDULE_EXPORT_ATTRIBUTES: AttributeSpec[] = [
         tier: 'optional',
         required: false,
         placeholder: 'ops@example.com, finance@example.com',
-        help: 'Who is notified when the export completes.',
-    },
-    {
-        key: 'attach',
-        label: 'Attach the export to the email',
-        type: 'boolean',
-        tier: 'optional',
-        default: false,
-        help: 'Sends the file itself, not only its location. Needs at least one recipient; large files are refused.',
+        help: 'Emailed the file location when the export completes (the file is not attached).',
     },
     { key: 'enabled', label: 'Enabled (armed)', type: 'boolean', tier: 'optional', default: true },
 ];

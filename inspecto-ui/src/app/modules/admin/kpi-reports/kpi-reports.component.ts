@@ -24,17 +24,20 @@ import { DashboardsService } from '../studio/dashboards/dashboards.service';
 import { ScheduleExportData, ScheduleExportDialog, ScheduleExportResult } from './schedule-export.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
-/** A `type:'report'` job's dashboard-export params (C6) — no new entity, params carry the shape. */
+/** A `type:'report'` job's export params — no new entity, params carry the shape. */
 interface ReportJobParams {
+    /** Set only on a legacy dashboard schedule (never delivered: `ReportJob` has no dashboard scope). */
     dashboardId: string;
-    format: 'csv' | 'pdf' | 'png';
+    scope: string;
+    dataset: string;
+    format: string;
     recipients: string[];
 }
 
 /**
  * KPI & Reports — the read-only landing gallery over the Studio dashboards, extended (C6) with
- * **scheduled exports**: a dashboard export IS a Job (`type: 'report'`, reusing the existing
- * scheduler/run-history/live-tail wholesale) so this pane only adds the "Schedule export" action and
+ * **scheduled Dataset exports**: an export IS a Job (`type: 'report'`, reusing the existing
+ * scheduler/run-history/live-tail wholesale) so this pane only adds the "Schedule Dataset export" action and
  * a status list — authoring stays here, execution stays in Jobs.
  */
 @Component({
@@ -139,6 +142,11 @@ export class KpiReportsComponent implements OnInit {
         return parts.join(' · ');
     }
 
+    /** Scheduled Dataset exports — the ones a Run actually delivers. */
+    datasetExports(): JobDetail[] {
+        return this.reportJobs().filter((j) => this.paramsOf(j).scope === 'dataset');
+    }
+
     jobsFor(dashboardId: string): JobDetail[] {
         return this.reportJobs().filter((j) => this.paramsOf(j).dashboardId === dashboardId);
     }
@@ -147,36 +155,21 @@ export class KpiReportsComponent implements OnInit {
         const p = j.params ?? {};
         return {
             dashboardId: String(p['dashboardId'] ?? ''),
-            format: (p['format'] as ReportJobParams['format']) ?? 'csv',
+            scope: String(p['scope'] ?? ''),
+            dataset: String(p['dataset'] ?? ''),
+            format: String(p['format'] ?? 'csv'),
             recipients: (p['recipients'] as string[]) ?? [],
         };
     }
 
-    scheduleExport(d: Dashboard): void {
-        const data: ScheduleExportData = {
-            dashboardId: d.id,
-            dashboardName: dashboardTitle(d),
-            existingNames: this.reportJobs().map((j) => j.name),
-        };
+    scheduleExport(job?: JobDetail): void {
+        const data: ScheduleExportData = { job, existingNames: this.reportJobs().map((j) => j.name) };
         this.dialog
             .open(ScheduleExportDialog, { data, width: '560px', maxHeight: '88vh' })
             .afterClosed()
             .subscribe((r?: ScheduleExportResult) => {
                 if (r?.saved) {
-                    this.toastr.success(`Scheduled export "${r.saved.name}" created`);
-                    this.loadReportDetails();
-                }
-            });
-    }
-
-    editSchedule(job: JobDetail, d: Dashboard): void {
-        const data: ScheduleExportData = { dashboardId: d.id, dashboardName: dashboardTitle(d), job };
-        this.dialog
-            .open(ScheduleExportDialog, { data, width: '560px', maxHeight: '88vh' })
-            .afterClosed()
-            .subscribe((r?: ScheduleExportResult) => {
-                if (r?.saved) {
-                    this.toastr.success(`Scheduled export "${r.saved.name}" saved`);
+                    this.toastr.success(`Scheduled export "${r.saved.name}" ${job ? 'saved' : 'created'}`);
                     this.loadReportDetails();
                 }
             });

@@ -171,22 +171,30 @@ describe('KpiReportsComponent', () => {
         await vi.waitFor(() => expect(fixture.componentInstance.reportJobs().length).toBeGreaterThan(0));
         fixture.detectChanges();
         expect(fixture.componentInstance.jobsFor('cdr_overview').map((j) => j.name)).toEqual(['daily_cdr_export']);
-        expect(fixture.nativeElement.textContent).not.toContain('Schedule export');
+        expect(fixture.nativeElement.textContent).not.toContain('Schedule Dataset export');
     });
 
-    // SCHEDULE-EXPORT-DIALOG-DEAD-1: the engine's report job cannot export a dashboard yet, so the action is
-    // inert (aria-disabled, no dialog) rather than saving a schedule that delivers nothing.
-    it('shows Schedule export as aria-disabled with an explanation and does not open the dialog', async () => {
-        const { fixture } = create({ canAuthor: true });
+    // SCHEDULE-EXPORT-DIALOG-DEAD-1: the action exports a Dataset (ReportJob has no dashboard scope) and
+    // opens the dialog with no dashboard in its data; only scope:'dataset' jobs are listed as exports.
+    it('offers Schedule Dataset export (never a dashboard export) and lists only dataset schedules', async () => {
+        const dsJob: JobDetail = {
+            ...REPORT_JOB,
+            name: 'cdr_csv',
+            params: { scope: 'dataset', dataset: 'cdr_daily', format: 'csv', out_dir: 'exports/cdr_csv' },
+        };
+        const { fixture } = create({ reportJobs: [dsJob], canAuthor: true });
+        await vi.waitFor(() => expect(fixture.componentInstance.reportJobs().length).toBeGreaterThan(0));
+        fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
+        expect(el.textContent).toContain('Scheduled Dataset exports');
+        expect(fixture.componentInstance.datasetExports().map((j) => j.name)).toEqual(['cdr_csv']);
         const btn = Array.from(el.querySelectorAll('button')).find((b) =>
-            b.textContent?.includes('Schedule export'),
+            b.textContent?.includes('Schedule Dataset export'),
         ) as HTMLButtonElement;
-        expect(btn.getAttribute('aria-disabled')).toBe('true');
-        expect(btn.getAttribute('ng-reflect-message') ?? btn.getAttribute('aria-describedby')).toBeTruthy();
         const dialog = TestBed.inject(MatDialog) as unknown as { open: ReturnType<typeof vi.fn> };
+        dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
         btn.click();
-        expect(dialog.open).not.toHaveBeenCalled();
+        expect(dialog.open.mock.calls[0][1].data).not.toHaveProperty('dashboardId');
         await expectNoA11yViolations(el);
     });
 

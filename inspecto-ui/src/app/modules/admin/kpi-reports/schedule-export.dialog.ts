@@ -6,14 +6,13 @@ import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, JobDetail, JobsService, JobUpsert } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
+import { datasetOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { SCHEDULE_EXPORT_ATTRIBUTES } from './schedule-export-attributes';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
-/** Dialog input: which dashboard the export is scheduled against, and an existing schedule to edit. */
+/** Dialog input: an existing schedule to edit (absent ⇒ create). */
 export interface ScheduleExportData {
-    dashboardId: string;
-    dashboardName: string;
     /** An existing report-job ⇒ edit; absent ⇒ create. */
     job?: JobDetail;
     /** Ids already in use — on create the schedule id rejects a duplicate inline (product-wide rule). */
@@ -49,8 +48,11 @@ function recipientsText(raw: unknown): string {
 }
 
 /**
- * Schedule a Dashboard export (C6) — no new entity: a scheduled export IS a Job with
- * `type: 'report'` and `params: {dashboardId, format, recipients}`; the existing scheduler
+ * Schedule a Dataset export — no new entity: a scheduled export IS a Job with
+ * `type: 'report'` and `params: {scope: 'dataset', dataset, format, out_dir, recipients}`. `out_dir` is the
+ * fixed per-Space convention `exports/<schedule id>` (the id is the Job name: immutable, the storage key),
+ * resolved by the server under the Space config root through the path jail — the operator never types a path.
+ * `ReportJob` has no dashboard scope, so a Dashboard export cannot be scheduled yet. The existing scheduler
  * (cron/manual, run history, live-tail) is reused as-is. SchemaForm-driven, mirrors
  * {@link JobFormDialog}'s shape.
  */
@@ -61,11 +63,7 @@ function recipientsText(raw: unknown): string {
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>
-            {{
-                isEdit
-                    ? 'Edit scheduled export "' + data.job!.name + '"'
-                    : 'Schedule export of "' + data.dashboardName + '"'
-            }}
+            {{ isEdit ? 'Edit scheduled export "' + data.job!.name + '"' : 'Schedule a Dataset export' }}
         </h2>
         <mat-dialog-content>
             @if (writesDisabled()) {
@@ -73,7 +71,12 @@ function recipientsText(raw: unknown): string {
                     The server is running read-only — the schedule was not saved.
                 </inspecto-alert>
             }
-            <inspecto-schema-form [specs]="attributes" [initial]="initialValue"></inspecto-schema-form>
+            <inspecto-schema-form
+                [specs]="attributes"
+                [initial]="initialValue"
+                [optionLoaders]="optionLoaders"
+                (submitted)="save()"
+            ></inspecto-schema-form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
             <button type="button" mat-button [disabled]="saving()" (click)="requestClose()">Cancel</button>
@@ -99,15 +102,16 @@ export class ScheduleExportDialog implements AfterViewInit {
     readonly saving = signal(false);
     readonly writesDisabled = signal(false);
     readonly attributes = SCHEDULE_EXPORT_ATTRIBUTES;
+    readonly optionLoaders = { dataset: datasetOptionLoader() };
 
     readonly initialValue: Record<string, unknown> | undefined = this.data.job
         ? {
               name: this.data.job.name,
+              dataset: String(this.data.job.params?.['dataset'] ?? ''),
               format: (this.data.job.params?.['format'] as string) ?? 'csv',
               scheduleMode: this.data.job.cron ? 'cron' : 'manual',
               cron: this.data.job.cron ?? '0 0 6 * * *',
               recipients: recipientsText(this.data.job.params?.['recipients']),
-              attach: this.data.job.params?.['attach'] === 'true' || this.data.job.params?.['attach'] === true,
               enabled: this.data.job.enabled,
           }
         : undefined;
@@ -128,30 +132,31 @@ export class ScheduleExportDialog implements AfterViewInit {
         if (!this.schemaForm.validate()) return;
         const v = this.schemaForm.value() as {
             name?: string;
-            format: 'csv' | 'xlsx' | 'pdf' | 'png';
+            dataset: string;
+            format: 'csv' | 'xlsx';
             scheduleMode: 'cron' | 'manual';
             cron?: string;
             recipients?: string;
-            attach?: boolean;
             enabled?: boolean;
         };
         const recipients = String(v.recipients ?? '')
             .split(',')
             .map((r) => r.trim())
             .filter(Boolean);
+        const name = this.isEdit ? this.data.job!.name : String(v.name ?? '').trim();
         const body: JobUpsert = {
-            name: this.isEdit ? this.data.job!.name : String(v.name ?? '').trim(),
+            name,
             type: 'report',
             cron: v.scheduleMode === 'cron' ? String(v.cron ?? '').trim() : null,
             onPipeline: null,
             enabled: v.enabled !== false,
-            // The report Job reads `recipients` as ONE comma-separated string and `attach` as 'true'/'false'.
+            // The report Job reads `recipients` as ONE comma-separated string; `out_dir` makes it deliver a file.
             params: {
-                reportKind: 'dashboard',
-                dashboardId: this.data.dashboardId,
+                scope: 'dataset',
+                dataset: String(v.dataset ?? '').trim(),
                 format: v.format,
+                out_dir: 'exports/' + name,
                 recipients: recipients.join(','),
-                attach: v.attach === true ? 'true' : 'false',
             },
         };
         this.saving.set(true);

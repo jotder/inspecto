@@ -1,7 +1,7 @@
 <div class="flex min-w-0 flex-auto flex-col p-6 sm:p-8">
     <inspecto-page-header
         title="KPI & Reports"
-        subtitle="Every saved Dashboard, with its scheduled exports — open one, run an export now, or schedule a new one."
+        subtitle="Every saved Dashboard, and the Datasets you export on a schedule — run an export now or schedule a new one."
         [terms]="['Dashboard', 'Widget', 'Measure']"
         [inset]="false"
         class="mb-6"
@@ -35,6 +35,73 @@
             </ul>
         </section>
     }
+
+    <section class="mb-6" aria-labelledby="dataset-exports-heading">
+        <div class="mb-2 flex items-center justify-between gap-2">
+            <h2 id="dataset-exports-heading" class="text-lg font-semibold">Scheduled Dataset exports</h2>
+            @if (lens.canAuthorWorkbench()) {
+                <button mat-button type="button" (click)="scheduleExport()">
+                    <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
+                    <span class="ml-1">Schedule Dataset export</span>
+                </button>
+            }
+        </div>
+        @for (job of datasetExports(); track job.name) {
+            <div class="flex items-center justify-between gap-2 py-1 text-sm">
+                <div class="min-w-0">
+                    <span class="truncate font-medium">{{ job.name }}</span>
+                    <span class="text-secondary ml-1 font-mono text-xs">{{ paramsOf(job).dataset }}</span>
+                    <span class="text-secondary ml-1 uppercase">{{ paramsOf(job).format }}</span>
+                    <span [innerHTML]="statusBadgeHtml(job.enabled ? 'enabled' : 'disabled')"></span>
+                    @if (job.lastRunTime) {
+                        <span class="text-secondary ml-1 text-xs">last {{ fmtDateTime(job.lastRunTime) }}</span>
+                    }
+                </div>
+                <div class="flex items-center gap-1">
+                    <button
+                        mat-icon-button
+                        (click)="runNow(job)"
+                        matTooltip="Run now"
+                        [attr.aria-label]="'Run ' + job.name + ' now'"
+                    >
+                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:play"></mat-icon>
+                    </button>
+                    <button
+                        mat-icon-button
+                        (click)="downloadLatest(job)"
+                        [disabled]="!job.lastRunTime"
+                        matTooltip="Download latest export"
+                        [attr.aria-label]="'Download latest export for ' + job.name"
+                    >
+                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                    </button>
+                    @if (lens.canAuthorWorkbench()) {
+                        <button
+                            mat-icon-button
+                            (click)="scheduleExport(job)"
+                            matTooltip="Edit schedule"
+                            [attr.aria-label]="'Edit schedule ' + job.name"
+                        >
+                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                        </button>
+                        <button
+                            mat-icon-button
+                            (click)="removeSchedule(job)"
+                            matTooltip="Delete schedule"
+                            [attr.aria-label]="'Delete schedule ' + job.name"
+                        >
+                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
+                        </button>
+                    }
+                </div>
+            </div>
+        } @empty {
+            <p class="text-secondary text-sm">
+                No scheduled exports yet. A schedule exports one Dataset's rows as CSV or Excel to
+                <span class="font-mono">exports/&lt;schedule id&gt;</span>.
+            </p>
+        }
+    </section>
 
     @if (loading()) {
         <inspecto-skeleton [lines]="3" height="4rem" />
@@ -75,8 +142,8 @@
                         <span class="text-secondary text-sm">{{ cardSummary(d) }}</span>
                     </a>
 
-                    <!-- C6: scheduled exports for this dashboard -->
-                    <div class="mt-1 border-t pt-2">
+                    <!-- Legacy dashboard schedules (never delivered): listed so they can be run/deleted -->
+                    <div class="mt-1 border-t pt-2" [class.hidden]="!jobsFor(d.id).length">
                         @for (job of jobsFor(d.id); track job.name) {
                             <div class="flex items-center justify-between gap-2 py-1 text-sm">
                                 <div class="min-w-0">
@@ -113,17 +180,6 @@
                                     @if (lens.canAuthorWorkbench()) {
                                         <button
                                             mat-icon-button
-                                            (click)="editSchedule(job, d)"
-                                            matTooltip="Edit schedule"
-                                            [attr.aria-label]="'Edit schedule ' + job.name"
-                                        >
-                                            <mat-icon
-                                                class="icon-size-5"
-                                                svgIcon="heroicons_outline:pencil-square"
-                                            ></mat-icon>
-                                        </button>
-                                        <button
-                                            mat-icon-button
                                             (click)="removeSchedule(job)"
                                             matTooltip="Delete schedule"
                                             [attr.aria-label]="'Delete schedule ' + job.name"
@@ -133,18 +189,6 @@
                                     }
                                 </div>
                             </div>
-                        }
-                        @if (lens.canAuthorWorkbench()) {
-                            <!-- SCHEDULE-EXPORT-DIALOG-DEAD-1: ReportJob has no dashboard scope, so a saved schedule delivers nothing. -->
-                            <button
-                                mat-button
-                                class="mt-1 -ml-2 opacity-60"
-                                aria-disabled="true"
-                                matTooltip="Scheduled dashboard export is not available yet"
-                            >
-                                <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
-                                <span class="ml-1">Schedule export</span>
-                            </button>
                         }
                     </div>
                 </div>

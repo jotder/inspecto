@@ -28,8 +28,6 @@ function create(data: ScheduleExportData, jobs: object = {}) {
 describe('ScheduleExportDialog', () => {
     it('create mode blocks a duplicate id inline and has no a11y violations', async () => {
         const fixture = create({
-            dashboardId: 'cdr_overview',
-            dashboardName: 'CDR Overview',
             existingNames: ['daily_cdr_export'],
         });
         const name = fixture.componentInstance.schemaForm.form.get('name')!;
@@ -42,57 +40,71 @@ describe('ScheduleExportDialog', () => {
 
     it('edit mode locks the id and prefills format/cron/recipients from the job params', () => {
         const fixture = create({
-            dashboardId: 'cdr_overview',
-            dashboardName: 'CDR Overview',
             job: {
                 name: 'daily_cdr_export',
                 type: 'report',
                 cron: '0 0 6 * * *',
                 onPipeline: null,
                 enabled: true,
-                params: { dashboardId: 'cdr_overview', format: 'pdf', recipients: ['ops@x.com', 'fin@x.com'] },
+                params: {
+                    scope: 'dataset',
+                    dataset: 'cdr_daily',
+                    format: 'xlsx',
+                    recipients: ['ops@x.com', 'fin@x.com'],
+                },
             },
         });
         const c = fixture.componentInstance;
         expect(c.schemaForm.form.get('name')!.disabled).toBe(true);
-        expect(c.schemaForm.form.get('format')!.value).toBe('pdf');
+        expect(c.schemaForm.form.get('format')!.value).toBe('xlsx');
+        expect(c.schemaForm.form.get('dataset')!.value).toBe('cdr_daily');
         expect(c.schemaForm.form.get('recipients')!.value).toBe('ops@x.com, fin@x.com');
     });
 
-    it('offers xlsx and sends attach + recipients in the shape the report Job reads', () => {
+    // Fails on the old dialog, which sent {reportKind:'dashboard', dashboardId, attach} and no scope/dataset/out_dir
+    // — a payload ReportJob ignores (it delivered nothing).
+    it('sends the dataset-scope payload ReportJob delivers: scope, dataset, out_dir exports/<id>, csv|xlsx only', () => {
         let sent: JobUpsert | undefined;
-        const fixture = create(
-            { dashboardId: 'cdr_overview', dashboardName: 'CDR Overview' },
-            { create: (b: JobUpsert) => ((sent = b), of(b)) },
-        );
+        const fixture = create({}, { create: (b: JobUpsert) => ((sent = b), of(b)) });
         const c = fixture.componentInstance;
         const format = SCHEDULE_EXPORT_ATTRIBUTES.find((a) => a.key === 'format')!;
-        expect(format.options!.map((o) => o.value)).toContain('xlsx');
+        expect(format.options!.map((o) => o.value)).toEqual(['csv', 'xlsx']);
+        expect(SCHEDULE_EXPORT_ATTRIBUTES.map((a) => a.key)).not.toContain('attach');
         c.schemaForm.form.patchValue({
             name: 'weekly_xlsx',
+            dataset: 'cdr_daily',
             format: 'xlsx',
             recipients: 'ops@x.com, fin@x.com',
-            attach: true,
         });
         c.save();
-        expect(sent!.params).toMatchObject({ format: 'xlsx', recipients: 'ops@x.com,fin@x.com', attach: 'true' });
+        expect(sent!.params).toEqual({
+            scope: 'dataset',
+            dataset: 'cdr_daily',
+            format: 'xlsx',
+            out_dir: 'exports/weekly_xlsx',
+            recipients: 'ops@x.com,fin@x.com',
+        });
     });
 
-    it('edit mode prefills attach and a comma-string recipients param', () => {
+    it('refuses to save without a Dataset', () => {
+        let called = false;
+        const fixture = create({}, { create: () => ((called = true), of({})) });
+        fixture.componentInstance.schemaForm.form.patchValue({ name: 'x_export', dataset: '' });
+        fixture.componentInstance.save();
+        expect(called).toBe(false);
+    });
+
+    it('edit mode prefills a comma-string recipients param', () => {
         const fixture = create({
-            dashboardId: 'cdr_overview',
-            dashboardName: 'CDR Overview',
             job: {
                 name: 'daily_cdr_export',
                 type: 'report',
                 cron: null,
                 onPipeline: null,
                 enabled: true,
-                params: { format: 'xlsx', recipients: 'ops@x.com,fin@x.com', attach: 'true' },
+                params: { scope: 'dataset', dataset: 'cdr_daily', format: 'xlsx', recipients: 'ops@x.com,fin@x.com' },
             },
         });
-        const f = fixture.componentInstance.schemaForm.form;
-        expect(f.get('recipients')!.value).toBe('ops@x.com, fin@x.com');
-        expect(f.get('attach')!.value).toBe(true);
+        expect(fixture.componentInstance.schemaForm.form.get('recipients')!.value).toBe('ops@x.com, fin@x.com');
     });
 });

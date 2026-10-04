@@ -73,6 +73,27 @@ class ReportJobDeliveryTest {
                 "the old working-directory rule must be gone, not merely shadowed: " + cwdRelative);
     }
 
+    /**
+     * SCHEDULE-EXPORT-DIALOG-DEAD-1 option 2: the exact params the Schedule-export dialog saves (scope dataset,
+     * a Dataset, csv, the fixed {@code exports/<schedule id>} out_dir, recipients, no attach) run to SUCCESS and
+     * write the file under the Space root's {@code exports/<id>}.
+     */
+    @Test
+    void theScheduleExportDialogPayloadDeliversUnderSpaceExports(@TempDir Path writeRoot) throws Exception {
+        seedSales(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+
+        JobResult r = new ReportJob(job(Map.of(
+                "scope", "dataset", "dataset", "sales_ds", "format", "csv",
+                "out_dir", "exports/weekly_sales", "recipients", "ops@example.com")), null).run();
+
+        assertEquals("SUCCESS", r.status(), r.message());
+        Path dir = writeRoot.resolve("exports").resolve("weekly_sales");
+        try (Stream<Path> files = Files.list(dir)) {
+            assertTrue(files.anyMatch(f -> f.getFileName().toString().endsWith(".csv")), "csv written: " + r.message());
+        }
+    }
+
     @Test
     void datasetScopeDeliversAggregatedCsv(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
         seedSales(writeRoot);
