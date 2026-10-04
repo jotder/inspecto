@@ -43,7 +43,10 @@ without `--bundle`, which checks the text hashes and the package.ps1 wiring.
 platforms). Each is classified by file name to its artifact's licence and its sha256 is pinned per jar entry in `natives.json`
 (`pins`); an unclassified or mismatching native fails CI and `package.ps1`. `natives.json` `artifacts` is cross-checked against
 `tools/dependencies.lock`. **Not verified:** whether the Linux/macOS `libtokenizers` builds statically link GCC or other
-third-party runtimes needing their own texts (the Windows build visibly bundles MinGW DLLs; the others carry no such files).
+third-party runtimes needing their own texts (the Windows build visibly bundles MinGW DLLs; the others carry no such files;
+on Linux the system libstdc++ is used). **Exercised:** `inspecto-intelligence` `NativeEmbeddingLoadTest` embeds one string
+through `OnnxEmbeddingAdapter`, so the ubuntu CI reactor loads and runs `libonnxruntime.so`, `libonnxruntime4j_jni.so` and
+`libtokenizers.so` (skipped, with the reason printed, only where the jars carry no native for the os/arch). No CI job runs macOS.
 
 **Shade merge (`NATIVE-LICENCE-SHADE-MERGE-1`, shipped 2026-10-03).** `inspecto-intelligence/pom.xml` concatenates colliding `META-INF/LICENSE`, `LICENSE.txt` and `LICENSE.md` (`AppendingTransformer`) and merges `NOTICE*` (`ApacheNoticeResourceTransformer`), so no artifact's licence file is dropped first-wins. `check-native-licences` requires a shipped text for every DLL; the only exception is a `textPending` that names an open backlog row.
 
