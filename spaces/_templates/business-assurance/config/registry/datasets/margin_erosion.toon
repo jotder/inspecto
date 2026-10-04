@@ -1,0 +1,3 @@
+name: margin_erosion
+physicalRef: margin_erosion
+description: "Output of the ba_margin_erosion Job over your own margin_lines store"

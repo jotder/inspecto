@@ -1,0 +1,3 @@
+name: revenue_forecast
+physicalRef: revenue_forecast
+description: "Output of the ba_revenue_forecast Job over your own daily_revenue store"
