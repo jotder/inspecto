@@ -324,17 +324,37 @@ timestamp: 2026-07-16T00:00:00Z
     which audit rows may lawfully vanish, authoring or editing an `event_prune` job needs `canAdminister` — on
     `POST/PUT /jobs` and `POST /config/write` (on top of `canAuthorWorkbench`); a bundle import refuses to carry
     one at all.
-  - ⚠ **Two known windows, stated so they are not overclaimed.** (1) *Lock race:* a writer that already linked
-    rows it had not yet flushed when its lock file was deleted can collide with a second writer that recovered an
-    older head from disk — the fork is not prevented, it is DETECTED afterwards as a `duplicate`. (2) *One-anchor
-    crash window:* an anchor line is appended before the anchoring record's `latestMac` is updated; a crash
-    between the two leaves the record naming the previous anchor, so removing that newest line in that window is
-    not seen.
+  - ⚠ **One known window, stated so it is not overclaimed:** *lock race* — a writer that already linked rows it
+    had not yet flushed when its lock file was deleted can collide with a second writer that recovered an older
+    head from disk — the fork is not prevented, it is DETECTED afterwards as a `duplicate`.
+  - **The one-anchor crash window is closed** (`ASSURE-AUDIT-CHAIN-RESIDUALS-1` (6), 2026-10-04). An anchor line is
+    still appended and fsynced BEFORE the anchoring record's `latestMac` is updated (order unchanged), so a crash
+    between the two leaves `audit-anchoring.json` one anchor behind a file that already holds it.
+    `AuditAnchors.reconcile(root)` runs at `ControlApi.start()` for every Space: when the anchor file verifies as a
+    whole (`firstProblem()` is null — every MAC valid, every link intact, the first anchor the one the record
+    names) and holds MAC-chained anchors AFTER the one `latestMac` names, `latestMac` is advanced to the file's last;
+    `firstMac` is kept. Truncating that last anchor is then `anchor-file-truncated`. ⚠ A file that does NOT verify is
+    never touched — a tampered or missing mid-file anchor stays reported by `firstProblem()`, nothing is repaired
+    silently — and a file BEHIND its record (a genuine truncation) is never "reconciled" forward, so a crash
+    produces no false `anchor-file-truncated`. Not covered: a crash inside a `rebaseline`'s file rotation (the
+    first anchor changes, so it already reads as truncated).
+  - **A shared `DbEventStore` has one chain writer or the Space does not start** (`ASSURE-AUDIT-CHAIN-RESIDUALS-1`
+    (2), 2026-10-04). 🔴 No honest signal COUNTS the pods sharing a database (no replica count, pod id or partition
+    map reaches the store), so the guard is a try-lock the process holds for its whole life: `DbEventStore.open`
+    on a `jdbc:postgresql:` URL opens a dedicated, never-pooled connection and `claimChainWriter()` takes a
+    session-level `pg_try_advisory_lock` (key from `current_schema()`) on it, re-checking that the connection is still
+    valid on every link. The server drops the lock with the session, so a crash never wedges the next start. It is
+    a fail-closed single-WRITER guard, not a pod detector: any second process that links onto the same database is
+    refused. `ServiceStores.openDbEventStore` claims eagerly and, on refusal, throws
+    `Space '<id>' refuses to start … run ONE pod per Space … or -Devents.backend=parquet` — deliberately outside the
+    open's degrade-to-in-memory `catch`, because degrading would silently drop the audit trail. A Postgres store
+    built from a bare `ConnectionSource` (no dedicated connection) also refuses; DuckDB needs no claim (the engine
+    holds an exclusive file lock) and any other engine is refused; the Parquet store's OS file lock is unchanged.
+    Consequence: D6's multi-pod READ sharing of the event DB now needs one writer pod per database (a second pod
+    on the same database no longer starts its Space).
   - **Residuals (not built):** (the scheduled off-box anchor export is built — `audit_anchor_export`, above;
-    its Sink destination is deferred); the multi-pod `DbEventStore` has no
-    chain-writer lock (two pods linking one table fork the chain — filed on the board row); a `DbEventStore` shared by several pods gets one chain per process interleaved in
-    one table (verifies as duplicates) and serves the chain reads through the `EventStore` keyset-walk defaults
-    (linear per page); no offline checker tool ships (the JSON `/audit/export` carries every hashed field);
+    its Sink destination is deferred); a `DbEventStore` serves the chain reads through the `EventStore` keyset-walk
+    defaults (linear per page); no offline checker tool ships (the JSON `/audit/export` carries every hashed field);
     per decision D-P8, classification-driven masking of audit rows and read auditing beyond what exists stay
     out of scope.
 * **Email/SMTP channel wired to `deliver(n, target)`** (2026-07-20) — `SmtpEmailChannel`

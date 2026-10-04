@@ -63,7 +63,14 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
 
     /** Borrow from {@code src} per operation; the schema is created if absent. */
     public DbEventStore(ConnectionSource src) {
+        this(src, null);
+    }
+
+    /** {@code lockConn}: the dedicated connection that holds the PostgreSQL chain-writer advisory lock for this
+     *  store's life (see {@link #claimChainWriter}); the store owns and closes it. */
+    private DbEventStore(ConnectionSource src, Connection lockConn) {
         super(src, "events", "Operational Events", TABLE, "event");
+        this.lockConn = lockConn;
         initSchema();
     }
 
@@ -73,7 +80,92 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
      * {@code jdbc:postgresql:}).
      */
     public static DbEventStore open(String url, String user, String pass) throws SQLException {
-        return new DbEventStore(JdbcDrivers.source(url, user, pass, "events"));
+        // PostgreSQL is the one engine several pods can share, so it gets a connection of its own that is never
+        // pooled or returned: a session-level advisory lock lives exactly as long as that session.
+        Connection lock = url != null && url.startsWith("jdbc:postgresql:") ? JdbcDrivers.connect(url, user, pass) : null;
+        try {
+            return new DbEventStore(JdbcDrivers.source(url, user, pass, "events"), lock);
+        } catch (SQLException | RuntimeException e) {
+            closeQuietly(lock);
+            throw e;
+        }
+    }
+
+    // ── the single chain writer (ASSURE-AUDIT-CHAIN-RESIDUALS-1 (2)) ───────────────────────────────
+
+    private final Connection lockConn;
+    private boolean writerHeld;
+
+    /**
+     * Claim the right to LINK onto this store's audit chain, or throw — a store two pods link onto forks the chain
+     * (each recovers the same head).
+     *
+     * <p>🔴 There is no honest way to COUNT the pods that share a database (no replica count, no pod id, no
+     * partition map reaches this store), so the signal is the only reliable one: a try-lock this process takes
+     * and holds for its whole life, on a dedicated connection. On PostgreSQL that is a session-level
+     * {@code pg_try_advisory_lock}, which the server releases the instant the process or its connection dies, so a
+     * crash never wedges the next start. ⚠ This is a fail-closed single-WRITER guard, not a pod detector: a
+     * second process that links onto the same database is refused whether or not it is a "pod". A store that
+     * cannot hold the lock (no dedicated connection, or the connection has died since) refuses too.
+     *
+     * <p>A single-connection file engine (DuckDB) needs no claim: the engine itself holds an exclusive lock on
+     * its file, so the file cannot be shared by two processes. Any other engine is refused.
+     */
+    @Override
+    public synchronized void claimChainWriter() {
+        if (!src.isPostgres()) {
+            try {
+                String product = withConn(c -> c.getMetaData().getDatabaseProductName());
+                if (product != null && product.toLowerCase().contains("duckdb")) return;
+                throw new IllegalStateException("the event database (" + product + ") has no single-writer guarantee "
+                        + "for the audit chain");
+            } catch (SQLException e) {
+                throw new IllegalStateException("could not identify the event database engine: " + e.getMessage(), e);
+            }
+        }
+        try {
+            if (lockConn == null || lockConn.isClosed() || !lockConn.isValid(5)) {
+                writerHeld = false;
+                throw new IllegalStateException("the audit chain writer lock connection of the shared event database "
+                        + (lockConn == null ? "was never opened (open the store with DbEventStore.open)" : "was lost"));
+            }
+            if (writerHeld) return;
+            String schema;
+            try (Statement st = lockConn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT current_schema()")) {
+                schema = rs.next() ? rs.getString(1) : "";
+            }
+            long key = ("inspecto.audit-chain-writer:" + schema).hashCode();
+            try (PreparedStatement ps = lockConn.prepareStatement("SELECT pg_try_advisory_lock(?)")) {
+                ps.setLong(1, key);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next() || !rs.getBoolean(1))
+                        throw new IllegalStateException("another process holds the audit chain writer lock on this "
+                                + "shared event database");
+                }
+            }
+            writerHeld = true;
+        } catch (SQLException e) {
+            throw new IllegalStateException("could not claim the audit chain writer lock: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void close() {
+        synchronized (this) {
+            writerHeld = false;
+            closeQuietly(lockConn);
+        }
+        super.close();
+    }
+
+    private static void closeQuietly(Connection c) {
+        if (c == null) return;
+        try {
+            c.close();
+        } catch (SQLException ignore) {
+            // the server drops the session (and its advisory lock) with the connection anyway
+        }
     }
 
     // ── append ──────────────────────────────────────────────────────────────────────

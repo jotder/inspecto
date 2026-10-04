@@ -421,7 +421,21 @@ public final class ControlApi implements AutoCloseable, HostContext {
         }
     }
 
+    /** Startup: bring each Space's "anchoring started" record up to its anchor file (see {@link AuditAnchors#reconcile}). */
+    private void reconcileAuditAnchors() {
+        for (SpaceContext ctx : spaces.all()) {
+            try {
+                Path root = ctx.root().config() != null ? ctx.root().config() : writeRoot;
+                if (root != null) AuditAnchors.reconcile(root);   // no config root: nothing was ever anchored
+            } catch (java.io.IOException | RuntimeException e) {
+                // never repaired silently, never fatal: the anchor file's own verification reports what is wrong
+                log.error("Audit anchor reconcile for Space {} failed: {}", ctx.root().id(), e.getMessage());
+            }
+        }
+    }
+
     public void start() {
+        reconcileAuditAnchors();
         http.start();
         anchorRoll = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "audit-anchor-roll");

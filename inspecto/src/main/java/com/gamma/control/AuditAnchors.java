@@ -255,6 +255,31 @@ final class AuditAnchors {
         Files.move(tmp, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
     }
 
+    /**
+     * ASSURE-AUDIT-CHAIN-RESIDUALS-1 (6), run at startup: {@link #write} appends and fsyncs an anchor BEFORE
+     * {@link #recordStarted} moves {@code latestMac} onto it, so a crash between the two leaves the record one anchor
+     * behind a file that already holds it — and truncating just that last anchor would then go undetected. When the
+     * anchor file verifies as a whole (every MAC valid, every link intact, the first anchor the one the record
+     * names) and holds MAC-chained anchors AFTER the one {@code latestMac} names, {@code latestMac} is advanced to
+     * the file's last. A file that does not verify is left exactly as it is: {@link AnchorFile#firstProblem} keeps
+     * reporting it — nothing is repaired silently, and nothing is forged (an anchor needs the Space key's MAC).
+     *
+     * @return {@code true} when {@code latestMac} was advanced
+     */
+    static boolean reconcile(Path root) throws IOException {
+        synchronized (lock(root)) {
+            AnchorFile file = readFile(root);
+            Started s = file.started();
+            if (s == null || file.anchors().isEmpty() || file.firstProblem() != null) return false;
+            Anchor last = file.last();
+            if (last.mac().equals(s.latestMac())) return false;
+            recordStarted(root, last, false);
+            log.warn("Audit anchoring record for {} was one or more anchors behind its anchor file (a crash between "
+                    + "appending an anchor and recording it); latestMac reconciled to the file's last anchor", root);
+            return true;
+        }
+    }
+
     // -- the scheduled day-boundary roll --
 
     /** Per config root: the last UTC day the roll completed through, and when it may next be attempted. */

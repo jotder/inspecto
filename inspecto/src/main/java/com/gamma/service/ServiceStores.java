@@ -394,18 +394,37 @@ final class ServiceStores {
         String url = backend.startsWith("jdbc:")
                 ? raw
                 : OperationalDb.urlFor(OperationalDb.Family.EVENTS, root, root.eventsDbUrl());
+        com.gamma.event.DbEventStore store;
         try {
-            EventStore store = com.gamma.event.DbEventStore.open(url,
+            store = com.gamma.event.DbEventStore.open(url,
                     System.getProperty("events.db.user"), System.getProperty("events.db.password"));
-            log.info("Event backend: database ({})", url);
-            StoreHealth.record(root.id(), "events", StoreHealth.Status.UP, url, "shared event database");
-            return store;
         } catch (Exception e) {
             log.warn("Could not open event DB ({}) — falling back to in-memory: {}", url, e.getMessage());
             StoreHealth.degraded(root.id(), "events", url,
                     "audit trail fell back to the in-memory ring — nothing survives a restart, and no other "
                             + "pod can see it: " + e.getMessage());
             return new InMemoryEventStore();
+        }
+        claimChainWriterOrRefuse(root.id(), store);
+        log.info("Event backend: database ({})", url);
+        StoreHealth.record(root.id(), "events", StoreHealth.Status.UP, url, "shared event database");
+        return store;
+    }
+
+    /**
+     * ASSURE-AUDIT-CHAIN-RESIDUALS-1 (2): the audit chain is linked onto this database by exactly ONE process, or the
+     * Space does not start. ⛔ Deliberately NOT inside the open's try: a refusal must never degrade to the in-memory
+     * ring — that would quietly drop the audit trail it is protecting — it fails the Space's start, loudly.
+     */
+    static void claimChainWriterOrRefuse(String spaceId, com.gamma.event.DbEventStore store) {
+        try {
+            store.claimChainWriter();
+        } catch (RuntimeException e) {
+            store.close();
+            throw new IllegalStateException("Space '" + spaceId + "' refuses to start: its audit chain would fork — "
+                    + "the shared event database (-Devents.backend=db) already has a chain writer (" + e.getMessage()
+                    + "). Run ONE pod per Space against it, or give each pod its own event store "
+                    + "(-Devents.backend=parquet).", e);
         }
     }
 
