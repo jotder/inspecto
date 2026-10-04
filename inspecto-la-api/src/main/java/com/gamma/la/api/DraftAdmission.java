@@ -3,6 +3,7 @@ package com.gamma.la.api;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
+import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.la.core.DraftCheckpoints;
@@ -25,7 +26,7 @@ import static com.gamma.la.core.InvestigationEvaluator.canonical;
  * D7-6 - admission and idle policy for Drafts (design {@code la-separation-d7-design.md} sections 7 and 11; decisions D7-Q5, D7-Q6).
  *
  * <ul>
- *   <li><b>Open-Draft cap (D21).</b> {@link DraftLifecycle#maxOpenDrafts} (50) open Drafts per Space, counted across its Investigations
+ *   <li><b>Open-Draft cap (D21).</b> {@code drafts.max_open} of the Space's {@code link-analysis.toon} (default 50) open Drafts per Space, counted across its Investigations
  *       by directory names and marker files only. The 51st fork answers 409 with the way out; idle Drafts of the Space are swept first,
  *       so an expired one never holds a seat.</li>
  *   <li><b>Heavy-job cap (D7-Q6).</b> At most {@code min(4, cores/3)} (at least 1) heavy Draft jobs - a rebase / conflict-report replay, a
@@ -89,11 +90,12 @@ public final class DraftAdmission {
         InvestigationStore store = inv.store();
         try {
             store.recoverDrafts(inv.id());
+            LinkAnalysisSettings.Drafts policy = LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveDrafts();
             for (String id : store.openDraftIds(inv.id())) {
                 Duration idle = store.draftIdle(inv.id(), id);
-                if (idle.compareTo(DraftLifecycle.expireAfter) >= 0) expire(inv, id);
-                else if (idle.compareTo(DraftLifecycle.hibernateAfter) >= 0
-                        && store.draftState(inv.id(), id) != InvestigationStore.DraftState.HIBERNATED) hibernate(inv, id);
+                if (idle.compareTo(policy.expireAfterInForce()) >= 0) expire(inv, id, policy);
+                else if (idle.compareTo(policy.hibernateAfterInForce()) >= 0
+                        && store.draftState(inv.id(), id) != InvestigationStore.DraftState.HIBERNATED) hibernate(inv, id, policy);
             }
         } catch (IOException | RuntimeException e) {
             // housekeeping: it must never fail the request it rides on; the next call retries
@@ -122,18 +124,18 @@ public final class DraftAdmission {
         WorkingSetRoutes.evict(key);
     }
 
-    private static void hibernate(InvestigationRoutes.Inv inv, String draftId) throws IOException {
-        if (inv.store().hibernateDraft(inv.id(), draftId, DraftLifecycle.hibernateAfter)) evictCaches(inv, draftId);
+    private static void hibernate(InvestigationRoutes.Inv inv, String draftId, LinkAnalysisSettings.Drafts policy) throws IOException {
+        if (inv.store().hibernateDraft(inv.id(), draftId, policy.hibernateAfterInForce())) evictCaches(inv, draftId);
     }
 
-    private static void expire(InvestigationRoutes.Inv inv, String draftId) throws IOException {
+    private static void expire(InvestigationRoutes.Inv inv, String draftId, LinkAnalysisSettings.Drafts policy) throws IOException {
         InvestigationStore store = inv.store();
         String rawHeader = store.draftHeader(inv.id(), draftId).orElse(null);
         if (rawHeader == null) return;
         @SuppressWarnings("unchecked") Map<String, Object> header = ApiContext.JSON.readValue(rawHeader, LinkedHashMap.class);
         long idleDays = store.draftIdle(inv.id(), draftId).toDays();
         int[] head = new int[1];
-        Optional<Boolean> closed = store.closeDraft(inv.id(), draftId, DraftLifecycle.expireAfter, own -> {
+        Optional<Boolean> closed = store.closeDraft(inv.id(), draftId, policy.expireAfterInForce(), own -> {
             head[0] = ((Number) header.get("baseStep")).intValue() + own.size();
             Map<String, Object> marker = new LinkedHashMap<>();
             marker.put("draftId", draftId);

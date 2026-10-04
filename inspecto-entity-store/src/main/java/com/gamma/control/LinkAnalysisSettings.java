@@ -46,7 +46,7 @@ import java.util.Map;
 public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNodeCap, Integer suspicionNodeCap,
                                    String maskingMode, Integer fourEyesBudgetAbove, Integer fourEyesFanOutAbove,
                                    List<EntityTypes.EntityType> entityTypes, Integer mergedDistinctCap,
-                                   Integer seedByDistinctCap, GraphRun graphRun, Index index) {
+                                   Integer seedByDistinctCap, GraphRun graphRun, Index index, Drafts drafts) {
 
     /**
      * The graph-run service's per-Space knobs (LA separation D-4 step 6; {@code graph_run} in {@code link-analysis.toon}):
@@ -104,8 +104,43 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         }
     }
 
+    /**
+     * The Draft lifecycle's per-Space knobs (LA-DRAFT-PROMOTE-COST-1; {@code drafts} in {@code link-analysis.toon}):
+     * {@code maxOpen} - the most open Drafts one Space holds (D21, default {@link #DEFAULT_MAX_OPEN});
+     * {@code hibernateAfterMinutes} - idle minutes before a Draft hibernates (D7-Q5, default 60);
+     * {@code expireAfterDays} - idle days before a Draft expires (D7-Q5, default 30). Every field is optional
+     * ({@code null} = the shipped default); the expiry must stay longer than the hibernation.
+     */
+    public record Drafts(Integer maxOpen, Integer hibernateAfterMinutes, Integer expireAfterDays) {
+        public static final Drafts NONE = new Drafts(null, null, null);
+        public static final int DEFAULT_MAX_OPEN = 50;
+        public static final int DEFAULT_HIBERNATE_AFTER_MINUTES = 60;
+        public static final int DEFAULT_EXPIRE_AFTER_DAYS = 30;
+
+        boolean isNone() {
+            return maxOpen == null && hibernateAfterMinutes == null && expireAfterDays == null;
+        }
+
+        public int maxOpenInForce() {
+            return maxOpen != null ? maxOpen : DEFAULT_MAX_OPEN;
+        }
+
+        public java.time.Duration hibernateAfterInForce() {
+            return java.time.Duration.ofMinutes(hibernateAfterMinutes != null ? hibernateAfterMinutes : DEFAULT_HIBERNATE_AFTER_MINUTES);
+        }
+
+        public java.time.Duration expireAfterInForce() {
+            return java.time.Duration.ofDays(expireAfterDays != null ? expireAfterDays : DEFAULT_EXPIRE_AFTER_DAYS);
+        }
+
+        /** Whether the expiry is longer than the hibernation (a Draft must sleep before it can die). */
+        public boolean ordered() {
+            return expireAfterInForce().compareTo(hibernateAfterInForce()) > 0;
+        }
+    }
+
     public static final String FILE = "link-analysis.toon";
-    static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null);
+    static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null);
 
     /** The shipped default of {@code merged_distinct_cap}. */
     public static final int DEFAULT_MERGED_DISTINCT_CAP = 20_000;
@@ -131,6 +166,11 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     /** The index knobs in force: the stated ones; a field never stated is {@code null} inside (use the {@code *InForce} accessors). */
     public Index effectiveIndex() {
         return index != null ? index : Index.NONE;
+    }
+
+    /** The Draft lifecycle knobs in force: the stated ones; a field never stated is {@code null} inside (use the {@code *InForce} accessors). */
+    public Drafts effectiveDrafts() {
+        return drafts != null ? drafts : Drafts.NONE;
     }
 
     /** The masking mode in force: the stated one, else the declared default ({@code typed}). */
@@ -174,6 +214,13 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
             if (index.queue() != null) x.put("queue", index.queue());
             m.put("index", x);
         }
+        if (drafts != null && !drafts.isNone()) {
+            Map<String, Object> x = new LinkedHashMap<>();
+            if (drafts.maxOpen() != null) x.put("max_open", drafts.maxOpen());
+            if (drafts.hibernateAfterMinutes() != null) x.put("hibernate_after_minutes", drafts.hibernateAfterMinutes());
+            if (drafts.expireAfterDays() != null) x.put("expire_after_days", drafts.expireAfterDays());
+            m.put("drafts", x);
+        }
         AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".link-analysis-");
     }
 
@@ -191,7 +238,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                     optInt(m, "suspicion_node_cap"), maskingMode(ToonHelper.opt(m, "masking_mode", "")),
                     optInt(m, "four_eyes_budget_above"), optInt(m, "four_eyes_fan_out_above"),
                     entityTypes(m.get("entity_types")), optInt(m, "merged_distinct_cap"),
-                    optInt(m, "seed_by_distinct_cap"), graphRun(m.get("graph_run")), index(m.get("index")));
+                    optInt(m, "seed_by_distinct_cap"), graphRun(m.get("graph_run")), index(m.get("index")), drafts(m.get("drafts")));
         } catch (Exception e) {
             return EMPTY;
         }
@@ -205,6 +252,20 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         GraphRun r = new GraphRun(optInt(g, "max_nodes"), optInt(g, "max_edges"), optInt(g, "timeout_ms"),
                 optInt(g, "threads"), optInt(g, "queue"), optInt(g, "max_result_items"));
         return r.isNone() ? null : r;
+    }
+
+    /**
+     * A stored {@code drafts} block, else {@code null} = every knob inherits; a bad value inside costs only that knob.
+     * ⚠ A stored pair whose expiry is not longer than its hibernation reads as {@code null} (all defaults): the write
+     * route refuses it, so only a hand edit gets here, and a Draft must never expire before it can hibernate.
+     * An empty TOON key arrives as {@code {}} (not a Map of values): it has no knob and reads as {@code null}.
+     */
+    @SuppressWarnings("unchecked")
+    private static Drafts drafts(Object raw) {
+        if (!(raw instanceof Map<?, ?>)) return null;
+        Map<String, Object> g = (Map<String, Object>) raw;
+        Drafts r = new Drafts(optInt(g, "max_open"), optInt(g, "hibernate_after_minutes"), optInt(g, "expire_after_days"));
+        return r.isNone() || !r.ordered() ? null : r;
     }
 
     /** A stored {@code index} block, else {@code null} = every knob inherits; a bad value inside costs only that knob. */

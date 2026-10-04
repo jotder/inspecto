@@ -1179,11 +1179,18 @@ Design and decisions D6-1…D6-7: [`la-separation-d6-design.md`](../../../archiv
   (D7-4):** `DraftCheckpoints` keeps the last evaluated State per Draft (valid while `log.jsonl` keeps size + mtime) so an op is one
   `copy()` + `apply`, not a re-fold of main prefix + own log; an undo still folds. The verified `baseLogHash` verdict is cached per
   main log file (size + mtime), so an unchanged main log is not re-read or re-hashed; `/replay` clears it and re-verifies. Caches are
-  in memory (a restart = one cold fold). **Admission, hibernate, expiry (D7-6, built 2026-10-03):** at most 50 open Drafts per Space
+  in memory (a restart = one cold fold). **Admission, hibernate, expiry (D7-6, built 2026-10-03):** at most 50 open Drafts per Space (default)
   (51st fork 409, hibernated ones count); heavy Draft jobs (rebase / conflict replay, a cold Working Set relation build, an `expand`
-  op) run under `min(4, cores/3)` permits and a full cap answers 429 at once, never queues. A Draft idle 1 h hibernates
+  op) run under `min(4, cores/3)` permits and a full cap answers 429 at once, never queues. A Draft idle 1 h (default) hibernates
   (`hibernated.json`; checkpoint + cached relation released; log, sets, pins kept; the next authorised access wakes it with one cold
-  fold), idle 30 d it expires (a discard with `expired:true`, pins released, `LINK_DRAFT_EXPIRED`, `expiryWarning` from 7 days out).
+  fold), idle 30 d (default) it expires (a discard with `expired:true`, pins released, `LINK_DRAFT_EXPIRED`, `expiryWarning` from 7 days out).
+  **The three numbers are per-Space `drafts` keys (`LA-DRAFT-PROMOTE-COST-1`, 2026-10-04):** `link-analysis.toon` `drafts: {max_open
+  (1..1000, 50), hibernate_after_minutes (1..10080, 60), expire_after_days (1..3650, 30)}`, wire `drafts{maxOpen,hibernateAfterMinutes,
+  expireAfterDays}` plus the echoed `draftsInForce` on `GET|PUT /settings/link-analysis`. They replaced the static fields on
+  `DraftLifecycle`; `DraftAdmission.maintain` / `maintainSpace` and `DraftRoutes` (fork cap, expired-409 text, `expiresAt`) read
+  `LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveDrafts()` per call. PUT refuses (422, never clamps) an out-of-range or
+  unknown key and an expiry not longer than the hibernation; a hand-edited unordered pair reads as all defaults. The Settings page
+  passes the block through untouched (it round-trips what it was served) and has no form field for it: edit by PUT or the file.
   Idle time = `DraftLifecycle.touch` (memory + `accessed.json` every 5 min); the sweep is lazy on list / open / fork (no scheduler).
   `drafts/index.json` is a rebuildable listing index (header `size:mtime`) so a listing reads no header; `DraftStore.recover` restores
   or deletes the `.old-<id>-*` a crashed rebase leaves, only after verifying the header. No per-Draft `draft.duckdb` exists (nothing
@@ -1533,7 +1540,7 @@ Harness `InvTraversalBench` (`@Tag("bench")`, skipped unless `-Dinspecto.bench.d
 
 **Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-SPA-OWED-SURFACES-1` ·
 `LA-INVESTIGATION-OPS-DEFERRED-1` · `LA-LIVE-DETECTION-1` · `LA-DOSSIER-OUTPUT-1` · `LA-COLLECTOR-COVERAGE-1` ·
-`LA-DRAFT-PROMOTE-COST-1` (filed 2026-10-03 when `LA-SEP-SPIKES-1` closed: spike `D-S5` re-ran on real Draft state at 10^8 edges, D-7 step D7-7; the promote-cost half fixed the same day, the Draft cap and idle periods as settings keys remain). Standing refusals with reopen triggers are in §6 under *Link Analysis & Geo*.
+`LA-DRAFT-PROMOTE-COST-1` (filed 2026-10-03 when `LA-SEP-SPIKES-1` closed; both halves shipped - promote linear 2026-10-03, the Draft cap and idle periods as `drafts` settings keys 2026-10-04 - and the row is closed). Standing refusals with reopen triggers are in §6 under *Link Analysis & Geo*.
 
 Design (archived): [`link-analysis-and-graphsource.md`](../../../archived-documents/plans-archive/link-analysis-and-graphsource.md)
 · [`link-analysis-projection-authoring-plan.md`](../../../archived-documents/plans-archive/link-analysis-projection-authoring-plan.md)
