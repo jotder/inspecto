@@ -440,6 +440,21 @@ flat edge file (D-3 step 1 measurement) — disk, not memory. §12 D7-Q3 decides
   full-state serialisations (`InvestigationEvaluator.serialisationCount`, every `toMap`) and requires exactly one per replayed op
   plus two. Mutants: a set file one step off fails the oracle; restoring `state.hash()` in the no-op test fails the guard (52 vs 27).
 
+  **Linear rebase examined and NOT built (2026-10-04, `LA-DRAFT-REBASE-COST-1` closed as a decision).** A set-file format change
+  (per-step deltas against a base) does not make rebase linear, because the set file is not the cost's root. The root is the sealed
+  hash: `workingSetHash` is `sha256(canonical(<whole Working Set>))` (`InvestigationEvaluator.State.hash()`), carried on every log
+  line, re-folded by `evaluate` (promote, `DraftRebase.verify`, every read at a step) and compared byte for byte by
+  `DraftPromoteCostTest`. A rebased step's state differs from its sealed one (renumbered `admittedBy`), so each step needs a NEW
+  full-state hash, O(state) each, O(steps x state) in total - deltas on disk change what is WRITTEN, not what is HASHED. Linear
+  needs a different hash definition - a chain `H_i = sha256(H_{i-1} || canonical(delta_i))`, or an incremental / Merkle hash over
+  entities - which (a) changes every sealed hash, so the "promote output byte-identical where pinned" oracle is replaced, not
+  preserved; (b) changes the meaning of "the hash of the Working Set" for ~55 sites (`WorkingSetRoutes`, `GraphDossierBuilder`,
+  `InvestigationTemplateRoutes`, `FsInvestigationStore`, checkpoints); (c) makes a state's hash depend on how it was reached, so two
+  routes to the same Working Set no longer compare equal (today's no-op test `afterHash.equals(stateHash)` relies on that). A
+  faster serialisation is a constant factor, not a complexity class. Decision: keep the quadratic rebase (800 steps about 8.4 s,
+  measured 2026-10-03; the 800-step bench is opt-in and was not re-run here), and reopen only on an analyst-reported slow rebase,
+  with the chained hash and an explicit pin change as the starting design.
+
   **Scale reached: 10^8, not 10^9.** The 10^8 index build alone took 24 min under the 8 GB build memory cap (the D-3 spike's uncapped
   build took 6.1 min at a 17.9 GB peak); 10^9 is at least ten times that, over 4 h capped or a peak beyond this 32 GB box uncapped, so
   it fails the "10^8 well under an hour" condition. Disk was not the limit (231 GB free; 10^9 is about 22-34 GB). The Draft-side numbers

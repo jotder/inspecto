@@ -1160,7 +1160,7 @@ Design and decisions D6-1…D6-7: [`la-separation-d6-design.md`](../../../archiv
   (`DraftStore.replaceRebased`, two renames, old restored if the second fails). Each rebased state is serialised once - its canonical
   bytes give both its `workingSetHash` and its set file - and the fail-closed fold runs before the main lock (`DraftRebase.verify`;
   the lock re-checks main and the Draft log byte-identical): 800 steps 36.7 s -> 8.4 s, still O(state) per step since nothing sealed
-  survives the renumbering (`LA-DRAFT-REBASE-COST-1`, pinned by `DraftRebaseCostTest` against the old algorithm). Each op is classed `no-op` / `changed` (re-sealed
+  survives the renumbering (`LA-DRAFT-REBASE-COST-1`, pinned by `DraftRebaseCostTest` against the old algorithm); a linear rebase was examined and declined 2026-10-04 - the cost is the whole-state sealed hash, not the set-file format, and a chained hash would change every sealed hash and the promote byte pin; design doc section 6). Each op is classed `no-op` / `changed` (re-sealed
   fingerprint differs, both counts) / `superseded` (a no-op AND main holds the same op) / `blocked` (refused on the new base); the
   last two are never carried and must be named in `confirm` (D7-Q7), else 409. A Draft's expand reads ITS pinned version
   (`IndexStore.version(n)`, `IndexedRead.select(..., pinned)`; a version no longer published falls back to the flat Dataset); a pin
