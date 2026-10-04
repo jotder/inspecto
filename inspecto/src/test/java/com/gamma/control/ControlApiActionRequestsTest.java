@@ -85,6 +85,9 @@ class ControlApiActionRequestsTest {
                 case EDITOR -> new String[] {"editor-1", "super"};
                 default -> null;
             };
+            if ("Bearer grouped".equals(ex.getRequestHeaders().getFirst("Authorization")))   // an IdP group claim
+                return Optional.of(new Subject("grp-1", Roles.effective(ex).get("admin").capabilities(), null,
+                        Map.of("groups", "ra-approvers")));
             if ("Bearer scoped".equals(ex.getRequestHeaders().getFirst("Authorization")))
                 return Optional.of(new Subject("scoped-1", Roles.effective(ex).get("operations").capabilities(),
                         Set.of("billing")));
@@ -141,6 +144,7 @@ class ControlApiActionRequestsTest {
         try {
             Thread.currentThread().setContextClassLoader(ControlApiReconPromoteTest.fakeObjectEngineClassLoader(outer));
             CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
+            if (writeRoot != null) seedApproverRoster(writeRoot);   // OIDC-shaped Authenticator: the Space's approver roster decides
             ControlApi api = new ControlApi(svc, 0);
             api.start();
             return new Ctx(svc, api, api.port(), writeRoot);
@@ -253,16 +257,32 @@ class ControlApiActionRequestsTest {
     // ── approver check (RESIDUALS-1 (6)) ────────────────────────────────────────────────────────
 
     @Test
-    void anIdpThatCannotEnumerateItsPrincipalsReadsUnknownAndStaysQuiet(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+    void anIdpThatCannotEnumerateItsPrincipalsReadsTheApproverRoster(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         List<com.gamma.event.Event> seen = new CopyOnWriteArrayList<>();
         java.util.function.Consumer<com.gamma.event.Event> sub = seen::add;
         com.gamma.event.EventLog.global().addSubscriber(sub);
         try (Ctx c = open(cfg, tmp, true)) {
             String id = propose(c, incident(c));
-            assertEquals("unknown", data(send(c, "GET", "/action-requests/" + id, null, AUTHOR), 200).get("approverCheck").asText());
-            assertEquals("unknown", data(send(c, "GET", "/action-requests", null, AUTHOR), 200).get("items").get(0)
-                    .get("approverCheck").asText());
-            assertTrue(noApproverEvents(seen, id).isEmpty(), "no warning when it cannot be known");
+            assertEquals("ok", data(send(c, "GET", "/action-requests/" + id, null, AUTHOR), 200).get("approverCheck").asText(),
+                    "the seeded roster lists non-makers");
+            assertTrue(noApproverEvents(seen, id).isEmpty());
+
+            data(send(c, "PUT", "/settings/approvers", "{\"users\":[]}", CHECKER), 200);
+            String none = propose(c, incident(c));
+            assertEquals("none-eligible", data(send(c, "GET", "/action-requests/" + none, null, AUTHOR), 200)
+                    .get("approverCheck").asText(), "an empty roster: nobody can approve, never anyone");
+            assertEquals(1, noApproverEvents(seen, none).size(), "warned once, at raise");
+            HttpResponse<String> refused = send(c, "POST", "/action-requests/" + none + "/approve", "{}", CHECKER);
+            assertEquals(403, refused.statusCode(), refused.body());
+            assertTrue(refused.body().contains("approver roster"), refused.body());
+            assertEquals(0, accepted.get(), "nothing dispatched");
+
+            data(send(c, "PUT", "/settings/approvers", "{\"users\":[\"author-1\"],\"groups\":[\"ra-approvers\"]}", CHECKER), 200);
+            HttpResponse<String> self = send(c, "POST", "/action-requests/" + none + "/approve", "{}", SELF);
+            assertEquals(403, self.statusCode());
+            assertTrue(self.body().contains("four-eyes"), "listed, a maker still never approves their own");
+            JsonNode done = data(send(c, "POST", "/action-requests/" + none + "/approve", "{}", "Bearer grouped"), 200);
+            assertEquals("grp-1", done.get("approver").asText(), "a group claim match decides");
         } finally {
             com.gamma.event.EventLog.global().removeSubscriber(sub);
         }
@@ -1132,5 +1152,12 @@ class ControlApiActionRequestsTest {
             assertEquals(503, send(c, "POST", "/action-requests", body(inc), AUTHOR).statusCode(), "no transport (Personal)");
             assertEquals(0, data(send(c, "GET", "/action-requests", null, AUTHOR), 200).get("total").asInt());
         }
+    }
+
+    /** The Space's approver roster ({@link ApproverRoster}): every id this class's Authenticator mints. */
+    private static void seedApproverRoster(Path root) throws java.io.IOException {
+        java.nio.file.Files.createDirectories(root);
+        java.nio.file.Files.writeString(root.resolve(ApproverRoster.FILE), dev.toonformat.jtoon.JToon.encode(
+                java.util.Map.of("users", java.util.List.of("author-1", "analyst-2", "checker-1", "checker-2", "dev-1", "editor-1", "power-1", "scoped-1"))));
     }
 }

@@ -91,6 +91,7 @@ class ControlApiPublicationTest {
         System.setProperty("assist.write.root", root.toString());
         try {
             CollectorService svc = new CollectorService(List.of(toon), 3600, 1);
+            seedApproverRoster(root);   // OIDC-shaped Authenticator: the Space's approver roster decides
             ControlApi api = new ControlApi(svc, 0);
             api.start();
             return new Ctx(svc, api, api.port(), root);
@@ -269,5 +270,12 @@ class ControlApiPublicationTest {
         assertEquals(409, refused.status);
         assertThrows(ApiException.class, () -> ImportCapabilityGuard.checkItems(null,
                 List.of(Map.of("kind", "job", "id", "to-bi", "content", Map.of("name", "to-bi", "type", "publish.postgres")))));
+    }
+
+    /** The Space's approver roster ({@link ApproverRoster}): every id this class's Authenticator mints. */
+    private static void seedApproverRoster(Path root) throws java.io.IOException {
+        java.nio.file.Files.createDirectories(root);
+        java.nio.file.Files.writeString(root.resolve(ApproverRoster.FILE), dev.toonformat.jtoon.JToon.encode(
+                java.util.Map.of("users", java.util.List.of("approver-1", "author-1", "builder-1", "checker-1"))));
     }
 }

@@ -84,6 +84,7 @@ class PendingChangesMultiPodTest {
         System.setProperty("assist.write.root", writeRoot.toString());
         try {
             CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
+            seedApproverRoster(writeRoot);   // OIDC-shaped Authenticator: the Space's approver roster decides
             ControlApi api = new ControlApi(svc, 0);
             api.start();
             return new Pod(svc, api, api.port());
@@ -262,5 +263,12 @@ class PendingChangesMultiPodTest {
                 return null;
             });
         }
+    }
+
+    /** The Space's approver roster ({@link ApproverRoster}): every id this class's Authenticator mints. */
+    private static void seedApproverRoster(Path root) throws java.io.IOException {
+        java.nio.file.Files.createDirectories(root);
+        java.nio.file.Files.writeString(root.resolve(ApproverRoster.FILE), dev.toonformat.jtoon.JToon.encode(
+                java.util.Map.of("users", java.util.List.of("admin-1", "author-1", "checker-1"))));
     }
 }

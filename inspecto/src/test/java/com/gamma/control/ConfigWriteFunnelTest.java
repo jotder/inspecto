@@ -74,6 +74,8 @@ class ConfigWriteFunnelTest {
     private static final String MAIL_ATTACH = "the Space mail attachment domain allowlist (mail-attachments.toon, "
             + "ASSURE-XLSX-ATTACHMENTS-1): a Space setting validated by MailAttachDomains (canAdminister) — the egress "
             + "allowlist's shape and reason";
+    private static final String APPROVERS = "the Space approver roster (approvers.toon, operator 2026-10-04): a Space "
+            + "setting validated by ApproverRosterRoutes (canAdminister) — the egress allowlist's shape and reason";
     private static final String JOBS = "JobRoutes runs its own job gate (the job spec + ConfigSafetyValidator.checkJob, "
             + "the two checks SaveGate's job arm runs) rather than the whole SaveGate list";
 
@@ -92,6 +94,7 @@ class ConfigWriteFunnelTest {
             Map.entry("POST /jobs/([^/]+)/enable", JOBS), Map.entry("POST /jobs/([^/]+)/disable", JOBS),
             Map.entry("POST /jobs/([^/]+)/reschedule", JOBS),
             Map.entry("PUT /settings/egress", EGRESS),
+            Map.entry("PUT /settings/approvers", APPROVERS),
             Map.entry("PUT /settings/publication-destinations", PUBLICATION_DESTINATIONS),
             Map.entry("PUT /settings/mail-attachments", MAIL_ATTACH)
     ));
@@ -124,6 +127,7 @@ class ConfigWriteFunnelTest {
             Map.entry("POST /expectations/evaluate", RESULT_STAMP),
             Map.entry("POST /expectations/([^/]+)/evaluate", RESULT_STAMP),
             Map.entry("PUT /settings/egress", EGRESS),
+            Map.entry("PUT /settings/approvers", APPROVERS),
             Map.entry("PUT /settings/publication-destinations", PUBLICATION_DESTINATIONS),
             Map.entry("PUT /settings/mail-attachments", MAIL_ATTACH),
             Map.entry("POST /pipelines/rename/resume",

@@ -142,6 +142,7 @@ class ControlApiSpaceBundleActionRequestsTest {
         Files.move(tmp, config.resolve("etl_pipeline.toon"));
         Files.writeString(base.resolve("space.toon"), "display_name: \"Alpha\"\ndescription: \"x\"\ncreated_at: \"2026-09-28\"\n");
         SpaceManager spaces = SpaceManager.discover(root);
+        seedApproverRoster(config);   // OIDC-shaped Authenticator: the Space's approver roster decides
         ControlApi api = new ControlApi(spaces, 0);
         spaces.startAll();
         api.start();
@@ -223,6 +224,11 @@ class ControlApiSpaceBundleActionRequestsTest {
             assertEquals(403, beta(c, "POST", "/action-requests/" + id + "/approve", "{}", RESTORED).statusCode(),
                     "the bundled rule's restored-version author");
 
+            // A new Space starts with an EMPTY approver roster: nobody may approve until an administrator lists them.
+            assertEquals(403, beta(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER).statusCode(),
+                    "the bundle carries no roster (approvers.toon is reserved from import)");
+            data(beta(c, "PUT", "/settings/approvers", "{\"users\":[\"checker-1\"]}", CHECKER), 200);
+
             // A new Space starts with an EMPTY allowlist: the private target is denied, nothing dialled.
             JsonNode done = data(beta(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER), 200);
             assertEquals("failed", done.get("status").asText(), done.toString());
@@ -278,5 +284,12 @@ class ControlApiSpaceBundleActionRequestsTest {
                     IMPORTER);
             assertEquals(422, bad.statusCode(), "a malformed bundled stamp is refused like restoredMakers: " + bad.body());
         }
+    }
+
+    /** The Space's approver roster ({@link ApproverRoster}): every id this class's Authenticator mints. */
+    private static void seedApproverRoster(Path root) throws java.io.IOException {
+        java.nio.file.Files.createDirectories(root);
+        java.nio.file.Files.writeString(root.resolve(ApproverRoster.FILE), dev.toonformat.jtoon.JToon.encode(
+                java.util.Map.of("users", java.util.List.of("admin-1", "author-0", "author-9", "checker-1", "importer-1", "operator-1"))));
     }
 }

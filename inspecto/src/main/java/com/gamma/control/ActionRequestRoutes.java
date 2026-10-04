@@ -198,7 +198,9 @@ final class ActionRequestRoutes implements RouteModule {
      * {@code none-eligible}: no role in the Space's table grants {@code canApproveChanges} (deny grants applied —
      * every edition), or the Authenticator enumerates its principals (Demo) and every holder is a maker.
      * {@code none-eligible} also with no Authenticator (Personal): no Subject exists, so no one can decide.
-     * {@code unknown}: roles grant it but the Authenticator cannot enumerate who holds them (OIDC), or enumerating failed.
+     * When roles grant it but the Authenticator cannot enumerate who holds them (OIDC), the Space's {@link ApproverRoster} answers — empty is
+     * {@code none-eligible}, a group or a listed non-maker is {@code ok}.
+     * {@code unknown}: enumerating failed, a tampered record, or every enumerated non-maker holder is data-scoped.
      * {@code ok}: an enumerated non-maker holds it.
      */
     static String approverCheck(Path root, Map<String, Object> rec) {
@@ -246,7 +248,8 @@ final class ActionRequestRoutes implements RouteModule {
                 .anyMatch(r -> JobAuthority.capabilitiesNow(List.of(r), root).contains(capability));
         if (!anyRole) return NONE_ELIGIBLE;
         Map<String, List<String>> who = auth.principals(root).orElse(null);
-        if (who == null) return UNKNOWN;
+        // No principal directory (OIDC): the Space's approver roster decides (operator 2026-10-04, (6b)).
+        if (who == null) return ApproverRoster.check(root, makers);
         // decide also needs visible(): the linked object must pass the approver's data scope and row policy, which
         // is not evaluable here without their request. So a scoped holder, or any authored Access Policy, reads unknown.
         // Only AUTHORED Access Policies count; the seeded space-isolation policies (inspecto-policy) do not. Safe today:
@@ -414,6 +417,7 @@ final class ActionRequestRoutes implements RouteModule {
                 throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "four-eyes: '" + by + "' edited the Decision "
                         + "Rule that raised this action request and cannot " + (approve ? "approve" : "decline")
                         + " it — a different person must");
+            ApproverRoster.requireOnRoster(ex, root, (approve ? "approve" : "decline") + " an action request");
             rec.put(approve ? "approver" : "decidedBy", by);
             rec.put(approve ? "approvedAt" : "decidedAt", ActionRequests.now());
             rec.put("decisionReason", ApiContext.str(body, "reason"));

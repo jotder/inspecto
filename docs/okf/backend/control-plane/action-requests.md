@@ -67,8 +67,9 @@ lock, once per distinct maker set:
   holder is the author or a co-author. Today only **Demo sign-in** enumerates (`Authenticator.principals`, a default
   method returning empty; `DemoAuthenticator` lists exactly what it authenticates: the bound Space's
   `demo-users.toon` plus every hosted Space's via `DemoTokenRelay.known()`).
-- **`unknown`** — roles grant it but who holds them cannot be known: OIDC identities arrive as token claims only and
-  the server keeps no principal directory. Also `unknown` when enumerating fails (a corrupt `demo-users.toon`):
+- **Under OIDC (no principal directory) the Space's approver roster answers** (operator 2026-10-04, see
+  *Approver roster* below): an empty roster is `none-eligible`, a listed group or a listed non-maker user is `ok`.
+- **`unknown`** — enumerating fails (a corrupt `demo-users.toon`):
   logged at most once per root per 10 minutes, never a 500 — the request is already saved when the check runs.
 - **`none-eligible` on Personal** too: no Authenticator ⇒ no Subject ⇒ deciding is always 403. Its raise-time
   audit event is **INFO**, not WARN: it holds for every request by construction, so a warning would be noise.
@@ -79,7 +80,29 @@ lock, once per distinct maker set:
 - A pending record whose MAC fails reads `unknown` (its makers cannot be trusted).
 - ⚠ The built-in `space-isolation` policy (`inspecto-policy`) is not considered. It engages only when an IdP
   `space` claim is mapped, and the only Authenticator that enumerates principals, and so the only one that can yield
-  `ok`, is Demo sign-in, which carries no claims. Under OIDC the answer is already `unknown`.
+  `ok` from roles, is Demo sign-in, which carries no claims. Under OIDC the roster answers instead.
+
+### Approver roster (operator 2026-10-04)
+
+Under an Authenticator with no principal directory (`Authenticator.principals` empty — OIDC; a throwing directory
+counts too) eligibility is decided by a **per-Space approver roster**, `approvers.toon` in the Space's config root
+(`ApproverRoster`, `users: [...]`, `groups: [...]`). **One list per Space**, not per approval kind: both consumers
+decide on the same notion (the approve capability plus "not a maker"), so a per-kind split had nothing to key on.
+
+- **Enforced, not advisory**: approve / decline of an Action Request and of a Pending Change (maker-checker) add
+  `ApproverRoster.requireOnRoster` after the capability and four-eyes gates — 403 *"not on this Space's approver
+  roster"*. The capability gate and the maker-can-never-approve rule still apply on top (a listed maker is 403
+  four-eyes). Retry / mark-failed are not decisions and are not gated by it.
+- **Fail closed**: absent, empty or unreadable roster admits nobody. A caller is admitted by `Subject.id()` or by any
+  value of the `groups` Subject attribute — the IdP claim must be allowlisted in `roles.toon`
+  `identity.attributeClaims`.
+- **Demo sign-in keeps deciding on roles alone** (it enumerates); Personal has no Subject (already 403).
+- `GET /settings/approvers` (ungated, adds `applies`), `PUT /settings/approvers` (`canAdminister`, 422 on unknown
+  key / non-list / non-string / blank / control char / >256 chars / >500 entries; trimmed, de-duplicated; an absent
+  key keeps its list; audited `approver-roster.changed`). Reserved from import (`ReservedConfigPaths`), so a bundled
+  Space starts with an empty roster. Settings ▸ **Approvers** edits it.
+- ⚠ Draft promote four-eyes (Link Analysis) is **not** a consumer: it decides on Investigation member roles
+  (lead / reviewer), a different notion.
 
 At raise time only (`propose`, so the route and the `invoke-api` consequence alike), a `none-eligible` answer emits
 **one WARN audit event `action-request.no-eligible-approver`**; reads never re-emit. It is visibility only:
@@ -302,8 +325,6 @@ is a valid DNS name) but still never lifts loopback at connect time — the noti
 ## Deferred / known gaps
 
 - No per-request `path` below the Connection's base path: one Connection per endpoint.
-- Under OIDC `approverCheck` is `unknown`: telling whether a specific person holds `canApproveChanges` needs a
-  principal directory the server does not have (a product decision; `ASSURE-ACTION-REQUESTS-RESIDUALS-1`; if built, a per-Space approver roster, no IdP).
 - `inspecto`-module tests drive the dispatcher over a loopback **test** wire (it connects to the pinned address like
   the real one); the real wire's pinning, SNI / certificate verification and redirect refusal are pinned in
   `HttpWebhookSinkTransportTest` and `PinnedHttpTlsTest`.

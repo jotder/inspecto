@@ -271,6 +271,7 @@ final class PendingChangeRoutes implements RouteModule {
             if (Boolean.TRUE.equals(rec.get("fourEyes")) && by.equals(rec.get("author")))
                 throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "four-eyes: '" + rec.get("author")
                         + "' proposed this change and cannot " + (approve ? "approve" : "decline") + " it — a different person must");
+            ApproverRoster.requireOnRoster(ex, root, (approve ? "approve" : "decline") + " a pending change");
             String at = Instant.now().truncatedTo(ChronoUnit.SECONDS).toString();
 
             if (!approve) {

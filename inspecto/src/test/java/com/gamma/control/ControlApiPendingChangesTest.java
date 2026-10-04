@@ -68,6 +68,9 @@ class ControlApiPendingChangesTest {
         Authenticators.forTest(ex -> {
             String h = String.valueOf(ex.getRequestHeaders().getFirst("Authorization"));
             if ("Bearer noroles".equals(h)) return Optional.of(new Subject("nr-1", Set.of("canAuthorWorkbench")));
+            if ("Bearer grouped".equals(h))   // an IdP group claim (identity.attributeClaims: [groups])
+                return Optional.of(new Subject("grp-1", Roles.effective(ex).get("admin").capabilities(), null,
+                        Map.of("groups", List.of("ops", "change-board"))));
             String[] who = switch (h) {
                 case AUTHOR -> new String[] {"author-1", "pipeline-developer"};
                 case CHECKER -> new String[] {"checker-1", "admin"};
@@ -94,6 +97,7 @@ class ControlApiPendingChangesTest {
         System.setProperty("assist.write.root", writeRoot.toString());
         try {
             CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
+            seedApproverRoster(writeRoot);   // OIDC-shaped Authenticator: the Space's approver roster decides
             ControlApi api = new ControlApi(svc, 0);
             api.start();
             return new Ctx(svc, api, api.port(), writeRoot);
@@ -564,6 +568,7 @@ class ControlApiPendingChangesTest {
         System.setProperty("assist.write.root", root.toString());
         try {
             CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
+            seedApproverRoster(root);   // OIDC-shaped Authenticator: the Space's approver roster decides
             ControlApi api = new ControlApi(svc, 0);
             api.start();
             return new Ctx(svc, api, api.port(), root);
@@ -1081,6 +1086,54 @@ class ControlApiPendingChangesTest {
         }
     }
 
+    // ── approver roster (operator 2026-10-04, ASSURE-ACTION-REQUESTS-RESIDUALS-1 (6b)) ─────────────────────
+
+    @Test
+    void underAnIdpWithoutADirectoryOnlyTheRosterMayDecideAndAnEmptyRosterMeansNobody(@TempDir Path cfg, @TempDir Path tmp)
+            throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Ctx c = open(cfg, root)) {
+            policy(c, PACK_POLICY);
+            String id = propose(c, "p1");
+
+            data(send(c, "PUT", "/settings/approvers", "{\"users\":[],\"groups\":[]}", ADMIN), 200);
+            assertEquals("none-eligible", data(send(c, "GET", "/pending-changes/" + id, null, AUTHOR), 200)
+                    .get("approverCheck").asText(), "empty roster: nobody, never anyone");
+            HttpResponse<String> refused = send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER);
+            assertEquals(403, refused.statusCode(), refused.body());
+            assertTrue(refused.body().contains("approver roster"), refused.body());
+
+            data(send(c, "PUT", "/settings/approvers", "{\"users\":[\"author-1\"]}", ADMIN), 200);
+            assertEquals("none-eligible", data(send(c, "GET", "/pending-changes/" + id, null, AUTHOR), 200)
+                    .get("approverCheck").asText(), "the only listed approver is the maker");
+            HttpResponse<String> self = send(c, "POST", "/pending-changes/" + id + "/approve", "{}", SELF);
+            assertEquals(403, self.statusCode());
+            assertTrue(self.body().contains("four-eyes"), "on the roster, a maker still never approves their own");
+            assertEquals(403, send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER).statusCode(),
+                    "a capable admin who is not listed");
+
+            data(send(c, "PUT", "/settings/approvers", "{\"groups\":[\"change-board\"]}", ADMIN), 200);
+            assertEquals("ok", data(send(c, "GET", "/pending-changes/" + id, null, AUTHOR), 200)
+                    .get("approverCheck").asText());
+            JsonNode done = data(send(c, "POST", "/pending-changes/" + id + "/approve", "{}", "Bearer grouped"), 200);
+            assertEquals("approved", done.at("/pendingChange/status").asText(), done.toString());
+            assertEquals("grp-1", done.at("/pendingChange/decidedBy").asText());
+        }
+    }
+
+    @Test
+    void aDirectoryAuthenticatorKeepsDecidingOnRolesAlone(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Ctx c = open(cfg, root)) {
+            policy(c, PACK_POLICY);
+            String id = propose(c, "p1");
+            data(send(c, "PUT", "/settings/approvers", "{\"users\":[]}", ADMIN), 200);
+            enumerating(Authenticators.active().orElseThrow(), Map.of("checker-1", List.of("admin")));
+            assertEquals(200, send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER).statusCode(),
+                    "Demo sign-in enumerates its users: the roster does not apply");
+        }
+    }
+
     // ── approver check (ASSURE-ENTITY-LISTS-RESIDUALS-1 (4)) ────────────────────────────────────────
 
     /** Re-arm with an Authenticator that, like Demo sign-in, can enumerate its principals (id → roles). */
@@ -1099,8 +1152,8 @@ class ControlApiPendingChangesTest {
             String id = propose(c, "p1");
             Authenticator base = Authenticators.active().orElseThrow();
 
-            assertEquals("unknown", data(send(c, "GET", "/pending-changes/" + id, null, AUTHOR), 200)
-                    .get("approverCheck").asText(), "an IdP that cannot enumerate its principals cannot say");
+            assertEquals("ok", data(send(c, "GET", "/pending-changes/" + id, null, AUTHOR), 200)
+                    .get("approverCheck").asText(), "an IdP without a directory reads the Space's approver roster");
 
             enumerating(base, Map.of("author-1", List.of("admin"), "dev-2", List.of("pipeline-developer")));
             assertEquals("none-eligible", data(send(c, "GET", "/pending-changes/" + id, null, AUTHOR), 200)
@@ -1118,5 +1171,12 @@ class ControlApiPendingChangesTest {
             assertFalse(data(send(c, "GET", "/pending-changes/" + id, null, AUTHOR), 200).has("approverCheck"),
                     "only a pending change carries it");
         }
+    }
+
+    /** The Space's approver roster ({@link ApproverRoster}): every id this class's Authenticator mints. */
+    private static void seedApproverRoster(Path root) throws java.io.IOException {
+        java.nio.file.Files.createDirectories(root);
+        java.nio.file.Files.writeString(root.resolve(ApproverRoster.FILE), dev.toonformat.jtoon.JToon.encode(
+                java.util.Map.of("users", java.util.List.of("admin-1", "author-1", "checker-1", "checker-2", "dev-2", "nr-1", "ops-1", "plain-1", "ada", "dana"))));
     }
 }
