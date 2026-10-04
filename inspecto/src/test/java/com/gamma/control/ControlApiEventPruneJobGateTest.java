@@ -102,6 +102,22 @@ class ControlApiEventPruneJobGateTest {
         }
     }
 
+    /** ASSURE-AUDIT-CHAIN-RESIDUALS-1 (1): the anchor export is an administrator's job, and its out_dir is jailed. */
+    @Test
+    void theAuditAnchorExportJobIsAnAdministratorsAndItsOutDirIsJailed(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            String job = "{\"name\":\"anchors\",\"type\":\"maintenance\",\"task\":\"audit_anchor_export\",\"out_dir\":\"%s\"}";
+            HttpResponse<String> author = send(c, "POST", "/jobs", job.formatted("exports"), "Bearer author");
+            assertEquals(403, author.statusCode(), author.body());
+            assertTrue(author.body().contains("canAdminister"), author.body());
+            HttpResponse<String> escape = send(c, "POST", "/jobs",
+                    job.formatted(Path.of(System.getProperty("user.home")).resolve("zz-anchor-escape-probe").toString().replace("\\", "/")), "Bearer admin");
+            assertEquals(422, escape.statusCode(), escape.body());
+            HttpResponse<String> admin = send(c, "POST", "/jobs", job.formatted("exports"), "Bearer admin");
+            assertTrue(admin.statusCode() < 300, admin.body());
+        }
+    }
+
     @Test
     void anAuthorCannotTurnAJobIntoAnEventPruneThroughConfigWrite(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {

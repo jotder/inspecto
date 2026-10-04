@@ -616,7 +616,7 @@ final class AuditAnchors {
         return Instant.ofEpochMilli(e.ts()).atZone(ZoneOffset.UTC).toLocalDate();
     }
 
-    private static Object lock(Path root) {
+    static Object lock(Path root) {
         return LOCKS.computeIfAbsent(file(root).toAbsolutePath().normalize(), p -> new Object());
     }
 

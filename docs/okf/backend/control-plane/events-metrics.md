@@ -266,6 +266,25 @@ timestamp: 2026-07-16T00:00:00Z
     - ⛔ **On-box anchors do not defend against anyone who holds the key** (a local administrator can rewrite
       the store and re-sign every anchor). The defence against that party is the OFF-box copy: export
       `GET /audit/anchors` on a schedule to storage the Space's administrators cannot write, and compare.
+    - *The scheduled export is built* (`ASSURE-AUDIT-CHAIN-RESIDUALS-1` (1), 2026-10-04): the `maintenance` Job
+      task **`audit_anchor_export`** (`AuditAnchorExportProvider`, contributed through the
+      `MaintenanceTaskProvider` seam; the logic is `AuditAnchorExport`) appends the Space's signed
+      `audit-anchors.jsonl` lines VERBATIM — not re-signed, not reformatted, hashes and seq numbers only, never
+      entity data — to `<out_dir>/audit-anchors.jsonl`. `out_dir` is the operator's, resolved under the Space
+      config root and path-jailed like every Job path (a `*.secrets` directory is refused; `ConfigSafetyValidator`
+      checks it at authoring because `out_dir` is already a job path key). Authoring or running it needs
+      `canAdminister` (`JobRoutes.ADMINISTER_ONLY_TASKS`, like `event_prune`). **Fail closed, every refusal a
+      FAILED run:** no anchors yet; the source anchor file does not verify; the destination is not a regular
+      file, lacks a trailing newline, or its lines are not exactly the leading lines of the source (edited,
+      truncated, foreign) — never repaired or overwritten. **Append-only and idempotent:** only the lines the
+      destination lacks are appended and forced; a re-run with nothing new writes nothing. After a
+      `rebaseline` (source opens with a BREAK anchor and shares no line with the destination) the new epoch is
+      appended after the old. The destination file verifies with the Space's key through the same
+      `AnchorFile.firstProblem()` the on-box file gets, so a copy truncated at the head is caught. ⚠ A tail
+      truncation of the COPY is not visible to that check alone — the next run refuses it (lines no longer a
+      prefix) only if the source still holds more. **Deferred:** a Sink destination (the slice is a path only —
+      no credentials or cloud integration), and keeping the copy somewhere the Space's administrators cannot
+      write is the operator's deployment choice, not enforced here.
   - 🔴 **Round 3 (a second verification FAILED round 2, 2026-09-27):**
     - *The writer lock is checked by identity.* An OS lock guards a file, not a path — the lock file can be
       deleted while held and a second writer locks a new one. The lock now covers a byte far past a random token
@@ -311,7 +330,8 @@ timestamp: 2026-07-16T00:00:00Z
     crash window:* an anchor line is appended before the anchoring record's `latestMac` is updated; a crash
     between the two leaves the record naming the previous anchor, so removing that newest line in that window is
     not seen.
-  - **Residuals (not built):** a scheduled off-box anchor export target; the multi-pod `DbEventStore` has no
+  - **Residuals (not built):** (the scheduled off-box anchor export is built — `audit_anchor_export`, above;
+    its Sink destination is deferred); the multi-pod `DbEventStore` has no
     chain-writer lock (two pods linking one table fork the chain — filed on the board row); a `DbEventStore` shared by several pods gets one chain per process interleaved in
     one table (verifies as duplicates) and serves the chain reads through the `EventStore` keyset-walk defaults
     (linear per page); no offline checker tool ships (the JSON `/audit/export` carries every hashed field);

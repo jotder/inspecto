@@ -479,6 +479,7 @@ public final class JobService implements AutoCloseable {
                         ParameterDecl.optional("archive", ParamType.STRING, null, "backup_verify: one archive name · restore: the archive path"),
                         ParameterDecl.optional("all", ParamType.BOOLEAN, "false", "backup_verify: verify every archive, not just the newest"),
                         ParameterDecl.optional("target_dir", ParamType.STRING, null, "restore: destination directory"),
+                        ParameterDecl.optional("out_dir", ParamType.STRING, null, "audit_anchor_export: the operator-owned directory the signed audit anchors are appended to (under the Space config root, path-jailed)"),
                         ParameterDecl.optional("overwrite", ParamType.BOOLEAN, "false", "restore: replace existing files instead of blocking on conflicts"),
                         ParameterDecl.optional("min_age_days", ParamType.INTEGER, "1", "compact / file_repository_audit: quiet window in days"),
                         // Read by PartitionCompactor:59 but never declared until now — an authoring form

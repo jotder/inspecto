@@ -442,7 +442,7 @@ final class JobRoutes implements RouteModule {
                 && ADMINISTER_ONLY_TASKS.contains(c.opt("task", "").toLowerCase(java.util.Locale.ROOT));
     }
 
-    private static final java.util.Set<String> ADMINISTER_ONLY_TASKS = java.util.Set.of("event_prune", "restore");
+    private static final java.util.Set<String> ADMINISTER_ONLY_TASKS = java.util.Set.of("event_prune", "restore", "audit_anchor_export");
 
     private static JobConfig parseJob(Map<String, Object> body) {
         JobConfig cfg;
