@@ -216,6 +216,22 @@ class ControlApiInvTraversalTest {
     }
 
     @Test
+    void aMaxGapBoundsTheTimeBetweenConsecutiveEdges(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedWires(c);
+            String tc = "\"targetNode\":\"E\",\"temporalConstraint\":{\"timestampCol\":\"executed_at\",\"monotonic\":true,\"maxGapHours\":";
+            // A-B-D-E is 01:00, 02:00, 07:00: a 1 h then a 5 h gap.
+            assertEquals(List.of("A-B-D-E"), paths(ok(c, body(tc + "6}"))), "every gap fits 6 h");
+            assertEquals(List.of(), paths(ok(c, body(tc + "2}"))), "D→E follows B→D by 5 h; the same request without a gap finds it");
+            // 422s: a gap is a bound on a time-ORDERED path, and must be positive.
+            HttpResponse<String> noMonotonic = traverse(c.port, body("\"targetNode\":\"E\",\"temporalConstraint\":{\"timestampCol\":\"executed_at\",\"maxGapHours\":6}"));
+            assertEquals(422, noMonotonic.statusCode(), noMonotonic.body());
+            HttpResponse<String> negative = traverse(c.port, body(tc + "-1}"));
+            assertEquals(422, negative.statusCode(), negative.body());
+        }
+    }
+
+    @Test
     void aFilterPrunesEdgesBeforeTheWalk(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             seedWires(c);

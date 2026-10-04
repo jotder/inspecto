@@ -8769,6 +8769,21 @@
         "x-optional-module" : true
       }
     },
+    "/inv/pattern/temporal" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "POST /inv/pattern/temporal (generated skeleton)",
+        "operationId" : "postInvPatternTemporal",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
     "/expectations/{expectationId}/baseline/accept" : {
       "post" : {
         "tags" : [ "expectations" ],

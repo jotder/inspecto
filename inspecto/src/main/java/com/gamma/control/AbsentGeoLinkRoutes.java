@@ -45,6 +45,7 @@ final class AbsentGeoLinkRoutes implements RouteModule {
             {"POST", "/inv/schema/overlap-profile"},
             {"POST", "/inv/traversal/recursive-paths"},
             {"POST", "/inv/pattern/branching"},
+            {"POST", "/inv/pattern/temporal"},
             {"GET",  "/inv/value-measures"},
             {"POST", "/inv/snapshots"},
             {"GET",  "/inv/snapshots"},

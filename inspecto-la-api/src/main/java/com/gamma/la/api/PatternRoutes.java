@@ -1,6 +1,7 @@
 package com.gamma.la.api;
 
 import com.gamma.la.core.LinkEventTypes;
+import com.gamma.la.core.LinkTemporalDetector;
 import com.gamma.la.core.BranchingPatternEngine;
 import com.gamma.la.core.PatternQueryCompiler;
 import com.gamma.la.core.DatasetProviders;
@@ -22,7 +23,12 @@ import com.sun.net.httpserver.HttpExchange;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -61,6 +67,159 @@ public final class PatternRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.post("/inv/pattern/branching", (e, m) -> branching(api, e, api.body(e)));
+        api.post("/inv/pattern/temporal", (e, m) -> temporal(api, e, api.body(e)));
+    }
+
+    // ── POST /inv/pattern/temporal — burst / periodicity over each link's event times ─────────────────────────────
+
+    static final int TEMPORAL_MAX_ROWS = 200_000;
+    private static final int TEMPORAL_DEFAULT_LIMIT = 200;
+    private static final int TEMPORAL_MAX_LIMIT = 1_000;
+    private static final long DAY_SECONDS = 86_400;
+
+    /**
+     * {@code POST /inv/pattern/temporal} — body {@code {dataset, sourceCol, targetCol, timeCol, mode: "burst"|"periodicity",
+     * filter?, limit?, windowSeconds?, minEvents?, maxCv?}}. The series is the event times of one LINK (a directed
+     * source→target pair, the values as the Dataset spells them); {@code burst} takes {@code windowSeconds} (default 60, 1 to
+     * 86 400) and {@code minEvents} (default 5, 2 to 1 000), {@code periodicity} takes {@code minEvents} (default 5, 3 to 1 000)
+     * and {@code maxCv} (default 0.1, 0 to 1). Rows without a parseable time are skipped and counted ({@code skippedNoTime}).
+     *
+     * <p>Same gates as {@code /inv/pattern/branching} (write root 503 → body 422 → Dataset 404 by the view gate → unknown column
+     * 422 → filter 422), plus D-U7 four-eyes ({@link InvRoutes#refuseIfSensitive}) for the rows it may read. Fences: one bound
+     * statement of at most {@value #TEMPORAL_MAX_ROWS} rows (more ⇒ {@code rowCapped}, {@code truncated}), a
+     * {@value #TIMEOUT_SECONDS} s timeout, a result limit. Read-shaped: persists nothing, audited as
+     * {@code LINK_PATTERN_MATCHED}. Output is endpoints and times the Dataset's own viewer could read - it never adds a column.
+     */
+    private Object temporal(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "temporal pattern");
+        String datasetId = ApiContext.str(body, "dataset");
+        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
+        String sourceCol = ident(body, "sourceCol", true);
+        String targetCol = ident(body, "targetCol", true);
+        String timeCol = ident(body, "timeCol", true);
+        String mode = ApiContext.str(body, "mode");
+        if (!"burst".equals(mode) && !"periodicity".equals(mode))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'mode' must be 'burst' or 'periodicity'");
+        boolean burst = mode.equals("burst");
+        long windowMs = 1000L * (long) boundedNumber(body, "windowSeconds", 60, 1, DAY_SECONDS);
+        int minEvents = (int) boundedNumber(body, "minEvents", 5, burst ? 2 : 3, 1_000);
+        double maxCv = boundedNumber(body, "maxCv", 0.1, 0, 1);
+        int limit = (int) boundedNumber(body, "limit", TEMPORAL_DEFAULT_LIMIT, 1, TEMPORAL_MAX_LIMIT);
+        for (String k : body.keySet())
+            if (!TEMPORAL_KEYS.contains(k))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown field '" + k + "'");
+
+        String relationSql = InvRoutes.relationFor(api, ex, writeRoot, datasetId);
+        List<String> columns = InvRoutes.relationColumns(datasetId, relationSql);
+        for (String col : List.of(sourceCol, targetCol, timeCol))
+            if (!InvRoutes.containsIgnoreCase(columns, col))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
+        String filterSql = body.get("filter") == null ? "TRUE" : InvRoutes.checkedFilterSql(body.get("filter"), columns, datasetId);
+        InvRoutes.refuseIfSensitive(writeRoot, "a temporal scan (up to " + TEMPORAL_MAX_ROWS + " rows)", TEMPORAL_MAX_ROWS, 0);
+
+        String sql = "SELECT CAST(\"" + sourceCol + "\" AS VARCHAR) AS s, CAST(\"" + targetCol + "\" AS VARCHAR) AS t,"
+                + " epoch_ms(TRY_CAST(CAST(\"" + timeCol + "\" AS VARCHAR) AS TIMESTAMP)) AS ts FROM \"" + datasetId + "\""
+                + " WHERE \"" + sourceCol + "\" IS NOT NULL AND \"" + targetCol + "\" IS NOT NULL AND (" + filterSql + ")"
+                + " ORDER BY s, t, ts";
+        SqlSandboxPolicy policy = SqlSandboxPolicy.withCaps(null, 0, TIMEOUT_SECONDS);
+        try {
+            DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
+                    datasetId, relationSql, sql, TEMPORAL_MAX_ROWS, 0, List.of(), List.of(), List.of()), policy);
+
+            List<Found> found = new ArrayList<>();
+            int skipped = 0;
+            String curS = null, curT = null;
+            long[] times = new long[64];
+            int n = 0;
+            for (Map<String, Object> row : r.rows()) {                       // rows arrive grouped by link, times ascending
+                String s = String.valueOf(row.get("s")), t = String.valueOf(row.get("t"));
+                if (curS != null && (!s.equals(curS) || !t.equals(curT))) {
+                    collect(found, curS, curT, Arrays.copyOf(times, n), burst, windowMs, minEvents, maxCv);
+                    n = 0;
+                }
+                curS = s;
+                curT = t;
+                if (!(row.get("ts") instanceof Number ts)) {
+                    skipped++;
+                    continue;
+                }
+                if (n == times.length) times = Arrays.copyOf(times, n * 2);
+                times[n++] = ts.longValue();
+            }
+            if (curS != null) collect(found, curS, curT, Arrays.copyOf(times, n), burst, windowMs, minEvents, maxCv);
+
+            // strongest first, so a result cut to the limit keeps the most telling: bursts by event count, series by regularity
+            Comparator<Found> strongest = burst ? Comparator.comparingLong((Found f) -> -f.events())
+                    : Comparator.comparingDouble(Found::cv).thenComparingLong(f -> -f.events());
+            found.sort(strongest.thenComparing(Found::s).thenComparing(Found::t).thenComparingLong(Found::startMs));
+            boolean limited = found.size() > limit;
+            List<Map<String, Object>> results = new ArrayList<>();
+            for (Found f : found.subList(0, Math.min(limit, found.size()))) results.add(f.view());
+
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("mode", mode);
+            out.put("results", results);
+            out.put("truncated", limited || r.truncated());
+            out.put("rowCapped", r.truncated());
+            out.put("skippedNoTime", skipped);
+            out.put("timeNote", "Times are the Dataset's own wall-clock values read as written, in UTC-neutral milliseconds; "
+                    + "gaps are exact differences of those values, so a time column read in a zone other than UTC is compared as stored");
+            Map<String, Object> f = new LinkedHashMap<>();
+            f.put("maxRows", TEMPORAL_MAX_ROWS);
+            f.put("maxResults", TEMPORAL_MAX_LIMIT);
+            f.put("timeoutMs", TIMEOUT_SECONDS * 1000);
+            out.put("fences", f);
+            audit(ex, datasetId, results.size(), limited || r.truncated(), null);
+            return out;
+        } catch (SQLException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "temporal query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+        }
+    }
+
+    private static final Set<String> TEMPORAL_KEYS = Set.of("dataset", "sourceCol", "targetCol", "timeCol", "mode", "filter", "limit",
+            "windowSeconds", "minEvents", "maxCv");
+
+    /** The Dataset's wall-clock value back as text: no zone is claimed, since none is known (see {@code timeNote}). */
+    private static String wall(long epochMs) {
+        return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMs), ZoneOffset.UTC).toString();
+    }
+
+    private record Found(String s, String t, long events, double cv, long startMs, Map<String, Object> view) { }
+
+    /** One link's series, evaluated; each burst / regular series found is appended to {@code out}. */
+    private static void collect(List<Found> out, String s, String t, long[] times, boolean burst, long windowMs, int minEvents, double maxCv) {
+        if (burst) {
+            for (LinkTemporalDetector.Burst b : LinkTemporalDetector.bursts(times, windowMs, minEvents)) {
+                Map<String, Object> v = new LinkedHashMap<>();
+                v.put("source", s);
+                v.put("target", t);
+                v.put("start", wall(b.startMs()));
+                v.put("end", wall(b.endMs()));
+                v.put("events", b.events());
+                out.add(new Found(s, t, b.events(), 0, b.startMs(), v));
+            }
+            return;
+        }
+        LinkTemporalDetector.Periodic p = LinkTemporalDetector.periodicity(times, minEvents, maxCv);
+        if (p == null) return;
+        Map<String, Object> v = new LinkedHashMap<>();
+        v.put("source", s);
+        v.put("target", t);
+        v.put("events", p.events());
+        v.put("periodSeconds", p.periodMs() / 1000.0);
+        v.put("cv", p.cv());
+        v.put("first", wall(p.firstMs()));
+        v.put("last", wall(p.lastMs()));
+        out.add(new Found(s, t, p.events(), p.cv(), p.firstMs(), v));
+    }
+
+    /** A numeric body field within {@code [min, max]}, defaulted when absent; anything else is a 422 (never silently clamped). */
+    private static double boundedNumber(Map<String, Object> body, String key, double def, double min, double max) {
+        Object v = body.get(key);
+        if (v == null) return def;
+        if (!(v instanceof Number n) || n.doubleValue() < min || n.doubleValue() > max)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + key + "' must be a number from " + js(min) + " to " + js(max));
+        return n.doubleValue();
     }
 
     private Object branching(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {

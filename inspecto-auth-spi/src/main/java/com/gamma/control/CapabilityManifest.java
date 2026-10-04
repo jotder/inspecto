@@ -469,6 +469,7 @@ final class CapabilityManifest {
             new Exemption("POST", "/inv/schema/overlap-profile", "read-shaped", "profiles column cardinality/overlap; persists nothing"),
             new Exemption("POST", "/inv/traversal/recursive-paths", "read-shaped", "walks paths over a Dataset (LA-11); persists nothing"),
             new Exemption("POST", "/inv/pattern/branching", "read-shaped", "matches a branching motif over a Dataset (LA-14b); persists nothing"),
+            new Exemption("POST", "/inv/pattern/temporal", "read-shaped", "burst / periodicity over a Dataset's link event times; persists nothing"),
             new Exemption("POST", "/inv/investigations/([^/]+)/replay", "read-shaped", "re-evaluates a sealed Investigation log (LA-10); persists nothing"),
             new Exemption("POST", "/inv/investigations/([^/]+)/dossier/verify", "read-shaped", "checks a Dossier manifest against the store (LA-12); persists nothing"),
             new Exemption("POST", "/inv/investigations/([^/]+)/dossier/bundle/verify", "read-shaped", "checks an exported Dossier bundle's seal, references and custody against the store (D-6); persists nothing"),

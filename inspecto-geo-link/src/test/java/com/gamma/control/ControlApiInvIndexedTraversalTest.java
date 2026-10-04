@@ -233,7 +233,9 @@ class ControlApiInvIndexedTraversalTest {
             equivalent(c, req("g_ds", "A", d2 + ",\"temporalConstraint\":{\"timestampCol\":\"ts\",\"monotonic\":true}"));            // B->D (03:00) precedes A->B edges
             equivalent(c, req("g_ds", "A", d2 + ",\"temporalConstraint\":{\"timestampCol\":\"ts\",\"maxTotalDurationHours\":30}"));
             equivalent(c, req("g_ds", "A", d2 + ",\"direction\":\"UNDIRECTED\",\"weightCol\":\"w\",\"temporalConstraint\":{\"timestampCol\":\"ts\",\"monotonic\":true,\"maxTotalDurationHours\":48}"));
-            String kindCall = "{\"kind\":\"group\",\"op\":\"AND\",\"items\":[{\"kind\":\"condition\",\"field\":\"kind\",\"operator\":\"=\",\"value\":\"call\"}]}";
+            equivalent(c, req("g_ds", "A", d2 + ",\"temporalConstraint\":{\"timestampCol\":\"ts\",\"monotonic\":true,\"maxGapHours\":3}"));      // A-B 01:00 then B-D 03:00 is a 2 h gap
+            equivalent(c, req("g_ds", "A", d2 + ",\"direction\":\"UNDIRECTED\",\"temporalConstraint\":{\"timestampCol\":\"ts\",\"monotonic\":true,\"maxGapHours\":30,\"maxTotalDurationHours\":48}"));
+            String kindCall ="{\"kind\":\"group\",\"op\":\"AND\",\"items\":[{\"kind\":\"condition\",\"field\":\"kind\",\"operator\":\"=\",\"value\":\"call\"}]}";
             equivalent(c, req("g_ds", "A", d2 + ",\"filter\":" + kindCall));                       // a filter on an indexed (kind) column
             String attrOrKind = "{\"kind\":\"group\",\"op\":\"OR\",\"items\":[{\"kind\":\"condition\",\"field\":\"c\",\"operator\":\"=\",\"value\":\"y\"},"
                     + "{\"kind\":\"condition\",\"field\":\"s\",\"operator\":\"=\",\"value\":\"C\"},{\"kind\":\"condition\",\"field\":\"kind\",\"operator\":\"isNull\"}]}";

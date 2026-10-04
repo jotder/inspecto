@@ -144,7 +144,7 @@ class IndexAppendTest {
                 n++;
                 if (!key.matches("N(0|1|2|5|9|17|30|44)|n0|nobody")) continue;                  // a walk returns every path: a sample keeps the test quick
                 for (boolean undirected : new boolean[] {false, true}) {
-                    IndexedTraversal.Params p = new IndexedTraversal.Params(key, null, undirected, 2, 1_000_000, 100_000, false, false, null, null);
+                    IndexedTraversal.Params p = new IndexedTraversal.Params(key, null, undirected, 2, 1_000_000, 100_000, false, false, null, null, null);
                     Object x = walk(a, p), y = walk(b, p);
                     assertEquals(x, y, "traversal " + key + " undirected=" + undirected);
                     n++;
