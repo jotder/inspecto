@@ -1,6 +1,6 @@
 <!--
   ACTIVE PLAN — docs/superpower/
-  Created 2026-10-04. DESIGN ONLY — no code. Decisions D-IS1…D-IS12 answered 2026-10-04 (section 11); S0 and S1 are next. Retire per the three-tier lifecycle
+  Created 2026-10-04. DESIGN ONLY — no code. Decisions D-IS1…D-IS12 answered 2026-10-04 (section 11); S0 and S1 are next. BACKLOG row: `LA-INVESTIGATION-STORE-DESIGN-1`. Retire per the three-tier lifecycle
   once the InvestigationStore seam ships: distil the as-built facts into okf/frontend/features/link-analysis.md, move leftovers
   to BACKLOG.md, then git mv this file to archived-documents/plans-archive/.
 -->
