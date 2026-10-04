@@ -25,6 +25,7 @@ import {
     RecursivePathsResult,
 } from '@inspecto/link-analysis/api/inv.service';
 import { apiErrorMessage } from '@inspecto/core/api';
+import type { ConditionGroup } from '@inspecto/core/query/query-types';
 import { firstValueFrom } from 'rxjs';
 import { CHART_CATEGORICAL_NEUTRAL } from '@inspecto/core/theme/chart-tokens';
 import type { LaDatasets } from '@inspecto/link-analysis/la-host';
@@ -398,6 +399,7 @@ export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGr
         type: EntityTypeRef | undefined,
         label?: string | null,
         category?: string | null,
+        attrs?: Record<string, string | null>,
     ) => {
         if (type) types.set(type.id, type);
         const id = typedOrEntityId(type, undefined, value);
@@ -406,6 +408,7 @@ export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGr
         if (node) {
             addSpelling(node, value);
             node.data.provenance = addTo(node.data.provenance, provenance);
+            if (attrs) node.data.attrs = { ...attrs, ...node.data.attrs };
             return id;
         }
         if (nodes.size >= projectionNodeCapValue()) {
@@ -419,13 +422,14 @@ export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGr
             provenance: [provenance],
         };
         if (category) data.color = categoryColor(category);
+        if (attrs) data.attrs = { ...attrs };
         nodes.set(id, { id, data });
         return id;
     };
 
     for (const n of res.nodes) {
         const v = String(n.id ?? '').trim();
-        if (v) ensure(v, n.__provenance_dataset, n.entityType, n.label, n.category);
+        if (v) ensure(v, n.__provenance_dataset, n.entityType, n.label, n.category, n.attrs);
     }
     for (const t of res.edges) {
         const s = String(t.source ?? '').trim();
@@ -458,7 +462,23 @@ export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGr
     return { nodes: [...nodes.values()], edges: [...edges.values()], truncated, mappings: res.mappings, idMappings };
 }
 
-/** The LA-08 GraphSource: one `POST /inv/projection/multi` call per query. No incremental expand (yet). */
+/** The most raw spellings of one node an expand reads per edge mapping — each is one `/inv/projection/neighbors` call. */
+const MAX_EXPAND_SPELLINGS = 8;
+
+/** The request filter AND the edge mapping's own filter — the two the multi projection applies to an edge mapping. */
+export function edgeFilter(
+    top: ConditionGroup | undefined,
+    own: ConditionGroup | undefined,
+): ConditionGroup | undefined {
+    const parts = [top, own].filter((g): g is ConditionGroup => !!g && g.items.length > 0);
+    return parts.length < 2 ? parts[0] : { kind: 'group', op: 'AND', items: parts };
+}
+
+/**
+ * The LA-08 GraphSource: one `POST /inv/projection/multi` call per query. Incremental expand reads each EDGE
+ * mapping's one-hop neighbourhood of the node's raw spellings through `POST /inv/projection/neighbors` (the same
+ * mapping, its own `filter` ANDed with the request's) and folds the answers exactly as a query does.
+ */
 export class MultiProjectionGraphSource implements GraphSource {
     readonly id = 'entity-projection-multi' as const;
     readonly label = 'Entity/Link (several Datasets)';
@@ -474,6 +494,56 @@ export class MultiProjectionGraphSource implements GraphSource {
             return projectMultiResult(res);
         } catch (err) {
             throw new Error(invErrorMessage(err, 'The multi-Dataset projection failed.'), { cause: err });
+        }
+    }
+
+    async expand(
+        _nodeId: string,
+        nodeLabel: string,
+        q: GraphSourceQuery,
+        spellings?: string[],
+    ): Promise<MultiProjectedGraph> {
+        const edgeMappings = q.multi?.edges ?? [];
+        if (!edgeMappings.length) throw new Error('Expand needs at least one edge mapping.');
+        const values = (spellings?.length ? spellings : [nodeLabel]).slice(0, MAX_EXPAND_SPELLINGS);
+        const calls = edgeMappings.flatMap((m) => values.map((value) => ({ m, value })));
+        try {
+            const answers = await Promise.all(
+                calls.map(({ m, value }) =>
+                    firstValueFrom(
+                        this.inv.neighbors({
+                            dataset: m.dataset,
+                            sourceCol: m.sourceColumn,
+                            targetCol: m.targetColumn,
+                            attrCols: m.attributes?.length ? m.attributes : undefined,
+                            filter: edgeFilter(q.filter, m.filter),
+                            value,
+                        }),
+                    ),
+                ),
+            );
+            return projectMultiResult({
+                nodes: [],
+                edges: answers.flatMap((a, i) => {
+                    const m = calls[i].m;
+                    return a.rows.map((t) => ({
+                        ...t,
+                        kind: m.type ?? null,
+                        __provenance_dataset: m.dataset,
+                        sourceType: a.columnTypes?.[m.sourceColumn],
+                        targetType: a.columnTypes?.[m.targetColumn],
+                    }));
+                }),
+                mappings: calls.map(({ m }, i) => ({
+                    dataset: m.dataset,
+                    role: 'edge' as const,
+                    rows: answers[i].rows.length,
+                    truncated: answers[i].truncated,
+                })),
+                truncated: answers.some((a) => a.truncated),
+            });
+        } catch (err) {
+            throw new Error(invErrorMessage(err, 'The multi-Dataset expand failed.'), { cause: err });
         }
     }
 }

@@ -131,6 +131,10 @@ export class TransferMenuComponent {
                     if (res.missing.length)
                         this.toastr.warning(`Unresolved references left out: ${res.missing.join(', ')}`);
                     if (res.absent.length) this.toastr.warning(`Not found on this instance: ${res.absent.join(', ')}`);
+                    if (res.converted.length)
+                        this.toastr.warning(
+                            `Exported changed (a Live item cannot leave its Space): ${res.converted.join(', ')}`,
+                        );
                 });
         });
     }

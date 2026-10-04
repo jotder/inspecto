@@ -109,6 +109,20 @@ describe('InvestigationSessionStore (LA-10)', () => {
         expect((inv.createInvestigation.mock.calls[0] as unknown[])[0]).toMatchObject({ timeCol: 'call_ts' });
     });
 
+    it('start sends the time column zone only together with its column (the server refuses a lone zone)', async () => {
+        const { store, inv } = setup();
+        await store.start(P, 'warrant 7', '', 'call_ts', 'Asia/Riyadh');
+        expect((inv.createInvestigation.mock.calls[0] as unknown[])[0]).toMatchObject({
+            timeCol: 'call_ts',
+            timeColZone: 'Asia/Riyadh',
+        });
+        await store.start(P, 'warrant 7', '', '', 'Asia/Riyadh');
+        expect((inv.createInvestigation.mock.calls[1] as unknown[])[0]).not.toHaveProperty(
+            'timeColZone',
+            'Asia/Riyadh',
+        );
+    });
+
     it('start → seed → undo: the op log and the Working Set follow each step', async () => {
         const { store, inv, logs, sets } = setup();
 

@@ -7,7 +7,15 @@ import { MatInputModule } from '@angular/material/input';
 import type { ExpandRung } from '@inspecto/link-analysis/api/inv.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
-import { EXPAND_DIRECTIONS, MAX_EXPAND_BUDGET, rungForm, rungOf } from './investigation-rung-form';
+import { InvestigationWindowFieldsComponent } from './investigation-window-fields.component';
+import {
+    EXPAND_DIRECTIONS,
+    MAX_EXPAND_BUDGET,
+    MAX_LINK_KINDS,
+    rungForm,
+    rungOf,
+    windowForm,
+} from './investigation-rung-form';
 
 /**
  * LA-SPA-OWED-SURFACES-1 — the expand form's **Advanced** section: the hop-ladder rung fields (plan §2.4) the
@@ -27,6 +35,7 @@ import { EXPAND_DIRECTIONS, MAX_EXPAND_BUDGET, rungForm, rungOf } from './invest
         MatInputModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
+        InvestigationWindowFieldsComponent,
     ],
     host: { class: 'block' },
     template: `
@@ -54,6 +63,22 @@ import { EXPAND_DIRECTIONS, MAX_EXPAND_BUDGET, rungForm, rungOf } from './invest
             </mat-form-field>
             <inspecto-option-picker label="Direction" formControlName="direction" [options]="directionOptions" />
             <inspecto-option-picker label="Time window" formControlName="window" [options]="windowOptions" />
+            @if (form.controls.window.value === 'override') {
+                <div class="rounded-md border p-2" style="border-color: var(--gamma-border)">
+                    <p class="text-secondary m-0 mb-1 text-xs">
+                        This rung only — the Investigation's own window is not changed.
+                    </p>
+                    <inspecto-la-window-fields [form]="override"></inspecto-la-window-fields>
+                </div>
+            }
+            <mat-form-field class="w-full" subscriptSizing="dynamic">
+                <mat-label>Link kinds</mat-label>
+                <input matInput formControlName="linkKinds" placeholder="call, sms" />
+                <mat-hint>Comma-separated; blank = all kinds. Needs the Investigation's link-kind column.</mat-hint>
+                @if (form.controls.linkKinds.invalid) {
+                    <mat-error>At most {{ maxKinds }} kinds.</mat-error>
+                }
+            </mat-form-field>
             <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>Minimum events per link</mat-label>
                 <input matInput type="number" formControlName="minEvents" placeholder="1" />
@@ -113,17 +138,23 @@ export class InvestigationExpandRungComponent {
     readonly windowOptions: PickerOption[] = [
         { value: 'inherit', label: "The Investigation's window" },
         { value: 'full', label: 'All time' },
+        { value: 'override', label: 'A window for this rung…' },
     ];
+    /** The rung's own window (`window: {from, to, slot, days, timezone}`), read only while the picker says so. */
+    readonly override = windowForm();
+    readonly maxKinds = MAX_LINK_KINDS;
 
     /** The rung to send, or null when a field is out of the server's bounds (the section opens on the errors). */
     rung(): ExpandRung | null {
         this.error.set('');
-        if (this.form.invalid) {
+        const overriding = this.form.controls.window.value === 'override';
+        if (this.form.invalid || (overriding && this.override.invalid)) {
             this.form.markAllAsTouched();
+            if (overriding) this.override.markAllAsTouched();
             this.open.set(true);
             return null;
         }
-        return rungOf(this.form);
+        return rungOf(this.form, this.override);
     }
 
     /** The server's refusal, verbatim. */

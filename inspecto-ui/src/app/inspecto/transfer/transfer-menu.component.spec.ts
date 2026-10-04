@@ -17,11 +17,19 @@ const WIDGET: BundleItem = {
     content: { vizType: 'bar', datasetId: 'cdr_sample', controls: {} },
 };
 
-function create(opts: { afterClosed?: unknown; canAuthor?: boolean; importDraft?: boolean } = {}) {
+function create(
+    opts: { afterClosed?: unknown; canAuthor?: boolean; importDraft?: boolean; converted?: string[] } = {},
+) {
     const download = vi.fn();
+    const toastr = { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() };
     // U-F (2026-08-01): export now goes through `POST /bundle/export`, so it is asynchronous.
     const buildExport = vi.fn((selected: BundleItem[]) =>
-        of({ bundle: { items: selected } as never, missing: [] as string[], absent: [] as string[] }),
+        of({
+            bundle: { items: selected } as never,
+            missing: [] as string[],
+            absent: [] as string[],
+            converted: opts.converted ?? [],
+        }),
     );
     const loadAll = vi.fn(() => of([WIDGET, { kind: 'dataset', id: 'cdr_sample', content: {} }] as BundleItem[]));
     const open = vi.fn(() => ({ afterClosed: () => of(opts.afterClosed ?? 0) }));
@@ -31,7 +39,7 @@ function create(opts: { afterClosed?: unknown; canAuthor?: boolean; importDraft?
             provideNoopAnimations(),
             { provide: BundleTransferService, useValue: { loadAll, buildExport, download } },
             { provide: MatDialog, useValue: { open } },
-            { provide: ToastrService, useValue: { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() } },
+            { provide: ToastrService, useValue: toastr },
             { provide: LensService, useValue: { canAuthorWorkbench: signal(opts.canAuthor !== false) } },
         ],
     });
@@ -39,7 +47,7 @@ function create(opts: { afterClosed?: unknown; canAuthor?: boolean; importDraft?
     fixture.componentRef.setInput('items', [{ kind: 'widget', id: 'cost_by_tariff' }]);
     if (opts.importDraft) fixture.componentRef.setInput('importDraft', true);
     fixture.detectChanges();
-    return { fixture, c: fixture.componentInstance, download, buildExport, loadAll, open };
+    return { fixture, c: fixture.componentInstance, download, buildExport, loadAll, open, toastr };
 }
 
 describe('TransferMenuComponent', () => {
@@ -49,6 +57,18 @@ describe('TransferMenuComponent', () => {
         expect(loadAll).toHaveBeenCalled();
         expect(buildExport).toHaveBeenCalledWith([WIDGET], expect.arrayContaining([WIDGET]), false);
         expect(download).toHaveBeenCalled();
+    });
+
+    it('says so when the server exported an item changed (a Live Working Set Widget leaves Frozen)', () => {
+        const { c, toastr } = create({ converted: ['widget/cost_by_tariff (LIVE to FROZEN)'] });
+        c.exportThisOnly();
+        expect(toastr.warning).toHaveBeenCalledWith(expect.stringContaining('widget/cost_by_tariff (LIVE to FROZEN)'));
+    });
+
+    it('stays quiet about conversion when nothing was converted', () => {
+        const { c, toastr } = create();
+        c.exportThisOnly();
+        expect(toastr.warning).not.toHaveBeenCalled();
     });
 
     it('exports with dependencies, resolving against the whole instance', () => {

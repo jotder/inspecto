@@ -17,6 +17,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import { QueryConditionGroupComponent } from '@inspecto/core/query/query-condition-group.component';
+import { ColumnMeta, ConditionGroup, emptyGroup } from '@inspecto/core/query/query-types';
+import { cloneGroup, hasConditions } from '@inspecto/link-analysis/graph/graph-filter';
 import { PipelineSummary } from '@inspecto/core/api';
 import { EntityProjection, GraphSource, GraphSourceId, GraphSourceQuery } from '@inspecto/core/graph';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
@@ -56,6 +59,7 @@ export interface QuerySummaryItem {
         MatSelectModule,
         LaHostSlotComponent,
         InspectoOptionPickerComponent,
+        QueryConditionGroupComponent,
     ],
     templateUrl: './link-analysis-query-panel.component.html',
 })
@@ -120,6 +124,9 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
     readonly edgeMappings = this.fb.array<FormGroup>([]);
     readonly nodeMappingColumns = signal<PickerOption[][]>([]);
     readonly edgeMappingColumns = signal<PickerOption[][]>([]);
+    /** Each edge mapping's own `filter` tree (the condition editor mutates it in place) and the typed columns it may name. */
+    readonly edgeFilters = signal<ConditionGroup[]>([]);
+    readonly edgeFilterColumns = signal<ColumnMeta[][]>([]);
     /** The optional label column's choices — a blank-valued "none" first, per the picker idiom. */
     readonly nodeLabelColumnOptions = computed<PickerOption[][]>(() =>
         this.nodeMappingColumns().map((cols) => [{ value: '', label: '—' }, ...cols]),
@@ -184,20 +191,28 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
 
     /** Add an LA-08 node mapping row: Dataset · id column · label column? · category?. */
     addNodeMapping(): FormGroup {
-        const group = this.fb.nonNullable.group({ datasetId: [''], idColumn: [''], labelColumn: [''], category: [''] });
+        const group = this.fb.nonNullable.group({
+            datasetId: [''],
+            idColumn: [''],
+            labelColumn: [''],
+            category: [''],
+            attributes: [[] as string[]],
+        });
         this.pushMultiRow(this.nodeMappings, this.nodeMappingColumns, group);
         return group;
     }
 
-    /** Add an LA-08 edge mapping row: Dataset · source column · target column · link type?. */
+    /** Add an LA-08 edge mapping row: Dataset · source column · target column · link type? · attributes? · filter?. */
     addEdgeMapping(): FormGroup {
         const group = this.fb.nonNullable.group({
             datasetId: [''],
             sourceColumn: [''],
             targetColumn: [''],
             type: [''],
+            attributes: [[] as string[]],
         });
-        this.pushMultiRow(this.edgeMappings, this.edgeMappingColumns, group);
+        this.pushMultiRow(this.edgeMappings, this.edgeMappingColumns, group, this.edgeFilterColumns);
+        this.edgeFilters.update((all) => [...all, emptyGroup()]);
         return group;
     }
 
@@ -209,6 +224,8 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
     removeEdgeMapping(i: number): void {
         this.edgeMappings.removeAt(i);
         this.edgeMappingColumns.update((all) => all.filter((_, idx) => idx !== i));
+        this.edgeFilterColumns.update((all) => all.filter((_, idx) => idx !== i));
+        this.edgeFilters.update((all) => all.filter((_, idx) => idx !== i));
     }
 
     /** Append a row whose Dataset pick loads its column choices — resolved by the row's CURRENT index. */
@@ -216,14 +233,19 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
         rows: FormArray<FormGroup>,
         columns: WritableSignal<PickerOption[][]>,
         group: FormGroup,
+        meta?: WritableSignal<ColumnMeta[][]>,
     ): void {
         group.controls['datasetId'].valueChanges.subscribe(async (id: string) => {
-            const opts = (await this.columnsForDataset(id)).map((c) => ({ value: c, label: c }));
+            const cols = await this.columnMetaForDataset(id);
+            const opts = cols.map((c) => ({ value: c.name, label: c.name }));
             const i = rows.controls.indexOf(group);
-            if (i >= 0) columns.update((all) => all.map((c, idx) => (idx === i ? opts : c)));
+            if (i < 0) return;
+            columns.update((all) => all.map((c, idx) => (idx === i ? opts : c)));
+            meta?.update((all) => all.map((c, idx) => (idx === i ? cols : c)));
         });
         rows.push(group);
         columns.update((all) => [...all, []]);
+        meta?.update((all) => [...all, []]);
     }
 
     private async onDatasetPicked(id: string): Promise<void> {
@@ -232,9 +254,13 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
 
     /** The columns a mapping row's Dataset select should offer — declared, else probed from the store. */
     private async columnsForDataset(id: string): Promise<string[]> {
+        return (await this.columnMetaForDataset(id)).map((c) => c.name);
+    }
+
+    /** The same columns with their types — what a mapping's own `filter` tree may name. */
+    private async columnMetaForDataset(id: string): Promise<ColumnMeta[]> {
         const ds = this.datasets().find((d) => d.id === id);
-        if (!ds) return [];
-        return (await this.datasetRows.columns(ds)).map((c) => c.name);
+        return ds ? this.datasetRows.columns(ds) : [];
     }
 
     /** The query the current form + source amounts to (also what a saved view persists). */
@@ -280,13 +306,19 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
                             idColumn: m.idColumn,
                             labelColumn: m.labelColumn || undefined,
                             category: m.category.trim() || undefined,
+                            attributes: m.attributes.length ? m.attributes : undefined,
                         })),
-                        edges: edgeRows.map((m) => ({
-                            dataset: m.datasetId,
-                            sourceColumn: m.sourceColumn,
-                            targetColumn: m.targetColumn,
-                            type: m.type.trim() || undefined,
-                        })),
+                        edges: edgeRows.map((m, i) => {
+                            const own = this.edgeFilters()[i];
+                            return {
+                                dataset: m.datasetId,
+                                sourceColumn: m.sourceColumn,
+                                targetColumn: m.targetColumn,
+                                type: m.type.trim() || undefined,
+                                attributes: m.attributes.length ? m.attributes : undefined,
+                                filter: own && hasConditions(own) ? cloneGroup(own) : undefined,
+                            };
+                        }),
                     },
                 };
             }
@@ -350,16 +382,22 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
                 idColumn: m.idColumn,
                 labelColumn: m.labelColumn ?? '',
                 category: m.category ?? '',
+                attributes: m.attributes ?? [],
             });
         }
-        for (const m of query.multi?.edges ?? []) {
+        this.edgeFilterColumns.set([]);
+        this.edgeFilters.set([]);
+        (query.multi?.edges ?? []).forEach((m, i) => {
             this.addEdgeMapping().patchValue({
                 datasetId: m.dataset,
                 sourceColumn: m.sourceColumn,
                 targetColumn: m.targetColumn,
                 type: m.type ?? '',
+                attributes: m.attributes ?? [],
             });
-        }
+            if (m.filter)
+                this.edgeFilters.update((all) => all.map((g, idx) => (idx === i ? cloneGroup(m.filter!) : g)));
+        });
         this.extraMappings.clear();
         this.extraMappingColumns.set([]);
         for (const m of extras) {

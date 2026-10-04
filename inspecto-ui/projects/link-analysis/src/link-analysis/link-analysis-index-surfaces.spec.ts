@@ -20,7 +20,11 @@ import { WorkingSet } from '@inspecto/link-analysis/api/inv.service';
 import { EntityProjection } from '@inspecto/core/graph';
 import { buildServerIdMap } from './graph-run-apply';
 import { workingSetToGraph } from './investigation-state';
-import { LinkAnalysisIndexBuildComponent, indexBuildErrorMessage } from './link-analysis-index-build.component';
+import {
+    LinkAnalysisIndexBuildComponent,
+    indexBuildCancelMessage,
+    indexBuildErrorMessage,
+} from './link-analysis-index-build.component';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 
 /** LA-INDEX-SPA-SURFACES-1: the toolbox hosts for `egoNetwork` and seeds-only `degreeCentrality`, and the build `mode` control. */
@@ -108,6 +112,7 @@ function runsMock(over: Record<string, unknown> = {}) {
         cancel: vi.fn(),
         startBuild: vi.fn(),
         watchBuild: vi.fn(),
+        cancelBuild: vi.fn(),
         ...over,
     };
 }
@@ -331,6 +336,110 @@ describe('LinkAnalysisIndexBuildComponent - the build mode control', () => {
 
     it('is axe-clean', async () => {
         const { fixture } = makeBuild();
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
+describe('LinkAnalysisIndexBuildComponent - cancel and a new mapping (LA-INDEX-SPA-SURFACES-1)', () => {
+    it('offers Cancel only while the build is queued or running, asks the server, and ends on CANCELLED', () => {
+        const stream = new Subject<LinkIndexBuildView>();
+        const runs = runsMock({
+            startBuild: vi.fn(() => of(bv())),
+            watchBuild: vi.fn(() => stream),
+            cancelBuild: vi.fn(() => of({ buildId: 'b1', status: 'RUNNING', cancelRequested: true })),
+        });
+        const { q, fixture } = makeBuild({ runs });
+        expect(q('cancel-build')).toBeNull();
+        q('start-build')!.click();
+        fixture.detectChanges();
+        q('cancel-build')!.click();
+        fixture.detectChanges();
+        expect(runs.cancelBuild).toHaveBeenCalledWith('b1');
+        expect((q('cancel-build') as HTMLButtonElement).disabled).toBe(true);
+        expect(q('build-progress')!.textContent).toContain('Cancelling');
+        // the polling that was already running reads the terminal state - never FAILED, never "done"
+        stream.next(bv({ status: 'CANCELLED' }));
+        fixture.detectChanges();
+        expect(fixture.nativeElement.textContent).toContain('The build was cancelled.');
+        expect(q('cancel-build')).toBeNull();
+        expect(q('build-done')).toBeNull();
+    });
+
+    it('puts a refused cancel in words and lets the analyst try again', () => {
+        const err = new HttpErrorResponse({ status: 409 });
+        const runs = runsMock({
+            startBuild: vi.fn(() => of(bv({ status: 'RUNNING' }))),
+            watchBuild: vi.fn(() => new Subject<LinkIndexBuildView>()),
+            cancelBuild: vi.fn(() => throwError(() => err)),
+        });
+        const { q, fixture } = makeBuild({ runs });
+        q('start-build')!.click();
+        fixture.detectChanges();
+        q('cancel-build')!.click();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.textContent).toContain('had already finished');
+        expect((q('cancel-build') as HTMLButtonElement).disabled).toBe(false);
+        expect(indexBuildCancelMessage(new HttpErrorResponse({ status: 404 }))).toContain('not found');
+        expect(indexBuildCancelMessage(new HttpErrorResponse({ status: 403 }))).toContain(
+            'starter or an administrator',
+        );
+        expect(indexBuildCancelMessage(new Error('x'))).toContain('could not be cancelled');
+    });
+
+    it('builds a NEW mapping in full from the chosen columns, instead of the listed index', () => {
+        const runs = runsMock({
+            startBuild: vi.fn((_r: LinkIndexBuildRequest) => of(bv())),
+            watchBuild: vi.fn(() => new Subject()),
+        });
+        const { q, fixture, el } = makeBuild({ runs });
+        expect(el.querySelector('inspecto-schema-form')).toBeNull();
+        (q('new-mapping') as HTMLInputElement).click();
+        fixture.detectChanges();
+        expect(el.querySelector('inspecto-schema-form')).not.toBeNull();
+        expect(el.querySelector('[data-testid="mode-help"]')).toBeNull(); // append / compact do not apply to a new mapping
+        expect(q('new-mapping-help')!.textContent).toContain('always built in full');
+        const form = fixture.componentInstance['mappingForm']()!;
+        form.form.patchValue({
+            dataset: 'wires',
+            sourceCol: 'from',
+            targetCol: 'to',
+            timeCol: 'ts',
+            timeColZone: 'Asia/Riyadh',
+            attrCols: ['ch'],
+        });
+        q('start-build')!.click();
+        expect(runs.startBuild).toHaveBeenCalledWith({
+            dataset: 'wires',
+            sourceCol: 'from',
+            targetCol: 'to',
+            timeCol: 'ts',
+            timeColZone: 'Asia/Riyadh',
+            attrCols: ['ch'],
+            mode: 'full',
+        });
+    });
+
+    it('does not start a new mapping until its Dataset and two columns are given', () => {
+        const runs = runsMock({ startBuild: vi.fn() });
+        const { q, fixture } = makeBuild({ runs });
+        (q('new-mapping') as HTMLInputElement).click();
+        fixture.detectChanges();
+        q('start-build')!.click();
+        expect(runs.startBuild).not.toHaveBeenCalled();
+    });
+
+    it('with index support on but no index listed, goes straight to choosing a mapping', () => {
+        const { q, el } = makeBuild({ list: { enabled: true, indexes: [] } as unknown as LinkIndexList });
+        expect(q('no-index')).toBeNull();
+        expect(q('new-mapping')).toBeNull(); // nothing to choose against: the form is the only way
+        expect(el.querySelector('inspecto-schema-form')).not.toBeNull();
+        expect(q('start-build')).not.toBeNull();
+    });
+
+    it('is axe-clean with the mapping form open', async () => {
+        const { q, fixture } = makeBuild();
+        (q('new-mapping') as HTMLInputElement).click();
+        fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
     });
 });

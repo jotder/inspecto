@@ -806,9 +806,9 @@ export interface ValueMeasureBlock {
     timeCol: string;
     from?: string;
     to?: string;
-    /** Parallel backend lane (not yet shipped): a rolling window `<N>h` | `<N>d` in place of `from`/`to`. */
+    /** A rolling window `<N>h` | `<N>d` in place of `from`/`to` (exclusive with them), resolved in UTC at read time. */
     last?: string;
-    /** Parallel backend lane (not yet shipped): restrict the Measure to the members of an Entity List. */
+    /** `cashOutConcentration` only: restrict the agents to the live members of an Entity List of Entity Type `agent`. */
     agentList?: string;
     [threshold: string]: string | number | string[] | undefined;
 }
@@ -826,6 +826,8 @@ export interface ValueMeasureResult {
     measure: ValueMeasureBlock;
     /** The thresholds in force, in words. */
     threshold: string;
+    /** The `[from, to)` this read resolved — for a rolling `last`, against the server clock (UTC). */
+    window?: { from: string; to: string; timezone: string };
     entities: Record<string, unknown>[];
     count: number;
     /** The answer was capped at `fences.maxEntities` — more entities breach than are listed. */

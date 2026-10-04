@@ -28,6 +28,7 @@ import { apiErrorMessage } from '@inspecto/core/api';
 import { WORKING_SET_PLUGIN } from '@inspecto/core/viz/plugins/view.plugins';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { expandFallbackNote, idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
@@ -95,6 +96,9 @@ export class LinkAnalysisInvestigationComponent {
     readonly timeCol = input('');
     /** LA-13: the Investigation's event-time column — windows and the coverage read need one (else 422). */
     readonly timeColumn = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] });
+    /** The IANA zone a naive TIMESTAMP time column is in; blank = UTC (the server records that explicitly). */
+    readonly timeColumnZone = new FormControl('', { nonNullable: true });
+    readonly timeZones: PickerOption[] = timeZoneOptions('UTC (default)');
 
     readonly title = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] });
     /** D-U5: the stated purpose / legal basis — required by the server, recorded and shown in the Dossier, not enforced. */
@@ -208,8 +212,17 @@ export class LinkAnalysisInvestigationComponent {
         const p = this.projection();
         if (!p || this.title.invalid || this.purpose.invalid) return;
         const timeCol = this.timeColumn.value.trim() || this.timeCol();
-        if (await this.store.start(p, this.purpose.value.trim(), this.title.value.trim(), timeCol)) {
+        if (
+            await this.store.start(
+                p,
+                this.purpose.value.trim(),
+                this.title.value.trim(),
+                timeCol,
+                this.timeColumnZone.value,
+            )
+        ) {
             this.timeColumn.reset('');
+            this.timeColumnZone.reset('');
             this.title.reset('');
             this.purpose.reset('');
         }

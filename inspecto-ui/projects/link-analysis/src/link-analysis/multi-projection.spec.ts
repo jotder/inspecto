@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { InvService, MultiProjectionResult, RecursivePathsResult } from '@inspecto/link-analysis/api/inv.service';
 import { G6GraphData, entityId } from '@inspecto/core/graph';
+import type { ConditionGroup } from '@inspecto/core/query/query-types';
 import {
     MultiProjectionGraphSource,
+    edgeFilter,
     invErrorMessage,
     projectMultiResult,
     recursivePathsToGraph,
@@ -210,5 +212,124 @@ describe('MultiProjectionGraphSource + invErrorMessage', () => {
         const g = await new MultiProjectionGraphSource(inv).query({ multi, filter });
         expect(sent).toEqual({ ...multi, filter });
         expect(g.truncated).toBe(false);
+    });
+});
+
+const tree = (field: string, value: string): ConditionGroup => ({
+    kind: 'group',
+    op: 'AND',
+    items: [{ kind: 'condition', field, operator: '=', value }],
+});
+
+describe('MultiProjectionGraphSource - node attributes, edge filter and expand (LA-SPA-OWED-SURFACES-1)', () => {
+    it('carries a node mapping attributes onto the node, merged across the mappings that name it', () => {
+        const g = projectMultiResult({
+            nodes: [
+                { id: 'ACME', label: null, category: 'company', attrs: { city: 'Oslo' }, __provenance_dataset: 'a' },
+                {
+                    id: 'acme',
+                    label: null,
+                    category: 'company',
+                    attrs: { city: 'Bergen', tier: '1' },
+                    __provenance_dataset: 'b',
+                },
+            ],
+            edges: [],
+            mappings: [],
+            truncated: false,
+        });
+        expect(g.nodes).toHaveLength(1);
+        // first mapping wins a clashing key; a key only the second names is added
+        expect(g.nodes[0].data.attrs).toEqual({ city: 'Oslo', tier: '1' });
+    });
+
+    it('ANDs the request filter with the edge mapping own filter, dropping empty trees', () => {
+        const a = tree('x', '1');
+        const b = { ...tree('y', '2'), op: 'OR' as const };
+        const empty = { kind: 'group' as const, op: 'AND' as const, items: [] };
+        expect(edgeFilter(undefined, undefined)).toBeUndefined();
+        expect(edgeFilter(a, empty)).toBe(a);
+        expect(edgeFilter(empty, b)).toBe(b);
+        expect(edgeFilter(a, b)).toEqual({ kind: 'group', op: 'AND', items: [a, b] });
+    });
+
+    it('expands through every edge mapping with its own columns, attributes and combined filter, and folds the answers', async () => {
+        const calls: Record<string, unknown>[] = [];
+        const inv = {
+            neighbors: (req: Record<string, unknown>) => {
+                calls.push(req);
+                return of({
+                    rows: [
+                        {
+                            source: 'Acme',
+                            target: req['dataset'] === 'wires' ? 'Cy' : 'Dee',
+                            kind: null,
+                            count: 2,
+                            attrs: { ch: 'x' },
+                        },
+                    ],
+                    truncated: req['dataset'] === 'wires',
+                });
+            },
+        } as unknown as InvService;
+        const top = tree('x', '1');
+        const own = tree('y', '2');
+        const multi = {
+            nodes: [],
+            edges: [
+                {
+                    dataset: 'calls',
+                    sourceColumn: 'a',
+                    targetColumn: 'b',
+                    type: 'called',
+                    attributes: ['ch'],
+                    filter: own,
+                },
+                { dataset: 'wires', sourceColumn: 's', targetColumn: 't' },
+            ],
+        };
+        const g = await new MultiProjectionGraphSource(inv).expand('n', 'Acme (label)', { multi, filter: top }, [
+            'Acme',
+            'ACME',
+        ]);
+        // two edge mappings x two raw spellings, never the label
+        expect(calls).toHaveLength(4);
+        expect(calls[0]).toMatchObject({
+            dataset: 'calls',
+            sourceCol: 'a',
+            targetCol: 'b',
+            attrCols: ['ch'],
+            value: 'Acme',
+        });
+        expect(calls[0]['filter']).toEqual({ kind: 'group', op: 'AND', items: [top, own] });
+        expect(calls[2]).toMatchObject({
+            dataset: 'wires',
+            sourceCol: 's',
+            targetCol: 't',
+            attrCols: undefined,
+            value: 'Acme',
+        });
+        expect(calls[2]['filter']).toBe(top);
+        // the folded answer: a constant link type from the mapping, provenance per Dataset, truncation carried
+        expect(g.truncated).toBe(true);
+        const called = g.edges.find((e) => e.data.provenance?.includes('calls'))!;
+        expect(called.data.kind).toMatch(/^called/); // folded across the two spellings of the node
+        expect(called.data.attrs).toEqual({ ch: 'x' });
+        expect(g.mappings.map((m) => m.dataset)).toEqual(['calls', 'calls', 'wires', 'wires']);
+    });
+
+    it('refuses an expand with no edge mapping, and names a failed read as a refusal of the whole expand', async () => {
+        const inv = {
+            neighbors: () => throwError(() => new HttpErrorResponse({ status: 404 })),
+        } as unknown as InvService;
+        const src = new MultiProjectionGraphSource(inv);
+        await expect(src.expand('n', 'x', { multi: { nodes: [], edges: [] } })).rejects.toThrow(
+            /at least one edge mapping/,
+        );
+        await expect(
+            src.expand('n', 'x', {
+                multi: { nodes: [], edges: [{ dataset: 'd', sourceColumn: 'a', targetColumn: 'b' }] },
+            }),
+        ).rejects.toThrow(/not available to you/);
     });
 });

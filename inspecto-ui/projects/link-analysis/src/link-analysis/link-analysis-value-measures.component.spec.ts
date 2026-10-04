@@ -10,7 +10,7 @@ import { InvService, InvestigationHeader, ValueMeasureResult } from '@inspecto/l
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/grid';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisValueMeasuresComponent } from './link-analysis-value-measures.component';
-import { valueMeasureQuery } from './value-measures';
+import { valueMeasureQuery, valueMeasureWindowIssue } from './value-measures';
 
 const HEADER: InvestigationHeader = {
     id: 'inv-1',
@@ -198,5 +198,62 @@ describe('LinkAnalysisValueMeasuresComponent', () => {
         await run();
         expect(el.querySelector('form[aria-label="Watch this value Measure"]')).toBeNull();
         expect(el.textContent).toContain('Open an Investigation');
+    });
+
+    it('runs over a rolling window, sends `last` and no From/To, and states the window the server resolved', async () => {
+        const { el, inv, fill, run } = setup();
+        inv.valueMeasures.mockReturnValueOnce(
+            of({
+                measure: { name: 'passThrough', valueCol: 'amount', timeCol: 'ts', last: '7d' },
+                threshold: 'in >= 1000',
+                window: { from: '2026-09-27T10:00:00', to: '2026-10-04T10:00:00', timezone: 'UTC' },
+                entities: [],
+                count: 0,
+                truncated: false,
+                rowsInWindow: 5,
+                unvalued: 0,
+            }),
+        );
+        fill({ valueCol: 'amount', timeCol: 'ts', last: '7d' });
+        await run();
+        const q = inv.valueMeasures.mock.calls[0][0] as unknown as Record<string, unknown>;
+        expect(q['last']).toBe('7d');
+        expect(q).not.toHaveProperty('from');
+        expect(q).not.toHaveProperty('to');
+        const w = el.querySelector('[data-test="window"]')!.textContent!;
+        expect(w).toContain('2026-09-27T10:00:00 to 2026-10-04T10:00:00 (UTC)');
+        expect(w).toContain('rolling, the last 7d');
+    });
+
+    it('refuses a window that is both fixed and rolling, or missing, before any call', async () => {
+        const { el, inv, fill, run } = setup();
+        fill({ valueCol: 'amount', timeCol: 'ts', from: '2026-09-01', to: '2026-09-08', last: '24h' });
+        await run();
+        expect(inv.valueMeasures).not.toHaveBeenCalled();
+        expect(el.textContent).toContain('not both');
+    });
+});
+
+describe('valueMeasureWindowIssue and agentList', () => {
+    it('demands exactly one window, as the server does', () => {
+        expect(valueMeasureWindowIssue({ from: '2026-09-01', to: '2026-09-08' })).toBeNull();
+        expect(valueMeasureWindowIssue({ last: '24h' })).toBeNull();
+        expect(valueMeasureWindowIssue({ from: '2026-09-01', last: '24h' })).toContain('not both');
+        expect(valueMeasureWindowIssue({ from: '2026-09-01' })).toContain('both From and To');
+        expect(valueMeasureWindowIssue({ from: ' ', last: '' })).toContain('Give a window');
+    });
+
+    it('sends agentList only for cash-out concentration, and never another Measure', () => {
+        const base = {
+            dataset: 'd',
+            sourceCol: 's',
+            targetCol: 't',
+            valueCol: 'v',
+            timeCol: 'ts',
+            last: '7d',
+            agentList: 'agents',
+        };
+        expect(valueMeasureQuery({ ...base, name: 'cashOutConcentration' })['agentList']).toBe('agents');
+        expect(valueMeasureQuery({ ...base, name: 'passThrough' })).not.toHaveProperty('agentList');
     });
 });

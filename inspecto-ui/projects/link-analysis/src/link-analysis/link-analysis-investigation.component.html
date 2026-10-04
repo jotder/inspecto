@@ -91,6 +91,12 @@
                     }}.</mat-hint
                 >
             </mat-form-field>
+            <inspecto-option-picker
+                label="Time column zone (optional)"
+                [formControl]="timeColumnZone"
+                [options]="timeZones"
+                help="The zone a plain TIMESTAMP time column is read in. A column that already carries a zone refuses one."
+            />
             <button
                 mat-flat-button
                 color="primary"

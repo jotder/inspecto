@@ -427,7 +427,12 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   `[from, to)` it read. `cashOutConcentration` takes an optional `agentList` — an Entity List of Entity Type
   `agent` (other type 422, unknown 404, retired 409) — restricting the answered agents to its live exact members
   under the list's sealed normaliser (the share's denominator stays all cash-out); a masked list answers its own
-  tokens, never raw values.
+  tokens, never raw values. **SPA (2026-10-04):** the form takes a rolling *Or the last* window (`7d` / `24h`; From/To
+  became optional and `valueMeasureWindowIssue` refuses both-or-neither before any call, as the server's exactly-one
+  rule does) and states the `[from, to)` UTC the server resolved (`window`, with "rolling, the last 7d"); for
+  *Cash-out concentration* an *Agent list* autocomplete lists non-retired Entity Lists of Entity Type `agent`
+  (suggestions only — a missing list capability leaves it free text). `last` and `agentList` travel only where they
+  apply, and *Watch* binds the answered `measure` block verbatim, so a rolling window stays rolling.
 
 * **Settings ▸ Link Analysis** (2026-09-30, `settings/link-analysis-settings.component`): the four-eyes thresholds
   (`fourEyesBudgetAbove`, `fourEyesFanOutAbove`), `mergedDistinctCap` with `mergedDistinctCapInForce`, and
@@ -633,7 +638,17 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   and their own provenance. The per-mapping `mappings[]` summary renders under the canvas alerts with each
   mapping's own `truncated`. A 404 — one Dataset unknown OR not viewable — reads as a refusal of the WHOLE
   query with no partial graph (`invErrorMessage`); a 422 shows the server's reason. ⚠ Deliberately not
-  wired: node/edge `attributes`, per-edge `filter` authoring, and incremental expand on this source.
+  wired until 2026-10-04, now shipped (`LA-SPA-OWED-SURFACES-1`): each node mapping and edge mapping row has an
+  *Attribute columns* multi-select (`attributes`), and each edge mapping its own *Filter* (the shared condition
+  editor over that Dataset's typed columns — an empty tree sends no `filter`; the pushed request filter still applies
+  to EVERY edge mapping, the row's own narrows only it). A node mapping's attribute values (RAW) land on the node
+  (`data.attrs`, merged across the mappings that name it, first mapping wins a clashing key) and show as rows in the
+  node detail dialog; an edge's attributes split a folded pair as on the single-mapping path. **Expand** now works on
+  this source: `MultiProjectionGraphSource.expand` reads each EDGE mapping's one-hop neighbourhood of the node's raw
+  spellings (`GraphSource.expand`'s new optional 4th argument, `data.spellings`, at most 8 per mapping) through
+  `POST /inv/projection/neighbors` — the same Dataset, columns and `attributes`, `filter` = the request filter ANDed
+  with the mapping's own, link type = the mapping's constant `type` — and folds the answers with
+  `projectMultiResult`, so an expanded edge has the same id as a queried one and merges rather than duplicates.
   ⚠ The existing `entity-projection` multi-mapping path (N × `/inv/projection`, type-scoped ids) is
   unchanged — the two coexist.
 
@@ -704,13 +719,19 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   `snapshot`, calendar exclusions, comparison mode and time-respecting paths remain
   deferred. **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
   settings* (`investigation-expand-rung.component`) sends `budget` (1–20 000; the server CLAMPS above, so the SPA
-  refuses) · `direction` · rung `window` (`inherit`/`full` only — no override object) · `minEvents` ·
+  refuses) · `direction` · rung `window` (`inherit` · `full` · *A window for this rung…*, an override object) · `linkKinds`
+  (comma-separated, trimmed and deduplicated, at most 100; blank = all kinds; the server 422s it without an Investigation
+  link-kind column) · `minEvents` ·
   `minDistinctDays` · `candidateDegreeMin/Max` (min ≤ max) · `maxFanOut`, only the fields set (blank = server
   default), to BOTH expand buttons; per-rung `truncated` stays the existing *Incomplete Working Set* alert. The
   *Time window* form (`investigation-window-op.component`) appends a `window` op: ISO instants WITH offset/Z,
   an `HH:mm` slot (a crossing-midnight note), a day mask, an IANA zone from `time-zones.ts` — required with a slot
   or mask, client-side as on the server — or *All time* (`'full'`). Bounds live in `investigation-rung-form.ts`;
-  a server 422 still renders verbatim in each form. ⏳ Not wired: rung `linkKinds`, a rung window override object.
+  a server 422 still renders verbatim in each form. The window FIELDS are one component
+  (`investigation-window-fields.component`) shared by the `window` op form and the rung override, so both send the
+  same object the server validates (`from`/`to` with an offset, an `HH:mm` slot, a day mask, an IANA zone required
+  with a slot or mask); the override applies to that rung only and an *Investigation's window* choice later ignores
+  whatever the override still holds. *(Both shipped 2026-10-04, `LA-SPA-OWED-SURFACES-1` closed.)*
   `seedBy` / `excludeBy` shipped 2026-09-26
   over Entity Lists (`LA-17`, design §4.4) — see the Entity Lists paragraph below.
 * **The Investigation tab drives it** (LA-10 SPA half, 2026-09-23): the right dock's third tab
@@ -823,7 +844,9 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   **Live** reads the head and states the drift since the pin; the tile always shows *Frozen*/*Live*. It stores no
   rows and reads only the Investigation-scoped route, so a dashboard viewer who is not the owner sees *Not
   available to you*. ⛔ A Live Widget cannot leave the Space: the Exchange refuses Working Set Widgets (Frozen too,
-  per D-E7), a bundle export converts Live → Frozen at its pin (`converted`). As-built:
+  per D-E7), a bundle export converts Live → Frozen at its pin (`converted`; the SPA's export — the Transfer menu and the
+  Transfer page — reads `converted` from `POST /bundle/export` and warns `Exported changed (a Live item cannot leave
+  its Space): widget/<id> (live to frozen)`, because the downloaded copy is not what was selected). As-built:
   `docs/archived-documents/plans-archive/link-analysis-backlog-plan.md` §5.9.
 * **Annotation and the coverage indicator** (LA-19; backend 2026-09-24 in `InvestigationRoutes` /
   `InvestigationEvaluator` / `InvestigationCoverageRoutes`, SPA half the same day in the Investigation panel).
@@ -839,8 +862,10 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   or says every day has data; it always states that per-Collector coverage is not assessed
   (`collectors.assessed:false`). A result is shown only while its Investigation is the open one. ⚠ The route
   needs a `timeCol` in the header and a bounded window: *Start Investigation* sends `timeCol` (since 2026-10-03)
-  from its optional *Time column* field, else the canvas time slider's column (`[timeCol]` input); `timeColZone`
-  is not asked (a naive TIMESTAMP is recorded as UTC). Without either, or before a `window` op bounds the
+  from its optional *Time column* field, else the canvas time slider's column (`[timeCol]` input); *Start
+  Investigation* also asks *Time column zone (optional)* (an IANA zone; blank = UTC, recorded explicitly) and sends
+  `timeColZone` only together with a time column — the server refuses a lone zone, and a `TIMESTAMPTZ` column
+  refuses one in its own 422, shown verbatim. Without either, or before a `window` op bounds the
   window, coverage still answers 422, shown verbatim.
 * **Purpose, masking, four-eyes** (LA-19 operator decisions 2026-09-24, D-U5/D-U6/D-U7 — decision record in
   `docs/archived-documents/plans-archive/link-analysis-backlog-plan.md` §4). *Start Investigation* now REQUIRES a *Purpose / legal
@@ -1109,7 +1134,15 @@ The edge/node index of a Dataset ([`la-separation-d3-design.md`](../../../archiv
 * **Neighbours and Investigation `expand` (step 6, as built 2026-10-03).** Same switch, same view gate, same staleness gate (`IndexedRead.select`, shared with `recursive-paths`). `POST /inv/projection/neighbors` folds the value's rows on the `out` copy (as source) and the `in` copy (as target), counting a self-loop once, in the flat order `cnt DESC, source, target`, cut at `limit` (`truncated` as before); it needs the `linkKindCol`, every `attrCols` entry and every `filter` field to be indexed columns, and adds `source` (`{kind:'index',...}` or `{kind:'dataset', reason}`) to the body. An Investigation `expand` is answered from the index only for a SIMPLE rung (no `window`, `minDistinctDays`, candidate degree bound or merged traversal; at most 20 distinct frontier entities): it reproduces the CTE's fold per (source, target, kind), `excluded`, `linkKinds`, direction (incl. `reciprocal`), `minEvents`, per-anchor `maxFanOut` rank with `fanOutCapped`, and the budget cut, so the sealed `fingerprint` (`sha256(canonical(rows))`) is identical on both paths. When the index answered, the sealed read carries `read.index = {version, stale, fingerprint}` BESIDE the fingerprint, never inside it; a non-simple rung (`rung_not_indexable`) or any failure keeps the flat CTE. `replay` is unchanged; `replay` with `reread` adds `indexVersionSealed` / `indexVersionNow` to a drift row (only when either is set) and `diverged` stays about the fingerprint alone. Audit: `link.expanded` and `link.investigation.stepped` gain `source` / `indexVersion` / `indexStale` (stepped only when the index answered).
 * **Graph Run from the index (step 7, as built 2026-10-03).** `POST /inv/graph/runs` takes `input: "workingSet"` (default, byte-identical to before) or `"index"`. With `index` the body adds `dataset`, `sourceCol`, `targetCol`, `linkKindCol?` and, for `degreeCentrality`, `seeds` (1..20); only `neighborhood` (hops <= 2), `egoNetwork` and a SEEDS-ONLY `degreeCentrality` run (engine id `index`, `GET /inv/graph/algorithms` lists `engines` per algorithm). `GraphInput` is sealed (`Materialised` | `IndexRef`); `RoutingGraphEngine` routes by input type, never as a fallback. Every case the index cannot serve exactly is a stated 422 (`index_disabled`, `no_index`, unfit mapping / column, `index_stale_refused`, non-native algorithm, hops > 2, seeds > 20, `at`, an Investigation that hides entities); a walk past 20 looked-up keys per level (the final induced-edge pass included) ends `BUDGET_EXCEEDED` / `INDEX_CAP` naming the cap. The pre-work size check uses the seeds' degrees; the answer is measured afterwards against the same budget. The response adds `source` and `input.kind: "index"` (estimated sizes); the cache key carries the index version; audit `link.graph.run.*` gains `source` / `indexVersion`. Result order is canonical-v1 (nodes and edges by id). Detail and deferrals: `archived-documents/plans-archive/la-separation-d3-design.md` section 5.6.
 * **SPA: Run on index (as built 2026-10-03).** `LinkAnalysisServerRunComponent` offers **Run on index** only when the catalogue `engines` of its algorithm include `index` AND `GET /inv/index` (`GraphRunsService.loadIndexes`, signal `indexes`) says `enabled` with at least one index; otherwise the button is absent, never disabled-with-a-fallback. It sends `input: "index"` with the index's OWN `dataset` / `mapping.sourceCol` / `targetCol` / `kindCol` (as `linkKindCol`) and `seeds` for `degreeCentrality` only; several indexes give an Index picker. Client-side fences state themselves before sending (hops > 2, seeds 0 or > 20, no Investigation, no capability). The Explain tab of the toolbox hosts it for `neighborhood` (`indexOnly`: no Working Set button). An index answer is NOT applied to the canvas (no apply path for GRAPH / seeds scores): the control states the version (`source.version`), a stale chip when `source.stale` (and beside the button when the listed index is stale), and a node / link or top-score summary. A 422 is put in words by `indexRefusalMessage` (reason codes, hops, seeds, `at`, hidden entities) followed by the server's own sentence, and the run is never repeated on the Working Set. Specs: `link-analysis-server-run.index.spec.ts`.
-* **SPA index surfaces (`LA-INDEX-SPA-SURFACES-1`, as built 2026-10-03).** The Explain tab of the toolbox hosts three index-only `LinkAnalysisServerRunComponent`s: `neighborhood` (hops), `egoNetwork` (the same Node, no hops) and a seeds-only `degreeCentrality` over a **Node to score** picker (Add node, removable chips, 1..20, the server ids from `serverIds`; none picked states why). A new **Edge index** tool (`LinkAnalysisIndexBuildComponent`, gated by the new lens `canBuildLinkIndex`, an identity capability with no Access-Catalog node) lists the index with its version, deltas, stale chip and the `plan` advice (recommended mode, counts, reasons, samples), a **Build mode** radio fieldset (`full` | `append` | `compact`, preselected from the advice, `full` when `none`) and **Build index**, which `POST`s `/inv/index/builds` with the index's OWN mapping plus `mode`, polls `GET /inv/index/builds/{id}` (`GraphRunsService.startBuild` / `watchBuild`) and refreshes `GET /inv/index` on COMPLETED. The advice never blocks: a mode the server cannot apply is its 409 in words (`indexBuildErrorMessage`), never retried as another mode. The Investigation panel states, in one non-blocking `role="status"` sentence (`expandFallbackNote`), why the last `expand` was answered by the flat Dataset: the sealed read carries `read.fallback = {reason, details?}` (the same closed reason vocabulary as `source.reason`; only when the flat Dataset answered an expand that could have tried the index, BESIDE the fingerprint and never in the sealed state hash, so old logs replay identically), and the audit event `link.investigation.stepped` gains `fallbackReason`. Deferred: cancelling a build from the SPA, choosing a NEW mapping (only a listed index is rebuilt). Specs: `link-analysis-index-surfaces.spec.ts`. Not driven live: the index routes need a Professional-edition server with `index.enabled`.
+* **SPA index surfaces (`LA-INDEX-SPA-SURFACES-1`, as built 2026-10-03).** The Explain tab of the toolbox hosts three index-only `LinkAnalysisServerRunComponent`s: `neighborhood` (hops), `egoNetwork` (the same Node, no hops) and a seeds-only `degreeCentrality` over a **Node to score** picker (Add node, removable chips, 1..20, the server ids from `serverIds`; none picked states why). A new **Edge index** tool (`LinkAnalysisIndexBuildComponent`, gated by the new lens `canBuildLinkIndex`, an identity capability with no Access-Catalog node) lists the index with its version, deltas, stale chip and the `plan` advice (recommended mode, counts, reasons, samples), a **Build mode** radio fieldset (`full` | `append` | `compact`, preselected from the advice, `full` when `none`) and **Build index**, which `POST`s `/inv/index/builds` with the index's OWN mapping plus `mode`, polls `GET /inv/index/builds/{id}` (`GraphRunsService.startBuild` / `watchBuild`) and refreshes `GET /inv/index` on COMPLETED. The advice never blocks: a mode the server cannot apply is its 409 in words (`indexBuildErrorMessage`), never retried as another mode. The Investigation panel states, in one non-blocking `role="status"` sentence (`expandFallbackNote`), why the last `expand` was answered by the flat Dataset: the sealed read carries `read.fallback = {reason, details?}` (the same closed reason vocabulary as `source.reason`; only when the flat Dataset answered an expand that could have tried the index, BESIDE the fingerprint and never in the sealed state hash, so old logs replay identically), and the audit event `link.investigation.stepped` gains `fallbackReason`. **Cancel and a new mapping (2026-10-04, `LA-INDEX-SPA-SURFACES-1` closed):** while a build is QUEUED or RUNNING a
+  *Cancel build* button posts `POST /inv/index/builds/{id}/cancel` (`GraphRunsService.cancelBuild`); the polling already
+  running reads the terminal `CANCELLED` (an interrupted builder never reads `FAILED`), the button disables and the
+  line says *Cancelling…* meanwhile, and a 403 / 404 / 409 is put in words (`indexBuildCancelMessage`). *Index a
+  different mapping instead* swaps the Build mode radios for a Dataset + columns form (`index-mapping.ts`: `dataset`,
+  `sourceCol`, `targetCol` required; `kindCol`, `timeCol`, `timeColZone`, `weightCol`, `attrCols` optional) that
+  starts a build with `mode: 'full'` — append and compact only exist against a live version of the SAME mapping — and
+  a zone never travels without its time column; with index support on but NO index listed the form is the only
+  option (the old "No index to build" text now means index support is off). The server stays the judge of the columns. Specs: `link-analysis-index-surfaces.spec.ts`. Not driven live: the index routes need a Professional-edition server with `index.enabled`.
 * **Incremental append, compaction and the plan (step 8, as built 2026-10-03).** `POST /inv/index/builds` takes `mode`: `full` (default), `append` or `compact`. `append` indexes ONLY the input files added since the live version, as a delta sorted within itself, and publishes the NEXT immutable version (the parent's files hard-linked in, the delta in the same bucket directories, manifest `builder: append`, `parent`, `deltas[]`); reads union main + deltas through the reader's own glob, so every read path (fold, edges, degree, traversal, neighbours, expand, `SqlGraphEngine`) answers exactly what a full rebuild answers, and each answer carries the version that produced it. It is sound only for pure additions: a removed, superseded or rewritten file, a changed relation SQL, a different bucket function or DuckDB version, a Dataset that is not a plain local store read (virtual, view-backed, shared), no new file, or 8 deltas already (compact first) is a 409 naming why, and a full build is the way. `compact` merges the deltas into one sorted main by reading the INDEX (not the Dataset), restoring one file per bucket and carrying the coverage record over unchanged. `GET /inv/index` items gain `deltas` and `plan {recommended: none|append|full|compact, appendable, reasons, added, removed, changed, samples}`: advice only - nothing appends, compacts or switches a version unless asked, and an index with added files is still served stale-flagged meanwhile. The per-append `nodes` rows are per-file partial folds (nothing reads them; compaction recomputes). See design §5.7.
 * **What it does NOT do yet.** `index.enabled` defaults to false. Staleness is grounded in the Dataset's input files (`DatasetProvider.inputFingerprint`, design 5.3a): an added file reads `input_files_changed` with `removedInput: false`, a deleted or touched one `removedInput: true`; a Dataset with nothing to list (a view), more than 10,000 files, a listing past its 2 s budget or one reached after `GET /inv/index`'s 5 s request budget reports `fingerprint: unknown` with `fingerprintReason` (`no-files` / `too-many-files` / `timeout` / `budget`) and is never claimed current.
 
@@ -1531,8 +1564,7 @@ Harness `InvTraversalBench` (`@Tag("bench")`, skipped unless `-Dinspecto.bench.d
 * Live check 2026-09-30 (Enterprise `-DemoAuth` bundle, three Demo Users): 33/33 steps passed once the demo Dataset
   classified its account columns as `ACCOUNT` and `account_links_dataset` existed for identity import.
 
-**Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-SPA-OWED-SURFACES-1` ·
-`LA-INVESTIGATION-OPS-DEFERRED-1` · `LA-LIVE-DETECTION-1` · `LA-DOSSIER-OUTPUT-1` · `LA-COLLECTOR-COVERAGE-1` ·
+**Still open — filed on the board (`docs/BACKLOG.md` §3.12).** `LA-INVESTIGATION-OPS-DEFERRED-1` · `LA-LIVE-DETECTION-1` · `LA-DOSSIER-OUTPUT-1` · `LA-COLLECTOR-COVERAGE-1` ·
 `LA-DRAFT-PROMOTE-COST-1` (filed 2026-10-03 when `LA-SEP-SPIKES-1` closed: spike `D-S5` re-ran on real Draft state at 10^8 edges, D-7 step D7-7; the promote-cost half fixed the same day, the Draft cap and idle periods as settings keys remain). Standing refusals with reopen triggers are in §6 under *Link Analysis & Geo*.
 
 Design (archived): [`link-analysis-and-graphsource.md`](../../../archived-documents/plans-archive/link-analysis-and-graphsource.md)

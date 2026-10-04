@@ -102,8 +102,15 @@ export class InvestigationSessionStore {
     }
 
     /** Create an Investigation over the projection's Dataset + columns and open it. `timeCol` binds the event time
-     *  windows and the coverage read use — without it `GET …/coverage` answers 422. */
-    async start(p: EntityProjection, purpose: string, title?: string, timeCol?: string): Promise<boolean> {
+     *  windows and the coverage read use — without it `GET …/coverage` answers 422. `timeColZone` is the IANA zone a naive
+     *  TIMESTAMP column is read in (UTC when absent). */
+    async start(
+        p: EntityProjection,
+        purpose: string,
+        title?: string,
+        timeCol?: string,
+        timeColZone?: string,
+    ): Promise<boolean> {
         return this.run('Could not start the Investigation.', async () => {
             const h = await firstValueFrom(
                 this.inv.createInvestigation({
@@ -114,6 +121,8 @@ export class InvestigationSessionStore {
                     targetCol: p.targetCol,
                     linkKindCol: p.linkKindCol || undefined,
                     timeCol: timeCol || undefined,
+                    // A zone means nothing without a time column (the server refuses it), so it never travels alone.
+                    timeColZone: timeCol && timeColZone ? timeColZone : undefined,
                 }),
             );
             this.refs.update((all) => [
