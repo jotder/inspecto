@@ -54,8 +54,10 @@ class BackupTaskTest {
     void theProviderIsDiscoveredAndClaimsExactlyTheThreeTasks() {
         var found = new java.util.ArrayList<MaintenanceTaskProvider>();
         java.util.ServiceLoader.load(MaintenanceTaskProvider.class).forEach(found::add);
-        assertEquals(1, found.size(), "exactly one provider on this classpath: " + found);
-        assertEquals(java.util.Set.of("backup", "backup_verify", "restore"), found.get(0).tasks());
+        // The core now ships its own provider (audit_anchor_export), so pick this module's by what it claims.
+        var mine = found.stream().filter(p -> p.tasks().contains("backup")).toList();
+        assertEquals(1, mine.size(), "exactly one provider claiming backup on this classpath: " + found);
+        assertEquals(java.util.Set.of("backup", "backup_verify", "restore"), mine.get(0).tasks());
     }
 
     @Test
