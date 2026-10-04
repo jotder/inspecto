@@ -82,8 +82,13 @@ last error: <msg>`; it also makes the overall status `DOWN`), the gauge `inspect
 - ⛔ Live verdicts are a **separate map** from the open-time records (`StoreHealth.live`): `StoreHealth.record`
   throws on DEGRADED under `-Dinspecto.topology=partitioned`, which on the heartbeat thread would cancel the renewer.
 - The heap lease (the default) registers no check, so Personal and single-node installs see no change.
-- Not built: telling a node-local partition (this node can't reach the DB while other holders keep renewing) from
-  a shared outage — a follow-up on the `ASSURE-OPERABILITY-1` row.
+- **Failure kind + down duration (operator option C, 2026-10-04).** The detail reads `unreachable since <instant>
+  (no successful tick for <n>s, kind DNS|REFUSED|TIMEOUT|AUTH|OTHER) - last error: <msg>`; the kind comes from
+  `DbRunLease.failureKind` (exception chain, then message/SQLState). The log flip line carries the kind too. The
+  gauge is unchanged (no new labels). It is a hint only.
+- Not built (open): telling a node-local partition from a shared outage needs a **second vantage point** (a node
+  cannot read other holders while cut off). Options recorded: A peer-heartbeat table in a second store, B an
+  external witness probe, D drop it (`/ready` ignores the verdict anyway). No operator choice yet.
 
 ## Kubernetes: single-replica Helm chart (ASSURE-OPERABILITY-1, 2026-09-29)
 

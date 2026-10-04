@@ -700,6 +700,45 @@ class DbRunLeaseTest {
         assertNull(com.gamma.util.StoreHealth.liveOf(space).get("runLease.run"), "a closed lease leaves no verdict");
     }
 
+    /** ASSURE-OPERABILITY-1 item 5: the failure kind is classified, the down-for duration grows, and clears on success. */
+    @Test
+    void unreachableDetailCarriesFailureKindAndGrowingDownDuration(@TempDir Path dir) throws Exception {
+        assertEquals("DNS", DbRunLease.failureKind(new java.sql.SQLException("x", new java.net.UnknownHostException("db1"))));
+        assertEquals("REFUSED", DbRunLease.failureKind(new java.sql.SQLException("Connection refused")));
+        assertEquals("TIMEOUT", DbRunLease.failureKind(new java.sql.SQLException("c", new java.net.SocketTimeoutException("Read timed out"))));
+        assertEquals("AUTH", DbRunLease.failureKind(new java.sql.SQLException("FATAL: password authentication failed", "28P01")));
+        assertEquals("OTHER", DbRunLease.failureKind(new java.sql.SQLException("syntax error")));
+
+        java.util.concurrent.atomic.AtomicBoolean cut = new java.util.concurrent.atomic.AtomicBoolean();
+        com.gamma.util.ConnectionSource real = JdbcDrivers.source(urlIn(dir), null, null, "t");
+        com.gamma.util.ConnectionSource flaky = new com.gamma.util.ConnectionSource() {
+            @Override public <T> T with(SqlFunction<T> body) throws java.sql.SQLException {
+                if (cut.get()) throw new java.sql.SQLException("c", new java.net.ConnectException("Connection refused"));
+                return real.with(body);
+            }
+            @Override public boolean isPostgres() { return false; }
+            @Override public void close() { real.close(); }
+        };
+        String space = "kind-" + System.nanoTime();
+        try (DbRunLease lease = new DbRunLease(flaky, space, DbRunLease.SCOPE_RUN, "pod-a", TTL)) {
+            awaitLive(space, com.gamma.util.StoreHealth.Status.UP);
+            cut.set(true);
+            awaitLive(space, com.gamma.util.StoreHealth.Status.DEGRADED);
+            long deadline = System.nanoTime() + 10_000_000_000L;
+            String detail = "";
+            while (System.nanoTime() < deadline) {
+                detail = com.gamma.util.StoreHealth.liveOf(space).get("runLease.run").detail();
+                if (!detail.contains("no successful tick for 0s")) break;
+                Thread.sleep(100);
+            }
+            assertTrue(detail.contains("kind REFUSED"), detail);
+            assertFalse(detail.contains("no successful tick for 0s"), "the down duration must grow: " + detail);
+            cut.set(false);
+            awaitLive(space, com.gamma.util.StoreHealth.Status.UP);
+            assertEquals("lease database answered", com.gamma.util.StoreHealth.liveOf(space).get("runLease.run").detail());
+        }
+    }
+
     private static void awaitLive(String space, com.gamma.util.StoreHealth.Status want) throws InterruptedException {
         long deadline = System.nanoTime() + 10_000_000_000L;
         while (System.nanoTime() < deadline) {

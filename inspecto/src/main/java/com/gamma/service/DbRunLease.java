@@ -303,11 +303,11 @@ final class DbRunLease implements RunLease, AutoCloseable {
                 });
                 reportLive(null);
             } catch (SQLException | RuntimeException ex) {
-                reportLive(String.valueOf(ex.getMessage()));
+                reportLive(ex);
             }
             return;
         }
-        String failure = null;
+        Exception failure = null;
         long until = System.currentTimeMillis() + ttlMs;
         String sql = "UPDATE " + TABLE + " SET expires_at = ? "
                 + "WHERE space = ? AND scope = ? AND pipeline = ? AND owner = ? AND epoch = ?";
@@ -332,7 +332,7 @@ final class DbRunLease implements RunLease, AutoCloseable {
                     }
                 });
             } catch (SQLException | RuntimeException ex) {
-                failure = String.valueOf(ex.getMessage());
+                failure = ex;
                 log.warn("Could not renew the run lease for '{}': {}", e.getKey(), ex.getMessage());
             }
         }
@@ -345,13 +345,16 @@ final class DbRunLease implements RunLease, AutoCloseable {
      * and a log line on each flip. ⛔ Not on {@code /ready} (operator 2026-10-03): a shared-DB outage would drain
      * every node, and read-only serving needs no lease. {@code failure == null} means reachable.
      */
-    private void reportLive(String failure) {
+    private void reportLive(Exception failure) {
         boolean up = failure == null;
         if (up) downSince = null;
         else if (downSince == null) downSince = java.time.Instant.now();
+        String msg = up ? null : String.valueOf(failure.getMessage());
         StoreHealth.live(space, liveFamily(), up, null,
                 up ? "lease database answered"
-                   : "lease database unreachable since " + downSince + " - last error: " + failure);
+                   : "lease database unreachable since " + downSince + " (no successful tick for "
+                     + Duration.between(downSince, java.time.Instant.now()).toSeconds() + "s, kind "
+                     + failureKind(failure) + ") - last error: " + msg);
         com.gamma.metrics.MetricRegistry.global().setGauge("inspecto_run_lease_db_reachable",
                 "1 when the shared run lease database answered the last heartbeat, else 0",
                 Map.of("space", space, "scope", scope), up ? 1 : 0);
@@ -359,8 +362,29 @@ final class DbRunLease implements RunLease, AutoCloseable {
         reachable = up;
         if (was != null && was != up) {
             if (up) log.info("Run lease database ({}) reachable again", scope);
-            else log.warn("Run lease database ({}) unreachable - new runs cannot claim a lease: {}", scope, failure);
+            else log.warn("Run lease database ({}) unreachable (kind {}) - new runs cannot claim a lease: {}",
+                    scope, failureKind(failure), msg);
         }
+    }
+
+    /**
+     * Coarse cause of a failed tick, from the exception chain (class names first, then message text):
+     * {@code DNS}, {@code REFUSED}, {@code TIMEOUT}, {@code AUTH}, else {@code OTHER}. A diagnostic hint only —
+     * it cannot say whether the fault is this node's or shared (that needs a second vantage point).
+     */
+    static String failureKind(Throwable t) {
+        for (Throwable c = t; c != null; c = c.getCause()) {
+            String n = c.getClass().getName();
+            String m = String.valueOf(c.getMessage()).toLowerCase(java.util.Locale.ROOT);
+            if (n.contains("UnknownHost") || m.contains("unknownhost") || m.contains("name or service not known")
+                    || m.contains("no such host") || m.contains("nodename nor servname")) return "DNS";
+            if (n.contains("ConnectException") || m.contains("connection refused")) return "REFUSED";
+            if (n.contains("Timeout") || m.contains("timed out") || m.contains("timeout")) return "TIMEOUT";
+            if (m.contains("authentication failed") || m.contains("password authentication")
+                    || m.contains("access denied") || "28P01".equals(c instanceof SQLException q ? q.getSQLState() : null)
+                    || "28000".equals(c instanceof SQLException q2 ? q2.getSQLState() : null)) return "AUTH";
+        }
+        return "OTHER";
     }
 
     private String liveFamily() {
