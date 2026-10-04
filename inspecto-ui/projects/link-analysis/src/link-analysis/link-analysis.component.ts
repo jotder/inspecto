@@ -1450,6 +1450,8 @@ export class LinkAnalysisComponent implements OnInit {
                         ...(node.data.provenance?.length
                             ? [{ label: 'Datasets', value: node.data.provenance.join(', ') }]
                             : []),
+                        // LA-08: a node mapping's `attributes` values (raw), one row per column.
+                        ...Object.entries(node.data.attrs ?? {}).map(([k, v]) => ({ label: k, value: v ?? '—' })),
                     ],
                     branch: collapsed ? 'expand' : descendants(g, id).size ? 'collapse' : undefined,
                     objectRef,
@@ -1462,7 +1464,7 @@ export class LinkAnalysisComponent implements OnInit {
                 if (action === 'focus') this.focusNode(id);
                 else if (action === 'collapse') this.collapseBranch(id);
                 else if (action === 'expand') this.expandBranch(id);
-                else if (action === 'expand-neighbors') this.expandNode(id, node.data.label);
+                else if (action === 'expand-neighbors') this.expandNode(id, node.data.label, node.data.spellings);
                 else if (action === 'open-record' && objectRef) {
                     this.router.navigate(['/' + (objectRef.type === 'CASE' ? 'cases' : 'incidents'), objectRef.id]);
                 }
@@ -1564,12 +1566,12 @@ export class LinkAnalysisComponent implements OnInit {
      * `expand()` and merge it into the loaded graph — filters/analysis state survives (unlike `run()`,
      * which replaces the graph and resets them).
      */
-    async expandNode(id: string, nodeLabel: string): Promise<void> {
+    async expandNode(id: string, nodeLabel: string, spellings?: string[]): Promise<void> {
         const run = this.lastRun();
         const source = this.graphSources.byId(this.sourceId());
         if (!run || !source?.expand) return;
         try {
-            const extra = await source.expand(id, nodeLabel, run.query);
+            const extra = await source.expand(id, nodeLabel, run.query, spellings);
             this.graph.update((g) => (g ? mergeGraphs([g, extra]) : extra));
             // LA-02: an expand that hit the server's row limit, or the browser's node cap, leaves the
             // working set INCOMPLETE. `mergeGraphs` returns a bare `G6GraphData` and structurally drops

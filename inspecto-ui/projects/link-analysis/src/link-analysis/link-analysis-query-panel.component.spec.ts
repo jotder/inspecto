@@ -285,4 +285,39 @@ describe('LinkAnalysisQueryPanelComponent', () => {
         expect(el.querySelector('[aria-label="Edge mapping 1"]')).not.toBeNull();
         await expectNoA11yViolations(el);
     });
+
+    it('entity-projection-multi: authors node/edge attributes and a per-edge filter, and round-trips them', () => {
+        const { c } = make('entity-projection-multi');
+        c.addNodeMapping().patchValue({ datasetId: 'people', idColumn: 'ID', attributes: ['CITY'] });
+        c.addEdgeMapping().patchValue({ datasetId: 'calls', sourceColumn: 'A', targetColumn: 'B', attributes: ['CH'] });
+        // an empty tree is no constraint, so no `filter` travels
+        expect(c.buildQuery()).toMatchObject({
+            multi: {
+                nodes: [{ attributes: ['CITY'] }],
+                edges: [{ attributes: ['CH'], filter: undefined }],
+            },
+        });
+        const own = c.edgeFilters()[0];
+        own.items.push({ kind: 'condition', field: 'CH', operator: '=', value: 'sms' });
+        const q = c.buildQuery() as { multi: { edges: { filter?: unknown }[] } };
+        expect(q.multi.edges[0].filter).toEqual(own);
+        expect(q.multi.edges[0].filter).not.toBe(own); // a copy: the editor keeps mutating its own tree
+
+        c.patchFormFromView({ id: 'v', name: 'v', sourceId: 'entity-projection-multi', query: q } as never);
+        expect(c.edgeFilters()).toHaveLength(1);
+        expect(c.edgeFilters()[0].items).toHaveLength(1);
+        c.removeEdgeMapping(0);
+        expect(c.edgeFilters()).toEqual([]);
+    });
+
+    it('entity-projection-multi: renders the per-edge filter editor with no a11y violations', async () => {
+        const { fixture } = make('entity-projection-multi');
+        const el: HTMLElement = fixture.nativeElement;
+        Array.from(el.querySelectorAll('button'))
+            .find((b) => b.textContent?.includes('Add edge mapping'))!
+            .click();
+        fixture.detectChanges();
+        expect(el.querySelector('[aria-label="Filter for edge mapping 1"]')).not.toBeNull();
+        await expectNoA11yViolations(el);
+    });
 });

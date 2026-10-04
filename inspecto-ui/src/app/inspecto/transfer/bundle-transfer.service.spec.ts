@@ -41,7 +41,7 @@ describe('BundleTransferService — buildExport consults the server closure (gap
 
     /** The export body must carry the grammar, which only the server's answer could have contributed. */
     it('pulls in a companion only the server knows about', () => {
-        let out: { bundle: MetadataBundle; missing: string[]; absent: string[] } | undefined;
+        let out: { bundle: MetadataBundle; missing: string[]; absent: string[]; converted: string[] } | undefined;
         svc.buildExport([PIPELINE], [PIPELINE, GRAMMAR], true).subscribe((r) => (out = r));
 
         http.expectOne(`${base}/pipelines/cdr_ingest/related`).flush({
@@ -61,6 +61,26 @@ describe('BundleTransferService — buildExport consults the server closure (gap
         expect(sent.map((i) => `${i.kind}/${i.id}`).sort()).toEqual(['grammar/cdr', 'pipeline/cdr_ingest']);
         exportReq.flush({ bundle: { items: [] } });
         expect(out?.missing).toEqual([]);
+    });
+
+    it('carries the server list of items it converted, as kind/id (from to to)', () => {
+        let out: { converted: string[]; absent: string[] } | undefined;
+        svc.buildExport([PIPELINE], [PIPELINE], false).subscribe((r) => (out = r));
+        http.expectOne(`${base}/bundle/export`).flush({
+            bundle: { items: [] },
+            missing: [{ kind: 'dataset', id: 'gone' }],
+            converted: [
+                {
+                    kind: 'widget',
+                    id: 'ws',
+                    from: 'live',
+                    to: 'frozen',
+                    reason: 'a Live Working Set Widget cannot leave its Space',
+                },
+            ],
+        });
+        expect(out?.converted).toEqual(['widget/ws (live to frozen)']);
+        expect(out?.absent).toEqual(['dataset/gone']);
     });
 
     /**

@@ -276,13 +276,15 @@ export class BundleTransferService {
      *
      * `missing` stays the closure's unresolvable references (nothing on this instance to pull in);
      * `absent` is the server's own list — requested items its stores do not hold. A partial bundle is
-     * still a valid bundle, so neither is fatal; the caller reports them.
+     * still a valid bundle, so neither is fatal; the caller reports them. `converted` is the server's list of
+     * items that left CHANGED — a Live Working Set Widget cannot leave its Space (D-E6), so it is exported Frozen
+     * at its pin — each as `kind/id (from to to)`; the caller says so, because the copy is not what was selected.
      */
     buildExport(
         selected: BundleItem[],
         available: BundleItem[],
         includeDeps: boolean,
-    ): Observable<{ bundle: MetadataBundle; missing: string[]; absent: string[] }> {
+    ): Observable<{ bundle: MetadataBundle; missing: string[]; absent: string[]; converted: string[] }> {
         // ⚠ The server's closure edges are fetched only when dependencies are actually being followed —
         // a selection-only export must not make N extra calls to answer a question nobody asked.
         const refs$ = includeDeps ? this.serverRefsFor(selected) : of(new Map() as ServerRefs);
@@ -301,12 +303,14 @@ export class BundleTransferService {
                     .post<{
                         bundle: MetadataBundle;
                         missing?: { kind: string; id: string }[];
+                        converted?: { kind: string; id: string; from: string; to: string }[];
                     }>(apiUrl('/bundle/export'), body)
                     .pipe(
                         map((res) => ({
                             bundle: res.bundle,
                             missing,
                             absent: (res.missing ?? []).map((m) => `${m.kind}/${m.id}`),
+                            converted: (res.converted ?? []).map((c) => `${c.kind}/${c.id} (${c.from} to ${c.to})`),
                         })),
                     );
             }),

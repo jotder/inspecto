@@ -24,6 +24,7 @@ import {
     valueMeasureAttributes,
     valueMeasureColumns,
     valueMeasureQuery,
+    valueMeasureWindowIssue,
 } from './value-measures';
 
 /** A value-measure failure in the analyst's words; 422 carries the server's own sentence verbatim. */
@@ -97,6 +98,13 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                 <p class="m-0" data-test="threshold">
                     <span class="font-semibold">Threshold in force:</span> {{ r.measure.name }} — {{ r.threshold }}
                 </p>
+                @if (r.window) {
+                    <p class="text-secondary m-0" data-test="window">
+                        Window read: {{ r.window.from }} to {{ r.window.to }} ({{ r.window.timezone }}){{
+                            r.measure.last ? ' — rolling, the last ' + r.measure.last : ''
+                        }}
+                    </p>
+                }
                 <p class="text-secondary m-0" data-test="counts">
                     {{ r.count }} entities breach · {{ r.rowsInWindow }} rows in the window · {{ r.unvalued }}
                     rows without a numeric value (skipped)
@@ -181,6 +189,17 @@ export class LinkAnalysisValueMeasuresComponent {
         linkKindCol: columnOptionLoader('dataset'),
         valueCol: columnOptionLoader('dataset'),
         timeCol: columnOptionLoader('dataset'),
+        // Suggestions assist, never constrain: a missing capability or module just leaves the field free-text.
+        agentList: async () => {
+            try {
+                const { lists } = await firstValueFrom(this.inv.listEntityLists());
+                return lists
+                    .filter((l) => l.entityType === 'agent' && !l.retired)
+                    .map((l) => ({ value: l.id, label: `${l.title} (${l.id})` }));
+            } catch {
+                return [];
+            }
+        },
     };
     readonly severities: { value: AlertSeverity; label: string }[] = [
         { value: 'INFO', label: 'Info' },
@@ -244,6 +263,12 @@ export class LinkAnalysisValueMeasuresComponent {
     async run(): Promise<void> {
         const form = this.form();
         if (this.busy() || !form.validate()) return;
+        const issue = valueMeasureWindowIssue(form.value());
+        if (issue) {
+            this.unavailable.set(false);
+            this.error.set(issue);
+            return;
+        }
         const q = valueMeasureQuery(form.value());
         this.busy.set(true);
         this.error.set('');

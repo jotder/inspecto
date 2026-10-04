@@ -299,8 +299,10 @@ describe('LinkAnalysisComponent', () => {
         const c = fixture.componentInstance;
         c.onSearch('a'); // some filter/analysis state that must survive the merge
 
-        await c.expandNode('c', 'C');
-        expect(expand).toHaveBeenCalledWith('c', 'C', expect.objectContaining({ projection: expect.anything() }));
+        await c.expandNode('c', 'C', ['C']);
+        expect(expand).toHaveBeenCalledWith('c', 'C', expect.objectContaining({ projection: expect.anything() }), [
+            'C',
+        ]);
         expect(
             c
                 .graph()
@@ -326,7 +328,7 @@ describe('LinkAnalysisComponent', () => {
         const c = fixture.componentInstance;
         expect(c.truncated()).toBe(false); // the initial projection was complete
 
-        await c.expandNode('c', 'C');
+        await c.expandNode('c', 'C', ['C']);
         expect(c.truncated()).toBe(true);
     });
 
@@ -341,7 +343,7 @@ describe('LinkAnalysisComponent', () => {
         await runQuery(fixture);
         const c = fixture.componentInstance;
 
-        await c.expandNode('c', 'C');
+        await c.expandNode('c', 'C', ['C']);
         expect(c.truncated()).toBe(false);
     });
 
@@ -350,7 +352,7 @@ describe('LinkAnalysisComponent', () => {
         fixture.detectChanges();
         await runQuery(fixture);
         const c = fixture.componentInstance;
-        await c.expandNode('c', 'C');
+        await c.expandNode('c', 'C', ['C']);
         expect(c.graph()).toEqual(GRAPH); // unchanged
     });
 
@@ -881,7 +883,7 @@ describe('LinkAnalysisComponent', () => {
         fixture.detectChanges();
         await runQuery(fixture);
         const c = fixture.componentInstance;
-        await c.expandNode('c', 'C');
+        await c.expandNode('c', 'C', ['C']);
         const alert = () => (fixture.nativeElement as HTMLElement).textContent?.includes('projection hit the node cap');
         fixture.detectChanges();
         expect(alert()).toBe(true);

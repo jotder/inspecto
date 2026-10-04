@@ -85,17 +85,30 @@ export function valueMeasureAttributes(): AttributeSpec[] {
             label: 'From (inclusive)',
             type: 'string',
             tier: 'required',
+            required: false,
             pattern: ISO,
             placeholder: '2026-09-01',
+            help: 'A fixed window: From and To, or instead a rolling window below.',
         },
         {
             key: 'to',
             label: 'To (exclusive)',
             type: 'string',
             tier: 'required',
+            required: false,
             pattern: ISO,
             placeholder: '2026-09-08',
             help: 'At most 31 days.',
+        },
+        {
+            key: 'last',
+            label: 'Or the last (rolling window)',
+            type: 'string',
+            tier: 'required',
+            required: false,
+            pattern: LAST,
+            placeholder: '24h or 7d',
+            help: 'Hours or days back from now, in UTC, re-read at every evaluation — never together with From/To.',
         },
         ...Object.keys(THRESHOLD_LABELS).map(
             (key): AttributeSpec => ({
@@ -123,7 +136,32 @@ export function valueMeasureAttributes(): AttributeSpec[] {
             tier: 'required',
             dependsOn: { key: 'name', in: ['benefitTransfer'] },
         },
+        {
+            key: 'agentList',
+            label: 'Agent list (optional)',
+            type: 'autocomplete',
+            tier: 'required',
+            required: false,
+            pattern: AGENT_LIST,
+            help: 'An Entity List of Entity Type agent: only its members count as cash-out agents.',
+            dependsOn: { key: 'name', in: ['cashOutConcentration'] },
+        },
     ];
+}
+
+/** `ValueMeasures.LAST`: 1–999 999 hours or days. */
+const LAST = '[1-9]\\d{0,5}[hd]';
+/** `EntityListFacts.LIST_ID`: the id an Entity List is minted with. */
+const AGENT_LIST = '[a-z0-9][a-z0-9_-]{0,63}';
+
+/** The server's "exactly one window" rule, stated before the call: `from` + `to`, or `last`, never both. */
+export function valueMeasureWindowIssue(v: Record<string, unknown>): string | null {
+    const set = (k: string) => typeof v[k] === 'string' && (v[k] as string).trim() !== '';
+    const fixed = set('from') || set('to');
+    if (fixed && set('last')) return 'Use either From and To or a rolling window (last), not both.';
+    if (!fixed && !set('last')) return 'Give a window: From and To, or a rolling window such as 7d.';
+    if (fixed && !(set('from') && set('to'))) return 'A fixed window needs both From and To.';
+    return null;
 }
 
 /**
@@ -144,8 +182,10 @@ export function valueMeasureQuery(v: Record<string, unknown>): ValueMeasureQuery
         'timeCol',
         'from',
         'to',
+        'last',
         ...(VALUE_MEASURE_THRESHOLDS[name] ?? []),
         ...(kindKey ? [kindKey] : []),
+        ...(name === 'cashOutConcentration' ? ['agentList'] : []),
     ];
     const out: Record<string, unknown> = {};
     for (const k of keys) {

@@ -103,8 +103,10 @@ export interface GraphSource {
      * value/id, not its graph node id) under the same query context `q` — merged into the existing
      * canvas by the caller rather than replacing it. Optional: sources with no natural "neighbors of
      * X" notion (component-registry — a fully-loaded static graph) omit it, and the UI hides the action.
+     * `spellings` are the node's RAW values (`data.spellings`) — a multi-mapping source needs them, because its
+     * node id is normalised and its label may come from a label column.
      */
-    expand?(nodeId: string, nodeLabel: string, q: GraphSourceQuery): Promise<G6GraphData>;
+    expand?(nodeId: string, nodeLabel: string, q: GraphSourceQuery, spellings?: string[]): Promise<G6GraphData>;
 }
 
 /** LA-08: one node mapping of {@code POST /inv/projection/multi} — distinct `idColumn` values become Entities. */

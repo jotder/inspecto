@@ -368,6 +368,20 @@ export class GraphRunsService {
         return this.http.post<LinkIndexBuildView>(apiUrl('/inv/index/builds'), req);
     }
 
+    /**
+     * `POST /inv/index/builds/{id}/cancel` → 202 `{buildId, status, cancelRequested}`: the build's starter or an
+     * administrator (anyone else, and a Dataset no longer viewable, is the same 404 as an unknown build); a build that
+     * already finished is a 409. The build ends `CANCELLED` on the next {@link watchBuild} read, never `FAILED`.
+     */
+    cancelBuild(
+        buildId: string,
+    ): Observable<{ buildId: string; status: LinkIndexBuildStatus; cancelRequested: boolean }> {
+        return this.http.post<{ buildId: string; status: LinkIndexBuildStatus; cancelRequested: boolean }>(
+            apiUrl(`/inv/index/builds/${encodeURIComponent(buildId)}/cancel`),
+            {},
+        );
+    }
+
     /** Re-read a build every {@link pollMs} until it is terminal (the terminal view last), then refresh {@link indexes}. */
     watchBuild(buildId: string): Observable<LinkIndexBuildView> {
         return timer(this.pollMs, this.pollMs).pipe(

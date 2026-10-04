@@ -38,6 +38,11 @@ export interface G6Node {
          * more means rows from different Datasets normalised to one key and were merged into this node.
          */
         provenance?: string[];
+        /**
+         * LA-08: the values of a node mapping's `attributes` columns (RAW, keyed by column), merged across the
+         * mappings that named this entity. Present only when a mapping asked for attributes.
+         */
+        attrs?: Record<string, string | null>;
     };
 }
 

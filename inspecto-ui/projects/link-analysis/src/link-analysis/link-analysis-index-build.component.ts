@@ -1,12 +1,24 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { DecimalPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    DestroyRef,
+    computed,
+    inject,
+    input,
+    signal,
+    viewChild,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { Subscription } from 'rxjs';
 import { apiErrorMessage } from '@inspecto/core/api/api-base';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
+import { columnOptionLoader, datasetOptionLoader } from '@inspecto/core/components/entity-option-loaders';
+import { InspectoSchemaFormComponent } from '@inspecto/core/components/schema-form.component';
+import { indexMappingAttributes, indexMappingRequest } from './index-mapping';
 import {
     GraphRunsService,
     LinkIndexBuildMode,
@@ -51,72 +63,103 @@ export function indexBuildErrorMessage(err: unknown): string {
     selector: 'inspecto-link-analysis-index-build',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, MatButtonModule, MatIconModule, InspectoAlertComponent, ChipComponent],
+    imports: [
+        DecimalPipe,
+        MatButtonModule,
+        MatIconModule,
+        InspectoAlertComponent,
+        ChipComponent,
+        InspectoSchemaFormComponent,
+    ],
     template: `
-        @if (index(); as ix) {
-            <div class="flex flex-wrap items-center gap-2">
-                @if (choices().length > 1) {
-                    <label class="text-secondary text-sm">
-                        Index
-                        <select
-                            class="ml-1 rounded border px-1"
-                            data-testid="build-index-pick"
-                            (change)="pick($any($event.target).value)"
-                        >
-                            @for (c of choices(); track c.dataset) {
-                                <option [value]="c.dataset" [selected]="c.dataset === ix.dataset">
-                                    {{ c.dataset }}
-                                </option>
-                            }
-                        </select>
-                    </label>
-                }
-                <span class="text-sm" data-testid="build-index-version">
-                    {{ ix.dataset }}: version {{ ix.version }}{{ ix.deltas ? ', ' + ix.deltas + ' appended' : '' }}
-                </span>
-                @if (ix.stale) {
-                    <inspecto-chip variant="soft" tone="warning" [title]="ix.reason ?? ''">Index stale</inspecto-chip>
-                }
-            </div>
-            @if (ix.plan; as plan) {
-                <div class="mt-1 text-sm" data-testid="build-plan">
-                    <p>
-                        Advice:
-                        <strong data-testid="build-plan-recommended">{{
-                            plan.recommended === 'none' ? 'nothing to do' : plan.recommended
-                        }}</strong
-                        >. {{ plan.added }} file(s) added, {{ plan.removed }} removed, {{ plan.changed }} changed since
-                        this version.
-                    </p>
-                    @if (plan.reasons.length) {
-                        <ul class="list-inside list-disc" aria-label="Why this advice">
-                            @for (r of plan.reasons; track $index) {
-                                <li>{{ r }}</li>
-                            }
-                        </ul>
+        @if (index() || enabled()) {
+            @if (index(); as ix) {
+                <div class="flex flex-wrap items-center gap-2">
+                    @if (choices().length > 1) {
+                        <label class="text-secondary text-sm">
+                            Index
+                            <select
+                                class="ml-1 rounded border px-1"
+                                data-testid="build-index-pick"
+                                (change)="pick($any($event.target).value)"
+                            >
+                                @for (c of choices(); track c.dataset) {
+                                    <option [value]="c.dataset" [selected]="c.dataset === ix.dataset">
+                                        {{ c.dataset }}
+                                    </option>
+                                }
+                            </select>
+                        </label>
                     }
-                    @for (g of sampleGroups(); track g.label) {
-                        <p class="text-secondary">{{ g.label }}: {{ g.paths.join(', ') }}</p>
+                    <span class="text-sm" data-testid="build-index-version">
+                        {{ ix.dataset }}: version {{ ix.version }}{{ ix.deltas ? ', ' + ix.deltas + ' appended' : '' }}
+                    </span>
+                    @if (ix.stale) {
+                        <inspecto-chip variant="soft" tone="warning" [title]="ix.reason ?? ''"
+                            >Index stale</inspecto-chip
+                        >
                     }
                 </div>
-            }
-            <fieldset class="mt-2 flex flex-wrap items-center gap-3" [disabled]="busy()">
-                <legend class="text-secondary text-sm">Build mode</legend>
-                @for (m of modes; track m.id) {
-                    <label class="flex items-center gap-1 text-sm">
-                        <input
-                            type="radio"
-                            name="index-build-mode"
-                            [value]="m.id"
-                            [attr.data-testid]="'mode-' + m.id"
-                            [checked]="effectiveMode() === m.id"
-                            (change)="mode.set(m.id)"
-                        />
-                        {{ m.label }}
-                    </label>
+                @if (ix.plan; as plan) {
+                    <div class="mt-1 text-sm" data-testid="build-plan">
+                        <p>
+                            Advice:
+                            <strong data-testid="build-plan-recommended">{{
+                                plan.recommended === 'none' ? 'nothing to do' : plan.recommended
+                            }}</strong
+                            >. {{ plan.added }} file(s) added, {{ plan.removed }} removed, {{ plan.changed }} changed
+                            since this version.
+                        </p>
+                        @if (plan.reasons.length) {
+                            <ul class="list-inside list-disc" aria-label="Why this advice">
+                                @for (r of plan.reasons; track $index) {
+                                    <li>{{ r }}</li>
+                                }
+                            </ul>
+                        }
+                        @for (g of sampleGroups(); track g.label) {
+                            <p class="text-secondary">{{ g.label }}: {{ g.paths.join(', ') }}</p>
+                        }
+                    </div>
                 }
-            </fieldset>
-            <p class="text-secondary mt-1 text-sm" data-testid="mode-help">{{ modeHelp() }}</p>
+            }
+            @if (index()) {
+                <label class="mt-2 flex items-center gap-1 text-sm">
+                    <input
+                        type="checkbox"
+                        data-testid="new-mapping"
+                        [checked]="newMapping()"
+                        [disabled]="busy()"
+                        (change)="newMapping.set($any($event.target).checked)"
+                    />
+                    Index a different mapping instead
+                </label>
+            }
+            @if (choosingMapping()) {
+                <p class="text-secondary mt-1 text-sm" data-testid="new-mapping-help">
+                    Choose the Dataset and the columns to index. A new mapping is always built in full; append and
+                    compact only apply to a listed index.
+                </p>
+                <inspecto-schema-form [specs]="mappingSpecs" [optionLoaders]="mappingLoaders"></inspecto-schema-form>
+            } @else {
+                <fieldset class="mt-2 flex flex-wrap items-center gap-3" [disabled]="busy()">
+                    <legend class="text-secondary text-sm">Build mode</legend>
+                    @for (m of modes; track m.id) {
+                        <label class="flex items-center gap-1 text-sm">
+                            <input
+                                type="radio"
+                                name="index-build-mode"
+                                [value]="m.id"
+                                [attr.data-testid]="'mode-' + m.id"
+                                [checked]="effectiveMode() === m.id"
+                                (change)="mode.set(m.id)"
+                            />
+                            {{ m.label }}
+                        </label>
+                    }
+                </fieldset>
+                <p class="text-secondary mt-1 text-sm" data-testid="mode-help">{{ modeHelp() }}</p>
+            }
             <div class="mt-1 flex flex-wrap items-center gap-2">
                 <button
                     mat-stroked-button
@@ -127,6 +170,12 @@ export function indexBuildErrorMessage(err: unknown): string {
                     <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
                     Build index
                 </button>
+                @if (cancellable()) {
+                    <button mat-stroked-button data-testid="cancel-build" [disabled]="cancelling()" (click)="cancel()">
+                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                        Cancel build
+                    </button>
+                }
             </div>
             @if (blockedReason(); as why) {
                 <p class="text-secondary mt-1 text-sm" role="status" data-testid="build-blocked">{{ why }}</p>
@@ -137,7 +186,9 @@ export function indexBuildErrorMessage(err: unknown): string {
             @if (build(); as b) {
                 @switch (b.status) {
                     @case ('QUEUED') {
-                        <p class="mt-1 text-sm" role="status" data-testid="build-progress">Queued on the server.</p>
+                        <p class="mt-1 text-sm" role="status" data-testid="build-progress">
+                            Queued on the server.{{ cancelling() ? ' Cancelling…' : '' }}
+                        </p>
                     }
                     @case ('RUNNING') {
                         <p class="mt-1 text-sm" role="status" data-testid="build-progress">
@@ -145,7 +196,7 @@ export function indexBuildErrorMessage(err: unknown): string {
                                 b.progress
                                     ? ' - ' + b.progress.phase + ' (' + b.progress.step + '/' + b.progress.steps + ')'
                                     : ''
-                            }}.
+                            }}.{{ cancelling() ? ' Cancelling…' : '' }}
                         </p>
                     }
                     @case ('COMPLETED') {
@@ -186,6 +237,30 @@ export class LinkAnalysisIndexBuildComponent {
     readonly build = signal<LinkIndexBuildView | null>(null);
     readonly error = signal('');
     private readonly starting = signal(false);
+
+    /** LA-INDEX-SPA-SURFACES-1: index a mapping no listed index has, instead of rebuilding a listed one. */
+    readonly newMapping = signal(false);
+    readonly mappingSpecs = indexMappingAttributes();
+    readonly mappingLoaders = {
+        dataset: datasetOptionLoader(),
+        ...Object.fromEntries(
+            ['sourceCol', 'targetCol', 'kindCol', 'timeCol', 'weightCol', 'attrCols'].map((k) => [
+                k,
+                columnOptionLoader('dataset'),
+            ]),
+        ),
+    };
+    private readonly mappingForm = viewChild(InspectoSchemaFormComponent);
+    readonly cancelling = signal(false);
+
+    /** Index support is on for the Space (`index.enabled`) — a build of a new mapping needs no listed index. */
+    readonly enabled = computed(() => !!this.runs.indexes()?.enabled);
+    /** The mapping form shows when the analyst asked for it, and always when there is no listed index to rebuild. */
+    readonly choosingMapping = computed(() => this.newMapping() || !this.index());
+    readonly cancellable = computed(() => {
+        const s = this.build()?.status;
+        return s === 'QUEUED' || s === 'RUNNING';
+    });
 
     readonly choices = computed<LinkIndexSummary[]>(() => {
         const l = this.runs.indexes();
@@ -229,25 +304,29 @@ export class LinkAnalysisIndexBuildComponent {
         this.mode.set(null);
     }
 
+    /** Ask the server to stop the build; the polling that is already running then reads it as `CANCELLED`. */
+    cancel(): void {
+        const b = this.build();
+        if (!b || this.cancelling() || !this.cancellable()) return;
+        this.cancelling.set(true);
+        this.error.set('');
+        this.runs.cancelBuild(b.buildId).subscribe({
+            error: (err) => {
+                this.cancelling.set(false);
+                this.error.set(indexBuildCancelMessage(err));
+            },
+        });
+    }
+
     start(): void {
-        const ix = this.index();
-        if (!ix || this.blockedReason() || this.busy()) return;
+        if (this.blockedReason() || this.busy()) return;
+        const req = this.choosingMapping() ? this.mappingRequest() : this.listedRequest();
+        if (!req) return;
         this.sub?.unsubscribe();
         this.error.set('');
         this.build.set(null);
+        this.cancelling.set(false);
         this.starting.set(true);
-        const m = ix.mapping;
-        const req: LinkIndexBuildRequest = {
-            dataset: ix.dataset,
-            sourceCol: m.sourceCol,
-            targetCol: m.targetCol,
-            ...(m.kindCol ? { kindCol: m.kindCol } : {}),
-            ...(m.timeCol ? { timeCol: m.timeCol } : {}),
-            ...(m.timeColZone ? { timeColZone: m.timeColZone } : {}),
-            ...(m.weightCol ? { weightCol: m.weightCol } : {}),
-            ...(m.attrCols?.length ? { attrCols: m.attrCols } : {}),
-            mode: this.effectiveMode(),
-        };
         this.sub = this.runs.startBuild(req).subscribe({
             next: (first) => {
                 this.starting.set(false);
@@ -265,5 +344,45 @@ export class LinkAnalysisIndexBuildComponent {
                 this.error.set(indexBuildErrorMessage(err));
             },
         });
+    }
+
+    /** A listed index rebuilt with its OWN mapping, in the chosen mode. */
+    private listedRequest(): LinkIndexBuildRequest | null {
+        const ix = this.index();
+        if (!ix) return null;
+        const m = ix.mapping;
+        return {
+            dataset: ix.dataset,
+            sourceCol: m.sourceCol,
+            targetCol: m.targetCol,
+            ...(m.kindCol ? { kindCol: m.kindCol } : {}),
+            ...(m.timeCol ? { timeCol: m.timeCol } : {}),
+            ...(m.timeColZone ? { timeColZone: m.timeColZone } : {}),
+            ...(m.weightCol ? { weightCol: m.weightCol } : {}),
+            ...(m.attrCols?.length ? { attrCols: m.attrCols } : {}),
+            mode: this.effectiveMode(),
+        };
+    }
+
+    /** A mapping the analyst chose; null (and the form's own messages) until its Dataset and two columns are set. */
+    private mappingRequest(): LinkIndexBuildRequest | null {
+        const form = this.mappingForm();
+        if (!form || !form.validate()) return null;
+        return indexMappingRequest(form.value());
+    }
+}
+
+/** A refused cancel in words: 403 / 404 / 409 each mean something specific on `POST /inv/index/builds/{id}/cancel`. */
+export function indexBuildCancelMessage(err: unknown): string {
+    if (!(err instanceof HttpErrorResponse)) return 'The build could not be cancelled.';
+    switch (err.status) {
+        case 403:
+            return "Only the build's starter or an administrator can cancel it.";
+        case 404:
+            return 'That build was not found - it is not yours to cancel, or it was never started.';
+        case 409:
+            return 'The build had already finished, so there was nothing to cancel.';
+        default:
+            return apiErrorMessage(err, 'The build could not be cancelled.');
     }
 }

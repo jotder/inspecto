@@ -36,12 +36,32 @@ function num(v: unknown): number | null {
     return Number.isFinite(n) ? n : null;
 }
 
+/** `InvestigationRoutes.MAX_LINK_KINDS` — the server refuses a longer list. */
+export const MAX_LINK_KINDS = 100;
+
+/** The kinds typed into the field: comma-separated, trimmed, blanks and repeats dropped. */
+export function parseKinds(text: string): string[] {
+    return [
+        ...new Set(
+            text
+                .split(',')
+                .map((k) => k.trim())
+                .filter((k) => k),
+        ),
+    ];
+}
+
+const maxKinds: ValidatorFn = (c: AbstractControl): ValidationErrors | null =>
+    parseKinds(String(c.value ?? '')).length > MAX_LINK_KINDS ? { maxKinds: true } : null;
+
 export function rungForm() {
     return new FormGroup(
         {
             budget: new FormControl<number | string | null>(null, { validators: int(1, MAX_EXPAND_BUDGET) }),
             direction: new FormControl<ExpandDirection>('either', { nonNullable: true }),
-            window: new FormControl<'inherit' | 'full'>('inherit', { nonNullable: true }),
+            window: new FormControl<'inherit' | 'full' | 'override'>('inherit', { nonNullable: true }),
+            /** Comma-separated link kinds; blank = all kinds. */
+            linkKinds: new FormControl('', { nonNullable: true, validators: maxKinds }),
             minEvents: new FormControl<number | string | null>(null, { validators: int(1) }),
             minDistinctDays: new FormControl<number | string | null>(null, { validators: int(1) }),
             candidateDegreeMin: new FormControl<number | string | null>(null, { validators: int(0) }),
@@ -54,7 +74,7 @@ export function rungForm() {
 export type RungForm = ReturnType<typeof rungForm>;
 
 /** Only the fields the analyst set — an unset field keeps the server default (budget 1 000-ish, minEvents 1, …). */
-export function rungOf(f: RungForm): ExpandRung {
+export function rungOf(f: RungForm, override?: WindowForm): ExpandRung {
     const v = f.getRawValue();
     const r: ExpandRung = {};
     for (const k of [
@@ -69,7 +89,11 @@ export function rungOf(f: RungForm): ExpandRung {
         if (n !== null) r[k] = n;
     }
     if (v.direction !== 'either') r.direction = v.direction;
-    if (v.window !== 'inherit') r.window = v.window;
+    if (v.window === 'override') {
+        if (override) r.window = windowOf(override);
+    } else if (v.window !== 'inherit') r.window = v.window;
+    const kinds = parseKinds(v.linkKinds);
+    if (kinds.length) r.linkKinds = kinds;
     return r;
 }
 

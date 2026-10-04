@@ -132,6 +132,14 @@
                             <mat-label>Category (optional)</mat-label>
                             <input matInput formControlName="category" placeholder="e.g. person" />
                         </mat-form-field>
+                        <mat-form-field subscriptSizing="dynamic" class="w-48">
+                            <mat-label>Attribute columns (optional)</mat-label>
+                            <mat-select formControlName="attributes" multiple>
+                                @for (c of nodeMappingColumns()[i] ?? []; track c.value) {
+                                    <mat-option [value]="c.value">{{ c.label }}</mat-option>
+                                }
+                            </mat-select>
+                        </mat-form-field>
                         <button
                             mat-icon-button
                             type="button"
@@ -172,6 +180,14 @@
                             <mat-label>Link type (optional)</mat-label>
                             <input matInput formControlName="type" placeholder="e.g. called" />
                         </mat-form-field>
+                        <mat-form-field subscriptSizing="dynamic" class="w-48">
+                            <mat-label>Attribute columns (optional)</mat-label>
+                            <mat-select formControlName="attributes" multiple>
+                                @for (c of edgeMappingColumns()[i] ?? []; track c.value) {
+                                    <mat-option [value]="c.value">{{ c.label }}</mat-option>
+                                }
+                            </mat-select>
+                        </mat-form-field>
                         <button
                             mat-icon-button
                             type="button"
@@ -180,6 +196,19 @@
                         >
                             <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                         </button>
+                        <div class="w-full" role="group" [attr.aria-label]="'Filter for edge mapping ' + (i + 1)">
+                            <p class="text-secondary m-0 text-xs">
+                                Filter (this mapping only; narrows its rows before they fold, and is combined with the
+                                predicate below).
+                            </p>
+                            @if (edgeFilters()[i]; as own) {
+                                <inspecto-query-condition-group
+                                    [group]="own"
+                                    [columns]="edgeFilterColumns()[i] ?? []"
+                                    [root]="true"
+                                ></inspecto-query-condition-group>
+                            }
+                        </div>
                     </div>
                 }
                 <button mat-stroked-button type="button" (click)="addNodeMapping()">
