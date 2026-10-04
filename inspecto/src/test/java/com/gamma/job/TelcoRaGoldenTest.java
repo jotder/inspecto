@@ -7,7 +7,9 @@ import com.gamma.signal.SignalEmitter;
 import com.gamma.util.DuckDbUtil;
 import com.gamma.util.RunLog;
 import com.gamma.util.Scheduler;
+import com.gamma.pipeline.SpaceConfigRoot;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,9 +55,17 @@ class TelcoRaGoldenTest {
         if (Boolean.getBoolean("telcora.regenerate")) CORPUS.writeTo(TEMPLATE.resolve("data").resolve("samples"));
     }
 
+    /** {@code SpaceConfigRoot.current()} prefers a registered Space over {@code -Dassist.write.root}; in the shared
+     *  {@code inspecto} test JVM an earlier class may have left one registered, which silently re-points this test. */
+    @BeforeEach
+    void startWithNoRegisteredSpace() {
+        SpaceConfigRoot.clear();
+    }
+
     @AfterEach
     void clearWriteRoot() {
         System.clearProperty("assist.write.root");
+        SpaceConfigRoot.clear();
     }
 
     @Test
