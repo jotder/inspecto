@@ -257,6 +257,21 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             if (load(name, e.getValue(), hash, trust)) (isReload ? reloaded : loadedNow).add(name);
             else rejected.add(name);
         }
+        // D-9 (S3-1): a pack whose Job/Step requires a service another pack contributes is refused when it
+        // sorts first. Retry such packs while a pass still loads something — no pack-dependency vocabulary.
+        boolean progress = !loadedNow.isEmpty() || !reloaded.isEmpty();
+        while (progress && !rejected.isEmpty()) {
+            progress = false;
+            for (String name : List.copyOf(rejected)) {
+                Map<String, Object> row = rejectedRows.get(name);
+                if (row == null || !String.valueOf(row.get("cause")).contains("unavailable Platform Service")) continue;
+                if (load(name, present.get(name), hash(present.get(name)), trust)) {
+                    rejected.remove(name);
+                    loadedNow.add(name);
+                    progress = true;
+                }
+            }
+        }
         return summary(loadedNow, reloaded, unloaded, rejected);
     }
 
@@ -310,11 +325,15 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             List<ParserPlugin> parsers = new ArrayList<>();
             for (ParserPlugin p : ServiceLoader.load(ParserPlugin.class, loader))
                 if (p.getClass().getClassLoader() == loader) parsers.add(p);
+            // The sixth kind (platform-services S3-1): a pack may contribute Platform Services.
+            List<ServiceProvider> services = new ArrayList<>();
+            for (ServiceProvider p : ServiceLoader.load(ServiceProvider.class, loader))
+                if (p.getClass().getClassLoader() == loader) services.add(p);
             if (providers.isEmpty() && exprProviders.isEmpty() && nodeTypes.isEmpty() && steps.isEmpty()
-                    && parsers.isEmpty())
+                    && parsers.isEmpty() && services.isEmpty())
                 throw new IllegalStateException(
-                        "no JobTypeProvider, ExpressionProvider, PipelineNodeType, StepExecutor or "
-                                + "ParserPlugin in META-INF/services");
+                        "no JobTypeProvider, ExpressionProvider, PipelineNodeType, StepExecutor, "
+                                + "ParserPlugin or ServiceProvider in META-INF/services");
 
             List<String> ids = new ArrayList<>();
             for (JobTypeProvider p : providers) {
@@ -328,6 +347,18 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
                 if (registry.has(id))
                     throw new IllegalStateException("job type id '" + id + "' already registered");
                 ids.add(id);
+            }
+            // Services first: a pack's own Job or Step may require a service the same pack contributes. A
+            // colliding id/interface, a pack-defined interface or a missing stand-in throws here, and the
+            // catch below takes every overlay back (the whole pack is rejected, nothing left bound).
+            if (!services.isEmpty()) {
+                PlatformServiceRegistry platform = registry.platform();
+                if (platform == null)
+                    throw new IllegalStateException("pack contributes Platform Services but this Space wires none");
+                for (ServiceProvider p : services) {
+                    platform.registerContributed(name, p);
+                    ids.add("service:" + p.id());
+                }
             }
             for (JobTypeProvider p : providers) registry.register(p, name);   // owner = jar filename
             // Expression tokens register under the same owner, so an unload takes them back with the types.
@@ -367,6 +398,7 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             PipelineNodeTypes.deregister(name);                         // half-loads — a refused node type
             StepExecutors.deregister(name);                             // must not leave a Step behind
             Parsers.deregister(name);                                   // ... nor a parser (the fifth kind)
+            if (registry.platform() != null) registry.platform().deregister(name);   // ... nor a service (sixth)
             if (loader != null) try { loader.close(); } catch (IOException ignore) { /* best effort */ }
             if (staged != null) try { Files.deleteIfExists(staged); } catch (IOException ignore) { /* best effort */ }
             log.warn("[PACKS] rejected {}: {}", name, ex.toString());
@@ -416,6 +448,9 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
         PipelineNodeTypes.deregister(name);
         StepExecutors.deregister(name);
         Parsers.deregister(name);   // a Pipeline naming its ingester then fails its next Run with a named error
+        // S3-1: the pack's services go with it. ⚠ No Run-grant pinning yet — a Run already holding a granted
+        // service keeps its reference; deferring the unload until it drains is S3-2.
+        if (registry.platform() != null) registry.platform().deregister(name);
         log.info("[PACKS] unloaded {} ({}): {}{}", pack.id(), name, removed,
                 removedTokens.isEmpty() ? "" : " + tokens " + removedTokens);
         signals.emit("job.pack.unloaded", Severity.INFO, packPayload(pack));

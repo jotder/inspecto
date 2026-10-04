@@ -189,7 +189,7 @@ Each slice is independently green; unit tests per change (`-pl inspecto-engine -
 | **S2-3** ✅ 2026-09-28 (§5.3) | `StepExecutor` + `StepContext` + `requires:` + dry-run + failure mapping + watchdog; pack raw-`Connection` executors rejected; `scaffold.mjs new step` unlocked | a pack Step runs armed and in a dry run (and knows which); a throwing Step leaves no node tables and fails the batch; a `reject:` emit is tagged as a reject stream by `ConservationCheck`; a sleeping Step is killed at its deadline with `STEP_TIMEOUT`; an undeclared service is invisible; `ScaffoldTemplatesTest` compiles and loads the new template |
 | **S2-4** | `graphLaneCarries` admits intervening nodes | `IngestLaneFlagTest`; the whole suite under `-Dingest.lane=graph` with zero refusals (the Row 15 parity gate, re-run); dedup / join / summarize between map and sink produce the same rows as today's at-rest run |
 | **S2-5** | Recipe spelling for a contributed kind (D-5) and catalog visibility (D-6) | `RecipeCompilerTest` round trip; contract JSONs regenerated in the same change |
-| **S3-1** | `ServiceProvider` via packs; overlay registry; collision rejects the pack; mandatory dry-run stand-in; `new service` unlocked | a service from pack A consumed by a Job in pack B; a colliding pack rejected whole with nothing left registered; a dry run of a Job using a contributed mutating service records, does not act |
+| **S3-1** ✅ 2026-10-04 (§5.4) | `ServiceProvider` via packs; overlay registry; collision rejects the pack; mandatory dry-run stand-in; `new service` unlocked | a service from pack A consumed by a Job in pack B; a colliding pack rejected whole with nothing left registered; a dry run of a Job using a contributed mutating service records, does not act |
 | **S3-2** | Reference-tracked quiesce + enable/disable | unload while a granted Run is in flight defers until drain; disable refuses new grants, running grants finish |
 | **S3-3** | `DatasetAccess` (read side first) | gated on D-10 |
 
@@ -306,6 +306,22 @@ Row 15 gate), and it changes ingest behaviour: `prepare()` refuses dedup/join/su
 lane, and the ingest lane passes no reference or run context (`ReferenceResolver.NONE`,
 `ExecutionContext.NONE`). So it is its own slice, not a small follow-on.
 
+### 5.4 S3-1 — as built (2026-10-04)
+
+As-built facts are in the owner concept, [`platform-services.md`](../okf/backend/control-plane/platform-services.md) §7d.
+
+1. `ServiceProvider` (`id`, `type`, `create`, `readOnly`, `dryRun(RunLog)`) is the sixth pack kind, discovered in
+   `JobPackManager.load` and registered **before** the pack's Job Types so a pack's own Job can require its service.
+2. `PlatformServiceRegistry.registerContributed(owner, p)` enforces D-12: `type()` must be an interface that the
+   pack's own loader did not define. It also refuses a colliding id or interface, a factory result that is not an
+   instance, and a mutating service whose `dryRun` does not return one. `deregister(owner)` runs in both the
+   rejection block and `unload`.
+3. `DryRunServices` asks a granted view for the contributed stand-in (`PlatformServiceRegistry.StandIns`); no
+   call site changed.
+4. D-9: after the load loop, `rescan()` retries packs refused with `unavailable Platform Service` while a pass
+   still loads something. The first refusal still emits `job.pack.rejected`.
+5. **Not in S3-1:** pinning a pack for Runs granted its services (S3-2). Unload deregisters the services at once.
+
 ## 6. Deliberately not designed here
 
 New Step Processors (on hold) · fan-in for contributed Steps (`RowShaper.merge` stays built-in-only) ·
@@ -350,6 +366,11 @@ The operator accepted every recommendation below on 2026-09-28. Each entry keeps
    rejected packs after each load round, or declared pack dependencies. *Recommended: the retry pass —
    no new manifest vocabulary.*
    **✅ Decided 2026-09-28 (operator): the retry pass.**
+10a. **D-12 — Where does a contributed service's interface live?** Services are looked up by `Class` identity and
+    each pack has its own parent-first loader, so a pack-defined interface cannot be shared with a consumer in
+    another pack. Options: (1) engine-published `@PublicApi` interfaces only; (2) a shared pack-API loader;
+    (3) child loaders chained to the provider. *Recommended: 1.*
+    **✅ Decided 2026-10-04 (operator): option 1.** Option 2 is recorded as a later design only.
 10. **D-10 — Is the `DatasetAccess` gate met?** `ConsignmentSelector` exists; confirm its pruning and
     generation pinning are the ones `DatasetAccess` should inherit before S3-3 is sized.
     **⏸ Deferred 2026-09-28 (operator):** gates S3-3 only; nothing else waits on it.

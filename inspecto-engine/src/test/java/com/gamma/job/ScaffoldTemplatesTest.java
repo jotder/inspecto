@@ -191,6 +191,30 @@ class ScaffoldTemplatesTest {
         }
     }
 
+    /** S3-1: the {@code service} template is a real pack. It compiles (its test included) and loads through
+     *  {@link JobPackManager}, which binds its service under the pack. */
+    @Test
+    void theServiceTemplateCompilesAndLoads(@TempDir Path work) throws Exception {
+        Path project = stamp(templates().resolve("service"), work.resolve("project"));
+        Path classes = compile(project, work.resolve("classes"));
+        Path jar = work.resolve("acme-reconcile-service.jar");
+        packageJar(jar, classes, project.resolve("src/main/resources"));
+
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        Files.copy(jar, packsDir.resolve(jar.getFileName()));
+        JobPackManagerTest.trustEveryJarIn(packsDir);
+        PlatformServiceRegistry platform = new PlatformServiceRegistry();
+        List<String> signals = new ArrayList<>();
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(platform),
+                ExpressionRegistry.withBuiltins(), (t, sev, payload) -> signals.add(t))) {
+            mgr.scanAtStartup();
+            assertTrue(platform.has("acme.reconcile"),
+                    "the scaffolded Service pack did not load: " + signals + " " + mgr.inventory());
+        } finally {
+            JobPackManagerTest.clearTrust();
+        }
+    }
+
     // ── the scaffolder's substitution, in Java ────────────────────────────────
 
     /** Walk up from the module dir to the repo root, which is where {@code tools/templates} lives. */

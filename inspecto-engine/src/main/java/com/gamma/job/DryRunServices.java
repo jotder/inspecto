@@ -64,6 +64,11 @@ final class DryRunServices implements PlatformServices {
                 return List.<Alert>of();
             });
         }
+        // S3-1: a pack-contributed mutating service substitutes through its own mandatory stand-in.
+        if (granted instanceof PlatformServiceRegistry.StandIns s) {
+            Optional<Object> standIn = s.standIn(type, log);
+            if (standIn.isPresent()) return Optional.of((T) standIn.get());
+        }
         return real;   // read-only services are unaffected by a dry run
     }
 

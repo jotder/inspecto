@@ -781,6 +781,183 @@ class JobPackManagerTest {
         }
     }
 
+    // ── S3-1: pack-contributed Platform Services ────────────────────────────────────────────────────
+
+    /** Source of a pack contributing a MUTATING {@code mail} service: the real one writes "real" to the file
+     *  named by {@code svc.out}; its dry-run stand-in logs and writes nothing. */
+    private static final String MAIL_SERVICE_SRC = """
+            package com.acme.pack;
+            import com.gamma.job.ServiceProvider;
+            import com.gamma.notify.MailAccess;
+            import com.gamma.util.RunLog;
+            public class MailSvc implements ServiceProvider {
+                public String id() { return "mail"; }
+                public Class<?> type() { return MailAccess.class; }
+                public Object create() {
+                    return (MailAccess) (to, cc, subject, body, att) -> {
+                        java.nio.file.Files.writeString(java.nio.file.Path.of(System.getProperty("svc.out")),
+                                "real;", java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+                        return true;
+                    };
+                }
+                //DRYRUN-BEGIN
+                public Object dryRun(RunLog log) {
+                    return (MailAccess) (to, cc, subject, body, att) -> {
+                        log.info("stand-in: would send mail", "subject", subject);
+                        return false;
+                    };
+                }
+                //DRYRUN-END
+            }
+            """;
+
+    private static Path buildMailServiceJar(Path work, Path jar) throws Exception {
+        Path classes = compile(work, "com/acme/pack/MailSvc.java", MAIL_SERVICE_SRC);
+        writeJar(jar, classes, "acme-mail", "1.0.0", Map.of("com.gamma.job.ServiceProvider", "com.acme.pack.MailSvc"));
+        return jar;
+    }
+
+    /** A pack whose Job requires {@code mail} and sends one message through it. */
+    private static Path buildMailConsumerJar(Path work, Path jar) throws Exception {
+        String src = """
+                package com.acme.pack;
+                import com.gamma.job.*;
+                import com.gamma.notify.MailAccess;
+                import java.util.List;
+                @JobTypeMeta(id = "acme.mailer", title = "Mailer")
+                public class Mailer implements JobTypeProvider {
+                    public JobTypeDescriptor descriptor() {
+                        return new JobTypeDescriptor("acme.mailer", "Mailer", "sends through a granted service",
+                                List.of(), List.of(), List.of(), List.of("mail"));
+                    }
+                    public Job create(JobConfig config) {
+                        return new Job() {
+                            public String name() { return config.name(); }
+                            public String type() { return "acme.mailer"; }
+                            public JobResult run() { return JobResult.ok("no context", 0L); }
+                            public JobResult run(JobContext ctx) {
+                                try {
+                                    ctx.services().get(MailAccess.class).send(List.of("a@b.c"), List.of(), "hi", "body");
+                                } catch (Exception e) { throw new IllegalStateException(e); }
+                                return JobResult.ok("sent", 0L);
+                            }
+                        };
+                    }
+                }
+                """;
+        Path classes = compile(work, "com/acme/pack/Mailer.java", src);
+        writeJar(jar, classes, "acme-mailer", "1.0.0", Map.of("com.gamma.job.JobTypeProvider", "com.acme.pack.Mailer"));
+        return jar;
+    }
+
+    @Test
+    void aServiceFromPackAIsConsumedByAJobInPackBAndADryRunRecordsInsteadOfActing(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        // The consumer sorts FIRST, so it is refused on the first pass and only the D-9 retry loads it.
+        buildMailConsumerJar(work, packsDir.resolve("a-consumer.jar"));
+        buildMailServiceJar(work, packsDir.resolve("b-provider.jar"));
+        Path out = work.resolve("mail.out");
+        System.setProperty("svc.out", out.toString());
+
+        PlatformServiceRegistry platform = new PlatformServiceRegistry();
+        JobTypeRegistry registry = new JobTypeRegistry(platform);
+        trustEveryJarIn(packsDir);
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry,
+                ExpressionRegistry.withBuiltins(), new Sink())) {
+            mgr.scanAtStartup();
+
+            assertTrue(platform.has("mail"), "pack B's service is bound: " + mgr.inventory());
+            assertTrue(registry.has("acme.mailer"), "pack A's Job loaded on the retry pass: " + mgr.inventory());
+
+            Job job = registry.create("acme.mailer", jobConfig("m1", "acme.mailer"));
+            assertEquals("SUCCESS", job.run(new GrantedContext(platform.grant(Set.of("mail")))).status());
+            assertEquals("real;", Files.readString(out), "the consumer reached pack B's real service");
+
+            // Dry run: the same grant, wrapped. The contributed stand-in logs and the real service is not called.
+            List<String> lines = new CopyOnWriteArrayList<>();
+            RunLog log = new RunLog() {
+                @Override public void info(String m, Object... kv) { lines.add(m); }
+                @Override public void warn(String m, Object... kv) {}
+                @Override public void error(String m, Throwable t, Object... kv) {}
+            };
+            PlatformServices dry = DryRunServices.wrap(platform.grant(Set.of("mail")), log);
+            assertFalse(dry.get(com.gamma.notify.MailAccess.class)
+                    .send(List.of("a@b.c"), List.of(), "hi", "body"));
+            assertEquals(List.of("stand-in: would send mail"), lines);
+            assertEquals("real;", Files.readString(out), "a dry run did not act");
+        } finally {
+            System.clearProperty("svc.out");
+            clearTrust();
+        }
+    }
+
+    @Test
+    void aCollidingServiceRejectsThePackWholeAndLeavesNothingRegistered(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        // Two services: the first ('ok') is fine, the second ('mail') collides with the host's binding.
+        String src = """
+                package com.acme.pack;
+                import com.gamma.job.ServiceProvider;
+                import com.gamma.notify.MailAccess;
+                import com.gamma.notify.NotificationAccess;
+                public class Two {
+                    public static class Ok implements ServiceProvider {
+                        public String id() { return "ok"; }
+                        public Class<?> type() { return NotificationAccess.class; }
+                        public Object create() { return (NotificationAccess) n -> java.util.Optional.of(n); }
+                        public boolean readOnly() { return true; }
+                    }
+                    public static class Clash implements ServiceProvider {
+                        public String id() { return "mail"; }
+                        public Class<?> type() { return MailAccess.class; }
+                        public Object create() { return (MailAccess) (to, cc, s, b, a) -> true; }
+                        public boolean readOnly() { return true; }
+                    }
+                }
+                """;
+        Path classes = compile(work, "com/acme/pack/Two.java", src);
+        writeJar(packsDir.resolve("two.jar"), classes, "acme-two", "1.0.0", Map.of("com.gamma.job.ServiceProvider",
+                "com.acme.pack.Two$Ok\ncom.acme.pack.Two$Clash"));
+
+        PlatformServiceRegistry platform = new PlatformServiceRegistry();
+        platform.register("mail", com.gamma.notify.MailAccess.class, (to, cc, s, b, a) -> true);
+        JobTypeRegistry registry = new JobTypeRegistry(platform);
+        trustEveryJarIn(packsDir);
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry,
+                ExpressionRegistry.withBuiltins(), new Sink())) {
+            mgr.scanAtStartup();
+            assertEquals(List.of("rejected"), states(mgr));
+            assertFalse(platform.has("ok"), "the first service was rolled back with the pack");
+            assertEquals(Set.of("mail"), platform.ids(), "only the host's own binding remains");
+        } finally {
+            clearTrust();
+        }
+    }
+
+    @Test
+    void aMutatingServiceWithoutADryRunStandInIsRefused(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        String src = MAIL_SERVICE_SRC.replace("MailSvc", "NoStandIn")
+                .replaceAll("(?s)//DRYRUN-BEGIN.*?//DRYRUN-END", "");
+        Path classes = compile(work, "com/acme/pack/NoStandIn.java", src);
+        writeJar(packsDir.resolve("nostandin.jar"), classes, "acme-nsi", "1.0.0",
+                Map.of("com.gamma.job.ServiceProvider", "com.acme.pack.NoStandIn"));
+        PlatformServiceRegistry platform = new PlatformServiceRegistry();
+        trustEveryJarIn(packsDir);
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(platform),
+                ExpressionRegistry.withBuiltins(), new Sink())) {
+            mgr.scanAtStartup();
+            assertEquals(List.of("rejected"), states(mgr));
+            assertTrue(String.valueOf(mgr.inventory().get(0).get("cause")).contains("dry-run stand-in"));
+            assertFalse(platform.has("mail"));
+        } finally {
+            clearTrust();
+        }
+    }
+
     /** A {@link JobContext} carrying a pre-granted {@link PlatformServices} — everything else is inert,
      *  because what is under test is the grant a pack Job receives. */
     private record GrantedContext(PlatformServices services) implements JobContext {

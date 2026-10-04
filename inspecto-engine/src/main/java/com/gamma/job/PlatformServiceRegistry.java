@@ -1,9 +1,14 @@
 package com.gamma.job;
 
+import com.gamma.util.RunLog;
+
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * The boot-built registry behind {@link PlatformServices} (platform-services plan §3.1): the one
@@ -20,7 +25,13 @@ import java.util.Set;
 public final class PlatformServiceRegistry {
 
     /** One bound service: the id authors declare in {@code requires:}, its public interface, the engine impl. */
-    private record Binding(String id, Class<?> type, Object impl) {}
+    private record Binding(String id, Class<?> type, Object impl, String owner,
+                           Function<RunLog, Object> standIn) {}
+
+    /** What a granted view can say about contributed mutating services: the dry-run stand-in, if any. */
+    interface StandIns {
+        Optional<Object> standIn(Class<?> type, RunLog log);
+    }
 
     private final Map<String, Binding> byId = new LinkedHashMap<>();
 
@@ -32,7 +43,51 @@ public final class PlatformServiceRegistry {
             if (b.type() == type)
                 throw new IllegalStateException("Platform Service interface already bound: "
                         + type.getName() + " (as id '" + b.id() + "')");
-        byId.put(id, new Binding(id, type, impl));
+        byId.put(id, new Binding(id, type, impl, null, null));
+    }
+
+    /**
+     * Bind a pack-contributed service under {@code owner} (S3-1). Refuses a colliding id or interface, an
+     * interface the pack itself defines (D-12), an implementation that is not an instance of the interface,
+     * and a mutating service without a usable dry-run stand-in. The caller rolls the pack back on a throw.
+     */
+    @SuppressWarnings("unchecked")
+    public synchronized void registerContributed(String owner, ServiceProvider p) {
+        String id = p.id();
+        Class<?> type = p.type();
+        if (id == null || id.isBlank() || type == null)
+            throw new IllegalStateException(p.getClass().getName() + " has a blank service id or no interface");
+        if (!type.isInterface() || type.getClassLoader() == p.getClass().getClassLoader())
+            throw new IllegalStateException("service '" + id + "' interface " + type.getName()
+                    + " must be an engine-published interface, not one the pack defines");
+        Object impl = p.create();
+        if (!type.isInstance(impl))
+            throw new IllegalStateException("service '" + id + "' factory did not return a " + type.getName());
+        Function<RunLog, Object> standIn = null;
+        if (!p.readOnly()) {
+            RunLog probe = new RunLog() {
+                @Override public void info(String m, Object... kv) {}
+                @Override public void warn(String m, Object... kv) {}
+                @Override public void error(String m, Throwable t, Object... kv) {}
+            };
+            if (!type.isInstance(p.dryRun(probe)))
+                throw new IllegalStateException("mutating service '" + id + "' has no dry-run stand-in "
+                        + "(dryRun must return a " + type.getName() + ") and does not declare readOnly()");
+            standIn = p::dryRun;
+        }
+        register(id, (Class<Object>) type, impl);
+        byId.put(id, new Binding(id, type, impl, owner, standIn));
+    }
+
+    /** Remove every service {@code owner} contributed; returns their ids. */
+    public synchronized List<String> deregister(String owner) {
+        List<String> removed = new ArrayList<>();
+        byId.values().removeIf(b -> {
+            boolean mine = owner.equals(b.owner());
+            if (mine) removed.add(b.id());
+            return mine;
+        });
+        return removed;
     }
 
     /** Whether {@code id} is available in this build — the S1-2 registration-time {@code requires:} check. */
@@ -48,17 +103,24 @@ public final class PlatformServiceRegistry {
     /** A view filtered to exactly {@code ids}; throws naming any id not bound in this build. */
     public synchronized PlatformServices grant(Set<String> ids) {
         Map<Class<?>, Object> granted = new LinkedHashMap<>();
+        Map<Class<?>, Function<RunLog, Object>> standIns = new LinkedHashMap<>();
         for (String id : ids) {
             Binding b = byId.get(id);
             if (b == null)
                 throw new IllegalStateException("Platform Service not available in this build: '" + id
                         + "' (available: " + byId.keySet() + ")");
             granted.put(b.type(), b.impl());
+            if (b.standIn() != null) standIns.put(b.type(), b.standIn());
         }
-        return new Granted(Map.copyOf(granted));
+        return new Granted(Map.copyOf(granted), Map.copyOf(standIns));
     }
 
-    private record Granted(Map<Class<?>, Object> byType) implements PlatformServices {
+    private record Granted(Map<Class<?>, Object> byType, Map<Class<?>, Function<RunLog, Object>> standIns)
+            implements PlatformServices, StandIns {
+        @Override public Optional<Object> standIn(Class<?> type, RunLog log) {
+            Function<RunLog, Object> f = standIns.get(type);
+            return f == null ? Optional.empty() : Optional.ofNullable(f.apply(log));
+        }
         @SuppressWarnings("unchecked")
         @Override public <T> Optional<T> find(Class<T> type) {
             return Optional.ofNullable((T) byType.get(type));

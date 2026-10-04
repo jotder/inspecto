@@ -6,7 +6,7 @@
 //   node tools/scaffold.mjs new processor --id acme.masker    --name "Acme Masker"
 //   node tools/scaffold.mjs new nodetype  --id acme.redact    --name "Acme Redact"
 //   node tools/scaffold.mjs new step      --id acme.score     --name "Acme Score"
-//   node tools/scaffold.mjs new service   ...   # refuses until contributed services land (S3-1)
+//   node tools/scaffold.mjs new service   --id acme.geoip --name "Acme GeoIP"
 //
 // Design notes, each one load-bearing:
 //
@@ -19,8 +19,8 @@
 //     dependency that does not resolve.
 //   * TOKENS ARE {{name}}, NOT ${name}. A generated pom.xml legitimately contains Maven's own
 //     ${...} properties (${project.version}); sharing the delimiter would mean stamping over them.
-//   * REFUSALS ARE HONEST. `new service` does not emit a half-working skeleton for a mount the
-//     engine cannot host yet; it names the slice that unlocks it and exits non-zero.
+//   * REFUSALS ARE HONEST. A kind whose mount the engine cannot host yet is gated: it names the slice
+//     that unlocks it and exits non-zero, rather than emitting a half-working skeleton.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
@@ -38,12 +38,9 @@ const KINDS = {
     // A `step` is PACK-hosted (platform-services S2-3): an isolated classloader, a StepContext instead
     // of a connection, a requires: grant, and a watchdog. A pack may not carry a raw executor (D-2).
     step: { template: 'step', gate: null },
-    service: {
-        gate: 'Packs cannot contribute Platform Services yet. That is S3-1 of '
-            + 'docs/superpower/platform-services-plan.md (the ServiceProvider SPI + collision '
-            + 'handling). A pack can already *consume* every service in the v1 menu — declare it in '
-            + "the Job Type's requires: list.",
-    },
+    // A `service` is PACK-contributed (platform-services S3-1): a ServiceProvider implementing an
+    // engine-published interface (D-12), with a mandatory dry-run stand-in unless read-only.
+    service: { template: 'service', gate: null },
 };
 
 // ── args ───────────────────────────────────────────────────────────────────────
@@ -64,7 +61,7 @@ function parseArgs(argv) {
 
 function usage() {
     return [
-        'usage: node tools/scaffold.mjs new <job|processor|nodetype|step> --id <id> --name "<Name>" [--package <pkg>] [--out <dir>]',
+        'usage: node tools/scaffold.mjs new <job|processor|nodetype|step|service> --id <id> --name "<Name>" [--package <pkg>] [--out <dir>]',
         '',
         '  --id       the type id authors reference, e.g. acme.reconcile (lowercase, dot-separated)',
         '  --name     the human title shown in the UI',

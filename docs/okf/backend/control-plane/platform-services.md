@@ -107,8 +107,8 @@ node tools/scaffold.mjs new step      --id acme.score     --name "Acme Score"
 - **The engine coordinates are read out of `inspecto-engine/pom.xml` at generation time**, never
   hardcoded, so an artifactId or version change cannot leave the script emitting a dependency that
   does not resolve.
-- **`new service` refuses** with a pointer to the slice that unlocks it (S3-1), rather than emitting a
-  skeleton for a mount the engine cannot host. `new step` opened at S2-3 (§7c).
+- **`new service` and `new step`** both emit real packs: `new step` opened at S2-3 (§7c), `new service` at
+  S3-1 (§7d). A kind the engine cannot host yet is gated by name rather than emitted as a skeleton.
 
 **`PackTestHarness`** (`com.gamma.job`, main scope) is the real deliverable: it fires one Run without
 booting the engine, applying the *same* registration-time `requires:` check, Parameter resolution,
@@ -304,9 +304,22 @@ Row 15 is discharged there. S2-5 shipped 2026-10-04: a pack kind is spelled by t
 `RecipeCompiler` compiles it to `transform.<kind>` and `RecipeConverter` projects it back; a built-in, unloaded or
 kind-less step is refused) and stays out of `ProcessorCatalog` (D-6). ⚠ It also fixed two latent save-path defects:
 `PipelineEditable.lower` gated on the closed `LOWERABLE` set, and `isLegacyShaped` NPE'd on a contributed kind, so a
-contributed step could not be saved at all before. Stage 3 (pack-contributed services) remains. The open items
+contributed step could not be saved at all before. S3-1 (pack-contributed services, §7d) shipped 2026-10-04; S3-2 and S3-3 remain. The open items
 live in [`BACKLOG.md`](../../../BACKLOG.md) §4 under *Platform Services*. A Job-side watchdog is still a
 recorded gap; the Step watchdog is §7c.
+
+### 7d. Pack-contributed services (S3-1, 2026-10-04)
+
+- **`ServiceProvider`** is the sixth kind a pack carries: `id()`, `type()`, `create()`, `readOnly()`,
+  `dryRun(RunLog)`. It binds under the pack's owner key and is taken back on unload or rejection.
+- **D-12: the interface is engine-published.** Consumers match on `Class` identity and pack loaders cannot share
+  a type, so `type()` must be an interface the engine classpath exposes. A pack supplies an implementation of an
+  interface that exists but is not bound in this build. A pack-defined interface (a shared pack-API loader) is a later design.
+- **Fail-closed, whole pack:** a colliding id or interface, a pack-defined interface, a factory result that is not
+  an instance, or a mutating service with no dry-run stand-in rejects the pack and leaves nothing bound.
+- **Dry run:** `DryRunServices` substitutes the contributed stand-in; a `readOnly()` service passes through.
+- **D-9 retry pass:** `rescan()` retries a pack refused for an unavailable service while a pass still loads something.
+- ⚠ **Not yet:** a Run granted a pack's service does not pin the pack (S3-2). Unload removes the binding at once.
 
 Related: [Job vs Pipeline Step](job-vs-step.md) · [Jobs & Scheduling](jobs.md) ·
 [Signal backbone](signal-backbone.md) · [API stability policy](api-stability.md) ·
