@@ -1342,7 +1342,7 @@ gate and never sees a Subject.
   input fingerprint. Manifests written before that fix read once as `relation_sql_changed`.
 * **Two copies of the data.** The index is a second copy, so the disk estimate is a budget (`index.max_disk_bytes`) and a rebuild peaks at
   about 2x (old and new version coexist until GC; `keep_versions` default 2, a stage touched in the last 5 minutes is never collected).
-  Extrapolating to 10^9 edges (about 34 GB per index) is NOT measured; D-3 claims <= 10^8.
+  Extrapolating to 10^9 edges (about 34 GB per index) is NOT measured (a 10^9 build would take about 2.5 h); D-3 claims <= 10^8.
 * A non-UTC `timeColZone` makes a temporal constraint non-servable (`time_zone_not_servable`): the flat path compares raw wall-clock
   values and DST changes durations, the index stores UTC instants. A filter on the weight column is not servable (stored as DOUBLE).
 * `neighbors` and `expand` fold EVERY row of a value (a count is exact only over all of them), so a node of millions of rows is bounded only
@@ -1358,8 +1358,37 @@ gate and never sees a Subject.
 
 **Not built (D-3).** The Investigation response naming WHY it fell back (only `neighbors` shows
 `rung_not_indexable` and the rest); `window` / `at`, hidden entities and `merged` rungs on the index; a scheduler or auto-compact; the
-`JobTypeProvider` adapter; `IndexSubgraph` and deep multi-hop (Path A); `K = 8` deltas and latency at 10^8 through the route, both
-unmeasured; cross-Dataset graphs. Filed: `LA-INDEX-SPA-SURFACES-1`, `LA-INDEX-SCALE-MEASURE-1`.
+`JobTypeProvider` adapter; `IndexSubgraph` and deep multi-hop (Path A); the 10^9 run (`K = 8` deltas and latency at 10^8 are
+measured, see *Index scale measurements*); cross-Dataset graphs. Filed: `LA-INDEX-SPA-SURFACES-1`, `LA-INDEX-SCALE-MEASURE-1`.
+
+## Index scale measurements (LA-INDEX-SCALE-MEASURE-1, 2026-10-05)
+
+Harness: `IndexScaleBench` in `inspecto-la-storage` tests (`-Dinspecto.bench.dir=<dir> -Dinspecto.bench.edges=N`; knobs `deltaEdges`,
+`maxDeltas`, `skipDeltas`, `skipCompact`, `buildMemory`, `samples`; never in the default suite). Method: D-S5 skew corpus (source ~
+nodes x u^3, target ~ nodes x u^2, nodes = edges / 5) written as real parquet files, a real `IndexBuilder` FULL build, then 1-8 appended
+delta files of 100,000 edges each (`IndexBuilder.Mode.APPEND`), then `COMPACT`; reads through `IndexReader.edges` and
+`IndexedTraversal.walk` (undirected, depth 2) over 60 random keys per series after one warm-up. Windows laptop, 12 hardware threads, warm.
+
+| Edges | FULL build | Index size | 1 key p50 / p95, 0 deltas | 1 key p50, 8 deltas | 1 key p50, compacted | depth-2 walk p50 / p95 |
+|---|---|---|---|---|---|---|
+| 10^6 | 4 s | 0.02 GB | 26.6 / 43.5 ms | 35.3 ms | 18.3 ms | 229 / 538 ms |
+| 10^7 | 22 s | 0.23 GB | 20.2 / 27.3 ms | 29.9 ms | 15.7 ms | 32 / 489 ms |
+| 10^8 | 447 s (32 buckets, 8 GB cap) | 2.23 GB | 20.9 / 31.0 ms | 37.8 ms | not run | 21.8 / 32.0 ms |
+
+* **`K = 8` holds.** The cost of a delta is linear and small: about +0.2 ms per delta on a single key at 10^8 (20.9, 24.4, 27.8, 33.9, 37.8 ms
+  at 0, 2, 4, 6, 8); a hub key 36.2 to 56.2 ms; a 20-key lookup 408 to 766 ms. No cliff before the cap; compaction restores the
+  single-file figure.
+* **Latency is flat in N** for a key lookup (about 20 ms from 10^6 to 10^8). A walk costs its frontier: a 20-key frontier is about 0.4 s
+  at every scale (about 20 ms per key, sequential), so the 20-key cap, not N, bounds a walk. The 10^6 / 10^7 depth-2 p95 is the 20-key
+  frontier case; at 10^8 the random keys of this corpus are cold (degree about 1) so the walk p95 is low; the 5 of 60 walks refused as
+  `FrontierOverCap` are the hubs.
+* **Caveats.** The corpus has no weight or extra columns, so 22 bytes per edge is below the documented 34 and does not retire that
+  estimate. Delta size was fixed at 100,000 edges. COMPACT was not run at 10^8. **10^9 was not run**: build time grows about 20x per
+  10x (4 s, 22 s, 447 s), so about 2.5 h, over the 20-minute limit per measurement; the 34 GB, 2x rebuild peak and the 10^9
+  `DraftConcurrencyBench` re-run remain extrapolations (backlog row `LA-INDEX-SCALE-MEASURE-1`).
+* **Defect found by the 10^8 build.** The pinned-file-list regex in `IndexBuilder.relationSqlHash` recursed per character and threw
+  `StackOverflowError` (surfaced as `index build failed: null`, after the whole build ran) for a list of about 20 long paths; fixed with
+  possessive quantifiers, pinned by `IndexBuilderTest.theRelationHashSurvivesALongPinnedFileList`.
 
 ## SPA separation record (D-5: library, second shell, packaging)
 
