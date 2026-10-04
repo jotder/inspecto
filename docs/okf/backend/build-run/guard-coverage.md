@@ -217,6 +217,13 @@ never the body), or **(c)** an id heads two ranked rows. Wired in `ci.yml` and `
 beside the gate-tally guard; `node tools/check-board-heads.mjs [file]` takes an optional path so a
 planted copy can be checked without touching the board.
 
+⚠ **What the guard does NOT cover — the sibling-doc shape (row closed 2026-10-04).** A row filed
+off one doc's prose while a sibling doc already says the work shipped (`STREAM-CONSUMER-1` vs
+`roadmap/ROADMAP.md` §3.4) is not caught mechanically, and no check is proposed: headlines and
+prose paragraphs share no id or marker to compare. The remedy is procedural — grep the id and the
+feature across `docs/okf/` and `docs/roadmap/` before filing. §3.4 was re-grounded at close and
+already reads the consumer as BUILT.
+
 * **The markers are deliberately narrow** — uppercase `CLOSED` (except `fail CLOSED`), `✅` directly
   followed by SHIPPED/CLOSED/DONE, `had`/`already shipped|closed`, a `**SHIPPED`/`**DONE` headline, a
   strike in the head, and a wholly struck ranked row. Lowercase `shipped`, `BUILT` and `decided` are

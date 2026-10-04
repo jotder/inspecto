@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **54<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 40<!--count:backlog-p3--> × P3** —
+> **53<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 39<!--count:backlog-p3--> × P3** —
+> ⬇ **54 → 53 (P3 40 → 39) on 2026-10-04**: closed P3 `BOARD-STALE-HEADS-1` — its last open clause, `roadmap/ROADMAP.md` §3.4, already reads the stream consumer as BUILT (`STREAM-CONSUMER-1`, closed 2026-09-24); the sibling-doc shape stays without a mechanical check by decision of the row itself (as-built `okf/backend/build-run/guard-coverage.md`).
 > ⬆ **53 → 54 on 2026-10-04**: filed P3 `LA-INVESTIGATION-STORE-DESIGN-1` (§3.12) — the `InvestigationStore` seam design for multi-pod Postgres; design only, decisions D-IS1…D-IS12 answered 2026-10-04 (all recommendations accepted).
 > ⬇ **55 → 53 (P2 15 → 14, P3 40 → 39) on 2026-10-04** (integration of the 2026-10-04 lanes; the per-lane ⬇/⬆ lines were folded into this one): closed P2 `INGEST-OUTPUT-NAME-EMBEDS-SOURCE-STEM-1`, P2 `INGEST-RAW-SOURCE-COPIES-RETENTION-1` (its filing and closure net out), P2 `ASSURE-WORKFLOW-SLA-1`, P3 `TESTCONFIGS-PREFIX-SUFFIX-TRAP-1` and P3 `ALERT-HEAL-FLAP-1`; filed P3 `ASSURE-WORKFLOW-SLA-RESIDUALS-1` and P3 `NATIVE-LICENCE-LINUX-MACOS-1`; retitled `SCHEDULE-EXPORT-DIALOG-DEAD-1` to `SCHEDULE-EXPORT-DASHBOARD-SCOPE-1`.
 > ⬇ **57 → 56 on 2026-10-03**: closed P3 `ENGINE-INMEMORY-UNSEALED-1` — the LA index build no longer takes the unsealed file-access opt-in: `DatasetProvider.readRoots` → `IndexBuildService.Relation` → `IndexBuilder.Request` declare the Dataset roots, the connection is sealed to them plus the store directory, and `openInMemoryWithFileAccess` is deleted (no caller left); the `DuckDbExtension` / DuckLake host gate and T9/T10 are tracked by `DUCKLE-C6-POLICY-NARROWING-1` (S5).
@@ -141,10 +142,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 40<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 39<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 40<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 54<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 39<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 53<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -464,7 +465,8 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 
 ## 5. Docs & board hygiene
 
-- **P3** · `BOARD-STALE-HEADS-1` — **rows filed off one doc's prose without checking a sibling doc.** The guard half shipped 2026-09-25: `tools/check-board-heads.mjs` (CI + pre-push) fails when a row id is both struck and live, when a §3–§5 head carries a closed marker, or when an id is ranked twice (`okf/backend/build-run/guard-coverage.md`). **Still open:** the third shape — the `STREAM-CONSUMER-1` / `roadmap/ROADMAP.md` §3.4 case; correct that paragraph if it still reads as unbuilt. No mechanical check is proposed for it. ⚠ P3 only because it is tooling; the cost is measured in whole shifts.
+_No open rows (last closed: `BOARD-STALE-HEADS-1`, 2026-10-04)._
+
 
 ## 6. Standing refusals and won't-do (not work — keep so nobody re-files)
 
