@@ -8,7 +8,6 @@ import com.gamma.la.core.DraftCheckpoints;
 import com.gamma.la.core.DraftLifecycle;
 import com.gamma.la.core.DraftStore;
 import com.gamma.la.core.InvestigationEvaluator;
-import com.gamma.la.core.SnapshotStore;
 import com.gamma.la.storage.IndexBuilder;
 import com.gamma.la.storage.IndexManifest;
 import com.gamma.la.storage.IndexMapping;
@@ -131,7 +130,7 @@ class DraftConcurrencyBench {
 
         // ── open: cap check + seat + pin + base fold + first index touch ──
         long heap0 = heap(), commit0 = commit();
-        List<Path> dirs = new ArrayList<>();
+        List<String> dirs = new ArrayList<>();
         long[] openMs = new long[drafts];
         for (int i = 0; i < drafts; i++) {
             long t = System.nanoTime();
@@ -167,23 +166,23 @@ class DraftConcurrencyBench {
         report(active + " active think " + thinkMs + " ms + heavy saturated", heavyThink);
         long heap2 = heap();
         long steps = 0;
-        for (Path d : dirs) steps += SnapshotStore.readLogAt(d).size();
+        for (String d : dirs) steps += store.log(InvestigationStore.Scope.draft(INV, d)).size();
         System.out.printf("D-S5R memory after the phases: %d own steps over %d Drafts, heap +%.2f MB over the pre-open heap (%.3f MB/Draft)%n",
                 steps, drafts, (heap2 - heap0) / 1048576.0, (heap2 - heap0) / 1048576.0 / drafts);
 
         // ── the long Draft: longSteps appends, then hibernate / rehydrate / promote ──
-        Path longDir = dirs.get(0);
-        if (SnapshotStore.readLogAt(longDir).size() < longSteps) run(List.of(longDir), 1, 0, 0, 0, longSteps);
+        String longDir = dirs.get(0);
+        if (store.log(InvestigationStore.Scope.draft(INV, longDir)).size() < longSteps) run(List.of(longDir), 1, 0, 0, 0, longSteps);
 
         // ── hibernate every Draft, then rehydrate each with its one cold fold ──
-        Map<Path, String> before = new LinkedHashMap<>();
-        for (Path d : dirs) before.put(d, stateOf(d).hash());
+        Map<String, String> before = new LinkedHashMap<>();
+        for (String d : dirs) before.put(d, stateOf(d).hash());
         long heapH0 = heap();
         long[] hib = new long[drafts];
         for (int i = 0; i < drafts; i++) {
             long t = System.nanoTime();
-            DraftLifecycle.hibernate(dirs.get(i));
-            DraftAdmission.evictCaches(dirs.get(i));
+            store.hibernateDraft(INV, dirs.get(i), java.time.Duration.ZERO);
+            DraftAdmission.evictCaches(main, dirs.get(i));
             hib[i] = (System.nanoTime() - t) / 1000;
         }
         long heapH1 = heap();
@@ -191,9 +190,9 @@ class DraftConcurrencyBench {
         int mismatch = 0;
         long longReh = 0;
         for (int i = 0; i < drafts; i++) {
-            Path d = dirs.get(i);
+            String d = dirs.get(i);
             long t = System.nanoTime();
-            DraftLifecycle.rehydrate(d);
+            store.rehydrateDraft(INV, d);
             String h = stateOf(d).hash();
             reh[i] = (System.nanoTime() - t) / 1_000_000;
             if (d.equals(longDir)) longReh = reh[i];
@@ -204,10 +203,10 @@ class DraftConcurrencyBench {
         System.out.printf("D-S5R hibernate: p50 %d us max %d us; heap released %.2f MB for %d Drafts%n", pct(hib, 50), hib[drafts - 1],
                 (heapH0 - heapH1) / 1048576.0, drafts);
         System.out.printf("D-S5R rehydrate (cold fold of main + own log): p50 %d ms max %d ms; the %d-step Draft %d ms; state mismatches %d%n",
-                pct(reh, 50), reh[drafts - 1], SnapshotStore.readLogAt(longDir).size(), longReh, mismatch);
+                pct(reh, 50), reh[drafts - 1], store.log(InvestigationStore.Scope.draft(INV, longDir)).size(), longReh, mismatch);
 
         // ── promote the long Draft (re-fold equivalence + append to main + marker + unpin) ──
-        String longId = longDir.getFileName().toString();
+        String longId = longDir;
         long t = System.nanoTime();
         Map<String, Object> out = DraftPromote.execute(main, longId, "bench", Map.of("approvedBy", "bench-lead"), null);
         System.out.printf("D-S5R promote: %s steps in %d ms (main %s -> %s)%n", out.get("steps"), (System.nanoTime() - t) / 1_000_000,
@@ -217,11 +216,8 @@ class DraftConcurrencyBench {
 
     // ── one Draft fork, as DraftRoutes does it minus HTTP: cap, seat, pin, base fold, first index touch ──
 
-    private Path fork(IndexMapping m, long version, String baseHash) throws Exception {
+    private String fork(IndexMapping m, long version, String baseHash) throws Exception {
         String id = DraftStore.newId();
-        Path d;
-        synchronized (DraftAdmission.CAP) {
-            DraftAdmission.requireRoom(main);
             Map<String, Object> h = new LinkedHashMap<>();
             h.put("draftId", id);
             h.put("investigationId", INV);
@@ -230,39 +226,35 @@ class DraftConcurrencyBench {
             h.put("baseStep", mainEntries.size());
             h.put("baseLogHash", baseHash);
             h.put("pins", Map.of("indexes", List.of(Map.of("mappingHash", m.hash(), "version", version))));
-            // DraftStore.create retries a transient Windows rename denial itself (DraftStore.moveRetrying).
-            if (!DraftStore.create(main.dir(), id, canonical(h))) throw new IllegalStateException("fork failed");
-            d = DraftStore.draftDir(main.dir(), id);
-        }
+            // the store checks the cap and creates in one act; it retries a transient Windows rename denial itself
+            if (store.createDraft(INV, id, canonical(h), String.valueOf(h.get("actor")), DraftLifecycle.maxOpenDrafts).outcome() != InvestigationStore.DraftCreation.Created.CREATED) throw new IllegalStateException("fork failed");
         new IndexStore(main.writeRoot().resolve(IndexRoutes.INDEX_DIR), DATASET, m.hash()).pins().pin(version, id);
-        DraftLifecycle.touch(d);
-        stateOf(d);
+        store.touchDraft(INV, id);
+        stateOf(id);
         try (IndexReader r = IndexReader.borrow(versionDir, manifest, SqlSandboxPolicy.defaultPolicy())) {
             r.degree("n7");
         }
-        return d;
+        return id;
     }
 
-    private InvestigationEvaluator.State stateOf(Path d) throws Exception {
+    private InvestigationEvaluator.State stateOf(String d) throws Exception {
         List<Map<String, Object>> all = new ArrayList<>(mainEntries);
-        all.addAll(DraftRebase.parseAll(SnapshotStore.readLogAt(d)));
-        return DraftCheckpoints.stateOf(d, all);
+        all.addAll(DraftRebase.parseAll(store.log(InvestigationStore.Scope.draft(INV, d))));
+        return DraftCheckpoints.stateOf(store.cacheKey(InvestigationStore.Scope.draft(INV, d)), store.logToken(InvestigationStore.Scope.draft(INV, d)), all);
     }
 
     /** Append one op to Draft {@code d} the checkpointed way (D7-4): one apply on the cached state, one append, remember. */
-    private void append(Path d, Map<String, Object> entry) throws Exception {
-        synchronized (InvestigationRoutes.lock(d)) {
+    private void append(String d, Map<String, Object> entry) throws Exception {
             List<Map<String, Object>> all = new ArrayList<>(mainEntries);
-            all.addAll(DraftRebase.parseAll(SnapshotStore.readLogAt(d)));
-            InvestigationEvaluator.State s = DraftCheckpoints.stateOf(d, all);
+            all.addAll(DraftRebase.parseAll(store.log(InvestigationStore.Scope.draft(INV, d))));
+            InvestigationEvaluator.State s = DraftCheckpoints.stateOf(store.cacheKey(InvestigationStore.Scope.draft(INV, d)), store.logToken(InvestigationStore.Scope.draft(INV, d)), all);
             int step = all.size() + 1;
             entry.put("step", step);
             InvestigationEvaluator.State next = DraftCheckpoints.after(s, all, entry);
             entry.put("workingSetHash", next.hash());
-            DraftStore.appendStep(d, step, canonical(entry), canonical(InvestigationRoutes.setDoc(step, next)));
-            DraftCheckpoints.remember(d, all.size() + 1, next);
-            DraftLifecycle.touch(d);
-        }
+            store.append(InvestigationStore.Scope.draft(INV, d), all.size() - mainEntries.size(), step, canonical(entry), canonical(InvestigationRoutes.setDoc(step, next)));
+            DraftCheckpoints.remember(store.cacheKey(InvestigationStore.Scope.draft(INV, d)), store.logToken(InvestigationStore.Scope.draft(INV, d)), all.size() + 1, next);
+            store.touchDraft(INV, d);
     }
 
     private static Map<String, Object> op(int step, String op, Map<String, Object> params) {
@@ -284,7 +276,7 @@ class DraftConcurrencyBench {
      * loop a 3-hop walk under {@code DraftAdmission.heavy}. Runs {@code seconds}, or (seconds 0) until worker 0 did
      * {@code appends} appends.
      */
-    private Result run(List<Path> dirs, int light, int heavy, long seconds, long thinkMs, int appends) throws Exception {
+    private Result run(List<String> dirs, int light, int heavy, long seconds, long thinkMs, int appends) throws Exception {
         List<List<Long>> reads = new ArrayList<>(), apps = new ArrayList<>(), heavies = new ArrayList<>();
         AtomicBoolean stop = new AtomicBoolean();
         CountDownLatch done = new CountDownLatch(light + heavy);
@@ -326,13 +318,13 @@ class DraftConcurrencyBench {
                             rows.add(Map.of("source", f.source(), "target", f.target(), "kind", f.extras().get(0), "count", f.count()));
                         Map<String, Object> e = op(0, "expand", new LinkedHashMap<>(Map.of("frontier", List.of(key), "hops", 1, "budget", 50, "maxFanOut", 50)));
                         e.put("read", Map.of("query", Map.of("frontier", List.of(key)), "rows", rows));
-                        Path d = dirs.get(wi);
+                        String d = dirs.get(wi);
                         // the frontier must be in the Working Set for the rows to admit: seed it first when it is not
                         if (!stateOf(d).entities.containsKey(key)) append(d, op(0, "seed", new LinkedHashMap<>(Map.of("ids", List.of(key)))));
                         t = System.nanoTime();
                         append(d, e);
                         ap.add((System.nanoTime() - t) / 1_000_000);
-                        if (appends > 0 && wi == 0 && SnapshotStore.readLogAt(d).size() >= appends) stop.set(true);
+                        if (appends > 0 && wi == 0 && store.log(InvestigationStore.Scope.draft(INV, d)).size() >= appends) stop.set(true);
                     }
                 } catch (Throwable e) {
                     errors.add(e);

@@ -4,7 +4,6 @@ import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.FsInvestigationStore;
 import com.gamma.la.core.DraftStore;
 import com.gamma.la.core.InvestigationEvaluator;
-import com.gamma.la.core.SnapshotStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
@@ -44,7 +43,7 @@ class DraftPromoteCostTest {
     void aMissingOrForeignSetFileIsResealedFromTheFoldWithTheSameBytes() throws Exception {
         Fixture f = fixture(tmp, 30);
         Expected want = legacy(f);
-        Path sets = DraftStore.draftDir(f.main.dir(), f.draftId).resolve("sets");
+        Path sets = DraftStore.draftDir(invDir(f.main), f.draftId).resolve("sets");
         Files.delete(sets.resolve("12.json"));
         Files.writeString(sets.resolve("20.json"), Files.readString(sets.resolve("19.json"), StandardCharsets.UTF_8), StandardCharsets.UTF_8);
         long before = DraftPromote.resealed.get();
@@ -58,7 +57,7 @@ class DraftPromoteCostTest {
     void aTamperedSetFileWithAnIntactHeadIsNotCarriedOntoMain() throws Exception {
         Fixture f = fixture(tmp, 30);
         Expected want = legacy(f);
-        Path set = DraftStore.draftDir(f.main.dir(), f.draftId).resolve("sets").resolve("15.json");
+        Path set = DraftStore.draftDir(invDir(f.main), f.draftId).resolve("sets").resolve("15.json");
         String raw = Files.readString(set, StandardCharsets.UTF_8);
         int at = raw.indexOf("\"workingSet\":") + 13;
         String tampered = raw.substring(0, at) + raw.substring(at).replaceFirst("x", "y");
@@ -93,7 +92,7 @@ class DraftPromoteCostTest {
             long legacyMs = (System.nanoTime() - t) / 1_000_000;
             // a real Draft's set files were written over its life; the FIRST open of a file written a moment ago costs ~6 ms on
             // Windows (the on-access scan), so read them once here as that life would have
-            if (!Boolean.getBoolean("inspecto.bench.promote.cold")) try (var w = Files.list(DraftStore.draftDir(f.main.dir(), f.draftId).resolve("sets"))) {
+            if (!Boolean.getBoolean("inspecto.bench.promote.cold")) try (var w = Files.list(DraftStore.draftDir(invDir(f.main), f.draftId).resolve("sets"))) {
                 for (Path p : w.toList()) Files.readAllBytes(p);
             }
             t = System.nanoTime();
@@ -108,14 +107,13 @@ class DraftPromoteCostTest {
 
     private static Expected legacy(Fixture f) throws Exception {
         InvestigationRoutes.Inv main = f.main;
-        Path draftDir = DraftStore.draftDir(main.dir(), f.draftId);
         @SuppressWarnings("unchecked") Map<String, Object> header = com.gamma.control.ApiContext.JSON.readValue(
-                DraftStore.readHeader(main.dir(), f.draftId), LinkedHashMap.class);
+                main.store().draftHeader(main.id(), f.draftId).orElseThrow(), LinkedHashMap.class);
         String actor = String.valueOf(header.get("actor"));
         int base = ((Number) header.get("baseStep")).intValue();
         List<String> mainLines = main.store().log(InvestigationStore.Scope.main(main.id()));
         List<Map<String, Object>> mainEntries = DraftRebase.parseAll(mainLines);
-        List<Map<String, Object>> effective = DraftRebase.effectiveOps(DraftRebase.parseAll(SnapshotStore.readLogAt(draftDir)));
+        List<Map<String, Object>> effective = DraftRebase.effectiveOps(DraftRebase.parseAll(main.store().log(InvestigationStore.Scope.draft(main.id(), f.draftId))));
         List<Map<String, Object>> sensitiveNow = DraftPromote.sensitiveSteps(main, effective);
         InvestigationEvaluator.State state = InvestigationEvaluator.evaluate(mainEntries, -1, null);
         List<String> lines = new ArrayList<>(), sets = new ArrayList<>();
@@ -146,7 +144,7 @@ class DraftPromoteCostTest {
         List<String> log = f.main.store().log(InvestigationStore.Scope.main(f.main.id()));
         assertEquals(MAIN + want.lines.size(), log.size());
         assertEquals(want.lines, log.subList(MAIN, log.size()));
-        Path sets = f.main.dir().resolve("sets");
+        Path sets = invDir(f.main).resolve("sets");
         for (int i = 0; i < want.sets.size(); i++)
             assertEquals(want.sets.get(i), Files.readString(sets.resolve((MAIN + i + 1) + ".json"), StandardCharsets.UTF_8), "set " + (MAIN + i + 1));
     }
@@ -154,6 +152,11 @@ class DraftPromoteCostTest {
     // ── fixture ──
 
     private static final int MAIN = 5;
+
+    /** The Investigation directory of the filesystem store (these tests tamper with set files on disk). */
+    static Path invDir(InvestigationRoutes.Inv main) {
+        return ((FsInvestigationStore) main.store()).investigationDir(main.id());
+    }
 
     record Fixture(InvestigationRoutes.Inv main, String draftId) { }
 
@@ -186,8 +189,7 @@ class DraftPromoteCostTest {
         h.put("createdAt", "2026-10-03T00:00:00Z");
         h.put("baseStep", MAIN);
         h.put("baseLogHash", DraftStore.prefixHash(mainLines, MAIN));
-        if (!DraftStore.create(main.dir(), id, canonical(h))) throw new IllegalStateException("fork failed");
-        Path d = DraftStore.draftDir(main.dir(), id);
+        if (store.createDraft("inv1", id, canonical(h), "analyst", 1000).outcome() != InvestigationStore.DraftCreation.Created.CREATED) throw new IllegalStateException("fork failed");
         for (int k = 1; k <= steps; k++) {
             int step = MAIN + k;
             Map<String, Object> e;
@@ -205,7 +207,7 @@ class DraftPromoteCostTest {
             e = InvestigationRoutes.roundTrip(e);
             InvestigationEvaluator.apply(s, e);
             e.put("workingSetHash", s.hash());
-            DraftStore.appendStep(d, step, canonical(e), canonical(InvestigationRoutes.setDoc(step, s)));
+            store.append(InvestigationStore.Scope.draft("inv1", id), k - 1, step, canonical(e), canonical(InvestigationRoutes.setDoc(step, s)));
         }
         return new Fixture(main, id);
     }

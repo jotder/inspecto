@@ -4,7 +4,6 @@ import com.gamma.la.core.DraftStore;
 import com.gamma.la.core.InvestigationEvaluator;
 import com.gamma.la.core.InvestigationEvaluator.Entity;
 import com.gamma.la.core.InvestigationEvaluator.Link;
-import com.gamma.la.core.SnapshotStore;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -79,8 +78,8 @@ class InvestigationStoreSizeBench {
         }
         // reading a 2,000-step log from the filesystem, and prefixHash over it (D-IS6)
         Path root = Files.createTempDirectory("s0-");
-        var store = new SnapshotStore(root);
-        store.createInvestigation("s0", "{\"id\":\"s0\"}");
+        var store = new com.gamma.la.core.FsInvestigationStore(root);
+        store.create("s0", "{\"id\":\"s0\"}");
         for (int i = 1; i <= 2_000; i++) {
             Map<String, Object> e = new LinkedHashMap<>();
             e.put("step", i); e.put("kind", "op"); e.put("op", "expand"); e.put("author", "analyst"); e.put("at", "2026-10-04T10:00:00Z");
@@ -88,12 +87,12 @@ class InvestigationStoreSizeBench {
             for (int k = 0; k < 50; k++) rs.add(Map.of("source", "a" + k, "target", "b" + k, "kind", "call", "count", 3));
             e.put("read", Map.of("rows", rs));
             e.put("workingSetHash", "sha256:" + "0".repeat(64));
-            store.appendStep("s0", i, canonical(e), "{}");
+            store.append(com.gamma.la.core.InvestigationStore.Scope.main("s0"), i - 1, i, canonical(e), "{}");
         }
         long[] read = new long[31], hash = new long[31];
         for (int r = 0; r < 31; r++) {
             long t = System.nanoTime();
-            List<String> lines = store.readLog("s0");
+            List<String> lines = store.log(com.gamma.la.core.InvestigationStore.Scope.main("s0"));
             read[r] = System.nanoTime() - t;
             t = System.nanoTime();
             DraftStore.prefixHash(lines, lines.size());

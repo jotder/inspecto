@@ -26,7 +26,7 @@ class EntityMaskingTest {
     private static InvestigationRoutes.Inv inv(Path root) throws Exception {
         InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(InvestigationStores.of(root), root, "case-a",
                 Map.of("dataset", "calls_ds", "sourceCol", "caller", "targetCol", "callee"));
-        Files.createDirectories(inv.dir());
+        inv.store().create(inv.id(), "{}");   // the Investigation must exist before it can mint its mask key
         return inv;
     }
 

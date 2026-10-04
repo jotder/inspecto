@@ -10,6 +10,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -317,6 +318,322 @@ abstract class InvestigationStoreContract {
         assertTrue(s.createTemplate("t1", "{\"id\":\"t1\"}"));
         assertFalse(s.createTemplate("t1", "{\"id\":\"changed\"}"));
         assertEquals("{\"id\":\"t1\"}", s.template("t1").orElseThrow());
+    }
+
+    // ── pending records: compare-and-set ────────────────────────────────────────────────────────────────
+
+    @Test
+    void replacePendingIsACompareAndSetAndExactlyOneRacerWins() throws Exception {
+        InvestigationStore s = fresh();
+        s.create("cas", "{}");
+        assertFalse(s.replacePending("cas", "p1", "{\"status\":\"pending\"}", "{\"status\":\"approved\"}"), "an absent record is not replaced");
+        s.writePending("cas", "p1", "{\"status\":\"pending\"}");
+        assertFalse(s.replacePending("cas", "p1", "{\"status\":\"something else\"}", "{\"status\":\"approved\"}"));
+        assertEquals("{\"status\":\"pending\"}", s.pending("cas", "p1").orElseThrow(), "a refused CAS wrote nothing");
+        int deciders = 12;
+        AtomicInteger won = new AtomicInteger();
+        CountDownLatch go = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(deciders);
+        try {
+            List<Future<?>> fs = new ArrayList<>();
+            for (int d = 0; d < deciders; d++) {
+                int me = d;
+                fs.add(pool.submit(() -> {
+                    go.await();
+                    if (s.replacePending("cas", "p1", "{\"status\":\"pending\"}", "{\"status\":\"approved\",\"by\":" + me + "}")) won.incrementAndGet();
+                    return null;
+                }));
+            }
+            go.countDown();
+            for (Future<?> f : fs) f.get();
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(1, won.get(), "one decision is made once");
+        assertTrue(s.pending("cas", "p1").orElseThrow().startsWith("{\"status\":\"approved\""));
+    }
+
+    @Test
+    void theMaskKeyIsMintedOnceAndStable() throws Exception {
+        InvestigationStore s = fresh();
+        s.create("mk", "{}");
+        int callers = 8;
+        Set<String> seen = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        CountDownLatch go = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(callers);
+        try {
+            List<Future<?>> fs = new ArrayList<>();
+            for (int c = 0; c < callers; c++)
+                fs.add(pool.submit(() -> {
+                    go.await();
+                    seen.add(HexFormat.of().formatHex(s.maskKey("mk")));
+                    return null;
+                }));
+            go.countDown();
+            for (Future<?> f : fs) f.get();
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(1, seen.size(), "racing first callers all get the same key");
+        assertEquals(32, s.maskKey("mk").length);
+        assertEquals(seen.iterator().next(), HexFormat.of().formatHex(s.maskKey("mk")));
+    }
+
+    // ── Drafts ──────────────────────────────────────────────────────────────────────────────────────────
+
+    private static String draftHeader(String id, String actor, int base) {
+        return "{\"draftId\":\"" + id + "\",\"actor\":\"" + actor + "\",\"baseStep\":" + base + ",\"zeta\":1,\"alpha\":2}";
+    }
+
+    private static InvestigationStore.Scope draft(String inv, String id) {
+        return InvestigationStore.Scope.draft(inv, id);
+    }
+
+    @Test
+    void createDraftEnforcesOneLiveDraftPerActorTheSpaceCapAndWriteOnceIds() throws Exception {
+        InvestigationStore s = fresh();
+        s.create("a", "{}");
+        s.create("b", "{}");
+        String d1 = DraftStore.newId(), d2 = DraftStore.newId(), d3 = DraftStore.newId();
+        var made = s.createDraft("a", d1, draftHeader(d1, "ann", 0), "ann", 2);
+        assertEquals(InvestigationStore.DraftCreation.Created.CREATED, made.outcome());
+        assertEquals(draftHeader(d1, "ann", 0), s.draftHeader("a", d1).orElseThrow(), "the header comes back verbatim");
+        var again = s.createDraft("a", d2, draftHeader(d2, "ann", 0), "ann", 2);
+        assertEquals(InvestigationStore.DraftCreation.Created.ACTOR_HAS_LIVE, again.outcome());
+        assertEquals(d1, again.detail());
+        assertTrue(s.draftHeader("a", d2).isEmpty(), "a refused create wrote nothing");
+        assertEquals(InvestigationStore.DraftCreation.Created.CREATED, s.createDraft("a", d2, draftHeader(d2, "bob", 0), "bob", 2).outcome());
+        var full = s.createDraft("b", d3, draftHeader(d3, "cy", 0), "cy", 2);
+        assertEquals(InvestigationStore.DraftCreation.Created.SPACE_FULL, full.outcome(), "the cap counts across the Space's Investigations");
+        assertEquals("2", full.detail());
+        assertEquals(2, s.openDraftCount());
+        assertEquals(InvestigationStore.DraftCreation.Created.ID_TAKEN, s.createDraft("a", d1, draftHeader(d1, "dee", 0), "dee", 9).outcome());
+        assertEquals(List.of(d1, d2).stream().sorted().toList(), s.openDraftIds("a").stream().sorted().toList());
+        assertEquals(InvestigationStore.DraftState.OPEN, s.draftState("a", d1));
+    }
+
+    @Test
+    void aDraftRacingCreatorsNeverExceedTheCap() throws Exception {
+        InvestigationStore s = fresh();
+        s.create("a", "{}");
+        int racers = 12, cap = 3;
+        AtomicInteger created = new AtomicInteger();
+        CountDownLatch go = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(racers);
+        try {
+            List<Future<?>> fs = new ArrayList<>();
+            for (int r = 0; r < racers; r++) {
+                String id = DraftStore.newId(), actor = "actor" + r;
+                fs.add(pool.submit(() -> {
+                    go.await();
+                    if (s.createDraft("a", id, draftHeader(id, actor, 0), actor, cap).outcome() == InvestigationStore.DraftCreation.Created.CREATED)
+                        created.incrementAndGet();
+                    return null;
+                }));
+            }
+            go.countDown();
+            for (Future<?> f : fs) f.get();
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(cap, created.get(), "the cap is checked and the seat taken as one act");
+        assertEquals(cap, s.openDraftCount());
+    }
+
+    @Test
+    void aDraftLogAppendsDenselyAndAStaleVersionWritesNothing() throws Exception {
+        InvestigationStore s = fresh();
+        s.create("a", "{}");
+        s.append(main("a"), 0, 1, line(1), "{\"set\":1}");
+        String d = DraftStore.newId();
+        s.createDraft("a", d, draftHeader(d, "ann", 1), "ann", 9);
+        var sc = draft("a", d);
+        assertEquals(0, s.version(sc), "a Draft's version counts its OWN entries");
+        s.append(sc, 0, 2, "{ \"own\" : 2 }", "{\"set\":\"d2\"}");
+        assertThrows(InvestigationVersionConflictException.class, () -> s.append(sc, 0, 3, "{\"own\":99}", "{}"));
+        s.append(sc, 1, 3, "{\"own\":3}", "{\"set\":\"d3\"}");
+        assertEquals(List.of("{ \"own\" : 2 }", "{\"own\":3}"), s.log(sc), "verbatim, in order");
+        assertEquals("{\"set\":\"d2\"}", s.draftSet("a", d, 2).orElseThrow());
+        assertEquals(List.of(line(1)), s.log(main("a")), "the main log is untouched");
+    }
+
+    @Test
+    void racingDraftWritersLoseNothing() throws Exception {
+        InvestigationStore s = fresh();
+        s.create("a", "{}");
+        String d = DraftStore.newId();
+        s.createDraft("a", d, draftHeader(d, "ann", 0), "ann", 9);
+        var sc = draft("a", d);
+        int writers = 6, each = 15;
+        ExecutorService pool = Executors.newFixedThreadPool(writers);
+        try {
+            List<Future<?>> fs = new ArrayList<>();
+            for (int w = 0; w < writers; w++) {
+                int me = w;
+                fs.add(pool.submit(() -> {
+                    for (int n = 0; n < each; n++)
+                        while (true) {
+                            long v = s.version(sc);
+                            try {
+                                s.append(sc, v, (int) v + 1, "{\"step\":" + (v + 1) + ",\"w\":" + me + ",\"n\":" + n + "}", "{}");
+                                break;
+                            } catch (InvestigationVersionConflictException retry) {
+                                // lost the race
+                            }
+                        }
+                    return null;
+                }));
+            }
+            for (Future<?> f : fs) f.get();
+        } finally {
+            pool.shutdownNow();
+        }
+        List<String> log = s.log(sc);
+        assertEquals(writers * each, log.size());
+        for (int i = 0; i < log.size(); i++) assertTrue(log.get(i).startsWith("{\"step\":" + (i + 1) + ","), log.get(i));
+    }
+
+    /** A main log of {@code n} steps and a Draft based on it holding {@code own} steps; returns the Draft id. */
+    private String promotable(InvestigationStore s, String inv, int n, int own) throws Exception {
+        s.create(inv, "{}");
+        for (int i = 1; i <= n; i++) s.append(main(inv), i - 1, i, line(i), "{\"main\":" + i + "}");
+        String d = DraftStore.newId();
+        s.createDraft(inv, d, draftHeader(d, "ann", n), "ann", 99);
+        for (int k = 1; k <= own; k++)
+            s.append(draft(inv, d), k - 1, n + k, "{\"step\":" + (n + k) + ",\"own\":true}", "{\"draftSet\":" + (n + k) + "}");
+        return d;
+    }
+
+    @Test
+    void promoteAppendsToMainVerbatimSealsTheDraftsOwnSetsAndClosesTheDraft() throws Exception {
+        InvestigationStore s = fresh();
+        String d = promotable(s, "p", 2, 3);
+        List<String> main = s.log(main("p"));
+        List<String> own = s.log(draft("p", d));
+        List<String> lines = List.of("{\"step\":3,\"promoted\":\"a\"}", "{\"step\":4,\"promoted\":\"b\"}", "{\"step\":5,\"promoted\":\"c\"}");
+        List<String> sets = new ArrayList<>();
+        sets.add(null);                       // step 3: the Draft's own sealed set, as it is
+        sets.add("{\"fresh\":4}");            // step 4: a re-sealed set
+        sets.add(null);
+        s.promoteDraft("p", d, 2, DraftStore.prefixHash(main, 2), DraftStore.prefixHash(own, own.size()), lines, sets, "{\"promoted\":true}");
+        assertEquals(List.of(line(1), line(2), lines.get(0), lines.get(1), lines.get(2)), s.log(main("p")), "verbatim, after the existing steps");
+        assertEquals("{\"draftSet\":3}", s.set("p", 3).orElseThrow(), "a shared set is the Draft's bytes");
+        assertEquals("{\"fresh\":4}", s.set("p", 4).orElseThrow());
+        assertEquals("{\"draftSet\":5}", s.set("p", 5).orElseThrow());
+        assertEquals("{\"main\":2}", s.set("p", 2).orElseThrow());
+        assertEquals(InvestigationStore.DraftState.PROMOTED, s.draftState("p", d));
+        assertEquals("{\"promoted\":true}", s.promoteMarker("p", d).orElseThrow());
+        assertEquals(List.of(), s.log(draft("p", d)), "the Draft's evidence is gone: it lives in the main log now");
+        assertEquals(List.of(), s.openDraftIds("p"));
+        assertThrows(InvestigationStore.DraftClosedException.class,
+                () -> s.promoteDraft("p", d, 5, DraftStore.prefixHash(s.log(main("p")), 5), DraftStore.prefixHash(List.of(), 0), List.of(), List.of(), "{}"),
+                "a closed Draft cannot be promoted again");
+    }
+
+    @Test
+    void promoteIsRefusedAndWritesNothingWhenEitherLogMovedUnderIt() throws Exception {
+        InvestigationStore s = fresh();
+        String d = promotable(s, "p", 2, 1);
+        List<String> main = s.log(main("p"));
+        List<String> own = s.log(draft("p", d));
+        String mainHash = DraftStore.prefixHash(main, 2), ownHash = DraftStore.prefixHash(own, own.size());
+        List<String> lines = List.of("{\"step\":3}");
+        // main moved: another writer appended after the promote was computed
+        s.append(main("p"), 2, 3, line(3), "{}");
+        assertThrows(InvestigationVersionConflictException.class,
+                () -> s.promoteDraft("p", d, 2, mainHash, ownHash, lines, java.util.Arrays.asList((String) null), "{}"));
+        assertEquals(3, s.version(main("p")), "nothing was appended");
+        assertEquals(InvestigationStore.DraftState.OPEN, s.draftState("p", d), "and the Draft is still open");
+        // the Draft moved
+        String m3 = DraftStore.prefixHash(s.log(main("p")), 3);
+        s.append(draft("p", d), 1, 4, "{\"step\":4,\"own\":true}", "{}");
+        assertThrows(InvestigationVersionConflictException.class,
+                () -> s.promoteDraft("p", d, 3, m3, ownHash, List.of("{\"step\":4}"), List.of("{}"), "{}"));
+        assertEquals(3, s.version(main("p")));
+        // a main prefix whose bytes differ from what the caller hashed is as stale as a moved head
+        assertThrows(InvestigationVersionConflictException.class,
+                () -> s.promoteDraft("p", d, 3, "sha256:" + "00".repeat(32), DraftStore.prefixHash(s.log(draft("p", d)), 2),
+                        List.of("{\"step\":4}"), List.of("{}"), "{}"));
+        assertEquals(3, s.version(main("p")));
+    }
+
+    @Test
+    void twoDraftsPromotedOntoOneMainExactlyOneWins() throws Exception {
+        InvestigationStore s = fresh();
+        s.create("p", "{}");
+        s.append(main("p"), 0, 1, line(1), "{}");
+        String d1 = DraftStore.newId(), d2 = DraftStore.newId();
+        s.createDraft("p", d1, draftHeader(d1, "ann", 1), "ann", 99);
+        s.createDraft("p", d2, draftHeader(d2, "bob", 1), "bob", 99);
+        s.append(draft("p", d1), 0, 2, "{\"step\":2,\"by\":\"ann\"}", "{}");
+        s.append(draft("p", d2), 0, 2, "{\"step\":2,\"by\":\"bob\"}", "{}");
+        String mainHash = DraftStore.prefixHash(s.log(main("p")), 1);
+        AtomicInteger won = new AtomicInteger();
+        CountDownLatch go = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<?>> fs = new ArrayList<>();
+            for (String d : List.of(d1, d2))
+                fs.add(pool.submit(() -> {
+                    go.await();
+                    try {
+                        s.promoteDraft("p", d, 1, mainHash, DraftStore.prefixHash(s.log(draft("p", d)), 1),
+                                List.of("{\"step\":2,\"from\":\"" + d + "\"}"), List.of("{}"), "{}");
+                        won.incrementAndGet();
+                    } catch (InvestigationVersionConflictException lost) {
+                        // the other promote landed first: this Draft must rebase
+                    }
+                    return null;
+                }));
+            go.countDown();
+            for (Future<?> f : fs) f.get();
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(1, won.get());
+        assertEquals(2, s.version(main("p")), "one step landed, not two");
+    }
+
+    @Test
+    void replaceDraftSwapsHeaderLogAndSetsWithinItsPreconditions() throws Exception {
+        InvestigationStore s = fresh();
+        String d = promotable(s, "r", 2, 2);
+        List<String> main = s.log(main("r"));
+        List<String> own = s.log(draft("r", d));
+        String mainHash = DraftStore.prefixHash(main, 2), ownHash = DraftStore.prefixHash(own, own.size());
+        assertThrows(InvestigationVersionConflictException.class, () -> s.replaceDraft("r", d, 2, mainHash, "sha256:" + "11".repeat(32),
+                "{\"new\":1}", List.of("{\"x\":1}"), List.of("{}"), List.of(3)));
+        assertEquals(own, s.log(draft("r", d)), "a refused swap changed nothing");
+        assertEquals(draftHeader(d, "ann", 2), s.draftHeader("r", d).orElseThrow());
+        String newHeader = "{ \"draftId\":\"" + d + "\", \"actor\":\"ann\", \"baseStep\":2,\"rebases\":[1] }";
+        s.replaceDraft("r", d, 2, mainHash, ownHash, newHeader, List.of("{\"step\":3,\"re\":true}"), List.of("{\"reset\":3}"), List.of(3));
+        assertEquals(newHeader, s.draftHeader("r", d).orElseThrow(), "verbatim");
+        assertEquals(List.of("{\"step\":3,\"re\":true}"), s.log(draft("r", d)));
+        assertEquals("{\"reset\":3}", s.draftSet("r", d, 3).orElseThrow());
+        assertTrue(s.draftSet("r", d, 4).isEmpty(), "the old set is gone");
+        assertEquals(InvestigationStore.DraftState.OPEN, s.draftState("r", d));
+    }
+
+    @Test
+    void closeDraftIsOneIdempotentActMarkerFirstThenTheEvidenceIsDeleted() throws Exception {
+        InvestigationStore s = fresh();
+        String d = promotable(s, "c", 1, 2);
+        var seen = new java.util.concurrent.atomic.AtomicReference<List<String>>();
+        assertEquals(Optional.of(true), s.closeDraft("c", d, null, own -> {
+            seen.set(own);
+            return "{\"discardedBy\":\"ann\",\"steps\":" + own.size() + "}";
+        }));
+        assertEquals(2, seen.get().size(), "the marker is built from the log as it stood");
+        assertEquals(InvestigationStore.DraftState.DISCARDED, s.draftState("c", d));
+        assertEquals("{\"discardedBy\":\"ann\",\"steps\":2}", s.discardMarker("c", d).orElseThrow());
+        assertEquals(List.of(), s.log(draft("c", d)), "the sealed rows do not outlive the discard");
+        assertTrue(s.draftSet("c", d, 2).isEmpty());
+        assertEquals(Optional.of(false), s.closeDraft("c", d, null, own -> "{}"), "a repeat reports it was already discarded");
+        assertThrows(InvestigationStore.DraftClosedException.class, () -> s.append(draft("c", d), 0, 2, "{}", "{}"));
+        assertEquals(List.of(), s.openDraftIds("c"));
+        assertEquals(0, s.openDraftCount());
+        assertEquals(Optional.empty(), s.closeDraft("c", d, java.time.Duration.ofDays(30), own -> "{}"),
+                "a conditional close of a closed Draft is not applicable");
     }
 
     private static String sha256(byte[] b) throws Exception {

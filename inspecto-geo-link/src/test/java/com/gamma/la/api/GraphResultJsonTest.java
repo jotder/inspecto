@@ -55,7 +55,7 @@ class GraphResultJsonTest {
         Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: all\n");
         InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(InvestigationStores.of(root), root, "case-a",
                 Map.of("dataset", "calls_ds", "sourceCol", "caller", "targetCol", "callee"));
-        Files.createDirectories(inv.dir());
+        inv.store().create(inv.id(), "{}");   // the Investigation must exist before it can mint its mask key
         return EntityMasking.of(inv, List.of(Map.of("op", "seed", "params", Map.of("ids", RAW))), List.of(KIND));
     }
 
@@ -155,7 +155,7 @@ class GraphResultJsonTest {
         Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: none\n");
         InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(InvestigationStores.of(root), root, "case-a",
                 Map.of("dataset", "calls_ds"));
-        Files.createDirectories(inv.dir());
+        inv.store().create(inv.id(), "{}");   // the Investigation must exist before it can mint its mask key
         assertSame(GraphResultJson.Ids.NONE, GraphResultJson.Ids.of(EntityMasking.of(inv, List.of(), List.of())));
     }
 

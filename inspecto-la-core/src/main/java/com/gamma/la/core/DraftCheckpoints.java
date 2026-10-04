@@ -37,7 +37,7 @@ public final class DraftCheckpoints {
     /** The verified-base verdict for one main log file: what was checked, against what, and the answer. */
     public record Base(String mainSig, int baseStep, String baseLogHash, boolean intact, int mainSize) {}
 
-    private static final Map<Path, Checkpoint> STATES = new ConcurrentHashMap<>();
+    private static final Map<String, Checkpoint> STATES = new ConcurrentHashMap<>();
     private static final Map<String, Base> BASES = new ConcurrentHashMap<>();
 
     /** File identity for cache validity: size + mtime, or {@code "absent"}. */
@@ -51,10 +51,23 @@ public final class DraftCheckpoints {
 
     /** The state of {@code log} (the whole list: main prefix + own entries) - the checkpoint when it is still current, else one fold. */
     public static InvestigationEvaluator.State stateOf(Path draftDir, List<Map<String, Object>> log) {
-        Checkpoint c = STATES.get(draftDir);
-        if (c != null && c.entries() == log.size() && c.logSig().equals(sig(draftDir.resolve("log.jsonl")))) return c.state();
+        return stateOf(keyOf(draftDir), sig(draftDir.resolve("log.jsonl")), log);
+    }
+
+    /** The cache key of a Draft directory: what {@link InvestigationStore#cacheKey} answers for the filesystem. */
+    static String keyOf(Path draftDir) {
+        return draftDir.toAbsolutePath().normalize().toString();
+    }
+
+    /**
+     * {@link #stateOf(Path, List)} keyed by {@code key} (a store's {@code cacheKey(scope)}) and valid only while {@code token}
+     * (the store's {@code logToken(scope)}, which changes whenever the log does) is the one the checkpoint was taken at.
+     */
+    public static InvestigationEvaluator.State stateOf(String key, String token, List<Map<String, Object>> log) {
+        Checkpoint c = STATES.get(key);
+        if (c != null && c.entries() == log.size() && c.logSig().equals(token)) return c.state();
         InvestigationEvaluator.State s = InvestigationEvaluator.evaluate(log, -1, null);
-        remember(draftDir, log.size(), s);
+        remember(key, token, log.size(), s);
         return s;
     }
 
@@ -72,7 +85,11 @@ public final class DraftCheckpoints {
 
     /** Record the state at {@code entries} entries; call it AFTER the step was appended so the log signature is the new one. */
     public static void remember(Path draftDir, int entries, InvestigationEvaluator.State state) {
-        STATES.put(draftDir, new Checkpoint(sig(draftDir.resolve("log.jsonl")), entries, state));
+        remember(keyOf(draftDir), sig(draftDir.resolve("log.jsonl")), entries, state);
+    }
+
+    public static void remember(String key, String token, int entries, InvestigationEvaluator.State state) {
+        STATES.put(key, new Checkpoint(token, entries, state));
     }
 
     /** Drop every cached base verdict, so the next check re-hashes (the replay audit calls this: it never trusts a cache). */
@@ -82,7 +99,11 @@ public final class DraftCheckpoints {
 
     /** Forget a Draft's checkpoint (discard). */
     public static void forget(Path draftDir) {
-        STATES.remove(draftDir);
+        forget(keyOf(draftDir));
+    }
+
+    public static void forget(String key) {
+        STATES.remove(key);
     }
 
     /**
@@ -90,8 +111,12 @@ public final class DraftCheckpoints {
      * on a miss (the main log changed, or first look).
      */
     public static Base base(Path mainLog, int baseStep, String baseLogHash, Supplier<List<String>> mainLines) {
-        String sig = sig(mainLog);
-        String key = mainLog + "|" + baseStep;
+        return base(mainLog.toString(), sig(mainLog), baseStep, baseLogHash, mainLines);
+    }
+
+    /** {@link #base(Path, int, String, Supplier)} keyed by the main log's {@code cacheKey} and valid while its {@code logToken} is unchanged. */
+    public static Base base(String mainKey, String sig, int baseStep, String baseLogHash, Supplier<List<String>> mainLines) {
+        String key = mainKey + "|" + baseStep;
         Base b = BASES.get(key);
         if (b != null && b.mainSig().equals(sig) && b.baseLogHash().equals(baseLogHash)) return b;
         List<String> main = mainLines.get();

@@ -139,7 +139,7 @@ final class EntityMasking {
         }
         Map<String, String> tokens = new LinkedHashMap<>();
         if (!masked.isEmpty()) {
-            byte[] key = key(inv.dir());
+            byte[] key = inv.store().maskKey(inv.id());
             for (String id : masked) tokens.put(id, token(key, id));
         }
         return new EntityMasking(mode, basis, tokens);

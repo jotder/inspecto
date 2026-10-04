@@ -1,13 +1,13 @@
 package com.gamma.la.api;
 
 import com.gamma.la.core.InvestigationStore;
+import com.gamma.la.core.InvestigationVersionConflictException;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.la.core.DraftCheckpoints;
 import com.gamma.la.core.DraftStore;
 import com.gamma.la.core.InvestigationEvaluator;
-import com.gamma.la.core.SnapshotStore;
 import com.gamma.la.storage.IndexPins;
 import com.gamma.la.storage.IndexStore;
 import com.sun.net.httpserver.HttpExchange;
@@ -107,9 +107,8 @@ final class DraftRebase {
 
     /** {@link #compute} with the replay as a seam (the cost test replays the sealed reads instead of re-reading an index). */
     static Plan plan(InvestigationRoutes.Inv view, Replay replay) throws IOException {
-        Path draftDir = view.draft().dir();
         List<String> mainLines = view.store().log(InvestigationStore.Scope.main(view.id()));
-        List<String> ownLines = SnapshotStore.readLogAt(draftDir);
+        List<String> ownLines = view.store().log(view.scope());
         int m = mainLines.size(), k = view.draft().baseStep();
         List<Map<String, Object>> main = parseAll(mainLines), own = parseAll(ownLines);
         InvestigationEvaluator.State state = InvestigationEvaluator.evaluate(main, -1, null);
@@ -224,25 +223,17 @@ final class DraftRebase {
      */
     static Map<String, Object> commit(ApiContext api, HttpExchange ex, InvestigationRoutes.Inv view, Map<String, Object> header, Plan plan,
                                       List<Integer> confirmed) throws IOException {
-        Path draftDir = view.draft().dir();
         String draftId = view.draft().draftId();
         List<String> verifiedMain = view.store().log(InvestigationStore.Scope.main(view.id()));
         if (verifiedMain.size() != plan.toBase() || !DraftStore.prefixHash(verifiedMain, verifiedMain.size()).equals(plan.toBaseHash()))
             throw new ApiException(409, ErrorCodes.CONFLICT, "the main log moved while the rebase was computed (head " + verifiedMain.size()
                     + ", was " + plan.toBase() + ") - read the conflict report again");
         verify(verifiedMain, plan);
-        synchronized (InvestigationRoutes.lock(view.dir())) {
-            synchronized (InvestigationRoutes.lock(draftDir)) {
-                if (DraftStore.isClosed(draftDir)) throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + draftId + "' was closed");
-                List<String> mainLines = view.store().log(InvestigationStore.Scope.main(view.id()));
-                if (mainLines.size() != plan.toBase() || !DraftStore.prefixHash(mainLines, mainLines.size()).equals(plan.toBaseHash()))
-                    throw new ApiException(409, ErrorCodes.CONFLICT, "the main log moved while the rebase was computed (head " + mainLines.size()
-                            + ", was " + plan.toBase() + ") - read the conflict report again");
-                List<String> ownLines = SnapshotStore.readLogAt(draftDir);
-                if (!DraftStore.prefixHash(ownLines, ownLines.size()).equals(plan.draftLogHash()))
-                    throw new ApiException(409, ErrorCodes.CONFLICT, "the draft changed while the rebase was computed - read the conflict report again");
-
-                // the plan was verified (above, outside the lock) over exactly these main bytes and this Draft log
+        if (view.store().draftState(view.id(), draftId).closed()) throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + draftId + "' was closed");
+        {
+            {
+                // the plan was verified (above, outside any lock) over exactly these main bytes and this Draft log; the store
+                // re-verifies both inside the swap (replaceDraft) and refuses it if either moved
 
                 Path root = view.writeRoot().resolve(IndexRoutes.INDEX_DIR);
                 List<Map<String, Object>> oldPins = pinsOf(header), newPins = new ArrayList<>();
@@ -274,12 +265,22 @@ final class DraftRebase {
                     rec.put("confirmedDropped", confirmed);
                     history.add(rec);
                     h.put("rebases", history);
-                    DraftStore.replaceRebased(draftDir, canonical(h), plan.lines(), plan.sets(), plan.steps());
+                    view.store().replaceDraft(view.id(), draftId, plan.toBase(), plan.toBaseHash(), plan.draftLogHash(), canonical(h),
+                            plan.lines(), plan.sets(), plan.steps());
+                } catch (InvestigationVersionConflictException moved) {
+                    restorePins(root, view, draftId, oldPins, newPins);
+                    int head = view.store().log(InvestigationStore.Scope.main(view.id())).size();
+                    throw new ApiException(409, ErrorCodes.CONFLICT, head != plan.toBase()
+                            ? "the main log moved while the rebase was computed (head " + head + ", was " + plan.toBase() + ") - read the conflict report again"
+                            : "the draft changed while the rebase was computed - read the conflict report again");
+                } catch (InvestigationStore.DraftClosedException closed) {
+                    restorePins(root, view, draftId, oldPins, newPins);
+                    throw new ApiException(409, ErrorCodes.CONFLICT, "draft '" + draftId + "' was closed");
                 } catch (IOException | RuntimeException failed) {
                     restorePins(root, view, draftId, oldPins, newPins);
                     throw failed;
                 }
-                DraftCheckpoints.forget(draftDir);
+                DraftCheckpoints.forget(view.cacheKey());
                 // an index the Draft pinned that no longer serves its columns is released
                 Set<String> keep = new HashSet<>();
                 for (Map<String, Object> n : newPins) keep.add(String.valueOf(n.get("mappingHash")));

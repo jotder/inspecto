@@ -101,14 +101,14 @@ class DraftStoreTest {
 
     @Test
     void theMainLogWriterIsTheSameCode(@TempDir Path root) throws Exception {
-        SnapshotStore store = new SnapshotStore(root);
-        store.createInvestigation("inv-1", "{}");
-        store.appendStep("inv-1", 1, "{\"step\":1}", "{\"s\":1}");
+        FsInvestigationStore store = new FsInvestigationStore(root);
+        store.create("inv-1", "{}");
+        store.append(InvestigationStore.Scope.main("inv-1"), 0, 1, "{\"step\":1}", "{\"s\":1}");
         Path d = store.investigationDir("inv-1");
         assertEquals("{\"step\":1}\n", Files.readString(d.resolve("log.jsonl")));
         assertEquals("{\"s\":1}", Files.readString(d.resolve("sets").resolve("1.json")));
-        assertEquals(List.of("{\"step\":1}"), SnapshotStore.readLogAt(d));
-        assertEquals(store.readLog("inv-1"), SnapshotStore.readLogAt(d));
+        assertEquals(List.of("{\"step\":1}"), FsInvestigationLayout.readLogAt(d));
+        assertEquals(store.log(InvestigationStore.Scope.main("inv-1")), FsInvestigationLayout.readLogAt(d));
     }
 
     @Test

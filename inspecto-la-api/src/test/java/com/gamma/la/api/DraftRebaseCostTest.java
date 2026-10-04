@@ -6,7 +6,6 @@ import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.la.core.DraftStore;
 import com.gamma.la.core.InvestigationEvaluator;
-import com.gamma.la.core.SnapshotStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
@@ -122,9 +121,8 @@ class DraftRebaseCostTest {
     private static long[] phase = new long[5];
 
     private static DraftRebase.Plan legacy(InvestigationRoutes.Inv view) throws Exception {
-        Path draftDir = view.draft().dir();
         List<String> mainLines = view.store().log(InvestigationStore.Scope.main(view.id()));
-        List<String> ownLines = SnapshotStore.readLogAt(draftDir);
+        List<String> ownLines = view.store().log(view.scope());
         int m = mainLines.size(), k = view.draft().baseStep();
         List<Map<String, Object>> main = DraftRebase.parseAll(mainLines), own = DraftRebase.parseAll(ownLines);
         InvestigationEvaluator.State state = InvestigationEvaluator.evaluate(main, -1, null);
@@ -229,6 +227,6 @@ class DraftRebaseCostTest {
             main.store().append(InvestigationStore.Scope.main(main.id()), step - 1, step, canonical(e), canonical(InvestigationRoutes.setDoc(step, s)));
         }
         return new InvestigationRoutes.Inv(main.store(), main.writeRoot(), main.id(), main.header(),
-                new InvestigationRoutes.Inv.DraftRef(f.draftId(), MAIN, DraftStore.draftDir(main.dir(), f.draftId())));
+                new InvestigationRoutes.Inv.DraftRef(f.draftId(), MAIN));
     }
 }

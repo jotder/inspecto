@@ -24,9 +24,6 @@ import java.util.Optional;
  * <p>Every method may throw {@link IOException}: an unavailable backend fails closed - the caller answers 503, it never falls
  * back to another backend, because a silent fallback on one node would fork the evidence.
  *
- * <p>⚠ MIGRATION STATE (S1): this port covers the Investigation's own records and the main-or-Draft <em>log</em>. Draft
- * lifecycle (create, close, promote, rebase swap, index, sweeps) is still the Path-keyed {@code Draft*} statics; see the
- * remaining-call-site checklist in the design doc.
  */
 public interface InvestigationStore {
 
@@ -139,4 +136,117 @@ public interface InvestigationStore {
     boolean createTemplate(String id, String json) throws IOException;
 
     Optional<String> template(String id) throws IOException;
+
+    /**
+     * Compare-and-set of one pending-expand record: replace it with {@code newJson} only if its stored text is still exactly
+     * {@code expectedJson} (the read the caller decided over). False, and nothing written, when another decider got there first
+     * or the record is absent. This is what makes a four-eyes decision happen once: the status moves BEFORE the append it
+     * authorises, so a retried or racing decide finds it already moved.
+     */
+    boolean replacePending(String investigationId, String requestId, String expectedJson, String newJson) throws IOException;
+
+    /**
+     * The Investigation's pseudonym key (D-U6 entity masking): 32 random bytes minted on first use and then the same for every caller,
+     * even two racing for the first one. A SECRET: never served, and a backend must protect it like any credential.
+     */
+    byte[] maskKey(String investigationId) throws IOException;
+
+    // ── per-pod cache identity ─────────────────────────────────────────────────────────────────────────
+
+    /** A stable key naming the scope in per-process caches (checkpoints, cached Working Set relations). Opaque to the caller. */
+    String cacheKey(Scope scope);
+
+    /** An opaque token that changes whenever the scope's log does (an append, a rebase swap, a close): a cache valid at one token is stale at another. */
+    String logToken(Scope scope) throws IOException;
+
+    // ── Drafts ─────────────────────────────────────────────────────────────────────────────────────────
+
+    /** The lifecycle state of a Draft; precedence promoted, discarded (an expiry is a discard), hibernated, open. */
+    enum DraftState {
+        OPEN, HIBERNATED, DISCARDED, PROMOTED;
+
+        public String wire() { return name().toLowerCase(java.util.Locale.ROOT); }
+
+        public boolean closed() { return this == DISCARDED || this == PROMOTED; }
+    }
+
+    /** What {@link #createDraft} decided. {@code detail} is the live Draft's id for ACTOR_HAS_LIVE and the open count for SPACE_FULL. */
+    record DraftCreation(Created outcome, String detail) {
+        public enum Created { CREATED, ID_TAKEN, ACTOR_HAS_LIVE, SPACE_FULL }
+    }
+
+    /** Create a Draft unless the actor already has a live one on this Investigation (D17) or the Space holds {@code spaceCap} open Drafts (D21); the checks and the create are one act. */
+    DraftCreation createDraft(String investigationId, String draftId, String headerJson, String actor, int spaceCap) throws IOException;
+
+    Optional<String> draftHeader(String investigationId, String draftId) throws IOException;
+
+    /** Every Draft's compact header (everything but {@code baseLogHash} and {@code rebases[]}), by draft id. A rebuildable listing, never a record. */
+    java.util.Map<String, java.util.Map<String, Object>> draftHeaders(String investigationId) throws IOException;
+
+    /** Ids of this Investigation's Drafts that are not closed. */
+    List<String> openDraftIds(String investigationId);
+
+    /** Open Drafts across the whole Space (the D21 cap's count). */
+    int openDraftCount();
+
+    DraftState draftState(String investigationId, String draftId);
+
+    /** True when the Draft's discard marker was written by the idle expiry, not by a person. */
+    boolean draftExpired(String investigationId, String draftId);
+
+    Optional<String> discardMarker(String investigationId, String draftId) throws IOException;
+
+    Optional<String> promoteMarker(String investigationId, String draftId) throws IOException;
+
+    /** One step's sealed set of a Draft's OWN log, verbatim, or empty. */
+    Optional<String> draftSet(String investigationId, String draftId, int step) throws IOException;
+
+    /** Record an authorised use of the Draft (keeps it from idling out). Best effort: never fails the read it rides on. */
+    void touchDraft(String investigationId, String draftId);
+
+    /** Wake a hibernated Draft; true when it WAS hibernated (the next read is then a cold fold). */
+    boolean rehydrateDraft(String investigationId, String draftId) throws IOException;
+
+    java.time.Instant draftLastAccess(String investigationId, String draftId);
+
+    java.time.Duration draftIdle(String investigationId, String draftId);
+
+    /** Hibernate the Draft if it is open and idle for at least {@code after}; true when this call hibernated it. */
+    boolean hibernateDraft(String investigationId, String draftId, java.time.Duration after) throws IOException;
+
+    /**
+     * Close a Draft (discard / expiry): the marker first, then the evidence is deleted, one act, idempotent. {@code marker}
+     * builds the marker text from the Draft's own log lines (a pure function, called while the Draft cannot change).
+     * {@code idleAtLeast}, when set, makes it conditional on the Draft still being open and idle that long (the expiry sweep).
+     * Empty = not applicable (conditional and no longer true, or the Draft is closed); true = this call closed it; false = it was already discarded.
+     */
+    Optional<Boolean> closeDraft(String investigationId, String draftId, java.time.Duration idleAtLeast,
+                                 java.util.function.Function<List<String>, String> marker) throws IOException;
+
+    /**
+     * Promote a Draft: append {@code lines} (steps {@code expectedMainVersion + 1 ...}) and their sets to the MAIN log and close the
+     * Draft as promoted ({@code markerJson}), all or nothing. {@code sets.get(i) == null} means "seal the Draft's own set of that
+     * step as it is" (a hard link on the filesystem: LA-DRAFT-PROMOTE-COST-1). The caller computed everything OUTSIDE; the store
+     * verifies, atomically with the write, that the main log still holds exactly {@code expectedMainVersion} entries hashing to
+     * {@code expectedMainHash} and that the Draft's own log still hashes to {@code expectedDraftLogHash} (both
+     * {@link DraftStore#prefixHash}); otherwise {@link InvestigationVersionConflictException}. A closed Draft throws
+     * {@link DraftClosedException}. A failure part-way leaves the main log as it was.
+     */
+    void promoteDraft(String investigationId, String draftId, long expectedMainVersion, String expectedMainHash,
+                      String expectedDraftLogHash, List<String> lines, List<String> sets, String markerJson) throws IOException;
+
+    /**
+     * Swap a rebased Draft in (header, log, sets) under the same preconditions style: the main log must still hold
+     * {@code expectedMainVersion} entries hashing to {@code expectedMainHash}, and the Draft's own log must still hash to
+     * {@code expectedDraftLogHash}; otherwise {@link InvestigationVersionConflictException}. A failed swap leaves the Draft as it was.
+     */
+    void replaceDraft(String investigationId, String draftId, long expectedMainVersion, String expectedMainHash,
+                      String expectedDraftLogHash, String headerJson, List<String> lines, List<String> sets, List<Integer> setSteps)
+            throws IOException;
+
+    /**
+     * Housekeeping that must run before Drafts are listed or opened: remove scratch left by a crashed fork or rebase, and finish or
+     * undo a promote a crash interrupted (complete it when every main step landed, otherwise put the main log back). Idempotent.
+     */
+    void recoverDrafts(String investigationId) throws IOException;
 }

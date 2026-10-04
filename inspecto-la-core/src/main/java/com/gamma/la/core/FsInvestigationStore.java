@@ -11,7 +11,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The filesystem {@link InvestigationStore}: a thin wrapper over {@link SnapshotStore}'s Investigation layout
+ * The filesystem {@link InvestigationStore}: a thin wrapper over the Investigation layout {@code FsInvestigationLayout} (moved out of {@code SnapshotStore})
  * ({@code <audit root>/investigations/<id>/...}) and {@link DraftStore}'s Draft log writer, so every byte written is exactly
  * what those wrote before the port existed (the sealed {@code workingSetHash}, the set file embedding its own hash,
  * {@code DraftStore.prefixHash} over the log lines).
@@ -36,10 +36,10 @@ public final class FsInvestigationStore implements InvestigationStore {
 
     private static final String MEMBERS = "members.jsonl";
 
-    private final SnapshotStore snapshots;
+    private final FsInvestigationLayout snapshots;
 
     public FsInvestigationStore(Path writeRoot) {
-        this.snapshots = new SnapshotStore(writeRoot);
+        this.snapshots = new FsInvestigationLayout(writeRoot);
     }
 
     /** TRANSITIONAL (Draft vertical): one Investigation's directory. Not part of the port. */
@@ -235,12 +235,275 @@ public final class FsInvestigationStore implements InvestigationStore {
         return Optional.ofNullable(snapshots.readTemplate(id));
     }
 
-    /**
-     * TRANSITIONAL (Draft vertical): promote appends a step whose set is an existing sealed Draft set file, shared by hard
-     * link (LA-DRAFT-PROMOTE-COST-1). Same order and CREATE_NEW refusal as {@link #append}; the caller holds the main
-     * monitor ({@link #monitor}) across the whole promote.
-     */
-    public void appendStepSharingSet(String id, int step, String lineJson, Path sealedSet) throws IOException {
-        snapshots.appendStepSharingSet(id, step, lineJson, sealedSet);
+    @Override
+    public boolean replacePending(String investigationId, String requestId, String expectedJson, String newJson) throws IOException {
+        synchronized (monitor(investigationDir(investigationId))) {
+            String current = snapshots.readPending(investigationId, requestId);
+            if (current == null || !current.equals(expectedJson)) return false;
+            snapshots.writePending(investigationId, requestId, newJson);
+            return true;
+        }
+    }
+
+    @Override
+    public byte[] maskKey(String investigationId) throws IOException {
+        return com.gamma.entitylist.MaskTokens.key(investigationDir(investigationId));
+    }
+
+    // ── per-pod cache identity ──────────────────────────────────────────────────────────────────────────
+
+    @Override
+    public String cacheKey(Scope scope) {
+        return DraftCheckpoints.keyOf(logDir(scope));
+    }
+
+    @Override
+    public String logToken(Scope scope) {
+        return DraftCheckpoints.sig(logDir(scope).resolve("log.jsonl"));
+    }
+
+    // ── Drafts ──────────────────────────────────────────────────────────────────────────────────────────
+
+    /** Held while a create checks the Space-wide cap and takes its seat (D21). */
+    private static final Object CAP = new Object();
+
+    private static final java.time.Duration SCRATCH_GRACE = java.time.Duration.ofHours(1);
+
+    /** The marker a promote leaves in the Draft before it touches the main log, so a crash can be finished or undone. */
+    static final String PROMOTING = "promoting.json";
+
+    /** TEST SEAM: called after the last main step landed and before the Draft is marked promoted; a test throws an Error to simulate a crash there. */
+    public static volatile Runnable promoteBeforeMarkHook = () -> { };
+
+    private Path draftDirOf(String investigationId, String draftId) {
+        return DraftStore.draftDir(investigationDir(investigationId), draftId);
+    }
+
+    @Override
+    public DraftCreation createDraft(String investigationId, String draftId, String headerJson, String actor, int spaceCap)
+            throws IOException {
+        Path inv = investigationDir(investigationId);
+        synchronized (CAP) {   // the Space-wide cap is checked and taken as one step
+            synchronized (monitor(DraftStore.draftsDir(inv))) {
+                for (var other : DraftIndex.headers(inv).entrySet())   // D17: ONE live Draft per member per Investigation
+                    if (actor.equals(other.getValue().get("actor")) && !DraftStore.isClosed(DraftStore.draftDir(inv, other.getKey())))
+                        return new DraftCreation(DraftCreation.Created.ACTOR_HAS_LIVE, other.getKey());
+                int open = DraftStore.countOpen(investigationsRoot());
+                if (open >= spaceCap) return new DraftCreation(DraftCreation.Created.SPACE_FULL, Integer.toString(open));
+                if (!DraftStore.create(inv, draftId, headerJson)) return new DraftCreation(DraftCreation.Created.ID_TAKEN, draftId);
+                return new DraftCreation(DraftCreation.Created.CREATED, draftId);
+            }
+        }
+    }
+
+    @Override
+    public Optional<String> draftHeader(String investigationId, String draftId) throws IOException {
+        return Optional.ofNullable(DraftStore.readHeader(investigationDir(investigationId), draftId));
+    }
+
+    @Override
+    public java.util.Map<String, java.util.Map<String, Object>> draftHeaders(String investigationId) throws IOException {
+        return DraftIndex.headers(investigationDir(investigationId));
+    }
+
+    @Override
+    public List<String> openDraftIds(String investigationId) {
+        return DraftStore.openIds(investigationDir(investigationId));
+    }
+
+    @Override
+    public int openDraftCount() {
+        return DraftStore.countOpen(investigationsRoot());
+    }
+
+    @Override
+    public DraftState draftState(String investigationId, String draftId) {
+        return switch (DraftLifecycle.state(draftDirOf(investigationId, draftId))) {
+            case "promoted" -> DraftState.PROMOTED;
+            case "discarded" -> DraftState.DISCARDED;
+            case "hibernated" -> DraftState.HIBERNATED;
+            default -> DraftState.OPEN;
+        };
+    }
+
+    @Override
+    public boolean draftExpired(String investigationId, String draftId) {
+        return DraftLifecycle.wasExpired(draftDirOf(investigationId, draftId));
+    }
+
+    @Override
+    public Optional<String> discardMarker(String investigationId, String draftId) throws IOException {
+        return Optional.ofNullable(DraftStore.readDiscarded(draftDirOf(investigationId, draftId)));
+    }
+
+    @Override
+    public Optional<String> promoteMarker(String investigationId, String draftId) throws IOException {
+        return Optional.ofNullable(DraftStore.readPromoted(draftDirOf(investigationId, draftId)));
+    }
+
+    @Override
+    public Optional<String> draftSet(String investigationId, String draftId, int step) throws IOException {
+        Path f = draftDirOf(investigationId, draftId).resolve("sets").resolve(step + ".json");
+        return Files.isRegularFile(f) ? Optional.of(Files.readString(f, StandardCharsets.UTF_8)) : Optional.empty();
+    }
+
+    @Override
+    public void touchDraft(String investigationId, String draftId) {
+        DraftLifecycle.touch(draftDirOf(investigationId, draftId));
+    }
+
+    @Override
+    public boolean rehydrateDraft(String investigationId, String draftId) throws IOException {
+        return DraftLifecycle.rehydrate(draftDirOf(investigationId, draftId));
+    }
+
+    @Override
+    public java.time.Instant draftLastAccess(String investigationId, String draftId) {
+        return DraftLifecycle.lastAccess(draftDirOf(investigationId, draftId));
+    }
+
+    @Override
+    public java.time.Duration draftIdle(String investigationId, String draftId) {
+        return DraftLifecycle.idle(draftDirOf(investigationId, draftId));
+    }
+
+    @Override
+    public boolean hibernateDraft(String investigationId, String draftId, java.time.Duration after) throws IOException {
+        Path dir = draftDirOf(investigationId, draftId);
+        synchronized (monitor(dir)) {
+            if (DraftStore.isClosed(dir) || DraftLifecycle.idle(dir).compareTo(after) < 0) return false;
+            return DraftLifecycle.hibernate(dir);
+        }
+    }
+
+    @Override
+    public Optional<Boolean> closeDraft(String investigationId, String draftId, java.time.Duration idleAtLeast,
+                                        java.util.function.Function<List<String>, String> marker) throws IOException {
+        Path dir = draftDirOf(investigationId, draftId);
+        synchronized (monitor(dir)) {   // serialised with appends: none lands after the marker
+            if (DraftStore.isPromoted(dir)) return Optional.empty();
+            if (idleAtLeast != null && (DraftStore.isClosed(dir) || DraftLifecycle.idle(dir).compareTo(idleAtLeast) < 0))
+                return Optional.empty();
+            if (idleAtLeast != null && !Files.isRegularFile(dir.resolve(DraftStore.HEADER))) return Optional.empty();
+            boolean first = DraftStore.markDiscarded(dir, marker.apply(committedLines(dir.resolve("log.jsonl"))));
+            DraftCheckpoints.forget(dir);
+            return Optional.of(first);
+        }
+    }
+
+    @Override
+    public void promoteDraft(String investigationId, String draftId, long expectedMainVersion, String expectedMainHash,
+                             String expectedDraftLogHash, List<String> lines, List<String> sets, String markerJson) throws IOException {
+        Path invDir = investigationDir(investigationId);
+        Path draftDir = draftDirOf(investigationId, draftId);
+        synchronized (monitor(invDir)) {   // the main log, THEN the Draft: the one order everywhere
+            synchronized (monitor(draftDir)) {
+                if (DraftStore.isClosed(draftDir)) throw new DraftClosedException(draftId);
+                List<String> main = committedLines(invDir.resolve("log.jsonl"));
+                if (main.size() != expectedMainVersion || !DraftStore.prefixHash(main, main.size()).equals(expectedMainHash))
+                    throw new InvestigationVersionConflictException(investigationId, expectedMainVersion, main.size());
+                List<String> own = committedLines(draftDir.resolve("log.jsonl"));
+                if (!DraftStore.prefixHash(own, own.size()).equals(expectedDraftLogHash))
+                    throw new InvestigationVersionConflictException(investigationId, own.size(), own.size());
+                Path log = invDir.resolve("log.jsonl");
+                long before = Files.isRegularFile(log) ? Files.size(log) : 0;
+                int from = main.size();
+                // the intent first: a crash from here until the Draft is marked is finished or undone by recoverDrafts
+                Files.writeString(draftDir.resolve(PROMOTING), InvestigationEvaluator.CANONICAL.writeValueAsString(java.util.Map.of(
+                        "from", from, "to", from + lines.size(), "linesHash", DraftStore.prefixHash(lines, lines.size()),
+                        "marker", markerJson)), StandardCharsets.UTF_8);
+                try {
+                    for (int i = 0; i < lines.size(); i++) {
+                        DraftStore.promoteHook.accept(from + i + 1);
+                        if (sets.get(i) == null)
+                            snapshots.appendStepSharingSet(investigationId, from + i + 1, lines.get(i),
+                                    draftDir.resolve("sets").resolve((from + i + 1) + ".json"));
+                        else snapshots.appendStep(investigationId, from + i + 1, lines.get(i), sets.get(i));
+                    }
+                    promoteBeforeMarkHook.run();
+                    if (!DraftStore.markPromoted(draftDir, markerJson)) throw new DraftClosedException(draftId);
+                } catch (IOException | RuntimeException failed) {
+                    truncateMain(invDir, before, from, lines.size());
+                    Files.deleteIfExists(draftDir.resolve(PROMOTING));
+                    throw failed;
+                }
+                Files.deleteIfExists(draftDir.resolve(PROMOTING));
+                DraftCheckpoints.forget(draftDir);
+            }
+        }
+    }
+
+    /** Put the main log back as it was: truncate to {@code before} bytes and remove the set files of the steps this attempt wrote. */
+    private static void truncateMain(Path invDir, long before, int from, int count) {
+        try (java.nio.channels.FileChannel ch = java.nio.channels.FileChannel.open(invDir.resolve("log.jsonl"), StandardOpenOption.WRITE)) {
+            ch.truncate(before);
+        } catch (IOException ignored) {
+            // the caller reports the original failure
+        }
+        deleteSets(invDir, from, from + count);
+    }
+
+    private static void deleteSets(Path invDir, int afterStep, int throughStep) {
+        for (int step = afterStep + 1; step <= throughStep; step++)
+            try {
+                Files.deleteIfExists(invDir.resolve("sets").resolve(step + ".json"));
+            } catch (IOException ignored) {
+                // best effort
+            }
+    }
+
+    @Override
+    public void replaceDraft(String investigationId, String draftId, long expectedMainVersion, String expectedMainHash,
+                             String expectedDraftLogHash, String headerJson, List<String> lines, List<String> sets,
+                             List<Integer> setSteps) throws IOException {
+        Path invDir = investigationDir(investigationId);
+        Path draftDir = draftDirOf(investigationId, draftId);
+        synchronized (monitor(invDir)) {
+            synchronized (monitor(draftDir)) {
+                if (DraftStore.isClosed(draftDir)) throw new DraftClosedException(draftId);
+                List<String> main = committedLines(invDir.resolve("log.jsonl"));
+                if (main.size() != expectedMainVersion || !DraftStore.prefixHash(main, main.size()).equals(expectedMainHash))
+                    throw new InvestigationVersionConflictException(investigationId, expectedMainVersion, main.size());
+                List<String> own = committedLines(draftDir.resolve("log.jsonl"));
+                if (!DraftStore.prefixHash(own, own.size()).equals(expectedDraftLogHash))
+                    throw new InvestigationVersionConflictException(investigationId, own.size(), own.size());
+                DraftStore.replaceRebased(draftDir, headerJson, lines, sets, setSteps);
+                DraftCheckpoints.forget(draftDir);
+            }
+        }
+    }
+
+    @Override
+    public void recoverDrafts(String investigationId) throws IOException {
+        Path invDir = investigationDir(investigationId);
+        if (!Files.isDirectory(DraftStore.draftsDir(invDir))) return;
+        DraftStore.recover(invDir, DraftLifecycle.now(), SCRATCH_GRACE, FsInvestigationStore::monitor);
+        for (String id : DraftStore.openIds(invDir)) {
+            Path draftDir = DraftStore.draftDir(invDir, id);
+            if (!Files.isRegularFile(draftDir.resolve(PROMOTING))) continue;
+            synchronized (monitor(invDir)) {
+                synchronized (monitor(draftDir)) {
+                    Path intentFile = draftDir.resolve(PROMOTING);
+                    if (!Files.isRegularFile(intentFile) || DraftStore.isClosed(draftDir)) continue;
+                    @SuppressWarnings("unchecked") java.util.Map<String, Object> intent = InvestigationEvaluator.CANONICAL
+                            .readValue(Files.readString(intentFile, StandardCharsets.UTF_8), java.util.Map.class);
+                    int from = ((Number) intent.get("from")).intValue(), to = ((Number) intent.get("to")).intValue();
+                    List<String> main = committedLines(invDir.resolve("log.jsonl"));
+                    boolean landed = main.size() >= to && DraftStore.prefixHash(main.subList(from, to), to - from).equals(intent.get("linesHash"));
+                    if (landed) {   // every main step is there: the promote happened, only the Draft's marker is missing
+                        DraftStore.markPromoted(draftDir, String.valueOf(intent.get("marker")));
+                        DraftCheckpoints.forget(draftDir);
+                    } else if (main.size() > from) {   // partial: put the main log back to the `from` entries it held
+                        long keep = 0;
+                        for (int i = 0; i < from; i++) keep += main.get(i).getBytes(StandardCharsets.UTF_8).length + 1L;
+                        try (java.nio.channels.FileChannel ch = java.nio.channels.FileChannel.open(invDir.resolve("log.jsonl"), StandardOpenOption.WRITE)) {
+                            ch.truncate(keep);
+                        }
+                        deleteSets(invDir, from, Math.max(to, main.size()));
+                    }
+                    Files.deleteIfExists(intentFile);
+                }
+            }
+        }
     }
 }

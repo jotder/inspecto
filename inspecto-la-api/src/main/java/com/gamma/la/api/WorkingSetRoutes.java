@@ -196,7 +196,7 @@ public final class WorkingSetRoutes implements RouteModule {
         for (String line : inv.store().log(inv.scope())) joined.writeBytes((line + "\n").getBytes(StandardCharsets.UTF_8));
         byte[] bytes = joined.toByteArray();
         int end = bytes.length;
-        String key = inv.logDir().toAbsolutePath().normalize() + "\u0000" + sha256(bytes, end) + (at < 0 ? "" : "@" + at);
+        String key = inv.cacheKey() + "\u0000" + sha256(bytes, end) + (at < 0 ? "" : "@" + at);
         synchronized (CACHE) {
             Relation hit = CACHE.get(key);
             if (hit != null) {
@@ -211,9 +211,9 @@ public final class WorkingSetRoutes implements RouteModule {
         return DraftAdmission.heavy("Working Set relation of draft " + inv.draft().draftId(), () -> build(key, draftBytes, draftEnd, at));
     }
 
-    /** D7-6 (hibernate / expire): forget every cached relation of the log directory {@code logDir}. */
-    static void evict(Path logDir) {
-        String prefix = logDir.toAbsolutePath().normalize() + "\u0000";
+    /** D7-6 (hibernate / expire): forget every cached relation of the log named {@code cacheKey}. */
+    static void evict(String cacheKey) {
+        String prefix = cacheKey + "\u0000";
         synchronized (CACHE) {
             CACHE.keySet().removeIf(k -> k.startsWith(prefix));
         }

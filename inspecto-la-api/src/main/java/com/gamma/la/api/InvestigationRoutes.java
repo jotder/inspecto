@@ -168,28 +168,21 @@ public final class InvestigationRoutes implements RouteModule {
             this(store, writeRoot, id, header, null);
         }
 
-        /**
-         * TRANSITIONAL (Draft vertical): the filesystem implementation, for the still Path-keyed Draft code. Fails loudly
-         * when another backend is plugged in, which is exactly the signal that the Draft vertical has not been ported.
-         */
-        com.gamma.la.core.FsInvestigationStore fs() {
-            if (store instanceof com.gamma.la.core.FsInvestigationStore fs) return fs;
-            throw new IllegalStateException("Drafts are not ported to the InvestigationStore port yet: " + store.getClass().getName());
-        }
-
         /** The scope this view reads and appends: the main log, or its Draft's own log. */
         public InvestigationStore.Scope scope() {
             return draft == null ? InvestigationStore.Scope.main(id) : InvestigationStore.Scope.draft(id, draft.draftId());
         }
 
-        /** D7-3: the Draft this view is working on - its id, the main step it forked from, and its own directory. */
-        public record DraftRef(String draftId, int baseStep, Path dir) { }
+        /** D7-3: the Draft this view is working on - its id and the main step it forked from. */
+        public record DraftRef(String draftId, int baseStep) { }
 
         public String dataset() { return String.valueOf(header.get("dataset")); }
-        /** The INVESTIGATION's directory, also for a Draft view (members, the masking key and the Case link live here). */
-        Path dir() { return fs().investigationDir(id); }
-        /** The directory whose {@code log.jsonl} this view appends to - the Investigation's, or the Draft's. */
-        Path logDir() { return draft == null ? dir() : draft.dir(); }
+
+        /** The key naming this view's log in per-pod caches (checkpoints, cached relations); see {@link InvestigationStore#cacheKey}. */
+        String cacheKey() { return store.cacheKey(scope()); }
+
+        /** The token that changes whenever this view's own log does; see {@link InvestigationStore#logToken}. */
+        String logToken() throws IOException { return store.logToken(scope()); }
 
         /**
          * The log this view evaluates: the main log, or - for a Draft - the main log's first {@code baseStep} entries
@@ -838,7 +831,7 @@ public final class InvestigationRoutes implements RouteModule {
         e.put("workingSetHash", after.hash());
         int step = ((Number) e.get("step")).intValue();
         inv.appendStep(log.size(), step, canonical(e), canonical(setDoc(step, after)));
-        if (inv.draft() != null) com.gamma.la.core.DraftCheckpoints.remember(inv.draft().dir(), next.size(), after);
+        if (inv.draft() != null) com.gamma.la.core.DraftCheckpoints.remember(inv.cacheKey(), inv.logToken(), next.size(), after);
 
         String op = "undo".equals(e.get("kind")) ? "undo" : String.valueOf(e.get("op"));
         @SuppressWarnings("unchecked") Map<String, Object> read = (Map<String, Object>) e.get("read");
@@ -1025,7 +1018,7 @@ public final class InvestigationRoutes implements RouteModule {
     static Map<String, Long> draftPins(Inv inv) {
         if (inv.draft() == null) return null;
         try {
-            String raw = com.gamma.la.core.DraftStore.readHeader(inv.dir(), inv.draft().draftId());
+            String raw = inv.store().draftHeader(inv.id(), inv.draft().draftId()).orElse(null);
             Map<String, Long> out = new LinkedHashMap<>();
             if (raw != null && ApiContext.JSON.readValue(raw, Map.class).get("pins") instanceof Map<?, ?> p && p.get("indexes") instanceof List<?> l)
                 for (Object o : l)
@@ -1972,7 +1965,7 @@ public final class InvestigationRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "request id must match " + SnapshotStore.SAFE_ID.pattern() + ", got '" + rid + "'");
         String reason = ApiContext.str(body, "reason");
         if (reason != null && reason.length() > 200) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'reason' is at most 200 chars");
-        synchronized (lock(inv.dir())) {
+        {   // no lock: the decision is claimed by a compare-and-set on the pending record BEFORE the append it authorises
             String raw = inv.store().pending(inv.id(), rid).orElse(null);
             if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no pending request '" + rid + "' on investigation '" + id + "'");
             Map<String, Object> rec = parse(raw);
@@ -1988,7 +1981,7 @@ public final class InvestigationRoutes implements RouteModule {
             if (!approve) {
                 rec.put("status", "denied");
                 if (reason != null) rec.put("reason", reason);
-                inv.store().writePending(inv.id(), rid, canonical(rec));
+                if (!inv.store().replacePending(inv.id(), rid, raw, canonical(rec))) throw alreadyDecided(inv, rid);
                 emit(ex, LinkEventTypes.LINK_EXPANSION_DENIED, "link.expansion.denied",
                         "link.expansion.denied — " + id + " " + rid + " by " + by,
                         b -> b.attr("investigationId", id).attr("requestId", rid)
@@ -1996,6 +1989,13 @@ public final class InvestigationRoutes implements RouteModule {
                 return masked(inv, Map.of("id", id, "pending", rec));
             }
 
+            // CLAIM the decision first: the status moves pending -> approved in one compare-and-set, so a second decider (or a retry
+            // of this one) finds it already moved and is refused, never double-approving. If the authorised act then fails, the claim
+            // is handed back so the request can be decided again; once the append has landed it is never handed back.
+            Map<String, Object> claimed = new LinkedHashMap<>(rec);
+            claimed.put("status", "approved");
+            String claimedJson = canonical(claimed);
+            if (!inv.store().replacePending(inv.id(), rid, raw, claimedJson)) throw alreadyDecided(inv, rid);
             if ("promote".equals(rec.get("kind"))) {   // D7-5: a held promote of a Draft carrying a sensitive expand
                 Map<String, Object> approval = new LinkedHashMap<>();
                 approval.put("request", rid);
@@ -2003,7 +2003,13 @@ public final class InvestigationRoutes implements RouteModule {
                 approval.put("requestedAt", rec.get("requestedAt"));
                 approval.put("approvedBy", by);
                 approval.put("approvedAt", at);
-                Map<String, Object> out = DraftPromote.executeApproved(api, ex, inv, rec, approval);
+                Map<String, Object> out;
+                try {
+                    out = DraftPromote.executeApproved(api, ex, inv, rec, approval);
+                } catch (IOException | RuntimeException failed) {
+                    inv.store().replacePending(inv.id(), rid, claimedJson, raw);
+                    throw failed;
+                }
                 rec.put("status", "approved");
                 rec.put("step", out.get("toStep"));
                 inv.store().writePending(inv.id(), rid, canonical(rec));
@@ -2011,6 +2017,15 @@ public final class InvestigationRoutes implements RouteModule {
                 return masked(inv, out);
             }
             Map<String, Object> params = (Map<String, Object>) rec.get("params");
+            Map<String, Object> approval = new LinkedHashMap<>();
+            approval.put("request", rid);
+            approval.put("requestedBy", rec.get("requestedBy"));
+            approval.put("requestedAt", rec.get("requestedAt"));
+            approval.put("approvedBy", by);
+            approval.put("approvedAt", at);
+            Map<String, Object> out;
+            try {
+                out = untilWon(() -> {
             List<Map<String, Object>> log = readLog(inv);
             InvestigationEvaluator.State before = stateBefore(inv, log);
             List<String> named = strings(params.get("ids"));
@@ -2022,19 +2037,18 @@ public final class InvestigationRoutes implements RouteModule {
                         + "Working Set since it was made; deny it instead");
             if (frontier.size() > MAX_FRONTIER)
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + MAX_FRONTIER + " entities");
-            Map<String, Object> approval = new LinkedHashMap<>();
-            approval.put("request", rid);
-            approval.put("requestedBy", rec.get("requestedBy"));
-            approval.put("requestedAt", rec.get("requestedAt"));
-            approval.put("approvedBy", by);
-            approval.put("approvedAt", at);
             Map<String, Object> entry = entry(log.size() + 1, "op", ex);
             entry.put("author", rec.get("requestedBy"));   // the requester's op; the approver is recorded beside it
             entry.put("op", "expand");
             entry.put("params", params);
             entry.put("approval", approval);
             entry.put("read", read(api, ex, inv, expandRung(api, ex, inv, params, frontier, before, "")));
-            Map<String, Object> out = (Map<String, Object>) commit(ex, inv, log, entry, before);
+            return (Map<String, Object>) commit(ex, inv, log, entry, before);
+                });
+            } catch (IOException | RuntimeException failed) {
+                inv.store().replacePending(inv.id(), rid, claimedJson, raw);   // nothing was appended: hand the claim back
+                throw failed;
+            }
             rec.put("status", "approved");
             rec.put("step", out.get("step"));
             inv.store().writePending(inv.id(), rid, canonical(rec));
@@ -2094,9 +2108,16 @@ public final class InvestigationRoutes implements RouteModule {
         }
     }
 
+    /** A decide that lost the compare-and-set: another decider moved the request first. */
+    private static ApiException alreadyDecided(Inv inv, String rid) throws IOException {
+        String raw = inv.store().pending(inv.id(), rid).orElse(null);
+        String now = raw == null ? "decided" : String.valueOf(parse(raw).get("status"));
+        return new ApiException(409, ErrorCodes.CONFLICT, "request '" + rid + "' is already " + now);
+    }
+
     /** The state of {@code log} before the next step: the main log folds; a Draft resumes from its checkpoint (D7-4). */
-    private static InvestigationEvaluator.State stateBefore(Inv inv, List<Map<String, Object>> log) {
-        return inv.draft() == null ? evaluate(log, -1, null) : com.gamma.la.core.DraftCheckpoints.stateOf(inv.draft().dir(), log);
+    private static InvestigationEvaluator.State stateBefore(Inv inv, List<Map<String, Object>> log) throws IOException {
+        return inv.draft() == null ? evaluate(log, -1, null) : com.gamma.la.core.DraftCheckpoints.stateOf(inv.cacheKey(), inv.logToken(), log);
     }
 
     private static List<Map<String, Object>> readLog(Inv inv) throws IOException {
@@ -2182,14 +2203,6 @@ public final class InvestigationRoutes implements RouteModule {
         if (!SAFE_IDENT.matcher(v).matches())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsafe column identifier '" + v + "' for " + key);
         return v;
-    }
-
-    /**
-     * TRANSITIONAL (Draft vertical): the monitor the filesystem store itself serialises its writers on, so the still Path-keyed
-     * compound critical sections (decide, promote, rebase, Draft admission and discard) keep excluding the port's own writers.
-     */
-    static Object lock(Path p) {
-        return com.gamma.la.core.FsInvestigationStore.monitor(p);
     }
 
     /** How many times an op or undo re-reads, re-evaluates and retries after another writer moved the log under it. */

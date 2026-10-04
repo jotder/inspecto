@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
  * investigations/&lt;id&gt;/drafts/&lt;draftId&gt;/
  *   header.json      write-once: draftId, investigationId, actor, createdAt, baseStep, baseLogHash, pins
  *   log.jsonl        the Draft's OWN ops, steps baseStep+1 ... (same entry shape and sealed payloads as the main log)
- *   sets/&lt;step&gt;.json   a Working Set per step (same writer as the main log: {@link SnapshotStore#appendStepAt})
+ *   sets/&lt;step&gt;.json   a Working Set per step (same writer as the main log: {@code FsInvestigationLayout.appendStepAt})
  *   discarded.json   present once discarded (log.jsonl and sets/ are then deleted; see {@link #markDiscarded})
  * </pre>
  *
@@ -328,7 +328,7 @@ public final class DraftStore {
         Path log = draftDir.resolve("log.jsonl");
         long before = Files.isRegularFile(log) ? Files.size(log) : 0;
         try {
-            SnapshotStore.appendStepAt(draftDir, step, lineJson, workingSetJson);
+            FsInvestigationLayout.appendStepAt(draftDir, step, lineJson, workingSetJson);
         } catch (IOException | RuntimeException failed) {
             if (Files.isRegularFile(log)) {
                 try (FileChannel ch = FileChannel.open(log, StandardOpenOption.WRITE)) {
