@@ -209,7 +209,7 @@ table) works and **survives the seal**, but `DuckDBConnection` exposes **no** Ja
 "UDF" can only ever mean a SQL macro, per-connection, re-created on every scratch connection
 (`EnrichmentEngine`, `PipelineJobRunner`, `ConsignmentIngestStrategy`, preview) and needing a component kind +
 registry that do not exist. **Parked on demand (operator 2026-10-04)** until a named consumer exists; if ever built, recommended: a Space-level `macros/*.toon` registry loaded by one shared helper per scratch connection, governed by existing Safety Policy tiers + SqlGuard/ExpressionGuard + seal. Dynamic/environment values — none in v1; when needed, render at read time
-(the standing rule) or `SET VARIABLE`/`getvariable()`.
+(the standing rule) or `SET VARIABLE`/`getvariable()`. AUTHORING-REDESIGN-1 (e) is **DEFERRED / WON'T-DO FOR NOW (decided 2026-10-04):** storing column metadata nothing reads is dead config, and the Catalog has no node for a Step's output columns; reopen when a consumer exists.
 
 ## The projection slot (was the `transform.map` group — deleted 2026-09-05)
 
