@@ -3,7 +3,6 @@ package com.gamma.job;
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.ConnectionRegistry;
 import com.gamma.acquire.SecretResolver;
-import com.gamma.catalog.PipelineSchemas;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
@@ -478,59 +477,12 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                             out.putIfAbsent(String.valueOf(col.get("name")).toLowerCase(Locale.ROOT), cl);
                     }
         }
-        schemaClassification(store.root().getParent(), stores, out);
+        EvidenceMasker.schemaClassification(store.root().getParent(), stores, out);
         return out;
     }
 
     /** Reserved {@link #lineageClassification} key: the store's classification could not be established. */
-    static final String UNKNOWN_LINEAGE = "*";
-
-    /**
-     * Adds what the pipeline schemas behind {@code stores} classify. A schema's {@code raw.fields[].classification}
-     * (sensitive classes only) follows its {@code mapping.fields[]} to the stored column: a {@code keep}/rename of a
-     * classified raw column, and any rule whose text ({@code from} or {@code args}) names one (a hash, a
-     * substring, a concatenation), classify the target; a target named like a classified raw column does too.
-     * Fails closed to {@link #UNKNOWN_LINEAGE} when a matching pipeline cannot be loaded, its mapping cannot be
-     * read, or it has a step that rewrites the columns (summarize, sql, lookup, join, route) while a raw column is
-     * classified. A store no pipeline claims (a Job output, a sidecar) contributes nothing.
-     */
-    private static void schemaClassification(Path configRoot, Set<String> stores, Map<String, String> out) {
-        for (String store : stores) {
-            int slash = store.indexOf('/');
-            PipelineSchemas.Found f = PipelineSchemas.forStore(configRoot, slash < 0 ? store : store.substring(0, slash));
-            if (f.unreadable()) out.put(UNKNOWN_LINEAGE, "UNKNOWN");
-            for (PipelineSchemas.Entry e : f.entries()) {
-                Map<String, String> sensitiveRaw = new java.util.LinkedHashMap<>();
-                if (e.schema().get("raw") instanceof Map<?, ?> raw && raw.get("fields") instanceof List<?> fields)
-                    for (Object o : fields)
-                        if (o instanceof Map<?, ?> fld && fld.get("name") != null && fld.get("classification") != null) {
-                            String cl = String.valueOf(fld.get("classification")).trim().toUpperCase(Locale.ROOT);
-                            if (EvidenceMasker.SENSITIVE.contains(cl))
-                                sensitiveRaw.putIfAbsent(String.valueOf(fld.get("name")).trim().toLowerCase(Locale.ROOT), cl);
-                        }
-                if (sensitiveRaw.isEmpty()) continue;
-                if (f.reshaped()) { out.put(UNKNOWN_LINEAGE, "UNKNOWN"); continue; }
-                sensitiveRaw.forEach(out::putIfAbsent);   // a stored column named like the raw one
-                if (!(e.schema().get("mapping") instanceof Map<?, ?> mapping) || mapping.get("fields") == null) continue;
-                if (!(mapping.get("fields") instanceof List<?> rules)) { out.put(UNKNOWN_LINEAGE, "UNKNOWN"); continue; }
-                for (Object o : rules) {
-                    if (!(o instanceof Map<?, ?> rule) || str(rule.get("name")) == null) {
-                        out.put(UNKNOWN_LINEAGE, "UNKNOWN");
-                        break;
-                    }
-                    String text = rule.get("from") + " " + rule.get("args");
-                    java.util.regex.Matcher m = java.util.regex.Pattern.compile("[A-Za-z0-9_]+").matcher(text);
-                    while (m.find()) {
-                        String cl = sensitiveRaw.get(m.group().toLowerCase(Locale.ROOT));
-                        if (cl != null) {
-                            out.putIfAbsent(str(rule.get("name")).toLowerCase(Locale.ROOT), cl);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
+    static final String UNKNOWN_LINEAGE = EvidenceMasker.UNKNOWN_LINEAGE;
 
     // ── target ───────────────────────────────────────────────────────────────────────────────
 

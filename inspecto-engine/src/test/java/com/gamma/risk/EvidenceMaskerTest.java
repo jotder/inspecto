@@ -68,4 +68,52 @@ class EvidenceMaskerTest {
         assertNotEquals(a.mask("topups", "topup_id", "t1"), a.mask("topups", "topup_id", "t2"));
         assertEquals(List.of("topups.topup_id"), a.maskedColumns());
     }
+
+    // ── ASSURE-CLASSIFICATION-PROPAGATION-1: a pipeline schema's classification follows its mapping into evidence ──
+
+    /** A pipeline "cust" whose schema gives raw MSISDN {@code rawClass}, renamed to stored {@code m}, and a Dataset
+     *  over it that classifies nothing itself; the model's evidence is {@code m} and {@code plan}. */
+    private static EvidenceMasker custMasker(Path config, String rawClass, String extraPipeline) throws Exception {
+        Files.createDirectories(config.resolve("cust"));
+        Files.writeString(config.resolve("cust/cust_pipeline.toon"), "name: cust\nactive: true\n\ndirs:\n"
+                + "  poll: data/inbox/cust\n  database: data/cust/database\n  backup: data/cust/backup\n"
+                + "  temp: data/cust/temp\n  errors: data/cust/errors\n  quarantine: data/cust/quarantine\n"
+                + "  markers: data/cust/markers\n  status_dir: data/cust/status\n  log_dir: data/cust/logs\n\n"
+                + "output:\n  format: PARQUET\n  compression: snappy\n\nprocessing:\n  threads: 1\n"
+                + "  file_pattern: \"glob:**/*.csv\"\n  schema_file: cust_schema.toon\n" + extraPipeline);
+        Files.writeString(config.resolve("cust/cust_schema.toon"), "partitionKey: DAY\nraw:\n  name: CUST\n  format: CSV\n"
+                + "  fields[2]{name,selector,type,description,unit,classification}:\n"
+                + "    MSISDN,\"0\",VARCHAR,\"\",\"\",\"" + rawClass + "\"\n    PLAN,\"1\",VARCHAR,\"\",\"\",\"\"\n"
+                + "mapping:\n  canonicalName: cust\n  rawName: CUST\n  fields[2]:\n"
+                + "    - name: m\n      from: MSISDN\n      fn: keep\n    - name: plan\n      from: PLAN\n      fn: keep\n");
+        ComponentStore store = new ComponentStore(config.resolve("registry"));
+        store.write("dataset", "cust", Map.of("physicalRef", "cust"));
+        return EvidenceMasker.of(store, config, RiskScoreModel.fromMap("m", Map.of("entityType", "subscriber",
+                "highThreshold", 50, "factors", List.of(Map.of("id", "f", "dataset", "cust", "key", "plan",
+                        "measure", "count", "weight", 1, "evidence", List.of("m", "plan"))))));
+    }
+
+    @Test
+    void aColumnRenamedFromAClassifiedRawFieldIsMaskedInEvidence(@TempDir Path space) throws Exception {
+        EvidenceMasker m = custMasker(Files.createDirectories(space.resolve("config")), "MSISDN", "");
+        assertTrue(String.valueOf(m.mask("cust", "m", "9198")).startsWith("masked:"), "m is MSISDN under another name");
+        assertEquals("gold", m.mask("cust", "plan", "gold"));
+    }
+
+    @Test
+    void anUnclassifiedRawFieldLeavesTheRenamedColumnRaw(@TempDir Path space) throws Exception {
+        EvidenceMasker m = custMasker(Files.createDirectories(space.resolve("config")), "", "");
+        assertEquals("9198", m.mask("cust", "m", "9198"));
+        assertEquals(List.of(), m.maskedColumns());
+    }
+
+    @Test
+    void untraceableLineageFailsClosedAndMasksEveryEvidenceColumn(@TempDir Path space) throws Exception {
+        // FAIL CLOSED: a summarize step rewrites the columns, so the mapping no longer says which stored column is
+        // MSISDN; the column's lineage cannot be resolved, so it is treated as CLASSIFIED (masked), never open.
+        EvidenceMasker m = custMasker(Files.createDirectories(space.resolve("config")), "MSISDN",
+                "steps[1]:\n  - summarize:\n      group_by: [plan]\n");
+        assertTrue(String.valueOf(m.mask("cust", "m", "9198")).startsWith("masked:"));
+        assertTrue(String.valueOf(m.mask("cust", "plan", "gold")).startsWith("masked:"), "even an unrelated column");
+    }
 }

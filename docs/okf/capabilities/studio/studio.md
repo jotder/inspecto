@@ -494,6 +494,11 @@ are the values four-eyes approved (below).
     cannot be read, or it has a step that rewrites the columns (`summarize`, `sql`, `lookup`, `join`, `route`)
     while a raw column is classified. The Dataset is then refused unless `include_sensitive` names `<dataset>.*`
     and the author holds `canAdminister`. The inherited set is part of the four-eyes approval fingerprint.
+  - **Risk Score evidence masking uses the same lineage (2026-10-04).** `EvidenceMasker.sensitiveColumns` adds what
+    `EvidenceMasker.schemaClassification` (the one resolver, moved there from `PostgresPublishJobType`) classifies
+    behind a factor Dataset's `physicalRef`/`sourceName`, so a renamed or hashed MSISDN is stored as a token. Where
+    that lineage cannot be traced the masker **fails closed: every evidence column of that Dataset is masked**.
+    Sibling-Dataset same-name inheritance and view lineage are NOT applied to evidence yet.
   - **Aggregates and Job outputs do not inherit** (decision): a store no pipeline claims (a Job `output_store`
     such as `rollup`, an entity-list sidecar) contributes no classification.
 - ⚠ **Residual:** classification is only as good as the registry and the pipeline schemas.

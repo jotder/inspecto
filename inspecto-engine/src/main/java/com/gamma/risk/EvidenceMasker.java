@@ -1,5 +1,6 @@
 package com.gamma.risk;
 
+import com.gamma.catalog.PipelineSchemas;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.util.SpaceSecretKeys;
@@ -63,6 +64,12 @@ public final class EvidenceMasker {
         return SpaceSecretKeys.keyFile(configRoot, KEY_FILE);
     }
 
+    /**
+     * The Dataset's sensitive columns, lower-cased: its own registry {@code columns[].classification}, plus what the
+     * pipeline schema behind its {@code physicalRef}/{@code sourceName} classifies through the mapping
+     * (ASSURE-CLASSIFICATION-PROPAGATION-1, the resolver {@code publish.postgres} uses). Fails closed: when that
+     * lineage cannot be traced the set holds {@link #UNKNOWN_LINEAGE} and EVERY evidence column is masked.
+     */
     static Set<String> sensitiveColumns(ComponentStore registry, String datasetId) {
         Set<String> out = new LinkedHashSet<>();
         Map<String, Object> ds = registry.get("dataset", datasetId).map(ComponentRegistry.Component::content).orElse(Map.of());
@@ -70,7 +77,13 @@ public final class EvidenceMasker {
             for (Object o : cols)
                 if (o instanceof Map<?, ?> c && c.get("name") != null && c.get("classification") != null
                         && SENSITIVE.contains(String.valueOf(c.get("classification")).trim().toUpperCase(Locale.ROOT)))
-                    out.add(String.valueOf(c.get("name")));
+                    out.add(String.valueOf(c.get("name")).trim().toLowerCase(Locale.ROOT));
+        Set<String> stores = new LinkedHashSet<>();
+        if (str(ds.get("physicalRef")) != null) stores.add(str(ds.get("physicalRef")));
+        if (str(ds.get("sourceName")) != null) stores.add(str(ds.get("sourceName")));
+        Map<String, String> inherited = new HashMap<>();
+        schemaClassification(registry.root().getParent(), stores, inherited);
+        out.addAll(inherited.keySet());
         return out;
     }
 
@@ -82,7 +95,9 @@ public final class EvidenceMasker {
 
     /** {@code value} as it may be stored: the token when the column is sensitive, else unchanged. */
     public Object mask(String dataset, String column, Object value) {
-        if (value == null || !sensitiveByDataset.getOrDefault(dataset, Set.of()).contains(column)) return value;
+        Set<String> sensitive = sensitiveByDataset.getOrDefault(dataset, Set.of());
+        if (value == null || !(sensitive.contains(UNKNOWN_LINEAGE)
+                || sensitive.contains(column.trim().toLowerCase(Locale.ROOT)))) return value;
         return token(String.valueOf(value));
     }
 
@@ -97,5 +112,59 @@ public final class EvidenceMasker {
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException("HmacSHA256 unavailable", e);
         }
+    }
+
+    /** Reserved classification-map key: the store's column lineage could not be established (fail closed). */
+    public static final String UNKNOWN_LINEAGE = "*";
+
+    /**
+     * Adds what the pipeline schemas behind {@code stores} classify. A schema's {@code raw.fields[].classification}
+     * (sensitive classes only) follows its {@code mapping.fields[]} to the stored column: a {@code keep}/rename of a
+     * classified raw column, and any rule whose text ({@code from} or {@code args}) names one (a hash, a
+     * substring, a concatenation), classify the target; a target named like a classified raw column does too.
+     * Fails closed to {@link #UNKNOWN_LINEAGE} when a matching pipeline cannot be loaded, its mapping cannot be
+     * read, or it has a step that rewrites the columns (summarize, sql, lookup, join, route) while a raw column is
+     * classified. A store no pipeline claims (a Job output, a sidecar) contributes nothing.
+     */
+    public static void schemaClassification(Path configRoot, Set<String> stores, Map<String, String> out) {
+        for (String store : stores) {
+            int slash = store.indexOf('/');
+            PipelineSchemas.Found f = PipelineSchemas.forStore(configRoot, slash < 0 ? store : store.substring(0, slash));
+            if (f.unreadable()) out.put(UNKNOWN_LINEAGE, "UNKNOWN");
+            for (PipelineSchemas.Entry e : f.entries()) {
+                Map<String, String> sensitiveRaw = new java.util.LinkedHashMap<>();
+                if (e.schema().get("raw") instanceof Map<?, ?> raw && raw.get("fields") instanceof List<?> fields)
+                    for (Object o : fields)
+                        if (o instanceof Map<?, ?> fld && fld.get("name") != null && fld.get("classification") != null) {
+                            String cl = String.valueOf(fld.get("classification")).trim().toUpperCase(Locale.ROOT);
+                            if (SENSITIVE.contains(cl))
+                                sensitiveRaw.putIfAbsent(String.valueOf(fld.get("name")).trim().toLowerCase(Locale.ROOT), cl);
+                        }
+                if (sensitiveRaw.isEmpty()) continue;
+                if (f.reshaped()) { out.put(UNKNOWN_LINEAGE, "UNKNOWN"); continue; }
+                sensitiveRaw.forEach(out::putIfAbsent);   // a stored column named like the raw one
+                if (!(e.schema().get("mapping") instanceof Map<?, ?> mapping) || mapping.get("fields") == null) continue;
+                if (!(mapping.get("fields") instanceof List<?> rules)) { out.put(UNKNOWN_LINEAGE, "UNKNOWN"); continue; }
+                for (Object o : rules) {
+                    if (!(o instanceof Map<?, ?> rule) || str(rule.get("name")) == null) {
+                        out.put(UNKNOWN_LINEAGE, "UNKNOWN");
+                        break;
+                    }
+                    String text = rule.get("from") + " " + rule.get("args");
+                    java.util.regex.Matcher m = java.util.regex.Pattern.compile("[A-Za-z0-9_]+").matcher(text);
+                    while (m.find()) {
+                        String cl = sensitiveRaw.get(m.group().toLowerCase(Locale.ROOT));
+                        if (cl != null) {
+                            out.putIfAbsent(str(rule.get("name")).toLowerCase(Locale.ROOT), cl);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static String str(Object o) {
+        return o == null || String.valueOf(o).isBlank() ? null : String.valueOf(o).trim();
     }
 }
