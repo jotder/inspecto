@@ -3,7 +3,6 @@ package com.gamma.catalog;
 import com.gamma.catalog.spi.DescriptionProvider;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.PipelineConfig;
-import com.gamma.etl.SchemaSelector;
 import com.gamma.pipeline.ComponentRegistry;
 
 import java.util.ArrayList;
@@ -82,23 +81,8 @@ final class MetadataGraphBuilder {
                         grouped ? cfg.stream() : cfg.identity().name(), Description.EMPTY, srcAttrs));
             }
 
-            PipelineConfig.Schemas s = cfg.schemas();
-            if (s.segments() != null && !s.segments().isEmpty()) {
-                for (Map.Entry<String, Map<String, Object>> e : s.segments().entrySet()) {
-                    addSchemaAndEvent(originId, pipeline, e.getKey(), e.getValue(), null, dbRoot, outFormat, nodes, edges);
-                }
-            } else if (s.selector() != null && s.selector().hasSchemas()) {
-                int i = 0;
-                for (SchemaSelector.Selection sel : s.selector().entries()) {
-                    String key = firstNonBlank(sel.table(),
-                            SchemaProjection.canonicalName(sel.schema()), "schema_" + i);
-                    addSchemaAndEvent(originId, pipeline, key, sel.schema(), sel.table(), dbRoot, outFormat, nodes, edges);
-                    i++;
-                }
-            } else if (s.single() != null) {
-                String key = firstNonBlank(SchemaProjection.canonicalName(s.single()), "main");
-                addSchemaAndEvent(originId, pipeline, key, s.single(), null, dbRoot, outFormat, nodes, edges);
-            }
+            for (PipelineSchemas.Entry e : PipelineSchemas.entries(cfg))
+                addSchemaAndEvent(originId, pipeline, e.key(), e.schema(), e.table(), dbRoot, outFormat, nodes, edges);
         }
 
         // ── grouped Stream membership (P4): stamp members[] only where a Stream groups >1 pipeline,
@@ -463,13 +447,6 @@ final class MetadataGraphBuilder {
     private static String rawFormat(Map<String, Object> schema) {
         if (schema != null && schema.get("raw") instanceof Map<?, ?> raw && raw.get("format") != null) {
             return raw.get("format").toString();
-        }
-        return "";
-    }
-
-    private static String firstNonBlank(String... vals) {
-        for (String v : vals) {
-            if (v != null && !v.isBlank()) return v;
         }
         return "";
     }

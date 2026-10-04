@@ -482,12 +482,26 @@ are the values four-eyes approved (below).
   - A **view or virtual** Dataset over a store with classified columns is refused outright unless
     `include_sensitive` names `<dataset>.*` and the author holds `canAdminister`, because a rename or computation
     (`msisdn AS m`) cannot be traced statically.
-- ⚠ **Residual:** classification is only as good as the registry.
-  - A store that no Dataset classifies publishes unmasked through any unclassified Dataset over it: the pipeline
-    schema's own `classification` fields are not consulted.
-  - A same-store Dataset that **renames** a column (a physical Dataset has no SQL to rename with, but a new
-    pipeline output can) is not caught.
-  - Propagating classification through lineage is P3 `ASSURE-CLASSIFICATION-PROPAGATION-1`.
+- **Pipeline schema lineage (operator 2026-10-04, `PostgresPublishJobType.schemaClassification`).** A Dataset's
+  `physicalRef` head (or `sourceName`) names a Stream or pipeline; `PipelineSchemas.forStore` (the one resolver,
+  also what `MetadataGraphBuilder` lays its schema nodes out from) finds that pipeline's `*_pipeline.toon` and its
+  schemas.
+  - A schema's `raw.fields[].classification` (sensitive classes only) follows its `mapping.fields[]`: a `keep` or
+    rename of a classified raw column, and any rule whose `from` or `args` text names one (`md5(MSISDN)`,
+    `substr(msisdn,1,3)`, a concatenation), classify the target column. A stored column named like a classified
+    raw column is classified too.
+  - **Fails closed** to *classified-unknown* when a pipeline that may be the store's cannot be loaded, its mapping
+    cannot be read, or it has a step that rewrites the columns (`summarize`, `sql`, `lookup`, `join`, `route`)
+    while a raw column is classified. The Dataset is then refused unless `include_sensitive` names `<dataset>.*`
+    and the author holds `canAdminister`. The inherited set is part of the four-eyes approval fingerprint.
+  - **Aggregates and Job outputs do not inherit** (decision): a store no pipeline claims (a Job `output_store`
+    such as `rollup`, an entity-list sidecar) contributes no classification.
+- ⚠ **Residual:** classification is only as good as the registry and the pipeline schemas.
+  - A store no pipeline claims and no Dataset classifies publishes unmasked.
+  - ⚠ Still mirrored, not shared, in four other places (`MetadataGraphBuilder.originNode`,
+    `PipelineDependents.datasets`, `DataSourceBundleResolver.datasetReadsStore`,
+    `PipelineRenameRoutes.rewriteDatasetRefs`): change the origin rule in all of them.
+  - Remaining work is P3 `ASSURE-CLASSIFICATION-PROPAGATION-1` (Job-output and sidecar stores).
 
 **Destination and TLS**
 - **Destination allowlist (operator 2026-09-29).** A per-Space `publication-destinations.toon` (`hosts: [...]`)

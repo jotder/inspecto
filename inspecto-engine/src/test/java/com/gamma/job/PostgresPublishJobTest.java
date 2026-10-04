@@ -479,4 +479,99 @@ class PostgresPublishJobTest {
         assertEquals("SUCCESS", ok.status(), ok.message());
         assertEquals(List.of("m", "plan"), columnsOf("renamed"));
     }
+
+    // ── ASSURE-CLASSIFICATION-PROPAGATION-1: a pipeline schema's classification follows its mapping ──────────────
+
+    /** A pipeline "cust" whose schema classifies raw MSISDN, with the given mapping rules and extra pipeline lines,
+     *  and a Dataset over it that itself classifies nothing. {@code cols} are the stored column names. */
+    void custStore(String cols, String mappingFields, String extraPipeline) throws Exception {
+        Files.createDirectories(cfg.resolve("cust"));
+        Files.writeString(cfg.resolve("cust/cust_pipeline.toon"), "name: cust\nactive: true\n\ndirs:\n"
+                + "  poll: data/inbox/cust\n  database: data/cust/database\n  backup: data/cust/backup\n"
+                + "  temp: data/cust/temp\n  errors: data/cust/errors\n  quarantine: data/cust/quarantine\n"
+                + "  markers: data/cust/markers\n  status_dir: data/cust/status\n  log_dir: data/cust/logs\n\n"
+                + "output:\n  format: PARQUET\n  compression: snappy\n\nprocessing:\n  threads: 1\n"
+                + "  file_pattern: \"glob:**/*.csv\"\n  schema_file: cust_schema.toon\n" + extraPipeline);
+        Files.writeString(cfg.resolve("cust/cust_schema.toon"), "partitionKey: DAY\nraw:\n  name: CUST\n  format: CSV\n"
+                + "  fields[3]{name,selector,type,description,unit,classification}:\n"
+                + "    MSISDN,\"0\",VARCHAR,\"\",\"\",\"MSISDN\"\n    PLAN,\"1\",VARCHAR,\"\",\"\",\"\"\n"
+                + "    DAY,\"2\",DATE,\"\",\"\",\"\"\nmapping:\n  canonicalName: cust\n  rawName: CUST\n" + mappingFields);
+        String sel = String.join(", ", java.util.Arrays.stream(cols.split(", *"))
+                .map(c -> c.equals("day") ? "DATE '2026-09-01' AS day" : "'x' AS " + c).toList());
+        plant("cust", "SELECT " + sel + " UNION ALL SELECT " + sel.replace("'x'", "'y'"), Map.of());
+        new ComponentStore(cfg.resolve("registry")).write("dataset", "cust", Map.of("physicalRef", "cust"));
+    }
+
+    static final String KEEP_RENAMED = "  fields[3]:\n    - name: m\n      from: MSISDN\n      fn: keep\n"
+            + "    - name: plan\n      from: PLAN\n      fn: keep\n    - name: day\n      from: DAY\n      fn: keep\n";
+
+    @Test
+    void aRenameThroughAPipelineMappingCarriesTheRawClassificationToThePublishedColumn() throws Exception {
+        custStore("m, plan, day", KEEP_RENAMED, "");
+        JobRun r = run(Map.of("datasets", "cust"));
+        assertEquals("SUCCESS", r.status(), r.message());
+        assertEquals(List.of("plan", "day"), columnsOf("cust"), "m is MSISDN under another name");
+    }
+
+    @Test
+    void aHashOrSubstringOfAClassifiedRawColumnStaysSensitive() throws Exception {
+        custStore("h, s, plan, day", "  fields[4]:\n    - name: h\n      from: \"\"\n      fn: custom\n      args:\n"
+                + "        expression: \"md5(MSISDN)\"\n    - name: s\n      from: \"\"\n      fn: custom\n      args:\n"
+                + "        expression: \"substr(msisdn, 1, 3)\"\n    - name: plan\n      from: PLAN\n      fn: keep\n"
+                + "    - name: day\n      from: DAY\n      fn: keep\n", "");
+        JobRun r = run(Map.of("datasets", "cust"));
+        assertEquals("SUCCESS", r.status(), r.message());
+        assertEquals(List.of("plan", "day"), columnsOf("cust"));
+    }
+
+    @Test
+    void anAmbiguousLineageRefusesUnlessTheWholeDatasetIsReleased() throws Exception {
+        // a summarize step rewrites the columns, so the mapping no longer says what the stored columns are
+        custStore("m, plan, day", KEEP_RENAMED, "steps[1]:\n  - summarize:\n      group_by: [plan]\n");
+        PostgresPublishJobType.installAuthority(c -> author("bob"));
+        JobRun r = run(Map.of("datasets", "cust"));
+        assertEquals("FAILED", r.status());
+        assertTrue(r.message().contains("cannot be traced"), r.message());
+        assertEquals("FAILED", run(Map.of("datasets", "cust", "include_sensitive", "cust.*")).status(),
+                "releasing the whole Dataset still needs canAdminister");
+        PostgresPublishJobType.installAuthority(c -> author("root", "canAdminister"));
+        JobRun ok = run(Map.of("datasets", "cust", "include_sensitive", "cust.*"));
+        assertEquals("SUCCESS", ok.status(), ok.message());
+        assertEquals(List.of("m", "plan", "day"), columnsOf("cust"));
+    }
+
+    @Test
+    void anUnreadablePipelineForTheStoreRefusesTheDataset() throws Exception {
+        custStore("m, plan, day", KEEP_RENAMED, "");
+        Files.writeString(cfg.resolve("cust/cust_pipeline.toon"), "name: [broken\n  : :");
+        PostgresPublishJobType.installAuthority(c -> author("bob"));
+        JobRun r = run(Map.of("datasets", "cust"));
+        assertEquals("FAILED", r.status());
+        assertTrue(r.message().contains("cannot be traced"), r.message());
+    }
+
+    @Test
+    void aMappingThatCannotBeReadRefusesTheDataset() throws Exception {
+        custStore("m, plan, day", "  fields: oops\n", "");
+        PostgresPublishJobType.installAuthority(c -> author("bob"));
+        assertEquals("FAILED", run(Map.of("datasets", "cust")).status());
+    }
+
+    @Test
+    void aJobOutputStoreNoPipelineClaimsDoesNotInheritThePipelineClassification() throws Exception {
+        custStore("m, plan, day", KEEP_RENAMED, "");
+        plant("custrollup", "SELECT * FROM (VALUES ('m1',1),('m2',2)) t(m, n)", Map.of());
+        new ComponentStore(cfg.resolve("registry")).write("dataset", "custrollup", Map.of("physicalRef", "custrollup"));
+        assertEquals("SUCCESS", run(Map.of("datasets", "custrollup")).status());
+        assertEquals(List.of("m", "n"), columnsOf("custrollup"), "an aggregate or Job output does not inherit");
+    }
+
+    @Test
+    void aClassifiedRenameCanBeReleasedByNameForACanAdministerAuthor() throws Exception {
+        custStore("m, plan, day", KEEP_RENAMED, "");
+        PostgresPublishJobType.installAuthority(c -> author("root", "canAdminister"));
+        JobRun r = run(Map.of("datasets", "cust", "include_sensitive", "cust.m"));
+        assertEquals("SUCCESS", r.status(), r.message());
+        assertEquals(List.of("m", "plan", "day"), columnsOf("cust"));
+    }
 }
