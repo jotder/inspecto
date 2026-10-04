@@ -1529,11 +1529,10 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         this.selectedNode.set(null);
         this.selectedEdgeId.set(null);
         this.canvasEpoch.update((e) => e + 1); // same tab ⇒ no graphKey change, so rebuild in place
-        // `/bundle/preview` judges references for the component kinds only (ComponentIntegrity: dataset,
-        // query, widget, dashboard, reconciliation), so its list is ALWAYS empty for a pipeline — which the
-        // banner would show as clean. Say "not checked" instead: a pipeline's references are judged by
-        // Validate and by this route's own save gate.
-        this.importDraft.set({ ...draft, integrity: null });
+        // `/bundle/preview` judges a pipeline item by what THIS pane's Save (`PUT …/graph`) would refuse —
+        // Validate + the save gate, writing nothing (operator 2026-10-04) — so its list is shown as-is; null
+        // (the preview could not run) still reads "not checked".
+        this.importDraft.set(draft);
         this.draftStored.set(stored as unknown as Record<string, unknown> | null);
         this.draftIfMatch = etag;
     }

@@ -370,11 +370,7 @@ final class PipelineGraphRoutes implements RouteModule {
         withId.put("name", name);   // the URL name wins over any name in the body
         PipelineGraph g = parseAndValidateFlow(api, withId);
 
-        Optional<Path> registered = registeredFile(api, name).map(Path::normalize)
-                .filter(p -> p.startsWith(writeRoot));
-        Path target = WriteGates.jail(writeRoot,
-                registered.orElseGet(() -> writeRoot.resolve(WriteGates.safeName(name, "pipeline name") + "_pipeline.toon")),
-                "resolved path");
+        Path target = saveTarget(api, writeRoot, name);
         boolean existsOnDisk = Files.exists(target);
         Map<String, Object> existing = existsOnDisk
                 ? ConfigLoader.filesystem().decode(target.toString()) : new LinkedHashMap<>();
@@ -423,6 +419,52 @@ final class PipelineGraphRoutes implements RouteModule {
         r.put("name", name);
         r.put("findings", findings);
         return r;
+    }
+
+    /** The file {@link #saveGraph} writes for {@code name}: the registered path when it is inside the write root,
+     *  else the canonical {@code <name>_pipeline.toon} there (see saveGraph's doc for why). */
+    private static Path saveTarget(ApiContext api, Path writeRoot, String name) {
+        Optional<Path> registered = registeredFile(api, name).map(Path::normalize)
+                .filter(p -> p.startsWith(writeRoot));
+        return WriteGates.jail(writeRoot,
+                registered.orElseGet(() -> writeRoot.resolve(WriteGates.safeName(name, "pipeline name") + "_pipeline.toon")),
+                "resolved path");
+    }
+
+    /**
+     * What {@link #saveGraph} would refuse a bundle draft's graph on, <b>writing nothing</b> (operator 2026-10-04,
+     * load-as-draft residual): the Pipeline editor adopts a draft's {@code nodes}/{@code edges} under {@code name},
+     * keeping the stored {@code active}, and saves through {@code PUT /pipelines/{name}/graph} - so this runs that
+     * route's own steps (parse + {@link #validatePipeline}, {@link PipelineEditable#lower} over the target file,
+     * {@link SaveGate} {@code MUST_EXIST} from its directory) and returns every refusal as one string, the
+     * {@code /bundle/preview} {@code integrity} shape. Null when there is no write root (the save cannot run either).
+     */
+    static List<String> draftSaveRefusals(ApiContext api, String name, Map<String, Object> content) {
+        Path writeRoot = api.writeRoot();
+        if (writeRoot == null) return null;
+        String at = "pipeline/" + name + ": ";
+        List<String> out = new ArrayList<>();
+        try {
+            Path target = saveTarget(api, writeRoot, name);
+            Map<String, Object> existing = Files.exists(target)
+                    ? ConfigLoader.filesystem().decode(target.toString()) : new LinkedHashMap<>();
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("name", name);
+            body.put("active", Boolean.parseBoolean(String.valueOf(existing.getOrDefault("active", "false"))));
+            body.put("nodes", content.get("nodes"));
+            body.put("edges", content.get("edges"));
+            PipelineGraph g = parseAndValidateFlow(api, body);
+            Map<String, Object> lowered = PipelineEditable.lower(g, existing, g.active() || existing.isEmpty());
+            for (Finding f : SaveGate.check(api, "pipeline", lowered, writeRoot, target.getParent(), SaveGate.Referents.MUST_EXIST))
+                if (f.severity() == Severity.ERROR) out.add(at + f.fieldPath() + " - " + f.message());
+        } catch (ApiException refused) {
+            out.add(at + refused.getMessage());
+        } catch (PipelineCompileException ex) {
+            for (PipelineCompileException.Refusal r : ex.refusals()) out.add(at + r.code() + " - " + r.message());
+        } catch (IOException unreadable) {
+            out.add(at + "the stored pipeline file could not be read: " + unreadable.getMessage());
+        }
+        return out;
     }
 
     /**
@@ -507,7 +549,7 @@ final class PipelineGraphRoutes implements RouteModule {
     }
 
     /** Parse a pipeline definition (400 on a malformed shape) and validate it (422 on validation errors). */
-    private PipelineGraph parseAndValidateFlow(ApiContext api, Map<String, Object> body) {
+    private static PipelineGraph parseAndValidateFlow(ApiContext api, Map<String, Object> body) {
         PipelineGraph g;
         try {
             g = PipelineCodec.fromMap(withoutDerivedEdges(body));
@@ -527,7 +569,7 @@ final class PipelineGraphRoutes implements RouteModule {
      * yields an EMPTY registry there, against which every binding would look dangling. A read-only space
      * cannot save anyway, and a draft-validate over one must not invent refusals.
      */
-    private void validatePipeline(ApiContext api, PipelineGraph g) {
+    private static void validatePipeline(ApiContext api, PipelineGraph g) {
         ComponentRegistry registry = api.writeRoot() == null ? null : componentRegistry(api);
         PipelineValidator.Result r = PipelineValidator.validate(g, registry);
         if (!r.ok())

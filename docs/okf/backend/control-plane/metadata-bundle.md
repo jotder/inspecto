@@ -4,7 +4,7 @@ title: Metadata Bundle & Transportability
 description: The cross-instance config bundle — v2 envelope (refs + provenance + requires), BundleRoutes export/preview/import, drift detection, idempotent re-promotion, and the config-not-data boundary.
 resource: inspecto/src/main/java/com/gamma/control/BundleRoutes.java
 tags: [control-plane, bundle, transportability, promotion, content-hash, drift]
-timestamp: 2026-07-16T00:00:00Z
+timestamp: 2026-10-04T00:00:00Z
 ---
 
 # Metadata Bundle & Transportability
@@ -174,7 +174,7 @@ work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
   (`draftSaveWarning`): findings ⇒ a warning naming them; an unreadable re-check ⇒ "could not run"; clean ⇒ the
   plain success. A refused Save stays on the page with the re-checked findings in the banner. ⚠ `POST
   /bundle/preview` is a POST that writes nothing — a spec counting "writes" must exclude it (the editor specs do).
-  The Pipeline editor does not re-check: the preview judges no pipeline refs (below).
+  The Pipeline editor does not re-check before Save: its Save IS the gate the preview ran (below).
 * **Save is the pane's own route (D2)** — `POST /components/{kind}` for a new id, `PUT` for an existing one.
   When the draft landed on an existing id (D6) the editor first reads the stored copy: its content is the
   banner's diff baseline (`configDiff`, the AI-draft diff) and its `contentHash` is sent as **`If-Match`**, so
@@ -196,9 +196,15 @@ work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
   New id: Save first runs the create route New pipeline uses (D5) — the space-convention scaffold via
   `POST /config/write` (409 if the id was taken meanwhile ⇒ nothing else is written) and `POST /runs` to
   register it — then the one graph `PUT`. The draft's tab survives a re-list although the id is not listed
-  yet. One draft at a time. ⚠ The preview's `integrity` list is ALWAYS empty for a pipeline —
-  `ComponentIntegrity` judges no pipeline references — so the editor shows a
-  pipeline draft's references as **not checked**, never as clean; Validate and the save gate judge them.
+  yet. One draft at a time. ✅ 2026-10-04 (operator): **the preview runs the draft's Save gates.** For a
+  `pipeline` item `/bundle/preview` runs `PipelineGraphRoutes.draftSaveRefusals` — exactly the steps of
+  `PUT …/graph` over the item's `nodes`/`edges` under its id with the stored `active` (parse +
+  `validatePipeline`, so a dangling `use:` is named; `PipelineEditable.lower` over the save target; `SaveGate`
+  `MUST_EXIST` from its directory) — and appends every refusal (ERROR findings, lower refusals) to `integrity`
+  as `pipeline/<id>: …`. **Writes nothing** (pinned: the test hashes the whole tree before/after). No write root
+  ⇒ the gates cannot run ⇒ `integrity: null` for the whole preview (*not checked*, never clean). The editor now
+  shows the list as-is. ⚠ A draft for a NEW id is judged with no satellites beside it (the editor adopts only
+  the graph), so an unresolvable `schema_file` is a real finding, not noise.
   ✅ Since 2026-09-25 the editor's transfer menu, the Pipelines list and the UI's `loadAll` offer
   **`pipeline`** items (BUNDLE-AUTHORED-PIPELINE-STORE-1, option B — see *Pipelines* above), so the draft
   reads the server content's top-level `nodes` / `edges` (the editable-graph projection) and ignores its

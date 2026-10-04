@@ -32,6 +32,8 @@ const INCOMING = {
     edges: [{ from: 'src', rel: 'data', to: 'flt' }],
 };
 
+const FINDINGS = ['pipeline/demo: pipeline validation failed: [UNKNOWN_USE — transform/no_such_rule]'];
+
 function draft(targetExists: boolean, id = 'demo'): ImportDraft {
     return {
         kind: 'pipeline',
@@ -39,7 +41,7 @@ function draft(targetExists: boolean, id = 'demo'): ImportDraft {
         content: INCOMING,
         sourceSpace: 'staging',
         targetExists,
-        integrity: [], // what /bundle/preview answers for a pipeline — ALWAYS, since it judges no pipeline refs
+        integrity: FINDINGS, // /bundle/preview judges a pipeline by what its graph Save would refuse
         prerequisites: [],
     };
 }
@@ -124,8 +126,8 @@ describe('PipelineEditorComponent — Import as draft', () => {
         expect(c.dirty()).toBe(true);
         expect(c.activeDraft()?.id).toBe('demo');
         expect(c.draftStored()).toEqual(STORED); // the banner's diff baseline
-        // The preview's [] means "pipelines are not judged", so it must not read as clean.
-        expect(c.activeDraft()?.integrity).toBeNull();
+        // The preview's findings (what this pane's Save would refuse) reach the banner as-is.
+        expect(c.activeDraft()?.integrity).toEqual(FINDINGS);
         expect(writes(http)).toEqual([]); // adopting wrote nothing
 
         await c.save();

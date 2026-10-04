@@ -232,6 +232,57 @@ class ControlApiPipelineKindBundleTest {
         }
     }
 
+    // ── preview judges a pipeline draft by its Save's own gates (operator 2026-10-04) ──
+
+    @Test
+    void previewRunsTheDraftSaveGatesOnAPipelineAndWritesNothing(@TempDir Path dir) throws Exception {
+        Authenticators.forTest(AUTH);
+        Path wr = dir.resolve("wr");
+        try (Ctx c = open(dir, wr, pipeline(wr, "test_etl"))) {
+            JsonNode exp = V1Body.of(send(c.port, "POST", "/bundle/export", EXPORT_TEST_ETL, "Bearer author").body());
+            ObjectNode bundle = (ObjectNode) exp.get("bundle");
+            Map<Path, String> before = tree(dir);
+
+            JsonNode clean = V1Body.of(send(c.port, "POST", "/bundle/preview",
+                    JSON.writeValueAsString(bundle), "Bearer author").body());
+            assertTrue(clean.get("integrity").isArray(), clean.toString());
+            assertEquals(0, clean.get("integrity").size(), "a pipeline its own Save accepts has no findings: " + clean);
+
+            ((com.fasterxml.jackson.databind.node.ArrayNode) bundle.get("items").get(0).get("content").get("nodes"))
+                    .addObject().put("id", "flt").put("type", "transform.filter").put("use", "transform/no_such_rule");
+            JsonNode broken = V1Body.of(send(c.port, "POST", "/bundle/preview",
+                    JSON.writeValueAsString(bundle), "Bearer author").body());
+            assertEquals(1, broken.get("integrity").size(), broken.toString());
+            String finding = broken.get("integrity").get(0).asText();
+            assertTrue(finding.startsWith("pipeline/test_etl: ") && finding.contains("no_such_rule"),
+                    "the broken reference is named, attributed to its item: " + finding);
+
+            assertEquals(before, tree(dir), "preview writes NOTHING - the whole tree is byte-identical");
+        }
+    }
+
+    @Test
+    void previewOfAPipelineWithoutAWriteRootIsNotChecked(@TempDir Path dir) throws Exception {
+        Authenticators.forTest(AUTH);
+        String bundle = exportFromSource(dir);
+        try (Ctx c = open(dir, null, pipeline(dir.resolve("tgt"), "other"))) {
+            JsonNode p = V1Body.of(send(c.port, "POST", "/bundle/preview", bundle, "Bearer author").body());
+            assertTrue(p.has("integrity") && p.get("integrity").isNull(),
+                    "no write root: the save gates cannot run, so 'not checked', never an empty (clean) list: " + p);
+        }
+    }
+
+    /** Every regular file under {@code root} with its content - the "nothing written" baseline. */
+    private static Map<Path, String> tree(Path root) throws Exception {
+        Map<Path, String> out = new java.util.TreeMap<>();
+        try (var walk = Files.walk(root)) {
+            for (Path p : (Iterable<Path>) walk.filter(Files::isRegularFile)::iterator)
+                out.put(root.relativize(p), java.util.HexFormat.of().formatHex(
+                        java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(p))));
+        }
+        return out;
+    }
+
     // ── authored-pipeline is read-only (W5: grandfathered graphs are never newly written) ──
 
     @Test

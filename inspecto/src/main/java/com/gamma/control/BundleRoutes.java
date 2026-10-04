@@ -228,6 +228,9 @@ final class BundleRoutes implements RouteModule {
      * ADVISORY here (bundle load-as-draft D3, 2026-09-25): a draft editor shows them before its own Save,
      * which goes through {@code /components} and runs no integrity check, so the draft is never weaker than
      * hand-authoring the same config. Empty when there is no write root (no registry to judge against).
+     * A {@code pipeline} item adds what its draft's graph Save would refuse
+     * ({@link PipelineGraphRoutes#draftSaveRefusals}); with no write root that cannot run, so a preview carrying
+     * one returns {@code integrity: null} (not checked).
      */
     private Object previewBundle(ApiContext api, Map<String, Object> body) {
         validateEnvelope(body);
@@ -273,8 +276,18 @@ final class BundleRoutes implements RouteModule {
         }
 
         Path registry = componentRootOrNull(api);
-        List<String> integrity = registry == null ? List.of()
-                : introducedIntegrityFindings(new ComponentStore(registry), asMapList(body.get("items")));
+        List<String> integrity = registry == null ? new ArrayList<>()
+                : new ArrayList<>(introducedIntegrityFindings(new ComponentStore(registry), asMapList(body.get("items"))));
+        // A `pipeline` item is judged by what its draft's Save would refuse (operator 2026-10-04): the graph save
+        // route's own Validate + SaveGate, writing nothing. No write root => that cannot run, so the whole list is
+        // null ("not checked") rather than an empty list that would read as clean.
+        for (Map<String, Object> item : asMapList(body.get("items"))) {
+            if (!"pipeline".equals(ApiContext.str(item, "kind")) || ApiContext.str(item, "id") == null
+                    || !(item.get("content") instanceof Map<?, ?> content)) continue;
+            List<String> refusals = PipelineGraphRoutes.draftSaveRefusals(api, ApiContext.str(item, "id"), cast(content));
+            if (refusals == null) { integrity = null; break; }
+            integrity.addAll(refusals);
+        }
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("items", items);
