@@ -454,7 +454,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   (`standing-detection.ts` `STANDING_REFUSAL_HELP`: what it means, what the analyst does). A *Monitoring* block
   (`LinkAnalysisStandingMonitorComponent`) counts `_SWEPT` / `_REFUSED` events from `GET /events/search` — counts and
   reason codes only, never an Investigation or entity id. ⚠ There is no status read-back route, so status is this
-  session's enable answer, and the SPA does not yet call the LD-4/5 routes (disable, edit in place, template list), so it offers Enable only right after a bind. Decisions D-LD2 to D-LD17 are recorded as "decided by the assistant,
+  session's enable answer, and the SPA calls only the LD-4/5 *disable* route (2026-10-05: *Disable standing detection*, `InvService.disableStandingDetection`, shown once enabled in this session; idempotent, narrows only, so no client-side owner check; it then says the rule stays bound and sweeps refuse `NOT_ENABLED`). Edit in place and the template list are not called, and after a reload the panel shows neither enabled state nor Disable (no read-back route). Decisions D-LD2 to D-LD17 are recorded as "decided by the assistant,
   pending operator confirmation" in `docs/superpower/la-live-detection-design.md` §8.
   **LD-4 and LD-5 (2026-10-04).** The Job Type **`la.detect`** (no parameters, `requires: [alerts]`, Signal
   `la.detect.completed` carrying a count and Alert Rule names only) is a clock over the existing evaluation: it calls

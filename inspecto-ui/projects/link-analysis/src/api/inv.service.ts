@@ -878,6 +878,15 @@ export interface StandingDetectionEnabled {
     authority: string;
 }
 
+/** `DELETE /inv/investigations/{id}/standing-detection/{rule}` answer (LD-5): idempotent, the rule stays bound. */
+export interface StandingDetectionDisabled {
+    rule: string;
+    investigation: string;
+    enabled: false;
+    /** False when it was already off (a repeat press changes nothing). */
+    wasEnabled: boolean;
+}
+
 // ── LA-17: Entity Lists (`EntityListRoutes`, wire contract: entity-model design §4.3.1) ─────────────────
 
 export type EntityListPurpose = 'allow' | 'block' | 'watch' | 'exclusion';
@@ -1178,6 +1187,13 @@ export class InvService {
     /** LD-6: owner-only; a 422 `standing detection refused [CODE]: …` carries a refusal code. */
     enableStandingDetection(id: string, rule: string): Observable<StandingDetectionEnabled> {
         return this.http.post<StandingDetectionEnabled>(invPath(id, 'standing-detection'), { rule });
+    }
+
+    /** LD-5: switch standing detection off; the rule stays bound and a sweep then refuses `NOT_ENABLED`. */
+    disableStandingDetection(id: string, rule: string): Observable<StandingDetectionDisabled> {
+        return this.http.delete<StandingDetectionDisabled>(
+            invPath(id, 'standing-detection/' + encodeURIComponent(rule)),
+        );
     }
 
     /** LA-23: bind an Alert Rule to a Measure. 503 when the alert engine is absent. */

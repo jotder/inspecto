@@ -11,8 +11,8 @@ import { standingDetectionErrorMessage } from './standing-detection';
  * **Standing detection — enable** (LA-LIVE-DETECTION-1 LD-6). A bound value-measure Alert Rule is INERT until the
  * Investigation's owner enables it: the server then records the sweep principal `sweep:<id>` (no capability of its
  * own) and the masking basis, and re-decides the owner's access before every read. Owner-only (the server's
- * 403 is the owner check — the SPA host edge exposes no actor), and gated on `canAuthorAlertRules`. ⚠ There is no read-back route yet, so the status shown is this session's enable answer;
- * disabling and editing the rule are backend follow-ups (LD-4/5) — not offered here.
+ * 403 is the owner check — the SPA host edge exposes no actor), and gated on `canAuthorAlertRules`. ⚠ There is no read-back route yet, so the status shown is this session's answer;
+ * Disable (LD-5) is offered once enabled in this session. Editing a rule in place and listing bound rules are still owed.
  */
 @Component({
     selector: 'inspecto-link-analysis-standing-detection',
@@ -48,12 +48,29 @@ import { standingDetectionErrorMessage } from './standing-detection';
                     >
                         {{ enabled() ? 'Re-enable standing detection' : 'Enable standing detection' }}
                     </button>
+                    @if (enabled()) {
+                        <button
+                            mat-stroked-button
+                            type="button"
+                            data-test="standing-disable"
+                            [disabled]="busy()"
+                            (click)="disable()"
+                        >
+                            Disable standing detection
+                        </button>
+                    }
                 </div>
             }
             @if (error()) {
                 <inspecto-alert [variant]="unavailable() ? 'info' : 'error'" title="Standing detection">{{
                     error()
                 }}</inspecto-alert>
+            }
+            @if (disabledNote()) {
+                <p class="text-secondary m-0" data-test="standing-disabled">
+                    Standing detection is off. The rule stays bound; a sweep refuses it as NOT_ENABLED until the owner
+                    enables it again.
+                </p>
             }
             @if (enabled(); as e) {
                 <inspecto-alert variant="success" title="Standing detection enabled">
@@ -86,16 +103,36 @@ export class LinkAnalysisStandingDetectionComponent {
     readonly error = signal('');
     readonly unavailable = signal(false);
     readonly enabled = signal<StandingDetectionEnabled | null>(null);
+    readonly disabledNote = signal(false);
 
     async enable(): Promise<void> {
         if (this.busy()) return;
         this.busy.set(true);
         this.error.set('');
         this.unavailable.set(false);
+        this.disabledNote.set(false);
         try {
             this.enabled.set(
                 await firstValueFrom(this.inv.enableStandingDetection(this.investigation().id, this.rule())),
             );
+        } catch (err) {
+            this.unavailable.set(isUnavailable(err));
+            this.error.set(standingDetectionErrorMessage(err));
+        } finally {
+            this.busy.set(false);
+        }
+    }
+
+    /** LD-5 disable: narrows only, idempotent; any author of Alert Rules who can open the Investigation may press it. */
+    async disable(): Promise<void> {
+        if (this.busy()) return;
+        this.busy.set(true);
+        this.error.set('');
+        this.unavailable.set(false);
+        try {
+            await firstValueFrom(this.inv.disableStandingDetection(this.investigation().id, this.rule()));
+            this.enabled.set(null);
+            this.disabledNote.set(true);
         } catch (err) {
             this.unavailable.set(isUnavailable(err));
             this.error.set(standingDetectionErrorMessage(err));
