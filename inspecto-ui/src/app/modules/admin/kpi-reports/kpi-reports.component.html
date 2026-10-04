@@ -142,29 +142,28 @@
                         <span class="text-secondary text-sm">{{ cardSummary(d) }}</span>
                     </a>
 
-                    <!-- Legacy dashboard schedules (never delivered): listed so they can be run/deleted -->
+                    <!-- Legacy dashboard schedules: unsupported (ReportJob refuses them); listed so they can be deleted -->
                     <div class="mt-1 border-t pt-2" [class.hidden]="!jobsFor(d.id).length">
                         @for (job of jobsFor(d.id); track job.name) {
                             <div class="flex items-center justify-between gap-2 py-1 text-sm">
                                 <div class="min-w-0">
                                     <span class="truncate font-medium">{{ job.name }}</span>
                                     <span class="text-secondary ml-1 uppercase">{{ paramsOf(job).format }}</span>
-                                    <span [innerHTML]="statusBadgeHtml(job.enabled ? 'enabled' : 'disabled')"></span>
-                                    @if (job.lastRunTime) {
-                                        <span class="text-secondary ml-1 text-xs"
-                                            >last {{ fmtDateTime(job.lastRunTime) }}</span
-                                        >
-                                    }
+                                    <span [innerHTML]="statusBadgeHtml('unsupported', 'Unsupported')"></span>
+                                    <p class="text-secondary text-xs" data-testid="legacy-unsupported">
+                                        {{ legacyUnsupportedReason }}
+                                    </p>
                                 </div>
                                 <div class="flex items-center gap-1">
-                                    <button
-                                        mat-icon-button
-                                        (click)="runNow(job)"
-                                        matTooltip="Run now"
-                                        [attr.aria-label]="'Run ' + job.name + ' now'"
-                                    >
-                                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:play"></mat-icon>
-                                    </button>
+                                    <span [matTooltip]="legacyUnsupportedReason">
+                                        <button
+                                            mat-icon-button
+                                            disabled
+                                            [attr.aria-label]="'Run ' + job.name + ' now (unavailable)'"
+                                        >
+                                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:play"></mat-icon>
+                                        </button>
+                                    </span>
                                     <button
                                         mat-icon-button
                                         (click)="downloadLatest(job)"

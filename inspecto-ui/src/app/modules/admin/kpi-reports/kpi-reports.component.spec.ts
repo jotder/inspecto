@@ -174,6 +174,26 @@ describe('KpiReportsComponent', () => {
         expect(fixture.nativeElement.textContent).not.toContain('Schedule Dataset export');
     });
 
+    // SCHEDULE-EXPORT-DASHBOARD-SCOPE-1 (declined): a legacy dashboardId schedule shows as unsupported —
+    // Run disabled with the reason, Delete still offered to an author.
+    it('marks a legacy dashboard schedule unsupported: Run disabled with the reason, Delete allowed', async () => {
+        const { fixture, jobsApi } = create({ reportJobs: [REPORT_JOB], canAuthor: true });
+        await vi.waitFor(() => expect(fixture.componentInstance.reportJobs().length).toBeGreaterThan(0));
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="legacy-unsupported"]')?.textContent?.trim()).toBe(
+            'Dashboard export is not supported — recreate this schedule for a Dataset',
+        );
+        expect(el.textContent).toContain('Unsupported');
+        const run = el.querySelector('[aria-label="Run daily_cdr_export now (unavailable)"]') as HTMLButtonElement;
+        expect(run.disabled).toBe(true);
+        run.click();
+        expect(jobsApi.trigger).not.toHaveBeenCalled();
+        const del = el.querySelector('[aria-label="Delete schedule daily_cdr_export"]') as HTMLButtonElement;
+        expect(del.disabled).toBe(false);
+        await expectNoA11yViolations(el);
+    });
+
     // SCHEDULE-EXPORT-DIALOG-DEAD-1: the action exports a Dataset (ReportJob has no dashboard scope) and
     // opens the dialog with no dashboard in its data; only scope:'dataset' jobs are listed as exports.
     it('offers Schedule Dataset export (never a dashboard export) and lists only dataset schedules', async () => {

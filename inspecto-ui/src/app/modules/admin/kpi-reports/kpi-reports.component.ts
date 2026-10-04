@@ -26,7 +26,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
 
 /** A `type:'report'` job's export params — no new entity, params carry the shape. */
 interface ReportJobParams {
-    /** Set only on a legacy dashboard schedule (never delivered: `ReportJob` has no dashboard scope). */
+    /** Set only on a legacy dashboard schedule — unsupported: `ReportJob` refuses to run it. */
     dashboardId: string;
     scope: string;
     dataset: string;
@@ -75,6 +75,8 @@ export class KpiReportsComponent implements OnInit {
     readonly statusBadgeHtml = statusBadgeHtml;
     readonly fmtDateTime = fmtDateTime;
     readonly dashboardTitle = dashboardTitle;
+    /** A legacy `dashboardId` schedule: `ReportJob` refuses to run it (SCHEDULE-EXPORT-DASHBOARD-SCOPE-1 declined). */
+    readonly legacyUnsupportedReason = 'Dashboard export is not supported — recreate this schedule for a Dataset';
 
     createDashboard(): void {
         this.router.navigate(['/studio/dashboards/new']);

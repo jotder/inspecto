@@ -96,6 +96,11 @@ final class ReportJob implements Job {
 
     private JobResult execute(JobContext ctx) throws Exception {
         ArtifactRecorder artifacts = ctx == null ? null : ctx.artifacts();
+        // SCHEDULE-EXPORT-DASHBOARD-SCOPE-1 (declined until demand): a legacy dashboard schedule carries
+        // `dashboardId`, which no scope reads — fail the Run loudly instead of emitting a status snapshot.
+        if (cfg.opt("dashboardId", null) != null)
+            throw new IllegalArgumentException(
+                    "Dashboard export is not supported — recreate this schedule for a Dataset");
         String scope = cfg.opt("scope", "status").toLowerCase();
         long t0 = System.nanoTime();
 
