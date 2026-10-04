@@ -305,6 +305,12 @@ describe('InvService (LA-08 multi projection, LA-11 recursive paths)', () => {
         expect(retire.request.method).toBe('POST');
         expect(retire.request.body).toEqual({ reason: 'case closed' });
         retire.flush({});
+
+        svc.registerEntityListDataset('wl/1').subscribe();
+        const register = httpMock.expectOne(`${base}/entity-lists/wl%2F1/register-dataset`);
+        expect(register.request.method).toBe('POST');
+        expect(register.request.body).toEqual({});
+        register.flush({ listId: 'wl/1', datasetId: 'entity_list_wl/1', physicalRef: 'entity_list_wl/1' });
     });
 
     it('passes 409 / 422 / 503 through untouched, so apiErrorMessage shows the server message', () => {

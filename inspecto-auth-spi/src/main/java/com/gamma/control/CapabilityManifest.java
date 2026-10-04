@@ -65,6 +65,8 @@ final class CapabilityManifest {
             new Entry("POST", "/entity-lists", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/entity-lists/([^/]+)/members", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/entity-lists/([^/]+)/retire", Roles.CAN_MANAGE_INCIDENTS),
+            // ASSURE-ENTITY-LISTS-RESIDUALS-1 (3): registers a DATASET (Dataset config), so the Dataset-authoring capability.
+            new Entry("POST", "/entity-lists/([^/]+)/register-dataset", Roles.CAN_AUTHOR_WORKBENCH),
             // EntityIdentityRoutes (LA-17 slice 2) — identity assertions share the same fact log, same capability.
             new Entry("GET", "/inv/entity-identities", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("GET", "/inv/entity-identities/group", Roles.CAN_MANAGE_INCIDENTS),

@@ -7,6 +7,7 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { EntityListSummary, InvService, InvestigationLog, WorkingSet } from '@inspecto/link-analysis/api/inv.service';
 import { LensService } from '@inspecto/core/api';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
@@ -65,10 +66,16 @@ interface Options {
     lists?: EntityListSummary[];
     canWrite?: boolean;
     geoLink?: boolean;
+    /** The caller holds canAuthorWorkbench (the Dataset-authoring capability). */
+    canAuthor?: boolean;
 }
 
-function create({ lists = LISTS, canWrite = true, geoLink = true }: Options = {}) {
+function create({ lists = LISTS, canWrite = true, geoLink = true, canAuthor = true }: Options = {}) {
+    const confirm = { confirm: vi.fn((_message: string, _title?: string) => Promise.resolve(true)) };
     const inv = {
+        registerEntityListDataset: vi.fn((id: string) =>
+            of({ listId: id, datasetId: `entity_list_${id}`, physicalRef: `entity_list_${id}` }),
+        ),
         listEntityLists: vi.fn(() => of({ lists, headSeq: 17, headHash: 'sha256:h' })),
         changeEntityListMembers: vi.fn((id: string) =>
             of({ ...summary({ id, size: 41 }), members: [], atSeq: 18, headHash: null, changed: 1 }),
@@ -96,7 +103,11 @@ function create({ lists = LISTS, canWrite = true, geoLink = true }: Options = {}
                 provide: LA_FEATURES,
                 useValue: { ops: signal(false), exchange: signal(false), geoLink: signal(geoLink) },
             },
-            { provide: LensService, useValue: { canManageIncidents: signal(canWrite) } },
+            {
+                provide: LensService,
+                useValue: { canManageIncidents: signal(canWrite), canAuthorWorkbench: signal(canAuthor) },
+            },
+            { provide: InspectoConfirmService, useValue: confirm },
             {
                 provide: LinkAnalysisSettingsService,
                 useValue: {
@@ -118,7 +129,7 @@ function create({ lists = LISTS, canWrite = true, geoLink = true }: Options = {}
         await fixture.whenStable();
         fixture.detectChanges();
     };
-    return { fixture, store, inv, dialog, next, el, button, settle };
+    return { fixture, store, inv, dialog, next, el, button, settle, confirm };
 }
 
 describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
@@ -263,6 +274,49 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
         expect(alert?.querySelector('[role="status"]')).not.toBeNull(); // info, not an error
         expect(alert?.textContent).toContain('Entity Lists are not available here');
         expect(el.querySelector('[aria-label="Entity Lists of this Space"]')).toBeNull();
+    });
+
+    it('registers the sidecar Dataset only after a confirm, and says what it registered', async () => {
+        const { inv, confirm, el, button, settle } = create();
+        await settle();
+        // Not offered on a retired list; offered on a live one.
+        expect(button('Register Old watch as a Dataset')).toBeNull();
+
+        confirm.confirm.mockResolvedValueOnce(false);
+        button('Register Known mules as a Dataset')!.click();
+        await settle();
+        expect(inv.registerEntityListDataset).not.toHaveBeenCalled(); // a cancelled confirm writes nothing
+
+        button('Register Known mules as a Dataset')!.click();
+        await settle();
+        expect(confirm.confirm.mock.calls[1][0]).toContain('entity_list_mules');
+        expect(inv.registerEntityListDataset).toHaveBeenCalledWith('mules');
+        expect(el.textContent).toContain('“Known mules” registered as the Dataset entity_list_mules.');
+        expect(inv.listEntityLists).toHaveBeenCalledTimes(2);
+        await expectNoA11yViolations(el);
+    });
+
+    it('shows a 409 refusal (the Dataset already exists) as the server’s reason, never as success', async () => {
+        const { inv, el, button, settle } = create();
+        await settle();
+        inv.registerEntityListDataset.mockReturnValue(http(409, 'a Dataset already exists') as never);
+        button('Register Known mules as a Dataset')!.click();
+        await settle();
+        expect(el.querySelector('inspecto-alert')?.textContent).toContain('Refused — a Dataset already exists');
+        expect(el.textContent).not.toContain('registered as the Dataset');
+    });
+
+    it('offers the Dataset action by canAuthorWorkbench alone, not by the list-write capability', async () => {
+        const noAuthor = create({ canAuthor: false });
+        await noAuthor.settle();
+        expect(noAuthor.button('Register Known mules as a Dataset')).toBeNull();
+        noAuthor.fixture.destroy();
+        TestBed.resetTestingModule();
+
+        const authorOnly = create({ canWrite: false });
+        await authorOnly.settle();
+        expect(authorOnly.button('Register Known mules as a Dataset')).not.toBeNull();
+        expect(authorOnly.button('Retire Known mules')).toBeNull();
     });
 
     it('without canManageIncidents the lists are read-only', async () => {

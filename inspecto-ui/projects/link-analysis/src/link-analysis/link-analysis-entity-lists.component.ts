@@ -4,6 +4,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import {
     EntityListDetail,
     EntityListSummary,
@@ -153,6 +154,18 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                                             </button>
                                         </div>
                                     }
+                                    @if (canAuthorDataset() && !l.retired) {
+                                        <div class="mt-1 flex flex-wrap gap-1">
+                                            <button
+                                                mat-button
+                                                [disabled]="busy()"
+                                                (click)="registerDataset(l)"
+                                                [attr.aria-label]="'Register ' + l.title + ' as a Dataset'"
+                                            >
+                                                Register as Dataset
+                                            </button>
+                                        </div>
+                                    }
                                 </li>
                             }
                         </ul>
@@ -174,6 +187,7 @@ export class LinkAnalysisEntityListsComponent {
     private dialog = inject(MatDialog);
     private settings = inject(LinkAnalysisSettingsService);
     private lens = inject(LensService);
+    private confirm = inject(InspectoConfirmService);
     readonly features = inject(LA_FEATURES);
     readonly store = inject(InvestigationSessionStore);
 
@@ -187,6 +201,8 @@ export class LinkAnalysisEntityListsComponent {
 
     /** Entity List writes are gated server-side on `canManageIncidents`; the section asks the same question. */
     readonly canWrite = computed(() => this.lens.canManageIncidents());
+    /** Registering the sidecar Dataset authors a Dataset, so the server asks `canAuthorWorkbench` (not the list-write one). */
+    readonly canAuthorDataset = computed(() => this.lens.canAuthorWorkbench());
     /** The selected canvas entity's raw values — masked pseudonyms are split out and never sent. */
     readonly selection = computed(() => listableIds(this.store.selected()));
 
@@ -271,6 +287,25 @@ export class LinkAnalysisEntityListsComponent {
         await this.write('Could not retire the Entity List.', async () => {
             const res = await firstValueFrom(this.inv.retireEntityList(list.id, reason));
             this.notice.set(`“${res.title}” retired.`);
+        });
+    }
+
+    /**
+     * The manual "Register as Dataset" action: an explicit confirm, then `POST …/register-dataset`. A list write never
+     * registers a Dataset, and a Dataset that already exists is never rewritten (409, shown as the refusal).
+     */
+    async registerDataset(list: EntityListSummary): Promise<void> {
+        const ref = `entity_list_${list.id}`;
+        const ok = await this.confirm.confirm(
+            `Register “${list.title}” as the Dataset ${ref}? It reads the list’s Parquet sidecar, so anyone who can read ` +
+                'Datasets can read the list’s raw keys — masking does not apply to a Dataset. Nothing changes if a ' +
+                'Dataset of that name already exists.',
+            'Register as Dataset',
+        );
+        if (!ok) return;
+        await this.write('Could not register the Dataset.', async () => {
+            const res = await firstValueFrom(this.inv.registerEntityListDataset(list.id));
+            this.notice.set(`“${list.title}” registered as the Dataset ${res.datasetId}.`);
         });
     }
 

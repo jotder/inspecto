@@ -2,6 +2,7 @@ package com.gamma.entitylist;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
+import com.gamma.control.DatasetRegistration;
 import com.gamma.control.EntityTypes;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.LinkAnalysisSettings;
@@ -88,6 +89,41 @@ public final class EntityListRoutes implements RouteModule {
         api.post("/entity-lists/([^/]+)/retire", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> retire(api, e, m.group(1), api.body(e))));
         api.post("/entity-lists/([^/]+)/match", (e, m) -> match(api, m.group(1), api.body(e)));
+        // ASSURE-ENTITY-LISTS-RESIDUALS-1 (3): the Dataset over the sidecar is registered only on this explicit call —
+        // authoring a Dataset needs canAuthorWorkbench, whatever the list's own write capability.
+        api.post("/entity-lists/([^/]+)/register-dataset", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> registerDataset(api, e, m.group(1))));
+    }
+
+    /**
+     * {@code POST /entity-lists/{id}/register-dataset} — register the Dataset {@code entity_list_<id>} over the list's
+     * Parquet sidecar ({@code physicalRef: entity_list_<id>}), through the same validated save path as a hand-authored
+     * Dataset ({@link DatasetRegistration}). Nothing else ever writes Dataset config: a list write never does.
+     * Gates: write root 503 → unknown list 404 → no sidecar on disk 409 → Dataset exists 409 → Dataset gate 422.
+     * No path-jail 403: the only path is {@code <dataRoot>/entity_list_<id>}, built from a {@code LIST_ID}-checked id.
+     * Answers 201 with the stored Dataset; a second call is a 409, never a rewrite.
+     */
+    private Object registerDataset(ApiContext api, HttpExchange ex, String id) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "entity list dataset registration");
+        EntityRegistry.EntityList l = current(read(new EntityFactLog(root)), id);
+        if (l == null) throw notFound(id, "");
+        String ref = EntityListSidecar.ref(id);
+        if (!EntityListSidecar.present(api.dataRoot(), id))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "entity list '" + id + "' has no sidecar on disk yet (" + ref
+                    + " under the data root), so a Dataset over it would have nothing to read — change the list once "
+                    + "with a data root present, then register");
+        if (DatasetRegistration.exists(api, ref))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "a Dataset '" + ref + "' already exists; nothing was written");
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("physicalRef", ref);
+        content.put("description", "Entity List '" + l.title() + "' (" + l.purpose() + ", " + l.entityType()
+                + ") — the Parquet sidecar, refreshed on every list write");
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("listId", id);
+        out.put("datasetId", ref);
+        out.put("physicalRef", ref);
+        out.put("dataset", DatasetRegistration.create(api, ex, ref, content));
+        return ApiContext.respondJson(ex, 201, out);
     }
 
     // ── reads ──────────────────────────────────────────────────────────────────────────────────────────

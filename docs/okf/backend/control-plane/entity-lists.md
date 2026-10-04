@@ -16,10 +16,10 @@ masking and `excludeBy` / `seedBy` are in
 [`link-analysis-entity-model-design.md`](../../../superpower/link-analysis-entity-model-design.md) §4.
 
 `ASSURE-ENTITY-LISTS-1` (WS-12, shipped 2026-09-28) extends the same store and the same routes. It adds no kind and
-no second store. 🔁 **SEP-08 (2026-10-01):** the store, the six routes (`/entity-lists…`, renamed from `/inv/entity-lists…`) and the
+no second store. 🔁 **SEP-08 (2026-10-01):** the store, the seven routes (`/entity-lists…`, renamed from `/inv/entity-lists…`) and the
 one shared, hash-chained fact log (`EntityFactLog`, `EntityRegistry`, package `com.gamma.entitylist`) now live in the optional
 **`inspecto-entity-list`** module, bundled in exactly the editions that ship `inspecto-geo-link` and absent on Personal
-(`AbsentEntityListRoutes` answers the six routes 503; `/bootstrap` `features.entityList` is `false`). Link Analysis
+(`AbsentEntityListRoutes` answers the seven routes 503; `/bootstrap` `features.entityList` is `false`). Link Analysis
 (`inspecto-geo-link`) depends on it — its `/inv/entity-identities*` routes, `EntityMasking` and the Investigation list-ops
 append to and read the SAME log through it; the reverse dependency does not exist. The on-disk format and paths are
 unchanged (`audit/entity-facts/`, `mask.key`), so a Space created before the move still verifies its chain. The masking
@@ -143,9 +143,32 @@ The seam is `com.gamma.risk.WatchListFeed`, an engine SPI that `inspecto-entity-
 - `excludeBy` / `seedBy` seal exact keys only; range entries do not take part yet. This is Link Analysis-owned. Decided 2026-10-04: DEFER until a customer asks; range / CIDR matching changes the sealed-log format and the replay hash, so it needs its own design.
 - There is no SPA authoring for ranges or expiry. The Investigation tab's Entity Lists section edits exact keys,
   and the Pending Change diff is the only view of a held list change.
-- A Dataset over a sidecar is not registered automatically. Author `physicalRef: entity_list_<id>`.
+- ~~A Dataset over a sidecar is not registered automatically~~ shipped 2026-10-04 as an **explicit, manual** action (below).
+  A list write still never writes Dataset config.
 - ~~`approverCheck` for a held list change~~ shipped 2026-10-04: every *pending* Pending Change (any kind, so a held
   list change too) carries `approverCheck: none-eligible | unknown | ok` on `GET /pending-changes[/{id}]`, computed live by
   `ActionRequestRoutes.check` over the change's own `approverCapability` with its author out when `fourEyes`. It is
   informational (never auto-declines) and, unlike an Action Request's, ignores data scope: a Pending Change's approve
   gate is the capability alone. Raising it emits no audit row.
+
+## Register the sidecar as a Dataset (manual, 2026-10-04)
+
+`POST /entity-lists/{id}/register-dataset` (no body) creates the Dataset `entity_list_<id>` with
+`physicalRef: entity_list_<id>`. The SPA's Entity Lists section offers it as **Register as Dataset** (after a confirm).
+
+- **Same save path as a hand-authored Dataset.** The route calls `DatasetRegistration.create` (public seam in the core,
+  because `ComponentRoutes` is package-private), which runs `ComponentRoutes.createComponent`: sharing envelope and owner
+  stamp, `validateKind`, the reserved-prefix check, the versioned store write. It does not write the registry file itself.
+- **Capability: `canAuthorWorkbench`** (the Dataset-authoring one), not `canManageIncidents`. `CapabilityManifest` carries the
+  entry. ⚠ A Dataset reads the raw Parquet, so masking does not apply to it. The confirm says so. Anyone with
+  `canAuthorWorkbench` could already hand-author the same Dataset, so a second capability would add no protection.
+- **Gates.** No write root 503, unknown list 404, **no sidecar on disk 409** (a Dataset over nothing reads nothing), a Dataset of
+  that id already exists **409** (never rewritten, so a repeat is safe and a hand edit survives), an approval policy for kind
+  `dataset` **409** (refused, not held), the Dataset gate 422. There is no path-jail 403: the only path is built from a
+  `LIST_ID`-checked id. The 422 has no live trigger today, because the content is server-built.
+- **Why refuse, not hold, under a policy.** A held change replays through the route that recorded it, and
+  `PendingChanges.REPLAYABLE` is pinned (`ConfigWriteFunnelTest`) to routes that hold in their own source file.
+  `EntityListRoutes#registerDataset` is a `WRITERS` row there for the same reason as the other routes that open the fact log.
+- A retired list offers no button (its sidecar holds zero rows).
+- Test: `ControlApiEntityListRegisterDatasetTest` (real Spaces, a Subject per caller, including an author without the
+  capability and a list-writer without it).

@@ -28,6 +28,7 @@ final class AbsentEntityListRoutes implements RouteModule {
             {"POST", "/entity-lists/([^/]+)/members"},
             {"POST", "/entity-lists/([^/]+)/retire"},
             {"POST", "/entity-lists/([^/]+)/match"},
+            {"POST", "/entity-lists/([^/]+)/register-dataset"},
     };
 
     @Override

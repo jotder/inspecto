@@ -40,6 +40,19 @@ final class EntityListSidecar {
 
     private EntityListSidecar() {}
 
+    /** The store name a Dataset's {@code physicalRef} uses to read {@code listId}'s sidecar. */
+    static String ref(String listId) {
+        return PREFIX + listId;
+    }
+
+    /** Whether {@code listId}'s sidecar is on disk (written by this class: marker + file), so a Dataset over it can read. */
+    static boolean present(Path dataRoot, String listId) {
+        if (dataRoot == null) return false;
+        Path dir = dataRoot.resolve(ref(listId)).normalize();
+        return dir.startsWith(dataRoot.normalize()) && Files.isRegularFile(dir.resolve(MARKER))
+                && Files.isRegularFile(dir.resolve(FILE));
+    }
+
     /** Rewrite {@code l}'s sidecar; answers {@code written}, {@code none} (no data root, or none on disk) or {@code failed}. */
     static String write(Path dataRoot, EntityRegistry.EntityList l, java.util.List<EntityFactLog.Fact> facts) {
         // A data root that does not exist is not created here: the legacy single-Space default is relative to the

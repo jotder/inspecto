@@ -335,7 +335,7 @@ final class ComponentRoutes implements RouteModule {
     }
 
     /** {@code POST /components/{type}} — create a component (id from body {@code id}/{@code name}); 409 if it exists. */
-    private Object createComponent(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String type, Map<String, Object> body) throws IOException {
+    Object createComponent(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String type, Map<String, Object> body) throws IOException {
         ComponentStore store = componentStore(api);
         String id = ApiContext.str(body, "id");
         if (id == null || id.isBlank()) id = ApiContext.str(body, "name");

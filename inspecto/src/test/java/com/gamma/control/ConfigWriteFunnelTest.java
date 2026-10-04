@@ -264,6 +264,8 @@ class ConfigWriteFunnelTest {
             Map.entry("EntityListRoutes#list", ENTITY_FACTS), Map.entry("EntityListRoutes#one", ENTITY_FACTS),
             Map.entry("EntityListRoutes#create", ENTITY_FACTS),
             Map.entry("EntityListRoutes#match", ENTITY_FACTS + " (a read: match persists nothing)"),
+            Map.entry("EntityListRoutes#registerDataset", ENTITY_FACTS + " (only READS the log; the Dataset itself is "
+                    + "written by DatasetRegistration, which holdRefusing's under a policy then takes the component save path)"),
             Map.entry("RiskWatchListFeed#check", ENTITY_FACTS + " (a read)"),
             Map.entry("RiskWatchListFeed#feed", MACHINE + " (the risk.score watch-list feed; expiring entries only, D-P5)"),
             Map.entry("EntityIdentityRoutes#assertIdentity", ENTITY_FACTS),

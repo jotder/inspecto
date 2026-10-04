@@ -902,6 +902,14 @@ export interface EntityListMembersResult extends EntityListDetail {
     changed: number;
 }
 
+/** `POST /entity-lists/{id}/register-dataset` → 201 (ASSURE-ENTITY-LISTS-RESIDUALS-1 (3)): the Dataset over the sidecar. */
+export interface EntityListDatasetRegistration {
+    listId: string;
+    /** `entity_list_<listId>` — also the `physicalRef`. */
+    datasetId: string;
+    physicalRef: string;
+}
+
 // ── LA-17 slice 2: analyst identity resolution (`EntityIdentityRoutes`, entity-model design §8.2) ───────
 
 /** One `identity.asserted` fact. `a`/`b` are typed keys `<type>:<value>` as the server rendered them — MASKED
@@ -1175,6 +1183,15 @@ export class InvService {
     /** Already retired → 409. */
     retireEntityList(id: string, reason: string): Observable<EntityListDetail> {
         return this.http.post<EntityListDetail>(entityListPath(id, '/retire'), { reason });
+    }
+
+    /**
+     * Register the list's Parquet sidecar as the Dataset `entity_list_<id>` — an explicit, manual action (a list write
+     * never does). Needs `canAuthorWorkbench`. 404 no such list · 409 no sidecar on disk yet, a Dataset of that id
+     * already exists, or an approval policy governs Datasets (nothing written) · 503 no write root.
+     */
+    registerEntityListDataset(id: string): Observable<EntityListDatasetRegistration> {
+        return this.http.post<EntityListDatasetRegistration>(entityListPath(id, '/register-dataset'), {});
     }
 
     // ── LA-17 slice 2 identity resolution. Reads AND writes need `canManageIncidents`; no write root → 503. ──
