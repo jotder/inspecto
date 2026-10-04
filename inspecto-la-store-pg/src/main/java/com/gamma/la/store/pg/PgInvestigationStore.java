@@ -1,5 +1,7 @@
 package com.gamma.la.store.pg;
 
+import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 import com.gamma.la.core.DraftLifecycle;
 import com.gamma.la.core.DraftStore;
 import com.gamma.la.core.InvestigationEvaluator;
@@ -65,13 +67,43 @@ public final class PgInvestigationStore implements InvestigationStore {
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final String LIVE = "state IN ('open','hibernated')";
 
-    private final ConnectionSource connections;
+    /** Runs a body on a connection it borrows and gives back (a pool's {@code with}, or open-use-close). */
+    @FunctionalInterface
+    private interface Borrow {
+        <T> T with(com.gamma.util.ConnectionSource.SqlFunction<T> body) throws SQLException;
+    }
+
+    /** An {@link IOException} thrown by a body running inside {@link Borrow#with}, which can only throw {@link SQLException}. */
+    private static final class Carried extends RuntimeException {
+        Carried(IOException cause) {
+            super(cause);
+        }
+    }
+
+    private final Borrow borrow;
     private final String schema;
 
+    /** A connection per call from {@code connections} (tests, {@code DriverManager}). */
     public PgInvestigationStore(ConnectionSource connections, String schema) throws IOException {
+        this(schema, new Borrow() {
+            @Override
+            public <T> T with(com.gamma.util.ConnectionSource.SqlFunction<T> body) throws SQLException {
+                try (Connection c = connections.open()) {
+                    return body.apply(c);
+                }
+            }
+        });
+    }
+
+    /** Connections borrowed from a pool (reentrant: a nested borrow on one thread reuses its connection, so one operation is one connection). */
+    public PgInvestigationStore(com.gamma.util.ConnectionSource pool, String schema) throws IOException {
+        this(schema, pool::with);
+    }
+
+    private PgInvestigationStore(String schema, Borrow borrow) throws IOException {
         if (schema == null || !SCHEMA.matcher(schema).matches())
             throw new IllegalArgumentException("schema must match " + SCHEMA.pattern());
-        this.connections = connections;
+        this.borrow = borrow;
         this.schema = schema;
         bootstrap();
     }
@@ -83,25 +115,54 @@ public final class PgInvestigationStore implements InvestigationStore {
         T run(Connection c) throws SQLException, IOException;
     }
 
-    /** One short transaction. A RuntimeException (a precondition conflict) rolls it back and propagates as itself. */
+    /**
+     * One short transaction. A RuntimeException (a precondition conflict) rolls it back and propagates as itself. A database that cannot be
+     * reached or has gone away is {@code 503 CAPABILITY_UNAVAILABLE} (fail closed: never another backend); any other SQL failure is an
+     * {@link IOException}.
+     */
     private <T> T tx(Work<T> work) throws IOException {
-        try (Connection c = connections.open()) {
-            c.setAutoCommit(false);
-            try {
-                T out = work.run(c);
-                c.commit();
-                return out;
-            } catch (SQLException | IOException | RuntimeException failed) {
+        try {
+            return borrow.with(c -> {
+                c.setAutoCommit(false);
                 try {
-                    c.rollback();
-                } catch (SQLException suppressed) {
-                    failed.addSuppressed(suppressed);
+                    T out = work.run(c);
+                    c.commit();
+                    return out;
+                } catch (SQLException | RuntimeException failed) {
+                    rollback(c, failed);
+                    throw failed;
+                } catch (IOException failed) {
+                    rollback(c, failed);
+                    throw new Carried(failed);
                 }
-                throw failed;
-            }
+            });
+        } catch (Carried carried) {
+            throw (IOException) carried.getCause();
         } catch (SQLException e) {
-            throw new IOException("investigation store (postgres) unavailable: " + e.getMessage(), e);
+            if (unreachable(e))
+                throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "Investigation database unavailable: " + e.getMessage());
+            throw new IOException("investigation store (postgres) failed: " + e.getMessage(), e);
         }
+    }
+
+    private static void rollback(Connection c, Exception failed) {
+        try {
+            c.rollback();
+        } catch (SQLException suppressed) {
+            failed.addSuppressed(suppressed);
+        }
+    }
+
+    /** Connection-class failures: SQLSTATE 08 (connection), 28 (authentication), 53 (resources), 57P (shutdown), and a pool that cannot lend. */
+    static boolean unreachable(SQLException e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof java.sql.SQLTransientConnectionException || t instanceof java.sql.SQLNonTransientConnectionException) return true;
+            if (t instanceof SQLException sql && sql.getSQLState() != null) {
+                String st = sql.getSQLState();
+                if (st.startsWith("08") || st.startsWith("28") || st.startsWith("53") || st.startsWith("57P")) return true;
+            }
+        }
+        return false;
     }
 
     private String t(String table) {
@@ -164,23 +225,38 @@ public final class PgInvestigationStore implements InvestigationStore {
             "CREATE TABLE IF NOT EXISTS " + t("la_template") + " (id text PRIMARY KEY, body text NOT NULL)",
             "CREATE TABLE IF NOT EXISTS " + t("la_draft") + " (inv text NOT NULL REFERENCES " + t("la_investigation") + "(id), id text NOT NULL, "
                     + "header text NOT NULL, actor text NOT NULL, state text NOT NULL CHECK (state IN ('open','hibernated','discarded','promoted')), "
-                    + "marker text, last_access timestamptz NOT NULL, version bigint NOT NULL DEFAULT 0, PRIMARY KEY (inv, id))"
+                    + "marker text, last_access timestamptz NOT NULL, version bigint NOT NULL DEFAULT 0, PRIMARY KEY (inv, id))",
+            // Append-only (design section 7): the sealed MAIN log, its sets, the members and the references are never changed or removed
+            // by anything but dropping the Space's schema. A trigger, not a REVOKE: the application connects as the table owner, which a
+            // REVOKE does not bind. A Draft's own rows (draft <> '') ARE deleted (close, rebase), so the log/set row triggers carry a WHEN.
+            "CREATE OR REPLACE FUNCTION " + t("la_append_only") + "() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN "
+                    + "RAISE EXCEPTION '% is append-only: % refused', TG_TABLE_NAME, TG_OP USING ERRCODE = 'integrity_constraint_violation'; END $fn$",
+            appendOnly("la_log", "BEFORE UPDATE OR DELETE", "FOR EACH ROW WHEN (OLD.draft = '')"),
+            appendOnly("la_set", "BEFORE UPDATE OR DELETE", "FOR EACH ROW WHEN (OLD.draft = '')"),
+            appendOnly("la_member", "BEFORE UPDATE OR DELETE", "FOR EACH ROW"),
+            appendOnly("la_reference", "BEFORE UPDATE OR DELETE", "FOR EACH ROW"),
+            appendOnly("la_log", "BEFORE TRUNCATE", "FOR EACH STATEMENT"),
+            appendOnly("la_set", "BEFORE TRUNCATE", "FOR EACH STATEMENT"),
+            appendOnly("la_member", "BEFORE TRUNCATE", "FOR EACH STATEMENT"),
+            appendOnly("la_reference", "BEFORE TRUNCATE", "FOR EACH STATEMENT")
         };
-        for (int attempt = 1; ; attempt++) {
-            try {
-                tx(c -> {
-                    try (Statement st = c.createStatement()) {
-                        for (String sql : ddl) st.execute(sql);
-                    }
-                    return null;
-                });
-                return;
-            } catch (IOException e) {
-                // Two pods bootstrapping one empty schema race on CREATE ... IF NOT EXISTS (a unique violation or a duplicate-relation
-                // error); the loser simply runs again over what the winner made. S6 owns serialising this properly.
-                if (attempt >= 3) throw e;
+        // First start of a Space on N pods at once: the DDL runs under a transaction-scoped advisory lock, so the pods take turns and the
+        // later ones find everything made (CREATE ... IF NOT EXISTS alone races on the catalog's unique index). Scoped to the transaction,
+        // it cannot outlive its connection or be orphaned, so the objection to a long-lived advisory lock (design section 6) does not apply.
+        tx(c -> {
+            try (PreparedStatement lock = bind(c, "SELECT pg_advisory_xact_lock(hashtext(?))", "inspecto-la-store:" + schema)) {
+                lock.execute();
             }
-        }
+            try (Statement st = c.createStatement()) {
+                for (String sql : ddl) st.execute(sql);
+            }
+            return null;
+        });
+    }
+
+    private String appendOnly(String table, String when, String scope) {
+        String name = table + (when.endsWith("TRUNCATE") ? "_no_truncate" : "_append_only");
+        return "CREATE OR REPLACE TRIGGER " + name + " " + when + " ON " + t(table) + " " + scope + " EXECUTE FUNCTION " + t("la_append_only") + "()";
     }
 
     private void lockInvestigation(Connection c, String id) throws SQLException, IOException {

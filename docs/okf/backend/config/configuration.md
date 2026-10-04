@@ -705,6 +705,7 @@ DuckDB holds a single-writer lock. The engine is chosen per store by process-glo
 | Operational objects | `-Dobjects.backend=db` | `-Dobjects.db.url` | mutable alerts/incidents/cases |
 | Object links | `-Dobjects.backend=db` | `-Dobjects.links.db.url` | correlation graph (append-only) |
 | Object notes | `-Dobjects.backend=db` | `-Dobjects.notes.db.url` | evidence / comments (append-only) |
+| Link Analysis Investigations | `-Dinvestigations.backend=db` (default `fs`; Enterprise bundles carry the module) | `-Dinvestigations.db.url` / `.user` / `.password`, else `-Dinspecto.db.url` / `.user` / `.password` | sealed Investigation log, Working Set sets, members, Drafts (one `space_<id>` schema per Space). PostgreSQL only; selected-but-unusable is `503`, never a filesystem fall-back |
 | Job runs | `-Djobs.backend=postgres` (or `duckdb`) | `-Djobs.db.url` | job-execution reporting (success rate, p50/p95) |
 | Pipeline provenance | `-Dprovenance.backend=postgres` (or `duckdb`) | `-Dprovenance.db.url` | per-edge record counts (T21) |
 

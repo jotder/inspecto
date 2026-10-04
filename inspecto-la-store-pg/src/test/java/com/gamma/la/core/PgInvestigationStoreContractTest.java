@@ -1,6 +1,7 @@
 package com.gamma.la.core;
 
 import com.gamma.la.store.pg.PgInvestigationStore;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -44,13 +45,162 @@ class PgInvestigationStoreContractTest extends InvestigationStoreContract {
 
     private final List<String> schemas = new ArrayList<>();
 
+    /**
+     * ONE small pool for the whole class, the production path: 4 connections for the contract's 16-writer races, so a store method that
+     * held two connections at once (a nested borrow) would starve the pool and the case would time out instead of passing.
+     */
+    private static com.gamma.util.ConnectionSource pool;
+
+    private static synchronized com.gamma.util.ConnectionSource pool(String url) throws Exception {
+        if (pool == null) {
+            String before = System.getProperty("db.pool.size");
+            System.setProperty("db.pool.size", "4");
+            try {
+                pool = com.gamma.util.JdbcDrivers.source(url, null, null, "la-test");
+            } finally {
+                if (before == null) System.clearProperty("db.pool.size");
+                else System.setProperty("db.pool.size", before);
+            }
+        }
+        return pool;
+    }
+
+    @AfterAll
+    static synchronized void closePool() {
+        if (pool != null) pool.close();
+        pool = null;
+    }
+
     @Override
     InvestigationStore fresh() throws Exception {
         String url = url();
         assumeTrue(url != null, "no Postgres: set INSPECTO_TEST_PG_URL (jdbc:postgresql://host:5432/db?user=..&password=..) to run this");
         String schema = "la_t_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         schemas.add(schema);
-        return new PgInvestigationStore(() -> DriverManager.getConnection(url), schema);
+        return new PgInvestigationStore(pool(url), schema);
+    }
+
+    @Test
+    void firstStartOfOneSpaceOnManyPodsAtOnceBootstrapsTheSchemaOnceAndAllSucceed() throws Exception {
+        String url = url();
+        assumeTrue(url != null, "no Postgres");
+        String schema = "la_t_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        schemas.add(schema);
+        int pods = 8;
+        java.util.concurrent.CyclicBarrier go = new java.util.concurrent.CyclicBarrier(pods);
+        java.util.concurrent.ExecutorService ex = java.util.concurrent.Executors.newFixedThreadPool(pods);
+        try {
+            List<java.util.concurrent.Future<InvestigationStore>> started = new ArrayList<>();
+            for (int i = 0; i < pods; i++)   // each "pod" has its own connections, as two JVMs would
+                started.add(ex.submit(() -> {
+                    go.await();
+                    return new PgInvestigationStore(() -> DriverManager.getConnection(url), schema);
+                }));
+            for (var f : started) assertNotNull(f.get(60, java.util.concurrent.TimeUnit.SECONDS), "every pod came up, none lost the DDL race");
+        } finally {
+            ex.shutdownNow();
+        }
+        InvestigationStore s = new PgInvestigationStore(() -> DriverManager.getConnection(url), schema);
+        assertTrue(s.create("x", "{}"));
+    }
+
+    @Test
+    void theSealedMainRecordsCanNeitherBeChangedNorRemovedButADraftsOwnRowsCanBe() throws Exception {
+        InvestigationStore s = fresh();
+        s.create("ao", "{}");
+        s.append(main("ao"), 0, 1, "{\"step\":1}", "{\"set\":1}");
+        s.appendMember("ao", 0, "{\"member\":1}");
+        s.appendReference("ao", "k", "{\"ref\":1}", 5);
+        String schema = schemas.get(schemas.size() - 1);
+        try (Connection c = DriverManager.getConnection(url()); Statement st = c.createStatement()) {
+            for (String sql : List.of(
+                    "UPDATE " + schema + ".la_log SET line = 'x' WHERE draft = ''",
+                    "DELETE FROM " + schema + ".la_log WHERE draft = ''",
+                    "UPDATE " + schema + ".la_set SET body = 'x' WHERE draft = ''",
+                    "DELETE FROM " + schema + ".la_set WHERE draft = ''",
+                    "UPDATE " + schema + ".la_member SET line = 'x'",
+                    "DELETE FROM " + schema + ".la_member",
+                    "UPDATE " + schema + ".la_reference SET line = 'x'",
+                    "DELETE FROM " + schema + ".la_reference",
+                    "TRUNCATE " + schema + ".la_log",
+                    "TRUNCATE " + schema + ".la_set",
+                    "TRUNCATE " + schema + ".la_member",
+                    "TRUNCATE " + schema + ".la_reference")) {
+                java.sql.SQLException refused = assertThrows(java.sql.SQLException.class, () -> st.execute(sql), sql);
+                assertEquals("23000", refused.getSQLState(), sql + ": " + refused.getMessage());
+            }
+        }
+        assertEquals(List.of("{\"step\":1}"), s.log(main("ao")), "nothing changed");
+        assertEquals("{\"set\":1}", s.set("ao", 1).orElseThrow());
+        // the Draft's own rows are deleted by a close: the trigger must not bind them
+        String d = DraftStore.newId();
+        s.createDraft("ao", d, "{\"draftId\":\"" + d + "\",\"actor\":\"a\"}", "a", 9);
+        s.append(InvestigationStore.Scope.draft("ao", d), 0, 1, "{\"step\":1}", "{\"set\":1}");
+        assertEquals(java.util.Optional.of(true), s.closeDraft("ao", d, null, own -> "{}"));
+        assertEquals(List.of("{\"step\":1}"), s.log(main("ao")));
+    }
+
+    @Test
+    void aDatabaseThatGoesAwayIs503NotAnotherBackendAndTheStoreRecoversWhenItReturns() throws Exception {
+        String url = url();
+        assumeTrue(url != null, "no Postgres");
+        String schema = "la_t_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        schemas.add(schema);
+        boolean[] down = {false};
+        InvestigationStore s = new PgInvestigationStore(() -> {
+            if (down[0]) throw new java.sql.SQLTransientConnectionException("connection refused", "08001");
+            return DriverManager.getConnection(url);
+        }, schema);
+        s.create("o", "{}");
+        down[0] = true;
+        com.gamma.control.ApiException e = assertThrows(com.gamma.control.ApiException.class, () -> s.header("o"));
+        assertEquals(503, com.gamma.control.ApiExceptionPeek.status(e));
+        assertEquals(com.gamma.control.ErrorCodes.CAPABILITY_UNAVAILABLE, com.gamma.control.ApiExceptionPeek.code(e));
+        down[0] = false;
+        assertEquals("{}", s.header("o").orElseThrow(), "the same store serves again: nothing was cached about the outage");
+    }
+
+    @Test
+    void selectedAndUnreachableIs503WithNoFallbackAndNothingCachedSoTheNextRequestRetries() {
+        String before = System.getProperty(InvestigationStores.BACKEND_PROPERTY);
+        System.setProperty(InvestigationStores.BACKEND_PROPERTY, "db");
+        System.setProperty(InvestigationStores.URL_PROPERTY, "jdbc:postgresql://127.0.0.1:1/none?connectTimeout=2");
+        try {
+            for (int attempt = 0; attempt < 2; attempt++) {
+                com.gamma.control.ApiException e = assertThrows(com.gamma.control.ApiException.class,
+                        () -> InvestigationStores.of(java.nio.file.Path.of("spaces", "s1", "config")));
+                assertEquals(503, com.gamma.control.ApiExceptionPeek.status(e));
+                assertTrue(e.getMessage().contains("cannot be used"), e.getMessage());
+            }
+        } finally {
+            System.clearProperty(InvestigationStores.URL_PROPERTY);
+            if (before == null) System.clearProperty(InvestigationStores.BACKEND_PROPERTY);
+            else System.setProperty(InvestigationStores.BACKEND_PROPERTY, before);
+        }
+    }
+
+    @Test
+    void selectedAndReachableTheRegisteredProviderServesEachSpaceItsOwnSchemaAndCachesTheStore() throws Exception {
+        String url = url();
+        assumeTrue(url != null, "no Postgres");
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        java.nio.file.Path a = java.nio.file.Path.of("spaces", "lasel-a-" + suffix, "config");
+        java.nio.file.Path b = java.nio.file.Path.of("spaces", "lasel-b-" + suffix, "config");
+        schemas.add("space_lasel_a_" + suffix);
+        schemas.add("space_lasel_b_" + suffix);
+        System.setProperty(InvestigationStores.BACKEND_PROPERTY, "db");
+        System.setProperty(InvestigationStores.URL_PROPERTY, url);
+        try {
+            InvestigationStore sa = InvestigationStores.of(a);
+            assertInstanceOf(PgInvestigationStore.class, sa);
+            assertSame(sa, InvestigationStores.of(a), "one store (and one schema bootstrap) per Space, not one per request");
+            sa.create("only-in-a", "{}");
+            assertEquals(List.of("only-in-a"), InvestigationStores.of(a).ids());
+            assertEquals(List.of(), InvestigationStores.of(b).ids(), "another Space is another schema");
+        } finally {
+            System.clearProperty(InvestigationStores.BACKEND_PROPERTY);
+            System.clearProperty(InvestigationStores.URL_PROPERTY);
+        }
     }
 
     @AfterEach
