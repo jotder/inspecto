@@ -28,8 +28,9 @@ public final class InMemoryObjectStore implements ObjectStore {
     public synchronized OperationalObject create(OperationalObject obj) {
         if (byId.containsKey(obj.id()))
             throw new IllegalStateException("object already exists: " + obj.id());
-        byId.put(obj.id(), obj);
-        return obj;
+        OperationalObject fresh = obj.withVersion(0);
+        byId.put(obj.id(), fresh);
+        return fresh;
     }
 
     @Override
@@ -39,10 +40,14 @@ public final class InMemoryObjectStore implements ObjectStore {
 
     @Override
     public synchronized OperationalObject update(OperationalObject obj) {
-        if (!byId.containsKey(obj.id()))
+        OperationalObject stored = byId.get(obj.id());
+        if (stored == null)
             throw new NoSuchElementException("no object with id '" + obj.id() + "'");
-        byId.put(obj.id(), obj);
-        return obj;
+        if (stored.version() != obj.version())
+            throw new ObjectVersionConflictException(obj.id(), obj.version());
+        OperationalObject next = obj.withVersion(obj.version() + 1);
+        byId.put(obj.id(), next);
+        return next;
     }
 
     @Override

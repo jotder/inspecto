@@ -379,7 +379,7 @@ class ObjectServiceTest {
      *  with no {@code closedAt} (what a later workflow file or an import leaves behind). */
     private static OperationalObject stored(String id, String status, long createdAt, Map<String, String> attrs) {
         return new OperationalObject(id, ObjectType.INCIDENT, id, "d", status, "HIGH", "LOW", null, null, "corr",
-                attrs, createdAt, createdAt, 0L);
+                attrs, createdAt, createdAt, 0L, 0L);
     }
 
     /** IMPORT-RESIDUALS-1 (4): every terminal state of the Incident's registered Workflow stops the SLA clock. */

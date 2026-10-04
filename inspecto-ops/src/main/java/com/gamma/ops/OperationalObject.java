@@ -24,13 +24,19 @@ import java.util.UUID;
  * <p>The record itself is immutable; a lifecycle change produces a new instance via {@link #withStatus}
  * / {@link #withAssignee}, and {@link ObjectStore#update} persists it.
  *
+ * <p><b>{@link #version()}</b> is the optimistic-lock counter: the version of the stored row this copy was
+ * read at ({@code 0} on a fresh object). {@link ObjectStore#update} writes only if the stored row is still at
+ * that version, bumps it, and returns the object at the new version — a racing writer's stale copy fails with
+ * {@link ObjectVersionConflictException} instead of silently overwriting. Stores own the counter; the
+ * {@code with*} methods carry it unchanged.
+ *
  * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record OperationalObject(String id, ObjectType objectType, String title, String description,
                                 String status, String severity, String priority, String owner,
                                 String assignee, String correlationId, Map<String, String> attributes,
-                                long createdAt, long updatedAt, long closedAt) {
+                                long createdAt, long updatedAt, long closedAt, long version) {
 
     /** Canonical constructor — validates the keys, defaults text fields, makes {@code attributes} immutable. */
     public OperationalObject {
@@ -49,25 +55,25 @@ public record OperationalObject(String id, ObjectType objectType, String title, 
      */
     public OperationalObject withStatus(String newStatus, long now, boolean terminal) {
         return new OperationalObject(id, objectType, title, description, newStatus, severity, priority,
-                owner, assignee, correlationId, attributes, createdAt, now, terminal ? now : 0);
+                owner, assignee, correlationId, attributes, createdAt, now, terminal ? now : 0, version);
     }
 
     /** A copy reassigned to {@code newAssignee} (touches {@code updatedAt}). */
     public OperationalObject withAssignee(String newAssignee, long now) {
         return new OperationalObject(id, objectType, title, description, status, severity, priority,
-                owner, newAssignee, correlationId, attributes, createdAt, now, closedAt);
+                owner, newAssignee, correlationId, attributes, createdAt, now, closedAt, version);
     }
 
     /** A copy at a new {@code severity} (INC-4 escalation bump); touches {@code updatedAt}. */
     public OperationalObject withSeverity(String newSeverity, long now) {
         return new OperationalObject(id, objectType, title, description, status, newSeverity, priority,
-                owner, assignee, correlationId, attributes, createdAt, now, closedAt);
+                owner, assignee, correlationId, attributes, createdAt, now, closedAt, version);
     }
 
     /** A copy at a new {@code priority} (operator triage — the {@code PATCH /objects/{id}} Prioritize); touches {@code updatedAt}. */
     public OperationalObject withPriority(String newPriority, long now) {
         return new OperationalObject(id, objectType, title, description, status, severity, newPriority,
-                owner, assignee, correlationId, attributes, createdAt, now, closedAt);
+                owner, assignee, correlationId, attributes, createdAt, now, closedAt, version);
     }
 
     /**
@@ -92,10 +98,16 @@ public record OperationalObject(String id, ObjectType objectType, String title, 
         Map<String, String> merged = new LinkedHashMap<>(attributes);
         if (updates != null) updates.forEach((k, v) -> { if (k != null && v != null) merged.put(k, v); });
         return new OperationalObject(id, objectType, title, description, status, severity, priority,
-                owner, assignee, correlationId, merged, createdAt, now, closedAt);
+                owner, assignee, correlationId, merged, createdAt, now, closedAt, version);
     }
 
     /** {@code true} once {@link #closedAt()} is set (the object reached a terminal state). */
+    /** This object as the store must hold it at {@code newVersion} (the stores bump it; callers never do). */
+    OperationalObject withVersion(long newVersion) {
+        return new OperationalObject(id, objectType, title, description, status, severity, priority,
+                owner, assignee, correlationId, attributes, createdAt, updatedAt, closedAt, newVersion);
+    }
+
     public boolean isClosed() {
         return closedAt > 0;
     }
@@ -121,6 +133,7 @@ public record OperationalObject(String id, ObjectType objectType, String title, 
         m.put("createdAt", createdAt);
         m.put("updatedAt", updatedAt);
         m.put("closedAt", closedAt);
+        m.put("version", version);
         return m;
     }
 
@@ -177,7 +190,7 @@ public record OperationalObject(String id, ObjectType objectType, String title, 
                     ? objectType.name() + "-" + UUID.randomUUID()
                     : id;
             return new OperationalObject(oid, objectType, title, description, status, severity, priority,
-                    owner, assignee, correlationId, attributes, createdAt, updatedAt, closedAt);
+                    owner, assignee, correlationId, attributes, createdAt, updatedAt, closedAt, 0);
         }
     }
 }

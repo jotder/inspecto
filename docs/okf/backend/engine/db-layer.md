@@ -158,9 +158,13 @@ CREATE TABLE IF NOT EXISTS inspecto_ops_objects (
   attributes     VARCHAR,   -- JSON
   created_at     BIGINT,    -- epoch ms
   updated_at     BIGINT,
-  closed_at      BIGINT
+  closed_at      BIGINT,
+  version        BIGINT DEFAULT 0   -- optimistic-lock counter (see below)
 );
+ALTER TABLE inspecto_ops_objects ADD COLUMN IF NOT EXISTS version BIGINT DEFAULT 0;  -- boot migration
 ```
+
+**Optimistic versioning (2026-10-04).** `OperationalObject.version` is persisted by both stores. `ObjectStore.update(obj)` writes only `WHERE id=? AND version=?` (the version the caller read) and sets `version=version+1`; zero rows means the id is gone (`NoSuchElementException`) or a racing writer won (`ObjectVersionConflictException`, nothing written). In-memory does the same compare under its lock. `create` stores version 0. ⚠ The column is `DEFAULT 0`, **not** `NOT NULL`: DuckDB cannot `ADD COLUMN` with a NOT NULL constraint, and the default fills pre-migration rows on both engines. `ObjectService` re-runs a read-modify-write that is a pure function of the fresh read up to `MAX_RMW_ATTEMPTS` (10) times (`retrying` / `rmw`: transition, patch, saveAttributes, saveImpact, watchers, assign, merge, tag projection), the SLA sweep skips a contended object (next sweep re-evaluates), and a conflict that survives the bound reaches the HTTP edge as `409 CONFLICT_STALE_VERSION` (`ObjectRoutes#scoped`, recoverable). Object JSON carries `version`. Pinned by `ObjectStoreContractTest` (contract, 8-writer race, 4x25 increments, migration on a legacy table — in-memory/DuckDB and real PG) and `ObjectServiceRaceTest`.
 
 ### 3.2 `inspecto_ops_links` — correlation edges  · **A**
 File: `inspecto-ops-links.db`

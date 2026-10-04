@@ -338,7 +338,13 @@ public final class ObjectRoutes implements RouteModule {
             OperationalObject o = OpsEngine.of(api).get(id).orElse(null);
             if (o != null && !visibleTo(e, o))
                 throw new ApiException(404, ErrorCodes.NOT_FOUND, "no object with id '" + id + "'");
-            return h.handle(e, m);   // absent ids keep their existing 404/behaviour
+            try {
+                return h.handle(e, m);   // absent ids keep their existing 404/behaviour
+            } catch (com.gamma.ops.ObjectVersionConflictException lost) {
+                // The service already re-ran its read-modify-write ObjectService.MAX_RMW_ATTEMPTS times: a writer
+                // that keeps winning the race. Recoverable - the client re-reads (GET carries `version`) and retries.
+                throw new ApiException(409, ErrorCodes.CONFLICT_STALE_VERSION, lost.getMessage());
+            }
         };
     }
 

@@ -199,7 +199,7 @@ class ObjectsAnalyticsJobTest {
         Map<String, String> eur = Map.of("impact", "{\"confirmed\":\"1\",\"currency\":\"EUR\"}");
         for (int i = 0; i < n; i++)
             store.create(new com.gamma.ops.OperationalObject("inc-" + i, ObjectType.INCIDENT, "t", "d", "IDENTIFIED",
-                    "HIGH", "LOW", null, null, "corr", eur, 1_000L + i, 1_000L + i, 0L));
+                    "HIGH", "LOW", null, null, "corr", eur, 1_000L + i, 1_000L + i, 0L, 0L));
         List<com.gamma.opsjob.ObjectsAnalyticsJob.LedgerRow> rows = com.gamma.opsjob.ObjectsAnalyticsJob.ledger(
                 new ObjectService(store), List.of(ObjectType.INCIDENT));
         assertEquals(n, rows.size());

@@ -224,7 +224,8 @@ class RetentionSweepSeamTest {
         e.objects.applyTag(o.id(), "q3-audit", "alice");
         e.objects.link(o.id(), peerId, "relates", "alice");
         // Backdate the archive stamp — open() stamps now, and retention is measured from closedAt.
-        e.store.update(o.withStatus("ARCHIVED", System.currentTimeMillis() - (400 * DAY), true));
+        e.store.update(e.store.get(o.id()).orElseThrow()   // re-read: applyTag above bumped the version
+                .withStatus("ARCHIVED", System.currentTimeMillis() - (400 * DAY), true));
         return o.id();
     }
 

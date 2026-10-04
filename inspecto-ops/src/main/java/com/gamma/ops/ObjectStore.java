@@ -29,7 +29,7 @@ import java.util.Optional;
 @com.gamma.api.PublicApi(since = "4.0.0")
 public interface ObjectStore extends AutoCloseable {
 
-    /** Insert a new object and return it. Throws {@link IllegalStateException} if the id already exists. */
+    /** Insert a new object (stored at version 0) and return it. Throws {@link IllegalStateException} if the id already exists. */
     OperationalObject create(OperationalObject obj);
 
     /** The object with this id, or empty. */
@@ -52,8 +52,13 @@ public interface ObjectStore extends AutoCloseable {
                                              int limit);
 
     /**
-     * Persist a mutated object (status/assignee/timestamps). Returns the stored object. Throws
-     * {@link java.util.NoSuchElementException} if no object with {@code obj.id()} exists.
+     * Persist a mutated object (status/assignee/timestamps) <b>optimistically</b>: it is written only if the
+     * stored row is still at {@code obj.version()} (the version the caller read), and the stored version is
+     * bumped by one. Returns the stored object, at its new version. The check and the write are one atomic step
+     * in every implementation.
+     *
+     * @throws java.util.NoSuchElementException   if no object with {@code obj.id()} exists
+     * @throws ObjectVersionConflictException     if the stored row is at a different version — nothing is written
      */
     OperationalObject update(OperationalObject obj);
 

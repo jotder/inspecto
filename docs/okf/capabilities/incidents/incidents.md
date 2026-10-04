@@ -358,6 +358,7 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
 
 `ObjectType` = `ALERT | INCIDENT | CASE | TASK`, one table `inspecto_ops_objects` when durable, else
 `InMemoryObjectStore` (`OpsEngineProvider.java:94-124` picks per store on `durable()`).
+Updates are **optimistic** (2026-10-04): every object carries a monotonic `version`, a stale write fails with `ObjectVersionConflictException`, `ObjectService` retries pure read-modify-writes and the edge answers a persistent loss as `409 CONFLICT_STALE_VERSION` — see `backend/engine/db-layer.md` §3.1. No client change is needed for server-side races; `PATCH /objects/{id}` does not yet accept an expected `version` (deferred — a client editing a whole object from a stale read still merges, it does not fail).
 
 - **Workflows** (`inspecto-engine/src/main/java/com/gamma/objects/Workflow.java:150-192`): ALERT
   `OPEN → ACKNOWLEDGED → RESOLVED`; **INCIDENT `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`**, `reopen`

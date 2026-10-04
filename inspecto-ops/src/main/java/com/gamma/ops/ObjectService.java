@@ -319,12 +319,14 @@ public final class ObjectService {
      *                                  moving to {@code RESOLVED}
      */
     public OperationalObject transition(String id, String action, String actor, String disposition) {
-        OperationalObject obj = require(id);
-        Workflow wf = workflow(obj.objectType());
-        String target = wf.apply(obj.status(), action).orElseThrow(() -> new IllegalStateException(
-                "illegal transition: '" + action + "' from " + obj.status()
-                        + " (" + obj.objectType() + ")"));
-        return commit(obj, wf, target, action, actor, disposition);
+        return retrying(() -> {
+            OperationalObject obj = require(id);
+            Workflow wf = workflow(obj.objectType());
+            String target = wf.apply(obj.status(), action).orElseThrow(() -> new IllegalStateException(
+                    "illegal transition: '" + action + "' from " + obj.status()
+                            + " (" + obj.objectType() + ")"));
+            return commit(obj, wf, target, action, actor, disposition);
+        });
     }
 
     /**
@@ -337,12 +339,14 @@ public final class ObjectService {
 
     /** As {@link #transitionTo(String, String, String)} with a {@code disposition} — see {@link #transition(String, String, String, String)}. */
     public OperationalObject transitionTo(String id, String targetState, String actor, String disposition) {
-        OperationalObject obj = require(id);
-        Workflow wf = workflow(obj.objectType());
-        if (!wf.allows(obj.status(), targetState))
-            throw new IllegalStateException("illegal transition: " + obj.status() + " -> " + targetState
-                    + " (" + obj.objectType() + ")");
-        return commit(obj, wf, targetState, "transition", actor, disposition);
+        return retrying(() -> {
+            OperationalObject obj = require(id);
+            Workflow wf = workflow(obj.objectType());
+            if (!wf.allows(obj.status(), targetState))
+                throw new IllegalStateException("illegal transition: " + obj.status() + " -> " + targetState
+                        + " (" + obj.objectType() + ")");
+            return commit(obj, wf, targetState, "transition", actor, disposition);
+        });
     }
 
     /**
@@ -355,14 +359,16 @@ public final class ObjectService {
      */
     public OperationalObject patch(String id, String priority, String severity, String assignee,
                                    Map<String, String> attributes) {
-        OperationalObject obj = require(id);
-        long now = System.currentTimeMillis();
-        OperationalObject next = obj;
-        if (priority != null) next = next.withPriority(priority, now);
-        if (severity != null) next = next.withSeverity(severity, now);
-        if (assignee != null) next = next.withAssignee(assignee, now);
-        if (attributes != null && !attributes.isEmpty()) next = next.withAttributes(attributes, now);
-        return next == obj ? obj : store.update(next);
+        return retrying(() -> {
+            OperationalObject obj = require(id);
+            long now = System.currentTimeMillis();
+            OperationalObject next = obj;
+            if (priority != null) next = next.withPriority(priority, now);
+            if (severity != null) next = next.withSeverity(severity, now);
+            if (assignee != null) next = next.withAssignee(assignee, now);
+            if (attributes != null && !attributes.isEmpty()) next = next.withAttributes(attributes, now);
+            return next == obj ? obj : store.update(next);
+        });
     }
 
     /**
@@ -386,18 +392,20 @@ public final class ObjectService {
      * @throws NoSuchElementException if no object has this id
      */
     public OperationalObject saveAttributes(String id, Map<String, String> attributes, String actor, String what) {
-        OperationalObject obj = require(id);
-        OperationalObject updated = store.update(obj.withAttributes(attributes, System.currentTimeMillis()));
-        EventLog.current().emit(Event.builder(EventType.OBJECT_ACTIVITY)
-                .level(EventLevel.INFO)
-                .source(SOURCE)
-                .correlationId(obj.correlationId())
-                .message(obj.objectType() + " " + id + ": " + what + " saved" + (actor == null ? "" : " by " + actor))
-                .attr("objectId", id)
-                .attr("objectType", obj.objectType().name())
-                .attr("action", what)
-                .attr("actor", actor));
-        return updated;
+        return retrying(() -> {
+            OperationalObject obj = require(id);
+            OperationalObject updated = store.update(obj.withAttributes(attributes, System.currentTimeMillis()));
+            EventLog.current().emit(Event.builder(EventType.OBJECT_ACTIVITY)
+                    .level(EventLevel.INFO)
+                    .source(SOURCE)
+                    .correlationId(obj.correlationId())
+                    .message(obj.objectType() + " " + id + ": " + what + " saved" + (actor == null ? "" : " by " + actor))
+                    .attr("objectId", id)
+                    .attr("objectType", obj.objectType().name())
+                    .attr("action", what)
+                    .attr("actor", actor));
+            return updated;
+        });
     }
 
     /**
@@ -412,41 +420,43 @@ public final class ObjectService {
      *                                  are closed; reopen it first
      */
     public OperationalObject saveImpact(String id, Impact impact, String actor) {
-        OperationalObject obj = require(id);
-        if (!Impact.TYPES.contains(obj.objectType()))
-            throw new IllegalArgumentException("impact is recorded on an Incident or a Case, not a " + obj.objectType());
-        boolean incident = obj.objectType() == ObjectType.INCIDENT;
-        if (incident && "ARCHIVED".equalsIgnoreCase(obj.status()))
-            throw new IllegalStateException(obj.objectType() + " " + id + " is ARCHIVED — its impact is closed; "
-                    + "reopen it to change the impact");
-        // Late recoveries (operator, 2026-09-26): money recovered or prevented after the outcome is decided is
-        // still recorded on a RESOLVED Incident or a CLOSED (terminal) Case — but nothing else on it changes.
-        boolean booksClosed = incident ? "RESOLVED".equalsIgnoreCase(obj.status())
-                : workflow(obj.objectType()).isTerminal(obj.status());
-        if (booksClosed) {
-            List<String> changed = Impact.fromAttribute(obj.attributes().get(Impact.ATTR)).changedFieldsOtherThan(
-                    impact, Impact.LATE_FIELDS);
-            if (!changed.isEmpty())
-                throw new IllegalStateException(obj.objectType() + " " + id + " is " + obj.status()
-                        + " — only " + Impact.LATE_FIELDS + " may still change (late recoveries), not " + changed
-                        + "; reopen it to change the rest");
-        }
-        String before = obj.attributes().getOrDefault(Impact.ATTR, "");
-        String after = impact.toJson();
-        OperationalObject updated = store.update(
-                obj.withAttributes(Map.of(Impact.ATTR, after), System.currentTimeMillis()));
-        EventLog.current().emit(Event.builder(EventType.OBJECT_ACTIVITY)
-                .level(EventLevel.INFO)
-                .source(SOURCE)
-                .correlationId(obj.correlationId())
-                .message(obj.objectType() + " " + id + ": impact saved" + (actor == null ? "" : " by " + actor))
-                .attr("objectId", id)
-                .attr("objectType", obj.objectType().name())
-                .attr("action", Impact.ATTR)
-                .attr("before", before)
-                .attr("after", after)
-                .attr("actor", actor));
-        return updated;
+        return retrying(() -> {
+            OperationalObject obj = require(id);
+            if (!Impact.TYPES.contains(obj.objectType()))
+                throw new IllegalArgumentException("impact is recorded on an Incident or a Case, not a " + obj.objectType());
+            boolean incident = obj.objectType() == ObjectType.INCIDENT;
+            if (incident && "ARCHIVED".equalsIgnoreCase(obj.status()))
+                throw new IllegalStateException(obj.objectType() + " " + id + " is ARCHIVED — its impact is closed; "
+                        + "reopen it to change the impact");
+            // Late recoveries (operator, 2026-09-26): money recovered or prevented after the outcome is decided is
+            // still recorded on a RESOLVED Incident or a CLOSED (terminal) Case — but nothing else on it changes.
+            boolean booksClosed = incident ? "RESOLVED".equalsIgnoreCase(obj.status())
+                    : workflow(obj.objectType()).isTerminal(obj.status());
+            if (booksClosed) {
+                List<String> changed = Impact.fromAttribute(obj.attributes().get(Impact.ATTR)).changedFieldsOtherThan(
+                        impact, Impact.LATE_FIELDS);
+                if (!changed.isEmpty())
+                    throw new IllegalStateException(obj.objectType() + " " + id + " is " + obj.status()
+                            + " — only " + Impact.LATE_FIELDS + " may still change (late recoveries), not " + changed
+                            + "; reopen it to change the rest");
+            }
+            String before = obj.attributes().getOrDefault(Impact.ATTR, "");
+            String after = impact.toJson();
+            OperationalObject updated = store.update(
+                    obj.withAttributes(Map.of(Impact.ATTR, after), System.currentTimeMillis()));
+            EventLog.current().emit(Event.builder(EventType.OBJECT_ACTIVITY)
+                    .level(EventLevel.INFO)
+                    .source(SOURCE)
+                    .correlationId(obj.correlationId())
+                    .message(obj.objectType() + " " + id + ": impact saved" + (actor == null ? "" : " by " + actor))
+                    .attr("objectId", id)
+                    .attr("objectType", obj.objectType().name())
+                    .attr("action", Impact.ATTR)
+                    .attr("before", before)
+                    .attr("after", after)
+                    .attr("actor", actor));
+            return updated;
+        });
     }
 
     /** Convenience: acknowledge an object (the {@code ack} action). */
@@ -723,17 +733,17 @@ public final class ObjectService {
 
     /** Apply one tag to an object and re-project the CSV. Idempotent; returns the updated object. */
     public OperationalObject applyTag(String objectId, String tag, String actor) {
-        OperationalObject o = require(objectId);
+        require(objectId);
         tagAssignments.add(com.gamma.objects.TagAssignment.of(
                 tag, com.gamma.objects.AnnotationKinds.OBJECT, objectId, actor));
-        return projectTags(o, System.currentTimeMillis());
+        return projectTags(objectId, System.currentTimeMillis());
     }
 
     /** Remove one tag from an object and re-project the CSV. Idempotent; returns the updated object. */
     public OperationalObject removeTag(String objectId, String tag) {
-        OperationalObject o = require(objectId);
+        require(objectId);
         tagAssignments.remove(tag, com.gamma.objects.AnnotationKinds.OBJECT, objectId);
-        return projectTags(o, System.currentTimeMillis());
+        return projectTags(objectId, System.currentTimeMillis());
     }
 
     /**
@@ -842,16 +852,15 @@ public final class ObjectService {
         for (String id : objectIds) {
             OperationalObject o = store.get(id).orElse(null);
             if (o == null) continue;
-            projectTags(o, now);
+            projectTags(id, now);
             done++;
         }
         return done;
     }
 
     /** Rewrite an object's CSV attribute from the assignment store — the projection, never the reverse. */
-    private OperationalObject projectTags(OperationalObject o, long now) {
-        return store.update(o.withAttributes(
-                Map.of(ATTR_TAGS, String.join(",", tagsOf(o.id()))), now));
+    private OperationalObject projectTags(String id, long now) {
+        return rmw(id, o -> o.withAttributes(Map.of(ATTR_TAGS, String.join(",", tagsOf(id))), now));
     }
 
     /** Mirror a freshly-created object's authored/rule-applied CSV tags into the assignment store. */
@@ -998,12 +1007,13 @@ public final class ObjectService {
      * @throws IllegalArgumentException no assignee was supplied
      */
     public OperationalObject assign(String id, String assignee, String actor) {
-        OperationalObject obj = require(id);
         if (assignee == null || assignee.isBlank()) throw new IllegalArgumentException("assign needs an 'assignee'");
         String target = assignee.trim();
         long now = System.currentTimeMillis();
+        OperationalObject[] read = new OperationalObject[1];   // the row the winning attempt actually read
+        OperationalObject updated = rmw(id, o -> { read[0] = o; return o.withAssignee(target, now); });
+        OperationalObject obj = read[0];
         String from = obj.assignee();
-        OperationalObject updated = store.update(obj.withAssignee(target, now));
         EventLog.current().emit(Event.builder(EventType.OBJECT_ASSIGNED)
                 .level(EventLevel.INFO)
                 .source(SOURCE)
@@ -1021,7 +1031,13 @@ public final class ObjectService {
         // (already ASSIGNED, or a type without one) the assignee change alone stands.
         Workflow wf = workflow(obj.objectType());
         if (wf.apply(updated.status(), "assign").isPresent())
-            return commit(updated, wf, wf.apply(updated.status(), "assign").get(), "assign", actor, null);
+            // Re-read per attempt: the assignee write above is done and must not be re-run (or re-audited).
+            return retrying(() -> {
+                OperationalObject cur = require(id);
+                return wf.apply(cur.status(), "assign").isPresent()
+                        ? commit(cur, wf, wf.apply(cur.status(), "assign").get(), "assign", actor, null)
+                        : cur;
+            });
         return updated;
     }
 
@@ -1044,13 +1060,15 @@ public final class ObjectService {
 
     private OperationalObject mutateWatchers(String id, String user, boolean add) {
         if (user == null || user.isBlank()) throw new IllegalArgumentException("watch needs a 'user'");
-        OperationalObject obj = require(id);
-        String u = user.trim();
-        List<String> current = new ArrayList<>(obj.watchers());
-        boolean changed = add ? (!current.contains(u) && current.add(u)) : current.remove(u);
-        if (!changed) return obj;   // idempotent — no write, no event
-        return store.update(obj.withAttributes(
-                Map.of(ATTR_WATCHERS, String.join(",", current)), System.currentTimeMillis()));
+        return retrying(() -> {
+            OperationalObject obj = require(id);
+            String u = user.trim();
+            List<String> current = new ArrayList<>(obj.watchers());
+            boolean changed = add ? (!current.contains(u) && current.add(u)) : current.remove(u);
+            if (!changed) return obj;   // idempotent — no write, no event
+            return store.update(obj.withAttributes(
+                    Map.of(ATTR_WATCHERS, String.join(",", current)), System.currentTimeMillis()));
+        });
     }
 
     /**
@@ -1098,15 +1116,20 @@ public final class ObjectService {
                 // already stamped, and its update would overwrite a status change made since the page was read.
                 OperationalObject current = store.get(o.id()).orElse(null);
                 if (current == null || stopped(current, wf) || !o.status().equalsIgnoreCase(current.status())) continue;
-                if (policy != null) current = stampPolicy(current, policy, now);
-                OperationalObject after = breachResponse(current, wf, now);
-                long dueAt = parseEpoch(after.attributes().get(ATTR_DUE_AT));
-                if (dueAt > 0 && dueAt <= now && !after.attributes().containsKey(ATTR_SLA_BREACHED_AT)) {
-                    after = store.update(after.withAttributes(Map.of(ATTR_SLA_BREACHED_AT, Long.toString(now)), now));
-                    emitBreach(after, "resolution", dueAt, now);
-                    breached++;
+                try {
+                    if (policy != null) current = stampPolicy(current, policy, now);
+                    OperationalObject after = breachResponse(current, wf, now);
+                    long dueAt = parseEpoch(after.attributes().get(ATTR_DUE_AT));
+                    if (dueAt > 0 && dueAt <= now && !after.attributes().containsKey(ATTR_SLA_BREACHED_AT)) {
+                        after = store.update(after.withAttributes(Map.of(ATTR_SLA_BREACHED_AT, Long.toString(now)), now));
+                        emitBreach(after, "resolution", dueAt, now);
+                        breached++;
+                    }
+                    if (!rules.isEmpty()) escalate(after, rules, now, escalations);
+                } catch (ObjectVersionConflictException contended) {
+                    // Someone changed the object under the sweep: that step wrote nothing, and the stamped markers
+                    // make every step idempotent, so the NEXT sweep re-evaluates it against the fresh row.
                 }
-                if (!rules.isEmpty()) escalate(after, rules, now, escalations);
             }
         }
         return breached;
@@ -1342,7 +1365,7 @@ public final class ObjectService {
             tags.addAll(tagsOf(src.id()));
             watchers.addAll(src.watchers());
             link(src.id(), survivorId, LinkRelationship.MERGED_INTO, actor);
-            store.update(src.withAttributes(Map.of(ATTR_MERGED_INTO, survivorId), now)
+            rmw(src.id(), o -> o.withAttributes(Map.of(ATTR_MERGED_INTO, survivorId), now)
                     .withStatus("CLOSED", now, true));
             comment(src.id(), actor, "Merged into " + survivorId + (actor == null ? "" : " by " + actor) + ".");
             comment(survivorId, actor, "Absorbed " + src.id() + " (\"" + src.title() + "\")"
@@ -1366,7 +1389,7 @@ public final class ObjectService {
         if (!tags.isEmpty()) union.put(ATTR_TAGS, String.join(",", tagsOf(survivorId)));
         if (!watchers.isEmpty()) union.put(ATTR_WATCHERS, String.join(",", watchers));
         OperationalObject updated = union.isEmpty() ? require(survivorId)
-                : store.update(require(survivorId).withAttributes(union, now));
+                : rmw(survivorId, o -> o.withAttributes(union, now));
         return new MergeResult(updated, absorbed.stream().map(OperationalObject::id).toList(), moved);
     }
 
@@ -1736,6 +1759,30 @@ public final class ObjectService {
 
     private OperationalObject require(String id) {
         return store.get(id).orElseThrow(() -> new NoSuchElementException("no object with id '" + id + "'"));
+    }
+
+    /** How many times a lost optimistic-lock race is re-run before the conflict is surfaced (409 at the edge). */
+    static final int MAX_RMW_ATTEMPTS = 10;
+
+    /**
+     * Run a read-modify-write that is a PURE function of the fresh read (every side effect - events, tag
+     * edges - happens after its {@code store.update}, so a conflict leaves none behind): on an
+     * {@link ObjectVersionConflictException} the whole body is re-run, re-reading the object, up to
+     * {@link #MAX_RMW_ATTEMPTS} times, then the conflict propagates.
+     */
+    private <T> T retrying(java.util.function.Supplier<T> rmw) {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return rmw.get();
+            } catch (ObjectVersionConflictException lost) {
+                if (attempt >= MAX_RMW_ATTEMPTS) throw lost;
+            }
+        }
+    }
+
+    /** Read {@code id} fresh, apply {@code change} (pure), persist, retrying a lost race - see {@link #retrying}. */
+    private OperationalObject rmw(String id, java.util.function.UnaryOperator<OperationalObject> change) {
+        return retrying(() -> store.update(change.apply(require(id))));
     }
 
     private OperationalObject commit(OperationalObject obj, Workflow wf, String target,

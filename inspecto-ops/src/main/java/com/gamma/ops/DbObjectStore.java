@@ -44,7 +44,7 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
     private static final String TABLE = "inspecto_ops_objects";
     /** {@code owner} is quoted — it is a reserved word in some SQL dialects. */
     private static final String COLS = "id, object_type, title, description, status, severity, priority, "
-            + "\"owner\", assignee, correlation_id, attributes, created_at, updated_at, closed_at";
+            + "\"owner\", assignee, correlation_id, attributes, created_at, updated_at, closed_at, version";
 
     /** Wrap an already-open JDBC connection (any engine); the schema is created if absent. */
     public DbObjectStore(Connection conn) {
@@ -72,13 +72,13 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
 
     @Override
     public OperationalObject create(OperationalObject obj) {
-        String sql = "INSERT INTO " + TABLE + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        String sql = "INSERT INTO " + TABLE + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)";
         try {
             return withConn(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
                     bindAll(ps, obj);
                     ps.executeUpdate();
-                    return obj;
+                    return obj.withVersion(0);
                 }
             });
         } catch (SQLException e) {
@@ -111,7 +111,7 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
     public OperationalObject update(OperationalObject obj) {
         String sql = "UPDATE " + TABLE + " SET object_type=?, title=?, description=?, status=?, "
                 + "severity=?, priority=?, \"owner\"=?, assignee=?, correlation_id=?, attributes=?, "
-                + "created_at=?, updated_at=?, closed_at=? WHERE id=?";
+                + "created_at=?, updated_at=?, closed_at=?, version=version+1 WHERE id=? AND version=?";
         try {
             return withConn(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -130,9 +130,18 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
                     ps.setLong(12, obj.updatedAt());
                     ps.setLong(13, obj.closedAt());
                     ps.setString(14, obj.id());
-                    if (ps.executeUpdate() == 0)
-                        throw new NoSuchElementException("no object with id '" + obj.id() + "'");
-                    return obj;
+                    ps.setLong(15, obj.version());
+                    if (ps.executeUpdate() == 0) {
+                        // Zero rows: the id is gone, or the row moved past the version the caller read.
+                        try (PreparedStatement probe = conn.prepareStatement("SELECT 1 FROM " + TABLE + " WHERE id = ?")) {
+                            probe.setString(1, obj.id());
+                            try (ResultSet rs = probe.executeQuery()) {
+                                if (!rs.next()) throw new NoSuchElementException("no object with id '" + obj.id() + "'");
+                            }
+                        }
+                        throw new ObjectVersionConflictException(obj.id(), obj.version());
+                    }
+                    return obj.withVersion(obj.version() + 1);
                 }
             });
         } catch (SQLException e) {
@@ -249,7 +258,10 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
                             + "id VARCHAR PRIMARY KEY, object_type VARCHAR, title VARCHAR, description VARCHAR, "
                             + "status VARCHAR, severity VARCHAR, priority VARCHAR, \"owner\" VARCHAR, "
                             + "assignee VARCHAR, correlation_id VARCHAR, attributes VARCHAR, "
-                            + "created_at BIGINT, updated_at BIGINT, closed_at BIGINT)");
+                            + "created_at BIGINT, updated_at BIGINT, closed_at BIGINT, version BIGINT DEFAULT 0)");
+                    // Optimistic lock counter — additive migration for tables created before it existed; their
+                    // rows start at 0. (A DEFAULT, not NOT NULL: DuckDB cannot add a constrained column.)
+                    st.execute("ALTER TABLE " + TABLE + " ADD COLUMN IF NOT EXISTS version BIGINT DEFAULT 0");
                 }
             });
         } catch (SQLException e) {
@@ -289,7 +301,8 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
                 JsonAttributes.fromJson(rs.getString("attributes")),
                 rs.getLong("created_at"),
                 rs.getLong("updated_at"),
-                rs.getLong("closed_at"));
+                rs.getLong("closed_at"),
+                rs.getLong("version"));
     }
 
     private static void ciEquals(List<String> where, List<Object> params, String col, String val) {

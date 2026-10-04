@@ -60,11 +60,11 @@ class ObjectCoreTest {
     @Test
     void requiredFieldsValidated() {
         assertThrows(IllegalArgumentException.class, () -> new OperationalObject(
-                "", ObjectType.ALERT, "t", "d", "OPEN", null, null, null, null, null, Map.of(), 1, 1, 0));
+                "", ObjectType.ALERT, "t", "d", "OPEN", null, null, null, null, null, Map.of(), 1, 1, 0, 0));
         assertThrows(IllegalArgumentException.class, () -> new OperationalObject(
-                "id", null, "t", "d", "OPEN", null, null, null, null, null, Map.of(), 1, 1, 0));
+                "id", null, "t", "d", "OPEN", null, null, null, null, null, Map.of(), 1, 1, 0, 0));
         assertThrows(IllegalArgumentException.class, () -> new OperationalObject(
-                "id", ObjectType.ALERT, "t", "d", "  ", null, null, null, null, null, Map.of(), 1, 1, 0));
+                "id", ObjectType.ALERT, "t", "d", "  ", null, null, null, null, null, Map.of(), 1, 1, 0, 0));
     }
 
     @Test

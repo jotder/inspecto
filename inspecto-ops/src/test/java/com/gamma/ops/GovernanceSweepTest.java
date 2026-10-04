@@ -73,7 +73,7 @@ class GovernanceSweepTest {
 
     private OperationalObject stored(String id, String status, String priority, long createdAt, Map<String, String> attrs) {
         return store.create(new OperationalObject(id, ObjectType.INCIDENT, id, "d", status, "HIGH", priority, null,
-                "alice", "corr", attrs, createdAt, createdAt, 0L));
+                "alice", "corr", attrs, createdAt, createdAt, 0L, 0L));
     }
 
     private static Map<String, String> postmortem() {
@@ -277,7 +277,7 @@ class GovernanceSweepTest {
 
     private OperationalObject storedCase(String id, String status, String priority, long createdAt) {
         return store.create(new OperationalObject(id, ObjectType.CASE, id, "d", status, "HIGH", priority, null,
-                "alice", "corr", Map.of(), createdAt, createdAt, 0L));
+                "alice", "corr", Map.of(), createdAt, createdAt, 0L, 0L));
     }
 
     @Test
