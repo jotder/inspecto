@@ -1,5 +1,6 @@
 package com.gamma.etl;
 
+import com.gamma.config.safety.EgressGate;
 import com.gamma.util.DuckDbUtil;
 import com.gamma.util.LakehouseCatalog;
 import com.gamma.util.Topology;
@@ -174,6 +175,7 @@ public final class DuckLakeRegistrar {
         String schema = (schemaOrNull == null || schemaOrNull.isBlank()) ? "main" : schemaOrNull;
 
         requireSharedCatalog(catalogUrl);
+        gateEgress(catalogUrl, dataPath);
 
         log.info("DuckLake: registering {} file(s) into {}.{} ...",
                 outputPaths.size(), schema, table);
@@ -212,6 +214,38 @@ public final class DuckLakeRegistrar {
             }
         } catch (Exception e) {
             onRegistrationFailure(e, catalogUrl);
+        }
+    }
+
+    /**
+     * S5: the catalog server and a remote data path go through the act-time {@link EgressGate} BEFORE the
+     * registration's catch-all, so a refusal is never downgraded to the single-topology warning. A file
+     * catalog / local path dials nothing. Hosts are read from the libpq-style {@code host=} / {@code hostaddr=}
+     * keys; a remote data path ({@code scheme://authority/...}) is gated on its authority.
+     */
+    static void gateEgress(String catalogUrl, String dataPath) {
+        EgressGate gate = EgressGate.current();
+        if (LakehouseCatalog.isShared(catalogUrl)) {
+            boolean any = false;
+            for (String tok : catalogUrl.trim().split("\s+")) {
+                int eq = tok.indexOf('=');
+                if (eq <= 0) continue;
+                String key = tok.substring(0, eq).toLowerCase(java.util.Locale.ROOT);
+                if (key.equals("host") || key.equals("hostaddr")) {
+                    gate.requireHostList(tok.substring(eq + 1), "DuckLake catalog");
+                    any = true;
+                }
+            }
+            if (!any) gate.require("localhost", 0, "DuckLake catalog");   // libpq default host: still a socket
+        }
+        if (dataPath != null) {
+            int at = dataPath.indexOf("://");
+            if (at > 0) {
+                String rest = dataPath.substring(at + 3);
+                int end = rest.indexOf('/');
+                String authority = end < 0 ? rest : rest.substring(0, end);
+                if (!authority.isBlank()) gate.requireHostList(authority, "DuckLake data path");
+            }
         }
     }
 

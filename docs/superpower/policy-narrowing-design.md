@@ -1,6 +1,6 @@
 # Safety Policy narrowing — design
 
-**Status: IN FLIGHT (2026-09-28). D1–D16 answered — every recommendation accepted (§8). S0 probes recorded (§6.1); S1 built (`SafetyPolicyTier`, `HostPattern`). S2a + S2b built (2026-10-03/04); S3 paths + S4 egress built (2026-10-04). S5–S7 open.**
+**Status: IN FLIGHT (2026-09-28). D1–D16 answered — every recommendation accepted (§8). S0 probes recorded (§6.1); S1 built (`SafetyPolicyTier`, `HostPattern`). S2a + S2b built (2026-10-03/04); S3 paths + S4 egress built (2026-10-04). S5 built bar the IndexBuilder opt-in. S6 (in flight elsewhere)–S7 open.**
 Row: `docs/BACKLOG.md` §3.8 `DUCKLE-C6-POLICY-NARROWING-1` (P3, adopted 2026-09-15 from duckle §1 C6 —
 `archived-documents/plans-archive/duckle-concepts-candidates.md` row C6). Owner concept once built:
 [`okf/backend/config/config-safety.md`](../okf/backend/config/config-safety.md).
@@ -410,6 +410,8 @@ needed `httpfs`, so no object-store opt-in exists; the one opt-in is `openInMemo
 ⚠ **Measured gotcha:** the `temp_directory` subtree is implicitly readable AND writable under the seal — the
 `null` spill default (all of `java.io.tmpdir`) let a sealed connection write any temp sibling, so it moved to
 `<tmpdir>/.duckdb_tmp`. Still owed: T9, T10 and the `DuckDbExtension` / DuckLake host gate.
+
+**S5 - DuckDB, third half (2026-10-04): extension + DuckLake gates; T9/T10.** `DuckDbExtension.load` reads the calling thread's `SafetyPolicy.effectiveTier()`: a name outside `allow.extensions` is refused for every mode, and the unstaged `INSTALL` fallback (the only network step) is refused when `permit.install_extensions` is false - a cached `LOAD` and the staged-file `LOAD` still work (T10, recording-proxy test: no `INSTALL` issued). `DuckLakeRegistrar.registerInto` calls `gateEgress` BEFORE its catch-all, so a refusal is never downgraded to the single-topology warning: a shared catalog's `host=`/`hostaddr=` (or the libpq default `localhost`) and a remote `scheme://authority` data path go through `EgressGate` (a file catalog / local path dials nothing). T9 needs no new code: every `sql_template` connection is sealed unconditionally (the first half above), so an `http://` read never reaches the network whatever `permit.network` says - there is no "permit.network true -> reads rows" twin by design. Tests: `DuckDbExtensionTest` (+4), `DuckLakeEgressGateTest` (3). **Deferred:** the `IndexBuilder` file-access opt-in (see BACKLOG `ENGINE-INMEMORY-UNSEALED-1`); `allowed_directories` alone (external access on) still unmeasured and unrelied on.
 
 ---
 

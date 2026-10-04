@@ -1,5 +1,7 @@
 package com.gamma.etl;
 
+import com.gamma.config.safety.SafetyPolicy;
+import com.gamma.config.safety.SafetyPolicyTier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,6 +77,11 @@ public final class DuckDbExtension {
     }
 
     private static void load(Connection conn, String name) throws SQLException {
+        // Safety Policy (policy-narrowing-design S5): allow.extensions bounds every load; install_extensions
+        // bounds the one network step below. The calling thread's pinned snapshot, as every act-time gate reads.
+        SafetyPolicyTier tier = SafetyPolicy.effectiveTier();
+        if (!tier.permitsExtension(name))
+            throw new SQLException("DuckDB extension '" + name + "' refused by the Safety Policy (allow.extensions)");
         String dir = System.getProperty(DIR_PROPERTY);
         if (dir != null && !dir.isBlank()) {
             Path file = Path.of(dir, name + ".duckdb_extension").toAbsolutePath();
@@ -90,6 +97,9 @@ public final class DuckDbExtension {
         try {
             execute(conn, "LOAD " + name);
         } catch (SQLException notCached) {
+            if (!tier.permitsInstallExtensions())
+                throw new SQLException("DuckDB extension '" + name + "' is not cached and the Safety Policy forbids "
+                        + "INSTALL (permit.install_extensions is false): " + notCached.getMessage(), notCached);
             try {
                 execute(conn, "INSTALL " + name);
                 execute(conn, "LOAD " + name);

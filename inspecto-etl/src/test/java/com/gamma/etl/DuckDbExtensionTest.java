@@ -213,4 +213,62 @@ class DuckDbExtensionTest {
                 "the failure must say what the caller needed it for: " + thrown.getMessage());
         assertTrue(thrown.getMessage().contains(DuckDbExtension.DIR_PROPERTY), thrown.getMessage());
     }
+
+    // ---- S5 / T10: the Safety Policy bounds INSTALL and the extension set ----------------------------
+
+    private static void withServerPolicy(Path dir, String toon, Runnable body) throws Exception {
+        Files.writeString(dir.resolve("safety-policy.toon"), toon);
+        String prev = System.getProperty("system.config.dir");
+        try {
+            System.setProperty("system.config.dir", dir.toString());
+            body.run();
+        } finally {
+            if (prev == null) System.clearProperty("system.config.dir");
+            else System.setProperty("system.config.dir", prev);
+        }
+    }
+
+    private static Predicate<String> firstLoadFails() {
+        int[] n = {0};
+        return sql -> sql.equals("LOAD ducklake") && n[0]++ == 0;
+    }
+
+    @Test
+    void installIsRefusedWhenThePolicyForbidsItAndNeverIssued(@TempDir Path dir) throws Exception {
+        Recorder rec = new Recorder(sql -> sql.equals("LOAD ducklake"));   // not cached
+        withServerPolicy(dir, "permit:\n  install_extensions: false\n", () ->
+                withExtensionDir(null, () -> {
+                    SQLException e = assertThrows(SQLException.class,
+                            () -> DuckDbExtension.ensureLoaded(rec.connection(), "ducklake", "t10"));
+                    assertTrue(e.getMessage().contains("permit.install_extensions"), e.getMessage());
+                }));
+        assertFalse(rec.issuedInstall(), "no INSTALL executed: " + rec.executed);
+    }
+
+    @Test
+    void theTwinWithInstallPermittedReachesInstall(@TempDir Path dir) throws Exception {
+        Recorder rec = new Recorder(firstLoadFails());
+        withServerPolicy(dir, "permit:\n  install_extensions: true\n", () ->
+                withExtensionDir(null, () -> assertTrue(DuckDbExtension.tryLoad(rec.connection(), "ducklake"))));
+        assertTrue(rec.issuedInstall(), rec.executed.toString());
+    }
+
+    @Test
+    void aCachedExtensionStillLoadsWhenInstallIsForbidden(@TempDir Path dir) throws Exception {
+        Recorder rec = new Recorder(sql -> false);   // cached: bare LOAD succeeds
+        withServerPolicy(dir, "permit:\n  install_extensions: false\n", () ->
+                withExtensionDir(null, () -> assertTrue(DuckDbExtension.tryLoad(rec.connection(), "ducklake"))));
+        assertEquals(List.of("LOAD ducklake"), rec.executed);
+    }
+
+    @Test
+    void anExtensionOutsideAllowExtensionsIsNeverLoaded(@TempDir Path dir) throws Exception {
+        Recorder rec = new Recorder(sql -> false);
+        withServerPolicy(dir, "allow:\n  extensions[1]: excel\n", () ->
+                withExtensionDir(null, () -> {
+                    assertFalse(DuckDbExtension.tryLoad(rec.connection(), "ducklake"));
+                    assertTrue(DuckDbExtension.tryLoad(rec.connection(), "excel"));   // twin
+                }));
+        assertEquals(List.of("LOAD excel"), rec.executed);
+    }
 }
