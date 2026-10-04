@@ -120,7 +120,7 @@
   1429/0/5 (+5 nav.handler; menu.service.spec rewritten around an in-memory server stand-in).
 * **Enrichment stage Preview** (BACKLOG §3 Onboarding — "Remaining: UI wiring"): the onboarding enrichment
   pane's new **Preview** button samples the stream's Stage-1 output via `GET /db/table?name=<normalizedName>`
-  (the decision-rule Simulate idiom) and posts it to `POST /enrichment/preview` (`ConfigService.previewEnrichment`);
+  (the decision-rule Simulate idiom) and posts it to `POST /enrichment/preview` (⚠ since superseded: `ConfigService.previewEnrichment` has no SPA caller now, kept deliberately — BACKLOG `API-DEAD-METHODS-1`);
   the `{columns,rows,truncated}` result renders in a shared `<inspecto-query-panel>`, a 422 surfaces inline,
   and a stream with no ingested data yet warns instead of calling the endpoint. `buildDraft()` extracted so
   save/preview share one validated draft. Read-only → every lens. Live-verified: Preview rendered 4 real rows.

@@ -173,7 +173,7 @@ export class GrammarEditorComponent implements AfterViewInit {
     @Input() lockType = false;
 
     /**
-     * Optional preview override. Onboarding parses BUILT-INS through `POST /config/preview/parsing`
+     * Optional preview override (e.g. onboarding, to route the parse elsewhere)
      * so the result feeds the sample thread and the Schema stage; without an override the editor uses
      * the stateless `POST /parsers/{id}/preview`, which is all a dialog needs.
      */

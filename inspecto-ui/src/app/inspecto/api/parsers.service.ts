@@ -31,7 +31,7 @@ export interface ParserDef {
  * The parser-plugin catalog + stateless grammar preview (v5.3.0) — the served, self-describing
  * side of the parsing experience: any parser deployed as a plugin appears here with its options
  * schema, no UI change needed. `preview` is the grammar-shaped sibling of
- * `ConfigService.previewParsing` (which stays the draft-true path for the four built-ins) and
+ * `ConfigService.previewParsing` (the draft-config sibling; it currently has no SPA caller, kept for a future pane) and
  * returns the same `ParserPreview` union — a flat table, or a record tree for hierarchical
  * formats (XML, ASN.1, …).
  */

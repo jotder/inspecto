@@ -57,7 +57,7 @@ indexed, catalog-visible, never executed; D3 of the design). Shipped P0–P3, 20
   fails on the sample (surfaces exactly the error a run would hit).
   **UI (2026-07-19):** the enrichment pane's **Preview** button (`enrichment-pane.component`) samples the
   stream's Stage-1 output via `GET /db/table?name=<normalizedName>&limit=200` (the decision-rule Simulate
-  idiom) and posts it as `sampleRows` (`ConfigService.previewEnrichment`); results render in a shared
+  idiom) and posts it as `sampleRows` to `POST /enrichment/preview` (⚠ today `ConfigService.previewEnrichment` has no SPA caller — kept for a future pane, BACKLOG `API-DEAD-METHODS-1`); results render in a shared
   `<inspecto-query-panel>`, a 422 surfaces as an inline alert, and a stream with no ingested data yet warns
   (the `/db/table` 404/empty path) instead of calling the endpoint. Read-only — available in every lens.
 
