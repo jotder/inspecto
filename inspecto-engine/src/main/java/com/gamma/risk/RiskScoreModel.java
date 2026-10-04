@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
  * entityType: subscriber            (subscriber · account · device · sim · dealer · channel · partner, or free-form)
  * highThreshold: 70                 (a score at or above this is "high")
  * (the scores Datasets are ALWAYS risk_scores_&lt;id&gt; and risk_scores_&lt;id&gt;_latest — not authorable)
+ * retainDays: 90                 (optional; prune history runs older than this — OR retainRuns: keep the newest N; OFF by default)
  * dataScope: fraud                  (optional; a data-scoped caller must hold it to read a score)
  * factors[n]:
  *   id: failed_topups
@@ -38,7 +39,8 @@ import java.util.regex.Pattern;
  * registry and runs at the route ({@link #referencedColumns}).
  */
 public record RiskScoreModel(String id, String entityType, double highThreshold, String scoresDataset,
-                             String dataScope, String description, List<Factor> factors, WatchList watchList) {
+                             String dataScope, String description, List<Factor> factors, WatchList watchList,
+                             Integer retainDays, Integer retainRuns) {
 
     /** The named entity types (D-P1). Anything else that is a plain token is accepted as free-form. */
     public static final List<String> ENTITY_TYPES =
@@ -56,7 +58,7 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
     /** The component envelope the store/route adds (name = id, owner, shares) — accepted, never scored. */
     public static final Set<String> ENVELOPE_KEYS = Set.of("name", "owner", "shares");
     private static final Set<String> MODEL_KEYS = Set.of("name", "owner", "shares", "id", "entityType",
-            "highThreshold", "dataScope", "description", "factors", "watchList");
+            "highThreshold", "dataScope", "description", "factors", "watchList", "retainDays", "retainRuns");
     private static final Set<String> FACTOR_KEYS = Set.of("id", "label", "dataset", "key", "measure",
             "filters", "weight", "cap", "evidence");
 
@@ -154,6 +156,8 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
         if (entityType == null || !SAFE_IDENT.matcher(entityType).matches())
             throw new IllegalArgumentException("risk-score.entityType is required and must be a plain token "
                     + "(one of " + ENTITY_TYPES + ", or a free-form name)");
+        if (m.get("retainDays") != null && m.get("retainRuns") != null)
+            throw new IllegalArgumentException("risk-score: set retainDays or retainRuns, not both");
         double high = number(m.get("highThreshold"), "risk-score.highThreshold");
         if (high <= 0 || high > 100)
             throw new IllegalArgumentException("risk-score.highThreshold must be in (0, 100], got " + high);
@@ -177,7 +181,17 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
             factors.add(f);
         }
         return new RiskScoreModel(id, entityType, high, scores, scope, Values.trimToNull(m.get("description")), factors,
-                watchList(m.get("watchList")));
+                watchList(m.get("watchList")), retain(m.get("retainDays"), "retainDays"),
+                retain(m.get("retainRuns"), "retainRuns"));
+    }
+
+    /** Optional history retention (a whole number >= 1); absent = keep every run. */
+    private static Integer retain(Object raw, String key) {
+        if (raw == null) return null;
+        double d = number(raw, "risk-score." + key);
+        if (d != Math.rint(d) || d < 1 || d > 100_000)
+            throw new IllegalArgumentException("risk-score." + key + " must be a whole number >= 1, got " + raw);
+        return (int) d;
     }
 
     private static WatchList watchList(Object raw) {

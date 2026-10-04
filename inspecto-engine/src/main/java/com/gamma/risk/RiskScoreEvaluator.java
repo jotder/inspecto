@@ -202,7 +202,35 @@ public final class RiskScoreEvaluator {
         }
         Files.move(histTmp, history.resolve("scores-" + stamp + ".parquet"), StandardCopyOption.ATOMIC_MOVE);
         swapIn(latest, latestTmp, "scores-" + stamp + ".parquet");
+        prune(history, model, scoredAt, "scores-" + stamp + ".parquet");
         return history;
+    }
+
+    /**
+     * Opt-in retention: delete whole older history run files ({@code retainDays} by file stamp, or all but the newest
+     * {@code retainRuns}). Never touches {@code _latest} or the run just written. A no-op unless the model opts in.
+     * ⚠ A pruned run's factors are no longer reproducible: that is the audit-vs-storage trade the operator chose.
+     */
+    static void prune(Path history, RiskScoreModel model, Instant now, String keep) throws IOException {
+        if (model.retainDays() == null && model.retainRuns() == null) return;
+        java.util.List<Path> runs = new java.util.ArrayList<>();
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(history, "scores-*.parquet")) {
+            for (Path p : ds) runs.add(p);
+        }
+        runs.sort(java.util.Comparator.comparingLong(RiskScoreEvaluator::stampOf));
+        long cutoff = model.retainDays() == null ? Long.MIN_VALUE
+                : now.minus(java.time.Duration.ofDays(model.retainDays())).toEpochMilli();
+        int excess = model.retainRuns() == null ? 0 : Math.max(0, runs.size() - model.retainRuns());
+        for (int i = 0; i < runs.size(); i++) {
+            Path p = runs.get(i);
+            if (p.getFileName().toString().equals(keep)) continue;
+            if (model.retainDays() != null ? stampOf(p) < cutoff : i < excess) Files.deleteIfExists(p);
+        }
+    }
+
+    private static long stampOf(Path p) {
+        String n = p.getFileName().toString().substring("scores-".length());
+        try { return Long.parseLong(n.substring(0, n.indexOf('-'))); } catch (RuntimeException e) { return Long.MAX_VALUE; }
     }
 
     /** Whether {@code dir} is a scores directory THIS model created (its marker names the model). */

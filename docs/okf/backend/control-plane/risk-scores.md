@@ -209,9 +209,15 @@ renders it as a required autocomplete over the saved models (`riskScoreModelOpti
 - ✅ **The watch Entity List is fed (2026-09-28).** An optional `watchList: {list, ttlHours}` (1..24) adds every
   high entity to a `watch` Entity List after each run, expiring `ttlHours` later. It fails closed at save and at
   run. See [Entity Lists — assurance entries](entity-lists.md#the-risk-score-watch-list-feed).
-- **Entity-key masking is D-P8** (deferred). The key is raw on every surface.
+- **Entity-key masking is D-P8** (deferred; blocked on that decision). The key is raw on every surface.
 - There is no authoring pane: models are written through `/components/risk-score`.
 - An indicator is a Measure. There is no free-form arithmetic expression, and no reference to a saved
   Measure component, because none exists.
-- The history Dataset grows by one file per run. No retention is applied yet.
+- ✅ **Opt-in history retention (2026-10-04).** Optional model key `retainDays` or `retainRuns` (whole number
+  >= 1; not both; fail closed at save). OFF by default: with neither set, every run is kept. After each write the
+  Job deletes whole older run files from `risk_scores_<id>` (by the file's run timestamp, or all but the newest N)
+  and never touches `_latest` or the run just written (`RiskScoreEvaluator.prune`).
+  ⚠ **Audit vs storage.** A pruned run's factors are gone, so that score is no longer reproducible. That loss
+  happens only when the operator opts in, and the default is to keep everything.
+- A row written before a column was classified stays raw: **by design, won't fix** (history is never rewritten).
 - Tracked as P3 `ASSURE-RISK-SCORE-RESIDUALS-1`.
