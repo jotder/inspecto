@@ -53,24 +53,42 @@ public final class SafetyPolicyFiles {
      * them (D3/D4: the operator's declared roots plus the Space's own base).
      */
     public static SafetyPolicyTier effective(Path serverDir, Path spaceBase, String spaceId, List<Path> defaultRoots) {
+        return tiers(serverDir, spaceBase, spaceId, defaultRoots).effective();
+    }
+
+    /**
+     * What {@link #effective} folded, kept apart so the policy can be explained (S7): the server file's tier
+     * as stated (before {@code defaultRoots} stand in), the Space file's tier as stated, and the fold.
+     * {@code serverFile}/{@code spaceFile} are the paths consulted (null when no directory/base was given);
+     * {@code *Present} says whether the file exists.
+     */
+    public record Tiers(Path serverFile, boolean serverPresent, SafetyPolicyTier server,
+                        Path spaceFile, boolean spacePresent, SafetyPolicyTier space, SafetyPolicyTier effective) {}
+
+    /** {@link #effective} with its inputs: the same strict loading, the same refusals. */
+    public static Tiers tiers(Path serverDir, Path spaceBase, String spaceId, List<Path> defaultRoots) {
         Loaded server = new Loaded(SafetyPolicyTier.NONE, Set.of());
-        if (serverDir != null) {
-            Loaded l = load(serverDir.resolve(FILE), false);
-            if (l != null) server = l;
+        Path serverFile = serverDir == null ? null : serverDir.resolve(FILE);
+        boolean serverPresent = false;
+        if (serverFile != null) {
+            Loaded l = load(serverFile, false);
+            if (l != null) { server = l; serverPresent = true; }
         }
         SafetyPolicyTier st = server.tier();
         if (st.allowRoots() == null) st = withAllowRoots(st, defaultRoots);
 
         SafetyPolicyTier space = SafetyPolicyTier.NONE;
-        if (spaceBase != null) {
-            Path file = spaceBase.resolve("config").resolve(FILE);
-            Loaded l = load(file, true);
-            if (l != null) space = l.tier();
+        Path spaceFile = spaceBase == null ? null : spaceBase.resolve("config").resolve(FILE);
+        boolean spacePresent = false;
+        if (spaceFile != null) {
+            Loaded l = load(spaceFile, true);
+            if (l != null) { space = l.tier(); spacePresent = true; }
             else if (spaceId != null && server.requiredSpaces().contains(spaceId))
-                throw new SafetyPolicyUnreadableException(file.toString(),
+                throw new SafetyPolicyUnreadableException(spaceFile.toString(),
                         "the server Safety Policy requires a policy file for Space '" + spaceId + "' and there is none", null);
         }
-        return SafetyPolicyTier.fold(st, space);
+        return new Tiers(serverFile, serverPresent, server.tier(), spaceFile, spacePresent, space,
+                SafetyPolicyTier.fold(st, space));
     }
 
     /** Loads one file; {@code null} when it does not exist, throws when it exists and is not a valid policy. */

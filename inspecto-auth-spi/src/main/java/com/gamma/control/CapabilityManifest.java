@@ -270,6 +270,8 @@ final class CapabilityManifest {
             new Entry("PUT", "/settings/approval", Roles.CAN_ADMINISTER),
             // EgressRoutes (ASSURE-ACTION-REQUESTS-1) — widening where an Action Request may reach is administration.
             new Entry("PUT", "/settings/egress", Roles.CAN_ADMINISTER),
+            // SafetyPolicyRoutes (DUCKLE-C6-POLICY-NARROWING-1 S7) - the effective policy names roots and hosts: administration.
+            new Entry("GET", "/settings/safety-policy", Roles.CAN_ADMINISTER),
             // PublicationDestinationRoutes (ASSURE-BI-PUBLICATION-1) — where Datasets may be published is administration.
             new Entry("PUT", "/settings/publication-destinations", Roles.CAN_ADMINISTER),
             // MailAttachmentRoutes (ASSURE-XLSX-ATTACHMENTS-1) — widening where attachments may be mailed is administration.

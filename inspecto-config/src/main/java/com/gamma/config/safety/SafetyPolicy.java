@@ -173,14 +173,21 @@ public record SafetyPolicy(
     }
 
     private static SafetyPolicyTier tierForSpace(String spaceId) {
+        return tiersForSpace(spaceId).effective();
+    }
+
+    /**
+     * The server and Space tiers a Space's effective policy folds, with the files consulted - the input of the
+     * explain route (S7). Same loading and refusals as {@link #forSpace}: throws when a file is unreadable.
+     */
+    public static SafetyPolicyFiles.Tiers tiersForSpace(String spaceId) {
         List<Path> roots = baseRoots(spaceId);
         Path base = DiscoveredRoots.baseOf(spaceId).orElse(null);
         // Safety Policy tiers (policy-narrowing-design S2): the server + Space files can only NARROW these
         // defaults; an unreadable file throws SafetyPolicyUnreadableException instead of reading as "none".
         String serverDir = System.getProperty("system.config.dir");
-        SafetyPolicyTier t = SafetyPolicyFiles.effective(
+        return SafetyPolicyFiles.tiers(
                 serverDir == null || serverDir.isBlank() ? null : Paths.get(serverDir.trim()), base, spaceId, roots);
-        return t;
     }
 
     private static SafetyPolicy toPolicy(SafetyPolicyTier t) {

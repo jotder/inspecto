@@ -575,7 +575,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 new QueryRoutes(), new DatasetRoutes(), new SpaceComparisonRoutes(), new BiRoutes(), new KpiRoutes(), new DbBrowserRoutes(), new ReconRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b)
                 new ExpectationRoutes(), new RequirementRoutes(),
                 new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new RiskScoreRoutes(), new AcquisitionRoutes(), new StreamPushRoutes(),
-                new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new PendingChangeRoutes(), new ActionRequestRoutes(), new EgressRoutes(), new PublicationDestinationRoutes(), new MailAttachmentRoutes(), new NavRoutes(), new AccessRoutes(),
+                new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new PendingChangeRoutes(), new ActionRequestRoutes(), new EgressRoutes(), new SafetyPolicyRoutes(), new PublicationDestinationRoutes(), new MailAttachmentRoutes(), new NavRoutes(), new AccessRoutes(),
                 new AuditLogRoutes(),   // the audit projection stays CORE though the /events feed is gated (EDG-01 cell 6)
                 new AssistRoutes(), new AgentRoutes(), new SystemRoutes(), new SchedulerRoutes()))
             module.register(this);
