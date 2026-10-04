@@ -188,9 +188,9 @@ class ControlApiInvestigationsTest {
             data(post(c.port, "/inv/investigations", CREATE));
             String ops = "/inv/investigations/case-a/ops";
             assertEquals(422, post(c.port, ops, "{\"op\":\"expand\"}").statusCode(), "nothing to expand yet");
-            HttpResponse<String> deferred = post(c.port, ops, "{\"op\":\"threshold\"}");
-            assertEquals(422, deferred.statusCode());
-            assertTrue(deferred.body().contains("not implemented yet"), deferred.body());
+            HttpResponse<String> bandless = post(c.port, ops, "{\"op\":\"threshold\"}");
+            assertEquals(422, bandless.statusCode());
+            assertTrue(bandless.body().contains("'min' and/or 'max'"), bandless.body());
             HttpResponse<String> unknown = post(c.port, ops, "{\"op\":\"sql\",\"ids\":[\"x\"]}");
             assertEquals(422, unknown.statusCode());
             assertTrue(unknown.body().contains("closed op vocabulary"), unknown.body());
@@ -203,6 +203,49 @@ class ControlApiInvestigationsTest {
             assertEquals(422, post(c.port, ops, "{\"op\":\"expand\",\"ids\":[\"zed\"]}").statusCode());
             assertEquals(1, Files.readAllLines(invDir(root, "case-a").resolve("log.jsonl")).size(),
                     "no refused op reached the log");
+        }
+    }
+
+    // ── threshold + snapshot (LA-INVESTIGATION-OPS-DEFERRED-1) ─────────────────────────────────────────
+
+    /** The degree band: min inclusive, max exclusive; keep protects; a removed entity is not re-admitted; undo restores. */
+    @Test
+    void thresholdKeepsTheDegreeBandAndSnapshotMovesNothing(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            data(post(c.port, "/inv/investigations", CREATE));
+            for (String s : List.of("{\"op\":\"seed\",\"ids\":[\"alice\"]}", "{\"op\":\"expand\"}", "{\"op\":\"expand\"}"))
+                op(c, "case-a", s);   // degrees: alice 2, bob 3, carol 2, dave 1, erin 1, frank 1
+            String ops = "/inv/investigations/case-a/ops";
+            assertEquals(422, post(c.port, ops, "{\"op\":\"threshold\",\"min\":3,\"max\":3}").statusCode(), "an empty band");
+            assertEquals(422, post(c.port, ops, "{\"op\":\"threshold\",\"min\":-1}").statusCode());
+            assertEquals(422, post(c.port, ops, "{\"op\":\"threshold\",\"min\":\"2\"}").statusCode());
+            assertEquals(422, post(c.port, ops, "{\"op\":\"threshold\",\"min\":2,\"ids\":[\"bob\"]}").statusCode());
+
+            op(c, "case-a", "{\"op\":\"keep\",\"ids\":[\"dave\"]}");
+            JsonNode cut = op(c, "case-a", "{\"op\":\"threshold\",\"min\":2,\"max\":3}");
+            assertEquals(List.of("bob", "erin", "frank"), texts(cut.at("/delta/removed")), "bob (3) is OUT: max is exclusive; dave is kept");
+            JsonNode ws = replay(c, "case-a", "{}").get("workingSet");
+            assertEquals(Set.of("alice", "carol", "dave"), entityIds(ws));
+            assertTrue(ws.toString().contains("threshold: degree outside [2, 3)"), "the exclusion names its band");
+
+            JsonNode snap = op(c, "case-a", "{\"op\":\"snapshot\",\"label\":\"before widening\"}");
+            assertEquals(0, snap.at("/delta/removed").size());
+            assertEquals(0, snap.at("/delta/admitted").size());
+            JsonNode again = op(c, "case-a", "{\"op\":\"expand\"}");
+            assertFalse(texts(again.at("/delta/admitted")).contains("bob"), "a threshold-removed entity is not re-admitted");
+
+            JsonNode log = data(send(c.port, "GET", "/inv/investigations/case-a/log", null, null));
+            String text = log.toString();
+            assertTrue(text.contains("outside [2, 3)"), text);
+            assertTrue(text.contains("Froze the Working Set here as \\\"before widening\\\""), text);
+            JsonNode rep = replay(c, "case-a", "{}");
+            assertTrue(rep.get("equivalent").asBoolean(), "replay reproduces every recorded hash");
+
+            data(post(c.port, "/inv/investigations/case-a/undo", "{}"));   // undoes the expand
+            data(post(c.port, "/inv/investigations/case-a/undo", "{}"));   // undoes the snapshot
+            data(post(c.port, "/inv/investigations/case-a/undo", "{}"));   // undoes the threshold
+            Set<String> restored = entityIds(replay(c, "case-a", "{}").get("workingSet"));
+            assertEquals(Set.of("alice", "bob", "carol", "dave", "erin", "frank"), restored);
         }
     }
 

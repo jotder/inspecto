@@ -700,9 +700,8 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   compared as epoch ms; a `slot` (`22:00–04:00` crosses midnight; start inclusive, end exclusive) and a `days`
   mask need an explicit IANA `timezone` and test the local day the EVENT fell on. `window` re-filters nothing
   already admitted — earlier sealed reads are evidence as made. Templates carry the whole rung; a `window`
-  becomes a parameter (`kind: "window"`) whose default is the authored window. ⏳ `threshold`, `annotate`,
-  `snapshot`, calendar exclusions, comparison mode and time-respecting paths remain
-  deferred. **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
+  becomes a parameter (`kind: "window"`) whose default is the authored window. ⏳ Calendar exclusions, comparison
+  mode and time-respecting paths remain deferred (`threshold` and `snapshot` shipped 2026-10-04, below). **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
   settings* (`investigation-expand-rung.component`) sends `budget` (1–20 000; the server CLAMPS above, so the SPA
   refuses) · `direction` · rung `window` (`inherit`/`full` only — no override object) · `minEvents` ·
   `minDistinctDays` · `candidateDegreeMin/Max` (min ≤ max) · `maxFanOut`, only the fields set (blank = server
@@ -1473,8 +1472,19 @@ entry**: `seed` · `seedBy` · `expand` · `exclude` · `excludeBy` · `keep` ·
 `annotate` · `snapshot`; reasons: the backend is safe because it is narrow (`SAFE_IDENT` + bind parameters), a
 closed set renders mechanically as numbered plain-language steps for a court, and every open query language
 converges on SQL. As built, `undo` is a recorded log edit and **not** a twelfth op; `resolve` (LA-17) was added
-under its own decision (design `D-M…`) to seal identity groups. `threshold` and `snapshot` still answer 422 *"not implemented yet"* (`InvestigationRoutes.DEFERRED`),
-never *"unknown"*. The log is **ordered and non-commutative** (`exclude → expand` ≠ `expand → exclude`;
+under its own decision (design `D-M…`) to seal identity groups. All eleven are now evaluable (`InvestigationRoutes.DEFERRED` is gone; an op outside the vocabulary answers 422 *"unknown"*).
+**`threshold {min?, max?}` and `snapshot {label?}` (2026-10-04, `LA-INVESTIGATION-OPS-DEFERRED-1`) — the NARROWEST reading
+of plan §2.2** (the plan row says only "measure, min, max, evaluation scope" / "freezes the Working Set as an Artifact"):
+`threshold`'s measure is an entity's **degree** (distinct counterparties among the Working Set's links at that step;
+hidden still counts, self-loops don't), its scope is the whole Working Set, the band is `min` inclusive / `max`
+exclusive (at least one required, `min < max`, no `ids`); everything outside is excluded exactly as `exclude` (keep
+protects, reason `threshold: degree outside [min, max)`, never re-admitted by a later expand), measured ONCE so it
+does not cascade. `snapshot` is a **marker**: it moves nothing and writes no file — the artifact is the log position
+(every entry already carries the Working Set hash). Both ride `POST /inv/investigations/{id}/ops`, so the gates are
+the existing `canManageIncidents` route, openapi entry and manifest row — no new route; templates carry both verbatim.
+⏳ Open questions: does a `snapshot` step also seal a `/inv/snapshots` Artifact (the SPA's snapshot dialog does,
+client-side)? are other measures (weighted degree, event count) wanted for `threshold`? should it be re-evaluable
+(not exclusion)? — filed in the BACKLOG row. The log is **ordered and non-commutative** (`exclude → expand` ≠ `expand → exclude`;
 re-ordering forks, D-E4); **`hide` ≠ `exclude` ≠ `keep`** (hide: gone from display, still traversed and counted;
 exclude: gone from all three, still inspectable as the `excluded` relation; keep: protected from later
 excludes). Two evaluators, one spec — incremental on append, full replay from the sealed log — with an
