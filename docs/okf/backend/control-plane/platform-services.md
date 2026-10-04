@@ -304,7 +304,7 @@ Row 15 is discharged there. S2-5 shipped 2026-10-04: a pack kind is spelled by t
 `RecipeCompiler` compiles it to `transform.<kind>` and `RecipeConverter` projects it back; a built-in, unloaded or
 kind-less step is refused) and stays out of `ProcessorCatalog` (D-6). ⚠ It also fixed two latent save-path defects:
 `PipelineEditable.lower` gated on the closed `LOWERABLE` set, and `isLegacyShaped` NPE'd on a contributed kind, so a
-contributed step could not be saved at all before. S3-1 (pack-contributed services, §7d) shipped 2026-10-04; S3-2 and S3-3 remain. The open items
+contributed step could not be saved at all before. S3-1, S3-2 and S3-3 (pack-contributed services and `DatasetAccess`, §7d/§7e) shipped 2026-10-04. The open items
 live in [`BACKLOG.md`](../../../BACKLOG.md) §4 under *Platform Services*. A Job-side watchdog is still a
 recorded gap; the Step watchdog is §7c.
 
@@ -329,6 +329,17 @@ recorded gap; the Step watchdog is §7c.
   (`PlatformServiceRegistry.disable/enable`, no route). A disabled id's `grant` throws naming it; `has()` stays true;
   running grants finish; not persisted (a restart re-enables). ⚠ A loaded pack Step's grant is a load-time snapshot,
   so a disable reaches later Job Runs, not an already-loaded Step.
+
+### 7e. `datasets` — `DatasetAccess` (S3-3, 2026-10-04)
+
+- **D-10 (operator): inherit `ConsignmentSelector` as-is.** `com.gamma.query.DatasetAccess`, service id `datasets`,
+  `read(spaceId, datasetId)` -> `Read(datasetId, relationSql, Optional<files>)`. The relation and file list come from
+  `DatasetRelation`, so unreadable files are pruned and the list is pinned per call. No held snapshot handle yet:
+  each read pins afresh. A view-backed Dataset reports no files ('cannot know').
+- **Read-only, per-Space, fail closed:** bound to one Space; another Space or an unknown Dataset throws naming the
+  ids, never an empty result. A Job's authority is its `requires: [datasets]` grant (no Subject at fire time).
+- Engine-published (D-12), `readOnly()` when pack-contributed (no stand-in); disable refuses the grant.
+  Design as-built: `superpower/platform-services-stage2-design.md` §5.6.
 
 Related: [Job vs Pipeline Step](job-vs-step.md) · [Jobs & Scheduling](jobs.md) ·
 [Signal backbone](signal-backbone.md) · [API stability policy](api-stability.md) ·

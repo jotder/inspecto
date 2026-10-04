@@ -2,7 +2,7 @@
 
 **Row:** `BACKLOG.md` §3.2 *Platform Services Stage 2 / 3* (P2).
 **Owner concept:** [`okf/backend/control-plane/platform-services.md`](../okf/backend/control-plane/platform-services.md).
-**Status:** written 2026-09-24. **All 10 decisions in §7 decided 2026-09-28 (operator: every recommendation accepted; D-10 deferred).** S2-0 ✅ shipped (`6edebc398`, 2026-09-24); S2-1 ✅ shipped 2026-09-28; S2-2 ✅ measured 2026-09-28 (§5.2); S2-3 ✅ built 2026-09-28 (§5.3); S2-4, S2-5 and Stage 3 are still in flight — this doc stays the plan for them.
+**Status:** written 2026-09-24. **All 10 decisions in §7 decided 2026-09-28 (operator: every recommendation accepted; D-10 decided 2026-10-04, option 1).** S2-0 ✅ shipped (`6edebc398`, 2026-09-24); S2-1 ✅ shipped 2026-09-28; S2-2 ✅ measured 2026-09-28 (§5.2); S2-3 ✅ built 2026-09-28 (§5.3); S2-4 closed (D-11), S2-5 and S3-1..S3-3 shipped 2026-10-04 (§5.4, §5.5, §5.6) — this doc stays the plan for them.
 **Scope fence:** new Step Processors are ⛔ **ON HOLD** (operator, 2026-09-23). This document designs the
 *registry and SPI* a Step kind is contributed through. It adds no processor to the catalog; the only Step
 it builds is a test-scope no-op for the S2-2 spike.
@@ -191,7 +191,7 @@ Each slice is independently green; unit tests per change (`-pl inspecto-engine -
 | **S2-5** | Recipe spelling for a contributed kind (D-5) and catalog visibility (D-6) | `RecipeCompilerTest` round trip; contract JSONs regenerated in the same change |
 | **S3-1** ✅ 2026-10-04 (§5.4) | `ServiceProvider` via packs; overlay registry; collision rejects the pack; mandatory dry-run stand-in; `new service` unlocked | a service from pack A consumed by a Job in pack B; a colliding pack rejected whole with nothing left registered; a dry run of a Job using a contributed mutating service records, does not act |
 | **S3-2** ✅ 2026-10-04 (§5.5) | Reference-tracked quiesce + enable/disable | unload while a granted Run is in flight defers until drain; disable refuses new grants, running grants finish |
-| **S3-3** | `DatasetAccess` (read side first) | gated on D-10 |
+| **S3-3** ✅ 2026-10-04 (§5.6) | `DatasetAccess` (read side first), read-only, per-Space, file-pinned via `ConsignmentSelector` | a pack Job reads a Dataset in its own Space as a pinned, pruned list; a foreign Space, an unknown Dataset and an ungranted consumer are refused naming the id; disable refuses the grant |
 
 ### 5.1 S2-2 — the bridge spike, specified
 
@@ -338,6 +338,26 @@ As-built facts are in the owner concept, [`platform-services.md`](../okf/backend
    grant finishes, enable restores, fresh registry re-enables) and `StepRunnerTest`
    `aWalkPinsTheProviderPacksOfAStepsGrantedServicesForItsDuration` (the walk-pin wiring).
 
+### 5.6 S3-3 — as built (2026-10-04)
+
+1. **D-10 = option 1:** inherit `ConsignmentSelector`'s pruning and per-call pinning as-is. No held snapshot handle
+   (a later slice: each `read` pins afresh, so two reads in one Run may see different lists).
+2. **Built:** `com.gamma.query.DatasetAccess` (`@PublicApi`), Platform Service id `datasets`: `read(spaceId, datasetId)`
+   returns `Read(datasetId, relationSql, Optional<files>)`. The implementation (`DatasetAccess.over`) goes through
+   `DatasetRelation.relationSql` / `inputFiles`, which call `ConsignmentSelector`: files the catalog marks unreadable are
+   pruned and the list is pinned. A view-backed Dataset has no enumerable files, so `files` is empty ('cannot know').
+   Bound per Space in `CollectorService` beside the other built-ins.
+3. **Gate, fail closed:** a Space other than the bound one, or an unknown Dataset, throws `IllegalStateException`
+   naming both ids. A Job has no Subject at fire time, so its authority is the `requires: [datasets]` grant itself: a
+   consumer without it gets the existing "Platform Service not granted: DatasetAccess" refusal. READ-ONLY, no write path.
+4. **S3-1/S3-2 rules:** the interface is engine-published (D-12). It is built-in-bound in the host, but a pack may
+   also contribute it through `ServiceProvider` on a build that does not bind it, declaring `readOnly()` (no stand-in;
+   a dry run passes it through). Disable refuses the grant. Pinning follows the owner of the binding.
+5. **Tests:** `DatasetAccessTest` (own-Space pinned + pruned read, post-read file invisible, foreign Space, unknown
+   Dataset, ungranted consumer, disable; mutation-checked by deleting the Space check) and
+   `JobPackManagerTest.aPackContributedReadOnlyDatasetAccessNeedsNoStandInAndHonoursDisable`.
+6. **Deferred:** the held snapshot handle; any write side; a Subject-level capability check (needs a Run Subject).
+
 ## 6. Deliberately not designed here
 
 New Step Processors (on hold) · fan-in for contributed Steps (`RowShaper.merge` stays built-in-only) ·
@@ -389,4 +409,4 @@ The operator accepted every recommendation below on 2026-09-28. Each entry keeps
     **✅ Decided 2026-10-04 (operator): option 1.** Option 2 is recorded as a later design only.
 10. **D-10 — Is the `DatasetAccess` gate met?** `ConsignmentSelector` exists; confirm its pruning and
     generation pinning are the ones `DatasetAccess` should inherit before S3-3 is sized.
-    **⏸ Deferred 2026-09-28 (operator):** gates S3-3 only; nothing else waits on it.
+    **✅ Decided 2026-10-04 (operator): option 1 — yes, inherit as-is.** `DatasetAccess` reads through `ConsignmentSelector`: it prunes unreadable files and pins the file list per call. NO held snapshot handle in S3-3 (a later slice). Access is READ-ONLY and per-Space. (Previously deferred 2026-09-28; the design offered no recommendation, the operator chose.)

@@ -428,6 +428,20 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         platformServices.register("consignment-status",
                 com.gamma.consignment.ConsignmentStatusAccess.class,
                 com.gamma.consignment.ConsignmentStatusAccess.over(this::loadedPipelines));
+        // S3-3: read-only Dataset access, bound to THIS Space (a foreign Space or unknown Dataset is refused).
+        platformServices.register("datasets", com.gamma.query.DatasetAccess.class,
+                com.gamma.query.DatasetAccess.over(spaceId,
+                        id -> {
+                            try {
+                                return root.config() == null ? java.util.Optional.empty()
+                                        : new com.gamma.pipeline.ComponentStore(root.config().resolve("registry"))
+                                                .get("dataset", id)
+                                                .map(com.gamma.pipeline.ComponentRegistry.Component::content);
+                            } catch (RuntimeException bad) { return java.util.Optional.empty(); }
+                        },
+                        this::dataRoot,
+                        () -> new com.gamma.pipeline.ViewStore(root.config() == null
+                                ? java.nio.file.Path.of("views") : root.config().resolve("views"))));
         // D7: the evaluator the alert.evaluate built-in used to receive by injection. Bound through the
         // accessor, so it resolves the engine at call time rather than capturing a not-yet-assigned field.
         platformServices.register("alerts", com.gamma.alert.AlertAccess.class,

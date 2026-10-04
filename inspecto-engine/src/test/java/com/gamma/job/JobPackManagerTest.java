@@ -892,6 +892,50 @@ class JobPackManagerTest {
         }
     }
 
+    /** S3-3: a pack may contribute the read-only {@code datasets} service; readOnly() needs no stand-in, and a
+     *  dry run hands the real one through unchanged; disable() refuses the grant. */
+    @Test
+    void aPackContributedReadOnlyDatasetAccessNeedsNoStandInAndHonoursDisable(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        String src = """
+                package com.acme.pack;
+                import com.gamma.job.ServiceProvider;
+                import com.gamma.query.DatasetAccess;
+                public class DsSvc implements ServiceProvider {
+                    public String id() { return "datasets"; }
+                    public Class<?> type() { return DatasetAccess.class; }
+                    public boolean readOnly() { return true; }
+                    public Object create() {
+                        return (DatasetAccess) (space, id) ->
+                                new DatasetAccess.Read(id, "SELECT 1", java.util.Optional.of(java.util.List.of("a.parquet")));
+                    }
+                }
+                """;
+        Path classes = compile(work, "com/acme/pack/DsSvc.java", src);
+        writeJar(packsDir.resolve("ds.jar"), classes, "acme-ds", "1.0.0",
+                Map.of("com.gamma.job.ServiceProvider", "com.acme.pack.DsSvc"));
+        PlatformServiceRegistry platform = new PlatformServiceRegistry();
+        trustEveryJarIn(packsDir);
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(platform),
+                ExpressionRegistry.withBuiltins(), new Sink())) {
+            mgr.scanAtStartup();
+            assertTrue(platform.has("datasets"), String.valueOf(mgr.inventory()));
+            RunLog quiet = new RunLog() {
+                @Override public void info(String m, Object... kv) {}
+                @Override public void warn(String m, Object... kv) {}
+                @Override public void error(String m, Throwable t, Object... kv) {}
+            };
+            PlatformServices dry = DryRunServices.wrap(platform.grant(Set.of("datasets")), quiet);
+            assertEquals(List.of("a.parquet"), dry.get(com.gamma.query.DatasetAccess.class)
+                    .read("s", "d").files().orElseThrow(), "read-only: a dry run reads for real");
+            platform.disable("datasets");
+            assertThrows(IllegalStateException.class, () -> platform.grant(Set.of("datasets")));
+        } finally {
+            clearTrust();
+        }
+    }
+
     @Test
     void unloadingAServiceProviderDefersItsCloseWhileAGrantedRunIsInFlight(@TempDir Path work) throws Exception {
         assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
