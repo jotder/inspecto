@@ -31,6 +31,7 @@ class JobWritersTest {
             Map.entry("POST /tags/rules", FIXED + " (tag rule)"),
             Map.entry("POST /cases/rules", FIXED + " (case rule)"),
             Map.entry("POST /connections", FIXED + " (connection)"),
+            Map.entry("PUT /settings/approvers", FIXED + " (the Space approver roster, approvers.toon; operator-approved 2026-10-04)"),
             Map.entry("PUT /connections/([^/]+)", FIXED + " (connection)"),
             Map.entry("POST /notifications/channels", FIXED + " (channel)"),
             Map.entry("PUT /notifications/channels/([^/]+)", FIXED + " (channel)"),
