@@ -13,7 +13,8 @@ import static com.gamma.util.Values.blankToNull;
  * {@code metadata_validate} maintenance task and the bundle-import pre-check. Rules are grounded in
  * the reference component shapes the demo space ships — never guessed: a widget's
  * {@code datasetId}/{@code queryId} must name an existing Dataset/Query; a dashboard tile's
- * {@code widgetId} must name an existing Widget; two components of one type must not be
+ * {@code widgetId} must name an existing Widget; a Link Analysis / Geo Map view's
+ * {@code query.projection.datasetId} must name an existing Dataset; two components of one type must not be
  * content-identical apart from {@code name}. Extend here as further kinds declare their reference
  * keys. Pure functions over an in-memory universe — no I/O, so callers decide what the universe is
  * (the live registry, or registry ∪ an incoming bundle).
@@ -44,6 +45,15 @@ public final class ComponentIntegrity {
                 String widgetId = blankToNull(tile.get("widgetId"));
                 if (widgetId != null && !widgets.contains(widgetId))
                     findings.add("broken reference: dashboard '" + d.name() + "' tile → missing widget '" + widgetId + "'");
+            }
+        }
+        // A Link Analysis / Geo Map view projects one Dataset, named at `query.projection.datasetId`.
+        for (String type : List.of("link-analysis-view", "geo-map-view")) {
+            for (ComponentRegistry.Component v : byType.getOrDefault(type, List.of())) {
+                if (!(v.content().get("query") instanceof Map<?, ?> q) || !(q.get("projection") instanceof Map<?, ?> p)) continue;
+                String datasetId = blankToNull(p.get("datasetId"));
+                if (datasetId != null && !datasets.contains(datasetId))
+                    findings.add("broken reference: " + type + " '" + v.name() + "' → missing dataset '" + datasetId + "'");
             }
         }
         // A reconciliation compares Datasets — every side (v2 `datasets` list, or v1 left/right) must exist.

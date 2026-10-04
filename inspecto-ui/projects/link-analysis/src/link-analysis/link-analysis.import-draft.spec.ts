@@ -28,15 +28,16 @@ const INCOMING = {
 const STORED = { name: 'Fraud ring', sourceId: 'entity-projection', query: QUERY, layout: 'dagre' };
 const GRAPH: G6GraphData = { nodes: [{ id: 'a', data: { label: 'A', kind: 'entity' } }], edges: [] };
 
-function draft(targetExists: boolean): ImportDraft {
+const FINDING = "broken reference: link-analysis-view 'fraud-ring' → missing dataset 'ghost_ds'";
+
+function draft(targetExists: boolean, integrity: string[] | null = []): ImportDraft {
     return {
         kind: 'link-analysis-view',
         id: 'fraud-ring',
         content: INCOMING,
         sourceSpace: 'staging',
         targetExists,
-        // The preview judges no link-analysis-view references, so its list is always [] for this kind.
-        integrity: [],
+        integrity,
         prerequisites: [],
     };
 }
@@ -116,17 +117,19 @@ describe('LinkAnalysisComponent — Import as draft', () => {
         expect(menu.importDraft()).toBe(true);
     });
 
-    it('adopts a NEW-id draft unsaved (refs "not checked"), then Save is one POST through the pane', async () => {
+    it('adopts a NEW-id draft unsaved (its preview findings shown), then Save is one POST through the pane', async () => {
         const { fixture, c, http, queried, release } = create();
         flushReads(http);
-        const adopted = c.onDraftImported(draft(false));
+        const adopted = c.onDraftImported(draft(false, [FINDING]));
         flushReads(http);
         fixture.detectChanges();
 
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain('Imported draft from staging — not saved');
-        // An always-empty list must not read as clean: this kind's references are not judged by the preview.
-        expect(text).toContain('References not checked');
+        // The preview now judges this kind's Dataset reference: its findings reach the banner as-is.
+        expect(text).toContain('Broken references this draft would introduce');
+        expect(text).toContain(FINDING);
+        expect(text).not.toContain('References not checked');
         await expectNoA11yViolations(fixture.nativeElement);
         release();
         await adopted;
@@ -178,6 +181,17 @@ describe('LinkAnalysisComponent — Import as draft', () => {
         put.flush({}, { status: 409, statusText: 'Conflict' });
         await saved;
         expect(c.importDraft()?.id).toBe('fraud-ring');
+    });
+
+    it('an unreadable preview (null) still says "not checked", never clean', async () => {
+        const { fixture, c, http, release } = create();
+        flushReads(http);
+        const adopted = c.onDraftImported(draft(false, null));
+        flushReads(http);
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('References not checked');
+        release();
+        await adopted;
     });
 
     it('Discard drops the draft, writing nothing', async () => {

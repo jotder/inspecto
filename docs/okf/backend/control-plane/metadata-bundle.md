@@ -197,7 +197,7 @@ work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
   `POST /config/write` (409 if the id was taken meanwhile ⇒ nothing else is written) and `POST /runs` to
   register it — then the one graph `PUT`. The draft's tab survives a re-list although the id is not listed
   yet. One draft at a time. ⚠ The preview's `integrity` list is ALWAYS empty for a pipeline —
-  `ComponentIntegrity` judges only dataset/query/widget/dashboard/reconciliation — so the editor shows a
+  `ComponentIntegrity` judges no pipeline references — so the editor shows a
   pipeline draft's references as **not checked**, never as clean; Validate and the save gate judge them.
   ✅ Since 2026-09-25 the editor's transfer menu, the Pipelines list and the UI's `loadAll` offer
   **`pipeline`** items (BUNDLE-AUTHORED-PIPELINE-STORE-1, option B — see *Pipelines* above), so the draft
@@ -214,9 +214,12 @@ work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
   is the ordinary *Save view*'s business. New id ⇒ `POST /components/{kind}`; existing id ⇒ `PUT` with the
   stored copy's hash as `If-Match` (`SavedViewStore.save` gained `ifMatch`), and Save refuses to run until
   that stored copy has loaded, so it can never go out unconditional. Discard reloads the stored view (existing
-  id) or leaves the canvas as unsaved exploration (new id). ⚠ The preview's `integrity` list is ALWAYS empty
-  for these kinds — `ComponentIntegrity` judges none of them, so a view's missing `datasetId` is never a
-  finding — hence the banner says **not checked** and Save runs no re-check (the Pipeline editor's rule). Its
+  id) or leaves the canvas as unsaved exploration (new id). ✅ Since 2026-10-04 `ComponentIntegrity` judges
+  a view's `query.projection.datasetId` against the Datasets and both kinds are in `BundleRoutes.INTEGRITY_KINDS`,
+  so the preview's `integrity` list is real for them: the banner shows the dialog's findings as-is (`null` from
+  an unreadable preview still reads **not checked**), `/bundle/import` refuses a view that would introduce a
+  dangling Dataset (422, the MNT-16 rule), and `metadata_validate` reports one. Save still runs no re-check —
+  `LaTransfer` exposes no preview to the LA project, so an edit after adoption is unjudged until saved. Its
   Datasets still arrive as D4 prerequisites: `investigationViewRefs` derives them, so the dialog imports them
   first.
 * ⛔ **No `enabled:false` stamp** — a Dataset/Widget/Dashboard has no inactive meaning; a stamped write-through

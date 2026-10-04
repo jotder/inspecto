@@ -271,6 +271,32 @@ class ControlApiBundleTest {
         }
     }
 
+    /**
+     * A Link Analysis / Geo Map view names its Dataset at {@code query.projection.datasetId}: preview judges it
+     * like a widget's {@code datasetId} (so the draft banner can say something better than "not checked"), and
+     * import refuses a view that would introduce a dangling one — the same MNT-16 rule every other kind meets.
+     */
+    @Test
+    void previewAndImportJudgeAViewsProjectionDataset(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            seed(c.port, "dataset", "cells", "title", "Cells");
+            for (String kind : List.of("link-analysis-view", "geo-map-view")) {
+                String ok = bundleOf(kind, "v_ok", "{\"query\":{\"projection\":{\"datasetId\":\"cells\"}}}");
+                String broken = bundleOf(kind, "v_bad", "{\"query\":{\"projection\":{\"datasetId\":\"ghost_ds\"}}}");
+
+                assertEquals(0, json(send(c.port, "POST", "/bundle/preview", ok)).get("integrity").size(), kind);
+                JsonNode b = json(send(c.port, "POST", "/bundle/preview", broken));
+                assertEquals(1, b.get("integrity").size(), kind + ": " + b);
+                assertTrue(b.get("integrity").get(0).asText().contains(kind + " 'v_bad'"), b.toString());
+                assertTrue(b.get("integrity").get(0).asText().contains("ghost_ds"), b.toString());
+
+                assertEquals(422, send(c.port, "POST", "/bundle/import", broken).statusCode(), kind);
+                assertEquals(404, send(c.port, "GET", "/components/" + kind + "/v_bad", null).statusCode(), kind);
+                assertEquals(200, send(c.port, "POST", "/bundle/import", ok).statusCode(), kind);
+            }
+        }
+    }
+
     /** Without a write root there is no registry to judge against: the list is present and empty, never a 503. */
     @Test
     void previewIntegrityIsEmptyWithoutAWriteRoot(@TempDir Path dir) throws Exception {

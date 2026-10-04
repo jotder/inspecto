@@ -438,7 +438,8 @@ final class BundleRoutes implements RouteModule {
     // ── helpers ────────────────────────────────────────────────────────────────────
 
     /** The integrity kinds the shared rules cover (see {@link com.gamma.pipeline.ComponentIntegrity}). */
-    private static final List<String> INTEGRITY_KINDS = List.of("dataset", "query", "widget", "dashboard", "reconciliation");
+    private static final List<String> INTEGRITY_KINDS = List.of("dataset", "query", "widget", "dashboard", "reconciliation",
+            "link-analysis-view", "geo-map-view");
 
     /** Broken-reference findings the incoming items would introduce: findings over
      *  (registry ∪ incoming) minus the findings the registry already has on its own. */

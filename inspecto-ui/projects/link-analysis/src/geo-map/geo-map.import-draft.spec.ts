@@ -28,15 +28,16 @@ const GEO: ProjectedGeo = {
     skipped: 0,
 };
 
-function draft(targetExists: boolean): ImportDraft {
+const FINDING = "broken reference: geo-map-view 'fraud-ring' → missing dataset 'ghost_ds'";
+
+function draft(targetExists: boolean, integrity: string[] | null = []): ImportDraft {
     return {
         kind: 'geo-map-view',
         id: 'dhaka-towers',
         content: INCOMING,
         sourceSpace: 'staging',
         targetExists,
-        // The preview judges no geo-map-view references, so its list is always [] for this kind.
-        integrity: [],
+        integrity,
         prerequisites: [],
     };
 }
@@ -111,17 +112,19 @@ describe('GeoMapComponent — Import as draft', () => {
         expect(menu.importDraft()).toBe(true);
     });
 
-    it('adopts a NEW-id draft unsaved (refs "not checked"), then Save is one POST through the pane', async () => {
+    it('adopts a NEW-id draft unsaved (its preview findings shown), then Save is one POST through the pane', async () => {
         const { fixture, c, http, queried } = create();
         flushReads(http);
-        const adopted = c.onDraftImported(draft(false));
+        const adopted = c.onDraftImported(draft(false, [FINDING]));
         flushReads(http);
         fixture.detectChanges();
 
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain('Imported draft from staging — not saved');
-        // An always-empty list must not read as clean: this kind's references are not judged by the preview.
-        expect(text).toContain('References not checked');
+        // The preview now judges this kind's Dataset reference: its findings reach the banner as-is.
+        expect(text).toContain('Broken references this draft would introduce');
+        expect(text).toContain(FINDING);
+        expect(text).not.toContain('References not checked');
         await expectNoA11yViolations(fixture.nativeElement);
         await adopted;
 
@@ -168,6 +171,16 @@ describe('GeoMapComponent — Import as draft', () => {
         put.flush({}, { status: 409, statusText: 'Conflict' });
         await saved;
         expect(c.importDraft()?.id).toBe('dhaka-towers');
+    });
+
+    it('an unreadable preview (null) still says "not checked", never clean', async () => {
+        const { fixture, c, http } = create();
+        flushReads(http);
+        const adopted = c.onDraftImported(draft(false, null));
+        flushReads(http);
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('References not checked');
+        await adopted;
     });
 
     it('Discard drops the draft, writing nothing', async () => {

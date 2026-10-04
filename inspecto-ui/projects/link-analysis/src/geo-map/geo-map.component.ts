@@ -892,10 +892,9 @@ export class GeoMapComponent implements OnInit, OnDestroy {
      * existing id (D6) also reads the stored copy: the banner's diff baseline and the Save's `If-Match`.
      */
     async onDraftImported(draft: LaImportDraft): Promise<void> {
-        // `/bundle/preview` judges references only for the kinds ComponentIntegrity knows (dataset, query,
-        // widget, dashboard, reconciliation) — never a geo-map-view — so its list is ALWAYS empty here,
-        // which the banner would show as clean. Say "not checked" instead.
-        this.importDraft.set({ ...draft, integrity: null });
+        // `/bundle/preview` judges this view's `query.projection.datasetId` (ComponentIntegrity), so the
+        // dialog's list is shown as-is; an unreadable preview arrives as null and reads "not checked".
+        this.importDraft.set(draft);
         this.draftStored.set(null);
         this.draftIfMatch = undefined;
         if (draft.targetExists) {
