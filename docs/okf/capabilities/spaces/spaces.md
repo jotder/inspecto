@@ -386,7 +386,8 @@ corpus CTE. A template's runbooks live at `config/runbooks/<pack>-runbooks.md` (
 pins it. There is still no runbook component kind.
 Each Job's `sink_dataset` is a shipped Dataset (`revenue_forecast`, `margin_erosion`; `physicalRef` = the sink dir) with a zero-row
 `data/<sink>/seed.parquet` (the telco-fraud pattern), so enabling a Job needs no hand re-point; regenerate the seeds with env
-`BA_SINK_REGENERATE=true` (`BusinessAssuranceSinkDatasetTest`). The Alert Rules and dashboard still read the view-backed demo Datasets.
+`BA_SINK_REGENERATE=true` (`BusinessAssuranceSinkDatasetTest`). The Alert Rules and dashboard still read the view-backed demo Datasets. Decision (operator, 2026-10-04): repointing them to the sink
+Datasets stays MANUAL until the pack has been driven live; no second Alert Rule set ships.
 
 **The telecom fraud pack — `spaces/_templates/telco-fraud/`** (`ASSURE-PACK-TELCO-FRAUD-1`, wave 5.1 of
 `superpower/assurance-capability-plan.md`, BUILT 2026-09-30, verified 2026-10-03, not closed). Three feed Pipelines + schemas (`cdr`,
