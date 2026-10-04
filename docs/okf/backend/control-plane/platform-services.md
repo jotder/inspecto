@@ -164,7 +164,7 @@ not write Datasets or send outbound mail).
 
 ## 7. S2-0 — pack isolation for pipeline node types (as built, 2026-09-24)
 
-S2-0 of the Stage 2 design ([`platform-services-stage2-design.md`](../../../superpower/platform-services-stage2-design.md),
+S2-0 of the Stage 2 design ([`platform-services-stage2-design.md`](../../../archived-documents/plans-archive/platform-services-stage2-design.md),
 whose §7 calls the operator decided 2026-09-28) is two defects that design pass found. Both reproduced red first;
 the tests are in `JobPackManagerTest` and `PipelineNodeTypesPackOverlayTest`. The lease test blocks the walk
 inside its sink write (after the pack executor ran), unloads the pack, and asserts the close is deferred AND,
@@ -304,9 +304,26 @@ Row 15 is discharged there. S2-5 shipped 2026-10-04: a pack kind is spelled by t
 `RecipeCompiler` compiles it to `transform.<kind>` and `RecipeConverter` projects it back; a built-in, unloaded or
 kind-less step is refused) and stays out of `ProcessorCatalog` (D-6). ⚠ It also fixed two latent save-path defects:
 `PipelineEditable.lower` gated on the closed `LOWERABLE` set, and `isLegacyShaped` NPE'd on a contributed kind, so a
-contributed step could not be saved at all before. S3-1, S3-2 and S3-3 (pack-contributed services and `DatasetAccess`, §7d/§7e) shipped 2026-10-04. The open items
-live in [`BACKLOG.md`](../../../BACKLOG.md) §4 under *Platform Services*. A Job-side watchdog is still a
-recorded gap; the Step watchdog is §7c.
+contributed step could not be saved at all before. S3-1, S3-2 and S3-3 (pack-contributed services and `DatasetAccess`, §7d/§7e) shipped 2026-10-04. The design is
+archived (2026-10-04, [`platform-services-stage2-design.md`](../../../archived-documents/plans-archive/platform-services-stage2-design.md)); this concept is the
+as-built owner. The open items live in [`BACKLOG.md`](../../../BACKLOG.md) §3.2 *Platform Services Stage 2 / 3*;
+none is decision-free. A Job-side watchdog is still a recorded gap (R1); the Step watchdog is §7c.
+
+**Decision register (operator; D-1..D-9 2026-09-28, D-10..D-12 2026-10-04):** D-1 evolve the live
+`PipelineNodeType` seam (Option B), no parallel registry · D-2 a pack carrying a raw-`Connection` executor is
+rejected · D-3 no bridge-ratio threshold, measure and publish · D-4 Arrow bridge only if it clearly beats JDBC
+(it did not, §7b) · D-5 generic `- step: {kind: …}` verb · D-6 contributed kinds stay out of `ProcessorCatalog` ·
+D-7 Step watchdog 5 min default, 30 min ceiling, an abandoned thread disables the kind · D-8 S2-0 shipped
+alone · D-9 cross-pack service dependencies resolved by a retry pass, no manifest vocabulary · D-10
+`DatasetAccess` inherits `ConsignmentSelector` per-call pinning · D-11 S2-4 a no-op · D-12 contributed service
+interfaces are engine-published `@PublicApi` only (a shared pack-API loader is a later design only).
+
+**Deliberately deferred (each needs a design or an operator call, not just code):** a held snapshot handle for
+`DatasetAccess` (two reads in one Run may see different file lists); a Job-side watchdog (R1); a write side and a
+Subject-level capability check for `DatasetAccess` (needs a Run Subject); filtered `services()` on
+`ProcessorContext` (D4) and a devkit jar (D5), on demand; fan-in for contributed Steps; user-instantiated
+configured resources (the Connection component's). ⛔ Third-party `LOWERED` stays closed until a SQL-fragment
+guard exists.
 
 ### 7d. Pack-contributed services (S3-1, 2026-10-04)
 
@@ -339,7 +356,7 @@ recorded gap; the Step watchdog is §7c.
 - **Read-only, per-Space, fail closed:** bound to one Space; another Space or an unknown Dataset throws naming the
   ids, never an empty result. A Job's authority is its `requires: [datasets]` grant (no Subject at fire time).
 - Engine-published (D-12), `readOnly()` when pack-contributed (no stand-in); disable refuses the grant.
-  Design as-built: `superpower/platform-services-stage2-design.md` §5.6.
+  Design as-built: `archived-documents/plans-archive/platform-services-stage2-design.md` §5.6.
 
 Related: [Job vs Pipeline Step](job-vs-step.md) · [Jobs & Scheduling](jobs.md) ·
 [Signal backbone](signal-backbone.md) · [API stability policy](api-stability.md) ·

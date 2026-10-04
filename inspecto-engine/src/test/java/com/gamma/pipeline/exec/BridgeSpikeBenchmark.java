@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Platform Services Stage 2, slice S2-2 — the <b>bridge spike</b> (measurement only; design
- * {@code docs/superpower/platform-services-stage2-design.md} §5.1). It prices what an {@code EXECUTED} Step
+ * {@code docs/archived-documents/plans-archive/platform-services-stage2-design.md} §5.1). It prices what an {@code EXECUTED} Step
  * costs between map and the write, against the fused flat lane, over one generated fixture in one warm JVM:
  *
  * <ul>
