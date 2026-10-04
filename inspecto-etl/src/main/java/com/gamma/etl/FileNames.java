@@ -29,7 +29,7 @@ public final class FileNames {
     static final int MIN_RUN = 8;
     /** A contiguous digit run, or an already-fingerprinted span (skipped, so {@link #safe} is idempotent: a 16-hex
      *  fingerprint can itself hold 8 decimal digits in a row). */
-    private static final Pattern RUN = Pattern.compile("<fp:[0-9a-f]{16}>|\\d{" + MIN_RUN + ",}");
+    private static final Pattern RUN = Pattern.compile("<fp:[0-9a-f]{16}>|fp-[0-9a-f]{16}|\\d{" + MIN_RUN + ",}");
     private static final Pattern FP_SPAN = Pattern.compile("<fp:([0-9a-f]{16})>");
     /** Short digit groups joined by single dashes or spaces ({@code 4111-1111-1111-1111}, {@code 91 98765 43210}). */
     private static final Pattern SPLIT = Pattern.compile("(?<!\\d)\\d{1,7}(?!\\d)(?:[ -]\\d{1,7}(?!\\d))+");
@@ -49,6 +49,13 @@ public final class FileNames {
      *  lands on the same file; a name with no value run is unchanged. */
     public static String outputStem(PipelineConfig cfg, String fileName) {
         return FP_SPAN.matcher(safe(cfg, CsvIngester.stripExtensions(fileName))).replaceAll("fp-$1");
+    }
+
+    /** The reject-sidecar name of an inbox file: {@code <outputStem>_errors.csv}. The ONE spelling every writer
+     *  ({@code ParserSpec}, the quarantine mover) and reader (the rejected-rows route, record replay) agrees on,
+     *  so a value in the source name never reaches the {@code errors} directory. */
+    public static String errorsFileName(PipelineConfig cfg, String fileName) {
+        return outputStem(cfg, fileName) + "_errors.csv";
     }
 
     /** {@code text} with {@link #safe} applied to every file-name-shaped token that holds a long digit run. */
@@ -71,7 +78,7 @@ public final class FileNames {
         Matcher m = RUN.matcher(name);
         StringBuilder sb = null;
         while (m.find()) {
-            if (m.group().startsWith("<") || isTimestamp(m.group())) continue;
+            if (m.group().startsWith("<") || m.group().startsWith("fp-") || isTimestamp(m.group())) continue;
             if (sb == null) sb = new StringBuilder();
             m.appendReplacement(sb, Matcher.quoteReplacement("<" + FailureText.fingerprint(cfg, m.group()) + ">"));
         }

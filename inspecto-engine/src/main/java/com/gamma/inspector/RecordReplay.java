@@ -4,6 +4,7 @@ import com.gamma.etl.ConsignmentEvent;
 import com.gamma.etl.ConsignmentManifest;
 import com.gamma.etl.MemberStatus;
 import com.gamma.etl.CsvIngester;
+import com.gamma.etl.FileNames;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.QuarantineManager;
 import com.gamma.etl.SchemaSelector;
@@ -88,7 +89,7 @@ public final class RecordReplay {
         if (manifests == null || manifests.isBlank())
             throw new IllegalArgumentException("record replay needs dirs.status_dir (its replay record lives there)");
 
-        Path sidecar = locateSidecar(cfg, CsvIngester.stripExtensions(file) + "_errors.csv");
+        Path sidecar = locateSidecar(cfg, FileNames.errorsFileName(cfg, file));
         if (sidecar == null) throw new NoSuchFileException("no reject sidecar recorded for '" + file + "'");
         // reject_mode all_or_nothing quarantined the file WHOLE — none of its good records landed, so replaying
         // only its rejects would land the part that was wrong and none of the part that was right. The recovery
@@ -119,7 +120,7 @@ public final class RecordReplay {
         Path claim = Paths.get(manifests).toAbsolutePath().resolveSibling("replays").resolve(hash + ".json");
         Files.createDirectories(claim.getParent());
         Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
-        String replayName = replayName(file, hash);
+        String replayName = replayName(cfg, file, hash);
         Path input = poll.resolve(replayName);
         try {
             Files.createFile(claim);
@@ -309,11 +310,11 @@ public final class RecordReplay {
     }
 
     /** {@code feed.csv.gz} → {@code feed__replay_<sha8>.csv}: a plain file (the sidecar holds decoded text). */
-    static String replayName(String file, String hash) {
+    static String replayName(PipelineConfig cfg, String file, String hash) {
         String plain = file.replaceAll("(?i)\\.(gz|bz2|zip|z)$", "");
         int dot = plain.lastIndexOf('.');
         String ext = dot > 0 ? plain.substring(dot) : "";
-        return CsvIngester.stripExtensions(file) + "__replay_" + hash.substring(0, 8) + ext;
+        return FileNames.outputStem(cfg, file) + "__replay_" + hash.substring(0, 8) + ext;
     }
 
     /**

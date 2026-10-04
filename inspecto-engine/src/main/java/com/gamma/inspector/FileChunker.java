@@ -1,6 +1,6 @@
 package com.gamma.inspector;
 
-import com.gamma.etl.CsvIngester;
+import com.gamma.etl.FileNames;
 import com.gamma.etl.PipelineConfig;
 
 import java.io.BufferedReader;
@@ -59,7 +59,7 @@ final class FileChunker implements Closeable {
      */
     FileChunker(File source, PipelineConfig cfg, Path outDir) throws IOException {
         this.outDir   = outDir;
-        this.baseName = CsvIngester.stripExtensions(source.getName());
+        this.baseName = FileNames.outputStem(cfg, source.getName());
         long target   = cfg.chunking().effectiveChunkBytes();
         this.targetBytes = target > 0 ? target : Long.MAX_VALUE;
         Files.createDirectories(outDir);

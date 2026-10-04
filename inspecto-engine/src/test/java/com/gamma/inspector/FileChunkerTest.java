@@ -93,4 +93,17 @@ class FileChunkerTest {
             assertTrue(chunks.stream().allMatch(c -> c.get(0).equals(HEADER)));
         }
     }
+
+    @Test
+    void aChunkFileNameCarriesNoValueFromTheSourceName(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = cfg(dir, 20);
+        String msisdn = "919876543210";
+        Path src = dir.resolve("cdr_" + msisdn + ".csv");
+        Files.writeString(src, HEADER + "\nr1,1.0,2020-04-03\nr2,2.0,2020-04-03\n");
+        try (FileChunker chunker = new FileChunker(src.toFile(), cfg, dir.resolve("chunks"))) {
+            File c = chunker.next();
+            assertFalse(c.getName().contains(msisdn), c.getName());
+            assertTrue(c.getName().startsWith("cdr_fp-"), c.getName());
+        }
+    }
 }

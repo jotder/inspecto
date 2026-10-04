@@ -44,6 +44,6 @@ record ParserSpec(List<Map<String, Object>> fields, int[] selectorIdx, int maxSe
     /** The per-file reject ledger: {@code <dirs.errors>/<basename>_errors.csv}. */
     static Path errorFile(File file, PipelineConfig cfg) {
         return Paths.get(cfg.dirs().errors()).toAbsolutePath()
-                .resolve(CsvIngester.stripExtensions(file.getName()) + "_errors.csv");
+                .resolve(FileNames.errorsFileName(cfg, file.getName()));
     }
 }

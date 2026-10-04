@@ -79,4 +79,19 @@ class FileNamesTest {
         assertNotEquals("feed_99999999.csv", FileNames.safe(c, "feed_99999999.csv"));
         assertNotEquals("feed_20261303.csv", FileNames.safe(c, "feed_20261303.csv"), "month 13");
     }
+
+    @Test
+    void theRejectSidecarNameCarriesNoValueAndIsStableAndIdempotent(@TempDir Path dir) throws Exception {
+        PipelineConfig c = cfg(dir, "a");
+        String msisdn = "919876543210";
+        String n = FileNames.errorsFileName(c, "cdr_" + msisdn + ".csv.gz");
+        assertFalse(n.contains(msisdn), n);
+        assertTrue(n.matches("cdr_fp-[0-9a-f]{16}_errors\\.csv"), n);
+        assertEquals(n, FileNames.errorsFileName(c, "cdr_" + msisdn + ".csv"), "extension-independent, stable");
+        assertEquals("feed_errors.csv", FileNames.errorsFileName(c, "feed.csv"), "a value-free name is unchanged");
+        // an already-rendered stem is not rendered again, even when its 16 hex digits hold 8 decimal digits in a row
+        String once = FileNames.outputStem(c, "x_" + msisdn + ".csv");
+        assertEquals(once, FileNames.outputStem(c, once + ".csv"));
+        assertEquals("fp-1234567890abcdef", FileNames.outputStem(c, "fp-1234567890abcdef.csv"));
+    }
 }

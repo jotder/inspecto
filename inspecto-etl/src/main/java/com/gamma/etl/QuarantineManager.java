@@ -125,9 +125,8 @@ public final class QuarantineManager {
         log.info("Quarantined [{}]: {} → {}", subDir, FileNames.safe(cfg, file.getName()), FileNames.safe(cfg, dst.toString()));
 
         if (includeErrorCsv) {
-            String baseName = CsvIngester.stripExtensions(errorBase);
             Path errorCsv = Paths.get(cfg.dirs().errors()).toAbsolutePath()
-                                 .resolve(baseName + "_errors.csv");
+                                 .resolve(FileNames.errorsFileName(cfg, errorBase));
             if (Files.exists(errorCsv))
                 Files.move(errorCsv, qDir.resolve(errorCsv.getFileName()),
                         StandardCopyOption.REPLACE_EXISTING);

@@ -550,6 +550,14 @@ Step Processor and no new route.
     on the same file; a name with no value run is unchanged. The status row's `output_paths` is value-free with it
     (`ConsignmentIngestorTest.aValueInAFileNameIsNeverWrittenToTheStatusLedgerButTheRealFileStillLands`). ⚠ Losing
     the salt renames those outputs once.
+  - **So are the reject sidecar, the chunk scratch name and the replay input name** (2026-10-04):
+    `FileNames.errorsFileName` (`<outputStem>_errors.csv`) is the ONE spelling the writers (`ParserSpec`,
+    `QuarantineManager`) and the readers (`GET .../rejected-rows` in `RunRoutes`, `RecordReplay`) agree on, so
+    lookups still resolve from the REAL file name the caller passes; `FileChunker` chunk files and
+    `RecordReplay.replayName` use `outputStem`. `outputStem` is idempotent (an `fp-<16 hex>` span is never
+    re-rendered), so a chunk's own sidecar is value-free too. ⚠ Breaking, on purpose: a value-bearing name's
+    existing `_errors.csv` is no longer found under its old name; a name with no value run is unchanged. Replay
+    still re-reads the SOURCE file by its real name.
   - **Residual, by design: names that RESOLVE a path stay real.** The per-Consignment manifest, `backup/` and
     quarantine paths, markers, the lineage ledger (queried by input file) and the `filename_column` data column
     hold the real

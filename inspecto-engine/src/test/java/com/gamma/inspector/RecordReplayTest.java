@@ -231,7 +231,7 @@ class RecordReplayTest {
         Files.setLastModifiedTime(claim, java.nio.file.attribute.FileTime.from(
                 java.time.Instant.now().minus(RecordReplay.ABANDONED_CLAIM_AFTER).minusSeconds(60)));
         String hash = claim.getFileName().toString().replace(".json", "");
-        Path leftover = Path.of(cfg.dirs().poll()).resolve(RecordReplay.replayName("feed.csv", hash));
+        Path leftover = Path.of(cfg.dirs().poll()).resolve(RecordReplay.replayName(cfg, "feed.csv", hash));
         Files.writeString(leftover, "short1,3.0,20");                        // half-written input
 
         RecordReplay.Result r = RecordReplay.replay(cfg, "feed.csv", null);
@@ -345,5 +345,15 @@ class RecordReplayTest {
         Files.writeString(restricted.resolve("bad_errors.csv"), "line_number,column,reason,raw_line\n1,,X,\"a,1\"\n");
         org.junit.jupiter.api.Assertions.assertThrows(NoSuchFileException.class,
                 () -> RecordReplay.replay(cfg, "bad.csv", e -> {}));
+    }
+
+    @Test
+    void aReplayInputNameCarriesNoValueFromTheSourceName(@TempDir Path dir) throws Exception {
+        ingestOnce(dir, "java");
+        PipelineConfig cfg = PipelineConfig.load(dir.resolve("mini_pipeline.toon").toString());
+        String msisdn = "919876543210";
+        String n = RecordReplay.replayName(cfg, "cdr_" + msisdn + ".csv.gz", "0123456789abcdef");
+        assertFalse(n.contains(msisdn), n);
+        assertTrue(n.matches("cdr_fp-[0-9a-f]{16}__replay_01234567\\.csv"), n);
     }
 }
