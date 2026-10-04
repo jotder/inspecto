@@ -132,7 +132,8 @@ class ControlApiSpaceTemplateSeedGateTest {
     private static final java.util.Map<String, String> RUNBOOK_PACKS = java.util.Map.of(
             "telco-ra", "telco-ra-runbooks.md",
             "business-assurance", "business-assurance-runbooks.md",
-            "telco-fraud", "telco-fraud-runbooks.md");
+            "telco-fraud", "telco-fraud-runbooks.md",
+            "payment-fraud", "payment-fraud-runbooks.md");
 
     private static void seedAlertTemplate(Path root, String alertToon) throws Exception {
         Path cfg = root.resolve("_templates").resolve("alerting").resolve("config");

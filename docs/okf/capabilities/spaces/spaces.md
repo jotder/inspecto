@@ -617,7 +617,7 @@ Step Processor and no new route.
   `declined_attempts`) as KPI tiles beside four bar Widgets (one per typology Dataset) on `payment_fraud_overview`.
   KPIs sit on the Job sink, not on the raw feeds: the seed gate reads each KPI's Dataset when the Space is created,
   and a raw feed has no data yet. `PaymentFraudDashboardTest` (inspecto) creates the Space through `POST /spaces`,
-  ingests, runs the Jobs and renders every tile through `/kpis/{id}/value` and `/bi/query`. Still open: runbooks.
+  ingests, runs the Jobs and renders every tile through `/kpis/{id}/value` and `/bi/query`. Runbooks (2026-10-04): `config/runbooks/payment-fraud-runbooks.md` (card-number tripwire, the four typologies, the Risk Score, labels and maturity), delivered to the created Space and pinned by `ControlApiSpaceTemplateSeedGateTest`.
 - **Dispute labels with a maturity flag (WS-44, slice 3, 2026-10-04; operator decision).** `pf_attempt_labels` (Job
   parameter `maturity_days`, **default 120 = the chargeback window, configurable; the operator may change it**)
   writes one row per attempt: `disputed`, `mature`, and `label` = `DISPUTED` (any age), `NEGATIVE` (undisputed and
@@ -684,7 +684,7 @@ Step Processor and no new route.
     - earlier, a card-testing threshold of 7, and a SIM window of 72 h.
   - `ControlApiSpaceTemplateSeedGateTest.everyShippedTemplateApplies` applies the template through the seed gate.
 - **Deferred to later slices** (open on the row): WS-44 (disputes as labels with a maturity flag, payment KPIs and
-  dashboards), further typologies, and runbooks.
+  dashboards), further typologies (operator call). WS-44 shipped as slices 2–3; runbooks shipped 2026-10-04.
  
 
 ### 3.6 Metadata Bundle v2 (SPC-4) — configuration moves, data never does
