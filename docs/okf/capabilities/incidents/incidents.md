@@ -476,11 +476,13 @@ Updates are **optimistic** (2026-10-04): every object carries a monotonic `versi
     **Closed 2026-10-04 (operator):** `ASSURE-WORKFLOW-SLA-1` is closed. Residuals are P3 (`ASSURE-WORKFLOW-SLA-RESIDUALS-1`): the
     sweep-time deleted-assignee recheck (recommended policy when built: skip the reassign, still notify / raise priority, one
     WARN per breach) waits for an IAM customer and a real `PrincipalDirectory`; a full state-diagram *editor* (the read-only
-    diagram ships); and a live-preview verification pass of Settings ▸ Incident governance (verification, not a build).
+    diagram ships). The live-preview pass of Settings ▸ Incident governance was done 2026-10-04 (see *UI* below).
   - **UI:** Settings ▸ *Incident governance* (`settings/incident-governance.component.ts`, model
     `inspecto/governance/governance-model.ts`): the effective workflow as a list editor (initial, terminal,
     transition rows), the SLA policy form and the Escalation Rules list; read-only without `canAdminister`; a 422
-    refusal is shown inline, a held write says it was submitted for approval. **SLA on the object (2026-10-03):**
+    refusal is shown inline, a held write says it was submitted for approval. **Without `inspecto-ops` (2026-10-04, live preview):** `GET
+    /workflows/{type}` answers 503 `CAPABILITY_UNAVAILABLE`; the pane then shows *Not available in this edition* with
+    the server's reason and renders no editor — before, it offered an empty, savable form. **SLA on the object (2026-10-03):**
     `slaBadges()` (`modules/admin/objects/mail-model.ts`) reads the server stamps only — never computes a clock —
     and the detail header shows *Respond by* / *Due* while open and *Response breached* / *SLA breached* always;
     the Incident/Case list prefixes a breach badge to the Description cell (no new column, so the list's width

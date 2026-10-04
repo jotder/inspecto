@@ -77,64 +77,177 @@ import {
                 <inspecto-alert variant="error" title="Not saved">{{ lastError() }}</inspecto-alert>
             }
 
-            <section class="flex flex-col gap-3" aria-labelledby="gov-workflow-heading">
-                <h2 id="gov-workflow-heading" class="text-lg font-semibold">Workflow</h2>
-                <p class="text-secondary text-sm">
-                    One initial state, the terminal states, and every transition. An Incident may finish only through
-                    RESOLVED (where the Disposition and postmortem are required) or by archiving.
-                </p>
-                <form [formGroup]="workflow" class="flex flex-col gap-3" (ngSubmit)="saveWorkflow()">
-                    <div class="flex flex-wrap gap-3">
-                        <mat-form-field class="w-56">
-                            <mat-label>Initial state</mat-label>
-                            <input matInput formControlName="initial" />
-                            @if (workflow.controls.initial.hasError('required')) {
-                                <mat-error>An initial state is required.</mat-error>
+            @if (unavailable(); as reason) {
+                <inspecto-alert variant="warning" title="Not available in this edition">{{ reason }}</inspecto-alert>
+            } @else {
+                <section class="flex flex-col gap-3" aria-labelledby="gov-workflow-heading">
+                    <h2 id="gov-workflow-heading" class="text-lg font-semibold">Workflow</h2>
+                    <p class="text-secondary text-sm">
+                        One initial state, the terminal states, and every transition. An Incident may finish only
+                        through RESOLVED (where the Disposition and postmortem are required) or by archiving.
+                    </p>
+                    <form [formGroup]="workflow" class="flex flex-col gap-3" (ngSubmit)="saveWorkflow()">
+                        <div class="flex flex-wrap gap-3">
+                            <mat-form-field class="w-56">
+                                <mat-label>Initial state</mat-label>
+                                <input matInput formControlName="initial" />
+                                @if (workflow.controls.initial.hasError('required')) {
+                                    <mat-error>An initial state is required.</mat-error>
+                                }
+                            </mat-form-field>
+                            <mat-form-field class="w-96">
+                                <mat-label>Terminal states (comma-separated)</mat-label>
+                                <input matInput formControlName="terminal" />
+                                @if (workflow.controls.terminal.hasError('required')) {
+                                    <mat-error>Declare at least one terminal state.</mat-error>
+                                }
+                            </mat-form-field>
+                        </div>
+                        <div class="flex flex-wrap items-start gap-6">
+                            <table class="w-full max-w-200 text-sm">
+                                <caption class="sr-only">
+                                    Transitions
+                                </caption>
+                                <thead>
+                                    <tr class="text-secondary text-left">
+                                        <th scope="col" class="py-1">From</th>
+                                        <th scope="col">Action</th>
+                                        <th scope="col">To</th>
+                                        <th scope="col"><span class="sr-only">Remove</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody formArrayName="transitions">
+                                    @for (row of transitions.controls; track row; let i = $index) {
+                                        <tr [formGroupName]="i">
+                                            <td>
+                                                <input
+                                                    class="w-full rounded border px-2 py-1"
+                                                    formControlName="from"
+                                                    [attr.aria-label]="'Transition ' + (i + 1) + ' from'"
+                                                />
+                                            </td>
+                                            <td>
+                                                <input
+                                                    class="w-full rounded border px-2 py-1"
+                                                    formControlName="action"
+                                                    [attr.aria-label]="'Transition ' + (i + 1) + ' action'"
+                                                />
+                                            </td>
+                                            <td>
+                                                <input
+                                                    class="w-full rounded border px-2 py-1"
+                                                    formControlName="to"
+                                                    [attr.aria-label]="'Transition ' + (i + 1) + ' to'"
+                                                />
+                                            </td>
+                                            <td>
+                                                <button
+                                                    mat-icon-button
+                                                    type="button"
+                                                    [disabled]="!canEdit()"
+                                                    (click)="transitions.removeAt(i)"
+                                                    [attr.aria-label]="'Remove transition ' + (i + 1)"
+                                                >
+                                                    <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                            <div class="flex flex-col gap-1 overflow-x-auto">
+                                <h3 class="text-sm font-semibold">State diagram (read-only)</h3>
+                                <inspecto-workflow-diagram [draft]="workflowDraftView()" />
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button mat-stroked-button type="button" [disabled]="!canEdit()" (click)="addTransition()">
+                                Add transition
+                            </button>
+                            <button mat-flat-button color="primary" type="submit" [disabled]="!canEdit()">
+                                Save workflow
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="flex flex-col gap-3" aria-labelledby="gov-sla-heading">
+                    <h2 id="gov-sla-heading" class="text-lg font-semibold">SLA policy</h2>
+                    <p class="text-secondary text-sm">
+                        Response and resolution targets per priority, counted in working time. "*" is the fallback
+                        priority.
+                    </p>
+                    <form [formGroup]="sla" class="flex flex-col gap-3" (ngSubmit)="saveSla()">
+                        <div class="flex flex-wrap gap-3">
+                            <mat-form-field class="w-64">
+                                <mat-label>Time zone (IANA, e.g. Europe/London)</mat-label>
+                                <input matInput formControlName="zone" />
+                                @if (sla.controls.zone.hasError('required')) {
+                                    <mat-error>An explicit time zone is required.</mat-error>
+                                }
+                            </mat-form-field>
+                            <mat-form-field class="w-32">
+                                <mat-label>Day starts</mat-label>
+                                <input matInput formControlName="start" placeholder="09:00" />
+                            </mat-form-field>
+                            <mat-form-field class="w-32">
+                                <mat-label>Day ends</mat-label>
+                                <input matInput formControlName="end" placeholder="17:00" />
+                            </mat-form-field>
+                            <mat-form-field class="w-96">
+                                <mat-label>Holidays (yyyy-mm-dd, comma-separated)</mat-label>
+                                <input matInput formControlName="holidays" />
+                            </mat-form-field>
+                        </div>
+                        <fieldset class="flex flex-wrap gap-3">
+                            <legend class="text-secondary mb-1 text-sm">Working days</legend>
+                            @for (d of weekDays; track d) {
+                                <mat-checkbox
+                                    [checked]="hasDay(d)"
+                                    [disabled]="!canEdit()"
+                                    (change)="toggleDay(d, $event.checked)"
+                                    >{{ d }}</mat-checkbox
+                                >
                             }
-                        </mat-form-field>
-                        <mat-form-field class="w-96">
-                            <mat-label>Terminal states (comma-separated)</mat-label>
-                            <input matInput formControlName="terminal" />
-                            @if (workflow.controls.terminal.hasError('required')) {
-                                <mat-error>Declare at least one terminal state.</mat-error>
-                            }
-                        </mat-form-field>
-                    </div>
-                    <div class="flex flex-wrap items-start gap-6">
-                        <table class="w-full max-w-200 text-sm">
+                        </fieldset>
+                        <table class="w-full max-w-160 text-sm">
                             <caption class="sr-only">
-                                Transitions
+                                SLA targets
                             </caption>
                             <thead>
                                 <tr class="text-secondary text-left">
-                                    <th scope="col" class="py-1">From</th>
-                                    <th scope="col">Action</th>
-                                    <th scope="col">To</th>
+                                    <th scope="col" class="py-1">Priority</th>
+                                    <th scope="col">Response (min)</th>
+                                    <th scope="col">Resolution (min)</th>
                                     <th scope="col"><span class="sr-only">Remove</span></th>
                                 </tr>
                             </thead>
-                            <tbody formArrayName="transitions">
-                                @for (row of transitions.controls; track row; let i = $index) {
+                            <tbody formArrayName="targets">
+                                @for (row of targets.controls; track row; let i = $index) {
                                     <tr [formGroupName]="i">
                                         <td>
                                             <input
                                                 class="w-full rounded border px-2 py-1"
-                                                formControlName="from"
-                                                [attr.aria-label]="'Transition ' + (i + 1) + ' from'"
+                                                formControlName="priority"
+                                                [attr.aria-label]="'Target ' + (i + 1) + ' priority'"
                                             />
                                         </td>
                                         <td>
                                             <input
+                                                type="number"
+                                                min="1"
                                                 class="w-full rounded border px-2 py-1"
-                                                formControlName="action"
-                                                [attr.aria-label]="'Transition ' + (i + 1) + ' action'"
+                                                formControlName="responseMinutes"
+                                                [attr.aria-label]="'Target ' + (i + 1) + ' response minutes'"
                                             />
                                         </td>
                                         <td>
                                             <input
+                                                type="number"
+                                                min="1"
                                                 class="w-full rounded border px-2 py-1"
-                                                formControlName="to"
-                                                [attr.aria-label]="'Transition ' + (i + 1) + ' to'"
+                                                formControlName="resolutionMinutes"
+                                                [attr.aria-label]="'Target ' + (i + 1) + ' resolution minutes'"
                                             />
                                         </td>
                                         <td>
@@ -142,8 +255,8 @@ import {
                                                 mat-icon-button
                                                 type="button"
                                                 [disabled]="!canEdit()"
-                                                (click)="transitions.removeAt(i)"
-                                                [attr.aria-label]="'Remove transition ' + (i + 1)"
+                                                (click)="targets.removeAt(i)"
+                                                [attr.aria-label]="'Remove target ' + (i + 1)"
                                             >
                                                 <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                                             </button>
@@ -152,192 +265,86 @@ import {
                                 }
                             </tbody>
                         </table>
-                        <div class="flex flex-col gap-1 overflow-x-auto">
-                            <h3 class="text-sm font-semibold">State diagram (read-only)</h3>
-                            <inspecto-workflow-diagram [draft]="workflowDraftView()" />
+                        <div class="flex gap-2">
+                            <button mat-stroked-button type="button" [disabled]="!canEdit()" (click)="addTarget()">
+                                Add target
+                            </button>
+                            <button mat-flat-button color="primary" type="submit" [disabled]="!canEdit()">
+                                Save SLA policy
+                            </button>
                         </div>
-                    </div>
-                    <div class="flex gap-2">
-                        <button mat-stroked-button type="button" [disabled]="!canEdit()" (click)="addTransition()">
-                            Add transition
-                        </button>
-                        <button mat-flat-button color="primary" type="submit" [disabled]="!canEdit()">
-                            Save workflow
-                        </button>
-                    </div>
-                </form>
-            </section>
+                    </form>
+                </section>
 
-            <section class="flex flex-col gap-3" aria-labelledby="gov-sla-heading">
-                <h2 id="gov-sla-heading" class="text-lg font-semibold">SLA policy</h2>
-                <p class="text-secondary text-sm">
-                    Response and resolution targets per priority, counted in working time. "*" is the fallback priority.
-                </p>
-                <form [formGroup]="sla" class="flex flex-col gap-3" (ngSubmit)="saveSla()">
-                    <div class="flex flex-wrap gap-3">
-                        <mat-form-field class="w-64">
-                            <mat-label>Time zone (IANA, e.g. Europe/London)</mat-label>
-                            <input matInput formControlName="zone" />
-                            @if (sla.controls.zone.hasError('required')) {
-                                <mat-error>An explicit time zone is required.</mat-error>
-                            }
-                        </mat-form-field>
-                        <mat-form-field class="w-32">
-                            <mat-label>Day starts</mat-label>
-                            <input matInput formControlName="start" placeholder="09:00" />
-                        </mat-form-field>
-                        <mat-form-field class="w-32">
-                            <mat-label>Day ends</mat-label>
-                            <input matInput formControlName="end" placeholder="17:00" />
-                        </mat-form-field>
-                        <mat-form-field class="w-96">
-                            <mat-label>Holidays (yyyy-mm-dd, comma-separated)</mat-label>
-                            <input matInput formControlName="holidays" />
-                        </mat-form-field>
-                    </div>
-                    <fieldset class="flex flex-wrap gap-3">
-                        <legend class="text-secondary mb-1 text-sm">Working days</legend>
-                        @for (d of weekDays; track d) {
-                            <mat-checkbox
-                                [checked]="hasDay(d)"
-                                [disabled]="!canEdit()"
-                                (change)="toggleDay(d, $event.checked)"
-                                >{{ d }}</mat-checkbox
-                            >
-                        }
-                    </fieldset>
-                    <table class="w-full max-w-160 text-sm">
-                        <caption class="sr-only">
-                            SLA targets
-                        </caption>
-                        <thead>
-                            <tr class="text-secondary text-left">
-                                <th scope="col" class="py-1">Priority</th>
-                                <th scope="col">Response (min)</th>
-                                <th scope="col">Resolution (min)</th>
-                                <th scope="col"><span class="sr-only">Remove</span></th>
-                            </tr>
-                        </thead>
-                        <tbody formArrayName="targets">
-                            @for (row of targets.controls; track row; let i = $index) {
-                                <tr [formGroupName]="i">
-                                    <td>
-                                        <input
-                                            class="w-full rounded border px-2 py-1"
-                                            formControlName="priority"
-                                            [attr.aria-label]="'Target ' + (i + 1) + ' priority'"
-                                        />
-                                    </td>
-                                    <td>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            class="w-full rounded border px-2 py-1"
-                                            formControlName="responseMinutes"
-                                            [attr.aria-label]="'Target ' + (i + 1) + ' response minutes'"
-                                        />
-                                    </td>
-                                    <td>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            class="w-full rounded border px-2 py-1"
-                                            formControlName="resolutionMinutes"
-                                            [attr.aria-label]="'Target ' + (i + 1) + ' resolution minutes'"
-                                        />
-                                    </td>
-                                    <td>
+                <section class="flex flex-col gap-3" aria-labelledby="gov-rules-heading">
+                    <h2 id="gov-rules-heading" class="text-lg font-semibold">
+                        Escalation Rules ({{ rules().length }})
+                    </h2>
+                    <p class="text-secondary text-sm">Each rule fires at most once per breach of each object.</p>
+                    @if (rules().length) {
+                        <ul class="flex max-w-200 flex-col divide-y rounded-lg border">
+                            @for (r of rules(); track r.name) {
+                                <li class="flex items-center justify-between gap-3 px-3 py-1.5">
+                                    <span class="text-sm"
+                                        ><span class="font-mono">{{ r.name }}</span> — {{ describe(r) }}</span
+                                    >
+                                    @if (canEdit()) {
                                         <button
                                             mat-icon-button
                                             type="button"
-                                            [disabled]="!canEdit()"
-                                            (click)="targets.removeAt(i)"
-                                            [attr.aria-label]="'Remove target ' + (i + 1)"
+                                            (click)="removeRule(r.name)"
+                                            [attr.aria-label]="'Delete Escalation Rule ' + r.name"
                                         >
                                             <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                                         </button>
-                                    </td>
-                                </tr>
+                                    }
+                                </li>
                             }
-                        </tbody>
-                    </table>
-                    <div class="flex gap-2">
-                        <button mat-stroked-button type="button" [disabled]="!canEdit()" (click)="addTarget()">
-                            Add target
-                        </button>
-                        <button mat-flat-button color="primary" type="submit" [disabled]="!canEdit()">
-                            Save SLA policy
-                        </button>
-                    </div>
-                </form>
-            </section>
-
-            <section class="flex flex-col gap-3" aria-labelledby="gov-rules-heading">
-                <h2 id="gov-rules-heading" class="text-lg font-semibold">Escalation Rules ({{ rules().length }})</h2>
-                <p class="text-secondary text-sm">Each rule fires at most once per breach of each object.</p>
-                @if (rules().length) {
-                    <ul class="flex max-w-200 flex-col divide-y rounded-lg border">
-                        @for (r of rules(); track r.name) {
-                            <li class="flex items-center justify-between gap-3 px-3 py-1.5">
-                                <span class="text-sm"
-                                    ><span class="font-mono">{{ r.name }}</span> — {{ describe(r) }}</span
-                                >
-                                @if (canEdit()) {
-                                    <button
-                                        mat-icon-button
-                                        type="button"
-                                        (click)="removeRule(r.name)"
-                                        [attr.aria-label]="'Delete Escalation Rule ' + r.name"
-                                    >
-                                        <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
-                                    </button>
+                        </ul>
+                    } @else {
+                        <p class="text-secondary text-sm">No Escalation Rules.</p>
+                    }
+                    @if (canEdit()) {
+                        <form [formGroup]="rule" class="flex flex-wrap items-start gap-3" (ngSubmit)="addRule()">
+                            <mat-form-field class="w-48">
+                                <mat-label>Rule id</mat-label>
+                                <input matInput formControlName="id" />
+                                @if (rule.controls.id.hasError('required')) {
+                                    <mat-error>An id is required.</mat-error>
                                 }
-                            </li>
-                        }
-                    </ul>
-                } @else {
-                    <p class="text-secondary text-sm">No Escalation Rules.</p>
-                }
-                @if (canEdit()) {
-                    <form [formGroup]="rule" class="flex flex-wrap items-start gap-3" (ngSubmit)="addRule()">
-                        <mat-form-field class="w-48">
-                            <mat-label>Rule id</mat-label>
-                            <input matInput formControlName="id" />
-                            @if (rule.controls.id.hasError('required')) {
-                                <mat-error>An id is required.</mat-error>
-                            }
-                        </mat-form-field>
-                        <div class="w-48">
-                            <inspecto-option-picker label="Fires" formControlName="on" [options]="onOptions" />
-                        </div>
-                        @if (rule.controls.on.value === 'age') {
-                            <mat-form-field class="w-40">
-                                <mat-label>After minutes</mat-label>
-                                <input matInput type="number" min="1" formControlName="afterMinutes" />
                             </mat-form-field>
-                        } @else {
                             <div class="w-48">
-                                <inspecto-option-picker
-                                    label="Target"
-                                    formControlName="target"
-                                    [options]="targetOptions"
-                                />
+                                <inspecto-option-picker label="Fires" formControlName="on" [options]="onOptions" />
                             </div>
-                        }
-                        <mat-form-field class="w-40">
-                            <mat-label>Only priority</mat-label>
-                            <input matInput formControlName="priority" />
-                        </mat-form-field>
-                        <mat-form-field class="w-48">
-                            <mat-label>Reassign to</mat-label>
-                            <input matInput formControlName="reassign" />
-                        </mat-form-field>
-                        <mat-checkbox formControlName="notify">Notify</mat-checkbox>
-                        <mat-checkbox formControlName="raisePriority">Raise priority</mat-checkbox>
-                        <button mat-flat-button color="primary" type="submit">Add Escalation Rule</button>
-                    </form>
-                }
-            </section>
+                            @if (rule.controls.on.value === 'age') {
+                                <mat-form-field class="w-40">
+                                    <mat-label>After minutes</mat-label>
+                                    <input matInput type="number" min="1" formControlName="afterMinutes" />
+                                </mat-form-field>
+                            } @else {
+                                <div class="w-48">
+                                    <inspecto-option-picker
+                                        label="Target"
+                                        formControlName="target"
+                                        [options]="targetOptions"
+                                    />
+                                </div>
+                            }
+                            <mat-form-field class="w-40">
+                                <mat-label>Only priority</mat-label>
+                                <input matInput formControlName="priority" />
+                            </mat-form-field>
+                            <mat-form-field class="w-48">
+                                <mat-label>Reassign to</mat-label>
+                                <input matInput formControlName="reassign" />
+                            </mat-form-field>
+                            <mat-checkbox formControlName="notify">Notify</mat-checkbox>
+                            <mat-checkbox formControlName="raisePriority">Raise priority</mat-checkbox>
+                            <button mat-flat-button color="primary" type="submit">Add Escalation Rule</button>
+                        </form>
+                    }
+                </section>
+            }
         </div>
     `,
 })
@@ -361,6 +368,8 @@ export class IncidentGovernanceComponent implements OnInit {
     ];
     readonly rules = signal<ComponentDef[]>([]);
     readonly lastError = signal<string | null>(null);
+    /** Set when the bundle has no operational-objects module (503) — the editor is then not offered at all. */
+    readonly unavailable = signal<string | null>(null);
     private readonly days = signal<string[]>(['MON', 'TUE', 'WED', 'THU', 'FRI']);
 
     readonly typeForm = this.fb.nonNullable.group({ objectType: 'INCIDENT' });
@@ -423,7 +432,14 @@ export class IncidentGovernanceComponent implements OnInit {
         this.lastError.set(null);
         this.objects
             .workflow(type)
-            .pipe(catchError(() => of(null)))
+            .pipe(
+                catchError((err: HttpErrorResponse) => {
+                    if (err.status === 503) {
+                        this.unavailable.set(apiErrorMessage(err, 'Incident governance is not installed.'));
+                    }
+                    return of(null);
+                }),
+            )
             .subscribe((wf) => {
                 const d = workflowDraft(type, wf as unknown as Record<string, unknown>);
                 this.workflow.patchValue({ initial: d.initial, terminal: d.terminal });

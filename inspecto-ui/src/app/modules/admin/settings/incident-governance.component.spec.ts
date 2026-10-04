@@ -26,7 +26,7 @@ const RULE = {
     content: { objectType: 'INCIDENT', on: 'breach', reassign: 'duty-manager', notify: true },
 };
 
-function setup(opts: { canAdminister?: boolean; createFails?: boolean } = {}) {
+function setup(opts: { canAdminister?: boolean; createFails?: boolean; opsMissing?: boolean } = {}) {
     const notFound = new HttpErrorResponse({ status: 404 });
     const components = {
         get: vi.fn(() => throwError(() => notFound)),
@@ -41,7 +41,13 @@ function setup(opts: { canAdminister?: boolean; createFails?: boolean } = {}) {
         update: vi.fn(() => of({})),
         remove: vi.fn(() => of({})),
     };
-    const objects = { workflow: vi.fn(() => of(WORKFLOW)) };
+    const unavailable = new HttpErrorResponse({
+        status: 503,
+        error: { error: { errorCode: 'CAPABILITY_UNAVAILABLE', message: 'Operational objects are not installed' } },
+    });
+    const objects = {
+        workflow: vi.fn(() => (opts.opsMissing ? throwError(() => unavailable) : of(WORKFLOW))),
+    };
     const toastr = { success: vi.fn(), error: vi.fn() };
     TestBed.configureTestingModule({
         imports: [IncidentGovernanceComponent],
@@ -116,5 +122,15 @@ describe('IncidentGovernanceComponent', () => {
         expect(el.textContent).toContain('Read-only');
         expect(button('Save workflow')!.disabled).toBe(true);
         expect(button('Add Escalation Rule')).toBeUndefined();
+    });
+
+    it('says the governance module is not installed instead of offering an empty editor (no a11y violations)', async () => {
+        const { el, button } = setup({ opsMissing: true });
+        expect(el.textContent).toContain('Not available in this edition');
+        expect(el.textContent).toContain('Operational objects are not installed');
+        expect(button('Save workflow')).toBeUndefined();
+        expect(button('Save SLA policy')).toBeUndefined();
+        expect(button('Add Escalation Rule')).toBeUndefined();
+        await expectNoA11yViolations(el);
     });
 });
