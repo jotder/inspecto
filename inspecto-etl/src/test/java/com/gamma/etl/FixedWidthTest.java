@@ -109,21 +109,39 @@ class FixedWidthTest {
         }
     }
 
-    /** The shipped worked-example pipeline references the fixed-width grammar by relative path. */
+    /**
+     * The SHIPPED fixed-width example ({@code inspecto/examples/02-parsing/fixedwidth}) loads through the
+     * production loader, which resolves its relative {@code processing.grammar} against the pipeline's own
+     * directory (never the working directory), and the grammar parses to the declared slices. Renaming the
+     * grammar reference must fail the load (mutation proof). No Space root is registered (SpaceConfigRoot lives in
+     * inspecto-engine, which this module does not depend on), so nothing can leak in from other tests.
+     */
     @Test
-    void shippedSubscriberPipelineResolvesFixedWidthGrammar() throws Exception {
-        Path pipeline = Path.of("config/subscriber/subscriber_pipeline.toon");
-        org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(pipeline),
-                "SKIPPED: config/subscriber/subscriber_pipeline.toon does not exist in this repo (no copy anywhere) "
-                        + "— this guard has never run; supply the file or delete the test");
-        // fromMap is a pure parse (no dir creation) but still resolves the grammar + schema files.
-        PipelineConfig cfg = PipelineConfig.fromMap(
-                com.gamma.util.ToonHelper.load(pipeline.toString()));
+    void shippedFixedWidthExampleResolvesGrammar() throws Exception {
+        Path dir = repoRoot().resolve("inspecto/examples/02-parsing/fixedwidth");
+        Path pipeline = dir.resolve("pipeline.toon");
+        assertTrue(Files.exists(pipeline), "shipped example present: " + pipeline);
+        PipelineConfig cfg = PipelineConfig.loadForValidation(pipeline.toString());
         assertNotNull(cfg.fixedWidth(), "frontend: fixedwidth resolved from the grammar file");
         assertFalse(cfg.fixedWidth().binary());
         assertEquals(4, cfg.fixedWidth().slices().size());
-        assertEquals(40, cfg.fixedWidth().minRecordLength(), "default min = widest slice end (28+12)");
+        assertEquals(34, cfg.fixedWidth().minRecordLength(), "default min = widest slice end (24+10)");
         assertEquals(PipelineConfig.FixedWidth.Trim.BOTH, cfg.fixedWidth().trim());
+
+        // Mutation: same pipeline map, grammar reference renamed -> the guard must go red.
+        java.util.Map<String, Object> raw = com.gamma.util.ToonHelper.load(pipeline.toString());
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> processing = (java.util.Map<String, Object>) raw.get("processing");
+        processing.put("grammar", "renamed.grammar.toon");
+        assertThrows(java.io.FileNotFoundException.class, () -> PipelineConfig.fromMap(raw, dir),
+                "a renamed grammar reference must fail the load");
+    }
+
+    private static Path repoRoot() {
+        Path dir = Path.of("").toAbsolutePath();
+        for (int up = 0; up < 4 && dir != null; up++, dir = dir.getParent())
+            if (Files.isDirectory(dir.resolve("spaces"))) return dir;
+        throw new AssertionError("cannot locate the repo root from " + Path.of("").toAbsolutePath());
     }
 
     // ── validation ──────────────────────────────────────────────────────────────

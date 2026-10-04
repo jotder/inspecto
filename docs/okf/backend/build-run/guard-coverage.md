@@ -463,3 +463,21 @@ v71) and the skip removed in both profiles. The full `-Pcoverage` reactor: 33/33
 failures; instructions 84.66% against a 78% floor, branches 71.51% against 64%. Lesson: when you switch a
 guard's input off, switch the guard off in the same change, or it fails every run and a failure earlier in
 CI hides it.
+
+## Instance, 2026-10-04: two shipped-grammar guards that were skipped forever
+`FixedWidthTest.shippedSubscriberPipelineResolvesFixedWidthGrammar` and
+`DelimitedGrammarTest.shippedVoucherPipelineResolvesGrammar` each opened a pipeline by a module-relative path
+guarded by `assumeTrue(Files.exists(..))`. The subscriber file exists nowhere in the repo; the voucher pipeline
+moved to `spaces/ucc/config/voucher/`. Both were silently SKIPPED, so no shipped grammar reference was ever
+proven to resolve. Repointing the path alone failed with "Grammar file not found" because the test used
+`PipelineConfig.fromMap(map)` (no config dir), which resolves relative refs against the working directory.
+**Now real:** both use `PipelineConfig.loadForValidation(<shipped pipeline>)`, the production loader, which
+resolves a relative `processing.grammar` against the pipeline's own directory.
+- `FixedWidthTest.shippedFixedWidthExampleResolvesGrammar` covers `inspecto/examples/02-parsing/fixedwidth`
+  (4 slices, min record length 34, trim BOTH).
+- `DelimitedGrammarTest.shippedVoucherPipelineResolvesGrammar` covers `spaces/ucc/config/voucher`
+  (delimiter, `has_header`, Oracle date format from the grammar).
+- Each also renames the grammar reference on the decoded map and asserts `FileNotFoundException` (mutation proof),
+  and the `assumeTrue` is now `assertTrue`, so a moved file turns the guard red instead of skipped.
+Neither registers a Space root (`SpaceConfigRoot` lives in `inspecto-engine`, which `inspecto-etl` does not
+depend on), so no root can leak in from another test.

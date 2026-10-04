@@ -91,21 +91,36 @@ class DelimitedGrammarTest {
         assertEquals(5, cfg.csv().skipJunkLines(), "grammar value preserved when not overridden");
     }
 
-    /** The shipped voucher pipeline references an external grammar file by relative path. */
+    /**
+     * The SHIPPED voucher pipeline ({@code spaces/ucc/config/voucher}) loads through the production loader,
+     * which resolves its relative {@code processing.grammar} against the pipeline's own directory (never the
+     * working directory), and the grammar parses. Renaming the grammar reference must fail the load.
+     */
     @Test
     void shippedVoucherPipelineResolvesGrammar() throws Exception {
-        Path pipeline = Path.of("config/voucher/voucher_pipeline.toon");
-        org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(pipeline),
-                "SKIPPED: config/voucher/voucher_pipeline.toon does not exist under the module CWD (the pipeline "
-                        + "now lives at spaces/ucc/config/voucher and its grammar path is CWD-relative, so the "
-                        + "test cannot simply be repointed) — this guard has never run; see guard-coverage.md");
-        // fromMap is a pure parse (no status-dir creation) but still resolves processing.grammar.
-        PipelineConfig cfg = PipelineConfig.fromMap(
-                com.gamma.util.ToonHelper.load(pipeline.toString()));
+        Path dir = repoRoot().resolve("spaces/ucc/config/voucher");
+        Path pipeline = dir.resolve("voucher_pipeline.toon");
+        assertTrue(Files.exists(pipeline), "shipped voucher pipeline present: " + pipeline);
+        PipelineConfig cfg = PipelineConfig.loadForValidation(pipeline.toString());
         assertEquals(",", cfg.csv().delimiter(), "delimiter comes from the grammar file");
         assertFalse(cfg.csv().hasHeader(), "has_header comes from the grammar file");
         assertTrue(cfg.csv().dateFormats().contains("%d-%b-%Y %H:%M:%S"),
                 "Oracle DD-MON-YYYY format resolved from grammar, got " + cfg.csv().dateFormats());
+
+        // Mutation: same pipeline map, grammar reference renamed -> the guard must go red.
+        java.util.Map<String, Object> raw = com.gamma.util.ToonHelper.load(pipeline.toString());
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> processing = (java.util.Map<String, Object>) raw.get("processing");
+        processing.put("grammar", "renamed.grammar.toon");
+        assertThrows(java.io.FileNotFoundException.class, () -> PipelineConfig.fromMap(raw, dir),
+                "a renamed grammar reference must fail the load");
+    }
+
+    private static Path repoRoot() {
+        Path dir = Path.of("").toAbsolutePath();
+        for (int up = 0; up < 4 && dir != null; up++, dir = dir.getParent())
+            if (Files.isDirectory(dir.resolve("spaces"))) return dir;
+        throw new AssertionError("cannot locate the repo root from " + Path.of("").toAbsolutePath());
     }
 
     @Test
