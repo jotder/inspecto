@@ -15,6 +15,7 @@ import com.gamma.pipeline.exec.EgressAllowlist;
 import com.gamma.pipeline.exec.EgressPolicy;
 import com.gamma.query.DatasetRelation;
 import com.gamma.risk.EvidenceMasker;
+import com.gamma.util.ColumnClassification;
 import com.gamma.signal.Severity;
 
 import java.math.BigDecimal;
@@ -405,7 +406,8 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                         + "canAdminister — refused");
         }
         inherited.remove(UNKNOWN_LINEAGE);
-        inherited.forEach(classification::putIfAbsent);   // same-name columns inherit the classification
+        // same-name columns inherit the classification, strictest wins (ColumnClassification)
+        inherited.forEach((col, cl) -> classification.merge(col, cl, ColumnClassification::stricter));
         List<Col> out = new ArrayList<>();
         Set<String> seenAllow = new HashSet<>();
         try (Statement st = duck.createStatement(); ResultSet rs = st.executeQuery("DESCRIBE SELECT * FROM (" + relation + ") t")) {
@@ -448,14 +450,13 @@ public final class PostgresPublishJobType implements JobTypeProvider {
     /**
      * The classified columns (lower-cased name to class) other Datasets declare over the stores {@code ds} reads: its
      * {@code physicalRef}, a virtual Dataset's {@code sourceName}, or a view's store and its {@code source_store}
-     * lineage. Only what the registry states; a pipeline schema's own classification is not consulted.
+     * lineage, plus what the pipeline schemas behind them classify ({@link EvidenceMasker#schemaClassification});
+     * several classes on one column resolve strictest-wins ({@link ColumnClassification}).
      */
     static Map<String, String> lineageClassification(String datasetId, Map<String, Object> ds, ComponentStore store,
                                                      ViewStore views) {
-        Set<String> stores = new HashSet<>();
-        String ref = str(ds.get("physicalRef")), source = str(ds.get("sourceName")), view = str(ds.get("view"));
-        if (ref != null) stores.add(ref);
-        if (source != null) stores.add(source);
+        Set<String> stores = new HashSet<>(EvidenceMasker.datasetStores(ds));
+        String view = str(ds.get("view"));
         if (view != null) {
             stores.add(view);
             views.get(view).ifPresent(v -> {
@@ -474,7 +475,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                     if (o instanceof Map<?, ?> col && col.get("name") != null && col.get("classification") != null) {
                         String cl = String.valueOf(col.get("classification")).trim().toUpperCase(Locale.ROOT);
                         if (EvidenceMasker.SENSITIVE.contains(cl))
-                            out.putIfAbsent(String.valueOf(col.get("name")).toLowerCase(Locale.ROOT), cl);
+                            out.merge(String.valueOf(col.get("name")).toLowerCase(Locale.ROOT), cl, ColumnClassification::stricter);
                     }
         }
         EvidenceMasker.schemaClassification(store.root().getParent(), stores, out);

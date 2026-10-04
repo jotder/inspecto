@@ -116,4 +116,45 @@ class EvidenceMaskerTest {
         assertTrue(String.valueOf(m.mask("cust", "m", "9198")).startsWith("masked:"));
         assertTrue(String.valueOf(m.mask("cust", "plan", "gold")).startsWith("masked:"), "even an unrelated column");
     }
+
+    // ── strictest wins (operator 2026-10-04): several classified inputs feed one computed column ──
+
+    /** A pipeline "subs" with raw IMSI (class IMSI), MSISDN (class MSISDN) and PLAN, and one mapping rule
+     *  {@code both} = concat of {@code args}. */
+    private static Path subs(Path config, String args) throws Exception {
+        Files.createDirectories(config.resolve("subs"));
+        Files.writeString(config.resolve("subs/subs_pipeline.toon"), "name: subs\nactive: true\n\ndirs:\n"
+                + "  poll: data/inbox/subs\n  database: data/subs/database\n  backup: data/subs/backup\n"
+                + "  temp: data/subs/temp\n  errors: data/subs/errors\n  quarantine: data/subs/quarantine\n"
+                + "  markers: data/subs/markers\n  status_dir: data/subs/status\n  log_dir: data/subs/logs\n\n"
+                + "output:\n  format: PARQUET\n  compression: snappy\n\nprocessing:\n  threads: 1\n"
+                + "  file_pattern: \"glob:**/*.csv\"\n  schema_file: subs_schema.toon\n");
+        Files.writeString(config.resolve("subs/subs_schema.toon"), "partitionKey: DAY\nraw:\n  name: SUBS\n  format: CSV\n"
+                + "  fields[3]{name,selector,type,description,unit,classification}:\n"
+                + "    IMSI,\"0\",VARCHAR,\"\",\"\",\"IMSI\"\n    MSISDN,\"1\",VARCHAR,\"\",\"\",\"MSISDN\"\n"
+                + "    PLAN,\"2\",VARCHAR,\"\",\"\",\"\"\n"
+                + "mapping:\n  canonicalName: subs\n  rawName: SUBS\n  fields[1]:\n"
+                + "    - name: both\n      from: \"\"\n      fn: custom\n      args:\n        expression: \"concat(" + args + ")\"\n");
+        return config;
+    }
+
+    @Test
+    void aConcatOfTwoClassifiedInputsTakesTheStrictestClass(@TempDir Path space) throws Exception {
+        // IMSI is named FIRST, so a first-match resolver would answer IMSI; strictest-wins answers MSISDN
+        Path config = subs(Files.createDirectories(space.resolve("config")), "IMSI, MSISDN");
+        assertEquals("MSISDN", EvidenceMasker.schemaClassification(config, java.util.Set.of("subs"),
+                EvidenceMasker.SENSITIVE::contains).get("both"));
+    }
+
+    @Test
+    void aMaskedInputOutranksAHigherRankedUnmaskedOne(@TempDir Path space) throws Exception {
+        // negative twin: a consumer that masks only IMSI (a Space whose MSISDN Entity Type is unmasked) gets IMSI,
+        // i.e. "masked if ANY input is masked", never the higher-ranked but unmasked MSISDN
+        Path config = subs(Files.createDirectories(space.resolve("config")), "MSISDN, IMSI");
+        assertEquals("IMSI", EvidenceMasker.schemaClassification(config, java.util.Set.of("subs"),
+                "IMSI"::equals).get("both"));
+        Path plain = subs(Files.createDirectories(space.resolve("other")), "PLAN, PLAN");
+        assertNull(EvidenceMasker.schemaClassification(plain, java.util.Set.of("subs"),
+                EvidenceMasker.SENSITIVE::contains).get("both"), "unclassified inputs classify nothing");
+    }
 }

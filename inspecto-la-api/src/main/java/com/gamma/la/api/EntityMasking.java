@@ -1,5 +1,6 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.control.EntityTypes;
 import com.gamma.control.LinkAnalysisSettings;
@@ -14,6 +15,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -54,11 +56,16 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
  *         <li>the bound Dataset's registry {@code columns[]} {@code classification} of the Investigation's
  *             {@code sourceCol} / {@code targetCol} — the in-force type whose {@code classifications[]} contains it
  *             (case-insensitive, trimmed); when that type is masked, EVERY entity id is masked, because an id does
- *             not record which column it was read from. A classification no type claims leaves the column untyped.</li>
+ *             not record which column it was read from. A classification no type claims leaves the column untyped.
+ *             The column's class ALSO comes from schema lineage (ASSURE-CLASSIFICATION-PROPAGATION-1, operator
+ *             2026-10-04): the pipeline schema's {@code raw.fields[].classification} followed through its mapping
+ *             to the bound column, by the platform's one resolver ({@code DatasetProvider.schemaClassification},
+ *             the one {@code publish.postgres} and Risk Score evidence use). Several classes on one computed
+ *             column resolve strictest-wins: masked if ANY input's type is masked. When that lineage cannot be
+ *             traced while a raw column carries a masked type's class, EVERY entity id is masked (fail closed).</li>
  *       </ol>
  *       Nothing else. An entity ADMITTED by an expand is typed only through rule 3, so a neighbour of a typed seed
- *       is NOT masked unless its column's type is. The schema-file {@code raw.fields[].classification} is not
- *       consulted: nothing resolves a Dataset to its schema file.</li>
+ *       is NOT masked unless its column's type is.</li>
  * </ul>
  *
  * <p><b>How.</b> A masked id becomes {@code masked:<16 hex>} — an HMAC-SHA256 of the id under a random per-Investigation
@@ -227,8 +234,21 @@ final class EntityMasking {
     /** The Investigation's bound source/target columns whose registry {@code columns[]} {@code classification} is
      *  claimed by a MASKED in-force Entity Type — column name → type id. A classification no type claims is untyped. */
     private static Map<String, String> maskedColumns(InvestigationRoutes.Inv inv, List<EntityTypes.EntityType> types) {
-        Map<String, Object> ds = DatasetProviders.require().dataset(inv.writeRoot(), inv.dataset()).orElse(Map.of());
+        DatasetProvider provider = DatasetProviders.require();
+        Map<String, Object> ds = provider.dataset(inv.writeRoot(), inv.dataset()).orElse(Map.of());
         Map<String, String> out = new LinkedHashMap<>();
+        // The pipeline-schema lineage (the platform's one resolver; a class is "masked" when a masked type claims it,
+        // so several classes on one column resolve strictest-wins = masked if any input is masked).
+        Map<String, String> lineage = provider.schemaClassification(inv.writeRoot(), ds,
+                cls -> typeOf(types, cls).map(EntityTypes.EntityType::masked).orElse(false));
+        if (lineage.containsKey(DatasetProvider.UNKNOWN_LINEAGE))
+            out.put("(untraceable lineage)", "unknown");   // fail closed: mask every entity id
+        for (String bound : List.of("sourceCol", "targetCol")) {
+            Object name = inv.header().get(bound);
+            String cls = name == null ? null : lineage.get(String.valueOf(name).trim().toLowerCase(Locale.ROOT));
+            if (cls != null) typeOf(types, cls).filter(EntityTypes.EntityType::masked)
+                    .ifPresent(t -> out.put(String.valueOf(name), t.id()));
+        }
         if (!(ds.get("columns") instanceof List<?> cols)) return out;
         for (String bound : List.of("sourceCol", "targetCol")) {
             Object name = inv.header().get(bound);
@@ -242,6 +262,12 @@ final class EntityMasking {
                 }
         }
         return out;
+    }
+
+    /** The in-force Entity Type whose {@code classifications[]} claims {@code cls} (case-insensitive, trimmed). */
+    private static java.util.Optional<EntityTypes.EntityType> typeOf(List<EntityTypes.EntityType> types, String cls) {
+        String c = cls.trim();
+        return types.stream().filter(t -> t.classifications().stream().anyMatch(x -> x.trim().equalsIgnoreCase(c))).findFirst();
     }
 
     /** The per-Investigation HMAC key, created on first use. Never served. The algorithm lives in {@link MaskTokens}

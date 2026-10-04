@@ -3,6 +3,7 @@ package com.gamma.risk;
 import com.gamma.catalog.PipelineSchemas;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
+import com.gamma.util.ColumnClassification;
 import com.gamma.util.SpaceSecretKeys;
 
 import javax.crypto.Mac;
@@ -19,6 +20,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * WRITE-time masking of Risk Score evidence (ASSURE-RISK-SCORE-1, operator decision 2026-09-27). The
@@ -38,7 +42,7 @@ import java.util.Set;
 public final class EvidenceMasker {
 
     /** Column classifications whose evidence values are masked. */
-    public static final Set<String> SENSITIVE = Set.of("MSISDN", "IMSI", "ACCOUNT", "PII");
+    public static final Set<String> SENSITIVE = ColumnClassification.SENSITIVE;
     public static final String TOKEN_PREFIX = "masked:";
     public static final String KEY_FILE = ".risk-score-mask.key";
 
@@ -78,12 +82,7 @@ public final class EvidenceMasker {
                 if (o instanceof Map<?, ?> c && c.get("name") != null && c.get("classification") != null
                         && SENSITIVE.contains(String.valueOf(c.get("classification")).trim().toUpperCase(Locale.ROOT)))
                     out.add(String.valueOf(c.get("name")).trim().toLowerCase(Locale.ROOT));
-        Set<String> stores = new LinkedHashSet<>();
-        if (str(ds.get("physicalRef")) != null) stores.add(str(ds.get("physicalRef")));
-        if (str(ds.get("sourceName")) != null) stores.add(str(ds.get("sourceName")));
-        Map<String, String> inherited = new HashMap<>();
-        schemaClassification(registry.root().getParent(), stores, inherited);
-        out.addAll(inherited.keySet());
+        out.addAll(schemaClassification(registry.root().getParent(), datasetStores(ds), SENSITIVE::contains).keySet());
         return out;
     }
 
@@ -118,15 +117,35 @@ public final class EvidenceMasker {
     public static final String UNKNOWN_LINEAGE = "*";
 
     /**
-     * Adds what the pipeline schemas behind {@code stores} classify. A schema's {@code raw.fields[].classification}
-     * (sensitive classes only) follows its {@code mapping.fields[]} to the stored column: a {@code keep}/rename of a
-     * classified raw column, and any rule whose text ({@code from} or {@code args}) names one (a hash, a
-     * substring, a concatenation), classify the target; a target named like a classified raw column does too.
-     * Fails closed to {@link #UNKNOWN_LINEAGE} when a matching pipeline cannot be loaded, its mapping cannot be
-     * read, or it has a step that rewrites the columns (summarize, sql, lookup, join, route) while a raw column is
-     * classified. A store no pipeline claims (a Job output, a sidecar) contributes nothing.
+     * The origin rule: the stores a Dataset reads directly, its {@code physicalRef} and a virtual Dataset's
+     * {@code sourceName} (a {@code store/table} ref resolves by its head). Shared by every lineage consumer.
      */
+    public static Set<String> datasetStores(Map<String, ?> ds) {
+        Set<String> stores = new LinkedHashSet<>();
+        if (str(ds.get("physicalRef")) != null) stores.add(str(ds.get("physicalRef")));
+        if (str(ds.get("sourceName")) != null) stores.add(str(ds.get("sourceName")));
+        return stores;
+    }
+
+    /** {@link #schemaClassification(Path, Set, Predicate)} under {@link #SENSITIVE}, merged into {@code out} strictest-wins. */
     public static void schemaClassification(Path configRoot, Set<String> stores, Map<String, String> out) {
+        schemaClassification(configRoot, stores, SENSITIVE::contains)
+                .forEach((col, cl) -> out.merge(col, cl, ColumnClassification::stricter));
+    }
+
+    /**
+     * What the pipeline schemas behind {@code stores} classify, lower-cased stored column to class. Only raw
+     * {@code raw.fields[].classification} values {@code masked} accepts count. A class follows the schema's
+     * {@code mapping.fields[]} to the stored column: a {@code keep}/rename of a classified raw column, and any rule
+     * whose text ({@code from} or {@code args}) names one (a hash, a substring, a concatenation), classify the
+     * target; a target named like a classified raw column does too. When several classified inputs feed one column
+     * it takes the STRICTEST class ({@link ColumnClassification}, operator 2026-10-04). Fails closed to
+     * {@link #UNKNOWN_LINEAGE} when a matching pipeline cannot be loaded, its mapping cannot be read, or it has a
+     * step that rewrites the columns (summarize, sql, lookup, join, route) while a raw column is classified. A store
+     * no pipeline claims (a Job output, a sidecar) contributes nothing.
+     */
+    public static Map<String, String> schemaClassification(Path configRoot, Set<String> stores, Predicate<String> masked) {
+        Map<String, String> out = new java.util.TreeMap<>();
         for (String store : stores) {
             int slash = store.indexOf('/');
             PipelineSchemas.Found f = PipelineSchemas.forStore(configRoot, slash < 0 ? store : store.substring(0, slash));
@@ -135,14 +154,14 @@ public final class EvidenceMasker {
                 Map<String, String> sensitiveRaw = new java.util.LinkedHashMap<>();
                 if (e.schema().get("raw") instanceof Map<?, ?> raw && raw.get("fields") instanceof List<?> fields)
                     for (Object o : fields)
-                        if (o instanceof Map<?, ?> fld && fld.get("name") != null && fld.get("classification") != null) {
-                            String cl = String.valueOf(fld.get("classification")).trim().toUpperCase(Locale.ROOT);
-                            if (SENSITIVE.contains(cl))
-                                sensitiveRaw.putIfAbsent(String.valueOf(fld.get("name")).trim().toLowerCase(Locale.ROOT), cl);
+                        if (o instanceof Map<?, ?> fld && fld.get("name") != null) {
+                            String cl = ColumnClassification.normalise(fld.get("classification"));
+                            if (cl != null && masked.test(cl))
+                                put(sensitiveRaw, String.valueOf(fld.get("name")).trim().toLowerCase(Locale.ROOT), cl, masked);
                         }
                 if (sensitiveRaw.isEmpty()) continue;
                 if (f.reshaped()) { out.put(UNKNOWN_LINEAGE, "UNKNOWN"); continue; }
-                sensitiveRaw.forEach(out::putIfAbsent);   // a stored column named like the raw one
+                sensitiveRaw.forEach((col, cl) -> put(out, col, cl, masked));   // a stored column named like the raw one
                 if (!(e.schema().get("mapping") instanceof Map<?, ?> mapping) || mapping.get("fields") == null) continue;
                 if (!(mapping.get("fields") instanceof List<?> rules)) { out.put(UNKNOWN_LINEAGE, "UNKNOWN"); continue; }
                 for (Object o : rules) {
@@ -150,18 +169,22 @@ public final class EvidenceMasker {
                         out.put(UNKNOWN_LINEAGE, "UNKNOWN");
                         break;
                     }
-                    String text = rule.get("from") + " " + rule.get("args");
-                    java.util.regex.Matcher m = java.util.regex.Pattern.compile("[A-Za-z0-9_]+").matcher(text);
-                    while (m.find()) {
-                        String cl = sensitiveRaw.get(m.group().toLowerCase(Locale.ROOT));
-                        if (cl != null) {
-                            out.putIfAbsent(str(rule.get("name")).toLowerCase(Locale.ROOT), cl);
-                            break;
-                        }
-                    }
+                    Matcher m = WORD.matcher(rule.get("from") + " " + rule.get("args"));
+                    String strictest = null;   // several classified inputs: the strictest wins
+                    while (m.find())
+                        strictest = ColumnClassification.stricter(strictest,
+                                sensitiveRaw.get(m.group().toLowerCase(Locale.ROOT)), masked);
+                    if (strictest != null) put(out, str(rule.get("name")).toLowerCase(Locale.ROOT), strictest, masked);
                 }
             }
         }
+        return out;
+    }
+
+    private static final Pattern WORD = Pattern.compile("[A-Za-z0-9_]+");
+
+    private static void put(Map<String, String> out, String col, String cl, Predicate<String> masked) {
+        out.merge(col, cl, (x, y) -> ColumnClassification.stricter(x, y, masked));
     }
 
     private static String str(Object o) {

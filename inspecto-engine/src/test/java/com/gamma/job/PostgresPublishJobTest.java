@@ -514,6 +514,28 @@ class PostgresPublishJobTest {
     }
 
     @Test
+    void aDatasetsOwnLaxerClassDoesNotOverrideTheStricterLineageClass() throws Exception {
+        // strictest wins (operator 2026-10-04): the Dataset labels m INTERNAL, its lineage says MSISDN -> sensitive
+        custStore("m, plan, day", KEEP_RENAMED, "");
+        new ComponentStore(cfg.resolve("registry")).write("dataset", "cust", Map.of("physicalRef", "cust",
+                "columns", List.of(Map.of("name", "m", "classification", "INTERNAL"))));
+        JobRun r = run(Map.of("datasets", "cust"));
+        assertEquals("SUCCESS", r.status(), r.message());
+        assertEquals(List.of("plan", "day"), columnsOf("cust"), "m stays MSISDN despite the laxer own label");
+    }
+
+    @Test
+    void aDatasetsOwnUnsensitiveLabelOnAnUnclassifiedLineagePublishes() throws Exception {
+        // negative twin: no classified input behind plan, so its own INTERNAL label leaves it published
+        custStore("m, plan, day", KEEP_RENAMED, "");
+        new ComponentStore(cfg.resolve("registry")).write("dataset", "cust", Map.of("physicalRef", "cust",
+                "columns", List.of(Map.of("name", "plan", "classification", "INTERNAL"))));
+        JobRun r = run(Map.of("datasets", "cust"));
+        assertEquals("SUCCESS", r.status(), r.message());
+        assertEquals(List.of("plan", "day"), columnsOf("cust"));
+    }
+
+    @Test
     void aHashOrSubstringOfAClassifiedRawColumnStaysSensitive() throws Exception {
         custStore("h, s, plan, day", "  fields[4]:\n    - name: h\n      from: \"\"\n      fn: custom\n      args:\n"
                 + "        expression: \"md5(MSISDN)\"\n    - name: s\n      from: \"\"\n      fn: custom\n      args:\n"

@@ -482,7 +482,7 @@ are the values four-eyes approved (below).
   - A **view or virtual** Dataset over a store with classified columns is refused outright unless
     `include_sensitive` names `<dataset>.*` and the author holds `canAdminister`, because a rename or computation
     (`msisdn AS m`) cannot be traced statically.
-- **Pipeline schema lineage (operator 2026-10-04, `PostgresPublishJobType.schemaClassification`).** A Dataset's
+- **Pipeline schema lineage (operator 2026-10-04, `EvidenceMasker.schemaClassification`, the ONE resolver).** A Dataset's
   `physicalRef` head (or `sourceName`) names a Stream or pipeline; `PipelineSchemas.forStore` (the one resolver,
   also what `MetadataGraphBuilder` lays its schema nodes out from) finds that pipeline's `*_pipeline.toon` and its
   schemas.
@@ -490,6 +490,13 @@ are the values four-eyes approved (below).
     rename of a classified raw column, and any rule whose `from` or `args` text names one (`md5(MSISDN)`,
     `substr(msisdn,1,3)`, a concatenation), classify the target column. A stored column named like a classified
     raw column is classified too.
+  - **Strictest wins (operator 2026-10-04).** When several classified inputs feed one column (`concat(msisdn,
+    imsi)`), or lineage and the Dataset's own label disagree, the column takes the most restrictive class. The order
+    lives in ONE place, `com.gamma.util.ColumnClassification`: a class the consumer masks outranks one it does not
+    (publication and evidence: `SENSITIVE` = MSISDN, IMSI, ACCOUNT, PII; Link Analysis: a class a masked Entity
+    Type claims), then `MSISDN > IMSI > ACCOUNT > PII`, then by name. A Dataset labelling a lineage-MSISDN column
+    `INTERNAL` no longer publishes it. The origin rule (`physicalRef` + `sourceName`) is `EvidenceMasker.datasetStores`,
+    shared by publication, evidence and Link Analysis (`EngineDatasetProvider.schemaClassification`).
   - **Fails closed** to *classified-unknown* when a pipeline that may be the store's cannot be loaded, its mapping
     cannot be read, or it has a step that rewrites the columns (`summarize`, `sql`, `lookup`, `join`, `route`)
     while a raw column is classified. The Dataset is then refused unless `include_sensitive` names `<dataset>.*`
@@ -503,7 +510,10 @@ are the values four-eyes approved (below).
     such as `rollup`, an entity-list sidecar) contributes no classification.
 - ⚠ **Residual:** classification is only as good as the registry and the pipeline schemas.
   - A store no pipeline claims and no Dataset classifies publishes unmasked.
-  - ⚠ Still mirrored, not shared, in four other places (`MetadataGraphBuilder.originNode`,
+  - **Link Analysis `EntityMasking` consults the same lineage (2026-10-04)**: a bound source/target column
+    classified only in the pipeline schema masks every id when a masked Entity Type claims its class; untraceable
+    lineage masks every id.
+  - ⚠ The Catalog/rename/bundle origin-rule walks (not classification consumers) are still mirrored in four other places (`MetadataGraphBuilder.originNode`,
     `PipelineDependents.datasets`, `DataSourceBundleResolver.datasetReadsStore`,
     `PipelineRenameRoutes.rewriteDatasetRefs`): change the origin rule in all of them.
   - **Decided 2026-10-04 (operator): KEEP** for Job-output and sidecar stores (P3 `ASSURE-CLASSIFICATION-PROPAGATION-1`): no new refusal, no inheritance; they publish unmasked unless some Dataset classifies the store. Accepted residual; revisit when a customer publishes such a store.

@@ -10,6 +10,7 @@ import com.gamma.query.DatasetRead;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
+import com.gamma.risk.EvidenceMasker;
 import com.gamma.sql.SqlSandboxPolicy;
 
 import java.io.IOException;
@@ -19,6 +20,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * The BRIDGE's implementation of Link Analysis's {@link DatasetProvider} port (LA separation D-1 step 5b/6): every method
@@ -40,6 +42,11 @@ public final class EngineDatasetProvider implements DatasetProvider {
 
     private static Entry entry(ComponentRegistry.Component c) {
         return new Entry(c.name(), c.content());
+    }
+
+    @Override
+    public Map<String, String> schemaClassification(Path writeRoot, Map<String, Object> dataset, Predicate<String> masked) {
+        return EvidenceMasker.schemaClassification(writeRoot, EvidenceMasker.datasetStores(dataset), masked);
     }
 
     @Override

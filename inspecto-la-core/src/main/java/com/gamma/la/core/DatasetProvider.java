@@ -9,6 +9,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * The Dataset PORT of Link Analysis (LA separation D-1 step 5b/6): exactly what Link Analysis reads from the platform's
@@ -112,6 +113,20 @@ public interface DatasetProvider {
      */
     default String relationSqlOverFiles(Map<String, Object> dataset, Path dataRoot, Path writeRoot, List<String> relativePaths) {
         return null;
+    }
+
+    /** Reserved {@link #schemaClassification} key: the Dataset's column lineage cannot be traced (fail closed). */
+    String UNKNOWN_LINEAGE = "*";
+
+    /**
+     * What the pipeline schemas behind the Dataset's stores classify, through their mappings (ASSURE-CLASSIFICATION-
+     * PROPAGATION-1): lower-cased column to its strictest class among those {@code masked} accepts, plus
+     * {@link #UNKNOWN_LINEAGE} when the lineage of a masked raw class cannot be traced. The platform's ONE lineage
+     * resolver, the one {@code publish.postgres} and Risk Score evidence masking use. The default (a provider with no
+     * pipeline schemas) reports nothing.
+     */
+    default Map<String, String> schemaClassification(Path writeRoot, Map<String, Object> dataset, Predicate<String> masked) {
+        return Map.of();
     }
 
     /** Run a statement under the platform's default sandbox policy. */

@@ -849,7 +849,12 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   Investigation response may arrive MASKED as `masked:<16 hex>` per the Space's `maskingMode` (default `typed`:
   ids whose Entity Type is `masked` — seeded with such an `entityType` or one naming no type in force, on or matched
   by an Entity List of such a type, or every id when a bound Dataset column's classification maps to such a type;
-  LA-17 step 5, 2026-09-26); the panel shows the pseudonym as given and may send it back in an op's `ids` — the server resolves it.
+  LA-17 step 5, 2026-09-26). That column classification comes from the Dataset registry AND, since 2026-10-04
+  (`ASSURE-CLASSIFICATION-PROPAGATION-1`, operator), from the pipeline schema's `raw.fields[].classification` followed
+  through its mapping by the platform's one lineage resolver (`DatasetProvider.schemaClassification`, the one
+  `publish.postgres` and Risk Score evidence use): several classes on one computed column resolve strictest-wins
+  (masked if any input's type is masked), and untraceable lineage of a masked class masks every id (fail closed).
+  The panel shows the pseudonym as given and may send it back in an op's `ids` — the server resolves it.
   **Oversight surface** (`link-analysis-oversight.component`, 2026-10-03, `LA-SPA-OWED-SURFACES-1` slice): lists
   `GET …/log`'s `pending[]` — each request's requester, the thresholds it crossed (`sensitivity.exceeded` and the
   Space's `fourEyes*Above`) and its status; a holder of `canApproveLinkExpansions` gets **Approve / Deny** (optional
