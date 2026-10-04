@@ -114,6 +114,21 @@ class ControlApiSpaceTemplateSeedGateTest {
         }
     }
 
+    @Test
+    void aTemplatePipelineWithAnUnreadBlockRefusesTheWholeTemplate(@TempDir Path root) throws Exception {
+        copyTree(Path.of("..", "spaces", "_templates", "orders-starter"), root.resolve("_templates").resolve("broken"));
+        Path pipeline = root.resolve("_templates").resolve("broken").resolve("config/orders/orders_pipeline.toon");
+        try (Ctx c = open(root)) {
+            // the probe: the untouched copy applies, so the refusal below is the content gate and nothing else
+            assertEquals(200, send(c, "POST", "/spaces", "{\"id\":\"ok\",\"template\":\"broken\"}", ADMIN).statusCode());
+            Files.writeString(pipeline, Files.readString(pipeline) + "\nno_such_block:\n  x: 1\n");
+            HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"broken\"}", ADMIN);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("template pipeline 'orders_pipeline.toon' is refused"), r.body());
+            assertFalse(Files.exists(root.resolve("acme")), "a refused template leaves no Space directory");
+        }
+    }
+
     private static final java.util.Map<String, String> RUNBOOK_PACKS = java.util.Map.of(
             "telco-ra", "telco-ra-runbooks.md",
             "business-assurance", "business-assurance-runbooks.md",

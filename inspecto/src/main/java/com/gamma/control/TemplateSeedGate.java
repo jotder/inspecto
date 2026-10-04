@@ -37,8 +37,8 @@ import java.util.stream.Stream;
  * Every step runs on every create, the zero-Space recovery create included ({@code TEMPLATE-RECOVERY-IMPORT-GATE-1},
  * operator 2026-10-03: that create is Space governance and needs {@code canAdminister} like the rest, so there is
  * no capability-less applier left to exempt). With no Subject (Personal) every capability check is a no-op.
- * ⚠ Not gated here: a template's non-registry configs (Pipelines, Connections', Jobs' content) are not run through
- * {@code SaveGate} — only their capability.
+ * Pipelines and Jobs are additionally run through {@link SaveGate} with referents deferred
+ * ({@code ASSURE-KPI-DEFINITIONS-RESIDUALS-1}). ⚠ Not gated: a template's Connection files' content.
  */
 final class TemplateSeedGate {
 
@@ -77,6 +77,42 @@ final class TemplateSeedGate {
             }
         }
         KpiRoutes.requireTemplateKpis(ex, spaceBase);
+        requireStructure(config);
+    }
+
+    /**
+     * The content gate every save path runs ({@link SaveGate}) over each staged Pipeline ({@code *_pipeline.toon})
+     * and Job ({@code jobs/*.toon}), with referents DEFERRED ({@link SaveGate.Referents#MAY_ARRIVE_LATER}): a
+     * template's Connections are filled in later, so a missing one is not a defect — a structurally invalid config is.
+     */
+    private static void requireStructure(Path config) {
+        for (Path file : configFiles(config)) {
+            String name = file.getFileName().toString();
+            Path parent = file.getParent();
+            String type = parent.equals(config.resolve("jobs")) && name.endsWith(".toon") ? "job"
+                    : name.endsWith("_pipeline.toon") && !parent.startsWith(config.resolve("registry")) ? "pipeline" : null;
+            if (type == null) continue;
+            Map<String, Object> draft;
+            try {
+                draft = com.gamma.config.io.ConfigLoader.filesystem().decode(file.toString());
+            } catch (IOException | RuntimeException unreadable) {
+                throw refused(type, name, unreadable.getMessage());
+            }
+            List<com.gamma.config.spec.Finding> findings = SaveGate.check(null, type, draft, config, parent,
+                    SaveGate.Referents.MAY_ARRIVE_LATER);
+            for (com.gamma.config.spec.Finding f : findings)
+                if (f.severity() == com.gamma.config.spec.Severity.ERROR)
+                    throw refused(type, name, f.fieldPath() + ": " + f.message());
+        }
+    }
+
+    private static List<Path> configFiles(Path config) {
+        if (!Files.isDirectory(config)) return List.of();
+        try (Stream<Path> walk = Files.walk(config)) {
+            return walk.filter(Files::isRegularFile).sorted().toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /** What {@code ComponentRoutes.writeComponent} runs before its write, over the content as stored. */

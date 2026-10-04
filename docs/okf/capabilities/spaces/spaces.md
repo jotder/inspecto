@@ -463,8 +463,10 @@ kind's own suffix (`ComponentStore.suffixFor` — `.csv` for a mapping) the stor
 Decision Rule is rewritten with `prepare`'s stamps: the applying actor is creator and maker, and the template's
 `createdBy`/`updatedBy`/`restoredMakers` are dropped. The recovery create skips the kind-table capability but still
 asks an invoke-api rule's `canWorkIncidents` (deliberate: outbound calls always need it); (3) `kpi` as above. First refusal → 403 / 422 naming the kind, no Space. `ControlApiSpaceTemplateSeedGateTest`
-applies EVERY shipped template and pins both refusals. ⚠ Not gated: the CONTENT of a template's non-registry configs
-(Pipelines, Connections, Jobs — the `SaveGate` `/config/write` runs); only their capability.
+applies EVERY shipped template and pins both refusals. (4) **structure** (2026-10-04) — every staged Pipeline (`*_pipeline.toon`)
+and Job (`jobs/*.toon`) runs through `SaveGate.check` with `Referents.MAY_ARRIVE_LATER` (a template's Connections are
+filled in later, so a missing one is not a defect; a structurally invalid config such as an unread block is), judged from
+the file's own directory; the first ERROR refuses the template. ⚠ Not gated: a template's Connection files' content.
 
 #### 3.5.1 The `payment-fraud` content pack — slice 1 (`ASSURE-PACK-PAYMENT-FRAUD-1`, 2026-09-30)
 
