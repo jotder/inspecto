@@ -241,17 +241,24 @@ exists (§2, §5).
   - `ra_data_quality` takes only the data-quality rows, and its Alert Rule is WARNING.
   - ⚠ A dataset Alert Rule has no row filter (`when` scopes only ledger-metric rules), so the split has to be
     two Datasets.
-  - ⚠ The rules are not keyed `by: CONTROL`: the seed gate checks a `by` column against the Dataset's
-    Schema, and that Dataset is empty at apply.
+  - Both rules are keyed `by: CONTROL` (2026-10-04): one Alert per firing control and rule, never per entity
+    (G-42). The seed gate checks a `by` column against the Dataset's Schema, so `ra_leakage` and
+    `ra_data_quality` ship a zero-row `schema-seed.parquet` (below).
   - Timestamps are naive, so every feed must arrive in one agreed timezone.
   - Tolerances are Job keys. A `$param` arrives as a string literal, so the SQL `CAST`s it to
     `DECIMAL(18,4)`.
   - ⚠ `CEIL` returns a DOUBLE: a settlement minute count must be cast back to `BIGINT`, or every downstream
     amount silently turns into a float. The golden test caught this.
-- **Alert Rules.** Both use `gte 1`. ⚠ An Alert Rule threshold must be positive, so "any row" cannot be
+- **Alert Rules.** Both use `gte 1` and `by: CONTROL`. ⚠ An Alert Rule threshold must be positive, so "any row" cannot be
   written `gt 0`.
-- **KPIs.** They ship as `kpi` Widgets plus the runbook table, not as `registry/kpis/`. The seed gate
-  reads a KPI's Dataset Schema, and every pack Dataset is empty at apply.
+- **KPIs (2026-10-04).** `registry/kpis/` ships `leakage_found` (`sum(LEAKAGE_AMOUNT)`), `leakage_items` and
+  `data_quality_items` (`count`), month grain over `EVENT_DATE`; the three matching dashboard tiles are bound by
+  `kpiId`. The seed gate reads a KPI's Dataset Schema and every pack Dataset is empty at apply, so
+  `data/ra_leakage/` and `data/ra_data_quality/` each ship a **zero-row `schema-seed.parquet`** (generated with
+  DuckDB, as `payment-fraud` does): `CONTROL`, `ITEM_KEY`, `REASON`, `FINDING` VARCHAR, `EVENT_DATE` DATE,
+  `LEAKAGE_AMOUNT` DECIMAL(38,4). The gate is NOT relaxed. ⚠ `TelcoRaGoldenTest` pins each seed to its Job's
+  output schema (a drift, e.g. the `DECIMAL(38,4)` the Job really emits, fails it) and that the first run replaces
+  the seed. The seed carries the two Jobs' columns only; the other findings Datasets need none.
   - ⚠ **Breaks are not xDRs.** On the golden corpus, 15 completeness Breaks are **9** distinct lost or short
     xDRs, because a record lost at mediation breaks both pairs. The dashboard shows the xDR count
     (`ra_xdr_lost`).
@@ -276,8 +283,9 @@ exists (§2, §5).
   - **End to end (2026-10-04).** `theTemplateIngestsEvaluatesAndAlertsEndToEnd` creates a Space from the template,
     drops each feed's CSV in `data/inbox/<feed>`, ingests it through the template's own 8 Pipelines
     (`CollectorService.runPipeline`), runs the Jobs (the `on_signal` chain included), evaluates the Alert Rules and
-    the Expectations, and asserts the same pinned rows (17 + 17). Exactly two Alerts fire, one per rule
-    (`ra_leakage_found` CRITICAL, `ra_data_quality` WARNING; never per control); both shipped Expectations PASS the
+    the Expectations, and asserts the same pinned rows (17 + 17). Six Alerts fire, one per firing control and rule
+    (`ra_leakage_found` CRITICAL: re-rating 5, roll-forward 5, settlement 7; `ra_data_quality` WARNING: 13, 1, 3;
+    never per entity), and the KPIs evaluate to 161.16 USD, 17 and 17; both shipped Expectations PASS the
     clean corpus, and a `non_null` probe on the NULL opening balance proves an Expectation can fail. The test moved
     from `inspecto-engine` to `inspecto` because Expectations and the Space bootstrap live there. No Pipeline
     needed a fix to ingest its feed. The direct-load tests stay as the fast unit-level pin.

@@ -1,7 +1,8 @@
 name: ra_leakage_found
 dataset: ra_leakage_dataset
 measure: count
+by[1]: CONTROL
 comparator: gte
 threshold: 1
 severity: CRITICAL
-description: "A revenue-assurance control found leakage (re-rating, roll-forward or settlement). It fires once for the rule, not per control; the rows name the control. Runbook: config/runbooks/telco-ra-runbooks.md, the control's section."
+description: "A revenue-assurance control found leakage (re-rating, roll-forward or settlement). It fires once per control (by CONTROL), never per entity; the rows name the entities. Runbook: config/runbooks/telco-ra-runbooks.md, the control's section."

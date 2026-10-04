@@ -1,0 +1,8 @@
+name: leakage_found
+title: Leakage found (USD)
+dataset: ra_leakage_dataset
+measure: sum(LEAKAGE_AMOUNT)
+timeField: EVENT_DATE
+grain: month
+comparison: previous
+direction: down

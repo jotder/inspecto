@@ -1,6 +1,7 @@
 name: ra_data_quality
 dataset: ra_data_quality_dataset
 measure: count
+by[1]: CONTROL
 comparator: gte
 threshold: 1
 severity: WARNING

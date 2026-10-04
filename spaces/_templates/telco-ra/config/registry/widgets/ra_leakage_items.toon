@@ -1,7 +1,5 @@
 vizType: kpi
-datasetId: ra_leakage_dataset
-controls:
-  value[1]{field,agg}:
-    ITEM_KEY,count
 options:
   title: Leakage items found
+  kpi:
+    kpiId: leakage_items

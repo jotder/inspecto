@@ -1,0 +1,8 @@
+name: leakage_items
+title: Leakage items found
+dataset: ra_leakage_dataset
+measure: count
+timeField: EVENT_DATE
+grain: month
+comparison: previous
+direction: down

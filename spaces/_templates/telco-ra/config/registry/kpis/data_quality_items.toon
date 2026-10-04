@@ -1,0 +1,8 @@
+name: data_quality_items
+title: Data-quality findings
+dataset: ra_data_quality_dataset
+measure: count
+timeField: EVENT_DATE
+grain: month
+comparison: previous
+direction: down

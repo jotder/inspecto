@@ -293,6 +293,8 @@ class TelcoRaGoldenTest {
             }
 
             // ── Jobs ──
+            Map<String, String> seeded = new java.util.TreeMap<>();
+            for (String d : List.of("ra_leakage", "ra_data_quality")) seeded.put(d, schema(dataDir, d));
             com.gamma.job.JobService js = svc.jobService().orElseThrow();
             js.eventLog(com.gamma.event.EventLog.global());
             for (String j : List.of("ra_xdr_lost", "ra_xdr_completeness", "ra_rated_vs_billed", "ra_rerating")) {
@@ -303,6 +305,10 @@ class TelcoRaGoldenTest {
             for (String j : List.of("ra_rollforward", "ra_settlement", "ra_leakage", "ra_data_quality")) {   // the on_signal chain
                 JobRun run = await(() -> js.runsFor(j).stream().filter(r -> !"SKIPPED".equals(r.status())).findFirst().orElse(null));
                 assertEquals("SUCCESS", run.status(), j + ": " + run.message());
+            }
+            for (String d : seeded.keySet()) {
+                assertFalse(Files.exists(dataDir.resolve(d).resolve("schema-seed.parquet")), d + ": the first run replaced the seed");
+                assertEquals(seeded.get(d), schema(dataDir, d), d + ": the shipped zero-row seed declares exactly the Job's schema");
             }
             assertEquals(17, rows(dataDir, "ra_leakage", "CONTROL").size(), "leakage rows, ingested end to end");
             assertEquals(17, rows(dataDir, "ra_data_quality", "CONTROL").size(), "data-quality rows, ingested end to end");
@@ -318,14 +324,34 @@ class TelcoRaGoldenTest {
                 assertEquals(new TreeSet<>(CORPUS.planted.get(recon)), flagged, recon);
             }
 
-            // ── Alert Rules: one Alert per rule, never per control or entity (G-42) ──
+            // ── KPI definitions over the findings Datasets ──
+            var kpis = new com.gamma.pipeline.ComponentStore(base.resolve("config/registry"));
+            assertEquals(Set.of("leakage_found", "leakage_items", "data_quality_items"),
+                    kpis.list("kpi").stream().map(com.gamma.pipeline.ComponentRegistry.Component::name).collect(Collectors.toSet()));
+            java.time.LocalDate july = java.time.LocalDate.of(2026, 7, 31);   // every planted finding is dated in July 2026
+            Map<String, Double> kpiValues = new java.util.TreeMap<>();
+            for (var k : kpis.list("kpi")) {
+                var def = com.gamma.query.KpiDefinition.fromMap(k.name(), k.content());
+                var ds = kpis.get("dataset", def.dataset()).orElseThrow().content();
+                kpiValues.put(k.name(), com.gamma.query.KpiEvaluator.evaluate(def,
+                        com.gamma.query.DatasetRelation.relationSql(ds, dataDir, null), july).value());
+            }
+            assertEquals(Map.of("leakage_found", 161.16, "leakage_items", 17.0, "data_quality_items", 17.0), kpiValues,
+                    "the KPI definitions read the pinned leakage / data-quality Datasets");
+
+            // ── Alert Rules: one Alert per control (by CONTROL), never per entity (G-42) ──
             List<com.gamma.alert.Alert> alerts = svc.alertService().orElseThrow().evaluateRules();
-            Map<String, String> bySeverity = alerts.stream().collect(Collectors.toMap(
-                    com.gamma.alert.Alert::rule, com.gamma.alert.Alert::severity));
-            assertEquals(Map.of("ra_leakage_found", "CRITICAL", "ra_data_quality", "WARNING"), bySeverity,
-                    "exactly the two rules fire, once each: " + alerts);
-            assertEquals(2, alerts.size());
-            assertEquals(Set.of(17.0), alerts.stream().map(com.gamma.alert.Alert::value).collect(Collectors.toSet()));
+            Map<String, Double> perControl = new java.util.TreeMap<>();
+            for (com.gamma.alert.Alert a : alerts) {
+                var m = java.util.regex.Pattern.compile("CONTROL=(\\w+)").matcher(a.message());
+                assertTrue(m.find(), a.message());
+                assertNull(perControl.put(a.rule() + "|" + a.severity() + "|" + m.group(1), a.value()), "one Alert per control: " + alerts);
+            }
+            assertEquals(Map.of(
+                    "ra_leakage_found|CRITICAL|ra_rerating", 5.0, "ra_leakage_found|CRITICAL|ra_rollforward", 5.0,
+                    "ra_leakage_found|CRITICAL|ra_settlement", 7.0,
+                    "ra_data_quality|WARNING|ra_rerating", 13.0, "ra_data_quality|WARNING|ra_rollforward", 1.0,
+                    "ra_data_quality|WARNING|ra_settlement", 3.0), perControl, "exactly one Alert per firing control and rule");
 
             // ── Expectations: the shipped two pass the clean corpus; a probe that would otherwise fail proves they can ──
             for (String name : List.of("ra_switch_xdr_id_non_null", "ra_rated_charge_non_negative")) {
@@ -344,6 +370,16 @@ class TelcoRaGoldenTest {
     }
 
     // ── helpers ──
+
+    private static String schema(Path dataDir, String store) throws Exception {
+        StringBuilder sb = new StringBuilder();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery("DESCRIBE SELECT * FROM read_parquet('"
+                     + dataDir.resolve(store).toString().replace('\\', '/') + "/*.parquet')")) {
+            while (rs.next()) sb.append(rs.getString(1)).append(' ').append(rs.getString(2)).append(';');
+        }
+        return sb.toString();
+    }
 
     private static Path templateJob(String name) {
         return TEMPLATE.resolve("config").resolve("jobs").resolve(name + "_job.toon");
