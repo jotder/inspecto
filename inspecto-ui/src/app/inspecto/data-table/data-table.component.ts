@@ -41,6 +41,7 @@ import { compileSql, compileSqlWithParams } from '../query/query-sql';
 import { QueryConditionGroupComponent } from '../query/query-condition-group.component';
 import { RuleSaveDialog, RuleTemplate } from 'app/inspecto/rule';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { ColumnChooserComponent } from './column-chooser.component';
 import { fieldNames } from './core/column-resolve';
 import { downloadCsv, toCsv } from './core/csv';
@@ -117,6 +118,7 @@ function isShortcutExempt(target: EventTarget | null): boolean {
         AgGridAngular,
         ColumnChooserComponent,
         InspectoEmptyStateComponent,
+        InspectoSkeletonComponent,
         QueryConditionGroupComponent,
         SqlEditorComponent,
     ],
@@ -362,6 +364,12 @@ export class DataTableComponent {
     /** No rows (and not loading) ⇒ a compact `<inspecto-empty-state>` instead of the grid: an empty ag-Grid is a
      *  header over a blank body, and axe flags it (`aria-required-children` — a grid with no data rows). */
     readonly showEmpty = computed(() => !this.loading() && this.displayRows().length === 0);
+
+    /** Loading with nothing to draw (no rows, so no derived columns either): a grid here is a header row with no
+     *  cells, which axe flags (LA-A11Y-AUDIT-1). A skeleton stands in until the first rows arrive. */
+    readonly showLoadingPlaceholder = computed(
+        () => this.loading() && this.displayRows().length === 0 && this.gridColumns().length === 0,
+    );
 
     /** EMPTY-GRID-HSCROLL-1: an empty grid never draws a horizontal scrollbar, even when column min widths exceed the pane. */
     readonly suppressHScroll = computed(() => this.displayRows().length === 0);

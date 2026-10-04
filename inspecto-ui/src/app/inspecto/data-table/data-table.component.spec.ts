@@ -563,7 +563,7 @@ describe('DataTableComponent', () => {
             expect((grid(f).componentInstance as AgGridAngular).suppressPaginationPanel).toBe(false);
         });
 
-        it('an empty table is a compact empty state, not a grid; loading keeps the grid (overlay)', async () => {
+        it('an empty table is a compact empty state, not a grid; loading shows a skeleton, never "empty"', async () => {
             const f = await create('mini');
             f.componentRef.setInput('rows', []);
             f.componentRef.setInput('noRowsTitle', 'No calls yet');
@@ -577,10 +577,22 @@ describe('DataTableComponent', () => {
             expect(f.componentInstance.countAnnouncement()).toBe('No rows');
             await expectNoA11yViolations(host);
 
-            f.componentRef.setInput('loading', true); // a fetch in flight: the grid's loading overlay, not "empty"
+            f.componentRef.setInput('loading', true); // a fetch in flight: not "empty"
             f.detectChanges();
-            expect(grid(f)).not.toBeNull();
+            expect(grid(f)).toBeNull();
             expect(host.querySelector('inspecto-empty-state')).toBeNull();
+        });
+
+        /** LA-A11Y-AUDIT-1: loading with no rows and no columns used to mount a header row with no cells (axe hit). */
+        it('loading with no rows and no columns shows no grid, so no empty header row', async () => {
+            const f = await create('mini');
+            f.componentRef.setInput('rows', []);
+            f.componentRef.setInput('loading', true);
+            f.detectChanges();
+            const host = f.nativeElement as HTMLElement;
+            expect(grid(f)).toBeNull();
+            expect(host.querySelector('inspecto-skeleton')).not.toBeNull();
+            await expectNoA11yViolations(host);
         });
 
         describe('row-count caption (one-page grid, no pager)', () => {
