@@ -109,7 +109,7 @@ public final class TestConfigs {
                 delimiter, hasHeader, skipHeader, skipJunk, skipTail, skipTailCols,
                 dateCount, dateFormats, tsCount, tsFormats);
 
-        Path p = dir.resolve("pipeline_" + Integer.toHexString(System.identityHashCode(this)) + ".toon");
+        Path p = dir.resolve(Integer.toHexString(System.identityHashCode(this)) + "_pipeline.toon");
         Files.writeString(p, toon);
         return p;
     }

@@ -402,11 +402,7 @@ Root `compliance/` is **not** under `docs/` and has never shipped in the bundle 
 ⚠ Listed here so the concept knows what it owes; the board carries the detail. A pointer from a row to
 this file is a claim, checked by `tools/check-backlog-homes.mjs`.
 
-- **`TESTCONFIGS-PREFIX-SUFFIX-TRAP-1`** — `TestConfigs.write()` emits `pipeline_<hash>.toon`, a PREFIX,
-  while every directory-scanning loader matches the SUFFIX `*_pipeline.toon`. 88 test files use the
-  fixture and none noticed, because they load by explicit PATH; the trap springs only for a test that
-  boots by SCAN — and then it presents as a JVM crash, not a missing file. Left as-is deliberately
-  (88 files to fix a trap that has sprung once); re-rank on the second scan-booting test.
+- ~~**`TESTCONFIGS-PREFIX-SUFFIX-TRAP-1`**~~ CLOSED 2026-10-04: `TestConfigs.write()` now emits `<hash>_pipeline.toon`, the SUFFIX every scanning loader matches; pinned by `TestConfigsNameTest`.
 
 - ~~**`LIB-SYSTEM-EXIT-FROM-PUBLIC-API-1`**~~ ✅ **CLOSED 2026-09-20 (`cf40aaf3f`).**
   `ServiceBootstrap.buildFrom(…, exitIfEmpty=true)` — reached from the PUBLIC `CollectorService.fromArgs`

@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **55<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 40<!--count:backlog-p3--> × P3** —
+> **54<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 39<!--count:backlog-p3--> × P3** —
 > ⬇ **57 → 56 on 2026-10-04**: closed P2 `INGEST-OUTPUT-NAME-EMBEDS-SOURCE-STEM-1` — the output file stem is `FileNames.outputStem` (a value run becomes `fp-<16 hex>`, stable per name and Space, so `OVERWRITE_OR_IGNORE` re-runs keep their file), and `output_paths` is value-free with it.
 > ⬇ **56 → 55 (P3 41 → 40) on 2026-10-04**: closed `ENGINE-INMEMORY-UNSEALED-1` — the LA index build runs sealed to its declared read roots and `openInMemoryWithFileAccess` is gone.
 > ⬇ **57 → 56 on 2026-10-04**: closed P2 `INGEST-RAW-SOURCE-COPIES-RETENTION-1` — every remaining file-name log site (`CommitRetry`, `UnpackStage`, `NativeCsvStreamingEngine`, the lane failure logs, `QuarantineManager`, `DuckDbCsvIngester`), the status ledger's file / origin / logical-name columns and the unpack ledger now carry `FileNames.safe`; `FailureText.scrub` fingerprints a file-name-shaped token in any failure text; the heuristic also catches a value split by dashes or spaces. The raw-copy default stays kept-forever (decided). Residuals recorded in `okf/capabilities/spaces/spaces.md` §3.5.1.
@@ -144,10 +144,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 40<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 39<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 40<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 55<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 39<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 54<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -460,7 +460,6 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 
 #### Test infrastructure
 
-- **P3** · `TESTCONFIGS-PREFIX-SUFFIX-TRAP-1` — **the shared fixture writes a name the production scanner cannot discover.** `TestConfigs.write()` emits `pipeline_<hash>.toon`; every directory-scanning loader matches the suffix `*_pipeline.toon`. 88 test files use the fixture and load by explicit path, so the trap springs only for a test that boots by SCAN — and then presents as a JVM crash. Left as-is deliberately (88 files to fix a trap that has sprung once). ⚠ Re-rank to P2 the moment a second scan-booting test is written. → `okf/backend/build-run/build-test.md` · `inspecto-etl/src/test/java/com/gamma/etl/TestConfigs.java:113`
 
 #### Developer tooling
 
