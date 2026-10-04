@@ -494,9 +494,16 @@ Step Processor and no new route.
   `PaymentFraudCorpus` in the engine test sources, with the fixed seed `20260701`; `main <template>/data/samples`
   regenerates it. The golden test asserts that the committed CSVs are byte-for-byte what the generator writes. Every
   identifier is a synthetic token.
+- **Runbook: a refused card-number file is deleted (operator decision 2026-10-04, PCI).** A refused file stays in
+  the restricted store only for `refusal_retention_days` (default 7, 1..30; the template ships 30). After that the
+  poll-cycle housekeeping deletes it, and the AUDIT event `ingest.refused.retention` records its stored name, size,
+  sha256, reason and retention, never its content. To investigate a refusal, use that event and the
+  `ingest.refused` event inside the window, then fix the file at its origin and resend it. Never copy a restricted
+  file out of the store. Nothing replays from the store, so a deletion costs no replay
+  ([Ingestion §3.6](../ingestion/ingestion.md)).
 - **Card-number scan at ingest (WS-40): what it covers, exactly.** The three Pipelines set
-  `processing.refusal: restricted_quarantine`, `refusal_scan: card_number` and `refusal_retention_days: 30`. The scan
-  is the platform's (`RefusalQuarantine.cardScanSql`, [Ingestion §3.6](../ingestion/ingestion.md)). The schemas carry
+  `processing.refusal: restricted_quarantine`, `refusal_scan: card_number` and `refusal_retention_days: 30` (the
+  maximum). The scan is the platform's (`RefusalQuarantine.cardScanSql`, [Ingestion §3.6](../ingestion/ingestion.md)). The schemas carry
   no scan expression.
   - **What it reads:** every raw cell except the `refusal_scan_exempt` columns (default: none), before anything is
     written.

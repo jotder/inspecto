@@ -450,12 +450,15 @@ public final class PipelineConfig {
      * {@code restricted_quarantine}, a file whose transform an AUTHORED mapping expression refuses — DuckDB
      * {@code error('INGEST_REFUSE:<CODE>')}, the whole message exactly that reason code — is moved to the
      * restricted quarantine (never re-polled, never backed up, never served) instead of failing the batch; only the
-     * reason code is recorded. {@code retentionDays} (optional, {@code processing.refusal_retention_days}) ages out
-     * restricted files. See {@code com.gamma.inspector.RefusalQuarantine}.
+     * reason code is recorded. {@code retentionDays} ({@code processing.refusal_retention_days}, MANDATORY when
+     * restricted: default 7, 1..30) is how long a restricted file is kept before it is deleted. See {@code com.gamma.inspector.RefusalQuarantine}.
      */
     @PublicApi(since = "4.0.0")
     public record Refusal(boolean restricted, Integer retentionDays, boolean cardScan, List<String> scanExempt) {
         public static final Refusal OFF = new Refusal(false, null, false, List.of());
+        /** Mandatory retention (operator 2026-10-04, PCI): the default and the cap of {@code refusal_retention_days}. */
+        public static final int DEFAULT_RETENTION_DAYS = 7;
+        public static final int MAX_RETENTION_DAYS = 30;
 
         public Refusal {
             scanExempt = scanExempt == null ? List.of() : List.copyOf(scanExempt);
@@ -469,8 +472,9 @@ public final class PipelineConfig {
         public static Refusal parse(Object mode, Integer retentionDays, Object scan, List<String> exempt) {
             String v = mode == null ? "" : String.valueOf(mode).trim();
             String sc = scan == null ? "" : String.valueOf(scan).trim();
-            if (retentionDays != null && retentionDays < 1)
-                throw new IllegalArgumentException("processing.refusal_retention_days must be >= 1 (got " + retentionDays + ")");
+            if (retentionDays != null && (retentionDays < 1 || retentionDays > MAX_RETENTION_DAYS))
+                throw new IllegalArgumentException("processing.refusal_retention_days must be in [1, " + MAX_RETENTION_DAYS
+                        + "] (got " + retentionDays + ")");
             if (!sc.isEmpty() && !sc.equalsIgnoreCase("off") && !sc.equalsIgnoreCase("card_number"))
                 throw new IllegalArgumentException("processing.refusal_scan must be one of off, card_number (got '" + sc + "')");
             boolean card = sc.equalsIgnoreCase("card_number");
@@ -484,7 +488,7 @@ public final class PipelineConfig {
                 throw new IllegalArgumentException("processing.refusal must be one of off, restricted_quarantine (got '" + v + "')");
             if (exempt != null && !exempt.isEmpty() && !card)
                 throw new IllegalArgumentException("processing.refusal_scan_exempt needs processing.refusal_scan: card_number");
-            return new Refusal(true, retentionDays, card, exempt);
+            return new Refusal(true, retentionDays == null ? DEFAULT_RETENTION_DAYS : retentionDays, card, exempt);
         }
     }
 

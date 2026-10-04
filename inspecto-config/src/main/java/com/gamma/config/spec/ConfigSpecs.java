@@ -373,7 +373,9 @@ public final class ConfigSpecs {
                         "Raw column names (list or comma-separated) the operator knows carry no card data, e.g. ORDER_ID. "
                                 + "Unset = none: every column is scanned."),
                 FieldSpec.of("processing.refusal_retention_days", "Restricted quarantine retention (days)", FieldType.INT,
-                        "Optional: restricted-quarantine files older than this are deleted at the next refusal. Unset = kept."),
+                        "Mandatory with refusal: restricted_quarantine (PCI): a restricted file older than this is DELETED by the "
+                                + "poll-cycle housekeeping, each deletion audited (name, size, sha256, reason, retention; never content). "
+                                + "1..30, unset = 7."),
                 FieldSpec.of("processing.raw_copy_retention_days", "Raw source copy retention (days)", FieldType.INT,
                         "Optional: raw source files kept in backup/ (not parked/) and quarantine older than this are deleted after each backup. "
                                 + "A reject quarantined or backed up is replayable only inside this window. Unset = kept forever."),

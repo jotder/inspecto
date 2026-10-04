@@ -45,8 +45,12 @@ import java.util.regex.Pattern;
  * <p><b>Effect.</b> The file moves to {@code <data root>/.restricted/<pipeline>/} ({@link #dir}) — outside every
  * directory the sealed ingest/enrichment connections allowlist — under a generated name carrying the reason code. It is never polled,
  * {@code BackupTask} skips {@code .restricted}, and the quarantine listing and errors-file routes skip it. Only the
- * reason code is recorded — the member's status row, one WARN line, one AUDIT event {@code ingest.refused} — and
- * each file the optional retention window deletes is audited ({@code ingest.refused.retention}, code only).
+ * reason code is recorded — the member's status row, one WARN line, one AUDIT event {@code ingest.refused}.
+ *
+ * <p><b>Retention (mandatory, operator 2026-10-04).</b> A restricted file is DELETED once older than
+ * {@code refusal_retention_days} (default 7, 1..30) by {@link #sweepExpired}, run with each poll cycle's housekeeping
+ * and after each refusal; each deletion is audited ({@code ingest.refused.retention}: stored name, size, sha256,
+ * reason code, retention — never content).
  */
 final class RefusalQuarantine {
 
@@ -243,7 +247,7 @@ final class RefusalQuarantine {
         Path target = dir.resolve(name).normalize();
         if (!target.getParent().equals(dir)) throw new IOException("restricted quarantine target escapes its directory");
         Files.move(m.file().toPath(), target);
-        age(dir, cfg);
+        sweepExpired(cfg);
         log.warn("[INGEST] [{}] refused {} → restricted quarantine as {}", cfg.identity().pipelineName(), code, name);
         audit(cfg, "ingest.refused", "Pipeline '" + cfg.identity().pipelineName() + "' refused a file: " + code,
                 code, name, batchId);
@@ -300,30 +304,86 @@ final class RefusalQuarantine {
 
     private static final Pattern STORED = Pattern.compile("refused-([A-Z][A-Z_]{0,63})-\\d+-\\d+.*");
 
-    private static void age(Path dir, PipelineConfig cfg) {
-        Integer days = cfg.refusal().retentionDays();
-        if (days == null) return;
-        FileTime cutoff = FileTime.from(Instant.now().minus(days, ChronoUnit.DAYS));
-        try (DirectoryStream<Path> files = Files.newDirectoryStream(dir)) {
-            for (Path p : files) {
-                if (!Files.isRegularFile(p) || Files.getLastModifiedTime(p).compareTo(cutoff) >= 0) continue;
-                if (!Files.deleteIfExists(p)) continue;
-                Matcher mm = STORED.matcher(p.getFileName().toString());
-                String code = mm.matches() ? "INGEST_REFUSE:" + mm.group(1) : "INGEST_REFUSE:UNKNOWN";
-                audit(cfg, "ingest.refused.retention", "Pipeline '" + cfg.identity().pipelineName()
-                        + "' deleted a restricted file past its retention: " + code, code, p.getFileName().toString(), null);
-            }
-        } catch (IOException e) {
+    private static final long SWEEP_THROTTLE_MS = 60_000L;
+    private static final Map<Path, Long> LAST_SWEEP = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** The housekeeping entry (every poll cycle): {@link #sweepExpired} at most once a minute per store. Never throws. */
+    static void sweep(PipelineConfig cfg) {
+        if (!cfg.refusal().restricted()) return;
+        try {
+            long now = System.currentTimeMillis();
+            Long prev = LAST_SWEEP.put(dir(cfg), now);
+            if (prev != null && now - prev < SWEEP_THROTTLE_MS) return;
+            sweepExpired(cfg);
+        } catch (RuntimeException e) {
             log.warn("[INGEST] restricted quarantine retention sweep failed: {}", e.getClass().getSimpleName());
         }
     }
 
+    /**
+     * Mandatory retention (operator 2026-10-04, PCI): DELETE every restricted file older than
+     * {@code refusal_retention_days} (default {@link PipelineConfig.Refusal#DEFAULT_RETENTION_DAYS}, at most
+     * {@link PipelineConfig.Refusal#MAX_RETENTION_DAYS}). Path-jailed: only a regular file (never a link, never a
+     * sub-directory) directly in this Pipeline's store whose real parent IS the store and whose name is one
+     * {@link #storedName} generated. Crash-safe and idempotent: the audit event (stored name, size, sha256, reason
+     * code, retention - never content) is emitted BEFORE the delete, so a crash can duplicate the record, never lose
+     * it; a delete that fails leaves the file, retried by the next sweep. Returns the number deleted.
+     */
+    static int sweepExpired(PipelineConfig cfg) {
+        if (!cfg.refusal().restricted()) return 0;
+        Path dir = dir(cfg);
+        if (!Files.isDirectory(dir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return 0;
+        int days = cfg.refusal().retentionDays();
+        FileTime cutoff = FileTime.from(Instant.now().minus(days, ChronoUnit.DAYS));
+        int n = 0;
+        try (DirectoryStream<Path> files = Files.newDirectoryStream(dir)) {
+            Path store = dir.toRealPath();
+            for (Path p : files) {
+                try {
+                    if (!Files.isRegularFile(p, java.nio.file.LinkOption.NOFOLLOW_LINKS)) continue;
+                    if (!store.equals(p.toRealPath(java.nio.file.LinkOption.NOFOLLOW_LINKS).getParent())) continue;
+                    Matcher mm = STORED.matcher(p.getFileName().toString());
+                    if (!mm.matches()) continue;
+                    if (Files.getLastModifiedTime(p, java.nio.file.LinkOption.NOFOLLOW_LINKS).compareTo(cutoff) >= 0) continue;
+                    String code = "INGEST_REFUSE:" + mm.group(1);
+                    audit(cfg, "ingest.refused.retention", "Pipeline '" + cfg.identity().pipelineName()
+                            + "' deleted a restricted file past its " + days + "-day retention: " + code, code,
+                            p.getFileName().toString(), null, Map.of("size", String.valueOf(Files.size(p)),
+                                    "sha256", sha256(p), "retention_days", String.valueOf(days)));
+                    if (Files.deleteIfExists(p)) n++;
+                } catch (IOException e) {
+                    log.warn("[INGEST] restricted file not deleted yet (retried next sweep): {}", e.getClass().getSimpleName());
+                }
+            }
+        } catch (IOException e) {
+            log.warn("[INGEST] restricted quarantine retention sweep failed: {}", e.getClass().getSimpleName());
+        }
+        return n;
+    }
+
+    private static String sha256(Path p) throws IOException {
+        try (java.io.InputStream in = Files.newInputStream(p, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] buf = new byte[65_536];
+            for (int r; (r = in.read(buf)) > 0; ) md.update(buf, 0, r);
+            return java.util.HexFormat.of().formatHex(md.digest());
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private static void audit(PipelineConfig cfg, String action, String message, String code, String stored, String batchId) {
+        audit(cfg, action, message, code, stored, batchId, Map.of());
+    }
+
+    private static void audit(PipelineConfig cfg, String action, String message, String code, String stored,
+                              String batchId, Map<String, String> extra) {
         try {
             Event.Builder b = Event.builder(EventType.AUDIT).source("audit").message(message)
                     .action(action).actionCategory("security")
                     .attr("pipeline", cfg.identity().pipelineName()).attr("reason", code).attr("stored_as", stored);
             if (batchId != null) b.attr("consignment", batchId);
+            extra.forEach(b::attr);
             EventLog.current().emit(b);
         } catch (RuntimeException auditDown) {
             log.warn("[INGEST] refusal audit event not recorded: {}", auditDown.getClass().getSimpleName());

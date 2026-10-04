@@ -145,7 +145,10 @@ public class CollectorProcessor {
 
         // cleanupStaleMarkers DELETES marker files — a mutation, so it is suppressed too.
         if (dryRun) log.info("dry run: would clean up stale markers under {}", cfg.dirs().markers());
-        else MarkerManager.cleanupStaleMarkers(cfg);
+        else {
+            MarkerManager.cleanupStaleMarkers(cfg);
+            RefusalQuarantine.sweep(cfg);   // mandatory restricted-file retention (operator 2026-10-04)
+        }
 
         // The set of inbox files this cycle will ingest (matching, ready/stable, not already-processed).
         // The real run path emits readiness signals (FILE_STABLE + the waiting-stability gauge); the

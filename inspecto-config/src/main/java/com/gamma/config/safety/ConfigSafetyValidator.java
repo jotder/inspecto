@@ -267,6 +267,8 @@ public final class ConfigSafetyValidator {
                 && !List.of("off", "restricted_quarantine").contains(refusal.trim().toLowerCase(java.util.Locale.ROOT)))
             out.add(Finding.error("processing.refusal", "refusal must be one of off, restricted_quarantine (got '"
                     + refusal + "')"));
+        // Mandatory restricted-file retention (operator 2026-10-04, PCI): 1..30 days, default 7 when unset.
+        checkIntBound(raw, "processing.refusal_retention_days", 1, 30, out);
         String refusalScan = RawConfig.str(raw, "processing.refusal_scan");
         if (refusalScan != null && !refusalScan.isBlank()
                 && !List.of("off", "card_number").contains(refusalScan.trim().toLowerCase(java.util.Locale.ROOT)))

@@ -303,8 +303,21 @@ default (added 2026-09-30, `RefusalQuarantine`). With it on, a file can be refus
   - `DataRef.requireUnder` refuses any data reference that addresses a `.restricted` segment, or whose read root
     contains one (DuckDB's `**` glob descends into dot-directories). That covers Datasets, Expectations and
     `collector.dataset`. The table browser and `/db/query` apply the same rule.
-  - `processing.refusal_retention_days` (optional, ≥ 1) deletes restricted files older than that at the next
-    refusal. Each deletion is audited as `ingest.refused.retention`, carrying the file's code only.
+  - **Retention is mandatory (operator decision 2026-10-04, PCI: no stored card number).**
+    `processing.refusal_retention_days` defaults to 7 when unset and must be 1..30. Outside that range,
+    `ConfigSafetyValidator` refuses the save (422) and `PipelineConfig` refuses the load. A restricted file older
+    than the window is **deleted** by `RefusalQuarantine.sweepExpired`. That runs with each poll cycle's
+    housekeeping (`CollectorProcessor.ingest`, next to `cleanupStaleMarkers`, at most once a minute per store) and
+    after each refusal.
+    - Each deletion is audited as `ingest.refused.retention` with the stored name, size, sha256, reason code and
+      `retention_days`. The content is never recorded.
+    - The audit is emitted *before* the delete, so a crash can duplicate the record but never lose it. A failed
+      delete leaves the file in place and the next sweep retries it.
+    - The sweep is path-jailed. It deletes only a regular file (never a link, never a sub-directory) directly in
+      this Pipeline's store, whose real parent is the store and whose name the store generated. Files in another
+      Pipeline's store, in the ordinary quarantine or in backup are never deleted.
+    - Replay never relies on a restricted file. `RecordReplay` reads only the inbox, backup and the ordinary
+      quarantine tree (it skips `.restricted`), and the store lives outside all three.
 - **What is recorded.** Only the reason code:
   - the member row becomes `QUARANTINED_RESTRICTED`, with the generated `filename`, the `error` set to the code
     and a blank `logical_name`;

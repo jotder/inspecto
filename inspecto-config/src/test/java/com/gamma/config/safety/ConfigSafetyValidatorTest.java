@@ -832,4 +832,15 @@ class ConfigSafetyValidatorTest {
                 SafetyPolicy.withRoots(s), configDir).isEmpty(), "a Cyrillic lookalike is its own directory");
     }
 
+    /** Operator 2026-10-04 (PCI): restricted-file retention is mandatory and capped — outside 1..30 is a 422. */
+    @Test
+    void refusalRetentionOutsideOneToThirtyDaysIsRefused(@TempDir Path s) {
+        for (int days : new int[]{0, -1, 31, 365, 1, 7, 30}) {
+            Map<String, Object> raw = pipelineWithDir("poll", "data/p/poll");
+            raw.put("processing", new LinkedHashMap<>(Map.of("refusal", "restricted_quarantine", "refusal_retention_days", days)));
+            assertEquals(days < 1 || days > 30, refuses(ConfigSafetyValidator.check("pipeline", raw,
+                    SafetyPolicy.withRoots(s), s), "processing.refusal_retention_days"), days + " days");
+        }
+    }
+
 }
