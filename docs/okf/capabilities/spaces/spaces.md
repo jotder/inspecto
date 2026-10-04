@@ -478,7 +478,10 @@ asks an invoke-api rule's `canWorkIncidents` (deliberate: outbound calls always 
 applies EVERY shipped template and pins both refusals. (4) **structure** (2026-10-04) — every staged Pipeline (`*_pipeline.toon`)
 and Job (`jobs/*.toon`) runs through `SaveGate.check` with `Referents.MAY_ARRIVE_LATER` (a template's Connections are
 filled in later, so a missing one is not a defect; a structurally invalid config such as an unread block is), judged from
-the file's own directory; the first ERROR refuses the template. ⚠ Not gated: a template's Connection files' content.
+the file's own directory; the first ERROR refuses the template. (5) **Connections** (2026-10-04, closes
+`ASSURE-KPI-DEFINITIONS-RESIDUALS-1`) — every `*_connection.toon` runs `ConnectionRoutes.validateProfile`, what
+`POST`/`PUT /connections` run before their write (the connector's option checks, and for `https` the egress host
+check that refuses a numeric-form IP); a refusal is 422 `template connection '<file>' is refused`, no Space.
 
 #### 3.5.1 The `payment-fraud` content pack — slice 1 (`ASSURE-PACK-PAYMENT-FRAUD-1`, 2026-09-30)
 

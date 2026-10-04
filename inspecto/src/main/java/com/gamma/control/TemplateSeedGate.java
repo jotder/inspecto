@@ -38,7 +38,8 @@ import java.util.stream.Stream;
  * operator 2026-10-03: that create is Space governance and needs {@code canAdminister} like the rest, so there is
  * no capability-less applier left to exempt). With no Subject (Personal) every capability check is a no-op.
  * Pipelines and Jobs are additionally run through {@link SaveGate} with referents deferred
- * ({@code ASSURE-KPI-DEFINITIONS-RESIDUALS-1}). ⚠ Not gated: a template's Connection files' content.
+ * ({@code ASSURE-KPI-DEFINITIONS-RESIDUALS-1}), and every Connection file through
+ * {@link ConnectionRoutes#validateProfile} (its connector checks and the https egress host check).
  */
 final class TemplateSeedGate {
 
@@ -78,6 +79,23 @@ final class TemplateSeedGate {
         }
         KpiRoutes.requireTemplateKpis(ex, spaceBase);
         requireStructure(config);
+        requireConnections(config);
+    }
+
+    /** Each {@code *_connection.toon} meets what a Connection save runs ({@link ConnectionRoutes#validateProfile}). */
+    private static void requireConnections(Path config) {
+        for (Path file : configFiles(config)) {
+            String name = file.getFileName().toString();
+            if (!name.endsWith("_connection.toon")) continue;
+            try {
+                Object block = ConfigCodec.toMap(Files.readString(file)).get("connection");
+                @SuppressWarnings("unchecked")
+                Map<String, Object> c = block instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
+                ConnectionRoutes.validateProfile(com.gamma.acquire.ConnectionProfile.fromMap(c));
+            } catch (IOException | RuntimeException bad) {
+                throw refused("connection", name, bad.getMessage());
+            }
+        }
     }
 
     /**

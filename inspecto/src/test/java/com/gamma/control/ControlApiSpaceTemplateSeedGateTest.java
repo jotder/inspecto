@@ -221,6 +221,25 @@ class ControlApiSpaceTemplateSeedGateTest {
         }
     }
 
+    /**
+     * {@code ASSURE-KPI-DEFINITIONS-RESIDUALS-1}: a template's Connection file meets what {@code POST /connections}
+     * runs before its write — an https Connection's host is an egress target, so a numeric-form IP is refused.
+     */
+    @Test
+    void aTemplateConnectionWithANumericFormHostRefusesTheWholeTemplate(@TempDir Path root) throws Exception {
+        seedInvokeApiTemplate(root);
+        Path conn = root.resolve("_templates/actions/config/connections/hook_connection.toon");
+        try (Ctx c = open(root)) {
+            // the probe: the untouched template applies, so the refusal below is the Connection gate alone
+            assertEquals(200, send(c, "POST", "/spaces", "{\"id\":\"ok\",\"template\":\"actions\"}", ADMIN).statusCode());
+            Files.writeString(conn, Files.readString(conn).replace("tickets.test", "2130706433"));
+            HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"actions\"}", ADMIN);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("template connection 'hook_connection.toon' is refused"), r.body());
+            assertFalse(Files.exists(root.resolve("acme")), "a refused template leaves no Space directory");
+        }
+    }
+
     @Test
     void theRecoveryCreateStillAsksTheInvokeApiCapability(@TempDir Path root) throws Exception {
         seedInvokeApiTemplate(root);
