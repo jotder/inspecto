@@ -799,6 +799,30 @@ class ControlApiActionRequestsTest {
         }
     }
 
+    /** RESIDUALS-1 (3): the fail-closed skip is audited once per skip (WARN, rule name only); it still raises nothing. */
+    @Test
+    void aSkipForUnknownMakersEmitsOneWarnAuditAndStillFailsClosed(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        List<com.gamma.event.Event> seen = new CopyOnWriteArrayList<>();
+        java.util.function.Consumer<com.gamma.event.Event> sub = seen::add;
+        com.gamma.event.EventLog.global().addSubscriber(sub);
+        try (Ctx c = open(cfg, tmp, true)) {
+            new com.gamma.pipeline.ComponentStore(c.root.resolve("registry")).write("decision-rule", "legacy",
+                    Map.of("name", "legacy", "enabled", true, "consequences",
+                            List.of(Map.of("action", "invoke-api", "params", Map.of("connection", "hook")))));
+            JsonNode one = data(send(c, "POST", "/decision-rules/legacy/apply", "{}", AUTHOR), 200).at("/executed/0");
+            assertEquals("skipped", one.get("status").asText(), one.toString());
+            List<com.gamma.event.Event> warn = seen.stream().filter(e -> e.attributes()
+                    .containsValue("action-request.skipped-unknown-makers")).toList();
+            assertEquals(1, warn.size(), "exactly one audit for the one skip");
+            assertEquals(com.gamma.event.EventLevel.WARN, warn.get(0).level());
+            assertEquals("legacy", warn.get(0).attributes().get("decisionRule"));
+            assertEquals(0, data(send(c, "GET", "/action-requests", null, CHECKER), 200).get("total").asInt(),
+                    "still fails closed — no request raised");
+        } finally {
+            com.gamma.event.EventLog.global().removeSubscriber(sub);
+        }
+    }
+
     // ── round-2 finding 1: every writer of a decision-rule runs the ONE guard ─────────────────────
 
     private static final String FORGED_RULE = "{\"name\":\"leak\",\"createdBy\":\"someone-else\",\"updatedBy\":\"someone-else\","

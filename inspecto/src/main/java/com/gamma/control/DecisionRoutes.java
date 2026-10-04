@@ -349,6 +349,23 @@ final class DecisionRoutes implements RouteModule {
     /** The payload an {@code invoke-api} consequence sends when it names none: which Incident, which rule. */
     static final Map<String, Object> DEFAULT_INVOKE_PAYLOAD = Map.of("incident", "{{incident.id}}", "rule", "{{context.rule}}");
 
+    /** One WARN audit per skip when the history cannot name the makers (names the rule only — no payload, no values). */
+    private static void auditUnknownMakers(String ruleName, String actor, boolean automatic) {
+        try {
+            EventLog log = EventLog.current();
+            if (log == null) return;
+            log.emit(com.gamma.event.Event.builder(com.gamma.event.EventType.AUDIT).source("audit")
+                    .level(com.gamma.event.EventLevel.WARN)
+                    .message("Decision Rule '" + ruleName + "' raised no Action Request: the version history cannot name "
+                            + "the makers of its invoke-api consequence (unstamped version or history pruned) — failed closed")
+                    .actor(automatic ? "decision-rule:" + ruleName : actor).actorType(automatic ? "system" : "user")
+                    .action("action-request.skipped-unknown-makers").actionCategory("operation")
+                    .attr("decisionRule", ruleName));
+        } catch (RuntimeException auditFailure) {
+            // an audit gap must never turn a fail-closed skip into a 500
+        }
+    }
+
     private static String[] proposeActionRequest(ApiContext api, String ruleName, Map<String, Object> rule,
                                                  Map<String, Object> c, boolean automatic, String actor) {
         com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
@@ -361,6 +378,7 @@ final class DecisionRoutes implements RouteModule {
         // Round-2 finding 1b: the makers are every editor, from the VERSION HISTORY, since the invoke-api
         // consequence last changed — all co-authors, none may approve. Unknown provenance fails closed.
         List<String> coAuthors = DecisionRuleGuard.makers(new ComponentStore(root.resolve("registry")), ruleName, rule);
+        if (coAuthors == null) auditUnknownMakers(ruleName, actor, automatic);   // ASSURE-ACTION-REQUESTS-RESIDUALS-1 (3)
         if (coAuthors == null || coAuthors.isEmpty())
             return new String[] {"skipped", "no Action Request — the version history of Decision Rule '" + ruleName
                     + "' has no recorded editor for its invoke-api consequence (a version saved before editors were "

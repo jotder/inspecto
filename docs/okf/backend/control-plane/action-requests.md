@@ -232,7 +232,8 @@ the rule's open Incident (correlation `decision-rule:<rule>`, opened when none i
 author is the person applying the rule, or `decision-rule:<rule>` for an engine-fired application; the rule's
 makers (above, from the version history) become `coAuthors`. When the history cannot say — an unstamped version
 on the chain, or a chain running past the retained history — the rule raises nothing, *skipped* — fail closed,
-because its makers cannot be excluded; save it again.
+because its makers cannot be excluded; save it again. Each skip emits one WARN audit
+`action-request.skipped-unknown-makers` (rule name only, no payload) so the gap is visible (2026-10-04).
 
 **At save** (`POST|PUT /decision-rules`), a rule with an `invoke-api` consequence needs the saver to hold
 `canWorkIncidents` (403) — otherwise a `canAuthorWorkbench`-only author could propose outbound calls by proxy — and
@@ -285,9 +286,12 @@ is a valid DNS name) but still never lifts loopback at connect time — the noti
 
 ## Deferred / known gaps
 
+- Pruned history silently disables a rule's Action Requests until it is saved again (audited, still fail closed). The
+  planned real fix (operator 2026-10-04, **option C**, not built): stamp the makers permanently on the rule at save, so
+  pruning cannot erase them (`ASSURE-ACTION-REQUESTS-RESIDUALS-1`).
 - No per-request `path` below the Connection's base path: one Connection per endpoint.
 - Under OIDC `approverCheck` is `unknown`: telling whether a specific person holds `canApproveChanges` needs a
-  principal directory the server does not have (a product decision; `ASSURE-ACTION-REQUESTS-RESIDUALS-1`).
+  principal directory the server does not have (a product decision; `ASSURE-ACTION-REQUESTS-RESIDUALS-1`; if built, a per-Space approver roster, no IdP).
 - `inspecto`-module tests drive the dispatcher over a loopback **test** wire (it connects to the pinned address like
   the real one); the real wire's pinning, SNI / certificate verification and redirect refusal are pinned in
   `HttpWebhookSinkTransportTest` and `PinnedHttpTlsTest`.
