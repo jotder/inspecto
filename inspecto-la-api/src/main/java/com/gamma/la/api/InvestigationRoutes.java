@@ -114,13 +114,11 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
 public final class InvestigationRoutes implements RouteModule {
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    /** The ten ops evaluated so far (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate} + LA-17's three). */
+    /** The twelve ops evaluated (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate} + LA-17's three + {@code threshold} and {@code snapshot}). */
     private static final Set<String> SHIPPED = Set.of("seed", "expand", "exclude", "hide", "keep", "window", "annotate",
-            "excludeBy", "seedBy", "resolve");
+            "excludeBy", "seedBy", "resolve", "threshold", "snapshot");
     /** The ops over a named Entity List (LA-17, design §4.4.1): they carry {@code listId}, never ids. */
     static final Set<String> LIST_OPS = Set.of("excludeBy", "seedBy");
-    /** The rest of the closed vocabulary (plan §2.2): named so they refuse as "not yet", never as "unknown". */
-    private static final Set<String> DEFERRED = Set.of("threshold", "snapshot");
     /** A list op seals at most this many members (design §4.4.1: bounded like every other op payload). */
     private static final int MAX_LIST_MEMBERS = 5_000;
     /** An {@code expand} rung's traversal direction (plan §2.4). */
@@ -343,9 +341,6 @@ public final class InvestigationRoutes implements RouteModule {
     Object appendOpOn(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> body) throws IOException {
         String op = ApiContext.str(body, "op");
         if (op == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'op'");
-        if (DEFERRED.contains(op))
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is in the closed vocabulary but not implemented yet (LA-10 "
-                    + "LA-13, LA-19 and LA-17 ship seed, expand, exclude, hide, keep, window, annotate, excludeBy, seedBy, resolve)");
         if (!SHIPPED.contains(op))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is not in the closed op vocabulary");
         Map<String, Object> params = params(op, resolvePseudonyms(inv, body));
@@ -636,8 +631,6 @@ public final class InvestigationRoutes implements RouteModule {
         int step = 0;
         for (Map<String, Object> body : ops) {
             String op = ApiContext.str(body, "op");
-            if (DEFERRED.contains(op))
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is in the closed vocabulary but not implemented yet");
             if (!SHIPPED.contains(op)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is not in the closed op vocabulary");
             Map<String, Object> e = entry(++step, "op", ex);
             e.put("op", op);
@@ -1453,6 +1446,27 @@ public final class InvestigationRoutes implements RouteModule {
             p.put("window", "full".equals(w) ? null : InvestigationTime.window(w, "window"));
             return p;
         }
+        if (op.equals("threshold") || op.equals("snapshot")) {   // no ids: over the whole Working Set / a log position
+            if (body.containsKey("ids"))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + op + "' applies to the whole Working Set, not ids");
+            if (op.equals("snapshot")) {
+                String label = ApiContext.str(body, "label");
+                if (label != null && label.length() > MAX_NOTE_LENGTH)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'label' is at most " + MAX_NOTE_LENGTH + " chars");
+                if (label != null) p.put("label", label);
+                return p;
+            }
+            if (body.get("min") == null && body.get("max") == null)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'threshold' requires 'min' and/or 'max' - the degree band to keep "
+                        + "(min inclusive, max exclusive)");
+            Integer min = body.get("min") == null ? null : positive(body, "min", 0);
+            Integer max = body.get("max") == null ? null : positive(body, "max", 1);
+            if (min != null && max != null && min >= max)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'min' must be less than 'max' (max is exclusive)");
+            if (min != null) p.put("min", min);
+            if (max != null) p.put("max", max);
+            return p;
+        }
         Object rawIds = body.get("ids");
         if (rawIds != null && !(rawIds instanceof List<?>)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'ids' must be a list");
         LinkedHashSet<String> ids = new LinkedHashSet<>();
@@ -1665,6 +1679,8 @@ public final class InvestigationRoutes implements RouteModule {
             case "excludeBy" -> "Excluded " + removed + " entit" + (removed != null && removed == 1 ? "y" : "ies")
                     + " on " + listClause(e) + " (reason: " + p.get("reason") + ").";
             case "resolve" -> resolveLine(e);
+            case "threshold" -> thresholdLine(p);
+            case "snapshot" -> snapshotLine(e, p);
             case "seedBy" -> {
                 Map<String, Object> r = (Map<String, Object>) e.get("read");
                 int n = strings(r.get("ids")).size();
@@ -1711,6 +1727,19 @@ public final class InvestigationRoutes implements RouteModule {
         int n = strings(l.get("members")).size();
         return "Entity List `" + l.get("listId") + "` (" + l.get("purpose") + ", " + n + " member" + (n == 1 ? "" : "s")
                 + ", as of fact " + l.get("atSeq") + ")";
+    }
+
+    /** What a {@code threshold} did, in words (the removed entities are in the step's delta, not the line). */
+    static String thresholdLine(Map<String, Object> p) {
+        return "Removed every entity whose degree (distinct counterparties in the Working Set) is outside "
+                + "[" + (p.get("min") == null ? "0" : p.get("min")) + ", " + (p.get("max") == null ? "unbounded" : p.get("max"))
+                + ") - min inclusive, max exclusive; kept (protected) entities stay, removed ones are not re-admitted.";
+    }
+
+    /** A {@code snapshot} marker's line (the Working Set hash is on the entry). */
+    static String snapshotLine(Map<String, Object> e, Map<String, Object> p) {
+        return "Froze the Working Set here" + (p.get("label") == null ? "" : " as \"" + p.get("label") + "\"")
+                + " (log position " + e.get("step") + "; later steps do not change it).";
     }
 
     /** {@code " graded B2 (source usually reliable, information probably true)"} — empty when ungraded (D-U9). */

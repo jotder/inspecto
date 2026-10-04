@@ -628,6 +628,8 @@ final class GraphDossierBuilder {
                         + (gone.isEmpty() ? "." : ": " + String.join(", ", gone) + ".");
             }
             case "resolve" -> InvestigationRoutes.resolveLine(e);
+            case "threshold" -> InvestigationRoutes.thresholdLine(p);
+            case "snapshot" -> InvestigationRoutes.snapshotLine(e, p);
             case "seedBy" -> {
                 Map<String, Object> r = castMap((Map<?, ?>) e.get("read"));
                 List<String> seeded = strings(r.get("ids"));

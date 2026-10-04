@@ -10,6 +10,7 @@ import java.security.NoSuchAlgorithmException;
 import com.gamma.control.EntityTypes;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -26,7 +27,7 @@ import java.util.TreeSet;
  * carries its SEALED read (the materialised rows, decision D-E3), so evaluating a log is a function of the log
  * alone and replays identically on any day, against any data.
  *
- * <p>The op semantics (plan §2.3), for the ten ops shipped so far:
+ * <p>The op semantics (plan §2.3), for the twelve ops shipped (the closed vocabulary is complete):
  * <ul>
  *   <li>{@code seed {ids, entityType?}} — admits each id at hop 0 as its own seed. An already-admitted id keeps
  *       its original provenance; an EXCLUDED id is re-admitted, because a later explicit analyst op wins.</li>
@@ -42,6 +43,16 @@ import java.util.TreeSet;
  *   <li>{@code keep {ids}} — pins an entity against later excludes.</li>
  *   <li>{@code annotate {ids, note, confidence?}} (LA-19; {@code confidence} is an Admiralty grade, D-U9) — attaches the note to each named entity in the Working Set. It changes
  *       nothing about traversal, display or counts; a later exclusion keeps the note, because a note is history.</li>
+ *   <li>{@code threshold {min?, max?}} (LA-INVESTIGATION-OPS-DEFERRED-1) - the narrowest reading of plan §2.2's
+ *       "measure, min, max, evaluation scope": the measure is an entity's DEGREE (its distinct counterparties among the
+ *       links of the Working Set as it stands at this step - hidden entities still count, as for every measure), the
+ *       scope is the whole Working Set, and the band is {@code min} inclusive, {@code max} exclusive (a threshold is
+ *       crossed AT its value). Every entity outside the band is excluded exactly as {@code exclude} would (keep protects
+ *       it; the reason names the band; later expands never re-admit it). Degrees are measured ONCE on the state before
+ *       the step, so the removal does not cascade.</li>
+ *   <li>{@code snapshot {label?}} - a marker: it changes NOTHING in the Working Set. The artifact is the log position
+ *       itself, because every entry already records the Working Set hash at that step; the step names the position
+ *       an analyst froze.</li>
  *   <li>{@code window {window}} (LA-13) — sets the window later {@code expand}s inherit ({@code null} clears it).
  *       It re-filters nothing already admitted: a sealed row is a folded count with no timestamps left in it, and
  *       an earlier step's read is evidence as it was made. Each expand's rows are already in-window (the route
@@ -569,6 +580,8 @@ public final class InvestigationEvaluator {
             case "keep" -> {
                 for (String id : ids) if (s.entities.containsKey(id)) s.kept.add(id);
             }
+            case "threshold" -> threshold(s, p, step);
+            case "snapshot" -> { }   // a marker: the position is the artifact, the state does not move
             case "window" -> s.window = p.get("window") instanceof Map<?, ?> w ? (Map<String, Object>) w : null;
             case "resolve" -> {   // LA-17 slice 2: the sealed resolution, in force from here (see the class note)
                 s.resolution = (Map<String, Object>) entry.get("resolution");
@@ -593,6 +606,33 @@ public final class InvestigationEvaluator {
             }
             default -> throw new IllegalStateException("op '" + entry.get("op") + "' in a sealed log is not evaluable");
         }
+    }
+
+    /** An entity's degree: its distinct counterparties among the links of {@code s} (a self-loop is not a counterparty). */
+    public static Map<String, Integer> degrees(State s) {
+        Map<String, Set<String>> nbrs = new HashMap<>();
+        for (Link l : s.links.values()) {
+            if (l.source().equals(l.target())) continue;
+            nbrs.computeIfAbsent(l.source(), k -> new HashSet<>()).add(l.target());
+            nbrs.computeIfAbsent(l.target(), k -> new HashSet<>()).add(l.source());
+        }
+        Map<String, Integer> out = new TreeMap<>();
+        for (String id : s.entities.keySet()) out.put(id, nbrs.getOrDefault(id, Set.of()).size());
+        return out;
+    }
+
+    /** The reason a {@code threshold} records for what it removed: names the band, e.g. {@code degree outside [2, 5)}. */
+    public static String thresholdReason(Map<String, Object> p) {
+        return "threshold: degree outside [" + (p.get("min") == null ? "0" : p.get("min")) + ", "
+                + (p.get("max") == null ? "unbounded" : p.get("max")) + ")";
+    }
+
+    private static void threshold(State s, Map<String, Object> p, int step) {
+        long min = p.get("min") instanceof Number n ? n.longValue() : 0;
+        long max = p.get("max") instanceof Number n ? n.longValue() : Long.MAX_VALUE;
+        String reason = thresholdReason(p);
+        for (var d : degrees(s).entrySet())
+            if (d.getValue() < min || d.getValue() >= max) exclude(s, d.getKey(), reason, step);
     }
 
     /** A frontier end an expand can hang a row off: admitted, or a sealed member value whose anchor is admitted. */
