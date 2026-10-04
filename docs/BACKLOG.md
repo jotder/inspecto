@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **46<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 33<!--count:backlog-p3--> × P3** —
+> **45<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 32<!--count:backlog-p3--> × P3** —
 > ⬇ **48 → 46 (P3 35 → 33) on 2026-10-04**: closed P3 `LA-SPA-OWED-SURFACES-1` and P3 `LA-INDEX-SPA-SURFACES-1` — every item shipped: the expand rung form sends `linkKinds` and a window override object; Value Measures take a rolling `last` and `agentList`; the bundle export reports `converted`; the start form asks `timeColZone`; the multi-mapping GraphSource authors node / edge `attributes` and a per-edge `filter` and expands; a build can be cancelled and a NEW mapping chosen. As-built in `okf/frontend/features/link-analysis.md`.
 > ⬇ **49 → 48 (P3 36 → 35) on 2026-10-04**: closed P3 `LA-DRAFT-PROMOTE-COST-1` — its last half shipped: the open-Draft cap, the hibernation period and the expiry period are per-Space `drafts` keys of `link-analysis.toon` (`max_open` 50, `hibernate_after_minutes` 60, `expire_after_days` 30), validated 422 on `PUT /settings/link-analysis` and read per call by `DraftAdmission` / `DraftRoutes`; the static `DraftLifecycle` fields are gone. As-built in `okf/frontend/features/link-analysis.md`.
 > ⬇ **50 → 49 (P3 37 → 36) on 2026-10-04**: closed P3 `LA-DRAFT-REBASE-COST-1` as a DECISION, not a build — a set-file delta format cannot make rebase linear because the cost is the sealed `workingSetHash` (sha256 of the whole Working Set, re-derived per renumbered step); linear needs a chained hash that changes every sealed hash and the promote byte pin. Evidence and reopen condition in `superpower/la-separation-d7-design.md` §6.
@@ -147,10 +147,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 33<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 32<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 33<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 46<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 32<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 45<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -417,7 +417,7 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 
 ### 3.11 Web UI — SPA-wide hygiene
 
-- **P3** · `API-DEAD-METHODS-1` — **the three config previews have no pane.** `config.service.ts` `previewParsing` / `previewSchema` / `previewEnrichment` have no caller in the SPA; the operator decided 2026-09-25 to KEEP them for a pane (and `deleteProfile`, `notify` and `JobRunsDialog` were deleted the same day). Build the pane when someone asks for it by name.
+- No open rows. (`API-DEAD-METHODS-1` shipped 2026-10-04: the Configuration pane's **Preview** tab now calls `previewParsing` / `previewSchema` / `previewEnrichment` — `okf/frontend/features/config.md`.)
 
 ### 3.12 Link Analysis & Geo
 

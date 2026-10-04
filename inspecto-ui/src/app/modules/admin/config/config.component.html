@@ -2,7 +2,7 @@
     <!-- Header -->
     <inspecto-page-header
         title="Configuration"
-        subtitle="Spec-driven authoring: draft → validate → copy the .toon"
+        subtitle="Spec-driven authoring: draft → validate → preview → copy the .toon"
         [terms]="['Pipeline', 'Job', 'Collector']"
     />
 
@@ -11,7 +11,12 @@
         <mat-tab-group [(selectedIndex)]="modeIndex">
             <mat-tab label="Author draft"></mat-tab>
             <mat-tab label="Validate file"></mat-tab>
+            <mat-tab label="Preview"></mat-tab>
         </mat-tab-group>
+
+        @if (mode === 'preview') {
+            <app-config-preview />
+        }
 
         <!-- Author draft -->
         @if (mode === 'draft') {

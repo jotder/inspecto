@@ -27,6 +27,8 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
 
+import { ConfigPreviewComponent } from './config-preview.component';
+
 const CONFIG_TYPES: ConfigType[] = ['pipeline', 'enrichment', 'job', 'schema', 'meta'];
 
 /** Stable schema-form control key for the nth spec field. Dotted `FieldSpec.path`s can't be control
@@ -120,6 +122,7 @@ export function assembleConfig(fields: FieldSpec[], values: Record<string, unkno
         MatIconModule,
         MatInputModule,
         MatTabsModule,
+        ConfigPreviewComponent,
         InspectoEmptyStateComponent,
         InspectoSchemaFormComponent,
         InspectoSkeletonComponent,
@@ -135,8 +138,8 @@ export class ConfigComponent implements OnInit {
     private destroyRef = inject(DestroyRef);
 
     modeIndex = 0;
-    get mode(): 'draft' | 'file' {
-        return this.modeIndex === 0 ? 'draft' : 'file';
+    get mode(): 'draft' | 'file' | 'preview' {
+        return this.modeIndex === 0 ? 'draft' : this.modeIndex === 1 ? 'file' : 'preview';
     }
 
     readonly types = pickerOptions(CONFIG_TYPES);

@@ -970,7 +970,7 @@ export class PipelineParseDefinitionComponent {
      * Test parse, with the result mirrored into the tab's sample thread so the strip's chips and every
      * downstream step see it. ⛔ It does NOT change WHERE the parse runs: the stateless
      * `POST /parsers/{id}/preview` the editor already used stays the request — (`POST /config/preview/parsing`,
-     * `ConfigService.previewParsing`, takes a draft config and has no SPA caller today; this editor
+     * `ConfigService.previewParsing`, takes a draft config and is called by the Configuration pane's Preview tab; this editor
      * holds a graph, not a config.)
      *
      * <p>⚠ It exists at all because the grammar editor's `previewed` output fires on SUCCESS only: a
