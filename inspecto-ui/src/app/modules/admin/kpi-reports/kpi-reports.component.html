@@ -135,7 +135,13 @@
                             </div>
                         }
                         @if (lens.canAuthorWorkbench()) {
-                            <button mat-button class="mt-1 -ml-2" (click)="scheduleExport(d)">
+                            <!-- SCHEDULE-EXPORT-DIALOG-DEAD-1: ReportJob has no dashboard scope, so a saved schedule delivers nothing. -->
+                            <button
+                                mat-button
+                                class="mt-1 -ml-2 opacity-60"
+                                aria-disabled="true"
+                                matTooltip="Scheduled dashboard export is not available yet"
+                            >
                                 <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
                                 <span class="ml-1">Schedule export</span>
                             </button>

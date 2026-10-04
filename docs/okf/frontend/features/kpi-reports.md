@@ -27,6 +27,7 @@ distinct from the analytical **Dashboards** authored in the [Studio](studio.md);
   with `options.kpi.kpiId` and then reads its numbers, target, direction, format and RAG band from
   `GET /kpis/{id}/value` — never the hand-set inputs, which apply only with no `kpiId` (a null value reads
   "No data", a failed read "KPI unavailable"). Contract: [Studio](../../capabilities/studio/studio.md) §3.6.
+* ⚠ **Scheduled dashboard export is DISABLED (2026-10-04, `SCHEDULE-EXPORT-DIALOG-DEAD-1`).** The card's *Schedule export* button is `aria-disabled` with the tooltip "Scheduled dashboard export is not available yet": `ReportJob` never reads `reportKind`/`dashboardId` and its scope switch accepts only `status|batch|dataset`, so a saved schedule delivered nothing. Existing schedules still list/edit/delete. Follow-up: the dialog picks one Dataset (scope `dataset` + `out_dir`, csv/xlsx only); the real fix is a dashboard scope in `ReportJob`. The paragraph below describes the dialog's intended shape, not a working delivery path.
 * **Scheduled exports** (C6, 2026-07-04): a schedule IS a [Job](jobs.md) — `type: 'report'` with
   `params: {reportKind, dashboardId, format, recipients}`; no separate entity. Dispatch keys on
   `params.dashboardId` presence, *not* on `type === 'report'` (that type predates C6 and covers other

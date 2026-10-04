@@ -174,6 +174,22 @@ describe('KpiReportsComponent', () => {
         expect(fixture.nativeElement.textContent).not.toContain('Schedule export');
     });
 
+    // SCHEDULE-EXPORT-DIALOG-DEAD-1: the engine's report job cannot export a dashboard yet, so the action is
+    // inert (aria-disabled, no dialog) rather than saving a schedule that delivers nothing.
+    it('shows Schedule export as aria-disabled with an explanation and does not open the dialog', async () => {
+        const { fixture } = create({ canAuthor: true });
+        const el = fixture.nativeElement as HTMLElement;
+        const btn = Array.from(el.querySelectorAll('button')).find((b) =>
+            b.textContent?.includes('Schedule export'),
+        ) as HTMLButtonElement;
+        expect(btn.getAttribute('aria-disabled')).toBe('true');
+        expect(btn.getAttribute('ng-reflect-message') ?? btn.getAttribute('aria-describedby')).toBeTruthy();
+        const dialog = TestBed.inject(MatDialog) as unknown as { open: ReturnType<typeof vi.fn> };
+        btn.click();
+        expect(dialog.open).not.toHaveBeenCalled();
+        await expectNoA11yViolations(el);
+    });
+
     it('downloadLatest fetches the latest run artifact and triggers a blob download', async () => {
         const { fixture, jobsApi } = create({ reportJobs: [REPORT_JOB] });
         fixture.componentInstance.downloadLatest(REPORT_JOB);
