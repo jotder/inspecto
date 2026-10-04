@@ -556,7 +556,7 @@ final class BundleRoutes implements RouteModule {
             } catch (IllegalArgumentException badId) {
                 prev = null;   // the per-item write refuses the id
             }
-            item.put("content", DecisionRuleGuard.prepare(ex, (Map<String, Object>) c, prev));
+            item.put("content", DecisionRuleGuard.prepare(ex, (Map<String, Object>) c, prev, store, id));
         }
     }
 

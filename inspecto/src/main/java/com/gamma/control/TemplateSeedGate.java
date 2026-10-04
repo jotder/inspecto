@@ -143,7 +143,8 @@ final class TemplateSeedGate {
             body.remove("createdBy");
             body.remove("updatedBy");
             body.remove(DecisionRuleGuard.RESTORED_MAKERS);
-            Map<String, Object> stamped = DecisionRuleGuard.prepare(ex, body, null, carried, false);
+            body.remove(DecisionRuleGuard.MAKERS);
+            Map<String, Object> stamped = DecisionRuleGuard.prepare(ex, body, null, carried, false, null, id);
             try {
                 Files.writeString(c.path(), ConfigCodec.toToon(stamped));
             } catch (IOException e) {

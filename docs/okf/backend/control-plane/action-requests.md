@@ -253,6 +253,21 @@ recomputes. The
 new Space's empty Egress Allowlist denies the target until that Space lifts it. `DecisionRuleWritersTest` enumerates `ConfigWriteFunnelTest`'s writer
 inventory and fails for a new writer that neither calls the guard nor is listed with its reason.
 
+🔴 **Makers are stamped on the rule at save** (`ASSURE-ACTION-REQUESTS-RESIDUALS-1` item 3, option C, 2026-10-04).
+`DecisionRuleGuard.prepare` — so every door above: `/decision-rules`, `/components/decision-rule`, version restore,
+`/bundle/import`, `/import`, `POST /spaces/import` and Space Template creation — writes `makers`, the version's
+complete maker set: the writer, any `restoredMakers`, and, when the invoke-api consequences are unchanged, the prior
+version's makers (its `makers` stamp, else the history walk). `makers()` reads the stamp first, so pruning the
+history no longer silences a rule. Server-only: a body `makers` is discarded and recomputed (a template's is dropped);
+only a new Space's bundle keeps it, additively, validated like `restoredMakers` (422). When the prior makers are
+unknown, or the set would pass 64, nothing is stamped and the history walk decides — the
+`action-request.skipped-unknown-makers` WARN audit and fail-closed skip remain for such legacy rules until a save
+whose history can still name them. ⚠ An import into an existing Space replaces the head without archiving it, so the
+stamp there is written but only becomes load-bearing at the next archiving save, which stamps itself; pinned by
+`ControlApiActionRequestsTest` `*StampsTheMakersSoAPrunedHistoryStillRaises` + `aClientCannotForgeTheStampedMakers`,
+`ControlApiSpaceBundleActionRequestsTest.aBundledRulesStampedMakersStayMakersInTheNewSpace` and
+`ControlApiSpaceTemplateSeedGateTest`.
+
 ## Routes
 
 | Route | Gate | |
@@ -286,9 +301,6 @@ is a valid DNS name) but still never lifts loopback at connect time — the noti
 
 ## Deferred / known gaps
 
-- Pruned history silently disables a rule's Action Requests until it is saved again (audited, still fail closed). The
-  planned real fix (operator 2026-10-04, **option C**, not built): stamp the makers permanently on the rule at save, so
-  pruning cannot erase them (`ASSURE-ACTION-REQUESTS-RESIDUALS-1`).
 - No per-request `path` below the Connection's base path: one Connection per endpoint.
 - Under OIDC `approverCheck` is `unknown`: telling whether a specific person holds `canApproveChanges` needs a
   principal directory the server does not have (a product decision; `ASSURE-ACTION-REQUESTS-RESIDUALS-1`; if built, a per-Space approver roster, no IdP).

@@ -154,13 +154,17 @@ class ControlApiSpaceBundleActionRequestsTest {
     }
 
     private byte[] bundle(List<String> restoredMakers) throws Exception {
+        return bundle(Map.of("name", "leak", "enabled", true,
+                "createdBy", "author-9", "updatedBy", "author-9", "restoredMakers", restoredMakers,
+                "consequences", List.of(Map.of("action", "invoke-api", "params", Map.of("connection", "hook")))));
+    }
+
+    private byte[] bundle(Map<String, Object> rule) throws Exception {
         Map<String, String> all = new LinkedHashMap<>();
         all.put("bundle.toon", "kind: datasource\n");
         all.put("connections/hook_connection.toon", "connection:\n  id: hook\n  connector: https\n  host: tickets.test\n"
                 + "  port: " + target.getAddress().getPort() + "\n  base_path: api\n");
-        all.put("registry/decision-rules/leak.toon", ConfigCodec.toToon(Map.of("name", "leak", "enabled", true,
-                "createdBy", "author-9", "updatedBy", "author-9", "restoredMakers", restoredMakers,
-                "consequences", List.of(Map.of("action", "invoke-api", "params", Map.of("connection", "hook"))))));
+        all.put("registry/decision-rules/leak.toon", ConfigCodec.toToon(rule));
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (ZipOutputStream z = new ZipOutputStream(bytes)) {
             for (Map.Entry<String, String> e : all.entrySet()) {
@@ -247,6 +251,32 @@ class ControlApiSpaceBundleActionRequestsTest {
             assertEquals(422, longId.statusCode(), longId.body());
             assertTrue(Files.notExists(root.resolve("beta")), "no Space directory is created");
             data(importSpace(c, bundle(tooMany.subList(1, tooMany.size())), IMPORTER), 200);   // exactly the cap
+        }
+    }
+
+    /**
+     * RESIDUALS-1 (3) option C: a rule exported from a Space whose history was pruned carries its makers only as the
+     * stamped {@code makers}; a new Space built from it keeps them (an imported value can only ADD makers) and stamps
+     * them on the rule, so no later pruning in the new Space erases them.
+     */
+    @Test
+    void aBundledRulesStampedMakersStayMakersInTheNewSpace(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            data(importSpace(c, bundle(Map.of("name", "leak", "enabled", true, "updatedBy", "author-9",
+                    "makers", List.of("author-9", "author-0"),
+                    "consequences", List.of(Map.of("action", "invoke-api", "params", Map.of("connection", "hook"))))),
+                    IMPORTER), 200);
+            JsonNode stored = data(beta(c, "GET", "/components/decision-rule/leak", null, IMPORTER), 200);
+            assertEquals(List.of("importer-1", "author-9", "author-0"),
+                    JSON.convertValue(stored.at("/content/makers"), List.class), stored.toString());
+            String id = data(beta(c, "POST", "/decision-rules/leak/apply", "{}", OPERATOR), 200)
+                    .at("/executed/0/actionRequestId").asText();
+            assertEquals(403, beta(c, "POST", "/action-requests/" + id + "/approve", "{}", RESTORED).statusCode(),
+                    "the bundled stamp's maker cannot approve");
+            HttpResponse<String> bad = importSpace(c, bundle(Map.of("name", "leak", "makers", List.of(""),
+                    "consequences", List.of(Map.of("action", "invoke-api", "params", Map.of("connection", "hook"))))),
+                    IMPORTER);
+            assertEquals(422, bad.statusCode(), "a malformed bundled stamp is refused like restoredMakers: " + bad.body());
         }
     }
 }

@@ -87,7 +87,7 @@ final class DecisionRoutes implements RouteModule {
         rule.put("lastSimulation", null);
         rule.put("createdAt", now);
         rule.put("updatedAt", now);
-        rule = DecisionRuleGuard.prepare(e, rule, null);   // invoke-api gate + server-stamped makers
+        rule = DecisionRuleGuard.prepare(e, rule, null, store, name);   // invoke-api gate + server-stamped makers
         PendingChanges.hold(api, e, TYPE, name, rule, null);   // maker-checker
         return write(store, name, rule);
     }
@@ -100,7 +100,7 @@ final class DecisionRoutes implements RouteModule {
         rule.put("lastSimulation", prev.get("lastSimulation"));
         rule.put("createdAt", prev.getOrDefault("createdAt", System.currentTimeMillis()));
         rule.put("updatedAt", System.currentTimeMillis());
-        rule = DecisionRuleGuard.prepare(e, rule, prev);   // invoke-api gate + server-stamped makers
+        rule = DecisionRuleGuard.prepare(e, rule, prev, store, name);   // invoke-api gate + server-stamped makers
         PendingChanges.hold(api, e, TYPE, name, rule, prev);   // maker-checker
         return write(store, name, rule);
     }

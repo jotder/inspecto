@@ -940,6 +940,118 @@ class ControlApiActionRequestsTest {
         }
     }
 
+    // ── RESIDUALS-1 (3) option C: the makers are stamped on the rule at save, so pruning cannot erase them ───────
+
+    /**
+     * Ten stored versions straight to the store (no stamp): v1 = editor-1's invoke-api consequence, v2..v10 =
+     * power-1 rewording it. The history walk can still name the makers (9 archived < keep), but the NEXT two writes
+     * prune v1 — after which only a stamp carried on the rule says editor-1 made the consequence.
+     */
+    private static void seedTenUnstampedVersions(Ctx c) throws Exception {
+        com.gamma.pipeline.ComponentStore store = new com.gamma.pipeline.ComponentStore(c.root.resolve("registry"));
+        for (int v = 1; v <= 10; v++)
+            store.write("decision-rule", "leak", Map.of("name", "leak", "enabled", true, "description", "v" + v,
+                    "updatedBy", v == 1 ? "editor-1" : "power-1",
+                    "consequences", List.of(Map.of("action", "invoke-api", "params", Map.of("connection", "hook")))));
+        assertEquals(9, store.versions("decision-rule", "leak").size());
+        assertEquals(10, com.gamma.pipeline.ComponentStore.historyKeep(), "the scenario assumes the default keep");
+    }
+
+    private static final String REWORDED = INVOKE_RULE.replace("\"name\":\"leak\",", "\"name\":\"leak\",\"description\":\"%s\",");
+
+    /** What the write under test stamped on the stored rule. */
+    private List<?> storedMakers(Ctx c) throws Exception {
+        return JSON.convertValue(data(send(c, "GET", "/components/decision-rule/leak", null, POWER), 200)
+                .at("/content/makers"), List.class);
+    }
+
+    /** After the write under test: one more save prunes v1; the rule must still raise with editor-1 a co-author. */
+    private void pruneThenAssertEditorStillAMaker(Ctx c) throws Exception {
+        // an import replaces the head without archiving it, so it can take two saves to push v1 out
+        com.gamma.pipeline.ComponentStore store = new com.gamma.pipeline.ComponentStore(c.root.resolve("registry"));
+        for (int i = 0; i < 3 && store.versions("decision-rule", "leak").stream()
+                .anyMatch(v -> "editor-1".equals(v.content().get("updatedBy"))); i++)
+            data(send(c, "PUT", "/decision-rules/leak", REWORDED.formatted("prunes v1 #" + i), POWER), 200);
+        assertTrue(store.versions("decision-rule", "leak").stream()
+                .noneMatch(v -> "editor-1".equals(v.content().get("updatedBy"))), "editor-1's version is pruned");
+        JsonNode one = data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200).at("/executed/0");
+        String id = one.path("actionRequestId").asText();
+        assertFalse(id.isBlank(), "a pruned history still raises: " + one);
+        JsonNode rec = data(send(c, "GET", "/action-requests/" + id, null, CHECKER), 200);
+        assertTrue(JSON.convertValue(rec.get("coAuthors"), List.class).containsAll(List.of("power-1", "editor-1")),
+                rec.toString());
+        assertEquals(403, send(c, "POST", "/action-requests/" + id + "/approve", "{}", EDITOR).statusCode(),
+                "four-eyes still sees the pruned version's author");
+        assertTrue(keys.isEmpty());
+    }
+
+    @Test
+    void theSaveRouteStampsTheMakersSoAPrunedHistoryStillRaises(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            allowLoopback(c);
+            seedTenUnstampedVersions(c);
+            data(send(c, "PUT", "/decision-rules/leak", REWORDED.formatted("saved"), POWER), 200);
+            pruneThenAssertEditorStillAMaker(c);
+        }
+    }
+
+    @Test
+    void aBundleImportStampsTheMakersSoAPrunedHistoryStillRaises(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            allowLoopback(c);
+            seedTenUnstampedVersions(c);
+            data(send(c, "POST", "/bundle/import", "{\"format\":\"inspecto-metadata-bundle\",\"version\":2,"
+                    + "\"actions\":{\"decision-rule/leak\":\"overwrite\"},\"items\":["
+                    + "{\"kind\":\"decision-rule\",\"id\":\"leak\",\"content\":" + REWORDED.formatted("imported")
+                    .replace("\"name\":\"leak\",", "\"name\":\"leak\",\"makers\":[\"nobody\"],") + "}]}", POWER), 200);
+            assertEquals(List.of("power-1", "editor-1"), storedMakers(c), "stamped server-side; the item's value dropped");
+            pruneThenAssertEditorStillAMaker(c);
+        }
+    }
+
+    @Test
+    void aRawImportStampsTheMakersSoAPrunedHistoryStillRaises(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            allowLoopback(c);
+            seedTenUnstampedVersions(c);
+            String rule = com.gamma.config.io.ConfigCodec.toToon(JSON.readValue(REWORDED.formatted("raw import"), Map.class));
+            HttpResponse<String> r = sendBytes(c, "/import", importZip(Map.of("registry/decision-rules/leak.toon", rule)), POWER);
+            assertEquals(200, r.statusCode(), r.body());
+            assertEquals(List.of("power-1", "editor-1"), storedMakers(c));
+            pruneThenAssertEditorStillAMaker(c);
+        }
+    }
+
+    @Test
+    void aVersionRestoreStampsTheMakersSoAPrunedHistoryStillRaises(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            allowLoopback(c);
+            seedTenUnstampedVersions(c);
+            data(send(c, "POST", "/components/decision-rule/leak/versions/5/restore", "{}", POWER), 200);
+            pruneThenAssertEditorStillAMaker(c);
+        }
+    }
+
+    /** The stamp is server-set: a body's {@code makers} is discarded and recomputed, never trusted. */
+    @Test
+    void aClientCannotForgeTheStampedMakers(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            data(send(c, "POST", "/decision-rules", INVOKE_RULE.replace("\"name\":\"leak\",",
+                    "\"name\":\"leak\",\"makers\":[\"nobody\"],"), EDITOR), 200);
+            assertEquals(List.of("editor-1"), JSON.convertValue(data(send(c, "GET", "/components/decision-rule/leak",
+                    null, POWER), 200).at("/content/makers"), List.class), "a create's makers are the writer alone");
+            data(send(c, "PUT", "/decision-rules/leak", REWORDED.formatted("x").replace("\"name\":\"leak\",",
+                    "\"name\":\"leak\",\"makers\":[],"), POWER), 200);
+            assertEquals(List.of("power-1", "editor-1"), JSON.convertValue(data(send(c, "GET",
+                    "/components/decision-rule/leak", null, POWER), 200).at("/content/makers"), List.class),
+                    "an empty body list cannot drop the earlier maker");
+            data(send(c, "POST", "/components/decision-rule", FORGED_RULE.replace("\"name\":\"leak\"",
+                    "\"name\":\"leak2\",\"makers\":[\"nobody\"]"), POWER), 200);
+            assertEquals(List.of("power-1"), JSON.convertValue(data(send(c, "GET", "/components/decision-rule/leak2",
+                    null, POWER), 200).at("/content/makers"), List.class), "the generic door too");
+        }
+    }
+
     private HttpResponse<String> sendBytes(Ctx c, String path, byte[] body, String auth) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path))
                 .header("Authorization", auth).POST(BodyPublishers.ofByteArray(body)).build(), BodyHandlers.ofString());

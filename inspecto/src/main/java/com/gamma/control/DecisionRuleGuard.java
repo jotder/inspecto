@@ -47,6 +47,14 @@ import java.util.Set;
  * field is server-only: {@link #prepare} discards any body value — except a NEW Space's bundle, which has no history
  * to recompute it from and keeps its recorded makers (see {@code bundledMakers}). A restore of a version whose makers the history
  * cannot say is refused (409) — fail closed.
+ *
+ * <p><b>The makers are stamped on the rule at save</b> ({@code ASSURE-ACTION-REQUESTS-RESIDUALS-1} item 3, option C):
+ * every {@link #prepare} computes the full maker set of the version it writes — the writer, plus the prior
+ * version's makers when the invoke-api consequences are unchanged, plus a restore's {@code restoredMakers} — and
+ * persists it as {@code makers}. {@link #makers} reads that stamp first, so pruning the history cannot erase who made
+ * the consequence. Server-only like the other stamps (a body value is discarded) — except a NEW Space's bundle, whose
+ * stamped {@code makers} only ADD. When the prior makers are unknown, or would exceed {@link #MAX_MAKERS}, nothing is
+ * stamped and the history walk decides (fail closed).
  */
 public final class DecisionRuleGuard {
 
@@ -55,19 +63,22 @@ public final class DecisionRuleGuard {
     static final String TYPE = "decision-rule";
     /** Server-stamped on a version restore: the restored version's makers (see the class doc). */
     static final String RESTORED_MAKERS = "restoredMakers";
+    /** Server-stamped on every save: the version's complete maker set (see the class doc). */
+    static final String MAKERS = "makers";
     /** Bounds on {@code restoredMakers}: it is copied forward into later versions, so it must never grow unbounded. */
     static final int MAX_MAKERS = 64, MAX_MAKER_ID = 256;
     private static final String DIR_PREFIX = "registry/" + ComponentRegistry.dirForType(TYPE).orElse("decision-rules") + "/";
 
     /** Validate and stamp one write of a rule; returns the content to persist. {@code prev}: the stored rule or null. */
-    static Map<String, Object> prepare(HttpExchange ex, Map<String, Object> content, Map<String, Object> prev) {
-        return prepare(ex, content, prev, Map.of(), true, null);
+    static Map<String, Object> prepare(HttpExchange ex, Map<String, Object> content, Map<String, Object> prev,
+                                       ComponentStore store, String name) {
+        return prepare(ex, content, prev, Map.of(), true, null, store, name);
     }
 
     /** {@link #prepare} for a version restore: {@code restoredMakers} from {@link #restoredMakers}, or null. */
     static Map<String, Object> prepare(HttpExchange ex, Map<String, Object> content, Map<String, Object> prev,
-                                       List<String> restoredMakers) {
-        return prepare(ex, content, prev, Map.of(), true, restoredMakers);
+                                       List<String> restoredMakers, ComponentStore store, String name) {
+        return prepare(ex, content, prev, Map.of(), true, restoredMakers, store, name);
     }
 
     /**
@@ -75,12 +86,13 @@ public final class DecisionRuleGuard {
      * which count as registered; {@code live} says whether this Space's registry applies (not for a new Space).
      */
     static Map<String, Object> prepare(HttpExchange ex, Map<String, Object> content, Map<String, Object> prev,
-                                       Map<String, String> carried, boolean live) {
-        return prepare(ex, content, prev, carried, live, null);
+                                       Map<String, String> carried, boolean live, ComponentStore store, String name) {
+        return prepare(ex, content, prev, carried, live, null, store, name);
     }
 
     private static Map<String, Object> prepare(HttpExchange ex, Map<String, Object> content, Map<String, Object> prev,
-                                               Map<String, String> carried, boolean live, List<String> restoredMakers) {
+                                               Map<String, String> carried, boolean live, List<String> restoredMakers,
+                                               ComponentStore store, String name) {
         checkInvokeApi(ex, content, carried, live);
         Map<String, Object> out = new LinkedHashMap<>(content);
         String actor = ApiContext.actor(ex);
@@ -90,6 +102,48 @@ public final class DecisionRuleGuard {
         out.remove(RESTORED_MAKERS);   // server-only, like the stamps above
         if (!live) restoredMakers = bundledMakers(content);   // a NEW Space has no history to recompute them from
         if (restoredMakers != null && !restoredMakers.isEmpty()) out.put(RESTORED_MAKERS, List.copyOf(restoredMakers));
+        out.remove(MAKERS);
+        List<String> makers = stampedMakers(out, prev, restoredMakers, store, name);
+        if (makers != null) out.put(MAKERS, makers);
+        return out;
+    }
+
+    /**
+     * The complete makers of the version being written ({@code out}, already stamped): its writer, any
+     * {@code restoredMakers}, and — when the invoke-api consequences are unchanged from {@code prev} — prev's makers
+     * (its stamp, else the history walk). Null (stamp nothing) when there is no invoke-api consequence, when prev's
+     * makers are unknown, or when the set would exceed {@link #MAX_MAKERS}.
+     */
+    private static List<String> stampedMakers(Map<String, Object> out, Map<String, Object> prev,
+                                              List<String> restoredMakers, ComponentStore store, String name) {
+        String sig = signature(out);
+        if (sig == null) return null;
+        Set<String> all = new LinkedHashSet<>();
+        all.add(String.valueOf(out.get("updatedBy")));
+        if (restoredMakers != null) all.addAll(restoredMakers);
+        if (prev != null && sig.equals(signature(prev))) {
+            List<String> prior = stamp(prev);
+            if (prior == null && store != null && name != null) {
+                try {
+                    prior = makers(store, name, prev);
+                } catch (RuntimeException unreadableHistory) {
+                    prior = null;
+                }
+            }
+            if (prior == null) return null;
+            all.addAll(prior);
+        }
+        return all.size() > MAX_MAKERS ? null : List.copyOf(all);
+    }
+
+    /** A version's stamped {@code makers}, or null when absent or malformed. */
+    private static List<String> stamp(Map<String, Object> version) {
+        if (!(version.get(MAKERS) instanceof List<?> list) || list.isEmpty() || list.size() > MAX_MAKERS) return null;
+        List<String> out = new ArrayList<>();
+        for (Object m : list) {
+            if (!(m instanceof String s) || s.isBlank() || s.length() > MAX_MAKER_ID) return null;
+            out.add(s);
+        }
         return out;
     }
 
@@ -102,12 +156,13 @@ public final class DecisionRuleGuard {
     private static List<String> bundledMakers(Map<String, Object> content) {
         Set<String> out = new LinkedHashSet<>();
         if (content.get("updatedBy") instanceof String by && !by.isBlank()) out.add(by);
-        Object restored = content.get(RESTORED_MAKERS);
-        if (restored != null) {
+        for (String key : List.of(RESTORED_MAKERS, MAKERS)) {   // MAKERS: a rule exported after option C
+            Object restored = content.get(key);
+            if (restored == null) continue;
             if (!(restored instanceof List<?> list) || list.stream().anyMatch(m -> !(m instanceof String s) || s.isBlank()
                     || s.length() > MAX_MAKER_ID))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "Decision Rule '" + content.get("name")
-                        + "': restoredMakers must be a list of editor ids (at most " + MAX_MAKER_ID + " characters each)");
+                        + "': " + key + " must be a list of editor ids (at most " + MAX_MAKER_ID + " characters each)");
             for (Object m : list) out.add((String) m);
         }
         if (out.size() > MAX_MAKERS)
@@ -175,7 +230,7 @@ public final class DecisionRuleGuard {
                     prev = null;
                 }
             }
-            Map<String, Object> prepared = prepare(ex, content, prev, carried, config != null);
+            Map<String, Object> prepared = prepare(ex, content, prev, carried, config != null, store, name);
             entries.put(e.getKey(), ConfigCodec.toToon(prepared).getBytes(StandardCharsets.UTF_8));
             changed = true;
         }
@@ -219,6 +274,8 @@ public final class DecisionRuleGuard {
                                            boolean complete) {
         String sig = signature(head);
         if (sig == null) return List.of();
+        List<String> stamped = stamp(head);
+        if (stamped != null) return List.copyOf(stamped);   // option C: complete as of its save; pruning cannot erase it
         Set<String> out = new LinkedHashSet<>();
         if (!addMakers(out, head)) return null;
         for (ComponentStore.ComponentVersion v : older) {

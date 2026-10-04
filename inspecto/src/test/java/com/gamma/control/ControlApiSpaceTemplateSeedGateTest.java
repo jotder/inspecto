@@ -204,7 +204,7 @@ class ControlApiSpaceTemplateSeedGateTest {
         Files.writeString(cfg.resolve("registry").resolve("decision-rules").resolve("leak.toon"),
                 com.gamma.config.io.ConfigCodec.toToon(java.util.Map.of("name", "leak", "enabled", true,
                         "createdBy", "author-9", "updatedBy", "author-9", "restoredMakers", List.of("author-0"),
-                        "consequences", List.of(java.util.Map.of("action", "invoke-api",
+                        "makers", List.of("author-8"), "consequences", List.of(java.util.Map.of("action", "invoke-api",
                                 "params", java.util.Map.of("connection", "hook"))))));
     }
 
@@ -216,8 +216,10 @@ class ControlApiSpaceTemplateSeedGateTest {
             assertEquals(200, r.statusCode(), r.body());
             String stored = Files.readString(root.resolve("acme/config/registry/decision-rules/leak.toon"));
             assertTrue(stored.contains("createdBy: admin-1") && stored.contains("updatedBy: admin-1"), stored);
-            assertFalse(stored.contains("author-9") || stored.contains("author-0") || stored.contains("restoredMakers"),
-                    "the template file's makers are not trusted: " + stored);
+            assertFalse(stored.contains("author-9") || stored.contains("author-0") || stored.contains("author-8")
+                    || stored.contains("restoredMakers"), "the template file's makers are not trusted: " + stored);
+            // RESIDUALS-1 (3) option C: the applier is stamped as the rule's maker, so pruning cannot erase them
+            assertEquals(List.of("admin-1"), com.gamma.config.io.ConfigCodec.toMap(stored).get("makers"), stored);
         }
     }
 

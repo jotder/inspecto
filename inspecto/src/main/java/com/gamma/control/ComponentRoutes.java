@@ -701,7 +701,8 @@ final class ComponentRoutes implements RouteModule {
             // and server-stamped makers as /decision-rules, before the hold (version restore lands here as well).
             if (DecisionRuleGuard.TYPE.equals(type)) {
                 ComponentRegistry.Component prior = existing(store, type, id);
-                content = DecisionRuleGuard.prepare(ex, content, prior == null ? null : prior.content(), restoredMakers);
+                content = DecisionRuleGuard.prepare(ex, content, prior == null ? null : prior.content(), restoredMakers,
+                        store, id);
             }
             // ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1 (3): this door refuses exactly what POST /alerts/rules refuses —
             // the same AlertRoutes.parse (AlertRule.fromMap, the Investigation-rule refusal, the `by` Schema check),
