@@ -1536,3 +1536,7 @@ Design (archived): [`link-analysis-and-graphsource.md`](../../../archived-docume
 plans: [`link-analysis-studio-plan.md`](../../../archived-documents/plans-archive/link-analysis-studio-plan.md)
 (§6–7, V1 now fully shipped; V2+ remains open backlog),
 [`link-analysis-toolboxes-plan.md`](../../../archived-documents/plans-archive/link-analysis-toolboxes-plan.md).
+
+## InvestigationStore port (S0 + S1 vertical 1, as built 2026-10-04)
+
+The Investigation sidecar records now sit behind `InvestigationStore` (`inspecto-la-core`), keyed by id and `Scope(investigationId, draftId|null)`, never a Path; `FsInvestigationStore` is the only implementation and `InvestigationStores.of(writeRoot)` the one place a backend is chosen. Writers carry the version they read (`append(scope, expectedVersion, ...)`, `appendMember(expectedCount)`); a lost race is `InvestigationVersionConflictException` (the ObjectStore convention), retried by the route and answered `409 CONFLICT_STALE_VERSION` if it keeps losing. Lines and sets come back byte for byte (the sealed `workingSetHash`, `prefixHash`, the set re-hash all depend on it). Still Path-keyed: the Draft code, `decide`, the masking-key file. Measurements, behaviour decisions and the remaining-call-site checklist: `superpower/investigation-store-design.md` sections 13.1 and 13.2 (row `LA-INVESTIGATION-STORE-DESIGN-1`).
