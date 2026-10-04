@@ -34,6 +34,10 @@ import { expandFallbackNote, idsInWorkingSet, moveStep, rawIdsOf } from './inves
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
 import { LA_WIDGETS } from '@inspecto/link-analysis/la-host';
 import { InvestigationExpandRungComponent } from './investigation-expand-rung.component';
+import {
+    InvestigationSnapshotOpComponent,
+    InvestigationThresholdOpComponent,
+} from './investigation-band-ops.component';
 import { InvestigationWindowOpComponent } from './investigation-window-op.component';
 import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component';
 import { LinkAnalysisEntityListsComponent } from './link-analysis-entity-lists.component';
@@ -69,6 +73,8 @@ import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set
         InspectoOptionPickerComponent,
         InvestigationExpandRungComponent,
         InvestigationWindowOpComponent,
+        InvestigationThresholdOpComponent,
+        InvestigationSnapshotOpComponent,
         LinkAnalysisDossierComponent,
         LinkAnalysisEntityListsComponent,
         LinkAnalysisIdentitiesComponent,

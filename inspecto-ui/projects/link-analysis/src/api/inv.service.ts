@@ -159,8 +159,7 @@ export interface BranchingPatternResult {
 // ── LA-10: the Investigation object (`InvestigationRoutes`) ──────────────────────────────────────────────
 
 /** The ops the backend evaluates (`InvestigationRoutes.SHIPPED`), plus LA-17's list-bound `excludeBy` / `seedBy`
- *  (entity-model design §4.4.1). `threshold` and `snapshot` are in the closed vocabulary but answer 422 "not
- *  implemented yet" — never offer them. */
+ *  (entity-model design §4.4.1), and `threshold` / `snapshot` (LA-INVESTIGATION-OPS-DEFERRED-1, 2026-10-04). */
 export type InvestigationOpName =
     | 'seed'
     | 'expand'
@@ -170,7 +169,9 @@ export type InvestigationOpName =
     | 'window'
     | 'annotate'
     | 'excludeBy'
-    | 'seedBy';
+    | 'seedBy'
+    | 'threshold'
+    | 'snapshot';
 
 /** A rung's traversal direction (plan §2.4; `InvestigationRoutes.DIRECTIONS`). */
 export type ExpandDirection = 'either' | 'out' | 'in' | 'reciprocal';
@@ -262,7 +263,12 @@ export type InvestigationOpRequest =
     /** LA-17 (§4.4.1): resolved at the Entity List's HEAD and sealed in the log — replay never re-reads the list.
      *  Refused at append: unknown list 404 · retired list / its Entity Type not in force 409 · over 5 000 members 422. */
     | { op: 'excludeBy'; listId: string; reason: string }
-    | { op: 'seedBy'; listId: string };
+    | { op: 'seedBy'; listId: string }
+    /** A degree band over the whole Working Set: `min` inclusive, `max` exclusive, at least one, `min < max`, no `ids`.
+     *  Entities outside it are excluded (as `exclude`; `keep` protects). */
+    | { op: 'threshold'; min?: number; max?: number }
+    /** A log marker (`label` ≤ 2000 chars): it changes nothing in the Working Set and seals no file. */
+    | { op: 'snapshot'; label?: string };
 
 /** What one step changed. Link changes are COUNTS only — the links themselves come from `/replay`. */
 export interface WorkingSetDelta {
@@ -462,10 +468,16 @@ export interface InvestigationLogEntry {
     at: string;
     op?: InvestigationOpName;
     /** The op's validated params: an expand's rung arrives resolved (defaults filled); a `window` op has no ids. */
-    params?: { ids?: string[]; entityType?: string | null; reason?: string; note?: string; listId?: string } & Omit<
-        ExpandRung,
-        'window'
-    > & {
+    params?: {
+        ids?: string[];
+        entityType?: string | null;
+        reason?: string;
+        note?: string;
+        listId?: string;
+        min?: number;
+        max?: number;
+        label?: string;
+    } & Omit<ExpandRung, 'window'> & {
             window?: 'inherit' | 'full' | InvestigationWindow | null;
         };
     undoes?: number;

@@ -1515,6 +1515,12 @@ protects, reason `threshold: degree outside [min, max)`, never re-admitted by a 
 does not cascade. `snapshot` is a **marker**: it moves nothing and writes no file — the artifact is the log position
 (every entry already carries the Working Set hash). Both ride `POST /inv/investigations/{id}/ops`, so the gates are
 the existing `canManageIncidents` route, openapi entry and manifest row — no new route; templates carry both verbatim.
+**SPA (2026-10-04):** `investigation-band-ops.component.ts` holds two sibling forms beside the `window` form
+(`inspecto-la-threshold-op` *Degree threshold*, `inspecto-la-snapshot-op` *Log marker*), same pattern: host-owned
+reactive form, `store.apply(...)`, the server's 422 shown verbatim in an `inspecto-alert`. Client-side mirror of the
+422s: threshold needs at least one bound, `min` an integer >= 0, `max` an integer >= 1, `min < max`; snapshot `label`
+is optional, trimmed, <= 2000 chars; neither sends `ids`. The op log line is the SERVER's `text` (the SPA does no
+op formatting), so nothing client-side renders these two. `InvestigationOpName` / `InvestigationOpRequest` gained both ops.
 ⏳ Open questions: does a `snapshot` step also seal a `/inv/snapshots` Artifact (the SPA's snapshot dialog does,
 client-side)? are other measures (weighted degree, event count) wanted for `threshold`? should it be re-evaluable
 (not exclusion)? — filed in the BACKLOG row. The log is **ordered and non-commutative** (`exclude → expand` ≠ `expand → exclude`;
