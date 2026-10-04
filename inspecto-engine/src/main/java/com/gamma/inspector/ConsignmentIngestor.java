@@ -115,6 +115,9 @@ public final class ConsignmentIngestor {
                 }
             }
         } else {
+            // S6: refuse before any output is written - the M1-M3 checks below run after outputs are durable.
+            if (cfg.processing().duplicateCheckEnabled() || cfg.dirs().markers() != null)
+                com.gamma.config.safety.StateGate.requireAdvance("processed markers / fingerprint ledger of '" + cfg.identity().pipelineName() + "'");
             try {
                 outcome = strategy.ingest(batch, cfg);
             } finally {
@@ -640,6 +643,7 @@ public final class ConsignmentIngestor {
         // Markers LAST — created only after every other side-effect is durable (PATH-mode dedup only;
         // content-based mode uses the ledger below — see writeMarkers above).
         if (writeMarkers) {
+            com.gamma.config.safety.StateGate.requireAdvance("processed markers");
             for (Consignment.Member m : survivors) {
                 if (com.gamma.etl.unpack.UnpackOrigins.isExpanded(m.file())) continue;   // deferred, below
                 MarkerManager.createMarkerFile(m.file(), cfg);
@@ -649,6 +653,7 @@ public final class ConsignmentIngestor {
 
         // Fingerprint ledger LAST too (content-based dedup; same stranding-safety reason as markers).
         if (ledgerRecord) {
+            com.gamma.config.safety.StateGate.requireAdvance("fingerprint ledger");
             AcquisitionLedger ledger = AcquisitionLedgers.shared();
             for (LedgerEntry e : ledgerEntries) ledger.record(e);
             recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.MARKED);
@@ -667,6 +672,7 @@ public final class ConsignmentIngestor {
             var wm = AcquisitionLedgers.takeDbWatermark(filePath);
             if (wm.isEmpty() && remoteSlices) wm = SliceFrontiers.read(cfg, filePath);
             if (wm.isPresent()) {
+                com.gamma.config.safety.StateGate.requireAdvance("DB-export / Kafka watermark");
                 if (wmLedger == null) wmLedger = AcquisitionLedgers.shared();
                 wmLedger.recordDbWatermark(wm.get().key(), wm.get().value());
                 watermarked.add(m);

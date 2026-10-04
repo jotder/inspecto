@@ -375,6 +375,7 @@ public final class PipelineJobRunner implements Job {
             // longer a path this class takes on its own.
             // PIPELINE-DRYRUN-1: manual-trigger dry run (POST /jobs/{name}/trigger?dryRun=true), never cron/event.
             boolean dryRun = ctx != null && ctx.dryRun();
+            if (incremental && !dryRun) com.gamma.config.safety.StateGate.requireAdvance("incremental watermark of '" + pipelineId + "'");   // before any sink write
             PartitionSinkWriter realWriter = dryRun ? null : new PartitionSinkWriter(
                     conn, dir, sinkBase, batchId, ctx == null ? null : ctx.runId(), pipelineId)
                     .beforeRegister(() -> fence(ctx));
@@ -876,6 +877,7 @@ public final class PipelineJobRunner implements Job {
             throws Exception {
         for (Seed seed : seeds) {
             String newMax = queryMaxAsText(conn, seedViews.get(seed.node()), incCol);
+            if (newMax != null) com.gamma.config.safety.StateGate.requireAdvance("incremental watermark of '" + pipelineId + "'");
             if (newMax != null) store.put(pipelineId, seed.store(), newMax);
         }
     }

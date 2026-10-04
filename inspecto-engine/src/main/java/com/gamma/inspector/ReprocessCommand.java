@@ -26,6 +26,7 @@ public final class ReprocessCommand {
     private ReprocessCommand() {}
 
     public static void run(String toonPath, String batchId) throws Exception {
+        com.gamma.config.safety.StateGate.requireRewind("reprocess of consignment " + batchId);
         PipelineConfig cfg = PipelineConfig.load(toonPath);
         if (cfg.dirs().manifestsDir() == null)
             throw new IllegalStateException("No manifests dir configured (set dirs.status_dir).");

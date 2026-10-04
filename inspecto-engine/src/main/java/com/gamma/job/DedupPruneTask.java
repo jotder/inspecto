@@ -33,6 +33,7 @@ final class DedupPruneTask {
             return JobResult.ok("dedup_prune[dry-run]: would remove " + ledger.countPrunable(cutoff)
                     + " of " + ledger.size() + " claim(s) whose window started before " + cutoff,
                     (System.nanoTime() - t0) / 1_000_000L);
+        com.gamma.config.safety.StateGate.requireRewind("dedup ledger prune");
         int removed = ledger.prune(cutoff);
         return JobResult.ok("dedup_prune: removed " + removed + " claim(s) whose window started before "
                 + cutoff, (System.nanoTime() - t0) / 1_000_000L);

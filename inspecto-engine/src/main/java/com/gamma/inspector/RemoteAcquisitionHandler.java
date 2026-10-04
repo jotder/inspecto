@@ -277,6 +277,7 @@ final class RemoteAcquisitionHandler {
         var frontier = com.gamma.acquire.AcquisitionLedgers.takeDbWatermark(staged);
         try {
             if (target.getParent() != null) Files.createDirectories(target.getParent());
+            if (frontier.isPresent()) com.gamma.config.safety.StateGate.requireAdvance("remote slice frontier");
             SliceFrontiers.write(cfg, target, frontier);
             try {
                 Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE);
