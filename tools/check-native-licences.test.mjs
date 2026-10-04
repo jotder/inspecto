@@ -81,6 +81,12 @@ test('an unclassified .dylib fails', () => {
   assert.match(r.stderr, /unlisted native library/);
 });
 
+test('an unclassified .jnilib fails', () => {
+  const r = fixture({ 'native/osx/libmystery.jnilib': bytes });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /unlisted native library/);
+});
+
 test('an unclassified .dll still fails', () => {
   const r = fixture({ 'native/win/mystery.dll': bytes });
   assert.equal(r.status, 1);
