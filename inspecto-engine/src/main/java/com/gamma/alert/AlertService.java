@@ -379,6 +379,35 @@ public final class AlertService {
     }
 
     /**
+     * LA-LIVE-DETECTION-1 (LD-4) - the <b>Investigation-only</b> sweep: evaluate just the rules bound to an
+     * Investigation, through the same probe the full sweep uses (so the owner binding and, for a value-measure
+     * rule, the standing-detection authority are re-decided exactly as there). This is what the {@code la.detect}
+     * Job arms; it is a clock over the existing evaluation, not a second evaluator.
+     *
+     * <p>Throws when no Investigation probe is wired (the Link Analysis module is absent): evaluating nothing
+     * must fail the Run, not report that nothing breached. Like every sweep it fires and advances cooldowns.
+     */
+    public synchronized List<Alert> evaluateInvestigationRules() {
+        if (investigationProbe == null)
+            throw new IllegalStateException("no Investigation probe is wired: the Link Analysis module is not "
+                    + "present in this build, so nothing could be evaluated");
+        List<Alert> out = new ArrayList<>();
+        evaluateInvestigationPass(System.currentTimeMillis(), out);
+        return out;
+    }
+
+    private void evaluateInvestigationPass(long nowMs, List<Alert> out) {
+        var probe = investigationProbe;
+        for (AlertRule rule : rules) {
+            if (!rule.isInvestigationRule()) continue;
+            InvestigationMeasureProbe.Reading reading = probe.apply(rule);
+            java.util.OptionalDouble value = reading.value();
+            if (value.isEmpty() || !rule.breached(value.getAsDouble())) continue;
+            fire(rule, rule.investigation(), rule.investigation(), value.getAsDouble(), nowMs, out, reading.evidence());
+        }
+    }
+
+    /**
      * Evaluate rules; {@code pipelineFilter} (a pipeline's display or normalized name) restricts to
      * one pipeline's ledger, {@code null} sweeps all. Returns the alerts fired by this pass.
      */
@@ -419,15 +448,7 @@ public final class AlertService {
         // Investigation rules (LA-23) are scoped to their Investigation: the scope — and so the cooldown key, the
         // Signal's correlation id and the Incident dedupe scope — is the Investigation id. The probe answers empty
         // for anything it cannot vouch for (no owner binding, unknown Investigation), which never fires.
-        for (AlertRule rule : rules) {
-            if (!rule.isInvestigationRule()) continue;
-            var probe = investigationProbe;
-            if (probe == null) continue;
-            InvestigationMeasureProbe.Reading reading = probe.apply(rule);
-            java.util.OptionalDouble value = reading.value();
-            if (value.isEmpty() || !rule.breached(value.getAsDouble())) continue;
-            fire(rule, rule.investigation(), rule.investigation(), value.getAsDouble(), nowMs, out, reading.evidence());
-        }
+        if (investigationProbe != null) evaluateInvestigationPass(nowMs, out);
 
         for (PipelineConfig cfg : configs.pipelines()) {
             String display = cfg.identity().name();

@@ -130,6 +130,70 @@ class SampleJobTypesTest {
         assertTrue(ctx.log.stream().anyMatch(l -> l.contains("NOT evaluated")), ctx.log.toString());
     }
 
+    // ── la.detect (LA-LIVE-DETECTION-1, LD-4): a clock over the Investigation-bound rules, nothing of its own ──
+
+    private static Job laDetect() {
+        return new LaDetectJob(JobConfig.fromMap(Map.of("job", Map.of("name", "detect", "type", "la.detect"))));
+    }
+
+    /** An AlertAccess whose full sweep fires something loudly, so a Job that used the wrong method would show. */
+    private static com.gamma.alert.AlertAccess investigationOnly(List<com.gamma.alert.Alert> fired,
+                                                                 java.util.concurrent.atomic.AtomicInteger narrow) {
+        return new com.gamma.alert.AlertAccess() {
+            @Override public List<com.gamma.alert.Alert> evaluateRules() { return List.of(breach("FULL_SWEEP")); }
+            @Override public List<com.gamma.alert.Alert> evaluateInvestigationRules() {
+                narrow.incrementAndGet();
+                return fired;
+            }
+        };
+    }
+
+    @Test
+    void laDetectFailsClosedWithoutTheAlertsService() {
+        var boom = assertThrows(IllegalStateException.class,
+                () -> laDetect().run(new StubContext(false, PlatformServices.none())));
+        assertTrue(boom.getMessage().contains("alerts"), boom.getMessage());
+    }
+
+    @Test
+    void laDetectRunsOnlyTheInvestigationSweepAndDisclosesNamesAndCountsOnly() throws Exception {
+        var narrow = new java.util.concurrent.atomic.AtomicInteger();
+        StubContext ctx = new StubContext(false, grantOf(investigationOnly(List.of(breach("ring-watch")), narrow)));
+
+        JobResult r = laDetect().run(ctx);
+
+        assertTrue(r.success());
+        assertEquals(1, narrow.get(), "the Investigation-only sweep, once");
+        assertTrue(r.message().contains("ring-watch"), r.message());
+        assertFalse(r.message().contains("FULL_SWEEP"), "the full sweep was not used");
+        assertEquals(List.of("la.detect.completed"), ctx.signals);
+    }
+
+    @Test
+    void laDetectDoesNotEvaluateUnderADryRun() throws Exception {
+        var narrow = new java.util.concurrent.atomic.AtomicInteger();
+        StubContext ctx = new StubContext(true, grantOf(investigationOnly(List.of(breach("ring-watch")), narrow)));
+
+        JobResult r = laDetect().run(ctx);
+
+        assertTrue(r.success());
+        assertEquals(0, narrow.get(), "a dry run must not evaluate");
+        assertTrue(r.message().contains("nothing evaluated"), r.message());
+    }
+
+    @Test
+    void laDetectIsRegisteredWithTheAlertsGrantAndAnAggregateSignal(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir)
+            throws Exception {
+        try (var s = new com.gamma.util.Scheduler();
+             JobService js = new JobService(List.of(), new com.gamma.etl.ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString())) {
+            JobTypeDescriptor d = js.jobTypes().stream().filter(t -> "la.detect".equals(t.id())).findFirst()
+                    .orElseThrow(() -> new AssertionError("la.detect is not registered"));
+            assertEquals(List.of("alerts"), d.requires(), "reaches the engine only through the alerts grant");
+            assertEquals(List.of("la.detect.completed"), d.emits());
+        }
+    }
+
     private static PlatformServices grantOf(com.gamma.alert.AlertAccess alerts) {
         PlatformServiceRegistry registry = new PlatformServiceRegistry();
         registry.register("alerts", com.gamma.alert.AlertAccess.class, alerts);

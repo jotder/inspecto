@@ -646,6 +646,15 @@ public final class JobService implements AutoCloseable {
                                 .build()),
                 List.of("alert.evaluate.completed"), List.of(), List.of("alerts")),
                 c -> new AlertEvaluateJob(c)));
+        // la.detect (LA-LIVE-DETECTION-1, LD-4) - Link Analysis standing detection on a cron: evaluates only the
+        // Alert Rules bound to an Investigation, through the same grant and engine as alert.evaluate. The
+        // authority re-decision (who the sweep acts as) lives in the Link Analysis module, not here.
+        registry.register(JobTypeProvider.of(new JobTypeDescriptor("la.detect", "Link Analysis standing detection",
+                "Evaluates the Alert Rules bound to Investigations on a schedule. A value-measure rule reads the "
+                        + "live Dataset only while its owner's enabled standing detection still holds; otherwise "
+                        + "the sweep stops and records why. Aggregate output only.",
+                List.of(), List.of("la.detect.completed"), List.of(), List.of("alerts")),
+                c -> new LaDetectJob(c)));
         // space.comparison (space-comparison design, decided 2026-09-24): compare the storage growth of two or
         // more Spaces. ⛔ Registered with the OWN-SPACE-ONLY grant, so an authored or scheduled job of this type
         // can read nothing outside this Space — and since a comparison needs >= 2 Spaces, it is refused. The

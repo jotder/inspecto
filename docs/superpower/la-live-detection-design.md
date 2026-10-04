@@ -214,8 +214,8 @@ the `inspecto-geo-link` module. This design does not change it; Standing Detecti
 | D-LD3 | **Synthetic Subject** built from the owner's id and the grants recorded at enable | Decided by the assistant 2026-10-04 pending operator confirmation (the design's recommendation) | Also records the owner's data scopes and IdP attributes (a DENY keyed on `subject.space` must not be skipped) and tags the Subject `sweepPrincipal`. A decider that throws is a refusal. **Residuals:** the snapshot cannot refresh off-request, and it carries no role names (guideline 13), so a DENY keyed on `subject.roles` cannot be reproduced. |
 | D-LD4 | **Evaluate in place**, persist nothing unless the Alert fires | Decided by the assistant 2026-10-04 pending operator confirmation (the design's recommendation) | The value-measure path already works this way (an aggregate count over the whole Dataset). Re-instantiation belongs to the Job Type (LD-4). |
 | D-LD5 | **Pause**, never transfer | Decided by the assistant 2026-10-04 pending operator confirmation | A sweep refuses `NOT_LEAD` once the owner is no longer a lead of the Investigation. The owner's `canManageIncidents` and `canAuthorAlertRules` cannot be re-checked off a request (capabilities are token-time); only lead membership can. "Notify" is the recorded refusal event. |
-| D-LD6 | **Owner-only**, no template list route or sharing | Decided by the assistant 2026-10-04 pending operator confirmation (the design's recommendation) | Not started (LD-5). |
-| D-LD7 | **Professional-and-above only** (the route lives in the optional `inspecto-geo-link` module); cadence is the existing Alert sweep cadence | Decided by the assistant 2026-10-04 pending operator confirmation | No new schedule or minimum interval until the Job Type exists (LD-4). |
+| D-LD6 | **Owner-only**, no template sharing | Decided by the assistant 2026-10-04 pending operator confirmation (the design's recommendation) | The list route (LD-5) lists the caller's own templates only; see D-LD17. |
+| D-LD7 | **Professional-and-above only** (the route lives in the optional `inspecto-geo-link` module); cadence is the existing Alert sweep cadence | Decided by the assistant 2026-10-04 pending operator confirmation | No new schedule or minimum interval: the `la.detect` Job's own cron is the cadence (D-LD13). |
 | D-LD8 (new) | The R3 admin hatch `canConfigureAccess` is **never** honoured by a sweep | Decided by the assistant 2026-10-04 pending operator confirmation | It is a live capability the sweep cannot confirm, so a snapshot would exceed the owner's live authority. Only the owner id and `user` shares count. |
 | D-LD9 (new) | Only masking **tightening** stops a sweep; loosening does not | Decided by the assistant 2026-10-04 pending operator confirmation | The operator asked to refuse on tightening. A sweep returns aggregates only, so a looser basis exposes nothing more. |
 | D-LD10 (new) | Only the **owner** may enable; only a **value-measure** rule may be enabled; a rule edited since binding is refused | Decided by the assistant 2026-10-04 pending operator confirmation | A co-lead cannot lend the owner's authority. A sealed-Working-Set rule reads no Dataset, so there is nothing to authorise. |
@@ -245,8 +245,37 @@ the `inspecto-geo-link` module. This design does not change it; Standing Detecti
 * **Tests:** `ComponentAccessAsOwnerTest` (auth-spi), `StandingDetectionTest` (la-api), and the real-HTTP
   `ControlApiStandingDetectionTest` (every gate; each stop reason, with the probe that would otherwise succeed: the
   same owner still opens the Investigation on a request). `ControlApiValueMeasureTest` now enables first.
-* **Not built:** LD-4 (`la.detect` Job Type), LD-5 (template list and sharing), LD-6 (SPA monitoring and the enable
-  affordance), and a way to disable other than deleting the rule.
+* **Not built here:** LD-6 (SPA monitoring and the enable affordance; another lane).
+
+### LD-4 and LD-5 wire contract (fixed 2026-10-04; the SPA lane builds against exactly this)
+
+Every route below lives in Professional-and-above (optional `inspecto-geo-link`), is listed in
+`AbsentGeoLinkRoutes.SURFACE`, and answers the standard envelope (`{data: ...}`); errors are the usual
+`{error: {code, message}}`.
+
+| Route | Gate | Request | Response `data` |
+|---|---|---|---|
+| `GET /inv/investigation-templates` | none beyond owner filter (as `GET .../{id}`) | none | `{templates: [{id, title, createdAt, dataset, investigation, parameters, ops}]}` newest first; `investigation` is the source Investigation id, `parameters` / `ops` are COUNTS. Only the caller's own templates (a Personal host with no Subject lists all). Never ops, ids or parameter names. |
+| `DELETE /inv/investigations/{id}/standing-detection/{rule}` | `canAuthorAlertRules`, then the Investigation's `open` (404 for a non-member) | none | `{rule, investigation, enabled: false, wasEnabled: boolean}`. 404 when the rule is not bound to that Investigation. Idempotent (`wasEnabled:false` the second time). The rule stays bound and armed; the sweep then refuses `NOT_ENABLED`. |
+| `PUT /inv/investigations/{id}/alert-rules/{rule}` | `canAuthorAlertRules`, then `open` | the same body as `POST .../alert-rules` (`name`, if given, must equal `{rule}`) | the same shape as `POST .../alert-rules` plus `replaced: true` and `standingDetection: "disabled: ..."`. 404 not bound here; 409 when the armed rule was edited out of band since binding. |
+
+The Job Type: `type: la.detect`, **no parameters**, `requires: [alerts]`, emits the Signal `la.detect.completed`
+(`{job, fired, rules[]}`: a count and Alert Rule names, never an Investigation or entity id). Author it as an
+ordinary Job (`config/jobs/<name>.toon`, `job: {name, type: la.detect, schedule: "<cron>"}`); the cadence is that
+cron (D-LD7: there is no separate schedule or minimum).
+
+New audit events: `LINK_STANDING_DETECTION_DISABLED` (`rule`, `investigationId`, `wasEnabled`) and
+`LINK_INVESTIGATION_ALERT_RULE_EDITED` (`rule`, `investigationId`, `standingDetectionDropped`).
+
+### LD-4 and LD-5 decisions (decided by the assistant 2026-10-04, pending operator confirmation)
+
+| # | Decision | What it means in the build |
+|---|---|---|
+| D-LD13 | `la.detect` is a **clock over the existing evaluation**, not a second evaluator, and evaluates **only Investigation-bound rules** (sealed-Working-Set and value-measure alike) | It calls `AlertAccess.evaluateInvestigationRules()` through the `alerts` grant (the one new method; default = the full sweep, so a stand-in stays correct by doing more). The authority re-decision stays in `WorkingSetMeasures.read` / `StandingDetection`, so the Job and the ordinary Alert sweep cannot disagree. D-LD4 holds: nothing is re-instantiated or persisted unless the Alert fires. |
+| D-LD14 | The Job **fails the Run closed** when the `alerts` service is absent, and when the Link Analysis module is not wired (the engine throws) | An empty Run that reads as "nothing breached" would claim health nobody checked. A dry run evaluates nothing and says so. |
+| D-LD15 | **Disabling** standing detection is allowed to anyone who may bind alert rules and open the Investigation, and is idempotent | It only narrows (the sweep refuses `NOT_ENABLED`), so no owner-only restriction is needed; enabling stays owner-only (D-LD10). |
+| D-LD16 | **Editing a bound rule in place drops standing detection** | An edit changes what the sweep computes and what its Alert discloses, but the owner's recorded authority was granted for the old rule. The new binding carries the new hash and NO `standing`, so the owner must re-enable (a re-snapshot), the same way as after a refusal. Order of writes: component, then binding, then re-arm, so in every interleaving a sweep sees a hash mismatch and refuses rather than evaluates. The name is immutable. |
+| D-LD17 | The template list is **owner-only and summary-only** (D-LD6 stands: no sharing) | Counts, not ops; template sharing is not built. |
 
 ## References
 

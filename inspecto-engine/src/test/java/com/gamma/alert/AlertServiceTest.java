@@ -299,4 +299,21 @@ class AlertServiceTest {
         assertEquals(0, svc.evaluate(null, now + java.time.Duration.ofMinutes(30).toMillis()).size(),
                 "a probe that cannot vouch for the rule (no owner binding) never fires");
     }
+    /** LD-4: the Investigation-only sweep evaluates through the probe and nothing else, and refuses to run unwired. */
+    @Test
+    void theInvestigationOnlySweepUsesTheProbeAndFailsClosedWithoutOne(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        AlertService svc = new AlertService(List.of(investigationRule("WARNING")), configs(cfg), store(List.of()),
+                new FakeObjectAccess());
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, svc::evaluateInvestigationRules,
+                "no probe (no Link Analysis module): evaluating nothing must not read as health");
+
+        svc.investigationProbe(r -> InvestigationMeasureProbe.Reading.of(java.util.OptionalDouble.of(5)));
+        List<Alert> fired = svc.evaluateInvestigationRules();
+        assertEquals(1, fired.size());
+        assertEquals("inv-42", fired.get(0).pipeline());
+
+        svc.investigationProbe(r -> InvestigationMeasureProbe.Reading.of(java.util.OptionalDouble.empty()));
+        assertEquals(0, svc.evaluateInvestigationRules().size(), "a refused rule (probe answers empty) never fires");
+    }
 }

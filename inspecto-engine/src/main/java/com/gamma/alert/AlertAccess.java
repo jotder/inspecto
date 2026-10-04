@@ -54,6 +54,18 @@ public interface AlertAccess {
         return evaluateRules();
     }
 
+    /**
+     * LA-LIVE-DETECTION-1 (LD-4) - evaluate only the Alert Rules bound to an Investigation; what the
+     * {@code la.detect} Job calls. Same contract as {@link #evaluateRules()} (it mutates; no preview form).
+     *
+     * <p>The default answers with the <b>full</b> sweep, which evaluates every Investigation rule too - narrower
+     * is an optimization, never a different answer. The production form throws when the Link Analysis module is
+     * not present, so the Job fails the Run instead of reporting health that was never checked.
+     */
+    default List<Alert> evaluateInvestigationRules() {
+        return evaluateRules();
+    }
+
     /** The production implementation over an {@link AlertService}, resolved lazily so boot wiring can
      *  register the service before the Alert engine is constructed. An absent engine fails loudly:
      *  evaluation is the whole work, so reporting success would report health that was never checked. */
@@ -64,6 +76,9 @@ public interface AlertAccess {
             }
             @Override public List<Alert> evaluateFreshnessRules() {
                 return engine().evaluateFreshnessRules();
+            }
+            @Override public List<Alert> evaluateInvestigationRules() {
+                return engine().evaluateInvestigationRules();
             }
             private AlertService engine() {
                 AlertService svc = alerts.get();
