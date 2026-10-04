@@ -384,6 +384,78 @@ public final class OperationalDb {
         return shared != null ? shared : spaceDefault;
     }
 
+    /**
+     * {@link #urlFor(Family, String)} scoped to one Space: a PostgreSQL URL gains {@code currentSchema=<space schema>}
+     * so every Space on a shared server keeps its own tables (schema-per-space, never database-per-space). A
+     * DuckDB URL (already one file per Space), the {@linkplain SpaceRoot#legacy() legacy} single-tenant root
+     * (its {@code config()} is {@code null}) and a URL that already names a {@code currentSchema} pass through
+     * unchanged — an explicit operator choice is not overridden.
+     *
+     * @throws IllegalArgumentException when the Space id cannot be made a safe schema identifier
+     */
+    public static String urlFor(Family family, SpaceRoot root, String spaceDefault) {
+        String url = urlFor(family, spaceDefault);
+        if (url == null || !isPostgresUrl(url) || root.config() == null || hasCurrentSchema(url)) return url;
+        return withSchema(url, schemaFor(root.id()));
+    }
+
+    /** The PostgreSQL schema for a Space id: {@code space_<id with '-' as '_'>} — injective, never needs quoting. */
+    public static String schemaFor(String spaceId) {
+        if (!SpaceId.isValid(spaceId))
+            throw new IllegalArgumentException("Space id '" + spaceId + "' cannot be made a PostgreSQL schema name");
+        String schema = "space_" + spaceId.replace('-', '_');
+        if (schema.length() > 63)
+            throw new IllegalArgumentException("Space id '" + spaceId + "' is too long for a PostgreSQL schema name"
+                    + " (" + schema.length() + " > 63 with the space_ prefix)");
+        return schema;
+    }
+
+    /** Appends {@code currentSchema} to a PostgreSQL URL; refuses anything else (fail closed). */
+    static String withSchema(String url, String schema) {
+        if (!isPostgresUrl(url))
+            throw new IllegalArgumentException("schema-per-space needs a jdbc:postgresql: URL, got "
+                    + url.split("\\?", 2)[0]);
+        if (!schema.matches("[a-z0-9_]{1,63}"))
+            throw new IllegalArgumentException("unsafe schema name '" + schema + "'");
+        return url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema;
+    }
+
+    private static boolean isPostgresUrl(String url) {
+        return url.toLowerCase().startsWith("jdbc:postgresql:");
+    }
+
+    private static boolean hasCurrentSchema(String url) {
+        return url.toLowerCase().matches(".*[?&;]currentschema=.*");
+    }
+
+    /**
+     * Create this Space's schema on every PostgreSQL server its families resolve to ({@code CREATE SCHEMA IF NOT
+     * EXISTS}, idempotent). Called at Space start, before any store opens. A no-op for DuckDB and the legacy root;
+     * throws (fail closed) when a server cannot be reached or the id cannot be a schema.
+     */
+    public static void ensureSpaceSchemas(SpaceRoot root) {
+        if (root.config() == null) return;
+        java.util.Map<String, Family> servers = new java.util.LinkedHashMap<>();
+        for (Resolved r : resolveAll(root)) {
+            if (!r.enabled() || r.source() == Source.BACKEND_PROPERTY || !isPostgresUrl(r.url())
+                    || hasCurrentSchema(r.url())) continue;
+            servers.putIfAbsent(r.url() + "\n" + userFor(r.family()), r.family());
+        }
+        if (servers.isEmpty()) return;
+        String schema = schemaFor(root.id());
+        for (java.util.Map.Entry<String, Family> e : servers.entrySet()) {
+            Family f = e.getValue();
+            String url = e.getKey().substring(0, e.getKey().lastIndexOf('\n'));
+            try (java.sql.Connection c = com.gamma.util.JdbcDrivers.connect(url, userFor(f), passwordFor(f));
+                 java.sql.Statement st = c.createStatement()) {
+                st.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
+            } catch (java.sql.SQLException ex) {
+                throw new IllegalStateException("could not create PostgreSQL schema " + schema + " for Space '"
+                        + root.id() + "' at " + url.split("\\?", 2)[0] + ": " + ex.getMessage(), ex);
+            }
+        }
+    }
+
     /** As {@link #urlFor}, for the credential half — a per-family value first, then the shared one. */
     public static String userFor(Family family) {
         if (family.userProperty == null) return user();

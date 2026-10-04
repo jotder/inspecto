@@ -115,7 +115,7 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
                     "-Dobjects.backend=memory — Incidents and Alerts are lost on restart");
             return new InMemoryObjectStore();
         }
-        String url = OperationalDb.urlFor(OperationalDb.Family.OBJECTS, root.objectsDbUrl());
+        String url = OperationalDb.urlFor(OperationalDb.Family.OBJECTS, root, root.objectsDbUrl());
         try {
             ObjectStore db = DbObjectStore.open(url,
                     OperationalDb.userFor(OperationalDb.Family.OBJECTS),
@@ -138,7 +138,7 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
                     "-Dobjects.backend=memory");
             return new InMemoryLinkStore();
         }
-        String url = OperationalDb.urlFor(OperationalDb.Family.LINKS, root.linksDbUrl());
+        String url = OperationalDb.urlFor(OperationalDb.Family.LINKS, root, root.linksDbUrl());
         try {
             LinkStore db = DbLinkStore.open(url,
                     OperationalDb.userFor(OperationalDb.Family.LINKS),
@@ -160,7 +160,7 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
                     "-Dobjects.backend=memory");
             return new InMemoryNoteStore();
         }
-        String url = OperationalDb.urlFor(OperationalDb.Family.NOTES, root.notesDbUrl());
+        String url = OperationalDb.urlFor(OperationalDb.Family.NOTES, root, root.notesDbUrl());
         try {
             NoteStore db = DbNoteStore.open(url,
                     OperationalDb.userFor(OperationalDb.Family.NOTES),
@@ -182,7 +182,7 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
                     "-Dobjects.backend=memory");
             return new InMemoryTagAssignmentStore();
         }
-        String url = OperationalDb.urlFor(OperationalDb.Family.TAGS, root.tagAssignmentsDbUrl());
+        String url = OperationalDb.urlFor(OperationalDb.Family.TAGS, root, root.tagAssignmentsDbUrl());
         try {
             TagAssignmentStore db = DbTagAssignmentStore.open(url,
                     OperationalDb.userFor(OperationalDb.Family.TAGS),

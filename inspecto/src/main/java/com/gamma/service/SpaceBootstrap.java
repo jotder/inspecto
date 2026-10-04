@@ -29,13 +29,16 @@ final class SpaceBootstrap {
         // Advisory storage-layout-contract check (WARN-only; never blocks boot).
         SpaceLayoutContract.verify(root);
 
+        // Schema-per-space: a PostgreSQL deployment gets this Space's schema BEFORE any store opens (idempotent).
+        OperationalDb.ensureSpaceSchemas(root);
+
         // Discover the space's configs from its own config/ tree; an empty space is allowed (no exit).
         CollectorService service = ServiceBootstrap.buildFrom(root, new String[]{root.config().toString()}, false);
 
         // The space's own acquisition (dedup) ledger — its own DuckDB file when the backend is `db`; the default
         // memory backend yields an isolated in-memory instance. Keyed by space id (the poll path resolves by MDC).
         String ledgerUrl = OperationalDb.urlFor(
-                OperationalDb.Family.ACQUISITION_LEDGER, root.acquisitionLedgerDbUrl());
+                OperationalDb.Family.ACQUISITION_LEDGER, root, root.acquisitionLedgerDbUrl());
         AcquisitionLedgers.register(id.value(), AcquisitionLedgers.build(ledgerUrl, id.value()));
         // Publishes THIS space's roots for every run-time reader — Decision Rules, every registry-reading
         // job type, and the `dataset` collector connector (MATERIALIZE-SPACE-ROOT-1 /

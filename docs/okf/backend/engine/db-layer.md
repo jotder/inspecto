@@ -1103,6 +1103,28 @@ Count the sites before filing. This row was filed three times — first as *"not
 (false: `OperationalDb.java:147` declares it), then as *"duplicated resolution bypassing `resolve()`"*
 (true but not a defect), and only the site count settled it.
 
+### 5.0-c Schema-per-space (2026-10-04, BACKLOG "Postgres multi-user" P3)
+
+⛔ **Schema**-per-space on one database, NOT database-per-space. `OperationalDb.urlFor(Family, SpaceRoot, default)`
+(the 3-arg overload every per-Space store opener now calls) appends `currentSchema=space_<id with - as _>` to a
+`jdbc:postgresql:` URL, so two Spaces sharing `-Dinspecto.db.url` keep separate tables.
+`OperationalDb.schemaFor(id)` is injective (a Space id has no `_`), only ever `[a-z0-9_]`, so it is never quoted;
+an id that is not a valid `SpaceId`, or whose schema would exceed PostgreSQL's 63-byte limit (ids over 57 chars),
+is **refused**, and `withSchema` refuses a non-PostgreSQL URL.
+
+- **Created at Space start:** `SpaceBootstrap.load` calls `OperationalDb.ensureSpaceSchemas(root)` before any store
+  opens — `CREATE SCHEMA IF NOT EXISTS` on every distinct PostgreSQL server the Space's enabled families resolve to.
+  A failure is an `IllegalStateException` (fail closed), never a fallback to the shared `public` schema.
+- **Untouched on purpose:** DuckDB URLs (already one file per Space); the legacy single-tenant root
+  (`config() == null`, keeps its unscoped tables); a URL that already carries `currentSchema` (an explicit operator
+  choice wins); the cross-pod `INBOX_REGISTRY` (it is opened against the SPACES root and must stay shared; it keeps
+  the 2-arg `urlFor`); the legacy acquisition ledger.
+- ⚠ **Deferred:** a raw `jdbc:` value in a family's own `*.backend` (`Source.BACKEND_PROPERTY`) bypasses `urlFor`, so
+  it is not schema-scoped — put the URL in `-D<family>.db.url` or `-Dinspecto.db.url` instead.
+- Proof: `PostgresSchemaPerSpaceTest` (URL rules always run; the two-Spaces-cannot-see-each-other probe needs
+  `INSPECTO_TEST_PG_URL` and skips per test). Existing single-schema installs on a shared server will see empty
+  tables on first start (breaking change, accepted — nothing after 3.x is in production).
+
 ### 5.1 Flags (all read in `ServiceStores` unless noted)
 
 | Capability | Backend flag | URL flag | Credentials |
