@@ -319,7 +319,14 @@ recorded gap; the Step watchdog is §7c.
   an instance, or a mutating service with no dry-run stand-in rejects the pack and leaves nothing bound.
 - **Dry run:** `DryRunServices` substitutes the contributed stand-in; a `readOnly()` service passes through.
 - **D-9 retry pass:** `rescan()` retries a pack refused for an unavailable service while a pass still loads something.
-- ⚠ **Not yet:** a Run granted a pack's service does not pin the pack (S3-2). Unload removes the binding at once.
+- **S3-2 pinning (2026-10-04):** a Run granted a pack's service pins the *provider* pack with the same
+  `acquireRun`/`releaseRun` counter. `JobService` pins `PlatformServiceRegistry.ownersOf(requires)` for the Run
+  (the owner set is taken once, before the body, so an unload mid-Run cannot lose the release); a pipeline walk
+  pins the providers of every pack Step's granted ids (`StepExecutors.Grant.serviceIds()` +
+  `PackRunLeases.Leaser.serviceOwners`). Unload still removes the binding at once (no NEW grant), and the
+  provider's classloader close is deferred until the granted Runs drain.
+- ⚠ **Not yet:** enable/disable of a service or pack (S3-2's second half) is **not built** — its trigger surface
+  is an open question (design §5.5).
 
 Related: [Job vs Pipeline Step](job-vs-step.md) · [Jobs & Scheduling](jobs.md) ·
 [Signal backbone](signal-backbone.md) · [API stability policy](api-stability.md) ·

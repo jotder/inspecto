@@ -893,6 +893,36 @@ class JobPackManagerTest {
     }
 
     @Test
+    void unloadingAServiceProviderDefersItsCloseWhileAGrantedRunIsInFlight(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        Path jar = buildMailServiceJar(work, packsDir.resolve("b-provider.jar"));
+        PlatformServiceRegistry platform = new PlatformServiceRegistry();
+        JobTypeRegistry registry = new JobTypeRegistry(platform);
+        trustEveryJarIn(packsDir);
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry,
+                ExpressionRegistry.withBuiltins(), new Sink())) {
+            mgr.scanAtStartup();
+            assertEquals(Set.of("b-provider.jar"), mgr.serviceOwners(Set.of("mail")),
+                    "the provider pack owns the granted id");
+            assertEquals(Set.of(), mgr.serviceOwners(Set.of("nope")), "an unbound id has no owner");
+
+            // What JobService does for a Run granted 'mail': pin each owner.
+            Set<String> pinned = mgr.serviceOwners(Set.of("mail"));   // taken once, like JobService, BEFORE the unload
+            pinned.forEach(mgr::acquireRun);
+            Files.delete(jar);
+            mgr.rescan();
+            assertFalse(platform.has("mail"), "the binding goes at once: no NEW grant after the unload");
+            assertTrue(mgr.isDraining("b-provider.jar"), "but the provider's loader close waits for the granted Run");
+
+            pinned.forEach(mgr::releaseRun);
+            assertFalse(mgr.isDraining("b-provider.jar"), "the close finishes when the granted Run ends");
+        } finally {
+            clearTrust();
+        }
+    }
+
+    @Test
     void aCollidingServiceRejectsThePackWholeAndLeavesNothingRegistered(@TempDir Path work) throws Exception {
         assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
         Path packsDir = Files.createDirectories(work.resolve("packs"));

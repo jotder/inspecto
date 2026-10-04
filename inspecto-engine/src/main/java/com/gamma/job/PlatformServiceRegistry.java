@@ -90,6 +90,16 @@ public final class PlatformServiceRegistry {
         return removed;
     }
 
+    /** The packs that contributed any of {@code ids} (S3-2: a Run granted them pins these); built-ins have no owner. */
+    public synchronized Set<String> ownersOf(Set<String> ids) {
+        Set<String> owners = new java.util.LinkedHashSet<>();
+        for (String id : ids) {
+            Binding b = byId.get(id);
+            if (b != null && b.owner() != null) owners.add(b.owner());
+        }
+        return owners;
+    }
+
     /** Whether {@code id} is available in this build — the S1-2 registration-time {@code requires:} check. */
     public synchronized boolean has(String id) {
         return byId.containsKey(id);

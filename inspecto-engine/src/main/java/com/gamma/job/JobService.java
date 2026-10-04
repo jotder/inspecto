@@ -1536,6 +1536,11 @@ public final class JobService implements AutoCloseable {
         // No-op for built-in job types (registry.ownerOf returns empty).
         String packOwner = registry.ownerOf(job.type()).orElse(null);
         packs.acquireRun(packOwner);
+        // S3-2: a Run granted a pack-contributed service also pins the pack that provides it, so unloading
+        // the provider defers its classloader close until this Run drains.
+        Set<String> serviceOwners = platform == null ? Set.of() : platform.ownersOf(Set.copyOf(
+                registry.descriptor(job.type()).map(JobTypeDescriptor::requires).orElse(List.of())));
+        serviceOwners.forEach(packs::acquireRun);
         try {
             res = job.run(ctx);
         } catch (Exception e) {
@@ -1546,6 +1551,7 @@ public final class JobService implements AutoCloseable {
                     0L);
         } finally {
             packs.releaseRun(packOwner);
+            serviceOwners.forEach(packs::releaseRun);
             if (pipelineId != null) runningPipelines.remove(pipelineId);
             // DUCKLE-C4: the receipt rides the run whether it succeeded or threw — "why did it use THAT value"
             // matters most for a failed run. GET /jobs/{name}/runs/{runId}/artifacts, kind `params`; layer

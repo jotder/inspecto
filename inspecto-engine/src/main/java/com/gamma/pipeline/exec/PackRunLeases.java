@@ -32,6 +32,9 @@ public final class PackRunLeases {
     public interface Leaser {
         void acquireRun(String owner);
         void releaseRun(String owner);
+
+        /** The packs that contributed these Platform Service ids (S3-2) — a Run granted them pins those packs. */
+        default Set<String> serviceOwners(Set<String> ids) { return Set.of(); }
     }
 
     /** A held lease; {@link #close} releases it. Never throws. */
@@ -61,9 +64,20 @@ public final class PackRunLeases {
     static Lease acquire(PipelineGraph g) {
         Set<String> owners = new LinkedHashSet<>();
         for (PipelineNode n : g.nodes()) PipelineNodeTypes.ownerOf(n.type()).ifPresent(owners::add);
-        if (owners.isEmpty() || LEASERS.isEmpty()) return NONE;
+        Set<String> ids = new LinkedHashSet<>();
+        for (PipelineNode n : g.nodes())
+            StepExecutors.get(n.type()).ifPresent(r -> ids.addAll(r.grant().serviceIds()));
+        if ((owners.isEmpty() && ids.isEmpty()) || LEASERS.isEmpty()) return NONE;
         List<Leaser> held = List.copyOf(LEASERS);
-        for (Leaser l : held) for (String o : owners) l.acquireRun(o);
-        return () -> { for (Leaser l : held) for (String o : owners) l.releaseRun(o); };
+        // S3-2: a Step granted a service another pack contributed also pins that provider, per leaser (each
+        // Space's registry binds its own overlay).
+        List<Set<String>> pins = new java.util.ArrayList<>();
+        for (Leaser l : held) {
+            Set<String> pin = new LinkedHashSet<>(owners);
+            if (!ids.isEmpty()) pin.addAll(l.serviceOwners(ids));
+            for (String o : pin) l.acquireRun(o);
+            pins.add(pin);
+        }
+        return () -> { for (int i = 0; i < held.size(); i++) for (String o : pins.get(i)) held.get(i).releaseRun(o); };
     }
 }

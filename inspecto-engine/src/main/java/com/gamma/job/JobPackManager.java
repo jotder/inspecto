@@ -433,7 +433,12 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
         }
         if (ids.isEmpty()) return StepExecutors.Grant.NONE;
         PlatformServices granted = registry.platform().grant(ids);
-        return (dryRun, log) -> dryRun ? DryRunServices.wrap(granted, log) : granted;
+        return new StepExecutors.Grant() {
+            @Override public PlatformServices services(boolean dryRun, com.gamma.util.RunLog log) {
+                return dryRun ? DryRunServices.wrap(granted, log) : granted;
+            }
+            @Override public Set<String> serviceIds() { return ids; }
+        };
     }
 
     /** Deregister a pack's types immediately, but only close its loader (release the jar file handle)
@@ -475,6 +480,11 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
      *  {@code Job.run(ctx)} — call {@link #releaseRun} in a {@code finally}. No-op for {@code null}
      *  (built-in/permanent job types have no owning pack). Also called by {@link PackRunLeases} for the
      *  duration of a pipeline run that uses one of the pack's node types (S2-0). */
+    @Override
+    public Set<String> serviceOwners(Set<String> ids) {
+        return registry.platform() == null ? Set.of() : registry.platform().ownersOf(ids);
+    }
+
     @Override
     public void acquireRun(String owner) {
         if (owner == null) return;

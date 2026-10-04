@@ -42,6 +42,9 @@ public final class StepExecutors {
         /** The Step's services — dry-run-wrapped when {@code dryRun}, with would-be effects sent to {@code log}. */
         PlatformServices services(boolean dryRun, RunLog log);
 
+        /** The Platform Service ids this grant hands out (S3-2: a walk pins the packs contributing them). */
+        default Set<String> serviceIds() { return Set.of(); }
+
         /** Grants nothing. */
         Grant NONE = (dryRun, log) -> PlatformServices.none();
     }
