@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: pf_device_small_amounts
+controls:
+  x[1]{field}:
+    device_id
+  y[1]{field,agg}:
+    small_distinct_instruments,max
+options:
+  title: Card testing: instruments per device

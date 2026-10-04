@@ -1,0 +1,5 @@
+vizType: kpi
+options:
+  title: Declined attempts
+  kpi:
+    kpiId: declined_attempts

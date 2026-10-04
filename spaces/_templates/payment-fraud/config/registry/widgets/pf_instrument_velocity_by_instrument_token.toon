@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: pf_instrument_velocity
+controls:
+  x[1]{field}:
+    instrument_token
+  y[1]{field,agg}:
+    max_attempts_in_window,max
+options:
+  title: Velocity burst: attempts per instrument

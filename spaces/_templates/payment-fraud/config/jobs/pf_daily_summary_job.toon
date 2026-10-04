@@ -1,0 +1,8 @@
+job:
+  name: pf_daily_summary
+  type: sql.template
+  sql: "WITH a AS (SELECT CAST(ATTEMPT_DATE AS DATE) AS d, count(*) AS attempts, count(*) FILTER (WHERE OUTCOME = 'DECLINED') AS declined_attempts, sum(AMOUNT) AS attempted_amount FROM payment_attempts GROUP BY 1), x AS (SELECT CAST(OPENED_DATE AS DATE) AS d, count(*) AS disputes, sum(AMOUNT) AS disputed_amount FROM disputes GROUP BY 1) SELECT COALESCE(a.d, x.d) AS activity_date, CAST(COALESCE(a.attempts, 0) AS BIGINT) AS attempts, CAST(COALESCE(a.declined_attempts, 0) AS BIGINT) AS declined_attempts, CAST(COALESCE(a.attempted_amount, 0) AS DOUBLE) AS attempted_amount, CAST(COALESCE(x.disputes, 0) AS BIGINT) AS disputes, CAST(COALESCE(x.disputed_amount, 0) AS DOUBLE) AS disputed_amount FROM a FULL OUTER JOIN x ON a.d = x.d"
+  sources: payment_attempts,disputes
+  sink_dataset: pf_daily_summary
+  cron: "0 * * * *"
+  enabled: true

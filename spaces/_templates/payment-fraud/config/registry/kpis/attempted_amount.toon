@@ -1,0 +1,8 @@
+name: attempted_amount
+title: Attempted amount
+dataset: pf_daily_summary
+measure: sum(attempted_amount)
+timeField: activity_date
+grain: day
+comparison: previous
+direction: up

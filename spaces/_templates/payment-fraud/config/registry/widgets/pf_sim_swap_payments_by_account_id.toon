@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: pf_sim_swap_payments
+controls:
+  x[1]{field}:
+    account_id
+  y[1]{field,agg}:
+    risky_payments,max
+options:
+  title: SIM-swap takeover: risky payments per account

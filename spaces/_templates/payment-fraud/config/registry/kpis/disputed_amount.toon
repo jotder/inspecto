@@ -1,0 +1,8 @@
+name: disputed_amount
+title: Disputed amount
+dataset: pf_daily_summary
+measure: sum(disputed_amount)
+timeField: activity_date
+grain: day
+comparison: previous
+direction: down

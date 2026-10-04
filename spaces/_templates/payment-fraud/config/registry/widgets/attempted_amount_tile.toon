@@ -1,0 +1,5 @@
+vizType: kpi
+options:
+  title: Attempted amount
+  kpi:
+    kpiId: attempted_amount

@@ -1,0 +1,5 @@
+vizType: kpi
+options:
+  title: Disputes opened
+  kpi:
+    kpiId: disputes_opened

@@ -597,6 +597,14 @@ Step Processor and no new route.
   🔴 Without it the seed gate REFUSES the template: an Alert Rule's `by` check and the Risk Score's factor-column
   check both read the Dataset's Schema, and a Job-produced Dataset has none until it runs. The golden test asserts
   that each seed's `DESCRIBE` equals the Job output's.
+- **KPIs and Dashboard (WS-44, slice 2, 2026-10-04).** The `pf_daily_summary` Job (`sql.template`, no parameters)
+  writes one row per day (`activity_date`, attempts, declined attempts, attempted amount, disputes, disputed amount),
+  with its own zero-row seed. Four KPIs read it (`disputed_amount`, `disputes_opened`, `attempted_amount`,
+  `declined_attempts`) as KPI tiles beside four bar Widgets (one per typology Dataset) on `payment_fraud_overview`.
+  KPIs sit on the Job sink, not on the raw feeds: the seed gate reads each KPI's Dataset when the Space is created,
+  and a raw feed has no data yet. `PaymentFraudDashboardTest` (inspecto) creates the Space through `POST /spaces`,
+  ingests, runs the Jobs and renders every tile through `/kpis/{id}/value` and `/bi/query`. Still open: disputes as
+  labels with a maturity flag, runbooks.
 - **Typologies (WS-42).** There are four per-entity CRITICAL Alert Rules. `AlertRule` accepts only
   `WARNING · INFO · CRITICAL`, so the Risk Score concept's "`CRITICAL` or `ERROR`" does not apply here.
   - `pf_card_testing`: `by device_id`, ≥ 8.

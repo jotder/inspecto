@@ -1,0 +1,10 @@
+name: payment_fraud_overview
+tiles[8]{widgetId,span}:
+  disputed_amount_tile,1
+  disputes_opened_tile,1
+  attempted_amount_tile,1
+  declined_attempts_tile,1
+  pf_device_small_amounts_by_device_id,2
+  pf_bin_declines_by_bin,2
+  pf_instrument_velocity_by_instrument_token,2
+  pf_sim_swap_payments_by_account_id,2

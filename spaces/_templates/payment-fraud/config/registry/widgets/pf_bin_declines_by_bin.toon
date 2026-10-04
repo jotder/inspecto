@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: pf_bin_declines
+controls:
+  x[1]{field}:
+    bin
+  y[1]{field,agg}:
+    declined_distinct_instruments,max
+options:
+  title: BIN attack: declined instruments per BIN
