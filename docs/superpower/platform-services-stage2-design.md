@@ -190,7 +190,7 @@ Each slice is independently green; unit tests per change (`-pl inspecto-engine -
 | **S2-4** | `graphLaneCarries` admits intervening nodes | `IngestLaneFlagTest`; the whole suite under `-Dingest.lane=graph` with zero refusals (the Row 15 parity gate, re-run); dedup / join / summarize between map and sink produce the same rows as today's at-rest run |
 | **S2-5** | Recipe spelling for a contributed kind (D-5) and catalog visibility (D-6) | `RecipeCompilerTest` round trip; contract JSONs regenerated in the same change |
 | **S3-1** ✅ 2026-10-04 (§5.4) | `ServiceProvider` via packs; overlay registry; collision rejects the pack; mandatory dry-run stand-in; `new service` unlocked | a service from pack A consumed by a Job in pack B; a colliding pack rejected whole with nothing left registered; a dry run of a Job using a contributed mutating service records, does not act |
-| **S3-2** ◐ 2026-10-04 (§5.5: pinning built, enable/disable owed a decision) | Reference-tracked quiesce + enable/disable | unload while a granted Run is in flight defers until drain; disable refuses new grants, running grants finish |
+| **S3-2** ✅ 2026-10-04 (§5.5) | Reference-tracked quiesce + enable/disable | unload while a granted Run is in flight defers until drain; disable refuses new grants, running grants finish |
 | **S3-3** | `DatasetAccess` (read side first) | gated on D-10 |
 
 ### 5.1 S2-2 — the bridge spike, specified
@@ -322,18 +322,21 @@ As-built facts are in the owner concept, [`platform-services.md`](../okf/backend
    still loads something. The first refusal still emits `job.pack.rejected`.
 5. **Not in S3-1:** pinning a pack for Runs granted its services (S3-2). Unload deregisters the services at once.
 
-### 5.5 S3-2 — as built, pinning half (2026-10-04)
+### 5.5 S3-2 — as built (2026-10-04)
 
 1. **Built:** a Run granted a contributed service pins the provider pack. `PlatformServiceRegistry.ownersOf(ids)`;
    `JobService` pins them beside the Job's own pack; `PackRunLeases.acquire(graph)` adds the providers of each
    pack Step's `Grant.serviceIds()` per leaser (each Space's registry binds its own overlay). Test:
    `JobPackManagerTest.unloadingAServiceProviderDefersItsCloseWhileAGrantedRunIsInFlight`.
-2. **Not built, owed a decision (enable/disable):** the design says only "disable refuses new grants, running
-   grants finish". Unspecified: (a) the unit (one service id, or a whole pack); (b) the trigger (a ControlApi
-   route with the four gates, a config key, or an engine-internal call like `StepExecutors.disable`); (c) what
-   a refused grant looks like (throw naming the id, or silently omit it, which R4 'honest grants' argues against);
-   (d) whether a `requires:` check at Job registration refuses a disabled id; (e) persistence across restart.
-   Running grants finishing is already true (a grant is a snapshot).
+2. **Enable/disable, decided by the operator 2026-10-04 (all five recommendations) and built:** (a) the unit is one
+   service id, no pack-level disable; (b) engine-internal only, `PlatformServiceRegistry.disable/enable/isDisabled`,
+   no route; (c) a disabled id's `grant` THROWS naming it (R4, never a silent omission); (d) `has()` stays true, so a
+   `requires:` check at Job registration does not refuse a disabled id; (e) in-memory only, a restart re-enables
+   (and unloading the provider clears its ids' flag). Running grants finish because a grant is a snapshot.
+   ⚠ A pack Step's grant is resolved once at pack load, so disabling an id does not reach an already-loaded Step;
+   it bites every later Job Run and any later pack load. Tests: `PlatformServicesTest` (refused at grant, running
+   grant finishes, enable restores, fresh registry re-enables) and `StepRunnerTest`
+   `aWalkPinsTheProviderPacksOfAStepsGrantedServicesForItsDuration` (the walk-pin wiring).
 
 ## 6. Deliberately not designed here
 

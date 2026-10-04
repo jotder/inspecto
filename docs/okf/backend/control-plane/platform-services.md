@@ -325,8 +325,10 @@ recorded gap; the Step watchdog is §7c.
   pins the providers of every pack Step's granted ids (`StepExecutors.Grant.serviceIds()` +
   `PackRunLeases.Leaser.serviceOwners`). Unload still removes the binding at once (no NEW grant), and the
   provider's classloader close is deferred until the granted Runs drain.
-- ⚠ **Not yet:** enable/disable of a service or pack (S3-2's second half) is **not built** — its trigger surface
-  is an open question (design §5.5).
+- **S3-2 enable/disable (operator 2026-10-04):** per service id, engine-internal only
+  (`PlatformServiceRegistry.disable/enable`, no route). A disabled id's `grant` throws naming it; `has()` stays true;
+  running grants finish; not persisted (a restart re-enables). ⚠ A loaded pack Step's grant is a load-time snapshot,
+  so a disable reaches later Job Runs, not an already-loaded Step.
 
 Related: [Job vs Pipeline Step](job-vs-step.md) · [Jobs & Scheduling](jobs.md) ·
 [Signal backbone](signal-backbone.md) · [API stability policy](api-stability.md) ·

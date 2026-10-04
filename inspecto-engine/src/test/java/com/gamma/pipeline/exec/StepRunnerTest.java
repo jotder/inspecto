@@ -75,6 +75,35 @@ class StepRunnerTest {
         register(type, Set.of(PipelineRel.DATA), StepRunner.DEFAULT_TIMEOUT, body);
     }
 
+    @Test
+    void aWalkPinsTheProviderPacksOfAStepsGrantedServicesForItsDuration() {
+        PipelineNodeTypes.register(new Type("transform.srt_pin", Set.of(PipelineRel.DATA)), OWNER);
+        StepExecutors.register(new Step("transform.srt_pin", StepRunner.DEFAULT_TIMEOUT, COPY), OWNER,
+                new StepExecutors.Grant() {
+                    @Override public com.gamma.job.PlatformServices services(boolean dryRun, com.gamma.util.RunLog log) {
+                        return com.gamma.job.PlatformServices.none();
+                    }
+                    @Override public Set<String> serviceIds() { return Set.of("mail"); }
+                });
+        List<String> events = new ArrayList<>();
+        PackRunLeases.Leaser leaser = new PackRunLeases.Leaser() {
+            @Override public void acquireRun(String o) { events.add("+" + o); }
+            @Override public void releaseRun(String o) { events.add("-" + o); }
+            @Override public Set<String> serviceOwners(Set<String> ids) {
+                return ids.contains("mail") ? Set.of("provider.jar") : Set.of();
+            }
+        };
+        PackRunLeases.install(leaser);
+        try (PackRunLeases.Lease lease = PackRunLeases.acquire(linear("transform.srt_pin", Map.of()))) {
+            assertTrue(events.contains("+provider.jar"), "the service's provider is pinned: " + events);
+            assertTrue(events.contains("+" + OWNER), "and so is the Step's own pack: " + events);
+            assertTrue(events.stream().noneMatch(e -> e.startsWith("-")), "nothing released while the walk runs");
+        } finally {
+            PackRunLeases.uninstall(leaser);
+        }
+        assertTrue(events.contains("-provider.jar") && events.contains("-" + OWNER), "released after: " + events);
+    }
+
     /** Every input row to {@code data}. */
     private static final Body COPY = ctx -> {
         StepInput in = ctx.in();

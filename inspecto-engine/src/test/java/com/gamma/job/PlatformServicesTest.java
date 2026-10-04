@@ -92,4 +92,32 @@ class PlatformServicesTest {
         assertTrue(minimal.services().granted().isEmpty());
         assertTrue(minimal.services().find(Greeting.class).isEmpty());
     }
+
+    // ── S3-2: enable / disable ───────────────────────────────────────────────────────────────
+
+    @Test
+    void aDisabledIdIsRefusedAtGrantRunningGrantsFinishAndEnableRestores() {
+        PlatformServiceRegistry reg = registryWithBoth();
+        PlatformServices running = reg.grant(Set.of("greeting"));
+
+        reg.disable("greeting");
+        assertTrue(reg.isDisabled("greeting"));
+        assertTrue(reg.has("greeting"), "registration-time requires: checks still pass (operator call 4)");
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> reg.grant(Set.of("greeting")));
+        assertTrue(ex.getMessage().contains("greeting"), "the refusal names the id: " + ex.getMessage());
+        assertEquals("hi", running.get(Greeting.class).hello(), "a grant already handed out finishes");
+        assertEquals(42, reg.grant(Set.of("counting")).get(Counting.class).next(), "other ids are unaffected");
+
+        reg.enable("greeting");
+        assertEquals("hi", reg.grant(Set.of("greeting")).get(Greeting.class).hello());
+    }
+
+    @Test
+    void disablingAnUnboundIdThrowsAndAFreshRegistryIsEnabledSoARestartReEnables() {
+        PlatformServiceRegistry reg = registryWithBoth();
+        assertThrows(IllegalStateException.class, () -> reg.disable("nope"));
+        reg.disable("greeting");
+        // "Restart" = a new registry built at boot: nothing is persisted.
+        assertTrue(!registryWithBoth().isDisabled("greeting"));
+    }
 }

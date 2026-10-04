@@ -34,6 +34,8 @@ public final class PlatformServiceRegistry {
     }
 
     private final Map<String, Binding> byId = new LinkedHashMap<>();
+    /** Ids switched off (S3-2, operator 2026-10-04): in-memory only, so a restart re-enables every one. */
+    private final Set<String> disabled = new java.util.HashSet<>();
 
     /** Bind {@code impl} under {@code id}; throws when the id or the interface is already bound. */
     public synchronized <T> void register(String id, Class<T> type, T impl) {
@@ -79,6 +81,22 @@ public final class PlatformServiceRegistry {
         byId.put(id, new Binding(id, type, impl, owner, standIn));
     }
 
+    /**
+     * Refuse every NEW grant of {@code id} (S3-2); a grant already handed out keeps working. Engine-internal
+     * only (no route), not persisted. {@link #has} stays true, so a {@code requires:} registration check
+     * still passes: it is the grant that refuses.
+     */
+    public synchronized void disable(String id) {
+        if (!byId.containsKey(id))
+            throw new IllegalStateException("Platform Service not available in this build: '" + id + "'");
+        disabled.add(id);
+    }
+
+    /** Undo {@link #disable}; a no-op for an id that is not disabled. */
+    public synchronized void enable(String id) { disabled.remove(id); }
+
+    public synchronized boolean isDisabled(String id) { return disabled.contains(id); }
+
     /** Remove every service {@code owner} contributed; returns their ids. */
     public synchronized List<String> deregister(String owner) {
         List<String> removed = new ArrayList<>();
@@ -87,6 +105,7 @@ public final class PlatformServiceRegistry {
             if (mine) removed.add(b.id());
             return mine;
         });
+        disabled.removeAll(removed);   // a replaced pack's service comes back enabled
         return removed;
     }
 
@@ -119,6 +138,8 @@ public final class PlatformServiceRegistry {
             if (b == null)
                 throw new IllegalStateException("Platform Service not available in this build: '" + id
                         + "' (available: " + byId.keySet() + ")");
+            if (disabled.contains(id))
+                throw new IllegalStateException("Platform Service disabled: '" + id + "'");
             granted.put(b.type(), b.impl());
             if (b.standIn() != null) standIns.put(b.type(), b.standIn());
         }
