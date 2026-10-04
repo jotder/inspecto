@@ -88,7 +88,7 @@ final class TemplateSeedGate {
             String name = file.getFileName().toString();
             if (!name.endsWith("_connection.toon")) continue;
             try {
-                Object block = ConfigCodec.toMap(Files.readString(file)).get("connection");
+                Object block = com.gamma.util.ToonHelper.load(file.toString()).get("connection");
                 @SuppressWarnings("unchecked")
                 Map<String, Object> c = block instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
                 ConnectionRoutes.validateProfile(com.gamma.acquire.ConnectionProfile.fromMap(c));
