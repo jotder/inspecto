@@ -603,8 +603,14 @@ Step Processor and no new route.
   `declined_attempts`) as KPI tiles beside four bar Widgets (one per typology Dataset) on `payment_fraud_overview`.
   KPIs sit on the Job sink, not on the raw feeds: the seed gate reads each KPI's Dataset when the Space is created,
   and a raw feed has no data yet. `PaymentFraudDashboardTest` (inspecto) creates the Space through `POST /spaces`,
-  ingests, runs the Jobs and renders every tile through `/kpis/{id}/value` and `/bi/query`. Still open: disputes as
-  labels with a maturity flag, runbooks.
+  ingests, runs the Jobs and renders every tile through `/kpis/{id}/value` and `/bi/query`. Still open: runbooks.
+- **Dispute labels with a maturity flag (WS-44, slice 3, 2026-10-04; operator decision).** `pf_attempt_labels` (Job
+  parameter `maturity_days`, **default 120 = the chargeback window, configurable; the operator may change it**)
+  writes one row per attempt: `disputed`, `mature`, and `label` = `DISPUTED` (any age), `NEGATIVE` (undisputed and
+  older than the window) or `UNMATURED` (undisputed, still inside it - not yet a trustworthy negative). Age is
+  measured against the newest attempt date in the data, so a replayed corpus is deterministic. It is a Dataset, not
+  an Alert Rule (G-42). `PaymentFraudDashboardTest` pins the default (no negatives in a 3-day corpus) and
+  `maturity_days=1` (negatives appear, disputed stay positive).
 - **Typologies (WS-42).** There are four per-entity CRITICAL Alert Rules. `AlertRule` accepts only
   `WARNING · INFO · CRITICAL`, so the Risk Score concept's "`CRITICAL` or `ERROR`" does not apply here.
   - `pf_card_testing`: `by device_id`, ≥ 8.

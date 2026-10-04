@@ -1,0 +1,9 @@
+job:
+  name: pf_attempt_labels
+  type: sql.template
+  sql: "WITH h AS (SELECT max(CAST(ATTEMPT_DATE AS DATE)) AS horizon FROM payment_attempts), d AS (SELECT DISTINCT ATTEMPT_ID FROM disputes) SELECT CAST(p.ATTEMPT_ID AS VARCHAR) AS attempt_id, CAST(p.ACCOUNT_ID AS VARCHAR) AS account_id, CAST(p.ATTEMPT_DATE AS DATE) AS attempt_date, CAST(p.AMOUNT AS DOUBLE) AS amount, (d.ATTEMPT_ID IS NOT NULL) AS disputed, (CAST(p.ATTEMPT_DATE AS DATE) + CAST($maturity_days AS INTEGER) <= h.horizon) AS mature, CASE WHEN d.ATTEMPT_ID IS NOT NULL THEN 'DISPUTED' WHEN CAST(p.ATTEMPT_DATE AS DATE) + CAST($maturity_days AS INTEGER) <= h.horizon THEN 'NEGATIVE' ELSE 'UNMATURED' END AS label FROM payment_attempts p CROSS JOIN h LEFT JOIN d ON d.ATTEMPT_ID = p.ATTEMPT_ID"
+  sources: payment_attempts,disputes
+  sink_dataset: pf_attempt_labels
+  maturity_days: "120"
+  cron: "0 * * * *"
+  enabled: true

@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: pf_attempt_labels
+controls:
+  x[1]{field}:
+    label
+  y[1]{field,agg}:
+    amount,sum
+options:
+  title: "Attempt labels: amount by label"
