@@ -281,6 +281,9 @@ exists (§2, §5).
     clean corpus, and a `non_null` probe on the NULL opening balance proves an Expectation can fail. The test moved
     from `inspecto-engine` to `inspecto` because Expectations and the Space bootstrap live there. No Pipeline
     needed a fix to ingest its feed. The direct-load tests stay as the fast unit-level pin.
+  - **Impact ledger stays manual (decided 2026-10-04, item (2) of `ASSURE-PACK-TELCO-RA-1`, no build).** A Break's amount
+    does not reach the impact ledger by itself; `recon.run` semantics are unchanged and an analyst records impact from a
+    Break explicitly (`PUT /objects/{id}/impact`). No automatic ledger write.
   - The benign look-alikes are real **boundary** cases:
     - a call spanning the tariff change;
     - one cent under the re-rating tolerance;
@@ -403,7 +406,7 @@ counts (`irsf_prefixes`, `premium_prefixes`, `home_cc`, `max_ring_seconds`, `cal
 `retention_days`) and the Alert Rule's `threshold` (`gt`) says how much is too much. **Schedule:** every detection Job carries `cron: "0 2 * * *"` and the rolling window `window_start: "$yesterday"` / `window_end: "$today"` (job-parameter Expressions, resolved at fire time in the Job's zone), so a created Space detects the previous day each night; a manual run (and the golden test) overrides both with literal timestamps. Also: four KPIs + tiles, one
 dashboard (`telco_fraud_overview`: the four KPI tiles plus one bar Widget per typology over its sink Dataset,
 keyed on the offender — the golden test renders every tile through `/kpis/{id}/value` and `/bi/query`), and `config/runbooks/telco-fraud-runbooks.md` (plain Markdown: there is no
-runbook component kind), which names the known false-positive sources that have no defence. Known limits (not product gaps): thresholds are generic defaults (the vendor-specific half
+runbook component kind; parked on demand, decided 2026-10-04: it would be new model + SPA + API surface with no named consumer, so no build until a customer asks), which names the known false-positive sources that have no defence. **Edition gating (decided 2026-10-04): none** — the template ships to all editions (editions are build flavours, the template is plain config; anyone holding the needed capabilities can create it). Known limits (not product gaps): thresholds are generic defaults (the vendor-specific half
 stays parked); each run reads and rewrites the whole retained sink, and the identity / dealer / voucher / reversal
 sinks keep every entity, so they grow with the subscriber base.
 

@@ -501,7 +501,7 @@ are the values four-eyes approved (below).
   - ⚠ Still mirrored, not shared, in four other places (`MetadataGraphBuilder.originNode`,
     `PipelineDependents.datasets`, `DataSourceBundleResolver.datasetReadsStore`,
     `PipelineRenameRoutes.rewriteDatasetRefs`): change the origin rule in all of them.
-  - Remaining work is P3 `ASSURE-CLASSIFICATION-PROPAGATION-1` (Job-output and sidecar stores).
+  - **Decided 2026-10-04 (operator): KEEP** for Job-output and sidecar stores (P3 `ASSURE-CLASSIFICATION-PROPAGATION-1`): no new refusal, no inheritance; they publish unmasked unless some Dataset classifies the store. Accepted residual; revisit when a customer publishes such a store.
 
 **Destination and TLS**
 - **Destination allowlist (operator 2026-09-29).** A per-Space `publication-destinations.toon` (`hosts: [...]`)
