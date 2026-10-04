@@ -84,6 +84,10 @@ public final class LinkEventTypes {
      *  {@code dataset}, {@code expectedDays} and {@code missingDays} (days in the window with no rows at all). */
     public static final String LINK_INVESTIGATION_COVERAGE = "LINK_INVESTIGATION_COVERAGE";
 
+    /** Two windows of an Investigation were compared ({@code GET /inv/investigations/{id}/compare}). {@code dataset},
+     *  {@code linksOnlyA} and {@code linksOnlyB} (Working Set links present in one window only). */
+    public static final String LINK_INVESTIGATION_COMPARED = "LINK_INVESTIGATION_COMPARED";
+
     /** An Investigation's Dossier was issued ({@code GET /inv/investigations/{id}/dossier}, LA-12). {@code at},
      *  {@code format}, the SHA-256 manifest {@code root} and {@code intact} (whether the stored evidence still
      *  agrees with its own recorded hashes) carry what was handed over — issuing evidence is an act, not a view. */

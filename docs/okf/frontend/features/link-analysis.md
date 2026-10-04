@@ -748,8 +748,8 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   compared as epoch ms; a `slot` (`22:00–04:00` crosses midnight; start inclusive, end exclusive) and a `days`
   mask need an explicit IANA `timezone` and test the local day the EVENT fell on. `window` re-filters nothing
   already admitted — earlier sealed reads are evidence as made. Templates carry the whole rung; a `window`
-  becomes a parameter (`kind: "window"`) whose default is the authored window. ⏳ Calendar exclusions, comparison
-  mode and time-respecting paths remain deferred (`threshold` and `snapshot` shipped 2026-10-04, below). **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
+  becomes a parameter (`kind: "window"`) whose default is the authored window. ⏳ Calendar exclusions
+  and time-respecting paths remain deferred (`threshold` and `snapshot` shipped 2026-10-04, below). **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
   settings* (`investigation-expand-rung.component`) sends `budget` (1–20 000; the server CLAMPS above, so the SPA
   refuses) · `direction` · rung `window` (`inherit` · `full` · *A window for this rung…*, an override object) · `linkKinds`
   (comma-separated, trimmed and deduplicated, at most 100; blank = all kinds; the server 422s it without an Investigation
@@ -1563,8 +1563,26 @@ re-ordering forks, D-E4); **`hide` ≠ `exclude` ≠ `keep`** (hide: gone from d
 exclude: gone from all three, still inspectable as the `excluded` relation; keep: protected from later
 excludes). Two evaluators, one spec — incremental on append, full replay from the sealed log — with an
 `equivalent` check that is pinned to be able to FAIL. **Negative space is part of every rendering** (G-E10).
-Not built from the target model: comparison mode (two windows diffed), time-respecting paths on the server,
+Not built from the target model: time-respecting paths on the server,
 timeline playback and burst / periodicity detection, calendar exclusions — see `LA-INVESTIGATION-OPS-DEFERRED-1`.
+
+**Comparison mode (2026-10-04, `LA-INVESTIGATION-OPS-DEFERRED-1`) — a READ route, not an op.** `GET /inv/investigations/{id}/compare?aFrom&aTo&bFrom&bTo&timezone&at`
+(`InvestigationComparisonRoutes`, semantics in `WindowComparison`) diffs two time windows over the Working Set at log position `at` (default head):
+links and entities present in A only, B only, both (links carry `countA`/`countB`), plus `neither`, each list capped at 500 with the true `count`. *Why a read:*
+a sealed Working Set holds folded counts with no timestamps (see `window`), so a time-sliced diff can only come from the LIVE Dataset — the same live read
+`coverage` makes — and it changes nothing in the Working Set; an op would have to seal the result into the entry and thread through append, undo, fork, Draft rebase,
+template and replay for evidence a reader re-runs by asking again. The answer says `sealed: false`. *Semantics (narrowest):* the universe is the Working Set's
+entities and links only (an `e–f` pair in the Dataset that was never admitted, and an excluded entity, never appear — tested); a link is *present* in a window with
+>= 1 event there, an entity when it is an endpoint of a present link; expand rungs (`minEvents`, direction, link kinds, degree) are not applied; windows are `from`/`to`
+(+ one shared optional `timezone`; no slot/day mask), validated by `InvestigationTime.window`; needs a `timeCol`; exact, a read over 50 000 links in one window is a 422
+(no silent sample); at most 2 000 Working Set entities. *Masking:* applied at render with `EntityMasking` exactly as the Working Set is; every id in the answer is one the
+Working Set already holds, so it names nothing new (a `masking_mode: all` test pins no raw id leaks). Access: `openForRead` (owner / Case member, R3, PDP) + the R3 gate on
+the Dataset read; audited best-effort as `LINK_INVESTIGATION_COMPARED`. *Dossier:* `GET …/dossier` carries an extra `comparison` section ONLY when the same window
+parameters are passed; it is labelled `sealed: false` and sits OUTSIDE the manifest and integrity check (the rest of the Dossier reads no Dataset, and the manifest root is
+unchanged by it); the `steps`/`method` renderings and the HTML print do not include it. Gates cleared: `AbsentGeoLinkRoutes`, `openapi-v1.json`, the RouteModule service
+file; a GET needs no `authgate` bare literal, `CapabilityManifest` row or `route-gating` entry (read route). Test: `ControlApiInvestigationComparisonTest`.
+⏳ Open questions: should a comparison be sealed into the log (an op) so a Dossier can carry it in custody? a slot/day mask or per-window `window: inherit`? an
+SPA surface (none built)? entity *activity* (event counts) diffs rather than presence? — filed in the BACKLOG row.
 
 **Listing and link notes (2026-10-01).** `GET /inv/investigations` lists what the caller may read — own plus
 those shared through an open linked Case, each judged by `openForRead` so R3 and a PDP DENY hide it — `{id,

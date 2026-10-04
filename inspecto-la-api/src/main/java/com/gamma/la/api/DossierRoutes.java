@@ -138,6 +138,10 @@ public final class DossierRoutes implements RouteModule {
         out.put("generatedAt", java.time.Instant.now().toString());   // NOT part of the manifest root
         out.putAll(dossier);
         out.put("masking", mask.describe());
+        // Comparison mode: an OPTIONAL, explicitly UNSEALED section - a live Dataset read, so outside the manifest and the
+        // integrity check (the rest of the Dossier reads no Dataset). Only when windows are asked for (aFrom..bTo).
+        Map<String, Map<String, Object>> compareWindows = WindowComparison.windows(ex);
+        if (compareWindows != null) out.put("comparison", comparison(api, ex, inv, log, at, compareWindows, mask));
         @SuppressWarnings("unchecked") Map<String, Object> renderings = (Map<String, Object>) dossier.get("renderings");
         return switch (format) {
             case "steps" -> ApiContext.respondText(ex,
@@ -152,6 +156,18 @@ public final class DossierRoutes implements RouteModule {
             }
             default -> out;
         };
+    }
+
+    /** The Dossier's comparison section: the diff at step {@code at}, masked like the rest, labelled live and unsealed. */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> comparison(ApiContext api, HttpExchange ex, Opened inv, List<String> log, int at,
+                                                  Map<String, Map<String, Object>> windows, EntityMasking mask) throws IOException {
+        List<Map<String, Object>> prefix = new ArrayList<>();
+        for (String line : log.subList(0, at)) prefix.add(ApiContext.JSON.readValue(line, Map.class));
+        Map<String, Object> raw = WindowComparison.compare(api, ex, inv.inv(),
+                com.gamma.la.core.InvestigationEvaluator.evaluate(prefix, -1, null), windows);
+        InvestigationComparisonRoutes.emit(ex, inv.id(), inv.inv().dataset(), raw);
+        return (Map<String, Object>) mask.apply(raw);
     }
 
     /**
