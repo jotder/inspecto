@@ -1,7 +1,8 @@
 # Link Analysis live detection: who does a scheduled sweep run as? (design)
 
-**Status: DESIGN 2026-10-04. Decisions D-LD1 to D-LD7 are OPEN. Nothing is built.** Unblocks backlog row
-`LA-LIVE-DETECTION-1` (`docs/BACKLOG.md` §3.12). Vocabulary follows `docs/GLOSSARY.md`: Investigation Template,
+**Status: LD-1, LD-2 and LD-3 BUILT 2026-10-04 (option A); LD-4 to LD-6 not started.** D-LD1 was decided by the
+operator (option A); D-LD2 to D-LD7 and four new calls were decided by the assistant, pending operator confirmation
+(section 8). Unblocks backlog row `LA-LIVE-DETECTION-1` (`docs/BACKLOG.md` §3.12). Vocabulary follows `docs/GLOSSARY.md`: Investigation Template,
 Working Set, Alert Rule, Job Type, Dataset, Incident.
 
 ## 1. The problem in one paragraph
@@ -178,18 +179,18 @@ moves (an expand, an exclude, an undo), never when new rows arrive in the Datase
 analyst's work, not detection. Editing it is delete-then-rebind (the binding hash breaks). It is inert without
 the `inspecto-geo-link` module. This design does not change it; Standing Detection adds a sibling path.
 
-## 6. Slices (proposed; none started)
+## 6. Slices (LD-1 to LD-3 built; section 9 is the as-built shape)
 
 | Slice | Content | Verifies |
 |---|---|---|
-| LD-1 | `ComponentAccess.canViewAs(owner, caps, content)` pure decider in auth-spi, mirroring `level` for owner and `user` shares only; explicit "role share is undecidable" answer | unit tests incl. unrestricted, owner, user share, role-only (refused), `canConfigureAccess` |
-| LD-2 | Binding extension (template id, grant-snapshot hash, masked-class snapshot) and an enable route that applies the C floor and refuses role-only grants | real-HTTP test, every gate |
-| LD-3 | Sweep-time re-check in `WorkingSetMeasures.read` for the value-measure path (closes today's silent option B) | un-share / DENY / reclassify each stop the sweep |
+| LD-1 ✅ | `ComponentAccess.canViewAs(owner, caps, content)` pure decider in auth-spi, mirroring `level` for owner and `user` shares only; explicit "role share is undecidable" answer | unit tests incl. unrestricted, owner, user share, role-only (refused), `canConfigureAccess` |
+| LD-2 ✅ | Binding extension (template id, grant-snapshot hash, masked-class snapshot) and an enable route that applies the C floor and refuses role-only grants | real-HTTP test, every gate |
+| LD-3 ✅ | Sweep-time re-check in `WorkingSetMeasures.read` for the value-measure path (closes today's silent option B) | un-share / DENY / reclassify each stop the sweep |
 | LD-4 | Job Type `la.detect` (declared `requires:` grant, fail closed when absent) that re-evaluates (or re-instantiates, D-LD4) per binding | Job Type tests, no ids in output |
 | LD-5 | Template list route and sharing (D-LD6), edit a bound rule in place | owner-only default kept |
 | LD-6 | Monitoring surface: live evaluation status per binding and the refusal reason | SPA a11y gate |
 
-## 7. Decisions needing the operator
+## 7. The seven decisions (as asked)
 
 * **D-LD1 Principal model.** A (recommended), B (stepping stone only) or C (floor only)?
 * **D-LD2 Role-share Datasets.** Refuse (recommended), or require a `user` share for the owner, or accept an
@@ -203,6 +204,49 @@ the `inspecto-geo-link` module. This design does not change it; Standing Detecti
 * **D-LD6 Template sharing.** Stay owner-only (recommended until D-LD1 ships) or share via the registry envelope?
 * **D-LD7 Cadence and edition.** Default schedule and minimum interval, and whether Standing Detection is
   Professional-and-above only (matches the module).
+
+## 8. Decision table
+
+| # | Decision | Status | What it means in the build |
+|---|---|---|---|
+| D-LD1 | **Option A**, a service principal `sweep:<id>` with no capability of its own | **Decided by the operator 2026-10-04** | Authority is a binding recorded at enable time and re-decided at every sweep; always a subset of the owner's live authority. Anything undecidable is a refusal (C is the floor). |
+| D-LD2 | **Refuse** a Dataset whose only grant to the owner is a role share | Decided by the assistant 2026-10-04 pending operator confirmation (the design's recommendation) | `ROLE_SHARE_ONLY`, at enable (422) and at every sweep. The fix is a `user` share to the owner. |
+| D-LD3 | **Synthetic Subject** built from the owner's id and the grants recorded at enable | Decided by the assistant 2026-10-04 pending operator confirmation (the design's recommendation) | Also records the owner's data scopes and IdP attributes (a DENY keyed on `subject.space` must not be skipped) and tags the Subject `sweepPrincipal`. A decider that throws is a refusal. **Residuals:** the snapshot cannot refresh off-request, and it carries no role names (guideline 13), so a DENY keyed on `subject.roles` cannot be reproduced. |
+| D-LD4 | **Evaluate in place**, persist nothing unless the Alert fires | Decided by the assistant 2026-10-04 pending operator confirmation (the design's recommendation) | The value-measure path already works this way (an aggregate count over the whole Dataset). Re-instantiation belongs to the Job Type (LD-4). |
+| D-LD5 | **Pause**, never transfer | Decided by the assistant 2026-10-04 pending operator confirmation | A sweep refuses `NOT_LEAD` once the owner is no longer a lead of the Investigation. The owner's `canManageIncidents` and `canAuthorAlertRules` cannot be re-checked off a request (capabilities are token-time); only lead membership can. "Notify" is the recorded refusal event. |
+| D-LD6 | **Owner-only**, no template list route or sharing | Decided by the assistant 2026-10-04 pending operator confirmation (the design's recommendation) | Not started (LD-5). |
+| D-LD7 | **Professional-and-above only** (the route lives in the optional `inspecto-geo-link` module); cadence is the existing Alert sweep cadence | Decided by the assistant 2026-10-04 pending operator confirmation | No new schedule or minimum interval until the Job Type exists (LD-4). |
+| D-LD8 (new) | The R3 admin hatch `canConfigureAccess` is **never** honoured by a sweep | Decided by the assistant 2026-10-04 pending operator confirmation | It is a live capability the sweep cannot confirm, so a snapshot would exceed the owner's live authority. Only the owner id and `user` shares count. |
+| D-LD9 (new) | Only masking **tightening** stops a sweep; loosening does not | Decided by the assistant 2026-10-04 pending operator confirmation | The operator asked to refuse on tightening. A sweep returns aggregates only, so a looser basis exposes nothing more. |
+| D-LD10 (new) | Only the **owner** may enable; only a **value-measure** rule may be enabled; a rule edited since binding is refused | Decided by the assistant 2026-10-04 pending operator confirmation | A co-lead cannot lend the owner's authority. A sealed-Working-Set rule reads no Dataset, so there is nothing to authorise. |
+| D-LD11 (new) | A value-measure rule is **not evaluated** unless standing detection is enabled | Decided by the assistant 2026-10-04 pending operator confirmation; breaking changes are free (operator 2026-09-20) | Rules bound before this change stop sweeping until the owner enables them. The bind response says so. The SPA owes an enable affordance (LD-6). |
+| D-LD12 (new) | The principal is named after the **Investigation** (`sweep:<investigation id>`), not a template id | Decided by the assistant 2026-10-04 pending operator confirmation | A template carries no Alert Rule today (section 2.2), so the rule's binding on its Investigation is the only record there is. |
+
+## 9. As built (LD-1 to LD-3, 2026-10-04)
+
+* **LD-1** `ComponentAccess.canViewAs(id, capabilities, content)` in auth-spi returns `ALLOWED | DENIED | ROLE_ONLY`
+  (owner id and `user` shares; a role share it cannot resolve is `ROLE_ONLY`, never `DENIED`). `RowScope.visibleAs`
+  asks the active PDP for a caller-less run through an inert package-private exchange (`SweepExchange`); a decider
+  that throws is a refusal.
+* **LD-2** `POST /inv/investigations/{id}/standing-detection {rule}` (`InvestigationMeasureRoutes`, gated on
+  `canAuthorAlertRules`, owner only) records `StandingDetection.Authority` under `standing` in the Alert Rule binding
+  (the same record, so the store interface and its three implementations are unchanged): principal, owner id,
+  capabilities, data scopes, attributes, Dataset, a masking-basis snapshot `{mode, columns[]}`. It runs the sweep's own
+  check first, so what enable accepts is exactly what a sweep would accept. Re-enabling re-snapshots (the way back
+  after a refusal). The rule is read as ARMED (`AlertService.rules()`), the one whose hash the binding holds; a stored
+  copy round-trips numbers through TOON and hashes differently.
+* **LD-3** `WorkingSetMeasures.read` for a value-measure rule calls `StandingDetection.check` before any Dataset read.
+  Refusal codes: `NOT_ENABLED · NO_OWNER · BINDING_CHANGED · DATASET_GONE · DATASET_NOT_SHARED · ROLE_SHARE_ONLY ·
+  NOT_LEAD · MASKING_TIGHTENED · POLICY_DENIED · UNDECIDABLE`. Events `LINK_STANDING_DETECTION_ENABLED`, `…_SWEPT`
+  (aggregate count only) and `…_REFUSED` (code only) are best-effort and name no entity id.
+* **Gates cleared:** `CapabilityManifest`, `docs/api/openapi-v1.json` (skeleton), `AbsentGeoLinkRoutes.SURFACE`,
+  `compliance/evidence/route-gating.md`, and the auth-gate baseline (the new route is covered by an armed test). The
+  route is not a Job writer, so it has no `JobWritersTest` row (an entry there fails: it names no writer route).
+* **Tests:** `ComponentAccessAsOwnerTest` (auth-spi), `StandingDetectionTest` (la-api), and the real-HTTP
+  `ControlApiStandingDetectionTest` (every gate; each stop reason, with the probe that would otherwise succeed: the
+  same owner still opens the Investigation on a request). `ControlApiValueMeasureTest` now enables first.
+* **Not built:** LD-4 (`la.detect` Job Type), LD-5 (template list and sharing), LD-6 (SPA monitoring and the enable
+  affordance), and a way to disable other than deleting the rule.
 
 ## References
 

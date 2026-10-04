@@ -43,6 +43,7 @@ final class CapabilityManifest {
             // InvestigationMeasureRoutes (LA-23) — binding an Alert Rule arms it, so it is alert authoring, as
             // POST /alerts/rules is; the Investigation's owner-only / PDP gate applies on top.
             new Entry("POST", "/inv/investigations/([^/]+)/alert-rules", Roles.CAN_AUTHOR_ALERT_RULES),
+            new Entry("POST", "/inv/investigations/([^/]+)/standing-detection", Roles.CAN_AUTHOR_ALERT_RULES),
             new Entry("PUT", "/inv/investigations/([^/]+)/case", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("DELETE", "/inv/investigations/([^/]+)/case", Roles.CAN_MANAGE_INCIDENTS),
             // InvestigationReferenceRoutes (D-6) — an external reference is appended beside the op log, so it is Case work too.

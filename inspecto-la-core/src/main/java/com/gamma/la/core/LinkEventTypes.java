@@ -171,6 +171,19 @@ public final class LinkEventTypes {
      *  {@code investigationId}, {@code relation}, {@code measure}, {@code threshold}. */
     public static final String LINK_INVESTIGATION_ALERT_RULE_BOUND = "LINK_INVESTIGATION_ALERT_RULE_BOUND";
 
+    /** Standing detection was enabled for a bound value-measure Alert Rule ({@code POST
+     *  /inv/investigations/{id}/standing-detection}, LA-LIVE-DETECTION-1) by the Investigation's owner.
+     *  {@code rule}, {@code investigationId}, {@code principal} ({@code sweep:<id>}), {@code dataset}. */
+    public static final String LINK_STANDING_DETECTION_ENABLED = "LINK_STANDING_DETECTION_ENABLED";
+
+    /** A standing-detection sweep re-decided its authority and READ the Dataset (aggregate only). {@code rule},
+     *  {@code investigationId}, {@code principal}, {@code value} (the breaching-entity COUNT, never an id). */
+    public static final String LINK_STANDING_DETECTION_SWEPT = "LINK_STANDING_DETECTION_SWEPT";
+
+    /** A standing-detection sweep REFUSED to read: nothing was evaluated. {@code rule}, {@code investigationId},
+     *  {@code principal}, and the stable reason {@code code}. */
+    public static final String LINK_STANDING_DETECTION_REFUSED = "LINK_STANDING_DETECTION_REFUSED";
+
     /** An Investigation was linked to a Case ({@code PUT /inv/investigations/{id}/case}, or {@code caseRef} at create,
      *  LA-24) by its owner. {@code investigationId}, {@code caseId} and {@code verified} (false when Case management
      *  is not installed, so the Case could not be checked and the link grants nothing). */

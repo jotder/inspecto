@@ -97,6 +97,11 @@ class ControlApiValueMeasureTest {
         return JSON.readTree(r.body()).get("data");
     }
 
+    /** LD-2: a value-measure rule reads the live Dataset on a sweep only once its owner enables standing detection. */
+    private void enable(Ctx c, String rule) throws Exception {
+        ok(c, "POST", "/inv/investigations/case-v/standing-detection", "{\"rule\":\"" + rule + "\"}");
+    }
+
     private int status(Ctx c, String method, String path, String body) throws Exception {
         return send(c.port, method, path, body, null).statusCode();
     }
@@ -159,6 +164,7 @@ class ControlApiValueMeasureTest {
         try (Ctx c = open(cfg, root)) {
             ok(c, "POST", "/inv/investigations", CREATE);
             JsonNode bound = ok(c, "POST", "/inv/investigations/case-v/alert-rules", STRUCTURING_RULE);
+            enable(c, "smurfs");
             assertEquals("gte", bound.at("/rule/comparator").asText(), "fixed: at least one entity");
             assertEquals(1, bound.at("/rule/threshold").asDouble());
             assertEquals(10, bound.at("/rule/valueMeasure/minLegs").asDouble(), "thresholds stored visibly");
@@ -190,6 +196,7 @@ class ControlApiValueMeasureTest {
                             .replace("\"to\":\"2026-09-08\"}", "\"to\":\"2026-09-08\",\"minLegs\":13}"));
             assertEquals(0, bound.get("current").asDouble());
             assertFalse(bound.get("wouldFire").asBoolean());
+            enable(c, "quiet");
             assertEquals(0, ok(c, "POST", "/alerts/evaluate", "").size());
         }
     }
@@ -253,6 +260,7 @@ class ControlApiValueMeasureTest {
             ok(c, "POST", "/inv/investigations/case-v/alert-rules", "{\"name\":\"tills-rule\",\"severity\":\"WARNING\","
                     + "\"valueMeasure\":{\"name\":\"cashOutConcentration\",\"valueCol\":\"amt\",\"timeCol\":\"booked\","
                     + "\"from\":\"2026-09-01\",\"to\":\"2026-09-08\",\"cashOutKinds\":[\"cash_out\"],\"agentList\":\"tills\"}}");
+            enable(c, "tills-rule");
             JsonNode head = ok(c, "GET", "/entity-lists", null);
             JsonNode fired = ok(c, "POST", "/alerts/evaluate", "");
             assertEquals(1, fired.size(), fired.toString());
@@ -278,6 +286,7 @@ class ControlApiValueMeasureTest {
         try (Ctx c = open(cfg, root)) {
             ok(c, "POST", "/inv/investigations", CREATE);
             ok(c, "POST", "/inv/investigations/case-v/alert-rules", STRUCTURING_RULE);
+            enable(c, "smurfs");
             JsonNode fired = ok(c, "POST", "/alerts/evaluate", "");
             assertEquals(1, fired.size(), fired.toString());
             assertTrue(fired.at("/0/evidence/agentListSeq").isMissingNode(), fired.toString());
@@ -328,6 +337,7 @@ class ControlApiValueMeasureTest {
             assertEquals("24h", bound.at("/rule/valueMeasure/last").asText());
             assertTrue(bound.at("/rule/valueMeasure/from").isMissingNode(), "never a baked window: " + bound);
             assertEquals(1, bound.get("current").asDouble());
+            enable(c, "rolling");
             JsonNode fired = ok(c, "POST", "/alerts/evaluate", "");
             assertEquals(1, fired.size(), fired.toString());
             String text = fired.at("/0/message").asText();   // plan §5.10: one scope, one window - never a contradiction
@@ -356,6 +366,8 @@ class ControlApiValueMeasureTest {
             assertEquals(403, send(c.port, "POST", path, STRUCTURING_RULE, "Bearer owner-noalerts").statusCode());
             assertTrue(c.alerts().rules().isEmpty());
             assertEquals(200, send(c.port, "POST", path, STRUCTURING_RULE, "Bearer owner").statusCode());
+            assertEquals(200, send(c.port, "POST", "/inv/investigations/case-v/standing-detection",
+                    "{\"rule\":\"smurfs\"}", "Bearer owner").statusCode());
             assertEquals(1, c.alerts().evaluateAll().size());
         } finally {
             Authenticators.forTest(null);

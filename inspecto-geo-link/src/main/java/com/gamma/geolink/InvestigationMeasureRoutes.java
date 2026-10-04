@@ -3,6 +3,7 @@ package com.gamma.geolink;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.api.InvRoutes;
 import com.gamma.la.api.InvestigationRoutes;
+import com.gamma.la.api.StandingDetection;
 import com.gamma.la.api.ValueMeasureRoutes;
 import com.gamma.la.api.ValueMeasures;
 import com.gamma.la.api.WorkingSetRoutes;
@@ -47,8 +48,10 @@ import java.util.function.UnaryOperator;
  * of the body. The binding route is additionally gated on {@code canAuthorAlertRules}, as {@code POST /alerts/rules}
  * is. A sweep carries no caller, so the gate is carried to evaluation time by a BINDING recorded beside the
  * Investigation (the rule's canonical hash and the owner): {@link WorkingSetMeasures#value} evaluates nothing else.
- * ⚠ What that does NOT carry: a later PDP DENY, or the owner losing sight of the Dataset. The PDP judges a request
- * Subject, and a sweep has none — both are checked when the rule is bound, not on every sweep.
+ * ⚠ What that does NOT carry (sealed-Working-Set rules): a later PDP DENY, or the owner losing sight of the Dataset —
+ * those rules read no Dataset. A VALUE-measure rule does read the live Dataset, so it additionally needs
+ * {@code POST …/standing-detection} (LA-LIVE-DETECTION-1): the owner's authority is recorded and RE-DECIDED at every
+ * sweep ({@link StandingDetection}), and without it the rule is never evaluated.
  *
  * <p>⚠ Once a rule fires, its Alert (and any Incident) is visible to whoever can read Alerts and Incidents — the
  * Investigation id, the relation, the measure, its value and the threshold, never an entity id. Binding a rule is
@@ -67,6 +70,9 @@ public final class InvestigationMeasureRoutes implements RouteModule {
         // ⚠ A String LITERAL on purpose — CapabilityManifestTest's scanner matches only a literal argument.
         api.post("/inv/investigations/([^/]+)/alert-rules", ApiContext.withCapability("canAuthorAlertRules",
                 (e, m) -> bind(api, e, m.group(1), api.body(e))));
+        // LA-LIVE-DETECTION-1 (LD-2). Same String-literal rule; same capability as binding the rule it arms.
+        api.post("/inv/investigations/([^/]+)/standing-detection", ApiContext.withCapability("canAuthorAlertRules",
+                (e, m) -> enableStanding(api, e, m.group(1), api.body(e))));
     }
 
     /** {@code GET …/measures} — gates: {@link InvestigationRoutes#open} (503 · 422 · 403 · 404) → a bad measure 422. */
@@ -186,8 +192,91 @@ public final class InvestigationMeasureRoutes implements RouteModule {
         out.put("current", current.isPresent() ? current.getAsDouble() : null);
         out.put("wouldFire", current.isPresent() && rule.breached(current.getAsDouble()));
         if (valued != null) out.putAll(ValueMeasureRoutes.answer(spec, valued));   // the entities it would name
+        if (valueRule) out.put("standingDetection", "not enabled: a sweep reads the live Dataset only after the owner enables it "
+                + "(POST /inv/investigations/" + id + "/standing-detection {rule}); until then the rule is not evaluated");
         out.put("disclosure", "when it fires, the Alert (and at CRITICAL the Incident) shows this Investigation's id, "
                 + "the measure, its value and the threshold to everyone who can read Alerts and Incidents");
+        return out;
+    }
+
+    /**
+     * {@code POST …/standing-detection} — body {@code {rule}}: let a BOUND value-measure Alert Rule keep reading the live
+     * Dataset on every Alert sweep (LA-LIVE-DETECTION-1, D-LD1 option A). The sweep acts as {@code sweep:<id>}, which
+     * holds no capability; this records the owner's authority beside the rule's binding and {@link StandingDetection}
+     * re-decides it at every sweep. Gates: {@code canAuthorAlertRules} 403 → {@link InvestigationRoutes#open} (503 · 422 ·
+     * 403 · 404) → a body field other than {@code rule}, or an unsafe name 422 → a caller who is not the owner 403 → no
+     * such bound value-measure rule 404 / 422 → the rule edited since binding 409 → the authority refused (a role-only
+     * Dataset, an unshared Dataset, a masked column the basis cannot trace, a PDP DENY…) 422 → write the binding.
+     * Enabling again re-snapshots the authority (the way back after a refusal).
+     */
+    private Object enableStanding(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
+        InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
+        for (String k : body.keySet())
+            if (!"rule".equals(k))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + k + "' is not a field of this request — only 'rule' is");
+        String ruleName = ApiContext.str(body, "rule");
+        if (ruleName == null || !SnapshotStore.SAFE_ID.matcher(ruleName).matches())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'rule' must name a bound Alert Rule matching " + SnapshotStore.SAFE_ID.pattern());
+        String actor = ApiContext.actor(ex);
+        Object owner = inv.header().get("owner");
+        if (owner == null || !actor.equals(String.valueOf(owner)))
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "only the Investigation's owner enables standing detection: "
+                    + "the sweep acts with the owner's authority, which the owner alone may lend it");
+        AlertService alerts = HostContext.of(api).service().alertService()
+                .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "alert engine unavailable"));
+        // The rule AS ARMED — the exact one a sweep evaluates and whose hash the binding recorded (a stored copy
+        // round-trips numbers through TOON and would hash differently).
+        Map<String, Object> armed = alerts.rules().stream().filter(r -> ruleName.equals(r.get("name"))).findFirst()
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no armed alert rule '" + ruleName + "'"));
+        AlertRule rule;
+        Map<String, Object> binding;
+        try {
+            rule = AlertRule.fromMap(armed);
+            String raw = inv.store().alertRuleBinding(id, ruleName).orElse(null);
+            binding = raw == null ? null : new LinkedHashMap<>(castMap(ApiContext.JSON.readValue(raw, Map.class)));
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+        }
+        if (binding == null || !id.equals(rule.investigation()))
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "alert rule '" + ruleName + "' is not bound to investigation '" + id + "'");
+        if (!rule.isValueMeasureRule())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "only a value-measure Alert Rule watches the live Dataset; '"
+                    + ruleName + "' watches the sealed Working Set, which does not move when the Dataset grows");
+        if (!WorkingSetMeasures.ruleHash(rule).equals(binding.get("ruleHash")))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "alert rule '" + ruleName + "' was edited after it was bound — delete it and bind it again");
+        Map<String, Object> masking = StandingDetection.masking(inv);
+        if (masking == null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "standing detection refused [" + StandingDetection.UNDECIDABLE
+                    + "]: the masking basis of Dataset '" + inv.dataset() + "' could not be determined");
+        var subject = ApiContext.subject(ex);
+        StandingDetection.Authority authority = new StandingDetection.Authority("sweep:" + id, String.valueOf(owner),
+                subject.map(com.gamma.control.Subject::capabilities).orElse(Set.of()),
+                subject.map(com.gamma.control.Subject::dataScopes).orElse(null),
+                subject.map(com.gamma.control.Subject::attributes).orElse(Map.of()), inv.dataset(), masking, actor,
+                Instant.now().toString());
+        StandingDetection.Verdict verdict = StandingDetection.check(inv.writeRoot(), inv.store(), id, inv.header(), authority);
+        if (!verdict.allowed())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "standing detection refused [" + verdict.code() + "]: " + verdict.reason());
+        com.gamma.control.PendingChanges.holdRefusing(api, java.util.List.of("alert-rule"),
+                "standing detection lends an owner's authority to a caller-less sweep inside an owner-only Investigation, where no approver can apply it");
+        boolean replaced = binding.containsKey(StandingDetection.KEY);
+        binding.put(StandingDetection.KEY, authority.toMap());
+        inv.store().bindAlertRule(id, ruleName, InvestigationEvaluator.canonical(binding));
+        emit(ex, LinkEventTypes.LINK_STANDING_DETECTION_ENABLED, "link.standing_detection.enabled",
+                "link.standing_detection.enabled — " + ruleName + " on " + id,
+                b -> b.attr("rule", ruleName).attr("investigationId", id).attr("principal", authority.principal())
+                        .attr("dataset", inv.dataset()).attr("replaced", replaced));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("rule", ruleName);
+        out.put("investigation", id);
+        out.put("principal", authority.principal());
+        out.put("dataset", inv.dataset());
+        out.put("masking", masking);
+        out.put("enabledAt", authority.enabledAt());
+        out.put("replaced", replaced);
+        out.put("authority", "each sweep reads Dataset '" + inv.dataset() + "' as " + owner + " and re-checks that they still "
+                + "may, by user id, before reading; it computes and discloses aggregates only, and stops (recorded) when that "
+                + "access, their lead role, an access policy or the masking basis changes");
         return out;
     }
 

@@ -209,7 +209,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/index/builds/([^/]+)/cancel` | exempt | self-service | `inspecto-la-api/src/main/java/com/gamma/la/api/IndexRoutes.java:108` |
 | POST | `/inv/investigation-templates/([^/]+)/instantiate` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationTemplateRoutes.java:94` |
 | POST | `/inv/investigations` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:143` |
-| POST | `/inv/investigations/([^/]+)/alert-rules` | gated | `canAuthorAlertRules` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java:68` |
+| POST | `/inv/investigations/([^/]+)/alert-rules` | gated | `canAuthorAlertRules` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java:71` |
 | DELETE | `/inv/investigations/([^/]+)/case` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationCaseRoutes.java:60` |
 | PUT | `/inv/investigations/([^/]+)/case` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationCaseRoutes.java:58` |
 | POST | `/inv/investigations/([^/]+)/dossier/bundle/verify` | exempt | read-shaped | `inspecto-la-api/src/main/java/com/gamma/la/api/DossierBundleRoutes.java:64` |
@@ -229,6 +229,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/investigations/([^/]+)/reorder` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:150` |
 | POST | `/inv/investigations/([^/]+)/replay` | exempt | read-shaped | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:152` |
 | POST | `/inv/investigations/([^/]+)/reveal` | gated | `canRevealLinkEntities` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:154` |
+| POST | `/inv/investigations/([^/]+)/standing-detection` | gated | `canAuthorAlertRules` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java:74` |
 | POST | `/inv/investigations/([^/]+)/template` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationTemplateRoutes.java:91` |
 | POST | `/inv/investigations/([^/]+)/undo` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:148` |
 | POST | `/inv/pattern/branching` | exempt | read-shaped | `inspecto-la-api/src/main/java/com/gamma/la/api/PatternRoutes.java:63` |
