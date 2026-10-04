@@ -140,7 +140,7 @@ The seam is `com.gamma.risk.WatchListFeed`, an engine SPI that `inspecto-entity-
 
 ## Residuals (P3 `ASSURE-ENTITY-LISTS-RESIDUALS-1`)
 
-- `excludeBy` / `seedBy` seal exact keys only; range entries do not take part yet. This is Link Analysis-owned.
+- `excludeBy` / `seedBy` seal exact keys only; range entries do not take part yet. This is Link Analysis-owned. Decided 2026-10-04: DEFER until a customer asks; range / CIDR matching changes the sealed-log format and the replay hash, so it needs its own design.
 - There is no SPA authoring for ranges or expiry. The Investigation tab's Entity Lists section edits exact keys,
   and the Pending Change diff is the only view of a held list change.
 - A Dataset over a sidecar is not registered automatically. Author `physicalRef: entity_list_<id>`.

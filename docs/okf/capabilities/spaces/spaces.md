@@ -381,10 +381,10 @@ day 100 → exactly 1 regime change (day 102), then silence; a ±8/day ramp → 
 days (measured 19 / 13); bad margin input → 2 data-quality Alerts, `new` and `insufficient` groups silent. The
 forecast Dataset's description is kept under 60 characters so Alert text names it (`DatasetMeasureProbe.label`). Runbooks: `config/runbooks/business-assurance-runbooks.md`.
 
-**Product gaps the pack recorded** (open on the BACKLOG row): the forecast is NOT a Measure function — the
+**Product gaps the pack recorded** (both decided 2026-10-04): the forecast is NOT a Measure function — the
 Measure shorthand is `count | agg(field)`, so a forecast inside a KPI or Alert Rule would need an engine change;
-the Dataset form was taken instead. A hand-authored view cannot read another view, so each view inlines its
-corpus CTE. A template's runbooks live at `config/runbooks/<pack>-runbooks.md` (`createFromTemplate` copies only `config/` and
+the Dataset form was taken instead, and stays (no build; revisit if a customer needs forecasting inside an ad-hoc Measure). A hand-authored view cannot read another view, so each view inlines its
+corpus CTE; this is by design: layering stays explicit through Job-written Datasets (avoids cycles, hidden cost and lineage ambiguity). A template's runbooks live at `config/runbooks/<pack>-runbooks.md` (`createFromTemplate` copies only `config/` and
 `data/`, and rewrites `${SPACE}` in `.toon` files only); all three assurance packs follow this, and the seed-gate test
 pins it. There is still no runbook component kind.
 Each Job's `sink_dataset` is a shipped Dataset (`revenue_forecast`, `margin_erosion`; `physicalRef` = the sink dir) with a zero-row
