@@ -2,6 +2,8 @@ package com.gamma.la.api;
 
 import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.LinkEventTypes;
+import com.gamma.la.core.CollectorCoveragePort;
+import com.gamma.la.core.CollectorCoveragePorts;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.InvestigationEvaluator;
@@ -24,6 +26,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 
 /**
@@ -43,8 +46,10 @@ import java.util.TreeMap;
  *       occurred, and a slot-empty day is exactly the "innocent or absent?" ambiguity this route exists to settle.</li>
  * </ul>
  *
- * <p>⏳ Per-Collector coverage (which Collectors are missing) is NOT assessed: a Dataset row carries no Collector
- * attribution this route could read, and the response says so explicitly under {@code collectors}.
+ * <p><b>Per-Collector coverage</b> ({@code collectors}, LA-COLLECTOR-COVERAGE-1): a Dataset row carries no Collector, so it is
+ * attributed through the Consignment audit trail ({@link CollectorCoveragePort}) - which Collectors delivered into the
+ * Dataset's stores and which expected days each delivered nothing. Without that evidence the response says
+ * {@code assessed:false}, never "no gaps".
  *
  * <p>Access: {@link InvestigationRoutes#openForRead} (owner or a linked-Case member — LA-24/A9 —, R3 Dataset gate, Enterprise PDP) and the R3 gate again on
  * the Dataset read. An open read — it persists nothing — audited best-effort as {@code LINK_INVESTIGATION_COVERAGE}.
@@ -141,8 +146,47 @@ public final class InvestigationCoverageRoutes implements RouteModule {
         out.put("complete", missing.isEmpty());
         out.put("perDay", perDay);
         out.put("readAt", Instant.now().toString());
-        out.put("collectors", Map.of("assessed", false, "note", "per-Collector coverage is not assessed: a Dataset "
-                + "row carries no Collector attribution"));
+        out.put("collectors", collectors(api, inv, expected));
+        return out;
+    }
+
+    /**
+     * Per-Collector coverage (LA-COLLECTOR-COVERAGE-1). A Dataset row carries no Collector, so attribution comes from the
+     * Consignment audit trail through {@link CollectorCoveragePort}: the Collectors that delivered into this Dataset's
+     * stores, and for each the expected days on which it delivered nothing. 🔴 Absent evidence stays "not assessed", never
+     * "no gaps": no port, a Dataset with no backing store, or no lineage naming one.
+     */
+    private static Map<String, Object> collectors(ApiContext api, InvestigationRoutes.Inv inv, List<LocalDate> expected) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        Optional<Map<String, Object>> ds = DatasetProviders.require().dataset(inv.writeRoot(), inv.dataset());
+        Optional<List<CollectorCoveragePort.Delivery>> found = ds.isEmpty() ? Optional.empty()
+                : CollectorCoveragePorts.active().flatMap(p -> p.deliveries(api, ds.get()));
+        if (found.isEmpty()) {
+            out.put("assessed", false);
+            out.put("note", "per-Collector coverage is not assessed: no Consignment lineage attributes this Dataset's "
+                    + "stores to a Collector (not written by a Pipeline, no audit files, or no attribution bound)");
+            return out;
+        }
+        TreeMap<String, TreeMap<String, Long>> by = new TreeMap<>();
+        for (CollectorCoveragePort.Delivery d : found.get()) by.computeIfAbsent(d.collector(), k -> new TreeMap<>()).merge(d.day(), d.rows(), Long::sum);
+        List<Map<String, Object>> list = new ArrayList<>();
+        by.forEach((collector, days) -> {
+            List<String> missing = new ArrayList<>();
+            for (LocalDate day : expected) if (days.getOrDefault(day.toString(), 0L) == 0) missing.add(day.toString());
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("collector", collector);
+            m.put("coveredDays", expected.size() - missing.size());
+            m.put("missingDays", missing);
+            m.put("complete", missing.isEmpty());
+            list.add(m);
+        });
+        out.put("assessed", true);
+        out.put("expectedDays", expected.size());
+        out.put("collectors", list);
+        out.put("basis", "Consignment lineage: event-day partitions each Collector wrote into this Dataset's stores");
+        out.put("note", "a missing day means that Collector delivered no rows for it - not that it failed. Only Collectors "
+                + "that have delivered into this Dataset are listed; one that never delivered is not visible here. Days "
+                + "are the Pipeline's own partition days, which can differ from the window's zone at the edges");
         return out;
     }
 

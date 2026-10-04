@@ -183,6 +183,42 @@ class ControlApiInvestigationEvidentialControlsTest {
         }
     }
 
+    /** LA-COLLECTOR-COVERAGE-1: the Consignment audit trail names the Collector that delivered nothing on a day. */
+    @Test
+    void coverageNamesTheCollectorThatDeliveredNothingOnADay(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            new ComponentStore(root.resolve("registry")).write("dataset", "calls_attr",
+                    Map.of("view", "calls_view", "physicalRef", "calls_store"));
+            post(c, "/inv/investigations", "{\"purpose\":\"test\",\"id\":\"attr\",\"dataset\":\"calls_attr\",\"sourceCol\":\"caller\","
+                    + "\"targetCol\":\"callee\",\"timeCol\":\"ts\",\"timeColZone\":\"America/Sao_Paulo\"}");
+            String uri = "/inv/investigations/attr/coverage?" + RANGE + "&timezone=America/Sao_Paulo";
+
+            // No audit files yet: attribution is unknown, which must read as NOT assessed.
+            assertFalse(data(send(c.port, "GET", uri, null, null)).at("/collectors/assessed").asBoolean());
+
+            var cfgOpt = c.svc.configFor(c.svc.pipelines().get(0).name()).orElseThrow();
+            String collector = cfgOpt.collector().id();
+            Path batches = Path.of(cfgOpt.dirs().batchesFilePath()), lineage = Path.of(cfgOpt.dirs().lineageFilePath());
+            Files.createDirectories(batches.getParent());
+            Files.createDirectories(lineage.getParent());
+            Files.writeString(batches, "consignment_id,output_table\nb1,calls_store\nb2,other_store\n");
+            Files.writeString(lineage, "consignment_id,src_id,input_file,output_file,partition,row_count\n"
+                    + "b1,0,f1.csv,o1,year=2026/month=09/day=01,10\n"
+                    + "b1,1,f2.csv,o2,year=2026/month=09/day=02,5\n"
+                    + "b1,2,f3.csv,o3,year=2026/month=09/day=05,7\n"
+                    + "b2,0,f4.csv,o4,year=2026/month=09/day=03,99\n");
+
+            JsonNode col = data(send(c.port, "GET", uri, null, null)).get("collectors");
+            assertTrue(col.get("assessed").asBoolean(), col.toString());
+            assertEquals(1, col.get("collectors").size(), "only the batches that wrote this Dataset's store count");
+            assertEquals(collector, col.at("/collectors/0/collector").asText());
+            assertEquals("[\"2026-09-03\",\"2026-09-04\"]", col.at("/collectors/0/missingDays").toString(),
+                    "09-03 is another store's delivery, 09-04 has none");
+            assertEquals(3, col.at("/collectors/0/coveredDays").asInt());
+            assertFalse(col.at("/collectors/0/complete").asBoolean());
+        }
+    }
+
     @Test
     void coverageRefusesWhatItCannotAssess(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

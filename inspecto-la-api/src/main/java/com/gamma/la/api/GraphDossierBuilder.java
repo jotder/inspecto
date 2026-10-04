@@ -438,9 +438,10 @@ final class GraphDossierBuilder {
         m.put("undone", undone);
         m.put("truncated", truncated);
         m.put("hidden", new ArrayList<>(s.hidden));
-        m.put("coverage", Map.of("assessed", false, "note", "the coverage indicator (LA-19) is not built: which days "
-                + "and Collectors are missing for the read windows is NOT known, and a gap in the data is "
-                + "indistinguishable from innocence"));
+        m.put("coverage", Map.of("assessed", false, "note", "which days and Collectors are missing for the read "
+                + "windows is NOT sealed in this Dossier (it is time-varying, and the Dossier root is deterministic): read "
+                + "GET /inv/investigations/{id}/coverage, whose days and collectors parts name them, and until you have, "
+                + "a gap in the data is indistinguishable from innocence"));
         m.put("measures", measures);
         m.put("datasetVersion", Map.of("pinned", false, "note", "no version-addressable read exists (D-E3): each read "
                 + "is sealed at use and its time recorded as weak provenance, not a replay pin"));
