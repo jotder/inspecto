@@ -81,9 +81,14 @@ export function standingDetectionErrorMessage(err: unknown): string {
                 server
             );
         case 404:
-            return 'That Alert Rule is not bound to this Investigation (or the Investigation is not yours). Server: ' + server;
+            return (
+                'That Alert Rule is not bound to this Investigation (or the Investigation is not yours). Server: ' +
+                server
+            );
         case 409:
-            return 'The rule was edited after it was bound. Delete it and bind it again, then enable. Server: ' + server;
+            return (
+                'The rule was edited after it was bound. Delete it and bind it again, then enable. Server: ' + server
+            );
         case 503:
             return 'Standing detection needs the alert engine and a write root. Server: ' + server;
         default:

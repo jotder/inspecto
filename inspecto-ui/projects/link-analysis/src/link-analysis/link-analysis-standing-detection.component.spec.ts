@@ -67,7 +67,10 @@ function setup(opts: { cap?: boolean; enable?: () => unknown; events?: (f: { typ
             provideNoopAnimations(),
             { provide: InvService, useValue: inv },
             { provide: LensService, useValue: { canAuthorAlertRules: () => opts.cap ?? true } },
-            { provide: EventsService, useValue: { search: (f: { type?: string }) => (opts.events ? opts.events(f) : of([])) } },
+            {
+                provide: EventsService,
+                useValue: { search: (f: { type?: string }) => (opts.events ? opts.events(f) : of([])) },
+            },
         ],
     });
     const fixture = TestBed.createComponent(HostComponent);
@@ -94,7 +97,11 @@ describe('standing detection helpers', () => {
     it('counts sweeps and refusals by code, flags a full page, and carries no ids', () => {
         const s = summariseStandingEvents(
             [{}, {}],
-            [{ attributes: { code: 'NOT_LEAD' } }, { attributes: { code: 'NOT_LEAD' } }, { attributes: { code: 'DATASET_GONE' } }],
+            [
+                { attributes: { code: 'NOT_LEAD' } },
+                { attributes: { code: 'NOT_LEAD' } },
+                { attributes: { code: 'DATASET_GONE' } },
+            ],
             500,
         );
         expect(s).toEqual({

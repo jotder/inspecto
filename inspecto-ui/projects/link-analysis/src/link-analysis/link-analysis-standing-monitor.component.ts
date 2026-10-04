@@ -27,7 +27,13 @@ const PAGE = 500;
                 Standing detection — Monitoring
             </h3>
             <div>
-                <button mat-stroked-button type="button" data-test="monitor-refresh" [disabled]="busy()" (click)="load()">
+                <button
+                    mat-stroked-button
+                    type="button"
+                    data-test="monitor-refresh"
+                    [disabled]="busy()"
+                    (click)="load()"
+                >
                     {{ summary() ? 'Refresh' : 'Show sweep counts' }}
                 </button>
             </div>

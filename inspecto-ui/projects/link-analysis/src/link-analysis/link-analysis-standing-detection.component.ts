@@ -33,9 +33,10 @@ import { standingDetectionErrorMessage } from './standing-detection';
                     Status: {{ enabled() ? 'Enabled' : 'Not enabled — this rule is not evaluated yet' }}.
                 </p>
                 <p class="text-secondary m-0">
-                    Only the Investigation's owner can enable this (the server refuses anyone else). Enabling lets a scheduled sweep read Dataset "{{ investigation().dataset }}" with your access,
-                    checked again before every read. It computes and discloses counts only, and stops (recorded) if your
-                    access, your lead role, an access policy or the masking changes.
+                    Only the Investigation's owner can enable this (the server refuses anyone else). Enabling lets a
+                    scheduled sweep read Dataset "{{ investigation().dataset }}" with your access, checked again before
+                    every read. It computes and discloses counts only, and stops (recorded) if your access, your lead
+                    role, an access policy or the masking changes.
                 </p>
                 <div>
                     <button
@@ -92,7 +93,9 @@ export class LinkAnalysisStandingDetectionComponent {
         this.error.set('');
         this.unavailable.set(false);
         try {
-            this.enabled.set(await firstValueFrom(this.inv.enableStandingDetection(this.investigation().id, this.rule())));
+            this.enabled.set(
+                await firstValueFrom(this.inv.enableStandingDetection(this.investigation().id, this.rule())),
+            );
         } catch (err) {
             this.unavailable.set(isUnavailable(err));
             this.error.set(standingDetectionErrorMessage(err));
