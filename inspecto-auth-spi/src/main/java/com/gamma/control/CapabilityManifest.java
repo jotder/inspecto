@@ -44,6 +44,9 @@ final class CapabilityManifest {
             // POST /alerts/rules is; the Investigation's owner-only / PDP gate applies on top.
             new Entry("POST", "/inv/investigations/([^/]+)/alert-rules", Roles.CAN_AUTHOR_ALERT_RULES),
             new Entry("POST", "/inv/investigations/([^/]+)/standing-detection", Roles.CAN_AUTHOR_ALERT_RULES),
+            // LD-5: disabling standing detection and editing a bound rule in place are alert authoring too.
+            new Entry("DELETE", "/inv/investigations/([^/]+)/standing-detection/([^/]+)", Roles.CAN_AUTHOR_ALERT_RULES),
+            new Entry("PUT", "/inv/investigations/([^/]+)/alert-rules/([^/]+)", Roles.CAN_AUTHOR_ALERT_RULES),
             new Entry("PUT", "/inv/investigations/([^/]+)/case", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("DELETE", "/inv/investigations/([^/]+)/case", Roles.CAN_MANAGE_INCIDENTS),
             // InvestigationReferenceRoutes (D-6) — an external reference is appended beside the op log, so it is Case work too.

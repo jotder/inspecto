@@ -137,6 +137,9 @@ public interface InvestigationStore {
 
     Optional<String> template(String id) throws IOException;
 
+    /** Every saved Investigation Template, raw, in id order (LD-5: the list route filters to the caller's own). */
+    List<String> templates() throws IOException;
+
     /**
      * Compare-and-set of one pending-expand record: replace it with {@code newJson} only if its stored text is still exactly
      * {@code expectedJson} (the read the caller decided over). False, and nothing written, when another decider got there first

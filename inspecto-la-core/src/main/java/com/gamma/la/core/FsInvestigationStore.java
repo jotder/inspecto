@@ -236,6 +236,11 @@ public final class FsInvestigationStore implements InvestigationStore {
     }
 
     @Override
+    public List<String> templates() throws IOException {
+        return snapshots.readTemplates();
+    }
+
+    @Override
     public boolean replacePending(String investigationId, String requestId, String expectedJson, String newJson) throws IOException {
         synchronized (monitor(investigationDir(investigationId))) {
             String current = snapshots.readPending(investigationId, requestId);

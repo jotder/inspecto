@@ -458,6 +458,11 @@ public final class PgInvestigationStore implements InvestigationStore {
     }
 
     @Override
+    public List<String> templates() throws IOException {
+        return tx(c -> strings(c, "SELECT body FROM " + t("la_template") + " ORDER BY id COLLATE \"C\""));
+    }
+
+    @Override
     public boolean replacePending(String investigationId, String requestId, String expectedJson, String newJson) throws IOException {
         // one conditional UPDATE: a second decider waits on the row, re-reads it, no longer matches, and changes nothing
         return tx(c -> update(c, "UPDATE " + t("la_pending") + " SET body = ? WHERE inv = ? AND request_id = ? AND body = ?",

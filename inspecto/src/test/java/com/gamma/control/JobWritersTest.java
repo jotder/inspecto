@@ -46,6 +46,7 @@ class JobWritersTest {
             Map.entry("POST /expectations/evaluate", FIXED + " (an expectation's result stamp)"),
             Map.entry("POST /expectations/([^/]+)/evaluate", FIXED + " (an expectation's result stamp)"),
             Map.entry("POST /inv/investigations/([^/]+)/alert-rules", FIXED + " (alert-rule, inspecto-geo-link)"),
+            Map.entry("PUT /inv/investigations/([^/]+)/alert-rules/([^/]+)", FIXED + " (alert-rule edited in place, inspecto-geo-link)"),
             Map.entry("PUT /settings/egress", FIXED + " (egress.toon)"),
             Map.entry("PUT /settings/mail-attachments", FIXED + " (mail-attachments.toon)"),
             Map.entry("PUT /settings/publication-destinations", FIXED + " (publication-destinations.toon)"),

@@ -71,7 +71,7 @@ Interfaces live beside their engine facility and carry `@PublicApi`.
 | `incidents` | `IncidentAccess.openIncident(…, dedupeAttribute)` | `ObjectService`; honours the active-object convention via a caller-named dedupe attribute. `AlertService.promoteToIncident` opens through it | reports the would-be Incident, opens nothing |
 | `schema` | `SchemaAccess.list/get/fingerprint` | `registry/schemas/*.toon` via a per-call `ComponentRegistry.scan`; the fingerprint is the same `CanonicalHash.sha256` pinned into manifests | n/a — read-only |
 | `consignment-status` | `ConsignmentStatusAccess.consignment/latestFor/outputs/fileStages` | the loaded pipelines' manifests, plus the two default-off registries | n/a — read-only |
-| `alerts` | `AlertAccess.evaluateRules()` → `List<Alert>` | `AlertService`'s evaluator; `alert.evaluate` is the only consumer (added 2026-08-10 on D7's demand — see §6) | ⚠ **cannot be previewed**: logs the would-be evaluation and returns empty, and a consumer must report that nothing was *checked* |
+| `alerts` | `AlertAccess.evaluateRules()` → `List<Alert>` (also `evaluateFreshnessRules()` and `evaluateInvestigationRules()`, narrower sweeps whose default is the full one) | `AlertService`'s evaluator; `alert.evaluate` and `la.detect` (Link Analysis standing detection, 2026-10-04) are the consumers (added 2026-08-10 on D7's demand — see §6) | ⚠ **cannot be previewed**: logs the would-be evaluation and returns empty, and a consumer must report that nothing was *checked* |
 
 **The engine is the seam's first consumer** — the CONTROL trio's dispatch was rewired through
 `NotificationAccess`/`IncidentAccess` before any plugin could bind to them, which is how the

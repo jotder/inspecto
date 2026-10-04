@@ -449,8 +449,18 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   resumes the sweep without re-enabling, and re-enabling re-snapshots. ⚠ Residuals: the synthetic Subject's grants are
   the enable-time snapshot and carry no role names, so a DENY keyed on `subject.roles` cannot be reproduced. ⚠ The SPA
   *Watch* binds the rule but does not yet enable it, so a SPA-bound value rule stays inert until enabled by API
-  (owed, with the monitoring surface: LD-6). Decisions D-LD2 to D-LD12 are recorded as "decided by the assistant,
+  (owed, with the monitoring surface: LD-6). Decisions D-LD2 to D-LD17 are recorded as "decided by the assistant,
   pending operator confirmation" in `docs/superpower/la-live-detection-design.md` §8.
+  **LD-4 and LD-5 (2026-10-04).** The Job Type **`la.detect`** (no parameters, `requires: [alerts]`, Signal
+  `la.detect.completed` carrying a count and Alert Rule names only) is a clock over the existing evaluation: it calls
+  `AlertAccess.evaluateInvestigationRules()`, which runs only Investigation-bound rules through the same probe as the
+  full sweep, so the authority re-decision above applies unchanged. It fails the Run closed when the `alerts` service
+  or the Link Analysis module is absent; a dry run evaluates nothing. Author it as an ordinary Job; its cron is the
+  cadence. Also: `GET /inv/investigation-templates` (the caller's own templates, newest first, summaries with counts;
+  sharing is not built), `DELETE /inv/investigations/{id}/standing-detection/{rule}` (disable; idempotent; the rule stays
+  bound and a sweep refuses `NOT_ENABLED`) and `PUT /inv/investigations/{id}/alert-rules/{rule}` (edit in place; the new
+  hash replaces the old and **the recorded authority is dropped**, so the owner enables it again). Wire shapes:
+  `docs/superpower/la-live-detection-design.md` §9.
 
 * **Settings ▸ Link Analysis** (2026-09-30, `settings/link-analysis-settings.component`): the four-eyes thresholds
   (`fourEyesBudgetAbove`, `fourEyesFanOutAbove`), `mergedDistinctCap` with `mergedDistinctCapInForce`, and

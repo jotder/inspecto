@@ -212,6 +212,19 @@ final class FsInvestigationLayout {
         }
     }
 
+    /** Every saved template, raw, in id order (empty when none was ever saved). */
+    public java.util.List<String> readTemplates() throws IOException {
+        Path d = templateDirectory();
+        if (!Files.isDirectory(d)) return java.util.List.of();
+        java.util.List<Path> files;
+        try (var s = Files.list(d)) {
+            files = s.filter(f -> f.getFileName().toString().endsWith(".json") && Files.isRegularFile(f)).sorted().toList();
+        }
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (Path f : files) out.add(Files.readString(f, StandardCharsets.UTF_8));
+        return out;
+    }
+
     /** One template's raw JSON, or null when it was never saved. */
     public String readTemplate(String id) throws IOException {
         Path f = templateDirectory().resolve(id + ".json");

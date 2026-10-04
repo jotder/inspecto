@@ -184,6 +184,14 @@ public final class LinkEventTypes {
      *  {@code principal}, and the stable reason {@code code}. */
     public static final String LINK_STANDING_DETECTION_REFUSED = "LINK_STANDING_DETECTION_REFUSED";
 
+    /** Standing detection was DISABLED for a rule ({@code DELETE /inv/investigations/{id}/standing-detection/{rule}},
+     *  LD-5). {@code rule}, {@code investigationId}, {@code wasEnabled}. Never an entity id. */
+    public static final String LINK_STANDING_DETECTION_DISABLED = "LINK_STANDING_DETECTION_DISABLED";
+
+    /** A bound Investigation Alert Rule was EDITED in place ({@code PUT /inv/investigations/{id}/alert-rules/{rule}},
+     *  LD-5). {@code rule}, {@code investigationId}, {@code standingDetectionDropped}. */
+    public static final String LINK_INVESTIGATION_ALERT_RULE_EDITED = "LINK_INVESTIGATION_ALERT_RULE_EDITED";
+
     /** An Investigation was linked to a Case ({@code PUT /inv/investigations/{id}/case}, or {@code caseRef} at create,
      *  LA-24) by its owner. {@code investigationId}, {@code caseId} and {@code verified} (false when Case management
      *  is not installed, so the Case could not be checked and the link grants nothing). */

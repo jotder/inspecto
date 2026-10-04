@@ -38,6 +38,8 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
  *
  * <ul>
  *   <li>{@code POST /inv/investigations/{id}/template} — save the Investigation's effective log as a template.</li>
+ *   <li>{@code GET /inv/investigation-templates} — the caller's own templates, newest first, as summaries
+ *       (LA-LIVE-DETECTION-1 LD-5: counts, never ops or parameters).</li>
  *   <li>{@code GET /inv/investigation-templates/{id}} — read one template.</li>
  *   <li>{@code POST /inv/investigation-templates/{id}/instantiate} — bind it to seeds and a Dataset: a NEW
  *       Investigation whose every {@code expand} reads (and seals) that Dataset now.</li>
@@ -90,6 +92,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         // ⚠ String LITERALS on purpose — CapabilityManifestTest's scanner matches only a literal argument.
         api.post("/inv/investigations/([^/]+)/template", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> save(api, e, m.group(1), api.body(e))));
+        api.get("/inv/investigation-templates", (e, m) -> list(api, e));
         api.get("/inv/investigation-templates/([^/]+)", (e, m) -> openTemplate(api, e, m.group(1)).doc());
         api.post("/inv/investigation-templates/([^/]+)/instantiate", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> instantiate(api, e, m.group(1), api.body(e))));
@@ -256,6 +259,40 @@ public final class InvestigationTemplateRoutes implements RouteModule {
                 b -> b.attr("templateId", templateId).attr("investigationId", invId)
                         .attr("dataset", header.get("dataset")).attr("steps", out.get("steps")));
         return out;
+    }
+
+    /**
+     * {@code GET /inv/investigation-templates} — the caller's own templates, newest first, as SUMMARIES
+     * {@code {id, title, createdAt, dataset, investigation, parameters, ops}} ({@code parameters} and {@code ops} are counts).
+     * Owner-only exactly as {@link #openTemplate}: another owner's template is not listed, so the list says nothing a 404
+     * would not (a Personal host with no Subject lists all). Gates: 503 without a write root. A template document that cannot
+     * be read is skipped, never listed half-parsed. Sharing is not built (D-LD6).
+     */
+    @SuppressWarnings("unchecked")
+    private static Object list(ApiContext api, HttpExchange ex) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis investigation template");
+        Optional<Subject> subject = ApiContext.subject(ex);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (String raw : InvestigationStores.of(writeRoot).templates()) {
+            Map<String, Object> doc;
+            try {
+                doc = ApiContext.JSON.readValue(raw, Map.class);
+            } catch (IOException | RuntimeException unreadable) {
+                continue;
+            }
+            if (subject.isPresent() && !subject.get().id().equals(doc.get("owner"))) continue;
+            Map<String, Object> roles = doc.get("roles") instanceof Map<?, ?> r ? (Map<String, Object>) r : Map.of();
+            Map<String, Object> from = doc.get("derivedFrom") instanceof Map<?, ?> d ? (Map<String, Object>) d : Map.of();
+            out.add(ordered("id", doc.get("id"), "title", doc.get("title"), "createdAt", doc.get("createdAt"),
+                    "dataset", roles.get("dataset"), "investigation", from.get("investigation"),
+                    "parameters", doc.get("parameters") instanceof List<?> p ? p.size() : 0,
+                    "ops", doc.get("ops") instanceof List<?> o ? o.size() : 0));
+        }
+        out.sort((a, b) -> {
+            int c = String.valueOf(b.get("createdAt")).compareTo(String.valueOf(a.get("createdAt")));
+            return c != 0 ? c : String.valueOf(a.get("id")).compareTo(String.valueOf(b.get("id")));
+        });
+        return ordered("templates", out);
     }
 
     /** Resolve one template: 503 without a write root · 422 unsafe id · 403 escaping · 404 absent or not the owner's. */

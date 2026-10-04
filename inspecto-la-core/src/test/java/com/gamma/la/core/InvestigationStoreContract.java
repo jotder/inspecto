@@ -317,6 +317,8 @@ abstract class InvestigationStoreContract {
         assertEquals("{\"rule\":\"r\"}", s.alertRuleBinding("w", "r").orElseThrow());
         assertTrue(s.createTemplate("t1", "{\"id\":\"t1\"}"));
         assertFalse(s.createTemplate("t1", "{\"id\":\"changed\"}"));
+        assertTrue(s.createTemplate("t0", "{\"id\":\"t0\"}"));
+        assertEquals(List.of("{\"id\":\"t0\"}", "{\"id\":\"t1\"}"), s.templates(), "every template, raw, in id order");
         assertEquals("{\"id\":\"t1\"}", s.template("t1").orElseThrow());
     }
 

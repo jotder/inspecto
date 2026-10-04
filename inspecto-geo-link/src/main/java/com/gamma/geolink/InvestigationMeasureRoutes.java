@@ -73,6 +73,11 @@ public final class InvestigationMeasureRoutes implements RouteModule {
         // LA-LIVE-DETECTION-1 (LD-2). Same String-literal rule; same capability as binding the rule it arms.
         api.post("/inv/investigations/([^/]+)/standing-detection", ApiContext.withCapability("canAuthorAlertRules",
                 (e, m) -> enableStanding(api, e, m.group(1), api.body(e))));
+        // LD-5. Same literal rule and capability: editing a bound rule in place and turning standing detection off.
+        api.put("/inv/investigations/([^/]+)/alert-rules/([^/]+)", ApiContext.withCapability("canAuthorAlertRules",
+                (e, m) -> edit(api, e, m.group(1), m.group(2), api.body(e))));
+        api.delete("/inv/investigations/([^/]+)/standing-detection/([^/]+)", ApiContext.withCapability("canAuthorAlertRules",
+                (e, m) -> disableStanding(api, e, m.group(1), m.group(2))));
     }
 
     /** {@code GET …/measures} — gates: {@link InvestigationRoutes#open} (503 · 422 · 403 · 404) → a bad measure 422. */
@@ -114,6 +119,64 @@ public final class InvestigationMeasureRoutes implements RouteModule {
      */
     private Object bind(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
         InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
+        Parsed parsed = parse(api, ex, inv, id, body);
+        AlertRule rule = parsed.rule();
+        ValueMeasures.Spec spec = parsed.spec();
+        boolean valueRule = spec != null;
+        OptionalDouble current = parsed.current();
+        ValueMeasures.Result valued = parsed.valued();
+
+        AlertService alerts = HostContext.of(api).service().alertService()
+                .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "alert engine unavailable"));
+        var store = DatasetRead.registry(inv.writeRoot());
+        if (store.get("alert-rule", rule.name()).isPresent())
+            throw new ApiException(409, ErrorCodes.CONFLICT, "alert rule '" + rule.name() + "' already exists");
+        // Maker-checker (ASSURE-MAKER-CHECKER-1): an approver could not replay this bind — the Investigation is
+        // owner-only — so under a policy for Alert Rules it is refused rather than written around the policy.
+        com.gamma.control.PendingChanges.holdRefusing(api, java.util.List.of("alert-rule"),
+                "an Investigation Alert Rule is bound inside an owner-only Investigation, where no approver can apply it");
+        Map<String, Object> written;
+        try {
+            written = store.write("alert-rule", rule.name(), rule.toMap()).content();
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+        }
+        Map<String, Object> binding = new LinkedHashMap<>();
+        binding.put("rule", rule.name());
+        binding.put("ruleHash", WorkingSetMeasures.ruleHash(rule));
+        binding.put("investigation", id);
+        binding.put("owner", inv.header().get("owner"));
+        binding.put("boundBy", ApiContext.actor(ex));
+        binding.put("boundAt", Instant.now().toString());
+        inv.store().bindAlertRule(id, rule.name(), InvestigationEvaluator.canonical(binding));
+        alerts.upsert(rule);   // armed last: a rule is never live without the binding that lets it evaluate
+
+        emit(ex, LinkEventTypes.LINK_INVESTIGATION_ALERT_RULE_BOUND, "link.investigation.alert_rule.bound",
+                "link.investigation.alert_rule.bound — " + rule.name() + " on " + id,
+                b -> b.attr("rule", rule.name()).attr("investigationId", id).attr("relation", rule.relation())
+                        .attr("measure", rule.measure()).attr("threshold", rule.threshold())
+                        .attr("valueMeasure", rule.isValueMeasureRule() ? rule.valueMeasure().get("name") : null));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("rule", written);
+        out.put("current", current.isPresent() ? current.getAsDouble() : null);
+        out.put("wouldFire", current.isPresent() && rule.breached(current.getAsDouble()));
+        if (valued != null) out.putAll(ValueMeasureRoutes.answer(spec, valued));   // the entities it would name
+        if (valueRule) out.put("standingDetection", "not enabled: a sweep reads the live Dataset only after the owner enables it "
+                + "(POST /inv/investigations/" + id + "/standing-detection {rule}); until then the rule is not evaluated");
+        out.put("disclosure", "when it fires, the Alert (and at CRITICAL the Incident) shows this Investigation's id, "
+                + "the measure, its value and the threshold to everyone who can read Alerts and Incidents");
+        return out;
+    }
+
+    /** A parsed, validated rule body and what it evaluates to now. */
+    private record Parsed(AlertRule rule, ValueMeasures.Spec spec, OptionalDouble current, ValueMeasures.Result valued) {}
+
+    /**
+     * The body of a bind or an edit, validated: a field outside the shape, an invalid rule, an unsafe name, or a measure
+     * the relation cannot compute is a 422, and a value-measure rule's whole Dataset is read R3-gated for this caller now.
+     */
+    private Parsed parse(ApiContext api, HttpExchange ex, InvestigationRoutes.Inv inv, String id, Map<String, Object> body)
+            throws IOException {
         boolean valueRule = body.containsKey("valueMeasure");
         for (String k : body.keySet())
             if (valueRule && !VALUE_RULE_FIELDS.contains(k))
@@ -156,47 +219,7 @@ public final class InvestigationMeasureRoutes implements RouteModule {
             WorkingSetRoutes.Relation rel = WorkingSetRoutes.relation(inv, new boolean[1]);
             current = compute(rel, rule.relation(), rule.measure());   // 422 if the relation cannot
         }
-
-        AlertService alerts = HostContext.of(api).service().alertService()
-                .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "alert engine unavailable"));
-        var store = DatasetRead.registry(inv.writeRoot());
-        if (store.get("alert-rule", rule.name()).isPresent())
-            throw new ApiException(409, ErrorCodes.CONFLICT, "alert rule '" + rule.name() + "' already exists");
-        // Maker-checker (ASSURE-MAKER-CHECKER-1): an approver could not replay this bind — the Investigation is
-        // owner-only — so under a policy for Alert Rules it is refused rather than written around the policy.
-        com.gamma.control.PendingChanges.holdRefusing(api, java.util.List.of("alert-rule"),
-                "an Investigation Alert Rule is bound inside an owner-only Investigation, where no approver can apply it");
-        Map<String, Object> written;
-        try {
-            written = store.write("alert-rule", rule.name(), rule.toMap()).content();
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
-        }
-        Map<String, Object> binding = new LinkedHashMap<>();
-        binding.put("rule", rule.name());
-        binding.put("ruleHash", WorkingSetMeasures.ruleHash(rule));
-        binding.put("investigation", id);
-        binding.put("owner", inv.header().get("owner"));
-        binding.put("boundBy", ApiContext.actor(ex));
-        binding.put("boundAt", Instant.now().toString());
-        inv.store().bindAlertRule(id, rule.name(), InvestigationEvaluator.canonical(binding));
-        alerts.upsert(rule);   // armed last: a rule is never live without the binding that lets it evaluate
-
-        emit(ex, LinkEventTypes.LINK_INVESTIGATION_ALERT_RULE_BOUND, "link.investigation.alert_rule.bound",
-                "link.investigation.alert_rule.bound — " + rule.name() + " on " + id,
-                b -> b.attr("rule", rule.name()).attr("investigationId", id).attr("relation", rule.relation())
-                        .attr("measure", rule.measure()).attr("threshold", rule.threshold())
-                        .attr("valueMeasure", rule.isValueMeasureRule() ? rule.valueMeasure().get("name") : null));
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("rule", written);
-        out.put("current", current.isPresent() ? current.getAsDouble() : null);
-        out.put("wouldFire", current.isPresent() && rule.breached(current.getAsDouble()));
-        if (valued != null) out.putAll(ValueMeasureRoutes.answer(spec, valued));   // the entities it would name
-        if (valueRule) out.put("standingDetection", "not enabled: a sweep reads the live Dataset only after the owner enables it "
-                + "(POST /inv/investigations/" + id + "/standing-detection {rule}); until then the rule is not evaluated");
-        out.put("disclosure", "when it fires, the Alert (and at CRITICAL the Incident) shows this Investigation's id, "
-                + "the measure, its value and the threshold to everyone who can read Alerts and Incidents");
-        return out;
+        return new Parsed(rule, spec, current, valued);
     }
 
     /**
@@ -277,6 +300,105 @@ public final class InvestigationMeasureRoutes implements RouteModule {
         out.put("authority", "each sweep reads Dataset '" + inv.dataset() + "' as " + owner + " and re-checks that they still "
                 + "may, by user id, before reading; it computes and discloses aggregates only, and stops (recorded) when that "
                 + "access, their lead role, an access policy or the masking basis changes");
+        return out;
+    }
+
+    /** The binding of a rule to this Investigation, or a 404 when the rule is not bound here. */
+    private static Map<String, Object> binding(InvestigationRoutes.Inv inv, String id, String ruleName) throws IOException {
+        if (!SnapshotStore.SAFE_ID.matcher(ruleName).matches())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the rule name must match " + SnapshotStore.SAFE_ID.pattern());
+        String raw = inv.store().alertRuleBinding(id, ruleName).orElse(null);
+        if (raw == null)
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "alert rule '" + ruleName + "' is not bound to investigation '" + id + "'");
+        return new LinkedHashMap<>(castMap(ApiContext.JSON.readValue(raw, Map.class)));
+    }
+
+    /**
+     * {@code DELETE …/standing-detection/{rule}} — turn standing detection OFF for a bound rule (LD-5, D-LD15). The rule stays
+     * bound and armed; its binding loses the recorded authority, so every sweep refuses {@code NOT_ENABLED} (a value-measure
+     * rule reads no Dataset). It only narrows, so any caller who may author alert rules and open the Investigation may do it,
+     * and it is idempotent. Gates: {@code canAuthorAlertRules} 403 → {@link InvestigationRoutes#open} (503 · 422 · 403 · 404)
+     * → unsafe name 422 → rule not bound here 404 → drop the authority.
+     */
+    private Object disableStanding(ApiContext api, HttpExchange ex, String id, String ruleName) throws IOException {
+        InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
+        Map<String, Object> binding = binding(inv, id, ruleName);
+        boolean wasEnabled = binding.containsKey(StandingDetection.KEY);
+        if (wasEnabled) {
+            binding.remove(StandingDetection.KEY);
+            inv.store().bindAlertRule(id, ruleName, InvestigationEvaluator.canonical(binding));
+        }
+        emit(ex, LinkEventTypes.LINK_STANDING_DETECTION_DISABLED, "link.standing_detection.disabled",
+                "link.standing_detection.disabled — " + ruleName + " on " + id,
+                b -> b.attr("rule", ruleName).attr("investigationId", id).attr("wasEnabled", wasEnabled));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("rule", ruleName);
+        out.put("investigation", id);
+        out.put("enabled", false);
+        out.put("wasEnabled", wasEnabled);
+        return out;
+    }
+
+    /**
+     * {@code PUT …/alert-rules/{rule}} — EDIT a bound rule in place (LD-5, D-LD16): the body is {@code POST …/alert-rules}'s
+     * ({@code name}, when given, must equal the path's). The binding takes the new rule's hash and LOSES its standing-detection
+     * authority — the owner granted it for the old rule — so the owner re-enables (re-snapshots) afterwards. Gates:
+     * {@code canAuthorAlertRules} 403 → {@link InvestigationRoutes#open} (503 · 422 · 403 · 404) → a different {@code name} or a
+     * body outside the shape 422 → no alert engine 503 → no such armed rule 404 → not bound to this Investigation 404 → armed
+     * rule edited out of band since binding 409 → an invalid rule or unevaluable measure 422 → maker-checker policy refusal →
+     * write the component, then the binding, then re-arm (so at every instant a sweep sees a hash mismatch and refuses).
+     */
+    private Object edit(ApiContext api, HttpExchange ex, String id, String ruleName, Map<String, Object> body) throws IOException {
+        InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
+        Object named = body.get("name");
+        if (named != null && !ruleName.equals(String.valueOf(named)))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'name' cannot change: the rule is '" + ruleName
+                    + "' (delete it and bind a new one to rename it)");
+        AlertService alerts = HostContext.of(api).service().alertService()
+                .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "alert engine unavailable"));
+        Map<String, Object> binding = binding(inv, id, ruleName);
+        Map<String, Object> armed = alerts.rules().stream().filter(r -> ruleName.equals(r.get("name"))).findFirst()
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no armed alert rule '" + ruleName + "'"));
+        AlertRule old;
+        try {
+            old = AlertRule.fromMap(armed);
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+        }
+        if (!id.equals(old.investigation()))
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "alert rule '" + ruleName + "' is not bound to investigation '" + id + "'");
+        if (!WorkingSetMeasures.ruleHash(old).equals(binding.get("ruleHash")))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "alert rule '" + ruleName + "' was edited after it was bound — delete it and bind it again");
+        Map<String, Object> next = new LinkedHashMap<>(body);
+        next.put("name", ruleName);
+        Parsed parsed = parse(api, ex, inv, id, next);
+        AlertRule rule = parsed.rule();
+        com.gamma.control.PendingChanges.holdRefusing(api, java.util.List.of("alert-rule"),
+                "an Investigation Alert Rule is edited inside an owner-only Investigation, where no approver can apply it");
+        try {
+            DatasetRead.registry(inv.writeRoot()).write("alert-rule", rule.name(), rule.toMap());
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+        }
+        boolean dropped = binding.remove(StandingDetection.KEY) != null;
+        binding.put("ruleHash", WorkingSetMeasures.ruleHash(rule));
+        binding.put("boundBy", ApiContext.actor(ex));
+        binding.put("boundAt", Instant.now().toString());
+        inv.store().bindAlertRule(id, rule.name(), InvestigationEvaluator.canonical(binding));
+        alerts.upsert(rule);   // re-armed last, as in bind
+        emit(ex, LinkEventTypes.LINK_INVESTIGATION_ALERT_RULE_EDITED, "link.investigation.alert_rule.edited",
+                "link.investigation.alert_rule.edited — " + rule.name() + " on " + id,
+                b -> b.attr("rule", rule.name()).attr("investigationId", id).attr("standingDetectionDropped", dropped));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("rule", rule.toMap());
+        out.put("current", parsed.current().isPresent() ? parsed.current().getAsDouble() : null);
+        out.put("wouldFire", parsed.current().isPresent() && rule.breached(parsed.current().getAsDouble()));
+        if (parsed.valued() != null) out.putAll(ValueMeasureRoutes.answer(parsed.spec(), parsed.valued()));
+        out.put("replaced", true);
+        if (parsed.spec() != null) out.put("standingDetection", "disabled: the rule was edited, so the owner must enable it again "
+                + "(POST /inv/investigations/" + id + "/standing-detection {rule}); until then it is not evaluated");
+        out.put("disclosure", "when it fires, the Alert (and at CRITICAL the Incident) shows this Investigation's id, "
+                + "the measure, its value and the threshold to everyone who can read Alerts and Incidents");
         return out;
     }
 

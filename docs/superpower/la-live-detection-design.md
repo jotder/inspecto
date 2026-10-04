@@ -245,6 +245,21 @@ the `inspecto-geo-link` module. This design does not change it; Standing Detecti
 * **Tests:** `ComponentAccessAsOwnerTest` (auth-spi), `StandingDetectionTest` (la-api), and the real-HTTP
   `ControlApiStandingDetectionTest` (every gate; each stop reason, with the probe that would otherwise succeed: the
   same owner still opens the Investigation on a request). `ControlApiValueMeasureTest` now enables first.
+* **LD-4** `la.detect` (`inspecto-engine`: `LaDetectJob`, registered in `JobService.registerBuiltins`; no loader file or
+  registry kind, so no reserved file name) calls the new `AlertAccess.evaluateInvestigationRules()` ->
+  `AlertService.evaluateInvestigationRules()`, the Investigation pass of the full sweep extracted into one private method both
+  share (so the Job and the ordinary sweep cannot disagree). It throws, failing the Run, when no probe is wired.
+* **LD-5** `GET /inv/investigation-templates` (`InvestigationTemplateRoutes`, over the new `InvestigationStore.templates()`,
+  implemented for the filesystem and Postgres stores and pinned in the shared store contract), `DELETE .../standing-detection/{rule}`
+  and `PUT .../alert-rules/{rule}` (`InvestigationMeasureRoutes`, whose bind body validation is now one shared `parse`).
+* **Gates cleared for the two new mutating routes:** `CapabilityManifest` (literal paths), `AbsentGeoLinkRoutes.SURFACE`,
+  `docs/api/openapi-v1.json` (regenerated skeleton), `compliance/evidence/route-gating.md`, the auth-gate baseline (unchanged,
+  armed tests), and a `JobWritersTest` row for the PUT only (it writes an `alert-rule` component, like the bind it edits; the
+  DELETE writes no component).
+* **Tests:** `ControlApiStandingDetectionLd5Test` (real HTTP: the Job run through `/jobs/{name}/trigger`, with the sweep refusing
+  before enable and firing after; list owner-filtering and the 503; disable gates, idempotence, resume; edit gates, failed edits
+  changing nothing, authority dropped and re-enable), `SampleJobTypesTest` (the Job), `AlertServiceTest` (the narrowed sweep),
+  the store contract (`templates()`).
 * **Not built here:** LD-6 (SPA monitoring and the enable affordance; another lane).
 
 ### LD-4 and LD-5 wire contract (fixed 2026-10-04; the SPA lane builds against exactly this)
