@@ -59,7 +59,6 @@ class ControlApiSpaceTemplatesTest {
         Files.writeString(tpl.resolve("config").resolve("orders").resolve("orders_pipeline.toon"), """
                 name: orders
                 active: false
-                version: 1
                 dirs:
                   poll:       spaces/${SPACE}/data/inbox/orders
                   database:   spaces/${SPACE}/data/orders/database
