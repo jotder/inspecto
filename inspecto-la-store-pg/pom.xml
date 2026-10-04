@@ -11,69 +11,43 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>inspecto-la-core</artifactId>
+    <artifactId>inspecto-la-store-pg</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — Link Analysis core (host-free model, stores, pure logic + the ports) (optional)</name>
+    <name>Inspecto — Link Analysis Postgres InvestigationStore (optional)</name>
     <description>
-        OPTIONAL Link Analysis module (LA separation D-1 step 5b/6, 2026-10-01): the host-free half of Link Analysis —
-        the Investigation evaluator, the branching-pattern engine and query compiler, the snapshot store, the
-        Admiralty grade, Investigation time and link ids (package com.gamma.la.core) — PLUS the two LA-owned PORTS it
-        stands on: DatasetProvider (what LA reads from the Dataset registry and query engine) and CasePort (the
-        host-bound part of sharing an Investigation with a Case team), each found through the fail-closed SpiSlot
-        discovery. It names no engine, ETL, acquisition or control-plane class: inspecto-geo-link (the bridge)
-        implements the ports from the engine and the host.
-
-        Dependency rule (Decision 5): this module may reach ONLY the inspecto-* modules listed in
-        tools/check-module-deps.mjs (the maven-enforcer rule below and the Node guard both derive from that table).
-        Bundled in exactly the editions that ship inspecto-geo-link; staged as an optional jar, not part of the fat jar.
-        Built only under the edition profiles (see the parent pom's profile-scoped &lt;modules&gt;).
+        OPTIONAL (LA-INVESTIGATION-STORE-DESIGN-1, slice S2, decision D-IS7): the PostgreSQL implementation of
+        inspecto-la-core's InvestigationStore port, so two pods can serve one Space. Plain JDBC (java.sql) - the driver is the
+        host's, exactly as for the other Postgres-backed stores - and NOT wired anywhere: the filesystem store stays the default
+        for every edition until slice S6 adds the investigations.backend selection. Built only under the enterprise and preview
+        edition profiles. Its tests run the SAME InvestigationStoreContract the filesystem store runs (la-core's test-jar) against
+        a real server: set INSPECTO_TEST_PG_URL, otherwise every case SKIPS (and says so).
     </description>
 
     <dependencies>
-        <!-- D-4 step 4: the graph engine seam (InMemoryGraphEngine) runs the ported algorithms. Plain JDK, no platform module. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-la-graph</artifactId>
+            <artifactId>inspecto-la-core</artifactId>
             <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-entity-store</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-http-spi</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-auth-spi</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-audit-spi</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-config</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-sql</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-util</artifactId>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-        </dependency>
 
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-la-core</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <!-- test scope is NOT transitive: the module that owns the test must declare the driver (a skipping test cannot report a missing one). -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
@@ -88,19 +62,6 @@
 
     <build>
         <plugins>
-            <!-- Publish a test-jar: InvestigationStoreContract is the ONE contract every InvestigationStore implementation runs
-                 (FsInvestigationStore here, the Postgres one in inspecto-la-store-pg). -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>test-jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
             <!-- LA separation D-1 (Decision 5): this module may reach ONLY the inspecto-* modules below, directly or
                  transitively, at compile/provided/runtime scope. tools/check-module-deps.mjs derives the same answer from the
                  poms and fails if this list drifts from its ALLOWED table. -->
@@ -128,11 +89,12 @@
                                         <include>com.gamma.inspector:inspecto-config</include>
                                         <include>com.gamma.inspector:inspecto-entity-store</include>
                                         <include>com.gamma.inspector:inspecto-http-spi</include>
+                                        <include>com.gamma.inspector:inspecto-la-core</include>
                                         <include>com.gamma.inspector:inspecto-la-graph</include>
                                         <include>com.gamma.inspector:inspecto-sql</include>
                                         <include>com.gamma.inspector:inspecto-util</include>
                                     </includes>
-                                    <message>inspecto-la-core may depend only on the inspecto-* modules listed in tools/check-module-deps.mjs (LA separation, D-1). A host module here silently undoes the extraction.</message>
+                                    <message>inspecto-la-store-pg may depend only on the inspecto-* modules listed in tools/check-module-deps.mjs (LA separation, D-1). A host module here silently undoes the extraction.</message>
                                 </bannedDependencies>
                             </rules>
                         </configuration>

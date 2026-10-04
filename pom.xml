@@ -168,6 +168,8 @@
                 <module>inspecto-geo-link</module>
                 <module>inspecto-la-graph</module>
                 <module>inspecto-la-storage</module>
+                <!-- LA-INVESTIGATION-STORE-DESIGN-1 S2: the Postgres InvestigationStore (optional jar; never the default) -->
+                <module>inspecto-la-store-pg</module>
                 <module>inspecto-exchange</module>
                 <module>inspecto-metrics</module>
                 <module>inspecto-events</module>
@@ -190,6 +192,8 @@
                 <module>inspecto-geo-link</module>
                 <module>inspecto-la-graph</module>
                 <module>inspecto-la-storage</module>
+                <!-- LA-INVESTIGATION-STORE-DESIGN-1 S2: the Postgres InvestigationStore (optional jar; never the default) -->
+                <module>inspecto-la-store-pg</module>
                 <module>inspecto-exchange</module>
                 <module>inspecto-metrics</module>
                 <module>inspecto-events</module>

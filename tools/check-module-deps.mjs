@@ -34,6 +34,8 @@ export const ALLOWED = {
     'inspecto-la-storage': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core'],
     // D-3 step 4: la-api now depends on la-storage (the index build service + manifest); the reverse edge, and la-core -> la-storage, stay banned.
     'inspecto-la-api': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core', 'inspecto-la-storage'],
+    // LA-INVESTIGATION-STORE-DESIGN-1 S2 (D-IS7): the Postgres InvestigationStore - la-core's closure plus la-core itself. JDBC only (java.sql); the driver is the host's. la-core must NEVER reach it.
+    'inspecto-la-store-pg': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core'],
     'inspecto-security': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
 };
 
