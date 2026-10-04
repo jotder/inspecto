@@ -857,7 +857,26 @@ export interface ValueMeasureAlertRuleRequest {
     severity: AlertSeverity;
 }
 
-export type ValueMeasureAlertRuleResult = InvestigationAlertRuleResult & Partial<ValueMeasureResult>;
+export type ValueMeasureAlertRuleResult = InvestigationAlertRuleResult &
+    Partial<ValueMeasureResult> & {
+        /** Present on a value-measure bind: `not enabled: …` until the owner enables standing detection. */
+        standingDetection?: string;
+    };
+
+/** `POST /inv/investigations/{id}/standing-detection` answer (LA-LIVE-DETECTION-1, LD-2). */
+export interface StandingDetectionEnabled {
+    rule: string;
+    investigation: string;
+    /** The recorded sweep principal, `sweep:<investigation id>` — it holds no capability of its own. */
+    principal: string;
+    dataset: string;
+    /** The masking basis recorded now: a sweep is refused if it ever tightens beyond this. */
+    masking: { mode: string; columns: string[] };
+    enabledAt: string;
+    /** True when enabling again re-snapshotted an earlier authority. */
+    replaced: boolean;
+    authority: string;
+}
 
 // ── LA-17: Entity Lists (`EntityListRoutes`, wire contract: entity-model design §4.3.1) ─────────────────
 
@@ -1154,6 +1173,11 @@ export class InvService {
     /** LA-23: the declared Measures over the Working Set — what an Alert Rule bound to one would compute. */
     investigationMeasures(id: string): Observable<InvestigationMeasures> {
         return this.http.get<InvestigationMeasures>(invPath(id, 'measures'));
+    }
+
+    /** LD-6: owner-only; a 422 `standing detection refused [CODE]: …` carries a refusal code. */
+    enableStandingDetection(id: string, rule: string): Observable<StandingDetectionEnabled> {
+        return this.http.post<StandingDetectionEnabled>(invPath(id, 'standing-detection'), { rule });
     }
 
     /** LA-23: bind an Alert Rule to a Measure. 503 when the alert engine is absent. */

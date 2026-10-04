@@ -5,7 +5,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ComponentsService, DbBrowserService } from '@inspecto/core/api';
+import { ComponentsService, DbBrowserService, EventsService, LensService } from '@inspecto/core/api';
 import { InvService, InvestigationHeader, ValueMeasureResult } from '@inspecto/link-analysis/api/inv.service';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/grid';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
@@ -66,6 +66,8 @@ function setup(opts: { valueMeasures?: () => unknown; investigation?: Investigat
         providers: [
             provideNoopAnimations(),
             { provide: InvService, useValue: inv },
+            { provide: LensService, useValue: { canAuthorAlertRules: () => true } },
+            { provide: EventsService, useValue: { search: () => of([]) } },
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
             { provide: ComponentsService, useValue: { list: () => of([{ name: 'transfers' }]) } },
             { provide: DbBrowserService, useValue: { table: () => of({ columns: [] }) } },
