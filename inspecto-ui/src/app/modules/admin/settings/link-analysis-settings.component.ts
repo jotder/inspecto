@@ -1,5 +1,12 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+    AbstractControl,
+    FormControl,
+    FormGroup,
+    ReactiveFormsModule,
+    ValidationErrors,
+    Validators,
+} from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -17,7 +24,48 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
 const MAX = 100_000;
 const intOrBlank = [Validators.min(1), Validators.max(MAX), Validators.pattern('\\d*')];
 
+type DraftKey = 'maxOpen' | 'hibernateAfterMinutes' | 'expireAfterDays';
+/** `drafts` keys: shipped default and accepted range (the server refuses outside it, 422). */
+const DRAFT_FIELDS: { key: DraftKey; label: string; max: number; def: number; hint: string }[] = [
+    {
+        key: 'maxOpen',
+        label: 'Drafts: open per Space',
+        max: 1000,
+        def: 50,
+        hint: 'Most open Drafts one Space holds; a further fork is refused.',
+    },
+    {
+        key: 'hibernateAfterMinutes',
+        label: 'Drafts: hibernate after (minutes idle)',
+        max: 10080,
+        def: 60,
+        hint: 'An idle Draft is parked on disk after this long.',
+    },
+    {
+        key: 'expireAfterDays',
+        label: 'Drafts: expire after (days idle)',
+        max: 3650,
+        def: 30,
+        hint: 'An idle Draft is discarded after this long; must be longer than the hibernation.',
+    },
+];
+const draftValidators = (max: number) => [Validators.min(1), Validators.max(max), Validators.pattern('\\d*')];
+
 type Key = 'fourEyesBudgetAbove' | 'fourEyesFanOutAbove' | 'mergedDistinctCap' | 'seedByDistinctCap';
+
+/** Expiry must outlast hibernation (server 422 otherwise); a blank key counts as its value in force, else default. */
+function expiryAfterHibernation(
+    inForce: { hibernateAfterMinutes?: number | null; expireAfterDays?: number | null } | undefined,
+) {
+    return (g: AbstractControl): ValidationErrors | null => {
+        const v = g.getRawValue() as Record<DraftKey, number | null | ''>;
+        const pick = (x: number | null | '', f: number | null | undefined, d: number): number =>
+            x === null || x === '' ? (f ?? d) : Number(x);
+        const hib = pick(v.hibernateAfterMinutes, inForce?.hibernateAfterMinutes, 60);
+        const exp = pick(v.expireAfterDays, inForce?.expireAfterDays, 30);
+        return exp * 1440 > hib ? null : { expiryNotAfterHibernation: true };
+    };
+}
 
 /**
  * Settings ▸ **Link Analysis** — the Investigation controls of `GET|PUT /settings/link-analysis` the SPA had no
@@ -43,7 +91,7 @@ type Key = 'fourEyesBudgetAbove' | 'fourEyesFanOutAbove' | 'mergedDistinctCap' |
         <div class="flex flex-col gap-6 p-6">
             <inspecto-page-header
                 title="Link Analysis"
-                subtitle="Four-eyes thresholds and traversal caps for Investigations in this space."
+                subtitle="Four-eyes thresholds, traversal caps and Draft limits for Investigations in this space."
                 [inset]="false"
             />
             @if (loading()) {
@@ -69,6 +117,33 @@ type Key = 'fourEyesBudgetAbove' | 'fourEyesFanOutAbove' | 'mergedDistinctCap' |
                             }
                         </mat-form-field>
                     }
+                    <fieldset formGroupName="drafts" class="flex flex-col gap-3">
+                        <legend class="text-sm font-semibold">Drafts</legend>
+                        @for (d of draftFields; track d.key) {
+                            <mat-form-field subscriptSizing="dynamic">
+                                <mat-label>{{ d.label }}</mat-label>
+                                <input
+                                    matInput
+                                    type="number"
+                                    min="1"
+                                    [formControlName]="d.key"
+                                    [readonly]="!canEdit()"
+                                    [placeholder]="'default ' + draftDefault(d)"
+                                />
+                                <mat-hint>{{ d.hint }} In force: {{ draftDefault(d) }}.</mat-hint>
+                                @if (form.controls.drafts.controls[d.key].invalid) {
+                                    <mat-error
+                                        >A whole number from 1 to {{ d.max }}, or blank for the default.</mat-error
+                                    >
+                                }
+                            </mat-form-field>
+                        }
+                        @if (form.controls.drafts.hasError('expiryNotAfterHibernation')) {
+                            <p class="text-warn text-sm" role="alert">
+                                Expiry must be longer than the hibernation period.
+                            </p>
+                        }
+                    </fieldset>
                     @if (saveError()) {
                         <inspecto-alert variant="error" title="Not saved">{{ saveError() }}</inspecto-alert>
                     }
@@ -99,6 +174,7 @@ export class LinkAnalysisSettingsComponent implements OnInit {
     private toastr = inject(ToastrService);
 
     readonly max = MAX;
+    readonly draftFields = DRAFT_FIELDS;
     readonly canEdit = computed(() => this.lens.canAuthorWorkbench());
     readonly loading = signal(true);
     readonly saving = signal(false);
@@ -112,7 +188,20 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         fourEyesFanOutAbove: new FormControl<number | null>(null, intOrBlank),
         mergedDistinctCap: new FormControl<number | null>(null, intOrBlank),
         seedByDistinctCap: new FormControl<number | null>(null, intOrBlank),
+        drafts: new FormGroup(
+            {
+                maxOpen: new FormControl<number | null>(null, draftValidators(1000)),
+                hibernateAfterMinutes: new FormControl<number | null>(null, draftValidators(10080)),
+                expireAfterDays: new FormControl<number | null>(null, draftValidators(3650)),
+            },
+            expiryAfterHibernation(undefined),
+        ),
     });
+
+    /** The value in force for a Drafts key (server-computed), else the shipped default. */
+    draftDefault(d: { key: DraftKey; def: number }): number {
+        return this.served()?.draftsInForce?.[d.key] ?? d.def;
+    }
 
     readonly fields = computed(() => {
         const s = this.served();
@@ -176,6 +265,14 @@ export class LinkAnalysisSettingsComponent implements OnInit {
         body['mergedDistinctCap'] = num(v.mergedDistinctCap);
         if ('seedByDistinctCap' in served) body['seedByDistinctCap'] = num(v.seedByDistinctCap);
         else delete body['seedByDistinctCap'];
+        // Blank keys are omitted (inherit); no stated key at all = no block.
+        const drafts: Record<string, number> = {};
+        for (const d of DRAFT_FIELDS) {
+            const n = num(v.drafts[d.key]);
+            if (n !== null) drafts[d.key] = n;
+        }
+        if (Object.keys(drafts).length) body['drafts'] = drafts;
+        else delete body['drafts'];
         this.saving.set(true);
         this.saveError.set(null);
         this.api.save(body as unknown as LinkAnalysisLimits).subscribe({
@@ -204,6 +301,13 @@ export class LinkAnalysisSettingsComponent implements OnInit {
             fourEyesFanOutAbove: s.fourEyesFanOutAbove ?? null,
             mergedDistinctCap: s.mergedDistinctCap ?? null,
             seedByDistinctCap: s.seedByDistinctCap ?? null,
+            drafts: {
+                maxOpen: s.drafts?.maxOpen ?? null,
+                hibernateAfterMinutes: s.drafts?.hibernateAfterMinutes ?? null,
+                expireAfterDays: s.drafts?.expireAfterDays ?? null,
+            },
         });
+        this.form.controls.drafts.setValidators(expiryAfterHibernation(s.draftsInForce));
+        this.form.controls.drafts.updateValueAndValidity();
     }
 }

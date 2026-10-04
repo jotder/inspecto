@@ -129,6 +129,58 @@ describe('LinkAnalysisSettingsComponent', () => {
         expect(c.form.controls.mergedDistinctCap.touched).toBe(true);
     });
 
+    it('shows the Drafts fields with the values in force and round-trips stated keys', () => {
+        const { el, c, api, submit } = setup({
+            served: {
+                drafts: { maxOpen: 10 },
+                draftsInForce: { maxOpen: 10, hibernateAfterMinutes: 60, expireAfterDays: 30 },
+            },
+        });
+        expect(el.textContent).toContain('Drafts: open per Space');
+        expect(el.textContent).toContain('In force: 60');
+        expect(c.form.controls.drafts.controls.maxOpen.value).toBe(10);
+        c.form.controls.drafts.controls.expireAfterDays.setValue(45);
+        submit();
+        expect(api.save).toHaveBeenCalledWith(
+            expect.objectContaining({ drafts: { maxOpen: 10, expireAfterDays: 45 } }),
+        );
+    });
+
+    it('omits the drafts block when every key is blank', () => {
+        const { api, submit } = setup();
+        submit();
+        expect(api.save.mock.calls[0][0]).not.toHaveProperty('drafts');
+    });
+
+    it('refuses an out-of-range Drafts value and an expiry not longer than hibernation, client-side', () => {
+        const { c, el, api, fixture, submit } = setup();
+        c.form.controls.drafts.controls.maxOpen.setValue(1001);
+        submit();
+        expect(api.save).not.toHaveBeenCalled();
+        c.form.controls.drafts.controls.maxOpen.setValue(null);
+        c.form.controls.drafts.controls.hibernateAfterMinutes.setValue(10080);
+        c.form.controls.drafts.controls.expireAfterDays.setValue(7);
+        fixture.detectChanges();
+        expect(el.querySelector('[role="alert"]')?.textContent).toContain('longer than the hibernation');
+        submit();
+        expect(api.save).not.toHaveBeenCalled();
+    });
+
+    it('shows a Drafts 422 in the server words', () => {
+        const { el, submit } = setup({
+            save: () =>
+                throwError(
+                    () =>
+                        new HttpErrorResponse({
+                            status: 422,
+                            error: { error: { message: 'drafts.expireAfterDays must be longer than hibernation' } },
+                        }),
+                ),
+        });
+        submit();
+        expect(el.textContent).toContain('drafts.expireAfterDays must be longer than hibernation');
+    });
+
     it('is read only without the authoring capability', () => {
         const { el } = setup({ canEdit: false });
         expect(el.querySelector('button[type="submit"]')).toBeNull();

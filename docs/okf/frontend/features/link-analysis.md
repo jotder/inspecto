@@ -1222,7 +1222,9 @@ Design and decisions D6-1…D6-7: [`la-separation-d6-design.md`](../../../archiv
   `DraftLifecycle`; `DraftAdmission.maintain` / `maintainSpace` and `DraftRoutes` (fork cap, expired-409 text, `expiresAt`) read
   `LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveDrafts()` per call. PUT refuses (422, never clamps) an out-of-range or
   unknown key and an expiry not longer than the hibernation; a hand-edited unordered pair reads as all defaults. The Settings page
-  passes the block through untouched (it round-trips what it was served) and has no form field for it: edit by PUT or the file.
+  has a **Drafts** group of three number fields (blank = inherit; placeholder and hint show the value in force from `draftsInForce`),
+  range-checked and with the expiry>hibernation rule shown client-side (a blank counts as its in-force value); blank keys are omitted
+  from the PUT (no stated key = no `drafts` block) and a server 422 shows inline in the server's words.
   Idle time = `DraftLifecycle.touch` (memory + `accessed.json` every 5 min); the sweep is lazy on list / open / fork (no scheduler).
   `drafts/index.json` is a rebuildable listing index (header `size:mtime`) so a listing reads no header; `DraftStore.recover` restores
   or deletes the `.old-<id>-*` a crashed rebase leaves, only after verifying the header. No per-Draft `draft.duckdb` exists (nothing

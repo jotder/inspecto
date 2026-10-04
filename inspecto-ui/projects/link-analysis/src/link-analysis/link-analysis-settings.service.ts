@@ -50,6 +50,10 @@ export interface LinkAnalysisLimits {
     /** Parallel backend lane (may be absent): the `seedBy` distinct cap stated, and the one in force. */
     seedByDistinctCap?: number | null;
     seedByDistinctCapInForce?: number;
+    /** D7-6: the stated Draft settings; `null`/absent = every key inherits. */
+    drafts?: Partial<DraftSettings> | null;
+    /** D7-6: the Draft settings actually in force - server-computed, read-only. */
+    draftsInForce?: DraftSettings;
     /**
      * D-4: the server-side graph-run knobs stated (default budget, workers, waiting line); `null` = every one inherits.
      * No form field yet - it is only round-tripped by a save, because the PUT replaces the whole document.
@@ -74,6 +78,16 @@ export interface LinkAnalysisLimits {
         threads: number | null;
         queue: number | null;
     } | null;
+}
+
+/** D7-6: the per-Space Draft admission and idle periods; a `null` key inherits the shipped default (50 / 60 / 30). */
+export interface DraftSettings {
+    /** Open Drafts per Space, 1..1000. */
+    maxOpen: number | null;
+    /** Idle minutes before a Draft hibernates, 1..10080. */
+    hibernateAfterMinutes: number | null;
+    /** Idle days before a Draft expires, 1..3650; must be longer than the hibernation. */
+    expireAfterDays: number | null;
 }
 
 /** LA-17: one Entity Type (entity-model design §4.1) — `classifications` are the Dataset column classifications it claims. */
