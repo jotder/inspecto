@@ -447,9 +447,14 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   DATASET_NOT_SHARED · ROLE_SHARE_ONLY · NOT_LEAD · MASKING_TIGHTENED · POLICY_DENIED · UNDECIDABLE`) and an audit
   event (`LINK_STANDING_DETECTION_ENABLED / _SWEPT / _REFUSED`, aggregate only, never an id); undoing the cause
   resumes the sweep without re-enabling, and re-enabling re-snapshots. ⚠ Residuals: the synthetic Subject's grants are
-  the enable-time snapshot and carry no role names, so a DENY keyed on `subject.roles` cannot be reproduced. ⚠ The SPA
-  *Watch* binds the rule but does not yet enable it, so a SPA-bound value rule stays inert until enabled by API
-  (owed, with the monitoring surface: LD-6). Decisions D-LD2 to D-LD17 are recorded as "decided by the assistant,
+  the enable-time snapshot and carry no role names, so a DENY keyed on `subject.roles` cannot be reproduced. **LD-6 (SPA, 2026-10-04):** under a bound value-measure rule the Value Measures panel
+  shows *Enable standing detection* (`LinkAnalysisStandingDetectionComponent`; shown on `canAuthorAlertRules`, the
+  server's 403 is the owner check because the SPA host edge exposes no actor), the answer's sweep principal
+  `sweep:<id>`, masking snapshot and enabled time, and every refusal code in plain language
+  (`standing-detection.ts` `STANDING_REFUSAL_HELP`: what it means, what the analyst does). A *Monitoring* block
+  (`LinkAnalysisStandingMonitorComponent`) counts `_SWEPT` / `_REFUSED` events from `GET /events/search` — counts and
+  reason codes only, never an Investigation or entity id. ⚠ There is no status read-back route, so status is this
+  session's enable answer, and the SPA does not yet call the LD-4/5 routes (disable, edit in place, template list), so it offers Enable only right after a bind. Decisions D-LD2 to D-LD17 are recorded as "decided by the assistant,
   pending operator confirmation" in `docs/superpower/la-live-detection-design.md` §8.
   **LD-4 and LD-5 (2026-10-04).** The Job Type **`la.detect`** (no parameters, `requires: [alerts]`, Signal
   `la.detect.completed` carrying a count and Alert Rule names only) is a clock over the existing evaluation: it calls
