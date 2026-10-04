@@ -72,6 +72,7 @@ final class AbsentGeoLinkRoutes implements RouteModule {
             {"POST", "/inv/investigation-templates/([^/]+)/instantiate"},
             {"GET",  "/inv/investigations/([^/]+)/measures"},
             {"POST", "/inv/investigations/([^/]+)/alert-rules"},
+            {"POST", "/inv/investigations/([^/]+)/standing-detection"},
             {"GET",  "/inv/investigations/([^/]+)/case"},
             {"PUT",  "/inv/investigations/([^/]+)/case"},
             {"DELETE", "/inv/investigations/([^/]+)/case"},

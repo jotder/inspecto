@@ -1,6 +1,10 @@
 package com.gamma.geolink;
 
 import com.gamma.la.api.InvestigationRoutes;
+import com.gamma.la.api.StandingDetection;
+import com.gamma.la.core.LinkEventTypes;
+import com.gamma.event.Event;
+import com.gamma.event.EventLog;
 import com.gamma.la.api.ValueMeasures;
 import com.gamma.la.api.WorkingSetRoutes;
 import com.gamma.la.core.InvestigationEvaluator;
@@ -133,7 +137,8 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
 
     /**
      * LA-18: the COUNT of entities breaching the rule's value Measure over the WHOLE Dataset the Investigation is
-     * bound to — read now, not from the sealed log. ⚠ The R3 gate was applied at binding (a sweep has no caller).
+     * bound to — read now, not from the sealed log. ⚠ A sweep has no caller: {@link #read} re-decides the owner's authority
+     * ({@link StandingDetection}) before calling this, and refuses (never reads) when it cannot.
      */
     private static Reading valueMeasure(Path writeRoot, Path dataRoot, Map<String, Object> header,
                                         AlertRule rule) throws java.sql.SQLException, java.io.IOException {
@@ -153,6 +158,19 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
         // A3 (operator 2026-09-30): the list version in force when THIS sweep evaluated, recorded on the firing
         return new Reading(value, Map.of("agentList", spec.agentList(), "agentListSeq", String.valueOf(agents.atSeq()),
                 "agentListHash", String.valueOf(agents.atHash())));
+    }
+
+    /** Best-effort audit of a sweep outcome (the LA-04 pattern): the sweep is the actor, and no entity id is ever named. */
+    private static void audit(String type, String action, String principal, String rule, String investigation,
+                              java.util.function.UnaryOperator<Event.Builder> attrs) {
+        try {
+            Event.Builder b = Event.builder(type).source("inv").message(action + " — " + rule + " on " + investigation)
+                    .actor(principal).actorType("system").action(action).actionCategory("analysis")
+                    .attr("rule", rule).attr("investigationId", investigation).attr("principal", principal);
+            EventLog.current().emit(attrs.apply(b));
+        } catch (RuntimeException ignored) {
+            // best effort — the sweep's outcome stands without it
+        }
     }
 
     /** The hash a binding records: SHA-256 of the rule's canonical JSON — any edit to the rule breaks the match. */
@@ -183,7 +201,23 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
                         rule.name(), id, id);
                 return Reading.of(OptionalDouble.empty());
             }
-            if (rule.isValueMeasureRule()) return valueMeasure(writeRoot, dataRoot, header, rule);
+            if (rule.isValueMeasureRule()) {
+                // LD-3 (D-LD1 option A): the live Dataset read has no caller, so its authority is the owner's, re-decided NOW.
+                StandingDetection.Authority authority = StandingDetection.Authority.from(binding).orElse(null);
+                StandingDetection.Verdict verdict = StandingDetection.check(writeRoot, store, id, header, authority);
+                String principal = authority == null ? "sweep:" + id : authority.principal();
+                if (!verdict.allowed()) {
+                    log.warn("alert rule '{}' standing detection REFUSED [{}]: {} — not evaluated", rule.name(),
+                            verdict.code(), verdict.reason());
+                    audit(LinkEventTypes.LINK_STANDING_DETECTION_REFUSED, "link.standing_detection.refused", principal,
+                            rule.name(), id, b -> b.attr("code", verdict.code()));
+                    return Reading.of(OptionalDouble.empty());
+                }
+                Reading reading = valueMeasure(writeRoot, dataRoot, header, rule);
+                audit(LinkEventTypes.LINK_STANDING_DETECTION_SWEPT, "link.standing_detection.swept", principal,
+                        rule.name(), id, b -> b.attr("value", reading.value().isPresent() ? reading.value().getAsDouble() : null));
+                return reading;
+            }
             InvestigationRoutes.Inv inv = new InvestigationRoutes.Inv(store, writeRoot, id, header);
             WorkingSetRoutes.Relation rel = WorkingSetRoutes.relation(inv, new boolean[1]);
             return Reading.of(compute(rel.tables().get(rule.relation()), rule.relation(), rule.measure()));

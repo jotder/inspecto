@@ -233,7 +233,7 @@ final class EntityMasking {
 
     /** The Investigation's bound source/target columns whose registry {@code columns[]} {@code classification} is
      *  claimed by a MASKED in-force Entity Type — column name → type id. A classification no type claims is untyped. */
-    private static Map<String, String> maskedColumns(InvestigationRoutes.Inv inv, List<EntityTypes.EntityType> types) {
+    static Map<String, String> maskedColumns(InvestigationRoutes.Inv inv, List<EntityTypes.EntityType> types) {
         DatasetProvider provider = DatasetProviders.require();
         Map<String, Object> ds = provider.dataset(inv.writeRoot(), inv.dataset()).orElse(Map.of());
         Map<String, String> out = new LinkedHashMap<>();

@@ -65,6 +65,45 @@ public final class ComponentAccess {
         return level(ex, content) >= VIEW;
     }
 
+    /** The three answers of {@link #canViewAs}: a caller-less read cannot always say yes or no. */
+    public enum AsOwner {
+        /** The owner id (or an unrestricted component, or a held capability) grants view. */
+        ALLOWED,
+        /** Restricted, and no owner / {@code user} share names this id and no {@code role} share exists. */
+        DENIED,
+        /** Restricted, no owner / {@code user} share names this id, but a {@code role} share exists. A role is
+         *  resolved only from the authenticator's token-time stamp ({@link #ATTR_HELD_ROLES}) and is never stored,
+         *  so off-request it can neither be confirmed nor excluded. The caller MUST refuse (fail closed). */
+        ROLE_ONLY
+    }
+
+    /**
+     * LD-1 (standing detection, {@code docs/superpower/la-live-detection-design.md} §6): the Subject-less twin of
+     * {@link #canView}, for a caller-less run (an Alert sweep) acting for a RECORDED id. Mirrors {@link #level} for the
+     * owner id and {@code user} shares only; {@code capabilities} lets a caller honour {@code canConfigureAccess} and
+     * a standing-detection sweep passes none, so it can never exceed the owner's live authority. Pure: no exchange,
+     * no I/O. A {@code role} share is the one thing it cannot decide, hence {@link AsOwner#ROLE_ONLY}.
+     */
+    public static AsOwner canViewAs(String subjectId, Set<String> capabilities, Map<String, Object> content) {
+        if (content == null) return AsOwner.DENIED;                       // nothing to judge: never ALLOWED
+        if (!content.containsKey(SHARES)) return AsOwner.ALLOWED;         // unrestricted, as level()
+        String id = trimOrEmpty(subjectId);
+        String owner = trimOrEmpty(content.get(OWNER));
+        if (!id.isEmpty() && id.equals(owner)) return AsOwner.ALLOWED;
+        if (capabilities != null && capabilities.contains(Roles.CAN_CONFIGURE_ACCESS)) return AsOwner.ALLOWED;
+        boolean roleShare = false;
+        if (content.get(SHARES) instanceof List<?> shares) {
+            for (Object o : shares) {
+                if (!(o instanceof Map<?, ?> share)) continue;            // malformed entry grants nothing
+                String subjectType = trimOrEmpty(share.get("subjectType"));
+                if ("user".equals(subjectType) && !id.isEmpty() && id.equals(trimOrEmpty(share.get("subjectId"))))
+                    return AsOwner.ALLOWED;
+                if ("role".equals(subjectType)) roleShare = true;
+            }
+        }
+        return roleShare ? AsOwner.ROLE_ONLY : AsOwner.DENIED;
+    }
+
     /** 404 (indistinguishable from absence) unless the request may view the component. */
     static void requireView(HttpExchange ex, String type, String id, Map<String, Object> content) {
         if (!canView(ex, content))

@@ -40,4 +40,31 @@ public final class RowScope {
         AuditTrail.policyDecision(ex, false, "read", route, resourceKind, id, policy);
         return false;
     }
+
+    /**
+     * LD-1 (standing detection): the PDP check for a caller-less run acting as a RECORDED {@code subject} (a synthetic
+     * one built from the owner's id and the grants snapshotted when the run was enabled). {@code true} unless the
+     * edition's decider says DENY. ⚠ Fail CLOSED where {@link #visible} cannot be: a decider that throws (or an
+     * ambiguous registration) answers {@code false}, because a sweep has no request to refuse and silence would read
+     * as permission. ALLOW and ABSTAIN grant nothing, as for a request; with no decider, nothing is denied. Audits
+     * nothing — the caller records its own outcome — and reads no response.
+     *
+     * @param configRoot the Space config root the decider's policies load from ({@link Roles#ATTR_CONFIG_ROOT})
+     */
+    public static boolean visibleAs(java.nio.file.Path configRoot, Subject subject, String resourceKind,
+                                    Map<String, Object> resource) {
+        SweepExchange ex = new SweepExchange("/inv/standing-detection/sweep");
+        try {
+            AccessDecider d = AccessDeciders.active().orElse(null);
+            if (d == null) return true;
+            if (configRoot != null) RequestAttrs.attr(ex, Roles.ATTR_CONFIG_ROOT, configRoot);
+            RequestAttrs.attr(ex, RequestAttrs.ATTR_SUBJECT, subject);
+            return d.decide(ex, subject, "read", ex.getRequestURI().getPath(), resourceKind, resource)
+                    != AccessDecider.Decision.DENY;
+        } catch (RuntimeException | LinkageError e) {
+            return false;
+        } finally {
+            RequestAttrs.dropAttrScope(ex);
+        }
+    }
 }

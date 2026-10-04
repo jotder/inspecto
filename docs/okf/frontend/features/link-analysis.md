@@ -433,6 +433,24 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   *Cash-out concentration* an *Agent list* autocomplete lists non-retired Entity Lists of Entity Type `agent`
   (suggestions only — a missing list capability leaves it free text). `last` and `agentList` travel only where they
   apply, and *Watch* binds the answered `measure` block verbatim, so a rolling window stays rolling.
+  **Standing detection (LA-LIVE-DETECTION-1 LD-1 to LD-3, 2026-10-04; operator decision D-LD1 = option A).** A
+  value-measure rule reads the live Dataset on every Alert sweep, and a sweep has no caller, so it is **not
+  evaluated until the Investigation's owner enables it**: `POST /inv/investigations/{id}/standing-detection
+  {rule}` (`canAuthorAlertRules`, owner only, a bound value-measure rule only). The sweep acts as
+  `sweep:<investigation id>`, which holds no capability; enable records the owner's authority under `standing` in the
+  rule's binding (id, capabilities, data scopes, IdP attributes, Dataset, a masking snapshot `{mode, columns[]}`), and
+  `StandingDetection` RE-DECIDES it before every Dataset read: the owner id or a **`user`** share still grants view on
+  the Dataset's CURRENT envelope (`ComponentAccess.canViewAs`; **a role share cannot be re-resolved off a request, so
+  a role-only grant is refused**, and `canConfigureAccess` is never honoured), the owner is still a lead, the masking
+  basis has not **tightened**, and the PDP (asked as a synthetic Subject, `RowScope.visibleAs`) does not DENY. Every
+  refusal is `Reading` EMPTY with a code (`NOT_ENABLED · NO_OWNER · BINDING_CHANGED · DATASET_GONE ·
+  DATASET_NOT_SHARED · ROLE_SHARE_ONLY · NOT_LEAD · MASKING_TIGHTENED · POLICY_DENIED · UNDECIDABLE`) and an audit
+  event (`LINK_STANDING_DETECTION_ENABLED / _SWEPT / _REFUSED`, aggregate only, never an id); undoing the cause
+  resumes the sweep without re-enabling, and re-enabling re-snapshots. ⚠ Residuals: the synthetic Subject's grants are
+  the enable-time snapshot and carry no role names, so a DENY keyed on `subject.roles` cannot be reproduced. ⚠ The SPA
+  *Watch* binds the rule but does not yet enable it, so a SPA-bound value rule stays inert until enabled by API
+  (owed, with the monitoring surface: LD-6). Decisions D-LD2 to D-LD12 are recorded as "decided by the assistant,
+  pending operator confirmation" in `docs/superpower/la-live-detection-design.md` §8.
 
 * **Settings ▸ Link Analysis** (2026-09-30, `settings/link-analysis-settings.component`): the four-eyes thresholds
   (`fourEyesBudgetAbove`, `fourEyesFanOutAbove`), `mergedDistinctCap` with `mergedDistinctCapInForce`, and
