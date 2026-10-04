@@ -9,6 +9,7 @@ com.gamma.la.api.InvestigationReferenceRoutes
 com.gamma.la.api.WorkingSetRoutes
 com.gamma.la.api.InvestigationTemplateRoutes
 com.gamma.la.api.InvestigationCoverageRoutes
+com.gamma.la.api.InvestigationComparisonRoutes
 com.gamma.la.api.InvestigationCaseRoutes
 com.gamma.la.api.EntityIdentityRoutes
 com.gamma.la.api.GraphRunRoutes
