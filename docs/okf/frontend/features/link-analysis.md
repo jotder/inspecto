@@ -749,7 +749,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   mask need an explicit IANA `timezone` and test the local day the EVENT fell on. `window` re-filters nothing
   already admitted — earlier sealed reads are evidence as made. Templates carry the whole rung; a `window`
   becomes a parameter (`kind: "window"`) whose default is the authored window. ⏳ Calendar exclusions
-  and time-respecting paths remain deferred (`threshold` and `snapshot` shipped 2026-10-04, below). **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
+  remains deferred (`threshold`, `snapshot`, comparison mode, time-respecting paths and burst / periodicity shipped 2026-10-04, below). **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
   settings* (`investigation-expand-rung.component`) sends `budget` (1–20 000; the server CLAMPS above, so the SPA
   refuses) · `direction` · rung `window` (`inherit` · `full` · *A window for this rung…*, an override object) · `linkKinds`
   (comma-separated, trimmed and deduplicated, at most 100; blank = all kinds; the server 422s it without an Investigation
@@ -1563,8 +1563,42 @@ re-ordering forks, D-E4); **`hide` ≠ `exclude` ≠ `keep`** (hide: gone from d
 exclude: gone from all three, still inspectable as the `excluded` relation; keep: protected from later
 excludes). Two evaluators, one spec — incremental on append, full replay from the sealed log — with an
 `equivalent` check that is pinned to be able to FAIL. **Negative space is part of every rendering** (G-E10).
-Not built from the target model: time-respecting paths on the server,
-timeline playback and burst / periodicity detection, calendar exclusions — see `LA-INVESTIGATION-OPS-DEFERRED-1`.
+Not built from the target model: timeline playback, calendar exclusions
+— see `LA-INVESTIGATION-OPS-DEFERRED-1`.
+
+**Time-respecting paths and burst / periodicity (2026-10-04).** Two operator-approved pieces, both built as
+**stateless Dataset reads, not Investigation ops and not graph-run algorithms** — an op only appends a
+state transition to the log, and the Working Set (`entities` / `links` relations) and `/inv/graph/runs` carry
+counts, never edge timestamps, so only the Dataset routes (which read the `timeCol`) can see event times.
+* **Time-respecting paths already existed**: `POST /inv/traversal/recursive-paths` took
+  `temporalConstraint {timestampCol, monotonic, maxTotalDurationHours}` since LA-11 (2026-09-23) — *monotonic* IS
+  "consecutive edges in non-decreasing time order" (ties pass). The row's "unbuilt" claim was stale; the only
+  missing piece was the per-hop gap, now **`temporalConstraint.maxGapHours`** (positive; **422 without
+  `monotonic: true`**, because a gap bounds a time-ORDERED path). Flat CTE and index walk
+  (`IndexedTraversal`) both apply it, pinned equal by `ControlApiInvIndexedTraversalTest`. It only ever removes
+  paths, so it cannot widen anything; the existing four-eyes gate, depth/yield/timeout fences and the Dataset
+  view gate (R3: unviewable = 404) are unchanged. A time column read in a non-UTC zone still falls back to the flat
+  read (`time_zone_not_servable`), as before.
+* **`POST /inv/pattern/temporal`** (`PatternRoutes`, body `{dataset, sourceCol, targetCol, timeCol, mode:
+  "burst"|"periodicity", filter?, limit?, windowSeconds?, minEvents?, maxCv?}`; pure maths in
+  `LinkTemporalDetector`). The series is the event times of one **link** = a directed source→target pair as the Dataset
+  spells the values (not normalised, not per entity). *Burst*: a `windowSeconds` window (default 60, 1–86 400) holding
+  ≥ `minEvents` (default 5, 2–1 000) events, overlapping windows merged into one maximal burst, window edge
+  inclusive. *Periodicity*: ≥ `minEvents` (default 5, min 3) events whose gap coefficient of variation (population
+  σ / mean) ≤ `maxCv` (default 0.1, 0–1); reports the MEDIAN gap as `periodSeconds`. Out-of-range numbers are a 422,
+  never clamped. Results are strongest-first (burst: most events; periodic: lowest CV) and cut to `limit`
+  (default 200, max 1 000), `truncated` says so. **Fences:** one bound statement of ≤ 200 000 rows (`rowCapped` +
+  `truncated`, never silent), a 5 s timeout, D-U7 four-eyes (`refuseIfSensitive`, 403 above the Space's threshold — the
+  route has no Investigation to hold an approval), rows with no parseable time skipped and counted
+  (`skippedNoTime`). Times come back as the Dataset's wall-clock text with NO zone claimed (gaps are differences of
+  the stored values, as in the recursive-paths flat read). **Masking:** the route reads a Dataset the caller can view
+  and returns only the two endpoint columns and times it was asked for — the same exposure as
+  `/inv/pattern/branching`; it takes no Investigation, so no `EntityMasking` applies and none can be widened.
+  Read-shaped (exempt in `CapabilityManifest`, audited as `LINK_PATTERN_MATCHED`). 🔴 DuckDB reserves `at`: a test
+  column so named made every read 422.
+* ⏳ Not decided (narrowest reading taken): per-ENTITY series (events touching an entity, either direction) rather
+  than per link; a burst/periodic run against the edge **index** (flat read only today); rendering a finding as a
+  Working Set op or SPA overlay (nothing in the SPA calls either addition yet).
 
 **Comparison mode (2026-10-04, `LA-INVESTIGATION-OPS-DEFERRED-1`) — a READ route, not an op.** `GET /inv/investigations/{id}/compare?aFrom&aTo&bFrom&bTo&timezone&at`
 (`InvestigationComparisonRoutes`, semantics in `WindowComparison`) diffs two time windows over the Working Set at log position `at` (default head):

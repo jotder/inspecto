@@ -234,7 +234,8 @@ system: the evidence cannot say something the code does not.
 | DELETE | `/inv/investigations/([^/]+)/standing-detection/([^/]+)` | gated | `canAuthorAlertRules` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java:79` |
 | POST | `/inv/investigations/([^/]+)/template` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationTemplateRoutes.java:93` |
 | POST | `/inv/investigations/([^/]+)/undo` | gated | `canManageIncidents` | `inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:148` |
-| POST | `/inv/pattern/branching` | exempt | read-shaped | `inspecto-la-api/src/main/java/com/gamma/la/api/PatternRoutes.java:63` |
+| POST | `/inv/pattern/branching` | exempt | read-shaped | `inspecto-la-api/src/main/java/com/gamma/la/api/PatternRoutes.java:69` |
+| POST | `/inv/pattern/temporal` | exempt | read-shaped | `inspecto-la-api/src/main/java/com/gamma/la/api/PatternRoutes.java:70` |
 | POST | `/inv/projection` | exempt | read-shaped | `inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:96` |
 | POST | `/inv/projection/multi` | exempt | read-shaped | `inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:98` |
 | POST | `/inv/projection/neighbors` | exempt | read-shaped | `inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:97` |

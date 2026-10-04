@@ -38,10 +38,11 @@ public final class IndexedTraversal {
      * @param temporal   the request has a {@code temporalConstraint}: edges without a time are not walked
      * @param monotonic  each edge's time must not precede the previous edge's
      * @param maxHours   the whole path must span at most this many hours (null = unbounded)
+     * @param maxGapHours each edge must follow the previous one within this many hours (null = unbounded; the caller requires {@code monotonic})
      * @param filterSql  rendered predicate over the index columns, or null
      */
     public record Params(String start, String target, boolean undirected, int maxDepth, int maxEdgeYield, int limit,
-                         boolean temporal, boolean monotonic, Double maxHours, String filterSql) { }
+                         boolean temporal, boolean monotonic, Double maxHours, Double maxGapHours, String filterSql) { }
 
     public record PathRow(List<String> nodes, int hops, double weight) { }
 
@@ -89,6 +90,8 @@ public final class IndexedTraversal {
                     if (w.nodes().contains(e.neighbour())) continue;                  // cycle refusal: simple paths only
                     if (p.temporal() && e.tsMicros() == null) continue;
                     if (p.monotonic() && w.lastTs() != null && e.tsMicros() < w.lastTs()) continue;
+                    if (p.maxGapHours() != null && w.lastTs() != null
+                            && (e.tsMicros() - w.lastTs()) / 1_000_000.0 > p.maxGapHours() * 3600) continue;
                     if (p.maxHours() != null && w.firstTs() != null
                             && (e.tsMicros() - w.firstTs()) / 1_000_000.0 > p.maxHours() * 3600) continue;
                     List<String> nodes = new ArrayList<>(w.nodes().size() + 1);

@@ -29,7 +29,7 @@ final class IndexedRecursivePaths {
 
     record Request(String datasetId, String sourceCol, String targetCol, String weightCol, String tsCol, Object filter,
                    String startNode, String targetNode, boolean undirected, int maxDepth, int maxEdges, int limit,
-                   boolean monotonic, Double maxHours) { }
+                   boolean monotonic, Double maxHours, Double maxGapHours) { }
 
     private IndexedRecursivePaths() { }
 
@@ -53,7 +53,7 @@ final class IndexedRecursivePaths {
 
         beforeRead.run();                                                                    // four-eyes, exactly as the flat path
         IndexedTraversal.Params p = new IndexedTraversal.Params(rq.startNode(), rq.targetNode(), rq.undirected(), rq.maxDepth(),
-                rq.maxEdges(), rq.limit(), rq.tsCol() != null, rq.monotonic(), rq.maxHours(), sel.filterSql());
+                rq.maxEdges(), rq.limit(), rq.tsCol() != null, rq.monotonic(), rq.maxHours(), rq.maxGapHours(), sel.filterSql());
         try (IndexReader reader = IndexReader.borrow(sel.dir(), sel.manifest(), policy)) {
             return sel.served(IndexedTraversal.walk(reader, p));
         } catch (IndexedTraversal.FrontierOverCap over) {

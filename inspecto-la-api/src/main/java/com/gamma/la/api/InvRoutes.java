@@ -945,6 +945,7 @@ public final class InvRoutes implements RouteModule {
         String tsColIn = null;
         boolean monotonicIn = false;
         Double maxHoursIn = null;
+        Double maxGapHoursIn = null;
         if (body.get("temporalConstraint") instanceof Map<?, ?> tc) {
             @SuppressWarnings("unchecked") Map<String, Object> t = (Map<String, Object>) tc;
             tsColIn = ident(t, "timestampCol", true);
@@ -952,6 +953,11 @@ public final class InvRoutes implements RouteModule {
             if (t.get("maxTotalDurationHours") instanceof Number h) {
                 if (h.doubleValue() <= 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'maxTotalDurationHours' must be positive");
                 maxHoursIn = h.doubleValue();
+            }
+            if (t.get("maxGapHours") instanceof Number g) {          // time-respecting: each hop within this gap of the previous one
+                if (g.doubleValue() <= 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'maxGapHours' must be positive");
+                if (!monotonicIn) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'maxGapHours' bounds the gap between consecutive edges of a time-ordered path - it needs 'monotonic': true");
+                maxGapHoursIn = g.doubleValue();
             }
         }
         int maxDepth = clamp(body.get("maxDepth"), DEFAULT_DEPTH, MAX_DEPTH);
@@ -962,12 +968,13 @@ public final class InvRoutes implements RouteModule {
         String tsCol = tsColIn;
         boolean monotonic = monotonicIn;
         Double maxHours = maxHoursIn;
+        Double maxGapHours = maxGapHoursIn;
 
         // D-3 step 5: answer from the edge index when - and only when - it can answer exactly (IndexedRecursivePaths). The view
         // gate above has run; a fallback below is the unchanged flat read, which then says why on `source`.
         IndexedRead.Outcome<com.gamma.la.storage.IndexedTraversal.Result> indexed = IndexedRecursivePaths.attempt(writeRoot, api.dataRoot(), relationSql,
                 new IndexedRecursivePaths.Request(datasetId, sourceCol, targetCol, weightCol, tsCol, body.get("filter"), startNode,
-                        targetNode, direction.equals("UNDIRECTED"), maxDepth, maxEdges, limit, monotonic, maxHours),
+                        targetNode, direction.equals("UNDIRECTED"), maxDepth, maxEdges, limit, monotonic, maxHours, maxGapHours),
                 traversalPolicy(), () -> refuseIfSensitive(writeRoot, "a traversal (maxDepth " + maxDepth + " × maxEdgeYield " + maxEdges + ")",
                         (long) maxDepth * maxEdges, maxEdges));
         if (indexed.served()) {
@@ -1030,6 +1037,10 @@ public final class InvRoutes implements RouteModule {
         }
         if (tsCol != null) sql.append(" AND e.ts IS NOT NULL");
         if (monotonic) sql.append(" AND (w.last_ts IS NULL OR e.ts >= w.last_ts)");
+        if (maxGapHours != null) {
+            sql.append(" AND (w.last_ts IS NULL OR epoch(e.ts) - epoch(w.last_ts) <= CAST(? AS DOUBLE) * 3600)");
+            binds.add(String.valueOf(maxGapHours));
+        }
         if (maxHours != null) {
             sql.append(" AND (w.first_ts IS NULL OR epoch(e.ts) - epoch(w.first_ts) <= CAST(? AS DOUBLE) * 3600)");
             binds.add(String.valueOf(maxHours));
