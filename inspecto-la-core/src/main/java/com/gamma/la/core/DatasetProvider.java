@@ -78,6 +78,12 @@ public interface DatasetProvider {
     String relationSql(Map<String, Object> dataset, Path dataRoot, Path writeRoot);
 
     /**
+     * The directories the Dataset's relation reads ({@link #relationSql}): its data root plus any shared-store root. Link
+     * Analysis seals the index build's DuckDB connection to these and the index store, so a relation can read nowhere else.
+     */
+    List<Path> readRoots(Map<String, Object> dataset, Path dataRoot);
+
+    /**
      * The {@link InputFingerprint} of the INPUT FILES the Dataset's relation reads now (after superseded-file
      * subtraction), or {@code null} when this provider cannot say ('unknown' - the default, so an existing implementer or
      * test double keeps compiling and Link Analysis claims no currency it cannot know). An implementation returns

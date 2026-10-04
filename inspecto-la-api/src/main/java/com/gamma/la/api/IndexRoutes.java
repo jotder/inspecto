@@ -181,7 +181,9 @@ public final class IndexRoutes implements RouteModule {
         // APPEND reads only the added files: the provider renders the relation over them (null = not row-wise, never appendable)
         Function<List<String>, String> deltaSql = added -> DatasetProviders.require().dataset(writeRoot, dataset)
                 .map(c -> DatasetProviders.require().relationSqlOverFiles(c, api.dataRoot(), writeRoot, added)).orElse(null);
-        return new IndexBuildService.Relation(relationSql, fp == null ? "unknown" : fp.value(), files, deltaSql);
+        List<Path> roots = DatasetProviders.require().dataset(writeRoot, dataset)
+                .map(c -> DatasetProviders.require().readRoots(c, api.dataRoot())).orElse(List.of());
+        return new IndexBuildService.Relation(relationSql, fp == null ? "unknown" : fp.value(), files, deltaSql, roots);
     }
 
     /** The body's {@code mode}: {@code full} (default), {@code append} (only the files added since the live version) or {@code compact} (merge the deltas). */

@@ -276,7 +276,7 @@ class IndexPinsTest {
         for (String f : names)
             stamps.add(new IndexManifest.InputFile(f, Files.size(data.resolve(f)), Files.getLastModifiedTime(data.resolve(f)).toMillis()));
         return IndexBuilder.build(new IndexBuilder.Request(DS, MAPPING, relation(data, names), new IndexStore(root, DS, MAPPING.hash()),
-                "fp-" + files, null, stamps, mode, added -> relation(data, added)));
+                "fp-" + files, null, stamps, mode, added -> relation(data, added), List.of(data)));
     }
 
     @Test

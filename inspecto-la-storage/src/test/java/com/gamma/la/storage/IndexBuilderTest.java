@@ -71,9 +71,17 @@ class IndexBuilderTest {
 
     static String sqlPath(Path p) { return p.toAbsolutePath().toString().replace('\\', '/').replace("'", "''"); }
 
+    /** Every directory {@link #plant} wrote: the declared read roots of the builds below (the relation reads nowhere else). */
+    private static final List<Path> PLANTED = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    private static Request req(String ds, IndexMapping m, String rel, IndexStore store, String fp, Options o) {
+        return new Request(ds, m, rel, store, fp, o, null, IndexBuilder.Mode.FULL, null, List.copyOf(PLANTED));
+    }
+
     /** Writes the planted edges as three parquet files (so the relation really is a glob over several files); returns the relation SQL. */
     static String plant(Path dir, List<E> edges, String tsType) throws Exception {
         Files.createDirectories(dir);
+        PLANTED.add(dir);
         try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
             st.execute("SET TimeZone = 'UTC'");
             st.execute("CREATE TABLE e (n INTEGER, a_party VARCHAR, b_party VARCHAR, call_type VARCHAR, ts " + tsType + ", dur DOUBLE, cell VARCHAR)");
@@ -98,7 +106,7 @@ class IndexBuilderTest {
     }
 
     static Result build(Path root, String rel, IndexMapping mapping, Options options) {
-        return IndexBuilder.build(new Request("planted ds", mapping, rel, new IndexStore(root, "planted ds", mapping.hash()), "fp-1", options));
+        return IndexBuilder.build(req("planted ds", mapping, rel, new IndexStore(root, "planted ds", mapping.hash()), "fp-1", options));
     }
 
     static Connection mem() throws Exception {
@@ -230,7 +238,7 @@ class IndexBuilderTest {
     void integerIdsAreCastToVarcharAndUnmappedKindAndTimeAreNull(@TempDir Path tmp) throws Exception {
         String rel = "SELECT CAST(i AS BIGINT) AS s, CAST((i * 7) % 50 AS BIGINT) AS t FROM range(500) r(i)";
         IndexMapping m = new IndexMapping("s", "t", null, null, null, null, null);
-        Result r = IndexBuilder.build(new Request("ints", m, rel, new IndexStore(tmp, "ints", m.hash()), "fp", null));
+        Result r = IndexBuilder.build(req("ints", m, rel, new IndexStore(tmp, "ints", m.hash()), "fp", null));
         assertEquals(500, r.edges());
         assertEquals(0, r.droppedNull());
         assertNull(r.manifest().timeColZone());
@@ -254,7 +262,7 @@ class IndexBuilderTest {
         try {
             for (String host : new String[] {"UTC", "Pacific/Auckland", "America/Los_Angeles"}) {
                 TimeZone.setDefault(TimeZone.getTimeZone(host));
-                Result r = IndexBuilder.build(new Request("tz-" + host, ny, rel, new IndexStore(tmp.resolve("i-" + host.replace('/', '_')), "tz", ny.hash()), "fp", null));
+                Result r = IndexBuilder.build(req("tz-" + host, ny, rel, new IndexStore(tmp.resolve("i-" + host.replace('/', '_')), "tz", ny.hash()), "fp", null));
                 assertEquals("America/New_York", r.manifest().timeColZone());
                 try (Connection c = mem()) {
                     assertEquals(List.of(List.of("2026-01-15 17:00:00"), List.of("2026-07-15 16:00:00")),   // EST = UTC-5, EDT = UTC-4
@@ -266,7 +274,7 @@ class IndexBuilderTest {
         }
         // no zone given for a naive column: UTC, recorded as such
         IndexMapping none = new IndexMapping("a_party", "b_party", null, "ts", null, null, null);
-        Result r = IndexBuilder.build(new Request("tz-none", none, rel, new IndexStore(tmp.resolve("i-none"), "tz", none.hash()), "fp", null));
+        Result r = IndexBuilder.build(req("tz-none", none, rel, new IndexStore(tmp.resolve("i-none"), "tz", none.hash()), "fp", null));
         assertEquals("UTC", r.manifest().timeColZone());
         try (Connection c = mem()) {
             assertEquals(List.of(List.of("2026-01-15 12:00:00"), List.of("2026-07-15 12:00:00")),
@@ -278,25 +286,25 @@ class IndexBuilderTest {
     void aTimestampWithTimeZoneColumnIsAnInstantAndRefusesAZone(@TempDir Path tmp) throws Exception {
         String rel = "SELECT 'a' AS s, 'b' AS d, TIMESTAMPTZ '2026-01-01 00:00:00+05:30' AS t";
         IndexMapping ok = new IndexMapping("s", "d", null, "t", null, null, null);
-        Result r = IndexBuilder.build(new Request("tz", ok, rel, new IndexStore(tmp, "tz", ok.hash()), "fp", null));
+        Result r = IndexBuilder.build(req("tz", ok, rel, new IndexStore(tmp, "tz", ok.hash()), "fp", null));
         assertNull(r.manifest().timeColZone());
         try (Connection c = mem()) {
             assertEquals(List.of(List.of("2025-12-31 18:30:00")), query(c, "SELECT CAST(ts AS VARCHAR) FROM read_parquet('" + sqlPath(r.directory()) + "/out/**/*.parquet')"));
         }
         IndexMapping bad = new IndexMapping("s", "d", null, "t", "Asia/Kolkata", null, null);
         IndexStore store = new IndexStore(tmp, "tz2", bad.hash());
-        assertThrows(IllegalArgumentException.class, () -> IndexBuilder.build(new Request("tz2", bad, rel, store, "fp", null)));
+        assertThrows(IllegalArgumentException.class, () -> IndexBuilder.build(req("tz2", bad, rel, store, "fp", null)));
         assertNoStageAndNoCurrent(store);
     }
 
     @Test
     void unsafeInputsAreRefusedBeforeAnyWork(@TempDir Path tmp) {
         IndexMapping zoneInjection = new IndexMapping("s", "d", null, "t", "UTC') ; DROP TABLE x; --", null, null);
-        assertThrows(IllegalArgumentException.class, () -> IndexBuilder.build(new Request("d", zoneInjection, "SELECT 1", new IndexStore(tmp, "d", "h"), "fp", null)));
+        assertThrows(IllegalArgumentException.class, () -> IndexBuilder.build(req("d", zoneInjection, "SELECT 1", new IndexStore(tmp, "d", "h"), "fp", null)));
         IndexMapping m = new IndexMapping("s", "d", null, null, null, null, null);
         for (String mem : new String[] {"1GB'; DROP", "lots", ""})
-            assertThrows(IllegalArgumentException.class, () -> IndexBuilder.build(new Request("d", m, "SELECT 1", new IndexStore(tmp, "d", "h"), "fp", new Options(null, mem, null, null, null))), mem);
-        assertThrows(IllegalArgumentException.class, () -> IndexBuilder.build(new Request("d", m, "SELECT 1", new IndexStore(tmp, "d", "h"), "fp", new Options(0, null, null, null, null))));
+            assertThrows(IllegalArgumentException.class, () -> IndexBuilder.build(req("d", m, "SELECT 1", new IndexStore(tmp, "d", "h"), "fp", new Options(null, mem, null, null, null))), mem);
+        assertThrows(IllegalArgumentException.class, () -> IndexBuilder.build(req("d", m, "SELECT 1", new IndexStore(tmp, "d", "h"), "fp", new Options(0, null, null, null, null))));
     }
 
     // ------------------------------------------------------------------------------------------------- shape
@@ -307,7 +315,7 @@ class IndexBuilderTest {
         String rel = "SELECT 'n' || CAST(floor(3000 * pow((hash(i) % 100000) / 100000.0, 2)) AS INTEGER) AS s,"
                 + " 'n' || CAST(floor(3000 * pow((hash(i * 31 + 7) % 100000) / 100000.0, 2)) AS INTEGER) AS t FROM range(60000) r(i)";
         IndexMapping m = new IndexMapping("s", "t", null, null, null, null, null);
-        Result r = IndexBuilder.build(new Request("skew", m, rel, new IndexStore(tmp, "skew", m.hash()), "fp", new Options(16, null, null, null, null)));
+        Result r = IndexBuilder.build(req("skew", m, rel, new IndexStore(tmp, "skew", m.hash()), "fp", new Options(16, null, null, null, null)));
         assertEquals(16, r.buckets());
         try (Connection c = mem()) {
             for (String t : new String[] {"out", "in"}) {
@@ -326,7 +334,7 @@ class IndexBuilderTest {
     void memoryLimitAndThreadsAreHonouredAndTheSpillDirectoryIsCleaned(@TempDir Path tmp) throws Exception {
         String rel = "SELECT md5(CAST(i AS VARCHAR)) AS s, md5(CAST(i * 7 + 1 AS VARCHAR)) AS t FROM range(400000) r(i)";
         IndexMapping m = new IndexMapping("s", "t", null, null, null, null, null);
-        Result r = IndexBuilder.build(new Request("mem", m, rel, new IndexStore(tmp, "mem", m.hash()), "fp", new Options(4, "256MB", 2, null, null)));
+        Result r = IndexBuilder.build(req("mem", m, rel, new IndexStore(tmp, "mem", m.hash()), "fp", new Options(4, "256MB", 2, null, null)));
         assertEquals(400000, r.edges());
         assertEquals(4, r.buckets());
         try (Stream<Path> w = Files.walk(tmp)) {
@@ -349,7 +357,7 @@ class IndexBuilderTest {
     void cancelMidCopyStopsTheStatementDeletesTheStageAndLeavesCurrentAlone(@TempDir Path tmp) throws Exception {
         IndexMapping m = new IndexMapping("s", "t", null, null, null, null, null);
         IndexStore store = new IndexStore(tmp, "slow", m.hash());
-        Result first = IndexBuilder.build(new Request("slow", m, "SELECT 'a' AS s, 'b' AS t", store, "fp0", null));   // v000001
+        Result first = IndexBuilder.build(req("slow", m, "SELECT 'a' AS s, 'b' AS t", store, "fp0", null));   // v000001
         assertEquals(first.directory(), store.current().orElseThrow());
 
         // 30M rows of md5 text, sorted under a small memory limit: far longer than the whole test is allowed to take
@@ -358,7 +366,7 @@ class IndexBuilderTest {
         CountDownLatch inOut = new CountDownLatch(1);
         ExecutorService ex = Executors.newSingleThreadExecutor();
         try {
-            Future<Result> f = ex.submit(() -> IndexBuilder.build(new Request("slow", m, slow, store, "fp1",
+            Future<Result> f = ex.submit(() -> IndexBuilder.build(req("slow", m, slow, store, "fp1",
                     new Options(16, "256MB", 2, token, p -> { if (p.phase().equals("out")) inOut.countDown(); }))));
             assertTrue(inOut.await(120, TimeUnit.SECONDS), "the build never reached the out COPY");
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);       // the COPY is under way once bytes land in the stage
@@ -386,7 +394,7 @@ class IndexBuilderTest {
         IndexStore store = new IndexStore(tmp, "pre", m.hash());
         CancelToken token = new CancelToken();
         token.cancel();
-        assertThrows(CancelledException.class, () -> IndexBuilder.build(new Request("pre", m, "SELECT 'a' AS s, 'b' AS t", store, "fp", new Options(null, null, null, token, null))));
+        assertThrows(CancelledException.class, () -> IndexBuilder.build(req("pre", m, "SELECT 'a' AS s, 'b' AS t", store, "fp", new Options(null, null, null, token, null))));
         assertNoStageAndNoCurrent(store);
     }
 
@@ -395,7 +403,7 @@ class IndexBuilderTest {
         // random() is re-evaluated per scan, so the count, out and in disagree - exactly what verification exists to catch
         IndexMapping m = new IndexMapping("s", "t", null, null, null, null, null);
         IndexStore store = new IndexStore(tmp, "flaky", m.hash());
-        var e = assertThrows(IndexBuildException.class, () -> IndexBuilder.build(new Request("flaky", m,
+        var e = assertThrows(IndexBuildException.class, () -> IndexBuilder.build(req("flaky", m,
                 "SELECT i AS s, i + 1 AS t FROM range(20000) r(i) WHERE random() < 0.5", store, "fp", null)));
         assertTrue(e.getMessage().contains("verification failed"), e.getMessage());
         assertNoStageAndNoCurrent(store);
@@ -405,15 +413,15 @@ class IndexBuilderTest {
     void noEdgesAnUnknownColumnAndBrokenSqlAreRefusedWithAReason(@TempDir Path tmp) {
         IndexMapping m = new IndexMapping("s", "t", null, null, null, null, null);
         IndexStore a = new IndexStore(tmp, "a", m.hash());
-        assertTrue(assertThrows(IndexBuildException.class, () -> IndexBuilder.build(new Request("a", m,
+        assertTrue(assertThrows(IndexBuildException.class, () -> IndexBuilder.build(req("a", m,
                 "SELECT CAST(NULL AS VARCHAR) AS s, 'x' AS t FROM range(5)", a, "fp", null))).getMessage().contains("no edge with both endpoints"));
         assertNoStageAndNoCurrent(a);
         IndexStore b = new IndexStore(tmp, "b", m.hash());
-        assertTrue(assertThrows(IndexBuildException.class, () -> IndexBuilder.build(new Request("b", m, "SELECT 1 AS s, 2 AS other", b, "fp", null)))
+        assertTrue(assertThrows(IndexBuildException.class, () -> IndexBuilder.build(req("b", m, "SELECT 1 AS s, 2 AS other", b, "fp", null)))
                 .getMessage().contains("no column 't'"));
         assertNoStageAndNoCurrent(b);
         IndexStore c = new IndexStore(tmp, "c", m.hash());
-        assertThrows(IndexBuildException.class, () -> IndexBuilder.build(new Request("c", m, "SELECT * FROM no_such_table", c, "fp", null)));
+        assertThrows(IndexBuildException.class, () -> IndexBuilder.build(req("c", m, "SELECT * FROM no_such_table", c, "fp", null)));
         assertNoStageAndNoCurrent(c);
     }
 
@@ -479,7 +487,7 @@ class IndexBuilderTest {
                 + " 'n' || CAST(floor(" + (edges / 5) + " * pow((hash(i * 31 + 7) % 1000000) / 1000000.0, 2)) AS BIGINT) AS t,"
                 + " TIMESTAMP '2026-01-01 00:00:00' + to_seconds(i % 31536000) AS ts FROM range(" + edges + ") r(i)";
         IndexMapping m = new IndexMapping("s", "t", null, "ts", "UTC", null, null);
-        Result r = IndexBuilder.build(new Request("bench", m, rel, new IndexStore(tmp, "bench", m.hash()), "fp", null));
+        Result r = IndexBuilder.build(req("bench", m, rel, new IndexStore(tmp, "bench", m.hash()), "fp", null));
         IndexBuilder.verify(r.directory());
         System.out.println("D3S3 bench edges=" + edges + " buckets=" + r.buckets() + " nodes=" + r.nodes() + " totalMs=" + r.totalMs() + " timings=" + r.timingsMs()
                 + " bytes=" + r.manifest().tables());
@@ -510,16 +518,26 @@ class IndexBuilderTest {
     }
 
     /**
-     * ENGINE-INMEMORY-UNSEALED-1: the builder takes the named file-access opt-in — its trusted relation reads a local
-     * file it was never told about (twin), while a URL still never reaches the network (autoload stays off).
+     * ENGINE-INMEMORY-UNSEALED-1: the build connection is sealed to the declared read roots plus the store - a relation
+     * reading a file outside them fails (the old unsealed opt-in read any local path), the twin over a declared root builds,
+     * and a URL never reaches the network.
      */
     @Test
-    void theFileAccessOptInReadsLocalFilesButNeverTheNetwork(@TempDir Path tmp) throws Exception {
-        String f = tmp.resolve("edges.parquet").toAbsolutePath().toString().replace('\\', '/');
-        try (Connection w = com.gamma.util.DuckDbUtil.openInMemory(null, List.of(tmp)); Statement st = w.createStatement()) {
-            st.execute("COPY (SELECT 'a' AS src, 'b' AS dst) TO '" + f + "' (FORMAT PARQUET)");
-        }
-        assertEquals(1, IndexBuilder.countRows("SELECT * FROM read_parquet('" + f + "')", 0));
+    void aBuildReadsOnlyDeclaredRootsAndNeverTheNetwork(@TempDir Path tmp) throws Exception {
+        String rel = plant(tmp.resolve("declared"), EDGES, "TIMESTAMP");
+        String other = plant(tmp.resolve("undeclared"), EDGES, "TIMESTAMP");
+        PLANTED.clear();                                                      // each build below names its own roots
+        IndexMapping m = MAPPING;
+        IndexStore ok = new IndexStore(tmp.resolve("i-ok"), "ds", m.hash());
+        IndexBuilder.build(new Request("ds", m, rel, ok, "fp", null, null, IndexBuilder.Mode.FULL, null, List.of(tmp.resolve("declared"))));
+        assertTrue(ok.current().isPresent(), "the twin over a declared root builds");
+        IndexStore bad = new IndexStore(tmp.resolve("i-bad"), "ds", m.hash());
+        assertThrows(IndexBuildException.class, () -> IndexBuilder.build(
+                new Request("ds", m, other, bad, "fp", null, null, IndexBuilder.Mode.FULL, null, List.of(tmp.resolve("declared")))));
+        assertTrue(bad.current().isEmpty(), "a refused build publishes nothing");
+        List<Path> declared = List.of(tmp.resolve("declared"));
+        assertThrows(IndexBuildException.class, () -> IndexBuilder.countRows(other, 0, declared));
+        assertEquals(EDGES.size(), IndexBuilder.countRows(rel, 0, declared));
         java.util.concurrent.atomic.AtomicInteger hits = new java.util.concurrent.atomic.AtomicInteger();
         com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(
                 new java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), 0);
@@ -531,7 +549,7 @@ class IndexBuilderTest {
         server.start();
         try {
             String url = "SELECT * FROM read_csv('http://127.0.0.1:" + server.getAddress().getPort() + "/x.csv')";
-            assertThrows(IndexBuildException.class, () -> IndexBuilder.countRows(url, 0));
+            assertThrows(IndexBuildException.class, () -> IndexBuilder.countRows(url, 0, declared));
         } finally {
             server.stop(0);
         }

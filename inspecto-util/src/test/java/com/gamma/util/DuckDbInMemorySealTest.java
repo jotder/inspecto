@@ -21,8 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * {@code ENGINE-INMEMORY-UNSEALED-1}: {@link DuckDbUtil#openInMemory} is sealed by default — no extension
- * autoload, external access only to the declared directories — and {@link DuckDbUtil#openInMemoryWithFileAccess}
- * is the named opt-in that reaches local files but still never the network. Each negative has a twin on a bare
+ * autoload, external access only to the declared directories — and each negative has a twin on a bare
  * connection that MUST succeed, and the network negatives count stub requests (the JDBC error text is generic).
  */
 class DuckDbInMemorySealTest {
@@ -103,23 +102,5 @@ class DuckDbInMemorySealTest {
             assertFalse(runs(c, "SELECT * FROM read_parquet(" + sql(allowed.resolve("x.parquet")) + ")"),
                     "no declared directory ⇒ no file at all");
         }
-    }
-
-    @Test
-    void theFileAccessOptInReadsAnyLocalFileButNeverTheNetwork(@TempDir Path tmp) throws Exception {
-        Path f = tmp.resolve("anywhere.parquet");
-        try (Connection w = DuckDbUtil.openInMemory(null, List.of(tmp))) {
-            assertTrue(runs(w, "COPY (SELECT 1 AS a) TO " + sql(f) + " (FORMAT PARQUET)"));
-        }
-        AtomicInteger hits = new AtomicInteger();
-        HttpServer server = stub(hits);
-        try (Connection c = DuckDbUtil.openInMemoryWithFileAccess(null, "test")) {
-            assertTrue(runs(c, "SELECT * FROM read_parquet(" + sql(f) + ")"), "an undeclared local file is readable");
-            assertFalse(runs(c, httpRead(server)));
-        } finally {
-            server.stop(0);
-        }
-        assertEquals(0, hits.get(), "the file-access opt-in reached the network");
-        assertThrows(IllegalArgumentException.class, () -> DuckDbUtil.openInMemoryWithFileAccess(null, " "));
     }
 }

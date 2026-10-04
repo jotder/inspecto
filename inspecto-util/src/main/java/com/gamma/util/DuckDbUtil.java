@@ -233,24 +233,6 @@ public final class DuckDbUtil {
         return conn;
     }
 
-    /**
-     * ⚠ The named OPT-IN to local file access beyond declared directories: autoload stays OFF (no network
-     * extension can be pulled in, so an {@code http://} or {@code s3://} read still fails), but every local
-     * path is reachable. {@code why} is the caller's reason; the callers are pinned by
-     * {@code NoRawInMemoryDuckDbOpenContractTest} so the opt-in cannot spread silently.
-     */
-    public static Connection openInMemoryWithFileAccess(Path spillDir, String why) throws SQLException {
-        if (why == null || why.isBlank()) throw new IllegalArgumentException("openInMemoryWithFileAccess needs a reason");
-        Connection conn = openUnsealed(spillDir);
-        try {
-            disableAutoload(conn);
-        } catch (SQLException | RuntimeException e) {
-            conn.close();
-            throw e;
-        }
-        return conn;
-    }
-
     /** {@code lock_configuration=true}: no further {@code SET} on this connection. */
     public static void lockConfiguration(Connection conn) throws SQLException {
         try (Statement st = conn.createStatement()) {

@@ -405,8 +405,8 @@ a hand-authored view passes through unguarded), `SqlTemplateJob`, `IndexBuilder`
 reading `http://` made the materialize connection hit a loopback stub 4 times; sealed, 0 and the run fails
 (`MaterializeTaskTest.anAuthoredViewThatReadsAUrlNeverReachesTheNetwork`, mutation-checked by skipping the seal).
 Relation readers declare `DatasetRelation.readRoots` (data root + a `shared/` ref's Exchange snapshot). No caller
-needed `httpfs`, so no object-store opt-in exists; the one opt-in is `openInMemoryWithFileAccess(spill, why)`
-(autoload off, local files open) for `IndexBuilder`, pinned by `NoRawInMemoryDuckDbOpenContractTest`.
+needed `httpfs`, so no object-store opt-in exists. `IndexBuilder` first held a file-access opt-in; it now declares
+`DatasetProvider.readRoots` + the store directory instead (`ENGINE-INMEMORY-UNSEALED-1` closed) and the opt-in was deleted.
 ⚠ **Measured gotcha:** the `temp_directory` subtree is implicitly readable AND writable under the seal — the
 `null` spill default (all of `java.io.tmpdir`) let a sealed connection write any temp sibling, so it moved to
 `<tmpdir>/.duckdb_tmp`. Still owed: T9, T10 and the `DuckDbExtension` / DuckLake host gate.

@@ -112,13 +112,14 @@ public final class IndexBuilder {
      * @param mode            what to do; APPEND and COMPACT build on the store's CURRENT version
      * @param deltaSql        APPEND only: the relation SQL over just the given (added) input files, null = the Dataset cannot be
      *                        appended to (its relation is not row-wise over its files)
+     * @param readRoots       the directories the relation may read; the connection is sealed to them plus the store directory
      */
     public record Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
                           Options options, List<IndexManifest.InputFile> inputFiles, Mode mode,
-                          java.util.function.Function<List<String>, String> deltaSql) {
+                          java.util.function.Function<List<String>, String> deltaSql, List<Path> readRoots) {
         public Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
                        Options options, List<IndexManifest.InputFile> inputFiles) {
-            this(datasetId, mapping, relationSql, store, baseFingerprint, options, inputFiles, Mode.FULL, null);
+            this(datasetId, mapping, relationSql, store, baseFingerprint, options, inputFiles, Mode.FULL, null, null);
         }
 
         public Request(String datasetId, IndexMapping mapping, String relationSql, IndexStore store, String baseFingerprint,
@@ -128,6 +129,7 @@ public final class IndexBuilder {
 
 
         public Request {
+            readRoots = readRoots == null ? List.of() : List.copyOf(readRoots);
             Objects.requireNonNull(datasetId, "datasetId");
             Objects.requireNonNull(mapping, "mapping");
             Objects.requireNonNull(relationSql, "relationSql");
@@ -211,8 +213,8 @@ public final class IndexBuilder {
      * The number of rows of {@code relationSql} (a trusted SELECT), on a short-lived connection of its own - the disk-budget
      * estimate of {@link IndexBuildService} needs it BEFORE a build is queued.
      */
-    public static long countRows(String relationSql) {
-        return countRows(relationSql, 0L);
+    public static long countRows(String relationSql, List<Path> readRoots) {
+        return countRows(relationSql, 0L, readRoots);
     }
 
     private static final ScheduledExecutorService ESTIMATE_TIMER = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -232,10 +234,10 @@ public final class IndexBuilder {
      * {@link #countRows(String)} bounded by a statement timeout: the running statement is cancelled from a timer after
      * {@code timeoutMs} (0 = unbounded) and {@link EstimateTimeoutException} is thrown.
      */
-    public static long countRows(String relationSql, long timeoutMs) {
+    public static long countRows(String relationSql, long timeoutMs, List<Path> readRoots) {
         String inner = relationSql.strip().replaceAll(";+\\s*$", "");
         java.util.concurrent.atomic.AtomicBoolean timedOut = new java.util.concurrent.atomic.AtomicBoolean();
-        try (Connection c = open(null, null, null); Statement s = c.createStatement()) {
+        try (Connection c = open(null, null, null, readRoots); Statement s = c.createStatement()) {
             java.util.concurrent.ScheduledFuture<?> guard = timeoutMs <= 0 ? null : ESTIMATE_TIMER.schedule(() -> {
                 timedOut.set(true);
                 try {
@@ -264,7 +266,7 @@ public final class IndexBuilder {
         } catch (IOException | IllegalArgumentException e) {
             throw new IndexBuildException("cannot read the manifest of " + versionDir.getFileName() + ": " + e.getMessage(), e);
         }
-        try (Connection c = open(null, null, null)) {
+        try (Connection c = open(null, null, null, List.of(versionDir))) {
             Map<String, TableStats> actual = scan(c, versionDir, man.buckets(), null);
             invariants(c, versionDir, actual, null);
             for (var e : man.tables().entrySet()) {
@@ -401,10 +403,17 @@ public final class IndexBuilder {
             timings.put("nodes", ms(t));
         }
 
+        /** What the sealed connection may touch: the relation's declared roots plus the store directory (stage, .spill, parent version, .delta). */
+        List<Path> sealDirs() {
+            List<Path> d = new ArrayList<>(req.readRoots());
+            d.add(req.store().directory());
+            return d;
+        }
+
         Result execute(long t0) throws Exception {
             IndexMapping m = req.mapping();
             Path spill = stage.resolve(".spill");
-            conn = open(opt.memoryLimit(), opt.threads(), spill);
+            conn = open(opt.memoryLimit(), opt.threads(), spill, sealDirs());
 
             // -- estimate -------------------------------------------------------------------------------------
             long t = System.nanoTime();
@@ -491,7 +500,7 @@ public final class IndexBuilder {
             if (deltaSql == null)
                 throw new NotApplicableException("this Dataset's relation is not row-wise over its input files, so its index cannot be appended to - run a full build");
             Path spill = stage.resolve(".spill");
-            conn = open(opt.memoryLimit(), opt.threads(), spill);
+            conn = open(opt.memoryLimit(), opt.threads(), spill, sealDirs());
 
             long t = System.nanoTime();
             progress("estimate", 1);
@@ -546,7 +555,7 @@ public final class IndexBuilder {
             Path parentDir = pd[0];
             if (parent.deltas().isEmpty()) throw new NotApplicableException("the live version has no deltas to compact");
             Path spill = stage.resolve(".spill");
-            conn = open(opt.memoryLimit(), opt.threads(), spill);
+            conn = open(opt.memoryLimit(), opt.threads(), spill, sealDirs());
 
             long t = System.nanoTime();
             progress("estimate", 1);
@@ -683,18 +692,15 @@ public final class IndexBuilder {
 
     private static final String COPY_OPTIONS = "(FORMAT parquet, PARTITION_BY (bucket), ROW_GROUP_SIZE " + ROW_GROUP_SIZE + ", COMPRESSION zstd)";
 
-    private static Connection open(String memoryLimit, Integer threads, Path spill) throws SQLException {
+    private static Connection open(String memoryLimit, Integer threads, Path spill, List<Path> dirs) throws SQLException {
         // DuckDbUtil.openInMemory caps memory and points the spill at a real directory (a raw in-memory open spills to .tmp
         // in the process CWD, outside the Space - see NoRawInMemoryDuckDbOpenContractTest); the caller-given limits then override it.
-        // ⚠ The named file-access opt-in (ENGINE-INMEMORY-UNSEALED-1): the TRUSTED relation reads Dataset files whose
-        // roots the builder is never told (see the class doc), so it cannot declare them; autoload stays off.
-        Connection c = DuckDbUtil.openInMemoryWithFileAccess(spill,
-                "LA index build: the trusted relation reads Dataset roots the builder is not given");
+        // Sealed to the relation's declared read roots plus the store directory (ENGINE-INMEMORY-UNSEALED-1).
+        Connection c = DuckDbUtil.openInMemory(spill, dirs);
         try (Statement s = c.createStatement()) {
             s.execute("SET TimeZone = 'UTC'");   // never the host zone
             if (memoryLimit != null) s.execute("SET memory_limit = '" + memoryLimit + "'");
             if (threads != null) s.execute("SET threads = " + threads);
-            if (spill != null) s.execute("SET temp_directory = '" + sqlPath(spill) + "'");
         } catch (SQLException e) {
             c.close();
             throw e;
@@ -830,7 +836,7 @@ public final class IndexBuilder {
     public static String duckdbVersion() {
         String v = duckdbVersion;
         if (v == null) {
-            try (Connection c = open(null, null, null); Statement st = c.createStatement(); ResultSet rs = st.executeQuery("SELECT version()")) {
+            try (Connection c = open(null, null, null, List.of()); Statement st = c.createStatement(); ResultSet rs = st.executeQuery("SELECT version()")) {
                 rs.next();
                 v = rs.getString(1);
             } catch (SQLException e) {

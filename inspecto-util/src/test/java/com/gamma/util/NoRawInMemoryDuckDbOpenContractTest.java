@@ -58,27 +58,6 @@ class NoRawInMemoryDuckDbOpenContractTest {
                 + " spill — use DuckDbUtil.openInMemory(spillDir) instead: " + offenders);
     }
 
-    /** ENGINE-INMEMORY-UNSEALED-1: the file-access opt-in is pinned to the callers that justified it. */
-    private static final Map<String, String> FILE_ACCESS_OPT_INS = Map.of(
-            "IndexBuilder.java", "the trusted LA relation reads Dataset roots the builder is not given");
-
-    @Test
-    void theFileAccessOptInSpreadsOnlyByDecision() throws IOException {
-        List<String> offenders = new ArrayList<>();
-        for (Path root : mainRoots()) {
-            try (Stream<Path> walk = Files.walk(root)) {
-                for (Path p : walk.filter(f -> f.toString().endsWith(".java")).toList()) {
-                    String name = p.getFileName().toString();
-                    if (name.equals("DuckDbUtil.java") || FILE_ACCESS_OPT_INS.containsKey(name)) continue;
-                    if (Files.readString(p).contains("openInMemoryWithFileAccess("))
-                        offenders.add(repoRoot().relativize(p).toString());
-                }
-            }
-        }
-        assertTrue(offenders.isEmpty(), "these take the unsealed file-access opt-in without a recorded reason"
-                + " — declare the directories via openInMemory(spill, dirs) instead: " + offenders);
-    }
-
     @Test
     void thePatternCatchesTheRawOpensAndSparesFileBackedOnes() {
         assertTrue(IN_MEMORY_LITERAL.matcher("DriverManager.getConnection(\"jdbc:duckdb:\");").find());

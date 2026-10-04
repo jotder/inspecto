@@ -111,7 +111,7 @@ class IndexAppendTest {
     private static IndexBuilder.Result buildOver(Path root, Path data, IndexBuilder.Mode mode, List<String> files, IndexBuilder.Options opt) throws Exception {
         Function<List<String>, String> delta = added -> relation(data, added);
         return IndexBuilder.build(new IndexBuilder.Request(DS, MAPPING, relation(data, files), store(root), "fp-" + files.size(), opt,
-                stamps(data, files), mode, delta));
+                stamps(data, files), mode, delta, List.of(data)));
     }
 
     // ---------------------------------------------------------------------------------------------------- parity
@@ -305,16 +305,16 @@ class IndexAppendTest {
         List<IndexManifest.InputFile> rewritten = new ArrayList<>(stamps(data, names(0, 4)));
         rewritten.set(1, new IndexManifest.InputFile("f1.parquet", rewritten.get(1).size() + 1, rewritten.get(1).mtimeMillis()));
         assertThrows(NotApplicableException.class, () -> IndexBuilder.build(new IndexBuilder.Request(DS, MAPPING, relation(data, names(0, 4)), store(inc),
-                "fp", null, rewritten, IndexBuilder.Mode.APPEND, added -> relation(data, added))));
+                "fp", null, rewritten, IndexBuilder.Mode.APPEND, added -> relation(data, added), List.of(data))));
         // 3. the relation's DEFINITION changed (a filter), even though a file was added
         assertThrows(NotApplicableException.class, () -> IndexBuilder.build(new IndexBuilder.Request(DS, MAPPING,
                 relation(data, names(0, 4)) + " WHERE k = 'call'", store(inc), "fp", null, stamps(data, names(0, 4)), IndexBuilder.Mode.APPEND,
-                added -> relation(data, added))));
+                added -> relation(data, added), List.of(data))));
         // 4. nothing was added
         assertThrows(NotApplicableException.class, () -> buildOver(inc, data, IndexBuilder.Mode.APPEND, names(0, 3), null));
         // 5. the Dataset cannot render a delta (not row-wise)
         assertThrows(NotApplicableException.class, () -> IndexBuilder.build(new IndexBuilder.Request(DS, MAPPING, relation(data, names(0, 4)), store(inc),
-                "fp", null, stamps(data, names(0, 4)), IndexBuilder.Mode.APPEND, null)));
+                "fp", null, stamps(data, names(0, 4)), IndexBuilder.Mode.APPEND, null, List.of(data))));
         // 6. an index that does not exist yet cannot be appended to
         assertThrows(NotApplicableException.class, () -> buildOver(tmp.resolve("none"), data, IndexBuilder.Mode.APPEND, names(0, 4), null));
 

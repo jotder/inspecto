@@ -43,6 +43,11 @@ public final class EngineDatasetProvider implements DatasetProvider {
     }
 
     @Override
+    public List<Path> readRoots(Map<String, Object> dataset, Path dataRoot) {
+        return DatasetRelation.readRoots(dataset, dataRoot);
+    }
+
+    @Override
     public String relationSql(Map<String, Object> dataset, Path dataRoot, Path writeRoot) {
         return DatasetRead.relationSql(dataset, dataRoot, writeRoot);
     }

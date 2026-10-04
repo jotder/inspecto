@@ -356,11 +356,15 @@ views on a scratch DuckDB. The same authored SQL as the dry run runs there (`fn:
   callers add `DuckDbUtil.lockConfiguration`.
 - ⚠ The `temp_directory` subtree is **implicitly reachable** (read + write) under the seal: a spill dir must be
   dedicated (`.duckdb_tmp`), never a temp or data root. The `null` default is `<java.io.tmpdir>/.duckdb_tmp`.
-- The one opt-in, `openInMemoryWithFileAccess(spill, why)` (autoload off, local files open), is held by
-  `IndexBuilder` only and pinned by `NoRawInMemoryDuckDbOpenContractTest.theFileAccessOptInSpreadsOnlyByDecision`.
+- **No opt-in remains.** The LA index build (`IndexBuilder`) was the last holder of `openInMemoryWithFileAccess`; it now
+  declares its roots instead: `DatasetProvider.readRoots` → `IndexBuildService.Relation.readRoots` →
+  `IndexBuilder.Request.readRoots`, and the connection is sealed to those plus the store directory (stage, `.spill`,
+  parent version, `.delta`). `countRows(sql, timeout, roots)` takes the roots too; `verify` seals to the version dir.
+  The spill is passed to `openInMemory` (it sets `temp_directory`; a later `SET temp_directory` is refused). The
+  opt-in method and its pin were deleted.
 - Tests: `DuckDbInMemorySealTest` (stub-counted network refusal with a bare-connection twin; declared vs sibling
   dir), `MaterializeTaskTest.anAuthoredViewThatReadsAUrlNeverReachesTheNetwork`,
-  `IndexBuilderTest.theFileAccessOptInReadsLocalFilesButNeverTheNetwork`.
+  `IndexBuilderTest.aBuildReadsOnlyDeclaredRootsAndNeverTheNetwork` (an undeclared dir is refused, its twin builds).
 
 ## The source time zone for temporal data
 

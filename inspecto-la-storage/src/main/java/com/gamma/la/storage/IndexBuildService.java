@@ -74,11 +74,19 @@ public final class IndexBuildService implements AutoCloseable {
     /**
      * What the caller's gate resolved: the trusted relation SELECT and a fingerprint of the base data it reads.
      * {@code deltaSql} (APPEND only) maps the added input files to the relation over just them; null = this Dataset cannot be appended to.
+     * {@code readRoots} are the directories the relation may read (the Dataset's roots); the build's DuckDB connection is sealed to
+     * them plus the index store, so a relation reading anywhere else fails.
      */
     public record Relation(String relationSql, String baseFingerprint, List<IndexManifest.InputFile> inputFiles,
-                           Function<List<String>, String> deltaSql) {
+                           Function<List<String>, String> deltaSql, List<java.nio.file.Path> readRoots) {
         public Relation {
             Objects.requireNonNull(relationSql, "relationSql");
+            readRoots = readRoots == null ? List.of() : List.copyOf(readRoots);
+        }
+
+        public Relation(String relationSql, String baseFingerprint, List<IndexManifest.InputFile> inputFiles,
+                        Function<List<String>, String> deltaSql) {
+            this(relationSql, baseFingerprint, inputFiles, deltaSql, null);
         }
 
         public Relation(String relationSql, String baseFingerprint, List<IndexManifest.InputFile> inputFiles) {
@@ -276,7 +284,7 @@ public final class IndexBuildService implements AutoCloseable {
                         + ") - try again shortly");
             long rows;
             try {
-                rows = IndexBuilder.countRows(estimateSql, estimateTimeoutMs);
+                rows = IndexBuilder.countRows(estimateSql, estimateTimeoutMs, rel.readRoots());
             } catch (IndexBuilder.EstimateTimeoutException e) {
                 throw new Refused(Refused.Kind.ESTIMATE_TIMEOUT, "the index size estimate timed out after " + estimateTimeoutMs
                         + " ms, so index.max_disk_bytes = " + req.maxDiskBytes() + " cannot be checked; set index.max_disk_bytes to 0"
@@ -423,7 +431,7 @@ public final class IndexBuildService implements AutoCloseable {
             IndexBuilder.Options opt = new IndexBuilder.Options(null, null, null, r.token,
                     p -> r.progress = new Progress(p.phase(), p.step(), p.steps()));
             IndexBuilder.Result result = builder.apply(new IndexBuilder.Request(r.datasetId, r.mapping, r.relation.relationSql(),
-                    store, r.relation.baseFingerprint(), opt, r.relation.inputFiles(), r.mode, r.relation.deltaSql()));
+                    store, r.relation.baseFingerprint(), opt, r.relation.inputFiles(), r.mode, r.relation.deltaSql(), r.relation.readRoots()));
             try {
                 store.gc(GC_MIN_AGE);                                  // best effort: a failed sweep never fails a published build
             } catch (IOException | RuntimeException ignored) {

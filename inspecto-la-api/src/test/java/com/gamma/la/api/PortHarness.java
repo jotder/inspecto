@@ -92,6 +92,10 @@ final class PortHarness {
             return columnsByDataset.keySet().stream().map(n -> new Entry(n, Map.of())).toList();
         }
 
+        @Override public List<Path> readRoots(Map<String, Object> dataset, Path dataRoot) {
+            return List.of(dataRoot);
+        }
+
         @Override public String relationSql(Map<String, Object> dataset, Path dataRoot, Path writeRoot) {
             return "SELECT * FROM fake_" + dataset.get("id");
         }
