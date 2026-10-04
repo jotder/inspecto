@@ -161,7 +161,7 @@ The seam is `com.gamma.risk.WatchListFeed`, an engine SPI that `inspecto-entity-
   stamp, `validateKind`, the reserved-prefix check, the versioned store write. It does not write the registry file itself.
 - **Capability: `canAuthorWorkbench`** (the Dataset-authoring one), not `canManageIncidents`. `CapabilityManifest` carries the
   entry. ⚠ A Dataset reads the raw Parquet, so masking does not apply to it. The confirm says so. Anyone with
-  `canAuthorWorkbench` could already hand-author the same Dataset, so a second capability would add no protection.
+  `canAuthorWorkbench` could already hand-author the same Dataset, so a second capability would add no protection. Decided 2026-10-04 (operator): KEEP `canAuthorWorkbench` as the only gate. The SPA's 403 message for this action names the Workbench-authoring capability (not Incident management).
 - **Gates.** No write root 503, unknown list 404, **no sidecar on disk 409** (a Dataset over nothing reads nothing), a Dataset of
   that id already exists **409** (never rewritten, so a repeat is safe and a hand edit survives), an approval policy for kind
   `dataset` **409** (refused, not held), the Dataset gate 422. There is no path-jail 403: the only path is built from a

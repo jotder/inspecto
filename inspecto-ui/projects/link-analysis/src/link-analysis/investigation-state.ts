@@ -166,7 +166,12 @@ export function investigationErrorMessage(err: unknown, fallback: string): strin
  * whose Entity Type is no longer in force; 422 carries the server's reason (a blank reason, a value empty after
  * normalising, a list over 5 000 members …). 503 is a deployment state (no module / no write root), not a fault.
  */
-export function entityListErrorMessage(err: unknown, fallback: string, onInvestigation = false): string {
+export function entityListErrorMessage(
+    err: unknown,
+    fallback: string,
+    onInvestigation = false,
+    forbidden = 'You are not allowed to change Entity Lists (it needs the Incident-management capability).',
+): string {
     const status = err instanceof HttpErrorResponse ? err.status : (err as { status?: number } | null)?.status;
     const server = apiErrorMessage(err, fallback);
     switch (status) {
@@ -177,10 +182,7 @@ export function entityListErrorMessage(err: unknown, fallback: string, onInvesti
                       server
                 : 'This Entity List does not exist (any more). Server: ' + server;
         case 403:
-            return (
-                'You are not allowed to change Entity Lists (it needs the Incident-management capability). Server: ' +
-                server
-            );
+            return forbidden + ' Server: ' + server;
         case 409:
             return 'Refused — ' + server;
         case 422:

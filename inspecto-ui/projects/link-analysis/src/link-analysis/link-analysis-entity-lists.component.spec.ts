@@ -306,6 +306,17 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
         expect(el.textContent).not.toContain('registered as the Dataset');
     });
 
+    it('a 403 on register names the Workbench-authoring capability, not Incident management', async () => {
+        const { inv, el, button, settle } = create();
+        await settle();
+        inv.registerEntityListDataset.mockReturnValue(http(403, 'forbidden') as never);
+        button('Register Known mules as a Dataset')!.click();
+        await settle();
+        const alert = el.querySelector('inspecto-alert')?.textContent;
+        expect(alert).toContain('needs the Workbench-authoring capability');
+        expect(alert).not.toContain('Incident-management');
+    });
+
     it('offers the Dataset action by canAuthorWorkbench alone, not by the list-write capability', async () => {
         const noAuthor = create({ canAuthor: false });
         await noAuthor.settle();

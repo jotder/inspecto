@@ -303,10 +303,14 @@ export class LinkAnalysisEntityListsComponent {
             'Register as Dataset',
         );
         if (!ok) return;
-        await this.write('Could not register the Dataset.', async () => {
-            const res = await firstValueFrom(this.inv.registerEntityListDataset(list.id));
-            this.notice.set(`“${list.title}” registered as the Dataset ${res.datasetId}.`);
-        });
+        await this.write(
+            'Could not register the Dataset.',
+            async () => {
+                const res = await firstValueFrom(this.inv.registerEntityListDataset(list.id));
+                this.notice.set(`“${list.title}” registered as the Dataset ${res.datasetId}.`);
+            },
+            'You are not allowed to register a Dataset (it needs the Workbench-authoring capability).',
+        );
     }
 
     /** §4.4.1 `excludeBy` — resolved at the list's head and sealed; the reason is required, as for `exclude`. */
@@ -353,7 +357,7 @@ export class LinkAnalysisEntityListsComponent {
         );
     }
 
-    private async write(fallback: string, body: () => Promise<void>): Promise<void> {
+    private async write(fallback: string, body: () => Promise<void>, forbidden?: string): Promise<void> {
         this.busy.set(true);
         this.error.set('');
         this.unavailable.set(false);
@@ -362,14 +366,14 @@ export class LinkAnalysisEntityListsComponent {
             await body();
             await this.load();
         } catch (err) {
-            this.fail(err, fallback);
+            this.fail(err, fallback, forbidden);
         } finally {
             this.busy.set(false);
         }
     }
 
-    private fail(err: unknown, fallback: string): void {
+    private fail(err: unknown, fallback: string, forbidden?: string): void {
         this.unavailable.set(isUnavailable(err));
-        this.error.set(entityListErrorMessage(err, fallback));
+        this.error.set(entityListErrorMessage(err, fallback, false, forbidden));
     }
 }
