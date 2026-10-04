@@ -100,6 +100,37 @@ class TelcoFraudTemplateGoldenTest {
         MetricRegistry.global().reset();
     }
 
+    /** The golden day: the Jobs ship a rolling {@code $yesterday} window, so the golden runs pin day 1 explicitly. */
+    private static final Map<String, String> DAY1 =
+            Map.of("window_start", "2026-07-01 00:00:00", "window_end", "2026-07-02 00:00:00");
+
+    private static Map<String, String> day1With(String k, String v) {
+        Map<String, String> m = new java.util.HashMap<>(DAY1);
+        m.put(k, v);
+        return m;
+    }
+
+    /** ASSURE-PACK-TELCO-FRAUD-1 (e): every detection Job runs daily and rolls its window with the clock. */
+    @Test
+    void everyDetectionJobRollsItsWindowOnADailySchedule(@TempDir Path root) throws Exception {
+        Path space = createSpace(root);
+        ingest(space);
+        List<JobConfig> jobs = jobs(space.resolve("config"));
+        assertEquals(10, jobs.size());
+        for (JobConfig j : jobs) {
+            assertEquals("0 2 * * *", j.cron(), j.name() + " cron");
+            assertEquals("$yesterday", j.params().get("window_start"), j.name());
+            assertEquals("$today", j.params().get("window_end"), j.name());
+        }
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(jobs, new ConsignmentEventBus(), s, null,
+                     root.resolve("audit").toString(), null, null, space.resolve("data").toString())) {
+            js.start();
+            for (JobConfig j : jobs)
+                assertEquals("SUCCESS", runJob(js, j.name(), Map.of()).status(), j.name() + " rolling window");
+        }
+    }
+
     @Test
     void theCommittedCorpusIsTheSeededGeneratorsOutput() throws Exception {
         Map<String, String> files = new TelcoFraudCorpus().generate().files();
@@ -175,7 +206,7 @@ class TelcoFraudTemplateGoldenTest {
              JobService js = new JobService(jobs, new ConsignmentEventBus(), s, null,
                      root.resolve("audit").toString(), null, null, data.toString())) {
             js.start();
-            for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), Map.of()).status(), j.name());
+            for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), DAY1).status(), j.name());
 
             assertRaisesExactlyThePlanted(rules, probe, corpus);
             Map<String, Integer> fired = new TreeMap<>();
@@ -186,7 +217,7 @@ class TelcoFraudTemplateGoldenTest {
 
             // Re-running the SAME window replaces that window's rows: no duplicates, no Alert change.
             Map<String, Long> rows = sinkRows(data, jobs);
-            for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), Map.of()).status(), j.name() + " re-run");
+            for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), DAY1).status(), j.name() + " re-run");
             assertEquals(rows, sinkRows(data, jobs), "a same-window re-run duplicates no row");
             assertRaisesExactlyThePlanted(rules, probe, corpus);
             assertEquals(List.of(), svc.evaluateRules(), "a same-window re-run changes no Alert");
@@ -221,7 +252,7 @@ class TelcoFraudTemplateGoldenTest {
              JobService js = new JobService(jobs, new ConsignmentEventBus(), s, null,
                      root.resolve("audit").toString(), null, null, data.toString())) {
             js.start();
-            for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), Map.of()).status(), j.name());
+            for (JobConfig j : jobs) assertEquals("SUCCESS", runJob(js, j.name(), DAY1).status(), j.name());
         }
         TelcoFraudCorpus corpus = new TelcoFraudCorpus().generate();
         com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
@@ -287,10 +318,10 @@ class TelcoFraudTemplateGoldenTest {
              JobService js = new JobService(jobs, new ConsignmentEventBus(), s, null,
                      root.resolve("audit").toString(), null, null, space.resolve("data").toString())) {
             js.start();
-            assertEquals("SUCCESS", runJob(js, "fraud_irsf", Map.of()).status());
-            JobRun bad = runJob(js, "fraud_irsf", Map.of("irsf_prefixes", "882,+883"));
+            assertEquals("SUCCESS", runJob(js, "fraud_irsf", DAY1).status());
+            JobRun bad = runJob(js, "fraud_irsf", day1With("irsf_prefixes", "882,+883"));
             assertNotEquals("SUCCESS", bad.status(), "a '+' in a prefix list entry must fail: " + bad.message());
-            JobRun blank = runJob(js, "fraud_premium_rate", Map.of("premium_prefixes", "999900,,999909"));
+            JobRun blank = runJob(js, "fraud_premium_rate", day1With("premium_prefixes", "999900,,999909"));
             assertNotEquals("SUCCESS", blank.status(), "an empty prefix list entry must fail: " + blank.message());
         }
     }

@@ -5,8 +5,9 @@ job:
   sql: "WITH cur AS (WITH s AS (SELECT msisdn, event_ts FROM subscriber_events WHERE event_type = 'SIM_SWAP' AND event_ts >= CAST($window_start AS TIMESTAMP) AND event_ts < CAST($window_end AS TIMESTAMP)), a AS (SELECT p.txn_id, p.msisdn, p.amount, p.txn_ts, max(s.event_ts) AS swap_ts FROM payments p JOIN s ON s.msisdn = p.msisdn AND s.event_ts < p.txn_ts WHERE p.txn_type = 'PAYMENT' GROUP BY p.txn_id, p.msisdn, p.amount, p.txn_ts) SELECT msisdn, CAST($window_start AS DATE) AS window_date, count(*) AS post_swap_payment_count, sum(amount) AS post_swap_payments FROM a WHERE txn_ts <= swap_ts + to_hours(CAST($window_hours AS INTEGER)) GROUP BY msisdn) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM fraud_sim_swap WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
   sources: subscriber_events,payments,fraud_sim_swap
   sink_dataset: fraud_sim_swap
-  window_start: "2026-07-01 00:00:00"
-  window_end: "2026-07-02 00:00:00"
+  cron: "0 2 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
   retention_days: "30"
   window_hours: "24"
   enabled: true

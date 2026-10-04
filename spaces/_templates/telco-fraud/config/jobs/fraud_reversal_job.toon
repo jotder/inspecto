@@ -5,7 +5,8 @@ job:
   sql: "WITH cur AS (SELECT msisdn, CAST($window_start AS DATE) AS window_date, count(*) FILTER (WHERE txn_type = 'PAYMENT') AS payments, count(*) FILTER (WHERE txn_type = 'REVERSAL') AS reversals, coalesce(sum(amount) FILTER (WHERE txn_type = 'REVERSAL'), 0) AS reversed_amount FROM payments WHERE txn_type IN ('PAYMENT', 'REVERSAL') AND txn_ts >= CAST($window_start AS TIMESTAMP) AND txn_ts < CAST($window_end AS TIMESTAMP) GROUP BY msisdn) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM fraud_reversal WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
   sources: payments,fraud_reversal
   sink_dataset: fraud_reversal
-  window_start: "2026-07-01 00:00:00"
-  window_end: "2026-07-02 00:00:00"
+  cron: "0 2 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
   retention_days: "30"
   enabled: true

@@ -5,7 +5,8 @@ job:
   sql: "WITH cur AS (SELECT a_number AS msisdn, CAST($window_start AS DATE) AS window_date, count(*) AS roaming_records, sum(charge) AS roaming_charge FROM cdr WHERE direction = 'MO' AND roaming = 'Y' AND start_ts >= CAST($window_start AS TIMESTAMP) AND start_ts < CAST($window_end AS TIMESTAMP) GROUP BY a_number) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM fraud_roaming WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
   sources: cdr,fraud_roaming
   sink_dataset: fraud_roaming
-  window_start: "2026-07-01 00:00:00"
-  window_end: "2026-07-02 00:00:00"
+  cron: "0 2 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
   retention_days: "30"
   enabled: true

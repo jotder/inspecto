@@ -5,8 +5,9 @@ job:
   sql: "WITH cur AS (SELECT id_doc, CAST($window_start AS DATE) AS window_date, count(DISTINCT msisdn) AS lines_on_document FROM subscriber_events WHERE event_type = 'ACTIVATION' AND event_ts >= CAST($window_start AS TIMESTAMP) AND event_ts < CAST($window_end AS TIMESTAMP) AND NOT (len(list_filter(string_split($exempt_doc_prefixes, ','), e -> trim(e) <> '' AND starts_with(id_doc, trim(e)))) > 0) GROUP BY id_doc) SELECT * FROM cur UNION ALL BY NAME SELECT * FROM fraud_identity WHERE window_date <> CAST($window_start AS DATE) AND window_date >= CAST($window_start AS DATE) - to_days(CAST($retention_days AS INTEGER))"
   sources: subscriber_events,fraud_identity
   sink_dataset: fraud_identity
-  window_start: "2026-07-01 00:00:00"
-  window_end: "2026-07-02 00:00:00"
+  cron: "0 2 * * *"
+  window_start: "$yesterday"
+  window_end: "$today"
   retention_days: "30"
   exempt_doc_prefixes: "CORP-"
   enabled: true

@@ -382,7 +382,7 @@ the offender alone (`msisdn`, the ringing number, `id_doc`, `dealer_id` or `vouc
 over every retained window, `stormCap: 500`. No new Step Processor. **Thresholds are configuration in two places**: the Job's parameters say what
 counts (`irsf_prefixes`, `premium_prefixes`, `home_cc`, `max_ring_seconds`, `callback_hours`, `max_cells`,
 `exempt_msisdns`, `exempt_doc_prefixes`, `window_hours`, `traffic_grace_hours`, `window_start` / `window_end`,
-`retention_days`) and the Alert Rule's `threshold` (`gt`) says how much is too much. Also: four KPIs + tiles, one
+`retention_days`) and the Alert Rule's `threshold` (`gt`) says how much is too much. **Schedule:** every detection Job carries `cron: "0 2 * * *"` and the rolling window `window_start: "$yesterday"` / `window_end: "$today"` (job-parameter Expressions, resolved at fire time in the Job's zone), so a created Space detects the previous day each night; a manual run (and the golden test) overrides both with literal timestamps. Also: four KPIs + tiles, one
 dashboard (`telco_fraud_overview`: the four KPI tiles plus one bar Widget per typology over its sink Dataset,
 keyed on the offender — the golden test renders every tile through `/kpis/{id}/value` and `/bi/query`), and `config/runbooks/telco-fraud-runbooks.md` (plain Markdown: there is no
 runbook component kind), which names the known false-positive sources that have no defence. Known limits (not product gaps): thresholds are generic defaults (the vendor-specific half
