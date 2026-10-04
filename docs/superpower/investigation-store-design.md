@@ -1,6 +1,6 @@
 <!--
   ACTIVE PLAN — docs/superpower/
-  Created 2026-10-04. DESIGN ONLY — no code. Decisions D-IS1…D-IS12 OPEN (section 11). Retire per the three-tier lifecycle
+  Created 2026-10-04. DESIGN ONLY — no code. Decisions D-IS1…D-IS12 answered 2026-10-04 (section 11); S0 and S1 are next. Retire per the three-tier lifecycle
   once the InvestigationStore seam ships: distil the as-built facts into okf/frontend/features/link-analysis.md, move leftovers
   to BACKLOG.md, then git mv this file to archived-documents/plans-archive/.
 -->
@@ -164,7 +164,7 @@ needs no heartbeat, TTL or fencing token. The long computations (rebase plan, pr
 **Fencing for the Draft main-lock** is therefore the compare-in-commit: a pod that stalls mid-compute and resumes after another
 pod promoted or rebased fails the `expectedMainHead` / `version` check and answers 409 — it can never write stale rows. ⚠
 UNVERIFIED: the row-versioning convention another lane is adding to the platform now (named in the brief) was not visible to
-this lane; section 11 D-IS4 asks that `la_draft.version` follow that convention's name and error mapping.
+this lane; D-IS4 (answered) makes `la_draft.version` follow that convention's name and error mapping.
 
 ## 7. Postgres shape (sketch, for review — not DDL to copy)
 
@@ -237,14 +237,14 @@ S1 and S6 push points (S1 touches shared seams).
   no dual write, no hybrid. Existing tests that call `new SnapshotStore(root)` migrate in S1.
 * **Audit events** (`emit` after the act, `InvestigationRoutes.java:2169`) are unchanged: they go to the event store, not here.
 
-## 11. Decision register (open — one interview)
+## 11. Decision register — ANSWERED 2026-10-04 (operator: every recommendation accepted as written)
 
 | ID | Question | Options | Recommendation |
 |---|---|---|---|
 | **D-IS1** | Scope: which files move? | (a) everything per-Investigation incl. Drafts and sets; (b) log, members, Drafts only, sets stay on a shared volume; (c) main-only, Drafts later | **(a)**. Sets are written in the same act as their log line (G2); splitting them re-creates the crash window the transaction removes. Parquet index stays out regardless. |
 | **D-IS2** | Where do sealed sets live on Postgres? | (a) `text` rows in `la_set` (TOAST); (b) Postgres holds `(step, sha256, uri)`, the bytes live in an object store; (c) do not store, recompute | **(a)**, guarded by a per-set size limit and measured first (S0). (c) is wrong: the Dossier and promote read the stored bytes (`DossierRoutes.java:213`, `DraftPromote.java:54`). (b) only if S0 shows sets near the 1 GB field limit. |
 | **D-IS3** | Seam shape | (a) expose `withLock(scope, fn)`; (b) preconditioned atomic operations, no lock exposed | **(b)** — no lock to distribute; the routes already do compute-then-verify (`DraftRebase.java:224-242`). |
-| **D-IS4** | Concurrency primitive | (a) short-tx `FOR UPDATE` row lock + PK + `version` column; (b) `pg_advisory_xact_lock`; (c) lease table with TTL + fencing token | **(a)**. (c) is for operations longer than a connection (D5, `DbRunLease`); none here are. Name the version column and the 409 mapping after the platform's new optimistic-versioning convention (⚠ UNVERIFIED — not visible to this lane). |
+| **D-IS4** | Concurrency primitive | (a) short-tx `FOR UPDATE` row lock + PK + `version` column; (b) `pg_advisory_xact_lock`; (c) lease table with TTL + fencing token | **(a)**. (c) is for operations longer than a connection (D5, `DbRunLease`); none here are. **Operator 2026-10-04: the LA store adopts the convention the ObjectStore optimistic-lock lane is building now — the same names and mapping: a monotonic `long version` column, a typed conflict exception, answered as 409 CONFLICT through the error funnel.** (Convention itself not visible to this lane; S1 reads it before naming anything.) |
 | **D-IS5** | Column type of log lines and sets | (a) `text`; (b) `bytea`; (c) `jsonb` | **(a)** `text` (greppable, UTF-8 by construction). **Never (c)** — breaks G2/G3 silently. |
 | **D-IS6** | Definition of the log prefix hash | (a) keep byte-prefix sha256 (`DraftStore.prefixHash`); (b) switch to a chain hash `H_k = sha256(H_{k-1} || line_k)` stored per step | **(a)** now: both backends must agree and values already recorded in headers stay meaningful; (b) is a cheap follow-up (O(1) head compare) once S0 shows the O(n) read hurts. |
 | **D-IS7** | Packaging | (a) port + FS in `la-core`, Postgres in a new optional `inspecto-la-store-pg`; (b) Postgres inside `la-core`; (c) inside `inspecto-ops` | **(a)** — keeps JDBC and the Postgres dependency out of Personal / Professional bundles; (c) would break the `la-*` dependency boundary. |
@@ -271,7 +271,7 @@ S1 and S6 push points (S1 touches shared seams).
 Order: S0 and S1 are independent; S2 follows S1; S3 to S5 follow S2; S6 and S7 last. S1 is the only slice that touches shared
 seams — it is the one that needs the full reactor gate before a push.
 
-## 13. Claims not verified (read these before signing)
+## 13. Claims not verified — carried as S0 checks (S0 resolves each before S1 relies on it)
 
 1. No test, build or Postgres run happened; every "today" statement is from reading source at the cited line.
 2. "Two pods on a shared volume would corrupt the log" is inferred from the absence of any cross-process lock in the LA write path
