@@ -280,6 +280,7 @@ if (-not $connectorsJarSrc -or -not (Test-Path $connectorsJarSrc)) {
 # so it bundles the security jar too — an Enterprise deployment authenticates AND authorizes.
 $securityJarSrc = $null
 $policyJarSrc   = $null
+$laStorePgJarSrc = $null  # Enterprise/Preview only (set below); strict mode throws on the read at the bundling step for Professional
 $channelsJarSrc = $null
 $backupJarSrc   = $null
 $geoLinkJarSrc  = $null
