@@ -36,6 +36,7 @@ class ScheduledIndexBuildTest {
     @AfterEach
     void reset() {
         DatasetProviders.forTest(null);
+        com.gamma.la.api.IndexRoutes.forTest(null);
     }
 
     private record Ctx(CollectorService svc, ControlApi api, Path root, String store, Path dir) implements AutoCloseable {
@@ -178,6 +179,41 @@ class ScheduledIndexBuildTest {
             assertTrue(audited.stream().allMatch(e -> "index-build:xdr_index".equals(String.valueOf(e.attributes().get(com.gamma.event.AuditAttrs.ACTOR)))));
         } finally {
             EventLog.current().removeSubscriber(sub);
+        }
+    }
+
+    @Test
+    void aSecondRunWhileABuildIsLiveIsRefusedBuildInProgressAndASlowBuildFailsAsRunningAtTheTimeout(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        java.util.concurrent.atomic.AtomicBoolean release = new java.util.concurrent.atomic.AtomicBoolean();
+        com.gamma.la.api.IndexRoutes.forTest(req -> {
+            try {
+                while (!release.get()) {
+                    if (req.options().cancel().isCancelled()) throw new com.gamma.la.storage.IndexBuilder.CancelledException();
+                    Thread.sleep(5);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+            return new com.gamma.la.storage.IndexBuilder.Result(1, req.store().directory(), null, 3, 3, 0, 3, 16, Map.of(), 5);
+        });
+        try (Ctx c = open(cfg, root, Map.of("owner", "analyst-1", "shares", List.of()))) {
+            land(c.dir.resolve("day0.parquet"), 0);
+            var slow = new java.util.concurrent.atomic.AtomicReference<Outcome>();
+            Thread t = new Thread(() -> slow.set(new ScheduledLinkIndexBuilder().build(c.root, c.api.dataRoot(),
+                    new LinkIndexAccess.Request("xdr_index", "xdr_daily", "who", "other", "kind", null, null, null, List.of(),
+                            "analyst-1", true, 1_500L))));
+            t.start();
+            Thread.sleep(500);                                                    // the first build is live (blocked in the builder)
+            Outcome dup = run(c, true, "analyst-1");
+            assertEquals("REFUSED", dup.result());
+            assertEquals("BUILD_IN_PROGRESS", dup.code());
+            t.join(20_000);
+            assertEquals("RUNNING", slow.get().result(), "still running when the wait ended: the Job fails the Run on this");
+            assertFalse(slow.get().ok());
+            release.set(true);
+        } finally {
+            release.set(true);
         }
     }
 
