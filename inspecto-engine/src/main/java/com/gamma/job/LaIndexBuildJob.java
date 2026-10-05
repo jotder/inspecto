@@ -57,10 +57,12 @@ final class LaIndexBuildJob implements Job {
                 .orElseThrow(() -> new IllegalStateException("la.index.build needs the 'link-index' Platform "
                         + "Service, which is not available in this build"));
 
-        Map<String, String> p = ctx.params();
+        // EVERY input comes from the SAVED config, never ctx.params(): the resolved ladder lets trigger args, a manual
+        // trigger body and signal bind override WHAT is built under the recorded owner's authority. No per-run knob.
+        Map<String, String> p = cfg.params();
         LinkIndexAccess.Request req = new LinkIndexAccess.Request(cfg.name(), need(p, "dataset"),
                 need(p, "source_col"), need(p, "target_col"), opt(p, "kind_col"), opt(p, "time_col"),
-                opt(p, "time_col_zone"), opt(p, "weight_col"), list(opt(p, "attr_cols")), need(cfg.params(), "owner"),   // the AUTHORED, save-stamped owner - never the args / bind / manual-trigger layers
+                opt(p, "time_col_zone"), opt(p, "weight_col"), list(opt(p, "attr_cols")), need(p, "owner"),
                 "true".equalsIgnoreCase(String.valueOf(p.get("allow_full")).trim()),
                 timeoutSeconds(p.get("timeout_seconds")) * 1000L);
 

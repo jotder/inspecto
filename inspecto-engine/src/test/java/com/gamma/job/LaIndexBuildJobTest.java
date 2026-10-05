@@ -23,8 +23,22 @@ class LaIndexBuildJobTest {
             "target_col", "b_party", "owner", "analyst-1", "attr_cols", "cell, lac", "allow_full", "true",
             "timeout_seconds", "5");
 
+    private static Map<String, Object> savedJob() {
+        Map<String, Object> m = new HashMap<>(PARAMS);
+        m.put("name", "xdr_index");
+        m.put("type", "la.index.build");
+        return Map.of("job", m);
+    }
+
+    private static Job jobWithout(String key) {
+        Map<String, Object> m = new HashMap<>(savedJob());
+        @SuppressWarnings("unchecked") Map<String, Object> inner = new HashMap<>((Map<String, Object>) m.get("job"));
+        inner.remove(key);
+        return new LaIndexBuildJob(JobConfig.fromMap(Map.of("job", inner)));
+    }
+
     private static Job job() {
-        return new LaIndexBuildJob(JobConfig.fromMap(Map.of("job", Map.of("name", "xdr_index", "type", "la.index.build", "owner", "analyst-1"))));
+        return new LaIndexBuildJob(JobConfig.fromMap(savedJob()));
     }
 
     private static PlatformServices grantOf(LinkIndexAccess access) {
@@ -84,7 +98,7 @@ class LaIndexBuildJobTest {
         p.remove("allow_full");
         Ctx ctx = new Ctx(false, grantOf(r -> { seen.set(r); return outcome("UP_TO_DATE", "none", null); }), p);
 
-        assertTrue(job().run(ctx).success());
+        assertTrue(jobWithout("allow_full").run(ctx).success());
         assertFalse(seen.get().allowFull(), "a full build is never started unless the Job says so");
     }
 
@@ -104,7 +118,7 @@ class LaIndexBuildJobTest {
     void aMissingRequiredParameterIsRejectedBeforeAnythingRuns() {
         Map<String, String> p = new HashMap<>(PARAMS);
         p.remove("owner");
-        var ownerless = new LaIndexBuildJob(JobConfig.fromMap(Map.of("job", Map.of("name", "xdr_index", "type", "la.index.build"))));
+        var ownerless = jobWithout("owner");
         var boom = assertThrows(IllegalArgumentException.class,
                 () -> ownerless.run(new Ctx(false, grantOf(r -> outcome("BUILT", "full", null)), PARAMS)));
         assertTrue(boom.getMessage().contains("owner"), boom.getMessage());
@@ -185,8 +199,13 @@ class LaIndexBuildJobTest {
         var seen = new AtomicReference<LinkIndexAccess.Request>();
         Map<String, String> p = new HashMap<>(PARAMS);
         p.put("owner", "victim");
+        p.put("dataset", "other_ds");
+        p.put("source_col", "x");
+        p.put("allow_full", "false");
         Ctx ctx = new Ctx(false, grantOf(r -> { seen.set(r); return outcome("BUILT", "append", null); }), p);
         assertTrue(job().run(ctx).success());
         assertEquals("analyst-1", seen.get().owner());
+    assertEquals("xdr_daily", seen.get().dataset());
+        assertTrue(seen.get().allowFull(), "allow_full comes from the saved config");
     }
 }
