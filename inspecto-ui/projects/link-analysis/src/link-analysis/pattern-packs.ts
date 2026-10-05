@@ -233,4 +233,32 @@ export const PATTERN_PACKS: PatternPack[] = [
             { shape: 'fan-in', minBranches: 2, afterPrevious: true, maxGapHours: 48 },
         ],
     },
+    {
+        id: 'layering-network',
+        label: 'Layering network (split and merge)',
+        category: 'money',
+        description:
+            'Funds split from one account across three or more parallel intermediaries within a day, which then re-converge on one account — each leg after the one before, within 48 hours. The branching sibling of Layering chain: a chain follows one path, this finds the fan-out/fan-in web that a chain search misses.',
+        steps: [],
+        // LA-LAYERING-1. No threshold on purpose: layering is about the SHAPE and its time order, not an amount band.
+        stages: [
+            { shape: 'fan-out', minBranches: 3, windowHours: 24 },
+            { shape: 'fan-in', minBranches: 3, afterPrevious: true, maxGapHours: 48 },
+        ],
+    },
+    {
+        id: 'circular-financing',
+        label: 'Circular financing (branching)',
+        category: 'money',
+        description:
+            'Value circulated through two successive split-and-merge rounds — split across two or more parties, re-converged, split again and re-converged — each leg after the one before, within 48 hours. Finds the round-tripping web; it does not prove the value returned to its origin, so confirm a closed loop with the Cycles tool (Circular flow).',
+        steps: [],
+        // LA-CIRCFIN-1. The branching matcher has no "return to the start node" stage, so closure stays with Cycles.
+        stages: [
+            { shape: 'fan-out', minBranches: 2, windowHours: 24 },
+            { shape: 'fan-in', minBranches: 2, afterPrevious: true, maxGapHours: 48 },
+            { shape: 'fan-out', minBranches: 2, afterPrevious: true, maxGapHours: 48 },
+            { shape: 'fan-in', minBranches: 2, afterPrevious: true, maxGapHours: 48 },
+        ],
+    },
 ];
