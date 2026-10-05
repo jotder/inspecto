@@ -360,6 +360,8 @@ export type InvestigationOpRequest =
           windowA: 'inherit' | InvestigationWindow;
           windowB: 'inherit' | InvestigationWindow;
           mode?: 'presence' | 'activity';
+          /** Integer >= 1: list only changes of at least this many events. `mode: 'activity'` only (else 422). */
+          minAbsDelta?: number;
       }
     /** A burst / periodicity finding set SEALED into the log (the Working Set does not change; a Dossier carries it). The
      *  server re-runs the `POST /inv/pattern/temporal` scan over the Investigation's own edge columns and keeps the
