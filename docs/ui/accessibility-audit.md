@@ -109,6 +109,8 @@ jsdom — which is why they are the natural scope of the real-browser pass in §
   canvas has a text alternative, a *Show as list* toggle that swaps it for a keyboard-navigable grid of the nodes it
   draws (Enter selects through the same path as a canvas click) with the selected node's links beneath, and the
   Analysis / View / Investigation switch is a `tablist` with `tabpanel` panes. The G6 canvas `tabindex` is `0` live.
-  Not fixed: the empty ag-Grid regions (vendor). It is still a manual, one-off pass, not a CI gate.
+  A fifth pass on 2026-10-05 fixed the one empty `.ag-header-row` that was ours (`inspecto-data-table` loading with no
+  rows now shows a skeleton, not a cell-less grid, pinned by a jsdom axe spec); the remaining ag-Grid loading-overlay
+  scroll region is vendor and decided not ours to patch. It is still a manual, one-off pass, not a CI gate.
 - Vendored Fuse auth/error pages (`modules/auth/**`).
 - A formal third-party audit / VPAT.

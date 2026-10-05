@@ -162,6 +162,8 @@
         [title]="noRowsHint() ? noRowsTitle() : ''"
         [message]="noRowsHint() ?? noRowsTitle()"
     />
+} @else if (showLoadingPlaceholder()) {
+    <inspecto-skeleton [lines]="3" />
 } @else {
     <ag-grid-angular
         class="w-full"
