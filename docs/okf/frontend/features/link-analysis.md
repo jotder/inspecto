@@ -1670,7 +1670,10 @@ render, and the Dossier stamps `linkId` on its link annotations.
   **rejected**: lineage `src_id` is a member index, the acquisition ledger / `file_stages` are opt-in with no list-by-file
   read, `file_name` is optional and basenames collide. No attribution evidence ⇒ `assessed:false` (never "no gaps"). The
   Dossier does not seal live coverage (its root is deterministic); its negative-space note points at the route. Residual:
-  never-delivering Collectors are invisible; partition days use the Pipeline's pinned zone; no SPA surface yet.
+  never-delivering Collectors are invisible; partition days use the Pipeline's pinned zone.
+  SPA (2026-10-05): the Investigation pane's Coverage section renders `collectors.collectors` as a table (Collector · days
+  covered of expected · missing days); `assessed:false` prints "Per-Collector coverage: not assessed" — never a blank or
+  "no gaps". `HostCollectorCoveragePort.day()` is pinned for the `year=/month=/day=` and `dt=` partition forms.
 * **D-U11 (2026-09-30) answers** that no paragraph above carries: A1 a snapshot captures what is on screen · A2 the
   cash-out share denominator is ALL cash-out · A3 the agent Entity List is read LIVE and its fact-log head seq/hash
   is recorded on each firing (`evidence.agentList` / `agentListSeq` / `agentListHash`) · A4 a retired list is 409 ·

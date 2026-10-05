@@ -439,7 +439,37 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', () => {
         expect(section.textContent).toContain('2 of 3 days in the window have zero rows in calls (UTC)');
         expect(section.textContent).toContain('2026-09-02, 2026-09-03');
         expect(section.textContent).not.toContain('2026-09-01');
-        expect(section.textContent?.match(/per-Collector coverage is not assessed/gi)).toHaveLength(1);
+        expect(section.textContent?.match(/per-Collector coverage: not assessed/gi)).toHaveLength(1);
+        await expectNoA11yViolations(el);
+
+        inv.investigationCoverage.mockReturnValue(
+            of({
+                ...COVERAGE,
+                collectors: {
+                    assessed: true,
+                    collectors: [
+                        { collector: 'north', coveredDays: 3, missingDays: [], complete: true },
+                        {
+                            collector: 'south',
+                            coveredDays: 1,
+                            missingDays: ['2026-09-02', '2026-09-03'],
+                            complete: false,
+                        },
+                    ],
+                },
+            }),
+        );
+        button('Check coverage').click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const rows = Array.from(section.querySelectorAll('tbody tr')).map((r) =>
+            Array.from(r.children).map((c) => c.textContent?.trim()),
+        );
+        expect(rows).toEqual([
+            ['north', '3 of 3', 'none'],
+            ['south', '1 of 3', '2026-09-02, 2026-09-03'],
+        ]);
+        expect(section.textContent).not.toContain('not assessed');
         await expectNoA11yViolations(el);
 
         inv.investigationCoverage.mockReturnValue(refused('coverage needs a bounded window'));
