@@ -11,6 +11,7 @@ import {
     GraphRunView,
     GraphRunsService,
 } from '@inspecto/link-analysis/api/graph-runs.service';
+import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisServerRunComponent } from './link-analysis-server-run.component';
 
 function view(status: GraphRunStatus, over: Partial<GraphRunView> = {}): GraphRunView {
@@ -257,5 +258,19 @@ describe('LinkAnalysisServerRunComponent', () => {
         expect(stream.observed).toBe(true);
         fixture.destroy();
         expect(stream.observed).toBe(false);
+    });
+
+    it('is axe-clean when blocked (LA-A11Y-AUDIT-1)', async () => {
+        await expectNoA11yViolations(make({ allowed: false }).el);
+    });
+
+    it('is axe-clean idle, running and failed (LA-A11Y-AUDIT-1)', async () => {
+        const { el, click, push } = make();
+        await expectNoA11yViolations(el);
+        click('run-on-server');
+        push(view('RUNNING', { progress: { work: 5, fraction: 0.4 } }));
+        await expectNoA11yViolations(el);
+        push(view('FAILED', { failure: 'IllegalStateException' }));
+        await expectNoA11yViolations(el);
     });
 });

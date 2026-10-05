@@ -1055,6 +1055,16 @@ describe('LinkAnalysisComponent', () => {
             return { fixture, c: fixture.componentInstance, el, tabs, press };
         };
 
+        it('keeps the keyboard order the reader sees: no positive tabindex, the Query dock before the Toolbox dock, one tab stop in the tablist', () => {
+            const { el, tabs } = open();
+            const positive = Array.from(el.querySelectorAll<HTMLElement>('[tabindex]')).filter((n) => n.tabIndex > 0);
+            expect(positive).toEqual([]); // a positive tabindex reorders focus ahead of everything else
+            const query = el.querySelector('aside[aria-label="Query"]')!;
+            const toolbox = el.querySelector('aside[aria-label="Toolbox"]')!;
+            expect(query.compareDocumentPosition(toolbox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+            expect(tabs().filter((t) => t.tabIndex === 0)).toHaveLength(1);
+        });
+
         it('is a tablist of three tabs, one tab stop, whose panes are tabpanels labelled by their tab', () => {
             const { el, tabs } = open();
             const list = el.querySelector('[role="tablist"]') as HTMLElement;

@@ -431,3 +431,28 @@ select.bg-transparent optgroup {
     background-color: var(--gamma-bg-card) !important;
     color: var(--gamma-text-default) !important;
 }
+
+/* Reduced motion (WCAG 2.3.3, best practice): a user who asked the OS for less motion gets none from Material's
+ * ripple / overlay / progress transitions or any component keyframe. Skeleton and tile-card already carry their own
+ * guards; this is the global net so a new animation cannot forget one. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Forced colors (Windows High Contrast, WCAG 1.4.11): the OS drops background and box-shadow colours, so a
+ * selection shown only by an inset shadow or a weight (the Link Analysis toolbox tab, the graph list's selected
+ * row) would vanish. An OUTLINE survives forced colors, in the system Highlight colour. */
+@media (forced-colors: active) {
+    [role='tab'][aria-selected='true'],
+    [role='row'][aria-selected='true'] {
+        outline: 2px solid Highlight;
+        outline-offset: -2px;
+    }
+}
