@@ -5,6 +5,8 @@ import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 
 import java.time.DateTimeException;
+import java.time.DayOfWeek;
+import java.time.Month;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -53,6 +55,16 @@ import java.util.TreeMap;
  * mask they are wall-clock notions: they test the local calendar day ON WHICH THE EVENT FELL in the window's
  * {@code timezone}, which is therefore required. They are canonicalised to {@code {from, to[, name]}} sorted by
  * date, so the same exclusions seal the same bytes. At most {@link #MAX_EXCLUDES} entries.
+ *
+ * <h2>Recurring exclusion rules</h2>
+ * An {@code exclude} entry may instead be a RULE: {@code {rule:"yearly", month, day[, name]}} (every 25 Dec) or
+ * {@code {rule:"nthWeekday", month, weekday, nth[, name]}} (the 4th Thursday of November; {@code nth} 1-5, and a
+ * 5th that a month lacks simply never matches). The RULE is what is sealed, not its expansion over the window, so
+ * the sealed bytes stay canonical and an unbounded window needs no horizon. The rule is applied to the local
+ * calendar day in the window's {@code timezone}, exactly like a named date ({@link #matches} for Java readers,
+ * the same arithmetic in {@link #predicates} SQL), which is deterministic: no clock, no host zone. A yearly
+ * {@code 02-29} matches leap years only. Canonical order: concrete entries (by date) then rules (by month, day or
+ * nth/weekday, name); at most {@link #MAX_RULES} rules, on top of {@link #MAX_EXCLUDES} dates.
  */
 public final class InvestigationTime {
 
@@ -61,6 +73,8 @@ public final class InvestigationTime {
     public static final List<String> DAYS = List.of("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN");
     /** The cap on {@code exclude} entries: a calendar of holidays, not a second Dataset. */
     public static final int MAX_EXCLUDES = 366;
+    /** The cap on recurring {@code exclude} rules: a handful of annual holidays, not a calendar. */
+    public static final int MAX_RULES = 32;
     private static final Set<String> WINDOW_KEYS = Set.of("from", "to", "slot", "days", "exclude", "timezone");
 
     /**
@@ -126,15 +140,28 @@ public final class InvestigationTime {
 
     private static List<Map<String, Object>> excludes(Object raw, String origin) {
         if (raw == null) return null;
-        if (!(raw instanceof List<?> l) || l.isEmpty() || l.size() > MAX_EXCLUDES)
+        if (!(raw instanceof List<?> l) || l.isEmpty() || l.size() > MAX_EXCLUDES + MAX_RULES)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " must be a non-empty list of at most " + MAX_EXCLUDES
-                    + " entries: a 'YYYY-MM-DD' string, {date} or {from, to} (inclusive), each with an optional 'name'");
+                    + " dates plus " + MAX_RULES + " rules: a 'YYYY-MM-DD' string, {date}, {from, to} (inclusive), "
+                    + "{rule:'yearly', month, day} or {rule:'nthWeekday', month, weekday, nth}, each with an optional 'name'");
         TreeMap<String, Map<String, Object>> sorted = new TreeMap<>();
-        int i = 0;
+        int i = 0, rules = 0;
         for (Object e : l) {
             String at = origin + "[" + i++ + "]";
             LocalDate from, to;
             String name = null;
+            if (e instanceof Map<?, ?> rm && rm.get("rule") != null) {
+                if (++rules > MAX_RULES)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " holds at most " + MAX_RULES + " recurring rules");
+                Map<String, Object> rule = rule(rm, at);
+                int month = (Integer) rule.get("month");
+                String order = rule.containsKey("day") ? String.format("%02d", (Integer) rule.get("day"))
+                        : rule.get("nth") + "/" + DAYS.indexOf(String.valueOf(rule.get("weekday")));
+                // "~" sorts after every digit: concrete dates first, then the rules.
+                sorted.put("~" + String.format("%02d", month) + "/" + rule.get("rule") + "/" + order + "/"
+                        + (rule.get("name") == null ? "" : rule.get("name")), rule);
+                continue;
+            }
             if (e instanceof String s) {
                 from = to = date(s, at);
             } else if (e instanceof Map<?, ?> m) {
@@ -166,6 +193,54 @@ public final class InvestigationTime {
             sorted.put(from + "/" + to + "/" + (name == null ? "" : name), c);
         }
         return new ArrayList<>(sorted.values());
+    }
+
+    /** One recurring rule, validated and canonicalised ({@code rule}, {@code month}, {@code day} | {@code weekday} + {@code nth}, {@code name}). */
+    private static Map<String, Object> rule(Map<?, ?> m, String at) {
+        String kind = String.valueOf(m.get("rule"));
+        Set<String> allowed = "yearly".equals(kind) ? Set.of("rule", "month", "day", "name")
+                : "nthWeekday".equals(kind) ? Set.of("rule", "month", "weekday", "nth", "name") : null;
+        if (allowed == null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + ".rule must be 'yearly' or 'nthWeekday', got '" + kind + "'");
+        for (Object k : m.keySet())
+            if (!allowed.contains(String.valueOf(k)))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + ": unknown key '" + k + "' for a '" + kind + "' rule (allowed: " + allowed + ")");
+        int month = whole(m.get("month"), 1, 12, at + ".month");
+        Map<String, Object> c = new LinkedHashMap<>();
+        c.put("rule", kind);
+        c.put("month", month);
+        if ("yearly".equals(kind)) {
+            int day = whole(m.get("day"), 1, 31, at + ".day");
+            if (day > Month.of(month).maxLength())
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + ": month " + month + " has no day " + day);
+            c.put("day", day);
+        } else {
+            String wd = String.valueOf(m.get("weekday"));
+            if (!DAYS.contains(wd)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + ".weekday must be one of " + DAYS);
+            c.put("weekday", wd);
+            c.put("nth", whole(m.get("nth"), 1, 5, at + ".nth"));
+        }
+        if (m.get("name") != null) {
+            String name = String.valueOf(m.get("name")).trim();
+            if (name.isEmpty() || name.length() > 80) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + ".name must be 1-80 characters");
+            c.put("name", name);
+        }
+        return c;
+    }
+
+    private static int whole(Object raw, int min, int max, String at) {
+        if (raw instanceof Number n && n.doubleValue() == Math.rint(n.doubleValue()) && n.intValue() >= min && n.intValue() <= max) return n.intValue();
+        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + " must be a whole number " + min + "-" + max);
+    }
+
+    /** Does the exclusion entry (a canonical date range or a recurring rule) remove this local calendar day? */
+    public static boolean matches(Map<?, ?> entry, LocalDate day) {
+        if (entry.get("rule") == null)
+            return !day.isBefore(LocalDate.parse(String.valueOf(entry.get("from")))) && !day.isAfter(LocalDate.parse(String.valueOf(entry.get("to"))));
+        if (day.getMonthValue() != ((Number) entry.get("month")).intValue()) return false;
+        if ("yearly".equals(entry.get("rule"))) return day.getDayOfMonth() == ((Number) entry.get("day")).intValue();
+        return day.getDayOfWeek() == DayOfWeek.of(DAYS.indexOf(String.valueOf(entry.get("weekday"))) + 1)
+                && (day.getDayOfMonth() - 1) / 7 + 1 == ((Number) entry.get("nth")).intValue();
     }
 
     private static LocalDate date(Object raw, String origin) {
@@ -251,10 +326,23 @@ public final class InvestigationTime {
             boolean first = true;
             for (Object o : ex) {
                 Map<?, ?> r = (Map<?, ?>) o;
-                where.append(first ? "" : " OR ").append("CAST(lt AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)");
-                binds.add(String.valueOf(r.get("from")));
-                binds.add(String.valueOf(r.get("to")));
+                where.append(first ? "" : " OR ");
                 first = false;
+                if (r.get("rule") == null) {
+                    where.append("CAST(lt AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)");
+                    binds.add(String.valueOf(r.get("from")));
+                    binds.add(String.valueOf(r.get("to")));
+                } else if ("yearly".equals(r.get("rule"))) {
+                    // The recurring rule on the local calendar day — same arithmetic as matches().
+                    where.append("(month(lt) = CAST(? AS INTEGER) AND day(lt) = CAST(? AS INTEGER))");
+                    binds.add(String.valueOf(r.get("month")));
+                    binds.add(String.valueOf(r.get("day")));
+                } else {
+                    where.append("(month(lt) = CAST(? AS INTEGER) AND isodow(lt) = CAST(? AS INTEGER) AND (day(lt) - 1) // 7 + 1 = CAST(? AS INTEGER))");
+                    binds.add(String.valueOf(r.get("month")));
+                    binds.add(Integer.toString(DAYS.indexOf(String.valueOf(r.get("weekday"))) + 1));
+                    binds.add(String.valueOf(r.get("nth")));
+                }
             }
             where.append(")");
         }
@@ -298,7 +386,9 @@ public final class InvestigationTime {
             List<String> xs = new ArrayList<>();
             for (Object o : ex) {
                 Map<?, ?> r = (Map<?, ?>) o;
-                String span = r.get("from").equals(r.get("to")) ? String.valueOf(r.get("from")) : r.get("from") + " to " + r.get("to");
+                String span = r.get("rule") == null ? (r.get("from").equals(r.get("to")) ? String.valueOf(r.get("from")) : r.get("from") + " to " + r.get("to"))
+                        : "yearly".equals(r.get("rule")) ? "every " + String.format("%02d-%02d", ((Number) r.get("month")).intValue(), ((Number) r.get("day")).intValue())
+                        : "the " + r.get("nth") + " " + r.get("weekday") + " of month " + r.get("month");
                 xs.add(r.get("name") == null ? span : r.get("name") + " (" + span + ")");
             }
             parts.add("excluding " + String.join(", ", xs));

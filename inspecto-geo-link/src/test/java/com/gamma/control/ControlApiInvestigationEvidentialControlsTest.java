@@ -188,6 +188,14 @@ class ControlApiInvestigationEvidentialControlsTest {
             JsonNode held = data(send(c.port, "GET", "/inv/investigations/case-a/coverage", null, null));
             assertEquals(4, held.get("expectedDays").asInt(), held.toString());
             assertEquals("[]", held.get("missingDays").toString());
+
+            // A recurring rule (the 1st Friday of September = 2026-09-04) removes the same expected day.
+            post(c, "/inv/investigations/case-a/ops", "{\"op\":\"window\",\"window\":{\"from\":\"2026-09-01T00:00:00-03:00\","
+                    + "\"to\":\"2026-09-06T00:00:00-03:00\",\"exclude\":[{\"rule\":\"nthWeekday\",\"month\":9,\"weekday\":\"FRI\",\"nth\":1}],"
+                    + "\"timezone\":\"America/Sao_Paulo\"}}");
+            JsonNode recurring = data(send(c.port, "GET", "/inv/investigations/case-a/coverage", null, null));
+            assertEquals(4, recurring.get("expectedDays").asInt(), recurring.toString());
+            assertEquals("[]", recurring.get("missingDays").toString());
         }
     }
 

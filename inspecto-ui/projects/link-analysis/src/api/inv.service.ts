@@ -245,6 +245,15 @@ export type WindowDay = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
  * mask is given — they are wall-clock notions.
  */
 export interface InvestigationWindowExclude {
+    /**
+     * A RECURRING rule instead of a date: `yearly` (`month` + `day`, e.g. every 25 Dec) or `nthWeekday` (`month` +
+     * `weekday` + `nth` 1-5, e.g. the 4th Thursday of November). Sealed as the rule; applied to the local day.
+     */
+    rule?: 'yearly' | 'nthWeekday';
+    month?: number;
+    day?: number;
+    weekday?: WindowDay;
+    nth?: number;
     date?: string;
     from?: string;
     to?: string;
