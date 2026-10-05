@@ -180,6 +180,14 @@ class ControlApiInvestigationEvidentialControlsTest {
             JsonNode fri = data(send(c.port, "GET", "/inv/investigations/case-a/coverage", null, null));
             assertEquals(1, fri.get("expectedDays").asInt(), fri.toString());
             assertEquals("[\"2026-09-04\"]", fri.get("missingDays").toString());
+
+            // A calendar exclusion (a holiday) is a day with no rows EXPECTED: the same window minus 09-04 has no gap.
+            post(c, "/inv/investigations/case-a/ops", "{\"op\":\"window\",\"window\":{\"from\":\"2026-09-01T00:00:00-03:00\","
+                    + "\"to\":\"2026-09-06T00:00:00-03:00\",\"exclude\":[{\"name\":\"Holiday\",\"date\":\"2026-09-04\"}],"
+                    + "\"timezone\":\"America/Sao_Paulo\"}}");
+            JsonNode held = data(send(c.port, "GET", "/inv/investigations/case-a/coverage", null, null));
+            assertEquals(4, held.get("expectedDays").asInt(), held.toString());
+            assertEquals("[]", held.get("missingDays").toString());
         }
     }
 

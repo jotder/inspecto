@@ -166,6 +166,7 @@ import {
     SAVED_VIEW_NOT_EVIDENCE,
 } from './link-analysis.service';
 import { LinkAnalysisTemporalFindingsComponent, TemporalRunRequest } from './link-analysis-temporal-findings.component';
+import { LinkAnalysisTimelinePlaybackComponent } from './link-analysis-timeline-playback.component';
 import { TemporalFindingsState, allTemporalSelection, temporalResultToState } from './temporal-findings';
 import {
     FindPathsRequest,
@@ -246,6 +247,7 @@ const SERVER_PATH_LIMIT = 100;
         LaHostSlotComponent,
         LinkAnalysisToolboxComponent,
         LinkAnalysisTemporalFindingsComponent,
+        LinkAnalysisTimelinePlaybackComponent,
         LinkAnalysisQueryPanelComponent,
         LinkAnalysisLegendComponent,
         LinkAnalysisWorkingSetComponent,
@@ -1704,6 +1706,8 @@ export class LinkAnalysisComponent implements OnInit {
         this.recordHistory();
         this.timeColumn.set(col);
         this.timeCutoff.set(col ? (this.timeExtent()?.[1] ?? null) : null);
+        // The playback strip leaves with the column; so must the slice it had highlighted.
+        if (!col) this.emphasis.set(null);
     }
 
     /** Move the timeline cutoff (epoch millis, from the slider). Not recorded per-drag (like search). */

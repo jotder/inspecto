@@ -782,6 +782,15 @@
                         </span>
                     </div>
 
+                    @if (!workingSetCanvas() && timeColumn() && timeExtent(); as ext) {
+                        <inspecto-link-analysis-timeline-playback
+                            [graph]="displayed()"
+                            [column]="timeColumn()"
+                            [extent]="ext"
+                            (highlight)="emphasis.set($event)"
+                        ></inspecto-link-analysis-timeline-playback>
+                    }
+
                     <div class="relative min-h-0 flex-auto">
                         <inspecto-graph-view
                             [fill]="true"

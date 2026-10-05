@@ -65,6 +65,39 @@ describe('InvestigationWindowOpComponent (LA-SPA-OWED-SURFACES-1)', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('sends calendar exclusions (dates, ranges, names) and needs a timezone for them', async () => {
+        const { fixture, cmp, store, el } = setup();
+        cmp.form.patchValue({ exclude: '2026-12-25, Winter break=2026-12-24..2026-12-26\n2026-01-01' });
+        await cmp.submit();
+        fixture.detectChanges();
+        expect(alerts(el).join(' ')).toContain('needs a timezone');
+        expect(store.apply).not.toHaveBeenCalled();
+        cmp.form.patchValue({ timezone: 'Asia/Riyadh' });
+        await cmp.submit();
+        expect(store.apply).toHaveBeenCalledWith({
+            op: 'window',
+            window: {
+                exclude: [
+                    { date: '2026-12-25' },
+                    { from: '2026-12-24', to: '2026-12-26', name: 'Winter break' },
+                    { date: '2026-01-01' },
+                ],
+                timezone: 'Asia/Riyadh',
+            },
+        });
+    });
+
+    it('refuses a malformed or inverted excluded date client-side', async () => {
+        const { fixture, cmp, store, el } = setup();
+        cmp.form.patchValue({ exclude: '2026-12-26..2026-12-24', timezone: 'UTC' });
+        await cmp.submit();
+        fixture.detectChanges();
+        expect(alerts(el).join(' ')).toContain('Excluded dates are YYYY-MM-DD');
+        cmp.form.patchValue({ exclude: '25/12/2026' });
+        await cmp.submit();
+        expect(store.apply).not.toHaveBeenCalled();
+    });
+
     it("'All time' sends window 'full'; a server 422 is shown verbatim in place", async () => {
         const { fixture, cmp, store, el } = setup(false, "window.timezone: unknown zone 'Mars/Base'");
         cmp.form.controls.full.setValue(true);

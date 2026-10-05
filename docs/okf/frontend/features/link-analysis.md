@@ -751,8 +751,18 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   compared as epoch ms; a `slot` (`22:00–04:00` crosses midnight; start inclusive, end exclusive) and a `days`
   mask need an explicit IANA `timezone` and test the local day the EVENT fell on. `window` re-filters nothing
   already admitted — earlier sealed reads are evidence as made. Templates carry the whole rung; a `window`
-  becomes a parameter (`kind: "window"`) whose default is the authored window. ⏳ Calendar exclusions
-  remains deferred (`threshold`, `snapshot`, comparison mode — read route, then the sealed `compare` op on 2026-10-05 —, time-respecting paths and burst / periodicity shipped 2026-10-04, below). **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
+  becomes a parameter (`kind: "window"`) whose default is the authored window. ✅ **Calendar exclusions
+  (2026-10-05):** a window's `exclude` list removes named dates / inclusive date ranges (holidays) beside the slot
+  and day mask. Entry = `"YYYY-MM-DD"` | `{date}` | `{from, to}`, each with an optional `name` (1–80 chars), at most
+  366, canonicalised to `{from, to[, name]}` sorted by date so the same calendar seals the same bytes. They are
+  wall-clock like the mask: they test the LOCAL calendar day the EVENT fell on in the window's `timezone`, which
+  they therefore require (no default). One implementation, `InvestigationTime.predicates`, so every reader that takes
+  a window honors them (expand, the `window` op, `compare`, the Dossier's rung read) and `describe` names them in the
+  log line; `GET …/coverage` treats an excluded day as not EXPECTED, so a holiday is not reported as a gap. Calls:
+  per-date (not per-instant) exclusion; ranges inclusive at both ends (unlike the half-open `[from, to)` instants,
+  because they name calendar days); no recurring rules (every 25 Dec) — list the dates. The SPA window form
+  takes them as one text field (`2026-12-25, Winter break=2026-12-24..2026-12-26`). ✅ The rest
+  (`threshold`, `snapshot`, comparison mode — read route, then the sealed `compare` op on 2026-10-05 —, time-respecting paths and burst / periodicity shipped 2026-10-04, below). **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
   settings* (`investigation-expand-rung.component`) sends `budget` (1–20 000; the server CLAMPS above, so the SPA
   refuses) · `direction` · rung `window` (`inherit` · `full` · *A window for this rung…*, an override object) · `linkKinds`
   (comma-separated, trimmed and deduplicated, at most 100; blank = all kinds; the server 422s it without an Investigation
@@ -1607,8 +1617,21 @@ re-ordering forks, D-E4); **`hide` ≠ `exclude` ≠ `keep`** (hide: gone from d
 exclude: gone from all three, still inspectable as the `excluded` relation; keep: protected from later
 excludes). Two evaluators, one spec — incremental on append, full replay from the sealed log — with an
 `equivalent` check that is pinned to be able to FAIL. **Negative space is part of every rendering** (G-E10).
-Not built from the target model: timeline playback, calendar exclusions
-— see `LA-INVESTIGATION-OPS-DEFERRED-1`.
+Calendar exclusions and timeline playback shipped 2026-10-05 (below and in the window section) — see
+`LA-INVESTIGATION-OPS-DEFERRED-1`.
+
+**Timeline playback (2026-10-05, SPA only).** A strip above the canvas
+(`link-analysis-timeline-playback.component`, pure slicing in `timeline-playback.ts`) steps through the timeline
+column's `[min, max]` in 20 equal slices — play / pause (1 s per slice, stops at the end) / previous / next / a
+range scrubber / reset — and highlights the links whose `attrs[col]` date falls in the current slice (half-open, the
+last slice includes the max) through the shared canvas `emphasis`. It writes NOTHING to the graph, the timeline
+filter or its cutoff, and a link with no parseable date is active in no slice. The status line (`role=status`)
+names the slice and its link count (`aria-live` off while playing, so it does not read every tick). **Reduced
+motion:** under `prefers-reduced-motion: reduce` nothing advances by itself — Play is disabled and says why; step and
+scrub remain. Calls made: the range is the TIMELINE column's, not the Investigation's `window` — a Working Set has
+no per-link timestamps (it is sealed), so playback exists on the query-graph canvas only, like the timeline filter
+beside it; a link carries ONE date, so an aggregated link plays at the date it carries; fixed 20 slices, no
+slice-size knob; no jump to a burst. Clearing the time column clears the highlight.
 
 **Time-respecting paths and burst / periodicity (2026-10-04).** Two operator-approved pieces, both built as
 **stateless Dataset reads, not Investigation ops and not graph-run algorithms** — an op only appends a

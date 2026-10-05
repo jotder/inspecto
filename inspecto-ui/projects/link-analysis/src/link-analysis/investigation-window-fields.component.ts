@@ -82,15 +82,31 @@ import { WINDOW_DAYS, WindowForm, crossesMidnight } from './investigation-rung-f
                     <mat-checkbox [formControlName]="d">{{ d }}</mat-checkbox>
                 }
             </fieldset>
+            <mat-form-field class="w-full" subscriptSizing="dynamic">
+                <mat-label>Excluded dates (holidays)</mat-label>
+                <textarea
+                    matInput
+                    rows="2"
+                    formControlName="exclude"
+                    data-test="window-exclude"
+                    placeholder="2026-12-25, Winter break=2026-12-24..2026-12-26"
+                ></textarea>
+                <mat-hint>Comma or line separated: DATE or FROM..TO (inclusive), optional "Name=" first.</mat-hint>
+            </mat-form-field>
+            @if (form().hasError('exclude') && form().touched) {
+                <p class="text-warn m-0 text-xs" role="alert">
+                    Excluded dates are YYYY-MM-DD or YYYY-MM-DD..YYYY-MM-DD (the end not before the start).
+                </p>
+            }
             <inspecto-option-picker label="Timezone" formControlName="timezone" [options]="zones" />
             <p class="text-secondary m-0 text-xs">
-                Slot and days are wall-clock time in this zone — required with either; there is no default.
+                Slot, days and excluded dates are wall-clock time in this zone — required with either; there is no default.
             </p>
             @if (form().hasError('zone') && form().touched) {
-                <p class="text-warn m-0 text-xs" role="alert">A slot or day mask needs a timezone.</p>
+                <p class="text-warn m-0 text-xs" role="alert">A slot, day mask or excluded date needs a timezone.</p>
             }
             @if (form().hasError('empty') && form().touched) {
-                <p class="text-warn m-0 text-xs" role="alert">Set at least one of From, To, a slot or days.</p>
+                <p class="text-warn m-0 text-xs" role="alert">Set at least one of From, To, a slot, days or excluded dates.</p>
             }
         </div>
     `,

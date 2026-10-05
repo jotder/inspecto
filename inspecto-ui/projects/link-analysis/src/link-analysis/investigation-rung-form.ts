@@ -3,6 +3,7 @@ import type {
     ExpandDirection,
     ExpandRung,
     InvestigationWindow,
+    InvestigationWindowExclude,
     WindowDay,
 } from '@inspecto/link-analysis/api/inv.service';
 
@@ -99,6 +100,24 @@ export function rungOf(f: RungForm, override?: WindowForm): ExpandRung {
 
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
 const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The calendar-exclusion text -> the wire entries. One entry per comma / newline: `[Name=]DATE` or `[Name=]DATE..DATE`
+ * (both ends inclusive), DATE = `YYYY-MM-DD`. `null` when any entry is malformed (the server's own 422 shapes).
+ */
+export function parseExcludes(text: string): InvestigationWindowExclude[] | null {
+    const out: InvestigationWindowExclude[] = [];
+    for (const raw of text.split(/[,\n]/).map((t) => t.trim()).filter(Boolean)) {
+        const eq = raw.indexOf('=');
+        const name = eq >= 0 ? raw.slice(0, eq).trim() : '';
+        const [a, b, ...rest] = (eq >= 0 ? raw.slice(eq + 1) : raw).trim().split('..').map((d) => d.trim());
+        if (rest.length || !ISO_DATE.test(a) || (b !== undefined && !ISO_DATE.test(b)) || (eq >= 0 && !name)) return null;
+        if (b !== undefined && b < a) return null;
+        out.push(b === undefined ? { date: a, ...(name ? { name } : {}) } : { from: a, to: b, ...(name ? { name } : {}) });
+    }
+    return out;
+}
 
 /** The window's cross-field rules, each the server's own 422 (`InvestigationTime.window`). */
 const windowRules: ValidatorFn = (g: AbstractControl): ValidationErrors | null => {
@@ -107,12 +126,14 @@ const windowRules: ValidatorFn = (g: AbstractControl): ValidationErrors | null =
     const errors: ValidationErrors = {};
     const days = WINDOW_DAYS.filter((d) => v.days[d]);
     const slot = !!(v.slotStart || v.slotEnd);
-    if (!v.from && !v.to && !slot && !days.length) errors['empty'] = true;
+    const excl = parseExcludes(v.exclude);
+    if (excl === null) errors['exclude'] = true;
+    if (!v.from && !v.to && !slot && !days.length && excl !== null && !excl.length) errors['empty'] = true;
     if (v.from && v.to && ISO_INSTANT.test(v.from) && ISO_INSTANT.test(v.to) && Date.parse(v.from) >= Date.parse(v.to))
         errors['inverted'] = true;
     if (slot && (!v.slotStart || !v.slotEnd)) errors['slotHalf'] = true;
     if (v.slotStart && v.slotStart === v.slotEnd) errors['slotEqual'] = true;
-    if ((slot || days.length) && !v.timezone) errors['zone'] = true;
+    if ((slot || days.length || excl?.length) && !v.timezone) errors['zone'] = true;
     return Object.keys(errors).length ? errors : null;
 };
 
@@ -130,6 +151,8 @@ export function windowForm() {
                     WINDOW_DAYS.map((d) => [d, new FormControl(false, { nonNullable: true })]),
                 ) as Record<WindowDay, FormControl<boolean>>,
             ),
+            /** Calendar exclusions as text — see {@link parseExcludes}. */
+            exclude: new FormControl('', { nonNullable: true }),
             timezone: new FormControl('', { nonNullable: true }),
         },
         { validators: windowRules },
@@ -147,6 +170,8 @@ export function windowOf(f: WindowForm): InvestigationWindow | 'full' {
     if (v.slotStart && v.slotEnd) w.slot = { start: v.slotStart, end: v.slotEnd };
     const days = WINDOW_DAYS.filter((d) => v.days[d]);
     if (days.length) w.days = days;
+    const exclude = parseExcludes(v.exclude);
+    if (exclude?.length) w.exclude = exclude;
     if (v.timezone) w.timezone = v.timezone;
     return w;
 }
