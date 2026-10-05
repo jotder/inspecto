@@ -109,6 +109,9 @@ describe('PATTERN_PACKS', () => {
                 p.id,
             ).toBe(false);
         }
+        // only circular-financing proves return to the origin
+        expect(circ.stages!.map((s) => !!s.closesToStart)).toEqual([false, false, false, true]);
+        expect(layering.stages!.some((s) => s.closesToStart)).toBe(false);
         // circular-flow keeps routing to the Cycles tool; the branching pack is a separate id
         expect(PATTERN_PACKS.find((p) => p.id === 'circular-flow')!.tool).toBe('cycles');
     });
@@ -164,6 +167,17 @@ describe('patternPackFromContent — branching stages', () => {
             { shape: 'fan-in', minBranches: 5, windowHours: 24, threshold: { attr: 'AMOUNT', min: 900, max: 1000 } },
             { shape: 'fan-out', minBranches: 2, afterPrevious: true, maxGapHours: 48 },
         ]);
+    });
+
+    it('carries an authored closesToStart (bool or string) and drops anything else', () => {
+        const stagesFor = (v: unknown) =>
+            patternPackFromContent(
+                pack([row({ closesToStart: v, thresholdAttr: '', thresholdMin: '', thresholdMax: '' })]),
+            )!.stages![0];
+        expect(stagesFor(true).closesToStart).toBe(true);
+        expect(stagesFor('true').closesToStart).toBe(true);
+        expect(stagesFor(false).closesToStart).toBeUndefined();
+        expect(stagesFor('').closesToStart).toBeUndefined();
     });
 
     it('keeps a threshold bound of 0 — only a BLANK cell means "no bound"', () => {

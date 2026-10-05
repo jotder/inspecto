@@ -34,4 +34,10 @@ export interface BranchStage {
     afterPrevious?: boolean;
     /** Upper bound on that gap, in hours. Only meaningful with {@link afterPrevious}. */
     maxGapHours?: number;
+    /**
+     * CLOSURE — only on the LAST stage, which must be a `fan-in`: its collector must be a member of the
+     * motif's ORIGIN (the first layer — the splitter of a stage-0 fan-out, the senders of a stage-0 fan-in),
+     * so the match proves value RETURNED to where it started. Without it the fan-in lands on a NEW node.
+     */
+    closesToStart?: boolean;
 }

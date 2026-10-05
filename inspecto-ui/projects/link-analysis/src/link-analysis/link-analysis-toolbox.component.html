@@ -966,6 +966,9 @@
                                                         st.maxGapHours ? ', ≤ ' + st.maxGapHours + ' h' : ''
                                                     }}
                                                 }
+                                                @if (st.closesToStart) {
+                                                    · back to the origin
+                                                }
                                             </span>
                                         </li>
                                     }

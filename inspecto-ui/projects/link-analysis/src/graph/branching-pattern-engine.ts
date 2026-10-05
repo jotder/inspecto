@@ -25,6 +25,8 @@ import { analysisNodeCapValue, baseEdgeKind, edgeTimeIndex, followsInTime } from
  *       frontier.</li>
  *   <li><b>fan-in</b> later (re-convergence): ≥ `minBranches` distinct frontier members each send a leg to
  *       one common new node. Every such node is a separate match.</li>
+ *   <li><b>closing fan-in</b> (`closesToStart`, last stage only): the common node must be a member of the
+ *       ORIGIN layer instead of a new node — proven return to where the value started.</li>
  * </ul>
  * A leg into or out of a frontier node obeys LA-14a's rule against the time the match reached THAT node —
  * per branch, not per stage — so relay-01 forwarding before it was paid is rejected even when relay-02's
@@ -159,6 +161,16 @@ export function matchBranchingPattern(
         return refuse('This pattern has a time window or ordering — choose a time column in the Query panel first.');
     }
 
+    const last = stages.length - 1;
+    const closureFault = stages.findIndex(
+        (st, i) => st.closesToStart && (i !== last || i === 0 || st.shape !== 'fan-in'),
+    );
+    if (closureFault >= 0) {
+        return refuse(
+            'closesToStart is only valid on the last stage of a motif, which must be a fan-in after at least one other stage.',
+        );
+    }
+
     const nodeKind = new Map(g.nodes.map((n) => [n.id, n.data.kind]));
     const kindOk = (id: string, k?: string): boolean => !k || nodeKind.get(id) === k;
     const edgeKind = new Map(g.edges.map((e) => [e.id, baseEdgeKind(e.data.kind)]));
@@ -244,13 +256,16 @@ export function matchBranchingPattern(
             });
             return;
         }
-        // fan-in (re-convergence): candidate collectors are the new nodes frontier members send to.
+        // fan-in (re-convergence): candidate collectors are the new nodes frontier members send to — or, on a
+        // CLOSING stage, ONLY members of the origin layer (the one place the `used` exclusion is lifted).
+        const origin = st.closesToStart ? new Set(s.layers[0]) : undefined;
         const byCollector = new Map<string, Leg[]>();
         for (const [f, at] of s.frontier) {
             const cand = out.get(f) ?? [];
             if (!spend(cand.length)) return;
             for (const l of cand) {
-                if (s.used.has(l.other) || !kindOk(l.other, st.nodeKind) || !followsInTime(at, l.t, st)) continue;
+                if (origin ? !origin.has(l.other) : s.used.has(l.other)) continue;
+                if (!kindOk(l.other, st.nodeKind) || !followsInTime(at, l.t, st)) continue;
                 if (!byCollector.has(l.other)) byCollector.set(l.other, []);
                 // Re-framed so `other` is the SENDER — breadth is counted over distinct frontier members.
                 byCollector.get(l.other)!.push({ edgeId: l.edgeId, other: f, t: l.t });

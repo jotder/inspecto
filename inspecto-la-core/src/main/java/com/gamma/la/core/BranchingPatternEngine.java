@@ -196,12 +196,15 @@ public final class BranchingPatternEngine {
                 extend(stageIdx + 1, new State(next, used, edges, layers));
                 return;
             }
+            // CLOSING stage: collectors are ONLY members of the origin layer (the one place `used` is lifted).
+            Set<String> origin = st.closesToStart() ? new HashSet<>(s.layers().get(0)) : null;
             Map<String, List<Leg>> byCollector = new LinkedHashMap<>();
             for (Map.Entry<String, Long> f : s.frontier().entrySet()) {
                 List<Leg> cand = idx.getOrDefault(f.getKey(), List.of());
                 if (!spend(cand.size())) return;
                 for (Leg l : cand) {
-                    if (s.used().contains(l.other()) || !kindOk(st.nodeKind()) || !followsInTime(f.getValue(), l.t(), st)) continue;
+                    if (origin != null ? !origin.contains(l.other()) : s.used().contains(l.other())) continue;
+                    if (!kindOk(st.nodeKind()) || !followsInTime(f.getValue(), l.t(), st)) continue;
                     // Re-framed so `other` is the SENDER — breadth is counted over distinct frontier members.
                     byCollector.computeIfAbsent(l.other(), k -> new ArrayList<>()).add(new Leg(l.edgeId(), f.getKey(), l.t()));
                 }

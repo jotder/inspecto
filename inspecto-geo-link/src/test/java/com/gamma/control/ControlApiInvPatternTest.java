@@ -160,6 +160,38 @@ class ControlApiInvPatternTest {
     }
 
     @Test
+    void closureGoldenMatchesOnlyTheRingThatReturnsToItsOrigin(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        JsonNode closure = fixture().get("closure");
+        try (Ctx c = open(cfg, root)) {
+            seed(c, rowsSql(closure, null));
+            JsonNode data = ok(c, motif(closure).toString());
+            assertNull(data.get("refusal"), data.toString());
+            assertEquals(expected(closure), canonAll(data), "the server must answer exactly what the browser closure golden says");
+
+            // the same motif WITHOUT closure also finds the open web (ring B), so the flag is what narrowed it
+            ObjectNode open = motif(closure);
+            ((ObjectNode) open.get("stages").get(3)).remove("closesToStart");
+            JsonNode web = ok(c, open.toString());
+            assertEquals(1, web.get("matches").size(), "without closure only the open ring B matches");
+            assertTrue(web.get("matches").get(0).get("layers").get(4).get(0).asText().equals("EXIT-B"), web.toString());
+        }
+    }
+
+    @Test
+    void closesToStartIsRefusedOffTheLastFanInStage(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        JsonNode closure = fixture().get("closure");
+        try (Ctx c = open(cfg, root)) {
+            seed(c, rowsSql(closure, null));
+            ObjectNode notLast = motif(closure);
+            ((ObjectNode) notLast.get("stages").get(1)).put("closesToStart", true);
+            assertEquals(422, post(c.port, "/inv/pattern/branching", notLast.toString()).statusCode());
+            ObjectNode notFanIn = motif(closure);
+            ((ObjectNode) notFanIn.get("stages").get(3)).put("shape", "fan-out");
+            assertEquals(422, post(c.port, "/inv/pattern/branching", notFanIn.toString()).statusCode());
+        }
+    }
+
+    @Test
     void theRingTheProjectionCutIsStillFound(@TempDir Path cfg, @TempDir Path root) throws Exception {
         JsonNode fx = fixture();
         // 2 100 heavy pairs, three rows each: every one outweighs a one-off deposit in `cnt DESC` order.

@@ -119,4 +119,21 @@ describe('LA-14b branching parity (browser half of the shared golden)', () => {
         expect(fresh.graph.edges).toHaveLength(legs.length);
         expect(fresh.state.matches.map((m) => canon(fresh.graph, m))).toEqual(fixture.expected);
     });
+
+    it('closure: the browser matcher finds exactly the closure golden — the open and mis-ordered rings are not matches', () => {
+        const c = fixture.closure;
+        const g = projectTriples(
+            (c.rows as Row[]).map(([source, target, ts, amount]) => ({
+                source,
+                target,
+                kind: null,
+                count: 1,
+                attrs: { TS: ts, AMOUNT: String(amount) },
+            })),
+            false,
+        );
+        const res = matchBranchingPattern(g, c.stages as BranchStage[], { timeAttr: c.timeAttr });
+        expect(res.refusal).toBeUndefined();
+        expect(res.matches.map((m) => canon(g, m))).toEqual(c.expected);
+    });
 });
