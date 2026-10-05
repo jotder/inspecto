@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * MEASUREMENT harness, not a test: LA-11 gate G-R4 (5 hops over 1 000 000 edges in under 350 ms through
  * {@code POST /inv/traversal/recursive-paths}) and the option-D spikes D-S1 / D-S3 (D-S2, DuckPGQ, was dropped 2026-10-01)
- * ({@code docs/superpower/la-separation-feasibility-plan.md} §7.10). Results are recorded there.
+ * ({@code docs/archived-documents/plans-archive/la-separation-feasibility-plan.md} §7.10). Results are recorded there.
  *
  * <p>Never runs in the default suite: it needs {@code -Dinspecto.bench.dir=<dir>} (generated Parquet goes there —
  * keep it under {@code .claude/worktrees/}, never commit it). Example:

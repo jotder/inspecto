@@ -13,7 +13,7 @@ An **Entity List** is one concept in one store (D-P10, reconciled by `LA-17` D-M
 typed Entity keys with a purpose (`allow · block · watch · exclusion`), stored as facts in the per-Space
 **Identity Fact** log (`EntityFactLog`, `audit/entity-facts/`). Link Analysis built it: the routes, the SHA-256 chain,
 masking and `excludeBy` / `seedBy` are in
-[`link-analysis-entity-model-design.md`](../../../superpower/link-analysis-entity-model-design.md) §4.
+[`link-analysis-entity-model-design.md`](../../../archived-documents/plans-archive/link-analysis-entity-model-design.md) §4.
 
 `ASSURE-ENTITY-LISTS-1` (WS-12, shipped 2026-09-28) extends the same store and the same routes. It adds no kind and
 no second store. 🔁 **SEP-08 (2026-10-01):** the store, the seven routes (`/entity-lists…`, renamed from `/inv/entity-lists…`) and the

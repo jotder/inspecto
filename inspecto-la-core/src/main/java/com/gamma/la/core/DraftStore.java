@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 
 /**
  * D7-3 - the on-disk side of a <b>Draft</b> (a member's working copy of an Investigation; design
- * {@code docs/superpower/la-separation-d7-design.md} section 4). Host-free: the HTTP gate and the evaluation live in
+ * {@code docs/archived-documents/plans-archive/la-separation-d7-design.md} section 4). Host-free: the HTTP gate and the evaluation live in
  * {@code inspecto-la-api}.
  *
  * <pre>

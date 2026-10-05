@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * LA-17 step 3 — Entity Lists over real HTTP, against the binding wire contract
- * ({@code docs/superpower/link-analysis-entity-model-design.md} §4.3.1): every gate and status, the {@code changed: 0}
+ * ({@code docs/archived-documents/plans-archive/link-analysis-entity-model-design.md} §4.3.1): every gate and status, the {@code changed: 0}
  * no-op, {@code at} time travel, masking under {@code typed · all · none}, and server-side normalisation.
  *
  * <p>The property worth pinning is that the list is a FOLD over an append-only fact log: a no-op writes no fact, a

@@ -24,7 +24,7 @@ import static com.gamma.la.core.InvestigationEvaluator.canonical;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The {@link InvestigationStore} contract (design {@code docs/superpower/investigation-store-design.md} sections 4, 6 and 9),
+ * The {@link InvestigationStore} contract (design {@code docs/archived-documents/plans-archive/investigation-store-design.md} sections 4, 6 and 9),
  * written once so every implementation runs the SAME cases: {@code FsInvestigationStoreContractTest} today, the Postgres one
  * when it exists. A subclass supplies only {@link #fresh()}.
  *

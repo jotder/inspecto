@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * LA-17 slice 2, part 2 — the {@code resolve} op over real HTTP ({@code docs/superpower/link-analysis-entity-model-design.md}
+ * LA-17 slice 2, part 2 — the {@code resolve} op over real HTTP ({@code docs/archived-documents/plans-archive/link-analysis-entity-model-design.md}
  * §8.1, §8.2): the Space's identity resolution applied INSIDE an Investigation at a pinned fact seq, sealed into the
  * entry so replay, {@code ?at}, a fork and the Dossier never re-read the fact log; merged nodes carrying every member
  * key and the assertions that joined them; masking per member key; the template carry (D-E8).

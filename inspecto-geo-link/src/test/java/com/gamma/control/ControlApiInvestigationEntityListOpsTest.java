@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * LA-17 step 4 — the Entity List ops {@code excludeBy} and {@code seedBy} over real HTTP, against the op contract
- * ({@code docs/superpower/link-analysis-entity-model-design.md} §4.4.1): every append-time refusal, the sealed list
+ * ({@code docs/archived-documents/plans-archive/link-analysis-entity-model-design.md} §4.4.1): every append-time refusal, the sealed list
  * (replay never re-reads it), normalised matching of raw ids, keep protection, byte-identical undo, the template
  * carry, the Dossier, the audit line and masking.
  *

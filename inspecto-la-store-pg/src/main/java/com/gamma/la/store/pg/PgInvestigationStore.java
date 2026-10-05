@@ -30,7 +30,7 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /**
- * The PostgreSQL {@link InvestigationStore} (design {@code docs/superpower/investigation-store-design.md}, slice S2; decisions
+ * The PostgreSQL {@link InvestigationStore} (design {@code docs/archived-documents/plans-archive/investigation-store-design.md}, slice S2; decisions
  * D-IS3 to D-IS5, D-IS8, D-IS9, D-IS12).
  *
  * <ul>

@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * The Dataset-read port (SEP-01, {@code docs/superpower/la-separation-feasibility-plan.md} §4): the one seam through
+ * The Dataset-read port (SEP-01, {@code docs/archived-documents/plans-archive/la-separation-feasibility-plan.md} §4): the one seam through
  * which an optional module (geo-link / Link Analysis) reads Dataset definitions and builds their relation SQL, so it
  * never constructs {@link ComponentStore} / {@link ViewStore} for Datasets itself. Behaviour-identical to the direct
  * calls it replaced: registry under {@code <writeRoot>/registry}, views under {@code <writeRoot>/views}.

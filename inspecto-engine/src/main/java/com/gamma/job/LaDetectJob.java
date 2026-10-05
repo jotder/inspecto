@@ -10,7 +10,7 @@ import java.util.Map;
 
 /**
  * The {@code la.detect} Job Type - Link Analysis standing detection on a schedule (LA-LIVE-DETECTION-1, LD-4,
- * {@code docs/superpower/la-live-detection-design.md}).
+ * {@code docs/archived-documents/plans-archive/la-live-detection-design.md}).
  *
  * <p>It is a clock over the evaluation that already exists, and nothing more: it asks the Alert engine to evaluate
  * the Alert Rules bound to an Investigation ({@link AlertAccess#evaluateInvestigationRules()}). Each rule is judged

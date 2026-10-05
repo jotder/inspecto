@@ -943,7 +943,7 @@ its source is `entity-projection` it is a **Widget** (a Graph Visualization Type
 `classification` values that map to it. Its Instance is a typed **Entity**, keyed `<type>:<normalised value>`; an
 untyped Entity keeps `entity:<value>`. ⛔ Never call it a *classification* — a classification is a column's free-text
 label (`columns[].classification`); the Entity Type is what that label maps to. Design:
-[`superpower/link-analysis-entity-model-design.md`](superpower/link-analysis-entity-model-design.md).
+[`archived-documents/plans-archive/link-analysis-entity-model-design.md`](archived-documents/plans-archive/link-analysis-entity-model-design.md).
 
 **Entity List** *(added 2026-09-26, `LA-17`; ✅ backend + SPA client built 2026-09-26: `/entity-lists*`, `EntityListRoutes`; `excludeBy`/`seedBy` and the panel not yet)* — A named, persisted, Space-scoped set of typed Entity keys
 with a stated purpose (`allow` · `block` · `watch` · `exclusion`), held as a fold over the Space's **Identity Fact** log,

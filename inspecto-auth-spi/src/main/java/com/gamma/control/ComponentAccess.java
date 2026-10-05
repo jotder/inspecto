@@ -78,7 +78,7 @@ public final class ComponentAccess {
     }
 
     /**
-     * LD-1 (standing detection, {@code docs/superpower/la-live-detection-design.md} §6): the Subject-less twin of
+     * LD-1 (standing detection, {@code docs/archived-documents/plans-archive/la-live-detection-design.md} §6): the Subject-less twin of
      * {@link #canView}, for a caller-less run (an Alert sweep) acting for a RECORDED id. Mirrors {@link #level} for the
      * owner id and {@code user} shares only; {@code capabilities} lets a caller honour {@code canConfigureAccess} and
      * a standing-detection sweep passes none, so it can never exceed the owner's live authority. Pure: no exchange,

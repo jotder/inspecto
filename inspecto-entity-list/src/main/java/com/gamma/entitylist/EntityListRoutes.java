@@ -34,7 +34,7 @@ import static com.gamma.entitylist.EntityListFacts.reason;
 import static com.gamma.entitylist.EntityListFacts.type;
 
 /**
- * <b>Entity Lists</b> (LA-17 slice 1, {@code docs/superpower/link-analysis-entity-model-design.md} §4.3 and the
+ * <b>Entity Lists</b> (LA-17 slice 1, {@code docs/archived-documents/plans-archive/link-analysis-entity-model-design.md} §4.3 and the
  * binding wire contract §4.3.1): named, Space-scoped sets of typed Entity keys, persisted as facts in the Space's
  * {@link EntityFactLog} and read as a fold over it ({@link EntityRegistry}).
  *

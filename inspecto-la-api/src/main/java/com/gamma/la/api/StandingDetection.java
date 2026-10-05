@@ -23,7 +23,7 @@ import java.util.TreeSet;
 
 /**
  * <b>Standing detection authority</b> (LA-LIVE-DETECTION-1, slices LD-1..LD-3,
- * {@code docs/superpower/la-live-detection-design.md}; operator decision D-LD1 = option A, 2026-10-04).
+ * {@code docs/archived-documents/plans-archive/la-live-detection-design.md}; operator decision D-LD1 = option A, 2026-10-04).
  *
  * <p>A scheduled sweep has no caller, so the gates a read passes (R3 sharing, the Enterprise PDP) have nothing to
  * judge. The sweep therefore acts as a service principal {@code sweep:<investigation id>} that holds NO capability of

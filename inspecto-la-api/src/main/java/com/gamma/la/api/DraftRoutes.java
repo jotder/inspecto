@@ -30,7 +30,7 @@ import static com.gamma.la.core.InvestigationEvaluator.canonical;
 
 /**
  * D7-3 - <b>Drafts</b>: a member's own working copy of an Investigation (D16, D17; design
- * {@code docs/superpower/la-separation-d7-design.md} sections 3, 4, 9, 10). A Draft forks from the main log at
+ * {@code docs/archived-documents/plans-archive/la-separation-d7-design.md} sections 3, 4, 9, 10). A Draft forks from the main log at
  * {@code baseStep k}; its state is the main log's first k entries folded, then its own entries - ONE list, because the
  * Draft's steps continue the numbering (k+1 ...), so the evaluator, the sealed payloads (D-E3) and the Working Set
  * relation run over it unchanged. There is no rebase or promote yet (D7-5): a Draft is explored, undone and discarded.

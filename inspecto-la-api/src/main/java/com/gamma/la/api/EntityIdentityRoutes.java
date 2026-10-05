@@ -35,7 +35,7 @@ import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 /**
- * <b>Analyst identity resolution</b> (LA-17 slice 2, {@code docs/superpower/link-analysis-entity-model-design.md}
+ * <b>Analyst identity resolution</b> (LA-17 slice 2, {@code docs/archived-documents/plans-archive/link-analysis-entity-model-design.md}
  * §8.1, D-M10): an analyst asserts that two typed Entity keys are one identity, or retracts such an assertion. Both
  * are Identity Facts in the Space's {@link EntityFactLog} — the same log, chain and lock as the Entity Lists — and the
  * resolved groups are a union-find fold over the live assertions ({@link EntityRegistry#resolve}).

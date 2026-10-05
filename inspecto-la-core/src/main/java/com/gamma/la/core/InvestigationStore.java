@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The home of an Investigation's sidecar records (design: {@code docs/superpower/investigation-store-design.md}, row
+ * The home of an Investigation's sidecar records (design: {@code docs/archived-documents/plans-archive/investigation-store-design.md}, row
  * {@code LA-INVESTIGATION-STORE-DESIGN-1}): header, sealed log, per-step Working Set sets, members, references, and the
  * workflow records beside them. Keyed by <b>ids and a {@link Scope}</b>, never a {@code Path}, so a backend that is not a
  * directory tree (Postgres, for multi-pod deployments) has something to implement. {@link FsInvestigationStore} is the

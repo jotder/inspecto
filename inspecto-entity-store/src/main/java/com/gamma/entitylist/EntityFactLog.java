@@ -20,7 +20,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The per-Space, append-only <b>identity fact log</b> (LA-17, {@code docs/superpower/link-analysis-entity-model-design.md}
+ * The per-Space, append-only <b>identity fact log</b> (LA-17, {@code docs/archived-documents/plans-archive/link-analysis-entity-model-design.md}
  * §4.2): {@code <Space config root>/audit/entity-facts/}, beside {@code SnapshotStore}'s {@code audit/snapshots/}.
  *
  * <p><b>Format.</b> One immutable JSON file per fact, named by its 12-digit zero-padded sequence number

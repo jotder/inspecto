@@ -4,7 +4,7 @@ import java.io.IOException;
 
 /**
  * The seam an optional module uses to supply the {@code investigations.backend=db} {@link InvestigationStore} (design
- * {@code docs/superpower/investigation-store-design.md}, D-IS7 / D-IS8). Registered through
+ * {@code docs/archived-documents/plans-archive/investigation-store-design.md}, D-IS7 / D-IS8). Registered through
  * {@code META-INF/services/com.gamma.la.core.InvestigationStoreProvider} and found by {@link InvestigationStores}; a bundle
  * without the module has no provider, and selecting {@code db} then answers 503 (never a silent fall-back to the filesystem:
  * a fall-back on one pod would fork the evidence).
