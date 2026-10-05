@@ -1474,8 +1474,15 @@ public final class InvestigationRoutes implements RouteModule {
                 return p;
             }
             if (body.get("min") == null && body.get("max") == null)
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'threshold' requires 'min' and/or 'max' - the degree band to keep "
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'threshold' requires 'min' and/or 'max' - the band of the measure (default degree) to keep "
                         + "(min inclusive, max exclusive)");
+            Object measure = body.get("measure");
+            if (measure != null) {
+                if (!InvestigationEvaluator.MEASURES.contains(String.valueOf(measure)))
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'measure' must be one of "
+                            + InvestigationEvaluator.MEASURES + ", got '" + measure + "'");
+                if (!"degree".equals(String.valueOf(measure))) p.put("measure", String.valueOf(measure));   // degree is the absent default: old entries stay byte-identical
+            }
             Integer min = body.get("min") == null ? null : positive(body, "min", 0);
             Integer max = body.get("max") == null ? null : positive(body, "max", 1);
             if (min != null && max != null && min >= max)
@@ -1749,7 +1756,12 @@ public final class InvestigationRoutes implements RouteModule {
 
     /** What a {@code threshold} did, in words (the removed entities are in the step's delta, not the line). */
     static String thresholdLine(Map<String, Object> p) {
-        return "Removed every entity whose degree (distinct counterparties in the Working Set) is outside "
+        String m = InvestigationEvaluator.measureOf(p);
+        return "Removed every entity whose " + switch (m) {
+            case "weightedDegree" -> "weighted degree (links touching it, each kind and direction once)";
+            case "eventCount" -> "event count (the folded events on its links)";
+            default -> "degree (distinct counterparties in the Working Set)";
+        } + " is outside "
                 + "[" + (p.get("min") == null ? "0" : p.get("min")) + ", " + (p.get("max") == null ? "unbounded" : p.get("max"))
                 + ") - min inclusive, max exclusive; kept (protected) entities stay, removed ones are not re-admitted.";
     }

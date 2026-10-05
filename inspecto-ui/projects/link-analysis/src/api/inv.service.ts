@@ -314,7 +314,7 @@ export type InvestigationOpRequest =
     | { op: 'seedBy'; listId: string }
     /** A degree band over the whole Working Set: `min` inclusive, `max` exclusive, at least one, `min < max`, no `ids`.
      *  Entities outside it are excluded (as `exclude`; `keep` protects). */
-    | { op: 'threshold'; min?: number; max?: number }
+    | { op: 'threshold'; min?: number; max?: number; measure?: 'degree' | 'weightedDegree' | 'eventCount' }
     /** A log marker (`label` ≤ 2000 chars): it changes nothing in the Working Set and seals no file. */
     | { op: 'snapshot'; label?: string }
     /** Two windows of the bound time column diffed over the Working Set; the diff is SEALED into the log entry (the Working

@@ -249,6 +249,30 @@ class ControlApiInvestigationsTest {
         }
     }
 
+    /** The other threshold measures: event count (folded events on an entity's links), an unknown measure refused, replay-deterministic. */
+    @Test
+    void thresholdMeasuresEventCountAndWeightedDegree(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            data(post(c.port, "/inv/investigations", CREATE));
+            for (String s : List.of("{\"op\":\"seed\",\"ids\":[\"alice\"]}", "{\"op\":\"expand\"}", "{\"op\":\"expand\"}"))
+                op(c, "case-a", s);   // event counts: alice 3, bob 4, carol 2, dave 1, erin 1, frank 1
+            String ops = "/inv/investigations/case-a/ops";
+            assertEquals(422, post(c.port, ops, "{\"op\":\"threshold\",\"measure\":\"pagerank\",\"min\":1}").statusCode(), "an unknown measure");
+            assertEquals(422, post(c.port, ops, "{\"op\":\"threshold\",\"measure\":3,\"min\":1}").statusCode());
+
+            JsonNode wd = op(c, "case-a", "{\"op\":\"threshold\",\"measure\":\"weightedDegree\",\"min\":1}");
+            assertEquals(0, wd.at("/delta/removed").size(), "every linked entity has weighted degree >= 1");
+
+            JsonNode cut = op(c, "case-a", "{\"op\":\"threshold\",\"measure\":\"eventCount\",\"min\":2,\"max\":4}");
+            assertEquals(List.of("bob", "dave", "erin", "frank"), texts(cut.at("/delta/removed")), "bob (4 events) is OUT: max is exclusive");
+            JsonNode ws = replay(c, "case-a", "{}").get("workingSet");
+            assertEquals(Set.of("alice", "carol"), entityIds(ws));
+            assertTrue(ws.toString().contains("threshold: eventCount outside [2, 4)"), "the exclusion names its measure and band");
+            assertTrue(replay(c, "case-a", "{}").get("equivalent").asBoolean(), "replay reproduces every recorded hash");
+            assertTrue(data(send(c.port, "GET", "/inv/investigations/case-a/log", null, null)).toString().contains("event count"));
+        }
+    }
+
     // ── semantics ──────────────────────────────────────────────────────────────────────────────────────
 
     /** G-E1 — order is respected, and the difference is exactly what was reachable only through the exclusion. */
