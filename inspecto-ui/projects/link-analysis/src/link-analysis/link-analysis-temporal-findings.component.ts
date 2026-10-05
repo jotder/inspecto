@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import { TemporalSeries } from '@inspecto/link-analysis/api/inv.service';
 import { GraphSelection } from '@inspecto/link-analysis/graph/graph-analysis';
 import { PlacedTemporalFinding, TemporalFindingsState, allTemporalSelection } from './temporal-findings';
 
@@ -10,6 +11,7 @@ import { PlacedTemporalFinding, TemporalFindingsState, allTemporalSelection } fr
 export interface TemporalRunRequest {
     mapping: number;
     mode: 'burst' | 'periodicity';
+    series: TemporalSeries;
     windowSeconds: number;
     minEvents: number;
     maxCv: number;
@@ -22,8 +24,8 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
  * **Burst and periodicity findings** (LA-INVESTIGATION-OPS-DEFERRED-1, SPA slice). Runs the stateless
  * `POST /inv/pattern/temporal` read over ONE edge mapping's whole Dataset and lists each finding — a link whose events
  * cluster (burst) or repeat at a steady interval (periodicity). Picking a finding highlights that link on the canvas;
- * nothing is added to the graph. A link is a directed source→target pair AS THE DATASET SPELLS IT (not per entity), and
- * the Dataset's own times are shown with no zone claimed — the panel says so rather than implying UTC.
+ * nothing is added to the graph. By default a series is ONE directed source→target link AS THE DATASET SPELLS IT;
+ * "Each entity" instead pools every event an entity takes part in, as source or as target. The Dataset's own times are shown with no zone claimed — the panel says so rather than implying UTC.
  */
 @Component({
     selector: 'inspecto-link-analysis-temporal-findings',
@@ -46,8 +48,8 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                 </p>
             } @else {
                 <p class="text-secondary m-0">
-                    Looks at each link's event times over the whole Dataset. A link is a source → target pair as the
-                    Dataset spells it, not a combined entity.
+                    Looks at event times over the whole Dataset. A link is a source → target pair as the Dataset spells
+                    it; an entity pools every event it takes part in, as source or as target.
                 </p>
                 <div class="flex flex-wrap items-end gap-2">
                     @if (mappings().length > 1) {
@@ -59,6 +61,13 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                             (ngModelChange)="mapping.set($any($event))"
                         />
                     }
+                    <inspecto-option-picker
+                        class="w-40"
+                        label="Series per"
+                        [options]="seriesOptions"
+                        [ngModel]="series()"
+                        (ngModelChange)="series.set($any($event))"
+                    />
                     <inspecto-option-picker
                         class="w-40"
                         label="Look for"
@@ -123,7 +132,7 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
             @if (state(); as s) {
                 <div role="status" class="flex flex-col gap-1" data-test="temporal-summary">
                     <p class="m-0 text-xs">
-                        {{ s.findings.length }} {{ s.mode === 'burst' ? 'burst(s)' : 'regular link(s)' }} found
+                        {{ s.findings.length }} {{ s.mode === 'burst' ? 'burst(s)' : s.series === 'entity' ? 'regular entity(ies)' : 'regular link(s)' }} found
                         @if (s.offCanvas) {
                             · {{ s.offCanvas }} not drawn on this canvas
                         }
@@ -165,7 +174,7 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                                     [attr.aria-label]="describe(p)"
                                     (click)="highlight.emit(p.selection)"
                                 >
-                                    <span class="font-medium">{{ p.finding.source }} → {{ p.finding.target }}</span>
+                                    <span class="font-medium">{{ subject(p) }}</span>
                                     <span class="text-secondary block">
                                         {{ detail(p) }}{{ p.onCanvas ? '' : ' — not drawn on this canvas' }}
                                     </span>
@@ -175,7 +184,7 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                     </ul>
                 } @else {
                     <p class="text-secondary m-0 text-xs" data-test="temporal-none">
-                        No link matched. Try a wider window or fewer minimum events.
+                        Nothing matched. Try a wider window or fewer minimum events.
                     </p>
                 }
             }
@@ -199,6 +208,11 @@ export class LinkAnalysisTemporalFindingsComponent {
         { value: 'burst', label: 'Bursts' },
         { value: 'periodicity', label: 'Regular intervals' },
     ];
+    readonly seriesOptions: PickerOption[] = [
+        { value: 'link', label: 'Each link' },
+        { value: 'entity', label: 'Each entity' },
+    ];
+    readonly series = signal<TemporalSeries>('link');
     readonly mapping = signal('0');
     readonly mode = signal<'burst' | 'periodicity'>('burst');
     readonly windowSeconds = signal(60);
@@ -222,6 +236,7 @@ export class LinkAnalysisTemporalFindingsComponent {
         this.runRequested.emit({
             mapping: idx >= 0 && idx < this.mappings().length ? idx : 0,
             mode: this.mode(),
+            series: this.series(),
             windowSeconds: clamp(this.windowSeconds(), 1, 86_400, 60),
             minEvents: Math.round(clamp(this.minEvents(), burst ? 2 : 3, 1_000, 5)),
             maxCv: clamp(this.maxCv(), 0, 1, 0.1),
@@ -235,7 +250,11 @@ export class LinkAnalysisTemporalFindingsComponent {
             : `${f.events} events from ${f.start} to ${f.end}`;
     }
 
+    subject(p: PlacedTemporalFinding): string {
+        return p.finding.entity !== undefined ? p.finding.entity : `${p.finding.source} → ${p.finding.target}`;
+    }
+
     describe(p: PlacedTemporalFinding): string {
-        return `${p.finding.source} to ${p.finding.target}: ${this.detail(p)}`;
+        return `${p.finding.entity !== undefined ? p.finding.entity : `${p.finding.source} to ${p.finding.target}`}: ${this.detail(p)}`;
     }
 }

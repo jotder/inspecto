@@ -158,7 +158,8 @@ export interface BranchingPatternResult {
 
 /**
  * {@code POST /inv/pattern/temporal} (LA-INVESTIGATION-OPS-DEFERRED-1) — burst / periodicity over each LINK's event
- * times (a directed source→target pair as the Dataset spells it). Out-of-range numbers are a 422, never clamped.
+ * times (a directed source→target pair as the Dataset spells it), or — with `series: 'entity'` — over each ENTITY's
+ * total activity (every event it takes part in, as source or target). Out-of-range numbers are a 422, never clamped.
  */
 export interface TemporalPatternRequest {
     dataset: string;
@@ -166,6 +167,8 @@ export interface TemporalPatternRequest {
     targetCol: string;
     timeCol: string;
     mode: 'burst' | 'periodicity';
+    /** One series per directed link (the default) or per entity. */
+    series?: TemporalSeries;
     filter?: ConditionGroup;
     limit?: number;
     /** Burst window, 1–86 400 (default 60). */
@@ -176,10 +179,16 @@ export interface TemporalPatternRequest {
     maxCv?: number;
 }
 
-/** One finding: a burst carries `start`/`end`; a periodic series `periodSeconds`/`cv`/`first`/`last`. Endpoints are RAW values. */
+export type TemporalSeries = 'link' | 'entity';
+
+/**
+ * One finding: a burst carries `start`/`end`; a periodic series `periodSeconds`/`cv`/`first`/`last`. A link finding names
+ * `source` and `target`, an entity finding names `entity`. Values are RAW.
+ */
 export interface TemporalFinding {
-    source: string;
-    target: string;
+    source?: string;
+    target?: string;
+    entity?: string;
     events: number;
     start?: string;
     end?: string;
@@ -191,6 +200,7 @@ export interface TemporalFinding {
 
 export interface TemporalPatternResult {
     mode: 'burst' | 'periodicity';
+    series: TemporalSeries;
     results: TemporalFinding[];
     /** The result limit or the row cap cut the answer short. */
     truncated: boolean;
@@ -201,6 +211,8 @@ export interface TemporalPatternResult {
     /** The Dataset's wall-clock values are read as written; no zone is claimed. */
     timeNote: string;
     fences: { maxRows: number; maxResults: number; timeoutMs: number };
+    /** What answered: the edge index (`kind: 'index'`) or the flat Dataset (`kind: 'dataset'` with a closed `reason`). The findings are the same. */
+    source: { kind: 'index' | 'dataset'; reason?: string };
 }
 
 // ── LA-10: the Investigation object (`InvestigationRoutes`) ──────────────────────────────────────────────

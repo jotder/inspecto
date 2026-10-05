@@ -1608,9 +1608,9 @@ counts, never edge timestamps, so only the Dataset routes (which read the `timeC
   view gate (R3: unviewable = 404) are unchanged. A time column read in a non-UTC zone still falls back to the flat
   read (`time_zone_not_servable`), as before.
 * **`POST /inv/pattern/temporal`** (`PatternRoutes`, body `{dataset, sourceCol, targetCol, timeCol, mode:
-  "burst"|"periodicity", filter?, limit?, windowSeconds?, minEvents?, maxCv?}`; pure maths in
+  "burst"|"periodicity", series?: "link"|"entity", filter?, limit?, windowSeconds?, minEvents?, maxCv?}`; pure maths in
   `LinkTemporalDetector`). The series is the event times of one **link** = a directed source→target pair as the Dataset
-  spells the values (not normalised, not per entity). *Burst*: a `windowSeconds` window (default 60, 1–86 400) holding
+  spells the values (not normalised; `series: "link"`, the default). *Burst*: a `windowSeconds` window (default 60, 1–86 400) holding
   ≥ `minEvents` (default 5, 2–1 000) events, overlapping windows merged into one maximal burst, window edge
   inclusive. *Periodicity*: ≥ `minEvents` (default 5, min 3) events whose gap coefficient of variation (population
   σ / mean) ≤ `maxCv` (default 0.1, 0–1); reports the MEDIAN gap as `periodSeconds`. Out-of-range numbers are a 422,
@@ -1624,9 +1624,29 @@ counts, never edge timestamps, so only the Dataset routes (which read the `timeC
   `/inv/pattern/branching`; it takes no Investigation, so no `EntityMasking` applies and none can be widened.
   Read-shaped (exempt in `CapabilityManifest`, audited as `LINK_PATTERN_MATCHED`). 🔴 DuckDB reserves `at`: a test
   column so named made every read 422.
-* ⏳ Not decided (narrowest reading taken): per-ENTITY series (events touching an entity, either direction) rather
-  than per link; a burst/periodic run against the edge **index** (flat read only today); rendering a finding as a
-  Working Set op (the SPA overlay now exists, below).
+* **Per-ENTITY series and the edge index (2026-10-05, `LA-INVESTIGATION-OPS-DEFERRED-1`).** `series: "entity"` (an
+  unknown value is a 422; absent = `"link"`, so today's callers see no change) pools EVERY event an entity takes part in,
+  as source or as target, into one series; a **self-loop row is ONE event** of its entity (not two). A finding then
+  carries `entity` instead of `source` / `target`; the maths, the bars, the order and every fence are the link mode's
+  (the row cap and `skippedNoTime` count EDGE ROWS, the same rows either way). The answer gains `series` and `source`
+  (`{kind: "index"|"dataset", reason?}`). **Index serving** (`IndexedTemporal`, via the ONE gate `IndexedRead`): when a
+  published index maps the same source and target columns AND its time column IS the request's `timeCol`, read in UTC,
+  AND every `filter` field is an index column, the rows come from a full ordered scan of the index's `out` copy
+  (`IndexReader.scanLinkTimes`: `src, dst, epoch_ms(ts)` in the flat statement's order, ≤ 200 001 rows) and feed the SAME
+  detection the flat read feeds — so the findings are identical by construction, and
+  `ControlApiInvTemporalIndexedTest` PROVES it (index on vs off, both series, both modes, a filter, a self-loop, a NULL
+  time, NULL endpoints, ARMED Authenticator). Otherwise the flat read answers with a closed reason
+  (`no_index`, `index_disabled`, `column_not_indexed` — e.g. an index built without the time column — `time_zone_not_servable`,
+  `filter_not_indexed`, `index_stale_refused`, `index_read_failed`). **Calls made:** (1) the request mode is a NEW field
+  `series`, not an overload of `mode` (which is already burst/periodicity); (2) an entity series reads the SAME edge
+  rows as the link series and fans them out in Java rather than a second index lookup per entity, so no per-key
+  bucket reads and no new index column; (3) the index path is a FULL scan (no per-key equality: a temporal scan has no
+  key), so it saves the relation's evaluation, not the Dataset-size cost — the row cap still applies; (4) the base-Dataset
+  view gate and the four-eyes refusal run BEFORE the index is considered, so a Dataset shared away is the same 404.
+  Pure gotcha: `ResultSet.wasNull()` speaks of the LAST column read — reading `getString` between `getLong` and
+  `wasNull` turned every NULL time into 1970 on the index path until the equivalence test caught it. The SPA panel
+  gained a "Series per: Each link / Each entity" selector (`series` on the wire); an entity finding highlights its NODE
+  and is listed by name. ⏳ Not decided: rendering a finding as a Working Set op (the SPA overlay now exists, below).
 * **SPA overlay (2026-10-05).** `link-analysis-temporal-findings.component.ts` is a panel under the Analysis tab of the
   Toolbox (a sibling of the toolbox, shown/hidden with `[class.hidden]`). It needs a **time column** and an **edge mapping**
   (the host's `traversalTargets`, the same ones server paths and the server pattern use), calls

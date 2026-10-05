@@ -2,6 +2,7 @@ package com.gamma.la.api;
 
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.LinkTemporalDetector;
+import com.gamma.la.storage.IndexReader.LinkTime;
 import com.gamma.la.core.BranchingPatternEngine;
 import com.gamma.la.core.PatternQueryCompiler;
 import com.gamma.la.core.DatasetProviders;
@@ -79,7 +80,7 @@ public final class PatternRoutes implements RouteModule {
 
     /**
      * {@code POST /inv/pattern/temporal} — body {@code {dataset, sourceCol, targetCol, timeCol, mode: "burst"|"periodicity",
-     * filter?, limit?, windowSeconds?, minEvents?, maxCv?}}. The series is the event times of one LINK (a directed
+     * series?: "link"|"entity", filter?, limit?, windowSeconds?, minEvents?, maxCv?}}. The series is the event times of one LINK (a directed
      * source→target pair, the values as the Dataset spells them); {@code burst} takes {@code windowSeconds} (default 60, 1 to
      * 86 400) and {@code minEvents} (default 5, 2 to 1 000), {@code periodicity} takes {@code minEvents} (default 5, 3 to 1 000)
      * and {@code maxCv} (default 0.1, 0 to 1). Rows without a parseable time are skipped and counted ({@code skippedNoTime}).
@@ -101,6 +102,10 @@ public final class PatternRoutes implements RouteModule {
         if (!"burst".equals(mode) && !"periodicity".equals(mode))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'mode' must be 'burst' or 'periodicity'");
         boolean burst = mode.equals("burst");
+        String series = ApiContext.str(body, "series");
+        if (series != null && !"link".equals(series) && !"entity".equals(series))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'series' must be 'link' or 'entity'");
+        boolean entity = "entity".equals(series);
         long windowMs = 1000L * (long) boundedNumber(body, "windowSeconds", 60, 1, DAY_SECONDS);
         int minEvents = (int) boundedNumber(body, "minEvents", 5, burst ? 2 : 3, 1_000);
         double maxCv = boundedNumber(body, "maxCv", 0.1, 0, 1);
@@ -117,50 +122,92 @@ public final class PatternRoutes implements RouteModule {
         String filterSql = body.get("filter") == null ? "TRUE" : InvRoutes.checkedFilterSql(body.get("filter"), columns, datasetId);
         InvRoutes.refuseIfSensitive(writeRoot, "a temporal scan (up to " + TEMPORAL_MAX_ROWS + " rows)", TEMPORAL_MAX_ROWS, 0);
 
-        String sql = "SELECT CAST(\"" + sourceCol + "\" AS VARCHAR) AS s, CAST(\"" + targetCol + "\" AS VARCHAR) AS t,"
-                + " epoch_ms(TRY_CAST(CAST(\"" + timeCol + "\" AS VARCHAR) AS TIMESTAMP)) AS ts FROM \"" + datasetId + "\""
-                + " WHERE \"" + sourceCol + "\" IS NOT NULL AND \"" + targetCol + "\" IS NOT NULL AND (" + filterSql + ")"
-                + " ORDER BY s, t, ts";
-        SqlSandboxPolicy policy = SqlSandboxPolicy.withCaps(null, 0, TIMEOUT_SECONDS);
+        // LA-INVESTIGATION-OPS-DEFERRED-1: answered from the edge index when - and only when - it can answer exactly (IndexedTemporal),
+        // else from the flat Dataset. Both hand the SAME ordered (source, target, time) rows to the one detection below.
+        IndexedRead.Outcome<IndexedTemporal.Result> indexed = IndexedTemporal.attempt(writeRoot, api.dataRoot(), relationSql,
+                new IndexedTemporal.Request(datasetId, sourceCol, targetCol, timeCol, body.get("filter"), TEMPORAL_MAX_ROWS),
+                InvRoutes.traversalPolicy());
         try {
-            DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
-                    datasetId, relationSql, sql, TEMPORAL_MAX_ROWS, 0, List.of(), List.of(), List.of()), policy);
+            List<LinkTime> rows = new ArrayList<>();
+            boolean rowCapped;
+            if (indexed.served()) {
+                rows = indexed.result().rows();
+                rowCapped = indexed.result().truncated();
+            } else {
+                String sql = "SELECT CAST(\"" + sourceCol + "\" AS VARCHAR) AS s, CAST(\"" + targetCol + "\" AS VARCHAR) AS t,"
+                        + " epoch_ms(TRY_CAST(CAST(\"" + timeCol + "\" AS VARCHAR) AS TIMESTAMP)) AS ts FROM \"" + datasetId + "\""
+                        + " WHERE \"" + sourceCol + "\" IS NOT NULL AND \"" + targetCol + "\" IS NOT NULL AND (" + filterSql + ")"
+                        + " ORDER BY s, t, ts";
+                SqlSandboxPolicy policy = SqlSandboxPolicy.withCaps(null, 0, TIMEOUT_SECONDS);
+                DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
+                        datasetId, relationSql, sql, TEMPORAL_MAX_ROWS, 0, List.of(), List.of(), List.of()), policy);
+                for (Map<String, Object> row : r.rows())                       // rows arrive grouped by link, times ascending
+                    rows.add(new LinkTime(String.valueOf(row.get("s")), String.valueOf(row.get("t")),
+                            row.get("ts") instanceof Number ts ? ts.longValue() : null));
+                rowCapped = r.truncated();
+            }
 
             List<Found> found = new ArrayList<>();
             int skipped = 0;
-            String curS = null, curT = null;
-            long[] times = new long[64];
-            int n = 0;
-            for (Map<String, Object> row : r.rows()) {                       // rows arrive grouped by link, times ascending
-                String s = String.valueOf(row.get("s")), t = String.valueOf(row.get("t"));
-                if (curS != null && (!s.equals(curS) || !t.equals(curT))) {
-                    collect(found, curS, curT, Arrays.copyOf(times, n), burst, windowMs, minEvents, maxCv);
-                    n = 0;
+            if (entity) {
+                // an entity's series is every event it takes part in, as source or as target (a self-loop row is ONE event)
+                Map<String, long[]> byEntity = new LinkedHashMap<>();
+                Map<String, Integer> sizes = new LinkedHashMap<>();
+                for (LinkTime row : rows) {
+                    if (row.ms() == null) {
+                        skipped++;
+                        continue;
+                    }
+                    for (String who : row.source().equals(row.target()) ? List.of(row.source()) : List.of(row.source(), row.target())) {
+                        long[] arr = byEntity.getOrDefault(who, new long[8]);
+                        int n = sizes.getOrDefault(who, 0);
+                        if (n == arr.length) arr = Arrays.copyOf(arr, n * 2);
+                        arr[n] = row.ms();
+                        byEntity.put(who, arr);
+                        sizes.put(who, n + 1);
+                    }
                 }
-                curS = s;
-                curT = t;
-                if (!(row.get("ts") instanceof Number ts)) {
-                    skipped++;
-                    continue;
+                for (Map.Entry<String, long[]> e : byEntity.entrySet()) {
+                    long[] times = Arrays.copyOf(e.getValue(), sizes.get(e.getKey()));
+                    Arrays.sort(times);
+                    collect(found, e.getKey(), null, times, burst, windowMs, minEvents, maxCv);
                 }
-                if (n == times.length) times = Arrays.copyOf(times, n * 2);
-                times[n++] = ts.longValue();
+            } else {
+                String curS = null, curT = null;
+                long[] times = new long[64];
+                int n = 0;
+                for (LinkTime row : rows) {
+                    String s = row.source(), t = row.target();
+                    if (curS != null && (!s.equals(curS) || !t.equals(curT))) {
+                        collect(found, curS, curT, Arrays.copyOf(times, n), burst, windowMs, minEvents, maxCv);
+                        n = 0;
+                    }
+                    curS = s;
+                    curT = t;
+                    if (row.ms() == null) {
+                        skipped++;
+                        continue;
+                    }
+                    if (n == times.length) times = Arrays.copyOf(times, n * 2);
+                    times[n++] = row.ms();
+                }
+                if (curS != null) collect(found, curS, curT, Arrays.copyOf(times, n), burst, windowMs, minEvents, maxCv);
             }
-            if (curS != null) collect(found, curS, curT, Arrays.copyOf(times, n), burst, windowMs, minEvents, maxCv);
 
             // strongest first, so a result cut to the limit keeps the most telling: bursts by event count, series by regularity
             Comparator<Found> strongest = burst ? Comparator.comparingLong((Found f) -> -f.events())
                     : Comparator.comparingDouble(Found::cv).thenComparingLong(f -> -f.events());
-            found.sort(strongest.thenComparing(Found::s).thenComparing(Found::t).thenComparingLong(Found::startMs));
+            found.sort(strongest.thenComparing(Found::s).thenComparing(f -> f.t() == null ? "" : f.t()).thenComparingLong(Found::startMs));
             boolean limited = found.size() > limit;
             List<Map<String, Object>> results = new ArrayList<>();
             for (Found f : found.subList(0, Math.min(limit, found.size()))) results.add(f.view());
 
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("mode", mode);
+            out.put("series", entity ? "entity" : "link");
             out.put("results", results);
-            out.put("truncated", limited || r.truncated());
-            out.put("rowCapped", r.truncated());
+            out.put("truncated", limited || rowCapped);
+            out.put("rowCapped", rowCapped);
             out.put("skippedNoTime", skipped);
             out.put("timeNote", "Times are the Dataset's own wall-clock values read as written, in UTC-neutral milliseconds; "
                     + "gaps are exact differences of those values, so a time column read in a zone other than UTC is compared as stored");
@@ -169,7 +216,8 @@ public final class PatternRoutes implements RouteModule {
             f.put("maxResults", TEMPORAL_MAX_LIMIT);
             f.put("timeoutMs", TIMEOUT_SECONDS * 1000);
             out.put("fences", f);
-            audit(ex, datasetId, results.size(), limited || r.truncated(), null);
+            out.put("source", indexed.source());
+            audit(ex, datasetId, results.size(), limited || rowCapped, null);
             return out;
         } catch (SQLException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "temporal query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
@@ -177,7 +225,7 @@ public final class PatternRoutes implements RouteModule {
     }
 
     private static final Set<String> TEMPORAL_KEYS = Set.of("dataset", "sourceCol", "targetCol", "timeCol", "mode", "filter", "limit",
-            "windowSeconds", "minEvents", "maxCv");
+            "windowSeconds", "minEvents", "maxCv", "series");
 
     /** The Dataset's wall-clock value back as text: no zone is claimed, since none is known (see {@code timeNote}). */
     private static String wall(long epochMs) {
@@ -186,13 +234,22 @@ public final class PatternRoutes implements RouteModule {
 
     private record Found(String s, String t, long events, double cv, long startMs, Map<String, Object> view) { }
 
-    /** One link's series, evaluated; each burst / regular series found is appended to {@code out}. */
+    /** A finding's subject: the link's two ends, or - for an entity series ({@code t} null) - the one entity. */
+    private static void put(Map<String, Object> v, String s, String t) {
+        if (t == null) {
+            v.put("entity", s);
+            return;
+        }
+        v.put("source", s);
+        v.put("target", t);
+    }
+
+    /** One link's (or, with {@code t} null, one entity's) series, evaluated; each burst / regular series found is appended to {@code out}. */
     private static void collect(List<Found> out, String s, String t, long[] times, boolean burst, long windowMs, int minEvents, double maxCv) {
         if (burst) {
             for (LinkTemporalDetector.Burst b : LinkTemporalDetector.bursts(times, windowMs, minEvents)) {
                 Map<String, Object> v = new LinkedHashMap<>();
-                v.put("source", s);
-                v.put("target", t);
+                put(v, s, t);
                 v.put("start", wall(b.startMs()));
                 v.put("end", wall(b.endMs()));
                 v.put("events", b.events());
@@ -203,8 +260,7 @@ public final class PatternRoutes implements RouteModule {
         LinkTemporalDetector.Periodic p = LinkTemporalDetector.periodicity(times, minEvents, maxCv);
         if (p == null) return;
         Map<String, Object> v = new LinkedHashMap<>();
-        v.put("source", s);
-        v.put("target", t);
+        put(v, s, t);
         v.put("events", p.events());
         v.put("periodSeconds", p.periodMs() / 1000.0);
         v.put("cv", p.cv());
