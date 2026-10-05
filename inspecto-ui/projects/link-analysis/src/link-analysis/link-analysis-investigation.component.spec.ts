@@ -440,7 +440,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', () => {
         expect(section.textContent).toContain('2026-09-02, 2026-09-03');
         expect(section.textContent).not.toContain('2026-09-01');
         expect(section.textContent?.match(/per-Collector coverage: not assessed/gi)).toHaveLength(1);
-        await expectNoA11yViolations(el);
+        await expectNoA11yViolations(section);
 
         inv.investigationCoverage.mockReturnValue(
             of({
@@ -470,7 +470,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', () => {
             ['south', '1 of 3', '2026-09-02, 2026-09-03'],
         ]);
         expect(section.textContent).not.toContain('not assessed');
-        await expectNoA11yViolations(el);
+        await expectNoA11yViolations(section);
 
         inv.investigationCoverage.mockReturnValue(refused('coverage needs a bounded window'));
         button('Check coverage').click();
