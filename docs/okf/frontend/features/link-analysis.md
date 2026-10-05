@@ -1663,8 +1663,14 @@ render, and the Dossier stamps `linkId` on its link annotations.
 * **D-U8 — NO purge** (operator 2026-09-24): no retention period, no purge task, no legal-hold record; the store
   stays append-only evidence. Reopen only if a regulator or retention policy demands it; the pattern to copy is
   `incident_purge`.
-* **D-U9 — per-Collector coverage is DEFERRED until asked** (`collectors:{assessed:false}` in the coverage route and
-  the Dossier negative space) — `LA-COLLECTOR-COVERAGE-1`.
+* **D-U9 — per-Collector coverage SHIPPED 2026-10-05** (`LA-COLLECTOR-COVERAGE-1`). The coverage route's `collectors`
+  part is attributed through `CollectorCoveragePort` (bridge `HostCollectorCoveragePort`): each Pipeline's `batches` CSV
+  (Consignment → output store) joined to its `lineage` CSV (Consignment → event-day partition, rows), batches kept when
+  they wrote the Dataset's `physicalRef`/`sourceName`, attributed to `collector().id()`. The Dataset-filename join was
+  **rejected**: lineage `src_id` is a member index, the acquisition ledger / `file_stages` are opt-in with no list-by-file
+  read, `file_name` is optional and basenames collide. No attribution evidence ⇒ `assessed:false` (never "no gaps"). The
+  Dossier does not seal live coverage (its root is deterministic); its negative-space note points at the route. Residual:
+  never-delivering Collectors are invisible; partition days use the Pipeline's pinned zone; no SPA surface yet.
 * **D-U11 (2026-09-30) answers** that no paragraph above carries: A1 a snapshot captures what is on screen · A2 the
   cash-out share denominator is ALL cash-out · A3 the agent Entity List is read LIVE and its fact-log head seq/hash
   is recorded on each firing (`evidence.agentList` / `agentListSeq` / `agentListHash`) · A4 a retired list is 409 ·
