@@ -1124,6 +1124,20 @@ is **refused**, and `withSchema` refuses a non-PostgreSQL URL.
 - Proof: `PostgresSchemaPerSpaceTest` (URL rules always run; the two-Spaces-cannot-see-each-other probe needs
   `INSPECTO_TEST_PG_URL` and skips per test). Existing single-schema installs on a shared server will see empty
   tables on first start (breaking change, accepted — nothing after 3.x is in production).
+- **Multi-user proof on a real PostgreSQL (2026-10-05):** `PostgresSchemaPerSpaceOpsTest` (inspecto-ops) drives the
+  objects / links / notes / tags families on two Spaces with 12 racing writers each — the same object id lives in both
+  Spaces, 12 concurrent `ObjectService.patch` calls per Space all land (version == 12), appends are counted per Space,
+  and racing to apply one tag yields one edge per Space with every caller succeeding.
+  `PostgresRunLeaseSchemaPerSpaceTest` (inspecto) races 10 pods per Space for one pipeline: exactly one wins per Space,
+  and the same pipeline name in the other Space is an independent lease. Gotcha: the test reactor pins
+  `-Dobjects.backend=memory`, so a test must set `objects.backend=postgres` or `ensureSpaceSchemas` skips those
+  families and the stores fail with "no schema has been selected".
+- 🔴 **Defect found and fixed — pool footprint.** Hikari's `minimumIdle` defaults to `maximumPoolSize`, so every open
+  store pinned 10 server connections while idle; there is one pool per family per Space, so a few Spaces exhaust
+  PostgreSQL's default `max_connections=100` ("too many clients already" at 20 pools). `PooledConnectionSource` now
+  sets `minimumIdle=1` (grows to `-Ddb.pool.size` on demand). DuckDB is unaffected (not pooled).
+  ⚠ Still open: even at 1 idle, N Spaces × ~15 families × 1 is a connection budget operators must size; a shared
+  pool per server (or PgBouncer) is the real answer at scale.
 
 ### 5.1 Flags (all read in `ServiceStores` unless noted)
 

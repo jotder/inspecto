@@ -42,6 +42,11 @@ final class PooledConnectionSource implements ConnectionSource {
         if (user != null) cfg.setUsername(user);
         if (pass != null) cfg.setPassword(pass);
         cfg.setMaximumPoolSize(maxSize);
+        // 🔴 Hikari's minimumIdle defaults to maximumPoolSize, so every OPEN store pinned `maxSize` (10) server
+        // connections even when idle. There is one pool per operational family per Space (schema-per-space), so a
+        // handful of Spaces exhausts PostgreSQL's default max_connections=100 ("too many clients already") —
+        // proven on a real PG by PostgresRunLeaseSchemaPerSpaceTest (20 pools). Hold one; grow on demand to maxSize.
+        cfg.setMinimumIdle(1);
         cfg.setPoolName(poolName);
         // A borrow that cannot be satisfied must fail loudly rather than hang a request forever.
         cfg.setConnectionTimeout(JdbcDrivers.poolBorrowTimeoutMs());
