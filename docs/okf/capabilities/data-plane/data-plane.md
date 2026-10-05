@@ -153,6 +153,15 @@ an empty store). A **Reference Dataset** is produced by a pipeline (`produces: r
 and bound by name; its load semantics (`replace | upsert | scd2`, `key[]`, `refresh_seconds`) are authorable
 config, but **the SCD2 engine is unbuilt** (`transform.dim.scd2` is `Status.PLANNED`).
 
+**Daily-updated Reference file (verified 2026-10-06, `LA-DAILY-INGEST-1` T6).** `load: replace` overwrites the
+SAME output file (the output stem is the input file name), so a dimension file named with its date leaves
+yesterday's file in place and the Reference reads both days; land it under a stable name or use `upsert`, which
+keeps a key absent from the new file and drops one only through `reference.delete`. A Reference is joined at
+READ time (`ReferenceReader.sqlFor`), so a change is visible with no fact re-ingest. A Link Analysis Index does
+NOT go stale when a Reference changes (its fingerprint covers the Dataset's own store files and relation SQL
+only; a view-backed join Dataset has no enumerable files), so mutable dimension attributes stay out of the
+index. Tests: `ReferenceDailyFileLoadTest`, `ReferenceChangeIndexStalenessTest`; detail in the Link Analysis roadmap.
+
 **Revisions and retention.** A full recompute writes a **new revision** and flips catalog state only; an
 in-flight read finishes on the revision it started with. Bytes leave later through the
 **`retire_superseded`** maintenance task (`RetireSupersededTask`): deletes files the Consignment catalog marks
