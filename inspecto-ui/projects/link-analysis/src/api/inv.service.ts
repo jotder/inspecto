@@ -156,6 +156,53 @@ export interface BranchingPatternResult {
     fences: { maxLegs: number; workBudget: number; timeoutMs: number };
 }
 
+/**
+ * {@code POST /inv/pattern/temporal} (LA-INVESTIGATION-OPS-DEFERRED-1) — burst / periodicity over each LINK's event
+ * times (a directed source→target pair as the Dataset spells it). Out-of-range numbers are a 422, never clamped.
+ */
+export interface TemporalPatternRequest {
+    dataset: string;
+    sourceCol: string;
+    targetCol: string;
+    timeCol: string;
+    mode: 'burst' | 'periodicity';
+    filter?: ConditionGroup;
+    limit?: number;
+    /** Burst window, 1–86 400 (default 60). */
+    windowSeconds?: number;
+    /** Burst 2–1 000 / periodicity 3–1 000 (default 5). */
+    minEvents?: number;
+    /** Periodicity: the largest gap coefficient of variation, 0–1 (default 0.1). */
+    maxCv?: number;
+}
+
+/** One finding: a burst carries `start`/`end`; a periodic series `periodSeconds`/`cv`/`first`/`last`. Endpoints are RAW values. */
+export interface TemporalFinding {
+    source: string;
+    target: string;
+    events: number;
+    start?: string;
+    end?: string;
+    periodSeconds?: number;
+    cv?: number;
+    first?: string;
+    last?: string;
+}
+
+export interface TemporalPatternResult {
+    mode: 'burst' | 'periodicity';
+    results: TemporalFinding[];
+    /** The result limit or the row cap cut the answer short. */
+    truncated: boolean;
+    /** The 200 000-row read fence was hit: part of the Dataset was not scanned. */
+    rowCapped: boolean;
+    /** Rows with no parseable time, skipped. */
+    skippedNoTime: number;
+    /** The Dataset's wall-clock values are read as written; no zone is claimed. */
+    timeNote: string;
+    fences: { maxRows: number; maxResults: number; timeoutMs: number };
+}
+
 // ── LA-10: the Investigation object (`InvestigationRoutes`) ──────────────────────────────────────────────
 
 /** The ops the backend evaluates (`InvestigationRoutes.SHIPPED`), plus LA-17's list-bound `excludeBy` / `seedBy`
@@ -1053,6 +1100,11 @@ export class InvService {
     /** LA-14b: a branching motif over the whole Dataset — bounded server-side (legs, work, timeout, match limit). */
     branchingPattern(req: BranchingPatternRequest): Observable<BranchingPatternResult> {
         return this.http.post<BranchingPatternResult>(apiUrl('/inv/pattern/branching'), req);
+    }
+
+    /** Burst / periodicity per link over the whole Dataset — bounded server-side (rows, results, timeout). */
+    temporalPattern(req: TemporalPatternRequest): Observable<TemporalPatternResult> {
+        return this.http.post<TemporalPatternResult>(apiUrl('/inv/pattern/temporal'), req);
     }
 
     // ── LA-10 Investigation. `GET /inv/investigations` lists what the caller may read; there is no get-one route. ──

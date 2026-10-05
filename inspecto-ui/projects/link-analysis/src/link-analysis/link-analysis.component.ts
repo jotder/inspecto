@@ -165,6 +165,8 @@ import {
     LinkAnalysisViewOptions,
     SAVED_VIEW_NOT_EVIDENCE,
 } from './link-analysis.service';
+import { LinkAnalysisTemporalFindingsComponent, TemporalRunRequest } from './link-analysis-temporal-findings.component';
+import { TemporalFindingsState, allTemporalSelection, temporalResultToState } from './temporal-findings';
 import {
     FindPathsRequest,
     LinkAnalysisToolboxComponent,
@@ -243,6 +245,7 @@ const SERVER_PATH_LIMIT = 100;
         DataTableComponent,
         LaHostSlotComponent,
         LinkAnalysisToolboxComponent,
+        LinkAnalysisTemporalFindingsComponent,
         LinkAnalysisQueryPanelComponent,
         LinkAnalysisLegendComponent,
         LinkAnalysisWorkingSetComponent,
@@ -440,6 +443,10 @@ export class LinkAnalysisComponent implements OnInit {
     /** LA-14b: the last whole-Dataset branching pattern search. */
     readonly serverPattern = signal<ServerPatternState | null>(null);
     readonly serverPatternBusy = signal(false);
+    /** LA-INVESTIGATION-OPS-DEFERRED-1: the last burst / periodicity scan, placed on the canvas (never added to it). */
+    readonly temporalFindings = signal<TemporalFindingsState | null>(null);
+    readonly temporalBusy = signal(false);
+    readonly temporalError = signal('');
 
     /**
      * LA-11: the edge mappings of the loaded query a server traversal can walk — one per single-Dataset mapping
@@ -991,6 +998,8 @@ export class LinkAnalysisComponent implements OnInit {
         this.history.set(emptyHistory()); // a fresh graph invalidates prior undo/redo snapshots
         this.serverPaths.set(null);
         this.serverPattern.set(null);
+        this.temporalFindings.set(null);
+        this.temporalError.set('');
         this.mappingSummary.set([]);
         try {
             const g = await source.query(q);
@@ -1559,6 +1568,47 @@ export class LinkAnalysisComponent implements OnInit {
         } finally {
             this.serverPatternBusy.set(false);
         }
+    }
+
+    /**
+     * Burst / periodicity (`POST /inv/pattern/temporal`) over the WHOLE Dataset of one edge mapping. A read: the
+     * findings are placed on the canvas and highlighted, and the graph itself is not changed.
+     */
+    async runTemporal(req: TemporalRunRequest): Promise<void> {
+        const target = this.traversalTargets()[req.mapping];
+        const g = this.graph();
+        const timeCol = this.timeColumn();
+        if (!target || !g || !timeCol) return;
+        this.temporalBusy.set(true);
+        this.temporalError.set('');
+        try {
+            const res = await firstValueFrom(
+                this.inv.temporalPattern({
+                    dataset: target.dataset,
+                    sourceCol: target.sourceCol,
+                    targetCol: target.targetCol,
+                    timeCol,
+                    mode: req.mode,
+                    filter: target.filter,
+                    windowSeconds: req.mode === 'burst' ? req.windowSeconds : undefined,
+                    minEvents: req.minEvents,
+                    maxCv: req.mode === 'periodicity' ? req.maxCv : undefined,
+                }),
+            );
+            const state = temporalResultToState(res, g, target.idMappings);
+            this.temporalFindings.set(state);
+            this.emphasis.set(this.focusTemporal(state));
+        } catch (err) {
+            this.temporalFindings.set(null);
+            this.temporalError.set(invErrorMessage(err, 'The burst and periodicity scan failed.'));
+        } finally {
+            this.temporalBusy.set(false);
+        }
+    }
+
+    private focusTemporal(state: TemporalFindingsState): GraphEmphasis | null {
+        const sel = allTemporalSelection(state);
+        return sel.edgeIds.length ? sel : null;
     }
 
     /**

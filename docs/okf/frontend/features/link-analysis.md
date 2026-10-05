@@ -1627,7 +1627,19 @@ counts, never edge timestamps, so only the Dataset routes (which read the `timeC
   column so named made every read 422.
 * ⏳ Not decided (narrowest reading taken): per-ENTITY series (events touching an entity, either direction) rather
   than per link; a burst/periodic run against the edge **index** (flat read only today); rendering a finding as a
-  Working Set op or SPA overlay (nothing in the SPA calls either addition yet).
+  Working Set op (the SPA overlay now exists, below).
+* **SPA overlay (2026-10-05).** `link-analysis-temporal-findings.component.ts` is a panel under the Analysis tab of the
+  Toolbox (a sibling of the toolbox, shown/hidden with `[class.hidden]`). It needs a **time column** and an **edge mapping**
+  (the host's `traversalTargets`, the same ones server paths and the server pattern use), calls
+  `InvService.temporalPattern` and hands the answer to the pure `temporal-findings.ts` (`temporalResultToState`).
+  🔴 Unlike `recursivePathsToGraph` / `branchingResultToGraph` it **never adds nodes or links**: each finding's raw
+  endpoints are minted with `resolveEntityId` and matched to the drawn links running source -> target; one the canvas
+  does not draw stays listed, disabled and counted as "not drawn on this canvas" (the scan ran over the whole Dataset,
+  not the loaded slice). A click highlights that link; *Highlight all* and a fresh run highlight every drawn finding.
+  The panel states `truncated` / `rowCapped` / `skippedNoTime` and the server's `timeNote` (no zone claimed). Numbers
+  are clamped to the server's ranges client-side so a typo is not a 422. Still open: per-ENTITY series, serving from the
+  edge index, and a Working Set op (the findings are not sealed in an Investigation); the panel is not wired to a saved
+  view, and a Dossier does not carry it.
 
 **Comparison mode (2026-10-04, `LA-INVESTIGATION-OPS-DEFERRED-1`) — a READ route, not an op.** `GET /inv/investigations/{id}/compare?aFrom&aTo&bFrom&bTo&timezone&at`
 (`InvestigationComparisonRoutes`, semantics in `WindowComparison`) diffs two time windows over the Working Set at log position `at` (default head):

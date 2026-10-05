@@ -961,6 +961,17 @@
                             (findPaths)="findPaths($event)"
                             (runPatternOnServer)="runPatternOnServer($event)"
                         ></inspecto-link-analysis-toolbox>
+                        <inspecto-link-analysis-temporal-findings
+                            class="mt-3"
+                            [class.hidden]="toolboxTab() !== 'analysis'"
+                            [mappings]="traversalMappingOptions()"
+                            [timeColumn]="timeColumn()"
+                            [state]="temporalFindings()"
+                            [busy]="temporalBusy()"
+                            [error]="temporalError()"
+                            (runRequested)="runTemporal($event)"
+                            (highlight)="emphasis.set($event)"
+                        ></inspecto-link-analysis-temporal-findings>
 
                         <!-- Investigation (LA-10) — state lives in the pane-provided store, so the dock may collapse -->
                         @if (toolboxTab() === 'investigation') {
