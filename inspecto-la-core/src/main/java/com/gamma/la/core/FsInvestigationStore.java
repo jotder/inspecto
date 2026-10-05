@@ -18,8 +18,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p><b>Serialisation is this class's internal detail.</b> The JVM monitors that used to be keyed on a {@code Path} in the
  * routes live here, in ONE map ({@link #monitor}), so a "verify the version, then write" is atomic per Investigation (and per
- * Draft) within the JVM. A second JVM on the same volume is NOT protected: that is the multi-pod problem the Postgres
- * implementation exists to solve, and this class does not pretend otherwise.
+ * Draft) within the JVM. Since S7 the same sections also hold an OS file lock ({@link #lock}) so a SECOND JVM on the same
+ * volume is excluded too (the two-JVM race proof tore append, decide and promote without it). Not covered: creates, forks,
+ * references, case-link / Alert Rule binding (whole-record replaces, last writer wins by design) and Draft creation.
  *
  * <p>⚠ TRANSITIONAL: the still Path-keyed Draft code (promote, rebase, lifecycle, admission) and a few reads
  * ({@link #investigationDir}) reach the directory through this class and take the SAME monitors via {@link #monitor}, so
@@ -32,6 +33,27 @@ public final class FsInvestigationStore implements InvestigationStore {
     /** The JVM monitor serialising writers to {@code p} (an Investigation's directory, a Draft's, or the investigations root). */
     public static Object monitor(Path p) {
         return MONITORS.computeIfAbsent(p.toAbsolutePath().normalize(), k -> new Object());
+    }
+
+    private static final String STORE_LOCK = ".store.lock";
+
+    /**
+     * The CROSS-PROCESS half of the exclusion (S7: two JVMs on one volume tore every check-then-write below). An OS file lock on
+     * {@code <investigation>/.store.lock}, taken INSIDE {@code synchronized (monitor(invDir))} - so threads of one JVM queue on the
+     * monitor and never reach {@code FileChannel.lock} together (it would throw {@code OverlappingFileLockException}) - and BEFORE
+     * any Draft monitor, the one order everywhere. Release by closing. A missing Investigation directory yields {@code null}
+     * (nothing to protect; the body fails as it always did). Never nest two calls.
+     */
+    private static java.nio.channels.FileChannel lock(Path invDir) throws IOException {
+        if (!Files.isDirectory(invDir)) return null;
+        java.nio.channels.FileChannel ch = java.nio.channels.FileChannel.open(invDir.resolve(STORE_LOCK), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+        try {
+            ch.lock();
+            return ch;
+        } catch (IOException | RuntimeException e) {
+            ch.close();
+            throw e;
+        }
     }
 
     private static final String MEMBERS = "members.jsonl";
@@ -129,14 +151,19 @@ public final class FsInvestigationStore implements InvestigationStore {
 
     @Override
     public void append(Scope scope, long expectedVersion, int step, String lineJson, String setJson) throws IOException {
-        Path dir = scope.isDraft() ? draftDir(scope) : investigationDir(scope.investigationId());
-        synchronized (monitor(dir)) {
-            if (scope.isDraft() && DraftStore.isClosed(dir)) throw new DraftClosedException(scope.draftId());
-            long actual = committedLines(dir.resolve("log.jsonl")).size();
-            if (actual != expectedVersion)
-                throw new InvestigationVersionConflictException(scope.investigationId(), expectedVersion, actual);
-            if (scope.isDraft()) DraftStore.appendStep(dir, step, lineJson, setJson);
-            else snapshots.appendStep(scope.investigationId(), step, lineJson, setJson);
+        Path inv = investigationDir(scope.investigationId());
+        Path dir = scope.isDraft() ? draftDir(scope) : inv;
+        synchronized (monitor(inv)) {
+            try (var held = lock(inv)) {
+                synchronized (monitor(dir)) {
+                    if (scope.isDraft() && DraftStore.isClosed(dir)) throw new DraftClosedException(scope.draftId());
+                    long actual = committedLines(dir.resolve("log.jsonl")).size();
+                    if (actual != expectedVersion)
+                        throw new InvestigationVersionConflictException(scope.investigationId(), expectedVersion, actual);
+                    if (scope.isDraft()) DraftStore.appendStep(dir, step, lineJson, setJson);
+                    else snapshots.appendStep(scope.investigationId(), step, lineJson, setJson);
+                }
+            }
         }
     }
 
@@ -151,10 +178,12 @@ public final class FsInvestigationStore implements InvestigationStore {
     public void appendMember(String investigationId, long expectedCount, String lineJson) throws IOException {
         Path dir = investigationDir(investigationId);
         synchronized (monitor(dir)) {
-            long actual = readLines(dir.resolve(MEMBERS)).size();
-            if (actual != expectedCount) throw new InvestigationVersionConflictException(investigationId, expectedCount, actual);
-            Files.writeString(dir.resolve(MEMBERS), lineJson + "\n", StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            try (var held = lock(dir)) {
+                long actual = readLines(dir.resolve(MEMBERS)).size();
+                if (actual != expectedCount) throw new InvestigationVersionConflictException(investigationId, expectedCount, actual);
+                Files.writeString(dir.resolve(MEMBERS), lineJson + "\n", StandardCharsets.UTF_8,
+                        StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            }
         }
     }
 
@@ -242,11 +271,14 @@ public final class FsInvestigationStore implements InvestigationStore {
 
     @Override
     public boolean replacePending(String investigationId, String requestId, String expectedJson, String newJson) throws IOException {
-        synchronized (monitor(investigationDir(investigationId))) {
-            String current = snapshots.readPending(investigationId, requestId);
-            if (current == null || !current.equals(expectedJson)) return false;
-            snapshots.writePending(investigationId, requestId, newJson);
-            return true;
+        Path inv = investigationDir(investigationId);
+        synchronized (monitor(inv)) {
+            try (var held = lock(inv)) {
+                String current = snapshots.readPending(investigationId, requestId);
+                if (current == null || !current.equals(expectedJson)) return false;
+                snapshots.writePending(investigationId, requestId, newJson);
+                return true;
+            }
         }
     }
 
@@ -374,25 +406,35 @@ public final class FsInvestigationStore implements InvestigationStore {
 
     @Override
     public boolean hibernateDraft(String investigationId, String draftId, java.time.Duration after) throws IOException {
+        Path inv = investigationDir(investigationId);
         Path dir = draftDirOf(investigationId, draftId);
-        synchronized (monitor(dir)) {
-            if (DraftStore.isClosed(dir) || DraftLifecycle.idle(dir).compareTo(after) < 0) return false;
-            return DraftLifecycle.hibernate(dir);
+        synchronized (monitor(inv)) {
+            try (var held = lock(inv)) {
+                synchronized (monitor(dir)) {
+                    if (DraftStore.isClosed(dir) || DraftLifecycle.idle(dir).compareTo(after) < 0) return false;
+                    return DraftLifecycle.hibernate(dir);
+                }
+            }
         }
     }
 
     @Override
     public Optional<Boolean> closeDraft(String investigationId, String draftId, java.time.Duration idleAtLeast,
                                         java.util.function.Function<List<String>, String> marker) throws IOException {
+        Path inv = investigationDir(investigationId);
         Path dir = draftDirOf(investigationId, draftId);
-        synchronized (monitor(dir)) {   // serialised with appends: none lands after the marker
-            if (DraftStore.isPromoted(dir)) return Optional.empty();
-            if (idleAtLeast != null && (DraftStore.isClosed(dir) || DraftLifecycle.idle(dir).compareTo(idleAtLeast) < 0))
-                return Optional.empty();
-            if (idleAtLeast != null && !Files.isRegularFile(dir.resolve(DraftStore.HEADER))) return Optional.empty();
-            boolean first = DraftStore.markDiscarded(dir, marker.apply(committedLines(dir.resolve("log.jsonl"))));
-            DraftCheckpoints.forget(dir);
-            return Optional.of(first);
+        synchronized (monitor(inv)) {
+            try (var held = lock(inv)) {
+                synchronized (monitor(dir)) {   // serialised with appends: none lands after the marker
+                    if (DraftStore.isPromoted(dir)) return Optional.empty();
+                    if (idleAtLeast != null && (DraftStore.isClosed(dir) || DraftLifecycle.idle(dir).compareTo(idleAtLeast) < 0))
+                        return Optional.empty();
+                    if (idleAtLeast != null && !Files.isRegularFile(dir.resolve(DraftStore.HEADER))) return Optional.empty();
+                    boolean first = DraftStore.markDiscarded(dir, marker.apply(committedLines(dir.resolve("log.jsonl"))));
+                    DraftCheckpoints.forget(dir);
+                    return Optional.of(first);
+                }
+            }
         }
     }
 
@@ -402,6 +444,7 @@ public final class FsInvestigationStore implements InvestigationStore {
         Path invDir = investigationDir(investigationId);
         Path draftDir = draftDirOf(investigationId, draftId);
         synchronized (monitor(invDir)) {   // the main log, THEN the Draft: the one order everywhere
+          try (var held = lock(invDir)) {
             synchronized (monitor(draftDir)) {
                 if (DraftStore.isClosed(draftDir)) throw new DraftClosedException(draftId);
                 List<String> main = committedLines(invDir.resolve("log.jsonl"));
@@ -435,6 +478,7 @@ public final class FsInvestigationStore implements InvestigationStore {
                 Files.deleteIfExists(draftDir.resolve(PROMOTING));
                 DraftCheckpoints.forget(draftDir);
             }
+          }
         }
     }
 
@@ -464,6 +508,7 @@ public final class FsInvestigationStore implements InvestigationStore {
         Path invDir = investigationDir(investigationId);
         Path draftDir = draftDirOf(investigationId, draftId);
         synchronized (monitor(invDir)) {
+          try (var held = lock(invDir)) {
             synchronized (monitor(draftDir)) {
                 if (DraftStore.isClosed(draftDir)) throw new DraftClosedException(draftId);
                 List<String> main = committedLines(invDir.resolve("log.jsonl"));
@@ -475,6 +520,7 @@ public final class FsInvestigationStore implements InvestigationStore {
                 DraftStore.replaceRebased(draftDir, headerJson, lines, sets, setSteps);
                 DraftCheckpoints.forget(draftDir);
             }
+          }
         }
     }
 
@@ -487,6 +533,7 @@ public final class FsInvestigationStore implements InvestigationStore {
             Path draftDir = DraftStore.draftDir(invDir, id);
             if (!Files.isRegularFile(draftDir.resolve(PROMOTING))) continue;
             synchronized (monitor(invDir)) {
+              try (var held = lock(invDir)) {   // an intent file is live while ANOTHER JVM promotes: wait it out, never roll it back
                 synchronized (monitor(draftDir)) {
                     Path intentFile = draftDir.resolve(PROMOTING);
                     if (!Files.isRegularFile(intentFile) || DraftStore.isClosed(draftDir)) continue;
@@ -508,6 +555,7 @@ public final class FsInvestigationStore implements InvestigationStore {
                     }
                     Files.deleteIfExists(intentFile);
                 }
+              }
             }
         }
     }
