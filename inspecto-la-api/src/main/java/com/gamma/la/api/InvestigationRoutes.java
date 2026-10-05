@@ -114,9 +114,9 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
 public final class InvestigationRoutes implements RouteModule {
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    /** The twelve ops evaluated (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate} + LA-17's three + {@code threshold} and {@code snapshot}). */
+    /** The thirteen ops evaluated (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate} + LA-17's three + {@code threshold}, {@code snapshot} and {@code compare}). */
     private static final Set<String> SHIPPED = Set.of("seed", "expand", "exclude", "hide", "keep", "window", "annotate",
-            "excludeBy", "seedBy", "resolve", "threshold", "snapshot");
+            "excludeBy", "seedBy", "resolve", "threshold", "snapshot", "compare");
     /** The ops over a named Entity List (LA-17, design §4.4.1): they carry {@code listId}, never ids. */
     static final Set<String> LIST_OPS = Set.of("excludeBy", "seedBy");
     /** A list op seals at most this many members (design §4.4.1: bounded like every other op payload). */
@@ -373,6 +373,7 @@ public final class InvestigationRoutes implements RouteModule {
                 if (op.equals("seedBy")) entry.put("read", seedRead(api, ex, inv, list));
             }
             if (op.equals("resolve")) entry.put("resolution", sealResolution(inv.writeRoot(), inv.header(), params.get("atSeq"), ""));
+            if (op.equals("compare")) entry.put("comparison", sealComparison(api, ex, inv, before, params));
             if (op.equals("exclude") && Boolean.TRUE.equals(params.get("merged"))) {
                 requireResolution(before, "");
                 List<Object> groups = new ArrayList<>(before.groupsHit(ids).values());
@@ -426,6 +427,7 @@ public final class InvestigationRoutes implements RouteModule {
         if (orig.get("list") != null) e.put("list", orig.get("list"));
         if ("seedBy".equals(op) && orig.get("read") != null) e.put("read", orig.get("read"));
         if (orig.get("resolution") != null) e.put("resolution", orig.get("resolution"));
+        if (op.equals("compare")) e.put("comparison", sealComparison(api, ex, inv, state, params));   // re-sealed over the NEW base, as an expand is
         if (op.equals("exclude") && Boolean.TRUE.equals(params.get("merged"))) {
             requireResolution(state, "");
             List<Object> groups = new ArrayList<>(state.groupsHit(ids).values());
@@ -548,6 +550,9 @@ public final class InvestigationRoutes implements RouteModule {
             // LA-17 slice 2: a resolve keeps the resolution it sealed, for the same reason — a fork re-orders the
             // method, it does not re-read the identity facts.
             if (orig.get("resolution") != null) e.put("resolution", orig.get("resolution"));
+            // compare: a different order is a different Working Set, so the diff is re-sealed over the NEW state (as an expand re-reads).
+            if ("compare".equals(orig.get("op")))
+                e.put("comparison", sealComparison(api, ex, parent, state, castParams(orig.get("params"))));
             // LA-17 merged traversal: a merged exclude re-seals its groups against the NEW order's state (a group is
             // judged from the entities admitted at that point), under the resolution the fork kept verbatim.
             if ("exclude".equals(orig.get("op")) && orig.get("groups") != null) {
@@ -785,6 +790,7 @@ public final class InvestigationRoutes implements RouteModule {
                     summary.put(k, r.get(k));
                 out.put("read", summary);
             }
+            if (e.get("comparison") instanceof Map<?, ?> c) out.put("comparison", WindowComparison.summary(c));   // ...and a diff's item lists
             if (e.get("list") instanceof Map<?, ?> l) out.put("list", listSummary(l));   // ...and so do the sealed members
             if (e.get("resolution") instanceof Map<?, ?> r) out.put("resolution", resolutionSummary(r));   // ...and groups
             Integer removed = "excludeBy".equals(e.get("op"))
@@ -877,6 +883,7 @@ public final class InvestigationRoutes implements RouteModule {
             r.put("rung", read.get("query"));   // the rung as READ: window resolved, frontier and exclusions included
             out.put("read", r);
         }
+        if (e.get("comparison") != null) out.put("comparison", e.get("comparison"));   // the sealed diff (masked with the rest)
         if (after.window != null || "window".equals(op)) out.put("window", after.window);
         // LA-17 slice 2: while a resolve is in force every step answers the merged nodes, so the canvas can redraw them.
         if (after.resolution != null) out.put("resolution", after.toMap().get("resolution"));
@@ -1403,11 +1410,11 @@ public final class InvestigationRoutes implements RouteModule {
 
     /**
      * The bindings an op needs from the Investigation's header, checked at append (and at template
-     * instantiation): {@code linkKinds} needs a link-kind column; a window, or {@code minDistinctDays}, needs a
+     * instantiation): {@code linkKinds} needs a link-kind column; a window, a {@code compare}, or {@code minDistinctDays}, needs a
      * time column.
      */
     private static void requireBindings(Map<String, Object> header, String op, Map<String, Object> p, String where) {
-        boolean timed = op.equals("window")
+        boolean timed = op.equals("window") || op.equals("compare")
                 || (op.equals("expand") && (p.get("window") instanceof Map<?, ?> || p.get("minDistinctDays") != null));
         if (timed && header.get("timeCol") == null)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + "this Investigation has no time column — create it with 'timeCol' "
@@ -1444,6 +1451,16 @@ public final class InvestigationRoutes implements RouteModule {
             Object w = body.get("window");
             if (w == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'window' requires 'window': an object, or \"full\" to clear it");
             p.put("window", "full".equals(w) ? null : InvestigationTime.window(w, "window"));
+            return p;
+        }
+        if (op.equals("compare")) {   // no ids: two windows of the bound time column, diffed over the Working Set at this position
+            if (body.containsKey("ids"))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'compare' applies to the whole Working Set, not ids");
+            for (String w : List.of("windowA", "windowB")) {
+                if (body.get(w) == null)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'compare' requires '" + w + "': {from?, to?, timezone?}");
+                p.put(w, InvestigationTime.window(body.get(w), w));
+            }
             return p;
         }
         if (op.equals("threshold") || op.equals("snapshot")) {   // no ids: over the whole Working Set / a log position
@@ -1681,6 +1698,7 @@ public final class InvestigationRoutes implements RouteModule {
             case "resolve" -> resolveLine(e);
             case "threshold" -> thresholdLine(p);
             case "snapshot" -> snapshotLine(e, p);
+            case "compare" -> compareLine(e, p);
             case "seedBy" -> {
                 Map<String, Object> r = (Map<String, Object>) e.get("read");
                 int n = strings(r.get("ids")).size();
@@ -1734,6 +1752,34 @@ public final class InvestigationRoutes implements RouteModule {
         return "Removed every entity whose degree (distinct counterparties in the Working Set) is outside "
                 + "[" + (p.get("min") == null ? "0" : p.get("min")) + ", " + (p.get("max") == null ? "unbounded" : p.get("max"))
                 + ") - min inclusive, max exclusive; kept (protected) entities stay, removed ones are not re-admitted.";
+    }
+
+    /** A {@code compare}'s line: the two windows and what the sealed diff found (counts only; the lists are in the entry). */
+    @SuppressWarnings("unchecked")
+    static String compareLine(Map<String, Object> e, Map<String, Object> p) {
+        String line = "Compared " + InvestigationTime.describe((Map<String, Object>) p.get("windowA")) + " (A) with "
+                + InvestigationTime.describe((Map<String, Object>) p.get("windowB")) + " (B)";
+        if (!(e.get("comparison") instanceof Map<?, ?> c)) return line + ".";
+        Map<?, ?> links = (Map<?, ?>) c.get("links"), ents = (Map<?, ?>) c.get("entities");
+        return line + ": links only in A " + ((Map<?, ?>) links.get("onlyA")).get("count") + ", only in B "
+                + ((Map<?, ?>) links.get("onlyB")).get("count") + ", in both " + ((Map<?, ?>) links.get("both")).get("count")
+                + "; entities only in A " + ((Map<?, ?>) ents.get("onlyA")).get("count") + ", only in B "
+                + ((Map<?, ?>) ents.get("onlyB")).get("count") + ", in both " + ((Map<?, ?>) ents.get("both")).get("count")
+                + ". Sealed at this step (fingerprint " + c.get("fingerprint") + "); the Working Set does not change.";
+    }
+
+    /** Seal a {@code compare}'s diff over {@code state}: both windows read live NOW, then frozen into the entry (never re-read). */
+    private static Map<String, Object> sealComparison(ApiContext api, HttpExchange ex, Inv inv, InvestigationEvaluator.State state,
+                                                      Map<String, Object> params) {
+        Map<String, Map<String, Object>> windows = new LinkedHashMap<>();
+        windows.put("a", castParams(params.get("windowA")));
+        windows.put("b", castParams(params.get("windowB")));
+        return WindowComparison.seal(WindowComparison.compare(api, ex, inv, state, windows));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> castParams(Object o) {
+        return (Map<String, Object>) o;
     }
 
     /** A {@code snapshot} marker's line (the Working Set hash is on the entry). */
