@@ -449,6 +449,15 @@ export class LinkAnalysisComponent implements OnInit {
     readonly temporalFindings = signal<TemporalFindingsState | null>(null);
     readonly temporalBusy = signal(false);
     readonly temporalError = signal('');
+    /** The scan the shown findings came from (what `sealTemporal` sends), and what the last seal answered. */
+    private lastTemporalRun: TemporalRunRequest | null = null;
+    readonly temporalSealed = signal<{
+        step: number;
+        count: number;
+        outsideWorkingSet: number;
+        fingerprint: string;
+    } | null>(null);
+    readonly temporalSealError = signal('');
 
     /**
      * LA-11: the edge mappings of the loaded query a server traversal can walk — one per single-Dataset mapping
@@ -1002,6 +1011,8 @@ export class LinkAnalysisComponent implements OnInit {
         this.serverPattern.set(null);
         this.temporalFindings.set(null);
         this.temporalError.set('');
+        this.temporalSealed.set(null);
+        this.temporalSealError.set('');
         this.mappingSummary.set([]);
         try {
             const g = await source.query(q);
@@ -1583,6 +1594,8 @@ export class LinkAnalysisComponent implements OnInit {
         if (!target || !g || !timeCol) return;
         this.temporalBusy.set(true);
         this.temporalError.set('');
+        this.temporalSealed.set(null);
+        this.temporalSealError.set('');
         try {
             const res = await firstValueFrom(
                 this.inv.temporalPattern({
@@ -1599,6 +1612,7 @@ export class LinkAnalysisComponent implements OnInit {
                 }),
             );
             const state = temporalResultToState(res, g, target.idMappings);
+            this.lastTemporalRun = req;
             this.temporalFindings.set(state);
             this.emphasis.set(this.focusTemporal(state));
         } catch (err) {
@@ -1607,6 +1621,35 @@ export class LinkAnalysisComponent implements OnInit {
         } finally {
             this.temporalBusy.set(false);
         }
+    }
+
+    /**
+     * "Seal these findings": a `temporal` op on the open Investigation, with the knobs of the scan the panel is showing.
+     * The server re-runs the scan over the Investigation's own edge columns, so what is sealed is its answer, not this
+     * panel's rows; the Working Set does not move.
+     */
+    async sealTemporal(): Promise<void> {
+        const req = this.lastTemporalRun;
+        if (!req || !this.temporalFindings()) return;
+        this.temporalSealed.set(null);
+        this.temporalSealError.set('');
+        const burst = req.mode === 'burst';
+        const ok = await this.investigation.apply({
+            op: 'temporal',
+            mode: req.mode,
+            series: req.series,
+            minEvents: req.minEvents,
+            ...(burst ? { windowSeconds: req.windowSeconds } : { maxCv: req.maxCv }),
+        });
+        const step = this.investigation.lastStep();
+        if (ok && step?.temporalFindings)
+            this.temporalSealed.set({
+                step: step.step,
+                count: step.temporalFindings.count,
+                outsideWorkingSet: step.temporalFindings.outsideWorkingSet,
+                fingerprint: step.temporalFindings.fingerprint,
+            });
+        else this.temporalSealError.set(this.investigation.error() || 'The findings could not be sealed.');
     }
 
     private focusTemporal(state: TemporalFindingsState): GraphEmphasis | null {

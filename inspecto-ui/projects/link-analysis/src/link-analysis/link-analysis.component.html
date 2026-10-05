@@ -978,7 +978,12 @@
                             [state]="temporalFindings()"
                             [busy]="temporalBusy()"
                             [error]="temporalError()"
+                            [canSeal]="investigation.active()"
+                            [sealBusy]="investigation.busy()"
+                            [sealed]="temporalSealed()"
+                            [sealError]="temporalSealError()"
                             (runRequested)="runTemporal($event)"
+                            (sealRequested)="sealTemporal()"
                             (highlight)="emphasis.set($event)"
                         ></inspecto-link-analysis-temporal-findings>
 

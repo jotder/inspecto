@@ -1685,7 +1685,7 @@ counts, never edge timestamps, so only the Dataset routes (which read the `timeC
   Pure gotcha: `ResultSet.wasNull()` speaks of the LAST column read — reading `getString` between `getLong` and
   `wasNull` turned every NULL time into 1970 on the index path until the equivalence test caught it. The SPA panel
   gained a "Series per: Each link / Each entity" selector (`series` on the wire); an entity finding highlights its NODE
-  and is listed by name. ⏳ Not decided: rendering a finding as a Working Set op (the SPA overlay now exists, below).
+  and is listed by name. ✅ Sealing a finding set as a `temporal` op shipped 2026-10-05 (below, *The `temporal` op*).
 * **SPA overlay (2026-10-05).** `link-analysis-temporal-findings.component.ts` is a panel under the Analysis tab of the
   Toolbox (a sibling of the toolbox, shown/hidden with `[class.hidden]`). It needs a **time column** and an **edge mapping**
   (the host's `traversalTargets`, the same ones server paths and the server pattern use), calls
@@ -1695,9 +1695,35 @@ counts, never edge timestamps, so only the Dataset routes (which read the `timeC
   does not draw stays listed, disabled and counted as "not drawn on this canvas" (the scan ran over the whole Dataset,
   not the loaded slice). A click highlights that link; *Highlight all* and a fresh run highlight every drawn finding.
   The panel states `truncated` / `rowCapped` / `skippedNoTime` and the server's `timeNote` (no zone claimed). Numbers
-  are clamped to the server's ranges client-side so a typo is not a 422. Still open: per-ENTITY series, serving from the
-  edge index, and a Working Set op (the findings are not sealed in an Investigation); the panel is not wired to a saved
-  view, and a Dossier does not carry it.
+  are clamped to the server's ranges client-side so a typo is not a 422. The panel is not wired to a saved view. A
+  **Seal these findings** button (below, *The `temporal` op*) appends the scan to the open Investigation's log.
+
+**The `temporal` op (2026-10-05, `LA-INVESTIGATION-OPS-DEFERRED-1`) — a burst / periodicity finding set sealed into the log.**
+`{op:"temporal", mode:"burst"|"periodicity", series?:"link"|"entity", windowSeconds?, minEvents?, maxCv?, limit?}` through
+`/ops`: a marker like `snapshot` / `compare` — the Working Set and its hash do not move. `InvestigationRoutes` runs the SAME scan as
+`POST /inv/pattern/temporal` (`PatternRoutes.scan`, now a static the op shares: same gates, four-eyes refusal, row cap, edge-index
+serving) over the Investigation's OWN `dataset` / `sourceCol` / `targetCol` / `timeCol`, narrows the findings to the Working Set at that
+log position, and seals them into `entry.temporalFindings` (`TemporalFindings`): `{dataset, params, workingSet, count, results,
+outsideWorkingSet, truncated, rowCapped, skippedNoTime, timeNote, servedFrom, readAt, sealed:true, basis, fingerprint}`. The
+`fingerprint` is SHA-256 over the content (not `basis`, `readAt`, `servedFrom`). Knobs are validated with the route's bounds (422, never
+clamped) and stored with every default filled. **Calls made:** (1) the columns are the Investigation's, never the request's — a sealed set
+must say what the Investigation said, and a client-supplied finding list would be unverifiable; (2) the Working Set narrowing: a link
+finding is kept when some Working Set link has that source and target (any kind), an entity finding when the entity is admitted — what is
+dropped is counted in `outsideWorkingSet` and never named, so the op names nothing the analyst could not already see; (3) the scan reads
+at the route's maximum limit (1 000) and the op's `limit` cuts AFTER the narrowing, so `truncated` also covers the scan's own cut;
+(4) the Investigation's window is NOT applied (the stateless route has none, times are wall-clock as written); (5) a time column is
+required (422, as `compare`). **Wiring (mirrors `compare`):** `InvestigationEvaluator` treats it as a marker; append, `replayOp` (Draft rebase / promote) and `reorder` (fork)
+RE-SEAL over the new Working Set (a fork ordering the scan before the expand seals zero findings — tested); replay never re-reads the
+Dataset; the log view carries counts only (`TemporalFindings.summary`); `GraphDossierBuilder` hashes the fingerprint (a forged
+count is `integrity` red with `sealed temporal findings hash to`, and `/dossier/verify` names `log.jsonl#N`), puts a top-level
+`temporalFindings` section `[{step, findings}]` only when an effective step carries one (undone steps are skipped), and the root stays
+deterministic; masking is applied at render over the raw ids (`EntityMasking`); `InvestigationTemplateRoutes.CASE_OPS` drops it as case
+evidence (it names the case's own links). Gate: the existing `/ops` one (`canManageIncidents`; 401/403 tested). Tests:
+`ControlApiInvestigationTemporalOpTest`. **SPA:** the temporal panel's *Seal these findings* button (disabled with a hint when no
+Investigation is open) sends the knobs of the scan on screen (`link-analysis.component.ts` `sealTemporal`) and shows the step, the
+count kept, those outside the Working Set and the fingerprint — the server re-runs the scan, so what is sealed is its answer, not the
+panel's rows. ⏳ Not built: a Dossier HTML rendering of the finding set (the JSON section and the step text carry it), and applying the
+Investigation's window.
 
 **Comparison mode (2026-10-04, `LA-INVESTIGATION-OPS-DEFERRED-1`) — a READ route, not an op.** `GET /inv/investigations/{id}/compare?aFrom&aTo&bFrom&bTo&timezone&at`
 (`InvestigationComparisonRoutes`, semantics in `WindowComparison`) diffs two time windows over the Working Set at log position `at` (default head):
