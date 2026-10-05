@@ -655,6 +655,34 @@ public final class JobService implements AutoCloseable {
                         + "the sweep stops and records why. Aggregate output only.",
                 List.of(), List.of("la.detect.completed"), List.of(), List.of("alerts")),
                 c -> new LaDetectJob(c)));
+        // la.index.build (LA-DAILY-INGEST-1, T5) - refreshes the Link Analysis Index of one configured Dataset
+        // mapping after a daily partition lands (on_signal job.dataset.produced). Runs as a delegated service
+        // principal re-decided every run; the Link Analysis module lives behind the link-index grant.
+        registry.register(JobTypeProvider.of(new JobTypeDescriptor(LaIndexBuildJob.TYPE, "Link Analysis index build",
+                "Builds or refreshes the Link Analysis Index of one Dataset mapping, running ONLY the mode the "
+                        + "server recommends (append | compact; full only when allow_full). Acts as a delegated "
+                        + "service principal standing in for the recorded owner, re-checked every run. A refusal "
+                        + "fails the Run with its reason. Aggregate output only.",
+                List.of(ParameterDecl.of("dataset", ParamType.DATASET_REF).label("Dataset").required().build(),
+                        ParameterDecl.of("source_col", ParamType.STRING).label("Source column").required().build(),
+                        ParameterDecl.of("target_col", ParamType.STRING).label("Target column").required().build(),
+                        ParameterDecl.of("owner", ParamType.STRING).label("Owner (user id)").required()
+                                .description("The user id the delegated principal stands in for; the build is "
+                                        + "refused the moment this user can no longer view the Dataset.").build(),
+                        ParameterDecl.of("kind_col", ParamType.STRING).label("Kind column").build(),
+                        ParameterDecl.of("time_col", ParamType.STRING).label("Time column").build(),
+                        ParameterDecl.of("time_col_zone", ParamType.STRING).label("Time column zone").build(),
+                        ParameterDecl.of("weight_col", ParamType.STRING).label("Weight column").build(),
+                        ParameterDecl.of("attr_cols", ParamType.STRING).label("Attribute columns")
+                                .description("Comma-separated column names").build(),
+                        ParameterDecl.of("allow_full", ParamType.BOOLEAN).label("Allow a full build")
+                                .description("A first build or a rewritten input needs a full build, which is "
+                                        + "expensive; unset = such a run is refused, never started.")
+                                .defaultValue("false").build(),
+                        ParameterDecl.of("timeout_seconds", ParamType.INTEGER).label("Wait at most (s)")
+                                .defaultValue("3600").build()),
+                List.of("la.index.build.completed"), List.of(), List.of("link-index")),
+                c -> new LaIndexBuildJob(c)));
         // space.comparison (space-comparison design, decided 2026-09-24): compare the storage growth of two or
         // more Spaces. ⛔ Registered with the OWN-SPACE-ONLY grant, so an authored or scheduled job of this type
         // can read nothing outside this Space — and since a comparison needs >= 2 Spaces, it is refused. The
