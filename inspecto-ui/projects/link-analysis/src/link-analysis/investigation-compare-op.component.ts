@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
-import { InvestigationWindow } from '../api/inv.service';
+import type { InvestigationWindow } from '@inspecto/link-analysis/api/inv.service';
 import { InvestigationWindowFieldsComponent } from './investigation-window-fields.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { windowForm, windowOf } from './investigation-rung-form';
