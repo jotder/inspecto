@@ -403,9 +403,30 @@
                             All {{ c.expectedDays }} days in the window have rows in {{ c.dataset }} ({{ c.zone }}).
                         </inspecto-alert>
                     }
-                    @if (!c.collectors.assessed) {
+                    @if (c.collectors.assessed) {
+                        <table class="m-0 w-full text-xs" aria-label="Per-Collector coverage">
+                            <thead>
+                                <tr class="text-secondary text-left">
+                                    <th scope="col">Collector</th>
+                                    <th scope="col">Days covered</th>
+                                    <th scope="col">Missing days</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (k of c.collectors.collectors; track k.collector) {
+                                    <tr>
+                                        <th scope="row" class="text-left font-medium">{{ k.collector }}</th>
+                                        <td>{{ k.coveredDays }} of {{ c.expectedDays }}</td>
+                                        <td>{{ k.missingDays.length ? k.missingDays.join(', ') : 'none' }}</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    } @else {
                         <p class="text-secondary m-0 text-xs">
-                            {{ c.collectors.note || 'Per-Collector coverage is not assessed.' }}
+                            Per-Collector coverage: not assessed{{
+                                c.collectors.note ? ' — ' + c.collectors.note : ''
+                            }}.
                         </p>
                     }
                 }

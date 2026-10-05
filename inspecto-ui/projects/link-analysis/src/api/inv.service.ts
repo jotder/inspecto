@@ -654,9 +654,17 @@ export interface InvestigationCoverage {
     complete: boolean;
     perDay: { date: string; rows: number }[];
     readAt: string;
-    /** Per-Collector coverage is NOT assessed: a Dataset row carries no Collector attribution. */
-    collectors: { assessed: false; note: string };
+    /** Per-Collector coverage (LA-COLLECTOR-COVERAGE-1): `assessed:false` when no attribution evidence exists. */
+    collectors: CollectorCoverage;
 }
+
+export type CollectorCoverage =
+    | { assessed: false; note?: string }
+    | {
+          assessed: true;
+          note?: string;
+          collectors: { collector: string; coveredDays: number; missingDays: string[]; complete: boolean }[];
+      };
 
 // ── LA-24: the optional Case link (`InvestigationCaseRoutes`) ─────────────────────────────────────────
 
