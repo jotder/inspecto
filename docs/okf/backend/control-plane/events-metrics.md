@@ -863,3 +863,7 @@ hostname fix, notification failures are logged and isolated by `NotificationServ
 affected install may not notice the switch to "loud failure" is happening beyond emails simply stopping.
 Documented in `SmtpEmailChannel`'s javadoc; proved by `SmtpEmailChannelStarttlsRequiredTest` (a fake relay that
 never advertises `STARTTLS` is refused, and no `AUTH` line ever reaches it).
+
+## Link Analysis rate-limit classes
+
+`RateLimiter` throttles per subject (IP when unauthenticated) with fixed in-memory token buckets and answers 429 `RATE_LIMITED`. Link Analysis routes are classified by `LinkAnalysisRateClasses`: eleven expensive ones (`/geo/*` computations, `/inv/projection*`, `/inv/traversal/recursive-paths`, `/inv/pattern/*`, `/inv/schema/overlap-profile`, `POST /inv/graph/runs`, `POST /inv/index/builds`) share their own bucket `RateLimiter.linkAnalysis()` (burst 20, 1 per 3 s); everything else is explicitly exempt. `LinkAnalysisRateClassCoverageTest` fails if a route in `AbsentGeoLinkRoutes.SURFACE` or `AbsentEntityListRoutes.SURFACE` has no class. Deliberate limits: no config key, no `Retry-After`, per node.

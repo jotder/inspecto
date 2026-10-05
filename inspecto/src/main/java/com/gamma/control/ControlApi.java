@@ -229,6 +229,8 @@ public final class ControlApi implements AutoCloseable, HostContext {
     private final RateLimiter callbackLimiter = RateLimiter.callback();
     /** {@code POST /streams/{id}/records}'s own per-caller bucket (ASSURE-PUSH-INGEST-1) — see {@link RateLimiter#push()}. */
     private final RateLimiter pushLimiter = RateLimiter.push();
+    /** The expensive Link Analysis routes' own per-subject bucket - see {@link LinkAnalysisRateClasses}. */
+    private final RateLimiter linkAnalysisLimiter = RateLimiter.linkAnalysis();
 
     /**
      * Control plane over a single running service — wrapped as the {@code default} space. The long-standing
@@ -1160,8 +1162,9 @@ public final class ControlApi implements AutoCloseable, HostContext {
      *  saturate DuckDB ({@code /db/query}, {@code /bi/query}, {@code /recon/*}) or spend model tokens
      *  ({@code /agent/*}) without any other bound on request volume — plus the one UNAUTHENTICATED write,
      *  the D8 {@code /public/delivery-status/*} callback (SEC review F1), on its own per-IP bucket. */
-    private static boolean isRateLimited(String path) {
-        return path.equals("/db/query") || path.equals("/bi/query")
+    private static boolean isRateLimited(String method, String path) {
+        return LinkAnalysisRateClasses.isExpensive(method, path)
+                || path.equals("/db/query") || path.equals("/bi/query")
                 || path.startsWith("/recon/") || path.startsWith("/agent/")
                 || path.startsWith("/public/delivery-status/")
                 || StreamPushRoutes.isPushPath(path);
@@ -1172,12 +1175,14 @@ public final class ControlApi implements AutoCloseable, HostContext {
      *  own. Runs after {@link #authenticate} so a {@link Subject}, when present, is the throttle key;
      *  {@code 429 RATE_LIMITED} when the bucket is empty. */
     private void rateLimit(HttpExchange ex, String path) {
-        if (!isRateLimited(path)) return;
+        String method = ex.getRequestMethod();
+        if (!isRateLimited(method, path)) return;
         String key = ApiContext.subject(ex).map(Subject::id).orElseGet(() -> {
             String ip = ApiContext.ip(ex);
             return ip == null ? "unknown" : ip;
         });
-        RateLimiter bucket = path.equals("/bi/query") ? dashboardLimiter
+        RateLimiter bucket = LinkAnalysisRateClasses.isExpensive(method, path) ? linkAnalysisLimiter
+                : path.equals("/bi/query") ? dashboardLimiter
                 : path.startsWith("/public/delivery-status/") ? callbackLimiter
                 : StreamPushRoutes.isPushPath(path) ? pushLimiter : rateLimiter;
         if (!bucket.tryConsume(key))
