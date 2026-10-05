@@ -73,12 +73,16 @@ export function graphSummaryLabel(data: G6GraphData | null, hint = ''): string {
 
 /**
  * G6 creates its canvas layers with `tabindex="1"` — a positive tabindex that pulls them ahead of the
- * page in the keyboard order (axe `tabindex`, LA-A11Y-AUDIT-1). Reset them to `0`: still focusable for
- * G6's keyboard behaviours, but in document order.
+ * page in the keyboard order (axe `tabindex`, LA-A11Y-AUDIT-1). Reset the first to `0` (still focusable for
+ * G6's keyboard behaviours, in document order) and the rest to `-1`: the layers are stacked on one spot, so
+ * live (Tab order driven 2026-10-05) four `0`s were four identical tab stops on one graph.
  */
 export function demotePositiveTabindex(root: HTMLElement): void {
+    let first = true;
     root.querySelectorAll<HTMLElement>('[tabindex]').forEach((el) => {
-        if (el.tabIndex > 0) el.setAttribute('tabindex', '0');
+        if (el.tabIndex <= 0) return;
+        el.setAttribute('tabindex', first ? '0' : '-1');
+        first = false;
     });
 }
 

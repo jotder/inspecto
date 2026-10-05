@@ -1065,6 +1065,21 @@ describe('LinkAnalysisComponent', () => {
             expect(tabs().filter((t) => t.tabIndex === 0)).toHaveLength(1);
         });
 
+        it('stacks the three docks below md so 400% zoom / 320 px reflows (live-proven 2026-10-05: a row of two fixed-width docks left the canvas 0 px wide)', () => {
+            const { el } = open();
+            const workspace = el.querySelector('aside[aria-label="Query"]')!.parentElement as HTMLElement;
+            expect(workspace.classList).toContain('max-md:flex-col');
+            for (const dock of ['Query', 'Toolbox']) {
+                expect(el.querySelector(`aside[aria-label="${dock}"]`)!.classList).toContain('max-md:!w-full'); // beats the inline px width
+            }
+            // the drag handles have nothing to drag once the docks stack
+            const handles = Array.from(el.querySelectorAll('[aria-label^="Resize the"]'));
+            expect(handles).toHaveLength(2);
+            for (const handle of handles) {
+                expect(handle.classList).toContain('max-md:hidden');
+            }
+        });
+
         it('is a tablist of three tabs, one tab stop, whose panes are tabpanels labelled by their tab', () => {
             const { el, tabs } = open();
             const list = el.querySelector('[role="tablist"]') as HTMLElement;
