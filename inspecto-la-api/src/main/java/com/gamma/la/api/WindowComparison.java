@@ -131,6 +131,46 @@ final class WindowComparison {
         return out;
     }
 
+    /**
+     * The {@code compare} op's SEALED form of a diff: JSON-normalised (so what is hashed is what the log stores and replay
+     * reads back), {@code sealed: true}, and a {@code fingerprint} over the content (windows, Working Set size, links,
+     * entities). Nothing time-varying is in it, so a Dossier root over a log carrying it stays deterministic.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> seal(Map<String, Object> raw) {
+        try {
+            Map<String, Object> out = ApiContext.JSON.readValue(InvestigationEvaluator.canonical(raw), Map.class);
+            out.put("sealed", true);
+            out.put("basis", String.valueOf(out.get("basis")).replace("not sealed into the log", "sealed into the log when the step "
+                    + "was appended: what the Dataset said then"));
+            out.put("fingerprint", fingerprint(out));
+            return out;
+        } catch (IOException e) {
+            throw new IllegalStateException("a comparison is plain JSON", e);
+        }
+    }
+
+    /** SHA-256 over the content of a sealed comparison (not its prose {@code basis}, not the fingerprint itself). */
+    static String fingerprint(Map<?, ?> sealed) {
+        Map<String, Object> content = new TreeMap<>();
+        for (String k : List.of("windowA", "windowB", "workingSet", "links", "entities")) content.put(k, sealed.get(k));
+        return InvestigationEvaluator.sha256(InvestigationEvaluator.canonical(content));
+    }
+
+    /** The counts of a sealed comparison without the item lists - for the log view, where sealed bodies stay out. */
+    static Map<String, Object> summary(Map<?, ?> sealed) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        for (String k : List.of("windowA", "windowB", "workingSet", "fingerprint")) out.put(k, sealed.get(k));
+        for (String part : List.of("links", "entities")) {
+            Map<String, Object> counts = new LinkedHashMap<>();
+            if (sealed.get(part) instanceof Map<?, ?> m)
+                for (var x : m.entrySet())
+                    counts.put(String.valueOf(x.getKey()), x.getValue() instanceof Map<?, ?> s ? s.get("count") : x.getValue());
+            out.put(part, counts);
+        }
+        return out;
+    }
+
     private static Map<String, Object> section(List<?> items) {
         Map<String, Object> s = new LinkedHashMap<>();
         s.put("count", items.size());

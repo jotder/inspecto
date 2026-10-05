@@ -104,6 +104,12 @@ final class GraphDossierBuilder {
                     failures.add(failure(step, "sets/" + step + ".json", "content hashes to " + content
                             + ", not the recorded " + doc.get("hash")));
             }
+            if (e.get("comparison") instanceof Map<?, ?> c) {   // compare: the sealed diff must still hash to what was sealed
+                String fp = WindowComparison.fingerprint(c);
+                if (!fp.equals(c.get("fingerprint")))
+                    failures.add(failure(step, "log.jsonl#" + step, "sealed comparison hashes to " + fp
+                            + ", not the recorded fingerprint " + c.get("fingerprint")));
+            }
             if (e.get("read") instanceof Map<?, ?> r) {
                 // A seedBy (LA-17) seals the ids it matched, where an expand seals its rows.
                 String rows = sha256(canonical("seedBy".equals(e.get("op")) ? r.get("ids") : r.get("rows")));
@@ -130,6 +136,9 @@ final class GraphDossierBuilder {
         integrity.put("stepsChecked", log.size());
         integrity.put("failures", failures);
         dossier.put("integrity", integrity);
+        // compare ops: the sealed diffs of the effective steps, in full (the log.jsonl artefacts in the manifest hash them).
+        List<Map<String, Object>> comparisons = comparisons(log);
+        if (!comparisons.isEmpty()) dossier.put("comparisons", comparisons);
         Map<String, Object> manifest = manifest(in, ws, snapshots);
         dossier.put("manifest", manifest);
 
@@ -462,6 +471,7 @@ final class GraphDossierBuilder {
                     read.put(k, r.get(k));
                 out.put("read", read);
             }
+            if (e.get("comparison") instanceof Map<?, ?> c) out.put("comparison", WindowComparison.summary(c));   // the full diff is under "comparisons"
             if (e.get("list") instanceof Map<?, ?> l) {   // LA-17: members counted — the log.jsonl artefact hashes them
                 Map<String, Object> list = new LinkedHashMap<>();
                 for (var x : l.entrySet()) if (!"members".equals(x.getKey())) list.put(String.valueOf(x.getKey()), x.getValue());
@@ -631,6 +641,7 @@ final class GraphDossierBuilder {
             case "resolve" -> InvestigationRoutes.resolveLine(e);
             case "threshold" -> InvestigationRoutes.thresholdLine(p);
             case "snapshot" -> InvestigationRoutes.snapshotLine(e, p);
+            case "compare" -> InvestigationRoutes.compareLine(e, p);
             case "seedBy" -> {
                 Map<String, Object> r = castMap((Map<?, ?>) e.get("read"));
                 List<String> seeded = strings(r.get("ids"));
@@ -641,6 +652,21 @@ final class GraphDossierBuilder {
             }
             default -> "Applied " + e.get("op") + ".";
         };
+    }
+
+    /** The sealed window diffs of the effective {@code compare} steps: {@code {step, comparison}}, in log order. */
+    private static List<Map<String, Object>> comparisons(List<Map<String, Object>> log) {
+        java.util.Set<Integer> undone = InvestigationEvaluator.undone(log);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> e : log) {
+            int step = ((Number) e.get("step")).intValue();
+            if (!"compare".equals(e.get("op")) || undone.contains(step) || !(e.get("comparison") instanceof Map<?, ?> c)) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("step", step);
+            row.put("comparison", castMap(c));
+            out.add(row);
+        }
+        return out;
     }
 
     private static String head(List<String> ids) {

@@ -749,7 +749,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   mask need an explicit IANA `timezone` and test the local day the EVENT fell on. `window` re-filters nothing
   already admitted — earlier sealed reads are evidence as made. Templates carry the whole rung; a `window`
   becomes a parameter (`kind: "window"`) whose default is the authored window. ⏳ Calendar exclusions
-  remains deferred (`threshold`, `snapshot`, comparison mode, time-respecting paths and burst / periodicity shipped 2026-10-04, below). **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
+  remains deferred (`threshold`, `snapshot`, comparison mode — read route, then the sealed `compare` op on 2026-10-05 —, time-respecting paths and burst / periodicity shipped 2026-10-04, below). **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
   settings* (`investigation-expand-rung.component`) sends `budget` (1–20 000; the server CLAMPS above, so the SPA
   refuses) · `direction` · rung `window` (`inherit` · `full` · *A window for this rung…*, an override object) · `linkKinds`
   (comma-separated, trimmed and deduplicated, at most 100; blank = all kinds; the server 422s it without an Investigation
@@ -1656,8 +1656,23 @@ the Dataset read; audited best-effort as `LINK_INVESTIGATION_COMPARED`. *Dossier
 parameters are passed; it is labelled `sealed: false` and sits OUTSIDE the manifest and integrity check (the rest of the Dossier reads no Dataset, and the manifest root is
 unchanged by it); the `steps`/`method` renderings and the HTML print do not include it. Gates cleared: `AbsentGeoLinkRoutes`, `openapi-v1.json`, the RouteModule service
 file; a GET needs no `authgate` bare literal, `CapabilityManifest` row or `route-gating` entry (read route). Test: `ControlApiInvestigationComparisonTest`.
-⏳ Open questions: should a comparison be sealed into the log (an op) so a Dossier can carry it in custody? a slot/day mask or per-window `window: inherit`? an
-SPA surface (none built)? entity *activity* (event counts) diffs rather than presence? — filed in the BACKLOG row.
+⏳ Open questions (still open after the `compare` op below): per-window `window: inherit`? entity *activity* (event counts) diffs rather than presence? — filed in the BACKLOG row.
+
+**Comparison as a SEALED op — `compare` (2026-10-05, `LA-INVESTIGATION-OPS-DEFERRED-1`, operator-recommended slice).** The read route above stays (live, unsealed); `POST /inv/investigations/{id}/ops`
+now also takes `{op:"compare", windowA:{…}, windowB:{…}}` (each side is a `window` object — `InvestigationTime.window`, so `from`/`to`/`slot`/`days`/`timezone`; needs a `timeCol`). **Design calls:**
+* **A marker op, like `snapshot`:** the evaluator's `apply` does nothing for it, so the Working Set and its hash do not move; the artefact is `entry.comparison`.
+* **Sealed at append, never re-read:** the route runs `WindowComparison.compare` over the Working Set *before* the step (the same live Dataset read the route does, R3 gate included), then `WindowComparison.seal`s it
+  into the entry: JSON-normalised, `sealed: true`, plus a `fingerprint` = SHA-256 over `{windowA, windowB, workingSet, links, entities}`. Nothing time-varying is inside (no `readAt`), so a Dossier root over a log carrying it is
+  deterministic; replay carries the sealed diff and re-reads nothing.
+* **Custody:** the diff lives in the `log.jsonl#<step>` line, which the Dossier manifest already hashes byte for byte, so `/dossier/verify` and the bundle's custody check cover it with no manifest change. `GraphDossierBuilder.build`
+  also recomputes the fingerprint per `compare` step and reports a mismatch under `integrity.failures` (probe: a hand-edited `eventsA` goes red on BOTH the verify and the integrity check). The Dossier gets a top-level
+  `comparisons: [{step, comparison}]` (effective, non-undone steps; absent when none, so older manifests/Dossiers are byte-identical), the `steps` / `method` renderings and the ledger carry a line, and the `json` rendering carries counts only.
+* **Fork / Draft promote / template:** a fork (`reorder`) and a Draft promote RE-SEAL over the new Working Set (a different order is a different universe; as an `expand` re-reads). A template DROPS it (`CASE_OPS`: two concrete windows are
+  this case's evidence, not method), like an `exclude`.
+* **Log view** (`GET …/log`) and the plain-language line show counts only (`links only in A n, …`); the append answer carries the full sealed `comparison`. Masking is at render over raw sealed ids, as for the Working Set.
+* **No new route:** `/ops` already gates on `canManageIncidents` (bare literal in `InvestigationRoutes.register`), `openapi-v1.json` does not enumerate ops, and the route-gating table is unchanged. Test: `ControlApiInvestigationCompareOpTest`
+  (real HTTP, with a Subject: gate 403/401, tamper probe, masking, determinism, fork re-seal, refusals). Slot/day masks per side fall out of reusing `InvestigationTime.window` (pinned: a `days:["TUE"]` side drops a Wednesday event).
+* **SPA:** `InvestigationCompareOpComponent` (`inspecto-la-compare-op`) beside the window / threshold / marker forms in the Investigation pane — two `inspecto-la-window-fields` (the window op's own field set) and `Compare and seal`.
 
 **Listing and link notes (2026-10-01).** `GET /inv/investigations` lists what the caller may read — own plus
 those shared through an open linked Case, each judged by `openForRead` so R3 and a PDP DENY hide it — `{id,

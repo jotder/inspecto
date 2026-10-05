@@ -38,6 +38,7 @@ import {
     InvestigationSnapshotOpComponent,
     InvestigationThresholdOpComponent,
 } from './investigation-band-ops.component';
+import { InvestigationCompareOpComponent } from './investigation-compare-op.component';
 import { InvestigationWindowOpComponent } from './investigation-window-op.component';
 import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component';
 import { LinkAnalysisEntityListsComponent } from './link-analysis-entity-lists.component';
@@ -75,6 +76,7 @@ import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set
         InvestigationWindowOpComponent,
         InvestigationThresholdOpComponent,
         InvestigationSnapshotOpComponent,
+        InvestigationCompareOpComponent,
         LinkAnalysisDossierComponent,
         LinkAnalysisEntityListsComponent,
         LinkAnalysisIdentitiesComponent,

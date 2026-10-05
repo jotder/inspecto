@@ -85,7 +85,7 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
 public final class InvestigationTemplateRoutes implements RouteModule {
 
     /** Extensional ops that name entities of one graph with an analyst's judgement — they stay with the case. */
-    static final Set<String> CASE_OPS = Set.of("exclude", "hide", "keep", "annotate");
+    static final Set<String> CASE_OPS = Set.of("exclude", "hide", "keep", "annotate", "compare");   // compare: its two windows are this case's evidence
 
     @Override
     public void register(ApiContext api) {

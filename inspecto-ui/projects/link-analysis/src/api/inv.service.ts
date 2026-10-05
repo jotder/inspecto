@@ -218,7 +218,8 @@ export type InvestigationOpName =
     | 'excludeBy'
     | 'seedBy'
     | 'threshold'
-    | 'snapshot';
+    | 'snapshot'
+    | 'compare';
 
 /** A rung's traversal direction (plan §2.4; `InvestigationRoutes.DIRECTIONS`). */
 export type ExpandDirection = 'either' | 'out' | 'in' | 'reciprocal';
@@ -315,7 +316,10 @@ export type InvestigationOpRequest =
      *  Entities outside it are excluded (as `exclude`; `keep` protects). */
     | { op: 'threshold'; min?: number; max?: number }
     /** A log marker (`label` ≤ 2000 chars): it changes nothing in the Working Set and seals no file. */
-    | { op: 'snapshot'; label?: string };
+    | { op: 'snapshot'; label?: string }
+    /** Two windows of the bound time column diffed over the Working Set; the diff is SEALED into the log entry (the Working
+     *  Set does not change) and a Dossier carries it. Needs a time column (else 422); each side is a `window` object. */
+    | { op: 'compare'; windowA: InvestigationWindow; windowB: InvestigationWindow };
 
 /** What one step changed. Link changes are COUNTS only — the links themselves come from `/replay`. */
 export interface WorkingSetDelta {
