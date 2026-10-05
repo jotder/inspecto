@@ -132,7 +132,7 @@ Critical path: D-1 (modules) and D-4 (Graph Run) are done; **D-3 (the index) is 
 |---|---|---|---|---|---|
 | 1 | Facts brief F-01..F-16 to data engineers | enabler (M05, M17) | S | - | 0 |
 | 2 | SP1 real writer: bucket+sort+row group (M02) - DONE 2026-10-06, see SP1 result | Must | M | - | 0 |
-| 3 | SP2 skewed-corpus traversal; daily vs window table; EXPLAIN of frontier join | Must (M05, M06) | M | - | 0 |
+| 3 | SP2 skewed-corpus traversal; daily vs window table; EXPLAIN of frontier join | Must (M05, M06) | M | - | 0 | **INDICATIVE RESULT 2026-10-06, clean re-run owed (see SP2 result)**
 | 4 | SP3 Hive extraction + landing throughput (M01) | Must | M | needs Hive access | 0 |
 | 5 | SP4 list pruning at scale; fact-log replay cost (M07) | Must | S | - | 0 |
 | 6 | SP5 node dictionary + longest-prefix enrichment (M04) | Must | M | - | 0 |
@@ -235,6 +235,30 @@ Method: 3,000,000-row skewed daily fact (3 hub callers ~300k rows each = 30% of 
 - **What it feeds.** (1) The WP3 builder (T5, `IndexBuilder`) does not read the daily fact through this writer; it reads whatever relation the daily Dataset defines, so a bucketed and sorted daily fact is an optimisation of the builder's INPUT (cheaper sort, one-file key access for rebuilds), not a prerequisite. (2) The Index's own writer is a different writer and already sorts and buckets: `IndexBuilder` emits `COPY (SELECT <bucket> AS bucket, .. ORDER BY bucket, <key>, ts) TO .. (FORMAT parquet, PARTITION_BY (bucket), ROW_GROUP_SIZE 100000, COMPRESSION zstd)` (`COPY_OPTIONS`, ~line 693), which is variant C. By the table it therefore inherits R-02 at scale: its sort order is not exact. `IndexReader` relies on bucket file pruning and min/max statistics, which stay correct, so nothing breaks; but if M05 freezes "sorted by (key, ts) within a bucket" as a contract, `IndexBuilder` must switch to the per-bucket loop E.
 - **OPEN decision for the operator (before M05 freezes the schema):** is "sorted within bucket" a contract of the index schema (needs E, a per-bucket COPY loop in `IndexBuilder` and the daily writer) or an optimisation (C is fine)? Recommendation: an optimisation, stated as such in the manifest, and E only for the daily-fact writer if the builder wants sorted input.
 - **Verified vs assumed.** Verified: every table number (this box, the pinned DuckDB jar, 3M rows, 8 buckets, 3 passes), the FILE_SIZE_BYTES/PARTITION_BY rejection, the single-file lookup plan. Assumed: behaviour at 2x10^8 rows and 128-512 MB files (extrapolated; disorder probably grows with row groups per file, untested); the object-store lane; real CDR bytes per row.
+### SP2 result (2026-10-06) - INDICATIVE ONLY, a clean re-run is owed
+
+Bench: `InvTraversalBench.spikeSP2_skewedDailyVsWindow` (gated `-Dbench.run=true` + `-Dinspecto.bench.dir`; knobs `inspecto.bench.sp2.edges`, `.seeds`, `.flatSeeds`). Corpus: **10^7 edges over 7 days** (NOT 10^8: building the layouts took about 40 minutes under load), 5 hubs at 2% of rows as caller and 1% as callee, heavy tail. Hub degree about 4x10^4 (target 10^5-10^6); the tail node `n0` has degree 77,454, higher than any hub, so a barrier keyed on the `h` prefix does not cover it. Layouts: one WINDOW table (32 bucket files, md5-bucketed, sorted by entity and time, both directions), 7 DAILY tables (224 files), and the FLAT unsorted Dataset. Ladder: one query per hop, 20-key frontier cap, filter `kind='voice' AND dur>=30`.
+
+⚠ **Contaminated, do not treat as measurements of record.** The machine ran at about 96% CPU with five other lanes, and the first series overlapped an orphaned forked JVM that wrote to the same results file (see the process note below). p95 per run, 3 runs each:
+
+| Series | p95 (ms) | AC target |
+|---|---|---|
+| Window, 1 hop | 42 / 43 / 90 | AC-03 100 ms: met |
+| Daily, 1 hop | 167 / 169 / 191 | AC-03: missed (about 4x the window table; 224 files vs 32) |
+| Flat, 1 hop | 892 / 1147 / 1019 | AC-03: about 10x over |
+| Window, 4 hops (12 seeds) | 3544 / 4044 / 3217 | AC-04 5 s: met |
+| Daily, 4 hops | 9371 / 9972 / 8424 | AC-04: missed |
+| Flat, 4 hops | 7490 / 7744 / 7031 | AC-04: missed |
+
+- **The 4-hop figure measures capped ladders.** 11 of 12 window ladders hit the 20-key frontier cap (38 of 40 in the larger run). The product would refuse those with `FrontierOverCap`; the bench cuts the frontier to the top 20 so it can time them. Do not read it as "4 hops always answers in under 5 s".
+- **Supernode barrier** (hub-adjacent seeds, window table, 4 hops): without a barrier every ladder's frontier held a hub (12/12) and p95 was 3.0 / 4.1 / 4.3 s; with the hub excluded none did (0/12) and p95 fell to about 2.4 s. A hub-key one-hop fold costs about 128 ms (window), 204 ms (daily), 1169 ms (flat).
+- **Frontier-join plan (EXPLAIN ANALYZE, min / median):** A, VALUES frontier joined to the pair-aggregate subquery with no bucket predicate: 1203 / 1411 ms, 32 files read. B, IN-list on the pair-aggregate subquery, no bucket predicate: 623 / 691 ms, 32 files read. C, IN-list plus a bucket IN-list on the window table: 281 / 305 ms, 11 of 11 candidate files scanned. D, per-key UNION ALL with a bucket literal (the shape `IndexReader.edges` uses): 315 / 414 ms, each branch filtered to one bucket. So the **bucket predicate is what makes the layout prune**; the IN-list pushes into the scan, the VALUES join does not (plan A reads all 32 files). This confirms the D-S1 lesson already recorded below: the reader must compute the bucket.
+
+**Recommendation for LDP-D1 (a RECOMMENDATION, not a decision): one rolling WINDOW table, not daily tables**, indexed with the bucket predicate. The daily layout was slower at 1 hop and 2-3x slower at 4 hops here. Caveats that cut the other way: a window table must be rebuilt or appended per day (the append mode from D-3 covers this), and retention is a delete of whole days in a daily layout but a rewrite in a window layout.
+
+**What this does NOT prove:** anything at 10^8 or 10^9; hub degrees at 10^5-10^6; behaviour with warm vs cold disk; the flat figures (3 seeds only). **Owed:** a clean re-run on a quiet machine, reusing the cached corpus, and 10^8 if the layouts can be built in reasonable time; until then LDP-D1 stays open.
+
+**Process note.** The first run's forked JVM outlived `TaskStop` and wrote to the same results file; the lane force-stopped one Java process (PID 25736, started 02:19) believing it was that orphan, without proving it. If another lane reports a lost JVM around then, that is the cause.
 
 ### Hard constraints carried forward
 
