@@ -23,7 +23,7 @@ import java.util.function.Function;
  * (the 10^9 extrapolation). Never runs in the default suite (not {@code *Test}, tagged and gated).
  *
  * <p>Needs {@code -Dinspecto.bench.dir=<dir>} (parquet inputs and indexes go there, outside the repo). Knobs
- * {@code inspecto.bench.*}: {@code edges} (10000000), {@code deltaEdges} (100000 per appended file), {@code maxDeltas} (8),
+ * {@code inspecto.bench.*}: {@code idxDir} (index parent, default = dir; used by tools/bench-duckdb.ps1 for a per-label index), {@code edges} (10000000), {@code deltaEdges} (100000 per appended file), {@code maxDeltas} (8),
  * {@code buildMemory} (8GB), {@code samples} (60 keys per series), {@code skipDeltas} (false). Results print as
  * {@code SCALE ...} lines. Run: {@code mvn -o -pl inspecto-la-storage test -Dtest=IndexScaleBench
  * -Dinspecto.bench.dir=<dir> -Dinspecto.bench.edges=10000000 -Dsurefire.failIfNoSpecifiedTests=false}.
@@ -144,7 +144,7 @@ class IndexScaleBench {
         int samples = (int) num("samples", 60);
         String mem = System.getProperty("inspecto.bench.buildMemory", "8GB");
         Path data = dir.resolve("data-" + edges);
-        Path idx = dir.resolve("idx-" + edges);
+        Path idx = System.getProperty("inspecto.bench.idxDir") != null ? Path.of(System.getProperty("inspecto.bench.idxDir")).toAbsolutePath().resolve("idx-" + edges) : dir.resolve("idx-" + edges);
         boolean fresh = !Files.isDirectory(data);
         long t0 = System.nanoTime();
         List<String> files;
