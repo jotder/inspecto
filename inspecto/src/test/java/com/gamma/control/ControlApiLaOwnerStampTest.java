@@ -146,4 +146,31 @@ class ControlApiLaOwnerStampTest {
             assertEquals("keepme", owner(c, "tidy"));
         }
     }
+
+    @Test
+    void oddlyCasedTypeStillStampedViaConfigWriteAndPatch(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            int i = 0;
+            for (String t : new String[] {"LA.INDEX.BUILD", " la.index.build "}) {
+                String n = "cw" + i++;
+                String body = "{\"type\":\"job\",\"config\":{\"job\":" + job(n, "victim", "").replace("\"la.index.build\"", "\"" + t + "\"") + "}}";
+                HttpResponse<String> w = send(c, "POST", "/config/write", body, "Bearer builder");
+                assertTrue(w.statusCode() < 300, w.body());
+                Path f;
+                try (var walk = Files.walk(c.wr())) {
+                    f = walk.filter(p -> p.getFileName().toString().startsWith(n)).findFirst().orElseThrow(() -> new AssertionError(w.body()));
+                }
+                String disk = Files.readString(f);
+                assertTrue(disk.contains("builder-1") && !disk.contains("victim"), "write: " + disk);
+
+                // patch by another user with a spoofed owner and an odd type
+                String patch = "{\"type\":\"job\",\"name\":\"" + n + "\",\"patch\":{\"job\":{\"type\":\"" + t
+                        + "\",\"owner\":\"victim\"}}}";
+                HttpResponse<String> p = send(c, "POST", "/config/patch", patch, "Bearer other");
+                assertTrue(p.statusCode() < 300, p.body());
+                disk = Files.readString(f);
+                assertTrue(disk.contains("other-2") && !disk.contains("victim"), "patch: " + disk);
+            }
+        }
+    }
 }

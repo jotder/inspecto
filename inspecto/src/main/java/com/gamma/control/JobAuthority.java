@@ -70,7 +70,7 @@ final class JobAuthority {
         // T5 owner-spoofing (operator 2026-10-06): an la.index.build Job's `owner` is the authority its scheduled
         // build runs under, so it is the SAVER's id unless the saver holds canConfigureAccess (then the typed value
         // stands). Every save re-stamps, so a different editor becomes the owner; no Subject => untouched (above).
-        if (LA_INDEX_BUILD.equals(String.valueOf(out.get("type"))) && !s.get().capabilities().contains(Roles.CAN_CONFIGURE_ACCESS))
+        if (LA_INDEX_BUILD.equals(String.valueOf(out.get("type")).trim().toLowerCase(Locale.ROOT)) && !s.get().capabilities().contains(Roles.CAN_CONFIGURE_ACCESS))
             out.put(LA_OWNER, by);
         return out;
     }
