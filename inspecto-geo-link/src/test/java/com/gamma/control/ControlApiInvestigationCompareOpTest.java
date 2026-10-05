@@ -191,6 +191,35 @@ class ControlApiInvestigationCompareOpTest {
     }
 
     @Test
+    void minAbsDeltaIsSealedOnlyWhenGivenAndHidesSmallerMoves(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            build(c);
+            String plain = post(c, OPS, ACTIVITY).at("/comparison/fingerprint").asText();
+            // Every move in this corpus is one event: a floor of 2 lists none and counts them as below the floor.
+            JsonNode r = post(c, OPS, ACTIVITY.replace("\"mode\":\"activity\",", "\"mode\":\"activity\",\"minAbsDelta\":2,"));
+            assertEquals(2, r.at("/comparison/activity/minAbsDelta").asInt(), r.toString());
+            assertEquals(0, r.at("/comparison/activity/links/changed/count").asInt(), r.toString());
+            assertEquals(2, r.at("/comparison/activity/links/belowMinDelta").asInt());
+            assertEquals(4, r.at("/comparison/activity/entities/belowMinDelta").asInt());
+            assertEquals(1, r.at("/comparison/activity/links/unchanged").asInt(), "unchanged keeps its meaning");
+            assertNotEquals(plain, r.at("/comparison/fingerprint").asText(), "the floor is in the hashed content");
+            // A floor of 1 lists everything the plain diff does, but states the floor.
+            JsonNode one = post(c, OPS, ACTIVITY.replace("\"mode\":\"activity\",", "\"mode\":\"activity\",\"minAbsDelta\":1,"));
+            assertEquals(2, one.at("/comparison/activity/links/changed/count").asInt());
+            assertEquals(0, one.at("/comparison/activity/links/belowMinDelta").asInt());
+            // Without it the sealed diff carries no trace of it, so earlier seals verify unchanged.
+            assertFalse(post(c, OPS, ACTIVITY).at("/comparison/activity").has("minAbsDelta"));
+            assertEquals(plain, post(c, OPS, ACTIVITY).at("/comparison/fingerprint").asText());
+            assertTrue(post(c, "/inv/investigations/case-a/replay", "{}").get("equivalent").asBoolean());
+            assertTrue(get(c, "/inv/investigations/case-a/dossier").at("/integrity/intact").asBoolean());
+            // Refusals: presence mode, zero, non-integer.
+            assertEquals(422, send(c, "POST", OPS, COMPARE.replace("\"op\":\"compare\",", "\"op\":\"compare\",\"minAbsDelta\":2,"), null).statusCode());
+            assertEquals(422, send(c, "POST", OPS, ACTIVITY.replace("\"mode\":\"activity\",", "\"mode\":\"activity\",\"minAbsDelta\":0,"), null).statusCode());
+            assertEquals(422, send(c, "POST", OPS, ACTIVITY.replace("\"mode\":\"activity\",", "\"mode\":\"activity\",\"minAbsDelta\":\"x\","), null).statusCode());
+        }
+    }
+
+    @Test
     void aSideMayInheritTheInvestigationsWindow(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             build(c);

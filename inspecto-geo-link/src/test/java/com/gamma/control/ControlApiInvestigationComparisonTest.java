@@ -110,6 +110,37 @@ class ControlApiInvestigationComparisonTest {
     }
 
     @Test
+    void activityModeOnTheReadRouteMatchesTheSealedOpSemantics(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            build(c);
+            JsonNode presence = data(send(c.port, "GET", CMP, null, null));
+            assertFalse(presence.has("activity"), "presence stays the default");
+            JsonNode d = data(send(c.port, "GET", CMP + "&mode=activity", null, null));
+            assertEquals("activity", d.get("mode").asText());
+            assertFalse(d.get("sealed").asBoolean());
+            // a>b 1 -> 0, a>c 1 -> 1, c>d 0 -> 1; a 2 -> 1, b 1 -> 0, c 1 -> 2, d 0 -> 1 (e-f was never admitted).
+            assertEquals(2, d.at("/activity/links/changed/count").asInt(), d.toString());
+            assertEquals(1, d.at("/activity/links/unchanged").asInt());
+            assertEquals("a", d.at("/activity/links/changed/items/0/source").asText());
+            assertEquals(-1, d.at("/activity/links/changed/items/0/delta").asInt());
+            assertEquals(4, d.at("/activity/entities/changed/count").asInt());
+            assertEquals("a", d.at("/activity/entities/changed/items/0/id").asText());
+            assertFalse(d.at("/activity").has("minAbsDelta"));
+            assertEquals(presence.get("links").get("onlyA").toString(), d.get("links").get("onlyA").toString(), "presence sections are unchanged");
+
+            JsonNode floor = data(send(c.port, "GET", CMP + "&mode=activity&minAbsDelta=2", null, null));
+            assertEquals(0, floor.at("/activity/links/changed/count").asInt());
+            assertEquals(2, floor.at("/activity/links/belowMinDelta").asInt());
+            assertEquals(2, floor.at("/activity/minAbsDelta").asInt());
+
+            assertEquals(422, status(c, CMP + "&mode=bogus"));
+            assertEquals(422, status(c, CMP + "&minAbsDelta=2"), "a floor needs mode=activity");
+            assertEquals(422, status(c, CMP + "&mode=activity&minAbsDelta=0"));
+            assertEquals(422, status(c, CMP + "&mode=activity&minAbsDelta=abc"));
+        }
+    }
+
+    @Test
     void diffsTheWorkingSetAcrossTwoWindowsAndOnlyTheWorkingSet(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             build(c);
