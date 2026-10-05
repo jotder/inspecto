@@ -94,12 +94,23 @@ public final class IndexRoutes implements RouteModule {
         builderOverride = builder;
     }
 
+    /** The registered routes of this JVM, so a scheduled build uses the same per-Space {@link IndexBuildService} as {@code POST /inv/index/builds}; null = no API is up. */
+    private static volatile IndexRoutes active;
+
+    /** The per-Space build service the HTTP routes use, or null when no control API is registered (a scheduled build then refuses). */
+    static IndexBuildService scheduledService(Path writeRoot) {
+        IndexRoutes r = active;
+        return r == null ? null : r.services.get(writeRoot);
+    }
+
     private final IndexBuildServices services = new IndexBuildServices(IndexRoutes::newService, System::currentTimeMillis,
             IndexBuildServices.IDLE_TTL_MS);
 
     @Override
     public void register(ApiContext api) {
         api.onClose(services::close);
+        active = this;                                                                        // the scheduled build (la.index.build) shares THIS service: one queue, one duplicate guard
+        api.onClose(() -> { if (active == this) active = null; });
         api.onClose(IndexReader::evictAll);                                                   // pooled sealed readers die with the API
         // ⚠ String LITERAL on purpose - CapabilityManifestTest's scanner matches only a literal argument.
         api.post("/inv/index/builds", ApiContext.withCapability("canBuildLinkIndex", (e, m) -> start(api, e, api.body(e))));
@@ -117,7 +128,7 @@ public final class IndexRoutes implements RouteModule {
                 IndexBuildService.WORKER_KEEPALIVE_MS, b);
     }
 
-    private static Path indexRoot(Path writeRoot) {
+    static Path indexRoot(Path writeRoot) {
         return writeRoot.resolve(INDEX_DIR);
     }
 
@@ -160,7 +171,7 @@ public final class IndexRoutes implements RouteModule {
         RunView v;
         try {
             v = service(writeRoot).submit(new IndexBuildService.Request(callerId(ex), dataset, mapping,
-                    ds -> relation(api, writeRoot, dataset, relationSql),
+                    ds -> relation(api.dataRoot(), writeRoot, dataset, relationSql),
                     ix.maxDiskBytesInForce(), ix.keepVersionsInForce(), mode));
         } catch (Refused refused) {
             throw map(refused);
@@ -173,16 +184,16 @@ public final class IndexRoutes implements RouteModule {
     }
 
     /** The relation to build over with its input fingerprint (and file list, when small enough to record). Runs on the submitting thread. */
-    private static IndexBuildService.Relation relation(ApiContext api, Path writeRoot, String dataset, String relationSql) {
-        InputFingerprint fp = currentInput(api, writeRoot, dataset);
+    static IndexBuildService.Relation relation(Path dataRoot, Path writeRoot, String dataset, String relationSql) {
+        InputFingerprint fp = currentInput(dataRoot, writeRoot, dataset);
         List<IndexManifest.InputFile> files = null;
         if (fp != null && fp.known() && fp.files().size() <= IndexManifest.MAX_INPUT_FILES)
             files = fp.files().stream().map(f -> new IndexManifest.InputFile(f.path(), f.size(), f.mtimeMillis())).toList();
         // APPEND reads only the added files: the provider renders the relation over them (null = not row-wise, never appendable)
         Function<List<String>, String> deltaSql = added -> DatasetProviders.require().dataset(writeRoot, dataset)
-                .map(c -> DatasetProviders.require().relationSqlOverFiles(c, api.dataRoot(), writeRoot, added)).orElse(null);
+                .map(c -> DatasetProviders.require().relationSqlOverFiles(c, dataRoot, writeRoot, added)).orElse(null);
         List<Path> roots = DatasetProviders.require().dataset(writeRoot, dataset)
-                .map(c -> DatasetProviders.require().readRoots(c, api.dataRoot())).orElse(List.of());
+                .map(c -> DatasetProviders.require().readRoots(c, dataRoot)).orElse(List.of());
         return new IndexBuildService.Relation(relationSql, fp == null ? "unknown" : fp.value(), files, deltaSql, roots);
     }
 
@@ -532,7 +543,8 @@ public final class IndexRoutes implements RouteModule {
                 InputFingerprintCache.invalidate(v.datasetId(), v.mappingHash());
                 IndexReader.evictAll();                                                       // a new version is current: close the old one's idle readers
             }
-            Event.Builder b = base(type, v, v.owner(), "user").attr("elapsedMs", v.elapsedMs());
+            Event.Builder b = base(type, v, v.owner(), v.owner().startsWith(ScheduledIndexBuild.PRINCIPAL_PREFIX) ? "service" : "user")
+                    .attr("elapsedMs", v.elapsedMs());
             if (v.result() != null) {
                 IndexBuilder.Result r = v.result();
                 b = b.attr("version", r.version()).attr("rows", r.rowsInRelation()).attr("edges", r.edges()).attr("buckets", r.buckets());

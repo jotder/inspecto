@@ -255,4 +255,9 @@ public final class LinkEventTypes {
 
     /** An index build failed; nothing was published. Adds {@code failure} (the exception CLASS name, never its message). */
     public static final String LINK_INDEX_BUILD_FAILED = "LINK_INDEX_BUILD_FAILED";
+
+    /** A SCHEDULED index build (the {@code la.index.build} Job, run as the delegated principal {@code index-build:<job>})
+     *  was attempted or refused. Adds {@code dataset}, {@code result} (BUILT | UP_TO_DATE | REFUSED | FAILED | RUNNING),
+     *  {@code mode} and, on a refusal, the stable {@code code}. Never a column name or a row value. */
+    public static final String LINK_INDEX_SCHEDULED_RUN = "LINK_INDEX_SCHEDULED_RUN";
 }

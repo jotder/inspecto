@@ -64,6 +64,16 @@ final class DryRunServices implements PlatformServices {
                 return List.<Alert>of();
             });
         }
+        if (type == com.gamma.linkindex.LinkIndexAccess.class) {
+            // A build writes a new index version: no preview form. Reporting DRY_RUN (not UP_TO_DATE) keeps a
+            // consumer from claiming an index that was never checked is current.
+            return Optional.of((T) (com.gamma.linkindex.LinkIndexAccess) req -> {
+                log.info("dry run: would build the Link Analysis Index - nothing was built", "job", req.job());
+                return new com.gamma.linkindex.LinkIndexAccess.Outcome(
+                        com.gamma.linkindex.LinkIndexAccess.Outcome.DRY_RUN, null, null,
+                        "dry run: nothing was built", 0L, 0L, 0);
+            });
+        }
         // S3-1: a pack-contributed mutating service substitutes through its own mandatory stand-in.
         if (granted instanceof PlatformServiceRegistry.StandIns s) {
             Optional<Object> standIn = s.standIn(type, log);

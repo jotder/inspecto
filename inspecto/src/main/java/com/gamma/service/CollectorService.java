@@ -446,6 +446,20 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // accessor, so it resolves the engine at call time rather than capturing a not-yet-assigned field.
         platformServices.register("alerts", com.gamma.alert.AlertAccess.class,
                 com.gamma.alert.AlertAccess.over(() -> alertService().orElse(null)));
+        // LA-DAILY-INGEST-1 (T5): the Link Analysis Index build, behind the optional inspecto-geo-link bridge.
+        // Same write-root resolution as the Investigation probe below (this Space's config dir, else the
+        // -Dassist.write.root read at construction); absent the bridge the service throws and the Job fails closed.
+        final String indexWriteRoot = System.getProperty("assist.write.root");
+        platformServices.register("link-index", com.gamma.linkindex.LinkIndexAccess.class,
+                com.gamma.linkindex.LinkIndexAccess.over(
+                        () -> OptionalSpi.first(com.gamma.linkindex.LinkIndexBuilder.class).orElse(null),
+                        () -> root.config() != null ? root.config()
+                                : (indexWriteRoot == null || indexWriteRoot.isBlank()) ? null
+                                : java.nio.file.Path.of(indexWriteRoot.trim()).toAbsolutePath().normalize(),
+                        () -> {
+                            String dd = System.getProperty("data.dir", root.dataDir());
+                            return (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd);
+                        }));
         // Object Engine (EDITIONS CP-11): discovered, not constructed. The optional inspecto-ops module
         // contributes an ObjectEngineProvider; absent it this is empty and every operational-object
         // surface answers 503, while events are still recorded and the audit trail is untouched.
