@@ -100,8 +100,14 @@ describe('PATTERN_PACKS', () => {
         expect(layering.stages!.map((s) => s.shape)).toEqual(['fan-out', 'fan-in']);
         expect(circ.stages!.map((s) => s.shape)).toEqual(['fan-out', 'fan-in', 'fan-out', 'fan-in']);
         for (const p of [layering, circ]) {
-            expect(p.stages!.slice(1).every((s) => s.afterPrevious && s.maxGapHours === 48), p.id).toBe(true);
-            expect(p.stages!.some((s) => s.threshold), p.id).toBe(false);
+            expect(
+                p.stages!.slice(1).every((s) => s.afterPrevious && s.maxGapHours === 48),
+                p.id,
+            ).toBe(true);
+            expect(
+                p.stages!.some((s) => s.threshold),
+                p.id,
+            ).toBe(false);
         }
         // circular-flow keeps routing to the Cycles tool; the branching pack is a separate id
         expect(PATTERN_PACKS.find((p) => p.id === 'circular-flow')!.tool).toBe('cycles');

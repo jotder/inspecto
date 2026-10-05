@@ -108,13 +108,22 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
  */
 export function parseExcludes(text: string): InvestigationWindowExclude[] | null {
     const out: InvestigationWindowExclude[] = [];
-    for (const raw of text.split(/[,\n]/).map((t) => t.trim()).filter(Boolean)) {
+    for (const raw of text
+        .split(/[,\n]/)
+        .map((t) => t.trim())
+        .filter(Boolean)) {
         const eq = raw.indexOf('=');
         const name = eq >= 0 ? raw.slice(0, eq).trim() : '';
-        const [a, b, ...rest] = (eq >= 0 ? raw.slice(eq + 1) : raw).trim().split('..').map((d) => d.trim());
-        if (rest.length || !ISO_DATE.test(a) || (b !== undefined && !ISO_DATE.test(b)) || (eq >= 0 && !name)) return null;
+        const [a, b, ...rest] = (eq >= 0 ? raw.slice(eq + 1) : raw)
+            .trim()
+            .split('..')
+            .map((d) => d.trim());
+        if (rest.length || !ISO_DATE.test(a) || (b !== undefined && !ISO_DATE.test(b)) || (eq >= 0 && !name))
+            return null;
         if (b !== undefined && b < a) return null;
-        out.push(b === undefined ? { date: a, ...(name ? { name } : {}) } : { from: a, to: b, ...(name ? { name } : {}) });
+        out.push(
+            b === undefined ? { date: a, ...(name ? { name } : {}) } : { from: a, to: b, ...(name ? { name } : {}) },
+        );
     }
     return out;
 }

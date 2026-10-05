@@ -108,8 +108,8 @@ const label = (t: number): string => new Date(t).toISOString().slice(0, 16).repl
             </p>
             @if (reduced) {
                 <p class="text-secondary m-0 w-full text-xs" data-test="playback-reduced">
-                    Your system asks for reduced motion, so playback does not advance by itself. Step through the
-                    slices instead.
+                    Your system asks for reduced motion, so playback does not advance by itself. Step through the slices
+                    instead.
                 </p>
             }
         </section>
@@ -149,7 +149,8 @@ export class LinkAnalysisTimelinePlaybackComponent {
 
     readonly status = computed(() => {
         const a = this.active();
-        if (!a) return `Not started. ${this.count()} slices from ${label(this.extent()[0])} to ${label(this.extent()[1])}.`;
+        if (!a)
+            return `Not started. ${this.count()} slices from ${label(this.extent()[0])} to ${label(this.extent()[1])}.`;
         const n = a.selection.edgeIds.length;
         return `Slice ${a.slice.index + 1} of ${a.slice.count}: ${label(a.slice.start)} to ${label(a.slice.end)} — ${n} ${n === 1 ? 'link' : 'links'} active.`;
     });

@@ -132,7 +132,15 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
             @if (state(); as s) {
                 <div role="status" class="flex flex-col gap-1" data-test="temporal-summary">
                     <p class="m-0 text-xs">
-                        {{ s.findings.length }} {{ s.mode === 'burst' ? 'burst(s)' : s.series === 'entity' ? 'regular entity(ies)' : 'regular link(s)' }} found
+                        {{ s.findings.length }}
+                        {{
+                            s.mode === 'burst'
+                                ? 'burst(s)'
+                                : s.series === 'entity'
+                                  ? 'regular entity(ies)'
+                                  : 'regular link(s)'
+                        }}
+                        found
                         @if (s.offCanvas) {
                             · {{ s.offCanvas }} not drawn on this canvas
                         }

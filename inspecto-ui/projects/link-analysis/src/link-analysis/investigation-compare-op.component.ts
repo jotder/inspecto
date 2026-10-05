@@ -83,7 +83,14 @@ export class InvestigationCompareOpComponent {
         // `full` is never set here, so a side is an object or 'inherit'; an empty side already fails the form's own rule.
         const windowA = this.inheritA() ? 'inherit' : (windowOf(this.formA) as InvestigationWindow);
         const windowB = this.inheritB() ? 'inherit' : (windowOf(this.formB) as InvestigationWindow);
-        if (await this.store.apply({ op: 'compare', windowA, windowB, ...(this.byCount() ? { mode: 'activity' as const } : {}) })) {
+        if (
+            await this.store.apply({
+                op: 'compare',
+                windowA,
+                windowB,
+                ...(this.byCount() ? { mode: 'activity' as const } : {}),
+            })
+        ) {
             this.formA.reset();
             this.formB.reset();
             this.inheritA.set(false);

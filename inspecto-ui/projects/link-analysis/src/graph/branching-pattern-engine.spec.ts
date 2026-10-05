@@ -214,7 +214,9 @@ describe('layering-network and circular-financing packs (run through the matcher
         expect(res.matches[0].layers).toEqual([['src'], ['m1', 'm2', 'm3'], ['dst']]);
         // the mules forward BEFORE they were paid: a topology claim, not a layering flow
         const early = web.map((l): Leg => (l[0].startsWith('m') ? [l[0], l[1], l[2], '2026-08-30 12:00:00'] : l));
-        expect(matchBranchingPattern(graph(early), stagesOf('layering-network'), { timeAttr: 'AT' }).matches).toHaveLength(0);
+        expect(
+            matchBranchingPattern(graph(early), stagesOf('layering-network'), { timeAttr: 'AT' }).matches,
+        ).toHaveLength(0);
     });
 
     it('circular-financing needs two split-and-merge rounds; one round is not enough', () => {

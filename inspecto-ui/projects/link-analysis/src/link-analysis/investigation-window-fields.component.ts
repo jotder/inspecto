@@ -100,13 +100,16 @@ import { WINDOW_DAYS, WindowForm, crossesMidnight } from './investigation-rung-f
             }
             <inspecto-option-picker label="Timezone" formControlName="timezone" [options]="zones" />
             <p class="text-secondary m-0 text-xs">
-                Slot, days and excluded dates are wall-clock time in this zone — required with either; there is no default.
+                Slot, days and excluded dates are wall-clock time in this zone — required with either; there is no
+                default.
             </p>
             @if (form().hasError('zone') && form().touched) {
                 <p class="text-warn m-0 text-xs" role="alert">A slot, day mask or excluded date needs a timezone.</p>
             }
             @if (form().hasError('empty') && form().touched) {
-                <p class="text-warn m-0 text-xs" role="alert">Set at least one of From, To, a slot, days or excluded dates.</p>
+                <p class="text-warn m-0 text-xs" role="alert">
+                    Set at least one of From, To, a slot, days or excluded dates.
+                </p>
             }
         </div>
     `,

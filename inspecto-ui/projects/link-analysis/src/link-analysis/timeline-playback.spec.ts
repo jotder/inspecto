@@ -54,7 +54,8 @@ describe('timeline playback slices', () => {
 
     it('every dated link is active in exactly one slice; undated or unparseable ones in none', () => {
         const seen: string[] = [];
-        for (let i = 0; i < PLAYBACK_SLICES; i++) seen.push(...activeInSlice(GRAPH, 'ts', playbackSlice(EXTENT, i)).edgeIds);
+        for (let i = 0; i < PLAYBACK_SLICES; i++)
+            seen.push(...activeInSlice(GRAPH, 'ts', playbackSlice(EXTENT, i)).edgeIds);
         expect(seen.sort()).toEqual(['e1', 'e2', 'e3']);
     });
 });
