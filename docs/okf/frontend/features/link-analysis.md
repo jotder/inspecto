@@ -1938,6 +1938,7 @@ Already covered there (skip): LD refusal codes, `standing` binding, `canViewAs`,
 
 #### Entity Types
 - Normaliser is a closed enum `default | digits | e164 | upper-trim`; Java and TS stay identical via `inspecto-ui/src/app/inspecto/graph/entity-normaliser-parity.fixture.json` (fed to `entity-key.spec.ts` and `EntityTypesTest`). "Whitespace" means the JavaScript `\s` set on both sides (Java `\s`, `trim()`, `strip()` miss NBSP); final sigma folds to sigma on both sides. (entity design 4.1, 4.3.2)
+- Phone numbers and the node dictionary (SP5, 2026-10-06): the sealed `e164` normaliser keeps a national number national (no default country, no trunk-prefix strip), loses the `+` after a leading `(`, and does no length check, so only `+` ids are longest-prefix enrichable. DuckDB measured longest-prefix enrichment of 10^7 numbers in about 2 s and a new-only daily upsert in about 4 s against about 10 s for a full re-derive (extrapolation to 10^9 is not a measurement). Evidence and the open normaliser decision: `docs/superpower/link-analysis-roadmap.md` "SP5 findings".
 - Settings validation (422, never clamped): id `^[a-z][a-z0-9_]{0,31}$` and unique; id `entity` reserved; label non-blank; a classification claimed by at most one type; at most 64 types; a stated list replaces the defaults and may not be empty. Wire `entityTypes` / `entityTypesInForce`. (4.1, 8.2)
 
 #### Entity List wire contract (4.3.1, 4.3.2)
