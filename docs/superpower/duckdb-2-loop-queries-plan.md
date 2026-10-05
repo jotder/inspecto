@@ -12,7 +12,7 @@
 1. **DuckDB 2.0 (alpha) has no native graph syntax.** `CREATE PROPERTY GRAPH` / `GRAPH_TABLE` / `ANY SHORTEST`
    are parse errors on 2.0 and on 1.5.6, and the community `duckpgq` extension is an HTTP 404 for both
    `v2.0.0-alpha43385` and `v1.5.6`. Decision `D9` in
-   [`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md) ("DuckDB 2.0's own graph features
+   [`la-separation-feasibility-plan.md`](../archived-documents/plans-archive/la-separation-feasibility-plan.md) ("DuckDB 2.0's own graph features
    when the pin moves") has therefore **no native-syntax answer yet**; what 2.0 actually offers is the
    items below.
 2. **The one big, verified win is recursive-CTE `USING KEY`** (key-based recursion, with the `recurring.<cte>`
@@ -222,7 +222,7 @@ Lane C and D need the machine quiet (benchmark timings); A and B are safe to run
 
 ## References
 
-- [`la-separation-feasibility-plan.md`](la-separation-feasibility-plan.md) §7.10 — spikes `D-S1`..`D-S5`, decision `D9` (graph engine order), `DuckPGQ` dropped 2026-10-01.
+- [`la-separation-feasibility-plan.md`](../archived-documents/plans-archive/la-separation-feasibility-plan.md) §7.10 — spikes `D-S1`..`D-S5`, decision `D9` (graph engine order), `DuckPGQ` dropped 2026-10-01.
 - [`../okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md) — the Link Analysis concept.
 - `inspecto-geo-link/src/test/java/com/gamma/control/InvTraversalBench.java` — the measurement harness (gate `G-R4`).
 - `docs/GLOSSARY.md` — canonical vocabulary (Dataset, Working Set, Investigation, Pipeline).
