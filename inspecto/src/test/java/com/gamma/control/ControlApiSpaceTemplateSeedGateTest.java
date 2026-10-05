@@ -292,4 +292,26 @@ class ControlApiSpaceTemplateSeedGateTest {
         b = "GET".equals(method) ? b.GET() : b.method(method, BodyPublishers.ofString(body == null ? "" : body));
         return client.send(b.build(), BodyHandlers.ofString());
     }
+
+    /** T5 owner-spoofing: a seeded la.index.build Job's typed owner is replaced by the applier's id (no Subject: kept). */
+    @Test
+    void aSeededIndexBuildJobOwnerIsStampedWithTheApplier(@TempDir Path root) throws Exception {
+        Path tpl = root.resolve("_templates").resolve("ix");
+        Files.createDirectories(tpl.resolve("config").resolve("jobs"));
+        Files.writeString(tpl.resolve("template.toon"), "name: Ix" + NL);
+        Files.writeString(tpl.resolve("config/jobs/ix_job.toon"), String.join(NL, "job:", "  name: ix",
+                "  type: LA.Index.Build", "  dataset: d", "  source_col: a", "  target_col: b", "  owner: victim", ""));
+        Files.writeString(tpl.resolve("config/jobs/other_job.toon"), String.join(NL, "job:", "  name: other",
+                "  type: maintenance", "  task: noop", "  owner: keepme", ""));
+        try (Ctx c = open(root)) {
+            HttpResponse<String> r = send(c, "POST", "/spaces", "{QQidQQ:QQacmeQQ,QQtemplateQQ:QQixQQ}".replace("QQ", QUOTE), ADMIN);
+            assertEquals(200, r.statusCode(), r.body());
+            String ix = Files.readString(root.resolve("acme/config/jobs/ix_job.toon"));
+            assertTrue(ix.contains("admin-1") && !ix.contains("victim"), ix);
+            assertTrue(Files.readString(root.resolve("acme/config/jobs/other_job.toon")).contains("keepme"));
+        }
+    }
+
+    private static final String NL = System.lineSeparator();
+    private static final String QUOTE = String.valueOf((char) 34);
 }

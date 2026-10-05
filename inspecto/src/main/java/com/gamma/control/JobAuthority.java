@@ -59,6 +59,13 @@ final class JobAuthority {
      * {@code updatedByRoles} = the writer's held roles. Nothing stamped without a Subject.
      */
     static Map<String, Object> stamp(HttpExchange ex, Map<String, Object> job, String priorCreatedBy) {
+        return stamp(ex, job, priorCreatedBy, Map.of());
+    }
+
+    /** {@link #stamp(HttpExchange, Map, String)}; {@code carriedTemplates} (name to its job block's {@code type}) are
+     *  the Job templates the same write carries, on top of the Space's own. */
+    static Map<String, Object> stamp(HttpExchange ex, Map<String, Object> job, String priorCreatedBy,
+                                     Map<String, String> carriedTemplates) {
         Map<String, Object> out = new LinkedHashMap<>(job);
         JobConfig.AUTHOR_KEYS.forEach(out::remove);
         Optional<Subject> s = ApiContext.subject(ex);
@@ -67,8 +74,66 @@ final class JobAuthority {
         out.put(JobConfig.CREATED_BY, priorCreatedBy == null || priorCreatedBy.isBlank() ? by : priorCreatedBy);
         out.put(JobConfig.UPDATED_BY, by);
         out.put(JobConfig.UPDATED_BY_ROLES, String.join(",", new TreeSet<>(ComponentAccess.heldRoles(ex))));
+        // T5 owner-spoofing (operator 2026-10-06): an la.index.build Job's `owner` is the authority its scheduled
+        // build runs under, so it is the SAVER's id unless the saver holds canConfigureAccess (then the typed value
+        // stands). Every save re-stamps, so a different editor becomes the owner; no Subject => untouched (above).
+        if (mayBeIndexBuild(ex, out, carriedTemplates) && !s.get().capabilities().contains(Roles.CAN_CONFIGURE_ACCESS)) {
+            out.put(LA_OWNER, by);   // the INSTANCE value wins over a template's (JobTemplate.instantiate overlays it)
+            for (String layer : List.of("args", "bind"))   // the run-time ladder would let these override it
+                if (out.get(layer) instanceof Map<?, ?> m && m.containsKey(LA_OWNER)) {
+                    Map<Object, Object> copy = new LinkedHashMap<>(m);
+                    copy.remove(LA_OWNER);
+                    out.put(layer, copy);
+                }
+        }
         return out;
     }
+
+    /**
+     * Whether {@code job} IS, or after template expansion may be, an {@code la.index.build} Job: its own type
+     * (normalised as {@code JobConfig.fromMap} does) when it has one, else its {@code template:}'s job-block type
+     * (carried by the write, else the Space's). A template that cannot be resolved here (not yet imported, or its type
+     * is a placeholder) counts as a match - FAIL CLOSED by stamping, not by refusing, so bundle order never matters.
+     */
+    private static boolean mayBeIndexBuild(HttpExchange ex, Map<String, Object> job, Map<String, String> carried) {
+        Object own = job.get("type");
+        if (own != null && !String.valueOf(own).isBlank())
+            return LA_INDEX_BUILD.equals(String.valueOf(own).trim().toLowerCase(Locale.ROOT));
+        Object ref = job.get("template");
+        if (ref == null || String.valueOf(ref).isBlank()) return false;
+        String name = String.valueOf(ref).trim();
+        String type = carried.get(name);
+        if (type == null) {
+            try {
+                var t = com.gamma.job.AttachApprovals.templates(ex == null ? null : Roles.configRoot(ex)).get(name);
+                if (t != null) type = String.valueOf(t.jobBlock().get("type"));
+            } catch (RuntimeException noSpace) {
+                type = null;
+            }
+        }
+        if (type == null || type.contains("${")) return true;
+        return LA_INDEX_BUILD.equals(type.trim().toLowerCase(Locale.ROOT));
+    }
+
+    /** name to job-block {@code type} for every {@code *_job_template.toon} in {@code entries}. */
+    private static Map<String, String> carriedTemplateTypes(Map<String, byte[]> entries) {
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Map.Entry<String, byte[]> e : entries.entrySet()) {
+            if (!ImportCapabilityGuard.normalizedPath(e.getKey()).endsWith("_job_template.toon")) continue;
+            try {
+                Map<String, Object> m = ConfigCodec.toMap(new String(e.getValue(), StandardCharsets.UTF_8));
+                if (m.get("job_template") instanceof Map<?, ?> t && t.get("name") != null)
+                    out.put(String.valueOf(t.get("name")).trim(),
+                            t.get("job") instanceof Map<?, ?> j && j.get("type") != null ? String.valueOf(j.get("type")) : "${unknown}");
+            } catch (RuntimeException unparseable) {
+                // the loader skips an unparseable template too
+            }
+        }
+        return out;
+    }
+
+    private static final String LA_INDEX_BUILD = "la.index.build";
+    private static final String LA_OWNER = "owner";
 
     /** {@link #stamp(HttpExchange, Map, String)} over a parsed Job; {@code existing} is the stored one, or null. */
     static JobConfig stamp(HttpExchange ex, JobConfig c, JobConfig existing) {
@@ -79,12 +144,18 @@ final class JobAuthority {
     /** A config-write draft ({@code {job: {...}}} or the bare section), stamped; {@code prior} as above. */
     @SuppressWarnings("unchecked")
     static Map<String, Object> stampDraft(HttpExchange ex, Map<String, Object> draft, String prior) {
+        return stampDraft(ex, draft, prior, Map.of());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> stampDraft(HttpExchange ex, Map<String, Object> draft, String prior,
+                                                  Map<String, String> carried) {
         if (draft.get("job") instanceof Map<?, ?> j) {
             Map<String, Object> out = new LinkedHashMap<>(draft);
-            out.put("job", stamp(ex, (Map<String, Object>) j, prior));
+            out.put("job", stamp(ex, (Map<String, Object>) j, prior, carried));
             return out;
         }
-        return stamp(ex, draft, prior);
+        return stamp(ex, draft, prior, carried);
     }
 
     /** The stored {@code createdBy} of a decoded Job doc (either shape), or null. */
@@ -101,6 +172,7 @@ final class JobAuthority {
      */
     static Map<String, byte[]> stampFiles(HttpExchange ex, Map<String, byte[]> entries) {
         LinkedHashMap<String, byte[]> out = null;
+        Map<String, String> carried = carriedTemplateTypes(entries);
         for (Map.Entry<String, byte[]> e : entries.entrySet()) {
             if (!ImportCapabilityGuard.normalizedPath(e.getKey()).endsWith("_job.toon")) continue;
             Map<String, Object> doc;
@@ -109,7 +181,7 @@ final class JobAuthority {
             } catch (RuntimeException unparseable) {
                 continue;
             }
-            Map<String, Object> stamped = stampDraft(ex, doc, null);
+            Map<String, Object> stamped = stampDraft(ex, doc, null, carried);
             if (stamped.equals(doc)) continue;   // nothing to strip or stamp (no Subject): the bytes stay verbatim
             if (out == null) out = new LinkedHashMap<>(entries);
             out.put(e.getKey(), ConfigCodec.toToon(stamped).getBytes(StandardCharsets.UTF_8));

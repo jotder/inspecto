@@ -197,6 +197,32 @@ class ControlApiImportCapabilityGateTest {
         }
     }
 
+    /** T5 owner-spoofing: a type-less `template:` instance whose template supplies la.index.build AND owner (raw import). */
+    @Test
+    void aTemplatedIndexBuildJobOwnerIsStampedOnRawImport(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            String nl = System.lineSeparator();
+            Map<String, byte[]> all = new LinkedHashMap<>();
+            all.put("bundle.toon", "kind: datasource" .concat(String.valueOf((char) 10)).getBytes(StandardCharsets.UTF_8));
+            Files.createDirectories(c.config.resolve("jobs"));
+            Files.writeString(c.config.resolve("jobs/lat_job_template.toon"), String.join(nl, "job_template:", "  name: lat", "  job:",
+                    "    type: la.index.build", "    dataset: d", "    source_col: a", "    target_col: b", "    owner: victim", ""));
+            all.put("jobs/ti_job.toon", String.join(nl, "job:", "  name: ti", "  template: lat", "").getBytes(StandardCharsets.UTF_8));
+            all.put("jobs/to_job.toon", String.join(nl, "job:", "  name: to", "  template: notyet", "").getBytes(StandardCharsets.UTF_8));
+            HttpResponse<String> r = send(c, "POST", "/import", zip(all), BUILDER);
+            assertEquals(200, r.statusCode(), r.body());
+            for (String n : new String[] {"ti", "to"}) {
+                String disk = Files.readString(c.config.resolve("jobs/" + n + "_job.toon"));
+                assertTrue(disk.contains("builder-1") && !disk.contains("victim"), n + ": " + disk);
+            }
+            // the template still says victim, but the instance key overlays it at load (JobTemplate.instantiate)
+            var tmpl = com.gamma.job.JobTemplate.load(c.config.resolve("jobs/lat_job_template.toon").toString());
+            var job = com.gamma.util.ToonHelper.requireSection(
+                    com.gamma.util.ToonHelper.load(c.config.resolve("jobs/ti_job.toon").toString()), "job");
+            assertEquals("builder-1", String.valueOf(tmpl.instantiate(job).get("owner")));
+        }
+    }
+
     @Test
     void aRawImportEventPruneJobNeedsCanAdministerButAnOrdinaryJobDoesNot(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {

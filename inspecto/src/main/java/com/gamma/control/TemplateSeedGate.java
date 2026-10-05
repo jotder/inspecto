@@ -79,7 +79,22 @@ final class TemplateSeedGate {
         }
         KpiRoutes.requireTemplateKpis(ex, spaceBase);
         requireStructure(config);
+        stampJobs(ex, config);   // T5 owner-spoofing: a seeded la.index.build Job is owned by the applier
         requireConnections(config);
+    }
+
+    /** Server-stamp every seeded {@code *_job.toon} as the other Job doors do ({@link JobAuthority#stampFiles}); rewritten only when changed. */
+    private static void stampJobs(HttpExchange ex, Path config) {
+        Map<String, byte[]> entries = configEntries(config);
+        Map<String, byte[]> stamped = JobAuthority.stampFiles(ex, entries);
+        if (stamped == entries) return;
+        try {
+            for (Map.Entry<String, byte[]> e : stamped.entrySet())
+                if (!java.util.Arrays.equals(e.getValue(), entries.get(e.getKey())))
+                    Files.write(config.resolve(e.getKey()), e.getValue());
+        } catch (IOException io) {
+            throw new UncheckedIOException(io);
+        }
     }
 
     /** Each {@code *_connection.toon} meets what a Connection save runs ({@link ConnectionRoutes#validateProfile}). */
