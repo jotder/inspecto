@@ -52,6 +52,9 @@ final class DossierHtml {
         section(b, "Topology", value(d.get("topology")));
         section(b, "Scores", value(d.get("scores")));
         section(b, "Working set", value(d.get("workingSet")));
+        // Sealed op sections exist only when the log has such an op, so a Dossier without one renders byte-identically.
+        if (d.get("comparisons") != null) section(b, "Comparisons", value(d.get("comparisons")));
+        if (d.get("temporalFindings") != null) section(b, "Temporal findings", value(d.get("temporalFindings")));
         section(b, "Integrity", value(d.get("integrity")));
         section(b, "Manifest", value(manifest));
         return b.append("</body></html>\n").toString();

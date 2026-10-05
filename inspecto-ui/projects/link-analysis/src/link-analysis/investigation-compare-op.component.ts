@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -12,7 +12,7 @@ import { windowForm, windowOf } from './investigation-rung-form';
  * over the Working Set as it stands. The server reads the Dataset once, SEALS the diff into the log entry and changes
  * nothing in the Working Set; a Dossier then carries the diff in custody. Each side is the same object the `window` op
  * sends, so the same fields (and the same timezone contract) apply; or `inherit`, the Investigation's own window at that step.
- * "By event count" also seals the per-link / per-entity count delta. The server's 422 is shown verbatim beside the form.
+ * "By event count" also seals the per-link / per-entity count delta, optionally only changes of at least `minAbsDelta` events. The server's 422 is shown verbatim beside the form.
  */
 @Component({
     selector: 'inspecto-la-compare-op',
@@ -54,6 +54,28 @@ import { windowForm, windowOf } from './investigation-rung-form';
                     <input type="checkbox" [checked]="byCount()" (change)="byCount.set(!byCount())" />
                     By event count (also seal each link's and entity's count change)
                 </label>
+                @if (byCount()) {
+                    <label class="flex flex-col gap-1 text-xs">
+                        Smallest count change to list (optional)
+                        <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            inputmode="numeric"
+                            class="w-32 rounded border px-2 py-1"
+                            style="border-color: var(--gamma-border)"
+                            [value]="minAbsDelta()"
+                            [attr.aria-invalid]="minAbsDeltaInvalid() ? 'true' : null"
+                            [attr.aria-describedby]="minAbsDeltaInvalid() ? 'la-compare-min-abs-delta-err' : null"
+                            (input)="minAbsDelta.set($any($event.target).value)"
+                        />
+                    </label>
+                    @if (minAbsDeltaInvalid()) {
+                        <p id="la-compare-min-abs-delta-err" class="m-0 text-xs" role="alert">
+                            Enter a whole number of 1 or more, or leave it empty.
+                        </p>
+                    }
+                }
                 <button mat-stroked-button type="submit" class="self-start" [disabled]="store.busy()">
                     Compare and seal
                 </button>
@@ -71,10 +93,17 @@ export class InvestigationCompareOpComponent {
     readonly inheritA = signal(false);
     readonly inheritB = signal(false);
     readonly byCount = signal(false);
+    /** Raw text of the optional `minAbsDelta` floor; honoured only with "By event count" (the server refuses it otherwise). */
+    readonly minAbsDelta = signal('');
+    readonly minAbsDeltaInvalid = computed(() => {
+        const v = this.minAbsDelta().trim();
+        return this.byCount() && v !== '' && !/^[1-9]\d*$/.test(v);
+    });
     readonly error = signal('');
 
     async submit(): Promise<void> {
         this.error.set('');
+        if (this.minAbsDeltaInvalid()) return;
         if ((!this.inheritA() && this.formA.invalid) || (!this.inheritB() && this.formB.invalid)) {
             this.formA.markAllAsTouched();
             this.formB.markAllAsTouched();
@@ -88,7 +117,12 @@ export class InvestigationCompareOpComponent {
                 op: 'compare',
                 windowA,
                 windowB,
-                ...(this.byCount() ? { mode: 'activity' as const } : {}),
+                ...(this.byCount()
+                    ? {
+                          mode: 'activity' as const,
+                          ...(this.minAbsDelta().trim() ? { minAbsDelta: Number(this.minAbsDelta().trim()) } : {}),
+                      }
+                    : {}),
             })
         ) {
             this.formA.reset();
@@ -96,6 +130,7 @@ export class InvestigationCompareOpComponent {
             this.inheritA.set(false);
             this.inheritB.set(false);
             this.byCount.set(false);
+            this.minAbsDelta.set('');
         } else this.error.set(this.store.error());
     }
 }

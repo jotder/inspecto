@@ -243,6 +243,24 @@ class ControlApiInvestigationTemporalOpTest {
     }
 
     @Test
+    void theHtmlDossierRendersTheSealedFindingsMaskedAndDeterministic(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: all\n");
+        try (Ctx c = open(cfg, root)) {
+            build(c);
+            String none = send(c, "GET", "/inv/investigations/case-a/dossier?format=html", null, null).body();
+            assertFalse(none.contains("Temporal findings"), "no temporal op, no section");
+            post(c, OPS, BURST);
+            String h1 = send(c, "GET", "/inv/investigations/case-a/dossier?format=html", null, null).body();
+            String h2 = send(c, "GET", "/inv/investigations/case-a/dossier?format=html", null, null).body();
+            assertEquals(h1.replaceAll("generated [^<]*", ""), h2.replaceAll("generated [^<]*", ""), "deterministic apart from the stamp");
+            assertTrue(h1.contains("<h2>Temporal findings</h2>"), h1);
+            assertTrue(h1.contains("<th>events</th>") || h1.contains("<th>results</th>"), h1);
+            String section = h1.substring(h1.indexOf("<h2>Temporal findings</h2>"), h1.indexOf("<h2>Integrity</h2>"));
+            assertFalse(section.contains(">ann<") || section.contains(">bob<"), "raw id leaked under masking_mode all: " + section);
+        }
+    }
+
+    @Test
     void masksTheSealedFindingsAndRefusesWhatItCannotSeal(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: all\n");
         try (Ctx c = open(cfg, root)) {

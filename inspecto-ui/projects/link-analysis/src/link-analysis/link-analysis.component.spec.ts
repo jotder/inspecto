@@ -1215,4 +1215,67 @@ describe('LinkAnalysisComponent', () => {
             expect(el.querySelector('[data-testid="node-list-omitted"]')?.textContent).toContain('40 more links');
         });
     });
+
+    describe('sealTemporal (LA-INVESTIGATION-OPS-DEFERRED-1)', () => {
+        const REQ = { mapping: 0, mode: 'burst', series: 'link', windowSeconds: 60, minEvents: 5, maxCv: 0.2 };
+        /** The scan panel is spec'd on its own; here the host's seal wiring is driven from the state a run leaves. */
+        function scanned() {
+            const { fixture } = create();
+            fixture.detectChanges();
+            const c = fixture.componentInstance;
+            (c as unknown as { lastTemporalRun: unknown }).lastTemporalRun = { ...REQ };
+            c.temporalFindings.set({} as never);
+            return c;
+        }
+
+        it('sends the scan knobs of the shown run as a temporal op and records what was sealed', async () => {
+            const c = scanned();
+            const apply = vi.spyOn(c.investigation, 'apply').mockResolvedValue(true);
+            c.investigation.lastStep.set({
+                step: 4,
+                temporalFindings: { count: 2, outsideWorkingSet: 1, fingerprint: 'abc' },
+            } as never);
+            await c.sealTemporal();
+            expect(apply).toHaveBeenCalledWith({
+                op: 'temporal',
+                mode: 'burst',
+                series: 'link',
+                minEvents: 5,
+                windowSeconds: 60,
+            });
+            expect(c.temporalSealed()).toEqual({ step: 4, count: 2, outsideWorkingSet: 1, fingerprint: 'abc' });
+            expect(c.temporalSealError()).toBe('');
+        });
+
+        it('sends maxCv, not windowSeconds, for periodicity', async () => {
+            const c = scanned();
+            (c as unknown as { lastTemporalRun: unknown }).lastTemporalRun = { ...REQ, mode: 'periodicity' };
+            const apply = vi.spyOn(c.investigation, 'apply').mockResolvedValue(true);
+            await c.sealTemporal();
+            expect(apply).toHaveBeenCalledWith({
+                op: 'temporal',
+                mode: 'periodicity',
+                series: 'link',
+                minEvents: 5,
+                maxCv: 0.2,
+            });
+        });
+
+        it('shows the server refusal and records no seal', async () => {
+            const c = scanned();
+            vi.spyOn(c.investigation, 'apply').mockResolvedValue(false);
+            c.investigation.error.set('this Investigation has no time column');
+            await c.sealTemporal();
+            expect(c.temporalSealError()).toBe('this Investigation has no time column');
+            expect(c.temporalSealed()).toBeNull();
+        });
+
+        it('does nothing when no scan is showing', async () => {
+            const { fixture } = create();
+            fixture.detectChanges();
+            const apply = vi.spyOn(fixture.componentInstance.investigation, 'apply');
+            await fixture.componentInstance.sealTemporal();
+            expect(apply).not.toHaveBeenCalled();
+        });
+    });
 });

@@ -54,6 +54,36 @@ describe('InvestigationCompareOpComponent (LA-INVESTIGATION-OPS-DEFERRED-1)', ()
         expect(cmp.byCount()).toBe(false);
     });
 
+    it('sends minAbsDelta only with By event count, and refuses a non-integer floor in place', async () => {
+        const { fixture, cmp, store, el } = setup();
+        cmp.formA.patchValue({ from: '2026-09-01T00:00:00Z' });
+        cmp.formB.patchValue({ from: '2026-09-03T00:00:00Z' });
+        expect(el.querySelector('input[type="number"]')).toBeNull();
+        cmp.byCount.set(true);
+        fixture.detectChanges();
+        const input = el.querySelector('input[type="number"]') as HTMLInputElement;
+        input.value = '0';
+        input.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        expect(el.textContent).toContain('Enter a whole number of 1 or more');
+        expect(input.getAttribute('aria-invalid')).toBe('true');
+        await expectNoA11yViolations(el);
+        await cmp.submit();
+        expect(store.apply).not.toHaveBeenCalled();
+        input.value = '5';
+        input.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        await cmp.submit();
+        expect(store.apply).toHaveBeenLastCalledWith({
+            op: 'compare',
+            windowA: { from: '2026-09-01T00:00:00Z' },
+            windowB: { from: '2026-09-03T00:00:00Z' },
+            mode: 'activity',
+            minAbsDelta: 5,
+        });
+        expect(cmp.minAbsDelta()).toBe('');
+    });
+
     it('does not send an empty side, nor a naive instant', async () => {
         const { fixture, cmp, store, el } = setup();
         cmp.formA.patchValue({ from: '2026-09-01T00:00:00Z' });
