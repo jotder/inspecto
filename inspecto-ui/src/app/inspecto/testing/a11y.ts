@@ -27,11 +27,32 @@ const DISABLED_RULES = [
  * several regions of a large page in ONE axe pass — each separate run pays axe's setup cost again.
  */
 export async function expectNoA11yViolations(root: Element | axe.ElementContext): Promise<void> {
-    const results = await axe.run(root, {
+    // axe-core keeps module-global run state and rejects an overlapping run with "Axe is already
+    // running". A run orphaned by a timed-out test (slow under suite load) would otherwise poison
+    // every later test in the worker, so runs are strictly serialised through this queue.
+    const turn = axeQueue;
+    let release!: () => void;
+    axeQueue = new Promise<void>((resolve) => (release = resolve));
+    await turn;
+    let results: axe.AxeResults;
+    try {
+        results = await runAxe(root);
+    } finally {
+        release();
+    }
+    reportViolations(results);
+}
+
+let axeQueue: Promise<void> = Promise.resolve();
+
+function runAxe(root: Element | axe.ElementContext): Promise<axe.AxeResults> {
+    return axe.run(root, {
         rules: Object.fromEntries(DISABLED_RULES.map((id) => [id, { enabled: false }])),
         resultTypes: ['violations'],
     });
+}
 
+function reportViolations(results: axe.AxeResults): void {
     if (results.violations.length > 0) {
         const summary = results.violations
             .map(
