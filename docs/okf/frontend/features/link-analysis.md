@@ -1671,7 +1671,7 @@ the Dataset read; audited best-effort as `LINK_INVESTIGATION_COMPARED`. *Dossier
 parameters are passed; it is labelled `sealed: false` and sits OUTSIDE the manifest and integrity check (the rest of the Dossier reads no Dataset, and the manifest root is
 unchanged by it); the `steps`/`method` renderings and the HTML print do not include it. Gates cleared: `AbsentGeoLinkRoutes`, `openapi-v1.json`, the RouteModule service
 file; a GET needs no `authgate` bare literal, `CapabilityManifest` row or `route-gating` entry (read route). Test: `ControlApiInvestigationComparisonTest`.
-⏳ Open questions (still open after the `compare` op below): per-window `window: inherit`? entity *activity* (event counts) diffs rather than presence? — filed in the BACKLOG row.
+Both open questions (per-side `window: inherit`; event-count *activity* diffs) were built into the sealed `compare` op below (2026-10-05); the read route stays presence-only.
 
 **Comparison as a SEALED op — `compare` (2026-10-05, `LA-INVESTIGATION-OPS-DEFERRED-1`, operator-recommended slice).** The read route above stays (live, unsealed); `POST /inv/investigations/{id}/ops`
 now also takes `{op:"compare", windowA:{…}, windowB:{…}}` (each side is a `window` object — `InvestigationTime.window`, so `from`/`to`/`slot`/`days`/`timezone`; needs a `timeCol`). **Design calls:**
@@ -1687,7 +1687,16 @@ now also takes `{op:"compare", windowA:{…}, windowB:{…}}` (each side is a `w
 * **Log view** (`GET …/log`) and the plain-language line show counts only (`links only in A n, …`); the append answer carries the full sealed `comparison`. Masking is at render over raw sealed ids, as for the Working Set.
 * **No new route:** `/ops` already gates on `canManageIncidents` (bare literal in `InvestigationRoutes.register`), `openapi-v1.json` does not enumerate ops, and the route-gating table is unchanged. Test: `ControlApiInvestigationCompareOpTest`
   (real HTTP, with a Subject: gate 403/401, tamper probe, masking, determinism, fork re-seal, refusals). Slot/day masks per side fall out of reusing `InvestigationTime.window` (pinned: a `days:["TUE"]` side drops a Wednesday event).
-* **SPA:** `InvestigationCompareOpComponent` (`inspecto-la-compare-op`) beside the window / threshold / marker forms in the Investigation pane — two `inspecto-la-window-fields` (the window op's own field set) and `Compare and seal`.
+* **`window: "inherit"` per side + `mode: "activity"` (2026-10-05, design calls).** (1) *inherit* is the string `"inherit"` for `windowA` and/or `windowB` (the same spelling `expand` already uses). The stored params keep `"inherit"`; the SEALED diff carries the
+  CONCRETE window it resolved to (the Investigation's window at that step, `state.window`) plus `inherited: ["B"]`, so replay and the Dossier read a fixed fact and never re-resolve. It is **refused 422 when the Investigation has no window at that step** (it
+  reads the full time range: an unbounded side is almost surely a mistake and would make a diff against "everything"); a fork / Draft promote re-resolves it against the new order's window and refuses the same way. Both sides may inherit (a diff of a
+  window with itself: nothing moves). (2) *activity* = `mode: "activity"` (absent / `"presence"` = the old behaviour, kept OUT of the params so earlier steps are byte-identical). The presence sections stay; the sealed diff adds `mode` and
+  `activity: {links:{changed, unchanged}, entities:{changed, unchanged}}` where `changed` is a capped (500) section of `{source,target,kind,countA,countB,delta}` / `{id,countA,countB,delta}` with `delta = countB - countA`, sorted by |delta| desc then id
+  (deterministic). An entity's count is the in-window events on the Working Set links it ends (a self-loop once); still Working Set only, exact, same row cap. (3) *Fingerprint:* `mode`, `activity` and `inherited` join the hashed content ONLY when present, so
+  a presence diff sealed before this slice still verifies; a presence and an activity diff of the same windows seal different fingerprints. The Dossier root stays deterministic (no clock); the tamper probe on a hand-edited `delta` goes red on the integrity
+  check. The log line and `GET …/log` carry counts only (`event count changed on n links and m entities`). Not built: an activity diff on the GET read route (`/compare` is presence-only), thresholds on the delta. Test additions: `ControlApiInvestigationCompareOpTest`
+  (`activityModeSeals…`, `aSideMayInheritTheInvestigationsWindow`).
+* **SPA:** `InvestigationCompareOpComponent` (`inspecto-la-compare-op`) beside the window / threshold / marker forms in the Investigation pane — two `inspecto-la-window-fields` (the window op's own field set), a per-side *Use the Investigation's window* checkbox (sends `"inherit"`, hides that side's fields), a *By event count* checkbox (sends `mode:"activity"`) and `Compare and seal`.
 
 **Listing and link notes (2026-10-01).** `GET /inv/investigations` lists what the caller may read — own plus
 those shared through an open linked Case, each judged by `openForRead` so R3 and a PDP DENY hide it — `{id,

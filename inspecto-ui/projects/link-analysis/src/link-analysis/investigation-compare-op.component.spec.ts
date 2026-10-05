@@ -35,6 +35,25 @@ describe('InvestigationCompareOpComponent (LA-INVESTIGATION-OPS-DEFERRED-1)', ()
         });
     });
 
+    it('sends inherit for a side and mode activity when asked, without validating the inherited side', async () => {
+        const { fixture, cmp, store, el } = setup();
+        cmp.inheritB.set(true);
+        cmp.byCount.set(true);
+        fixture.detectChanges();
+        expect(el.textContent).toContain("Use the Investigation's window");
+        await expectNoA11yViolations(el);
+        cmp.formA.patchValue({ from: '2026-09-01T00:00:00Z' });
+        await cmp.submit();
+        expect(store.apply).toHaveBeenLastCalledWith({
+            op: 'compare',
+            windowA: { from: '2026-09-01T00:00:00Z' },
+            windowB: 'inherit',
+            mode: 'activity',
+        });
+        expect(cmp.inheritB()).toBe(false);
+        expect(cmp.byCount()).toBe(false);
+    });
+
     it('does not send an empty side, nor a naive instant', async () => {
         const { fixture, cmp, store, el } = setup();
         cmp.formA.patchValue({ from: '2026-09-01T00:00:00Z' });

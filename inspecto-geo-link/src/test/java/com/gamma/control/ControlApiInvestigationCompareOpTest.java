@@ -141,6 +141,86 @@ class ControlApiInvestigationCompareOpTest {
         }
     }
 
+    private static final String ACTIVITY = COMPARE.replace("\"op\":\"compare\",", "\"op\":\"compare\",\"mode\":\"activity\",");
+
+    @Test
+    void activityModeSealsPerLinkAndPerEntityEventCountDeltas(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            build(c);
+            JsonNode r = post(c, OPS, ACTIVITY);
+            assertEquals("activity", r.at("/comparison/mode").asText());
+            // a-b 1 -> 0, a-c 1 -> 1 (unchanged), c-d 0 -> 1; ties on |delta| order by id.
+            assertEquals(2, r.at("/comparison/activity/links/changed/count").asInt(), r.toString());
+            assertEquals(1, r.at("/comparison/activity/links/unchanged").asInt());
+            assertEquals("a", r.at("/comparison/activity/links/changed/items/0/source").asText());
+            assertEquals(-1, r.at("/comparison/activity/links/changed/items/0/delta").asInt());
+            assertEquals(1, r.at("/comparison/activity/links/changed/items/1/delta").asInt());
+            // a 2 -> 1, b 1 -> 0, c 1 -> 2, d 0 -> 1: every Working Set entity moved by one.
+            assertEquals(4, r.at("/comparison/activity/entities/changed/count").asInt(), r.toString());
+            assertEquals("a", r.at("/comparison/activity/entities/changed/items/0/id").asText());
+            assertEquals(2, r.at("/comparison/activity/entities/changed/items/0/countA").asInt());
+            assertEquals(1, r.at("/comparison/activity/entities/changed/items/0/countB").asInt());
+            assertTrue(r.at("/comparison/links/onlyA/count").isNumber(), "presence sections stay alongside");
+
+            JsonNode entry = get(c, "/inv/investigations/case-a/log").at("/entries/3");
+            assertTrue(entry.get("text").asText().contains("by event count") && entry.get("text").asText().contains("changed on 2 links and 4 entities"),
+                    entry.get("text").asText());
+            assertEquals(2, entry.at("/comparison/activity/links/changed").asInt(), "the log view carries counts only: " + entry);
+
+            // Same inputs, same fingerprint; a presence diff of the same windows seals a different one (mode is in the content).
+            String fp = r.at("/comparison/fingerprint").asText();
+            assertEquals(fp, post(c, OPS, ACTIVITY).at("/comparison/fingerprint").asText(), "deterministic");
+            assertNotEquals(fp, post(c, OPS, COMPARE).at("/comparison/fingerprint").asText());
+
+            assertTrue(post(c, "/inv/investigations/case-a/replay", "{}").get("equivalent").asBoolean());
+            JsonNode d = get(c, "/inv/investigations/case-a/dossier");
+            assertTrue(d.at("/integrity/intact").asBoolean(), d.at("/integrity").toString());
+            assertEquals(d.at("/manifest/root").asText(), get(c, "/inv/investigations/case-a/dossier").at("/manifest/root").asText());
+
+            // Tamper with a sealed delta on disk: the fingerprint no longer matches the content.
+            Path logFile = root.resolve("audit/snapshots/investigations/case-a/log.jsonl");
+            List<String> lines = Files.readAllLines(logFile);
+            String forged = lines.get(3).replaceFirst("\"delta\":-1", "\"delta\":-9");
+            assertNotEquals(lines.get(3), forged, "the probe edited nothing");
+            lines.set(3, forged);
+            Files.write(logFile, lines);
+            assertFalse(get(c, "/inv/investigations/case-a/dossier").at("/integrity/intact").asBoolean());
+
+            assertEquals(422, send(c, "POST", OPS, COMPARE.replace("\"op\":\"compare\",", "\"op\":\"compare\",\"mode\":\"bogus\","), null).statusCode());
+        }
+    }
+
+    @Test
+    void aSideMayInheritTheInvestigationsWindow(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            build(c);
+            String inheritB = ACTIVITY.replaceAll("\"windowB\":\\{[^}]*\\}", "\"windowB\":\"inherit\"");
+            assertEquals(422, send(c, "POST", OPS, inheritB, null).statusCode(), "no window set yet: nothing to inherit");
+            assertEquals(3, Files.readAllLines(root.resolve("audit/snapshots/investigations/case-a/log.jsonl")).size(), "the refusal appended nothing");
+
+            post(c, OPS, "{\"op\":\"window\",\"window\":{\"from\":\"2026-09-03T00:00:00-03:00\",\"to\":\"2026-09-06T00:00:00-03:00\","
+                    + "\"timezone\":\"America/Sao_Paulo\"}}");
+            JsonNode inherited = post(c, OPS, inheritB);
+            JsonNode explicit = post(c, OPS, ACTIVITY);
+            assertEquals("2026-09-03T03:00:00Z", inherited.at("/comparison/windowB/from").asText(), "frozen as the concrete window it was");
+            assertEquals("B", inherited.at("/comparison/inherited/0").asText());
+            assertEquals(explicit.at("/comparison/links").toString(), inherited.at("/comparison/links").toString());
+            assertEquals(explicit.at("/comparison/activity").toString(), inherited.at("/comparison/activity").toString());
+            String text = get(c, "/inv/investigations/case-a/log").at("/entries/4/text").asText();
+            assertTrue(text.contains("the Investigation's window (from 2026-09-03T03:00:00Z"), text);
+            assertNotEquals(explicit.at("/comparison/fingerprint").asText(), inherited.at("/comparison/fingerprint").asText(), "the inherit is part of the sealed content");
+
+            // Both sides inherited is allowed (a window diffed with itself: nothing moves).
+            JsonNode same = post(c, OPS, "{\"op\":\"compare\",\"windowA\":\"inherit\",\"windowB\":\"inherit\",\"mode\":\"activity\"}");
+            assertEquals(0, same.at("/comparison/activity/links/changed/count").asInt());
+
+            // The stored params keep "inherit"; replay carries the sealed diff.
+            String line = Files.readAllLines(root.resolve("audit/snapshots/investigations/case-a/log.jsonl")).get(4);
+            assertTrue(line.contains("\"windowB\":\"inherit\""), line);
+            assertTrue(post(c, "/inv/investigations/case-a/replay", "{}").get("equivalent").asBoolean());
+        }
+    }
+
     @Test
     void aDossierCarriesTheSealedDiffInCustodyAndItsRootIsDeterministic(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
