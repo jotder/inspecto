@@ -6,6 +6,7 @@ import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.util.JdbcDrivers;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -28,6 +29,7 @@ class DbEventStoreChainWriterTest {
 
     private static String adminUrl;
     private static String pgUrl;
+    private static String pgSchema;
 
     @BeforeAll
     static void prepareAnIsolatedSchema() throws Exception {
@@ -38,7 +40,16 @@ class DbEventStoreChainWriterTest {
         try (Connection c = DriverManager.getConnection(adminUrl); Statement s = c.createStatement()) {
             s.execute("CREATE SCHEMA " + schema);
         }
+        pgSchema = schema;
         pgUrl = adminUrl + (adminUrl.contains("?") ? "&" : "?") + "currentSchema=" + schema;
+    }
+
+    @AfterAll
+    static void dropTheIsolatedSchema() throws Exception {
+        if (pgSchema == null) return;
+        try (Connection c = DriverManager.getConnection(adminUrl); Statement s = c.createStatement()) {
+            s.execute("DROP SCHEMA IF EXISTS " + pgSchema + " CASCADE");
+        }
     }
 
     private static void needPg() {
