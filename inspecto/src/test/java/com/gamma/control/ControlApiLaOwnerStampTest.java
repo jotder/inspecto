@@ -173,4 +173,23 @@ class ControlApiLaOwnerStampTest {
             }
         }
     }
+
+    private static final String Q = String.valueOf((char) 34);
+
+    /** the run-time ladder (args / bind) could override the stamped owner: they are stripped of `owner` on save. */
+    @Test
+    void argsAndBindOwnerAreStrippedOnSave(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            String body = job("ab", "victim", ",QargsQ:{QownerQ:QvictimQ,QxQ:Q1Q},QbindQ:{QownerQ:Q$signal.uQ}".replace("Q", Q));
+            HttpResponse<String> w = send(c, "POST", "/config/write", ("{QtypeQ:QjobQ,QconfigQ:{QjobQ:" + body + "}}").replace("Q", Q), "Bearer builder");
+            assertTrue(w.statusCode() < 300, w.body());
+            Path f;
+            try (var walk = Files.walk(c.wr())) {
+                f = walk.filter(x -> x.getFileName().toString().startsWith("ab")).findFirst().orElseThrow(() -> new AssertionError(w.body()));
+            }
+            String disk = Files.readString(f);
+            assertTrue(disk.contains("builder-1") && !disk.contains("victim"), disk);
+            assertTrue(disk.contains("x"), disk);
+        }
+    }
 }

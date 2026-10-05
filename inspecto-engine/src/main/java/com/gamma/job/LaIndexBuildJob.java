@@ -60,7 +60,7 @@ final class LaIndexBuildJob implements Job {
         Map<String, String> p = ctx.params();
         LinkIndexAccess.Request req = new LinkIndexAccess.Request(cfg.name(), need(p, "dataset"),
                 need(p, "source_col"), need(p, "target_col"), opt(p, "kind_col"), opt(p, "time_col"),
-                opt(p, "time_col_zone"), opt(p, "weight_col"), list(opt(p, "attr_cols")), need(p, "owner"),
+                opt(p, "time_col_zone"), opt(p, "weight_col"), list(opt(p, "attr_cols")), need(cfg.params(), "owner"),   // the AUTHORED, save-stamped owner - never the args / bind / manual-trigger layers
                 "true".equalsIgnoreCase(String.valueOf(p.get("allow_full")).trim()),
                 timeoutSeconds(p.get("timeout_seconds")) * 1000L);
 

@@ -24,7 +24,7 @@ class LaIndexBuildJobTest {
             "timeout_seconds", "5");
 
     private static Job job() {
-        return new LaIndexBuildJob(JobConfig.fromMap(Map.of("job", Map.of("name", "xdr_index", "type", "la.index.build"))));
+        return new LaIndexBuildJob(JobConfig.fromMap(Map.of("job", Map.of("name", "xdr_index", "type", "la.index.build", "owner", "analyst-1"))));
     }
 
     private static PlatformServices grantOf(LinkIndexAccess access) {
@@ -104,8 +104,9 @@ class LaIndexBuildJobTest {
     void aMissingRequiredParameterIsRejectedBeforeAnythingRuns() {
         Map<String, String> p = new HashMap<>(PARAMS);
         p.remove("owner");
+        var ownerless = new LaIndexBuildJob(JobConfig.fromMap(Map.of("job", Map.of("name", "xdr_index", "type", "la.index.build"))));
         var boom = assertThrows(IllegalArgumentException.class,
-                () -> job().run(new Ctx(false, grantOf(r -> outcome("BUILT", "full", null)), p)));
+                () -> ownerless.run(new Ctx(false, grantOf(r -> outcome("BUILT", "full", null)), PARAMS)));
         assertTrue(boom.getMessage().contains("owner"), boom.getMessage());
     }
 
@@ -176,5 +177,16 @@ class LaIndexBuildJobTest {
                 @Override public void error(String m, Throwable t, Object... kv) { }
             };
         }
+    }
+
+    /** T5 owner-spoofing class: trigger args / signal bind / manual params can resolve a different `owner`; it is ignored. */
+    @Test
+    void aResolvedOwnerFromArgsOrBindIsIgnoredTheAuthoredOneIsUsed() throws Exception {
+        var seen = new AtomicReference<LinkIndexAccess.Request>();
+        Map<String, String> p = new HashMap<>(PARAMS);
+        p.put("owner", "victim");
+        Ctx ctx = new Ctx(false, grantOf(r -> { seen.set(r); return outcome("BUILT", "append", null); }), p);
+        assertTrue(job().run(ctx).success());
+        assertEquals("analyst-1", seen.get().owner());
     }
 }
