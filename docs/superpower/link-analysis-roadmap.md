@@ -134,7 +134,7 @@ Critical path: D-1 (modules) and D-4 (Graph Run) are done; **D-3 (the index) is 
 | 2 | SP1 real writer: bucket+sort+row group (M02) | Must | M | - | 0 |
 | 3 | SP2 skewed-corpus traversal; daily vs window table; EXPLAIN of frontier join | Must (M05, M06) | M | - | 0 |
 | 4 | SP3 Hive extraction + landing throughput (M01) | Must | M | needs Hive access | 0 |
-| 5 | SP4 list pruning at scale; fact-log replay cost (M07) | Must | S | - | 0 |
+| 5 | SP4 list pruning at scale; fact-log replay cost (M07) - MEASURED 2026-10-06, see SP4 findings | Must | S | - | 0 |
 | 6 | SP5 node dictionary + longest-prefix enrichment (M04) | Must | M | - | 0 |
 | 7 | Rate-limiter coverage of `/inv` and `/geo` (M16 part) | Must | S | - | 0 |
 | 8 | Doc fixes (below) + GLOSSARY entries for signed terms | enabler | S | - | 0 |
@@ -206,6 +206,31 @@ Done-when: WP2 sorted row groups survive partitioned write, day re-run gives ide
 - SP5: node dictionary 2x10^8-10^9 numbers, longest-prefix enrichment of new numbers, full re-derive. Pass: daily upsert <=30 min, memory + re-derive time stated. Feeds M04.
 - SP6: presence at 4.5x10^8 rows/day x 7 days; "who was with X" with/without hot-cell cap. Pass: AC-06. Feeds M10, F-05 (waits on F-02/F-05).
 - SP7: concurrency (3 and 20 analysts + one heavy job; extends D-S5). Pass: others' p95 <=2x. Feeds D1, M17 (waits on LDP-D1).
+
+### SP4 findings (2026-10-06, lane `w2-sp4-list-pruning`; harness `ListPruningSp4Bench` + `FactLogReplaySp4Bench` in `inspecto-entity-store`, gated `-Dbench.run=true`; fast checks `ListPruningSp4Test`, `FactLogReplaySp4Test`)
+
+Setup: DuckDB 1.5.6 on Parquet, 4 threads, synthetic skewed corpus (10^7 edges, 5x10^6 string nodes, hubs = low ids), lists written in the real sidecar schema. Each cell = 1 warm-up + 3 runs, min/median; the baseline is re-timed beside every cell. Load: about five other lanes on a 12-core / 32 GB shared host, so the **same baseline moved 236..460 ms between cells: treat differences under ~30% as noise.** Hop = 1000 seeds one hop (A uniform seeds, B hub-heavy seeds), C = whole-relation degree count; edges unsorted or sorted by src.
+
+1. **Correctness: no bug found.** Over the real sidecar written from the real fact log, all four forms agree: a list member is never counted toward degree or budget, a member in the frontier spends no budget, an expired entry still counts, a retired list prunes nothing, a list not asked for prunes nothing (`ListPruningSp4Test`).
+2. **Result by form (median ms vs paired baseline, hops A/B, lists 1x10^3 .. 10x10^5 = up to 9x10^5 distinct members):**
+   - **Derived `list_member` (distinct live keys, built once):** -45%..+16% added (inside noise); build cost 3 ms (10^3) .. 112 ms (9x10^5 distinct) .. 368 ms (3.1x10^6 distinct). **PASS (<=25%)** at every realistic size; the worst cells were hop C (+41% at 10x10^5, whole-relation degree scan, where baseline noise was also high).
+   - **Raw sidecar Parquet filtered per hop:** passes to 10^6 members in one list (-44%..+29%), but at 5x10^6 sidecar rows (50x10^5) it already reads +127%, and at 4.5x10^7 rows (50x10^6) it costs 5-16 s per hop (+750%..+2000%). Re-reading and re-filtering every list per hop does not scale with total sidecar rows.
+   - **Raw list loaded to a table, filtered per hop:** same shape as the sidecar form (+55%..+179% at 50x10^5; 36-49 s at 50x10^6).
+   - **`NOT IN ('a','b',...)` literal list: FAILS by orders of magnitude.** 1,987 literals: 12-22 s per hop (+2900%..+6500%); 10,924 literals crashed the forked JVM (native, exit -1) on a skewed hop. Never build the exclusion as a literal IN list.
+   - Sorted-by-src edges make the baseline hop ~2x faster (~150-350 ms), which makes a fixed list cost a larger share; the derived form still held.
+3. **Not proven:** (a) the 50x10^6 cell is degenerate: 5x10^6 distinct members out of 5x10^6 nodes excluded the whole graph, so only its cost columns mean anything; (b) 10^8 edges not run (10^7 only; hash-probe cost scales with edges touched, list-build cost does not, so the ratio should improve, but this is unmeasured); (c) key matches only: `prefix`, `range` and `cidr` entries are not pruned by an equality anti-join and need their own spike if a barrier list uses them; (d) the 25% line is within the noise band, so a pass here means "no evidence of a problem", not a certified 25%; (e) `list_member` liveness is frozen at build time (expiry passes without a write), so a cache must carry a build time or expire at the earliest `expires_at`; (f) no real hop route exists yet (WP4), so this is the SQL cost only.
+4. **Fact-log replay (R-09), real `EntityFactLog.read()` = list dir + read + JSON parse + SHA-256 chain check, per read, warm OS cache, -Xmx6g:**
+
+| Facts | read() min / median | fold min / median | list dir only | heap after |
+|---|---|---|---|---|
+| 10^4 | 0.86 s / 0.92 s | 14 / 22 ms | 25 / 34 ms | 16 MB |
+| 10^5 | 8.8 s / 10.5 s | 195 / 198 ms | 180 / 215 ms | 120 MB |
+| 10^6 | 220 s / 274 s | 1.5 / 1.6 s | 1.6 / 2.4 s | 1.15 GB |
+
+   Cost is per-fact I/O + parse (~90 us/fact to 10^5, ~220 us/fact at 10^6 once the heap and GC bite), not the fold. It is uncached on every route call. **Stops being acceptable around 10^4 facts (~1 s per request, an interactive route would be unusable);** 10^5 is 10 s; 10^6 is minutes and >1 GB heap. Cold disk is slower still. The generator, not `append`, wrote these logs (`append` copies the whole list and fsyncs per fact: O(n^2), so a 10^6-fact log cannot be built through it; that is also a limit of the log as designed).
+5. **Cheapest fix (RECOMMENDATION, not built into production):** cache the verified `Log` keyed by the chain head: a read re-hashes only the head file and stats seq+1; measured **0.2 ms at every size** (prototype `Sp4FactLogs.HeadCached`, test only). Contract proven in `FactLogReplaySp4Test`: a new tail is seen; a changed head falls back to the full verify and refuses; **a tamper deep in the chain is NOT noticed by the cached read** (only the full verify throws), so keep the full `read()` at start-up, on a timer and on any audit/export path. Next step if adopted: an incremental verify of only new files (a few lines), and one cache per Space keyed by `dir`. Also cache the derived `list_member` per `(listIds, lastSeq)`.
+
+**OPEN decision (operator) LDP-D3a:** is a head-hash read cache with a periodic full verify an acceptable integrity trade, given a deep tamper is caught only at the next full verify? Recommendation: yes, full verify at start-up and every N minutes plus on audit. Also OPEN (recommendation): the index derives `list_member` as a distinct-live-key table built once per build and per list change, never a per-hop filter over the sidecar, and never a literal IN list.
 
 ### Hard constraints carried forward
 
