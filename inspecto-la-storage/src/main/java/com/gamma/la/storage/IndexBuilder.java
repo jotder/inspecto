@@ -817,7 +817,7 @@ public final class IndexBuilder {
 
     /** The pinned file list a store read renders ({@code read_parquet(['a', 'b'], ...)}): the Dataset's INPUT, tracked by the input fingerprint, not part of its definition. */
     private static final java.util.regex.Pattern PINNED_FILE_LIST = java.util.regex.Pattern.compile(
-            "(read_(?:parquet|csv)\\(\\s*)\\[\\s*'(?:[^']|'')*'(?:\\s*,\\s*'(?:[^']|'')*')*\\s*\\]");
+            "(read_(?:parquet|csv)\\(\\s*)\\[\\s*'(?:[^']++|'')*+'(?:\\s*,\\s*'(?:[^']++|'')*+')*+\\s*\\]");
 
     /**
      * What the manifest records as {@code relationSqlHash}: the SHA-256 of the relation SQL text with the pinned file list of

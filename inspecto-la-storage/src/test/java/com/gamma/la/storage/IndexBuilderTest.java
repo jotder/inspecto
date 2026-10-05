@@ -517,6 +517,15 @@ class IndexBuilderTest {
                 "a literal list outside the read is part of the definition");
     }
 
+    /** Found by LA-INDEX-SCALE-MEASURE-1: the list-blanking regex recursed per character and overflowed the stack on 20 long paths. */
+    @Test
+    void theRelationHashSurvivesALongPinnedFileList() {
+        StringBuilder list = new StringBuilder();
+        for (int i = 0; i < 5_000; i++) list.append(i == 0 ? "'" : ", '").append("C:/some/long/directory/of/a/space/data/part-").append(i).append(".parquet'");
+        String sql = "SELECT * FROM read_parquet([" + list + "], union_by_name=true)";
+        assertEquals(IndexBuilder.relationSqlHash("SELECT * FROM read_parquet(['/d/a.parquet'], union_by_name=true)"), IndexBuilder.relationSqlHash(sql));
+    }
+
     /**
      * ENGINE-INMEMORY-UNSEALED-1: the build connection is sealed to the declared read roots plus the store - a relation
      * reading a file outside them fails (the old unsealed opt-in read any local path), the twin over a declared root builds,
