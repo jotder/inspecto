@@ -90,5 +90,56 @@
         "smurf-06>mule-hub-01@2026-03-01 13:00:00"
       ]
     }
-  ]
+  ],
+  "closure": {
+    "_comment": "LA-CIRCFIN-2 closure golden, asserted by BOTH engines (own rows + stages, so the structuring golden above is untouched). Ring A (ORIG) returns to its origin and matches; ring B (ORIG-B) pays out and merges on a NEW node, so it must not; ring C re-merges on the origin but BEFORE it was paid (ordering) and must not.",
+    "timeAttr": "TS",
+    "stages": [
+      { "shape": "fan-out", "minBranches": 2, "windowHours": 24 },
+      { "shape": "fan-in", "minBranches": 2, "afterPrevious": true, "maxGapHours": 48 },
+      { "shape": "fan-out", "minBranches": 2, "afterPrevious": true, "maxGapHours": 48 },
+      { "shape": "fan-in", "minBranches": 2, "afterPrevious": true, "maxGapHours": 48, "closesToStart": true }
+    ],
+    "rows": [
+      ["ORIG", "M-1", "2026-03-01 09:00:00", 500],
+      ["ORIG", "M-2", "2026-03-01 09:30:00", 500],
+      ["M-1", "HUB", "2026-03-01 12:00:00", 500],
+      ["M-2", "HUB", "2026-03-01 13:00:00", 500],
+      ["HUB", "N-1", "2026-03-02 09:00:00", 900],
+      ["HUB", "N-2", "2026-03-02 09:30:00", 900],
+      ["N-1", "ORIG", "2026-03-02 12:00:00", 900],
+      ["N-2", "ORIG", "2026-03-02 13:00:00", 900],
+      ["ORIG-B", "MB-1", "2026-03-01 09:00:00", 500],
+      ["ORIG-B", "MB-2", "2026-03-01 09:30:00", 500],
+      ["MB-1", "HUB-B", "2026-03-01 12:00:00", 500],
+      ["MB-2", "HUB-B", "2026-03-01 13:00:00", 500],
+      ["HUB-B", "NB-1", "2026-03-02 09:00:00", 900],
+      ["HUB-B", "NB-2", "2026-03-02 09:30:00", 900],
+      ["NB-1", "EXIT-B", "2026-03-02 12:00:00", 900],
+      ["NB-2", "EXIT-B", "2026-03-02 13:00:00", 900],
+      ["ORIG-C", "MC-1", "2026-03-05 09:00:00", 500],
+      ["ORIG-C", "MC-2", "2026-03-05 09:30:00", 500],
+      ["MC-1", "HUB-C", "2026-03-05 12:00:00", 500],
+      ["MC-2", "HUB-C", "2026-03-05 13:00:00", 500],
+      ["HUB-C", "NC-1", "2026-03-06 09:00:00", 900],
+      ["HUB-C", "NC-2", "2026-03-06 09:30:00", 900],
+      ["NC-1", "ORIG-C", "2026-03-04 12:00:00", 900],
+      ["NC-2", "ORIG-C", "2026-03-04 13:00:00", 900]
+    ],
+    "expected": [
+      {
+        "layers": [["orig"], ["m-1", "m-2"], ["hub"], ["n-1", "n-2"], ["orig"]],
+        "edges": [
+          "hub>n-1@2026-03-02 09:00:00",
+          "hub>n-2@2026-03-02 09:30:00",
+          "m-1>hub@2026-03-01 12:00:00",
+          "m-2>hub@2026-03-01 13:00:00",
+          "n-1>orig@2026-03-02 12:00:00",
+          "n-2>orig@2026-03-02 13:00:00",
+          "orig>m-1@2026-03-01 09:00:00",
+          "orig>m-2@2026-03-01 09:30:00"
+        ]
+      }
+    ]
+  }
 }

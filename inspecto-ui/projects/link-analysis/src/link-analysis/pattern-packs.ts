@@ -120,7 +120,7 @@ function numberOf(value: unknown): number | undefined {
  * would match something other than what was authored, which is worse than not offering the pack).
  *
  * The persisted shape is one FLAT tabular row per stage, because a TOON tabular array cannot nest an object:
- * `stages[3]{shape,minBranches,edgeKind,nodeKind,windowHours,afterPrevious,maxGapHours,thresholdAttr,thresholdMin,thresholdMax}`.
+ * `stages[3]{shape,minBranches,edgeKind,nodeKind,windowHours,afterPrevious,maxGapHours,thresholdAttr,thresholdMin,thresholdMax}` (+ an optional `closesToStart` column).
  * Blank strings are wildcards / absent; `windowHours` and `maxGapHours` of `0` mean "none" (the LA-14a
  * convention — a zero-hour window would match nothing while looking authored), but a threshold bound of
  * `0` is a real bound and only a blank cell means "no bound".
@@ -149,6 +149,7 @@ function stagesOf(raw: unknown): BranchStage[] | null {
             ...kindOf(row['nodeKind'], 'nodeKind'),
             ...(window !== undefined && window > 0 ? { windowHours: window } : {}),
             ...temporalOf(row),
+            ...(row['closesToStart'] === true || row['closesToStart'] === 'true' ? { closesToStart: true } : {}),
             ...(threshold ? { threshold } : {}),
         });
     }
@@ -251,14 +252,14 @@ export const PATTERN_PACKS: PatternPack[] = [
         label: 'Circular financing (branching)',
         category: 'money',
         description:
-            'Value circulated through two successive split-and-merge rounds — split across two or more parties, re-converged, split again and re-converged — each leg after the one before, within 48 hours. Finds the round-tripping web; it does not prove the value returned to its origin, so confirm a closed loop with the Cycles tool (Circular flow).',
+            'Value circulated through two successive split-and-merge rounds — split across two or more parties, re-converged, split again and re-converged — each leg after the one before, within 48 hours — and the final merge must land back on the ORIGINAL splitter, so a match is a proven round trip, not just a web. For a single exact loop (A → … → A) use the Cycles tool (Circular flow).',
         steps: [],
-        // LA-CIRCFIN-1. The branching matcher has no "return to the start node" stage, so closure stays with Cycles.
+        // LA-CIRCFIN-1 + LA-CIRCFIN-2: the last stage `closesToStart`, so its collector must be stage 0's splitter.
         stages: [
             { shape: 'fan-out', minBranches: 2, windowHours: 24 },
             { shape: 'fan-in', minBranches: 2, afterPrevious: true, maxGapHours: 48 },
             { shape: 'fan-out', minBranches: 2, afterPrevious: true, maxGapHours: 48 },
-            { shape: 'fan-in', minBranches: 2, afterPrevious: true, maxGapHours: 48 },
+            { shape: 'fan-in', minBranches: 2, afterPrevious: true, maxGapHours: 48, closesToStart: true },
         ],
     },
 ];

@@ -219,23 +219,47 @@ describe('layering-network and circular-financing packs (run through the matcher
         ).toHaveLength(0);
     });
 
-    it('circular-financing needs two split-and-merge rounds; one round is not enough', () => {
+    it('circular-financing needs two rounds AND proven return: one round, or an open exit, is not enough', () => {
         const round1: Leg[] = [
             ['o', 'a', 100, '2026-09-01 08:00:00'],
             ['o', 'b', 100, '2026-09-01 09:00:00'],
             ['a', 'h', 90, '2026-09-01 12:00:00'],
             ['b', 'h', 90, '2026-09-01 13:00:00'],
         ];
-        const round2: Leg[] = [
+        const round2 = (back: string): Leg[] => [
             ['h', 'c', 80, '2026-09-01 18:00:00'],
             ['h', 'd', 80, '2026-09-01 19:00:00'],
-            ['c', 'z', 70, '2026-09-01 22:00:00'],
-            ['d', 'z', 70, '2026-09-01 23:00:00'],
+            ['c', back, 70, '2026-09-01 22:00:00'],
+            ['d', back, 70, '2026-09-01 23:00:00'],
         ];
         const circ = stagesOf('circular-financing');
+        expect(circ.at(-1)!.closesToStart).toBe(true);
         expect(matchBranchingPattern(graph(round1), circ, { timeAttr: 'AT' }).matches).toHaveLength(0);
-        const res = matchBranchingPattern(graph([...round1, ...round2]), circ, { timeAttr: 'AT' });
-        expect(res.matches).toHaveLength(1);
-        expect(res.matches[0].layers.at(-1)).toEqual(['z']);
+        // closure TRUE: the last merge lands on the original splitter `o`
+        const closed = matchBranchingPattern(graph([...round1, ...round2('o')]), circ, { timeAttr: 'AT' });
+        expect(closed.matches).toHaveLength(1);
+        expect(closed.matches[0].layers).toEqual([['o'], ['a', 'b'], ['h'], ['c', 'd'], ['o']]);
+        // closure FALSE: the same web merging on a NEW node `z` is an open web, no longer a match
+        expect(
+            matchBranchingPattern(graph([...round1, ...round2('z')]), circ, { timeAttr: 'AT' }).matches,
+        ).toHaveLength(0);
+        // the twin without the flag still finds the open web (the flag is what changed the answer)
+        const open = circ.map((st) => ({ ...st, closesToStart: undefined }));
+        expect(
+            matchBranchingPattern(graph([...round1, ...round2('z')]), open, { timeAttr: 'AT' }).matches,
+        ).toHaveLength(1);
+    });
+
+    it('refuses a closesToStart that is not the last stage, not a fan-in, or the only stage', () => {
+        const fo = { shape: 'fan-out', minBranches: 2 } as const;
+        const fi = { shape: 'fan-in', minBranches: 2 } as const;
+        const run = (stages: BranchStage[]) => matchBranchingPattern(graph(deposits), stages);
+        for (const bad of [
+            [{ ...fi, closesToStart: true }],
+            [{ ...fo, closesToStart: true }, fi],
+            [fo, { ...fo, closesToStart: true }],
+        ] as BranchStage[][]) {
+            expect(run(bad).refusal).toContain('closesToStart');
+        }
     });
 });

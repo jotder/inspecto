@@ -48,7 +48,7 @@ public final class PatternQueryCompiler {
     public record Threshold(String attr, Double min, Double max) {}
 
     public record Stage(boolean fanIn, int minBranches, String edgeKind, String nodeKind, Threshold threshold,
-                 Double windowHours, boolean afterPrevious, Double maxGapHours) {}
+                 Double windowHours, boolean afterPrevious, Double maxGapHours, boolean closesToStart) {}
 
     /** One statement plus its positional binds (all strings; the SQL casts each). */
     public record Compiled(String sql, List<String> binds) {}
@@ -77,7 +77,10 @@ public final class PatternQueryCompiler {
             }
             out.add(new Stage("fan-in".equals(shape), mb.intValue(), text(m.get("edgeKind")), text(m.get("nodeKind")),
                     th, positive(m.get("windowHours"), i, "windowHours"), Boolean.TRUE.equals(m.get("afterPrevious")),
-                    positive(m.get("maxGapHours"), i, "maxGapHours")));
+                    positive(m.get("maxGapHours"), i, "maxGapHours"), Boolean.TRUE.equals(m.get("closesToStart"))));
+            if (Boolean.TRUE.equals(m.get("closesToStart")) && (i != list.size() - 1 || i == 0 || !"fan-in".equals(shape)))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                        "stages[" + i + "].closesToStart is only valid on the last stage, which must be a fan-in after at least one other stage");
         }
         return out;
     }
@@ -204,6 +207,8 @@ public final class PatternQueryCompiler {
                 sb.append("e.s IN (SELECT t FROM ").append(prev).append(")");
                 if (st.afterPrevious())
                     sb.append(" AND e.ts > (SELECT min(p.ts) FROM ").append(prev).append(" p WHERE p.t = e.s)");
+                // A CLOSING stage can only land on the origin: stage 0's anchor (fan-out) or senders (fan-in) — both its `s`.
+                if (st.closesToStart()) sb.append(" AND e.t IN (SELECT s FROM __s0)");
             }
             sb.append(")");
         }
