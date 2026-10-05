@@ -18,7 +18,7 @@ import { InspectoOptionPickerComponent } from '@inspecto/core/components/option-
 import { InspectoSchemaFormComponent } from '@inspecto/core/components/schema-form.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
 import { isUnavailable } from './link-analysis-template.dialogs';
-import { LinkAnalysisStandingDetectionComponent } from './link-analysis-standing-detection.component';
+import { LinkAnalysisBoundRulesComponent } from './link-analysis-bound-rules.component';
 import { LinkAnalysisStandingMonitorComponent } from './link-analysis-standing-monitor.component';
 import {
     VALUE_MEASURES,
@@ -72,7 +72,7 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
         DataTableComponent,
         InspectoOptionPickerComponent,
         InspectoSchemaFormComponent,
-        LinkAnalysisStandingDetectionComponent,
+        LinkAnalysisBoundRulesComponent,
         LinkAnalysisStandingMonitorComponent,
     ],
     host: { class: 'block' },
@@ -173,12 +173,14 @@ export function valueMeasureErrorMessage(err: unknown, fallback: string): string
                             }}
                             breaching). {{ b.disclosure }}
                         </inspecto-alert>
-                        <inspecto-link-analysis-standing-detection
-                            [investigation]="investigation()!"
-                            [rule]="boundName()"
-                        ></inspecto-link-analysis-standing-detection>
                     }
                 }
+            }
+            @if (investigation(); as h) {
+                <inspecto-link-analysis-bound-rules
+                    [investigation]="h"
+                    [reloadKey]="bound()"
+                ></inspecto-link-analysis-bound-rules>
             }
             <inspecto-link-analysis-standing-monitor></inspecto-link-analysis-standing-monitor>
         </section>
@@ -268,8 +270,6 @@ export class LinkAnalysisValueMeasuresComponent {
     });
     readonly binding = signal(false);
     readonly bound = signal<ValueMeasureAlertRuleResult | null>(null);
-    /** The name the open Alert Rule was bound under — what standing detection is enabled for. */
-    readonly boundName = signal('');
 
     async run(): Promise<void> {
         const form = this.form();
@@ -335,7 +335,6 @@ export class LinkAnalysisValueMeasuresComponent {
                     }),
                 ),
             );
-            this.boundName.set(f.name.trim());
         } catch (err) {
             this.unavailable.set(isUnavailable(err));
             this.error.set(valueMeasureErrorMessage(err, 'Could not create the Alert Rule.'));

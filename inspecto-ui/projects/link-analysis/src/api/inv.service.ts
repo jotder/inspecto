@@ -938,6 +938,27 @@ export interface StandingDetectionDisabled {
     wasEnabled: boolean;
 }
 
+/** The owner's recorded standing-detection authority, as `GET …/alert-rules` reads it back (LD-7): no capabilities, masking or values. */
+export interface StandingDetectionState {
+    enabled: boolean;
+    principal?: string;
+    enabledAt?: string;
+    dataset?: string;
+}
+
+/** One Alert Rule bound to an Investigation, as `GET /inv/investigations/{id}/alert-rules` lists it (LD-7). */
+export interface BoundAlertRule {
+    /** The armed rule: `name`, `severity`, and `valueMeasure` or `relation`/`measure`/`comparator`/`threshold`. */
+    rule: Record<string, unknown>;
+    valueMeasure: boolean;
+    /** The rule was changed outside this Investigation since it was bound: a sweep refuses it until it is bound again. */
+    edited: boolean;
+    standingDetection: StandingDetectionState;
+}
+
+/** `PUT …/alert-rules/{rule}` body: the bind body, `name` (when given) unchanged. */
+export type EditAlertRuleRequest = InvestigationAlertRuleRequest | ValueMeasureAlertRuleRequest;
+
 // ── LA-17: Entity Lists (`EntityListRoutes`, wire contract: entity-model design §4.3.1) ─────────────────
 
 export type EntityListPurpose = 'allow' | 'block' | 'watch' | 'exclusion';
@@ -1238,6 +1259,16 @@ export class InvService {
     /** LA-23: the declared Measures over the Working Set — what an Alert Rule bound to one would compute. */
     investigationMeasures(id: string): Observable<InvestigationMeasures> {
         return this.http.get<InvestigationMeasures>(invPath(id, 'measures'));
+    }
+
+    /** LD-7: the Alert Rules bound to this Investigation and each one's standing-detection state (survives a reload). */
+    boundAlertRules(id: string): Observable<{ investigation: string; rules: BoundAlertRule[] }> {
+        return this.http.get<{ investigation: string; rules: BoundAlertRule[] }>(invPath(id, 'alert-rules'));
+    }
+
+    /** LD-5: edit a bound rule in place; it LOSES its standing-detection authority (the owner enables it again). */
+    editAlertRule(id: string, rule: string, req: EditAlertRuleRequest): Observable<InvestigationAlertRuleResult> {
+        return this.http.put<InvestigationAlertRuleResult>(invPath(id, 'alert-rules/' + encodeURIComponent(rule)), req);
     }
 
     /** LD-6: owner-only; a 422 `standing detection refused [CODE]: …` carries a refusal code. */

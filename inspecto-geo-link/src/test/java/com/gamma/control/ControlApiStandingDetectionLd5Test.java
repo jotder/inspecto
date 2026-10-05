@@ -224,6 +224,58 @@ class ControlApiStandingDetectionLd5Test {
         }
     }
 
+    // ── LD-7: the bound-rule read-back ─────────────────────────────────────────────────────────────────
+
+    @Test
+    void theBoundRuleListReadsBackStandingStateAcrossEnableDisableAndEdit(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        authenticators();
+        try (Ctx c = open(cfg, root)) {
+            ok(c, "POST", "/inv/investigations", CREATE, OWNER);
+            assertEquals(0, ok(c, "GET", BIND, null, OWNER).get("rules").size(), "nothing bound yet");
+            ok(c, "POST", BIND, RULE, OWNER);
+            JsonNode bound = ok(c, "GET", BIND, null, OWNER).get("rules");
+            assertEquals(1, bound.size(), bound.toString());
+            assertEquals("smurfs", bound.get(0).get("rule").get("name").asText());
+            assertTrue(bound.get(0).get("valueMeasure").asBoolean());
+            assertFalse(bound.get(0).get("edited").asBoolean());
+            assertFalse(bound.get(0).get("standingDetection").get("enabled").asBoolean(), "bound, not enabled");
+
+            ok(c, "POST", ENABLE, enableBody(), OWNER);
+            JsonNode on = ok(c, "GET", BIND, null, OWNER).get("rules").get(0).get("standingDetection");
+            assertTrue(on.get("enabled").asBoolean());
+            assertEquals("sweep:case-v", on.get("principal").asText());
+            assertEquals("tx_ds", on.get("dataset").asText());
+            assertFalse(on.toString().contains("capabilities") || on.toString().contains("masking"), "no recorded authority detail: " + on);
+
+            ok(c, "PUT", EDIT, RULE_EDITED, OWNER);
+            JsonNode edited = ok(c, "GET", BIND, null, OWNER).get("rules").get(0);
+            assertEquals("WARNING", edited.get("rule").get("severity").asText(), "the edit shows");
+            assertFalse(edited.get("standingDetection").get("enabled").asBoolean(), "the edit dropped the authority");
+
+            ok(c, "POST", ENABLE, enableBody(), OWNER);
+            ok(c, "DELETE", DISABLE, null, OWNER);
+            assertFalse(ok(c, "GET", BIND, null, OWNER).get("rules").get(0).get("standingDetection").get("enabled").asBoolean());
+
+            // gates, each with the probe that would otherwise succeed (the owner read above)
+            assertEquals(404, status(c, "GET", BIND, null, STRANGER), "a non-member reads as absence");
+            assertEquals(404, status(c, "GET", "/inv/investigations/nope/alert-rules", null, OWNER));
+            assertEquals(200, status(c, "GET", BIND, null, NO_ALERTS), "reading needs no alert-authoring capability");
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
+    @Test
+    void theBoundRuleListFailsClosedWithoutAWriteRoot(@TempDir Path cfg) throws Exception {
+        Path pipe = PipelineConfigBatchTest.writePipeline(cfg, "");
+        CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
+        ControlApi api = new ControlApi(svc, 0);
+        api.start();
+        try (Ctx c = new Ctx(svc, api, api.port(), null)) {
+            assertEquals(503, status(c, "GET", BIND, null, null));
+        }
+    }
+
     // ── LD-5: disable ──────────────────────────────────────────────────────────────────────────────────
 
     @Test
