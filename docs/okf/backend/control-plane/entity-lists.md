@@ -172,3 +172,7 @@ The seam is `com.gamma.risk.WatchListFeed`, an engine SPI that `inspecto-entity-
 - A retired list offers no button (its sidecar holds zero rows).
 - Test: `ControlApiEntityListRegisterDatasetTest` (real Spaces, a Subject per caller, including an author without the
   capability and a list-writer without it).
+
+## Scale facts (SP4, 2026-10-06)
+
+Measured in `inspecto-entity-store` (`ListPruningSp4Bench`, `FactLogReplaySp4Bench`, gated `-Dbench.run=true`; findings in `docs/superpower/link-analysis-roadmap.md` "SP4 findings"). As an exclusion/barrier anti-join over a 10^7-edge Parquet relation, a distinct-live-key table derived from the sidecar adds within noise of 25% up to ~10^6 members; filtering the raw sidecar per hop degrades past ~5x10^6 rows, and a literal `NOT IN (...)` list is unusable (seconds at 2,000 literals, a JVM crash at 10^4). `EntityFactLog.read()` verifies the whole chain on every call: ~1 s at 10^4 facts, ~10 s at 10^5, minutes at 10^6; a head-hash cache (0.2 ms) is the cheapest fix and is recommended but not built (a deep tamper is then caught only by the next full verify).
