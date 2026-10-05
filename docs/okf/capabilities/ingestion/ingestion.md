@@ -427,15 +427,17 @@ exports a daily CSV or Parquet file with their own scheduler and query, D-ING5) 
 
 | Item | Guarantee |
 |---|---|
-| File name | one pattern per feed with the day in it, e.g. `XDR_yyyyMMdd.csv`; the Collector `include` glob and `gap_detection.sequence` use the same pattern |
-| Grain | exactly one UTC calendar day per file; no file spans two days, no day is split across files |
+| File name | one pattern per feed with the day in it, e.g. `XDR_yyyyMMdd.csv` or, with parts, `XDR_yyyyMMdd_partNNNN.csv`; the name of a file is STABLE (a feed rule); the Collector `include` glob and `gap_detection.sequence` use the same pattern |
+| Grain | exactly ONE UTC event date per file; no file spans two dates. MANY files (parts) per event date are allowed, each with its own stable name |
+| Parts | part numbers are ZERO-PADDED (`part0001`; lexical sorting); parts of one day are delivered together, or completeness is signalled (recommended: a per-day manifest or `_SUCCESS` marker file; open design point of roadmap T8, not decided) |
 | Event-date column | one DATE column (`EVENT_DATE`) equal to the UTC date of the event timestamp; it is the `partitionKey`. The day in the file name and every row's event date agree |
 | Time zone | the event timestamp column is UTC wall clock with no offset in the text; the schema declares `timezone: UTC` |
 | Delimiter, encoding, header | comma (or one declared delimiter), UTF-8, one header row whose names match the schema |
 | Null strings | the declared `null_strings` only (template: `NULL`, `N/A`); an empty field is also null |
-| Corrections | a corrected day is re-delivered as a WHOLE file for that day, never a partial or a delta |
+| Corrections | a corrected file is re-delivered as a WHOLE file under the SAME name (it overwrites cleanly), never a partial or a delta. A correction under a NEW name doubles every row of the date: the feed owner's error, not fixed in the platform, detected by the T8 duplicate-delivery check |
 | Completeness | no partial days: a file is written complete (temp name, then rename) so the Collector never sees half a day |
 | Late files | allowed: a day may arrive after later days; it lands in its own event-date partition |
+| Reference feeds | the same stable-name rule: ONE stable file name, or `load: upsert` with a key. A dated Reference file name makes `load: replace` read both days (T6 finding) |
 | Parquet export | same name, grain, column and zone rules; the schema uses `parsing.frontend: parquet` |
 
 What the platform does when a day is delivered twice (replace vs append of the partition, the file-level duplicate
