@@ -119,7 +119,7 @@ condition*).
 * When a cap cuts data you see **Truncated** — never a silent "no results". Narrow the query, or use a server-side
   tool (*Find paths (server)*, *Run on server* for patterns, the Measures panel).
 * Very busy hub nodes are folded into a **super-node** so they do not hide everything else.
-* Above about 300 nodes link labels are hidden (shown on hover or click) to keep the picture readable.
+* Above 20 links on the canvas, link labels are hidden (shown on hover or click) to keep the picture readable; *All link labels* in the Display menu overrides it.
 
 ---
 
@@ -355,8 +355,8 @@ person), the merged-traversal cap and the `seedBy` cap.
 * **Views are not evidence; snapshots and Dossiers are.** A snapshot captures what was on screen when you saved.
 * Nothing is silently dropped: truncation, unmatched values, unvalued rows and refusals are all stated.
 * Time-based tools read times in a stated zone (UTC for Measures); naive timestamps are assumed UTC.
-* The server-side path search works directly over a Dataset and is measured to about ten million links; beyond
-  that a dedicated edge index (a planned, separate step) is needed.
+* The server-side path search works directly over a Dataset and is certified at about one million links (5-hop walk, warm p95 under
+  350 ms); above that a Space can switch on the edge index (Space setting `index.enabled`, off by default), measured to 100 million links.
 * An Alert on an Investigation watches its **sealed** Working Set, not live data.
 
 ## 13. Troubleshooting

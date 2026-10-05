@@ -151,7 +151,7 @@ snapshot store reads unchanged; an explicit deeper ref is honoured; `shared/…`
 `sourceName` is **never defaulted** (a source-less Dataset once read empty everywhere, indistinguishable from
 an empty store). A **Reference Dataset** is produced by a pipeline (`produces: reference`, node `ref:<pipeline>`)
 and bound by name; its load semantics (`replace | upsert | scd2`, `key[]`, `refresh_seconds`) are authorable
-config, but **the SCD2 engine is unbuilt** (`transform.dim.scd2` is `Status.PLANNED`).
+config, and `upsert`/`scd2` are **built** as an append-only version store (rechecked 2026-10-06, `LA-DAILY-INGEST-1` D-ING4): `ConsignmentIngestStrategy.stampReferenceVersions` stamps `__key_hash/__row_hash/__valid_from/__op/__batch_id`, skips unchanged rows and appends changed ones under `__v_<batch>`; `ReferenceReader` derives the current view, or, for `scd2`, one `as_of` instant per binding (`__valid_from <= instant`, `ReferenceScd2AsOfTest`). What is **unbuilt** is the `transform.dim.scd2` processor (`Status.PLANNED`), a `valid_to` column, a feed-supplied effective date (`__valid_from` is ingest `now()`), and a per-fact-row as-of join.
 
 **Daily-updated Reference file (verified 2026-10-06, `LA-DAILY-INGEST-1` T6).** `load: replace` overwrites the
 SAME output file (the output stem is the input file name), so a dimension file named with its date leaves
@@ -538,7 +538,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | **The Query Library never calls `POST /queries/{id}/run`** | zero callers in `inspecto-ui/src/app`; `queries.component.ts` → `DatasetRowsService.sql()` → `/db/query` | Server-side parameter resolution (`$current_user`, `$role`), the Result Set descriptor and the 500/10 000 limits are unreachable from the product; `DAT-3` is a Must whose client half is absent |
 | **No UI triggers `materialize`**; no committed job schedules one | `DatasetKind.materialized` "for completeness"; no `materialize` job in `spaces/` | `DAT-4` is reachable only by hand-authoring a maintenance job |
 | **`memory_limit` had no default in code** while two pages said it did | `DuckDbUtil.memoryLimit` → DuckDB default; `BACKLOG.md` GAP-4 | Corrected in both pages with this spec; ✅ GAP-4 then shipped a code default 2026-09-26 |
-| **The SCD2 Reference engine is unbuilt** behind an authorable `load: scd2` | `ProcessorCatalog` `transform.dim.scd2` PLANNED | A config value the engine accepts and does not honour |
+| **The `transform.dim.scd2` processor, `valid_to`, feed effective dates and per-row as-of joins are unbuilt**; `load: scd2` itself IS honoured (version store + single-instant `as_of`) | `ProcessorCatalog` `transform.dim.scd2` PLANNED; `ReferenceScd2CharacterizationTest` | A fact cannot be joined to the dimension as of its own event time |
 | **`DuckLakeRegistrar` has no test**; the warehouse runbook has no code | `inspecto-etl` test tree; `warehouse_setup.sql` at the repo root | `SP-SNK-03` is ✅ on the board for a registrar nothing exercises |
 | **The Postgres test covers 9 of 12 families** and the page said 6, 7 and 10 | `PostgresStateStoreTest` methods | Corrected with this spec; the three uncovered stores are `DbDedupLedger`, `DbAcquisitionLedger`, `DbDeliveryReceiptStore` |
 | **`DatasetRelation.temporalColumn` has no caller** | `BACKLOG.md` §3 note | Dead seam |
@@ -698,4 +698,4 @@ run time; `SchemaFieldTypes` at load (`MET`); `expression-guard` and `measure-gr
 | **Postgres coverage is opt-in and partial** — 9 of 12 families, only with a server | §3.8 |
 | **No test that the DuckDB session zone equals the host zone** — pinned by ⛔ comments at three call sites | `duckdb.md` |
 | **No test that `retire_superseded` is ENABLED anywhere** — only a WARN; the demo job ships disabled on purpose, pinned by `DemoRetireSupersededJobShipsDisabledTest` | §3.2 |
-| **The SCD2 `load` value is accepted and never honoured** — no test could pass | §3.2 |
+| **No per-fact-row as-of join, `valid_to` or feed effective date for `load: scd2`** (the version store and single-instant `as_of` are built and tested) | §3.2 |

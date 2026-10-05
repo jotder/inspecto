@@ -42,7 +42,7 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
   (column → source/target Entity, optional columns → Link type/attributes).
 * **Rendering** — the shared G6 host (`src/app/inspecto/graph/`), reused by the Catalog graph and the
   Geo co-location bridge. Nodes are canvas-drawn — verify inspector logic in unit tests, not preview clicks.
-* **Toolboxes** — Layout (11 G6 layouts; tree shapes gated to acyclic data) and Algorithm, plus
+* **Toolboxes** — Layout (14 G6 layouts; tree shapes gated to acyclic data) and Algorithm, plus
   paths/neighborhood/centrality analysis. The **V2 algorithm depth** (2026-07-24) lives in the pure,
   framework-free `inspecto-ui/projects/link-analysis/src/graph/graph-analysis.ts` library (the extension seam — a new algorithm is a
   pure `(g: G6GraphData, …) ⇒ result` drop-in) and is surfaced as accordion groups in
@@ -315,8 +315,9 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
 * **Projection, expansion and schema inspection are audited** (LA-04): `InvRoutes`/`GeoRoutes` emit
   `link.projected`, `link.expanded`, `link.schema.inspected`, `geo.projected` and `geo.routes.projected`,
   each carrying the dataset, the result size and `truncated`, best-effort so an audit failure can never
-  fail the analyst's query. ⚠ Exclusion, reveal and export remain **client-side** and so are still
-  unaudited — they have no server surface to emit from.
+  fail the analyst's query. Exclusion and reveal are **server ops with audit** (`exclude` is an
+  Investigation op; `POST /inv/investigations/{id}/reveal` is audited per entity, LA-19); only the
+  browser-local canvas export has no server surface to emit from.
 * **The View toolbox offers 14 layouts and 8 canvas plugins**, each a G6 v5 built-in id, and LA-09 added
   what was genuinely drop-in: the `fruchterman` layout, plus `dendrogram` and `fishbone`, which carry the
   same tree/forest gate as the three hierarchical layouts already did. `snapline` is a new lens, and
