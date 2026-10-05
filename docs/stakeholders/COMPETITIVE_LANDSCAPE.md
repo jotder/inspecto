@@ -183,7 +183,7 @@ Two lanes, and we should say so rather than apologise for the rest:
 | "nothing occupies the same square" | Definite occupies the neighbouring square with the same stack | "no direct competitor" is a risk, not a moat |
 | "the Expectation engine has routes but no UI (`ING-6`)" — §2.2, §3, §4.2, §6 A6 | the builder UI landed 2026-07-04 (`73831fa6`) and `ING-6` closed 2026-07-07, two months **before** this document's status date (corrected 2026-09-23) | a board ID quoted as a gap needs its close date checked first |
 | "the assistant and the autonomy ladder ship in NO edition" — §1.2, §4.2 | `PKG-5` staged the assist agent into Professional and Enterprise on 2026-09-12; only `inspecto-intelligence` and `inspecto-agent-hosted` still ship in none (corrected 2026-09-23) | re-read `tools/bundle-modules.mjs` after any packaging change |
-| "Link Analysis backend projection pending" — §3, §6 A8 | `/inv/projection*` routes ship in `inspecto-geo-link`; only the evidential controls (`LA-19`) are unstarted (corrected 2026-09-23) | — |
+| "Link Analysis backend projection pending" — §3, §6 A8 | `/inv/projection*` routes ship in `inspecto-geo-link`; the evidential controls (`LA-19`) were built 2026-09-24 (corrected 2026-10-06) | — |
 | "the audit trail is in memory on every stock bundle" — §4.1 | `EVENTS-DURABLE-1` closed 2026-09-11: the Professional/Enterprise launchers set `-Devents.backend=parquet`; only Personal stays in memory (corrected 2026-09-23) | a P1 cited by ID goes stale the day it closes |
 
 ---
@@ -198,7 +198,7 @@ at once. This is structural, not a failing — Palantir loses it too.
 | Ingestion | 300–500 connectors; NiFi's processor library | SFTP/FTP/DB/S3/GCS; the hard-format parsers |
 | BI | 40+ chart types, plugin ecosystems, communities | Datasets → Widgets → Dashboards |
 | Data quality | GX's 300+ expectations, profiling, docs generation | an Expectation engine with a builder UI and five check kinds (`non_null`, `range`, `regex`, `referential`, `condition`) |
-| Investigation | i2's decades of analyst workflows, case management, court-ready export | Link Analysis (server projection `POST /inv/projection*` shipped; evidential controls `LA-19` not started) + Geo Map |
+| Investigation | i2's decades of analyst workflows, case management, court-ready export | Link Analysis (server projection `POST /inv/projection*` shipped; evidential controls `LA-19` built 2026-09-24) + Geo Map |
 | Ops workflow | ServiceNow's CMDB, SLAs, approvals, integrations | Alerts → Incidents → Cases |
 
 **How the bundle wins anyway — five levers, all grounded:**
@@ -279,7 +279,7 @@ counts; SSO as a feature (table stakes).
 | **A5** | The plugin/services line | 19 SPIs; one dead seam to fix or remove | "we build the rest for you" is a revenue line — price it | Open |
 | **A6** | The Expectation engine | engine + builder UI shipped (`ING-6`, closed 2026-07-07), five check kinds; absorb GX suites rather than rival them | DQ buyers test this first | Open — product decision |
 | **A7** | Retire the stale stakeholder docs | brief + capabilities dated 2026-07-07 under- and over-sell | a sponsor reading them today gets the wrong product | Open — refresh from `EDITIONS.md` |
-| **A8** | Link Analysis backend | projection shipped; the Investigation layer (op log, multi-hop traversal, dossier) landed 2026-09-23; evidential controls (`LA-19`) not started; serves two verticals | the i2-shaped differentiator is worth zero half-built | Open |
+| **A8** | Link Analysis backend | projection shipped; the Investigation layer (op log, multi-hop traversal, dossier) landed 2026-09-23; evidential controls (`LA-19`) built 2026-09-24; serves two verticals | the i2-shaped differentiator is worth zero half-built | Open |
 
 ---
 
