@@ -318,13 +318,13 @@ describe('graph text alternative and canvas tabindex (LA-A11Y-AUDIT-1)', () => {
         );
     });
 
-    it('demotes the positive tabindex G6 puts on its canvases and leaves others alone', async () => {
+    it('demotes the positive tabindex G6 puts on its canvases to one tab stop and leaves others alone', async () => {
         const root = document.createElement('div');
         root.innerHTML = '<canvas tabindex="1"></canvas><canvas tabindex="1"></canvas><button tabindex="-1">x</button>';
         document.body.appendChild(root);
         demotePositiveTabindex(root);
         const values = Array.from(root.querySelectorAll('[tabindex]')).map((el) => el.getAttribute('tabindex'));
-        expect(values).toEqual(['0', '0', '-1']);
+        expect(values).toEqual(['0', '-1', '-1']); // one tab stop for the stacked layers
         await expectNoA11yViolations(root);
         root.remove();
     });

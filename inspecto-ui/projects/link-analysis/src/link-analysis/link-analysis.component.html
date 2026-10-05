@@ -652,13 +652,13 @@
 
         <!-- ══ workspace: [query dock] │ canvas zone │ [toolbox dock] — the pipelines-editor dock idiom ══ -->
         <div
-            class="relative flex min-h-[28rem] overflow-hidden rounded-lg border"
+            class="relative flex min-h-[28rem] overflow-hidden rounded-lg border max-md:!h-auto max-md:flex-col"
             [class.flex-auto]="fullscreen() !== null"
             [style.height]="fullscreen() === null ? 'calc(100dvh - 17rem)' : null"
         >
             <!-- left dock — Query (+ Filter); collapses to an icon rail -->
             <aside
-                class="flex min-h-0 shrink-0 flex-col overflow-hidden border-r"
+                class="flex min-h-0 shrink-0 flex-col overflow-hidden border-r max-md:!w-full max-md:border-b max-md:border-r-0"
                 [class.w-10]="!queryDockOpen()"
                 [style.width.px]="queryDockOpen() ? querySplit.width() : null"
                 style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
@@ -744,6 +744,7 @@
                 [min]="240"
                 [max]="560"
                 [defaultWidth]="320"
+                class="max-md:hidden"
                 [class.hidden]="!queryDockOpen()"
                 aria-label="Resize the query panel (arrow keys or drag)"
             ></div>
@@ -751,7 +752,7 @@
             <!-- ══ canvas zone (graph + states + overlays) — the graph-fullscreen target ══ -->
             <div
                 #canvasZone
-                class="flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-2"
+                class="flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-2 max-md:min-h-[24rem]"
                 [style.background]="fullscreen() === 'graph' ? 'var(--gamma-bg-default)' : null"
             >
                 @if (graph(); as g) {
@@ -886,12 +887,13 @@
                 [min]="260"
                 [max]="560"
                 [defaultWidth]="340"
+                class="max-md:hidden"
                 [class.hidden]="!toolboxDockOpen()"
                 aria-label="Resize the toolbox (arrow keys or drag)"
             ></div>
             <!-- right dock — Analysis | View toolbox; collapses to an icon rail -->
             <aside
-                class="flex min-h-0 shrink-0 flex-col overflow-hidden border-l"
+                class="flex min-h-0 shrink-0 flex-col overflow-hidden border-l max-md:!w-full max-md:border-l-0 max-md:border-t"
                 [class.w-10]="!toolboxDockOpen()"
                 [style.width.px]="toolboxDockOpen() ? toolboxSplit.width() : null"
                 style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
@@ -899,7 +901,7 @@
             >
                 @if (toolboxDockOpen()) {
                     <div
-                        class="flex shrink-0 items-center gap-1 border-b py-1 pl-3 pr-1"
+                        class="flex shrink-0 flex-wrap items-center gap-1 border-b py-1 pl-3 pr-1"
                         style="border-color: var(--gamma-border)"
                     >
                         <h2 class="text-xs font-semibold uppercase tracking-wide text-secondary">Toolbox</h2>

@@ -34,13 +34,13 @@ import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
             <button
                 mat-stroked-button
                 [matMenuTriggerFor]="menu"
-                class="min-w-0"
+                class="min-w-0 max-sm:!px-2"
                 matTooltip="Switch space"
                 aria-label="Switch space"
             >
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:square-3-stack-3d"></mat-icon>
                 <!-- label collapses to the icon on phones so the header row fits 375px (Wave 5 P2) -->
-                <span class="ml-2 hidden max-w-40 truncate sm:inline">{{ label() }}</span>
+                <span class="ml-2 hidden max-w-40 truncate md:inline">{{ label() }}</span>
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:chevron-down"></mat-icon>
             </button>
             <mat-menu #menu="matMenu">
