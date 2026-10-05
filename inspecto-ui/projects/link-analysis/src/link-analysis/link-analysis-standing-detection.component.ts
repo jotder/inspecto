@@ -3,7 +3,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { firstValueFrom } from 'rxjs';
 import { LensService } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
-import { InvService, InvestigationHeader, StandingDetectionEnabled } from '@inspecto/link-analysis/api/inv.service';
+import {
+    InvService,
+    InvestigationHeader,
+    StandingDetectionEnabled,
+    StandingDetectionState,
+} from '@inspecto/link-analysis/api/inv.service';
 import { isUnavailable } from './link-analysis-template.dialogs';
 import { standingDetectionErrorMessage } from './standing-detection';
 
@@ -11,8 +16,8 @@ import { standingDetectionErrorMessage } from './standing-detection';
  * **Standing detection — enable** (LA-LIVE-DETECTION-1 LD-6). A bound value-measure Alert Rule is INERT until the
  * Investigation's owner enables it: the server then records the sweep principal `sweep:<id>` (no capability of its
  * own) and the masking basis, and re-decides the owner's access before every read. Owner-only (the server's
- * 403 is the owner check — the SPA host edge exposes no actor), and gated on `canAuthorAlertRules`. ⚠ There is no read-back route yet, so the status shown is this session's answer;
- * Disable (LD-5) is offered once enabled in this session. Editing a rule in place and listing bound rules are still owed.
+ * 403 is the owner check — the SPA host edge exposes no actor), and gated on `canAuthorAlertRules`. The state a reload must keep arrives as `initial` (LD-7: `GET …/alert-rules`);
+ * this session's own enable / disable answer then overrides it.
  */
 @Component({
     selector: 'inspecto-link-analysis-standing-detection',
@@ -30,7 +35,7 @@ import { standingDetectionErrorMessage } from './standing-detection';
                 </p>
             } @else {
                 <p class="text-secondary m-0" data-test="standing-status">
-                    Status: {{ enabled() ? 'Enabled' : 'Not enabled — this rule is not evaluated yet' }}.
+                    Status: {{ isEnabled() ? 'Enabled' : 'Not enabled — this rule is not evaluated yet' }}.
                 </p>
                 <p class="text-secondary m-0">
                     Only the Investigation's owner can enable this (the server refuses anyone else). Enabling lets a
@@ -46,9 +51,9 @@ import { standingDetectionErrorMessage } from './standing-detection';
                         [disabled]="busy()"
                         (click)="enable()"
                     >
-                        {{ enabled() ? 'Re-enable standing detection' : 'Enable standing detection' }}
+                        {{ isEnabled() ? 'Re-enable standing detection' : 'Enable standing detection' }}
                     </button>
-                    @if (enabled()) {
+                    @if (isEnabled()) {
                         <button
                             mat-stroked-button
                             type="button"
@@ -70,6 +75,13 @@ import { standingDetectionErrorMessage } from './standing-detection';
                 <p class="text-secondary m-0" data-test="standing-disabled">
                     Standing detection is off. The rule stays bound; a sweep refuses it as NOT_ENABLED until the owner
                     enables it again.
+                </p>
+            }
+            @if (!enabled() && isEnabled()) {
+                <p class="text-secondary m-0" data-test="standing-readback">
+                    Enabled {{ initial()?.enabledAt }} — sweep principal {{ initial()?.principal }}, reading Dataset "{{
+                        initial()?.dataset
+                    }}".
                 </p>
             }
             @if (enabled(); as e) {
@@ -97,6 +109,9 @@ export class LinkAnalysisStandingDetectionComponent {
     /** The bound value-measure Alert Rule's name. */
     readonly rule = input.required<string>();
 
+    /** The state read back from the server (LD-7); null when none was read. */
+    readonly initial = input<StandingDetectionState | null>(null);
+
     readonly canAuthor = computed(() => this.lens.canAuthorAlertRules());
 
     readonly busy = signal(false);
@@ -104,6 +119,7 @@ export class LinkAnalysisStandingDetectionComponent {
     readonly unavailable = signal(false);
     readonly enabled = signal<StandingDetectionEnabled | null>(null);
     readonly disabledNote = signal(false);
+    readonly isEnabled = computed(() => !!this.enabled() || (!!this.initial()?.enabled && !this.disabledNote()));
 
     async enable(): Promise<void> {
         if (this.busy()) return;

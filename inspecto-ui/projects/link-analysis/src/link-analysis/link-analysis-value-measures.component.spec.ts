@@ -57,6 +57,7 @@ class HostComponent {
 function setup(opts: { valueMeasures?: () => unknown; investigation?: InvestigationHeader | null } = {}) {
     const inv = {
         valueMeasures: vi.fn((_q: unknown) => (opts.valueMeasures ? opts.valueMeasures() : of(ANSWER))),
+        boundAlertRules: vi.fn(() => of({ investigation: 'inv-1', rules: [] })),
         bindValueMeasureAlertRule: vi.fn(() =>
             of({ rule: {}, current: 1, wouldFire: true, disclosure: 'Shown to Alert readers.', ...ANSWER }),
         ),

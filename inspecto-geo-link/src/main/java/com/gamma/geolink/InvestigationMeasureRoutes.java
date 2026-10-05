@@ -67,6 +67,8 @@ public final class InvestigationMeasureRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/inv/investigations/([^/]+)/measures", (e, m) -> measures(api, e, m.group(1)));
+        // LD-7: the read-back of the bound rules and their standing-detection state (a GET carries no capability gate).
+        api.get("/inv/investigations/([^/]+)/alert-rules", (e, m) -> listBound(api, e, m.group(1)));
         // ⚠ A String LITERAL on purpose — CapabilityManifestTest's scanner matches only a literal argument.
         api.post("/inv/investigations/([^/]+)/alert-rules", ApiContext.withCapability("canAuthorAlertRules",
                 (e, m) -> bind(api, e, m.group(1), api.body(e))));
@@ -301,6 +303,51 @@ public final class InvestigationMeasureRoutes implements RouteModule {
                 + "may, by user id, before reading; it computes and discloses aggregates only, and stops (recorded) when that "
                 + "access, their lead role, an access policy or the masking basis changes");
         return out;
+    }
+
+    /**
+     * {@code GET …/alert-rules} — the Alert Rules bound to this Investigation and each one's standing-detection state, so a
+     * reload need not guess (LD-7, D-LD18). Gates: {@link InvestigationRoutes#openForRead} (503 · 422 · 403 · 404) → no alert
+     * engine 503. Reads the armed rules, then each one's binding; no store listing exists or is needed. Per rule: the rule, whether
+     * it was {@code edited} out of band since binding (hash mismatch — a sweep refuses it), and {@code standingDetection}
+     * {@code {enabled, principal, enabledAt, dataset}} — never the recorded capabilities, masking or any value.
+     */
+    private Object listBound(ApiContext api, HttpExchange ex, String id) throws IOException {
+        InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, id);
+        AlertService alerts = HostContext.of(api).service().alertService()
+                .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "alert engine unavailable"));
+        java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (Map<String, Object> armed : alerts.rules()) {
+            AlertRule rule;
+            try {
+                rule = AlertRule.fromMap(armed);
+            } catch (IllegalArgumentException e) {
+                continue;
+            }
+            if (!id.equals(rule.investigation()) || !SnapshotStore.SAFE_ID.matcher(rule.name()).matches()) continue;
+            String raw = inv.store().alertRuleBinding(id, rule.name()).orElse(null);
+            if (raw == null) continue;
+            Map<String, Object> binding = castMap(ApiContext.JSON.readValue(raw, Map.class));
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("rule", rule.toMap());
+            row.put("valueMeasure", rule.isValueMeasureRule());
+            row.put("edited", !WorkingSetMeasures.ruleHash(rule).equals(binding.get("ruleHash")));
+            Map<String, Object> standing = new LinkedHashMap<>();
+            var authority = StandingDetection.Authority.from(binding);
+            standing.put("enabled", authority.isPresent());
+            authority.ifPresent(a -> {
+                standing.put("principal", a.principal());
+                standing.put("enabledAt", a.enabledAt());
+                standing.put("dataset", a.dataset());
+            });
+            row.put("standingDetection", standing);
+            out.add(row);
+        }
+        out.sort(java.util.Comparator.comparing(r -> String.valueOf(castMap((Map<?, ?>) r.get("rule")).get("name"))));
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("investigation", id);
+        res.put("rules", out);
+        return res;
     }
 
     /** The binding of a rule to this Investigation, or a 404 when the rule is not bound here. */
