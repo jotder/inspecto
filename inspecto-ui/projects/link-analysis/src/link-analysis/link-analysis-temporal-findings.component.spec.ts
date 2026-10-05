@@ -78,7 +78,12 @@ describe('temporalResultToState', () => {
         [timeColumn]="time()"
         [state]="state()"
         [error]="error()"
+        [canSeal]="canSeal()"
+        [sealBusy]="sealBusy()"
+        [sealed]="sealed()"
+        [sealError]="sealError()"
         (runRequested)="ran($event)"
+        (sealRequested)="sealRequested()"
         (highlight)="focused($event)"
     />`,
 })
@@ -87,6 +92,13 @@ class HostComponent {
     readonly time = signal('ts');
     readonly state = signal<TemporalFindingsState | null>(null);
     readonly error = signal('');
+    readonly canSeal = signal(false);
+    readonly sealBusy = signal(false);
+    readonly sealed = signal<{ step: number; count: number; outsideWorkingSet: number; fingerprint: string } | null>(
+        null,
+    );
+    readonly sealError = signal('');
+    readonly sealRequested = vi.fn<() => void>();
     readonly ran = vi.fn<(r: TemporalRunRequest) => void>();
     readonly focused = vi.fn<(s: GraphSelection) => void>();
 }
@@ -172,6 +184,50 @@ describe('LinkAnalysisTemporalFindingsComponent', () => {
         fixture.detectChanges();
         expect(el.querySelector('[data-test=temporal-none]')).not.toBeNull();
         expect(el.textContent).toContain('The scan failed.');
+        await expectNoA11yViolations(el);
+    });
+
+    it('offers to seal the findings only into an open Investigation', async () => {
+        const { fixture, host, el } = setup();
+        expect(el.querySelector('[data-test=temporal-seal]')).toBeNull();
+        host.state.set(temporalResultToState(RESULT, GRAPH));
+        fixture.detectChanges();
+        const button = el.querySelector<HTMLButtonElement>('[data-test=temporal-seal-button]')!;
+        expect(button.textContent).toContain('Seal these findings');
+        expect(button.disabled).toBe(true);
+        expect(el.querySelector('[data-test=temporal-seal-note]')!.textContent).toContain('Open an Investigation');
+        button.click();
+        expect(host.sealRequested).not.toHaveBeenCalled();
+
+        host.canSeal.set(true);
+        fixture.detectChanges();
+        expect(button.disabled).toBe(false);
+        expect(el.querySelector('[data-test=temporal-seal-note]')!.textContent).toContain(
+            'Working Set does not change',
+        );
+        button.click();
+        expect(host.sealRequested).toHaveBeenCalledTimes(1);
+        await expectNoA11yViolations(el);
+    });
+
+    it('reports what was sealed, or why it was refused', async () => {
+        const { fixture, host, el } = setup();
+        host.state.set(temporalResultToState(RESULT, GRAPH));
+        host.canSeal.set(true);
+        host.sealed.set({ step: 4, count: 1, outsideWorkingSet: 2, fingerprint: 'abcdef0123456789' });
+        fixture.detectChanges();
+        const sealed = el.querySelector('[data-test=temporal-sealed]')!.textContent ?? '';
+        expect(sealed).toContain('Sealed at step 4: 1 finding(s)');
+        expect(sealed).toContain('2 outside it');
+        expect(sealed).toContain('abcdef012345');
+        host.sealed.set(null);
+        host.sealError.set('this Investigation has no time column');
+        fixture.detectChanges();
+        expect(el.querySelector('[data-test=temporal-sealed]')).toBeNull();
+        expect(el.textContent).toContain('this Investigation has no time column');
+        host.sealBusy.set(true);
+        fixture.detectChanges();
+        expect(el.querySelector<HTMLButtonElement>('[data-test=temporal-seal-button]')!.disabled).toBe(true);
         await expectNoA11yViolations(el);
     });
 });

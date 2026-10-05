@@ -159,6 +159,40 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                     }
                     <p class="text-secondary m-0 text-xs" data-test="temporal-note">{{ s.timeNote }}</p>
                 </div>
+                <div class="flex flex-col gap-1" data-test="temporal-seal">
+                    <div>
+                        <button
+                            mat-stroked-button
+                            type="button"
+                            data-test="temporal-seal-button"
+                            [disabled]="!canSeal() || sealBusy()"
+                            (click)="sealRequested.emit()"
+                        >
+                            {{ sealBusy() ? 'Sealing…' : 'Seal these findings' }}
+                        </button>
+                    </div>
+                    <p class="text-secondary m-0 text-xs" data-test="temporal-seal-note">
+                        @if (canSeal()) {
+                            Records a step in the open Investigation's log: the scan is re-run over its own edge
+                            columns, kept to the links or entities of its Working Set, and sealed with a fingerprint.
+                            The Working Set does not change.
+                        } @else {
+                            Open an Investigation to seal these findings into its log.
+                        }
+                    </p>
+                    @if (sealed(); as z) {
+                        <p role="status" class="m-0 text-xs" data-test="temporal-sealed">
+                            Sealed at step {{ z.step }}: {{ z.count }} finding(s) on the Working Set
+                            @if (z.outsideWorkingSet) {
+                                ({{ z.outsideWorkingSet }} outside it, not kept)
+                            }
+                            · fingerprint {{ z.fingerprint.slice(0, 12) }}
+                        </p>
+                    }
+                    @if (sealError()) {
+                        <inspecto-alert variant="error" title="Seal these findings">{{ sealError() }}</inspecto-alert>
+                    }
+                </div>
                 @if (s.findings.length) {
                     <div>
                         <button
@@ -207,8 +241,18 @@ export class LinkAnalysisTemporalFindingsComponent {
     readonly state = input<TemporalFindingsState | null>(null);
     readonly busy = input(false);
     readonly error = input('');
+    /** An Investigation is open, so the findings can be sealed into its log. */
+    readonly canSeal = input(false);
+    readonly sealBusy = input(false);
+    /** What the last seal answered (counts and fingerprint), cleared by a new scan. */
+    readonly sealed = input<{ step: number; count: number; outsideWorkingSet: number; fingerprint: string } | null>(
+        null,
+    );
+    readonly sealError = input('');
 
     readonly runRequested = output<TemporalRunRequest>();
+    /** Seal the findings just scanned into the open Investigation's log (a `temporal` op). */
+    readonly sealRequested = output<void>();
     /** Highlight on the canvas (a finding's, or every drawn finding's, nodes and links). */
     readonly highlight = output<GraphSelection>();
 

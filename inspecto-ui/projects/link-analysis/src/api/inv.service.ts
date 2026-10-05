@@ -231,7 +231,8 @@ export type InvestigationOpName =
     | 'seedBy'
     | 'threshold'
     | 'snapshot'
-    | 'compare';
+    | 'compare'
+    | 'temporal';
 
 /** A rung's traversal direction (plan §2.4; `InvestigationRoutes.DIRECTIONS`). */
 export type ExpandDirection = 'either' | 'out' | 'in' | 'reciprocal';
@@ -359,6 +360,18 @@ export type InvestigationOpRequest =
           windowA: 'inherit' | InvestigationWindow;
           windowB: 'inherit' | InvestigationWindow;
           mode?: 'presence' | 'activity';
+      }
+    /** A burst / periodicity finding set SEALED into the log (the Working Set does not change; a Dossier carries it). The
+     *  server re-runs the `POST /inv/pattern/temporal` scan over the Investigation's own edge columns and keeps the
+     *  findings on the Working Set at this step. Needs a time column (else 422). The knobs are the scan route's own. */
+    | {
+          op: 'temporal';
+          mode: 'burst' | 'periodicity';
+          series?: TemporalSeries;
+          windowSeconds?: number;
+          minEvents?: number;
+          maxCv?: number;
+          limit?: number;
       };
 
 /** What one step changed. Link changes are COUNTS only — the links themselves come from `/replay`. */
@@ -397,6 +410,14 @@ export interface InvestigationStepResult {
         fallback?: { reason: string; details?: string };
     };
     workingSet: WorkingSetSummary;
+    /** `temporal`: the sealed finding set (the findings themselves are in the entry; `outsideWorkingSet` were dropped). */
+    temporalFindings?: {
+        count: number;
+        outsideWorkingSet: number;
+        truncated: boolean;
+        fingerprint: string;
+        readAt: string;
+    };
     /** LA-17 `excludeBy` / `seedBy`: what the step resolved and did (§4.4.1). */
     list?: EntityListStepReport;
 }

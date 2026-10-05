@@ -110,6 +110,12 @@ final class GraphDossierBuilder {
                     failures.add(failure(step, "log.jsonl#" + step, "sealed comparison hashes to " + fp
                             + ", not the recorded fingerprint " + c.get("fingerprint")));
             }
+            if (e.get("temporalFindings") instanceof Map<?, ?> t) {   // temporal: the sealed finding set must still hash to what was sealed
+                String fp = TemporalFindings.fingerprint(t);
+                if (!fp.equals(t.get("fingerprint")))
+                    failures.add(failure(step, "log.jsonl#" + step, "sealed temporal findings hash to " + fp
+                            + ", not the recorded fingerprint " + t.get("fingerprint")));
+            }
             if (e.get("read") instanceof Map<?, ?> r) {
                 // A seedBy (LA-17) seals the ids it matched, where an expand seals its rows.
                 String rows = sha256(canonical("seedBy".equals(e.get("op")) ? r.get("ids") : r.get("rows")));
@@ -139,6 +145,8 @@ final class GraphDossierBuilder {
         // compare ops: the sealed diffs of the effective steps, in full (the log.jsonl artefacts in the manifest hash them).
         List<Map<String, Object>> comparisons = comparisons(log);
         if (!comparisons.isEmpty()) dossier.put("comparisons", comparisons);
+        List<Map<String, Object>> temporalFindings = temporalFindings(log);   // temporal ops: likewise, only when present
+        if (!temporalFindings.isEmpty()) dossier.put("temporalFindings", temporalFindings);
         Map<String, Object> manifest = manifest(in, ws, snapshots);
         dossier.put("manifest", manifest);
 
@@ -472,6 +480,7 @@ final class GraphDossierBuilder {
                 out.put("read", read);
             }
             if (e.get("comparison") instanceof Map<?, ?> c) out.put("comparison", WindowComparison.summary(c));   // the full diff is under "comparisons"
+            if (e.get("temporalFindings") instanceof Map<?, ?> t) out.put("temporalFindings", TemporalFindings.summary(t));   // the full set is under "temporalFindings"
             if (e.get("list") instanceof Map<?, ?> l) {   // LA-17: members counted — the log.jsonl artefact hashes them
                 Map<String, Object> list = new LinkedHashMap<>();
                 for (var x : l.entrySet()) if (!"members".equals(x.getKey())) list.put(String.valueOf(x.getKey()), x.getValue());
@@ -642,6 +651,7 @@ final class GraphDossierBuilder {
             case "threshold" -> InvestigationRoutes.thresholdLine(p);
             case "snapshot" -> InvestigationRoutes.snapshotLine(e, p);
             case "compare" -> InvestigationRoutes.compareLine(e, p);
+            case "temporal" -> TemporalFindings.line(e, p);
             case "seedBy" -> {
                 Map<String, Object> r = castMap((Map<?, ?>) e.get("read"));
                 List<String> seeded = strings(r.get("ids"));
@@ -664,6 +674,21 @@ final class GraphDossierBuilder {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("step", step);
             row.put("comparison", castMap(c));
+            out.add(row);
+        }
+        return out;
+    }
+
+    /** The sealed finding sets of the effective {@code temporal} steps: {@code {step, findings}}, in log order. */
+    private static List<Map<String, Object>> temporalFindings(List<Map<String, Object>> log) {
+        java.util.Set<Integer> undone = InvestigationEvaluator.undone(log);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> e : log) {
+            int step = ((Number) e.get("step")).intValue();
+            if (!"temporal".equals(e.get("op")) || undone.contains(step) || !(e.get("temporalFindings") instanceof Map<?, ?> t)) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("step", step);
+            row.put("findings", castMap(t));
             out.add(row);
         }
         return out;
