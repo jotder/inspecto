@@ -319,7 +319,9 @@ export type InvestigationOpRequest =
     | { op: 'snapshot'; label?: string }
     /** Two windows of the bound time column diffed over the Working Set; the diff is SEALED into the log entry (the Working
      *  Set does not change) and a Dossier carries it. Needs a time column (else 422); each side is a `window` object. */
-    | { op: 'compare'; windowA: InvestigationWindow; windowB: InvestigationWindow };
+    // a side is a window, or 'inherit' = the Investigation's own window at this step (frozen into the sealed diff as the concrete window);
+    // mode 'activity' adds the per-link / per-entity event-COUNT delta (default 'presence').
+    | { op: 'compare'; windowA: 'inherit' | InvestigationWindow; windowB: 'inherit' | InvestigationWindow; mode?: 'presence' | 'activity' };
 
 /** What one step changed. Link changes are COUNTS only — the links themselves come from `/replay`. */
 export interface WorkingSetDelta {

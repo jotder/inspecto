@@ -1458,9 +1458,14 @@ public final class InvestigationRoutes implements RouteModule {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'compare' applies to the whole Working Set, not ids");
             for (String w : List.of("windowA", "windowB")) {
                 if (body.get(w) == null)
-                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'compare' requires '" + w + "': {from?, to?, timezone?}");
-                p.put(w, InvestigationTime.window(body.get(w), w));
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'compare' requires '" + w + "': {from?, to?, timezone?}, or \"inherit\" "
+                            + "(the Investigation's window at this step)");
+                p.put(w, "inherit".equals(body.get(w)) ? "inherit" : InvestigationTime.window(body.get(w), w));
             }
+            Object mode = body.get("mode");
+            if (mode != null && !"presence".equals(mode) && !"activity".equals(mode))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'mode' is \"presence\" (default) or \"activity\" (event-count delta), got " + mode);
+            if ("activity".equals(mode)) p.put("mode", "activity");   // presence is the default and stays out of the params
             return p;
         }
         if (op.equals("threshold") || op.equals("snapshot")) {   // no ids: over the whole Working Set / a log position
@@ -1757,24 +1762,47 @@ public final class InvestigationRoutes implements RouteModule {
     /** A {@code compare}'s line: the two windows and what the sealed diff found (counts only; the lists are in the entry). */
     @SuppressWarnings("unchecked")
     static String compareLine(Map<String, Object> e, Map<String, Object> p) {
-        String line = "Compared " + InvestigationTime.describe((Map<String, Object>) p.get("windowA")) + " (A) with "
-                + InvestigationTime.describe((Map<String, Object>) p.get("windowB")) + " (B)";
-        if (!(e.get("comparison") instanceof Map<?, ?> c)) return line + ".";
+        Map<?, ?> c = e.get("comparison") instanceof Map<?, ?> c0 ? c0 : null;
+        String line = "Compared " + windowText(p.get("windowA"), c == null ? null : c.get("windowA")) + " (A) with "
+                + windowText(p.get("windowB"), c == null ? null : c.get("windowB")) + " (B)"
+                + ("activity".equals(p.get("mode")) ? ", by event count" : "");
+        if (c == null) return line + ".";
         Map<?, ?> links = (Map<?, ?>) c.get("links"), ents = (Map<?, ?>) c.get("entities");
         return line + ": links only in A " + ((Map<?, ?>) links.get("onlyA")).get("count") + ", only in B "
                 + ((Map<?, ?>) links.get("onlyB")).get("count") + ", in both " + ((Map<?, ?>) links.get("both")).get("count")
                 + "; entities only in A " + ((Map<?, ?>) ents.get("onlyA")).get("count") + ", only in B "
                 + ((Map<?, ?>) ents.get("onlyB")).get("count") + ", in both " + ((Map<?, ?>) ents.get("both")).get("count")
+                + (c.get("activity") instanceof Map<?, ?> act
+                        ? "; event count changed on " + ((Map<?, ?>) ((Map<?, ?>) act.get("links")).get("changed")).get("count") + " links and "
+                        + ((Map<?, ?>) ((Map<?, ?>) act.get("entities")).get("changed")).get("count") + " entities" : "")
                 + ". Sealed at this step (fingerprint " + c.get("fingerprint") + "); the Working Set does not change.";
+    }
+
+    /** One side of a {@code compare}: {@code inherit} reads as the window it resolved to (from the sealed diff when there is one). */
+    @SuppressWarnings("unchecked")
+    private static String windowText(Object param, Object resolved) {
+        if (!"inherit".equals(param)) return InvestigationTime.describe((Map<String, Object>) param);
+        return "the Investigation's window" + (resolved instanceof Map<?, ?> r ? " (" + InvestigationTime.describe((Map<String, Object>) r) + ")" : "");
     }
 
     /** Seal a {@code compare}'s diff over {@code state}: both windows read live NOW, then frozen into the entry (never re-read). */
     private static Map<String, Object> sealComparison(ApiContext api, HttpExchange ex, Inv inv, InvestigationEvaluator.State state,
                                                       Map<String, Object> params) {
         Map<String, Map<String, Object>> windows = new LinkedHashMap<>();
-        windows.put("a", castParams(params.get("windowA")));
-        windows.put("b", castParams(params.get("windowB")));
-        return WindowComparison.seal(WindowComparison.compare(api, ex, inv, state, windows));
+        List<String> inherited = new ArrayList<>();
+        for (String w : List.of("a", "b")) {
+            Object side = params.get("window" + w.toUpperCase());
+            if ("inherit".equals(side)) {   // the Investigation's window at THIS position, frozen into the diff as the concrete window it was
+                if (state.window == null)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'compare' window" + w.toUpperCase() + " is \"inherit\" but the "
+                            + "Investigation has no window at this step (it reads the full time range) - set a window first or give the side explicit bounds");
+                inherited.add(w.toUpperCase());
+                windows.put(w, state.window);
+            } else windows.put(w, castParams(side));
+        }
+        Map<String, Object> raw = WindowComparison.compare(api, ex, inv, state, windows, "activity".equals(params.get("mode")));
+        if (!inherited.isEmpty()) raw.put("inherited", inherited);
+        return WindowComparison.seal(raw);
     }
 
     @SuppressWarnings("unchecked")
