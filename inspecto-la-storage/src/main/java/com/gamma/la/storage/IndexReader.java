@@ -214,6 +214,29 @@ public final class IndexReader implements AutoCloseable {
         return out;
     }
 
+    /** One edge row of the {@code out} copy for a temporal scan: {@code ms} is the event time as epoch milliseconds, null when the row has none. */
+    public record LinkTime(String source, String target, Long ms) { }
+
+    /**
+     * Every edge row of the index (the {@code out} copy holds each edge once), ordered {@code src, dst, ts} as the flat temporal
+     * statement orders them (NULL times last), at most {@code maxRows}; {@code truncated} is not reported here - ask for
+     * {@code maxRows + 1} and compare. A full scan: cost linear in the Dataset, bounded by {@code maxRows}. {@code filterSql} is an
+     * already-rendered predicate over the index columns or null.
+     */
+    public List<LinkTime> scanLinkTimes(String filterSql, int maxRows) throws SQLException {
+        String sql = "SELECT src, dst, epoch_ms(ts) AS ms FROM e_out" + (filterSql == null ? "" : " WHERE (" + filterSql + ")")
+                + " ORDER BY src, dst, ts LIMIT " + maxRows;
+        List<LinkTime> out = new ArrayList<>();
+        try (PreparedStatement ps = sandbox.preparedStatement(sql); ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                long ms = rs.getLong(3);
+                Long time = rs.wasNull() ? null : ms;                     // wasNull() speaks of the LAST column read: ask before the next getString
+                out.add(new LinkTime(rs.getString(1), rs.getString(2), time));
+            }
+        }
+        return out;
+    }
+
     /**
      * How many edge ROWS the key has on both sides (its raw degree: a self-loop row counts on each side, and parallel rows are not
      * folded) - one equality statement per side, cost linear in the key's own rows. An upper bound of its folded links, which is

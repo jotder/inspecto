@@ -19,6 +19,7 @@ const GRAPH: G6GraphData = {
 
 const RESULT: TemporalPatternResult = {
     mode: 'burst',
+    series: 'link',
     results: [
         { source: 'a', target: 'b', events: 7, start: '2026-01-01T00:00:00', end: '2026-01-01T00:00:30' },
         { source: 'c', target: 'b', events: 5, start: '2026-01-02T00:00:00', end: '2026-01-02T00:00:10' },
@@ -28,9 +29,27 @@ const RESULT: TemporalPatternResult = {
     skippedNoTime: 2,
     timeNote: 'Times are the Dataset own wall-clock values.',
     fences: { maxRows: 200000, maxResults: 1000, timeoutMs: 5000 },
+    source: { kind: 'dataset', reason: 'no_index' },
 };
 
 describe('temporalResultToState', () => {
+    it('places an entity finding on its node and counts an undrawn entity', () => {
+        const res: TemporalPatternResult = {
+            ...RESULT,
+            series: 'entity',
+            results: [
+                { entity: 'a', events: 6, start: '2026-01-01T00:00:00', end: '2026-01-01T00:00:25' },
+                { entity: 'zzz', events: 5, start: '2026-01-02T00:00:00', end: '2026-01-02T00:00:10' },
+            ],
+        };
+        const s = temporalResultToState(res, GRAPH);
+        expect(s.series).toBe('entity');
+        expect(s.findings.map((f) => f.onCanvas)).toEqual([true, false]);
+        expect(s.findings[0].selection).toEqual({ nodeIds: [id('a', 'source')], edgeIds: [] });
+        expect(s.offCanvas).toBe(1);
+        expect(allTemporalSelection(s)).toEqual({ nodeIds: [id('a', 'source')], edgeIds: [] });
+    });
+
     it('highlights the drawn link, counts the undrawn one, and never adds to the graph', () => {
         const before = JSON.stringify(GRAPH);
         const s = temporalResultToState(RESULT, GRAPH);
@@ -99,10 +118,35 @@ describe('LinkAnalysisTemporalFindingsComponent', () => {
         expect(host.ran).toHaveBeenCalledWith({
             mapping: 0,
             mode: 'burst',
+            series: 'link',
             windowSeconds: 86400,
             minEvents: 5,
             maxCv: 0.1,
         });
+    });
+
+    it('asks for the entity series when the analyst picks it', () => {
+        const { fixture, host, el } = setup();
+        const cmp = fixture.debugElement.children[0].componentInstance as LinkAnalysisTemporalFindingsComponent;
+        cmp.series.set('entity');
+        (el.querySelector('[data-test=temporal-run]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(host.ran).toHaveBeenCalledWith(expect.objectContaining({ series: 'entity' }));
+    });
+
+    it('lists an entity finding by its name', async () => {
+        const { fixture, host, el } = setup();
+        host.state.set(
+            temporalResultToState(
+                { ...RESULT, series: 'entity', results: [{ entity: 'a', events: 6, start: 's', end: 'e' }] },
+                GRAPH,
+            ),
+        );
+        fixture.detectChanges();
+        expect(el.textContent).toContain('1 burst(s) found');
+        expect(el.querySelector('[data-test=temporal-finding]')!.textContent).toContain('a');
+        expect(el.querySelector('[data-test=temporal-finding]')!.textContent).not.toContain('→');
+        await expectNoA11yViolations(el);
     });
 
     it('lists findings, says what is cut and not drawn, and focuses on click', async () => {

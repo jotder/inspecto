@@ -1589,6 +1589,7 @@ export class LinkAnalysisComponent implements OnInit {
                     targetCol: target.targetCol,
                     timeCol,
                     mode: req.mode,
+                    series: req.series,
                     filter: target.filter,
                     windowSeconds: req.mode === 'burst' ? req.windowSeconds : undefined,
                     minEvents: req.minEvents,
@@ -1608,7 +1609,7 @@ export class LinkAnalysisComponent implements OnInit {
 
     private focusTemporal(state: TemporalFindingsState): GraphEmphasis | null {
         const sel = allTemporalSelection(state);
-        return sel.edgeIds.length ? sel : null;
+        return sel.edgeIds.length || sel.nodeIds.length ? sel : null;
     }
 
     /**

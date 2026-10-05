@@ -1,8 +1,8 @@
 import { EntityIdMapping, G6GraphData, resolveEntityId } from '@inspecto/core/graph';
 import { GraphSelection } from '@inspecto/link-analysis/graph/graph-analysis';
-import { TemporalFinding, TemporalPatternResult } from '@inspecto/link-analysis/api/inv.service';
+import { TemporalFinding, TemporalPatternResult, TemporalSeries } from '@inspecto/link-analysis/api/inv.service';
 
-/** One finding placed on the canvas: the finding itself plus what it highlights (empty when the canvas does not draw it). */
+/** One finding placed on the canvas: the finding itself plus what it highlights (empty when the canvas does not draw it). A link finding highlights its endpoints and links, an entity finding its node. */
 export interface PlacedTemporalFinding {
     finding: TemporalFinding;
     /** The endpoints and the drawn link(s) between them, in canvas ids. Empty `edgeIds` = not on the canvas. */
@@ -13,6 +13,7 @@ export interface PlacedTemporalFinding {
 /** What a burst / periodicity run found, placed on the working set. Nothing is added to the graph. */
 export interface TemporalFindingsState {
     mode: 'burst' | 'periodicity';
+    series: TemporalSeries;
     findings: PlacedTemporalFinding[];
     /** How many findings the canvas does not draw (the scan ran over the whole Dataset, not the loaded slice). */
     offCanvas: number;
@@ -35,6 +36,15 @@ export function temporalResultToState(
 ): TemporalFindingsState {
     const nodeIds = new Set(base.nodes.map((n) => n.id));
     const findings = res.results.map((finding): PlacedTemporalFinding => {
+        if (finding.entity !== undefined) {
+            // an entity finding highlights the entity's node (it is minted from either end of the mapping)
+            const raw = String(finding.entity).trim();
+            const n =
+                resolveEntityId(mappings, raw, (x) => nodeIds.has(x), 'source') ??
+                resolveEntityId(mappings, raw, (x) => nodeIds.has(x), 'target');
+            const onCanvas = !!n && nodeIds.has(n);
+            return { finding, onCanvas, selection: { nodeIds: onCanvas ? [n!] : [], edgeIds: [] } };
+        }
         const s = resolveEntityId(mappings, String(finding.source ?? '').trim(), (x) => nodeIds.has(x), 'source');
         const t = resolveEntityId(mappings, String(finding.target ?? '').trim(), (x) => nodeIds.has(x), 'target');
         const edgeIds = s && t ? base.edges.filter((e) => e.source === s && e.target === t).map((e) => e.id) : [];
@@ -43,6 +53,7 @@ export function temporalResultToState(
     });
     return {
         mode: res.mode,
+        series: res.series,
         findings,
         offCanvas: findings.filter((f) => !f.onCanvas).length,
         truncated: res.truncated,
