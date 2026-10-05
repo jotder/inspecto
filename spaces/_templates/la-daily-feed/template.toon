@@ -1,0 +1,5 @@
+name: Link Analysis daily feed
+tagline: "A daily telecom XDR CSV feed - one file per UTC day, partitioned by event date, ready for the Link Analysis index"
+description: "The reusable daily-feed shape for Link Analysis (LA-DAILY-INGEST-1 T2): a Pipeline with a typed schema, partitionKey = EVENT_DATE (the UTC calendar date of START_AT), a poll Collector matching one file per day, duplicate markers, quarantine for refused files and a Dataset. Valid for a daily CSV drop and for a daily CSV export of a database (the database owner exports the file; see the export contract in docs/okf/capabilities/ingestion/ingestion.md). Sample days land in data/samples - copy them into data/inbox/daily_xdr to ingest. Rename the feed, the columns and the file pattern per feed; keep partitionKey on the event-date column."
+icon: heroicons_outline:calendar-days
+contents[3]: "Pipeline + schema (daily partition)", "Collector (poll, one file per day)", "Dataset"

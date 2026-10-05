@@ -1,0 +1,49 @@
+partitionKey: EVENT_DATE
+raw:
+  name: XDR
+  format: CSV
+  fields[10]{name,selector,type,timezone,description}:
+    REC_SEQ,"0",VARCHAR,"","Record sequence within the day"
+    REC_TYPE,"1",VARCHAR,"","VOICE, SMS or DATA"
+    MSISDN,"2",VARCHAR,"","A-party number"
+    OTHER_PARTY,"3",VARCHAR,"","B-party number; N/A on DATA records"
+    IMSI,"4",VARCHAR,"","Subscriber identity (the SIM)"
+    IMEI,"5",VARCHAR,"","Device identity (the handset)"
+    START_AT,"6",TIMESTAMP,"UTC","Record start time, UTC wall clock with no offset in the text"
+    EVENT_DATE,"7",DATE,"","UTC calendar date of START_AT - the partition key"
+    DURATION_SEC,"8",INTEGER,"",""
+    DIRECTION,"9",VARCHAR,"","MOC, MTC or NA"
+mapping:
+  canonicalName: daily_xdr
+  rawName: XDR
+  fields[10]:
+    - name: REC_SEQ
+      from: REC_SEQ
+      fn: keep
+    - name: REC_TYPE
+      from: REC_TYPE
+      fn: keep
+    - name: MSISDN
+      from: MSISDN
+      fn: keep
+    - name: OTHER_PARTY
+      from: OTHER_PARTY
+      fn: keep
+    - name: IMSI
+      from: IMSI
+      fn: keep
+    - name: IMEI
+      from: IMEI
+      fn: keep
+    - name: START_AT
+      from: START_AT
+      fn: keep
+    - name: EVENT_DATE
+      from: EVENT_DATE
+      fn: keep
+    - name: DURATION_SEC
+      from: DURATION_SEC
+      fn: keep
+    - name: DIRECTION
+      from: DIRECTION
+      fn: keep
