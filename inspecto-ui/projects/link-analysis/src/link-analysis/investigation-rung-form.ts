@@ -17,6 +17,8 @@ import type {
 export const MAX_EXPAND_BUDGET = 20_000;
 export const EXPAND_DIRECTIONS: ExpandDirection[] = ['either', 'out', 'in', 'reciprocal'];
 export const WINDOW_DAYS: WindowDay[] = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+/** `InvestigationTime.MAX_RULES` — more recurring exclusion rules than this is refused with 422. */
+export const MAX_RECURRING_RULES = 32;
 
 const int = (min: number, max?: number): ValidatorFn[] => [
     Validators.pattern(/^-?\d+$/),
@@ -102,9 +104,40 @@ const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}
 const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Days in each month, February at its leap length (`02-29` is a valid yearly rule, matching leap years only). */
+const MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/**
+ * A recurring rule body: `*-MM-DD` (every year on that day) or `*-MM-DOW#N` (the Nth DOW of month MM, N 1-5, e.g.
+ * `*-11-THU#4`). `undefined` = not a recurring entry (starts without `*-`); `null` = recurring but malformed (the
+ * server's own 422 shapes: month 1-12, a day the month has, a known weekday, nth 1-5).
+ */
+function parseRecurring(body: string): InvestigationWindowExclude | null | undefined {
+    if (!body.startsWith('*-')) return undefined;
+    const yearly = /^\*-(\d{2})-(\d{2})$/.exec(body);
+    if (yearly) {
+        const month = Number(yearly[1]);
+        const day = Number(yearly[2]);
+        return month >= 1 && month <= 12 && day >= 1 && day <= MONTH_DAYS[month - 1]
+            ? { rule: 'yearly', month, day }
+            : null;
+    }
+    const nth = /^\*-(\d{2})-([A-Z]{3})#(\d)$/.exec(body);
+    if (nth) {
+        const month = Number(nth[1]);
+        const n = Number(nth[3]);
+        return month >= 1 && month <= 12 && (WINDOW_DAYS as readonly string[]).includes(nth[2]) && n >= 1 && n <= 5
+            ? { rule: 'nthWeekday', month, weekday: nth[2] as WindowDay, nth: n }
+            : null;
+    }
+    return null;
+}
+
 /**
  * The calendar-exclusion text -> the wire entries. One entry per comma / newline: `[Name=]DATE` or `[Name=]DATE..DATE`
- * (both ends inclusive), DATE = `YYYY-MM-DD`. `null` when any entry is malformed (the server's own 422 shapes).
+ * (both ends inclusive), DATE = `YYYY-MM-DD`; or a recurring rule `[Name=]*-MM-DD` / `[Name=]*-MM-DOW#N` (see
+ * {@link parseRecurring}). `null` when any entry is malformed (the server's own 422 shapes) or there are more than
+ * {@link MAX_RECURRING_RULES} rules.
  */
 export function parseExcludes(text: string): InvestigationWindowExclude[] | null {
     const out: InvestigationWindowExclude[] = [];
@@ -114,7 +147,14 @@ export function parseExcludes(text: string): InvestigationWindowExclude[] | null
         .filter(Boolean)) {
         const eq = raw.indexOf('=');
         const name = eq >= 0 ? raw.slice(0, eq).trim() : '';
-        const [a, b, ...rest] = (eq >= 0 ? raw.slice(eq + 1) : raw)
+        const body = (eq >= 0 ? raw.slice(eq + 1) : raw).trim();
+        const recurring = parseRecurring(body);
+        if (recurring !== undefined) {
+            if (recurring === null || (eq >= 0 && !name)) return null;
+            out.push({ ...recurring, ...(name ? { name } : {}) });
+            continue;
+        }
+        const [a, b, ...rest] = body
             .trim()
             .split('..')
             .map((d) => d.trim());
@@ -125,6 +165,7 @@ export function parseExcludes(text: string): InvestigationWindowExclude[] | null
             b === undefined ? { date: a, ...(name ? { name } : {}) } : { from: a, to: b, ...(name ? { name } : {}) },
         );
     }
+    if (out.filter((e) => e.rule).length > MAX_RECURRING_RULES) return null;
     return out;
 }
 

@@ -160,8 +160,7 @@ public final class InvestigationCoverageRoutes implements RouteModule {
     private static boolean excluded(Map<String, Object> window, LocalDate day) {
         if (!(window.get("exclude") instanceof List<?> ex)) return false;
         for (Object o : ex) {
-            Map<?, ?> r = (Map<?, ?>) o;
-            if (!day.isBefore(LocalDate.parse(String.valueOf(r.get("from")))) && !day.isAfter(LocalDate.parse(String.valueOf(r.get("to"))))) return true;
+            if (InvestigationTime.matches((Map<?, ?>) o, day)) return true;
         }
         return false;
     }

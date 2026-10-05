@@ -201,6 +201,49 @@ class ControlApiInvestigationHopLadderTest {
         }
     }
 
+    /** Recurring rules are SEALED as rules (not expanded) and applied to the local calendar day, with no from/to horizon. */
+    @Test
+    void recurringExclusionRulesApplyToTheLocalDayAndSealAsRules(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            timed(c, "t", "a");   // Tokyo: b, e, f, g on 2026-09-01 (a Tuesday); c, d on 2026-09-02
+            JsonNode w = op(c, "t", "{\"op\":\"window\",\"window\":{\"exclude\":[{\"rule\":\"yearly\",\"month\":9,\"day\":1,\"name\":\"Every Sep 1\"},"
+                    + "\"2025-01-01\"],\"timezone\":\"Asia/Tokyo\"}}");
+            assertEquals("2025-01-01", w.at("/window/exclude/0/from").asText(), "dates first, rules after");
+            assertEquals("yearly", w.at("/window/exclude/1/rule").asText(), "the rule is sealed, not its expansion");
+            assertEquals(2, w.at("/window/exclude").size());
+            assertEquals(Set.of("c", "d"), admitted(op(c, "t", "{\"op\":\"expand\"}")));
+
+            timed(c, "t2", "a");   // the 1st Tuesday of September = 2026-09-01
+            op(c, "t2", "{\"op\":\"window\",\"window\":{\"exclude\":[{\"rule\":\"nthWeekday\",\"month\":9,\"weekday\":\"TUE\",\"nth\":1}],"
+                    + "\"timezone\":\"Asia/Tokyo\"}}");
+            assertEquals(Set.of("c", "d"), admitted(op(c, "t2", "{\"op\":\"expand\"}")));
+
+            timed(c, "t3", "a");   // the 2nd Tuesday is a day no event fell on: nothing is removed
+            op(c, "t3", "{\"op\":\"window\",\"window\":{\"exclude\":[{\"rule\":\"nthWeekday\",\"month\":9,\"weekday\":\"TUE\",\"nth\":2}],"
+                    + "\"timezone\":\"Asia/Tokyo\"}}");
+            assertEquals(Set.of("b", "c", "d", "e", "f", "g"), admitted(op(c, "t3", "{\"op\":\"expand\"}")));
+        }
+    }
+
+    @Test
+    void malformedRecurringRulesAreRefusedAndNeverLogged(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            timed(c, "t", "a");
+            for (String bad : List.of(
+                    "{\"rule\":\"monthly\",\"month\":9,\"day\":1}",
+                    "{\"rule\":\"yearly\",\"month\":13,\"day\":1}",
+                    "{\"rule\":\"yearly\",\"month\":2,\"day\":30}",
+                    "{\"rule\":\"yearly\",\"month\":9}",
+                    "{\"rule\":\"nthWeekday\",\"month\":9,\"weekday\":\"TUESDAY\",\"nth\":1}",
+                    "{\"rule\":\"nthWeekday\",\"month\":9,\"weekday\":\"TUE\",\"nth\":6}"))
+                assertEquals(422, opStatus(c, "t", "{\"op\":\"window\",\"window\":{\"exclude\":[" + bad + "],\"timezone\":\"UTC\"}}"), bad);
+            StringBuilder many = new StringBuilder();
+            for (int i = 0; i <= 32; i++) many.append(i == 0 ? "" : ",").append("{\"rule\":\"yearly\",\"month\":1,\"day\":1,\"name\":\"n").append(i).append("\"}");
+            assertEquals(422, opStatus(c, "t", "{\"op\":\"window\",\"window\":{\"exclude\":[" + many + "],\"timezone\":\"UTC\"}}"), "more than 32 rules");
+            assertFalse(data(send(c.port, "GET", "/inv/investigations/t/log", null, null)).toString().contains("exclude"));
+        }
+    }
+
     @Test
     void malformedCalendarExclusionsAreRefusedAndNeverLogged(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

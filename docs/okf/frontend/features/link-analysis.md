@@ -760,8 +760,21 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   a window honors them (expand, the `window` op, `compare`, the Dossier's rung read) and `describe` names them in the
   log line; `GET …/coverage` treats an excluded day as not EXPECTED, so a holiday is not reported as a gap. Calls:
   per-date (not per-instant) exclusion; ranges inclusive at both ends (unlike the half-open `[from, to)` instants,
-  because they name calendar days); no recurring rules (every 25 Dec) — list the dates. The SPA window form
-  takes them as one text field (`2026-12-25, Winter break=2026-12-24..2026-12-26`). ✅ The rest
+  because they name calendar days). The SPA window form
+  takes them as one text field (`2026-12-25, Winter break=2026-12-24..2026-12-26`). ✅ **Recurring exclusion rules
+  (2026-10-05):** an `exclude` entry may be `{rule:"yearly", month, day[, name]}` (every 25 Dec) or
+  `{rule:"nthWeekday", month, weekday, nth[, name]}` (4th Thursday of November; `nth` 1–5, a 5th a month lacks never
+  matches; yearly `02-29` matches leap years only). Calls: **the RULE is sealed, not its expansion** — the sealed
+  bytes stay canonical, an unbounded window (no `from`/`to`) needs no horizon, and a replay re-derives the same days;
+  so "expanded over `[from,to)`" is realised as a per-day test on the local calendar day in the window's
+  `timezone` (SQL `month(lt)`/`day(lt)`/`isodow(lt)`/`(day(lt)-1)//7+1` in `InvestigationTime.predicates`, the same
+  arithmetic as `InvestigationTime.matches` used by coverage; no clock, no host zone). Canonical order: dates (by
+  date) then rules (by month, day or nth/weekday, name); caps `MAX_EXCLUDES` 366 dates + `MAX_RULES` 32 rules; an
+  unknown `rule`, bad month/day (`04-31`, `02-30`), weekday or `nth`, or extra keys is 422 and never logged. A window
+  with no rules seals byte-identically to before (pinned by `InvestigationTimeRecurringTest`). SPA text syntax
+  `[Name=]*-MM-DD` and `[Name=]*-MM-DOW#N` (`Xmas=*-12-25`, `*-11-THU#4`), client-validated against the same bounds
+  (a11y spec in `investigation-window-op.component.spec.ts`). ⏳ Not built: "last weekday of month", Easter-style
+  computed holidays, lunar calendars. ✅ The rest
   (`threshold`, `snapshot`, comparison mode — read route, then the sealed `compare` op on 2026-10-05 —, time-respecting paths and burst / periodicity shipped 2026-10-04, below). **SPA (2026-10-03, `LA-SPA-OWED-SURFACES-1` slice):** the expand form's collapsed *Advanced expand
   settings* (`investigation-expand-rung.component`) sends `budget` (1–20 000; the server CLAMPS above, so the SPA
   refuses) · `direction` · rung `window` (`inherit` · `full` · *A window for this rung…*, an override object) · `linkKinds`

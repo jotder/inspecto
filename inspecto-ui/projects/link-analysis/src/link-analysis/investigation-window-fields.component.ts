@@ -89,13 +89,17 @@ import { WINDOW_DAYS, WindowForm, crossesMidnight } from './investigation-rung-f
                     rows="2"
                     formControlName="exclude"
                     data-test="window-exclude"
-                    placeholder="2026-12-25, Winter break=2026-12-24..2026-12-26"
+                    placeholder="2026-12-25, Winter break=2026-12-24..2026-12-26, Xmas=*-12-25, Thanksgiving=*-11-THU#4"
                 ></textarea>
-                <mat-hint>Comma or line separated: DATE or FROM..TO (inclusive), optional "Name=" first.</mat-hint>
+                <mat-hint
+                    >Comma or line separated: DATE, FROM..TO (inclusive), or a yearly rule *-MM-DD / *-MM-DOW#N (the Nth
+                    weekday of a month); optional "Name=" first.</mat-hint
+                >
             </mat-form-field>
             @if (form().hasError('exclude') && form().touched) {
                 <p class="text-warn m-0 text-xs" role="alert">
-                    Excluded dates are YYYY-MM-DD or YYYY-MM-DD..YYYY-MM-DD (the end not before the start).
+                    Excluded dates are YYYY-MM-DD or YYYY-MM-DD..YYYY-MM-DD (the end not before the start); a yearly
+                    rule is *-MM-DD or *-MM-DOW#N with N 1-5 (at most 32 rules).
                 </p>
             }
             <inspecto-option-picker label="Timezone" formControlName="timezone" [options]="zones" />
