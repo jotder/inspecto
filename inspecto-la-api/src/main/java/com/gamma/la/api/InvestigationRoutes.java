@@ -114,9 +114,9 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
 public final class InvestigationRoutes implements RouteModule {
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    /** The thirteen ops evaluated (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate} + LA-17's three + {@code threshold}, {@code snapshot} and {@code compare}). */
+    /** The fourteen ops evaluated (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate} + LA-17's three + {@code threshold}, {@code snapshot}, {@code compare} and {@code temporal}). */
     private static final Set<String> SHIPPED = Set.of("seed", "expand", "exclude", "hide", "keep", "window", "annotate",
-            "excludeBy", "seedBy", "resolve", "threshold", "snapshot", "compare");
+            "excludeBy", "seedBy", "resolve", "threshold", "snapshot", "compare", "temporal");
     /** The ops over a named Entity List (LA-17, design §4.4.1): they carry {@code listId}, never ids. */
     static final Set<String> LIST_OPS = Set.of("excludeBy", "seedBy");
     /** A list op seals at most this many members (design §4.4.1: bounded like every other op payload). */
@@ -374,6 +374,7 @@ public final class InvestigationRoutes implements RouteModule {
             }
             if (op.equals("resolve")) entry.put("resolution", sealResolution(inv.writeRoot(), inv.header(), params.get("atSeq"), ""));
             if (op.equals("compare")) entry.put("comparison", sealComparison(api, ex, inv, before, params));
+            if (op.equals("temporal")) entry.put("temporalFindings", TemporalFindings.seal(TemporalFindings.compute(api, ex, inv, before, params)));
             if (op.equals("exclude") && Boolean.TRUE.equals(params.get("merged"))) {
                 requireResolution(before, "");
                 List<Object> groups = new ArrayList<>(before.groupsHit(ids).values());
@@ -428,6 +429,7 @@ public final class InvestigationRoutes implements RouteModule {
         if ("seedBy".equals(op) && orig.get("read") != null) e.put("read", orig.get("read"));
         if (orig.get("resolution") != null) e.put("resolution", orig.get("resolution"));
         if (op.equals("compare")) e.put("comparison", sealComparison(api, ex, inv, state, params));   // re-sealed over the NEW base, as an expand is
+        if (op.equals("temporal")) e.put("temporalFindings", TemporalFindings.seal(TemporalFindings.compute(api, ex, inv, state, params)));
         if (op.equals("exclude") && Boolean.TRUE.equals(params.get("merged"))) {
             requireResolution(state, "");
             List<Object> groups = new ArrayList<>(state.groupsHit(ids).values());
@@ -553,6 +555,8 @@ public final class InvestigationRoutes implements RouteModule {
             // compare: a different order is a different Working Set, so the diff is re-sealed over the NEW state (as an expand re-reads).
             if ("compare".equals(orig.get("op")))
                 e.put("comparison", sealComparison(api, ex, parent, state, castParams(orig.get("params"))));
+            if ("temporal".equals(orig.get("op")))   // likewise: the findings are narrowed to the NEW state, so they are re-sealed
+                e.put("temporalFindings", TemporalFindings.seal(TemporalFindings.compute(api, ex, parent, state, castParams(orig.get("params")))));
             // LA-17 merged traversal: a merged exclude re-seals its groups against the NEW order's state (a group is
             // judged from the entities admitted at that point), under the resolution the fork kept verbatim.
             if ("exclude".equals(orig.get("op")) && orig.get("groups") != null) {
@@ -791,6 +795,7 @@ public final class InvestigationRoutes implements RouteModule {
                 out.put("read", summary);
             }
             if (e.get("comparison") instanceof Map<?, ?> c) out.put("comparison", WindowComparison.summary(c));   // ...and a diff's item lists
+            if (e.get("temporalFindings") instanceof Map<?, ?> t) out.put("temporalFindings", TemporalFindings.summary(t));   // ...and a finding set's findings
             if (e.get("list") instanceof Map<?, ?> l) out.put("list", listSummary(l));   // ...and so do the sealed members
             if (e.get("resolution") instanceof Map<?, ?> r) out.put("resolution", resolutionSummary(r));   // ...and groups
             Integer removed = "excludeBy".equals(e.get("op"))
@@ -884,6 +889,7 @@ public final class InvestigationRoutes implements RouteModule {
             out.put("read", r);
         }
         if (e.get("comparison") != null) out.put("comparison", e.get("comparison"));   // the sealed diff (masked with the rest)
+        if (e.get("temporalFindings") != null) out.put("temporalFindings", e.get("temporalFindings"));   // the sealed finding set (masked with the rest)
         if (after.window != null || "window".equals(op)) out.put("window", after.window);
         // LA-17 slice 2: while a resolve is in force every step answers the merged nodes, so the canvas can redraw them.
         if (after.resolution != null) out.put("resolution", after.toMap().get("resolution"));
@@ -1414,7 +1420,7 @@ public final class InvestigationRoutes implements RouteModule {
      * time column.
      */
     private static void requireBindings(Map<String, Object> header, String op, Map<String, Object> p, String where) {
-        boolean timed = op.equals("window") || op.equals("compare")
+        boolean timed = op.equals("window") || op.equals("compare") || op.equals("temporal")
                 || (op.equals("expand") && (p.get("window") instanceof Map<?, ?> || p.get("minDistinctDays") != null));
         if (timed && header.get("timeCol") == null)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + "this Investigation has no time column — create it with 'timeCol' "
@@ -1468,6 +1474,7 @@ public final class InvestigationRoutes implements RouteModule {
             if ("activity".equals(mode)) p.put("mode", "activity");   // presence is the default and stays out of the params
             return p;
         }
+        if (op.equals("temporal")) return TemporalFindings.params(body);   // no ids: the scan knobs; the columns are the Investigation's own
         if (op.equals("threshold") || op.equals("snapshot")) {   // no ids: over the whole Working Set / a log position
             if (body.containsKey("ids"))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + op + "' applies to the whole Working Set, not ids");
@@ -1711,6 +1718,7 @@ public final class InvestigationRoutes implements RouteModule {
             case "threshold" -> thresholdLine(p);
             case "snapshot" -> snapshotLine(e, p);
             case "compare" -> compareLine(e, p);
+            case "temporal" -> TemporalFindings.line(e, p);
             case "seedBy" -> {
                 Map<String, Object> r = (Map<String, Object>) e.get("read");
                 int n = strings(r.get("ids")).size();

@@ -56,6 +56,9 @@ import java.util.TreeSet;
  *   <li>{@code compare {windowA, windowB}} (LA-INVESTIGATION-OPS-DEFERRED-1) - a marker like {@code snapshot}: it changes
  *       NOTHING in the Working Set. The route SEALS the window diff ({@code entry.comparison}, with a fingerprint) into the
  *       entry at append, so replay never re-reads the Dataset and a Dossier carries it in custody.</li>
+ *   <li>{@code temporal {mode, series?, ...}} (LA-INVESTIGATION-OPS-DEFERRED-1) - a marker like {@code compare}: NOTHING in
+ *       the Working Set changes; the route seals the burst / periodicity finding set ({@code entry.temporalFindings}, with a
+ *       fingerprint) into the entry at append.</li>
  *   <li>{@code window {window}} (LA-13) — sets the window later {@code expand}s inherit ({@code null} clears it).
  *       It re-filters nothing already admitted: a sealed row is a folded count with no timestamps left in it, and
  *       an earlier step's read is evidence as it was made. Each expand's rows are already in-window (the route
@@ -584,7 +587,7 @@ public final class InvestigationEvaluator {
                 for (String id : ids) if (s.entities.containsKey(id)) s.kept.add(id);
             }
             case "threshold" -> threshold(s, p, step);
-            case "snapshot", "compare" -> { }   // markers: the position (and, for compare, the sealed diff on the entry) is the artifact, the state does not move
+            case "snapshot", "compare", "temporal" -> { }   // markers: the position (and, for compare / temporal, the sealed diff / finding set on the entry) is the artifact, the state does not move
             case "window" -> s.window = p.get("window") instanceof Map<?, ?> w ? (Map<String, Object>) w : null;
             case "resolve" -> {   // LA-17 slice 2: the sealed resolution, in force from here (see the class note)
                 s.resolution = (Map<String, Object>) entry.get("resolution");

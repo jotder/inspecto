@@ -68,7 +68,7 @@ public final class PatternRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.post("/inv/pattern/branching", (e, m) -> branching(api, e, api.body(e)));
-        api.post("/inv/pattern/temporal", (e, m) -> temporal(api, e, api.body(e)));
+        api.post("/inv/pattern/temporal", (e, m) -> scan(api, e, api.body(e)));
     }
 
     // ── POST /inv/pattern/temporal — burst / periodicity over each link's event times ─────────────────────────────
@@ -91,7 +91,7 @@ public final class PatternRoutes implements RouteModule {
      * {@value #TIMEOUT_SECONDS} s timeout, a result limit. Read-shaped: persists nothing, audited as
      * {@code LINK_PATTERN_MATCHED}. Output is endpoints and times the Dataset's own viewer could read - it never adds a column.
      */
-    private Object temporal(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+    static Map<String, Object> scan(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "temporal pattern");
         String datasetId = ApiContext.str(body, "dataset");
         if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
@@ -222,6 +222,29 @@ public final class PatternRoutes implements RouteModule {
         } catch (SQLException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "temporal query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
+    }
+
+    /**
+     * The scan knobs of the {@code temporal} Investigation op ({@code mode}, {@code series}, {@code windowSeconds},
+     * {@code minEvents}, {@code maxCv}, {@code limit}) validated with the route's own bounds (422, never clamped) and returned
+     * with every default filled, so what is sealed states exactly what was asked. Columns come from the Investigation's header.
+     */
+    static Map<String, Object> temporalKnobs(Map<String, Object> body) {
+        String mode = ApiContext.str(body, "mode");
+        if (!"burst".equals(mode) && !"periodicity".equals(mode))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'mode' must be 'burst' or 'periodicity'");
+        String series = ApiContext.str(body, "series");
+        if (series != null && !"link".equals(series) && !"entity".equals(series))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'series' must be 'link' or 'entity'");
+        boolean burst = mode.equals("burst");
+        Map<String, Object> k = new LinkedHashMap<>();
+        k.put("mode", mode);
+        k.put("series", series == null ? "link" : series);
+        if (burst) k.put("windowSeconds", (long) boundedNumber(body, "windowSeconds", 60, 1, DAY_SECONDS));
+        k.put("minEvents", (int) boundedNumber(body, "minEvents", 5, burst ? 2 : 3, 1_000));
+        if (!burst) k.put("maxCv", boundedNumber(body, "maxCv", 0.1, 0, 1));
+        k.put("limit", (int) boundedNumber(body, "limit", TEMPORAL_DEFAULT_LIMIT, 1, TEMPORAL_MAX_LIMIT));
+        return k;
     }
 
     private static final Set<String> TEMPORAL_KEYS = Set.of("dataset", "sourceCol", "targetCol", "timeCol", "mode", "filter", "limit",
