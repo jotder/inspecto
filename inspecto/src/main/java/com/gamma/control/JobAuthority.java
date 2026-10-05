@@ -67,8 +67,16 @@ final class JobAuthority {
         out.put(JobConfig.CREATED_BY, priorCreatedBy == null || priorCreatedBy.isBlank() ? by : priorCreatedBy);
         out.put(JobConfig.UPDATED_BY, by);
         out.put(JobConfig.UPDATED_BY_ROLES, String.join(",", new TreeSet<>(ComponentAccess.heldRoles(ex))));
+        // T5 owner-spoofing (operator 2026-10-06): an la.index.build Job's `owner` is the authority its scheduled
+        // build runs under, so it is the SAVER's id unless the saver holds canConfigureAccess (then the typed value
+        // stands). Every save re-stamps, so a different editor becomes the owner; no Subject => untouched (above).
+        if (LA_INDEX_BUILD.equals(String.valueOf(out.get("type"))) && !s.get().capabilities().contains(Roles.CAN_CONFIGURE_ACCESS))
+            out.put(LA_OWNER, by);
         return out;
     }
+
+    private static final String LA_INDEX_BUILD = "la.index.build";
+    private static final String LA_OWNER = "owner";
 
     /** {@link #stamp(HttpExchange, Map, String)} over a parsed Job; {@code existing} is the stored one, or null. */
     static JobConfig stamp(HttpExchange ex, JobConfig c, JobConfig existing) {
