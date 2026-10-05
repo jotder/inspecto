@@ -102,4 +102,30 @@ class ControlApiRateLimitTest {
             assertTrue(exhausted.body().contains("rate limit"), "body: " + exhausted.body());
         }
     }
+
+    private HttpResponse<String> invRequest(int port, String method, String path) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("Content-Type", "application/json")
+                .method(method, HttpRequest.BodyPublishers.ofString("POST".equals(method) ? "{}" : "")).build(),
+                BodyHandlers.ofString());
+    }
+
+    /** Roadmap item 7: an expensive Link Analysis route has its own bucket (429 after the burst of 20); a
+     *  cheap Investigation read, the standard bucket and an unrelated route are untouched. The module is
+     *  absent here, so the handler answers the 503 stub - proof each request below 429 reached dispatch. */
+    @Test
+    void expensiveLinkAnalysisRoutesAreThrottledAndCheapOnesAreNot(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg)) {
+            for (int i = 0; i < 20; i++)
+                assertNotEquals(429, invRequest(c.port, "POST", "/inv/projection").statusCode(), "call " + i);
+            HttpResponse<String> r = invRequest(c.port, "POST", "/inv/graph/runs");
+            assertEquals(429, r.statusCode(), "the bucket is shared by the expensive LA class");
+            assertTrue(r.body().contains("rate limit"), r.body());
+            assertEquals(429, invRequest(c.port, "POST", "/geo/projection").statusCode());
+            for (int i = 0; i < 25; i++)
+                assertNotEquals(429, invRequest(c.port, "GET", "/inv/investigations").statusCode(), "cheap read " + i);
+            assertNotEquals(429, agentTriageRuns(c.port).statusCode(), "standard bucket is separate");
+            assertEquals(200, health(c.port).statusCode());
+        }
+    }
 }

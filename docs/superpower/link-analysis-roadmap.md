@@ -136,7 +136,7 @@ Critical path: D-1 (modules) and D-4 (Graph Run) are done; **D-3 (the index) is 
 | 4 | SP3 Hive extraction + landing throughput (M01) | Must | M | needs Hive access | 0 |
 | 5 | SP4 list pruning at scale; fact-log replay cost (M07) | Must | S | - | 0 |
 | 6 | SP5 node dictionary + longest-prefix enrichment (M04) | Must | M | - | 0 |
-| 7 | Rate-limiter coverage of `/inv` and `/geo` (M16 part) | Must | S | - | 0 |
+| 7 | Rate-limiter coverage of `/inv` and `/geo` (M16 part) - DONE, see Item 7 findings | Must | S | - | 0 |
 | 8 | Doc fixes (below) + GLOSSARY entries for signed terms | enabler | S | - | 0 |
 | 9 | SP6 presence sizing + co-location (M10) | Must | M | after F-02, F-05 | 0 |
 | 10 | Decisions LDP-D1, D2, D6 | - | - | operator | 0-1 |
@@ -162,6 +162,13 @@ Critical path: D-1 (modules) and D-4 (Graph Run) are done; **D-3 (the index) is 
 | 30 | S01 mobile money, S02 GPRS incidence, S04-S07, S09-S11, Coulds | Should/Could | - | various | 5 |
 
 Start-now (no decision): #1-9, M11 server gate, M03.
+
+### Item 7 findings (rate-limiter coverage of `/inv` and `/geo`, 2026-10-06) - DONE, lane `w2-rate-limit-inv-geo`
+
+- **Before:** a limiter existed (`RateLimiter`, in-memory token bucket per `ControlApi`, key = authenticated subject id, else caller IP; 429 `RATE_LIMITED`, no `Retry-After`; fixed budgets, no config key). It covered only `/db/query`, `/bi/query`, `/recon/*`, `/agent/*`, `/public/delivery-status/*`, push-ingest. No `/inv/*`, `/geo/*` or `/entity-lists*` route was throttled, so projection, traversal, pattern, Graph Run and Index build were unbounded per caller.
+- **Now:** `LinkAnalysisRateClasses` gives every route in `AbsentGeoLinkRoutes.SURFACE` and `AbsentEntityListRoutes.SURFACE` an explicit class. EXPENSIVE (11: `POST /geo/projection`, `/geo/routes`, `/inv/projection`, `/inv/projection/neighbors`, `/inv/projection/multi`, `/inv/schema/overlap-profile`, `/inv/traversal/recursive-paths`, `/inv/pattern/branching`, `/inv/pattern/temporal`, `/inv/graph/runs`, `/inv/index/builds`) spend their own bucket `RateLimiter.linkAnalysis()` (burst 20, then 1 per 3 s per subject; separate from the standard bucket). EXEMPT (71): CRUD, reads, cancel, status. No new config key.
+- **Tests:** `LinkAnalysisRateClassCoverageTest` fails when an LA route is in neither table; `ControlApiRateLimitTest` proves 429 on the expensive class and no effect on a cheap read, the standard bucket or `/health`.
+- **Not decided / follow-up (recommendation):** exempt-but-possibly-heavy reads (`working-set`, `coverage`, `compare`, `dossier`, `replay`) are unmeasured; add them to EXPENSIVE if a measurement shows load. Limits are guesses mirroring `standard()`, not tuned; `Retry-After` is not sent by any bucket (adding it is a cross-route change). In-memory per node: a multi-node deployment multiplies the budget.
 
 ### Work packages
 

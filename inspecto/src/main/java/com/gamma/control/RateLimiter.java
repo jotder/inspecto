@@ -35,6 +35,10 @@ final class RateLimiter {
      *  client's file count in the inbox without throttling a sane one. */
     static RateLimiter push() { return new RateLimiter(60.0, 10.0); }
 
+    /** The expensive Link Analysis budget (projection, traversal, pattern, Graph Run, Index build): same shape
+     *  as {@link #standard()} but its own bucket, so a graph session cannot drain ad-hoc SQL and vice versa. */
+    static RateLimiter linkAnalysis() { return new RateLimiter(20.0, 1.0 / 3.0); }
+
     private final double capacity;
     private final double refillPerSecond;
 
