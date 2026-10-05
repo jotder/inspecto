@@ -168,7 +168,7 @@
                     <mat-menu #timelineMenu="matMenu">
                         <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                         <div
-                            class="flex w-80 flex-col gap-2 px-4 py-2"
+                            class="flex w-80 max-w-full flex-col gap-2 px-4 py-2"
                             (click)="$event.stopPropagation()"
                             aria-label="Timeline filter"
                         >
@@ -383,7 +383,7 @@
                 <form
                     [formGroup]="saveForm"
                     (ngSubmit)="saveView()"
-                    class="flex w-72 flex-col p-3"
+                    class="flex w-72 max-w-full flex-col p-3"
                     (click)="$event.stopPropagation()"
                     aria-label="Save this view"
                 >

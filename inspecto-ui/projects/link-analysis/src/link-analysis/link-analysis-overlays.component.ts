@@ -127,7 +127,10 @@ export class LinkAnalysisLegendComponent {
     host: { class: 'block' },
     template: `
         @if (open()) {
-            <div class="w-64 rounded-lg border p-2 text-xs shadow-sm" style="background: var(--gamma-bg-card)">
+            <div
+                class="w-64 max-w-full rounded-lg border p-2 text-xs shadow-sm"
+                style="background: var(--gamma-bg-card)"
+            >
                 <div class="flex items-center gap-1">
                     <span class="font-semibold">Working set</span>
                     @if (truncated()) {
