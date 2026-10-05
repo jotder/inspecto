@@ -371,3 +371,36 @@ query failed. Reader throughput saturates near 5–7 q/s for this query shape re
 beyond ~4 readers the extra threads only queue (p50 doubles from 4 to 8). ⚠ The two "ingest alone" numbers
 differ 1.7× between runs on the same host — the dev host is shared, so compare phases *within* a run, not
 across runs. These are single runs on a developer box, not customer sizing (which stays parked).
+
+## DuckDB version comparison harness
+
+Like-for-like timing of the SAME workloads on two DuckDB versions (built for the 1.5.x to 2.0.x move). Run each side on an
+**idle machine** (no concurrent Maven/test work; it contaminates timings), with `JAVA_HOME` on JDK 27 (the JSON records the JVM).
+The JDBC jar for each version must be in `~/.m2`.
+
+```
+tools/bench-duckdb.ps1 -Label v1.5.6 -OutDir C:\bench -DuckDbVersion 1.5.6.0
+tools/bench-duckdb.ps1 -Label v2.0a  -OutDir C:\bench -DuckDbVersion 2.0.0-alpha43385-881
+node tools/bench-duckdb-compare.mjs C:\bench\v1.5.6.json C:\bench\v2.0a.json
+```
+
+Options: `-Workloads scan,readers,csv,store,la1m,la10m,la100m,engine` (default: all but `la100m`), `-Warmup 1 -Reps 3`,
+`-Scale 1.0` (row-count multiplier), `-CorpusDir`, `-ScaleDir`. One JSON per run (`<OutDir>/<Label>.json`: DuckDB `version()`,
+JVM, host, params, raw per-rep samples per metric, peak RSS) plus per-workload logs. The compare script reports medians,
+% delta (B vs A) and flags a delta as *within noise* when it is under max(5%, either side's p95 spread); `_ms` is
+lower-is-better, `_rps`/`_qps` higher-is-better.
+
+| Workload | Where it runs | Exercises |
+|---|---|---|
+| `scan` | `tools/bench/DuckDbBench.java` | 5M-row parquet Dataset: filter+aggregate, high-cardinality group-by, count distinct, top-N |
+| `readers` | `DuckDbBench.java` | 1/4/8 concurrent readers (`duplicate()` connections) on one file-backed database |
+| `csv` | `DuckDbBench.java` | 2M-row `read_csv`, transform SQL, `COPY ... PARTITION_BY` parquet (the `DuckDbCsvIngester` shape) |
+| `store` | `DuckDbBench.java` | file-backed INSERT / `ON CONFLICT` throughput in the dedup-ledger, status, events and status re-sync shapes (same SQL idioms as the `Db*Store` classes, not the classes themselves) |
+| `la1m`, `la10m`, `la100m` | `IndexScaleBench` via `mvn -o -pl inspecto-la-storage` | index build (once per label), one-hop (1 and 20 keys), hub key, depth-2 walk; p50/p95 per rep. 1M/10M reuse the `-ScaleDir` data and build a per-label index under `<OutDir>`; `la100m` is **read-only** on the existing `idx-100000000` |
+| `engine` | `PluginIngestBenchmark` via `mvn -o -pl inspecto-engine` | the engine's real streaming ingest, transform and partitioned parquet write, union and generation modes (1M rows x `-Scale`) |
+
+Gotchas: the two `mvn` workloads use `-Dduckdb.version=<v>` and the sibling jars already in `~/.m2` (no `-am`), and report no
+peak RSS; the harness cannot see which DuckDB the forked JVM loaded beyond that property, so read `duckdbVersion` from the
+`DuckDbBench` workloads. The `scan`/`csv` corpus is generated once into `-CorpusDir` and shared across labels; databases are
+never shared across versions (the storage format differs). Estimated wall time at `-Warmup 1 -Reps 3`: scan ~1 min,
+readers ~1 min, csv ~1 min, store ~1 min, la1m ~3 min, la10m ~8 min (index build each), engine ~4 min, la100m ~4 min (read-only).
