@@ -410,6 +410,38 @@ CSV** round-trip (2026-08-19). Parse **does not drop columns** (D8, 2026-09-04) 
 things — Grammar · the Schemas it emits · other properties — and the drawer is their one home (PARSE-HOME-1,
 2026-09-06). The Onboarding Parsing stage **no longer exists** (P6-e); the editor is the guided surface.
 
+### 3.10 The daily-feed template and the per-feed export contract (`LA-DAILY-INGEST-1` T2, T3)
+
+**Template.** `spaces/_templates/la-daily-feed/` is the reusable shape of a daily feed for Link Analysis: Pipeline
+`daily_xdr` + schema (`partitionKey: EVENT_DATE`, the UTC calendar date of `START_AT`), a poll Collector
+(`connector: local`, `include: XDR_*.csv`, gap detection on `XDR_{yyyyMMdd}`), `.processed` duplicate markers, the
+quarantine directories, and the Dataset `daily_xdr_dataset`; two synthetic sample days in `data/samples`. Modelled on
+`postmed_xdr` (§3.6 reference build). It is a Space Template, so it is applied by `POST /spaces` with `template`, and
+`ControlApiSpaceTemplateSeedGateTest.everyShippedTemplateApplies` loads and validates every `_templates/*` entry.
+Per feed, rename the feed, columns and file pattern; keep `partitionKey` on the event-date column.
+⚠ The trigger is **poll discovery only**. A cron trigger for the Collector is not a Pipeline setting today (cron exists
+on Jobs and on pipeline entry nodes); the template does not claim one.
+
+**Export contract (the INPUT guarantee).** Whoever produces the daily file (a mediation drop, or a database owner who
+exports a daily CSV or Parquet file with their own scheduler and query, D-ING5) guarantees, per feed:
+
+| Item | Guarantee |
+|---|---|
+| File name | one pattern per feed with the day in it, e.g. `XDR_yyyyMMdd.csv`; the Collector `include` glob and `gap_detection.sequence` use the same pattern |
+| Grain | exactly one UTC calendar day per file; no file spans two days, no day is split across files |
+| Event-date column | one DATE column (`EVENT_DATE`) equal to the UTC date of the event timestamp; it is the `partitionKey`. The day in the file name and every row's event date agree |
+| Time zone | the event timestamp column is UTC wall clock with no offset in the text; the schema declares `timezone: UTC` |
+| Delimiter, encoding, header | comma (or one declared delimiter), UTF-8, one header row whose names match the schema |
+| Null strings | the declared `null_strings` only (template: `NULL`, `N/A`); an empty field is also null |
+| Corrections | a corrected day is re-delivered as a WHOLE file for that day, never a partial or a delta |
+| Completeness | no partial days: a file is written complete (temp name, then rename) so the Collector never sees half a day |
+| Late files | allowed: a day may arrive after later days; it lands in its own event-date partition |
+| Parquet export | same name, grain, column and zone rules; the schema uses `parsing.frontend: parquet` |
+
+What the platform does when a day is delivered twice (replace vs append of the partition, the file-level duplicate
+marker versus a changed file, late-data effect on the Link Analysis Index) is **not part of this contract: see T4**
+(`LA-DAILY-INGEST-1`). Until T4 lands, treat a re-delivered day as unverified.
+
 ## 4. Decisions
 
 Dated, one line each, with the reason. Only decisions that still bind are listed; where one reversed an

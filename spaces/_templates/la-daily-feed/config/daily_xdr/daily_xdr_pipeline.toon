@@ -1,0 +1,41 @@
+name: daily_xdr
+active: true
+description: "Daily telecom XDR feed - one CSV file per UTC day, XDR_yyyyMMdd.csv, comma-delimited with a header. Partition = EVENT_DATE."
+
+dirs:
+  poll:       data/inbox/daily_xdr
+  database:   data/daily_xdr/database
+  backup:     data/daily_xdr/backup
+  temp:       data/daily_xdr/temp
+  errors:     data/daily_xdr/errors
+  quarantine: data/daily_xdr/quarantine
+  markers:    data/daily_xdr/markers
+  status_dir: data/daily_xdr/status
+  log_dir:    data/daily_xdr/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: daily_xdr_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    null_strings[2]: "NULL", "N/A"
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
+  include[1]: "glob:**/XDR_*.csv"
+  gap_detection:
+    enabled: true
+    sequence: "XDR_{yyyyMMdd}"
