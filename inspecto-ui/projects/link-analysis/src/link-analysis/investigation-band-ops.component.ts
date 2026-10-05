@@ -11,6 +11,7 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 
@@ -30,9 +31,18 @@ const bandOrder: ValidatorFn = (g: AbstractControl): ValidationErrors | null => 
     return !blank(min) && !blank(max) && Number(min) >= Number(max) ? { order: true } : null;
 };
 
+/** The `threshold` measures (`InvestigationEvaluator.MEASURES`); `degree` is the default and is not sent. */
+export const THRESHOLD_MEASURES = [
+    { value: 'degree', label: 'Degree (distinct counterparties)' },
+    { value: 'weightedDegree', label: 'Weighted degree (links, each kind and direction)' },
+    { value: 'eventCount', label: 'Event count (events on its links)' },
+] as const;
+export type ThresholdMeasure = (typeof THRESHOLD_MEASURES)[number]['value'];
+
 export function thresholdForm() {
     return new FormGroup(
         {
+            measure: new FormControl<ThresholdMeasure>('degree', { nonNullable: true }),
             min: new FormControl<string | number | null>(null, [Validators.pattern(/^\d+$/)]),
             max: new FormControl<string | number | null>(null, [Validators.pattern(/^\d+$/), Validators.min(1)]),
         },
@@ -41,15 +51,22 @@ export function thresholdForm() {
 }
 
 /**
- * LA-INVESTIGATION-OPS-DEFERRED-1 — appends a `threshold` op: keep the entities whose degree (distinct
- * counterparties among the Working Set's links) falls in `[min, max)`; the rest are excluded exactly as `exclude`
+ * LA-INVESTIGATION-OPS-DEFERRED-1 — appends a `threshold` op: keep the entities whose measure (degree by default;
+ * weighted degree or event count on choice) falls in `[min, max)`; the rest are excluded exactly as `exclude`
  * does (a `keep` protects), once, with no cascade. The server's 422 is shown verbatim beside the form.
  */
 @Component({
     selector: 'inspecto-la-threshold-op',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, InspectoAlertComponent],
+    imports: [
+        ReactiveFormsModule,
+        MatButtonModule,
+        MatFormFieldModule,
+        MatInputModule,
+        MatSelectModule,
+        InspectoAlertComponent,
+    ],
     host: { class: 'block' },
     template: `
         <section
@@ -58,12 +75,20 @@ export function thresholdForm() {
             aria-labelledby="la-threshold-op-title"
         >
             <h3 id="la-threshold-op-title" class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">
-                Degree threshold
+                Threshold
             </h3>
             <form class="flex flex-col gap-2" [formGroup]="form" (ngSubmit)="submit()">
+                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                    <mat-label>Measure</mat-label>
+                    <mat-select formControlName="measure">
+                        @for (m of measures; track m.value) {
+                            <mat-option [value]="m.value">{{ m.label }}</mat-option>
+                        }
+                    </mat-select>
+                </mat-form-field>
                 <div class="flex gap-2">
                     <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Minimum degree</mat-label>
+                        <mat-label>Minimum</mat-label>
                         <input matInput inputmode="numeric" formControlName="min" placeholder="2" />
                         <mat-hint>Kept at or above this.</mat-hint>
                         @if (form.controls.min.hasError('pattern')) {
@@ -71,7 +96,7 @@ export function thresholdForm() {
                         }
                     </mat-form-field>
                     <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Maximum degree</mat-label>
+                        <mat-label>Maximum</mat-label>
                         <input matInput inputmode="numeric" formControlName="max" placeholder="50" />
                         <mat-hint>Kept below this.</mat-hint>
                         @if (form.controls.max.hasError('pattern') || form.controls.max.hasError('min')) {
@@ -98,6 +123,7 @@ export function thresholdForm() {
 export class InvestigationThresholdOpComponent {
     readonly store = inject(InvestigationSessionStore);
     readonly form = thresholdForm();
+    readonly measures = THRESHOLD_MEASURES;
     readonly error = signal('');
 
     async submit(): Promise<void> {
@@ -106,13 +132,14 @@ export class InvestigationThresholdOpComponent {
             this.form.markAllAsTouched();
             return;
         }
-        const { min, max } = this.form.getRawValue();
+        const { measure, min, max } = this.form.getRawValue();
         const ok = await this.store.apply({
             op: 'threshold',
+            ...(measure === 'degree' ? {} : { measure }),
             ...(blank(min) ? {} : { min: Number(min) }),
             ...(blank(max) ? {} : { max: Number(max) }),
         });
-        if (ok) this.form.reset();
+        if (ok) this.form.reset({ measure: 'degree' });
         else this.error.set(this.store.error());
     }
 }

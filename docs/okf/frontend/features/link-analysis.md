@@ -1584,9 +1584,21 @@ reactive form, `store.apply(...)`, the server's 422 shown verbatim in an `inspec
 422s: threshold needs at least one bound, `min` an integer >= 0, `max` an integer >= 1, `min < max`; snapshot `label`
 is optional, trimmed, <= 2000 chars; neither sends `ids`. The op log line is the SERVER's `text` (the SPA does no
 op formatting), so nothing client-side renders these two. `InvestigationOpName` / `InvestigationOpRequest` gained both ops.
-⏳ Open questions: does a `snapshot` step also seal a `/inv/snapshots` Artifact (the SPA's snapshot dialog does,
-client-side)? are other measures (weighted degree, event count) wanted for `threshold`? should it be re-evaluable
-(not exclusion)? — filed in the BACKLOG row. The log is **ordered and non-commutative** (`exclude → expand` ≠ `expand → exclude`;
+**`threshold` measures (2026-10-05):** `{measure?}` — `degree` (default; absent from the entry, so every older log and
+hash replays byte-identically), `weightedDegree` (links touching the entity, each kind + direction once, so a
+counterparty reached by two kinds weighs 2) and `eventCount` (sum of those links' folded event `count`). ⚠ Call: the
+Working Set carries ONE weight, the folded event count, so "weighted degree" as sum-of-weights would equal
+`eventCount`; `weightedDegree` is therefore the multigraph degree and `eventCount` is the weighted one (rename is a
+one-line change if the operator prefers another word). Self-loops count for no measure; band, protection, no-cascade
+and reason (`threshold: <measure> outside [min, max)`) are as for degree. An unknown measure is 422. SPA: a *Measure*
+select on the threshold form (sent only when not `degree`). **`snapshot` does NOT seal a `/inv/snapshots` Artifact —
+reasoned decline (2026-10-05):** the Working Set at any log position is already reconstructible and verified (each
+entry carries its Working Set hash; replay checks it; the Dossier `at` freezes any position), so a server-side copy
+would be a second source of truth that bloats the log; and a `/inv/snapshots` Artifact is a CLIENT-computed record
+(layout, metrics, `manifestHash`) the server cannot author. The need it would serve (frozen metrics/layout) is met by
+the SPA's snapshot dialog, whose Artifact anchors to the Investigation and is already carried with custody by the
+Dossier. Revisit only if an operator needs a server-authored capture independent of the log. ⏳ Open: should
+`threshold` be re-evaluable (not exclusion)? The log is **ordered and non-commutative** (`exclude → expand` ≠ `expand → exclude`;
 re-ordering forks, D-E4); **`hide` ≠ `exclude` ≠ `keep`** (hide: gone from display, still traversed and counted;
 exclude: gone from all three, still inspectable as the `excluded` relation; keep: protected from later
 excludes). Two evaluators, one spec — incremental on append, full replay from the sealed log — with an

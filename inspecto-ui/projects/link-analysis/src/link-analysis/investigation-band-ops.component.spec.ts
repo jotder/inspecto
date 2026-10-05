@@ -39,6 +39,17 @@ describe('InvestigationThresholdOpComponent (LA-INVESTIGATION-OPS-DEFERRED-1)', 
         expect(store.apply).toHaveBeenLastCalledWith({ op: 'threshold', min: 0, max: 50 });
     });
 
+    it('sends a measure only when it is not the degree default', async () => {
+        const { cmp, store } = setup(InvestigationThresholdOpComponent);
+        cmp.form.patchValue({ measure: 'eventCount', min: '10' });
+        await cmp.submit();
+        expect(store.apply).toHaveBeenLastCalledWith({ op: 'threshold', measure: 'eventCount', min: 10 });
+        expect(cmp.form.controls.measure.value).toBe('degree');
+        cmp.form.patchValue({ measure: 'weightedDegree', max: '4' });
+        await cmp.submit();
+        expect(store.apply).toHaveBeenLastCalledWith({ op: 'threshold', measure: 'weightedDegree', max: 4 });
+    });
+
     it('refuses client-side what the server refuses: no bound, min >= max, non-integer, max 0', async () => {
         const { fixture, cmp, store, el } = setup(InvestigationThresholdOpComponent);
         await cmp.submit();

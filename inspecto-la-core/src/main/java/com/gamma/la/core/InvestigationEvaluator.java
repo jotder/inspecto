@@ -624,9 +624,39 @@ public final class InvestigationEvaluator {
         return out;
     }
 
-    /** The reason a {@code threshold} records for what it removed: names the band, e.g. {@code degree outside [2, 5)}. */
+    /** The {@code threshold} measures: the default {@code degree}, then {@code weightedDegree} and {@code eventCount}. */
+    public static final List<String> MEASURES = List.of("degree", "weightedDegree", "eventCount");
+
+    /** The measure a threshold names ({@code degree} when absent - the pre-measure shape, so old logs replay unchanged). */
+    public static String measureOf(Map<String, Object> p) {
+        return p.get("measure") == null ? "degree" : String.valueOf(p.get("measure"));
+    }
+
+    /**
+     * Each admitted entity's value of {@code measure} over the links of {@code s} (self-loops never count, for every measure):
+     * {@code degree} = distinct counterparties; {@code weightedDegree} = links touching it, each (kind, direction) once, so a
+     * counterparty reached by two kinds weighs 2; {@code eventCount} = the sum of those links' folded event counts.
+     */
+    public static Map<String, Long> measures(State s, String measure) {
+        if ("degree".equals(measure)) {
+            Map<String, Long> out = new TreeMap<>();
+            degrees(s).forEach((k, v) -> out.put(k, v.longValue()));
+            return out;
+        }
+        Map<String, Long> out = new TreeMap<>();
+        for (String id : s.entities.keySet()) out.put(id, 0L);
+        for (Link l : s.links.values()) {
+            if (l.source().equals(l.target())) continue;
+            long w = "eventCount".equals(measure) ? l.count() : 1L;
+            out.computeIfPresent(l.source(), (k, v) -> v + w);
+            out.computeIfPresent(l.target(), (k, v) -> v + w);
+        }
+        return out;
+    }
+
+    /** The reason a {@code threshold} records for what it removed: names the measure and band, e.g. {@code degree outside [2, 5)}. */
     public static String thresholdReason(Map<String, Object> p) {
-        return "threshold: degree outside [" + (p.get("min") == null ? "0" : p.get("min")) + ", "
+        return "threshold: " + measureOf(p) + " outside [" + (p.get("min") == null ? "0" : p.get("min")) + ", "
                 + (p.get("max") == null ? "unbounded" : p.get("max")) + ")";
     }
 
@@ -634,7 +664,7 @@ public final class InvestigationEvaluator {
         long min = p.get("min") instanceof Number n ? n.longValue() : 0;
         long max = p.get("max") instanceof Number n ? n.longValue() : Long.MAX_VALUE;
         String reason = thresholdReason(p);
-        for (var d : degrees(s).entrySet())
+        for (var d : measures(s, measureOf(p)).entrySet())
             if (d.getValue() < min || d.getValue() >= max) exclude(s, d.getKey(), reason, step);
     }
 
