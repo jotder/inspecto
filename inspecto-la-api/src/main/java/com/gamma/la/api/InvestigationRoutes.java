@@ -1466,6 +1466,12 @@ public final class InvestigationRoutes implements RouteModule {
             if (mode != null && !"presence".equals(mode) && !"activity".equals(mode))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'mode' is \"presence\" (default) or \"activity\" (event-count delta), got " + mode);
             if ("activity".equals(mode)) p.put("mode", "activity");   // presence is the default and stays out of the params
+            Long minAbs = WindowComparison.minAbsDelta(body.get("minAbsDelta"));
+            if (minAbs != null) {
+                if (!"activity".equals(mode))
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'minAbsDelta' applies to \"mode\": \"activity\" only");
+                p.put("minAbsDelta", minAbs);   // sealed in the params, and in the diff's hashed content, only when given
+            }
             return p;
         }
         if (op.equals("threshold") || op.equals("snapshot")) {   // no ids: over the whole Working Set / a log position
@@ -1777,7 +1783,7 @@ public final class InvestigationRoutes implements RouteModule {
         Map<?, ?> c = e.get("comparison") instanceof Map<?, ?> c0 ? c0 : null;
         String line = "Compared " + windowText(p.get("windowA"), c == null ? null : c.get("windowA")) + " (A) with "
                 + windowText(p.get("windowB"), c == null ? null : c.get("windowB")) + " (B)"
-                + ("activity".equals(p.get("mode")) ? ", by event count" : "");
+                + ("activity".equals(p.get("mode")) ? ", by event count" + (p.get("minAbsDelta") == null ? "" : " (changes of at least " + p.get("minAbsDelta") + " events)") : "");
         if (c == null) return line + ".";
         Map<?, ?> links = (Map<?, ?>) c.get("links"), ents = (Map<?, ?>) c.get("entities");
         return line + ": links only in A " + ((Map<?, ?>) links.get("onlyA")).get("count") + ", only in B "
@@ -1812,7 +1818,8 @@ public final class InvestigationRoutes implements RouteModule {
                 windows.put(w, state.window);
             } else windows.put(w, castParams(side));
         }
-        Map<String, Object> raw = WindowComparison.compare(api, ex, inv, state, windows, "activity".equals(params.get("mode")));
+        Map<String, Object> raw = WindowComparison.compare(api, ex, inv, state, windows, "activity".equals(params.get("mode")),
+                params.get("minAbsDelta") instanceof Number n ? Long.valueOf(n.longValue()) : null);
         if (!inherited.isEmpty()) raw.put("inherited", inherited);
         return WindowComparison.seal(raw);
     }

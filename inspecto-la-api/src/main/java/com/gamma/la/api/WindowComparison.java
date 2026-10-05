@@ -66,15 +66,37 @@ final class WindowComparison {
         return out;
     }
 
+    /** {@code minAbsDelta} as an integer >= 1, or null when absent. */
+    static Long minAbsDelta(Object raw) {
+        if (raw == null) return null;
+        try {
+            long v = raw instanceof Number n && n.doubleValue() == n.longValue() ? n.longValue() : Long.parseLong(String.valueOf(raw).trim());
+            if (v >= 1) return v;
+        } catch (NumberFormatException ignored) {
+            // falls through to the refusal
+        }
+        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'minAbsDelta' is an integer >= 1 (the smallest event-count change to list), got " + raw);
+    }
+
     /** The diff, with RAW ids (the caller masks). */
     static Map<String, Object> compare(ApiContext api, HttpExchange ex, InvestigationRoutes.Inv inv,
                                        InvestigationEvaluator.State state, Map<String, Map<String, Object>> windows) {
-        return compare(api, ex, inv, state, windows, false);
+        return compare(api, ex, inv, state, windows, false, null);
     }
 
-    /** {@code activity}: also report, per Working Set link and entity, the event-COUNT delta between the windows (B minus A). */
     static Map<String, Object> compare(ApiContext api, HttpExchange ex, InvestigationRoutes.Inv inv,
                                        InvestigationEvaluator.State state, Map<String, Map<String, Object>> windows, boolean activity) {
+        return compare(api, ex, inv, state, windows, activity, null);
+    }
+
+    /**
+     * {@code activity}: also report, per Working Set link and entity, the event-COUNT delta between the windows (B minus A).
+     * {@code minAbsDelta} (activity only, null = none): a move smaller than this is not listed as changed; it is counted under
+     * {@code belowMinDelta} instead.
+     */
+    static Map<String, Object> compare(ApiContext api, HttpExchange ex, InvestigationRoutes.Inv inv,
+                                       InvestigationEvaluator.State state, Map<String, Map<String, Object>> windows, boolean activity,
+                                       Long minAbsDelta) {
         Map<String, Object> h = inv.header();
         if (h.get("timeCol") == null)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "this Investigation has no time column - create it with 'timeCol' to compare windows");
@@ -147,7 +169,7 @@ final class WindowComparison {
         out.put("links", links);
         out.put("entities", entities);
         if (activity) out.put("mode", "activity");
-        if (activity) out.put("activity", activity(linkMoves, linkUnchanged, entCounts));
+        if (activity) out.put("activity", activity(linkMoves, linkUnchanged, entCounts, minAbsDelta));
         out.put("sealed", false);
         out.put("basis", "Working Set entities and links at the chosen log position; in-window event counts read live from the "
                 + "Dataset (not sealed into the log). A link is present in a window with at least one event there; an entity "
@@ -160,7 +182,11 @@ final class WindowComparison {
      * id, so the order is deterministic), each with {@code countA}, {@code countB} and {@code delta} (B minus A); the rest are
      * counted as {@code unchanged}. An entity's count is the events on the Working Set links it ends, a self-loop once.
      */
-    private static Map<String, Object> activity(List<Map<String, Object>> linkMoves, long linkUnchanged, TreeMap<String, long[]> entCounts) {
+    private static Map<String, Object> activity(List<Map<String, Object>> linkMoves, long linkUnchanged, TreeMap<String, long[]> entCounts,
+                                                Long minAbsDelta) {
+        long min = minAbsDelta == null ? 0 : minAbsDelta;
+        long linksBelow = linkMoves.stream().filter(m -> Math.abs((Long) m.get("delta")) < min).count();
+        linkMoves.removeIf(m -> Math.abs((Long) m.get("delta")) < min);
         linkMoves.sort(Comparator.comparingLong((Map<String, Object> m) -> -Math.abs((Long) m.get("delta")))
                 .thenComparing(m -> String.valueOf(m.get("source"))).thenComparing(m -> String.valueOf(m.get("target")))
                 .thenComparing(m -> String.valueOf(m.get("kind"))));
@@ -176,6 +202,8 @@ final class WindowComparison {
             row.put("delta", b - a);
             entMoves.add(row);
         }
+        long entsBelow = entMoves.stream().filter(m -> Math.abs((Long) m.get("delta")) < min).count();
+        entMoves.removeIf(m -> Math.abs((Long) m.get("delta")) < min);
         entMoves.sort(Comparator.comparingLong((Map<String, Object> m) -> -Math.abs((Long) m.get("delta")))
                 .thenComparing(m -> String.valueOf(m.get("id"))));
         Map<String, Object> out = new LinkedHashMap<>();
@@ -184,6 +212,11 @@ final class WindowComparison {
         l.put("unchanged", linkUnchanged);
         en.put("changed", section(entMoves));
         en.put("unchanged", entUnchanged);
+        if (minAbsDelta != null) {   // only when asked, so a diff sealed without it is byte-identical to before
+            out.put("minAbsDelta", minAbsDelta);
+            l.put("belowMinDelta", linksBelow);
+            en.put("belowMinDelta", entsBelow);
+        }
         out.put("links", l);
         out.put("entities", en);
         return out;
@@ -234,8 +267,13 @@ final class WindowComparison {
             Map<String, Object> counts = new LinkedHashMap<>();
             for (String part : List.of("links", "entities")) {
                 Map<?, ?> a = (Map<?, ?>) act.get(part);
-                counts.put(part, Map.of("changed", ((Map<?, ?>) a.get("changed")).get("count"), "unchanged", a.get("unchanged")));
+                Map<String, Object> c = new LinkedHashMap<>();
+                c.put("changed", ((Map<?, ?>) a.get("changed")).get("count"));
+                c.put("unchanged", a.get("unchanged"));
+                if (a.get("belowMinDelta") != null) c.put("belowMinDelta", a.get("belowMinDelta"));
+                counts.put(part, c);
             }
+            if (act.get("minAbsDelta") != null) counts.put("minAbsDelta", act.get("minAbsDelta"));
             out.put("activity", counts);
         }
         return out;

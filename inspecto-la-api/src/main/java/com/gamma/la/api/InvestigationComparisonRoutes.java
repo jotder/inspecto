@@ -56,7 +56,13 @@ public final class InvestigationComparisonRoutes implements RouteModule {
         for (String line : lines.subList(0, at)) log.add(ApiContext.JSON.readValue(line, Map.class));
         InvestigationEvaluator.State state = InvestigationEvaluator.evaluate(log, -1, null);
 
-        Map<String, Object> raw = WindowComparison.compare(api, ex, inv, state, windows);
+        String mode = ApiContext.query(ex, "mode");
+        if (mode != null && !"presence".equals(mode) && !"activity".equals(mode))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'mode' is \"presence\" (default) or \"activity\" (event-count delta), got " + mode);
+        Long minAbs = WindowComparison.minAbsDelta(ApiContext.query(ex, "minAbsDelta"));
+        if (minAbs != null && !"activity".equals(mode))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'minAbsDelta' applies to mode=activity only");
+        Map<String, Object> raw = WindowComparison.compare(api, ex, inv, state, windows, "activity".equals(mode), minAbs);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
         out.put("at", at);
