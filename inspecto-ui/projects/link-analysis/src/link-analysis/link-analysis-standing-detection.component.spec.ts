@@ -60,7 +60,12 @@ class HostComponent {
 }
 
 function setup(opts: { cap?: boolean; enable?: () => unknown; events?: (f: { type?: string }) => unknown } = {}) {
-    const inv = { enableStandingDetection: vi.fn(() => (opts.enable ? opts.enable() : of(ENABLED))) };
+    const inv = {
+        enableStandingDetection: vi.fn(() => (opts.enable ? opts.enable() : of(ENABLED))),
+        disableStandingDetection: vi.fn(() =>
+            of({ rule: 'r1', investigation: 'inv-1', enabled: false, wasEnabled: true }),
+        ),
+    };
     TestBed.configureTestingModule({
         imports: [HostComponent],
         providers: [
@@ -126,6 +131,18 @@ describe('LinkAnalysisStandingDetectionComponent', () => {
         expect(el.querySelector('[data-test=standing-principal]')!.textContent).toContain('sweep:inv-1');
         expect(el.querySelector('[data-test=standing-masking]')!.textContent).toContain('payer:msisdn');
         expect(el.querySelector('[data-test=standing-status]')!.textContent).toContain('Enabled');
+        await expectNoA11yViolations(el);
+    });
+
+    it('disables after enabling and says the rule stays bound', async () => {
+        const { el, inv, click } = setup();
+        expect(el.querySelector('[data-test=standing-disable]')).toBeNull();
+        await click('[data-test=standing-enable]');
+        await click('[data-test=standing-disable]');
+        expect(inv.disableStandingDetection).toHaveBeenCalledWith('inv-1', 'r1');
+        expect(el.querySelector('[data-test=standing-disabled]')!.textContent).toContain('NOT_ENABLED');
+        expect(el.querySelector('[data-test=standing-status]')!.textContent).toContain('Not enabled');
+        expect(el.querySelector('[data-test=standing-disable]')).toBeNull();
         await expectNoA11yViolations(el);
     });
 
