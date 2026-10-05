@@ -40,7 +40,7 @@ describe('InvestigationCompareOpComponent (LA-INVESTIGATION-OPS-DEFERRED-1)', ()
         cmp.formA.patchValue({ from: '2026-09-01T00:00:00Z' });
         await cmp.submit();
         fixture.detectChanges();
-        expect(el.textContent).toContain('Set at least one of From, To, a slot or days');
+        expect(el.textContent).toContain('Set at least one of From, To, a slot, days or excluded dates');
         cmp.formB.patchValue({ from: '2026-09-01T00:00:00' });
         await cmp.submit();
         expect(store.apply).not.toHaveBeenCalled();

@@ -98,7 +98,7 @@ public final class InvestigationCoverageRoutes implements RouteModule {
         for (LocalDate day = first; !day.isAfter(last); day = day.plusDays(1)) {
             if (expected.size() >= MAX_DAYS)
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "coverage is capped at " + MAX_DAYS + " days; narrow the window");
-            if (mask == null || mask.contains(InvestigationTime.DAYS.get(day.getDayOfWeek().getValue() - 1)))
+            if ((mask == null || mask.contains(InvestigationTime.DAYS.get(day.getDayOfWeek().getValue() - 1))) && !excluded(window, day))
                 expected.add(day);
         }
 
@@ -156,6 +156,16 @@ public final class InvestigationCoverageRoutes implements RouteModule {
      * stores, and for each the expected days on which it delivered nothing. 🔴 Absent evidence stays "not assessed", never
      * "no gaps": no port, a Dataset with no backing store, or no lineage naming one.
      */
+    /** A day the window's calendar exclusions remove is not EXPECTED to have rows, so its absence is not a gap. */
+    private static boolean excluded(Map<String, Object> window, LocalDate day) {
+        if (!(window.get("exclude") instanceof List<?> ex)) return false;
+        for (Object o : ex) {
+            Map<?, ?> r = (Map<?, ?>) o;
+            if (!day.isBefore(LocalDate.parse(String.valueOf(r.get("from")))) && !day.isAfter(LocalDate.parse(String.valueOf(r.get("to"))))) return true;
+        }
+        return false;
+    }
+
     private static Map<String, Object> collectors(ApiContext api, InvestigationRoutes.Inv inv, List<LocalDate> expected) {
         Map<String, Object> out = new LinkedHashMap<>();
         Optional<Map<String, Object>> ds = DatasetProviders.require().dataset(inv.writeRoot(), inv.dataset());

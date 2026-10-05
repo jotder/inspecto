@@ -232,11 +232,23 @@ export type WindowDay = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
  * `slot` `[start, end)` (`HH:mm`, may cross midnight) and a `days` mask. `timezone` is REQUIRED whenever a slot or
  * mask is given — they are wall-clock notions.
  */
+export interface InvestigationWindowExclude {
+    date?: string;
+    from?: string;
+    to?: string;
+    name?: string;
+}
+
 export interface InvestigationWindow {
     from?: string | null;
     to?: string | null;
     slot?: { start: string; end: string } | null;
     days?: WindowDay[] | null;
+    /**
+     * Calendar exclusions (holidays): a local date or an inclusive date range in `timezone` (which they therefore
+     * require), optionally named. The server also takes a bare "YYYY-MM-DD" and canonicalises each entry to {from, to}.
+     */
+    exclude?: InvestigationWindowExclude[] | null;
     timezone?: string | null;
 }
 

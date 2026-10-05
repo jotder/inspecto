@@ -6,6 +6,7 @@ import com.gamma.control.ErrorCodes;
 
 import java.time.DateTimeException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -15,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * The time model of an Investigation (LA-13, plan §2.5): the {@code window} shape, its validation, and the SQL that
@@ -44,14 +46,22 @@ import java.util.Set;
  * Zones are validated by {@link SourceZoneGrammar} — the set measured to be a strict subset of what DuckDB accepts,
  * so a zone that passes here always evaluates (offset forms such as {@code +05:30} are refused there too).
  *
- * <p>⏳ Not built: calendar exclusions, comparison mode (two windows diffed), time-respecting paths.
+ * <h2>Calendar exclusions</h2>
+ * {@code exclude} is a list of named dates / date ranges (holidays) removed from the window, in addition to the
+ * slot and day mask. Each entry is {@code {date}} or {@code {from, to}} (local calendar dates, both INCLUSIVE),
+ * optionally with a {@code name}; a bare {@code "YYYY-MM-DD"} string is shorthand for {@code {date}}. Like the day
+ * mask they are wall-clock notions: they test the local calendar day ON WHICH THE EVENT FELL in the window's
+ * {@code timezone}, which is therefore required. They are canonicalised to {@code {from, to[, name]}} sorted by
+ * date, so the same exclusions seal the same bytes. At most {@link #MAX_EXCLUDES} entries.
  */
 public final class InvestigationTime {
 
     private InvestigationTime() {}
 
     public static final List<String> DAYS = List.of("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN");
-    private static final Set<String> WINDOW_KEYS = Set.of("from", "to", "slot", "days", "timezone");
+    /** The cap on {@code exclude} entries: a calendar of holidays, not a second Dataset. */
+    public static final int MAX_EXCLUDES = 366;
+    private static final Set<String> WINDOW_KEYS = Set.of("from", "to", "slot", "days", "exclude", "timezone");
 
     /**
      * Validate an authored window and return its canonical form: instants normalised to UTC ({@link Instant#toString}),
@@ -97,18 +107,73 @@ public final class InvestigationTime {
         }
         out.put("days", days);
 
+        List<Map<String, Object>> exclude = excludes(w.get("exclude"), origin + ".exclude");
+        out.put("exclude", exclude);
+
         String zone = w.get("timezone") == null ? null : String.valueOf(w.get("timezone"));
         if (zone != null) {
             String refusal = SourceZoneGrammar.zoneRefusal(zone, origin + ".timezone");
             if (refusal != null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, refusal);
         }
-        if ((slot != null || days != null) && zone == null)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + ": a slot or day mask is wall-clock time and needs an explicit "
+        if ((slot != null || days != null || exclude != null) && zone == null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + ": a slot, day mask or calendar exclusion is wall-clock time and needs an explicit "
                     + "'timezone' (an IANA region id) — there is no default, because the default would be the host's");
         out.put("timezone", zone);
-        if (from == null && to == null && slot == null && days == null)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " must set at least one of from, to, slot, days");
+        if (from == null && to == null && slot == null && days == null && exclude == null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " must set at least one of from, to, slot, days, exclude");
         return out;
+    }
+
+    private static List<Map<String, Object>> excludes(Object raw, String origin) {
+        if (raw == null) return null;
+        if (!(raw instanceof List<?> l) || l.isEmpty() || l.size() > MAX_EXCLUDES)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " must be a non-empty list of at most " + MAX_EXCLUDES
+                    + " entries: a 'YYYY-MM-DD' string, {date} or {from, to} (inclusive), each with an optional 'name'");
+        TreeMap<String, Map<String, Object>> sorted = new TreeMap<>();
+        int i = 0;
+        for (Object e : l) {
+            String at = origin + "[" + i++ + "]";
+            LocalDate from, to;
+            String name = null;
+            if (e instanceof String s) {
+                from = to = date(s, at);
+            } else if (e instanceof Map<?, ?> m) {
+                for (Object k : m.keySet())
+                    if (!Set.of("date", "from", "to", "name").contains(String.valueOf(k)))
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + ": unknown key '" + k + "' (allowed: date, from, to, name)");
+                if (m.get("date") != null) {
+                    if (m.get("from") != null || m.get("to") != null)
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + ": give 'date' OR 'from' and 'to', not both");
+                    from = to = date(m.get("date"), at + ".date");
+                } else {
+                    if (m.get("from") == null || m.get("to") == null)
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + " needs 'date', or both 'from' and 'to'");
+                    from = date(m.get("from"), at + ".from");
+                    to = date(m.get("to"), at + ".to");
+                    if (to.isBefore(from))
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + ": 'from' must not be after 'to' (both inclusive)");
+                }
+                if (m.get("name") != null) name = String.valueOf(m.get("name")).trim();
+                if (name != null && (name.isEmpty() || name.length() > 80))
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + ".name must be 1-80 characters");
+            } else {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, at + " must be a 'YYYY-MM-DD' string, {date} or {from, to}");
+            }
+            Map<String, Object> c = new LinkedHashMap<>();
+            c.put("from", from.toString());
+            c.put("to", to.toString());
+            if (name != null) c.put("name", name);
+            sorted.put(from + "/" + to + "/" + (name == null ? "" : name), c);
+        }
+        return new ArrayList<>(sorted.values());
+    }
+
+    private static LocalDate date(Object raw, String origin) {
+        String s = raw == null ? "" : String.valueOf(raw);
+        try {
+            if (s.matches("\\d{4}-\\d{2}-\\d{2}")) return LocalDate.parse(s);
+        } catch (DateTimeException ignored) { /* falls through to the refusal */ }
+        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " must be a calendar date YYYY-MM-DD, got '" + s + "'");
     }
 
     private static Instant instant(Object raw, String origin) {
@@ -180,6 +245,19 @@ public final class InvestigationTime {
                  .append(String.join(",", Collections.nCopies(days.size(), "CAST(? AS INTEGER)"))).append(")");
             for (Object d : days) binds.add(Integer.toString(DAYS.indexOf(String.valueOf(d)) + 1));
         }
+        if (w.get("exclude") instanceof List<?> ex && !ex.isEmpty()) {
+            // The local calendar day the event fell on, never the host's: lt is already in the window's zone.
+            where.append(" AND NOT (");
+            boolean first = true;
+            for (Object o : ex) {
+                Map<?, ?> r = (Map<?, ?>) o;
+                where.append(first ? "" : " OR ").append("CAST(lt AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)");
+                binds.add(String.valueOf(r.get("from")));
+                binds.add(String.valueOf(r.get("to")));
+                first = false;
+            }
+            where.append(")");
+        }
     }
 
     /**
@@ -216,7 +294,16 @@ public final class InvestigationTime {
             parts.add("daily " + s.get("start") + "–" + s.get("end") + (crosses ? " (crossing midnight)" : ""));
         }
         if (w.get("days") instanceof List<?> d) parts.add("on " + String.join(", ", (List<String>) d));
-        if (w.get("timezone") != null) parts.add(w.get("slot") != null || w.get("days") != null
+        if (w.get("exclude") instanceof List<?> ex && !ex.isEmpty()) {
+            List<String> xs = new ArrayList<>();
+            for (Object o : ex) {
+                Map<?, ?> r = (Map<?, ?>) o;
+                String span = r.get("from").equals(r.get("to")) ? String.valueOf(r.get("from")) : r.get("from") + " to " + r.get("to");
+                xs.add(r.get("name") == null ? span : r.get("name") + " (" + span + ")");
+            }
+            parts.add("excluding " + String.join(", ", xs));
+        }
+        if (w.get("timezone") != null) parts.add(w.get("slot") != null || w.get("days") != null || w.get("exclude") != null
                 ? "wall clock in " + w.get("timezone") : "(" + w.get("timezone") + ")");
         return String.join(", ", parts);
     }

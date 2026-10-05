@@ -179,6 +179,47 @@ class ControlApiInvestigationHopLadderTest {
         }
     }
 
+    /** Calendar exclusions (holidays) remove LOCAL calendar days of the window's zone, alongside the slot. */
+    @Test
+    void calendarExclusionsRemoveLocalDatesInTheWindowsZone(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            timed(c, "t", "a");
+            // Tokyo dates: b, e, f, g fell on 2026-09-01; c, d on 2026-09-02 (the São Paulo date is Sep 1 for ALL of them).
+            JsonNode w = op(c, "t", "{\"op\":\"window\",\"window\":{\"exclude\":[\"2026-09-01\"],\"timezone\":\"Asia/Tokyo\"}}");
+            assertEquals("2026-09-01", w.at("/window/exclude/0/from").asText(), "string shorthand is canonicalised");
+            assertEquals(Set.of("c", "d"), admitted(op(c, "t", "{\"op\":\"expand\"}")));
+
+            timed(c, "t2", "a");
+            op(c, "t2", "{\"op\":\"window\",\"window\":{\"exclude\":[{\"name\":\"Holiday\",\"from\":\"2026-09-02\",\"to\":\"2026-09-03\"}],"
+                    + "\"timezone\":\"Asia/Tokyo\"}}");
+            assertEquals(Set.of("b", "e", "f", "g"), admitted(op(c, "t2", "{\"op\":\"expand\"}")));
+
+            timed(c, "t3", "a");   // composes with the slot: 22:00-04:00 admits b,c,f; Sep 2 excluded leaves b,f
+            op(c, "t3", "{\"op\":\"window\",\"window\":{\"slot\":{\"start\":\"22:00\",\"end\":\"04:00\"},"
+                    + "\"exclude\":[{\"date\":\"2026-09-02\"}],\"timezone\":\"Asia/Tokyo\"}}");
+            assertEquals(Set.of("b", "f"), admitted(op(c, "t3", "{\"op\":\"expand\"}")));
+        }
+    }
+
+    @Test
+    void malformedCalendarExclusionsAreRefusedAndNeverLogged(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            timed(c, "t", "a");
+            for (String bad : List.of(
+                    "{\"exclude\":[\"2026-09-01\"]}",
+                    "{\"exclude\":[],\"timezone\":\"UTC\"}",
+                    "{\"exclude\":[\"2026-13-01\"],\"timezone\":\"UTC\"}",
+                    "{\"exclude\":[\"2026-9-1\"],\"timezone\":\"UTC\"}",
+                    "{\"exclude\":[{\"from\":\"2026-09-03\",\"to\":\"2026-09-02\"}],\"timezone\":\"UTC\"}",
+                    "{\"exclude\":[{\"from\":\"2026-09-03\"}],\"timezone\":\"UTC\"}",
+                    "{\"exclude\":[{\"date\":\"2026-09-03\",\"to\":\"2026-09-04\"}],\"timezone\":\"UTC\"}",
+                    "{\"exclude\":[{\"date\":\"2026-09-03\",\"why\":\"x\"}],\"timezone\":\"UTC\"}"))
+                assertEquals(422, opStatus(c, "t", "{\"op\":\"window\",\"window\":" + bad + "}"), bad);
+            assertFalse(data(send(c.port, "GET", "/inv/investigations/t/log", null, null)).toString().contains("exclude"),
+                    "no refused window reached the log");
+        }
+    }
+
     /** The absolute range is two instants, half-open, and an offset other than Z means what it says. */
     @Test
     void theAbsoluteRangeIsHalfOpenOverInstants(@TempDir Path cfg, @TempDir Path root) throws Exception {
