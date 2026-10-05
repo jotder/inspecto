@@ -400,6 +400,10 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
   rendered as editable fields in the toolbox. 🔴 **A band, not an open "under 1 000"**: ordinary traffic is a
   long tail below any threshold, and an open bound made every busy account a "collector". On the demo corpus
   (`mule_structuring` view, 1 928 transfers, 170 accounts) it finds exactly the one planted ring in ~9 ms.
+* **Two more built-in branching packs (2026-10-05, `LA-INVESTIGATION-OPS-DEFERRED-1`)**, same constant-only shape as Structuring (no TOON copy, reach every Space via the PACK-1 merge, no threshold):
+  `layering-network` = fan-out ≥ 3 within 24 h → re-converge ≥ 3 within 48 h (the web a single-path `layering-chain` misses);
+  `circular-financing` = two successive split-and-merge rounds (fan-out ≥ 2 → fan-in ≥ 2 → fan-out ≥ 2 → fan-in ≥ 2), each after the one before within 48 h.
+  ⚠ **Call:** the branching matcher has no "return to the start node" stage and adding one would also change the server `PatternQueryCompiler`, so `circular-financing` finds round-trip WEBS, not proven closure; `circular-flow` keeps routing to Cycles for exact loops. Ids are `layering-network` (not `layering`, which would read as a rename of `layering-chain`) and `circular-financing`.
 * ⛔ **It REFUSES rather than answering "none"** — no time column · no link carrying the threshold
   attribute · **no link passing the threshold at all** (plan §2.6: `mule_large_transfers`' `AMOUNT ≥ 5 000`
   removed every leg before the matcher ran, and "no matches" would have declared the structuring absent) ·

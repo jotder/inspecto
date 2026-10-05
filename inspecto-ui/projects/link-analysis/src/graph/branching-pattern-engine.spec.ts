@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { G6GraphData } from '@inspecto/core/graph/graph-types';
 import { configureGraphLimits, matchPattern, resetGraphLimits } from './graph-analysis';
+import { PATTERN_PACKS } from '../link-analysis/pattern-packs';
 import { BranchStage, branchingNeedsTime, matchBranchingPattern, thresholdLabel } from './branching-pattern-engine';
 
 /**
@@ -192,5 +193,47 @@ describe('matchBranchingPattern (LA-14b)', () => {
     it('labels a threshold the way an analyst reads it', () => {
         expect(thresholdLabel({ attr: 'AMOUNT', min: 900, max: 1000 })).toBe('900 ≤ AMOUNT < 1000');
         expect(thresholdLabel({ attr: 'AMOUNT', max: 10000 })).toBe('AMOUNT < 10000');
+    });
+});
+
+describe('layering-network and circular-financing packs (run through the matcher)', () => {
+    const stagesOf = (id: string): BranchStage[] => PATTERN_PACKS.find((p) => p.id === id)!.stages!;
+
+    it('layering-network finds a split into 3 mules that re-converge, in time order, and rejects reversed order', () => {
+        const web: Leg[] = [
+            ['src', 'm1', 500, '2026-09-01 08:00:00'],
+            ['src', 'm2', 500, '2026-09-01 09:00:00'],
+            ['src', 'm3', 500, '2026-09-01 10:00:00'],
+            ['m1', 'dst', 480, '2026-09-01 12:00:00'],
+            ['m2', 'dst', 480, '2026-09-01 13:00:00'],
+            ['m3', 'dst', 480, '2026-09-01 14:00:00'],
+        ];
+        const res = matchBranchingPattern(graph(web), stagesOf('layering-network'), { timeAttr: 'AT' });
+        expect(res.refusal).toBeUndefined();
+        expect(res.matches).toHaveLength(1);
+        expect(res.matches[0].layers).toEqual([['src'], ['m1', 'm2', 'm3'], ['dst']]);
+        // the mules forward BEFORE they were paid: a topology claim, not a layering flow
+        const early = web.map((l): Leg => (l[0].startsWith('m') ? [l[0], l[1], l[2], '2026-08-30 12:00:00'] : l));
+        expect(matchBranchingPattern(graph(early), stagesOf('layering-network'), { timeAttr: 'AT' }).matches).toHaveLength(0);
+    });
+
+    it('circular-financing needs two split-and-merge rounds; one round is not enough', () => {
+        const round1: Leg[] = [
+            ['o', 'a', 100, '2026-09-01 08:00:00'],
+            ['o', 'b', 100, '2026-09-01 09:00:00'],
+            ['a', 'h', 90, '2026-09-01 12:00:00'],
+            ['b', 'h', 90, '2026-09-01 13:00:00'],
+        ];
+        const round2: Leg[] = [
+            ['h', 'c', 80, '2026-09-01 18:00:00'],
+            ['h', 'd', 80, '2026-09-01 19:00:00'],
+            ['c', 'z', 70, '2026-09-01 22:00:00'],
+            ['d', 'z', 70, '2026-09-01 23:00:00'],
+        ];
+        const circ = stagesOf('circular-financing');
+        expect(matchBranchingPattern(graph(round1), circ, { timeAttr: 'AT' }).matches).toHaveLength(0);
+        const res = matchBranchingPattern(graph([...round1, ...round2]), circ, { timeAttr: 'AT' });
+        expect(res.matches).toHaveLength(1);
+        expect(res.matches[0].layers.at(-1)).toEqual(['z']);
     });
 });

@@ -93,6 +93,20 @@ describe('PATTERN_PACKS', () => {
         }
     });
 
+    it('ships a distinct layering pack and a circular-financing branching pack, both time-ordered and unthresholded', () => {
+        const layering = PATTERN_PACKS.find((p) => p.id === 'layering-network')!;
+        const circ = PATTERN_PACKS.find((p) => p.id === 'circular-financing')!;
+        expect(layering.id).not.toBe('layering-chain');
+        expect(layering.stages!.map((s) => s.shape)).toEqual(['fan-out', 'fan-in']);
+        expect(circ.stages!.map((s) => s.shape)).toEqual(['fan-out', 'fan-in', 'fan-out', 'fan-in']);
+        for (const p of [layering, circ]) {
+            expect(p.stages!.slice(1).every((s) => s.afterPrevious && s.maxGapHours === 48), p.id).toBe(true);
+            expect(p.stages!.some((s) => s.threshold), p.id).toBe(false);
+        }
+        // circular-flow keeps routing to the Cycles tool; the branching pack is a separate id
+        expect(PATTERN_PACKS.find((p) => p.id === 'circular-flow')!.tool).toBe('cycles');
+    });
+
     it('ships the structuring pack with a VISIBLE threshold band, not an open-ended "under" (§2.6)', () => {
         const pack = PATTERN_PACKS.find((p) => p.id === 'structuring')!;
         expect(pack.stages![0]).toMatchObject({ shape: 'fan-in', threshold: { attr: 'AMOUNT', min: 900, max: 1000 } });

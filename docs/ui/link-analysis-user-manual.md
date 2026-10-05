@@ -191,6 +191,8 @@ Pick a **pattern pack** to pre-fill the motif, edit the thresholds (they are alw
 | **Call-forwarding relay** | Calls bounced through a relay. |
 | **Circular flow** | Value that loops back. |
 | **Shared associates** | Different entities sharing the same contacts. |
+| **Layering network (split and merge)** | Money split across three or more parallel intermediaries that re-converge, each leg after the one before (the branching sibling of Layering chain). |
+| **Circular financing (branching)** | Two successive split-and-merge rounds of value; confirm a true return to origin with Circular flow (Cycles). |
 | **Structuring (smurfing)** | Many small deposits in a band (default 900 ≤ amount < 1 000) → a few intermediaries → re-converging. |
 
 Patterns can require **time order** ("after the previous hop", "within N hours"), which needs a time column. If
