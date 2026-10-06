@@ -587,7 +587,8 @@ public final class JobService implements AutoCloseable {
                         + "as unknown, never as zero.",
                 KpiCompletenessJob.PARAMS,
                 List.of(com.gamma.signal.SignalType.KPI_COMPLETENESS_EVALUATED,
-                        com.gamma.signal.SignalType.KPI_COMPLETENESS_BREACHED),
+                        com.gamma.signal.SignalType.KPI_COMPLETENESS_BREACHED,
+                        com.gamma.signal.SignalType.KPI_COMPLETENESS_UNKNOWN_STREAK),
                 List.of(), List.of("incidents")),
                 c -> new KpiCompletenessJob(c, name -> {
                     var lookup = this.pipelineLookup;

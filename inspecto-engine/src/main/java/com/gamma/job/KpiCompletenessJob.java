@@ -109,7 +109,8 @@ final class KpiCompletenessJob implements Job {
         int window = Integer.parseInt(cfg.opt("baseline_window", "28"));
         int minDays = Integer.parseInt(cfg.opt("min_baseline_days", "7"));
         double tolerance = Double.parseDouble(cfg.opt("tolerance", "0.3"));
-        String from = LocalDate.parse(recordDay).minusDays(window).toString();
+        // At least STREAK_DAYS-1 prior days are read, so the unknown streak is measurable at any window.
+        String from = LocalDate.parse(recordDay).minusDays(Math.max(window, STREAK_DAYS - 1)).toString();
         // ⛔ The series goes to assess untouched: it already ignores the unknown bucket and treats an absent
         // day as NO_OBSERVATION. Pre-filtering here would duplicate, then contradict, that pinned rule.
         List<DailyVolume> series = store.dailyVolume(pipeline, from, recordDay);
@@ -127,24 +128,43 @@ final class KpiCompletenessJob implements Job {
         FileSequenceGaps.Report gaps = files == null ? null : readGaps(files, recordDay);
         if (gaps != null) putGaps(payload, gaps);
         boolean fileGaps = gaps != null && gaps.hasGaps();
-        // ⚠ File gaps raise the signal's severity but open no Incident: one-vs-two Incidents when both
-        // halves breach is design §7-g, still an operator call.
+        int streak = unknownStreak(series, recordDay);
+        payload.put("unknownStreakDays", streak);
         ctx.signals().emit(SignalType.KPI_COMPLETENESS_EVALUATED, breach || fileGaps ? Severity.WARN : Severity.INFO, payload);
-        // ⛔ Only BREACH is an Incident: NO_BASELINE / NO_OBSERVATION are unknown, not breached.
-        if (breach) {
+        // §7-h (operator, 2026-10-06): 3+ consecutive days with nothing registered is a WARN, never an Incident.
+        if (streak >= STREAK_DAYS)
+            ctx.signals().emit(SignalType.KPI_COMPLETENESS_UNKNOWN_STREAK, Severity.WARN, payload);
+        // §7-g (operator, 2026-10-06): a volume BREACH or a file gap opens ONE Incident per Pipeline-day carrying
+        // both findings. ⛔ NO_BASELINE / NO_OBSERVATION alone are unknown, not breached.
+        if (breach || fileGaps) {
             ctx.signals().emit(SignalType.KPI_COMPLETENESS_BREACHED, Severity.WARN, payload);
-            openIncident(ctx, pipeline, recordDay, a);
+            openIncident(ctx, pipeline, recordDay, a, breach, gaps);
         }
         return JobResult.ok(TYPE + " '" + pipeline + "' " + recordDay + ": " + a.status() + ", " + describe(payload),
                 (System.nanoTime() - t0) / 1_000_000L);
     }
 
+    /** Consecutive UNKNOWN days (nothing registered) a WARN needs — §7-h (operator, 2026-10-06). */
+    static final int STREAK_DAYS = 3;
+
+    /** Consecutive days ending at {@code recordDay} with no registered output, within the fetched series. */
+    static int unknownStreak(List<DailyVolume> series, String recordDay) {
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (DailyVolume v : series) if (v.recordDay() != null) seen.add(v.recordDay());
+        int n = 0;
+        for (LocalDate d = LocalDate.parse(recordDay); n < STREAK_DAYS && !seen.contains(d.toString()); d = d.minusDays(1))
+            n++;
+        return n;
+    }
+
     /**
-     * One open Incident per Pipeline across repeated runs: scope = the pipeline id, deduped centrally by
-     * {@link IncidentAccess} on the {@code pipeline} attribute. An absent grant (a bare registry) leaves the
-     * run signal-only; a dry run gets the framework's recording stand-in and opens nothing.
+     * ONE Incident per Pipeline-day (operator, 2026-10-06, §7-g): scope = the pipeline id, deduped centrally by
+     * {@link IncidentAccess} on {@code pipelineDay} = {@code <pipeline>@<day>}, carrying both halves' findings.
+     * ⚠ {@code IncidentAccess} has no update: a later run the same day whose findings differ is suppressed as
+     * the duplicate. An absent grant leaves the run signal-only; a dry run opens nothing.
      */
-    private static void openIncident(JobContext ctx, String pipeline, String recordDay, VolumeBaseline.Assessment a) {
+    private static void openIncident(JobContext ctx, String pipeline, String recordDay, VolumeBaseline.Assessment a,
+                                     boolean volumeBreach, FileSequenceGaps.Report gaps) {
         Optional<IncidentAccess> incidents = ctx.services().find(IncidentAccess.class);
         if (incidents.isEmpty()) {
             ctx.log().warn("completeness breach not promoted: no incidents service granted", "pipeline", pipeline);
@@ -153,13 +173,26 @@ final class KpiCompletenessJob implements Job {
         Map<String, String> attrs = new LinkedHashMap<>();
         attrs.put("pipeline", pipeline);
         attrs.put("recordDay", recordDay);
-        attrs.put("rows", String.valueOf(a.actualRows()));
-        attrs.put("baselineRows", String.valueOf(a.baselineRows()));
-        String pct = String.format(java.util.Locale.ROOT, "%.0f%%", -a.deviation() * 100);
-        incidents.get().openIncident("Completeness: " + pipeline + " " + pct + " below baseline on " + recordDay,
-                "Pipeline " + pipeline + " received " + a.actualRows() + " row(s) on " + recordDay + " against a "
-                        + a.baselineDays() + "-day baseline of " + a.baselineRows() + ".",
-                "WARNING", pipeline, attrs, "pipeline");
+        attrs.put("pipelineDay", pipeline + "@" + recordDay);
+        attrs.put("volumeStatus", a.status().name());
+        StringBuilder msg = new StringBuilder("Pipeline " + pipeline + " on " + recordDay + ":");
+        if (volumeBreach) {
+            attrs.put("rows", String.valueOf(a.actualRows()));
+            attrs.put("baselineRows", String.valueOf(a.baselineRows()));
+            msg.append(" received ").append(a.actualRows()).append(" row(s) against a ").append(a.baselineDays())
+                    .append("-day baseline of ").append(a.baselineRows()).append(".");
+        }
+        if (gaps != null) {
+            attrs.put("missingFiles", String.valueOf(gaps.missingFiles()));
+            attrs.put("emptyBuckets", String.valueOf(gaps.emptyBuckets().size()));
+            if (gaps.hasGaps())
+                msg.append(" ").append(gaps.missingFiles()).append(" missing file(s), ")
+                        .append(gaps.emptyBuckets().size()).append(" empty bucket(s) against ").append(gaps.template()).append(".");
+        }
+        String what = volumeBreach && gaps != null && gaps.hasGaps() ? "volume and files"
+                : volumeBreach ? "volume below baseline" : "missing files";
+        incidents.get().openIncident("Completeness: " + pipeline + " " + recordDay + " — " + what,
+                msg.toString(), "WARNING", pipeline, attrs, "pipelineDay");
     }
 
     /** K2's resolved inputs: the template, its scope, and the Collector whose filenames are read. */

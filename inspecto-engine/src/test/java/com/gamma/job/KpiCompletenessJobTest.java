@@ -195,8 +195,13 @@ class KpiCompletenessJobTest {
             assertTrue(ctx.inner.signals.stream()
                     .anyMatch(x -> SignalType.KPI_COMPLETENESS_BREACHED.equals(x.get("__type"))));
         }
-        assertEquals(1, open.size(), "one open Incident per Pipeline, not one per run");
-        assertEquals("cdr", open.get(0).get("pipeline"));
+        assertEquals(1, open.size(), "one open Incident per Pipeline-day, not one per run");
+        assertEquals("cdr@2026-08-08", open.get(0).get("pipelineDay"));
+
+        // A different day is a different Incident (dedupe is pipeline + day).
+        db.record(List.of(out("cdr", "2026-08-09", "/w/9.parquet", 40)));
+        job(params("pipeline", "cdr", "record_day", "2026-08-09")).run(new ServicesContext(incidents));
+        assertEquals(2, open.size(), "the next day's breach opens its own Incident");
     }
 
     /** ⛔ Unknown is not breached: NO_BASELINE emits no .breached and opens no Incident. */
@@ -330,6 +335,7 @@ class KpiCompletenessJobTest {
             CapturingJobContext ctx = new CapturingJobContext();
             IllegalStateException e = assertThrows(IllegalStateException.class, () -> fileJob(pc).run(ctx));
             assertTrue(e.getMessage().contains("collector.gap_detection.file_template"), e.getMessage());
+            assertTrue(e.getMessage().contains("check_files: false"), "names the opt-out: " + e.getMessage());
             assertTrue(ctx.signals.isEmpty(), "a refusal emits no number");
         } finally {
             FileStages.use(null);
@@ -365,5 +371,49 @@ class KpiCompletenessJobTest {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> pipelineWith(dir, "    file_template: \"" + TEMPLATE + "\"\n"));
         assertTrue(e.getMessage().contains("seq_scope"), e.getMessage());
+    }
+
+    /** §7-g: a file gap alone (volume STEADY) opens the Pipeline-day Incident, carrying the file finding. */
+    @Test
+    void aFileGapAloneOpensTheIncident(@TempDir Path dir) throws Exception {
+        for (int d = 1; d <= 4; d++) db.record(List.of(out("cdr", "2026-08-0" + d, "/w/" + d + ".parquet", 100)));
+        PipelineConfig pc = pipelineWith(dir, "    file_template: \"" + TEMPLATE + "\"\n    seq_scope: CONTINUOUS\n");
+        List<Map<String, String>> opened = new java.util.ArrayList<>();
+        try (DbFileStageStore st = stagesWith(pc.collector().id(),
+                "CDR_2026080400_1.csv", "CDR_2026080401_2.csv", "CDR_2026080402_4.csv")) {
+            ServicesContext ctx = new ServicesContext((t, m, sev, sc, at, k) -> {
+                opened.add(at);
+                return Optional.of("x");
+            });
+            KpiCompletenessJob j = fileJob(pc, "min_baseline_days", "3");
+            j.run(ctx);
+            assertEquals("STEADY", ctx.inner.signals.get(0).get("status"));
+        } finally {
+            FileStages.use(null);
+        }
+        assertEquals(1, opened.size(), "a file gap with fine volume still opens the Incident");
+        assertEquals("1", opened.get(0).get("missingFiles"));
+        assertEquals("cdr@2026-08-04", opened.get(0).get("pipelineDay"));
+    }
+
+    /** §7-h: three consecutive days with nothing registered raise a WARN signal and open no Incident. */
+    @Test
+    void threeUnknownDaysRaiseAStreakWarning() {
+        db.record(List.of(out("cdr", "2026-08-01", "/w/1.parquet", 100)));
+        List<String> opened = new java.util.ArrayList<>();
+        ServicesContext ctx = new ServicesContext((t, m, sev, sc, at, k) -> {
+            opened.add(t);
+            return Optional.of("x");
+        });
+        job(params("pipeline", "cdr", "record_day", "2026-08-04")).run(ctx);
+        assertTrue(ctx.inner.signals.stream()
+                .anyMatch(x -> SignalType.KPI_COMPLETENESS_UNKNOWN_STREAK.equals(x.get("__type"))));
+        assertTrue(opened.isEmpty(), "an unknown streak is a WARN, never an Incident");
+
+        ServicesContext two = new ServicesContext((t, m, sev, sc, at, k) -> Optional.of("x"));
+        job(params("pipeline", "cdr", "record_day", "2026-08-03")).run(two);
+        assertTrue(two.inner.signals.stream()
+                .noneMatch(x -> SignalType.KPI_COMPLETENESS_UNKNOWN_STREAK.equals(x.get("__type"))),
+                "two unknown days are below the threshold");
     }
 }

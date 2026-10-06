@@ -20,4 +20,7 @@ public final class SignalType {
 
     /** A {@code kpi.completeness} run whose day sits below its baseline by more than the tolerance. */
     public static final String KPI_COMPLETENESS_BREACHED = "kpi.completeness.breached";
+
+    /** Three or more consecutive days with nothing registered — a WARN, never an Incident (operator, 2026-10-06). */
+    public static final String KPI_COMPLETENESS_UNKNOWN_STREAK = "kpi.completeness.unknown_streak";
 }
