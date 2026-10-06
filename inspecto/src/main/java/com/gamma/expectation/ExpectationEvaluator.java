@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  * <b>unsealed</b> because the count query legitimately reads Parquet by absolute path. Unlike a user
  * query there is no untrusted SQL phase — the <em>entire</em> statement is server-built here from
  * validated inputs (column/ref identifiers pass {@link #SAFE_IDENT}, dataset refs pass
- * {@link DataRef#requireUnder}, numeric bounds are formatted as numbers, the regex is a single-quote-escaped literal),
+ * {@link DataRef#requireUnder}, non_null / range / regex render through {@code ConditionSql}, which quote-escapes every identifier and literal),
  * so no {@code SqlGuard} pass is needed.
  */
 public final class ExpectationEvaluator {
@@ -59,7 +59,7 @@ public final class ExpectationEvaluator {
         String relation = parquetGlob(dataRoot, exp.target());
         // 'condition' names its own field(s) in the tree; every other kind checks exp.column().
         String predicate = "condition".equals(exp.kind())
-                ? com.gamma.query.ConditionSql.predicate(exp.when())
+                ? com.gamma.query.ConditionSql.predicate(exp.violationTree())
                 : columnPredicate(exp, dataRoot);
         return "SELECT count(*) FROM " + relation + " AS __t WHERE " + predicate;
     }
@@ -73,30 +73,12 @@ public final class ExpectationEvaluator {
                     + "not as a row predicate");
         String col = quoteIdent(ident(exp.column()));
         return switch (exp.kind()) {
-            case "non_null" -> col + " IS NULL";
-            case "range" -> rangePredicate(exp, col);
-            case "regex" -> col + " IS NOT NULL AND NOT regexp_matches(CAST(" + col + " AS VARCHAR), "
-                    + literal(exp.pattern()) + ")";
+            case "non_null", "range", "regex" -> com.gamma.query.ConditionSql.predicate(exp.violationTree());
             case "referential" -> col + " IS NOT NULL AND CAST(" + col + " AS VARCHAR) NOT IN (SELECT CAST("
                     + quoteIdent(ident(exp.refColumn())) + " AS VARCHAR) FROM "
                     + parquetGlob(dataRoot, exp.refDataset()) + ")";
             default -> throw new IllegalArgumentException("unsupported expectation kind '" + exp.kind() + "'");
         };
-    }
-
-    private static String rangePredicate(Expectation exp, String col) {
-        String num = "TRY_CAST(" + col + " AS DOUBLE)";
-        StringBuilder sb = new StringBuilder(col + " IS NOT NULL AND (");
-        boolean first = true;
-        if (exp.min() != null) {
-            sb.append(num).append(" < ").append(number(exp.min()));
-            first = false;
-        }
-        if (exp.max() != null) {
-            if (!first) sb.append(" OR ");
-            sb.append(num).append(" > ").append(number(exp.max()));
-        }
-        return sb.append(")").toString();
     }
 
     /**
@@ -119,14 +101,5 @@ public final class ExpectationEvaluator {
         if (col == null || !SAFE_IDENT.matcher(col).matches())
             throw new IllegalArgumentException("unsafe column identifier '" + col + "'");
         return col;
-    }
-
-    private static String literal(String s) {
-        return "'" + s.replace("'", "''") + "'";
-    }
-
-    /** Format a numeric bound without locale/exponent surprises (it is interpolated into the SQL). */
-    private static String number(double v) {
-        return java.math.BigDecimal.valueOf(v).toPlainString();
     }
 }

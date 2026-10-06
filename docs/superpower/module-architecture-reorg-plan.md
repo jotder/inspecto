@@ -803,11 +803,33 @@ framework-free `query/condition-rules.ts` holds the operator sets, `validateCond
 wired by `aria-describedby`) and `describeGroup`. `query-sql.ts` (preview + param compiler) now emits the Java `ConditionSql`
 shapes. `sql-ast.ts` is unchanged on purpose: it only reads SQL into a tree and refuses what it does not recognise. Hosts
 clone the tree and the editor mutates in place, so unmodelled keys survive save (pinned by a round-trip spec).
-(2) Step 1: Expectation `non_null` / `range` onto `isNull` / `between`, and `regex` onto `matches`.
+(2) Step 1: Expectation `non_null` / `range` / `regex` onto the tree — **DONE 2026-10-07**, see "Decision Kernel step 1 as built".
 (3) Steps 3-6: Tag and Case Rule filters (now unblocked: `ignoreCase`), Notification, Risk, Escalation match.
 (4) `DECISION-RULE-SQL-GUARD-1` stays open: the new operators keep today's discipline (quoted identifiers,
 escaped literals) but the appliers still concatenate. (5) `query-eval.ts` date parsing treats a zone-less
 date-time as local time where Java treats it as UTC (pre-existing for literals; now also field-to-field).
+
+### Decision Kernel step 1 as built (2026-10-07) — Expectation onto the tree
+
+**Decision: the shorthand kinds stay authorable, as sugar.** Grep: six shipped Expectation TOONs (`spaces/demo`, `spaces/ucc`,
+`_templates/orders-starter`, `_templates/telco-ra`; all `non_null` or `range`) plus dozens of test and UI-spec bodies author them, and
+the Expectation editor, the agent's `expectationDraft` suggestions and `ConfigSpecs` all key on them. Migrating them away would buy
+nothing the sugar does not, so no config migrated and no TOON was rewritten. `Expectation.violationTree()` expands `non_null` →
+`AND[isNull]`, `range` → `AND[isNotNull, OR[< min, > max]]` (an open end simply omits its leaf — no `between`, since a violation is
+the *outside*), `regex` → `AND[isNotNull, NOT AND[matches]]`; `condition` returns its own `when`; `referential` / `baseline`
+return `null` and stay bespoke. `ExpectationEvaluator` renders the tree through `ConditionSql.predicate`; the per-kind
+`rangePredicate`, the regex literal builder and the number formatter were deleted (identifier checks and the referential
+predicate remain).
+
+**Parity.** `ExpectationEvaluatorParityTest` (5) was written first, against the old hand-built SQL, over a seeded Parquet corpus
+(NULLs, a non-numeric text column, fractional / open bounds, a quote and `%` in the data and pattern): every hand-computed count
+matched the old implementation, and the same counts hold after the switch. TelcoRaGoldenTest (the shipped telco-ra Expectations
+plus the planted blank opening balance), `ControlApiExpectationTest`, `ControlApiExpectationCensusTest` and the baseline tests
+are unchanged and green.
+
+**Two deliberate behaviour differences** (both pinned): (1) `''` is null to the tree, so `non_null` now also flags empty-string
+cells (old `IS NULL` did not) — and `regex` skips them; (2) a `regex` pattern is validated at save by `ConditionTree.validate`
+(no lookaround / back-references, 256 characters), where it used to fail at first evaluation inside RE2.
 
 ### Target picture
 ![Inspecto target module architecture](assets/module-target-architecture.svg)

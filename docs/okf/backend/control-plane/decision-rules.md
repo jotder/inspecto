@@ -165,6 +165,13 @@ output; Job-Pack types can adopt the same applier seam when they do.
 
 ## The other two-thirds of the triad now share the condition-tree contract too (2026-07-18)
 
+> **Update 2026-10-07 (Decision Kernel step 1):** `non_null`, `range` and `regex` are now authoring sugar —
+> `Expectation.violationTree()` expands each into a condition tree (`isNull`; `isNotNull` AND (`<` min OR `>` max);
+> `isNotNull` AND NOT `matches`) and `ExpectationEvaluator` renders it through `ConditionSql`, so there is one SQL
+> generator. `referential` keeps its own subquery predicate and `baseline` its profile comparison. Two consequences:
+> an empty-string cell now counts as null for `non_null`, and a `regex` pattern the condition language refuses
+> (lookaround, back-reference, over 256 characters) is refused at save.
+
 Expectation and Alert Rule each adopted `ConditionTree`/`ConditionSql` in the shape that fits their
 own domain — neither became a Decision Rule clone:
 

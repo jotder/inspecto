@@ -41,7 +41,9 @@ import static com.gamma.util.Values.trimToNull;
  * unlike the other four kinds it needs no {@code column} — the tree names its own field(s), and can
  * span several columns or use any {@code query-types} operator {@code non_null}/{@code range} can't
  * (e.g. {@code contains}, multi-column {@code AND}/{@code OR}). {@code when} is required for this
- * kind and ignored for the other four (each keeps its own hand-built predicate).
+ * kind and ignored for the other four. {@code non_null}, {@code range} and {@code regex} stay authorable as
+ * sugar: {@link #violationTree()} expands them into the same tree (Decision Kernel step 1), so one SQL
+ * generator ({@code ConditionSql}) serves all four; only {@code referential} keeps a hand-built predicate.
  *
  * <p><b>{@code baseline} kind (DUCKLE-C8, 2026-09-24)</b> — not a row predicate at all: it profiles the
  * target's current input and compares it against the median of the last N <em>accepted</em> profiles
@@ -88,6 +90,58 @@ public record Expectation(String name, String description, String targetType, St
             default -> { /* non_null carries no extra params */ }
         }
         if (!"baseline".equals(kind)) baseline = null;   // ignored for every other kind, like 'when'
+        // a regex the condition language refuses (lookaround, back-reference, too long) is refused at save time
+        if ("regex".equals(kind)) com.gamma.query.ConditionTree.validate(violationTree(kind, column, min, max, pattern, when));
+    }
+
+    /**
+     * The violation predicate as a condition tree (Decision Kernel step 1) — {@code non_null}, {@code range}
+     * and {@code regex} are authoring sugar for it; {@code condition} is its own tree; {@code referential} and
+     * {@code baseline} have none (a subquery / a profile comparison) and answer {@code null}. Rows the tree
+     * matches are the violations. A NULL cell never violates a {@code range} or {@code regex}.
+     */
+    public Object violationTree() {
+        return violationTree(kind, column, min, max, pattern, when);
+    }
+
+    private static Object violationTree(String kind, String column, Double min, Double max, String pattern,
+                                        Object when) {
+        return switch (kind) {
+            case "condition" -> when;
+            case "non_null" -> group("AND", false, leaf(column, "isNull", null));
+            case "range" -> {
+                List<Object> out = new ArrayList<>();
+                if (min != null) out.add(leaf(column, "<", plain(min)));
+                if (max != null) out.add(leaf(column, ">", plain(max)));
+                yield group("AND", false, leaf(column, "isNotNull", null), group("OR", false, out.toArray()));
+            }
+            case "regex" -> group("AND", false, leaf(column, "isNotNull", null),
+                    group("AND", true, leaf(column, "matches", pattern)));
+            default -> null;
+        };
+    }
+
+    private static Map<String, Object> group(String op, boolean negate, Object... items) {
+        Map<String, Object> g = new LinkedHashMap<>();
+        g.put("kind", "group");
+        g.put("op", op);
+        if (negate) g.put("negate", true);
+        g.put("items", List.of(items));
+        return g;
+    }
+
+    private static Map<String, Object> leaf(String field, String operator, String value) {
+        Map<String, Object> c = new LinkedHashMap<>();
+        c.put("kind", "condition");
+        c.put("field", field);
+        c.put("operator", operator);
+        if (value != null) c.put("value", value);
+        return c;
+    }
+
+    /** A numeric bound without locale/exponent surprises (the tree renders it back through {@code Double.parseDouble}). */
+    private static String plain(double v) {
+        return java.math.BigDecimal.valueOf(v).toPlainString();
     }
 
     /**
