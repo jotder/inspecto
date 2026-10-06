@@ -28,9 +28,12 @@ const VERSIONS: ComponentVersion[] = [
     },
 ];
 
-function create(opts: { versions?: ComponentVersion[]; confirm?: boolean } = {}) {
+function create(opts: { versions?: ComponentVersion[]; confirm?: boolean; restored?: unknown } = {}) {
     const close = vi.fn();
-    const restore = vi.fn(() => of({ type: 'dashboard', name: 'cdr', ref: 'dashboard/cdr', content: {} }));
+    const toast = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
+    const restore = vi.fn(() =>
+        of(opts.restored ?? { type: 'dashboard', name: 'cdr', ref: 'dashboard/cdr', content: {} }),
+    );
     const versions = vi.fn(() => of(opts.versions ?? VERSIONS));
     TestBed.configureTestingModule({
         imports: [ComponentHistoryDialog],
@@ -40,12 +43,12 @@ function create(opts: { versions?: ComponentVersion[]; confirm?: boolean } = {})
             { provide: MatDialogRef, useValue: { close } },
             { provide: ComponentsService, useValue: { versions, restore } },
             { provide: InspectoConfirmService, useValue: { confirm: () => Promise.resolve(opts.confirm ?? true) } },
-            { provide: ToastrService, useValue: { success: () => {}, error: () => {}, warning: () => {} } },
+            { provide: ToastrService, useValue: toast },
         ],
     });
     const f = TestBed.createComponent(ComponentHistoryDialog);
     f.detectChanges();
-    return { f, c: f.componentInstance, close, restore };
+    return { f, c: f.componentInstance, close, restore, toast };
 }
 
 describe('ComponentHistoryDialog', () => {
@@ -59,6 +62,16 @@ describe('ComponentHistoryDialog', () => {
         const { c, close, restore } = create();
         await c.restore(VERSIONS[1]); // restore v1
         expect(restore).toHaveBeenCalledWith('dashboard', 'cdr', 1);
+        expect(close).toHaveBeenCalledWith(true);
+    });
+
+    it('says a held restore is awaiting approval, not that it was restored', async () => {
+        const { c, close, toast } = create({
+            restored: { status: 'pending', written: false, pendingChange: { id: 'pc-1' } },
+        });
+        await c.restore(VERSIONS[1]);
+        expect(toast.info).toHaveBeenCalledWith('Restore to version 1 held for approval.');
+        expect(toast.success).not.toHaveBeenCalled();
         expect(close).toHaveBeenCalledWith(true);
     });
 

@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { convertToParamMap, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
@@ -9,7 +10,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
-import { AlertsComponent } from './alerts.component';
+import { AlertsComponent, alertRuleSeed } from './alerts.component';
 
 const FIRED: FiredAlert = {
     rule: 'failed_batches',
@@ -49,6 +50,7 @@ async function create(
         imports: [AlertsComponent],
         providers: [
             provideNoopAnimations(),
+            provideRouter([]),
             { provide: AlertsService, useValue: api },
             { provide: ToastrService, useValue: toastr },
             { provide: InspectoConfirmService, useValue: { confirmDestructive: vi.fn(async () => confirmed) } },
@@ -144,5 +146,33 @@ describe('AlertsComponent', () => {
         const { fixture } = await create();
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
+describe('alertRuleSeed', () => {
+    it('reads only the keys a ?newRule link names, by as a list and threshold as a number', () => {
+        expect(
+            alertRuleSeed(
+                convertToParamMap({
+                    newRule: '1',
+                    dataset: 'risk_scores_x_latest',
+                    measure: 'max(score)',
+                    by: 'model, entity_key',
+                    comparator: 'gte',
+                    threshold: '70',
+                    severity: 'CRITICAL',
+                }),
+            ),
+        ).toEqual({
+            dataset: 'risk_scores_x_latest',
+            measure: 'max(score)',
+            by: ['model', 'entity_key'],
+            comparator: 'gte',
+            threshold: 70,
+        });
+    });
+
+    it('drops a non-numeric threshold rather than seeding text', () => {
+        expect(alertRuleSeed(convertToParamMap({ threshold: 'high' }))).toEqual({});
     });
 });

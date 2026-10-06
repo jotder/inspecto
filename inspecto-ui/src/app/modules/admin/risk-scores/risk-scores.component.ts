@@ -14,6 +14,7 @@ import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.comp
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { RiskModelView, riskModelView } from 'app/inspecto/risk/risk-score-view';
 import { RiskScoreActionsComponent } from './risk-score-actions.component';
+import { RiskScoreHeldBadgeComponent } from './risk-score-held';
 
 /**
  * Risk Scores — read-only list + detail (ASSURE-RISK-SCORE-RESIDUALS-1 (2), slice S1; D-RP1 own admin route).
@@ -33,6 +34,7 @@ import { RiskScoreActionsComponent } from './risk-score-actions.component';
         StatusBadgeComponent,
         RiskScorePanelComponent,
         RiskScoreActionsComponent,
+        RiskScoreHeldBadgeComponent,
     ],
     templateUrl: './risk-scores.component.html',
 })

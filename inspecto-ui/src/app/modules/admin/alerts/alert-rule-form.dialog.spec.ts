@@ -542,4 +542,21 @@ describe('AlertRuleFormDialog', () => {
         const [, body] = save.mock.lastCall as unknown as [string, Record<string, unknown>];
         expect(body).toEqual({ ...fresh, severity: 'CRITICAL' });
     });
+
+    it('a seeded create starts as a Measure rule with the seed values and stays a create (D-RP9)', () => {
+        const { c } = create({
+            seed: {
+                dataset: 'risk_scores_sim_box_latest',
+                measure: 'max(score)',
+                by: ['model', 'entity_key'],
+                comparator: 'gte',
+                threshold: 70,
+            },
+        });
+        expect(c.isEdit).toBe(false);
+        expect(c.kind()).toBe('measure');
+        expect(c.schemaForm.form.get('dataset')?.value).toBe('risk_scores_sim_box_latest');
+        expect(c.schemaForm.form.get('by')?.value).toEqual(['model', 'entity_key']);
+        expect(c.schemaForm.form.get('threshold')?.value).toBe(70);
+    });
 });

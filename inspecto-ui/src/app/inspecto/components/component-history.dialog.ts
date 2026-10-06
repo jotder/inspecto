@@ -107,8 +107,11 @@ export class ComponentHistoryDialog {
         if (!ok) return;
         this.restoring.set(true);
         this.components.restore(this.data.type, this.data.id, v.version).subscribe({
-            next: () => {
-                this.toastr.success(`Restored to version ${v.version}.`);
+            next: (res) => {
+                // A maker-checker hold answers 202 with the Pending Change, not the restored component.
+                if ((res as { status?: string } | null)?.status === 'pending')
+                    this.toastr.info(`Restore to version ${v.version} held for approval.`);
+                else this.toastr.success(`Restored to version ${v.version}.`);
                 this.ref.close(true);
             },
             error: (e) => {

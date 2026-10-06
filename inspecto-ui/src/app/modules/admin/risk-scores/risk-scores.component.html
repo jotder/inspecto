@@ -25,7 +25,7 @@
                 ></inspecto-empty-state>
             } @else {
                 <ul class="flex flex-col gap-1">
-                    @for (m of models(); track m.id) {
+                    @for (m of models(); track m.id; let first = $first) {
                         <li>
                             <button
                                 type="button"
@@ -41,6 +41,7 @@
                                 @if (m.invalid) {
                                     <inspecto-status-badge value="error" label="Invalid"></inspecto-status-badge>
                                 }
+                                <app-risk-score-held-badge [model]="m.id" [loads]="first"></app-risk-score-held-badge>
                             </button>
                         </li>
                     }
@@ -53,7 +54,11 @@
                 <div class="flex items-center gap-2">
                     <h2 class="text-lg font-semibold">{{ m.id }}</h2>
                     <button mat-stroked-button type="button" (click)="history(m)">History</button>
-                    <app-risk-score-actions [model]="m.id" (changed)="load()"></app-risk-score-actions>
+                    <app-risk-score-actions
+                        [model]="m.id"
+                        [highThreshold]="m.highThreshold"
+                        (changed)="load()"
+                    ></app-risk-score-actions>
                 </div>
                 @if (m.description) {
                     <p class="text-secondary mt-1 text-sm">{{ m.description }}</p>

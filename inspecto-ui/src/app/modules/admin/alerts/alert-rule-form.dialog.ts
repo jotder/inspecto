@@ -91,6 +91,8 @@ export interface AlertRuleFormData {
     rule?: AlertRule;
     /** Names already armed — on create the name control rejects a duplicate inline (product-wide rule). */
     existingNames?: string[];
+    /** Create only: values to start from (a prefilled link, e.g. the Risk Scores pane's per-entity rule, D-RP9). */
+    seed?: Partial<AlertRule>;
 }
 export interface AlertRuleFormResult {
     saved?: AlertRule;
@@ -281,7 +283,9 @@ export class AlertRuleFormDialog implements AfterViewInit {
     /** The server's refusal of the last save (`apiErrorMessage`) — shown in the dialog, not a toast. */
     readonly saveError = signal('');
     /** The kind this form authors for the loaded rule — `null` for a freshness / Investigation rule. */
-    readonly authored = authoredKind(this.data.rule);
+    readonly authored = authoredKind(
+        this.data.rule ?? (this.data.seed?.dataset ? (this.data.seed as AlertRule) : undefined),
+    );
     /** The live kind choice — drives the host-rendered `when` editor, which is not a spec. */
     readonly kind = signal<AuthoredKind | null>(this.authored);
     /** A freshness / Investigation rule gets neither kind's fields (the engine refuses them on it). */
@@ -316,7 +320,9 @@ export class AlertRuleFormDialog implements AfterViewInit {
               onPipeline: this.data.rule.onPipeline ?? '',
               ...(this.authored ? { kind: this.authored } : {}),
           }
-        : undefined;
+        : this.data.seed
+          ? { ...this.data.seed, ...(this.authored ? { kind: this.authored } : {}) }
+          : undefined;
 
     /** Deep-cloned on edit — the condition editor mutates the bound group in place. */
     readonly when: ConditionGroup = this.data.rule?.when ? structuredClone(this.data.rule.when) : emptyGroup('AND');

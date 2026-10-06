@@ -3,10 +3,12 @@ import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ToastrService } from 'ngx-toastr';
+import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ComponentDef, ComponentsService } from 'app/inspecto/api/components.service';
 import { RiskScoresService } from 'app/inspecto/api/risk-scores.service';
+import { PendingChangesService } from 'app/inspecto/api/pending-changes.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { RiskScoresComponent } from './risk-scores.component';
 
@@ -73,10 +75,12 @@ function create(list: () => unknown) {
         imports: [RiskScoresComponent],
         providers: [
             provideNoopAnimations(),
+            provideRouter([]),
             { provide: ComponentsService, useValue: { list: vi.fn(list) } },
             { provide: RiskScoresService, useValue: { latest, preview } },
             { provide: MatDialog, useValue: { open } },
             { provide: ToastrService, useValue: {} },
+            { provide: PendingChangesService, useValue: { list: () => of({ items: [], total: 0, truncated: false }) } },
         ],
     });
     TestBed.overrideComponent(RiskScoresComponent, { set: { changeDetection: ChangeDetectionStrategy.Eager } });

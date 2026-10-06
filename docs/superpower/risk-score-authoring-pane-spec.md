@@ -3,7 +3,7 @@
      okf/backend/control-plane/risk-scores.md and git mv this to archived-documents/plans-archive/. -->
 # Risk Score authoring pane — UX / product spec
 
-**Status:** decisions D-RP1..D-RP10 approved (operator, 2026-10-06); S1, S2a and S3 built, S2b open. **Owns:** residual (2) of BACKLOG row
+**Status:** decisions D-RP1..D-RP10 approved (operator, 2026-10-06); S1, S2 (S2a + S2b) and S3 built — every slice shipped. **Owns:** residual (2) of BACKLOG row
 `ASSURE-RISK-SCORE-RESIDUALS-1`. **As-built of the model:** [`okf/backend/control-plane/risk-scores.md`](../okf/backend/control-plane/risk-scores.md).
 Vocabulary per [`GLOSSARY.md`](../GLOSSARY.md): *Risk Score*, *Factor*, *indicator* (a Measure), *Dataset*, *Alert Rule*, *Incident*.
 
@@ -103,7 +103,7 @@ masking function, D-P8 = mask on read; D-RP7 (c) reuse the filter builder if the
 cards; D-RP8 (a) pickers show only Datasets with a readable Schema; D-RP9 (a) per-entity Alert Rule is a prefilled
 link; D-RP10 (a) deliver S1 → S2 → S3.
 
-**Progress.** S1 SHIPPED 2026-10-06 (`/risk-scores`, as-built in the OKF concept). S3 SHIPPED 2026-10-06 (`POST /risk-scores/preview` + the detail Preview button; the single-entity filter is an extra factor filter, no new `MeasureCompiler` field — section 8's claim resolved). S2a SHIPPED 2026-10-06 (create / edit form); S2b open; unsaved-content preview from the S2 form reuses the same route with `content`.
+**Progress.** S1 SHIPPED 2026-10-06 (`/risk-scores`, as-built in the OKF concept). S3 SHIPPED 2026-10-06 (`POST /risk-scores/preview` + the detail Preview button; the single-entity filter is an extra factor filter, no new `MeasureCompiler` field — section 8's claim resolved). S2a SHIPPED 2026-10-06 (create / edit form); S2b SHIPPED 2026-10-06 (held state, delete, restore-held, per-entity Alert Rule link); unsaved-content preview from the S2 form reuses the same route with `content`.
 
 **D-RP7 spike result (2026-10-06): (b) bespoke cards.** The only reusable filter editor,
 `inspecto/query/query-condition-group.component.ts`, edits a nested AND/OR `ConditionGroup` with its own operator

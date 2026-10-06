@@ -248,6 +248,18 @@ A 422 is shown verbatim in a banner and placed by `mapRiskRefusal`: `risk-score.
 output-collision refusals name no path and stay in the banner. No rule is duplicated client-side beyond
 required/number checks.
 
+**Held changes, delete, restore and the Alert Rule link (slice S2b, 2026-10-06).** A save, delete or restore the
+Approval Policy holds answers `202 {status: pending, pendingChange}`, which `HttpClient` delivers as a success —
+every caller checks `status === 'pending'` (`heldChange` in `risk-score-form.dialog.ts`; `ComponentHistoryDialog`
+now says "held for approval" instead of "Restored"). The list badges a model *Awaiting approval* from ONE read of
+`GET /pending-changes?status=pending` filtered to `kind: risk-score` (`risk-score-held.ts`); a failed read shows
+nothing — the badge is a hint, never a gate. *Delete* confirms, then `DELETE /components/risk-score/{id}`; the
+derived Datasets stay and History can restore. **Add per-entity Alert Rule** (D-RP9 (a)) is a LINK, never a second
+write: `/alerts?newRule=1&dataset=risk_scores_<id>_latest&measure=max(score)&by=model,entity_key&comparator=gte&threshold=<high>`
+(`perEntityAlertRuleParams`). The Alerts pane strips the params (`replaceUrl`) and opens the create dialog seeded
+through the new `AlertRuleFormData.seed` (`alertRuleSeed`); the author still registers the `_latest` Dataset and
+saves the rule under its own gate.
+
 **Entity key display (D-RP6, operator 2026-10-06; D-P8 = mask on read).** Every SPA surface that prints an
 entity key goes through ONE function, `displayEntityKey` (`inspecto/risk/risk-score-view.ts`): it keeps the
 last four characters and masks the rest. Today the panel's label uses it. ⚠ This is display only — the key

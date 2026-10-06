@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsu
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
+import { ActivatedRoute, ParamMap, Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
@@ -46,6 +47,8 @@ export class AlertsComponent implements OnInit {
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
     protected lens = inject(LensService);
+    private route = inject(ActivatedRoute);
+    private router = inject(Router);
 
     readonly alerts = signal<FiredAlert[]>([]);
     readonly rules = signal<AlertRule[]>([]);
@@ -148,6 +151,15 @@ export class AlertsComponent implements OnInit {
 
     ngOnInit(): void {
         this.load();
+        // `?newRule=1&dataset=…` — a prefilled create handed over by another pane (Risk Scores, D-RP9). Strip the
+        // params first, then open: MatDialog closes open dialogs on navigation.
+        const q = this.route.snapshot.queryParamMap;
+        if (q.get('newRule') === '1') {
+            const seed = alertRuleSeed(q);
+            this.router
+                .navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true })
+                .then(() => this.newRule(seed));
+        }
     }
 
     load(): void {
@@ -191,9 +203,10 @@ export class AlertsComponent implements OnInit {
         });
     }
 
-    newRule(): void {
+    newRule(seed?: Partial<AlertRule>): void {
         const data: AlertRuleFormData = {
             existingNames: this.rules().map((r) => r.name),
+            ...(seed ? { seed } : {}),
         };
         this.dialog
             .open(AlertRuleFormDialog, { data, width: '560px', maxHeight: '88vh' })
@@ -229,4 +242,22 @@ export class AlertsComponent implements OnInit {
             error: (err) => this.toastr.error(apiErrorMessage(err, `Could not delete "${rule.name}".`)),
         });
     }
+}
+
+/** The prefilled rule a `?newRule=1` link carries: only the keys it names; `by` is a comma list. */
+export function alertRuleSeed(q: ParamMap): Partial<AlertRule> {
+    const seed: Partial<AlertRule> = {};
+    for (const k of ['dataset', 'measure', 'comparator', 'description'] as const) {
+        const v = q.get(k);
+        if (v) (seed as Record<string, unknown>)[k] = v;
+    }
+    const by = q.get('by');
+    if (by)
+        seed.by = by
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
+    const t = q.get('threshold');
+    if (t != null && t !== '' && isFinite(Number(t))) seed.threshold = Number(t);
+    return seed;
 }
