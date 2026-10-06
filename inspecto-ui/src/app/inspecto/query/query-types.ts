@@ -29,6 +29,7 @@ export type Operator =
     | 'contains'
     | 'startsWith'
     | 'endsWith'
+    | 'matches'
     | 'in'
     | 'between'
     | 'isNull'
@@ -41,6 +42,10 @@ export interface Condition {
     operator: Operator;
     value?: string; // single value; for `in` a comma list; for `between` the low bound
     value2?: string; // `between` high bound
+    /** Compare against another field's cell instead of `value` (= != < <= > >= contains startsWith endsWith). */
+    valueField?: string;
+    /** Case-insensitive string match (= != in contains startsWith endsWith matches). */
+    ignoreCase?: boolean;
 }
 
 /** A nested group of conditions/groups joined by a single boolean operator. */
@@ -48,6 +53,8 @@ export interface ConditionGroup {
     kind: 'group';
     op: 'AND' | 'OR';
     items: (Condition | ConditionGroup)[];
+    /** NOT: invert the group's result (an empty/incomplete group stays "no constraint"). */
+    negate?: boolean;
 }
 
 export type QueryItem = Condition | ConditionGroup;

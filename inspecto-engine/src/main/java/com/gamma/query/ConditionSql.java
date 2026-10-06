@@ -70,7 +70,10 @@ public final class ConditionSql {
                 rendered++;
             }
         }
-        return rendered == 0 ? null : sql.toString();
+        if (rendered == 0) return null;
+        // NOT over SQL's three-valued logic would turn "NULL" into "NULL" (row dropped) where ConditionTree
+        // says false ⇒ NOT false ⇒ true; COALESCE pins the group to two values first.
+        return ConditionTree.flag(g, "negate") ? "(NOT COALESCE(" + sql + ", FALSE))" : sql.toString();
     }
 
     private static boolean isGroup(Map<?, ?> m) {
@@ -81,13 +84,7 @@ public final class ConditionSql {
     }
 
     private static boolean isComplete(Map<?, ?> c) {
-        String field = strOrEmpty(c.get("field"));
-        String operator = strOrEmpty(c.get("operator"));
-        if (field.isEmpty() || operator.isEmpty()) return false;
-        if (operator.equals("isNull") || operator.equals("isNotNull")) return true;
-        if (operator.equals("between")) return !strOrEmpty(c.get("value")).isEmpty() && !strOrEmpty(c.get("value2")).isEmpty();
-        Object v = c.get("value");
-        return v != null && !String.valueOf(v).isEmpty();
+        return ConditionTree.isComplete(c);
     }
 
     // ── one leaf ─────────────────────────────────────────────────────────────────
@@ -97,6 +94,9 @@ public final class ConditionSql {
         String operator = strOrEmpty(c.get("operator"));
         String value = strOrEmpty(c.get("value"));
         String value2 = strOrEmpty(c.get("value2"));
+        boolean ic = ConditionTree.flag(c, "ignoreCase");
+        String valueField = strOrEmpty(c.get("valueField"));
+        if (!valueField.isEmpty()) return fields(f, operator, ident(valueField), ic);
         return switch (operator) {
             // ConditionTree treats null and '' alike for the null checks
             case "isNull" -> "(" + f + " IS NULL OR CAST(" + f + " AS VARCHAR) = '')";
@@ -104,20 +104,22 @@ public final class ConditionSql {
             case "contains" -> like(f, value, true, true);
             case "startsWith" -> like(f, value, false, true);
             case "endsWith" -> like(f, value, true, false);
-            case "in" -> in(f, value);
-            case "between" -> "(" + typed(f, ">=", value) + " AND " + typed(f, "<=", value2) + ")";
-            case "=", "!=", "<", "<=", ">", ">=" -> typed(f, operator, value);
+            case "matches" -> "regexp_matches(CAST(" + f + " AS VARCHAR), " + lit(value) + (ic ? ", 'i')" : ")");
+            case "in" -> in(f, value, ic);
+            case "between" -> "(" + typed(f, ">=", value, false) + " AND " + typed(f, "<=", value2, false) + ")";
+            case "=", "!=" -> typed(f, operator, value, ic);
+            case "<", "<=", ">", ">=" -> typed(f, operator, value, false);
             default -> "FALSE";
         };
     }
 
-    private static String in(String f, String csv) {
+    private static String in(String f, String csv, boolean ic) {
         StringJoiner sql = new StringJoiner(" OR ", "(", ")");
         int n = 0;
         for (String x : csv.split(",")) {
             String xt = x.trim();
             if (!xt.isEmpty()) {
-                sql.add(typed(f, "=", xt));
+                sql.add(typed(f, "=", xt, ic));
                 n++;
             }
         }
@@ -134,7 +136,7 @@ public final class ConditionSql {
     }
 
     /** Operand-driven typed comparison (see class doc). */
-    private static String typed(String f, String op, String v) {
+    private static String typed(String f, String op, String v, boolean ic) {
         String sqlOp = "!=".equals(op) ? "<>" : op;
         if (isNumeric(v))
             return "TRY_CAST(" + f + " AS DOUBLE) " + sqlOp + " " + Double.parseDouble(v);
@@ -145,7 +147,40 @@ public final class ConditionSql {
         }
         if (isDateLike(v))
             return "TRY_CAST(CAST(" + f + " AS VARCHAR) AS TIMESTAMP) " + sqlOp + " TRY_CAST(" + lit(v) + " AS TIMESTAMP)";
+        if (ic) return "LOWER(CAST(" + f + " AS VARCHAR)) " + sqlOp + " " + lit(v.toLowerCase(Locale.ROOT));
         return "CAST(" + f + " AS VARCHAR) " + sqlOp + " " + lit(v);
+    }
+
+    /**
+     * Field-to-field leaf; {@code g} is an already-quoted identifier ({@link #ident}, the same rule as
+     * {@code field}). Mirrors {@code ConditionTree.matchFields}: per row, both cells numeric &rArr; numbers;
+     * else both date-like &rArr; timestamps; else strings (lower-cased when {@code ic}). A NULL cell on either
+     * side yields NULL, i.e. no match.
+     */
+    private static String fields(String f, String operator, String g, boolean ic) {
+        String sa = "CAST(" + f + " AS VARCHAR)", sb = "CAST(" + g + " AS VARCHAR)";
+        switch (operator) {
+            case "contains": return "(LOWER(" + sa + ") LIKE '%' || " + escLike("LOWER(" + sb + ")") + " || '%' ESCAPE '\\')";
+            case "startsWith": return "(LOWER(" + sa + ") LIKE " + escLike("LOWER(" + sb + ")") + " || '%' ESCAPE '\\')";
+            case "endsWith": return "(LOWER(" + sa + ") LIKE '%' || " + escLike("LOWER(" + sb + ")") + " ESCAPE '\\')";
+            case "=", "!=", "<", "<=", ">", ">=": break;
+            default: return "FALSE";
+        }
+        String sqlOp = "!=".equals(operator) ? "<>" : operator;
+        String na = "TRY_CAST(" + sa + " AS DOUBLE)", nb = "TRY_CAST(" + sb + " AS DOUBLE)";
+        String ta = "TRY_CAST(" + sa + " AS TIMESTAMP)", tb = "TRY_CAST(" + sb + " AS TIMESTAMP)";
+        String shape = "regexp_matches(" + sa + ", '\\d{4}') AND regexp_matches(" + sa + ", '[-/:T]') AND "
+                + "regexp_matches(" + sb + ", '\\d{4}') AND regexp_matches(" + sb + ", '[-/:T]')";
+        String str = ic ? "LOWER(" + sa + ") " + sqlOp + " LOWER(" + sb + ")" : sa + " " + sqlOp + " " + sb;
+        return "(CASE WHEN regexp_full_match(" + sa + ", '-?\\d+(\\.\\d+)?') AND regexp_full_match(" + sb + ", '-?\\d+(\\.\\d+)?') "
+                + "THEN " + na + " " + sqlOp + " " + nb
+                + " WHEN " + shape + " AND " + ta + " IS NOT NULL AND " + tb + " IS NOT NULL THEN " + ta + " " + sqlOp + " " + tb
+                + " ELSE " + str + " END)";
+    }
+
+    /** SQL expression escaping LIKE metacharacters of a runtime string expression. */
+    private static String escLike(String expr) {
+        return "REPLACE(REPLACE(REPLACE(" + expr + ", '\\', '\\\\'), '%', '\\%'), '_', '\\_')";
     }
 
     private static boolean isNumeric(String s) {

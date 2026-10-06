@@ -21,7 +21,12 @@ live in `inspecto/src/main/java/com/gamma/control/DecisionRoutes.java`. A rule i
 `when` is the **`query-types` condition tree** the UI authors — a group
 `{kind:'group', op:'AND'|'OR', items:[…]}` nesting leaf conditions
 `{kind:'condition', field, operator, value?, value2?}`. Operators: `= != < <= > >= contains
-startsWith endsWith in between isNull isNotNull`.
+startsWith endsWith in between isNull isNotNull matches`. **Extensions (Decision Kernel step 2,
+2026-10-07):** `negate: true` on a group (NOT); `valueField` on a leaf (compare against another field's
+cell, never together with `value`); `ignoreCase: true` on `= != in contains startsWith endsWith matches`;
+`matches` (regular expression, partial match, pattern ≤ 256 chars, no lookaround / back-references /
+possessive quantifiers). `ConditionTree.validate` (called by `requireGroupRoot`) refuses misuse and bad
+patterns; full detail in `docs/superpower/module-architecture-reorg-plan.md` §8b "Decision Kernel step 2 as built".
 
 `com.gamma.query.ConditionTree` (`inspecto-engine/src/main/java/com/gamma/query/ConditionTree.java`) is a
 **pure, dependency-free port of the browser evaluator** (`inspecto-ui/.../query/query-eval.ts`) plus

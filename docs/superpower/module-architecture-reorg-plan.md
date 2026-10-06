@@ -657,6 +657,50 @@ field-to-field, case-insensitive, `matches`); (3) Tag and Case Rule filters; (4)
 filters; (6) Escalation match; (7) Access Policies' `Conditions` text compiled into the tree (last:
 security-sensitive); then retire the duplicate evaluator.
 
+### Decision Kernel step 2 as built (2026-10-07) — the Condition Language tree extensions
+
+P7 adoption order step 2. Java `ConditionTree` + `ConditionSql` and the UI twin `query-eval.ts` (plus the
+optional fields in `query-types.ts`) gained four extensions. Every existing authored tree evaluates
+identically — each extension is a new optional key or a new operator.
+
+| Extension | Shape chosen | Why |
+|---|---|---|
+| `not` | `negate: true` on a **group** (`{kind:'group', op, negate:true, items}`) | One optional key on the existing shape; an op `NOT` with one item would need a new arity rule. Empty / incomplete negated group stays "no constraint" (matches all), like any empty group. In SQL: `(NOT COALESCE((…), FALSE))` — plain `NOT` over SQL's NULL would drop a row the in-memory walk keeps (a NULL cell is "not > 3"). |
+| field-to-field | `valueField: '<field>'` beside `value` on a leaf; valid on `= != < <= > >= contains startsWith endsWith`; setting both `value` and `valueField` is refused | Identifier goes through the same `SqlIdent.q` quoting as `field` (nothing widened). A right-hand cell has no column type, so typing is **per row and symmetric** in both backends: both cells numeric → numbers; else both date-like → instants; else strings. A NULL right cell never matches. |
+| case-insensitive | `ignoreCase: true`; valid on `= != in contains startsWith endsWith matches`; refused on `< <= > >= between isNull isNotNull` | Applies in the string branch only (a numeric compare is unchanged). SQL: `LOWER(CAST(f AS VARCHAR)) = lower-literal`. `contains/startsWith/endsWith` were already case-insensitive, so the flag is accepted and a no-op there (it cannot make them case-sensitive). |
+| `matches` | operator; `value` is the pattern; DuckDB `regexp_matches(CAST(f AS VARCHAR), 'pat'[, 'i'])`, Java `Pattern.find()` | Partial match in both. Pattern is a single-quote-escaped literal. |
+
+**Dialect gap (matches).** DuckDB runs RE2; the JVM runs `java.util.regex`. Validation (`ConditionTree.validate`,
+called from `requireGroupRoot`, so both backends and save-time callers share it) refuses a pattern that
+fails to compile, exceeds `MAX_PATTERN_LENGTH` (256), or contains lookaround, atomic groups, possessive
+quantifiers or back-references — so an accepted pattern means the same in both. Residual gaps: Unicode
+class details, `.` vs line terminators, and the check is textual (it can refuse a legal escaped backslash followed by a digit, or an escaped plus followed by +). There is
+**no catastrophic-backtracking mitigation** beyond the length cap in the in-JVM evaluator (RE2 in SQL is linear).
+The browser twin does not validate: an uncompilable pattern simply matches nothing there; Java is the authority.
+
+**Settled semantic — `''` is null for `isNull`.** The tree keeps treating `''` and NULL alike for `isNull` /
+`isNotNull` in both backends (pinned by `ConditionExtensionsTest.emptyStringCountsAsNullForIsNullInBothBackends`).
+The `Conditions` text notation in `inspecto-util` (Access Policies) distinguishes them — that is a known
+difference to reconcile when step 7 compiles `Conditions` text into the tree (map its null test to
+`isNull` AND a non-empty guard, or add a strict operator then).
+
+**Tests.** `ConditionExtensionsTest` (21; each feature selects the same row ids through `ConditionTree` and
+through `ConditionSql` executed in DuckDB, plus hostile quotes / semicolons / comments / backslashes /
+`%` `_` per operator and a column whose name contains `"`), `query-eval.spec.ts` (+8). 🔴 `query-eval.ts`
+has **no application caller** — `evaluateRows` is exported and spec-tested only; the live evaluators are
+Java `ConditionTree` (simulate, Alert Rule `when`, Expectation) and `ConditionSql` (Decision Rule applier). The
+TS twin is kept in step as the reference the builder preview will use, not because anything runs it today.
+`query-sql.ts` (illustrative SQL preview) was NOT extended.
+
+**Follow-ups.** (1) Builder UI: `query-columns.ts` `OPERATORS` + `query-condition-group.component` need
+`matches`, a field picker for `valueField`, an ignore-case toggle and a NOT toggle (out of this lane's
+ownership; a11y work, not a one-line list change); `query-sql.ts` and `sql-ast.ts` should learn the new shapes.
+(2) Step 1: Expectation `non_null` / `range` onto `isNull` / `between`, and `regex` onto `matches`.
+(3) Steps 3-6: Tag and Case Rule filters (now unblocked: `ignoreCase`), Notification, Risk, Escalation match.
+(4) `DECISION-RULE-SQL-GUARD-1` stays open: the new operators keep today's discipline (quoted identifiers,
+escaped literals) but the appliers still concatenate. (5) `query-eval.ts` date parsing treats a zone-less
+date-time as local time where Java treats it as UTC (pre-existing for literals; now also field-to-field).
+
 ### Target picture
 ![Inspecto target module architecture](assets/module-target-architecture.svg)
 - Offerings (P6) become: one tier + any add-ons + any solution packs.
