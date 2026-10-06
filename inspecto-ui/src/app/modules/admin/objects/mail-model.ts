@@ -192,6 +192,16 @@ export function parseFindings(o: OperationalObject): Findings | null {
 }
 
 /**
+ * The Case type whose own Findings form applies to `o` (FINDINGS-PER-CASE-TYPE-1, operator 2026-10-06): its
+ * `attributes.caseType`, or null for an untyped Case. The server serves `GET /findings/case.<caseType>` as that
+ * type's spec when one is authored, else the generic Case spec — so the panel never has to know which exists.
+ */
+export function findingsCaseType(o: { attributes?: Record<string, string> } | null): string | null {
+    const t = o?.attributes?.['caseType']?.trim();
+    return t ? t : null;
+}
+
+/**
  * Narrow a served Findings spec (C3/D6) to `AttributeSpec[]` for `<inspecto-schema-form>`. The server
  * already authors sections in this vocabulary and validates them fail-closed at authoring time, so this
  * only casts the open `string` type/tier onto their unions and drops anything unrecognised — a spec the

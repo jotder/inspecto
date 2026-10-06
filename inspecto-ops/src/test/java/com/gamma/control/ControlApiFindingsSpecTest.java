@@ -256,6 +256,73 @@ class ControlApiFindingsSpecTest {
         }
     }
 
+    /**
+     * FINDINGS-PER-CASE-TYPE-1 (operator 2026-10-06): a Case type may name its own Findings form as the
+     * component {@code case.<caseType>}; a Case of that type is judged (and served) by it, any other Case
+     * keeps the generic form. The negative probe: the value refused for the typed Case is ACCEPTED on an
+     * untyped Case, so the 422 is the per-type spec at work, not a generic refusal.
+     */
+    @Test
+    void aCaseTypesOwnSpecJudgesOnlyCasesOfThatType(@TempDir Path dir) throws Exception {
+        Path writeRoot = dir.resolve("cfg");
+        try (Ctx c = open(dir, writeRoot)) {
+            assertEquals(200, send(c.port, "POST", "/components/findings-spec",
+                    """
+                    {"name":"case.sim-box","objectType":"case","caseType":"sim-box","sections":[
+                      {"key":"recovery","label":"Recovery route","type":"select","tier":"required","required":true,
+                       "options":[{"value":"BLOCK"},{"value":"BILL"}]}]}
+                    """).statusCode());
+
+            JsonNode typed = json(send(c.port, "GET", "/findings/case.sim-box", null));
+            assertEquals("case.sim-box", typed.get("name").asText());
+            assertEquals("sim-box", typed.get("caseType").asText());
+            assertEquals(List.of("recovery"), keys(typed));
+            // A Case type with no spec of its own keeps the generic form — additive, nothing to migrate.
+            assertEquals(List.of("disposition", "recordsAffected", "summary"),
+                    keys(json(send(c.port, "GET", "/findings/case.wangiri", null))));
+            assertEquals(List.of("disposition", "recordsAffected", "summary"),
+                    keys(json(send(c.port, "GET", "/findings/case", null))));
+
+            var ops = TestOpsEngine.of(c.svc);
+            var simbox = ops.open(com.gamma.objects.ObjectType.CASE, "sim box", "d", "HIGH",
+                    null, null, null, "c1", Map.of("caseType", "sim-box"));
+            var plain = ops.open(com.gamma.objects.ObjectType.CASE, "other", "d", "HIGH",
+                    null, null, null, "c2", Map.of());
+
+            assertEquals(422, send(c.port, "PATCH", "/objects/" + simbox.id(),
+                    findings(Map.of("disposition", "CONFIRMED"))).statusCode(),
+                    "the type's own form requires 'recovery' — the generic form is not consulted");
+            assertEquals(422, send(c.port, "PUT", "/objects/" + simbox.id() + "/findings",
+                    "{\"findings\":{\"recovery\":\"REFUND\"}}").statusCode(), "off the type's ladder");
+            assertEquals(200, send(c.port, "PUT", "/objects/" + simbox.id() + "/findings",
+                    "{\"findings\":{\"recovery\":\"BLOCK\"}}").statusCode());
+            assertEquals(200, send(c.port, "PATCH", "/objects/" + plain.id(),
+                    findings(Map.of("disposition", "CONFIRMED"))).statusCode(),
+                    "an untyped Case is judged by the generic form");
+        }
+    }
+
+    /** The per-type component id must agree with its content, and a caseType is a Case-only, dot-free name. */
+    @Test
+    void aPerTypeSpecIsRejectedWhenItsIdAndContentDisagree(@TempDir Path dir) throws Exception {
+        Path writeRoot = dir.resolve("cfg");
+        try (Ctx c = open(dir, writeRoot)) {
+            String sections = ",\"sections\":[{\"key\":\"a\"}]}";
+            assertEquals(422, send(c.port, "POST", "/components/findings-spec",
+                    "{\"name\":\"case\",\"objectType\":\"case\",\"caseType\":\"sim-box\"" + sections).statusCode(),
+                    "a caseType under the generic id");
+            assertEquals(422, send(c.port, "POST", "/components/findings-spec",
+                    "{\"name\":\"case.a\",\"objectType\":\"case\",\"caseType\":\"b\"" + sections).statusCode(),
+                    "id names one type, content another");
+            assertEquals(422, send(c.port, "POST", "/components/findings-spec",
+                    "{\"name\":\"incident.x\",\"objectType\":\"incident\"" + sections).statusCode(),
+                    "caseType is Case-only");
+            assertEquals(200, send(c.port, "POST", "/components/findings-spec",
+                    "{\"name\":\"case.a\",\"objectType\":\"case\"" + sections).statusCode(),
+                    "the caseType may be implied by the id");
+        }
+    }
+
     private static final String ROOT_CAUSE_SPEC = """
             {"name":"case","objectType":"case","sections":[
               {"key":"rootCause","label":"Root cause category","type":"select","tier":"required","required":true,

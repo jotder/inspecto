@@ -767,14 +767,15 @@ final class ComponentRoutes implements RouteModule {
         if (RiskScoreRoutes.TYPE.equals(type)) com.gamma.risk.RiskScoreModel.fromMap(id, content);
         if ("findings-spec".equals(type)) {
             // The store stamps name=id, and GET /findings/{type} resolves by that id, so validate the
-            // content as it will be persisted and refuse a spec whose objectType disagrees with its id.
+            // content as it will be persisted and refuse a spec whose objectType/caseType disagrees with
+            // its id: `case` = the generic form, `case.<caseType>` = one Case type's own form
+            // (FINDINGS-PER-CASE-TYPE-1, operator 2026-10-06).
             Map<String, Object> stamped = new LinkedHashMap<>(content);
             stamped.put("name", id);
-            String declared = ApiContext.str(content, "objectType");
-            if (declared != null && !declared.trim().equalsIgnoreCase(id))
-                throw new IllegalArgumentException("findings-spec objectType '" + declared
-                        + "' must match the component id '" + id + "' (one spec per object type)");
-            FindingsSpec.fromMap(stamped);
+            String expected = FindingsSpec.fromMap(stamped).id();
+            if (!expected.equalsIgnoreCase(id))
+                throw new IllegalArgumentException("findings-spec objectType/caseType ('" + expected
+                        + "') must match the component id '" + id + "' (one spec per object type or Case type)");
         }
         // A `schema` component is a file the engine parses: `/components/schema/{id}` writes
         // `registry/schemas/<id>.toon`, which `PipelineConfigParser.resolveSchemaRef` loads for a

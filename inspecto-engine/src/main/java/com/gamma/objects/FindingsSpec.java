@@ -44,7 +44,7 @@ import java.util.regex.PatternSyntaxException;
  * @since 4.0.0
  */
 @PublicApi(since = "4.0.0")
-public record FindingsSpec(String objectType, List<Section> sections) {
+public record FindingsSpec(String objectType, String caseType, List<Section> sections) {
 
     /**
      * Renderer-supported control types. Single source: {@link NodeAttribute#TYPES} — the published
@@ -63,7 +63,19 @@ public record FindingsSpec(String objectType, List<Section> sections) {
 
     public FindingsSpec {
         objectType = objectType == null ? "" : objectType.trim().toLowerCase(Locale.ROOT);
+        caseType = caseType == null || caseType.isBlank() ? null : caseType.trim();
         sections = sections == null ? List.of() : List.copyOf(sections);
+    }
+
+    /** A Case type value ({@code attributes.caseType}) that may carry its own spec — the id-safe charset, no dot. */
+    private static final Pattern CASE_TYPE = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]*");
+
+    /**
+     * The component id this spec persists under (FINDINGS-PER-CASE-TYPE-1, operator 2026-10-06): the object
+     * type alone ({@code case}) for the generic form, or {@code case.<caseType>} for one Case type's own form.
+     */
+    public String id() {
+        return caseType == null ? objectType : objectType + "." + caseType;
     }
 
     /** One Findings field. Mirrors {@code AttributeSpec}; {@code required} is boxed so "unset" stays
@@ -114,7 +126,7 @@ public record FindingsSpec(String objectType, List<Section> sections) {
     public static FindingsSpec defaultFor(ObjectType type) {
         List<Option> dispositions = CHOOSABLE_DISPOSITIONS.stream()
                 .map(d -> new Option(d, humanize(d))).toList();
-        return new FindingsSpec(type == null ? "case" : type.name().toLowerCase(Locale.ROOT), List.of(
+        return new FindingsSpec(type == null ? "case" : type.name().toLowerCase(Locale.ROOT), null, List.of(
                 // WS-10 (ASSURE-IMPACT-LEDGER-1): the Case's money is its typed impact (attributes.impact,
                 // PUT /objects/{id}/impact), not a Findings field — an `impactAmount` here would be a parallel
                 // home for the same number.
@@ -137,17 +149,31 @@ public record FindingsSpec(String objectType, List<Section> sections) {
     // ── parse + validate ────────────────────────────────────────────────────────
 
     /**
-     * Parse + validate a spec from a stored/request map ({@code {name|objectType, sections:[…]}}).
+     * Parse + validate a spec from a stored/request map ({@code {name|objectType, caseType?, sections:[…]}}).
+     * A {@code name} of {@code case.<caseType>} (the component id) names a per-Case-type spec; a
+     * {@code caseType} is legal only on {@code case} and only in the id-safe charset.
      * Rejects (→ 422): no sections; a blank or duplicate {@code key}; an unknown {@code type} or
      * {@code tier}; a {@code select} with no {@code options}; an unparseable {@code pattern};
      * {@code min > max}; a {@code dependsOn} naming no sibling section; and any unknown section key.
      */
     public static FindingsSpec fromMap(Map<String, Object> m) {
         if (m == null) throw new IllegalArgumentException("a findings spec body is required");
-        String objectType = str(m, "objectType") != null ? str(m, "objectType") : str(m, "name");
+        String name = str(m, "name");
+        String nameType = name == null ? null : name.contains(".") ? name.substring(0, name.indexOf('.')) : name;
+        String nameCase = name == null || !name.contains(".") ? null : name.substring(name.indexOf('.') + 1);
+        String objectType = str(m, "objectType") != null ? str(m, "objectType") : nameType;
         if (objectType == null)
             throw new IllegalArgumentException("objectType (or name) is required, e.g. 'incident' or 'case'");
-        ObjectType.of(objectType);   // throws IllegalArgumentException on an unknown type
+        ObjectType ot = ObjectType.of(objectType);   // throws IllegalArgumentException on an unknown type
+        String caseType = str(m, "caseType") != null ? str(m, "caseType") : nameCase;
+        if (caseType != null) {
+            if (ot != ObjectType.CASE)
+                throw new IllegalArgumentException("caseType is only legal on a 'case' findings spec, not '"
+                        + objectType + "'");
+            if (!CASE_TYPE.matcher(caseType).matches())
+                throw new IllegalArgumentException("caseType '" + caseType
+                        + "' must be letters, digits, '-' or '_' (no dot)");
+        }
 
         if (!(m.get("sections") instanceof List<?> raw) || raw.isEmpty())
             throw new IllegalArgumentException("sections must be a non-empty list");
@@ -168,7 +194,7 @@ public record FindingsSpec(String objectType, List<Section> sections) {
                 throw new IllegalArgumentException("section '" + s.key() + "' dependsOn unknown key '"
                         + s.dependsOn().key() + "'");
         }
-        return new FindingsSpec(objectType, sections);
+        return new FindingsSpec(objectType, caseType, sections);
     }
 
     private static Section section(Map<String, Object> m) {
@@ -348,8 +374,9 @@ public record FindingsSpec(String objectType, List<Section> sections) {
     /** The wire shape {@code <inspecto-schema-form>} consumes (also the persisted TOON content). */
     public Map<String, Object> toMap() {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("name", objectType);          // the component id, so file stem / URL id / content agree
+        m.put("name", id());                // the component id, so file stem / URL id / content agree
         m.put("objectType", objectType);
+        if (caseType != null) m.put("caseType", caseType);
         List<Map<String, Object>> out = new ArrayList<>();
         for (Section s : sections) out.add(sectionMap(s));
         m.put("sections", out);

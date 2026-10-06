@@ -3,6 +3,7 @@ import {
     Component,
     computed,
     DestroyRef,
+    effect,
     inject,
     OnInit,
     signal,
@@ -41,6 +42,7 @@ import { InspectoSplitDirective } from 'app/inspecto/components/split.directive'
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import {
+    findingsCaseType,
     caseFoldersFrom,
     currentOperator,
     DEFAULT_CASE_WORKFLOW,
@@ -190,6 +192,24 @@ export class ObjectMailComponent implements OnInit {
     readonly tagFilter = signal<string | null>(null);
     readonly selected = signal<OperationalObject[]>([]);
     readonly detail = signal<OperationalObject | null>(null);
+    /** The open Case's caseType (FINDINGS-PER-CASE-TYPE-1); drives the per-type Findings fetch. */
+    private readonly detailCaseType = computed(() => (this.isIncident ? null : findingsCaseType(this.detail())));
+    /** The last per-Case-type spec fetched, tagged with its caseType so a stale answer is never shown. */
+    private readonly typedFindingsSpec = signal<{ caseType: string; spec: FindingsSpecDef } | null>(null);
+    /** The Findings spec for the open Case: its type's own form when served, else the generic one. */
+    readonly detailFindingsSpec = computed(() => {
+        const t = this.detailCaseType();
+        const typed = this.typedFindingsSpec();
+        return t && typed?.caseType === t ? typed.spec : this.findingsSpec();
+    });
+    private readonly typedFindingsFetch = effect(() => {
+        const t = this.detailCaseType();
+        if (!t || this.typedFindingsSpec()?.caseType === t) return;
+        this.api.findingsSpec(`case.${t}`).subscribe({
+            next: (spec) => this.typedFindingsSpec.set({ caseType: t, spec }),
+            error: () => undefined,
+        });
+    });
 
     // Pane widths live on the shared inspectoSplit handles (R7); only collapse stays host-owned.
     readonly navCollapsed = signal(localStorage.getItem(NAV_COLLAPSED_KEY) === 'true');
@@ -762,6 +782,7 @@ export class ObjectMailComponent implements OnInit {
             .afterClosed()
             .subscribe((changed?: boolean) => {
                 if (!changed) return;
+                this.typedFindingsSpec.set(null);
                 this.api.findingsSpec(this.type).subscribe({
                     next: (spec) => this.findingsSpec.set(spec),
                     error: () => undefined,

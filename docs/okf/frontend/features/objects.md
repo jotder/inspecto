@@ -112,6 +112,8 @@ the real ControlApi.
 * **Configurable Findings sections (C3 / BACKLOG D6) — SHIPPED end-to-end 2026-07-26.** The Findings field
   set is deployment-authored: a **`findings-spec` ComponentStore kind** (one per `ObjectType`, id = the
   lowercased type) resolved and served by **`GET /findings/{type}`**, rendered by `<inspecto-schema-form>`.
+  Since 2026-10-06 a Case type may add its own (`case.<caseType>`, optional; see `incidents.md`), and the
+  mail pane binds `detailFindingsSpec()`: the open Case's type spec when served, else the generic one.
   Absent a component, `FindingsSpec.defaultFor()` serves today's exact shape
   (disposition/recordsAffected/summary since WS-10 — `impactAmount` retired 2026-09-26, the Case's money is
   its typed impact below — all `tier:'required'` + `required:false` — always
@@ -320,7 +322,7 @@ lead would not find). Conditional Notes: **PASS**. Preview: **PASS**. Open a Cas
 |---|---|---|---|
 | 1 | Text typed into a choice box that was on screen before a later *Add choice* is silently lost; the dialog reports "a choice with no name" while the box shows text | **P2** (blocks) | `FINDINGS-EDITOR-CHOICE-BINDING-1` |
 | 2 | Neither New case nor New incident can be created in a Space with no objects (mandatory link); the only guidance is "one must exist" | P3 (product decision; blocked the proxy) | `CASE-FIRST-OBJECT-DEAD-END-1` — ✅ shipped 2026-10-03: the rule stays; the create dialog's empty state names Decision Rules (create-incident action) as where the first Incident comes from and opens them |
-| 3 | One Findings form for every Case, so a "SIM-box" form has no home; loss can only be a plain Number and is separate from *Impact* | P3 (concept / wording) | `FINDINGS-PER-CASE-TYPE-1` |
+| 3 | One Findings form for every Case, so a "SIM-box" form has no home; loss can only be a plain Number and is separate from *Impact* | P3 (concept / wording) | `FINDINGS-PER-CASE-TYPE-1` — ✅ shipped 2026-10-06: a Case type (`attributes.caseType`) may author its own form as `findings-spec` `case.<caseType>`; the panel renders it for Cases of that type, the generic form otherwise (operator, 2026-10-06). The loss-vs-*Impact* wording half is not addressed |
 | 4 | *Add choice* leaves focus in *Name*, so the next keystrokes rename the field | P3 | `FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1` |
 | 5 | Radios are announced as "required"/"optional"; the condition word is truncated to "i."; *Technical details* (regex) stays open across fields | P3 (wording / a11y) | `FINDINGS-EDITOR-WORDING-1` — closed 2026-09-30 |
 | 6 | The Case detail panel does not scroll by itself; the whole document scrolls (blank band) and the list is squeezed to about 130 px | P3 | `CASE-DETAIL-DOCUMENT-SCROLL-1` — **fixed 2026-09-30**: the admin shell scrolls at document level, so the mail shell (`object-mail.component.html`) is now bounded to `calc(100dvh - 120px)` (64 px header + 56 px footer, as the Pipelines shell); folder nav, list and detail panel each scroll in their own area |

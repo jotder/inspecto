@@ -547,6 +547,17 @@ kind per `ObjectType`, served by `GET /findings/{type}`, rendered by `<inspecto-
 `attributes` is a shared bag. The `AttributeSpec` vocabulary is pinned by a cross-language contract
 (`inspecto-ui/src/app/inspecto/contracts/attribute-spec.contract.json`, compared by `FindingsSpecContractTest` (Java) and `attribute-spec.contract.spec.ts` (TS)).
 
+**A Case type may have its own Findings form — optional** (`FINDINGS-PER-CASE-TYPE-1`, operator, 2026-10-06).
+A Case type is the existing `attributes.caseType` value (the SEC-7d data-scope dimension). Its form is a
+`findings-spec` component with id `case.<caseType>` (`caseType` = letters, digits, `-`, `_`; Case-only;
+id and content must agree, else `422`). `GET /findings/case.<caseType>` serves it, else the generic `case`
+spec, else the built-in default; the served `name` says which. `PATCH /objects/{id}` and
+`PUT /objects/{id}/findings` judge a Case's blob against the spec for its own `caseType` (fail closed,
+`422`). A type with no spec, or an unreadable one, keeps the generic form: additive, no migration. The SPA
+mail pane fetches the open Case's type spec (`findingsCaseType` in `mail-model.ts`) and falls back to the
+generic one. Authoring is the generic `/components/findings-spec` CRUD; the *Findings fields* dialog still
+edits only the generic form (gap: no per-type picker in the editor yet).
+
 **Case Rules** (`CaseRule`, `/cases/rules`) are saved searches that auto-group: when ≥ *threshold* Incidents
 match within a *window* they are grouped under one Case, opened or attached idempotently. Evaluation is on
 demand from the pane **and** schedulable as the `caserule.evaluate` Job Type (`CaseRuleEvalJob`) — the
@@ -719,6 +730,7 @@ earlier one, both appear.
 | 2026-07-25 | **Retention is a tier** (D5): `CLOSED → ARCHIVED` and `ARCHIVED → purge` are two windows | "Archived" must not mean "about to be deleted" |
 | 2026-07-26 | **D7**: tags become a generic cross-entity concept — *this* system generalized, not a second one; `attributes.tags` becomes a projection | Two tag systems would drift; the old row's claim that nothing wrote `attributes.tags` was simply false |
 | 2026-07-26 | **D6 / C3**: Findings sections are a `findings-spec` kind that **fully replaces** the default; values validated `422`; the gate lives in `ObjectRoutes` | Field-level merge makes "remove a section" inexpressible; the engine stays store-agnostic |
+| 2026-10-06 | **FINDINGS-PER-CASE-TYPE-1**: per-Case-type Findings spec as component `case.<caseType>`, optional, falls back to the generic spec (operator, 2026-10-06) | A SIM-box form had no home; keying on the existing `caseType` attribute adds no new concept and needs no migration |
 | 2026-07-26 | D8 receipts: **first observation wins**; verification precedes every write; unknown id `202` | A provider retries; a later duplicate must not rewrite history |
 | 2026-07-27 | **MNT-14 `incident_purge`**: `retention_days` required, derived not stamped, legal hold fail-safe, dependents first through **abstract** methods, `INCIDENT` only, **never scheduled by default** | A shipped default that hard-deletes business records is indefensible; a silent no-op default would orphan rows |
 | 2026-07-27 | **G3**: a purge keeps the Incident's ledger trace, including the purge record | The ledger is append-only; that is the compliance claim |

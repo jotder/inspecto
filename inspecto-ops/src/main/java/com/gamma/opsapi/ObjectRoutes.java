@@ -254,29 +254,48 @@ public final class ObjectRoutes implements RouteModule {
      * D6): the authored {@code findings-spec} component when one exists, else
      * {@link FindingsSpec#defaultFor}. Unknown type → 400.
      *
+     * <p>{@code {type}} may be {@code case.<caseType>} (FINDINGS-PER-CASE-TYPE-1, operator 2026-10-06): that
+     * Case type's own spec when one is authored, else the generic {@code case} one. The served {@code name}
+     * says which was found.
+     *
      * <p>The overlay is resolved <em>here</em> rather than in the client so the built-in default has exactly
      * one definition. A spec that is malformed on disk falls back to the default with a warning — a broken
      * config file must not take the triage panel down (it was already rejected at authoring time by
      * {@link FindingsSpec#fromMap}, so reaching this branch means the file was hand-edited).
      */
     private Object findingsSpecOf(ApiContext api, String type) {
-        return effectiveFindingsSpec(api, parseObjectType(type)).toMap();
+        int dot = type.indexOf('.');
+        ObjectType objectType = parseObjectType(dot < 0 ? type : type.substring(0, dot));
+        return effectiveFindingsSpec(api, objectType, dot < 0 ? null : type.substring(dot + 1)).toMap();
     }
 
-    /** The effective spec for {@code objectType} — see {@link #findingsSpecOf}, which serves it. */
-    private static FindingsSpec effectiveFindingsSpec(ApiContext api, ObjectType objectType) {
+    /**
+     * The effective spec for {@code objectType} and, for a Case, its {@code caseType} — see
+     * {@link #findingsSpecOf}, which serves it. A Case type with no spec of its own (or an unreadable one)
+     * keeps the generic form: per-type specs are optional and additive.
+     */
+    private static FindingsSpec effectiveFindingsSpec(ApiContext api, ObjectType objectType, String caseType) {
         String id = objectType.name().toLowerCase(java.util.Locale.ROOT);
-        Path root = api.writeRoot();
-        if (root != null) {
-            try {
-                Map<String, Object> content = new ComponentStore(root.resolve("registry"))
-                        .get("findings-spec", id).map(ComponentRegistry.Component::content).orElse(null);
-                if (content != null) return FindingsSpec.fromMap(content);
-            } catch (RuntimeException bad) {   // a malformed spec (IllegalArgumentException) or an unreadable file
-                log.warn("findings-spec '{}' is unreadable, serving the built-in default: {}", id, bad.getMessage());
-            }
+        if (objectType == ObjectType.CASE && caseType != null && !caseType.isBlank()) {
+            FindingsSpec own = storedFindingsSpec(api, id + "." + caseType.trim());
+            if (own != null) return own;
         }
-        return FindingsSpec.defaultFor(objectType);
+        FindingsSpec generic = storedFindingsSpec(api, id);
+        return generic != null ? generic : FindingsSpec.defaultFor(objectType);
+    }
+
+    /** The authored {@code findings-spec} component {@code id}, or null when absent or unreadable. */
+    private static FindingsSpec storedFindingsSpec(ApiContext api, String id) {
+        Path root = api.writeRoot();
+        if (root == null) return null;
+        try {
+            Map<String, Object> content = new ComponentStore(root.resolve("registry"))
+                    .get("findings-spec", id).map(ComponentRegistry.Component::content).orElse(null);
+            return content == null ? null : FindingsSpec.fromMap(content);
+        } catch (RuntimeException bad) {   // a malformed spec (IllegalArgumentException), an unsafe id, or an unreadable file
+            log.warn("findings-spec '{}' is unreadable, falling back: {}", id, bad.getMessage());
+            return null;
+        }
     }
 
     // ── SEC-7d data-scoped grants ("a fraud analyst sees fraud cases") ───────────────
@@ -953,7 +972,7 @@ public final class ObjectRoutes implements RouteModule {
         OperationalObject o = OpsEngine.of(api).get(id).orElse(null);
         if (o == null) return;
         try {
-            effectiveFindingsSpec(api, o.objectType()).validateFindings(
+            effectiveFindingsSpec(api, o.objectType(), o.attributes().get(ATTR_CASE_TYPE)).validateFindings(
                     findingsBlob(attrs.get(FINDINGS_ATTR)), findingsBlob(o.attributes().get(FINDINGS_ATTR)));
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());

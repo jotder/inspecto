@@ -105,6 +105,29 @@ async function create(opts: CreateOpts = {}) {
 }
 
 describe('ObjectMailComponent', () => {
+    it('renders the open Case own Case-type Findings form, and the generic one for an untyped Case', async () => {
+        const { fixture, c, api } = await create({ type: 'CASE' });
+        const typed = {
+            objectType: 'case',
+            caseType: 'sim-box',
+            sections: [{ key: 'recovery', label: 'Recovery', type: 'string', tier: 'required' }],
+        };
+        const fetch = api.findingsSpec as Mock;
+        // The detail panel mounts once a Case is open; its own fetches stay pending.
+        Object.assign(api, { graph: vi.fn(() => NEVER), comments: vi.fn(() => NEVER), get: vi.fn(() => NEVER) });
+        fetch.mockImplementation((t: string) => (t === 'case.sim-box' ? of(typed) : throwError(() => new Error('x'))));
+
+        c.detail.set({ ...kase('c1', 'OPEN'), attributes: { caseType: 'sim-box' } });
+        fixture.detectChanges();
+        expect(fetch).toHaveBeenCalledWith('case.sim-box');
+        expect(c.detailFindingsSpec()).toBe(typed);
+
+        // Negative probe: an untyped Case never takes the typed form (the generic one failed to load here).
+        c.detail.set(kase('c2', 'OPEN'));
+        fixture.detectChanges();
+        expect(c.detailFindingsSpec()).toBeNull();
+    });
+
     it('folders the loaded incidents on the normalized mail lifecycle', async () => {
         const { c } = await create();
         const counts = c.counts();

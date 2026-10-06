@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OperationalObject } from 'app/inspecto/api';
-import { postmortemGaps, slaBadges } from './mail-model';
+import { findingsCaseType, postmortemGaps, slaBadges } from './mail-model';
 
 /** An Incident carrying `postmortem` (raw JSON) and `dueAt`. */
 function incident(postmortem: unknown, dueAt: string | undefined = '1790000000000'): OperationalObject {
@@ -72,5 +72,14 @@ describe('slaBadges (ASSURE-WORKFLOW-SLA-1)', () => {
 
     it('a blank or non-numeric stamp is no SLA', () => {
         expect(slaBadges(obj('IDENTIFIED', { dueAt: '', slaBreachedAt: 'x' }))).toEqual([]);
+    });
+});
+
+describe('findingsCaseType', () => {
+    it('reads a trimmed attributes.caseType, null when absent or blank', () => {
+        expect(findingsCaseType({ attributes: { caseType: ' sim-box ' } })).toBe('sim-box');
+        expect(findingsCaseType({ attributes: { caseType: '  ' } })).toBeNull();
+        expect(findingsCaseType({})).toBeNull();
+        expect(findingsCaseType(null)).toBeNull();
     });
 });
