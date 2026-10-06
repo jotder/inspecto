@@ -7,8 +7,7 @@ import com.gamma.event.EventLevel;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentStore;
-import com.gamma.risk.RiskScoreEvaluator;
-import com.gamma.risk.RiskScoreModel;
+import com.gamma.alert.RiskScoreOutputs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,11 +90,11 @@ public final class PendingAlertRules {
         Object model = body.get(AFTER);
         if (!(model instanceof String m) || m.isBlank())
             throw new IllegalArgumentException(AFTER + " must name the Risk Score model whose first run creates it");
-        if (!new ComponentStore(configRoot.resolve("registry")).exists(RiskScoreRoutes.TYPE, m))
+        if (!new ComponentStore(configRoot.resolve("registry")).exists(RiskScoreOutputs.KIND, m))
             throw new IllegalArgumentException(AFTER + " names unknown risk-score '" + m + "'");
         Map<String, Object> rule = ruleBody(body, name);
         AlertRule parsed = AlertRule.fromMap(rule);
-        String latest = RiskScoreModel.SCORES_PREFIX + m + RiskScoreModel.LATEST_SUFFIX;
+        String latest = RiskScoreOutputs.SCORES_PREFIX + m + RiskScoreOutputs.LATEST_SUFFIX;
         if (!latest.equals(parsed.dataset()))
             throw new IllegalArgumentException("a pending Alert Rule reads its Risk Score's output: dataset must be '"
                     + latest + "'");
@@ -161,11 +160,11 @@ public final class PendingAlertRules {
      */
     private static void ensureLatestDataset(Path configRoot, Supplier<Path> dataRoot, ComponentStore store,
                                             String modelId) throws IOException {
-        String latest = RiskScoreModel.SCORES_PREFIX + modelId + RiskScoreModel.LATEST_SUFFIX;
+        String latest = RiskScoreOutputs.SCORES_PREFIX + modelId + RiskScoreOutputs.LATEST_SUFFIX;
         if (store.exists("dataset", latest)) return;
         Map<String, Object> ds = new LinkedHashMap<>(Map.of("physicalRef", latest));
         ComponentRoutes.validateKind(configRoot, dataRoot, "dataset", latest, ds);
-        if (dataRoot.get() == null || !RiskScoreEvaluator.ownedBy(dataRoot.get().resolve(latest), modelId))
+        if (dataRoot.get() == null || !RiskScoreOutputs.ownedBy(dataRoot.get().resolve(latest), modelId))
             throw new IllegalArgumentException("risk-score '" + modelId + "' has not written '" + latest + "' yet");
         store.write("dataset", latest, ds);
     }

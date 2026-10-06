@@ -758,14 +758,17 @@ final class ComponentRoutes implements RouteModule {
     static void validateKind(java.nio.file.Path writeRoot, java.util.function.Supplier<java.nio.file.Path> dataRoot,
                              String type, String id, Map<String, Object> content) {
         validateKind(type, id, content);
-        if (RiskScoreRoutes.TYPE.equals(type))
-            RiskScoreRoutes.requireStorable(writeRoot, dataRoot, com.gamma.risk.RiskScoreModel.fromMap(id, content));
-        if ("dataset".equals(type) || "sink".equals(type)) RiskScoreRoutes.requireNotReserved(writeRoot, type, id, content);
+        // An optional module's own kinds and reserved store names (the risk-score kind and its risk_scores_ outputs):
+        // absent module = the kind stays opaque config and nothing is reserved.
+        for (ComponentKindValidator v : com.gamma.service.OptionalSpi.all(ComponentKindValidator.class)) {
+            if (v.type().equals(type)) v.validateInSpace(writeRoot, dataRoot, id, content);
+            if ("dataset".equals(type) || "sink".equals(type)) v.requireNotReserved(writeRoot, type, id, content);
+        }
     }
 
     static void validateKind(String type, String id, Map<String, Object> content) {
-        // ASSURE-RISK-SCORE-1: structure, numeric weights, and every indicator compiled by MeasureCompiler.
-        if (RiskScoreRoutes.TYPE.equals(type)) com.gamma.risk.RiskScoreModel.fromMap(id, content);
+        for (ComponentKindValidator v : com.gamma.service.OptionalSpi.all(ComponentKindValidator.class))
+            if (v.type().equals(type)) v.validate(id, content);
         if ("findings-spec".equals(type)) {
             // The store stamps name=id, and GET /findings/{type} resolves by that id, so validate the
             // content as it will be persisted and refuse a spec whose objectType/caseType disagrees with

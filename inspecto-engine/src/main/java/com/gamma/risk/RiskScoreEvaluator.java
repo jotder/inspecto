@@ -79,7 +79,7 @@ public final class RiskScoreEvaluator {
      * directory it created (marker present and naming THIS model) and deletes only its own {@code scores-*.parquet}
      * there — so a scores name that happens to equal a real store can never be wiped.
      */
-    public static final String OWNER_MARKER = ".risk-score-output";
+    public static final String OWNER_MARKER = com.gamma.alert.RiskScoreOutputs.OWNER_MARKER;
 
     private static final ObjectMapper JSON = new ObjectMapper()
             .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
@@ -290,12 +290,7 @@ public final class RiskScoreEvaluator {
 
     /** Whether {@code dir} is a scores directory THIS model created (its marker names the model). */
     public static boolean ownedBy(Path dir, String modelId) {
-        Path marker = dir.resolve(OWNER_MARKER);
-        try {
-            return Files.isRegularFile(marker) && modelId.equals(Files.readString(marker).trim());
-        } catch (IOException e) {
-            return false;
-        }
+        return com.gamma.alert.RiskScoreOutputs.ownedBy(dir, modelId);
     }
 
     /**

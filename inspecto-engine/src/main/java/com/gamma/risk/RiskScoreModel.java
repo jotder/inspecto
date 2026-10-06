@@ -55,8 +55,8 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
     /** A model id: no '-', so {@code risk_scores_<id>} is injective (a-b and a_b cannot share an output). */
     private static final Pattern MODEL_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_]*");
     /** The prefix of every scores Dataset — the output name is derived, never authored. */
-    public static final String SCORES_PREFIX = "risk_scores_";
-    public static final String LATEST_SUFFIX = "_latest";
+    public static final String SCORES_PREFIX = com.gamma.alert.RiskScoreOutputs.SCORES_PREFIX;
+    public static final String LATEST_SUFFIX = com.gamma.alert.RiskScoreOutputs.LATEST_SUFFIX;
     static final int MAX_FACTORS = 32;
     static final int MAX_EVIDENCE = 8;
     /** The component envelope the store/route adds (name = id, owner, shares) — accepted, never scored. */
