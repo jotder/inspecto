@@ -11,7 +11,7 @@ import java.util.function.BiPredicate;
 
 /**
  * One tier of a <b>Safety Policy</b> — the server file or a Space file — and, after {@link #fold}, the
- * effective policy a run is checked against ({@code docs/superpower/policy-narrowing-design.md} §2–§3).
+ * effective policy a run is checked against ({@code docs/archived-documents/plans-archive/policy-narrowing-design.md} §2–§3).
  *
  * <p><b>A lower tier can only narrow.</b> There is no name, no overlay, no replace: {@code permit.*} fold by
  * AND, {@code allow.*} by intersection (prefix sets through a boundary matcher, §3.3), {@code deny.*} by

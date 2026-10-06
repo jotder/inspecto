@@ -159,7 +159,7 @@ the **server** file (operator, on disk) and a **Space** file — and a lower tie
 AND, allow-sets intersect, denies union, caps take the minimum, `mode` is server-only. Code: `SafetyPolicy`
 (the effective policy the `ConfigSafetyValidator` enforces) and `SafetyPolicyTier` (one tier, and the fold).
 Distinct from an **Access Policy**, which says which Subject may call which route. ⛔ Never bare *Policy*.
-*(Added 2026-09-28, D1 of `superpower/policy-narrowing-design.md`.)*
+*(Added 2026-09-28, D1 of `archived-documents/plans-archive/policy-narrowing-design.md`.)*
 
 **Attribute** — A named **subject / resource / environment fact** an Access Policy conditions on:
 subject = `id`, `capabilities`, `dataScopes`, plus IdP claims allowlisted in `roles.toon`
