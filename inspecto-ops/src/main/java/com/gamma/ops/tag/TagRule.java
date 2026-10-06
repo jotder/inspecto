@@ -1,5 +1,6 @@
 package com.gamma.ops.tag;
 
+import com.gamma.query.ConditionTree;
 import com.gamma.util.ToonHelper;
 import com.gamma.ops.ObjectService;
 import com.gamma.workflow.ObjectType;
@@ -8,7 +9,9 @@ import com.gamma.util.Values;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -82,10 +85,11 @@ public record TagRule(String name, String tag, Filter filter, long createdAt) {
 
     /**
      * The rule's criteria — every set field must match: {@code type}/{@code status}/{@code priority}/
-     * {@code severity} exact (case-insensitive), {@code category} a path prefix (e.g. {@code "Pipeline"}
-     * or {@code "Pipeline / Ingest"}), {@code q} a case-insensitive substring of title + description.
-     * Incident statuses are compared on the mail lifecycle (GLOSSARY §9), tolerating the legacy
-     * pre-rename names so config-overridden deployments keep matching.
+     * {@code severity} exact (case-insensitive), {@code category} a case-insensitive path prefix (e.g.
+     * {@code "Pipeline"} or {@code "Pipeline / Ingest"}), {@code q} a case-insensitive substring of title +
+     * description. Incident statuses are compared on the mail lifecycle (GLOSSARY §9), tolerating the legacy
+     * pre-rename names so config-overridden deployments keep matching. The flat fields are authoring sugar for
+     * {@link #tree()}, which {@link #matches} evaluates through the Condition Language.
      */
     public record Filter(String type, String q, String status, String priority, String severity, String category) {
 
@@ -100,16 +104,69 @@ public record TagRule(String name, String tag, Filter filter, long createdAt) {
                     || notBlank(severity) || notBlank(category);
         }
 
-        /** Whether {@code o} satisfies every set criterion. */
+        /** Whether {@code o} satisfies every set criterion — evaluated as {@link #tree()} over {@link #context}. */
         public boolean matches(OperationalObject o) {
-            if (notBlank(type) && o.objectType() != ObjectType.of(type.trim())) return false;
-            if (notBlank(status) && !normalizedStatus(o).equalsIgnoreCase(normalizeIncident(o, status))) return false;
-            if (notBlank(priority) && !priority.trim().equalsIgnoreCase(nullToEmpty(o.priority()))) return false;
-            if (notBlank(severity) && !severity.trim().equalsIgnoreCase(nullToEmpty(o.severity()))) return false;
-            if (notBlank(category) && !nullToEmpty(o.attributes().get("category")).startsWith(category.trim())) return false;
-            if (notBlank(q) && !(o.title() + " " + o.description()).toLowerCase(Locale.ROOT)
-                    .contains(q.trim().toLowerCase(Locale.ROOT))) return false;
-            return true;
+            return ConditionTree.matched(tree(), List.of(context(o))) == 1;
+        }
+
+        /**
+         * The criteria as a condition tree (Decision Kernel step 3) — the flat fields stay the authoring form,
+         * this is what they mean. Evaluated over {@link #context}. {@code status} is the one that needs shape:
+         * an Incident's cell is already folded onto the mail lifecycle, so its operand is folded too, while
+         * every other type compares exactly — hence the type-guarded pair.
+         */
+        public Map<String, Object> tree() {
+            List<Object> all = new ArrayList<>();
+            if (notBlank(type)) all.add(leaf("type", "=", ObjectType.of(type.trim()).name(), false));
+            if (notBlank(status)) {
+                String exact = status.trim().toUpperCase(Locale.ROOT);
+                all.add(group("OR",
+                        group("AND", leaf("type", "=", ObjectType.INCIDENT.name(), false),
+                                leaf("status", "=", foldIncident(exact), false)),
+                        group("AND", leaf("type", "!=", ObjectType.INCIDENT.name(), false),
+                                leaf("status", "=", exact, false))));
+            }
+            if (notBlank(priority)) all.add(leaf("priority", "=", priority.trim(), true));
+            if (notBlank(severity)) all.add(leaf("severity", "=", severity.trim(), true));
+            if (notBlank(category)) all.add(leaf("category", "startsWith", category.trim(), true));
+            if (notBlank(q)) all.add(leaf("text", "contains", q.trim(), true));
+            return group("AND", all.toArray());
+        }
+
+        /**
+         * The row the tree is evaluated over: {@code type}, {@code status} (an Incident's folded onto the mail
+         * lifecycle, GLOSSARY §9, tolerating the legacy pre-rename names so config-overridden deployments keep
+         * matching), {@code priority}, {@code severity}, {@code category} (the attribute) and {@code text}
+         * (title + description) — absent values are empty strings.
+         */
+        public static Map<String, Object> context(OperationalObject o) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("type", o.objectType().name());
+            String status = o.status() == null ? "" : o.status().trim().toUpperCase(Locale.ROOT);
+            row.put("status", o.objectType() == ObjectType.INCIDENT ? foldIncident(status) : status);
+            row.put("priority", nullToEmpty(o.priority()));
+            row.put("severity", nullToEmpty(o.severity()));
+            row.put("category", nullToEmpty(o.attributes().get("category")));
+            row.put("text", o.title() + " " + o.description());
+            return row;
+        }
+
+        private static Map<String, Object> group(String op, Object... items) {
+            Map<String, Object> g = new LinkedHashMap<>();
+            g.put("kind", "group");
+            g.put("op", op);
+            g.put("items", List.of(items));
+            return g;
+        }
+
+        private static Map<String, Object> leaf(String field, String operator, String value, boolean ignoreCase) {
+            Map<String, Object> c = new LinkedHashMap<>();
+            c.put("kind", "condition");
+            c.put("field", field);
+            c.put("operator", operator);
+            c.put("value", value);
+            if (ignoreCase) c.put("ignoreCase", true);
+            return c;
         }
 
         /** JSON-ready view of the set criteria only. */
@@ -124,19 +181,13 @@ public record TagRule(String name, String tag, Filter filter, long createdAt) {
             return m;
         }
 
-        private String normalizedStatus(OperationalObject o) {
-            return normalizeIncident(o, o.status());
-        }
-
         /** Fold the legacy incident lifecycle names onto the mail lifecycle for comparison. */
-        private static String normalizeIncident(OperationalObject o, String status) {
-            String s = status == null ? "" : status.trim().toUpperCase(Locale.ROOT);
-            if (o.objectType() != ObjectType.INCIDENT) return s;
-            return switch (s) {
+        private static String foldIncident(String upper) {
+            return switch (upper) {
                 case "OPEN" -> "IDENTIFIED";
                 case "ASSIGNED", "IN_PROGRESS" -> "DIAGNOSING";
                 case "CLOSED" -> "ARCHIVED";
-                default -> s;
+                default -> upper;
             };
         }
 

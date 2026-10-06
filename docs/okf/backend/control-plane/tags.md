@@ -264,3 +264,16 @@ no write at all — re-tagging must not rewrite an edge's provenance.
   the reader to a file that does not exist.)* Route-order
   trap: `/tags/{name}` is a catch-all, so every more specific `/tags/…` pattern must be matched before it
   or `DELETE /tags/rules` deletes a tag named `rules`.
+
+## Tag Rule and Case Rule filters run on the condition tree (2026-10-07, Decision Kernel step 3)
+
+`TagRule.Filter` (shared by Case Rules) keeps its flat authoring fields — `type`, `q`, `status`, `priority`,
+`severity`, `category` — as sugar; `Filter.tree()` expands them into a condition tree and `Filter.matches` evaluates it
+with `ConditionTree` over `Filter.context(object)`. The context builder supplies the normalised fields: `status` is an
+Incident's value folded onto the mail lifecycle (legacy `OPEN` / `ASSIGNED` / `IN_PROGRESS` / `CLOSED`), so the status
+leaf is a type-guarded pair (Incident: folded operand; any other type: exact), and `text` is title + description.
+`ignoreCase` replaces the old per-field lower-casing. A Case Rule's count-within-window grouping (`threshold`,
+`windowMinutes`, the already-grouped skip) stays in `ObjectService`. One deliberate difference: `category` is now a
+case-insensitive path prefix (the tree's `startsWith` cannot be case-sensitive). Golden corpus:
+`TagRuleFilterParityTest`.
+

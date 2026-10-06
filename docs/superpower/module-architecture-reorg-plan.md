@@ -804,7 +804,7 @@ wired by `aria-describedby`) and `describeGroup`. `query-sql.ts` (preview + para
 shapes. `sql-ast.ts` is unchanged on purpose: it only reads SQL into a tree and refuses what it does not recognise. Hosts
 clone the tree and the editor mutates in place, so unmodelled keys survive save (pinned by a round-trip spec).
 (2) Step 1: Expectation `non_null` / `range` / `regex` onto the tree — **DONE 2026-10-07**, see "Decision Kernel step 1 as built".
-(3) Steps 3-6: Tag and Case Rule filters (now unblocked: `ignoreCase`), Notification, Risk, Escalation match.
+(3) Step 3 (Tag and Case Rule filters) — **DONE 2026-10-07**, see "Decision Kernel step 3 as built"; steps 4-6: Notification, Risk, Escalation match.
 (4) `DECISION-RULE-SQL-GUARD-1` stays open: the new operators keep today's discipline (quoted identifiers,
 escaped literals) but the appliers still concatenate. (5) `query-eval.ts` date parsing treats a zone-less
 date-time as local time where Java treats it as UTC (pre-existing for literals; now also field-to-field).
@@ -830,6 +830,31 @@ are unchanged and green.
 **Two deliberate behaviour differences** (both pinned): (1) `''` is null to the tree, so `non_null` now also flags empty-string
 cells (old `IS NULL` did not) — and `regex` skips them; (2) a `regex` pattern is validated at save by `ConditionTree.validate`
 (no lookaround / back-references, 256 characters), where it used to fail at first evaluation inside RE2.
+
+### Decision Kernel step 3 as built (2026-10-07) — Tag Rule and Case Rule filters onto the tree
+
+**Decision: the flat filter stays the authoring form (sugar), evaluation moves to the tree.** Two shipped configs
+(`spaces/demo/config/ops/*_tagrule.toon`, `*_caserule.toon`), the `/tags/rules` and `/cases/rules` bodies and their UI forms
+all author `type` / `q` / `status` / `priority` / `severity` / `category`, so nothing was migrated and no TOON was rewritten.
+`TagRule.Filter.tree()` expands the fields (`Case Rule` reuses the same `Filter`); `Filter.matches` runs
+`ConditionTree.matched(tree, [context(o)])`. The hand-coded matcher and its `equalsIgnoreCase` / `toLowerCase` calls are gone.
+
+**Context builder.** `Filter.context(OperationalObject)` supplies `type`, `status`, `priority`, `severity`, `category`,
+`text`. The status alias fold is done there for an Incident (`OPEN`→`IDENTIFIED`, `ASSIGNED` / `IN_PROGRESS`→`DIAGNOSING`,
+`CLOSED`→`ARCHIVED`); because the operand's fold depends on the *object's* type (a CASE `OPEN` must still equal a rule's
+`OPEN`), the status leaf is `OR[AND[type = INCIDENT, status = fold(v)], AND[type != INCIDENT, status = v]]`. A single static
+folded leaf would have stopped a rule saying `OPEN` from reaching a non-incident `OPEN`.
+
+**Parity.** `TagRuleFilterParityTest` (7) was written first against the old matcher over a six-object corpus (three
+Incident lifecycles, a CASE, a TASK with a lower-case status, null priority / severity / category): selections were
+identical before and after. `TagRuleTest`, `CaseRuleEvalJobTest`, `ObjectService*`, `ControlApiTagRoutesTest`,
+`ControlApiCaseRuleTest`, `PerEntityAlertObjectsTest`, `OpsJobTypesRunInAServiceTest` unchanged and green.
+
+**One deliberate difference (pinned):** `category` was a case-sensitive `startsWith`; the tree's `startsWith` is always
+case-insensitive (`ignoreCase` is a no-op there), so a rule `pipeline` now also matches category `Pipeline / Ingest`. The
+other criteria keep their semantics (priority / severity stay exact; `q` stays a substring over title + " " + description).
+**Not done:** letting an author write a `when` tree on a Tag / Case Rule directly (the builder would need the context fields
+as a field catalogue) — a follow-up, not needed to retire the duplicate matcher.
 
 ### Target picture
 ![Inspecto target module architecture](assets/module-target-architecture.svg)
