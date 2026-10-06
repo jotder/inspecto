@@ -60,15 +60,15 @@ class ControlApiSpaceTemplatesTest {
                 name: orders
                 active: false
                 dirs:
-                  poll:       spaces/${SPACE}/data/inbox/orders
-                  database:   spaces/${SPACE}/data/orders/database
-                  backup:     spaces/${SPACE}/data/orders/backup
-                  temp:       spaces/${SPACE}/data/orders/temp
-                  errors:     spaces/${SPACE}/data/orders/errors
-                  quarantine: spaces/${SPACE}/data/orders/quarantine
-                  markers:    spaces/${SPACE}/data/orders/markers
-                  status_dir: spaces/${SPACE}/data/orders/status
-                  log_dir:    spaces/${SPACE}/data/orders/logs
+                  poll:       data/inbox/${SPACE}/orders
+                  database:   data/orders/database
+                  backup:     data/orders/backup
+                  temp:       data/orders/temp
+                  errors:     data/orders/errors
+                  quarantine: data/orders/quarantine
+                  markers:    data/orders/markers
+                  status_dir: data/orders/status
+                  log_dir:    data/orders/logs
                 output:
                   format: PARQUET
                   compression: snappy
@@ -150,7 +150,7 @@ class ControlApiSpaceTemplatesTest {
             // config copied with ${SPACE} rewritten to the new id
             String pipeline = Files.readString(
                     root.resolve("acme").resolve("config").resolve("orders").resolve("orders_pipeline.toon"));
-            assertTrue(pipeline.contains("spaces/acme/data/inbox/orders"), pipeline);
+            assertTrue(pipeline.contains("data/inbox/acme/orders"), pipeline);
             assertFalse(pipeline.contains("${SPACE}"), "every token rewritten");
             assertTrue(Files.exists(root.resolve("acme").resolve("config").resolve("registry")
                     .resolve("datasets").resolve("orders_dataset.toon")));
