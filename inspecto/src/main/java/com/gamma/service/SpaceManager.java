@@ -444,7 +444,7 @@ public final class SpaceManager implements AutoCloseable {
                 String name = p.getFileName().toString();
                 String parent = p.getParent().getFileName().toString();
                 if (!com.gamma.etl.EditionFeatures.present(alert)
-                        && ("alert-rules".equals(parent)
+                        && ("alert-rules".equals(parent)   // registry/alert-rules/ and a pending/alert-rules/ deferred seed
                             || ("decision-rules".equals(parent) && Files.readString(p).contains("create-alert"))))
                     missing.putIfAbsent(alert, com.gamma.etl.EditionFeatures.refusal(alert));
                 if (name.endsWith("_pipeline.toon")) {

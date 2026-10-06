@@ -475,8 +475,9 @@ Updates are **optimistic** (2026-10-04): every object carries a monotonic `versi
     import a new Space's included); `TemplateGovernanceExamplesTest` runs every example through the real parsers.
     **Closed 2026-10-04 (operator):** `ASSURE-WORKFLOW-SLA-1` is closed. Residuals are P3 (`ASSURE-WORKFLOW-SLA-RESIDUALS-1`): the
     sweep-time deleted-assignee recheck (recommended policy when built: skip the reassign, still notify / raise priority, one
-    WARN per breach) waits for an IAM customer and a real `PrincipalDirectory`; a full state-diagram *editor* (the read-only
-    diagram ships). The live-preview pass of Settings ▸ Incident governance was done 2026-10-04 (see *UI* below).
+    WARN per breach) waits for an IAM customer and a real `PrincipalDirectory`; a graphical state-diagram *editor* is ON
+    DEMAND (operator, 2026-10-06) — built only when a customer asks, like the recheck (the read-only diagram and the list
+    editor ship). The live-preview pass of Settings ▸ Incident governance was done 2026-10-04 (see *UI* below).
   - **UI:** Settings ▸ *Incident governance* (`settings/incident-governance.component.ts`, model
     `inspecto/governance/governance-model.ts`): the effective workflow as a list editor (initial, terminal,
     transition rows), the SLA policy form and the Escalation Rules list; read-only without `canAdminister`; a 422

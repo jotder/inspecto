@@ -486,8 +486,8 @@ check that refuses a numeric-form IP); a refusal is 422 `template connection '<f
 #### 3.5.1 The `payment-fraud` content pack — slice 1 (`ASSURE-PACK-PAYMENT-FRAUD-1`, 2026-09-30)
 
 > **Closed as BUILT (operator, 2026-10-06).** Further typologies and customer sign-offs come on customer request.
-> Known gap, filed as P3 `TEMPLATE-RISK-SCORE-ALERT-RULE-1`: a template cannot ship an Alert Rule over its own Risk
-> Score output — the seed gate needs the output store's Schema, and seeding it would forge the ownership marker.
+> The Alert Rule over the template's own Risk Score output (`pf_high_risk_account`, `max(score) >= 60` by
+> `model, entity_key`) ships as a deferred seed — see §3.5.2.
 
 Wave 5.3 of `superpower/assurance-capability-plan.md`, generic half. `spaces/_templates/payment-fraud/` ships
 config and a synthetic corpus; it uses the opt-in `processing.refusal` mode of the ingest engine. There is no new
@@ -700,6 +700,37 @@ Step Processor and no new route.
 - **Deferred to later slices** (open on the row): WS-44 (disputes as labels with a maturity flag, payment KPIs and
   dashboards), further typologies (operator call). WS-44 shipped as slices 2–3; runbooks shipped 2026-10-04.
  
+
+#### 3.5.2 Deferred seed — an Alert Rule over the template's own Risk Score output (`TEMPLATE-RISK-SCORE-ALERT-RULE-1`, 2026-10-06)
+
+**Decision (operator, 2026-10-06): DEFERRED SEED.** A per-entity Alert Rule's `by` columns are checked against its
+Dataset's Schema at save, and a Risk Score's `risk_scores_<model>_latest` store has no Schema — and may not even be
+named by a Dataset (`RiskScoreRoutes.requireStorable`) — until the model first runs. Seeding a Schema or the store
+would forge the ownership marker, so a template declares the rule as PENDING instead, and nothing is forced.
+
+- **Where it is recorded (in the Space).** `config/pending/alert-rules/<name>.toon`: the Alert Rule body plus
+  `afterRiskScore: <model>`. It is copied with the template like any config file. At apply the seed gate checks it
+  (`TemplateSeedGate`, step after `kpi`): the edition carries Alert Rules, it parses (`AlertRule.fromMap`), it names a
+  `risk-score` the template seeds, and its `dataset` is that model's `risk_scores_<model>_latest`. The capability
+  table classifies the path as `alert-rule` (`ImportCapabilityGuard`, `canAuthorAlertRules`) and so does the
+  approval-policy classifier (`PendingChanges.kindOfConfigPath`).
+- **What fires it.** The `risk.score` Job emits `risk.score.produced` after it has written the scores; each Space's
+  `CollectorService` subscribes to its own event log and calls `PendingAlertRules.onRiskScoreProduced` for that model.
+  For each pending rule naming the model it registers the `_latest` Dataset (id = physicalRef) through the Dataset save
+  gate if absent, then runs `AlertRoutes.parse` (the `by` Schema check included), writes `registry/alert-rules/<name>`,
+  arms it in the `AlertService` and deletes the pending file. **Once:** the pending file is the only trigger, and the
+  call is synchronized; an Alert Rule already under that name is never overwritten (the pending entry is dropped).
+- **A refusal stays pending.** Any gate refusal — no output yet, a Schema mismatch, an edition without Alert Rules, or
+  a Space approval policy that holds `alert-rule` or `dataset` changes (a writer outside any request cannot be
+  approved) — keeps the file, emits an AUDIT event `alert-rule.pending.refused` with the reason, and is retried on the
+  model's next run. `alert-rule.pending.created` / `.dropped` record the other outcomes (actor `system`).
+- **Status.** `GET /alerts/rules/pending` lists `{name, afterRiskScore, dataset}` for what is still waiting; a
+  refusal's reason is in the audit log. There is no SPA surface yet; the rule appears on the Alert Rules page once
+  created.
+- **Use.** `payment-fraud` ships `pf_high_risk_account` (`max(score) >= 60` by `model, entity_key`, CRITICAL) after
+  `payment_account`. Tests: `PendingAlertRulesTest` (pending, refused + audited, created once, never overwritten, held
+  under an approval policy), `ControlApiSpaceTemplateSeedGateTest` (capability and content refusal at apply) and
+  `PaymentFraudDashboardTest` (the live Space's own `pf_risk_score` run creates and arms it).
 
 ### 3.6 Metadata Bundle v2 (SPC-4) — configuration moves, data never does
 

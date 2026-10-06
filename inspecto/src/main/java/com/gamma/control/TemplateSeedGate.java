@@ -39,7 +39,8 @@ import java.util.stream.Stream;
  * no capability-less applier left to exempt). With no Subject (Personal) every capability check is a no-op.
  * Pipelines and Jobs are additionally run through {@link SaveGate} with referents deferred
  * ({@code ASSURE-KPI-DEFINITIONS-RESIDUALS-1}), and every Connection file through
- * {@link ConnectionRoutes#validateProfile} (its connector checks and the https egress host check).
+ * {@link ConnectionRoutes#validateProfile} (its connector checks and the https egress host check),
+ * and every deferred Alert Rule ({@code pending/alert-rules/}) through {@link PendingAlertRules#requireDeclarable}.
  */
 final class TemplateSeedGate {
 
@@ -78,9 +79,32 @@ final class TemplateSeedGate {
             }
         }
         KpiRoutes.requireTemplateKpis(ex, spaceBase);
+        requirePendingAlertRules(config);
         requireStructure(config);
         stampJobs(ex, config);   // T5 owner-spoofing: a seeded la.index.build Job is owned by the applier
         requireConnections(config);
+    }
+
+    /**
+     * Each deferred Alert Rule ({@code pending/alert-rules/}, {@code TEMPLATE-RISK-SCORE-ALERT-RULE-1}) meets what can
+     * be judged before its Risk Score runs: the edition carries Alert Rules, it parses, and it reads the
+     * {@code _latest} output of a Risk Score model this template seeds. Its {@code by} Schema check runs when it is
+     * created ({@link PendingAlertRules#onRiskScoreProduced}).
+     */
+    private static void requirePendingAlertRules(Path config) {
+        Path dir = config.resolve(PendingAlertRules.DIR);
+        if (!Files.isDirectory(dir)) return;
+        for (Path file : files(dir, ".toon")) {
+            String name = file.getFileName().toString().replaceFirst("\\.toon$", "");
+            if (!com.gamma.etl.EditionFeatures.present(com.gamma.etl.EditionFeatures.ALERT_DISPATCH))
+                throw refused("pending alert-rule", name, com.gamma.etl.EditionFeatures.refusal(
+                        com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
+            try {
+                PendingAlertRules.requireDeclarable(config, ConfigCodec.toMap(Files.readString(file)), name);
+            } catch (IOException | RuntimeException bad) {
+                throw refused("pending alert-rule", name, bad.getMessage());
+            }
+        }
     }
 
     /** Server-stamp every seeded {@code *_job.toon} as the other Job doors do ({@link JobAuthority#stampFiles}); rewritten only when changed. */

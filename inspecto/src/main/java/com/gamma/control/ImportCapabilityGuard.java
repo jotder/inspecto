@@ -166,6 +166,8 @@ final class ImportCapabilityGuard {
             if (file.endsWith("_connection.toon")) require(ex, "connection", Roles.CAN_ONBOARD_CONNECTIONS);
             else if (file.endsWith("_job.toon")) requireIfAdministerOnly(ex, jobSection(e.getValue()));
             else if (file.endsWith("_job_template.toon")) refuseAttachingTemplate(e.getKey(), e.getValue());
+            else if (rel.startsWith(PendingAlertRules.DIR + "/"))   // a deferred Alert Rule (TEMPLATE-RISK-SCORE-ALERT-RULE-1)
+                require(ex, "alert-rule", KIND_CAPABILITY.get("alert-rule"));
             else if (rel.startsWith("registry/") || rel.contains("/registry/")) {
                 String[] parts = rel.substring(rel.startsWith("registry/") ? 0 : rel.indexOf("/registry/") + 1).split("/");
                 String kind = parts.length < 3 ? null : kindOfRegistryDir(parts[1]);

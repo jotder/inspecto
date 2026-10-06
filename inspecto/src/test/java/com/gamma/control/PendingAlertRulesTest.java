@@ -1,0 +1,170 @@
+package com.gamma.control;
+
+import com.gamma.event.Event;
+import com.gamma.event.EventLog;
+import com.gamma.event.EventType;
+import com.gamma.pipeline.ComponentStore;
+import com.gamma.risk.RiskScoreEvaluator;
+import com.gamma.risk.RiskScoreModel;
+import com.gamma.risk.RiskScorer;
+import com.gamma.util.DuckDbUtil;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * TEMPLATE-RISK-SCORE-ALERT-RULE-1 (operator 2026-10-06, deferred seed): a pending Alert Rule over a Risk Score's
+ * {@code _latest} output stays pending until that output exists, is then created through the normal save gate
+ * ({@link AlertRoutes#parse}, the {@code by} Schema check), exactly once; a refusal stays pending and is audited.
+ */
+class PendingAlertRulesTest {
+
+    private static final String MODEL = "acct";
+    private static final String RULE = "high_risk_acct";
+
+    @TempDir Path space;
+    private Path config;
+    private Path data;
+    private final List<Event> audit = new ArrayList<>();
+    private EventLog events;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        com.gamma.etl.EditionFeatures.overrideForTest(Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
+        DuckDbUtil.loadDriver();
+        config = Files.createDirectories(space.resolve("config"));
+        data = Files.createDirectories(space.resolve("data"));
+        ComponentStore store = new ComponentStore(config.resolve("registry"));
+        store.write("risk-score", MODEL, model());
+        Path pending = Files.createDirectories(config.resolve(PendingAlertRules.DIR));
+        Files.writeString(pending.resolve(RULE + ".toon"), """
+                afterRiskScore: acct
+                dataset: risk_scores_acct_latest
+                measure: "max(score)"
+                by[2]: model, entity_key
+                comparator: gte
+                threshold: 60
+                severity: CRITICAL
+                """);
+        events = EventLog.create();
+        events.addSubscriber(e -> { if (EventType.AUDIT.equals(e.type())) audit.add(e); });
+    }
+
+    @AfterEach
+    void tearDown() {
+        com.gamma.etl.EditionFeatures.overrideForTest(null);
+    }
+
+    private static Map<String, Object> model() {
+        return Map.of("entityType", "account", "highThreshold", 60, "factors", List.of(Map.of("id", "f", "label", "f",
+                "dataset", "feat", "key", "account_id", "measure", "max(x)", "weight", 10, "cap", 100)));
+    }
+
+    private List<String> produced() {
+        return PendingAlertRules.onRiskScoreProduced(config, () -> data, MODEL, null, events);
+    }
+
+    private void runRiskScore() throws Exception {
+        Map<String, Object> content = new ComponentStore(config.resolve("registry")).get("risk-score", MODEL)
+                .orElseThrow().content();
+        RiskScoreEvaluator.write(data, RiskScoreModel.fromMap(MODEL, content), "v1", "run-1", Instant.now(),
+                List.of(new RiskScorer.Scored("a1", 70, true, List.of())));
+    }
+
+    private boolean ruleExists() {
+        return new ComponentStore(config.resolve("registry")).exists("alert-rule", RULE);
+    }
+
+    private List<String> actions() {
+        return audit.stream().map(e -> String.valueOf(e.attributes().get(com.gamma.event.AuditAttrs.ACTION))).toList();
+    }
+
+    @Test
+    void pendingBeforeTheFirstRunAndARefusalIsAuditedAndStaysPending() {
+        assertEquals(List.of(RULE), PendingAlertRules.list(config).stream().map(m -> m.get("name")).toList());
+        // The output store has no Schema yet: the normal gate refuses, nothing is forced.
+        assertEquals(List.of(), produced());
+        assertFalse(ruleExists());
+        assertEquals(1, PendingAlertRules.list(config).size(), "a refusal stays pending");
+        assertEquals(List.of("alert-rule.pending.refused"), actions());
+        assertTrue(String.valueOf(audit.get(0).attributes().get("reason")).contains("has not written"),
+                "the refusal names the gate's reason: " + audit.get(0).attributes());
+    }
+
+    @Test
+    void createdThroughTheGateAfterTheRunExactlyOnce() throws Exception {
+        produced();                       // refused, before the run
+        runRiskScore();
+        assertEquals(List.of(RULE), produced(), "retried on the next run and created");
+        assertTrue(ruleExists());
+        Map<String, Object> stored = new ComponentStore(config.resolve("registry")).get("alert-rule", RULE)
+                .orElseThrow().content();
+        assertNull(stored.get(PendingAlertRules.AFTER), "the pending marker is not part of the rule");
+        assertEquals("risk_scores_acct_latest", stored.get("dataset"));
+        assertTrue(new ComponentStore(config.resolve("registry")).exists("dataset", "risk_scores_acct_latest"),
+                "the Dataset over the output is registered with the rule");
+        assertEquals(List.of(), PendingAlertRules.list(config));
+        assertEquals(List.of("alert-rule.pending.refused", "alert-rule.pending.created"), actions());
+        // Never twice: the next run finds nothing pending.
+        assertEquals(List.of(), produced());
+        assertEquals(2, actions().size());
+    }
+
+    @Test
+    void anotherModelsRunDoesNotReleaseIt() throws Exception {
+        runRiskScore();
+        assertEquals(List.of(), PendingAlertRules.onRiskScoreProduced(config, () -> data, "other", null, events));
+        assertFalse(ruleExists());
+        assertEquals(1, PendingAlertRules.list(config).size());
+    }
+
+    @Test
+    void anExistingRuleIsNeverOverwritten() throws Exception {
+        runRiskScore();
+        ComponentStore store = new ComponentStore(config.resolve("registry"));
+        store.write("alert-rule", RULE, Map.of("dataset", "risk_scores_acct_latest", "measure", "max(score)",
+                "comparator", "gte", "threshold", 90, "severity", "WARNING"));
+        assertEquals(List.of(), produced());
+        assertEquals("90", String.valueOf(store.get("alert-rule", RULE).orElseThrow().content().get("threshold")));
+        assertEquals(List.of(), PendingAlertRules.list(config));
+        assertEquals(List.of("alert-rule.pending.dropped"), actions());
+    }
+
+    @Test
+    void anApprovalPolicyOnAlertRulesKeepsItPendingEvenWithTheOutputPresent() throws Exception {
+        runRiskScore();
+        Files.writeString(config.resolve("approval.toon"), """
+                approval:
+                  alert-rule:
+                    required: true
+                """);
+        assertEquals(List.of(), produced());
+        assertFalse(ruleExists());
+        assertEquals(1, PendingAlertRules.list(config).size());
+        assertEquals(List.of("alert-rule.pending.refused"), actions());
+    }
+
+    @Test
+    void theTemplateCheckRefusesARuleThatDoesNotReadItsModelsOutput() {
+        Map<String, Object> ok = Map.of("afterRiskScore", MODEL, "dataset", "risk_scores_acct_latest",
+                "measure", "max(score)", "comparator", "gte", "threshold", 60, "severity", "CRITICAL");
+        PendingAlertRules.requireDeclarable(config, ok, RULE);
+        Map<String, Object> other = new java.util.HashMap<>(ok);
+        other.put("dataset", "pf_daily_summary");
+        assertThrows(IllegalArgumentException.class, () -> PendingAlertRules.requireDeclarable(config, other, RULE));
+        Map<String, Object> unknown = new java.util.HashMap<>(ok);
+        unknown.put("afterRiskScore", "nope");
+        assertThrows(IllegalArgumentException.class, () -> PendingAlertRules.requireDeclarable(config, unknown, RULE));
+    }
+}

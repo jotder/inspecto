@@ -369,6 +369,7 @@ public final class PendingChanges {
                 if (com.gamma.pipeline.ComponentRegistry.dirForType(type).map(parts[1]::equals).orElse(false)) return type;
             return "connections".equals(parts[1]) ? "connection" : null;
         }
+        if (p.startsWith(PendingAlertRules.DIR + "/")) return "alert-rule";   // TEMPLATE-RISK-SCORE-ALERT-RULE-1
         String file = parts[parts.length - 1];
         if (file.endsWith("_pipeline.toon")) return "pipeline";
         if (file.endsWith("_enrich.toon")) return "enrichment";

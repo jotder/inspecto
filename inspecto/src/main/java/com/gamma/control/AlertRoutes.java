@@ -32,7 +32,7 @@ import java.util.Set;
  */
 final class AlertRoutes implements RouteModule {
 
-    private static final String TYPE = "alert-rule";
+    static final String TYPE = "alert-rule";
 
     @Override
     public void register(ApiContext api) {
@@ -42,6 +42,10 @@ final class AlertRoutes implements RouteModule {
         api.get("/alerts/rules", (e, m) -> HostContext.of(api).service().alertService()
                 .map(a -> (Object) a.rules())
                 .orElse(java.util.List.of()));
+        // TEMPLATE-RISK-SCORE-ALERT-RULE-1: the deferred Alert Rules still waiting on their Risk Score's first run
+        // (a refusal's reason is in the audit log, action alert-rule.pending.refused). Read like /alerts/rules.
+        api.get("/alerts/rules/pending", (e, m) -> api.writeRoot() == null ? java.util.List.of()
+                : PendingAlertRules.list(api.writeRoot()));
         // Gated 2026-09-17: a fired rule emits ALERT_FIRED, which the default NotificationRules dispatch to
         // email/webhook — this route can page people, so it is an operate action, not a read.
         api.post("/alerts/evaluate", ApiContext.withCapability("canOperateRuns", (e, m) -> HostContext.of(api).service().alertService()

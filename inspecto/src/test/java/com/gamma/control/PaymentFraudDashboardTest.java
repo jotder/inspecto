@@ -50,7 +50,8 @@ class PaymentFraudDashboardTest {
     void arm() {
         com.gamma.etl.EditionFeatures.overrideForTest(Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
         Authenticators.forTest(ex -> Optional.of(new Subject("admin-1",
-                Set.of(Roles.CAN_ADMINISTER, Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_AUTHOR_ALERT_RULES))));
+                Set.of(Roles.CAN_ADMINISTER, Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_AUTHOR_ALERT_RULES,
+                        Roles.CAN_OPERATE_RUNS))));
     }
 
     @AfterEach
@@ -75,6 +76,12 @@ class PaymentFraudDashboardTest {
                             .POST(HttpRequest.BodyPublishers.ofString("{\"id\":\"pay\",\"template\":\"payment-fraud\"}")).build(),
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(200, created.statusCode(), created.body());
+            // TEMPLATE-RISK-SCORE-ALERT-RULE-1: the Alert Rule over the Risk Score output is pending, not created.
+            JsonNode pending = V1Body.of(call(base + "/pay/alerts/rules/pending", null));
+            assertEquals(1, pending.size(), pending.toString());
+            assertEquals("pf_high_risk_account", pending.get(0).get("name").asText());
+            assertEquals("payment_account", pending.get(0).get("afterRiskScore").asText());
+            assertFalse(Files.exists(root.resolve("pay/config/registry/alert-rules/pf_high_risk_account.toon")));
         } finally {
             api.close();
             spaces.close();
@@ -134,6 +141,19 @@ class PaymentFraudDashboardTest {
             assertTrue(bars.get("pf_bin_declines").get("498765") >= 15, "BIN-attack offender: " + bars);
             assertTrue(bars.get("pf_instrument_velocity").get("tok_vb_01") >= 6, "velocity offender: " + bars);
             assertTrue(bars.get("pf_sim_swap_payments").get("acc_ss01") >= 1, "SIM-swap offender: " + bars);
+
+            // The Space's own Risk Score run creates the pending Alert Rule through the save gate, then arms it.
+            HttpResponse<String> fired = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
+                            URI.create(base + "/jobs/pf_risk_score/trigger")).header("Authorization", "Bearer admin")
+                            .POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+            assertTrue(fired.statusCode() / 100 == 2, fired.body());
+            Path rule = root.resolve("pay/config/registry/alert-rules/pf_high_risk_account.toon");
+            long deadline = System.nanoTime() + 60_000_000_000L;
+            while (!Files.exists(rule) && System.nanoTime() < deadline) Thread.sleep(100);
+            assertTrue(Files.exists(rule), "the pending rule was not created after the Risk Score run: "
+                    + call(base + "/alerts/rules/pending", null));
+            assertEquals(0, V1Body.of(call(base + "/alerts/rules/pending", null)).size());
+            assertTrue(call(base + "/alerts/rules", null).contains("pf_high_risk_account"), "armed in the alert engine");
         } finally {
             api.close();
             spaces.close();

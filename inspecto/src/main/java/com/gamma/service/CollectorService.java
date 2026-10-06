@@ -635,6 +635,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         final com.gamma.event.EventLog triggerLog = this.eventLog;
         this.securityTriggers = new com.gamma.notify.SecurityTriggers(triggerLog, triggerLog::emit);
         this.eventLog.addSubscriber(securityTriggers);
+        // TEMPLATE-RISK-SCORE-ALERT-RULE-1: a template's PENDING Alert Rule over a Risk Score output is created,
+        // through the normal save gate, once that model's risk.score Job has written the output it reads.
+        this.pendingAlertRuleSubscriber = this::onRiskScoreProduced;
+        this.eventLog.addSubscriber(pendingAlertRuleSubscriber);
         String viewsFile = System.getProperty("events.views.file");
         this.savedViews = new SavedViewStore(viewsFile == null ? null : Path.of(viewsFile));
         CatalogOverlay.Stage2Reads stage2 = new CatalogOverlay.Stage2Reads() {
@@ -806,6 +810,23 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     private final com.gamma.notify.DeliveryReceiptStore deliveryReceipts;
     private final java.util.function.Consumer<com.gamma.event.Event> notificationSubscriber;
     private final com.gamma.notify.SecurityTriggers securityTriggers;
+    private final java.util.function.Consumer<com.gamma.event.Event> pendingAlertRuleSubscriber;
+
+    /** {@code risk.score.produced} → {@link com.gamma.control.PendingAlertRules#onRiskScoreProduced} for its model. */
+    private void onRiskScoreProduced(com.gamma.event.Event e) {
+        if (!com.gamma.event.EventType.SIGNAL.equals(e.type())) return;
+        com.gamma.signal.Signal sig = com.gamma.signal.Signal.fromEvent(e);
+        if (!"risk.score.produced".equals(sig.type()) || !(sig.payload().get("model") instanceof String model)) return;
+        java.nio.file.Path writeRoot = root.config();
+        if (writeRoot == null) {
+            String wr = System.getProperty("assist.write.root");
+            writeRoot = (wr == null || wr.isBlank()) ? null : java.nio.file.Path.of(wr);
+        }
+        com.gamma.control.PendingAlertRules.onRiskScoreProduced(writeRoot, () -> {
+            String dd = System.getProperty("data.dir", root.dataDir());
+            return (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd);
+        }, model, alerting, eventLog);
+    }
 
     /** The alert engine (always present; empty until a rule is armed) — backs {@code /alerts}. */
     public java.util.Optional<com.gamma.alert.AlertService> alertService() {
@@ -2126,6 +2147,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         enrichment.close();   // drain in-flight recomputes first
         this.eventLog.removeSubscriber(eventObjectBridge);   // de-register the D2 gap→ALERT bridge
         this.eventLog.removeSubscriber(notificationSubscriber);   // de-register the B2 event→feed engine
+        this.eventLog.removeSubscriber(pendingAlertRuleSubscriber);   // de-register the deferred Alert Rule seed
         this.eventLog.removeSubscriber(securityTriggers);   // de-register the security trigger evaluator
         this.eventLog.removeSubscriber(freshnessSubscriber);   // de-register the DUCKLE-C1 freshness probe
         this.eventLog.removeSubscriber(datasetWriteSubscriber);   // de-register the S3b dataset-write trigger

@@ -179,6 +179,32 @@ class ControlApiSpaceTemplateSeedGateTest {
         }
     }
 
+    /** TEMPLATE-RISK-SCORE-ALERT-RULE-1: a deferred Alert Rule is gated at apply like a registry one. */
+    @Test
+    void aPendingAlertRuleNeedsTheAlertCapabilityAndMustReadItsModelsOutput(@TempDir Path root) throws Exception {
+        copyTree(Path.of("..", "spaces", "_templates", "payment-fraud"), root.resolve("_templates").resolve("pf"));
+        Path cfg = root.resolve("_templates").resolve("pf").resolve("config");
+        // only the pending rule asks canAuthorAlertRules once the registry rules are gone
+        try (Stream<Path> s = Files.list(cfg.resolve("registry/alert-rules"))) {
+            for (Path f : s.toList()) Files.delete(f);
+        }
+        Path pending = cfg.resolve(PendingAlertRules.DIR).resolve("pf_high_risk_account.toon");
+        try (Ctx c = open(root)) {
+            HttpResponse<String> denied = send(c, "POST", "/spaces", "{\"id\":\"a1\",\"template\":\"pf\"}", OPS);
+            assertEquals(403, denied.statusCode(), denied.body());
+            assertTrue(denied.body().contains(Roles.CAN_AUTHOR_ALERT_RULES), denied.body());
+            // the probe: the untouched copy applies for a caller with the capability, and the rule is pending
+            assertEquals(200, send(c, "POST", "/spaces", "{\"id\":\"a2\",\"template\":\"pf\"}", ADMIN).statusCode());
+            assertTrue(Files.exists(root.resolve("a2").resolve("config").resolve(PendingAlertRules.DIR)
+                    .resolve("pf_high_risk_account.toon")));
+            Files.writeString(pending, Files.readString(pending).replace("risk_scores_payment_account_latest", "pf_daily_summary"));
+            HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"a3\",\"template\":\"pf\"}", ADMIN);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("template pending alert-rule 'pf_high_risk_account' is refused"), r.body());
+            assertFalse(Files.exists(root.resolve("a3")), "a refused template leaves no Space directory");
+        }
+    }
+
     @Test
     void aTemplateCsvMappingIsValidatedLikeEveryOtherKind(@TempDir Path root) throws Exception {
         Path cfg = root.resolve("_templates").resolve("mapped").resolve("config");
