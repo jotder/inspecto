@@ -298,6 +298,30 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
 - **Deferred:** a settings screen (SPA) for `/settings/modules`; the SPA still reads `/bootstrap` only. A disabled
   module's background Jobs and stores are NOT stopped (the gate is on the HTTP surface; P4 owns removal semantics).
 
+### P5a as built (2026-10-06 — platform test kit + RouteModule TCK; the processor dependency is NOT yet dropped)
+- **Kit home:** the **test-jar of `inspecto-http-spi`** (`src/test/java/com/gamma/control/testkit`), not a new module (§1 #4).
+  Consumers declare `inspecto-http-spi` `type test-jar`, scope test (managed in the root pom). `FakeApiContext` is the one
+  in-repo `ApiContext` double (`ControlApi` is the only other implementation): it records `(method, pattern, withCapability
+  capability, stub)` per route, answers `hasRoute` (stubs excluded, like the host), `registeredFeatures`/`disabledFeatures`
+  defaults, `writeRoot`/`dataRoot`, `body`, and `dispatch(method, concretePath, body[, Subject])` runs a handler in-memory — with a
+  `Subject`, `withCapability` enforces exactly as the host does. `replay` throws (needs the real dispatcher).
+  `PortHarness` (la-api) was migrated onto it (it is now ~30 lines of delegation; `LaApiPortsTest` unchanged, 6/6).
+- **TCK:** abstract `RouteModuleContract` (`module()` + optional `exemptMutatingRoutes()` = key `METHOD pattern` to reason). Five
+  tests: registers at least one route; no duplicate `(method, pattern)`; every POST/PUT/PATCH/DELETE is behind `withCapability` or
+  exempt (a stale exemption fails too, so the list cannot rot); `featureIds()` within the module's OWN `module.toon`
+  `provides.features` (located by loading only the class's code-source through an isolated class loader, so the other modules'
+  manifests on the class path are invisible); two fresh registrations yield the same routes. Exemption reasons mirror
+  `CapabilityManifest.EXEMPTIONS`.
+- **Driven without booting the processor (8 classes, 5 modules, 40 tests):** `EntityListRoutes`, `EventRoutes`, `MetricsRoutes`,
+  `ObjectRoutes`, `NoteRoutes`, `TagRoutes` (ops), `GeoRoutes`, `InvRoutes` (la-api). Note: these modules still have
+  `inspecto-processor` on their compile class path; what changed is that a route test no longer needs `ControlApi`/a Space.
+- **Cannot yet be driven — `ExchangeRoutes`:** `register()` itself calls `HostContext.of(api).spaces()` (to install
+  `SharedRefResolver`, the signal forwarder and two fence hooks), so any `ApiContext` that is not the host's `HostContext` throws
+  `IllegalState`. Blocker for dropping its processor dependency: those installs belong in a boot hook that receives the Space
+  registry, not in `register()`. Not mocked on purpose. Not attempted: the remaining la-api route classes (many take host-free
+  ports and could subclass the TCK next), `inspecto-geo-link` and `inspecto-policy`.
+- **Still open for P5:** the TCKs of §5 other than RouteModule; the "drop the processor dependency from the 7 modules" step.
+
 ## 7. Success measures (baseline → target)
 
 | Measure | Today | Target |

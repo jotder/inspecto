@@ -357,6 +357,12 @@
             </dependency>
             <dependency>
                 <groupId>com.gamma.inspector</groupId>
+                <artifactId>inspecto-http-spi</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+            </dependency>
+            <dependency>
+                <groupId>com.gamma.inspector</groupId>
                 <artifactId>inspecto-entity-store</artifactId>
                 <version>${project.version}</version>
             </dependency>

@@ -1,78 +1,35 @@
 package com.gamma.la.api;
 
 import com.gamma.control.ApiContext;
-import com.gamma.control.Handler;
+import com.gamma.control.testkit.FakeApiContext;
 import com.gamma.la.core.DatasetProvider;
-import com.sun.net.httpserver.Headers;
-import com.sun.net.httpserver.HttpContext;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpPrincipal;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.lang.reflect.Proxy;
-import java.net.InetSocketAddress;
-import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * A test harness that needs NO control plane and NO engine: a proxy {@link ApiContext} that records the routes a module
+ * A test harness that needs NO control plane and NO engine: the platform test kit's {@link FakeApiContext} that records the routes a module
  * registers, a stub {@link HttpExchange}, and a fake {@link DatasetProvider}. Link Analysis routes run through it against
  * the ports alone (LA separation D-1 step 5b/6).
  */
 final class PortHarness {
 
-    private final Map<String, Handler> routes = new LinkedHashMap<>();
-    private final Map<String, Pattern> patterns = new LinkedHashMap<>();
     final Path root;
     final ApiContext api;
+    private final FakeApiContext fake;
 
     PortHarness(Path root) {
         this.root = root;
-        this.api = (ApiContext) Proxy.newProxyInstance(ApiContext.class.getClassLoader(), new Class<?>[]{ApiContext.class},
-                (proxy, m, args) -> {
-                    switch (m.getName()) {
-                        case "get", "post", "put", "patch", "delete" -> {
-                            String key = m.getName().toUpperCase() + " " + args[0];
-                            routes.put(key, (Handler) args[1]);
-                            patterns.put(key, Pattern.compile((String) args[0]));
-                            return null;
-                        }
-                        case "writeRoot", "dataRoot" -> {
-                            return PortHarness.this.root;
-                        }
-                        case "body" -> {
-                            return ((StubExchange) args[0]).body;
-                        }
-                        case "hasRoute" -> {
-                            return false;
-                        }
-                        default -> {
-                            Class<?> r = m.getReturnType();
-                            return r == boolean.class ? (Object) false : r == int.class ? (Object) 0 : r == long.class ? (Object) 0L : null;
-                        }
-                    }
-                });
+        this.fake = new FakeApiContext(root);
+        this.api = fake;
     }
 
     /** Call a registered route: {@code METHOD /concrete/path}, with a JSON-ish body map. */
     Object call(String method, String path, Map<String, Object> body) throws Exception {
-        for (Map.Entry<String, Pattern> e : patterns.entrySet()) {
-            if (!e.getKey().startsWith(method + " ")) continue;
-            Matcher m = e.getValue().matcher(path);
-            if (m.matches()) return routes.get(e.getKey()).handle(new StubExchange(method, path, body), m);
-        }
-        throw new AssertionError("no route registered for " + method + " " + path);
+        return fake.dispatch(method, path, body);
     }
 
     /** A fake Dataset registry: id -> columns. {@code run} answers the columns of the Dataset the request names. */
@@ -118,37 +75,10 @@ final class PortHarness {
         @Override public String predicate(Object filter) { return "TRUE"; }
     }
 
-    /** A request that has no network behind it. */
-    static final class StubExchange extends HttpExchange {
-        final String method;
-        final URI uri;
-        final Map<String, Object> body;
-        private final Headers requestHeaders = new Headers();
-        private final Headers responseHeaders = new Headers();
-        private final Map<String, Object> attributes = new LinkedHashMap<>();
-
+    /** A request that has no network behind it (the platform test kit's, kept under this name for the tests). */
+    static final class StubExchange extends FakeApiContext.StubExchange {
         StubExchange(String method, String path, Map<String, Object> body) {
-            this.method = method;
-            this.uri = URI.create("/api/v1" + path);
-            this.body = body == null ? Map.of() : body;
+            super(method, path, body);
         }
-
-        @Override public Headers getRequestHeaders() { return requestHeaders; }
-        @Override public Headers getResponseHeaders() { return responseHeaders; }
-        @Override public URI getRequestURI() { return uri; }
-        @Override public String getRequestMethod() { return method; }
-        @Override public HttpContext getHttpContext() { return null; }
-        @Override public void close() { }
-        @Override public InputStream getRequestBody() { return new ByteArrayInputStream(new byte[0]); }
-        @Override public OutputStream getResponseBody() { return new ByteArrayOutputStream(); }
-        @Override public void sendResponseHeaders(int code, long length) throws IOException { }
-        @Override public InetSocketAddress getRemoteAddress() { return new InetSocketAddress("127.0.0.1", 0); }
-        @Override public int getResponseCode() { return -1; }
-        @Override public InetSocketAddress getLocalAddress() { return new InetSocketAddress("127.0.0.1", 0); }
-        @Override public String getProtocol() { return "HTTP/1.1"; }
-        @Override public Object getAttribute(String name) { return attributes.get(name); }
-        @Override public void setAttribute(String name, Object value) { attributes.put(name, value); }
-        @Override public void setStreams(InputStream i, OutputStream o) { }
-        @Override public HttpPrincipal getPrincipal() { return null; }
     }
 }
