@@ -196,7 +196,8 @@ by [execution-lanes.md](execution-lanes.md); the branch-aware ingest fork by
 
 No inter-node queues: the durable inbox is the queue, and back-pressure is admission control.
 
-- **`IntakeGovernor`** (per-pipeline per-cycle admission cap, oldest-first, opt-in via
+- **`IntakeGovernor`** (per-pipeline per-cycle admission cap, oldest-first, **on by default at 500
+  files/cycle** (operator, 2026-10-06: soak waived; `0` = unbounded) via
   `-Dingest.maxFilesPerCycle`, floor `-Dingest.minFilesPerCycle`, `-Dingest.backpressure.adaptive`;
   per-flow TOON override `processing.intake.*`, absent block = inherit globals). The controller
   halves the cap on **cycle overrun** and doubles it back under half the interval — the 2× gap is

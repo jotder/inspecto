@@ -439,7 +439,7 @@ final class PipelineScheduler {
     /**
      * T15 adaptive back-pressure (§3.5): feed one pipeline's run duration to the {@link IntakeGovernor} so a
      * run that overran the poll interval halves that pipeline's admission cap, and a comfortably-fitting run
-     * restores it. Inert unless an operator set {@code -Dingest.maxFilesPerCycle}.
+     * restores it. Active by default (base cap 500); {@code -Dingest.maxFilesPerCycle=0} makes it inert.
      *
      * <p>The signal is <b>overrun</b>, not inbox lag: admitting fewer files cannot reduce inbox age or
      * pending depth, so throttling on those would be positive feedback that pins a backlogged-but-healthy

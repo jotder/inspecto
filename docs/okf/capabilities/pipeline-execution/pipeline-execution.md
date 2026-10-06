@@ -119,11 +119,10 @@ a restart, is a 404**. The observability spec additionally misattributes that 40
 backend flag; it is the wrong cause, and the two failure modes are opposite — replay works with the
 projection off for a run still in memory, and fails with the projection on for one that has been evicted.
 
-⚠ **Intake caps are advertised as shipped and are off by default.** `JOB-04` marks the concurrency broker
-with *"priority shares, intake caps"* ✅ in all three editions, and a processor row cites intake caps as
-the shipped throttle. The cap's default is zero, which is byte-for-byte the pre-throttle behaviour, and
-*"flip the intake cap on by default (needs a soak)"* is an open row. The concurrency page states the honest
-version — the broker is **inert unless configured** — which the board's ✅ does not convey.
+**The intake file cap is on by default** — `ingest.maxFilesPerCycle` = 500
+(`IntakeGovernor.DEFAULT_MAX_FILES_PER_CYCLE`; operator, 2026-10-06, the 2026-09-15 soak precondition
+waived). An explicit `0` — system property or per-Pipeline `intake.max_files_per_cycle` — means unbounded.
+Adaptive back-pressure and `ingest.minFilesPerCycle` are unchanged; the byte cap stays off by default.
 
 ### 2.4 The default that does not exist, in six more places
 
@@ -674,7 +673,7 @@ and `ControlApiAsyncV1Test.pipelineTriggerDryRunImpliesSkipPostAction`.
   eject-and-continue choice as per-pipeline config — ⛔ explicitly no build without a driver.
 * **The retry deferrals** — a per-pipeline retry block, and an operator cancel or retry-now affordance
   (today: delete the sidecar, or reprocess).
-* **Flip the intake cap on by default** (needs a soak), and a pre-materialise cap to save fetch bandwidth —
+* A pre-materialise cap to save fetch bandwidth —
   ⚠ the latter is **design-first** (checked 2026-09-16): no unit, config key or enforcement point exists
   anywhere. `IntakeGovernor` caps FILES per cycle after listing; a pre-materialise cap would have to cap BYTES
   or files *before* the remote fetch, which needs the connector to expose size before download and a

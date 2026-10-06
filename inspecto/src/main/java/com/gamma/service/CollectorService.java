@@ -661,7 +661,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         int maxConcurrentAcquisitions = Integer.getInteger("acquire.maxConcurrent", this.maxConcurrentRuns);
         // B4: acquisition back-pressure — pause fetching for a pipeline whose inbox backlog (countPending)
         // has reached this high-water mark, so a slow ingest cannot make acquisition fill local disk
-        // unboundedly. The durable inbox is the spill queue (§3.5). 0 = off (default), like -Dingest.maxFilesPerCycle.
+        // unboundedly. The durable inbox is the spill queue (§3.5). 0 = off (default).
         int acquireHighWater = Integer.getInteger("acquire.backpressure.highWater", 0);
         // Two leases, two scopes — runs and remote acquisition stay independent (operator, 2026-09-12).
         this.pipelineScheduler = new PipelineScheduler(this.registry, this.configRegistry, this.paused,

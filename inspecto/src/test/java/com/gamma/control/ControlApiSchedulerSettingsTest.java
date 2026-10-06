@@ -240,15 +240,15 @@ class ControlApiSchedulerSettingsTest {
 
             // PUT the trio: persisted, and live on the running governor with no restart.
             HttpResponse<String> put = send(c.port, "PUT", "/system/scheduler",
-                    "{\"maxConcurrentConsignments\":0,\"intakeMaxFilesPerCycle\":500,"
+                    "{\"maxConcurrentConsignments\":0,\"intakeMaxFilesPerCycle\":250,"
                             + "\"intakeMinFilesPerCycle\":10,\"intakeAdaptive\":false}");
             assertEquals(200, put.statusCode(), put.body());
             JsonNode sys = json(put).get("system");
             assertEquals("file", sys.get("intakeSource").asText());
-            assertEquals(500, sys.get("effectiveIntake").get("maxFilesPerCycle").asInt());
+            assertEquals(250, sys.get("effectiveIntake").get("maxFilesPerCycle").asInt());
             assertTrue(sys.get("effectiveIntake").get("active").asBoolean());
             var live = com.gamma.acquire.IntakeGovernor.shared().policy();
-            assertEquals(500, live.baseCap(), "hot-apply did not reach the governor");
+            assertEquals(250, live.baseCap(), "hot-apply did not reach the governor");
             assertEquals(10, live.minCap());
             assertFalse(live.adaptive());
 
@@ -256,13 +256,13 @@ class ControlApiSchedulerSettingsTest {
             assertEquals(200, send(c.port, "PUT", "/system/scheduler",
                     "{\"maxConcurrentConsignments\":4}").statusCode());
             sys = json(send(c.port, "GET", "/system/scheduler", null)).get("system");
-            assertEquals(500, sys.get("intakeMaxFilesPerCycle").asInt(), "cap-only PUT wiped intake globals");
+            assertEquals(250, sys.get("intakeMaxFilesPerCycle").asInt(), "cap-only PUT wiped intake globals");
 
-            // Explicit null clears: back to the -Dingest.* bootstrap default (off in tests).
+            // Explicit null clears: back to the -Dingest.* bootstrap default (500, operator 2026-10-06).
             assertEquals(200, send(c.port, "PUT", "/system/scheduler",
                     "{\"maxConcurrentConsignments\":4,\"intakeMaxFilesPerCycle\":null,"
                             + "\"intakeMinFilesPerCycle\":null,\"intakeAdaptive\":null}").statusCode());
-            assertEquals(0, com.gamma.acquire.IntakeGovernor.shared().policy().baseCap(),
+            assertEquals(com.gamma.acquire.IntakeGovernor.DEFAULT_MAX_FILES_PER_CYCLE, com.gamma.acquire.IntakeGovernor.shared().policy().baseCap(),
                     "clear must revert the live governor to the bootstrap default");
 
             // Bounds gates.

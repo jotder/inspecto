@@ -23,10 +23,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * since the cap is per-pipeline, the duration is attributed to the pipeline that spent it rather than to
  * every pipeline that shared a tick with it (see {@code PipelineScheduler.governRun}).
  *
- * <h3>Inert unless configured</h3>
- * The whole mechanism is opt-in: with no {@code -Dingest.maxFilesPerCycle} there is no base cap, {@link #capFor}
- * returns {@link #UNBOUNDED} and nothing in the ingest path changes. Setting a base cap enables both the hard
- * cap and (unless {@code -Dingest.backpressure.adaptive=false}) the controller.
+ * <h3>On by default</h3>
+ * With no {@code -Dingest.maxFilesPerCycle} the base cap is {@link #DEFAULT_MAX_FILES_PER_CYCLE} (operator,
+ * 2026-10-06: soak waived, default flipped on). An explicit {@code 0} disables admission control: {@link #capFor}
+ * returns {@link #UNBOUNDED}. A base cap enables both the hard cap and (unless
+ * {@code -Dingest.backpressure.adaptive=false}) the controller.
  *
  * <h3>Per-pipeline override (T15 follow-up)</h3>
  * A pipeline's {@code processing.intake} TOON block installs its own {@link Policy} via {@link #configure}
@@ -49,6 +50,9 @@ public final class IntakeGovernor {
     /** {@link #capFor} result meaning "admit every candidate" (the default, and the pre-T15 behaviour). */
     public static final int UNBOUNDED = 0;
 
+    /** Base cap when {@code -Dingest.maxFilesPerCycle} is unset (operator, 2026-10-06). */
+    public static final int DEFAULT_MAX_FILES_PER_CYCLE = 500;
+
     /**
      * Admission-control thresholds, read from system properties so the defaults are never hard-coded into
      * the ingest path (§3.5's "configurable, conservative default" — decided 2026-06-16).
@@ -67,11 +71,11 @@ public final class IntakeGovernor {
             this(baseCap, minCap, adaptive, UNBOUNDED_BYTES);
         }
 
-        /** {@code -Dingest.maxFilesPerCycle} (default 0 = off) · {@code -Dingest.minFilesPerCycle} (1) ·
+        /** {@code -Dingest.maxFilesPerCycle} (default {@value IntakeGovernor#DEFAULT_MAX_FILES_PER_CYCLE}; 0 = off) · {@code -Dingest.minFilesPerCycle} (1) ·
          *  {@code -Dingest.backpressure.adaptive} (true). A malformed value falls back to the default. */
         public static Policy fromSystemProperties() {
             return new Policy(
-                    intProperty("ingest.maxFilesPerCycle", 0),
+                    intProperty("ingest.maxFilesPerCycle", DEFAULT_MAX_FILES_PER_CYCLE),
                     Math.max(1, intProperty("ingest.minFilesPerCycle", 1)),
                     !"false".equalsIgnoreCase(System.getProperty("ingest.backpressure.adaptive")),
                     longProperty("ingest.maxBytesPerCycle", UNBOUNDED_BYTES));

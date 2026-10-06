@@ -228,4 +228,41 @@ class IntakeGovernorTest {
         assertEquals(30, gov.capFor("pinned"), "adaptive=false in the override is a hard cap for that pipeline");
         assertEquals(50, gov.capFor("global"), "the globally-governed pipeline in the same cycle still adapts");
     }
+
+    // ── Default-on cap (operator, 2026-10-06): 500 when unset; explicit 0 = unbounded ─────────────────
+
+    private static IntakeGovernor.Policy policyWithMaxProperty(String value) {
+        String prev = System.getProperty("ingest.maxFilesPerCycle");
+        try {
+            if (value == null) System.clearProperty("ingest.maxFilesPerCycle");
+            else System.setProperty("ingest.maxFilesPerCycle", value);
+            return IntakeGovernor.Policy.fromSystemProperties();
+        } finally {
+            if (prev == null) System.clearProperty("ingest.maxFilesPerCycle");
+            else System.setProperty("ingest.maxFilesPerCycle", prev);
+        }
+    }
+
+    @Test
+    void theCapAppliesWhenNothingIsConfigured() {
+        IntakeGovernor.Policy p = policyWithMaxProperty(null);
+        assertEquals(500, p.baseCap());
+        assertEquals(500, new IntakeGovernor(p).capFor("never-configured"),
+                "no property, no override: the default cap governs");
+    }
+
+    @Test
+    void anExplicitZeroPropertyMeansUnbounded() {
+        IntakeGovernor.Policy p = policyWithMaxProperty("0");
+        assertEquals(0, p.baseCap());
+        assertEquals(IntakeGovernor.UNBOUNDED, new IntakeGovernor(p).capFor("p"));
+    }
+
+    @Test
+    void anExplicitZeroPipelineOverrideExemptsItFromTheDefaultCap() {
+        IntakeGovernor gov = new IntakeGovernor(policyWithMaxProperty(null));
+        gov.configure("exempt", new IntakeGovernor.Policy(0, 1, true));
+        assertEquals(IntakeGovernor.UNBOUNDED, gov.capFor("exempt"));
+        assertEquals(500, gov.capFor("other"), "probe: an un-overridden pipeline IS capped by the default");
+    }
 }
