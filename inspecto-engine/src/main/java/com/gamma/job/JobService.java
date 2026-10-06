@@ -729,6 +729,11 @@ public final class JobService implements AutoCloseable {
         }
     }
 
+    /** Test seam: register one more Job Type on this service's registry (no pack, no owner). */
+    void registerJobType(JobTypeProvider provider) {
+        registry.register(provider);
+    }
+
     /** Whether {@link #start()} has run — {@link #upsertJob} only needs to arm a cron directly (via
      *  {@link #armCron}) once the service is live; before that, {@link #start()} itself arms every
      *  enabled config's cron the first time. */
@@ -1565,6 +1570,19 @@ public final class JobService implements AutoCloseable {
         ctx.log().info("run started", "trigger", trigger,
                 "params", SecretMasking.mask(pr.resolved(), SecretMasking.names(decls)),
                 "dryRun", firing.dryRun());
+        // R1: resolve the deadline before anything is pinned; a malformed deadline_seconds: refuses the run.
+        java.time.Duration deadline;
+        try {
+            deadline = JobDeadline.resolve(registry.deadline(job.type()), cfg);
+        } catch (IllegalArgumentException bad) {
+            ctx.log().error("run rejected: " + bad.getMessage(), null);
+            ctx.signals().emit("job.run.rejected", Severity.WARN,
+                    Map.of("job", name, "run", runId, "reason", bad.getMessage()));
+            if (pipelineId != null) runningPipelines.remove(pipelineId);
+            record(new JobRun(runId, name, job.type(), trigger, start,
+                    LocalDateTime.now().format(TS), "REJECTED", 0L, bad.getMessage()));
+            return;
+        }
         ctx.signals().emit("job.run.started", Severity.INFO,
                 Map.of("job", name, "run", runId, "trigger", trigger));
         JobResult res;
@@ -1579,14 +1597,29 @@ public final class JobService implements AutoCloseable {
         Set<String> serviceOwners = platform == null ? Set.of() : platform.ownersOf(Set.copyOf(
                 registry.descriptor(job.type()).map(JobTypeDescriptor::requires).orElse(List.of())));
         serviceOwners.forEach(packs::acquireRun);
+        // Platform-services R1 (operator 2026-10-06): every Run has a deadline - type default, the definition's
+        // deadline_seconds:, capped by the ceiling. Expiry interrupts this thread and the Run is FAILED, even
+        // when the body swallows the interrupt and returns a result.
+        long t0 = System.nanoTime();
+        JobDeadline.Watch watch = JobDeadline.arm(deadline);
         try {
-            res = job.run(ctx);
-        } catch (Exception e) {
-            threw = true;
-            log.error("Job '{}' ({}) failed", name, trigger, e);
-            ctx.log().error("run failed", e);
-            res = JobResult.failed(String.valueOf(e.getMessage()),
-                    0L);
+            try {
+                res = job.run(ctx);
+            } catch (Exception e) {
+                threw = true;
+                log.error("Job '{}' ({}) failed", name, trigger, e);
+                ctx.log().error("run failed", e);
+                res = JobResult.failed(String.valueOf(e.getMessage()),
+                        0L);
+            } finally {
+                if (watch.finish()) {
+                    threw = true;
+                    String reason = watch.reason();
+                    log.error("Job '{}' ({}) {}", name, trigger, reason);
+                    ctx.log().error("run failed: " + reason, null);
+                    res = JobResult.failed(reason, (System.nanoTime() - t0) / 1_000_000L);
+                }
+            }
         } finally {
             packs.releaseRun(packOwner);
             serviceOwners.forEach(packs::releaseRun);

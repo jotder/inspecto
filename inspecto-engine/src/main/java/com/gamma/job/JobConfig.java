@@ -120,6 +120,10 @@ public record JobConfig(String name, String type, String cron, String onPipeline
     public boolean hasWhen()   { return when != null && !when.isBlank(); }
     public boolean hasBind()   { return !bind.isEmpty(); }
 
+    /** The {@code deadline_seconds:} key: this definition's Run deadline (platform-services R1, operator
+     *  2026-10-06), capped by the ceiling; read by {@link JobDeadline}, never by a Job Type. */
+    public static final String DEADLINE_SECONDS = "deadline_seconds";
+
     /** The {@code coalesce:} key (operator, 2026-09-28; cross-Space consequence design §8). */
     public static final String COALESCE = "coalesce";
 
@@ -198,6 +202,8 @@ public record JobConfig(String name, String type, String cron, String onPipeline
         // CHAIN-CONFIG-1: a consignment.process chain and its per-step config must align AT SAVE — every
         // API write and the boot loader funnel through here, so the refusal is not left to the next commit.
         if (ConsignmentProcessJobType.TYPE_ID.equals(type)) ConsignmentProcessJobType.requireAlignedChain(params);
+        String deadline = params.get(DEADLINE_SECONDS);
+        if (deadline != null && !deadline.isBlank()) JobDeadline.parse(deadline);   // fail closed at load
         return new JobConfig(name, type, cron, onPipeline, enabled, catchUp, params, onSignal, when, args, bind);
     }
 

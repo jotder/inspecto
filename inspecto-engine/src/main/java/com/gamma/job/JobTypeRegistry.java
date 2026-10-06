@@ -141,6 +141,12 @@ final class JobTypeRegistry {
         return Optional.ofNullable(p).map(JobTypeProvider::descriptor);
     }
 
+    /** A type's Run deadline default ({@link JobTypeProvider#deadline()}); {@link JobDeadline#DEFAULT} if unknown. */
+    java.time.Duration deadline(String id) {
+        JobTypeProvider p = providers.get(id == null ? "" : id.toLowerCase(Locale.ROOT));
+        return p == null ? JobDeadline.DEFAULT : p.deadline();
+    }
+
     /** The parameters a type requires for one authored config (R3) — config-aware where the provider
      *  overrides {@link JobTypeProvider#parameters(JobConfig)}; empty for an unknown id. */
     List<ParameterDecl> parameters(String id, JobConfig config) {

@@ -307,7 +307,7 @@ kind-less step is refused) and stays out of `ProcessorCatalog` (D-6). ⚠ It als
 contributed step could not be saved at all before. S3-1, S3-2 and S3-3 (pack-contributed services and `DatasetAccess`, §7d/§7e) shipped 2026-10-04. The design is
 archived (2026-10-04, [`platform-services-stage2-design.md`](../../../archived-documents/plans-archive/platform-services-stage2-design.md)); this concept is the
 as-built owner. The open items live in [`BACKLOG.md`](../../../BACKLOG.md) §3.2 *Platform Services Stage 2 / 3*;
-none is decision-free. A Job-side watchdog is still a recorded gap (R1); the Step watchdog is §7c.
+none is decision-free. The Job-side deadline (R1) shipped 2026-10-06 (§7f); the Step watchdog is §7c.
 
 **Decision register (operator; D-1..D-9 2026-09-28, D-10..D-12 2026-10-04):** D-1 evolve the live
 `PipelineNodeType` seam (Option B), no parallel registry · D-2 a pack carrying a raw-`Connection` executor is
@@ -316,13 +316,13 @@ rejected · D-3 no bridge-ratio threshold, measure and publish · D-4 Arrow brid
 D-7 Step watchdog 5 min default, 30 min ceiling, an abandoned thread disables the kind · D-8 S2-0 shipped
 alone · D-9 cross-pack service dependencies resolved by a retry pass, no manifest vocabulary · D-10
 `DatasetAccess` inherits `ConsignmentSelector` per-call pinning · D-11 S2-4 a no-op · D-12 contributed service
-interfaces are engine-published `@PublicApi` only (a shared pack-API loader is a later design only).
+interfaces are engine-published `@PublicApi` only (a shared pack-API loader is a later design only) · D-13 Job
+deadline 30 min default, 24 h ceiling, long built-in types default to the ceiling (operator, 2026-10-06; §7f).
 
 ⚠ **Known limit (operator, 2026-10-06):** `DatasetAccess` pins per call (D-10), so two reads in one Run may see
 different file lists; a per-Run held snapshot handle is built ON DEMAND only.
 
-**Deliberately deferred (each needs a design or an operator call, not just code):** a Job-side watchdog (R1, being
-built by another lane); a write side and a
+**Deliberately deferred (each needs a design or an operator call, not just code):** a write side and a
 Subject-level capability check for `DatasetAccess` (needs a Run Subject); filtered `services()` on
 `ProcessorContext` (D4) and a devkit jar (D5), on demand; fan-in for contributed Steps; user-instantiated
 configured resources (the Connection component's). ⛔ Third-party `LOWERED` stays closed until a SQL-fragment
@@ -364,3 +364,25 @@ guard exists.
 Related: [Job vs Pipeline Step](job-vs-step.md) · [Jobs & Scheduling](jobs.md) ·
 [Signal backbone](signal-backbone.md) · [API stability policy](api-stability.md) ·
 [`PROJECT_NOTES.md`](../../../PROJECT_NOTES.md) §5
+
+### 7f. Job Run deadline (R1, as built 2026-10-06)
+
+- **D-13 (operator, 2026-10-06), mirroring D-7:** every Job Run has a deadline. The default is 30 min
+  (`JobDeadline.DEFAULT`); a Job Type overrides it with `JobTypeProvider.deadline()`; a definition overrides
+  both with the framework key `deadline_seconds:` (decimals allowed, excused from the undeclared-parameter
+  warning); `-Djob.deadlineCeilingSeconds` (default 86400 = 24 h) caps all of them. 24 h is the ceiling because
+  backup, compaction, bulk reprocessing and export Jobs legitimately run for hours, where a Step is bounded at 30 min.
+- **Long built-in types default to the ceiling** so nothing that works today breaks: `pipeline`, `enrich`,
+  `maintenance`, `recon.run`, `consignment.process`, `objectstore.export`, `publish.postgres`, `la.index.build`.
+  Every other type gets 30 min. The existing per-Job timeouts still fire first: `la.index.build`'s
+  `timeout_seconds` (default 3600) and `publish.postgres`'s per-statement `timeout_seconds` (1..3600).
+- **On expiry** `JobService.executeRun` interrupts the Run's own thread and records the Run `FAILED` with a
+  `deadline exceeded: …` message, a `job.run.failed` CRITICAL Signal and the run-log error. A body that swallows
+  the interrupt and returns success is still `FAILED`. A malformed `deadline_seconds:` is refused by
+  `JobConfig.fromMap`, and a config that bypasses it is `REJECTED` before its body starts.
+- ⚠ **Honest limit:** the body runs on the Run's own thread, so its MDC, pinned Safety Policy and commit fence
+  stay in scope. A body that ignores interrupts (a pure-Java loop, a blocking native call) is not killed; the Run
+  stays `RUNNING` until it returns and is then recorded `FAILED`. There is no abandon-and-disable step as in D-7.
+- Tests: `JobDeadlineTest` (hung ⇒ FAILED + interrupted, swallowed interrupt ⇒ still FAILED, in-time ⇒
+  untouched, definition override shortens and lengthens, ceiling caps override and type default, malformed ⇒
+  refused / REJECTED, built-in defaults vs the existing timeouts). Mutation-checked red.

@@ -24,6 +24,11 @@ public interface JobTypeProvider {
      */
     default List<ParameterDecl> parameters(JobConfig config) { return descriptor().parameters(); }
 
+    /** The Run deadline for this type (platform-services R1, operator 2026-10-06): {@link JobDeadline#DEFAULT}
+     *  (30 min), or the 24 h ceiling for the built-in long-running types. A pack overrides it; a definition's
+     *  {@code deadline_seconds:} overrides both, and {@code -Djob.deadlineCeilingSeconds} caps all of them. */
+    default java.time.Duration deadline() { return JobDeadline.builtinDefault(id()); }
+
     /** The registry key — the descriptor's id. */
     default String id() { return descriptor().id(); }
 
