@@ -5,27 +5,18 @@ import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The {@link ConnectionSource} seam — scale-out phase A's connection pool ({@code OPS-03}).
  *
  * <p>⚠ <b>These run OFFLINE against the bundled DuckDB driver, deliberately.</b> The pool's own
- * behaviour — sizing, saturation, reentrancy — is a property of the pool, not of PostgreSQL, and
- * {@link PooledConnectionSource} is package-private so this test can drive it directly with any JDBC URL.
+ * behaviour — sizing, saturation, reentrancy — is a property of the pool, not of PostgreSQL; the pool itself
+ * ({@link SharedPoolConnectionSource}) is driven directly by {@code SharedPoolConnectionSourceTest}.
  * The alternative was a test gated on {@code INSPECTO_TEST_PG_URL} that SKIPS on every machine without a
  * live server, and this repo has already had a skipping test hide a broken classpath for months. The
  * Postgres-specific store behaviour stays covered by {@code PostgresStateStoreTest}.
@@ -87,120 +78,7 @@ class ConnectionSourceTest {
         assertEquals(10, JdbcDrivers.poolSize(), "an unparseable value falls back to the default");
     }
 
-    // ── the pool itself ────────────────────────────────────────────────────────────────────────
-
-    @Test
-    void concurrentBorrowsGetDifferentConnectionsUpToThePoolSize() throws Exception {
-        PooledConnectionSource pool = new PooledConnectionSource(MEM, null, null, 2, "test-distinct");
-        src = pool;
-        assertEquals(2, pool.maximumPoolSize());
-
-        CountDownLatch bothIn = new CountDownLatch(2);
-        AtomicReference<Connection> first = new AtomicReference<>();
-        AtomicReference<Connection> second = new AtomicReference<>();
-
-        ExecutorService pool2 = Executors.newFixedThreadPool(2);
-        try {
-            Future<?> f1 = pool2.submit(() -> hold(pool, first, bothIn));
-            Future<?> f2 = pool2.submit(() -> hold(pool, second, bothIn));
-            f1.get(10, TimeUnit.SECONDS);
-            f2.get(10, TimeUnit.SECONDS);
-        } finally {
-            pool2.shutdownNow();
-        }
-
-        assertNotSame(first.get(), second.get(),
-                "two threads inside the pool at the same time must hold DIFFERENT connections — that "
-                        + "is the whole point of pooling over the old one-connection-per-store shape");
-    }
-
-    /** Borrow, announce arrival, and wait until BOTH threads are inside before releasing. */
-    private static void hold(ConnectionSource src, AtomicReference<Connection> seen, CountDownLatch bothIn) {
-        try {
-            src.run(conn -> {
-                seen.set(conn);
-                bothIn.countDown();
-                try {
-                    if (!bothIn.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("peer never arrived");
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            });
-        } catch (SQLException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    @Test
-    void aSaturatedPoolFailsTheBorrowRatherThanHangingForever() throws Exception {
-        // Phase A's owed verify gate. A pool with no free connection must surface a timeout; a borrow
-        // that blocks indefinitely turns one slow query into a wedged pod that no health check explains.
-        System.setProperty(JdbcDrivers.POOL_TIMEOUT_PROPERTY, "500");
-        PooledConnectionSource pool = new PooledConnectionSource(MEM, null, null, 1, "test-saturate");
-        src = pool;
-
-        CountDownLatch holding = new CountDownLatch(1);
-        CountDownLatch release = new CountDownLatch(1);
-        ExecutorService worker = Executors.newSingleThreadExecutor();
-        try {
-            worker.submit(() -> {
-                try {
-                    pool.run(conn -> {
-                        holding.countDown();
-                        try {
-                            release.await(10, TimeUnit.SECONDS);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
-                    });
-                } catch (SQLException e) {
-                    throw new IllegalStateException(e);
-                }
-            });
-            assertTrue(holding.await(10, TimeUnit.SECONDS), "the holder never got its connection");
-
-            long t0 = System.nanoTime();
-            assertThrows(SQLException.class, () -> pool.with(c -> c),
-                    "the only connection is held, so this borrow must FAIL on the configured timeout");
-            long waitedMs = (System.nanoTime() - t0) / 1_000_000;
-            assertTrue(waitedMs < 8_000,
-                    "it must fail on the timeout, not hang: waited " + waitedMs + "ms");
-        } finally {
-            release.countDown();
-            worker.shutdownNow();
-            assertTrue(worker.awaitTermination(10, TimeUnit.SECONDS), "worker did not stop");
-        }
-
-        // ...and the pool is usable again once the holder gives its connection back.
-        boolean reusable = pool.with(c -> {
-            try (Statement st = c.createStatement()) {
-                st.execute("SELECT 1");
-            }
-            return Boolean.TRUE;
-        });
-        assertTrue(reusable, "a released connection must return to the pool");
-    }
-
-    // ── reentrancy: the rule that keeps one operation on one connection ────────────────────────
-
-    @Test
-    void aNestedBorrowReusesTheConnectionInsteadOfTakingASecond() throws Exception {
-        // 🔴 The store methods this seam replaced were reentrant `synchronized` methods, so one store
-        // operation can call another. With a pool of 1, taking a second connection for the nested call
-        // deadlocks the thread against itself — it would wait for a connection only it can return.
-        PooledConnectionSource pool = new PooledConnectionSource(MEM, null, null, 1, "test-nested");
-        src = pool;
-
-        Connection[] seen = new Connection[2];
-        pool.run(outer -> {
-            seen[0] = outer;
-            pool.run(inner -> seen[1] = inner);
-        });
-
-        assertSame(seen[0], seen[1],
-                "a nested borrow must reuse the connection the thread already holds — one logical "
-                        + "operation is one connection");
-    }
+    // ── reentrancy (the pooled source's reentrancy, timeout and close are in SharedPoolConnectionSourceTest) ──
 
     @Test
     void theSingleSourceIsReentrantToo() throws Exception {

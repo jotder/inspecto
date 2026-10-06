@@ -66,6 +66,34 @@ class SharedPoolConnectionSourceTest {
     }
 
     @Test
+    void concurrentBorrowsGetDifferentConnectionsUpToTheFamilyCap() throws Exception {
+        SharedPoolConnectionSource v = view("jdbc:duckdb:", "distinct", 2);
+        CountDownLatch bothIn = new CountDownLatch(2);
+        java.sql.Connection[] seen = new java.sql.Connection[2];
+        ExecutorService two = Executors.newFixedThreadPool(2);
+        try {
+            for (int i = 0; i < 2; i++) {
+                int slot = i;
+                two.submit(() -> {
+                    v.run(c -> {
+                        seen[slot] = c;
+                        bothIn.countDown();
+                        try { bothIn.await(10, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                    });
+                    return null;
+                });
+            }
+            two.shutdown();
+            assertTrue(two.awaitTermination(10, TimeUnit.SECONDS));
+            assertNotNull(seen[0]);
+            assertNotSame(seen[0], seen[1], "two threads inside the pool at once must hold DIFFERENT connections");
+        } finally {
+            two.shutdownNow();
+            v.close();
+        }
+    }
+
+    @Test
     void aNestedBorrowReusesTheConnection_soAFamilyCapOfOneCannotSelfDeadlock() throws Exception {
         SharedPoolConnectionSource v = view("jdbc:duckdb:", "nested", 1);
         try {

@@ -1134,8 +1134,8 @@ is **refused**, and `withSchema` refuses a non-PostgreSQL URL.
   families and the stores fail with "no schema has been selected".
 - 🔴 **Defect found and fixed — pool footprint.** Hikari's `minimumIdle` defaults to `maximumPoolSize`, so every open
   store pinned 10 server connections while idle; there is one pool per family per Space, so a few Spaces exhaust
-  PostgreSQL's default `max_connections=100` ("too many clients already" at 20 pools). `PooledConnectionSource` now
-  sets `minimumIdle=1` (grows to `-Ddb.pool.size` on demand). DuckDB is unaffected (not pooled).
+  PostgreSQL's default `max_connections=100` ("too many clients already" at 20 pools). the per-store pool (since deleted) then
+  set `minimumIdle=1` (grows to `-Ddb.pool.size` on demand). DuckDB is unaffected (not pooled).
   ⚠ Still open: even at 1 idle, N Spaces × ~15 families × 1 is a connection budget operators must size; a shared
   pool per server (or PgBouncer) is the real answer at scale.
   **Decided (operator, 2026-10-06):** the connection budget is ONE shared pool per process with a per-family cap;
@@ -1156,7 +1156,8 @@ is **refused**, and `withSchema` refuses a non-PostgreSQL URL.
   ⚠ Outside the budget by design: each `DbEventStore` on PostgreSQL holds one dedicated, never-pooled advisory-lock
   connection (the chain writer) — N event stores = N extra connections. ⚠ A nested borrow from a DIFFERENT store
   of the same family on one thread takes a second permit; with a family cap of 1 it fails on the timeout rather
-  than deadlocking. `PooledConnectionSource` is no longer selected by `JdbcDrivers` (kept for its offline tests).
+  than deadlocking. The old per-store `PooledConnectionSource` was deleted (2026-10-06); its offline
+  pool tests moved to `SharedPoolConnectionSourceTest`.
 
 ### 5.1 Flags (all read in `ServiceStores` unless noted)
 
