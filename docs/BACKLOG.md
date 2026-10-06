@@ -441,7 +441,7 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 
 #### Module architecture
 
-- **P2** · `MODULE-REORG-1` — **reorganise the ~40 Maven modules for itemized distribution; plan complete, all decisions taken (D-MR1…D-MR12, operator 2026-10-06), nothing built.** Three axes per module (build role, offering role, binding time), Offerings composed of a tier + domain-neutral add-ons + function packs + industry packs, the Installed / Enabled per Space / Permitted gates, a TOON manifest per module with an activator, thin per-module jars, removal semantics, a platform test kit and TCKs, one Decision Kernel for the nine rule kinds. Next: the Decision Kernel spike, then P0 (glossary terms + report-only baseline guards). → `superpower/module-architecture-reorg-plan.md`
+- **P2** · `MODULE-REORG-1` — **reorganise the ~40 Maven modules for itemized distribution; plan complete, all decisions taken (D-MR1…D-MR12, operator 2026-10-06), nothing built.** Three axes per module (build role, offering role, binding time), Offerings composed of a tier + domain-neutral add-ons + function packs + industry packs, the Installed / Enabled per Space / Permitted gates, a TOON manifest per module with an activator, thin per-module jars, removal semantics, a platform test kit and TCKs, one Decision Kernel for the nine rule kinds. **P0 shipped; P1 half done** (governable kinds + `features{}`/SPA nav now contribution points; open: `OperationalDb.Family`, OpenAPI fragments, stubs → P2, capabilities → P2). → `superpower/module-architecture-reorg-plan.md`
 
 #### Release & CI
 

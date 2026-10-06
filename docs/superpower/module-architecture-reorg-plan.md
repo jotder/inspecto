@@ -1,7 +1,7 @@
 # Module architecture reorganisation — plan (2026-10-06, revised the same day)
 
 > 🟢 **PLAN — analysis only, nothing built; ALL decisions D-MR1…D-MR12 taken (operator, 2026-10-06, §8).**
-> Next: the Decision Kernel spike (§8b) and P0.
+> **Progress 2026-10-06:** P0 ✅ shipped; P1 partly (governable kinds ✅, `features{}` + SPA nav gating ✅ — see §6 *P1 decision log*). Still open in P1: `OperationalDb.Family` contribution (survey done: `StoreFamily` interface + `StoreFamilyProvider`, update `check-family-count.mjs` and the 15-count tests to core+loaded), contributed OpenAPI fragments, 503 stubs (needs P2 manifests). RBAC capabilities deferred to P2 (P1-D3). Then P2.
 > Row to file on approval: `MODULE-REORG-1` (not yet in `BACKLOG.md`).
 > Inputs: *Enterprise-Grade Modular Architecture Guidelines* (PDF, 4 pages) and the "System Architecture
 > Topology" mock-up (four layers + a per-module inspector). Operator brief: long-term benefit across
