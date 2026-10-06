@@ -92,18 +92,20 @@ one-element shorthand; `PipelineConfig.sinks()` is never empty (it synthesises t
   unreachable since this change, and an unreachable refusal code reads as a live one.
 * **Refusals (deliberate, at load/runtime).** A **versioned reference store** (`reference.load:
   upsert|scd2`) + `sinks>1` is refused at `PipelineConfig.prepare()` (single version history is
-  ill-defined across destinations) - **permanent (operator, 2026-10-06)**, matching the `route:` refusal. **Decision-rule *routing* + `sinks>1`** is refused at runtime in
-  `writeAndTrace` (routed outputs are single-destination). Multi-sink commit is **not** cross-branch
-  transactional (B9 stands) — a clone may have some destinations committed and others retrying.
-  ⚠ **Neither is a one-line lift (re-grounded 2026-09-24).** Routing: `DecisionRuleApplier.RouteSink`
-  writes a routed rule's rows ONCE, to `Paths.get(dbDir, dest)` — `dbDir` is the PRIMARY destination —
-  and DELETEs them from the relation before the fan-out. Dropping the refusal would silently land routed
-  rows under the first destination only, so it needs a decision first: **replicate** routed rows under
-  every `sinks[].database` (the fan-out's own rule for the remainder) or **primary only**; the refusal
-  sites are `flatWriteAndTrace` and `graphWriteAndTrace` (both lanes). Versioned reference: the stamp
-  reads ONE prior version store (`existingStoreReader(dbDir, …)`) to skip unchanged rows, so N
-  destinations are N version histories that the enrichment views would each read as the truth — the same
-  "one history is ill-defined across branches" rule `graphWriteAndTrace` holds permanently for `route:`.
+  ill-defined across destinations) - **permanent (operator, 2026-10-06)**: the stamp reads ONE prior version store (`existingStoreReader(dbDir, …)`)
+  to skip unchanged rows, so N destinations would be N version histories that the enrichment views would
+  each read as the truth — the same "one history is ill-defined across branches" rule `graphWriteAndTrace`
+  holds permanently for `route:`. Multi-sink commit is **not** cross-branch transactional (B9 stands) — a
+  clone may have some destinations committed and others retrying.
+* **Decision-rule *routing* + `sinks>1` is CARRIED (operator, 2026-10-06).** The routed rows are
+  **replicated** under every `sinks[].database` — the fan-out's own rule for the remainder: the pipeline
+  `RouteSink` in `DecisionRuleApplier.apply(…, PipelineConfig, …)` re-roots `dbDir`'s suffix beyond
+  `dirs.database` under each destination, writes `<dest db>/<rel>/<route destination>` in that
+  destination's `format`/`compression`, and returns one output + lineage set per destination. The rules
+  still run ONCE, above the lane fork; the old refusals in `flatWriteAndTrace`, `graphWriteAndTrace`
+  and `flatReason` are gone, so both lanes carry it. A single destination is byte-for-byte the legacy
+  write under `dbDir`. Routed copies do not apply `filename_column` (the routed write never did).
+  Pinned by `DecisionRuleWiringTest.routeWithTwoSinksReplicatesRoutedRowsOnThe{Flat,Graph}Lane`.
 
 ⚠ **Toon authoring:** in the indexed-tuple form `sinks[N]{database,format}:`, a `database` path
 (contains `:` and `/`) **must be quoted** — `"/data/hot",PARQUET` — or the tabular decoder reads 0 rows.

@@ -181,6 +181,62 @@ class DecisionRuleWiringTest {
         }
     }
 
+    // ── route + sinks>1: routed rows REPLICATE to every destination (operator, 2026-10-06) ──────
+
+    /** The {@link #config} pipeline with two parquet destinations, hot and cold. */
+    private PipelineConfig twoSinkConfig(Path dir) throws Exception {
+        Path toon = TestConfigs.csv(dir.resolve("cfg"), PipelineConfigBatchTest.miniSchema())
+                .format("PARQUET").write();
+        String d = dir.toString().replace('\\', '/');
+        Files.writeString(toon, Files.readString(toon).replace("processing:",
+                "sinks[2]{database,format}:\n  \"" + d + "/hot\",PARQUET\n  \"" + d + "/cold\",PARQUET\nprocessing:"));
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        assertEquals(2, cfg.sinks().size());
+        return cfg;
+    }
+
+    private void routedRowsLandInEveryDestination(Path dir, String lane) throws Exception {
+        PipelineConfig cfg = twoSinkConfig(dir);
+        writeRule(dir, "route_cheap", Map.of(
+                "name", "route_cheap", "targetType", "pipeline", "target", "TEST_ETL",
+                "when", when("cost", "<", "100"), "priority", 10, "enabled", true,
+                "consequences", List.of(Map.of("action", "route", "destination", "review"))));
+        File db = DuckDbUtil.tempDbFile("drw_route_fan_");
+        String prior = System.getProperty(ConsignmentIngestStrategy.LANE_PROPERTY);
+        System.setProperty(ConsignmentIngestStrategy.LANE_PROPERTY, lane);
+        try (Connection conn = openWithTable(db)) {
+            var written = run(conn, cfg);
+            for (String sink : List.of("hot", "cold")) {
+                Path root = dir.resolve(sink);
+                assertEquals(3, countParquet(conn, root + "/year*/**/*.parquet"),
+                        lane + ": the remainder fans out to " + sink);
+                assertEquals(1, countParquet(conn, root + "/review/**/*.parquet"),
+                        lane + ": bob is replicated under " + sink + "/review");
+                assertEquals(1, written.outputs().stream()
+                                .filter(o -> o.outputFile().replace('\\', '/').contains("/" + sink + "/review/"))
+                                .count(), lane + ": one routed output per destination: " + written.outputs());
+                assertTrue(written.lineage().stream()
+                                .anyMatch(l -> l.outputFile().replace('\\', '/').contains("/" + sink + "/review/")
+                                        && l.inputFile().equals("f.csv") && l.rowCount() == 1),
+                        lane + ": routed lineage names the " + sink + " copy: " + written.lineage());
+            }
+        } finally {
+            if (prior == null) System.clearProperty(ConsignmentIngestStrategy.LANE_PROPERTY);
+            else System.setProperty(ConsignmentIngestStrategy.LANE_PROPERTY, prior);
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    @Test
+    void routeWithTwoSinksReplicatesRoutedRowsOnTheFlatLane(@TempDir Path dir) throws Exception {
+        routedRowsLandInEveryDestination(dir, "flat");
+    }
+
+    @Test
+    void routeWithTwoSinksReplicatesRoutedRowsOnTheGraphLane(@TempDir Path dir) throws Exception {
+        routedRowsLandInEveryDestination(dir, "graph");
+    }
+
     @Test
     void disabledOrOtherPipelineRulesAreIgnored(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = config(dir);

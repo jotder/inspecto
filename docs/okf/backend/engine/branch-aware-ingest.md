@@ -61,7 +61,7 @@ scratch dir**.
 in `ConsignmentIngestStrategy.admittedLift` (the fork's decision, extracted pure so it is testable).
 `auto` (default) is the admission above. `graph` **disables the legacy flat lane**: a write the graph lane
 cannot carry fails the batch with an `IllegalStateException` naming the pipeline and the reason
-(`flatReason` — no scratch dir, a Decision Rule routed rows, a node between map and the write, …) rather
+(`flatReason` — no scratch dir, a node between map and the write, …) rather
 than quietly diverting flat. That is what the "one verification minor" runs with: every remaining
 dependency on the flat lane surfaces as a refusal. `flat` is the kill switch (never divert). Any other
 value is refused. Pinned by `IngestLaneFlagTest`. ⚠ The deletion of the flat readers stays release-gated
@@ -114,7 +114,8 @@ Each rule refuses BY NAME a shape that would drop rows silently:
 | multi-schema (selector/segments): every branch `where:` must bind in EVERY schema's mapped row | one shared `route:` block applies to every schema (2026-09-24); a predicate on a column only some schemas map would fail mid-run on the others, after the earlier schemas' branches committed — see *Multi-schema route* below |
 
 Runtime refusals in `graphWriteAndTrace`: decision-rule routing + route branches; a versioned
-reference store per branch.
+reference store per branch. Decision-rule routing + `sinks>1` (no `route:`) is carried in both lanes since
+2026-10-06 — the routed rows are replicated to every destination (`output-sinks.md` § *Refusals*).
 
 ## Deliberately not built (residuals — BACKLOG §6)
 

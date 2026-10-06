@@ -133,8 +133,9 @@ interface ConsignmentIngestStrategy {
      * that destination's own {@code database} root (the {@code dbDir} suffix beyond {@code dirs.database},
      * e.g. the {@code table} subdir, is preserved) and its own {@code format}/{@code compression}. A single
      * destination (the {@code output:} shorthand) is byte-for-byte the legacy single write. The Decision
-     * Rules run <em>once</em> (they have side effects — routed writes + quarantine — that must not repeat),
-     * so decision-rule routing combined with multiple destinations is refused here; a versioned reference
+     * Rules run <em>once</em> (they have side effects — routed writes + quarantine — that must not repeat);
+     * a rule's routed rows are REPLICATED under every destination by {@code DecisionRuleApplier}'s
+     * pipeline sink (operator, 2026-10-06), matching the remainder's fan-out; a versioned reference
      * store combined with multiple destinations is refused earlier, at {@link PipelineConfig#prepare()}.
      * The batch's source finalisation (backup/markers/ledger) runs once over the union of every
      * destination's outputs — those side effects are per-source-file, not per-destination.
@@ -265,9 +266,6 @@ interface ConsignmentIngestStrategy {
     /** As above, scoped to the segment {@code segKey} when this call writes one segment of a batch. */
     static String flatReason(PipelineConfig cfg, DecisionRuleApplier.Result applied, String segKey) {
         if (cfg.routeConfig() != null) return "the authored route does not engage the graph lane";
-        if (!applied.outputs().isEmpty() && cfg.sinks().size() > 1)
-            return "a Decision Rule routed rows and this pipeline declares " + cfg.sinks().size()
-                    + " destinations - routing writes to a single destination (the flat lane refuses this too)";
         if (scratchDir(cfg) == null) return "no scratch dir (dirs.temp / duckdb.temp_directory) for the branch-commit ledger";
         com.gamma.pipeline.PipelineGraph lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
         List<com.gamma.pipeline.PipelineNode> sinks = writeSinks(lifted, segKey);
@@ -302,10 +300,6 @@ interface ConsignmentIngestStrategy {
                                      DecisionRuleApplier.Result applied) throws Exception {
         List<PipelineConfig.Sink> sinks = cfg.sinks();
         boolean fanOut = sinks.size() > 1;
-
-        if (fanOut && !applied.outputs().isEmpty())
-            throw new IllegalStateException("decision-rule routing writes to a single destination; combining "
-                    + "it with a multi-destination sinks: pipeline is not yet supported");
 
         // Reference Phase-2 P1/P2: a `produces: reference` pipeline with `load: upsert|scd2` writes an
         // append-only versioned store — each batch stamps system columns (__key_hash/__row_hash/
@@ -382,7 +376,7 @@ interface ConsignmentIngestStrategy {
      *
      * <p>Refusals mirror the flat path's: decision-rule routing combined with route branches would
      * run rule side effects against rows a branch may then re-route — refused by name, exactly as
-     * the flat path refuses rule-routing + fan-out.
+     * the flat path refuses it. Rule-routing + {@code sinks>1} is carried in both lanes (2026-10-06).
      */
     private static Written graphWriteAndTrace(Connection conn, String table, List<String> partCols,
                                               PipelineConfig cfg, String dbDir, String baseName,
@@ -395,14 +389,12 @@ interface ConsignmentIngestStrategy {
         // routed outputs only have to be merged into this method's Written (the flat path does the same, by
         // seeding its list with applied.outputs()). Quarantine and drop rules - which remove rows and produce
         // no outputs - have always run here for exactly that reason. What stays refused is the pair the flat
-        // path also refuses, by the same words: routing combined with a write that has somewhere else to go.
+        // path also refuses, by the same words: routing combined with route: BRANCHES. Routing + sinks>1 is carried
+        // (operator, 2026-10-06): the applier already replicated the routed rows under every sinks[].database.
         if (!applied.outputs().isEmpty()) {
             if (cfg.routeConfig() != null)
                 throw new IllegalStateException("decision-rule routing writes to a single destination; combining "
                         + "it with a route: pipeline's branches is not supported");
-            if (cfg.sinks().size() > 1)
-                throw new IllegalStateException("decision-rule routing writes to a single destination; combining "
-                        + "it with a multi-destination sinks: pipeline is not yet supported");
         }
         // Reference Phase-2 P1/P2, carried here in slice C2. Combining it with route BRANCHES stays
         // refused — one version history across branches is ill-defined (the same rule as sinks:>1 at

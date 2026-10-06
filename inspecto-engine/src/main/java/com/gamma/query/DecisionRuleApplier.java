@@ -135,11 +135,27 @@ public final class DecisionRuleApplier {
                                String batchId, Map<Integer, String> srcIdToFile) {
         return apply(conn, table, Subject.pipeline(cfg, batchId), cfg.dirs().quarantine(), baseName,
                 (c, routedTable, dest) -> {
-                    List<PartitionOutput> routedOut = PartitionWriter.write(c, routedTable,
-                            Paths.get(dbDir, dest).toString(),
-                            cfg.output().format(), cfg.output().compression(), baseName, partCols);
-                    return new Result(routedOut, LineageCollector.collect(
-                            c, routedTable, batchId, srcIdToFile, routedOut, partCols));
+                    // One destination: the legacy single write under dbDir. sinks>1 REPLICATES the routed
+                    // rows under every sinks[].database, re-rooting dbDir's suffix beyond dirs.database
+                    // exactly as the remainder's fan-out does (operator, 2026-10-06).
+                    if (cfg.sinks().size() <= 1) {
+                        List<PartitionOutput> routedOut = PartitionWriter.write(c, routedTable,
+                                Paths.get(dbDir, dest).toString(),
+                                cfg.output().format(), cfg.output().compression(), baseName, partCols);
+                        return new Result(routedOut, LineageCollector.collect(
+                                c, routedTable, batchId, srcIdToFile, routedOut, partCols));
+                    }
+                    Path rel = Paths.get(cfg.dirs().database()).relativize(Paths.get(dbDir));
+                    List<PartitionOutput> outs = new ArrayList<>();
+                    List<LineageRow> lin = new ArrayList<>();
+                    for (PipelineConfig.Sink s : cfg.sinks()) {
+                        List<PartitionOutput> o = PartitionWriter.write(c, routedTable,
+                                Paths.get(s.database()).resolve(rel).resolve(dest).toString(),
+                                s.format(), s.compression(), baseName, partCols);
+                        outs.addAll(o);
+                        lin.addAll(LineageCollector.collect(c, routedTable, batchId, srcIdToFile, o, partCols));
+                    }
+                    return new Result(List.copyOf(outs), List.copyOf(lin));
                 });
     }
 
