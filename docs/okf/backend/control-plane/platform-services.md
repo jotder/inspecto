@@ -318,8 +318,11 @@ alone · D-9 cross-pack service dependencies resolved by a retry pass, no manife
 `DatasetAccess` inherits `ConsignmentSelector` per-call pinning · D-11 S2-4 a no-op · D-12 contributed service
 interfaces are engine-published `@PublicApi` only (a shared pack-API loader is a later design only).
 
-**Deliberately deferred (each needs a design or an operator call, not just code):** a held snapshot handle for
-`DatasetAccess` (two reads in one Run may see different file lists); a Job-side watchdog (R1); a write side and a
+⚠ **Known limit (operator, 2026-10-06):** `DatasetAccess` pins per call (D-10), so two reads in one Run may see
+different file lists; a per-Run held snapshot handle is built ON DEMAND only.
+
+**Deliberately deferred (each needs a design or an operator call, not just code):** a Job-side watchdog (R1, being
+built by another lane); a write side and a
 Subject-level capability check for `DatasetAccess` (needs a Run Subject); filtered `services()` on
 `ProcessorContext` (D4) and a devkit jar (D5), on demand; fan-in for contributed Steps; user-instantiated
 configured resources (the Connection component's). ⛔ Third-party `LOWERED` stays closed until a SQL-fragment

@@ -92,7 +92,7 @@ one-element shorthand; `PipelineConfig.sinks()` is never empty (it synthesises t
   unreachable since this change, and an unreachable refusal code reads as a live one.
 * **Refusals (deliberate, at load/runtime).** A **versioned reference store** (`reference.load:
   upsert|scd2`) + `sinks>1` is refused at `PipelineConfig.prepare()` (single version history is
-  ill-defined across destinations). **Decision-rule *routing* + `sinks>1`** is refused at runtime in
+  ill-defined across destinations) - **permanent (operator, 2026-10-06)**, matching the `route:` refusal. **Decision-rule *routing* + `sinks>1`** is refused at runtime in
   `writeAndTrace` (routed outputs are single-destination). Multi-sink commit is **not** cross-branch
   transactional (B9 stands) — a clone may have some destinations committed and others retrying.
   ⚠ **Neither is a one-line lift (re-grounded 2026-09-24).** Routing: `DecisionRuleApplier.RouteSink`

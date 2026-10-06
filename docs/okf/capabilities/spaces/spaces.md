@@ -485,6 +485,10 @@ check that refuses a numeric-form IP); a refusal is 422 `template connection '<f
 
 #### 3.5.1 The `payment-fraud` content pack — slice 1 (`ASSURE-PACK-PAYMENT-FRAUD-1`, 2026-09-30)
 
+> **Closed as BUILT (operator, 2026-10-06).** Further typologies and customer sign-offs come on customer request.
+> Known gap, filed as P3 `TEMPLATE-RISK-SCORE-ALERT-RULE-1`: a template cannot ship an Alert Rule over its own Risk
+> Score output — the seed gate needs the output store's Schema, and seeding it would forge the ownership marker.
+
 Wave 5.3 of `superpower/assurance-capability-plan.md`, generic half. `spaces/_templates/payment-fraud/` ships
 config and a synthetic corpus; it uses the opt-in `processing.refusal` mode of the ingest engine. There is no new
 Step Processor and no new route.

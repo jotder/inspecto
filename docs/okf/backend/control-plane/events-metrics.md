@@ -357,6 +357,12 @@ timestamp: 2026-07-16T00:00:00Z
     defaults (linear per page); no offline checker tool ships (the JSON `/audit/export` carries every hashed field);
     per decision D-P8, classification-driven masking of audit rows and read auditing beyond what exists stay
     out of scope.
+  - **Accepted limits (operator, 2026-10-06; `ASSURE-AUDIT-CHAIN-RESIDUALS-1` (5), (7)).** (5) The lock-race fork
+    window is a stated limit, not prevented: a writer with unflushed linked rows when its lock is deleted can
+    collide with a second writer, and `GET /audit/verify` detects it afterwards as a `duplicate`. (7) A local
+    administrator who can read the Space key can rewrite the store and re-sign every anchor - the stated limit of
+    on-box evidence, accepted for now; off-box anchoring (`audit_anchor_export` to an external Sink) is built when
+    a customer asks.
 * **Email/SMTP channel wired to `deliver(n, target)`** (2026-07-20) — `SmtpEmailChannel`
   (`inspecto-notify-channels/src/main/java/com/gamma/notify/channel/SmtpEmailChannel.java`, id `email`,
   ⚠ **relocated from `inspecto-connectors` 2026-09-07, EDG-01 cell 1** — CP-15 is not for Personal and that sidecar ships in every edition,

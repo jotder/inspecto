@@ -1138,6 +1138,8 @@ is **refused**, and `withSchema` refuses a non-PostgreSQL URL.
   sets `minimumIdle=1` (grows to `-Ddb.pool.size` on demand). DuckDB is unaffected (not pooled).
   ⚠ Still open: even at 1 idle, N Spaces × ~15 families × 1 is a connection budget operators must size; a shared
   pool per server (or PgBouncer) is the real answer at scale.
+  **Decided (operator, 2026-10-06):** the connection budget is ONE shared pool per process with a per-family cap;
+  the build follows the live PG probe.
 
 ### 5.1 Flags (all read in `ServiceStores` unless noted)
 
