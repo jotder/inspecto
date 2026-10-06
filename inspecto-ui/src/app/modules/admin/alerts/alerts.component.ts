@@ -120,12 +120,8 @@ export class AlertsComponent implements OnInit {
 
     readonly ruleColumnDefs: ColDef<AlertRule>[] = [
         { field: 'name', headerName: 'Rule', flex: 1, minWidth: 160 },
-        { field: 'metric', headerName: 'Metric', flex: 1, minWidth: 140 },
-        {
-            headerName: 'Condition',
-            minWidth: 170,
-            valueGetter: (p) => (p.data ? `${p.data.comparator} ${p.data.threshold} / ${p.data.window}` : ''),
-        },
+        { headerName: 'Metric', flex: 1, minWidth: 140, valueGetter: (p) => (p.data ? ruleMetricText(p.data) : '') },
+        { headerName: 'Condition', minWidth: 170, valueGetter: (p) => (p.data ? ruleConditionText(p.data) : '') },
         {
             field: 'severity',
             headerName: 'Severity',
@@ -304,4 +300,18 @@ export function alertRuleSeed(q: ParamMap): Partial<AlertRule> {
     const t = q.get('threshold');
     if (t != null && t !== '' && isFinite(Number(t))) seed.threshold = Number(t);
     return seed;
+}
+
+/** The Metric cell: a ledger metric, else a Dataset rule's Measure "on" its Dataset (per `by` keys when set). */
+export function ruleMetricText(r: AlertRule): string {
+    if (r.metric) return r.metric;
+    if (!r.measure) return r.dataset ?? '';
+    const by = r.by?.length ? ` by ${r.by.join(', ')}` : '';
+    return r.dataset ? `${r.measure} on ${r.dataset}${by}` : `${r.measure}${by}`;
+}
+
+/** The Condition cell: comparator and threshold, plus ` / window` only when the rule has a window. */
+export function ruleConditionText(r: AlertRule): string {
+    const base = `${r.comparator} ${r.threshold}`;
+    return r.window ? `${base} / ${r.window}` : base;
 }

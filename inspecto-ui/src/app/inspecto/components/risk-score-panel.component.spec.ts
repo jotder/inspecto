@@ -32,7 +32,7 @@ const SCORE: RiskScore = {
     ],
 };
 
-function mount(api: Partial<RiskScoresService>) {
+function mount(api: Partial<RiskScoresService>, explain = false) {
     TestBed.configureTestingModule({
         imports: [RiskScorePanelComponent],
         providers: [{ provide: RiskScoresService, useValue: api }],
@@ -40,6 +40,7 @@ function mount(api: Partial<RiskScoresService>) {
     const fixture = TestBed.createComponent(RiskScorePanelComponent);
     fixture.componentRef.setInput('model', 'subs');
     fixture.componentRef.setInput('entityKey', 'm1');
+    fixture.componentRef.setInput('explainAbsence', explain);
     fixture.detectChanges();
     return fixture;
 }
@@ -72,5 +73,27 @@ describe('RiskScorePanelComponent', () => {
         await fixture.whenStable();
         fixture.detectChanges();
         expect(fixture.nativeElement.querySelector('section')).toBeNull();
+    });
+
+    it('renders nothing on a 404 by default, but explains it under explainAbsence', async () => {
+        const quiet = mount({ latest: () => throwError(() => ({ status: 404 })) });
+        await quiet.whenStable();
+        quiet.detectChanges();
+        expect(quiet.nativeElement.textContent.trim()).toBe('');
+        quiet.componentRef.setInput('explainAbsence', true);
+        quiet.detectChanges();
+        const el = quiet.nativeElement as HTMLElement;
+        expect(el.querySelector('[role="status"]')?.textContent).toContain('No stored score for this entity yet');
+        expect(el.querySelector('inspecto-alert')).toBeNull();
+        await expectNoA11yViolations(el);
+    });
+
+    it('shows an error state for a non-404 failure under explainAbsence', async () => {
+        const fixture = mount({ latest: () => throwError(() => ({ status: 500 })) }, true);
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('inspecto-alert')?.textContent).toContain('Could not load the latest score.');
+        expect(el.textContent).not.toContain('No stored score');
     });
 });

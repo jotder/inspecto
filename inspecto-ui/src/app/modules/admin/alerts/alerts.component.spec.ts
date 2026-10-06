@@ -252,3 +252,23 @@ describe('alertRuleSeed', () => {
         expect(alertRuleSeed(convertToParamMap({ threshold: 'high' }))).toEqual({});
     });
 });
+
+describe('Alert Rules grid text', () => {
+    it('omits the window for a Dataset-measure rule and names its Measure on its Dataset', async () => {
+        const { ruleConditionText, ruleMetricText } = await import('./alerts.component');
+        const r = {
+            name: 'r',
+            comparator: 'gte',
+            threshold: 6,
+            severity: 'high',
+            dataset: 'pf_sim_swap_payments',
+            measure: 'max(risky_payments)',
+            by: ['msisdn'],
+        };
+        expect(ruleConditionText(r)).toBe('gte 6');
+        expect(ruleMetricText(r)).toBe('max(risky_payments) on pf_sim_swap_payments by msisdn');
+        const ledger = { name: 'l', metric: 'rejects', comparator: 'gt', threshold: 5, window: '1h', severity: 'low' };
+        expect(ruleConditionText(ledger)).toBe('gt 5 / 1h');
+        expect(ruleMetricText(ledger)).toBe('rejects');
+    });
+});

@@ -16,7 +16,7 @@ export type RiskScoreChange = { kind: 'saved' | 'held' | 'deleted'; id: string }
 /**
  * Authoring actions of the Risk Scores pane (slice S2), kept out of the page component so the S1 page and the
  * preview lane touch disjoint lines. Without `model` it renders the header's *New Risk Score*; with one, the
- * detail's *Edit*, *Delete* and the prefilled per-entity Alert Rule link (D-RP9: a link, never a second write). Gated on `canAuthorWorkbench` (D-RP4 a) — the server gates the write again.
+ * detail's *Edit*, *Delete* and the prefilled per-entity Alert Rule link (D-RP9: a link, never a second write). Edit/Delete gated on `canAuthorWorkbench` (D-RP4 a), the link on `canAuthorAlertRules` — the server gates the write again.
  */
 @Component({
     selector: 'app-risk-score-actions',
@@ -29,7 +29,11 @@ export type RiskScoreChange = { kind: 'saved' | 'held' | 'deleted'; id: string }
                 <button mat-stroked-button type="button" (click)="edit(id)">Edit</button>
                 <button mat-stroked-button type="button" (click)="remove(id)">Delete</button>
             }
-            <a mat-stroked-button routerLink="/alerts" [queryParams]="alertRuleParams(id)">Add per-entity Alert Rule</a>
+            @if (lens.canAuthorAlertRules()) {
+                <a mat-stroked-button routerLink="/alerts" [queryParams]="alertRuleParams(id)"
+                    >Add per-entity Alert Rule</a
+                >
+            }
         } @else if (lens.canAuthorWorkbench()) {
             <button mat-flat-button color="primary" type="button" (click)="create()">New Risk Score</button>
         }

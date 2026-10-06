@@ -158,7 +158,11 @@
                 }
                 @if (entityKey(); as k) {
                     <div class="mt-3">
-                        <inspecto-risk-score-panel [model]="m.id" [entityKey]="k"></inspecto-risk-score-panel>
+                        <inspecto-risk-score-panel
+                            [model]="m.id"
+                            [entityKey]="k"
+                            [explainAbsence]="true"
+                        ></inspecto-risk-score-panel>
                     </div>
                 }
             } @else if (models().length > 0) {

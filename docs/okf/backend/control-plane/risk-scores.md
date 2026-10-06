@@ -229,7 +229,9 @@ two places:
 - In the Link Analysis toolbox's scoring section, once a model id is entered. Each row's **Factors** button
   uses the node id as the entity key.
 
-A 404 renders nothing.
+A 404 renders nothing, except on the Risk Scores pane's *Latest score of an entity* lookup, which sets
+`explainAbsence`: there a 404 says no stored score exists yet (the risk.score Job has not scored the entity; use
+Preview) and any other failure renders an error alert (2026-10-06).
 
 **The Risk Scores pane (`/risk-scores`, slice S1, 2026-10-06).** `modules/admin/risk-scores/` is a read-only
 list + detail over `GET /components/risk-score` (D-RP1: its own admin route, nav item under Operations). The
@@ -264,7 +266,7 @@ list load) lists it as a read-only *Awaiting approval* row from what the Pending
 when — with a link to `/pending-changes`; it is not a button, so nothing tries to load a stored model. A held edit
 or delete of a stored model stays a badge on that model's row (`heldCreates` in `risk-scores.component.ts`). *Delete* confirms, then `DELETE /components/risk-score/{id}`; the
 derived Datasets stay and History can restore. **Add per-entity Alert Rule** (D-RP9 (a)) is a LINK, never a second
-write: `/alerts?newRule=1&dataset=risk_scores_<id>_latest&measure=max(score)&by=model,entity_key&comparator=gte&threshold=<high>`
+write, shown only to a caller holding `canAuthorAlertRules` (2026-10-06): `/alerts?newRule=1&dataset=risk_scores_<id>_latest&measure=max(score)&by=model,entity_key&comparator=gte&threshold=<high>`
 (`perEntityAlertRuleParams`). The Alerts pane strips the params (`replaceUrl`) and opens the create dialog seeded
 through the new `AlertRuleFormData.seed` (`alertRuleSeed`); the author still registers the `_latest` Dataset and
 saves the rule under its own gate.

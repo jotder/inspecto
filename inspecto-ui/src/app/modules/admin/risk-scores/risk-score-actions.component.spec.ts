@@ -28,7 +28,7 @@ class HostComponent {
     readonly seen: RiskScoreChange[] = [];
 }
 
-function setup(opts: { author?: boolean; confirm?: boolean; removed?: unknown } = {}) {
+function setup(opts: { author?: boolean; alerts?: boolean; confirm?: boolean; removed?: unknown } = {}) {
     const remove = vi.fn(() => of(opts.removed ?? null));
     const toast = { success: vi.fn(), info: vi.fn(), error: vi.fn() };
     const list = vi.fn(() =>
@@ -47,7 +47,13 @@ function setup(opts: { author?: boolean; confirm?: boolean; removed?: unknown } 
             provideNoopAnimations(),
             provideRouter([]),
             { provide: ComponentsService, useValue: { remove, get: vi.fn() } },
-            { provide: LensService, useValue: { canAuthorWorkbench: () => opts.author ?? true } },
+            {
+                provide: LensService,
+                useValue: {
+                    canAuthorWorkbench: () => opts.author ?? true,
+                    canAuthorAlertRules: () => opts.alerts ?? opts.author ?? true,
+                },
+            },
             { provide: ToastrService, useValue: toast },
             { provide: MatDialog, useValue: { open: vi.fn() } },
             {
@@ -86,8 +92,14 @@ describe('RiskScoreActionsComponent', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
-    it('hides the write actions from a non-author but keeps the link', () => {
-        const { el } = setup({ author: false });
+    it('hides the Alert Rule link from a caller without canAuthorAlertRules', () => {
+        const { el } = setup({ author: false, alerts: false });
+        expect(buttons(el)).toEqual([]);
+        expect(el.querySelector('a[href^="/alerts"]')).toBeNull();
+    });
+
+    it('hides the write actions from a non-author but keeps the link for an Alert Rule author', () => {
+        const { el } = setup({ author: false, alerts: true });
         expect(buttons(el)).toEqual([]);
         expect(el.querySelector('a[href^="/alerts"]')).not.toBeNull();
     });
