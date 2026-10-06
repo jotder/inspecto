@@ -43,7 +43,7 @@ describe('NavigationService — custom menus from the backend', () => {
                 { provide: ToastrService, useValue: { error: toastError } },
                 {
                     provide: SessionService,
-                    useValue: { geoLinkEnabled: signal(true), eventsEnabled: signal(true), opsEnabled: signal(true) },
+                    useValue: { features: signal({ geoLink: true, events: true, ops: true }) },
                 },
             ],
         });

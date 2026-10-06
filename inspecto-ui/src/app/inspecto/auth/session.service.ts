@@ -58,6 +58,7 @@ interface Bootstrap {
         geoLink?: boolean;
         events?: boolean;
         ops?: boolean;
+        [feature: string]: string | boolean | undefined;
     };
     session?: { authenticated?: boolean; actor?: string; displayName?: string | null; capabilities?: string[] };
     branding?: Partial<BootstrapBranding>;
@@ -131,6 +132,8 @@ export class SessionService {
      * backend derives it from what actually registered, so this is never a guess about the edition.
      * ⚠ Set by `init()`, an APP_INITIALIZER, so it is settled before any route resolver builds the nav.
      */
+    /** Every boolean `/bootstrap` feature, by id — what `navFeature` on a nav entry is checked against. */
+    readonly features = signal<Record<string, boolean>>({});
     readonly geoLinkEnabled = signal(false);
     /**
      * `bootstrap.features.events` — the operational events FEED is registered in this bundle (EDITIONS
@@ -225,6 +228,7 @@ export class SessionService {
             caption: boot.branding?.caption ?? null,
             footerText: boot.branding?.footerText ?? null,
         });
+        this.features.set(Object.fromEntries(Object.entries(boot.features ?? {}).filter(([, v]) => typeof v === 'boolean')) as Record<string, boolean>);
         this.exchangeEnabled.set(boot.features?.exchange === true);
         this.geoLinkEnabled.set(boot.features?.geoLink === true);
         this.eventsEnabled.set(boot.features?.events === true);

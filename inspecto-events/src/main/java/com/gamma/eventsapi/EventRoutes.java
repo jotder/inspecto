@@ -46,6 +46,11 @@ import java.util.Map;
 public final class EventRoutes implements RouteModule {
 
     @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("events");
+    }
+
+    @Override
     public void register(ApiContext api) {
         // Legacy: the newest ?limit= events from the live-tail ring, byte-for-byte unchanged. On /api/v1
         // the list is instead cursor-paginated over the full retained history (eventsPage), sharing the route.

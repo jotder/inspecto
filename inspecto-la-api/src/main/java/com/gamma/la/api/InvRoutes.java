@@ -92,6 +92,11 @@ public final class InvRoutes implements RouteModule {
     private static final int TRAVERSAL_TIMEOUT_SECONDS = 5;
 
     @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("geoLink");
+    }
+
+    @Override
     public void register(ApiContext api) {
         api.post("/inv/projection", (e, m) -> project(api, e, api.body(e), null));
         api.post("/inv/projection/neighbors", (e, m) -> neighbors(api, e, api.body(e)));

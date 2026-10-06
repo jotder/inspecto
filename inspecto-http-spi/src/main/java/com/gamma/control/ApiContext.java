@@ -253,6 +253,11 @@ public interface ApiContext extends WriteRootProvider {
      */
     boolean hasRoute(String method, String pattern);
 
+    /** Feature ids declared by the route modules that registered ({@link RouteModule#featureIds()}). */
+    default java.util.Set<String> registeredFeatures() {
+        return java.util.Set.of();
+    }
+
     /**
      * Register an <b>absent-module stub</b>: a handler that answers for an optional feature's path when the
      * feature's module is not on the classpath (typically a 503 that explains itself). It occupies the route

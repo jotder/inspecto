@@ -39,42 +39,21 @@ export class NavigationService {
     private hydrated = false;
 
     /**
-     * Nav items whose backend lives in an optional module (EDITIONS CP-09). Hidden — not disabled, not
-     * explained — when `/bootstrap` says the module is absent: a Personal install must not OFFER geo map
-     * or link analysis and then show an error page. The ids are the `defaultNavigation` ones; the
-     * compact/futuristic/horizontal variants copy children FROM `_default`, so filtering `_default` first
-     * covers all four layouts in one place.
-     */
-    private static readonly GEO_LINK_NAV_IDS = new Set(['studio-link-analysis', 'studio-geo-map']);
-
-    /**
-     * The Events screen, whose whole data source is the optional `inspecto-events` module (EDITIONS CP-13,
-     * EDG-01 cell 6). Hidden — not disabled — when `/bootstrap` reports the feed absent: every `/events*`
-     * path 503s on a Personal build, so offering the entry would lead straight to a dead screen.
+     * Drop every entry whose `navFeature` (EDITIONS CP-09 / CP-11 / CP-13) `/bootstrap` does not report true,
+     * at any depth, in place. Hidden — not disabled — so a Personal install never OFFERS a screen whose
+     * backend module is absent. The id is declared ON the entry (navigation-data.ts), and the backend reports
+     * only features whose routes actually bound — adding an optional module's screen edits neither this
+     * service nor the session (MODULE-REORG-1 P1).
      *
-     * ⛔ `audit` is deliberately NOT in this set. The Audit log reads the core `/audit/*` routes, which
-     * every edition serves — gating it here would hide a capability EDITIONS §Audit promises Personal.
+     * ⛔ `audit` and `alerts` carry no `navFeature`: both read core routes every edition serves.
+     * ⚠ Recursive on purpose: studio-group is a CHILD of platform-group, so a top-level-only walk silently
+     * filters nothing.
      */
-    private static readonly EVENTS_NAV_IDS = new Set(['events']);
-
-    /**
-     * The operational-object screens, whose whole backend is the optional `inspecto-ops` module
-     * (EDITIONS CP-11, EDG-01 cell 7). Hidden — not disabled — when `/bootstrap` reports it absent:
-     * every `/objects*`, `/notes*` and `/tags*` path 503s on a Personal build.
-     *
-     * ⛔ `alerts` is deliberately NOT in this set. That pane reads `AlertsService` over config-authored
-     * alert RULES, which every edition serves. It is the adjacent nav id and shares the word "alert"
-     * with an `OperationalObject` type, which is exactly why an over-wide filter would take it — the
-     * spec asserts it survives.
-     */
-    private static readonly OPS_NAV_IDS = new Set(['incidents', 'cases', 'tags', 'approvals', 'autonomy', 'learning']);
-
-    /** Remove every item whose id is in `ids`, at any depth, in place. */
-    private static dropIds(items: GammaNavigationItem[], ids: Set<string>): void {
+    private static dropUnavailable(items: GammaNavigationItem[], features: Record<string, boolean>): void {
         for (const item of items) {
             if (item.children) {
-                item.children = item.children.filter((c) => !ids.has(c.id));
-                NavigationService.dropIds(item.children, ids);
+                item.children = item.children.filter((c) => !c.navFeature || features[c.navFeature] === true);
+                NavigationService.dropUnavailable(item.children, features);
             }
         }
     }
@@ -134,20 +113,9 @@ export class NavigationService {
 
     private _build(): Navigation {
         const _default = cloneDeep(defaultNavigation);
-        if (!this.session.geoLinkEnabled()) {
-            // ⚠ Runs from a route RESOLVER, after SessionService.init() (an APP_INITIALIZER) has awaited
-            // /bootstrap — so this reads a settled flag, not a race. A one-shot filter is correct here.
-            // ⚠ Recursive on purpose: studio-group is a CHILD of platform-group, so a top-level-only walk
-            // silently filters nothing — which is exactly what the first version of this did, and the
-            // two-directional spec caught it because the "shows" case found no studio-group either.
-            NavigationService.dropIds(_default, NavigationService.GEO_LINK_NAV_IDS);
-        }
-        if (!this.session.eventsEnabled()) {
-            NavigationService.dropIds(_default, NavigationService.EVENTS_NAV_IDS);
-        }
-        if (!this.session.opsEnabled()) {
-            NavigationService.dropIds(_default, NavigationService.OPS_NAV_IDS);
-        }
+        // Runs from a route RESOLVER, after SessionService.init() (an APP_INITIALIZER) has awaited /bootstrap —
+        // so this reads a settled map, not a race. A one-shot filter is correct here.
+        NavigationService.dropUnavailable(_default, this.session.features());
         const _compact = cloneDeep(compactNavigation);
         const _futuristic = cloneDeep(futuristicNavigation);
         const _horizontal = cloneDeep(horizontalNavigation);

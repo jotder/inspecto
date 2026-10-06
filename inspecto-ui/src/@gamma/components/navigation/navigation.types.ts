@@ -6,6 +6,8 @@ import {
 
 export interface GammaNavigationItem {
     id?: string;
+    /** Backend feature id (`/bootstrap` features) this entry needs; the entry is dropped when it is not reported true. */
+    navFeature?: string;
     title?: string;
     subtitle?: string;
     type: 'aside' | 'basic' | 'collapsable' | 'divider' | 'group' | 'spacer';

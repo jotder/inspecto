@@ -23,4 +23,13 @@ package com.gamma.control;
 @com.gamma.api.PublicApi(since = "4.0.0")
 public interface RouteModule {
     void register(ApiContext api);
+
+    /**
+     * Feature ids this module makes available (reported under {@code /bootstrap} {@code features}). Collected
+     * by the host only AFTER {@link #register} returned, and never from an absent-module stub — so a feature is
+     * reported present exactly when its routes bound, never by an edition guess (MODULE-REORG-1 P1).
+     */
+    default java.util.Set<String> featureIds() {
+        return java.util.Set.of();
+    }
 }

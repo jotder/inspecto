@@ -61,6 +61,11 @@ public final class GeoRoutes implements RouteModule {
     private static final int MAX_LIMIT = 100_000;
 
     @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("geoLink");
+    }
+
+    @Override
     public void register(ApiContext api) {
         api.post("/geo/projection", (e, m) -> projection(api, e, api.body(e)));
         api.post("/geo/routes", (e, m) -> routes(api, e, api.body(e)));

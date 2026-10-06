@@ -55,6 +55,11 @@ import java.util.NoSuchElementException;
 public final class ExchangeRoutes implements RouteModule {
 
     @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("exchange");
+    }
+
+    @Override
     public void register(ApiContext api) {
         // The seam ControlApi's constructor used to wire (`SharedRefResolver.install(new
         // ExchangeRefResolver(spaces))`, deleted there in EDG-01 cell 4). Doing it HERE is what makes it

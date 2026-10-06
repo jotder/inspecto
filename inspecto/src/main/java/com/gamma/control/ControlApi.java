@@ -615,6 +615,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // every other route module and the boot down with it.
         for (RouteModule module : com.gamma.service.OptionalSpi.all(RouteModule.class)) {
             module.register(this);
+            registeredFeatures.addAll(module.featureIds());
             log.info("route module discovered: {}", module.getClass().getName());
         }
         // Absent-module stubs, LAST of all: they register only the paths no discovered module claimed
@@ -1519,6 +1520,8 @@ public final class ControlApi implements AutoCloseable, HostContext {
 
     /** Every registered {@code METHOD pattern}, for the duplicate guard. */
     private final java.util.Set<String> registeredRoutes = new java.util.HashSet<>();
+    /** Feature ids of discovered route modules that registered cleanly (RouteModule#featureIds). */
+    private final java.util.Set<String> registeredFeatures = new java.util.HashSet<>();
 
     /**
      * <b>The runtime route inventory (route-gating plan step 4c/4d).</b> One row per registered route, with
@@ -1568,6 +1571,8 @@ public final class ControlApi implements AutoCloseable, HostContext {
      */
     /** Absent-module stubs (ApiContext.stub) — in the route table, but NOT counted by hasRoute. */
     private final java.util.Set<String> stubbedRoutes = new java.util.HashSet<>();
+
+    @Override public java.util.Set<String> registeredFeatures() { return java.util.Collections.unmodifiableSet(registeredFeatures); }
 
     @Override public boolean hasRoute(String method, String pattern) { return registeredRoutes.contains(method + " " + pattern); }
 

@@ -22,9 +22,7 @@ describe('NavigationService — optional-module nav entries', () => {
                 {
                     provide: SessionService,
                     useValue: {
-                        geoLinkEnabled: signal(geoLinkEnabled),
-                        eventsEnabled: signal(eventsEnabled),
-                        opsEnabled: signal(opsEnabled),
+                        features: signal({ geoLink: geoLinkEnabled, events: eventsEnabled, ops: opsEnabled }),
                     },
                 },
             ],

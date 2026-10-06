@@ -78,6 +78,11 @@ public final class EntityListRoutes implements RouteModule {
     private static final int MAX_VALUE_LENGTH = 512;
 
     @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("entityList");
+    }
+
+    @Override
     public void register(ApiContext api) {
         // ⚠ String LITERALS on purpose — CapabilityManifestTest's scanner matches only a literal argument.
         api.get("/entity-lists", (e, m) -> list(api));

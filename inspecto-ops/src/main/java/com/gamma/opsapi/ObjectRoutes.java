@@ -52,6 +52,11 @@ public final class ObjectRoutes implements RouteModule {
     private static final Logger log = LoggerFactory.getLogger(ObjectRoutes.class);
 
     @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("ops");
+    }
+
+    @Override
     public void register(ApiContext api) {
         api.get("/objects", (e, m) -> objectsList(api, e));
         // Registered before the /objects/{id} catch-all so "analytics" is not read as an id (C4).
