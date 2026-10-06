@@ -110,6 +110,7 @@ Counts were measured by read-only subagents over `git ls-files` unless marked �
 | API contract ✔ | one `docs/api/openapi-v1.json` | a new route fails the reactor in a module never touched |
 | Edition / bundle lists | 4 pom profiles, `tools/bundle-modules.mjs`, two `$modules` strings in `inspecto/package.ps1`, `check-module-deps.mjs`, `docs/EDITIONS.md`, `docs/FEATURE_INVENTORY.md` | 5+ files per module; Preview is a manual union |
 | `jlink` module set | `$runtimeModules` in `package.ps1` | a module needing a `jdk.*` module breaks the zip |
+| Operational store families | `OperationalDb.Family` (processor) | a new store family is a core edit (§8c) |
 
 ✔ **The counter-example to copy:** `EventType` is deliberately open — `Event.type` is a free-form string
 and the class holds conventions only, so a module emits a new type without touching it. Every registry above
@@ -188,7 +189,7 @@ contribution point, which is what that plan's D-AS3 asked for.
 | Measure | Today | Target |
 |---|---|---|
 | Files outside its own module touched to add an Optional feature | 5+ core/UI/build files | 0 |
-| Closed central registries (§3.2) | 9 | 0 |
+| Closed central registries (§3.2) | 10 | 0 |
 | Hand-maintained edition/module lists | 5+ | 1 (Offerings) |
 | Split packages | 7 | 0 |
 | Per-Offering boot tests | 0 | one each |
@@ -255,7 +256,7 @@ an XL move for no offering value.
 | **Reconciliation** (operator, 2026-10-06) | `ReconRunJob`, `ReconRoutes`, recon boards, break sets (CP-10) | domain-neutral: revenue in telecom; stock, orders and shipments in retail and supply chain. The RA function pack requires it |
 | **Scoring & Lists** (operator, 2026-10-06) | engine `risk` (`RiskScoreModel`, `RiskScorer`, `RiskScoreEvaluator`), `RiskScoreJobType`, `RiskScoreRoutes`, `entity-list` (Entity Lists, watch-list feed) | domain-neutral: entity types are already free-form. The FM function pack requires it; credit, churn or supplier-risk packs could too |
 | **Action Requests** (operator, 2026-10-06) | four-eyes approved outbound calls: create → approve/decline → dispatch with bounded retries under one idempotency key, the `approverCheck`, the Decision Rule `invoke-api` consequence — **raisable from any module** | today `ActionRequests`, `ActionDispatcher`, `ActionRequestRoutes` sit in the processor, link only to an Incident or Case (`inspecto-ops`), and send through `inspecto-notify-channels` (CP-16). The add-on links to anything that implements a small **linked-subject contract** (id, visibility check for the approver's data scope, a place to show the answers): Incidents and Cases first, then e.g. reconciliation breaks, Link Analysis investigations, Entity List entries. It **requires Integration & Delivery** for the wire (egress allowlist, pinned connect) and uses the base approver roster and four-eyes rules, which stay base because the Pending Change hold needs them too |
-| **Workflow & SLA** (operator, 2026-10-06) | authored Workflows (states, transitions), SLA policies with a business calendar, escalation — **usable by any module**, not only Case Management | today the models are dependency-free (`Workflow` 325 LOC, `SlaPolicy` 179, `EscalationRule` 100 in engine `objects`) but only `ops` applies them, keyed by its own object types. The add-on applies them to anything that implements a small **governed-item contract** (state, priority, owner, timestamps, allowed transitions): Incidents and Cases first, then e.g. reconciliation breaks, Entity List reviews, Link Analysis investigations. `inspecto-agent`'s own `EscalationPolicy` **folds into this add-on** (operator, 2026-10-06): one escalation concept. Base features (the maker-checker expiry, Action Request expiry) keep their simple built-in expiry and never depend on the add-on |
+| **Workflow & SLA** (operator, 2026-10-06) | authored Workflows (states, transitions), SLA policies with a business calendar, escalation — **usable by any module**, not only Case Management | today the models are dependency-free (`Workflow` 325 LOC, `SlaPolicy` 179, `EscalationRule` 100 in engine `objects`) but only `ops` applies them, keyed by its own object types. The add-on applies them to anything that implements a small **governed-item contract** (state, priority, owner, timestamps, allowed transitions): Incidents and Cases first, then e.g. reconciliation breaks, Entity List reviews, Link Analysis investigations. `inspecto-agent`'s own `EscalationPolicy` **stays separate** (operator re-decision 2026-10-06, after the spike showed it is an LLM retry ladder, not an escalation rule); it gets its own canonical name in P0. Base features (the maker-checker expiry, Action Request expiry) keep their simple built-in expiry and never depend on the add-on |
 | **Link Analysis & Investigations** | `la-*`, `geo-link`, the `la-app` UI | the fraud investigator; already optional (CP-09) and already ships as its own UI application — the strongest standalone candidate, possibly a product of its own |
 | **AI Assist & Intelligence** | `agent`, `agent-hosted`, `intelligence` | LLM cost and data-egress risk; air-gapped customers must be able to omit it (CP-14) |
 | **Integration & Delivery** | `notify-channels`, the `publish.postgres` BI publication Job, outbound webhooks | outbound egress is a security decision; needs the Postgres driver (CP-15, JOB-06) |
@@ -328,6 +329,37 @@ Three design requirements follow, and they are binding on P1–P6:
   `risk` + `entity-list` → Scoring & Lists; recon → Reconciliation; the ASN.1 parser → Telecom industry pack;
   the `connectors` split. `alert`, `notify`, `query`, `catalog` stay in the engine.
 
+## 8c. Storage and state — the base layer the first drafts left implicit
+
+Raised by the operator (2026-10-06): the plan read as if the platform had no database. It has **no single
+database and no ORM**, but it does have a storage layer with three kinds of state (as built:
+[`okf/backend/engine/db-layer.md`](../okf/backend/engine/db-layer.md) §1):
+
+| Kind of state | What | Where and how | Today's code |
+|---|---|---|---|
+| **Business data** | ingested records | Hive-partitioned Parquet/CSV under the Space's data directory, queried through DuckDB (`read_parquet` / `read_csv`); DuckLake registration | `SqlViews`, `DatasetRelation`, `DuckDbRecordSink`, `DuckLakeRegistrar`, the Sinks |
+| **Configuration** | authored Components, Pipelines, Views, Connections, settings | TOON files under the Space's `registry/`, versioned in `.history/`, written atomically | `ComponentStore`, `AtomicFiles`, `ConfigSafetyValidator`, the path jail |
+| **Operational data** | facts about the system's own operation: job runs, ingest status, provenance, Consignment outputs, file stages, dedup and acquisition ledgers, run lease, delivery receipts, operational objects | one DuckDB file per family by default, **Postgres** via `-Dinspecto.db=postgres` (driver as the `postgresql.jar` sidecar); events append-only in Parquet | `OperationalDb` (+ its `Family` roster), `ServiceStores`, `JdbcDrivers`, `DbRunLease`, `ParquetEventStore` |
+
+Everything is **per Space** (`SpaceRoot` resolves the file topology), and backup / restore (tier, Professional
+up) carries all three.
+
+**Where it sits in the target model:** a **Storage** row in the Platform base — Lakehouse (business data),
+Configuration, Operational DB, Space roots, Sinks — with the backends as **Providers**: the Postgres driver
+sidecar, the Postgres Investigation store (`la-store-pg`), and later a shared object store (OPS-05).
+
+**What the reorganisation changes in it:**
+1. 🔴 **A tenth closed registry: `OperationalDb.Family`.** The roster of operational-store families is one enum
+   in the processor, and optional modules (`inspecto-ops`) open their stores through it so there is "ONE place
+   that decides how an operational DB is addressed". Under §1 #10 it becomes a contribution point: a module's
+   manifest declares the families it owns (name, default backend, Postgres schema); the platform still owns
+   *how* a family is addressed and selected. Lands in P1.
+2. **Store-family ownership** is the hook for removal semantics (P4): an absent module's families stay on disk,
+   unread, and travel through backup and restore.
+3. **Storage contracts stay with their capabilities** (`ObjectStore`, `StatusStore`, `InvestigationStoreProvider`
+   …); no central storage SPI module is added (consistent with D-MR1). Each such contract with two or more
+   implementations gets a TCK (P5) — `InvestigationStoreContract` is the existing model.
+
 ## 8b. Rule evaluation — consolidate, do not add an engine (D-MR12, OPEN)
 
 **Question (operator, 2026-10-06): don't we need a rule engine?** The platform already has nine rule kinds, each
@@ -376,8 +408,8 @@ the shared machinery:
   when / if / then model and the Consequence registry. A Decision Engine is a *kind* (Alert Rule, Tag Rule…); the
   Decision Kernel is the one runtime they share. ⛔ Not "rule engine" (bare Rule is banned) and not "policy engine"
   (Policy is taken by Access, Approval and SLA policies).
-- **Condition Language** — the `Conditions` grammar in `inspecto-util`, promoted from a class name to the
-  canonical term (the glossary's Access Policy entry already calls it "the shared `Conditions` grammar").
+- **Condition Language** — the **condition tree** (`ConditionTree` / `ConditionSql` / `query-eval.ts`), with
+  `Conditions` as a text notation that parses into it (✅ confirmed by the operator after the spike, 2026-10-06).
 - **Consequence registry** — the open contribution point for Consequences (an existing term plus "registry").
 ⚠ `inspecto-agent` has a package `agent.kernel` — a code name, not a glossary term; note the shared word where
 the two meet.
@@ -406,6 +438,61 @@ SQL, before any kind is migrated. Time-box: one lane, read-mostly; code only in 
 **Exit:** a short report appended here with a per-kind verdict (*adopt as is* / *adopt after grammar extension
 X* / *stays bespoke because Y*), the grammar extensions accepted, and the P7 adoption order. ⛔ The spike changes
 no shipped behaviour; any prototype lives in a worktree under `.claude/worktrees/` and is deleted after.
+
+### Decision Kernel spike — report (2026-10-06, read-only; three parallel investigations)
+
+**🔴 The premise was wrong: the platform has TWO condition languages, and the richer one is not `Conditions`.**
+
+| | `Conditions` (`inspecto-util`, 282 LOC) | Condition tree (`ConditionTree` 249 + `ConditionSql` 194, engine `query`; UI twin `query-eval.ts`) |
+|---|---|---|
+| Form | text expression | JSON tree `{kind: group, op: AND\|OR, items: [{kind: condition, field, operator, value, value2}]}` |
+| Operators | `==` `!=` `in` `contains`, `and` `or` `not` | `= != < <= > >=`, `between`, `in`, `contains`, `startsWith`, `endsWith`, `isNull`, `isNotNull`; groups AND/OR; **no `not`** |
+| Backends | in memory only | in memory **and** DuckDB SQL |
+| Users today | Access Policies only | Alert Rule `when`, Decision Rule `when`, Expectation `condition`, the SPA's query builder |
+| Compares | field to field (`resource.space != subject.space`) | field to literal only |
+
+So the **Condition Language should be the condition tree**, not `Conditions`: it already has both backends, the
+operators most kinds need, a UI builder, and three of the nine kinds. `Conditions` becomes a **text notation that
+parses into the same tree** (kept for Access Policies), once the tree gains what it lacks. The canonical name
+stands; its referent changes (✅ confirmed, operator 2026-10-06).
+
+**Tree extensions the kinds need:** `not` (negated group); field-to-field operand; a case-insensitive flag on
+string operators; `matches` (regex, for Expectations); derived context fields supplied by each kind's context
+builder (`ageMinutes`, `levelRank`, a normalised status). One semantic to settle: the tree treats `''` as null in
+`isNull`, `Conditions` does not.
+
+**Per-kind verdict**
+
+| Kind | Verdict | Stays bespoke |
+|---|---|---|
+| Decision Rule | **on the tree already** | — |
+| Alert Rule | `when` on the tree already | metric / measure, threshold, window, `by` group-by, freshness — the kind's own shape around a condition |
+| Expectation | `condition` on the tree; `non_null` and `range` map to `isNull` / `between`; `regex` after `matches` | `referential` (subquery) and `baseline` (profile comparison) |
+| Risk factor | `filters` move to the tree | aggregate, key, weight, cap |
+| Tag Rule | filter → tree (needs case-insensitive flag) | status alias fold → done by the context builder |
+| Case Rule | filter → tree (same as Tag Rule) | count-within-window grouping |
+| Notification Rule | → tree (needs `levelRank`, case-insensitive) | — |
+| Escalation Rule | match → tree (needs `ageMinutes`, breach flag) | fire-once ledger, sweep |
+| Access Policy | keep the `Conditions` text, compiled into the tree once `not` and field-to-field exist | — |
+
+**What it saves, honestly:** little code (~50 LOC of single-item matchers, plus one of the two duplicate
+evaluators). The value is one authoring surface and builder for every kind, one place to lint references, and the
+Consequence registry — not deleted code.
+
+**Two findings outside the question:**
+- 🔴 **Decision Rules build `DELETE` / `UPDATE` / `CREATE TABLE AS` / `COPY` on the in-flight table by string
+  concatenation of `ConditionSql` output, guarded by escaping only — no `SqlGuard`, no bound parameters**
+  (`DecisionRuleApplier.java:185-276`). Not shown to be exploitable here; recorded for the security review before
+  the kernel makes this path the shared one — ✅ filed as `DECISION-RULE-SQL-GUARD-1` (BACKLOG §3.8).
+- ⚠ **The agent's `EscalationPolicy` is not an escalation rule.** It is an LLM retry ladder (`BumpModelTier` →
+  `HumanHandoff(queue)` → `Abstain`), procedural and synchronous; only its confidence threshold is a condition. The
+  2026-10-06 decision to fold it into Workflow & SLA rested on a false premise — ✅ **re-decided the same day: it
+  stays in the agent, under its own canonical name.**
+
+**P7 adoption order:** (1) Expectation `non_null` / `range` onto the tree; (2) tree extensions (`not`,
+field-to-field, case-insensitive, `matches`); (3) Tag and Case Rule filters; (4) Notification Rules; (5) Risk
+filters; (6) Escalation match; (7) Access Policies' `Conditions` text compiled into the tree (last:
+security-sensitive); then retire the duplicate evaluator.
 
 ### Target picture
 ![Inspecto target module architecture](assets/module-target-architecture.svg)

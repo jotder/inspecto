@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **39<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 12<!--count:backlog-p2--> × P2 · 27<!--count:backlog-p3--> × P3** —
+> **40<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 27<!--count:backlog-p3--> × P3** —
 > ⬇ **40 → 39 (P3 28 → 27) on 2026-10-06**: closed P3 `TEMPLATE-RISK-SCORE-ALERT-RULE-1` — deferred seed (operator, 2026-10-06): a Space Template declares an Alert Rule over its own Risk Score output in `config/pending/alert-rules/`; it is created through the normal save gate after the model's first run (`PendingAlertRules`), and `payment-fraud` ships `pf_high_risk_account`. As-built in `okf/capabilities/spaces/spaces.md` §3.5.2. Also: `ASSURE-WORKFLOW-SLA-RESIDUALS-1` (b) is ON DEMAND (operator, 2026-10-06).
 > ⬇ **41 → 40 (P3 29 → 28) on 2026-10-06**: closed P3 `ASSURE-AUDIT-CHAIN-RESIDUALS-1` — (5) and (7) accepted as stated limits (operator, 2026-10-06), (8) D-P8 built: `AuditReadMasking` masks classified values in audit rows on read; read auditing deferred. As-built in `okf/backend/control-plane/events-metrics.md`.
 > ⬇ **42 → 41 (P3 30 → 29) on 2026-10-06**: closed P3 `DUCKLE-C6-POLICY-NARROWING-1` — every slice S0–S7 shipped (the last: S6 residuals M6 / `AcquisitionLedger.prune` / T11 / Kafka T12 and the D9 plan-time refusal `ERR_SAFETY_STATE_ADVANCE_REFUSED`; M7 deliberately ungated). As-built in `okf/backend/config/config-safety.md`; plan archived.
@@ -152,11 +152,11 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 12<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 27<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 12<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 27<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 39<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 40<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -381,6 +381,8 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 
 ### 3.8 Security, Policy, Editions & Compliance
+
+- **P2** · `DECISION-RULE-SQL-GUARD-1` — **Decision Rules build write SQL by string concatenation, guarded by escaping only.** `DecisionRuleApplier` (`inspecto-engine`, ~lines 185-276) renders `ConditionSql` output into `DELETE` / `UPDATE` / `CREATE TABLE AS` / `COPY` statements on the in-flight table with no `SqlGuard` check and no bound parameters. Not shown to be exploitable; found by the Decision Kernel spike (2026-10-06), and must be reviewed before the Decision Kernel makes this the shared SQL path (bind values, check the statement, or confine the writer). → `superpower/module-architecture-reorg-plan.md`
 
 
 - **P3** · `IMPORT-WHOLE-SPACE-SPLIT-1` — **split a whole-Space export into its kinds' own validated routes on import, if ever asked.** Operator 2026-09-29: importing a whole-Space export into an EXISTING Space is not supported — `POST /spaces/{id}/import` answers a `kind: space` bundle 403 naming the two supported flows (per-data-source import, or a new Space from the zip). Build only on a real request. → `okf/backend/editions/auth-security.md` (import section)
