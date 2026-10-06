@@ -37,7 +37,23 @@ final class RateLimiter {
 
     /** The expensive Link Analysis budget (projection, traversal, pattern, Graph Run, Index build): same shape
      *  as {@link #standard()} but its own bucket, so a graph session cannot drain ad-hoc SQL and vice versa. */
-    static RateLimiter linkAnalysis() { return new RateLimiter(20.0, 1.0 / 3.0); }
+    static RateLimiter linkAnalysis() {
+        return new RateLimiter(positive("control.rateLimit.linkAnalysis.capacity", 20.0),
+                positive("control.rateLimit.linkAnalysis.refillPerSecond", 1.0 / 3.0));
+    }
+
+    /** An operator-tunable budget (operator, 2026-10-06): the system property when it parses to a positive
+     *  number, else {@code fallback} — a malformed or non-positive value never disables the limiter. */
+    static double positive(String property, double fallback) {
+        String raw = System.getProperty(property);
+        if (raw == null) return fallback;
+        try {
+            double v = Double.parseDouble(raw.strip());
+            return v > 0 && Double.isFinite(v) ? v : fallback;
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
 
     private final double capacity;
     private final double refillPerSecond;

@@ -12,7 +12,9 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.service.CollectorService;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -48,6 +50,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * in the same test: a probe that WOULD be served from the index but for the one thing being tested.
  */
 class ControlApiInvIndexedTraversalTest {
+    /** Each test compares the indexed and flat paths call by call, well past the Link Analysis bucket's
+     *  burst; the operator-tunable capacity is raised for this class only. */
+    @BeforeAll static void raiseLinkAnalysisBudget() {
+        System.setProperty("control.rateLimit.linkAnalysis.capacity", "10000");
+    }
+
+    @AfterAll static void restoreLinkAnalysisBudget() {
+        System.clearProperty("control.rateLimit.linkAnalysis.capacity");
+    }
+
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String OWNER = "Bearer owner", STRANGER = "Bearer stranger";
