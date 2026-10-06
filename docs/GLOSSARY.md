@@ -37,6 +37,7 @@
 |---|---|---|
 | Flow | **Pipeline** | "Flow" collided with FlowGraph/Run; one word for the DAG |
 | Data Store *(as a relation)* | **Dataset** | "Store" means the physical backend, not a queryable relation |
+| `EscalationPolicy` *(agent LLM retry ladder)* | **Model Escalation Ladder** | 🔲 not started (module reorganisation P0, 2026-10-06). Backend: `inspecto-agent` `EscalationPolicy` and its `BumpModelTier` / `HumanHandoff` / `Abstain` steps; ⛔ never *Escalation Rule* (`EscalationRule` in engine `objects`, §15). |
 | Issue | **Incident** | aligns Alert → Incident → Case |
 | Rule *(bare)* | **Expectation** \| **Alert Rule** \| **Decision Rule** | one word hid three engines |
 | Metric *(for a BI aggregation)* | **Measure** | "metric" is reserved for the observability time-series |
@@ -1164,3 +1165,72 @@ true, and one of them is currently false where the product changed underneath it
 vocabulary, secret, doc-link, gate-tally, dependency-review and coverage guards plus the processor-board
 `--check`. ⛔ Not an **Expectation** (data-side, §4) and not a **Capability** (an authorization question,
 §1-A). A guard's *scope* is a silent exemption — every one lists what it declines to read.
+
+---
+
+## 15. Module architecture *(added 2026-10-06 — module reorganisation P0; plan `superpower/module-architecture-reorg-plan.md` §2, §8a, §8b)*
+
+**Platform module** — A horizontal Maven module that the rest of the system builds on (for example
+`inspecto-engine`): its **Build role** is *Platform module*. ⛔ Not **Platform Service** (§6-A — the grantable
+engine facility a Job or pack requests with `requires:`), and not a **Capability** (an RBAC permission, §1-A).
+Three words, three concepts: *module* is code, *Platform Service* is a runtime grant, *Capability* is a permission.
+
+**The three axes of a module** — every module is classified once on each axis; the axes answer different questions.
+
+| Axis | Values | Decides |
+|---|---|---|
+| **Build role** | Foundation · Contract · Platform module · Implementation | what the module may depend on |
+| **Offering role** | Base (always present) · Optional (part of an Offering) · Provider (chosen by deployment profile) · Internal | whether it can be absent |
+| **Binding time** | Build (classpath) · Boot (activator) · Space (enabled per Space) · Run (Platform Service grant, Job Pack) | how it is switched on |
+
+**Offering** — A sellable composition of modules and content, declared in `offerings/<id>.toon`: modules, UI
+features, packs (Space Templates, Pipelines, Dashboards, Alert / Decision Rule sets) and default Space
+settings. An **Edition** (§14 `PKG`) is an Offering that lists other Offerings; the bundle, the EDITIONS matrix
+and the SBOM are generated from Offerings. ⛔ Not *plan*, *SKU*, *package* or *product tier*.
+
+**Add-on** — A horizontal, domain-neutral Optional module set sold to any customer (Incidents, Case Management,
+Reconciliation, Scoring & Lists, Action Requests, Workflow & SLA, Link Analysis & Investigations, AI Assist &
+Intelligence, Integration & Delivery, Premium Connectors, Multi-entity / Group). **Tiers** (Personal ·
+Professional · Enterprise) are deployment and compliance posture, not Add-ons.
+
+**Solution pack** — Mostly-content bundle of Space Templates that **requires** Add-ons. Two kinds, composed:
+- **Function pack** — domain-neutral, written against neutral entity and measure names (Revenue Assurance,
+  Fraud Management, Compliance Audit, BI, Link Analysis).
+- **Industry pack** — a vertical's data: record formats and parsers, Collector connectors, entity types, link
+  kinds, reference data, and the mapping to the function packs' neutral names (telecom mobile, fixed-line,
+  cable / IPDR, mobile money, retail, supply chain).
+
+⛔ Not *vertical pack × function pack* as one artifact — a sold solution is an **Offering** that composes them.
+⚠ A **Job Pack** (§6-A) is an unrelated, Implementation-level unit of executable Jobs.
+
+**Module manifest** — A module's declaration of what it **provides** (contracts, capabilities, routes, config
+kinds, store families) and **requires** (contracts, other modules). At boot the activator resolves the graph; an
+unsatisfied module stays inert and is reported by name with the missing requirement.
+
+**Installed · Enabled · Permitted** — The three gates, in order. **Installed**: jar present, requirements
+resolved, build id matches. **Enabled**: switched on per Space (default from the Offering). **Permitted**: the
+caller's RBAC allows it. `/bootstrap` reports all three. ⛔ Never *licensed*, *activated* or *available* for
+any one of them.
+
+**Removal semantics (inert config)** — Config that references an absent module **loads inert**: shown with a
+diagnostic naming the missing module, never rewritten, normalised away or dropped by a save. An absent owner
+leaves its store family untouched and unread; backup, restore and Space bundles carry it opaquely.
+
+**Decision Kernel** — The base capability every **Decision Engine** (§4) runs on: the **Condition Language**,
+the when / if / then model and the **Consequence registry**. A Decision Engine is a *kind* (Alert Rule, Tag
+Rule…); the Decision Kernel is the one runtime they share. ⛔ Not "rule engine" (bare Rule is banned) and not
+"policy engine" (Policy is taken by Access, Approval and SLA policies). ⚠ `inspecto-agent` has a package
+`agent.kernel` — a code name, not this term.
+
+**Condition Language** — The **condition tree** (`ConditionTree` / `ConditionSql` / `query-eval.ts`) in which
+every Decision Engine states its condition. **Conditions** is a *text notation* that parses into the tree; it
+is not a second language.
+
+**Consequence registry** — The open contribution point where modules register **Consequences** (§4). An
+existing term plus "registry"; ⛔ not *action registry*.
+
+**Model Escalation Ladder** — `inspecto-agent`'s `EscalationPolicy`: a procedural, synchronous LLM retry ladder
+(`BumpModelTier` → `HumanHandoff(queue)` → `Abstain`) triggered by a confidence threshold. ⛔ **Not an
+Escalation Rule** (`EscalationRule`, Workflow & SLA: one object escalating over time) and not an *escalation
+policy* in any other sense; the two stay separate (operator, 2026-10-06). Rename of the class is a §13
+touchpoint, not yet done.

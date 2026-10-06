@@ -184,6 +184,17 @@ end, and every `ci.yml` no-build guard before any push.
 The approval-SPI extraction (archived 2026-10-06 as superseded: `archived-documents/plans-archive/approval-spi-extraction-plan.md`) folds into P1: governable kinds become a
 contribution point, which is what that plan's D-AS3 asked for.
 
+## 6-A. P0 baseline (recorded 2026-10-06, `node tools/check-module-architecture.mjs`)
+
+✅ P0 shipped: GLOSSARY §15, OKF `backend/module-taxonomy.md`, the report-only guard (not wired into CI).
+Baseline: **7** split packages · **10** closed registries (built-in route list 59, `Absent*` stubs 6, `hasRoute`
+probes 6, SPA nav ids 9, capabilities 216, `OperationalDb.Family` 8, `jlink` set 13, `openapi` paths 423) ·
+35 modules with main Java · telecom words in generic code: engine 51, alert 4, query 4, la-api 2, la-graph 3
+(possibly similarity `sim`), la-core/storage/store-pg 0 → "LA for other domains" looks like content, not code.
+P1 survey: the built-in route list is at `ControlApi` `:590-604`; optional modules already load via
+`OptionalSpi.all(RouteModule.class)`; registration is first-match so the built-in order is load-bearing — step 1
+needs an `order()` on `RouteModule` and a golden registration-order test.
+
 ## 7. Success measures (baseline → target)
 
 | Measure | Today | Target |
