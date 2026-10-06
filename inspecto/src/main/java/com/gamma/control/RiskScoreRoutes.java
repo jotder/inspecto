@@ -35,6 +35,8 @@ import java.util.regex.Pattern;
  *       the SEC-7d rule {@code ObjectRoutes} applies).</li>
  * </ol>
  * The entity key travels as a bound parameter — it is compared, never resolved as a path or spliced into SQL.
+ * The response echoes it as the Space {@code masked:} token (with {@code keyMasked: true}) unless the caller holds
+ * {@code canRevealLinkEntities} (D-P8 mask on read, as {@code POST /risk-scores/preview}).
  */
 final class RiskScoreRoutes implements RouteModule {
 
@@ -129,13 +131,10 @@ final class RiskScoreRoutes implements RouteModule {
         } catch (IllegalArgumentException | IllegalStateException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
-        boolean reveal = ApiContext.subject(ex)
-                .map(s -> s.capabilities().contains(AuditReadMasking.UNMASK_CAPABILITY)).orElse(true);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("model", model.id());
         out.put("entityType", model.entityType());
-        out.put("entityKey", reveal ? entityKey : EvidenceMasker.forSpace(writeRoot).tokenFor(entityKey));
-        out.put("keyMasked", !reveal);
+        putEntityKey(ex, writeRoot, out, entityKey);
         out.put("found", p.found());
         out.put("score", p.scored().score());
         out.put("high", p.scored().high());
@@ -145,6 +144,17 @@ final class RiskScoreRoutes implements RouteModule {
         for (com.gamma.risk.RiskScorer.FactorResult f : p.scored().factors()) factors.add(f.toMap());
         out.put("factors", factors);
         return out;
+    }
+
+    /**
+     * D-P8 mask on read: put {@code entityKey} raw for a caller holding {@link AuditReadMasking#UNMASK_CAPABILITY}
+     * (or no Subject at all — auth off), else as the Space {@code masked:} token, plus a {@code keyMasked} flag.
+     */
+    private static void putEntityKey(HttpExchange ex, Path writeRoot, Map<String, Object> out, String entityKey) {
+        boolean reveal = ApiContext.subject(ex)
+                .map(s -> s.capabilities().contains(AuditReadMasking.UNMASK_CAPABILITY)).orElse(true);
+        out.put("entityKey", reveal ? entityKey : EvidenceMasker.forSpace(writeRoot).tokenFor(entityKey));
+        out.put("keyMasked", !reveal);
     }
 
     /** SEC-7d as the GET applies it: a data-scoped caller reaches only a model carrying a scope it holds. */
@@ -200,9 +210,9 @@ final class RiskScoreRoutes implements RouteModule {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("model", modelId);
         out.put("entityType", row.get("entity_type"));
-        // The entity key is raw, like every per-entity Alert and Incident key (platform-wide masking = D-P8);
-        // classified evidence was masked at WRITE time by the Job (EvidenceMasker), so nothing is masked here.
-        out.put("entityKey", row.get("entity_key"));
+        // The entity key is masked on read (D-P8) like the preview's; classified evidence was masked at WRITE time
+        // by the Job under the same Space key (EvidenceMasker), so the factors are returned as stored.
+        putEntityKey(ex, writeRoot, out, String.valueOf(row.get("entity_key")));
         out.put("score", row.get("score"));
         out.put("high", row.get("high"));
         out.put("highThreshold", model.highThreshold());

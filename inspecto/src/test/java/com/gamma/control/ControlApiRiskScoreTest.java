@@ -52,6 +52,8 @@ class ControlApiRiskScoreTest {
         if ("Bearer fraud".equals(auth)) return Optional.of(new Subject("fay", CAPS, Set.of("fraud")));
         if ("Bearer billing".equals(auth)) return Optional.of(new Subject("bo", CAPS, Set.of("billing")));
         if ("Bearer nocap".equals(auth)) return Optional.of(new Subject("nc", Set.of("canAuthorWorkbench")));
+        if ("Bearer revealer".equals(auth))
+            return Optional.of(new Subject("rev", Set.of("canWorkIncidents", "canRevealLinkEntities")));
         return Optional.empty();
     };
 
@@ -252,7 +254,7 @@ class ControlApiRiskScoreTest {
     }
 
     @Test
-    void evidenceIsMaskedAtWriteTimeTheKeyIsRawAndNoRouteServesTheMaskKey(@TempDir Path root) throws Exception {
+    void evidenceIsMaskedAtWriteTimeTheKeyOnReadAndNoRouteServesTheMaskKey(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             // msisdn is classified MSISDN, topup_id PII; status is not classified.
             ComponentStore store = new ComponentStore(c.config.resolve("registry"));
@@ -271,7 +273,17 @@ class ControlApiRiskScoreTest {
             HttpResponse<String> r = send(c.port, "GET", "/spaces/s1/risk-scores/subs/m1", null, "analyst");
             assertEquals(200, r.statusCode(), r.body());
             JsonNode d = V1Body.of(r.body());
-            assertEquals("m1", d.get("entityKey").asText(), "the entity key is raw, like every Alert key (D-P8)");
+            // D-P8 mask on read: without canRevealLinkEntities the key is the Space token — the same token masked
+            // evidence carries for that value — and the raw key appears nowhere in the body.
+            String token = com.gamma.risk.EvidenceMasker.forSpace(c.config).tokenFor("m1");
+            assertEquals(token, d.get("entityKey").asText(), "the entity key is masked for analyst: " + r.body());
+            assertTrue(d.get("keyMasked").asBoolean());
+            assertFalse(r.body().contains("\"m1\""), "the raw key leaked: " + r.body());
+            JsonNode rev = V1Body.of(send(c.port, "GET", "/spaces/s1/risk-scores/subs/m1", null, "revealer").body());
+            assertEquals("m1", rev.get("entityKey").asText(), "canRevealLinkEntities sees the raw key");
+            assertFalse(rev.get("keyMasked").asBoolean());
+            assertTrue(rev.get("factors").get(0).get("evidence").get(0).get("topup_id").asText().startsWith("masked:"),
+                    "unmasking the key does not unmask write-time evidence");
             assertFalse(r.body().contains("\"t1\""), "the PII evidence value was never stored: " + r.body());
             assertTrue(d.get("factors").get(0).get("evidence").get(0).get("topup_id").asText().startsWith("masked:"));
             List<Map<String, Object>> factors = JSON.convertValue(d.get("factors"), new TypeReference<>() {});

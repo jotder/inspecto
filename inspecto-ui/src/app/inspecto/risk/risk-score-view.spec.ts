@@ -46,4 +46,8 @@ describe('displayEntityKey', () => {
         expect(displayEntityKey('abc')).toBe('•••');
         expect(displayEntityKey('')).toBe('');
     });
+
+    it('shows a server-masked token as-is, not as a fake tail of the key', () => {
+        expect(displayEntityKey('masked:0123456789abcdef')).toBe('masked:0123456789abcdef');
+    });
 });

@@ -10415,7 +10415,7 @@
         "tags" : [ "risk-scores" ],
         "summary" : "The latest Risk Score of one entity under a saved risk-score model, with its factors",
         "operationId" : "getRiskScore",
-        "description" : "ASSURE-RISK-SCORE-1. Gated on canWorkIncidents. An unknown model, a model outside the caller's data scopes, a row the policy engine denies, or no score for the entity are all 404 (existence-hiding). score = sum of factor contributions (weight x indicator, held to cap), clamped 0-100; every score is recomputable from its factors.",
+        "description" : "ASSURE-RISK-SCORE-1. Gated on canWorkIncidents. An unknown model, a model outside the caller's data scopes, a row the policy engine denies, or no score for the entity are all 404 (existence-hiding). score = sum of factor contributions (weight x indicator, held to cap), clamped 0-100; every score is recomputable from its factors. The entity key is returned as the Space masked: token (keyMasked: true) unless the caller holds canRevealLinkEntities; classified evidence is masked at write time.",
         "parameters" : [ {
           "name" : "model",
           "in" : "path",

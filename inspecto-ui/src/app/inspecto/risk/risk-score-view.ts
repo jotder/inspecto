@@ -69,10 +69,13 @@ export function riskModelView(name: string, content: Record<string, unknown>): R
 
 /**
  * The ONE place an entity key is turned into display text (D-RP6, operator 2026-10-06; D-P8 = mask on read).
- * Keeps the last four characters; a key of four or fewer characters is fully masked.
+ * Keeps the last four characters; a key of four or fewer characters is fully masked. A key the server already
+ * masked (the Space `masked:` token, for a caller without canRevealLinkEntities) is shown as-is — it holds no raw
+ * characters, and bulleting it would pass four hex digits off as the tail of the real key.
  */
 export function displayEntityKey(key: string): string {
     if (!key) return '';
+    if (key.startsWith('masked:')) return key;
     if (key.length <= 4) return '•'.repeat(key.length);
     return '•'.repeat(key.length - 4) + key.slice(-4);
 }

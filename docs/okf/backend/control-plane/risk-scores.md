@@ -172,7 +172,8 @@ evidence rows, under `PREVIEW_POLICY` (512 MB, 2 threads, 10 s). An entity no fa
 `found: false` and every indicator missing. Evidence is masked exactly as a Job run masks it.
 
 **Entity key (D-P8 mask on read, D-RP6).** The response key is the Space `masked:<16 hex>` token unless the caller
-holds `canRevealLinkEntities` (`keyMasked` says which). The GET route still serves keys raw.
+holds `canRevealLinkEntities` (`keyMasked` says which). The GET route does the same (2026-10-06), through one
+helper, `RiskScoreRoutes.putEntityKey`.
 
 **Import-capability scan (operator, 2026-10-06).** `ImportCapabilityGuardTest` lists `POST /risk-scores/preview` on
 its `ACTS` exemptions — a read-only POST (keys stay out of URLs) that writes nothing — so its `canWorkIncidents` gate
@@ -182,14 +183,15 @@ is not read as a stricter write route of the `risk-score` kind. The kind's impor
 "refusing to score a subset" check could never fire: a Job run past the cap silently scored a subset. The spec now
 asks for cap + 1 rows, so the refusal fires. The cap itself is configurable — see *Entity cap* under the Job.
 
-### Masking — evidence at WRITE time, the key raw (operator decision 2026-09-27)
+### Masking — evidence at WRITE time, the key on READ (operator decisions 2026-09-27, 2026-10-06)
 
 Operator decision, 2026-09-27, under the standing "go with recommendations":
 
-- **The entity key stays raw.** This matches every per-entity Alert and Incident key in the platform, and
-  access to it is governed by `canWorkIncidents` and data scopes. **D-P8** was decided 2026-10-06 (operator:
-  mask on read, under `canRevealLinkEntities`) and built for audit rows (`AuditReadMasking`); applying it to this
-  key is not built. The read route masks nothing, so every surface shows the same key.
+- **The entity key is masked on READ (D-P8, operator 2026-10-06).** It is stored raw (the GET looks it up as a
+  bound parameter). `GET /risk-scores/{model}/{entityKey}` and the preview return it as the Space `masked:` token —
+  the same token write-time evidence carries for that value — with `keyMasked: true`, unless the caller holds
+  `canRevealLinkEntities` (or there is no Subject, auth off). The key in the request URL is the caller's own input.
+  Unmasking the key never unmasks evidence. (Until 2026-10-06 the key was raw, like Alert and Incident keys.)
 - **Classified evidence is masked at write time.** It is the widening: an Incident carries only a key and a
   value, while evidence copies source rows. The `risk.score` Job (`EvidenceMasker`, applied inside
   `RiskScoreEvaluator.evaluate`) stores the token and never the raw value, for any evidence column whose
@@ -266,8 +268,9 @@ saves the rule under its own gate.
 
 **Entity key display (D-RP6, operator 2026-10-06; D-P8 = mask on read).** Every SPA surface that prints an
 entity key goes through ONE function, `displayEntityKey` (`inspecto/risk/risk-score-view.ts`): it keeps the
-last four characters and masks the rest. Today the panel's label uses it. ⚠ This is display only — the key
-still travels raw in the read route's URL and response; server-side mask-on-read is not built.
+last four characters and masks the rest; a key the server already masked (`masked:…`) is shown as-is, never
+bulleted into a fake four-character tail. Today the panel's label uses it. The response is masked server-side (above);
+the key still travels in the request URL, which is the caller's own input.
 
 **Authoring the Job.** `risk.score` is in the Jobs palette (`job-attributes.ts`, the declared fallback when
 `GET /jobs/types` is unavailable). Its one parameter, `model`, is declared `STRING` (there is no component-ref
@@ -280,7 +283,7 @@ renders it as a required autocomplete over the saved models (`riskScoreModelOpti
 - ✅ **The watch Entity List is fed (2026-09-28).** An optional `watchList: {list, ttlHours}` (1..24) adds every
   high entity to a `watch` Entity List after each run, expiring `ttlHours` later. It fails closed at save and at
   run. See [Entity Lists — assurance entries](entity-lists.md#the-risk-score-watch-list-feed).
-- **Entity-key masking (D-P8 = mask on read, operator 2026-10-06).** The SPA displays keys through `displayEntityKey`; the preview route masks on read; the GET route still serves them raw (not built).
+- ✅ **Entity-key masking (D-P8 = mask on read, 2026-10-06).** The GET and preview routes mask the key unless the caller holds `canRevealLinkEntities` (`keyMasked`); the SPA displays keys through `displayEntityKey`, which passes a `masked:` token through.
 - ✅ **Authoring pane shipped (2026-10-06): S1 list + detail, S2a create/edit, S2b held/delete/Alert Rule link, S3
   preview.** Decisions D-RP1..D-RP10 (operator 2026-10-06): own admin route; schema-form plus bespoke factor cards
   (D-RP7 spike: the condition-group editor authors nested AND/OR the model cannot store); score stays a binary
