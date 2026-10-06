@@ -239,9 +239,34 @@ export function choiceValuesOf(field: FieldDraft): string[] {
 }
 
 /** The `findings-spec` component body — `{name, objectType, sections}`, the `FindingsSpec.toMap` shape. */
-export function toWire(objectType: string, fields: FieldDraft[]): Record<string, unknown> {
+export function toWire(
+    objectType: string,
+    fields: FieldDraft[],
+    caseType: string | null = null,
+): Record<string, unknown> {
     const type = objectType.toLowerCase();
-    return { name: type, objectType: type, sections: toSections(fields) };
+    const wire: Record<string, unknown> = { name: findingsSpecId(type, caseType), objectType: type };
+    if (caseType) wire['caseType'] = caseType;
+    wire['sections'] = toSections(fields);
+    return wire;
+}
+
+/** A Case type that may carry its own form — the server's id-safe charset (`FindingsSpec.CASE_TYPE`). */
+export const CASE_TYPE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+
+/** The `findings-spec` component id: `case` for the shared form, `case.<caseType>` for one Case type's own. */
+export function findingsSpecId(objectType: string, caseType: string | null): string {
+    const type = objectType.toLowerCase();
+    return caseType ? `${type}.${caseType}` : type;
+}
+
+/** The Case types that already have their own form, from a `findings-spec` component listing. */
+export function caseTypesOf(ids: string[], objectType: string): string[] {
+    const prefix = `${objectType.toLowerCase()}.`;
+    return ids
+        .filter((id) => id.startsWith(prefix))
+        .map((id) => id.slice(prefix.length))
+        .sort();
 }
 
 /** The drafts as served sections (what `GET /findings/{type}` would return after a save). */

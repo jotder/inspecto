@@ -1,7 +1,10 @@
 <h2 mat-dialog-title inspectoDialogResize #chrome="inspectoDialogResize" class="flex items-center gap-3">
     <span class="flex-auto">Findings fields — {{ data.typeLabel }}</span>
     @if (!loading() && !loadError()) {
-    <inspecto-status-badge [value]="authored() ? 'info' : 'neutral'" [label]="authored() ? 'Customised' : 'Built-in'" />
+    <inspecto-status-badge
+        [value]="authored() ? 'info' : 'neutral'"
+        [label]="authored() ? 'Customised' : caseType() ? 'Shared form' : 'Built-in'"
+    />
     } @if (authored()) {
     <button mat-icon-button type="button" (click)="openHistory()" matTooltip="History" aria-label="History">
         <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
@@ -29,10 +32,37 @@
         <button mat-button type="button" (click)="load()">Try again</button>
     </inspecto-alert>
     } @else {
+    @if (perCaseType) {
+    <div class="flex flex-wrap items-end gap-3">
+        <inspecto-option-picker
+            class="min-w-60 flex-1"
+            label="Form"
+            [formControl]="targetCtrl"
+            [options]="targetOptionsList()"
+        />
+        @if (askingNewType()) {
+        <mat-form-field class="min-w-48 flex-1" subscriptSizing="dynamic">
+            <mat-label>Case type</mat-label>
+            <input matInput [formControl]="newTypeCtrl" (keydown.enter)="openNewType()" placeholder="e.g. sim-box" />
+            @if (newTypeCtrl.hasError('required')) {
+            <mat-error>Name the Case type.</mat-error>
+            } @else if (newTypeCtrl.hasError('pattern')) {
+            <mat-error>Letters, digits, - and _ only, starting with a letter or digit.</mat-error>
+            }
+        </mat-form-field>
+        <button mat-stroked-button type="button" (click)="openNewType()">Open form</button>
+        }
+    </div>
+    }
     <p class="text-secondary text-sm">
-        These are the questions your team answers in a {{ data.typeLabel }}'s Findings panel. A change applies to every
-        {{ data.typeLabel }}.
+        These are the questions your team answers in a {{ data.typeLabel }}'s Findings panel. A change applies to
+        {{ scopeText() }}.
     </p>
+    @if (caseType() && !authored()) {
+    <inspecto-alert variant="info" title="No own form yet">
+        Cases of type “{{ caseType() }}” use the shared form below. Saving creates this type’s own form.
+    </inspecto-alert>
+    }
     @if (!canEdit()) {
     <inspecto-alert variant="info" title="View only">
         Changing the Findings fields needs permission to manage Incidents and Cases.
@@ -339,7 +369,7 @@
     <button mat-button type="button" (click)="requestClose()">{{ canEdit() ? 'Cancel' : 'Close' }}</button>
     @if (canEdit() && authored()) {
     <button mat-stroked-button color="warn" type="button" [disabled]="saving()" (click)="restoreBuiltIn()">
-        Restore built-in
+        {{ caseType() ? 'Use the shared form' : 'Restore built-in' }}
     </button>
     } @if (canEdit()) {
     <button

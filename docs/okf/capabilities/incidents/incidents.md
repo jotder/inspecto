@@ -555,8 +555,8 @@ spec, else the built-in default; the served `name` says which. `PATCH /objects/{
 `PUT /objects/{id}/findings` judge a Case's blob against the spec for its own `caseType` (fail closed,
 `422`). A type with no spec, or an unreadable one, keeps the generic form: additive, no migration. The SPA
 mail pane fetches the open Case's type spec (`findingsCaseType` in `mail-model.ts`) and falls back to the
-generic one. Authoring is the generic `/components/findings-spec` CRUD; the *Findings fields* dialog still
-edits only the generic form (gap: no per-type picker in the editor yet).
+generic one. Authoring is the generic `/components/findings-spec` CRUD, which the *Findings fields* dialog drives through
+its *Form* picker (shared form, an existing Case type, or a new one; `FINDINGS-EDITOR-PER-CASE-TYPE-1`).
 
 **Case Rules** (`CaseRule`, `/cases/rules`) are saved searches that auto-group: when ≥ *threshold* Incidents
 match within a *window* they are grouped under one Case, opened or attached idempotently. Evaluation is on

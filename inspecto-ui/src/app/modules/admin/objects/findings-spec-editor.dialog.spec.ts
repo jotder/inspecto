@@ -48,6 +48,7 @@ interface Opts {
     confirm?: boolean;
     create?: () => Observable<ComponentDef>;
     update?: () => Observable<ComponentDef>;
+    list?: ComponentDef[];
 }
 
 async function create(opts: Opts = {}) {
@@ -57,7 +58,9 @@ async function create(opts: Opts = {}) {
         create: vi.fn(opts.create ?? (() => of(AUTHORED))),
         update: vi.fn(opts.update ?? (() => of(AUTHORED))),
         remove: vi.fn(() => of({})),
+        list: vi.fn(() => of(opts.list ?? [])),
     };
+    const objects = { findingsSpec: vi.fn(() => of(BUILT_IN)) };
     const confirm = { confirmDestructive: vi.fn(async () => opts.confirm ?? true), confirm: vi.fn(async () => true) };
     const toastr = { success: vi.fn(), error: vi.fn() };
     TestBed.configureTestingModule({
@@ -66,7 +69,7 @@ async function create(opts: Opts = {}) {
             provideNoopAnimations(),
             { provide: MAT_DIALOG_DATA, useValue: { objectType: 'CASE', typeLabel: 'Case' } },
             { provide: MatDialogRef, useValue: ref },
-            { provide: ObjectsService, useValue: { findingsSpec: vi.fn(() => of(BUILT_IN)) } },
+            { provide: ObjectsService, useValue: objects },
             { provide: ComponentsService, useValue: components },
             { provide: LensService, useValue: { canManageIncidents: signal(opts.canEdit ?? true) } },
             { provide: InspectoConfirmService, useValue: confirm },
@@ -88,7 +91,7 @@ async function create(opts: Opts = {}) {
         Array.from(el.ownerDocument.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Save') as
             | HTMLButtonElement
             | undefined;
-    return { fixture, el, c, ref, components, confirm, toastr, render, saveButton };
+    return { fixture, el, c, ref, objects, components, confirm, toastr, render, saveButton };
 }
 
 describe('FindingsSpecEditorDialog', () => {
@@ -371,5 +374,66 @@ describe('FindingsSpecEditorDialog', () => {
         await render();
         expect(toggle().getAttribute('aria-expanded')).toBe('false');
         expect(el.querySelector('#ff-technical')).toBeNull();
+    });
+
+    describe('per-Case-type forms (FINDINGS-EDITOR-PER-CASE-TYPE-1)', () => {
+        const SIMBOX: ComponentDef = { ...AUTHORED, name: 'case.sim-box', ref: 'findings-spec/case.sim-box' };
+
+        it('says the shared form applies only to Cases without their own, and lists existing types', async () => {
+            const { el, c } = await create({ list: [AUTHORED, SIMBOX] });
+            expect(el.textContent).toContain('every Case without its own form');
+            expect(el.textContent).not.toContain('applies to every Case.');
+            expect(c.caseTypes()).toEqual(['sim-box']);
+            await expectNoA11yViolations(el);
+        });
+
+        it('picking a Case type loads and saves component case.<type>', async () => {
+            const { c, objects, components, render } = await create({ list: [AUTHORED, SIMBOX], authored: SIMBOX });
+            c.targetCtrl.setValue('sim-box');
+            await render();
+            expect(objects.findingsSpec).toHaveBeenLastCalledWith('case.sim-box');
+            expect(components.get).toHaveBeenLastCalledWith('findings-spec', 'case.sim-box');
+            c.addField();
+            c.save();
+            expect(components.update).toHaveBeenCalledWith(
+                'findings-spec',
+                'case.sim-box',
+                expect.objectContaining({ name: 'case.sim-box', objectType: 'case', caseType: 'sim-box' }),
+                { ifMatch: 'abc123' },
+            );
+        });
+
+        it('a new Case type is created from the shared form; an illegal name is refused', async () => {
+            const { el, c, components, render } = await create();
+            c.targetCtrl.setValue('#new');
+            await render();
+            c.newTypeCtrl.setValue('bad type');
+            await c.openNewType();
+            await render();
+            expect(c.caseType()).toBeNull();
+            expect(el.textContent).toContain('Letters, digits');
+            c.newTypeCtrl.setValue('roaming');
+            await c.openNewType();
+            await render();
+            expect(c.caseType()).toBe('roaming');
+            expect(el.textContent).toContain('No own form yet');
+            c.addField();
+            c.save();
+            expect(components.create).toHaveBeenCalledWith(
+                'findings-spec',
+                expect.objectContaining({ name: 'case.roaming', caseType: 'roaming' }),
+            );
+        });
+
+        it('keeps the draft when the lead declines to discard it on switch', async () => {
+            const { c } = await create({ list: [SIMBOX], confirm: false });
+            c.addField();
+            c.targetCtrl.setValue('sim-box');
+            await Promise.resolve();
+            await Promise.resolve();
+            expect(c.caseType()).toBeNull();
+            expect(c.targetCtrl.value).toBe('');
+            expect(c.dirty()).toBe(true);
+        });
     });
 });

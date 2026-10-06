@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
-import { FormArray, FormBuilder, FormControl, ReactiveFormsModule } from '@angular/forms';
+import { FormArray, FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -37,9 +37,12 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import {
     ANALYTICS_KEYS,
+    CASE_TYPE_PATTERN,
+    caseTypesOf,
     CONTROL_CHOICES,
     choiceValuesOf,
     controlLabel,
+    findingsSpecId,
     FieldDraft,
     fieldsAbove,
     fromWire,
@@ -63,6 +66,8 @@ export interface FindingsSpecEditorData {
 }
 
 const KIND = 'findings-spec' as const;
+/** Picker value for a Case type that has no form yet (never a legal Case type). */
+const NEW_TYPE = '#new';
 
 /**
  * **Findings fields** editor (findings-spec authoring UI S2–S5, design
@@ -113,7 +118,28 @@ export class FindingsSpecEditorDialog {
     /** D1: writing needs `canManageIncidents`. Everyone else gets the same screen, read-only (T1). */
     readonly canEdit = inject(LensService).canManageIncidents;
 
-    private readonly id = this.data.objectType.toLowerCase();
+    /** Case only: whose form is edited — `null` = the shared form every Case without its own uses. */
+    readonly caseType = signal<string | null>(null);
+    /** Case types that already have their own form (FINDINGS-EDITOR-PER-CASE-TYPE-1). */
+    readonly caseTypes = signal<string[]>([]);
+    readonly perCaseType = this.data.objectType.toLowerCase() === 'case';
+    private get id(): string {
+        return findingsSpecId(this.data.objectType, this.caseType());
+    }
+    /** The form picker: `''` = shared, a Case type, or {@link NEW_TYPE}. */
+    readonly targetCtrl = new FormControl('', { nonNullable: true });
+    readonly newTypeCtrl = new FormControl('', {
+        nonNullable: true,
+        validators: [Validators.required, Validators.pattern(CASE_TYPE_PATTERN)],
+    });
+    readonly targetOptionsList = computed<PickerOption[]>(() => [
+        { value: '', label: `Every ${this.data.typeLabel} without its own form`, hint: 'The shared form' },
+        ...this.caseTypes().map((t) => ({ value: t, label: t, hint: 'This Case type’s own form' })),
+        ...(this.canEdit()
+            ? [{ value: NEW_TYPE, label: 'A new Case type…', hint: 'Start its own form from the shared one' }]
+            : []),
+    ]);
+    readonly askingNewType = signal(false);
 
     readonly loading = signal(true);
     readonly loadError = signal<string | null>(null);
@@ -174,7 +200,77 @@ export class FindingsSpecEditorDialog {
 
     constructor() {
         this.fieldForm.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.applyForm());
+        this.targetCtrl.valueChanges
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe((v) => void this.onTargetPicked(v));
+        if (this.perCaseType) this.loadCaseTypes();
         this.load();
+    }
+
+    // ── which form ──
+
+    private loadCaseTypes(): void {
+        this.components.list(KIND).subscribe({
+            next: (defs) =>
+                this.caseTypes.set(
+                    caseTypesOf(
+                        defs.map((d) => d.name),
+                        this.data.objectType,
+                    ),
+                ),
+            // The picker degrades to the shared form alone; the dialog itself still works.
+            error: () => this.caseTypes.set([]),
+        });
+    }
+
+    private async onTargetPicked(v: string): Promise<void> {
+        if (v === NEW_TYPE) {
+            this.askingNewType.set(true);
+            this.newTypeCtrl.reset('');
+            return;
+        }
+        this.askingNewType.set(false);
+        await this.switchTo(v || null);
+    }
+
+    /** Open the form for a Case type typed in by the lead (its own form, or a new one seeded from the shared). */
+    async openNewType(): Promise<void> {
+        if (this.newTypeCtrl.invalid) {
+            this.newTypeCtrl.markAsTouched();
+            return;
+        }
+        const t = this.newTypeCtrl.value.trim();
+        if (!(await this.switchTo(t))) return;
+        this.askingNewType.set(false);
+        if (!this.caseTypes().includes(t)) this.caseTypes.set([...this.caseTypes(), t].sort());
+        this.targetCtrl.setValue(t, { emitEvent: false });
+    }
+
+    /** Discard-guarded switch; returns false (and restores the picker) when the lead keeps the draft. */
+    private async switchTo(caseType: string | null): Promise<boolean> {
+        if (caseType === this.caseType()) return true;
+        if (this.dirty()) {
+            const ok = await this.confirm.confirmDestructive('Your unsaved changes to this form will be lost.', {
+                title: 'Switch form?',
+                confirmText: 'Discard changes',
+                cancelText: 'Keep editing',
+            });
+            if (!ok) {
+                this.targetCtrl.setValue(this.caseType() ?? '', { emitEvent: false });
+                this.askingNewType.set(false);
+                return false;
+            }
+        }
+        this.caseType.set(caseType);
+        this.load();
+        return true;
+    }
+
+    /** "every Case without its own form" / "every Case of type “sim-box”". */
+    scopeText(): string {
+        const t = this.caseType();
+        if (!this.perCaseType) return `every ${this.data.typeLabel}`;
+        return t ? `every ${this.data.typeLabel} of type “${t}”` : `every ${this.data.typeLabel} without its own form`;
     }
 
     get choiceControls(): FormArray<FormControl<string>> {
@@ -188,7 +284,7 @@ export class FindingsSpecEditorDialog {
         this.loading.set(true);
         this.loadError.set(null);
         forkJoin({
-            effective: this.objects.findingsSpec(this.data.objectType),
+            effective: this.objects.findingsSpec(this.id),
             authored: this.components
                 .get(KIND, this.id)
                 // 404 = nothing authored yet (the built-in is in force); 503 = no write root on this deployment.
@@ -445,7 +541,7 @@ export class FindingsSpecEditorDialog {
 
     save(): void {
         if (!this.canEdit() || this.problems().length || this.saving()) return;
-        const body = toWire(this.data.objectType, this.fields());
+        const body = toWire(this.data.objectType, this.fields(), this.caseType());
         const authored = this.authored();
         const write$ = authored
             ? this.components.update(KIND, this.id, body, { ifMatch: authored.contentHash })
@@ -472,6 +568,7 @@ export class FindingsSpecEditorDialog {
     /** Back to the four built-in fields: `DELETE` the authored component, the server then serves the default. */
     async restoreBuiltIn(): Promise<void> {
         if (!this.canEdit() || !this.authored()) return;
+        if (this.caseType()) return this.removeTypeForm();
         const ok = await this.confirm.confirmDestructive(
             'Your team will see the built-in Findings fields again (Disposition, Records affected, ' +
                 'Summary). Values already recorded in your own fields stay stored on each Case but stop showing.',
@@ -489,11 +586,35 @@ export class FindingsSpecEditorDialog {
         });
     }
 
+    /** A Case type's own form is deleted: its Cases go back to the shared form. */
+    private async removeTypeForm(): Promise<void> {
+        const t = this.caseType()!;
+        const ok = await this.confirm.confirmDestructive(
+            `Cases of type “${t}” will use the shared Findings form again. Values already recorded in ` +
+                'this form’s own fields stay stored on each Case but stop showing.',
+            { title: `Remove the “${t}” form?`, confirmText: 'Use the shared form', cancelText: 'Cancel' },
+        );
+        if (!ok) return;
+        this.components.remove(KIND, this.id).subscribe({
+            next: () => {
+                this.changed = true;
+                this.dirty.set(false);
+                this.toastr.success(`Cases of type “${t}” now use the shared form`);
+                this.ref.close(true);
+            },
+            error: (e) => this.toastr.error(apiErrorMessage(e, 'Remove failed')),
+        });
+    }
+
     openHistory(): void {
         this.dialog
             .open(ComponentHistoryDialog, {
                 width: '560px',
-                data: { type: KIND, id: this.id, label: `Findings fields — ${this.data.typeLabel}` },
+                data: {
+                    type: KIND,
+                    id: this.id,
+                    label: `Findings fields — ${this.data.typeLabel}${this.caseType() ? ' · ' + this.caseType() : ''}`,
+                },
             })
             .afterClosed()
             .subscribe((restored?: boolean) => {
