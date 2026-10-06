@@ -173,6 +173,12 @@
                                 </transformer>
                                 <!-- Merge JDBC driver service registrations from all dependencies -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <!-- MODULE-REORG-1 P2a: every module ships META-INF/inspecto/module.toon; without this the
+                                     shade keeps only the first. Each file starts with a separator line (three hyphens), which ModuleManifests
+                                     splits on. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                    <resource>META-INF/inspecto/module.toon</resource>
+                                </transformer>
                             </transformers>
                             <filters>
                                 <!-- Strip JAR signatures — required to avoid SecurityException at runtime -->

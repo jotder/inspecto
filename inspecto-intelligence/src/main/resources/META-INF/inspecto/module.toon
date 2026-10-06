@@ -1,0 +1,8 @@
+---
+id: intelligence
+title: AI assist and intelligence
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+provides:
+  contracts[1]: IntelligenceAgent

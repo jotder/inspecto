@@ -1,0 +1,6 @@
+---
+id: api
+title: Public API annotations
+buildRole: foundation
+offeringRole: base
+bindingTime: build

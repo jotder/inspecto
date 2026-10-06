@@ -1,0 +1,6 @@
+---
+id: event
+title: Event model and log
+buildRole: foundation
+offeringRole: base
+bindingTime: build

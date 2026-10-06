@@ -1,0 +1,10 @@
+---
+id: la-store-pg
+title: Link analysis PostgreSQL store
+buildRole: implementation
+offeringRole: provider
+bindingTime: boot
+provides:
+  contracts[1]: InvestigationStoreProvider
+requires:
+  modules[1]: la-core

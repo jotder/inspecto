@@ -9,10 +9,30 @@ timestamp: 2026-10-06T00:00:00Z
 
 # Module taxonomy
 
-> 🟢 **Status (2026-10-06): target model; P0 only.** Vocabulary is in `docs/GLOSSARY.md` §15; nothing
-> below is built except the baseline report (`tools/check-module-architecture.mjs`). The full plan,
-> decisions D-MR1…D-MR12 and phases P0–P7 live in
+> 🟢 **Status (2026-10-06): target model; P0, P1 (part) and P2a built.** Vocabulary is in `docs/GLOSSARY.md` §15.
+> Built: the per-module manifest (`META-INF/inspecto/module.toon`, all 34 modules), the activator
+> (`com.gamma.module` in `inspecto-util`) and `GET /modules`. Not built: directory regroup, per-Space Enabled gate,
+> offerings. Decisions D-MR1…D-MR12 and phases P0–P7 live in
 > [module-architecture-reorg-plan.md](../../superpower/module-architecture-reorg-plan.md) until they ship.
+
+## Manifest format (`META-INF/inspecto/module.toon`)
+```
+---
+id: ops
+title: Case management and objects
+buildRole: implementation      # foundation | contract | platform | implementation
+offeringRole: optional         # base | optional | provider | internal
+bindingTime: boot              # build | boot | space | run
+provides:
+  features[1]: ops             # must equal the code's RouteModule.featureIds() (guard-tested)
+  contracts[3]: JobTypeProvider,MaintenanceTaskProvider,ObjectEngineProvider
+requires:
+  modules[1]: la-core          # only real runtime edges; empty sections are omitted
+```
+The leading `---` line separates manifests when a shade merges them (the processor's does). ⚠ TOON has no comment
+syntax — the `#` notes above are for this page only; never put one in a manifest. A module is **INERT** when a
+required module is absent or inert, or a required contract is provided by no active module; `GET /modules` reports
+each module's state with the reasons, plus loader diagnostics.
 
 ## Three axes (a module is classified on all three)
 | Axis | Values |

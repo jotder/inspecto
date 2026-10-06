@@ -1,0 +1,6 @@
+---
+id: audit-spi
+title: Audit contract
+buildRole: contract
+offeringRole: base
+bindingTime: build

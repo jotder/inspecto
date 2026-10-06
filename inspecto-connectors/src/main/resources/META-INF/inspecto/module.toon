@@ -1,0 +1,8 @@
+---
+id: connectors
+title: Collector and export connectors
+buildRole: implementation
+offeringRole: provider
+bindingTime: boot
+provides:
+  contracts[3]: CollectorConnectorFactory,ExportConnectorFactory,DeliveryStatusAdapter

@@ -1,0 +1,11 @@
+---
+id: entity-list
+title: Entity lists
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+provides:
+  features[1]: entityList
+  contracts[2]: GovernableKindProvider,WatchListFeed
+requires:
+  modules[1]: entity-store

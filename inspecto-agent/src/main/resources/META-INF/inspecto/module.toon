@@ -1,0 +1,8 @@
+---
+id: agent
+title: Assistant agent
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+provides:
+  contracts[2]: AssistAgent,DescriptionProvider

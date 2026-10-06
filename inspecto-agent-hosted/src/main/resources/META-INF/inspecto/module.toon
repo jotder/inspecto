@@ -1,0 +1,10 @@
+---
+id: agent-hosted
+title: Hosted model providers for the assistant
+buildRole: implementation
+offeringRole: provider
+bindingTime: boot
+provides:
+  contracts[1]: HostedProviderPlugin
+requires:
+  modules[1]: agent

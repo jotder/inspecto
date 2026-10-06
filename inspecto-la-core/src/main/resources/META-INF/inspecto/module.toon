@@ -1,0 +1,8 @@
+---
+id: la-core
+title: Link analysis core and ports
+buildRole: platform
+offeringRole: optional
+bindingTime: boot
+requires:
+  modules[1]: la-graph

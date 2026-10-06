@@ -215,6 +215,35 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
 - **P1-D4 (2026-10-06): `features{}` / SPA gating** — `RouteModule.featureIds()` default, collected only after a
   successful `register()`; five legacy keys kept; SPA `navFeature` replaces the three id sets.
 
+### P2a as built (2026-10-06 — manifest, activator, `GET /modules`; the directory regroup is NOT done)
+- `inspecto-util` `com.gamma.module`: `ModuleManifest`, `ModuleManifests.load(ClassLoader)` (fail-soft per file; enum
+  fields and duplicate ids validated), `ModuleActivator.resolve` (fixpoint from all-active; reasons name each unmet
+  module or contract). `module.toon` is in all 34 modules with `src/main/java` (33 under `inspecto*` plus
+  `asn-decoders` in the nested `asn-facade`); roles follow §4. `GET /modules` = `ModulesRoutes`, appended LAST in
+  `ControlApi`'s list, read-only, no capability, one generated skeleton in `openapi-v1.json`.
+- **P2a-D1: `provides.features` is checked against the code, not trusted** — `ModuleManifestGuardTest` fails when a
+  module with main Java has no manifest, or its features differ from the strings in its `featureIds()`; it also
+  resolves the whole source tree and demands every module ACTIVE. `check-module-architecture.mjs` prints
+  *modules without manifest* (0).
+- **P2a-D2: `requires.modules` only for real runtime Maven edges** — la-core→la-graph, la-storage→la-core,
+  la-api→la-core+la-storage, la-store-pg→la-core, geo-link→la-api+la-core, entity-list→entity-store,
+  agent-hosted→agent. `exchange`→`ops` and `policy`→`ops`/`geo-link` are test scope, so NOT declared. The host
+  (`processor`) is implicit and never listed. `provides.contracts` lists the SPIs a module implements
+  (its `META-INF/services` files).
+- **Gotcha — `geoLink` is provided by `la-api`, not `geo-link`:** `GeoRoutes`/`InvRoutes` (which declare it) live in
+  `inspecto-la-api`; `geo-link` only adapts ports. The manifest follows the code.
+- **Gotcha — shaded jars collapse same-named resources.** All 34 files share one path, so the processor's shade got
+  an `AppendingTransformer` for it; each file therefore starts with a `---` line and the loader splits on that
+  line. A **sidecar** shade (`agent`, `connectors`) has no such transformer and is not on the host's class path.
+  Verified 2026-10-06: the `-Pedition-enterprise` fat jar's merged resource holds 14 manifests (the processor's dependency closure; optional modules ship as separate jars).
+- **Gotcha — TOON:** empty sections are simply omitted from the files; the loader still tolerates `{}` for an empty
+  key and `[0]:` arrays. A `#` line is data, not a comment (JToon) — never put one in a manifest.
+- **Build-id stamp: SKIPPED.** Only the shaded processor jar carries `Implementation-Version` (HOME-VERSION-1);
+  module jars are unstamped, so a per-jar boot check has nothing to compare. It needs a P3 packaging change first.
+- Deferred to later P2 steps: directory/artifactId regroup (D-MR2), per-Space Enabled gate, capabilities in
+  `provides` (P1-D3), 503 stubs synthesised from manifests, `/bootstrap` reading the three gates.
+- `route-gating.md` was already stale from the P1 `featureIds()` line shifts; it was regenerated with this change.
+
 ## 7. Success measures (baseline → target)
 
 | Measure | Today | Target |

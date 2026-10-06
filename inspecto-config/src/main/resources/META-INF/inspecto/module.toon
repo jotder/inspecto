@@ -1,0 +1,6 @@
+---
+id: config
+title: Config model and codecs
+buildRole: foundation
+offeringRole: base
+bindingTime: build

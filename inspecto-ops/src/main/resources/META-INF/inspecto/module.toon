@@ -1,0 +1,9 @@
+---
+id: ops
+title: Case management and objects
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+provides:
+  features[1]: ops
+  contracts[3]: JobTypeProvider,MaintenanceTaskProvider,ObjectEngineProvider

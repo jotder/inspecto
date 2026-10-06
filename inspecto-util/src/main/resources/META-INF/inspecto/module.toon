@@ -1,0 +1,6 @@
+---
+id: util
+title: Utilities, DuckDB access, TOON helpers, module manifests
+buildRole: foundation
+offeringRole: base
+bindingTime: build

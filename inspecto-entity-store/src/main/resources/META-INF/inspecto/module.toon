@@ -1,0 +1,6 @@
+---
+id: entity-store
+title: Entity store
+buildRole: platform
+offeringRole: base
+bindingTime: build

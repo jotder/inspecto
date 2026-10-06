@@ -1,0 +1,8 @@
+---
+id: la-storage
+title: Link analysis storage
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+requires:
+  modules[1]: la-core

@@ -1,0 +1,6 @@
+---
+id: asn-decoders
+title: ASN.1 decoders
+buildRole: implementation
+offeringRole: provider
+bindingTime: build

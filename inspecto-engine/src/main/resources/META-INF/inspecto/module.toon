@@ -1,0 +1,6 @@
+---
+id: engine
+title: Execution engine
+buildRole: platform
+offeringRole: base
+bindingTime: build

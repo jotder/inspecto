@@ -1,0 +1,8 @@
+---
+id: exchange
+title: Exchange (publication and ingestion contracts)
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+provides:
+  features[1]: exchange

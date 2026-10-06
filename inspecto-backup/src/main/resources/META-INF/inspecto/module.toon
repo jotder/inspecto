@@ -1,0 +1,8 @@
+---
+id: backup
+title: Backup and restore
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+provides:
+  contracts[1]: MaintenanceTaskProvider

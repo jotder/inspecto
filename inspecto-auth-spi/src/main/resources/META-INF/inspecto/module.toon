@@ -1,0 +1,6 @@
+---
+id: auth-spi
+title: Authentication and capability contract
+buildRole: contract
+offeringRole: base
+bindingTime: build

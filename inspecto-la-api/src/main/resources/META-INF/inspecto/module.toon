@@ -1,0 +1,10 @@
+---
+id: la-api
+title: Link analysis and geo routes
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+provides:
+  features[1]: geoLink
+requires:
+  modules[2]: la-core,la-storage

@@ -1,0 +1,8 @@
+---
+id: notify-channels
+title: Notification channels
+buildRole: implementation
+offeringRole: provider
+bindingTime: boot
+provides:
+  contracts[2]: NotificationChannel,WebhookSinkTransport

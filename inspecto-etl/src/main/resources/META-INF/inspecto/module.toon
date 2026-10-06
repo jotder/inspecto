@@ -1,0 +1,6 @@
+---
+id: etl
+title: ETL model and step registry
+buildRole: foundation
+offeringRole: base
+bindingTime: build

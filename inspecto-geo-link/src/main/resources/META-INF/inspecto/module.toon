@@ -1,0 +1,10 @@
+---
+id: geo-link
+title: Geo and link adapters over platform data
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+provides:
+  contracts[5]: CasePort,CollectorCoveragePort,DatasetProvider,LinkIndexBuilder,InvestigationMeasureProbe
+requires:
+  modules[2]: la-api,la-core

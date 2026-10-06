@@ -1,0 +1,8 @@
+---
+id: policy
+title: Attribute-based access policy
+buildRole: implementation
+offeringRole: provider
+bindingTime: boot
+provides:
+  contracts[1]: AccessDecider

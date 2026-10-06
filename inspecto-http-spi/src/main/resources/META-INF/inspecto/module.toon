@@ -1,0 +1,6 @@
+---
+id: http-spi
+title: Route module contract
+buildRole: contract
+offeringRole: base
+bindingTime: build

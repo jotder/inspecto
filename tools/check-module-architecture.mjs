@@ -123,8 +123,12 @@ export function gather(root) {
         const v = (vocab[g] ??= { total: 0 });
         for (const [w, n] of Object.entries(h)) { v[w] = (v[w] ?? 0) + n; v.total += n; }
     }
+    // P2a: a module with main Java must ship META-INF/inspecto/module.toon (asn-parser is a nested reactor, checked by ModuleManifestGuardTest)
+    const withoutManifest = Object.keys(mods).filter((m) => m.startsWith('inspecto')
+        && !files.includes(`${m}/src/main/resources/META-INF/inspecto/module.toon`)).sort();
     return {
         splitPackages: splitPackages(java),
+        withoutManifest,
         registries: registries(read, files),
         modules: Object.fromEntries(Object.entries(mods).sort((a, b) => b[1].loc - a[1].loc)),
         vocab: Object.fromEntries(Object.entries(vocab).sort()),
@@ -138,7 +142,7 @@ export function render(r) {
     L.push('', `## 2. Closed central registries: ${r.registries.length}`, '', '| Registry | Where | Size | Unit |', '|---|---|---|---|');
     for (const x of r.registries) L.push(`| ${x.name} | ${x.where} | ${x.size ?? 'MISSING'} | ${x.unit} |`);
     const ms = Object.entries(r.modules);
-    L.push('', `## 3. Modules with main code: ${ms.length}`, '', '| Module | Java files | Main LOC |', '|---|---|---|');
+    L.push('', `## 3. Modules with main code: ${ms.length} — modules without manifest: ${r.withoutManifest.length}${r.withoutManifest.length ? ` (${r.withoutManifest.join(', ')})` : ''}`, '', '| Module | Java files | Main LOC |', '|---|---|---|');
     for (const [m, v] of ms) L.push(`| ${m} | ${v.files} | ${v.loc} |`);
     L.push('', '## 4. Telecom vocabulary in generic modules', '', '| Module | Total | Words |', '|---|---|---|');
     for (const [m, v] of Object.entries(r.vocab)) L.push(`| ${m} | ${v.total} | ${Object.entries(v).filter(([k]) => k !== 'total').map(([k, n]) => `${k}=${n}`).join(' ') || '-'} |`);
@@ -151,6 +155,7 @@ export function summary(r) {
         closedRegistries: r.registries.length,
         registrySizes: Object.fromEntries(r.registries.map((x) => [x.name, x.size])),
         modules: Object.keys(r.modules).length,
+        modulesWithoutManifest: r.withoutManifest.length,
         mainLoc: Object.fromEntries(Object.entries(r.modules).map(([m, v]) => [m, v.loc])),
         vocab: Object.fromEntries(Object.entries(r.vocab).map(([m, v]) => [m, v.total])),
     };

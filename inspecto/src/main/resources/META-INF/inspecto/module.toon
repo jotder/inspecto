@@ -1,0 +1,6 @@
+---
+id: processor
+title: Control plane and processor host
+buildRole: platform
+offeringRole: base
+bindingTime: build
