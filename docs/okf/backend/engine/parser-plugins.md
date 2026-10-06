@@ -440,8 +440,18 @@ edition gate. **D8** no out-of-process host.
   packs-dir writer could otherwise rewrite staged bytes after they were hashed.
 - The 4- and 5-argument constructors are test conveniences that stage in the sibling `<packs dir>.staging`.
   Production never uses them.
-- ⚠ A crashed process leaves its `job-packs-*` dir behind. The copies in it are inert (a manager only loads
-  from the dir it created this run), and can be deleted by hand.
+- **Orphaned staging dirs are swept at the next use (2026-10-06).** Each manager holds an OS file lock on
+  the sibling `<job-packs-*>.lock` for its whole life; the OS drops it when the process dies. Before a
+  manager creates its own dir, `JobPackManager.sweepOrphans(root)` removes a `job-packs-*` dir only when
+  that lock can be taken now — so a live owner (this JVM or another process) is never touched. A dir with
+  **no** lock file (made before this change, or a live manager mid-creation) cannot be proven orphaned
+  and is **kept** — delete those by hand. Containment: a symlink entry is skipped (`NOFOLLOW_LINKS`); a
+  dir whose real path is not `<real root>/<name>` (a Windows junction) is skipped; only regular files
+  directly inside are deleted, never followed or recursed, and a dir holding anything else stays.
+  Proof: `JobPackStagingSweepTest` (orphan removed with its lock; in-JVM lock kept; a lock held by a
+  **child process** kept, then swept once it exits; no-lock dir kept; symlink/junction escape untouched;
+  a second manager sweeps a crashed dir but not the first manager's). **Mutation-checked**: ignoring the
+  lock turns three tests red; dropping the `NOFOLLOW` and real-path checks turns the junction test red.
 - Proof: `JobPackStagingTest` (the copy's parent is the given root; a root inside the packs dir refuses
   boot; the root is the audit dir unless overridden). **Mutation-checked**: back on `createTempDirectory`,
   the first test goes red on the parent assertion.

@@ -16,7 +16,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.ClosedWatchServiceException;
+import java.nio.file.LinkOption;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -141,6 +146,9 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
     /** Server-owned parent of {@link #stagingDir} (P0); {@code null} only when the feature is off. */
     private final Path stagingRoot;
     private Path stagingDir;                         // lazily created under stagingRoot; holds the locked copies we load from
+    /** Held for this manager's lifetime on {@code <stagingDir>.lock} (a sibling, so the dir holds only
+     *  staged copies); the OS drops it when the process dies, which is what lets {@link #sweepOrphans} prove a dir orphaned. */
+    private FileChannel ownerLock;
     /** Test seams around {@link #stage}: run just before / just after the watched jar is copied, so a test
      *  can swap the watched file inside the TOCTOU window. No-ops in production. */
     Runnable beforeStage = () -> {};
@@ -583,7 +591,65 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
         }
         draining.clear();
         activeRuns.clear();
-        if (stagingDir != null) try { Files.deleteIfExists(stagingDir); } catch (IOException ignore) { /* best effort */ }
+        if (ownerLock != null) try { ownerLock.close(); } catch (IOException ignore) { /* best effort */ }
+        if (stagingDir != null) try {
+            Files.deleteIfExists(stagingDir);
+            Files.deleteIfExists(lockFor(stagingDir));
+        } catch (IOException ignore) { /* best effort */ }
+    }
+
+    /** The owner lock of a {@code job-packs-*} staging dir: the sibling {@code <dir>.lock}. */
+    static Path lockFor(Path stagingDir) {
+        return stagingDir.resolveSibling(stagingDir.getFileName() + ".lock");
+    }
+
+    /**
+     * Delete the {@code job-packs-*} dirs under {@code root} that a crashed process left behind. A dir is
+     * removed ONLY when it is proven orphaned: it has a sibling {@code <dir>.lock} and that lock can be taken now
+     * (a live manager, in this JVM or another, holds it for its whole life; the OS releases it on death).
+     * A dir without a lock (pre-dating this sweep, or a live manager between creating its dir and locking
+     * it) is kept. Nothing outside {@code root} is touched: a symlink/junction entry is skipped, a dir whose
+     * real path is not {@code <real root>/<name>} is skipped, and only regular files directly inside the dir
+     * are deleted (never followed, never recursed) — a dir with anything else in it stays.
+     * @return the dirs removed
+     */
+    static List<Path> sweepOrphans(Path root) {
+        List<Path> removed = new ArrayList<>();
+        if (root == null || !Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)) return removed;
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(root, "job-packs-*")) {
+            Path realRoot = root.toRealPath();
+            for (Path d : ds) {
+                try {
+                    if (!Files.isDirectory(d, LinkOption.NOFOLLOW_LINKS)) continue;          // symlink / file
+                    if (!d.toRealPath().equals(realRoot.resolve(d.getFileName().toString()))) continue; // junction
+                    Path lock = lockFor(d);
+                    if (!Files.isRegularFile(lock, LinkOption.NOFOLLOW_LINKS)) continue;     // unprovable
+                    try (FileChannel ch = FileChannel.open(lock, StandardOpenOption.WRITE)) {
+                        FileLock l;
+                        try { l = ch.tryLock(); } catch (OverlappingFileLockException live) { continue; }
+                        if (l == null) continue;                                             // live owner
+                        l.release();
+                    }
+                    boolean clean = true;
+                    try (DirectoryStream<Path> files = Files.newDirectoryStream(d)) {
+                        for (Path f : files) {
+                            if (Files.isRegularFile(f, LinkOption.NOFOLLOW_LINKS)) Files.delete(f);
+                            else clean = false;                                              // never follow
+                        }
+                    }
+                    if (!clean) continue;
+                    Files.delete(d);
+                    Files.delete(lock);
+                    removed.add(d);
+                    log.info("Removed orphaned job-pack staging dir {} (its owner process is gone)", d);
+                } catch (IOException e) {
+                    log.warn("Could not sweep job-pack staging dir {}: {}", d, e.toString());
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Could not sweep job-pack staging root {}: {}", root, e.toString());
+        }
+        return removed;
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────────────────────────
@@ -616,7 +682,11 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             // One unique dir per manager under the server-owned root: several Spaces may share the root (a
             // JVM-wide -Djobs.packs.stagingDir), and each manager deletes only its own copies.
             Files.createDirectories(stagingRoot);
+            sweepOrphans(stagingRoot);
             stagingDir = Files.createTempDirectory(stagingRoot, "job-packs-");
+            ownerLock = FileChannel.open(lockFor(stagingDir),
+                    StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            if (ownerLock.tryLock() == null) throw new IOException("could not lock " + stagingDir);
         }
         Path dest = Files.createTempFile(stagingDir, "pack-", "-" + name);
         try {
