@@ -436,6 +436,8 @@ public final class RowShaper {
                     byWindow.computeIfAbsent(win.startFor(rs.getObject(2, java.time.LocalDate.class)),
                             w -> new ArrayList<>()).add(rs.getString(1));
             }
+            // M6 (policy-narrowing-design §4.2): a claim advances the dedup ledger - gate it before the first one.
+            if (!byWindow.isEmpty()) com.gamma.config.safety.StateGate.requireAdvance("dedup claims of '" + ctx.pipeline() + "'");
             Set<String> lost = new java.util.LinkedHashSet<>();
             for (Map.Entry<java.time.LocalDate, List<String>> w : byWindow.entrySet()) {
                 Set<String> won = ctx.ledger().claim(ctx.pipeline(), w.getKey(), ctx.consignmentId(), w.getValue());

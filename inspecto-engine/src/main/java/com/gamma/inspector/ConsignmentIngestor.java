@@ -118,6 +118,10 @@ public final class ConsignmentIngestor {
             // S6: refuse before any output is written - the M1-M3 checks below run after outputs are durable.
             if (cfg.processing().duplicateCheckEnabled() || cfg.dirs().markers() != null)
                 com.gamma.config.safety.StateGate.requireAdvance("processed markers / fingerprint ledger of '" + cfg.identity().pipelineName() + "'");
+            // ...and a DB-export / Kafka / remote slice whose frontier (M3) commits after its outputs are durable.
+            if (batch.members().stream().map(m -> m.file().toPath().toAbsolutePath().normalize()).anyMatch(f ->
+                    AcquisitionLedgers.hasDbWatermark(f) || SliceFrontiers.read(cfg, f).isPresent()))
+                com.gamma.config.safety.StateGate.requireAdvance("DB-export / Kafka watermark of '" + cfg.identity().pipelineName() + "'");
             try {
                 outcome = strategy.ingest(batch, cfg);
             } finally {

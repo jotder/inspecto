@@ -21,6 +21,7 @@ final class LedgerPruneTask {
             return JobResult.ok("ledger_prune[dry-run]: would remove " + would + " fingerprint(s)" + scope,
                     (System.nanoTime() - t0) / 1_000_000L);
         }
+        com.gamma.config.safety.StateGate.requireRewind("acquisition ledger prune");   // M8
         int removed = ledger.prune(cutoff, source);
         return JobResult.ok("ledger_prune: removed " + removed + " fingerprint(s)" + scope,
                 (System.nanoTime() - t0) / 1_000_000L);

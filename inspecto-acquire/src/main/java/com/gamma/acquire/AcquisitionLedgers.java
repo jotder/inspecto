@@ -133,6 +133,11 @@ public final class AcquisitionLedgers {
         return java.util.Optional.ofNullable(PENDING_DB_WATERMARKS.remove(key(dest)));
     }
 
+    /** Is a watermark stashed for {@code dest}? A peek - the stash stays for the commit to take. */
+    public static boolean hasDbWatermark(Path dest) {
+        return PENDING_DB_WATERMARKS.containsKey(key(dest));
+    }
+
     /** Drop any watermark stashed for {@code staged}: its slice failed to land or was quarantined, so it must never commit. */
     public static void discardDbWatermark(Path staged) {
         PENDING_DB_WATERMARKS.remove(key(staged));

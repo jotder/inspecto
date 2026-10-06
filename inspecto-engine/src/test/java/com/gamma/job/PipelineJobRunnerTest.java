@@ -551,6 +551,55 @@ class PipelineJobRunnerTest {
         assertEquals(List.of(1, 2, 3, 4), readIds(dataDir, "rollup"), "second run appends only the new rows");
     }
 
+    /**
+     * T11 (policy-narrowing-design §7), runner level: {@code permit.advance_state false} with the planner bypassed
+     * (the runner called directly) fails the incremental run BEFORE the sink write - no output, no watermark file.
+     */
+    @Test
+    void advanceStateFalseFailsAnIncrementalRunBeforeTheSinkWrite() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        Path audit = tmp.resolve("audit");
+        seedParquetFile(dataDir, "events", "batch1", "(1,150),(2,50)");
+        PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+        store.write("inc_flow", new PipelineGraph("inc_flow", true,
+                List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                        new PipelineNode("out", "sink.persistent", "Rollup", null, Map.of("store", "rollup"), null)),
+                List.of(PipelineEdge.data("src", "out"))));
+        JobConfig cfg = new JobConfig("incjob", JobType.PIPELINE, null, null, true, false,
+                Map.of("flow", "inc_flow", "data_dir", dataDir, "incremental_column", "id", "batch_id", "inc1"));
+
+        boolean refused;
+        try {
+            refused = !underAdvance(false, () -> new PipelineJobRunner(cfg, new ConsignmentEventBus(), store,
+                    dataDir, audit.toString()).run()).success();
+        } catch (RuntimeException e) {
+            refused = true;
+        }
+        assertTrue(refused, "the run must fail");
+        assertFalse(Files.exists(Path.of(dataDir, "rollup")), "the sink was never written");
+        assertEquals(0, watermarkFiles(audit), "no watermark advanced");
+
+        // the probe that succeeds: the same run with advance permitted writes both
+        assertTrue(underAdvance(true, () -> new PipelineJobRunner(cfg, new ConsignmentEventBus(), store,
+                dataDir, audit.toString()).run()).success());
+        assertEquals(List.of(1, 2), readIds(dataDir, "rollup"));
+        assertEquals(1, watermarkFiles(audit), "the high-water mark was recorded");
+    }
+
+    private static long watermarkFiles(Path audit) throws Exception {
+        if (!Files.exists(audit)) return 0;
+        try (var s = Files.walk(audit)) { return s.filter(f -> f.toString().endsWith(".watermark")).count(); }
+    }
+
+    private <T> T underAdvance(Boolean advance, java.util.concurrent.Callable<T> r) {
+        var tier = new com.gamma.config.safety.SafetyPolicyTier(null, null, null, advance, null,
+                null, null, null, null, null, null, null, null, null, null);
+        return com.gamma.config.safety.SafetyPolicy.runWithPinned(new com.gamma.config.safety.SafetyPolicy.Pin(
+                "default", com.gamma.config.safety.SafetyPolicy.withRoots(tmp), tier), () -> {
+            try { return r.call(); } catch (Exception e) { throw new RuntimeException(e); }
+        });
+    }
+
     @Test
     void incrementalMultiSourceAdvancesPerSourceWatermarks() throws Exception {
         // T32 follow-up — each source_store keeps its OWN watermark, so a multi-source incremental pipeline

@@ -93,6 +93,34 @@ class PipelineExecutorDedupWindowTest {
         return out;
     }
 
+    /** M6 (policy-narrowing-design §4.2): {@code permit.advance_state false} refuses the claim - nothing lands in the ledger. */
+    @Test
+    void advanceStateFalseRefusesTheDedupClaim() throws Exception {
+        PipelineGraph g = windowedGraph("window(P4D)", "event_time DESC");
+        Throwable t = assertThrows(Throwable.class, () -> underAdvance(false, () ->
+                runBatch(g, "('A', DATE '2026-08-02')", "c1", new RowShaper.ExecutionContext("pipe1", "c1", ledger))));
+        boolean refused = false;
+        for (Throwable c = t; c != null; c = c.getCause())
+            refused |= c instanceof com.gamma.config.safety.StateRefusedException;
+        assertTrue(refused, "refused by the state gate: " + t);
+        assertEquals(0, ledger.size(), "a refused run claims nothing");
+
+        // the probe that succeeds: the same batch with advance permitted claims its key
+        Batch ok = underAdvance(true, () ->
+                runBatch(g, "('A', DATE '2026-08-02')", "c1", new RowShaper.ExecutionContext("pipe1", "c1", ledger)));
+        assertEquals(List.of("A"), ok.sinkKeys());
+        assertEquals(1, ledger.size());
+    }
+
+    private static <T> T underAdvance(Boolean advance, java.util.concurrent.Callable<T> r) {
+        var tier = new com.gamma.config.safety.SafetyPolicyTier(null, null, null, advance, null,
+                null, null, null, null, null, null, null, null, null, null);
+        return com.gamma.config.safety.SafetyPolicy.runWithPinned(new com.gamma.config.safety.SafetyPolicy.Pin(
+                "default", com.gamma.config.safety.SafetyPolicy.withRoots(), tier), () -> {
+            try { return r.call(); } catch (Exception e) { throw new RuntimeException(e); }
+        });
+    }
+
     @Test
     void aSecondConsignmentInsideTheWindowLosesTheKeyToTheDuplicateRelation() throws Exception {
         PipelineGraph g = windowedGraph("window(P4D)", "event_time DESC");

@@ -433,6 +433,43 @@ class MaintenanceLibraryTest {
         assertTrue(ledger.find("OTHER", "old2.csv").isPresent(), "other source untouched with a source scope");
     }
 
+    /** Run {@code r} under a pinned Safety Policy tier with {@code permit.rewind_state = rewind}. */
+    private static <T> T underRewind(Boolean rewind, java.util.concurrent.Callable<T> r) {
+        var tier = new com.gamma.config.safety.SafetyPolicyTier(null, null, null, null, rewind,
+                null, null, null, null, null, null, null, null, null, null);
+        return com.gamma.config.safety.SafetyPolicy.runWithPinned(new com.gamma.config.safety.SafetyPolicy.Pin(
+                "default", com.gamma.config.safety.SafetyPolicy.withRoots(), tier), () -> {
+            try { return r.call(); } catch (Exception e) { throw new RuntimeException(e); }
+        });
+    }
+
+    private static boolean causedByStateRefusal(Throwable t) {
+        for (; t != null; t = t.getCause())
+            if (t instanceof com.gamma.config.safety.StateRefusedException) return true;
+        return false;
+    }
+
+    /** M8 (policy-narrowing-design §4.2): {@code permit.rewind_state false} refuses ledger_prune before it forgets. */
+    @Test
+    void ledgerPruneIsRefusedWhenRewindStateIsFalse() {
+        InMemoryAcquisitionLedger ledger = new InMemoryAcquisitionLedger();
+        AcquisitionLedgers.use(ledger);
+        long old = System.currentTimeMillis() - Duration.ofDays(120).toMillis();
+        ledger.record(new LedgerEntry("S", "old.csv", "old.csv", 1, null, null, null, old, old, LedgerEntry.PROCESSED));
+        ledger.record(new LedgerEntry("S", "new.csv", "new.csv", 1, null, null, null, old,
+                System.currentTimeMillis(), LedgerEntry.PROCESSED));   // holds the watermark floor
+        Map<String, String> cfg = Map.of("task", "ledger_prune", "retention_days", "90", "source", "S");
+
+        Throwable t = assertThrows(Throwable.class, () -> underRewind(false, () -> new MaintenanceJob(job(cfg)).run()));
+        assertTrue(causedByStateRefusal(t), "refused by the state gate: " + t);
+        assertTrue(ledger.find("S", "old.csv").isPresent(), "a refused prune forgets nothing");
+
+        // the probe that succeeds: the same prune with rewind permitted removes the fingerprint
+        JobResult r = underRewind(true, () -> new MaintenanceJob(job(cfg)).run());
+        assertTrue(r.message().contains("removed 1"), r.message());
+        assertTrue(ledger.find("S", "old.csv").isEmpty());
+    }
+
     @Test
     void ledgerPruneRequiresRetentionDays() {
         assertThrows(IllegalArgumentException.class,
