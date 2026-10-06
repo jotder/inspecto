@@ -56,6 +56,7 @@ export * from './timezone-settings.service';
 export * from './scheduler-settings.service';
 export * from './egress-settings.service';
 export * from './approver-roster.service';
+export * from './module-settings.service';
 export * from './share.service';
 export * from './exchange.service';
 export * from './shared-ref';

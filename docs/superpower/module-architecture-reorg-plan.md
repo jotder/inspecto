@@ -295,7 +295,8 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
 - **Open:** `ImportLoaderInventoryTest.everyFixedNameALoaderReadsIsReservedOrAllowedWithAReason` is RED since P2a
   (`META-INF/inspecto/module.toon` read by `ModuleManifests.java`): it needs an `ALLOWED` row with a reason (a classpath
   resource an import cannot plant) — a guard-inventory edit that needs the operator.
-- **Deferred:** a settings screen (SPA) for `/settings/modules`; the SPA still reads `/bootstrap` only. A disabled
+- **Done 2026-10-07:** the settings screen (SPA) for `/settings/modules` — Settings ▸ Modules (see `docs/okf/frontend/features/spaces.md`).
+- **Deferred:** the SPA still reads `/bootstrap` only for gating. A disabled
   module's background Jobs and stores are NOT stopped (the gate is on the HTTP surface; P4 owns removal semantics).
 
 ### P5a as built (2026-10-06 — platform test kit + RouteModule TCK; the processor dependency is NOT yet dropped)

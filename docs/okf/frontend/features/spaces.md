@@ -41,3 +41,9 @@ so the gallery never offers a create that `POST /spaces` would refuse with a 422
 - `choose()` still refuses the card. This is pinned in two places:
 `ControlApiSpaceTemplatesTest.galleryMarksATemplateThisEditionCannotCreate` (a Personal context over real HTTP)
 and the gallery spec.
+
+**Per-Space settings screens (Settings drawer sections).** Egress Allowlist, Approvers and **Modules**
+(`modules/admin/settings/module-settings.component.ts`, 2026-10-07). Modules lists installed Modules by offering role
+from `GET /modules`, with a labelled switch ("Enabled in this Space") only for Optional/Provider Modules that declare
+Features; Save PUTs `/settings/modules` (administer capability), then `SessionService.reloadFeatures()` and a
+`NavigationService.get()` rebuild refresh the menu without a page reload. Unknown (inert) ids are listed and sent back untouched.

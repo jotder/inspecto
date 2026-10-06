@@ -26,6 +26,7 @@ import { ModelSettingsComponent } from 'app/modules/admin/model-settings/model-s
 import { NotificationCenterComponent } from 'app/modules/admin/notification-center/notification-center.component';
 import { EgressSettingsComponent } from './egress.component';
 import { ApproverRosterSettingsComponent } from './approver-roster.component';
+import { ModuleSettingsComponent } from './module-settings.component';
 import { IncidentGovernanceComponent } from './incident-governance.component';
 import { LinkAnalysisSettingsComponent } from './link-analysis-settings.component';
 import { OperationalDbComponent } from './operational-db.component';
@@ -112,6 +113,13 @@ export class SettingsComponent {
             icon: 'heroicons_outline:user-group',
             description: 'Who may approve Action Requests and Pending Changes.',
             component: ApproverRosterSettingsComponent,
+        },
+        {
+            id: 'modules',
+            title: 'Modules',
+            icon: 'heroicons_outline:puzzle-piece',
+            description: 'Which installed Modules and their Features are on in this Space.',
+            component: ModuleSettingsComponent,
         },
         {
             id: 'incident-governance',

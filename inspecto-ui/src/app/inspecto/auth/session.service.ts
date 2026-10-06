@@ -255,6 +255,22 @@ export class SessionService {
         if (token) await this.loadSessionFromBootstrap();
     }
 
+    /**
+     * Re-read `/bootstrap` `features` after a Space's Module settings changed (Settings ▸ Modules), so a Feature
+     * that was just switched off or on is reflected without a page reload. Degrades to the current map on failure.
+     */
+    async reloadFeatures(): Promise<void> {
+        const boot = await firstValueFrom(
+            this.http.get<Bootstrap>(apiUrl('/bootstrap')).pipe(catchError(() => of(null))),
+        );
+        if (!boot?.features) return;
+        this.features.set(Object.fromEntries(Object.entries(boot.features).filter(([, v]) => typeof v === 'boolean')) as Record<string, boolean>);
+        this.exchangeEnabled.set(boot.features.exchange === true);
+        this.geoLinkEnabled.set(boot.features.geoLink === true);
+        this.eventsEnabled.set(boot.features.events === true);
+        this.opsEnabled.set(boot.features.ops === true);
+    }
+
     /** Start the Authorization-Code + PKCE redirect (or, in mock mode, grant a code locally offline). */
     async beginLogin(demoUserId?: string): Promise<void> {
         const { randomVerifier, randomState, challengeFromVerifier } = await import('./pkce');
