@@ -54,7 +54,7 @@ class SecretResolverTest {
     void fileAndKeystoreSchemesAreRefusedNamingTheEditionWhenNoProviderIsBundled(@TempDir Path dir) throws Exception {
         Path secret = dir.resolve("db.pass");
         Files.writeString(secret, "swordfish\n");
-        SecretResolver.useProviders(List.of());                  // a Personal bundle: no inspecto-security on the classpath
+        SecretResolver.useProviders(List.of());                  // a Personal bundle: no inspecto-secrets on the classpath
         try {
             IllegalStateException e = assertThrows(IllegalStateException.class,
                     () -> SecretResolver.resolve("${FILE:" + secret + "}"),

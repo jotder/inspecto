@@ -109,7 +109,7 @@ final class AuthRoutes implements RouteModule {
 
     private static TokenRelay relay() {
         return TokenRelays.active().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
-                "no session broker on this edition (Professional bundles the inspecto-security module)"));
+                "no session broker on this edition (Professional bundles the inspecto-oidc module)"));
     }
 
     /** Origin gate: reject a browser-attributed cross-site call. Only enforced when an allowed origin

@@ -1,0 +1,7 @@
+id: secrets
+title: File-keystore secrets provider
+buildRole: implementation
+offeringRole: provider
+bindingTime: boot
+provides:
+  contracts[1]: SecretsProvider

@@ -41,7 +41,7 @@ import java.util.regex.Pattern;
  * The core (Personal edition) is <b>auth-free</b> — every route is open, exactly as before. Authentication
  * and authorization are an <em>edition</em> concern: {@link #dispatch} looks up an {@link Authenticator}
  * via {@link Authenticators} (a {@code ServiceLoader} seam); when the Professional edition's
- * {@code inspecto-security} module is absent, the lookup is empty and nothing is enforced. When it is
+ * {@code inspecto-oidc} module is absent, the lookup is empty and nothing is enforced. When it is
  * present, every route outside the health/bootstrap probe surface requires a valid credential
  * ({@code 401 UNAUTHENTICATED} on failure); write routes additionally declare a required capability via
  * {@link ApiContext#withCapability} ({@code 403 PERMISSION_DENIED} on a missing grant). See

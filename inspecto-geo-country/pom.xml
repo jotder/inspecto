@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-geo-country</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — geo-country resolver module (Professional edition, optional)</name>
+    <description>
+        OPTIONAL Professional-edition GeoCountryResolver: a MaxMind .mmdb country lookup behind the core GeoCountryResolver ServiceLoader seam (D12). Reads the operator-supplied -Dgeoip.db. Shaded as a sidecar jar so maxmind-db rides with it. Split out of inspecto-security by MODULE-REORG-1 D-MR6.
+    </description>
+
+    <properties>
+        <maxmind-db.version>4.2.0</maxmind-db.version>
+    </properties>
+
+    <dependencies>
+        <!-- The auth SPI: Authenticator, Subject, Roles, ComponentAccess, TokenRelay, GeoCountryResolver, SecretsProvider,
+             EgressPolicy (D-1 step 4, 2026-10-01 — this module no longer depends on the core at all). PROVIDED
+             (SEC-SIDECAR-BOOT-1, 2026-09-07): this jar is dropped onto a running engine's classpath, where inspecto.jar
+             already supplies all of it. Compile scope would drag the SPI into the shaded sidecar below. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-auth-spi</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- The core, for TESTS only: MaxMindAuditRowTest boots a real CollectorService. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+
+        <!-- MaxMind DB (.mmdb) reader behind the GeoCountryResolver binding (D12). Apache 2.0, no runtime
+             dependencies, needs java.base only. Reads the operator-supplied -Dgeoip.db; never downloads one. -->
+        <dependency>
+            <groupId>com.maxmind.db</groupId>
+            <artifactId>maxmind-db</artifactId>
+            <version>${maxmind-db.version}</version>
+        </dependency>
+
+        <!-- slf4j-api facade — logs a warning when the .mmdb cannot be opened; version is managed by the parent. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- LA separation D-1 (Decision 5): this module may reach ONLY the inspecto-* modules below, directly or
+                 transitively, at compile/provided/runtime scope. tools/check-module-deps.mjs derives the same answer from the
+                 poms and fails if this list drifts from its ALLOWED table. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>platform-layer-deps</id>
+                        <phase>validate</phase>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <searchTransitive>true</searchTransitive>
+                                    <excludes>
+                                        <exclude>com.gamma.inspector:*:*:*:compile</exclude>
+                                        <exclude>com.gamma.inspector:*:*:*:provided</exclude>
+                                        <exclude>com.gamma.inspector:*:*:*:runtime</exclude>
+                                    </excludes>
+                                    <includes>
+                                        <include>com.gamma.inspector:inspecto-api</include>
+                                        <include>com.gamma.inspector:inspecto-audit-spi</include>
+                                        <include>com.gamma.inspector:inspecto-auth-spi</include>
+                                        <include>com.gamma.inspector:inspecto-config</include>
+                                        <include>com.gamma.inspector:inspecto-util</include>
+                                    </includes>
+                                    <message>inspecto-geo-country may depend only on the inspecto-* modules listed in tools/check-module-deps.mjs (LA separation, D-1). A host module here silently undoes the extraction.</message>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- SEC-SIDECAR-BOOT-1 (2026-09-07), carried over from inspecto-security by D-MR6: a THIN jar would lack
+                 com/maxmind classes, and the resolver is resolved at startup by the core ServiceLoader seam.
+                 See okf/backend/build-run/guard-coverage.md. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <!-- Version parent-managed (pluginManagement). -->
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>sidecar</shadedClassifierName>
+                            <transformers>
+                                <!-- Load-bearing: the GeoCountryResolver registration is how the binding is
+                                     switched on. Lose it and geo-country lookups silently abstain. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>logback.xml</exclude>
+                                        <exclude>module-info.class</exclude>
+                                        <!-- 🔴 A SECOND SLF4J BINDING on one classpath is a real conflict:
+                                             SLF4J picks one non-deterministically and warns, so a bundle
+                                             with this sidecar could silently log through a different
+                                             backend than the core configured. The core owns the binding;
+                                             this sidecar must carry slf4j-api ONLY. Same reasoning as
+                                             inspecto-agent's shade config.
+                                             ⛔ Do not drop these excludes to "fix" a missing-logger
+                                             warning inside the sidecar - fix the dependency instead. -->
+                                        <exclude>META-INF/services/org.slf4j.spi.SLF4JServiceProvider</exclude>
+                                        <exclude>org/slf4j/impl/**</exclude>
+                                        <exclude>ch/qos/logback/**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

@@ -31,7 +31,7 @@ same SPI without touching the core engine.
 ### 1. Define a connection profile (`<name>_connection.toon`)
 
 Reachability and credentials live in a reusable profile, referenced by one or more pipelines. **Secrets are
-references, never literals** — `SecretResolver` expands five forms at connect time: `${ENV:VAR}` (environment variable), `${SYS:prop}` (JVM system property), `${FILE:/path}` (a mounted secret file), `${KEYSTORE:alias}` (a `SecretKeyEntry` from the store named by `-Dsecrets.keystore.path`/`.type`/`.password`), and bare `${NAME}` (environment first, then system property). ⚠ **SEC-07: `${FILE}` and `${KEYSTORE}` are Standard + Enterprise only** — they are served by the `inspecto-security` module's `SecretsProvider`, so a Personal bundle refuses the scheme by name and a connection test surfaces it as the failure.
+references, never literals** — `SecretResolver` expands five forms at connect time: `${ENV:VAR}` (environment variable), `${SYS:prop}` (JVM system property), `${FILE:/path}` (a mounted secret file), `${KEYSTORE:alias}` (a `SecretKeyEntry` from the store named by `-Dsecrets.keystore.path`/`.type`/`.password`), and bare `${NAME}` (environment first, then system property). ⚠ **SEC-07: `${FILE}` and `${KEYSTORE}` are Standard + Enterprise only** — they are served by the `inspecto-oidc` module's `SecretsProvider`, so a Personal bundle refuses the scheme by name and a connection test surfaces it as the failure.
 
 ```yaml
 connection:

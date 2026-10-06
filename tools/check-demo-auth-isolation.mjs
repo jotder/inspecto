@@ -16,7 +16,7 @@
  *   2. `inspecto/package.ps1` — every non-comment line that names inspecto-demo-auth lies inside an
  *      `if ($DemoAuth …) { … }` block. That one rule covers the `$modules` build list, the staging
  *      steps, the boot-smoke `$cp` literal and the serve.sh / serve.bat here-strings, all of which sit
- *      outside those blocks. It also requires the demo branch to REMOVE inspecto-security.jar and the
+ *      outside those blocks. It also requires the demo branch to REMOVE inspecto-oidc.jar and the
  *      demo launcher's `$demoJars` to omit it, so a demo bundle never carries two Authenticators.
  *   3. Every tracked pom.xml — none but the module's own declares a dependency on inspecto-demo-auth,
  *      and no edition profile lists it as a module. A dependency would ride into a shaded shipped jar
@@ -27,7 +27,7 @@
  *
  * The runtime backstop is in the core: the Authenticator slot refuses to boot when more than one
  * provider is registered (SpiSlot, fail-closed posture), so a hand-assembled classpath with both
- * inspecto-security.jar and inspecto-demo-auth.jar fails loudly instead of taking whichever came first.
+ * inspecto-oidc.jar and inspecto-demo-auth.jar fails loudly instead of taking whichever came first.
  *
  * Usage: node tools/check-demo-auth-isolation.mjs [--root <dir>]   (--root exists for the fixture test,
  * tools/check-demo-auth-isolation.test.mjs; the default is this repo). Pure Node + git ls-files.
@@ -108,13 +108,13 @@ for (const [n, line] of ps.split('\n').entries()) {
 }
 if (!gatedRefs) fail(`${SCRIPT}: no gated ${DEMO} reference found at all — the -DemoAuth branch changed shape. Fix this parser.`);
 const gated = blocks.map(([s, e]) => ps.slice(s, e)).join('\n');
-if (!/Remove-Item[^\n]*'inspecto-security\.jar'/.test(gated)) {
-    problems.push(`${SCRIPT}: no \`if ($DemoAuth)\` block removes inspecto-security.jar — a demo bundle would carry two Authenticators`);
+if (!/Remove-Item[^\n]*'inspecto-oidc.jar'/.test(gated)) {
+    problems.push(`${SCRIPT}: no \`if ($DemoAuth)\` block removes inspecto-oidc.jar — a demo bundle would carry two Authenticators`);
 }
 const demoJars = /\$demoJars\s*=\s*@\(([\s\S]*?)\)/.exec(ps);
 if (!demoJars) fail(`${SCRIPT}: no \`$demoJars = @(…)\` demo launcher classpath found. Fix this parser.`);
-if (demoJars[1].includes('inspecto-security.jar')) {
-    problems.push(`${SCRIPT}: the demo launcher classpath ($demoJars) names inspecto-security.jar next to ${DEMO}.jar`);
+if (demoJars[1].includes('inspecto-oidc.jar')) {
+    problems.push(`${SCRIPT}: the demo launcher classpath ($demoJars) names inspecto-oidc.jar next to ${DEMO}.jar`);
 }
 
 // ── 3. poms: nothing depends on the module, no edition profile lists it ─────────────────────────
@@ -150,7 +150,7 @@ if (problems.length) {
     fail(
         `${DEMO} can reach a non-demo bundle:\n  - ${problems.join('\n  - ')}\n` +
             `  The Demo User sign-in has NO real authentication. Only \`package.ps1 -DemoAuth\` may stage it,\n` +
-            `  and only in place of inspecto-security.jar (docs/okf/backend/editions/local-testing-without-iam.md).`,
+            `  and only in place of inspecto-oidc.jar (docs/okf/backend/editions/local-testing-without-iam.md).`,
     );
 }
 console.log(

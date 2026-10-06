@@ -400,7 +400,7 @@ Pinned by `TrustedProxiesTest` + `ControlApiClientIpTest`.
 **Auth model (editions realignment, 2026-06-16).** The common core is **auth-free**: on the Personal
 edition every route is open — no token, guard, or login (the old `CONTROL`/`assist.*` token scopes were
 removed). The **Standard** edition re-adds authentication out-of-band via the `Authenticator` / `Subject` /
-`TokenRelay` SPIs (`com.gamma.control`), implemented by the `inspecto-security` module (OIDC resource
+`TokenRelay` SPIs (`com.gamma.control`), implemented by the `inspecto-oidc` module (OIDC resource
 server, HTTPS, BFF `/auth/*` routes) — see [`EDITIONS.md`](../../../EDITIONS.md). Separate from auth and always on:
 **write routes are fail-closed** behind the `-Dassist.write.root` gate (`503` when unset).
 

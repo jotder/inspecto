@@ -27,7 +27,7 @@ Inspecto is deliberately **framework-free**: no Spring, no web framework, no IoC
   the [assist agent](./agent/assist-agent.md) (`AssistAgent`), `RouteModule`, `JobTypeProvider`,
   `MaintenanceTaskProvider`, `StepKindRegistry`, `DecompressorPlugin`, `ObjectEngineProvider`,
   `NotificationChannel`, `AccessDecider`, and the `Authenticator` / `Subject` / `TokenRelay` trio
-  implemented by `inspecto-security` on Standard ([auth](./editions/auth-security.md)). An absent module
+  implemented by `inspecto-oidc` on Standard ([auth](./editions/auth-security.md)). An absent module
   simply isn't discovered — the no-op path wins. This is what makes
   [editions build flavors](./editions/editions-model.md).
   ⚠ **[`StreamingFileIngester`](./engine/ingestion.md) is NOT one of them** — despite sitting beside them

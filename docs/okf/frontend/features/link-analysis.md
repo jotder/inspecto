@@ -1535,7 +1535,7 @@ its execution order in [`la-separation-execution-plan.md`](../../../archived-doc
 | Module | Holds |
 |---|---|
 | `inspecto-audit-spi` | `Event` `EventLog` `EventType` (+ `MetricRegistry`, which `EventLog` calls back); cuts the old `inspecto-event` → `inspecto-etl` edge (`ParquetEventStore` stays in `inspecto-event`) |
-| `inspecto-auth-spi` | the LOWER half of the control contract: `RequestAttrs` `WriteRootProvider` `ApiException` `ErrorCodes` `SpiSlot` `WriteGates` `Subject` `Roles` `ComponentAccess` `RowScope` `AccessDecider(s)` `AccessPolicies` `AuditTrail` `AccessGrants` `Authenticator(s)` `CapabilityManifest` `GeoCountryResolver(s)`, plus the OIDC helpers of `inspecto-security` |
+| `inspecto-auth-spi` | the LOWER half of the control contract: `RequestAttrs` `WriteRootProvider` `ApiException` `ErrorCodes` `SpiSlot` `WriteGates` `Subject` `Roles` `ComponentAccess` `RowScope` `AccessDecider(s)` `AccessPolicies` `AuditTrail` `AccessGrants` `Authenticator(s)` `CapabilityManifest` `GeoCountryResolver(s)`, plus the OIDC helpers of `inspecto-oidc` |
 | `inspecto-http-spi` | the UPPER half, depends on auth-spi: `ApiContext` (extends `WriteRootProvider`) `RouteModule` `Handler` `Envelope` `Idempotency` |
 | `inspecto-la-graph` | the six `Graph*` algorithm classes — JDK only |
 | `inspecto-la-core` | model, evaluator, pattern engine, Snapshot store, `LinkEventTypes`, and the ports `DatasetProvider` / `CasePort` |

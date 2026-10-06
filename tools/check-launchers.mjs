@@ -4,7 +4,7 @@
 //
 // WHY THIS EXISTS (`LAUNCHER-GUARD-1`, filed 2026-09-11). `serve.bat` spent its life dropping
 // `-Dauth.mode=oidc` on every Windows Standard/Enterprise bundle. The edition branch was a
-// parenthesised `if exist inspecto-security.jar ( ... )` block, and cmd.exe expands every `%OPTS%`
+// parenthesised `if exist inspecto-oidc.jar ( ... )` block, and cmd.exe expands every `%OPTS%`
 // inside a parenthesised block ONCE, when the block is PARSED — so N successive
 // `set "OPTS=%OPTS% ..."` statements all expand to the value OPTS held BEFORE the block and only the
 // last one survives. Five of six were discarded. The service booted AUTH-FREE while printing
@@ -130,7 +130,7 @@ function observe(out) {
 // `expect` / `reject` match an argv entry exactly; a `reject` PREFIX is written with a trailing `=`
 // removed so `-Dauth.mode` catches any value at all, which is the assertion Personal needs.
 const PERSONAL = ['inspecto.jar'];
-const PROFESSIONAL = [...PERSONAL, 'inspecto-security.jar'];
+const PROFESSIONAL = [...PERSONAL, 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar'];
 const ENTERPRISE = [...PROFESSIONAL, 'inspecto-policy.jar'];
 const OIDC_ENV = {
   AUTH_OIDC_ISSUER: 'https://idp.example/realms/x',
@@ -146,7 +146,7 @@ const ALWAYS = ['--enable-native-access=ALL-UNNAMED', '-Dcontrol.port=8080', '-D
 
 const SCENARIOS = [
   {
-    name: 'Personal — no security jar',
+    name: 'Personal — no OIDC jar',
     jars: PERSONAL, env: {}, edition: 'Personal',
     expect: ALWAYS,
     // The whole point of the edition seam: Personal is byte-for-byte the historic auth-free bundle.
@@ -154,17 +154,17 @@ const SCENARIOS = [
     jarsOnCp: ['inspecto.jar'],
   },
   {
-    name: 'Professional — security jar, no OIDC env',
+    name: 'Professional — OIDC + secrets + geo jars, no OIDC env',
     jars: PROFESSIONAL, env: {}, edition: 'Professional',
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Devents.backend=parquet'],
     // OBJECTS-BACKEND-DEFAULT-MEMORY-1: Professional runs the engine default (`db`); only Enterprise pins one.
     rejectPrefix: ['-Dauth.oidc.', '-Dobjects.backend'],
-    jarsOnCp: ['inspecto.jar', 'inspecto-security.jar'],
+    jarsOnCp: ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar'],
   },
   {
     // 🔴 THE REGRESSION TEST. SERVEBAT-OPTS-1 lost five of these six flags and kept the last. Any
     // future rewrite that reintroduces a parse-time-expanded block fails HERE, with the flag named.
-    name: 'Professional — security jar + every OIDC variable set',
+    name: 'Professional — OIDC + secrets + geo jars + every OIDC variable set',
     jars: PROFESSIONAL, env: OIDC_ENV, edition: 'Professional',
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Devents.backend=parquet',
       `-Dauth.oidc.issuer=${OIDC_ENV.AUTH_OIDC_ISSUER}`,
@@ -175,14 +175,14 @@ const SCENARIOS = [
       // reach the process command line. Asserting the literal is asserting that.
       '-Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}'],
     reject: [`-Dauth.oidc.clientSecret=${OIDC_ENV.AUTH_OIDC_CLIENT_SECRET}`],
-    jarsOnCp: ['inspecto.jar', 'inspecto-security.jar'],
+    jarsOnCp: ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar'],
   },
   {
-    name: 'Enterprise — security + policy jar',
+    name: 'Enterprise — OIDC + secrets + geo + policy jar',
     jars: ENTERPRISE, env: OIDC_ENV, edition: 'Enterprise',
     // OBJECTS-BACKEND-DEFAULT-MEMORY-1 (2026-09-25): PostgreSQL is MANDATORY for the operational objects.
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Devents.backend=parquet', '-Dobjects.backend=postgres'],
-    jarsOnCp: ['inspecto.jar', 'inspecto-security.jar', 'inspecto-policy.jar'],
+    jarsOnCp: ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar', 'inspecto-policy.jar'],
   },
   {
     // Operator flags are appended LAST on purpose, so they cannot clobber the required ones.
@@ -190,7 +190,7 @@ const SCENARIOS = [
     jars: PROFESSIONAL, env: { INSPECTO_JAVA_OPTS: '-Xmx4g -Dui.static.log=DEBUG' }, edition: 'Professional',
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Xmx4g', '-Dui.static.log=DEBUG'],
     lastAfter: { after: '-Dauth.mode=oidc', these: ['-Xmx4g', '-Dui.static.log=DEBUG'] },
-    jarsOnCp: ['inspecto.jar', 'inspecto-security.jar'],
+    jarsOnCp: ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar'],
   },
 ];
 

@@ -1,5 +1,5 @@
 {
-  "_comment": "ILLUSTRATIVE STARTING POINT (docs/api/deployment/README.md) — a partial Keycloak realm export. Import via the admin console (Realm settings > Action > Partial import) or `kcadm.sh create realms -f this-file.json`, then fill in real users/LDAP federation. Role names below are exactly what inspecto-security's RoleMapper (rbac-groundwork.md §3) understands.",
+  "_comment": "ILLUSTRATIVE STARTING POINT (docs/api/deployment/README.md) — a partial Keycloak realm export. Import via the admin console (Realm settings > Action > Partial import) or `kcadm.sh create realms -f this-file.json`, then fill in real users/LDAP federation. Role names below are exactly what inspecto-oidc's RoleMapper (rbac-groundwork.md §3) understands.",
 
   "realm": "inspecto",
   "enabled": true,

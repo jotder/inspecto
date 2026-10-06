@@ -61,9 +61,9 @@ function mvn() {
 }
 
 function resolve() {
-    // `-Pedition-enterprise` (2026-09-07): the profile is MODULES-ONLY, so it adds inspecto-security and
+    // `-Pedition-enterprise` (2026-09-07): the profile is MODULES-ONLY, so it adds inspecto-oidc, inspecto-secrets, inspecto-geo-country and
     // inspecto-policy to the resolve. Without it the lock covered only the DEFAULT reactor, which meant
-    // the one dependency tree a security reviewer most wants under review — inspecto-security's Nimbus
+    // the one dependency tree a security reviewer most wants under review — inspecto-oidc's Nimbus
     // JOSE+JWT — was the one the guard never saw, while compliance/controls-matrix.md marked G7 CLOSED.
     // Enterprise is the superset, so this single flag covers Standard too.
     // ⚠ `package -DskipTests` runs BEFORE dependency:list on purpose (EDG-01 cell 7, 2026-09-08).

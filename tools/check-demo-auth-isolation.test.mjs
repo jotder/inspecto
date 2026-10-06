@@ -65,11 +65,11 @@ const RED = {
         /bundle-modules\.mjs ships inspecto-demo-auth\.jar/,
     ],
     'the boot-smoke classpath literal': [
-        edit('inspecto/package.ps1', "@('inspecto-security.jar',", "@('inspecto-security.jar','inspecto-demo-auth.jar',"),
+        edit('inspecto/package.ps1', "@('inspecto-oidc.jar',", "@('inspecto-oidc.jar','inspecto-demo-auth.jar',"),
         /outside an `if \(\$DemoAuth\)` block/,
     ],
     'an edition $modules build list': [
-        edit('inspecto/package.ps1', "{ 'inspecto-security,inspecto-policy,", "{ 'inspecto-security,inspecto-demo-auth,inspecto-policy,"),
+        edit('inspecto/package.ps1', "{ 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-policy,", "{ 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-demo-auth,inspecto-policy,"),
         /outside an `if \(\$DemoAuth\)` block/,
     ],
     'a staging step under a NEGATED gate': [
@@ -77,12 +77,12 @@ const RED = {
             'Copy-Item $jarSrc "$bundleDir\\inspecto.jar"\nif (-not $DemoAuth) { Copy-Item $x "$bundleDir\\inspecto-demo-auth.jar" }'),
         /outside an `if \(\$DemoAuth\)` block/,
     ],
-    'the demo branch no longer removing inspecto-security.jar': [
-        edit('inspecto/package.ps1', "Remove-Item (Join-Path $bundleDir 'inspecto-security.jar')", "Write-Host 'kept'"),
-        /removes inspecto-security\.jar/,
+    'the demo branch no longer removing inspecto-oidc.jar': [
+        edit('inspecto/package.ps1', "Remove-Item (Join-Path $bundleDir 'inspecto-oidc.jar')", "Write-Host 'kept'"),
+        /removes inspecto-oidc.jar/,
     ],
-    'inspecto-security.jar on the demo launcher classpath': [
-        edit('inspecto/package.ps1', "$demoJars = @('inspecto.jar',", "$demoJars = @('inspecto.jar', 'inspecto-security.jar',"),
+    'inspecto-oidc.jar on the demo launcher classpath': [
+        edit('inspecto/package.ps1', "$demoJars = @('inspecto.jar',", "$demoJars = @('inspecto.jar', 'inspecto-oidc.jar',"),
         /demo launcher classpath/,
     ],
     'a shipped module depending on it': [

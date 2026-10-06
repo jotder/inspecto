@@ -123,7 +123,7 @@ in-memory store oldest-first so nothing emitted before the configured backend at
 configuration — but a ring that empties on restart cannot carry the **tamper-evident, append-only** audit
 trail Professional+ sells, and `AuditTrail` emits `EventType.AUDIT` straight into `EventLog`. So the
 Standard/Enterprise launchers emitted by `inspecto/package.ps1` now pass **`-Devents.backend=parquet`**,
-selected off the same `inspecto-security.jar` presence check that turns on OIDC. `-Devents.dir` is
+selected off the same `inspecto-oidc.jar` presence check that turns on OIDC. `-Devents.dir` is
 deliberately left unset: it falls back to `SpaceRoot.eventsDir()`, so discover mode keeps **one trail per
 space** rather than pooling every space's audit into one directory. Both halves are pinned by
 `EventStoreDurabilityTest` — including the memory drop, so the default is a choice and not an accident.

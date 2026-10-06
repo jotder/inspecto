@@ -995,7 +995,7 @@ acquisition ledger. Personal sets nothing at all.
   by design"*) and that stays true — **the driver rides the Standard/Enterprise bundle as the
   `postgresql.jar` sidecar** (PG-1 Open 1, decided 2026-08-14): `package.ps1` copies it from the local
   Maven repo (version = the parent pom's `postgresql.version`), and `serve.sh`/`serve.bat` auto-detect
-  it exactly as they do `inspecto-security.jar`. ⛔ The considered alternative — an edition Maven profile
+  it exactly as they do `inspecto-oidc.jar`. ⛔ The considered alternative — an edition Maven profile
   gating the dependency — was rejected: it would be the first edition seam gating a *runtime dependency*
   rather than a ServiceLoader SPI, and the sidecar mechanism already existed. The classpath entry is
   inert until `-Dinspecto.db=postgres` selects it, and the serve scripts honour a `postgresql.jar`

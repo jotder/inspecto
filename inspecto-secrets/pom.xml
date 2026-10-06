@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-secrets</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — file-keystore secrets provider module (Professional edition, optional)</name>
+    <description>
+        OPTIONAL Professional-edition SecretsProvider: resolves ${SECRET:...} references from an operator-supplied PKCS12 keystore behind the core SecretsProvider ServiceLoader seam. No third-party dependencies, so it ships as a thin jar. Split out of inspecto-security by MODULE-REORG-1 D-MR6.
+    </description>
+
+    <dependencies>
+        <!-- The auth SPI: Authenticator, Subject, Roles, ComponentAccess, TokenRelay, GeoCountryResolver, SecretsProvider,
+             EgressPolicy (D-1 step 4, 2026-10-01 — this module no longer depends on the core at all). PROVIDED
+             (SEC-SIDECAR-BOOT-1, 2026-09-07): this jar is dropped onto a running engine's classpath, where inspecto.jar
+             already supplies all of it. Compile scope would drag the SPI into the shaded sidecar below. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-auth-spi</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- LA separation D-1 (Decision 5): this module may reach ONLY the inspecto-* modules below, directly or
+                 transitively, at compile/provided/runtime scope. tools/check-module-deps.mjs derives the same answer from the
+                 poms and fails if this list drifts from its ALLOWED table. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>platform-layer-deps</id>
+                        <phase>validate</phase>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <searchTransitive>true</searchTransitive>
+                                    <excludes>
+                                        <exclude>com.gamma.inspector:*:*:*:compile</exclude>
+                                        <exclude>com.gamma.inspector:*:*:*:provided</exclude>
+                                        <exclude>com.gamma.inspector:*:*:*:runtime</exclude>
+                                    </excludes>
+                                    <includes>
+                                        <include>com.gamma.inspector:inspecto-api</include>
+                                        <include>com.gamma.inspector:inspecto-audit-spi</include>
+                                        <include>com.gamma.inspector:inspecto-auth-spi</include>
+                                        <include>com.gamma.inspector:inspecto-config</include>
+                                        <include>com.gamma.inspector:inspecto-util</include>
+                                    </includes>
+                                    <message>inspecto-secrets may depend only on the inspecto-* modules listed in tools/check-module-deps.mjs (LA separation, D-1). A host module here silently undoes the extraction.</message>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

@@ -65,7 +65,7 @@
     </modules>
 
     <!--
-        Edition assembly (docs/EDITIONS.md): inspecto-security (W6 — the Authenticator SPI's OIDC
+        Edition assembly (docs/EDITIONS.md): inspecto-oidc, inspecto-secrets and inspecto-geo-country (W6 — the Authenticator SPI's OIDC
         implementation), inspecto-notify-channels (CP-15 — the webhook + SMTP transports), inspecto-backup (OPS-06 — the
         backup/backup_verify/restore tasks) inspecto-entity-list (SEP-08 — Entity Lists + the shared entity fact log),
         inspecto-geo-link (CP-09 — the geo map + link analysis
@@ -81,7 +81,9 @@
         <profile>
             <id>edition-professional</id>
             <modules>
-                <module>inspecto-security</module>
+                <module>inspecto-oidc</module>
+                <module>inspecto-secrets</module>
+                <module>inspecto-geo-country</module>
                 <!-- EDG-01 cell 1 (2026-09-07): the external notification transports. CP-15 is "not for
                      Personal", and both channels used to reach every bundle — WebhookChannel from
                      inspecto-engine (an unconditional dependency) and SmtpEmailChannel from the
@@ -129,7 +131,9 @@
         <profile>
             <id>edition-standard</id>
             <modules>
-                <module>inspecto-security</module>
+                <module>inspecto-oidc</module>
+                <module>inspecto-secrets</module>
+                <module>inspecto-geo-country</module>
                 <module>inspecto-notify-channels</module>
                 <module>inspecto-backup</module>
                 <module>inspecto-entity-list</module>
@@ -156,7 +160,9 @@
         <profile>
             <id>edition-preview</id>
             <modules>
-                <module>inspecto-security</module>
+                <module>inspecto-oidc</module>
+                <module>inspecto-secrets</module>
+                <module>inspecto-geo-country</module>
                 <module>inspecto-policy</module>
                 <module>inspecto-notify-channels</module>
                 <module>inspecto-backup</module>
@@ -179,7 +185,9 @@
         <profile>
             <id>edition-enterprise</id>
             <modules>
-                <module>inspecto-security</module>
+                <module>inspecto-oidc</module>
+                <module>inspecto-secrets</module>
+                <module>inspecto-geo-country</module>
                 <module>inspecto-policy</module>
                 <module>inspecto-notify-channels</module>
                 <module>inspecto-backup</module>
@@ -535,7 +543,7 @@
                 </plugin>
                 <!-- maven-shade-plugin: the fat-jar/sidecar builder. FIVE modules run it — inspecto
                      (the core fat jar) plus the inspecto-agent, inspecto-connectors,
-                     inspecto-notify-channels and inspecto-security sidecars — and each pinned 3.5.2
+                     inspecto-notify-channels, inspecto-oidc and inspecto-geo-country sidecars — and each pinned 3.5.2
                      with its own copy of the "Pinned: the offline reactor resolves no plugin version
                      from a repository" comment, so a bump half-landed. The version now lives once; the
                      five children declare the plugin version-free and keep their own <configuration>.

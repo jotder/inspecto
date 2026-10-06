@@ -32,7 +32,7 @@ import java.util.function.Function;
  * {@code inspecto-engine/pom.xml}: "runtime stays JDBC-driver-free"); the driver rides the
  * <b>Standard/Enterprise bundle as the {@code postgresql.jar} sidecar</b> (PG-1, decided 2026-08-14),
  * which {@code serve.sh}/{@code serve.bat} auto-detect and add to the classpath — the same mechanism
- * as {@code inspecto-security.jar}, so the fat JAR and its SBOM stay driver-free. On a Personal
+ * as {@code inspecto-oidc.jar}, so the fat JAR and its SBOM stay driver-free. On a Personal
  * bundle this is the expected failure and the message says what to drop in rather than leaving an
  * operator to infer it.
  *

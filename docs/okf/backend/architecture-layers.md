@@ -42,7 +42,7 @@ is a **layered monolith** with satellite plug-in modules discovered via ServiceL
 
 ```
 ┌─ L5 · EXTENSION MODULES (separate Maven artifacts, ServiceLoader-discovered) ─────────────┐
-│  inspecto-connectors   inspecto-security   inspecto-agent   inspecto-intelligence         │
+│  inspecto-connectors   inspecto-oidc       inspecto-agent   inspecto-intelligence         │
 │  (SFTP/FTP/S3/Kafka/DB) (OIDC, Keycloak)   (assist skills)  (embedded agent)              │
 │                                             └── inspecto-agent-hosted (plugin-of-plugin)  │
 ├─ L4 · HTTP / CONTROL PLANE ───────────────────────────────────────────────────────────────┤
@@ -157,7 +157,7 @@ core at all.
 | Module | Core surface actually used | API-jar-buildable today? |
 |---|---|---|
 | inspecto-connectors | `acquire.*` (10 types), `etl.PipelineConfig`, `notify.{Notification,NotificationChannel}` | **Yes** — clean; needs only `@PublicApi` freezing |
-| inspecto-security | Exactly 4 types: `Authenticator`, `TokenRelay`, `Subject`, `SecretResolver` | **Yes** — tightest seam in the repo |
+| inspecto-oidc | Exactly 4 types: `Authenticator`, `TokenRelay`, `Subject`, `SecretResolver` | **Yes** — tightest seam in the repo |
 | inspecto-agent | catalog(10) + config(10) + sql(2) + etl(2) + service(3) + job(1) + report(2) + assist(5) + enrich(2) — direct internals, no facade | **No** — needs an `agent.spi` facade covering that surface |
 | inspecto-intelligence | Clean SPI (`IntelligenceAgent`, `AgentAnswerSink`) **but** compile-deps on inspecto-agent's `AssistModelSettings`/`ProviderSettings`/`ModelTier`, plus `RepoPaths` monorepo-layout filesystem walk | **No** — needs a core-owned model-settings bridge + packaged-artifact path resolution |
 | inspecto-agent-hosted | none (only inspecto-agent types) | N/A — isolated by construction |

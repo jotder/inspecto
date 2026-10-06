@@ -374,7 +374,7 @@ jobs:
       # makes the guard actually executable. See okf/backend/build-run/guard-coverage.md.
       #
       # `-Pedition-enterprise` (GUARD-SWEEP-1a, 2026-09-07): the profile is MODULES-ONLY — it adds
-      # inspecto-security and inspecto-policy, which are absent from the default <modules> and were
+      # inspecto-oidc, inspecto-secrets, inspecto-geo-country and inspecto-policy, which are absent from the default <modules> and were
       # therefore never built or tested by ANY workflow. That left 54 test methods running nowhere
       # automated: all OIDC authentication, token relay, ABAC policy enforcement and keystore-secret
       # resolution — the security-critical surface. `release.yml` does build Enterprise, but with

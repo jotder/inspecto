@@ -1,8 +1,0 @@
----
-id: security
-title: OIDC, secrets and geo providers
-buildRole: implementation
-offeringRole: provider
-bindingTime: boot
-provides:
-  contracts[4]: Authenticator,TokenRelay,SecretsProvider,GeoCountryResolver

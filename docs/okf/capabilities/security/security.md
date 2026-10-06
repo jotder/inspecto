@@ -2,7 +2,7 @@
 type: Capability
 title: Security (SEC)
 description: Who may call what — the auth-free core, the Authenticator/Subject/TokenRelay/AccessDecider/SecretsProvider SPIs, the Standard OIDC + RBAC module, the Enterprise ABAC policy engine, secrets, HTTPS and the write-root gate. The requirement of record for the SEC area, its specification, its decisions, and what was refused.
-resource: inspecto-security/, inspecto-policy/
+resource: inspecto-oidc/, inspecto-policy/
 tags: [sec, capability, security, oidc, rbac, abac, capabilities, roles, access-policy, secrets, https, write-gate]
 timestamp: 2026-09-08T00:00:00Z
 ---
@@ -36,7 +36,7 @@ authentication code**: Personal is auth-free by construction, and everything abo
 build either bundles or does not.
 
 **In scope:** the `Authenticator` / `Subject` / `TokenRelay` / `AccessDecider` / `SecretsProvider` SPIs and
-the request-gating order in `ControlApi`; the `inspecto-security` module (OIDC resource server, role
+the request-gating order in `ControlApi`; the `inspecto-oidc` module (OIDC resource server, role
 mapping, token relay, the BFF session, file/keystore secrets); the capability vocabulary, seed roles and the
 authorable `roles.toon`; Access Catalog / Profile enforcement and the component sharing envelope; the
 `inspecto-policy` ABAC engine (attributes, condition grammar, `access-policies.toon`, the two enforcement
@@ -64,7 +64,7 @@ feature × edition matrix is authoritative for the Edition column**; this table 
 |---|---|---|---|---|
 | `SEC-1` | **Auth-free common core** — no auth/RBAC/user-management code in core; Personal boots login-free | Must | ✅ SHIPPED (2026-06-16) | P |
 | `SEC-2` | `Authenticator` / `Subject` / `TokenRelay` SPIs; the AuthN gate; per-route capability checks; `UNAUTHENTICATED` / `PERMISSION_DENIED` | Must | ✅ SHIPPED (W6) | All (no-op on P) |
-| `SEC-3` | `inspecto-security`: OIDC resource server (Nimbus JWKS), `RoleMapper`, **`OidcTokenRelay`** — reactor-gated behind `edition-standard` | Must (S) | ✅ SHIPPED | S/E |
+| `SEC-3` | `inspecto-oidc`: OIDC resource server (Nimbus JWKS), `RoleMapper`, **`OidcTokenRelay`** — reactor-gated behind `edition-standard` | Must (S) | ✅ SHIPPED | S/E |
 | `SEC-4` | HTTPS via pure-JDK `HttpsServer` + keystore | Must (S) | ✅ SHIPPED **and TESTED 2026-09-09** — `ControlApiHttpsTest` proves TLS 1.3 is served against a keytool-generated PKCS12 (verified against that same store as its trust store, ⛔ not a trust-all manager), that cleartext no longer works on the port, and that a bad keystore **fails closed**. 🔴 Writing it found and fixed a real defect: a wrong password lost the diagnostic naming `-Dhttps.keystore`, because `KeyStore.load` signals it as a plain `IOException` and the catch covered only `GeneralSecurityException` | S/E |
 | `SEC-5` | BFF session: the refresh token never reaches the browser (httpOnly cookie, `SameSite=Strict`, `Origin` CSRF) | Must (S) | ✅ SHIPPED (W6d) | S/E |
 | `SEC-6` | UI OIDC login driven by `bootstrap.features.authMode`; Personal = no-op | Must (S) | ✅ SHIPPED (W6d/W7) — ⚠ the coupling is a launcher convention (§2 note 2) | S/E |
@@ -75,7 +75,7 @@ feature × edition matrix is authoritative for the Edition column**; this table 
 **Corrections this table makes to its predecessor**, each verified against source:
 
 - **`SEC-3` named "Keycloak token relay".** The class is `OidcTokenRelay`
-  (`inspecto-security/src/main/java/com/gamma/security/OidcTokenRelay.java`) — D15 renamed it on 2026-07-25
+  (`inspecto-oidc/src/main/java/com/gamma/oidc/OidcTokenRelay.java`) — D15 renamed it on 2026-07-25
   because no IdP vendor is of record (§4). `PROJECT_NOTES.md` §3 and `ROADMAP.md` §3.1 carried the old name
   too; all three are fixed in the same change as this spec.
 - **`SEC-8` read `SHIPPED`.** The requirement names a Vault option and the Vault/KMS half is unbuilt by an
@@ -103,7 +103,7 @@ citing either. The EDITIONS rows are the edition truth and are corrected here in
 
 1. 🔴 **A Standard or Enterprise bundle exits at startup without OIDC configuration.** `ControlApi` calls
    `Authenticators.active()` during construction and `SpiSlot` runs `ServiceLoader` regardless of
-   `-Dauth.mode`; the mere presence of `inspecto-security.jar` makes `OidcAuthenticator`'s constructor
+   `-Dauth.mode`; the mere presence of `inspecto-oidc.jar` makes `OidcAuthenticator`'s constructor
    mandatory, and it fails closed without `-Dauth.oidc.jwksUri` + `-Dauth.oidc.issuer`. The message names
    the property; the *timing* surprises. There is **no** "module present, auth off" mode
    (`SEC-SIDECAR-BOOT-1`, 2026-09-07). *A requirement is not delivered until it is reachable* — and this one
@@ -116,7 +116,7 @@ citing either. The EDITIONS rows are the edition truth and are corrected here in
    sidecar on the classpath and no flag leaves the SPA in no-login mode against a server answering 401 on
    every route. `UNTRACKED` — filed in §5.
    🔴 **`serve.bat` did NOT actually do this until 2026-09-11 (`SERVEBAT-OPTS-1`).** The Windows branch was a
-   parenthesised `if exist inspecto-security.jar ( … )` block containing six `set "OPTS=%OPTS% …"`
+   parenthesised `if exist inspecto-oidc.jar ( … )` block containing six `set "OPTS=%OPTS% …"`
    statements — and **cmd.exe expands every `%OPTS%` in a block once, when the block is PARSED**, so all six
    expanded to the value `OPTS` held *before* the block and only the last one executed survived. Measured on
    an Enterprise bundle with all four `AUTH_OIDC_*` env vars set, the emitted flags were exactly
@@ -149,11 +149,11 @@ Enforcement returns through five SPIs the core *defines* and never *implements*:
 
 | SPI | Package | Contract | `@PublicApi` | Implemented by |
 |---|---|---|---|---|
-| `Authenticator` | `com.gamma.control` | `Optional<Subject> authenticate(HttpExchange)` | `since = "4.0.0"` | `OidcAuthenticator` (`inspecto-security`) |
+| `Authenticator` | `com.gamma.control` | `Optional<Subject> authenticate(HttpExchange)` | `since = "4.0.0"` | `OidcAuthenticator` (`inspecto-oidc`) |
 | `Subject` | `com.gamma.control` | record `(id, capabilities, dataScopes, attributes)`; `dataScopes == null` = unscoped | — | built by the authenticator |
 | `TokenRelay` | `com.gamma.control` | `exchangeCode`, `refresh`, default no-op `revoke`; absent ⇒ `/auth/*` answers `503 CAPABILITY_UNAVAILABLE` | `since = "4.0.0"` | `OidcTokenRelay` |
 | `AccessDecider` | `com.gamma.control` | `decide(...)` → `ALLOW | DENY | ABSTAIN`; `explain(...)`; `seededPolicies()` default-empty | `since = "4.0.0"` | `PolicyEngine` (`inspecto-policy`) |
-| `SecretsProvider` | `com.gamma.acquire` | `supports(scope)`, `resolve(scope, key)` | — | `FileKeystoreSecretsProvider` (`inspecto-security`) |
+| `SecretsProvider` | `com.gamma.acquire` | `supports(scope)`, `resolve(scope, key)` | — | `FileKeystoreSecretsProvider` (`inspecto-secrets`) |
 
 Discovery is `ServiceLoader` through `META-INF/services`; the core's `Authenticators` / `SpiSlot` wrapper
 exposes `active()` (empty on Personal) and a `forTest(...)` seam. ⚠ `Subject` and `SecretsProvider` carry no
@@ -161,9 +161,9 @@ exposes `active()` (empty on Personal) and a `forTest(...)` seam. ⚠ `Subject` 
 `api-stability.md`), and its absence here is an inconsistency, not a policy.
 
 **Editions** (`GLOSSARY.md` §14 *Edition*): Personal bundles neither module; Standard adds
-`inspecto-security` (Maven profile `edition-standard`, `pom.xml:73-77`); Enterprise adds `inspecto-policy` on
+`inspecto-oidc` (Maven profile `edition-standard`, `pom.xml:73-77`); Enterprise adds `inspecto-policy` on
 top (`edition-enterprise`, `pom.xml:112-116`). `package.ps1 -Edition Standard|Enterprise` bundles the
-**shaded** `inspecto-security-*-sidecar.jar` (Nimbus classes verified present at package time — the
+**shaded** `inspecto-oidc-*-sidecar.jar` (Nimbus classes verified present at package time — the
 `SEC-SIDECAR-BOOT-1` lesson). No runtime flag selects a module: the classpath entry is the switch, and the
 default `mvn -o clean test` reactor **never compiles either module** — see §8.
 
@@ -210,7 +210,7 @@ streams stay capability-gated by design. `attributes` (ABAC A1) holds only the c
 
 ### 3.4 The OIDC authenticator
 
-`OidcAuthenticator` (`inspecto-security/src/main/java/com/gamma/security/OidcAuthenticator.java`) is a
+`OidcAuthenticator` (`inspecto-oidc/src/main/java/com/gamma/oidc/OidcAuthenticator.java`) is a
 **vendor-agnostic resource server**: Nimbus JOSE+JWT `RemoteJWKSet` + `DefaultJWTProcessor`, RS256, no vendor
 SDK. Configuration is system properties only:
 
@@ -409,14 +409,14 @@ on the `AccessDecider` SPI. Personal and Standard never bundle it and behave byt
 the pure-JDK `HttpsServer` with `SSLContext.getInstance("TLSv1.3")` (`ControlApi.java:301-324`); unset ⇒
 plain HTTP (the Personal default). `-Dcontrol.bind=<host>` restricts the listen address in every edition
 (`:271-296`) — ⚠ the default binds **every interface**, in Personal too; "localhost-bound" in
-`STAKEHOLDER_OVERVIEW.md` is wrong (plan §8 cluster). HTTPS lives in **core**, not in `inspecto-security`, and
+`STAKEHOLDER_OVERVIEW.md` is wrong (plan §8 cluster). HTTPS lives in **core**, not in `inspecto-oidc`, and
 is the one SEC mechanism with **no test** (§8.7).
 
 ### 3.12 Secrets
 
 `SecretResolver` (`inspecto-acquire`) resolves `${ENV:NAME}`, `${SYS:NAME}` and bare `${NAME}` in every
 edition; `${FILE:path}` and `${KEYSTORE:alias}` (JCEKS) route to a `SecretsProvider` and arrive by
-`ServiceLoader` from `inspecto-security` (`FileKeystoreSecretsProvider`), which only the Standard and
+`ServiceLoader` from `inspecto-secrets` (`FileKeystoreSecretsProvider`), which only the Standard and
 Enterprise bundles carry. **A Personal bundle refuses those two schemes with an edition-naming message, never
 a silent null** (2026-09-06). `SecretScrubber` keeps resolved values out of logs; `tools/check-secrets.mjs`
 keeps secret-shaped literals out of the tree (§8.6). Vault / cloud KMS: §5.
@@ -645,14 +645,14 @@ the logs were deleted 2026-07-26 before export).
 | `rbac-abac-plan` Q2 "fold X-Actor retirement into R2" | X-Actor is *rejected*, not removed; removal is gated on the next MAJOR | §5 |
 | The X-Actor gate "client migration with the API-v1 sunset" | the next MAJOR tag (the sunset apparatus was deleted 2026-07-25) | `BACKLOG.md` §2 |
 | Lens Access P3's root-default-allow as contractual for roles | flagged forward-compatible only: the server default for roles may flip to deny-by-default — a security-module call, unmade | `lens-access-config-design.md` §P3 (archive) |
-| The 2026-06-19 `STAKEHOLDER_OVERVIEW.md` ("a *planned* `inspecto-security` module", "Enterprise (future)", "Personal localhost-bound") | shipped 2026-07-06 / 2026-07-23; binds every interface | plan §8 cluster — reconciled at step 6, not here |
+| The 2026-06-19 `STAKEHOLDER_OVERVIEW.md` ("a *planned* `inspecto-oidc` module", "Enterprise (future)", "Personal localhost-bound") | shipped 2026-07-06 / 2026-07-23; binds every interface | plan §8 cluster — reconciled at step 6, not here |
 
 ## 7. As-built mechanism (pointers only)
 
 | Mechanism | Owning file | `resource:` | Read it for |
 |---|---|---|---|
-| The whole posture, RBAC R0–R5, ABAC A1–A5, the 2026-07-25 decisions, the boot precondition | `docs/okf/backend/editions/auth-security.md` (`Concept`) | `inspecto-security/, inspecto-policy/` | the long-form narrative every row above was distilled from |
-| The Standard module's classes, properties, shading and boot behaviour | `docs/okf/backend/modules/security.md` (`Concept`) | `inspecto-security/` | `audience` warn-only, `SEC-SIDECAR-BOOT-1`, why the sidecar is shaded |
+| The whole posture, RBAC R0–R5, ABAC A1–A5, the 2026-07-25 decisions, the boot precondition | `docs/okf/backend/editions/auth-security.md` (`Concept`) | `inspecto-oidc/, inspecto-policy/` | the long-form narrative every row above was distilled from |
+| The Standard module's classes, properties, shading and boot behaviour | `docs/okf/backend/modules/security.md` (`Concept`) | `inspecto-oidc/` | `audience` warn-only, `SEC-SIDECAR-BOOT-1`, why the sidecar is shaded |
 | Edition gating as a mechanism; the EDG-01 recipe items | `docs/okf/backend/editions/editions-model.md` (`Concept`) | `pom.xml` | how a module joins a profile and what the compiler cannot see |
 | Request dispatch, `PUBLIC_PATHS`, the envelope, error codes | `docs/okf/backend/control-plane/control-api.md` · `api-v1.md` (`Concept`) | `inspecto/src/main/java/com/gamma/control` | the contract SEC gates inside |
 | Intra-Space shares and the cross-Space Exchange lifecycle | `docs/okf/backend/control-plane/exchange-sharing.md` (`Concept`) | `inspecto-exchange/` | the `ShareGrant` state machine and the attribute-scope pin |
@@ -693,13 +693,13 @@ once because of exactly this.
 
 | Module | Class | `@Test` | Proves |
 |---|---|---|---|
-| `inspecto-security` | `OidcAuthenticatorTest` | 24 | JWKS validation, roles claim → capabilities, `Roles.SEED` equality, profile-deny stripping, gateway path, A1 allowlist |
-| `inspecto-security` | `OidcTokenRelayTest` | 7 | exchange / refresh / revoke against a fake token endpoint; the mandatory `tokenEndpoint` |
-| `inspecto-security` | `FileKeystoreSecretsProviderTest` | 3 | `${FILE}` / `${KEYSTORE}` resolution, JCEKS |
+| `inspecto-oidc` | `OidcAuthenticatorTest` | 24 | JWKS validation, roles claim → capabilities, `Roles.SEED` equality, profile-deny stripping, gateway path, A1 allowlist |
+| `inspecto-oidc` | `OidcTokenRelayTest` | 7 | exchange / refresh / revoke against a fake token endpoint; the mandatory `tokenEndpoint` |
+| `inspecto-secrets` | `FileKeystoreSecretsProviderTest` | 3 | `${FILE}` / `${KEYSTORE}` resolution, JCEKS |
 | `inspecto-policy` | `PolicyEngineTest` | 12 | deny-overrides → allow → abstain; seeds overlaid by name; fail-closed on an unreadable doc; `explain` trace |
 | `inspecto-policy` | `ControlApiPolicyEnforcementTest` | 8 | both PEPs over real HTTP: route `403`, row hidden, `access.denied` audited, space isolation engages only with a mapped claim |
 
-`inspecto-security`'s count is **34**, measured 2026-09-08 (24 + 7 + 3); `auth-security.md` said 41 and is
+`inspecto-oidc`'s count is **34**, measured 2026-09-08 (24 + 7 + 3); `auth-security.md` said 41 and is
 corrected with this spec.
 
 ### 8.3 Grammar and secrets
@@ -724,9 +724,9 @@ and `callback.a11y.spec.ts`, `core/navigation/navigation.service.spec.ts` (modul
 
 | File | Provider |
 |---|---|
-| `inspecto-security/src/main/resources/META-INF/services/com.gamma.control.Authenticator` | `com.gamma.security.OidcAuthenticator` |
-| `inspecto-security/src/main/resources/META-INF/services/com.gamma.control.TokenRelay` | `com.gamma.security.OidcTokenRelay` |
-| `inspecto-security/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider` | `com.gamma.security.FileKeystoreSecretsProvider` |
+| `inspecto-oidc/src/main/resources/META-INF/services/com.gamma.control.Authenticator` | `com.gamma.oidc.OidcAuthenticator` |
+| `inspecto-oidc/src/main/resources/META-INF/services/com.gamma.control.TokenRelay` | `com.gamma.oidc.OidcTokenRelay` |
+| `inspecto-secrets/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider` | `com.gamma.secrets.FileKeystoreSecretsProvider` |
 | `inspecto-policy/src/main/resources/META-INF/services/com.gamma.control.AccessDecider` | `com.gamma.policy.PolicyEngine` |
 
 ### 8.6 Guards

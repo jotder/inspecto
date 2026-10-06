@@ -131,7 +131,7 @@ Verified by building both flavors 2026-08-27 (Personal 169.3 MB, Enterprise 170.
 | Jar | Personal | Standard / Enterprise |
 |---|---|---|
 | `inspecto.jar` (shaded core) | ✅ | ✅ |
-| `inspecto-security.jar` (OIDC `Authenticator` SPI) | — | ✅ Professional+ |
+| `inspecto-oidc.jar` (OIDC `Authenticator` SPI) | — | ✅ Professional+ |
 | `inspecto-policy.jar` (ABAC `AccessDecider` SPI) | — | ✅ Enterprise only |
 | `inspecto-connectors.jar` (shaded sidecar — `CONNECTORS-BUNDLE-1`) | ✅ | ✅ |
 | the **seven** EDG-01 sidecars (`notify-channels` shaded, `backup`, `geo-link`, `exchange`, `metrics`, `events`, `ops`) | — | ✅ Professional+ |
@@ -186,7 +186,7 @@ the vendored kernel + eoiagent model transport.
 
 ⚠ **They are NOT edition-gated modules.** `inspecto-agent`, `inspecto-agent-hosted` and
 `inspecto-intelligence` are plain default `<modules>` in the root POM. The profile-gated modules are the
-**nine** edition modules: `inspecto-security`, `inspecto-policy`, and the seven EDG-01 ones
+**nine** edition modules: `inspecto-oidc`, `inspecto-policy`, and the seven EDG-01 ones
 (`inspecto-notify-channels`, `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`,
 `inspecto-observability`, `inspecto-observability`, `inspecto-ops`) — see [editions model](../editions/editions-model.md). The agent modules build in an
 ordinary `mvn test` run; they are simply never *bundled*.
@@ -304,12 +304,12 @@ deployment and silently did nothing for a one-shot run. 🔴 The divergence is t
 with two different classpath rules meant fixing one looked like fixing both. All four now build the
 classpath the same way, each sidecar inert unless a config asks for it. ⚠ `ura.sh`/`ura.bat` (the pre-ETL file utilities) are deliberately NOT among them: they run `-cp inspecto.jar` alone, with no sidecar of any kind (no connectors, exchange, ops or Link Analysis jars), because they never start the control plane; the Dockerfile, `inspecto.service` and `install-service.sh` all launch `serve.sh`, which carries the full list.
 
-⚠ **`inspecto-security` ships SHADED too, for the same reason** (SEC-SIDECAR-BOOT-1, 2026-09-07). It is
+⚠ **`inspecto-oidc` ships SHADED too, for the same reason** (SEC-SIDECAR-BOOT-1, 2026-09-07). It is
 profile-gated (`-Pedition-standard` / `-Pedition-enterprise`), but until that date `package.ps1` staged its
 plain 16 KB jar — which carries **no `com/nimbusds` classes**, while `OidcAuthenticator` has nine direct
 Nimbus imports and `ControlApi` resolves the `Authenticator` SPI *during startup* through an unguarded
 `ServiceLoader`. Every Standard and Enterprise bundle failed to boot. It now builds an
-`inspecto-security-*-sidecar.jar` (core and slf4j `provided`, so the shade carries Nimbus and nothing else),
+`inspecto-oidc-*-sidecar.jar` (core and slf4j `provided`, so the shade carries Nimbus and nothing else),
 `package.ps1` stages that one, and verifies the STAGED artifact for `com/nimbusds` plus all three SPI
 registrations. `inspecto-policy` needs none of this — it has no third-party dependencies, so its thin jar
 is genuinely complete.

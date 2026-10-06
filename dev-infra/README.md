@@ -72,7 +72,7 @@ curl -sk -u admin:admin -H "Content-Type: application/json" -d '{
 
 ### Trust the self-signed certificate
 
-There is **no TLS-skip option in `inspecto-security`, by design**: JWKS is fetched with stock Nimbus over
+There is **no TLS-skip option in `inspecto-oidc`, by design**: JWKS is fetched with stock Nimbus over
 the JVM default truststore.
 
 ```bash
@@ -85,7 +85,7 @@ keytool -importcert -noprompt -alias wso2is -file wso2is.crt -keystore ts.jks -s
 
 ```bash
 MAVEN_OPTS="-Djavax.net.ssl.trustStore=$PWD/ts.jks -Djavax.net.ssl.trustStorePassword=changeit" \
-mvn -o -B test -Pedition-enterprise -pl inspecto-security -am -DforkCount=0 \
+mvn -o -B test -Pedition-enterprise -pl inspecto-oidc -am -DforkCount=0 \
     -Dtest=OidcAgainstRealProviderTest -Dsurefire.failIfNoSpecifiedTests=false \
     -Dinspecto.test.oidc.issuer=https://localhost:9443/oauth2/token \
     -Dinspecto.test.oidc.clientId=inspecto_spa_client \

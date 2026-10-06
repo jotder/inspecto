@@ -111,7 +111,7 @@ Contract detail: [API v1](api-v1.md); requirement of record:
 ## Auth by edition
 
 The core/Personal edition is **auth-free**: every route is open — no token, guard, or login. On **Standard**
-the `inspecto-security` module (reactor-gated behind the `edition-standard` Maven profile) enforces OIDC by
+the `inspecto-oidc` module (reactor-gated behind the `edition-standard` Maven profile) enforces OIDC by
 implementing the `Authenticator` / `Subject` / `TokenRelay` SPIs in `com.gamma.control` (see
 [auth & security](../editions/auth-security.md)). The `-Dassist.write.root` 503 write-gate is **separate** from
 auth and stays in all editions.

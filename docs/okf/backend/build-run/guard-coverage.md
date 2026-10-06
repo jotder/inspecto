@@ -28,7 +28,7 @@ indicting the real risk, because the test supplies what production must supply.
 - Every connector test lives inside `inspecto-connectors`, where the classes and their
   `META-INF/services` file are trivially on the test classpath. They passed for 85 days while the module
   reached no deployment at all (CONNECTORS-BUNDLE-1).
-- `inspecto-security`'s tests passed because Nimbus is a compile dependency **there**, while the shipped
+- `inspecto-oidc`'s tests passed because Nimbus is a compile dependency **there**, while the shipped
   16 KB jar carried none of it and every Standard/Enterprise bundle failed to boot; the core-side auth
   tests passed because they inject a lambda through `Authenticators.forTest`. Both halves green, the join
   untested. ✅ Fixed 2026-09-07 the same way as the connectors: a shaded `-sidecar` artifact with the core
@@ -117,7 +117,7 @@ the trigger is *"when X is recorded in \<file\>"*, never *"when X happens"*.
 A guard's SCOPE exempts more than its allowlist does, and nothing announces it:
 `check-design-tokens.mjs` scans two roots, so `src/app/layout/**` — real inspecto-authored components —
 can hardcode colours freely. ✅ `check-dependencies.mjs` resolved without an edition profile until
-2026-09-07, so `inspecto-security`'s Nimbus tree — the one dependency tree a security reviewer most wants
+2026-09-07, so `inspecto-oidc`'s Nimbus tree — the one dependency tree a security reviewer most wants
 under review — was the only one the lock never saw, while `compliance/controls-matrix.md` marked G7
 CLOSED. It now resolves `-Pedition-enterprise` (25 modules, not 23). Audit a guard's scope apart from its
 rules: the scope is where the silent exemptions live.

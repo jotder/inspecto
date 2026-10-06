@@ -33,7 +33,7 @@ Start with the [Overview](overview.md) and [Architecture](architecture.md), then
 ## Cross-cutting
 
 * [Config](config/) - TOON config + the safety validator.
-* [Editions](editions/) - editions as build flavors, auth/security SPI + the `inspecto-security` module,
+* [Editions](editions/) - editions as build flavors, auth/security SPI + the `inspecto-oidc` module,
   branch & release policy.
 * [Agent](agent/) - the optional AI assist agent (vendored kernel + [eoiagent](../agentic/index.md)
   transport) and hosted model providers.

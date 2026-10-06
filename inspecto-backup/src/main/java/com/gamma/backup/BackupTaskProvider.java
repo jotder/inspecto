@@ -13,7 +13,7 @@ import java.util.Set;
  * <p>This is the whole of the edition gate for EDITIONS {@code OPS-06}: the three tasks exist wherever this
  * jar is on the classpath ({@code META-INF/services/com.gamma.job.MaintenanceTaskProvider}) and are unknown
  * tasks everywhere else. There is no flag — the classpath entry IS the switch, exactly as it is for
- * {@code inspecto-security} and {@code inspecto-policy}.
+ * {@code inspecto-oidc} and {@code inspecto-policy}.
  *
  * <p>The dispatch below is the three {@code case} arms that used to sit in {@code MaintenanceJob}'s switch,
  * moved verbatim: same arguments, same dry-run handling, same {@link BackupTask} methods.

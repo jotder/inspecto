@@ -76,7 +76,7 @@ against source:
 
 ⚠ **`ACQ-1` carries an edition nuance the matrix column cannot express.** Connections are `All`, but two
 of `SecretResolver`'s five reference forms — `${FILE:…}` and `${KEYSTORE:…}` — are **Standard +
-Enterprise only** (SEC-07): they are served by `inspecto-security`'s `SecretsProvider`, so a Personal
+Enterprise only** (SEC-07): they are served by `inspecto-secrets`'s `SecretsProvider`, so a Personal
 bundle refuses the scheme *by name* and a connection test surfaces that as the failure. See §3.
 
 🔴 **What none of these rows said, and every one of them depended on:** for 85 days the remote
@@ -597,9 +597,9 @@ Anything not matching `${…}` is returned unchanged (a tolerated-but-discourage
 resolved value is **never logged**.
 
 ⚠ **SEC-07 (2026-09-06): `${FILE}` and `${KEYSTORE}` are Standard + Enterprise only.** They are served by
-the `SecretsProvider` SPI in the core, whose implementation is `inspecto-security`'s
+the `SecretsProvider` SPI in the core, whose implementation is `inspecto-secrets`'s
 `FileKeystoreSecretsProvider`, discovered by ServiceLoader
-(`inspecto-security/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider`). A bundle
+(`inspecto-secrets/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider`). A bundle
 without that module — Personal — **refuses the scheme with an `IllegalStateException` naming the edition,
 never a silent `null`**; a connection test surfaces that refusal as its failure. A Vault/KMS scope is the
 Enterprise follow-on. ⚠ `connectors-runbook.md` (formerly `integrations.md`) once listed only 2 of the 5 forms and omitted this gate; its
@@ -1051,7 +1051,7 @@ Incidental (the route string is an example for another concern, but they do exer
 |---|---|
 | `inspecto-connectors/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | the **eight**: `SftpConnectorFactory`, `FtpConnectorFactory`, `FtpsConnectorFactory`, `DbExportConnectorFactory`, `S3ConnectorFactory`, `KafkaConnectorFactory`, `AzureBlobConnectorFactory`, `GcsConnectorFactory` |
 | `inspecto-engine/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | `com.gamma.inspector.DatasetCollectorConnectorFactory` — the ninth scheme, `dataset`, from a different module |
-| `inspecto-security/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider` | `com.gamma.security.FileKeystoreSecretsProvider` — the SEC-07 edition seam |
+| `inspecto-secrets/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider` | `com.gamma.secrets.FileKeystoreSecretsProvider` — the SEC-07 edition seam |
 | `inspecto/src/test/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | `com.gamma.service.FakeRemoteConnectorFactory` (test-only remote scheme) |
 
 `inspecto-engine/src/test/java/com/gamma/inspector/DatasetCollectorConnectorFactoryTest.theFactoryIsServiceLoaderDiscoverable()`

@@ -40,7 +40,7 @@
 
     <dependencies>
         <!-- The core: Notification, NotificationChannel, Values.trimToNull. PROVIDED on purpose, the same
-             idiom as inspecto-connectors and inspecto-security: this jar is dropped onto a running engine's
+             idiom as inspecto-connectors and inspecto-oidc: this jar is dropped onto a running engine's
              classpath where inspecto.jar already supplies all of it, and compile scope would drag the whole
              core into the shaded sidecar below. -->
         <dependency>

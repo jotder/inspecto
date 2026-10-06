@@ -28,7 +28,7 @@ bodies pass through untouched), so **services keep their raw-DTO signatures**. v
 
 `auth.interceptor.ts` **exists** but the OIDC login flow is a **no-op on Personal** — it is driven by
 `GET /bootstrap` → `features.authMode` (`none` on Personal, `oidc` on Standard, where the backend's
-`inspecto-security` module enforces it). Don't reintroduce per-screen auth or `canControl`/`canAssist`
+`inspecto-oidc` module enforces it). Don't reintroduce per-screen auth or `canControl`/`canAssist`
 gating in features — auth stays at the interceptor/edition seam.
 
 See [errors & connectivity](errors-and-connectivity.md) for the error interceptor, [multi-space](multi-space.md)

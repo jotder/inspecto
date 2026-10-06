@@ -176,7 +176,7 @@ the stub-server tests use to present `127.0.0.1` as an allowlisted LAN address).
   `${ENV:VAR}` / `${SYS:prop}` / `${FILE:/path}` / `${KEYSTORE:alias}` / `${NAME}` at connect time, never at
   load; `isResolvable()` powers the test endpoint without exposing values. **SEC-07 (2026-09-06): `${FILE}` and
   `${KEYSTORE}` are Standard + Enterprise** — the `SecretsProvider` SPI in the core is served by
-  `inspecto-security`'s `FileKeystoreSecretsProvider` (ServiceLoader); a Personal bundle throws a refusal naming
+  `inspecto-secrets`'s `FileKeystoreSecretsProvider` (ServiceLoader); a Personal bundle throws a refusal naming
   the edition, which a connection test surfaces as its failure. `${FILE:…}` reads a mounted secret
   file (Docker/K8s idiom; one trailing newline stripped). `${KEYSTORE:alias}` reads a `SecretKeyEntry` from a
   Java KeyStore located by `-Dsecrets.keystore.path` / `-Dsecrets.keystore.type` (default `JCEKS`) /

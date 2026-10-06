@@ -30,7 +30,7 @@ Module dirs were renamed 2026-06-12; the **artifactIds caught up on 2026-08-10**
 artifactId everywhere — with one deliberate exception: `inspecto/` is `inspecto-processor`, because a bare
 `inspecto` would collide with the aggregator. The shipped bundle is named `inspecto.jar` (renamed from
 `file-processor.jar` on 2026-08-13, along with the `inspecto-deploy/` bundle dir and the
-`inspecto-security.jar` / `inspecto-policy.jar` edition jars); that is the deployment surface, not an
+`inspecto-oidc.jar` / `inspecto-policy.jar` edition jars); that is the deployment surface, not an
 artifactId:
 
 Reactor = **13 modules** (build order below; WS-D 2026-07-22 added `inspecto-engine`, then split
@@ -53,7 +53,7 @@ Authoritative shape, version management, and the module-extraction playbook:
 | `inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `inspecto-agent` |
 | `inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `inspecto-agent-hosted` |
 | `inspecto-intelligence/` | embedded-intelligence agent (eoiagent-backed) | `inspecto-intelligence` |
-| `inspecto-security/` | Professional/Enterprise OIDC auth, `-Pedition-professional` only (not in default `<modules>`) | `inspecto-security` |
+| `inspecto-oidc/` | Professional/Enterprise OIDC auth, `-Pedition-professional` only (not in default `<modules>`) | `inspecto-oidc` |
 | `inspecto-policy/` | Enterprise ABAC policy engine (`AccessDecider` impl), `-Pedition-enterprise` only (= professional + this) | `inspecto-policy` |
 | `inspecto-ui/` | Angular SPA (gamma/Fuse template), serves from the engine | — (npm; dev :4204) |
 
@@ -95,12 +95,12 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 ## 3. Key decisions (the "why", not derivable from code)
 
 - **Editions are build flavors, never git branches.** One source tree (`master` = auth-free common core);
-  edition-only code in its own Maven module (`inspecto-security` for Professional/Enterprise), assembled via
+  edition-only code in its own Maven module (`inspecto-oidc` for Professional/Enterprise), assembled via
   `-Pedition-*` profiles + `ServiceLoader` + `-D` flags. A fix lands once in core; all editions inherit it
   at build. Rationale: branches would force perpetual cross-line cherry-picking. → [`EDITIONS.md`](EDITIONS.md).
 - **All auth removed from `master`/common core (2026-06-16).** Personal is genuinely auth-free (every
   ControlApi route open; SPA boots to `/dashboard`; no token paste/guards). Professional re-adds auth out-of-band
-  via the **`inspecto-security` module (BUILT, W6 2026-07-06** — `OidcAuthenticator` Nimbus+JWKS, `RoleMapper`,
+  via the **`inspecto-oidc` module (BUILT, W6 2026-07-06** — `OidcAuthenticator` Nimbus+JWKS, `RoleMapper`,
   `OidcTokenRelay` (renamed from `KeycloakTokenRelay` 2026-07-25, D15); reactor-gated behind the `edition-professional` profile) behind the
   `Authenticator`/`Subject`/`TokenRelay` SPIs (`com.gamma.control`), plus HTTPS (`HttpsServer`) and the BFF
   `/auth/exchange|refresh|logout` routes; Angular uses OIDC Auth-Code+PKCE driven by `bootstrap.features.authMode`
@@ -108,7 +108,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 - **Edition gating is real as of 2026-09-07, not just a matrix claim (EDG-01).** Five "not for Personal"
   features left the core into optional modules — `inspecto-notify-channels` (CP-15), `inspecto-backup`
   (OPS-06), `inspecto-geo-link` (CP-09), `inspecto-exchange` (SEC-10) and `inspecto-observability` (CP-13's
-  exposition) — joining `inspecto-security` and `inspecto-policy`. Personal answers their surfaces **503
+  exposition) — joining `inspecto-oidc` and `inspecto-policy`. Personal answers their surfaces **503
   naming the module**, never 404. 🔴 The load-bearing one was `/metrics`: a `PUBLIC_PATH` on an edition
   that ships no authenticator and binds every interface. Recipe + traps:
   [editions model](okf/backend/editions/editions-model.md). ✅ **EDG-01 COMPLETE 2026-09-08** — all six
@@ -652,7 +652,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   `set "X=%X% …"` lines in one `if ( … )` collapse to the LAST one executed.** Measured 2026-09-11:
   `set "OPTS=BASE"` then a block doing `-Dfirst` and `-Dsecond` yields `BASE -Dsecond`; `-Dfirst` is gone.
   This shipped in the generated `serve.bat` (`SERVEBAT-OPTS-1`): six such lines in the
-  `if exist inspecto-security.jar (…)` branch meant **every Windows Professional/Enterprise bundle booted
+  `if exist inspecto-oidc.jar (…)` branch meant **every Windows Professional/Enterprise bundle booted
   AUTH-FREE** — `-Dauth.mode=oidc` and three of the four OIDC flags dropped — while printing
   `edition: Enterprise`. ✅ Fix = **one statement per line**, chaining conditions
   (`if exist X if not "%Y%"=="" set …`), the form the adjacent Postgres lines already used AND documented.
@@ -941,7 +941,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   a *supported deployment*. Read the JDK source before reasoning about attribute lifetime.
 
 - **A profile-scoped module is invisible to the verify loop that everyone actually runs.**
-  `inspecto-security` / `inspecto-policy` live in the parent's *profile-scoped* `<modules>`
+  `inspecto-oidc` / `inspecto-policy` live in the parent's *profile-scoped* `<modules>`
   (`-Pedition-professional` / `-Pedition-enterprise`), not the default list — so `mvn -o clean test`
   reports **BUILD SUCCESS while both edition builds are broken**. The 2026-08-10 artifactId rename
   proved it: the two poms still declared `file-processor-parent`, which is a *non-resolvable parent*,
@@ -973,7 +973,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   ⚠ **Read a reactor summary for SKIPPED, not just for FAILURE.** A fail-fast abort marks downstream
   modules `SKIPPED`, and "25 modules" in a summary means *listed*, not *built* — a run reported as
   "25 modules, 3017 tests, 0 failures" on 2026-08-10 had in fact failed one module and skipped six,
-  `inspecto-security` and `inspecto-policy` among them.
+  `inspecto-oidc` and `inspecto-policy` among them.
 
 - **A UI spec that RUNS green is not proof it typechecks — there are THREE tsconfigs and the root one
   is a different gate, not a superset.** Proved 2026-08-11 (`842a3a77`): a spec asserting `toHaveLength`

@@ -154,7 +154,7 @@ class ObjectsBackendEditionBootTest {
         int seen = 0;
         while (m.find()) {
             String jar = m.group(1);
-            if (jar.equals("inspecto-security.jar") || jar.equals("inspecto.jar")) continue;
+            if (jar.equals("inspecto-oidc.jar") || jar.equals("inspecto-secrets.jar") || jar.equals("inspecto-geo-country.jar") || jar.equals("inspecto.jar")) continue;
             seen++;
             assertTrue(demo.contains("'" + jar + "'"),
                     "serve-demo.* must put " + jar + " on its classpath");

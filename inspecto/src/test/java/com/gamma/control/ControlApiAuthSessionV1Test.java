@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * the {@code httpOnly}+{@code SameSite=Strict} refresh cookie and returns only the access token;
  * refresh rotates the cookie; logout clears it; the Origin gate rejects cross-site calls; and — the
  * Personal-edition invariant — with no {@link TokenRelay} on the classpath every route is a
- * {@code 503 CAPABILITY_UNAVAILABLE}. A fake relay stands in for {@code inspecto-security}'s Keycloak
+ * {@code 503 CAPABILITY_UNAVAILABLE}. A fake relay stands in for {@code inspecto-oidc}'s Keycloak
  * implementation via {@link TokenRelays#forTest} (same rationale as {@code ControlApiAuthV1Test}).
  */
 class ControlApiAuthSessionV1Test {

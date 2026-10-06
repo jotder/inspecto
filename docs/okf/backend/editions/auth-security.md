@@ -1,8 +1,8 @@
 ---
 type: Concept
 title: Auth & Security
-description: Auth-free core; the Authenticator/Subject/TokenRelay/AccessDecider SPIs; the shipped inspecto-security module (Professional, OIDC via Keycloak/WSO2, data-driven roles, Access-Profile + sharing enforcement); the Enterprise inspecto-policy ABAC engine (authored Access Policies, space isolation, decision audit); the separate -Dassist.write.root write-gate.
-resource: inspecto-security/, inspecto-policy/
+description: Auth-free core; the Authenticator/Subject/TokenRelay/AccessDecider SPIs; the shipped inspecto-oidc module (split into inspecto-oidc, inspecto-secrets, inspecto-geo-country by D-MR6) (Professional, OIDC via Keycloak/WSO2, data-driven roles, Access-Profile + sharing enforcement); the Enterprise inspecto-policy ABAC engine (authored Access Policies, space isolation, decision audit); the separate -Dassist.write.root write-gate.
+resource: inspecto-oidc/, inspecto-policy/
 tags: [auth, security, spi, oidc, keycloak, wso2, bff, write-gate, rbac, abac, policy-engine, edition-professional, edition-enterprise]
 timestamp: 2026-07-24T00:00:00Z
 ---
@@ -14,9 +14,9 @@ timestamp: 2026-07-24T00:00:00Z
 is no token paste / guard / interceptor. The removed hand-rolled bearer-token plane (per-route `Scope`,
 `-Dcontrol.token`, the Angular token screen) is gone.
 
-**Professional re-adds auth via SPIs + the shipped `inspecto-security` module.** The core defines three SPIs in
+**Professional re-adds auth via SPIs + the shipped `inspecto-oidc` module.** The core defines three SPIs in
 `com.gamma.control`: **`Authenticator`** (validates a request, yields a subject), **`Subject`** (a record of
-`id` + capabilities), and **`TokenRelay`**. `inspecto-security/` (artifactId `inspecto-security`, **34**
+`id` + capabilities), and **`TokenRelay`**. `inspecto-oidc/` (artifactId `inspecto-oidc`, **34**
 tests — measured 2026-09-08: 24 + 7 + 3; an earlier "41" was never true of the tree) implements them: `OidcAuthenticator` (Nimbus JOSE+JWT), `RoleMapper` (roles from IAM claims), and
 `OidcTokenRelay`. It joins the reactor **only under the `edition-professional` Maven profile** (with `edition-standard` retained as an alias) — the default
 build never compiles it (verify with `-Pedition-professional`); because it's a
@@ -257,7 +257,7 @@ via `META-INF/services`. Personal/Professional never bundle it and behave byte-i
   `builder` set and `power`, and joined `admin` (`super` holds the whole vocabulary via `KNOWN_CAPABILITIES`).
   ⚠ **`Roles.SEED` is asserted by an *equality* check** in `OidcAuthenticatorTest`
   (`adminRoleGrantsOnboardConnectionsAndNotWorkbench`) — every future grant addition must update that test, and
-  it must be run under **`-Pedition-enterprise`**: the default reactor omits `inspecto-security` entirely, so a
+  it must be run under **`-Pedition-enterprise`**: the default reactor omits `inspecto-oidc` entirely, so a
   plain `mvn -o clean test` cannot see a failure there. That gap had already left this assertion red on
   `master` since `63a556f8`; see `.claude/skills/build-verify/SKILL.md`.
 - **D4 — `canCurateMenus`, split out of `canAuthorWorkbench`. SHIPPED end-to-end 2026-07-25**
@@ -442,10 +442,10 @@ Discovered 2026-09-07 by the packaging boot smoke, and worth stating plainly bec
 precondition, not a runtime one:
 
 * `ControlApi` calls `Authenticators.active()` **during construction**, and `SpiSlot` runs
-  `ServiceLoader` **regardless of `-Dauth.mode`**. So the mere PRESENCE of `inspecto-security.jar` on the
+  `ServiceLoader` **regardless of `-Dauth.mode`**. So the mere PRESENCE of `inspecto-oidc.jar` on the
   classpath makes `OidcAuthenticator`'s constructor mandatory.
 * That constructor requires **`-Dauth.oidc.jwksUri`** and **`-Dauth.oidc.issuer`**, and fails closed with
-  a named message (`inspecto-security requires -Dauth.oidc.jwksUri (Professional edition …)`) otherwise.
+  a named message (`inspecto-oidc requires -Dauth.oidc.jwksUri (Professional edition …)`) otherwise.
 
 ⇒ Dropping the security sidecar into a bundle without also supplying the `AUTH_OIDC_*` environment
 variables `serve.sh` reads is not a degraded deployment — it is one that **exits at startup**. The

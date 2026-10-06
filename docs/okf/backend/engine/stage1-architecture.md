@@ -22,7 +22,7 @@ timestamp: 2026-07-16T00:00:00Z
 > Metrics, audit, and the versioned **`/api/v1`** contract); **authored Pipelines**
 > (`com.gamma.pipeline` — DAGs of Steps run as `type: pipeline` Jobs); **multi-space tenancy**
 > (`spaces/<id>/…`); the **Component metamodel** + derived registry; **editions** as build flavors
-> (Personal/Standard/Enterprise; `inspecto-security` for Standard); and the optional **assist agent**
+> (Personal/Standard/Enterprise; `inspecto-oidc` for Standard); and the optional **assist agent**
 > (vendored kernel + eoiagent model transport). The whole-platform map lives in the
 > [OKF knowledge bundle](../../index.md); the package-level **layer map** (dependency layering, SPI
 > surface, event/config/storage/threading models) in [`architecture-layers.md`](../architecture-layers.md);

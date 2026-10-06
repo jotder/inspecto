@@ -51,7 +51,7 @@ threads), embedded DuckDB, TOON config files, one fat JAR + jlink runtime. Small
 ## Security & editions
 
 Editions are **build flavors** (never branches): the common core has **no auth code**. Professional adds
-the `inspecto-security` module behind three core SPIs (`Authenticator`/`Subject`/`TokenRelay`): OIDC
+the `inspecto-oidc` module behind three core SPIs (`Authenticator`/`Subject`/`TokenRelay`): OIDC
 resource server (Nimbus/JWKS) against the customer's IAM (Keycloak/WSO2/Okta/Entra), `RoleMapper`,
 HTTPS (pure-JDK `HttpsServer`), and a BFF session (`/auth/exchange|refresh|logout`; refresh token never
 reaches the browser; SameSite + Origin CSRF). Write routes are separately fail-closed behind

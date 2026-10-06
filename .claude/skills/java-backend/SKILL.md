@@ -42,7 +42,7 @@ years. Do not reach for a framework; this design is intentional (see [docs/EDITI
 
 ⚠ **`file-processor` names nothing anymore** — not a reactor artifact, and since 2026-08-13 not the
 deployment surface either. `package.ps1` copies the fat JAR to `inspecto.jar` inside
-`inspecto-deploy/`, and the edition jars are `inspecto-security.jar` / `inspecto-policy.jar`. Every
+`inspecto-deploy/`, and the edition jars are `inspecto-oidc.jar` / `inspecto-policy.jar`. Every
 **artifactId and `target/` jar** is `inspecto-*`. A glob like `inspecto/target/file-processor-*.jar`
 matches nothing.
 
@@ -63,7 +63,7 @@ Dir == artifactId for every module **except** `inspecto/` → `inspecto-processo
 | `inspecto-agent-hosted` | Hosted model providers (langchain4j). |
 | `inspecto-connectors` | **Optional** SFTP/FTP connectors, ServiceLoader-discovered. |
 | `inspecto-intelligence` | **Optional** embedded intelligence. |
-| `inspecto-security` | **Optional, `-Pedition-standard` / `-Pedition-enterprise` only**: `Authenticator` SPI impl (OIDC/Nimbus JWKS). |
+| `inspecto-oidc` | **Optional, `-Pedition-standard` / `-Pedition-enterprise` only**: `Authenticator` SPI impl (OIDC/Nimbus JWKS). |
 | `inspecto-policy` | **Optional, `-Pedition-enterprise` only**: ABAC policy engine. |
 
 `asn-parser/asn-decoders` is a **separate reactor** aggregated by the root pom only so
@@ -119,7 +119,7 @@ Entry points: `com.gamma.inspector.CollectorProcessor` (one-shot ETL) · `com.ga
 
 ```bash
 mvn -o clean test          # default reactor, offline — misses the profile-gated modules
-mvn -o clean test -Pedition-enterprise   # + inspecto-security AND inspecto-policy
+mvn -o clean test -Pedition-enterprise   # + inspecto-oidc AND inspecto-policy
 mvn -o clean package -q    # → inspecto/target/inspecto-processor-*.jar
 ```
 ⚠ A **profile-scoped module is invisible** to a bare `mvn -o clean test`. Anything touching the parent

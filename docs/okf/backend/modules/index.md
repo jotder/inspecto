@@ -21,5 +21,5 @@ modules. Reactor shape, version management, and the module-extraction playbook:
 * [Connectors](connectors.md) - `inspecto-connectors/` — SFTP/FTP/FTPS/DB connectors (all network deps).
 * [Agent](agent.md) - `inspecto-agent/` — optional AI assist skills (vendored kernel layer + eoiagent model transport).
 * [Agent (hosted)](agent-hosted.md) - `inspecto-agent-hosted/` — hosted model providers (omitted from air-gapped builds).
-* [Security](security.md) - `inspecto-security/` — Standard-only OIDC auth (`inspecto-security`),
+* [Security](security.md) - `inspecto-oidc/` — Standard-only OIDC auth (`inspecto-oidc`),
   reactor-gated behind the `edition-standard` Maven profile — see also [auth & security](../editions/auth-security.md).

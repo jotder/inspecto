@@ -12,7 +12,7 @@ import java.util.ServiceLoader;
  *   <li>{@code ${ENV:NAME}} → the {@code NAME} environment variable</li>
  *   <li>{@code ${SYS:prop}} → the {@code prop} JVM system property</li>
  *   <li>{@code ${FILE:/path}} and {@code ${KEYSTORE:alias}} → <b>Standard + Enterprise only (SEC-07,
- *       2026-09-06)</b>: served by a {@link SecretsProvider} the {@code inspecto-security} edition module
+ *       2026-09-06)</b>: served by a {@link SecretsProvider} the {@code inspecto-secrets} edition module
  *       registers via ServiceLoader (mounted-file secrets; a {@code SecretKeyEntry} from the keystore named by
  *       {@code secrets.keystore.path/type/password}). A bundle without that module — Personal — REFUSES the
  *       scheme with an {@link IllegalStateException} naming the edition, never a silent {@code null}. A
@@ -84,7 +84,7 @@ public final class SecretResolver {
     /** The Personal-edition refusal for a scheme no bundled provider serves — what an operator reads in a connection test. */
     static String refusal(String scope) {
         return "secret scheme ${" + scope + ":…} is not available in this edition: mounted-file and keystore secrets"
-                + " are Standard and Enterprise features (inspecto-security module) — use ${ENV:NAME} or ${SYS:prop} here";
+                + " are Standard and Enterprise features (inspecto-secrets module) — use ${ENV:NAME} or ${SYS:prop} here";
     }
 
     /** Whether {@code ref} resolves to a non-blank value in this environment — for a connection test;

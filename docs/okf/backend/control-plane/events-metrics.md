@@ -469,7 +469,7 @@ timestamp: 2026-07-16T00:00:00Z
   There is **no city key**, and `GeoCountryResolver.Geo` has no city field, so no implementation can supply one.
   The seam is the `@PublicApi` SPI `GeoCountryResolver` (ServiceLoader, via `GeoCountryResolvers.active()`); a
   resolver that throws costs only the geo attributes, never the row. ✅ **The MaxMind binding shipped
-  2026-09-29:** `com.gamma.security.MaxMindGeoCountryResolver` in `inspecto-security` (so Standard/Enterprise
+  2026-09-29:** `com.gamma.geocountry.MaxMindGeoCountryResolver` in `inspecto-geo-country` (so Standard/Enterprise
   only; Personal keeps the inert one-WARN path), on `com.maxmind.db:maxmind-db:4.2.0` (Apache 2.0, no runtime
   dependencies, `java.base` only, so the jlink `$runtimeModules` needed no change), shaded into the security
   sidecar. It reads `-Dgeoip.db` once, lazily, into memory (`FileMode.MEMORY`: the default memory-mapped mode

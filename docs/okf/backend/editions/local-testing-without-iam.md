@@ -27,7 +27,7 @@ Enterprise-only by construction.)
 
 **`Preview`** (added 2026-09-21, `-Pedition-preview` / `package.ps1 -Edition Preview`) bundles **every**
 optional module unconditionally — see [`EDITIONS.md` §Preview](../../../EDITIONS.md#preview--not-a-customer-facing-tier).
-It is not an auth bypass: it ships the real `inspecto-security.jar`/`inspecto-policy.jar` and fails
+It is not an auth bypass: it ships the real `inspecto-oidc.jar`/`inspecto-policy.jar` and fails
 closed exactly like Enterprise without a real IdP. `package.ps1 -DemoAuth` accepts only
 `-Edition Enterprise`, so there is no Preview demo build.
 
@@ -107,7 +107,7 @@ users[2]{id,displayName,title,roles}:
   is a dependency of any other module or a module of an edition profile, or is named — or
   `-DemoAuth` passed — by any other launcher, script or workflow. Its fixture test
   `tools/check-demo-auth-isolation.test.mjs` plants each violation and requires red.
-- **Not with `inspecto-security`.** `-DemoAuth` removes `inspecto-security.jar` (the guard above
+- **Not with `inspecto-oidc`.** `-DemoAuth` removes `inspecto-oidc.jar` (the guard above
   fails if that removal goes, or if the demo launcher's classpath names the security jar). At runtime
   the fail-closed `Authenticator` slot (`SpiSlot`) **refuses to boot when more than one provider is
   registered**, naming both, before constructing either — so a hand-assembled classpath carrying both
@@ -124,7 +124,7 @@ pwsh -File inspecto/package.ps1 -Edition Enterprise -DemoAuth
 
 - assembles into `inspecto-demo/` (never `inspecto-deploy/`) and zips as `inspecto-demo-<platform>.zip`;
 - builds `inspecto-demo-auth` (unless `-NoBuild`), then, **after** the SBOM step (the SBOM describes
-  the Enterprise set), deletes `inspecto-security.jar`, copies in `inspecto-demo-auth.jar`, and checks
+  the Enterprise set), deletes `inspecto-oidc.jar`, copies in `inspecto-demo-auth.jar`, and checks
   the jar carries both SPI registrations;
 - deletes `serve.*`, `Dockerfile`, `.dockerignore` and the service installers (without the security
   jar they would boot an auth-free server on every interface);
@@ -186,7 +186,7 @@ pwsh -File inspecto/package.ps1 -Edition Enterprise        # or -Edition Profess
 ```
 
 `serve.bat`/`serve.sh` auto-detect the edition from which jars are in the bundle
-(`inspecto-security.jar` present ⇒ Professional; `+ inspecto-policy.jar` ⇒ Enterprise) — no separate
+(`inspecto-oidc.jar` present ⇒ Professional; `+ inspecto-policy.jar` ⇒ Enterprise) — no separate
 runtime flag exists for this.
 
 ### 2. Point it at a real OIDC provider
@@ -244,16 +244,16 @@ as Path A, with zero other change.
 curl http://localhost:8080/health   # 200
 ```
 then confirm the boot log names the real authenticator: `authentication enforced via
-com.gamma.security.OidcAuthenticator` (not `com.gamma.demoauth.DemoAuthenticator`) — that string is the
+com.gamma.oidc.OidcAuthenticator` (not `com.gamma.demoauth.DemoAuthenticator`) — that string is the
 tell for "is this actually a real deployment or did Path A's demo jar end up on the classpath by mistake."
 
 ## Comparison
 
 | | Path A (Demo User, local) | Path B (real release) |
 |---|---|---|
-| Authenticator | `com.gamma.demoauth.DemoAuthenticator` (Demo Users with real roles, `inspecto-demo-auth`) | `com.gamma.security.OidcAuthenticator` (real IdP) |
+| Authenticator | `com.gamma.demoauth.DemoAuthenticator` (Demo Users with real roles, `inspecto-demo-auth`) | `com.gamma.oidc.OidcAuthenticator` (real IdP) |
 | Operational DB | DuckDB (default, unset `-Dinspecto.db`) | DuckDB or Postgres (`INSPECTO_DB_URL` set) |
 | Needs a running IdP? | No | Yes |
 | Safe to expose beyond localhost? | **Never** (refuses to load unless bound to loopback) | Yes, per the edition's transport/TLS story |
-| Classpath includes `inspecto-security.jar`? | No (deliberately) | Yes |
+| Classpath includes `inspecto-oidc.jar`? | No (deliberately) | Yes |
 | Boot log tell | `...DemoAuthenticator` | `...OidcAuthenticator` |

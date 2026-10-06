@@ -32,7 +32,7 @@ The directory names were renamed 2026-06-12 and the Maven **artifactIds followed
 | `inspecto-connectors/` | remote connectors (SFTP/FTP/FTPS/DB) — all network deps | `inspecto-connectors` |
 | `inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `inspecto-agent` |
 | `inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `inspecto-agent-hosted` |
-| `inspecto-security/` | Standard-only OIDC auth (reactor-gated: `edition-standard` profile) | `inspecto-security` |
+| `inspecto-oidc/` | Standard-only OIDC auth (reactor-gated: `edition-standard` profile) | `inspecto-oidc` |
 | `inspecto-ui/` | Angular SPA (served by the engine) | — (npm) |
 
 See [Modules](./modules) for each one.
@@ -43,6 +43,6 @@ See [Modules](./modules) for each one.
   [agent-hosted](./modules/agent-hosted.md) (physically absent from air-gapped builds).
 * **Editions are build flavors, never git branches** — one auth-free common core, assembled per edition via
   Maven profiles + `ServiceLoader` + `-D` flags. Standard's OIDC auth now exists as the profile-gated
-  `inspecto-security` module — the core itself still carries zero auth code. See
+  `inspecto-oidc` module — the core itself still carries zero auth code. See
   [Editions](./editions/editions-model.md) and [auth & security](./editions/auth-security.md).
 * **Mainline** `master` — today the **only** line. `4.x` was deleted 2026-08-17 with its `v4.0.0`/`v4.0.0-RC1` tags, and nothing is in production after `3.x` (newest tag `v3.12.0`); the next `N.x` is cut from `master` at release. See [branch & release policy](./editions/branching-release.md) and `docs/BRANCHING.md` §0-A.

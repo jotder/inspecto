@@ -1,15 +1,15 @@
 ---
 type: Concept
-title: Security module (inspecto-security)
+title: Security module (inspecto-oidc, with inspecto-secrets and inspecto-geo-country split out by D-MR6)
 description: Professional-edition OIDC resource server behind the Authenticator/Subject/TokenRelay SPIs — Nimbus JWKS, RoleMapper, vendor-neutral OIDC token relay; reactor-gated behind the edition-professional profile.
-resource: inspecto-security/
+resource: inspecto-oidc/
 tags: [module, security, oidc, editions, professional, spi]
 timestamp: 2026-07-07T00:00:00Z
 ---
 
-# Security module (inspecto-security)
+# Security module (inspecto-oidc, with inspecto-secrets and inspecto-geo-country split out by D-MR6)
 
-A profile-gated Maven module (`inspecto-security`, in the `edition-professional`/`edition-enterprise` profiles only — with `edition-standard` retained as an alias — `pom.xml:76`, `:115`), shipped W6 (2026-07-06). It supplies the
+A profile-gated Maven module (`inspecto-oidc`, in the `edition-professional`/`edition-enterprise` profiles only — with `edition-standard` retained as an alias — `pom.xml:76`, `:115`), shipped W6 (2026-07-06). It supplies the
 **Professional/Enterprise** auth implementation; the common core stays auth-free.
 
 * **SPI seam (in core)** — `com.gamma.control.Authenticator` / `Subject` (id + capabilities) /
@@ -28,7 +28,7 @@ A profile-gated Maven module (`inspecto-security`, in the `edition-professional`
   `-Dauth.oidc.issuer` and `-Dauth.oidc.jwksUri`, so a Professional/Enterprise bundle missing either
   **fails to boot** rather than accepting every request (`OidcAuthenticator.java:29-32,61,166`);
   `-Dauth.oidc.audience` is warn-only by decision (`:96-101`). (2) **SEC-SIDECAR-BOOT-1** — this
-  module must ship **shaded** (`inspecto-security-*-sidecar.jar`): the plain 16 KB jar carries no
+  module must ship **shaded** (`inspecto-oidc-*-sidecar.jar`): the plain 16 KB jar carries no
   `com/nimbusds` classes and every Professional/Enterprise bundle failed to boot until 2026-09-07; see
   [build & test](../build-run/build-test.md).
 * **jlink** — ✅ **PKG-4 closed 2026-07-07**: the embedded runtime's module set is verified sufficient

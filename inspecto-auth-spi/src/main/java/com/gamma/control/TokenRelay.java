@@ -8,7 +8,7 @@ import java.util.Optional;
  * Server-to-server OIDC token exchange for the backend-mediated session pattern (W6d): the SPA never
  * sees the refresh token — {@link AuthRoutes} keeps it in an {@code httpOnly} cookie and calls this
  * relay to mint access tokens against the IAM's token endpoint. Like {@link Authenticator}, this is
- * an edition seam: the Standard edition's {@code inspecto-security} module contributes the Keycloak
+ * an edition seam: the Standard edition's {@code inspecto-oidc} module contributes the Keycloak
  * implementation via {@code META-INF/services/com.gamma.control.TokenRelay}; the auth-free core ships
  * none, so the {@code /auth/*} routes answer {@code 503 CAPABILITY_UNAVAILABLE} on Personal.
  */

@@ -49,7 +49,7 @@ Build order (root `pom.xml`, parent `inspecto-parent`):
 | 8 | `inspecto-engine/` | `inspecto-engine` | **The remaining engine cluster**: `signal`, `query`, `pipeline`, `inspector`, `ingester`, `ops`, `job`, `enrich`, `alert`, `notify`, `catalog`. Deps: fp-api/util/config/sql/**etl**(+test-jar)/**event**/**acquire** + duckdb, jtoon, jackson, slf4j. Owns both `META-INF/services` files (`catalog.spi.DescriptionProvider`, `notify.NotificationChannel`). No longer owns logback-classic or a test-jar publish (both moved with event/etl). |
 | 9 | `inspecto/` | `inspecto-processor` | The core / composition root: `service`, `control`, `report`, `assist`, `exchange`, `expectation`, `intelligence`, `model`; ships the shaded fat JAR. Depends DOWN on fp-api/util/config/sql/**etl**(+test-jar)/**event**/**acquire**/**engine**. |
 | 10–13 | `inspecto-agent/`, `-agent-hosted/`, `-connectors/`, `-intelligence/` | `inspecto-*` | Siblings; each depends on core (and resolves the leaf/etl/event/acquire/engine modules transitively). |
-| (opt) | `inspecto-security/` | `inspecto-security` | Standard-edition only, behind `-Pedition-standard` — not in the default `<modules>`. |
+| (opt) | `inspecto-oidc/` | `inspecto-oidc` | Standard-edition only, behind `-Pedition-standard` — not in the default `<modules>`. |
 
 Binding constraints (unchanged by the split): framework-free (JDK HttpServer, manual DI,
 ServiceLoader SPI); **one deployable** — modularization is reactor-internal, the fat

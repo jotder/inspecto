@@ -3,7 +3,7 @@
  * SBOM module-set guard — the bill of materials must declare the jars the bundle actually ships.
  *
  * WHY THIS EXISTS. `tools/sbom.mjs` built its first-party table from four artifacts (inspecto-processor,
- * inspecto-connectors, inspecto-security, inspecto-policy) under a comment claiming it was "the SAME
+ * inspecto-connectors, inspecto-oidc, inspecto-policy) under a comment claiming it was "the SAME
  * table package.ps1 stages from". It was not. Since EDG-01 (2026-09-07) package.ps1 has staged eleven
  * jars for Standard and twelve for Enterprise, so every Standard bill of materials declared 4 first-party
  * jars where the bundle carried 10, and Enterprise 4 where it carried 11. javax.mail appeared in NO

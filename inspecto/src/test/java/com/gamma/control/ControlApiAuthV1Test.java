@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Real-HTTP tests for W6's AuthN/AuthZ gate in {@link ControlApi#dispatch}. The core ships no
  * {@link Authenticator}, so these force one via {@link Authenticators#forTest} to stand in for the
- * Standard edition's {@code inspecto-security} module — the only way to exercise the gate from this
+ * Standard edition's {@code inspecto-oidc} module — the only way to exercise the gate from this
  * module's own test classpath (a real {@code META-INF/services} registration here would poison every
  * other test in {@code inspecto} with an active Authenticator). Always restored in {@link #tearDown}.
  */

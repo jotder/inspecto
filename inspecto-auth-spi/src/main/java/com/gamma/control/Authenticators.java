@@ -19,7 +19,7 @@ final class Authenticators {
     private Authenticators() {}
 
     // 🔴 failClosed: for THIS spi, absent means every route serves unauthenticated, so a registered
-    // inspecto-security that refuses to construct (a typo in -Dauth.oidc.jwksUri) must propagate rather
+    // inspecto-oidc that refuses to construct (a typo in -Dauth.oidc.jwksUri) must propagate rather
     // than resolve empty. Personal registers no provider at all and still resolves empty, unchanged.
     private static final SpiSlot<Authenticator> SLOT = new SpiSlot<>(Authenticator.class, true);
 

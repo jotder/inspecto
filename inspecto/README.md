@@ -329,7 +329,7 @@ served same-origin by `ControlApi`, so one process hosts both the API and the UI
 > the Java tree, so `CONTROL_TOKEN=secret bash serve.sh` authenticated nothing while reading exactly like
 > it did — anyone following it would have believed they had secured an auth-free service. `SCR-9` removed
 > it from the generated launchers on 2026-09-09; **this README, which ships inside the bundle, still
-> carried it until 2026-09-11**. Real authentication is the `inspecto-security` module (Standard+, OIDC):
+> carried it until 2026-09-11**. Real authentication is the `inspecto-oidc` module (Standard+, OIDC):
 > see [EDITIONS](../docs/EDITIONS.md). ✅ The sweep is complete as of 2026-09-14 — every remaining mention
 in the tree describes the flag as *removed*, which is true and deliberately left in place.
 

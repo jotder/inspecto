@@ -48,9 +48,11 @@ const MODULES = [
     { artifactId: 'inspecto-processor', dir: 'inspecto', bundleFile: 'inspecto.jar', from: 'all' },
     { artifactId: 'inspecto-connectors', dir: 'inspecto-connectors', bundleFile: 'inspecto-connectors.jar', from: 'all' },
 
-    // Professional and above. inspecto-security is the original non-Personal sidecar; the seven below are
+    // Professional and above. inspecto-oidc (ex inspecto-security) is the original non-Personal sidecar; the seven below are
     // EDG-01 cells 1–7, added 2026-09-07 and absent from the generator until this file existed.
-    { artifactId: 'inspecto-security', dir: 'inspecto-security', bundleFile: 'inspecto-security.jar', from: 'professional' },
+    { artifactId: 'inspecto-oidc', dir: 'inspecto-oidc', bundleFile: 'inspecto-oidc.jar', from: 'professional' },                      // D-MR6: was inspecto-security (OIDC Authenticator + TokenRelay)
+    { artifactId: 'inspecto-secrets', dir: 'inspecto-secrets', bundleFile: 'inspecto-secrets.jar', from: 'professional' },            // D-MR6: the file-keystore SecretsProvider
+    { artifactId: 'inspecto-geo-country', dir: 'inspecto-geo-country', bundleFile: 'inspecto-geo-country.jar', from: 'professional' },  // D-MR6: the MaxMind GeoCountryResolver
     // EDG-01 cell 1 (CP-15). Brings javax.mail — SmtpEmailChannel needs it, and it came here FROM
     // inspecto-connectors, whose pom no longer declares it.
     { artifactId: 'inspecto-notify-channels', dir: 'inspecto-notify-channels', bundleFile: 'inspecto-notify-channels.jar', from: 'professional' },
@@ -89,7 +91,7 @@ export function editionProfile(edition) {
 
 /**
  * The first-party modules staged for `edition`, in package.ps1's staging order.
- * Personal 2, Professional 15, Enterprise 18, Preview 18 — first-party only; add PG_SIDECAR for the jar count.
+ * Personal 2, Professional 17, Enterprise 20, Preview 20 — first-party only; add PG_SIDECAR for the jar count.
  * ⚠ Those three numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this
  * very line. They said 2/10/11 from EDG-01 until 2026-09-17, missing inspecto-agent (PKG-5, 2026-09-12);
  * the assertion exists so the next module to arrive cannot leave them wrong again.

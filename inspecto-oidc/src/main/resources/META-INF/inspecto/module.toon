@@ -1,0 +1,7 @@
+id: oidc
+title: OIDC authenticator and token relay
+buildRole: implementation
+offeringRole: provider
+bindingTime: boot
+provides:
+  contracts[2]: Authenticator,TokenRelay

@@ -1,0 +1,7 @@
+id: geo-country
+title: MaxMind geo-country resolver
+buildRole: implementation
+offeringRole: provider
+bindingTime: boot
+provides:
+  contracts[1]: GeoCountryResolver

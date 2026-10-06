@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * a Standard deployment with a mistyped {@code -Dauth.oidc.jwksUri} booted <b>wide open</b> while
  * {@link ControlApi}'s constructor comment promised it would "fail to boot instead of silently accepting
  * traffic". The companion {@code AuthenticatorDiscoveryFailClosedTest} pins the same contract against the
- * real {@code inspecto-security} provider.
+ * real {@code inspecto-oidc} provider.
  *
  * <p>⛔ Fail-soft remains the default and is not a bug: PKG-5 introduced it so an optional component
  * compiled for a newer JDK (the assistant sidecar) is an absence rather than a boot failure. The two
@@ -107,7 +107,7 @@ class SpiSlotFailClosedTest {
 
     /**
      * 🔴 Two registrations of a fail-closed SPI refuse, naming both — the shape of a classpath carrying
-     * inspecto-security.jar AND the demo build's inspecto-demo-auth.jar, where "first found wins" would let
+     * inspecto-oidc.jar AND the demo build's inspecto-demo-auth.jar, where "first found wins" would let
      * classpath order choose between real authentication and a password-less picker. Neither provider is
      * constructed: the refusal happens before either could run side effects (the demo one checks loopback).
      */

@@ -41,7 +41,7 @@ public final class SpiSlot<T> {
      * <p>🔴 <b>It is the wrong default for an SPI whose absence removes a safety property</b>, which is
      * why {@code failClosed} exists. For {@link Authenticator}, absent means <em>every route serves
      * unauthenticated</em> — there are no "its routes" to answer 503. Degrading a misconfigured
-     * {@code inspecto-security} to absence therefore turns a typo in {@code -Dauth.oidc.jwksUri} into a
+     * {@code inspecto-oidc} to absence therefore turns a typo in {@code -Dauth.oidc.jwksUri} into a
      * wide-open control plane, which is precisely what {@link ControlApi}'s constructor says it prevents.
      *
      * <p>⚠ The distinction under {@code failClosed} is <b>registered-but-broken</b> vs <b>not
@@ -50,7 +50,7 @@ public final class SpiSlot<T> {
      * construct propagates.
      *
      * <p>🔴 <b>Fail-closed also refuses MORE THAN ONE provider.</b> "First found wins" means classpath order
-     * picks the Authenticator, so a hand-assembled classpath carrying both {@code inspecto-security.jar} and
+     * picks the Authenticator, so a hand-assembled classpath carrying both {@code inspecto-oidc.jar} and
      * the demo build's {@code inspecto-demo-auth.jar} (a permit-by-picker sign-in) would silently serve
      * whichever came first. Two registrations of a safety SPI are a packaging error, not a choice to make at
      * runtime: throw, naming both, before either is constructed. (The build-side half is

@@ -467,7 +467,7 @@ Updates are **optimistic** (2026-10-04): every object carries a monotonic `versi
     a version restore and a Space-Template seed alike). With a directory registered, an unknown user id OR a lookup
     that throws is refused 422 (fail closed); with none registered — the offline editions, Personal / Standard / the
     demo build — the id-shape check alone applies, the same standing as `POST /objects/{id}/assign`. ⚠ The core ships
-    NO implementation: no SCIM / user-lookup client exists in `inspecto-security` (it only validates tokens), so on
+    NO implementation: no SCIM / user-lookup client exists in `inspecto-oidc` (it only validates tokens), so on
     every shipped edition today the check is the id shape. It is checked at SAVE time only: a user deleted from the
     IAM later is still assigned by the sweep. **Examples per Space Template (operator 2026-10-03):** each template
     carries `config/examples/sla-escalation-examples.md` — labelled, INERT markdown (an Incident and a Case policy

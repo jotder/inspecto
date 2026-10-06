@@ -24,7 +24,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  # The OIDC provider inspecto-security authenticates against (Standard/Enterprise editions).
+  # The OIDC provider inspecto-oidc authenticates against (Standard/Enterprise editions).
   # ⚠ State lives in the container layer: it survives stop/start, and `docker rm` discards the registered
   # OAuth application. Re-register it with the DCR call in README.md.
   wso2is:

@@ -38,7 +38,7 @@ AI-driven autonomy without redesign.
 | Section | What it is | Where |
 |---|---|---|
 | **Angular UI** | The one operator console (all Lenses); requires a live control plane | `inspecto-ui/` |
-| **Java backend** | Engine + control plane + connectors + agent + security modules | `inspecto/`, `inspecto-connectors/`, `inspecto-agent/`, `inspecto-agent-hosted/`, `inspecto-security/` |
+| **Java backend** | Engine + control plane + connectors + agent + security modules | `inspecto/`, `inspecto-connectors/`, `inspecto-agent/`, `inspecto-agent-hosted/`, `inspecto-oidc/` |
 | **Agentic framework** | **eoiagent** — reusable, embeddable agent platform (separate repo); Inspecto's model transport since 2026-07-07; the kernel reasoning layer is vendored in `inspecto-agent` | upstream repo `jotder/inspect-agent` (`com.eoiagent:*`) — ⚠ corrected 2026-09-09; this cell named a machine-local path |
 
 ### 1.2 Personas (Lenses) and editions
@@ -48,7 +48,7 @@ AI-driven autonomy without redesign.
   Signals, Incidents). **Role** = assigned, server-enforced authorization (security module); Roles project
   onto Lenses through **Capabilities** — panes gate on a Capability, never on Lens identity.
 - **Editions are build flavors, never branches**: **Personal** (auth-free, local, free tier) ·
-  **Professional** (adds `inspecto-security`: HTTPS, OIDC via external IAM, RBAC/ABAC, attributed audit — the
+  **Professional** (adds `inspecto-oidc`: HTTPS, OIDC via external IAM, RBAC/ABAC, attributed audit — the
   free→paid line) · **Enterprise** (future: shared state, distributed scheduling, per-tenant ABAC;
   demand-gated).
 
@@ -157,7 +157,7 @@ library. The split is fixed by `GLOSSARY.md` §14, not chosen here.
 **Delivered baseline (former MUSTs, now shipped):** acquisition framework · Stage-1 ingest · medallion
 ELT · authored Pipelines · scheduler/jobs + async runs · Datasets/Queries + live DuckDB execution ·
 Studio persistence · component metamodel + R1–R6 rework · multi-space · `/api/v1` contract ·
-`inspecto-security` (OIDC/HTTPS/BFF) · UI on v1 with OIDC · Assistant on eoiagent · packaging/editions.
+`inspecto-oidc` (OIDC/HTTPS/BFF) · UI on v1 with OIDC · Assistant on eoiagent · packaging/editions.
 
 ### MUST (remaining — the release-gating set, each scoped)
 

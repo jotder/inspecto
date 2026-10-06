@@ -17,7 +17,7 @@
 - **[`keycloak-realm-blueprint.json`](keycloak-realm-blueprint.json)** — a partial Keycloak realm
   export: the `inspecto-spa` public client (Authorization Code + PKCE, no client secret — a browser
   SPA cannot keep one), a `roles` protocol mapper so an access token's role grants land in the JWT
-  claim `inspecto-security`'s `RoleMapper` reads, and realm roles matching the taxonomy in
+  claim `inspecto-oidc`'s `RoleMapper` reads, and realm roles matching the taxonomy in
   [`../../archived-documents/plans-archive/rbac-groundwork.md`](../../archived-documents/plans-archive/rbac-groundwork.md) §3.
 
 ## How the pieces fit (§8 recap)
@@ -38,7 +38,7 @@ Browser ── HTTPS/HTTP2 ──> WSO2 API Gateway ── HTTPS/HTTP1.1 ──>
 2. **WSO2** fronts the backend, terminates client TLS, enforces OAuth2 (token introspection or JWT
    validation at the edge — a fast pre-check), rate-limits, and forwards the bearer token upstream
    unchanged.
-3. **Inspecto** (`inspecto-security`'s `OidcAuthenticator`) validates the same JWT again — signature
+3. **Inspecto** (`inspecto-oidc`'s `OidcAuthenticator`) validates the same JWT again — signature
    against Keycloak's JWKS, issuer, audience, expiry — "defense in depth, never trust the gateway
    blindly" — then maps claims → Roles → Capabilities (`RoleMapper`) and attaches a `Subject` the
    control plane's `requireCapability` gates and the v1 envelope's `permissions[]` read from.

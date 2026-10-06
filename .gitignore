@@ -129,7 +129,9 @@ inspecto-consignment-outputs.db.wal
 /inspecto-exchange/target/
 /inspecto-observability/target/
 /inspecto-ops/target/
-/inspecto-security/target/
+/inspecto-oidc/target/
+/inspecto-secrets/target/
+/inspecto-geo-country/target/
 /inspecto-policy/target/
 /inspecto-intelligence/target/
 
