@@ -143,4 +143,9 @@ public final class FindingCodes {
     /** The same dead-key finding where a config already on disk is merely being read, not authored —
      *  refusing there would brick a deployed pipeline over a key that was never load-bearing. */
     public static final String WARN_UNKNOWN_CONFIG_KEY = "WARN_UNKNOWN_CONFIG_KEY";
+
+    /** A config that implies advancing progress state (a remote/DB-export/Kafka Collector, content dedup,
+     *  markers + duplicate_check, windowed {@code transform.dedup}, a job's {@code incremental_column}) saved
+     *  into a Space whose effective Safety Policy has {@code permit.advance_state: false} (policy-narrowing D9). */
+    public static final String ERR_SAFETY_STATE_ADVANCE_REFUSED = "ERR_SAFETY_STATE_ADVANCE_REFUSED";
 }

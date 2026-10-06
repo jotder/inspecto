@@ -2,6 +2,7 @@ package com.gamma.config.safety;
 
 import com.gamma.api.PublicApi;
 import com.gamma.config.spec.Finding;
+import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.RawConfig;
 
 import java.nio.file.Path;
@@ -175,6 +176,11 @@ public final class ConfigSafetyValidator {
 
     private static void checkJob(Map<String, Object> raw, SafetyPolicy p, Function<String, Path> baseForKey,
                                  List<Finding> out) {
+        if (!p.advanceState()) {
+            String inc = RawConfig.str(raw, "job.incremental_column");
+            if (inc != null && !inc.isBlank())
+                refuseAdvance(out, "job.incremental_column", "an incremental run advances a watermark");
+        }
         for (String k : JOB_PATH_KEYS) {
             String field = "job." + k;
             String v = RawConfig.str(raw, field);
@@ -302,6 +308,7 @@ public final class ConfigSafetyValidator {
 
         checkOutput(raw, "output.format", "output.compression", p, out);
         checkDuckLake(raw, out);
+        if (!p.advanceState()) checkStateAdvance(raw, out);
 
         // ── processing.map (the authored half of the projection slot — a Record Transformer) ──
         // The third hand-rolled list-of-objects walker in this file, for the same reason as the other
@@ -330,6 +337,51 @@ public final class ConfigSafetyValidator {
                 }
             }
         }
+    }
+
+    /** Collector connectors that move no progress state: a local poll (markers are judged separately) and a Dataset
+     *  consumer. Every other connector (sftp/s3/http/db/kafka/...) keeps a frontier, a watermark or an offset. */
+    private static final Set<String> STATELESS_CONNECTORS = Set.of("local", "dataset");
+
+    /**
+     * Plan-time half of S6 (policy-narrowing D9, operator 2026-10-06): with {@code permit.advance_state: false} a
+     * pipeline whose config implies moving progress state is refused at save/register, with one finding on each key
+     * that implies it. The act-time {@link StateGate} sites stay the backstop for a policy tightened after the save.
+     */
+    private static void checkStateAdvance(Map<String, Object> raw, List<Finding> out) {
+        String connector = RawConfig.str(raw, "collector.connector");
+        if (connector != null && !connector.isBlank()
+                && !STATELESS_CONNECTORS.contains(connector.trim().toLowerCase(java.util.Locale.ROOT)))
+            refuseAdvance(out, "collector.connector", "a '" + connector.trim()
+                    + "' Collector advances a slice frontier / watermark / offset");
+        String mode = RawConfig.str(raw, "collector.duplicate.mode");
+        if (mode != null && !mode.isBlank() && !"path".equalsIgnoreCase(mode.trim()))
+            refuseAdvance(out, "collector.duplicate.mode", "content dedup records a fingerprint ledger");
+        String markers = RawConfig.str(raw, "dirs.markers");
+        if (RawConfig.boolOr(raw, "processing.duplicate_check.enabled", false) && markers != null && !markers.isBlank())
+            refuseAdvance(out, "processing.duplicate_check.enabled", "duplicate_check with dirs.markers writes "
+                    + "processed markers");
+        if (isWindowed(RawConfig.at(raw, "processing.dedup.scope")))
+            refuseAdvance(out, "processing.dedup.scope", "a windowed dedup records sightings in a dedup ledger");
+        if (RawConfig.at(raw, "processing.steps") instanceof List<?> steps) {
+            for (int i = 0; i < steps.size(); i++) {
+                if (steps.get(i) instanceof Map<?, ?> step && step.get("dedup") instanceof Map<?, ?> d
+                        && isWindowed(d.get("scope")))
+                    refuseAdvance(out, "processing.steps[" + i + "].dedup.scope",
+                            "a windowed dedup records sightings in a dedup ledger");
+            }
+        }
+    }
+
+    private static boolean isWindowed(Object scope) {
+        return scope != null && scope.toString().trim().regionMatches(true, 0, "window(", 0, 7);
+    }
+
+    private static void refuseAdvance(List<Finding> out, String field, String why) {
+        out.add(Finding.error(field, field + " implies advancing progress state (" + why
+                + "), but the Safety Policy has permit.advance_state: false").coded(
+                FindingCodes.ERR_SAFETY_STATE_ADVANCE_REFUSED,
+                "Remove the key, or ask the operator to allow permit.advance_state for this Space"));
     }
 
     /**

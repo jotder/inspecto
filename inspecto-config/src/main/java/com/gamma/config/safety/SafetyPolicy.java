@@ -31,6 +31,9 @@ import java.util.Set;
  * @param maxBatchBytes      upper bound for {@code collector.consignment.max_bytes} (and the legacy {@code processing.batch.max_bytes})
  * @param allowedFormats     permitted {@code output.format} values (upper-case)
  * @param allowedCompression permitted {@code output.compression} codecs (lower-case)
+ * @param advanceState       whether this Space's runs may move progress state ({@code permit.advance_state}); the
+ *                           plan-time half of S6 (D9) refuses a config that implies an advance when false. A
+ *                           {@code mode: audit} policy reads as true here: the act-time {@link StateGate} logs instead of refusing
  * @since 3.5.0
  */
 @PublicApi(since = "4.0.0")
@@ -41,7 +44,8 @@ public record SafetyPolicy(
         int maxBatchFiles,
         long maxBatchBytes,
         Set<String> allowedFormats,
-        Set<String> allowedCompression) {
+        Set<String> allowedCompression,
+        boolean advanceState) {
 
     private static final Set<String> DEFAULT_FORMATS = Set.of("CSV", "PARQUET");
     private static final Set<String> DEFAULT_COMPRESSION =
@@ -195,7 +199,7 @@ public record SafetyPolicy(
         if (t.allowFormats() != null) formats.retainAll(t.allowFormats());
         return new SafetyPolicy(t.allowRoots(), t.denyRoots(), t.capThreads(Runtime.getRuntime().availableProcessors()),
                 t.capBatchFiles(1_000_000), t.capBatchBytes(Long.MAX_VALUE), formats.isEmpty() ? Set.of("-") : formats,
-                DEFAULT_COMPRESSION);
+                DEFAULT_COMPRESSION, t.permitsAdvanceState() || t.effectiveMode() == SafetyPolicyTier.Mode.AUDIT);
     }
 
     /**
@@ -218,6 +222,6 @@ public record SafetyPolicy(
     /** A policy rooted at the given dirs (the skill's workspace, or a test temp dir). */
     public static SafetyPolicy withRoots(Path... roots) {
         return new SafetyPolicy(List.of(roots), List.of(), Runtime.getRuntime().availableProcessors(),
-                1_000_000, Long.MAX_VALUE, DEFAULT_FORMATS, DEFAULT_COMPRESSION);
+                1_000_000, Long.MAX_VALUE, DEFAULT_FORMATS, DEFAULT_COMPRESSION, true);
     }
 }
