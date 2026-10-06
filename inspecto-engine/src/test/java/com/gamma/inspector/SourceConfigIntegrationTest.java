@@ -492,6 +492,8 @@ class SourceConfigIntegrationTest {
 
         List<com.gamma.event.Event> gaps = events.recent(1000).stream()
                 .filter(e -> com.gamma.event.EventType.SEQUENCE_GAP.equals(e.type()))
+                // installStore DRAINS the previous store, so earlier tests' gaps (DeliveryCheckTest, T8) ride along
+                .filter(e -> "cdr_{yyyyMMddHH}.csv".equals(String.valueOf(e.attributes().get("sequence"))))
                 .toList();
         assertEquals(1, gaps.size(), "exactly one hole reported (the 02:00 file)");
         assertEquals("cdr_2026061402.csv", String.valueOf(gaps.get(0).attributes().get("expected")));
@@ -503,7 +505,8 @@ class SourceConfigIntegrationTest {
         // the poll loop re-runs each cycle; a persistent gap must not re-fire
         CollectorProcessor.run(cfg);
         long after = events.recent(1000).stream()
-                .filter(e -> com.gamma.event.EventType.SEQUENCE_GAP.equals(e.type())).count();
+                .filter(e -> com.gamma.event.EventType.SEQUENCE_GAP.equals(e.type()))
+                .filter(e -> "cdr_{yyyyMMddHH}.csv".equals(String.valueOf(e.attributes().get("sequence")))).count();
         assertEquals(1, after, "a persistent gap fires once, not every poll cycle");
     }
 }
