@@ -1,6 +1,8 @@
 package com.gamma.control;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 
 /**
  * Per-subject token-bucket throttle for the expensive routes named in {@code NO-RATE-LIMIT-EXPENSIVE-ROUTES-1}
@@ -57,6 +59,11 @@ final class RateLimiter {
 
     private final double capacity;
     private final double refillPerSecond;
+    /** Nanosecond clock; {@link System#nanoTime} in production, replaced by tests so the refill is deterministic. */
+    private volatile LongSupplier clock = System::nanoTime;
+    /** How often (at most) a {@link #tryConsume} call sweeps the map for evictable buckets. */
+    static final long SWEEP_INTERVAL_NANOS = 60_000_000_000L;
+    private final AtomicLong lastSweepNanos = new AtomicLong(System.nanoTime());
 
     RateLimiter(double capacity, double refillPerSecond) {
         this.capacity = capacity;
@@ -65,30 +72,74 @@ final class RateLimiter {
 
     private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
 
+    /** Test seam: drive the refill (and the eviction sweep) from {@code nanos} instead of the wall clock. */
+    void useClock(LongSupplier nanos) {
+        this.clock = nanos;
+        this.lastSweepNanos.set(nanos.getAsLong());
+    }
+
+    /** Number of live buckets - visible for the bounded-memory test. */
+    int size() { return buckets.size(); }
+
     /** True when {@code key} has a token to spend (and spends it); false when exhausted. */
     boolean tryConsume(String key) {
-        return buckets.computeIfAbsent(key, k -> new Bucket(capacity, refillPerSecond)).tryConsume();
+        long now = clock.getAsLong();
+        sweepIfDue(now);
+        while (true) {
+            Bucket b = buckets.computeIfAbsent(key, k -> new Bucket(capacity, refillPerSecond, now));
+            Boolean r = b.tryConsume(now);
+            if (r != null) return r;
+            buckets.remove(key, b);   // evicted under our feet: retry against a fresh (identical, full) bucket
+        }
+    }
+
+    /**
+     * Idle-bucket eviction (bounded memory): drop a bucket only once it has refilled to FULL capacity. A full
+     * bucket and a freshly created one are indistinguishable, so eviction can never hand a client a budget it
+     * would not already have by waiting - a caller cannot reset its budget faster than a full refill
+     * ({@code capacity / refillPerSecond}). A bucket is marked evicted under its own lock, so a request that
+     * fetched it concurrently retries instead of spending from an orphan.
+     */
+    private void sweepIfDue(long now) {
+        long last = lastSweepNanos.get();
+        if (now - last < SWEEP_INTERVAL_NANOS || !lastSweepNanos.compareAndSet(last, now)) return;
+        buckets.entrySet().removeIf(e -> e.getValue().evictIfFull(now));
     }
 
     private static final class Bucket {
         private final double capacity;
         private final double refillPerSecond;
         private double tokens;
-        private long lastRefillNanos = System.nanoTime();
+        private long lastRefillNanos;
+        private boolean evicted;
 
-        Bucket(double capacity, double refillPerSecond) {
+        Bucket(double capacity, double refillPerSecond, long now) {
             this.capacity = capacity;
             this.refillPerSecond = refillPerSecond;
             this.tokens = capacity;
+            this.lastRefillNanos = now;
         }
 
-        synchronized boolean tryConsume() {
-            long now = System.nanoTime();
-            double elapsedSeconds = (now - lastRefillNanos) / 1_000_000_000.0;
-            lastRefillNanos = now;
-            tokens = Math.min(capacity, tokens + elapsedSeconds * refillPerSecond);
+        private void refill(long now) {
+            if (now > lastRefillNanos) {
+                tokens = Math.min(capacity, tokens + (now - lastRefillNanos) / 1_000_000_000.0 * refillPerSecond);
+                lastRefillNanos = now;
+            }
+        }
+
+        /** True/false = spent/exhausted; {@code null} = this bucket was evicted, look up again. */
+        synchronized Boolean tryConsume(long now) {
+            if (evicted) return null;
+            refill(now);
             if (tokens < 1.0) return false;
             tokens -= 1.0;
+            return true;
+        }
+
+        synchronized boolean evictIfFull(long now) {
+            refill(now);
+            if (tokens < capacity) return false;
+            evicted = true;
             return true;
         }
     }

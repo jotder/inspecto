@@ -232,6 +232,12 @@ public final class ControlApi implements AutoCloseable, HostContext {
     /** The expensive Link Analysis routes' own per-subject bucket - see {@link LinkAnalysisRateClasses}. */
     private final RateLimiter linkAnalysisLimiter = RateLimiter.linkAnalysis();
 
+    /** Test seam: drive every rate-limit bucket from {@code nanos} (deterministic refill in real-HTTP tests). */
+    void useRateLimitClock(java.util.function.LongSupplier nanos) {
+        for (RateLimiter l : new RateLimiter[] {rateLimiter, dashboardLimiter, callbackLimiter, pushLimiter, linkAnalysisLimiter})
+            l.useClock(nanos);
+    }
+
     /**
      * Control plane over a single running service — wrapped as the {@code default} space. The long-standing
      * single-tenant entry point (and every test); behaviour is unchanged.

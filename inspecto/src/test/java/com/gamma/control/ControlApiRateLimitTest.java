@@ -35,6 +35,9 @@ class ControlApiRateLimitTest {
         Path pipe = PipelineConfigBatchTest.writePipeline(configDir, "");
         CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
         ControlApi api = new ControlApi(svc, 0);
+        // A frozen clock: no token refills mid-test, so the 21st/121st request is 429 however slow the host is
+        // (the /bi/query bucket refills 2/s, and 120 real-HTTP calls under load used to earn a token back).
+        api.useRateLimitClock(() -> 0L);
         api.start();
         return new Ctx(svc, api, api.port());
     }
