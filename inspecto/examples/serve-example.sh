@@ -113,7 +113,7 @@ fi
 # ⚠ probes.txt is PRINTED, never asserted — a failed probe prints "(request failed)" and the script
 # still exits 0. That is deliberate and was re-confirmed 2026-09-17 rather than "fixed": the generic
 # /events probe legitimately answers 503 CAPABILITY_UNAVAILABLE on a Personal bundle (the feed lives in
-# the optional inspecto-events module, Standard and above), so a fatal probe would make the release
+# the optional inspecto-observability module, Standard and above), so a fatal probe would make the release
 # smoke edition-dependent — a check that gets disabled beats no check only in the wrong direction.
 # ⛔ So do NOT read probes.txt as a gate. The exit code below is decided by --check-jobs alone.
 FAILURES=0

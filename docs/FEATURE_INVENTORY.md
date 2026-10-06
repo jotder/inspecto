@@ -186,7 +186,7 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 
 ### K — Views, measures, events (serve mode) [`DAT` · `OPS`]
 
-`GET /metrics` (Prometheus — optional `inspecto-metrics`) · `GET /events` / `/events/search` (optional `inspecto-events`; the core audit read is `/audit/search` / `/audit/export`) · `GET /views` / `/views/{name}/data`
+`GET /metrics` (Prometheus — optional `inspecto-observability`) · `GET /events` / `/events/search` (optional `inspecto-observability`; the core audit read is `/audit/search` / `/audit/export`) · `GET /views` / `/views/{name}/data`
 (a `sink.view` registration, or a hand-authored definition — see below) · `GET /catalog` /
 `/catalog/graph` (lineage) ·
 `GET /sources` (current DB watermark).

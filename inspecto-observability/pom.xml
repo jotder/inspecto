@@ -11,11 +11,14 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>inspecto-metrics</artifactId>
+    <artifactId>inspecto-observability</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — Prometheus scrape endpoint (Professional edition, optional)</name>
+    <name>Inspecto — Observability: /metrics + /events* (Professional edition, optional)</name>
     <description>
+        MODULE-REORG-1 P7 (D-MR5): the former inspecto-metrics (GET /metrics) and inspecto-events (the /events*
+        feed) merged into this one module; both RouteModules and their ServiceLoader lines live here.
+
         OPTIONAL Professional-edition metrics EXPOSITION (EDITIONS.md CP-13): GET /metrics, the Prometheus text
         endpoint, contributed through the core's public com.gamma.control.RouteModule ServiceLoader seam.
 

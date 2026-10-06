@@ -131,7 +131,7 @@ class ControlApiMultiSpaceTest {
      * HTTP exposition is edition-gated as of EDG-01 cell 5 and is absent from this (Personal) build — the path
      * answers 503 here. That is not a weakening: {@code MetricsRoutes} serves exactly this string, so the
      * needles are unchanged, and the subject of this test is per-space LABEL ISOLATION, which lives in the
-     * registry the endpoint merely renders. The exposition itself is asserted in inspecto-metrics.
+     * registry the endpoint merely renders. The exposition itself is asserted in inspecto-observability.
      */
     private String awaitMetric(String needle) throws Exception {
         long deadline = System.nanoTime() + 8_000_000_000L;

@@ -178,7 +178,7 @@ all 422s in `inspecto-geo-link` `AdmiraltyGrade` / `InvestigationCoverageRoutes`
 still prints 4 lines because `ImportRollback` / `PendingChangeRoutes` / `ServerFaults` / `TemplateSeedGate` pass a
 *computed* code, not a default) — after the `BiRoutes` / `DatasetRoutes` / `PipelineListRoutes` / `BiTemplates` /
 `AuditLogRoutes` / `AssistRoutes` / `ViewRoutes` / `SignalRoutes` / `DeliveryStatusRoutes` / the five `Absent*Routes`
-and 13 smaller files (incl. `inspecto-ops` `NoteRoutes`/`OpsEngine`, `inspecto-events` `EventRoutes`,
+and 13 smaller files (incl. `inspecto-ops` `NoteRoutes`/`OpsEngine`, `inspecto-observability` `EventRoutes`,
 `inspecto-exchange` `ExchangeRoutes`) slice — 82 sites, every one the status default, so no wire change (the
 `Absent*Routes`/assist/ops 503s are `CAPABILITY_UNAVAILABLE`; `DeliveryStatusRoutes`' public-callback 404/422 and
 its non-durable-receipts 409 keep `NOT_FOUND`/`CONFIG_VALIDATION_FAILED`/`CONFLICT`). Before that (2026-09-25), the
@@ -415,7 +415,7 @@ A route family an edition does not bundle is registered by an **absent-module st
 "wrong path". `features.*` in `/bootstrap` is `api.hasRoute(...)`, so the flag cannot disagree with the
 build; the SPA hides navigation on it and renders an explained panel, never a toast. The families:
 geo/link (`inspecto-geo-link`, 5 paths), exchange (`inspecto-exchange`, 11), `/metrics` exposition
-(`inspecto-metrics`), `/events*` (`inspecto-events`; the core keeps `/audit/search|export`), and the
+(`inspecto-observability`), `/events*` (`inspecto-observability`; the core keeps `/audit/search|export`), and the
 objects domain (`inspecto-ops`, ~49). Gating is **`ServiceLoader` modules, never `-D` switches** (operator,
 2026-09-07). The core `AuditLogRoutes` stay in every edition, fail-closed so they cannot serve as the events
 feed.
@@ -721,7 +721,7 @@ mutation paths.
 | File | Providers |
 |---|---|
 | `inspecto-ops/src/main/resources/META-INF/services/com.gamma.control.RouteModule` | `ObjectRoutes`, `NoteRoutes`, `QueueRoutes`, `TagRoutes` — the first external adopters of the public SPI |
-| the same service name in `inspecto-geo-link`, `inspecto-exchange`, `inspecto-metrics`, `inspecto-events` | the other four gated families |
+| the same service name in `inspecto-geo-link`, `inspecto-exchange`, `inspecto-observability`, `inspecto-observability` | the other four gated families |
 
 ### 8.4 Cross-language wire vocabularies — `inspecto-ui/src/app/inspecto/contracts/`
 

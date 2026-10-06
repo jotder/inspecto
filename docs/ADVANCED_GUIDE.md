@@ -461,7 +461,7 @@ infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
 - **Audit (core, every edition):** `GET /audit/search`, `/audit/export[?format=csv]` — `type` is required
   and must be `AUDIT` or `ACCESS_DENIED` (fail-closed; anything else is a 400). This is the audit read on
   every edition, Personal included.
-- **Events** (⚠ the optional `inspecto-events` module — Standard edition and above; **503 on Personal**,
+- **Events** (⚠ the optional `inspecto-observability` module — Standard edition and above; **503 on Personal**,
   where events are still recorded but the feed is not served): `GET /events`, `/events/search`,
   `/events/{id}`, `/events/export`, `GET/POST /events/views`,
   `POST /events/views/{name}/delete`.

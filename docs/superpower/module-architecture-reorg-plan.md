@@ -136,7 +136,7 @@ isolation.
 | processor platform half (`control` plumbing, `service`) | Platform · Base | no |
 | processor other feature routes | Implementation · Base | register by `ServiceLoader` (P1) — no physical move |
 | ops, exchange, entity-list, events, backup, agent, intelligence | Implementation · Optional | keep; trim the processor dependency to narrow interfaces |
-| metrics (1 file), events (1 file) | Implementation · Optional, Professional up | **merge** into one Observability module (D-MR5) |
+| metrics (1 file), events (1 file) | Implementation · Optional, Professional up | **merge** into one Observability module (D-MR5) — ✅ DONE 2026-10-06: `inspecto-observability` (module id `observability`; Java packages `com.gamma.metricsapi` + `com.gamma.eventsapi` unchanged; both RouteModules in one services file; directory stays at repo root until the regroup step) |
 | connectors | Implementation · Provider | **split per third-party footprint** (SFTP/FTP, Kafka, DB export, cloud object stores) |
 | security | Implementation · Provider | **split into three** providers now (D-MR6) |
 | demo-auth, notify-channels, agent-hosted, policy, la-store-pg | Implementation · Provider | keep; govern |

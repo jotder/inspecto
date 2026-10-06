@@ -69,8 +69,8 @@
         implementation), inspecto-notify-channels (CP-15 — the webhook + SMTP transports), inspecto-backup (OPS-06 — the
         backup/backup_verify/restore tasks) inspecto-entity-list (SEP-08 — Entity Lists + the shared entity fact log),
         inspecto-geo-link (CP-09 — the geo map + link analysis
-        routes), inspecto-exchange (SEC-10 — cross-space sharing), inspecto-metrics (CP-13 — the
-        Prometheus exposition), inspecto-events (CP-13 — the /events* feed) and inspecto-ops (CP-11 —
+        routes), inspecto-exchange (SEC-10 — cross-space sharing), inspecto-observability (CP-13 — the
+        Prometheus exposition and the /events* feed) and inspecto-ops (CP-11 —
         operational objects) are Professional-edition-only.
         None is in the default <modules> above, so a routine
         "mvn -o clean test" (= PERSONAL, the default build; there is no -Pedition-personal) never
@@ -106,12 +106,11 @@
                 <module>inspecto-exchange</module>
                 <!-- EDG-01 cell 5 (2026-09-07): the Prometheus scrape endpoint. CP-13 is "not for Personal";
                      only the EXPOSITION moves — MetricRegistry stays core (nine classes, three modules). -->
-                <module>inspecto-metrics</module>
+                <module>inspecto-observability</module>
                 <!-- EDG-01 cell 6 (2026-09-08): CP-13's OTHER half — the whole /events* feed, incl. the audit
                      CSV export. Moved whole by operator decision: the audit CSV is a ?format= branch inside
                      GET /events/export, so gating it alone would be an `if` in a core route. ⚠ Personal
                      loses the Events SCREEN; recording (EventStore/EventLog) stays core and ungated. -->
-                <module>inspecto-events</module>
                 <!-- EDG-01 cell 7 (2026-09-08): CP-11 operational objects — the com.gamma.ops domain, its
                      four stores, the /objects|/notes|/tags routes, two Job Types and the
                      incident_purge task. The largest cell: 31 domain files, 23 code dependants, several of
@@ -140,8 +139,7 @@
                 <module>inspecto-la-graph</module>
                 <module>inspecto-la-storage</module>
                 <module>inspecto-exchange</module>
-                <module>inspecto-metrics</module>
-                <module>inspecto-events</module>
+                <module>inspecto-observability</module>
                 <module>inspecto-ops</module>
             </modules>
         </profile>
@@ -171,8 +169,7 @@
                 <!-- LA-INVESTIGATION-STORE-DESIGN-1 S2: the Postgres InvestigationStore (optional jar; never the default) -->
                 <module>inspecto-la-store-pg</module>
                 <module>inspecto-exchange</module>
-                <module>inspecto-metrics</module>
-                <module>inspecto-events</module>
+                <module>inspecto-observability</module>
                 <module>inspecto-ops</module>
             </modules>
         </profile>
@@ -195,8 +192,7 @@
                 <!-- LA-INVESTIGATION-STORE-DESIGN-1 S2: the Postgres InvestigationStore (optional jar; never the default) -->
                 <module>inspecto-la-store-pg</module>
                 <module>inspecto-exchange</module>
-                <module>inspecto-metrics</module>
-                <module>inspecto-events</module>
+                <module>inspecto-observability</module>
                 <module>inspecto-ops</module>
             </modules>
         </profile>

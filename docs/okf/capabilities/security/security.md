@@ -188,7 +188,7 @@ Every request passes, in order (`ControlApi.dispatch`, `inspecto/src/main/java/c
 **`PUBLIC_PATHS`** (`ControlApi.java:197-198`, exact-match): `/health`, `/ready`, `/metrics`, `/bootstrap`,
 `/auth/exchange`, `/auth/refresh`, `/auth/logout`. ⚠ `/metrics` in this list is what made a Personal bundle
 serve full telemetry unauthenticated on every interface until EDG-01 cell 5 moved the exposition into
-`inspecto-metrics` (2026-09-07) — Personal now answers it `503` naming the module. **Self-verifying public**
+`inspecto-observability` (2026-09-07) — Personal now answers it `503` naming the module. **Self-verifying public**
 routes (`isSelfVerifyingPublic`, `:756-757`) carry their own credential in the URL and are deliberately not in
 the list: `/public/dashboards/*` and `/public/delivery-status/*`. `GET /api/v1/openapi.json` is **auth-gated
 on purpose** (2026-08-25, `38c7a32d`).

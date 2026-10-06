@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * step fails one of them.
  *
  * <p>⚠ Lives in package {@code com.gamma.control} so it can construct the package-private
- * {@code ControlApi} — the same split-package arrangement {@code inspecto-metrics} and
+ * {@code ControlApi} — the same split-package arrangement {@code inspecto-observability} and
  * {@code inspecto-exchange} use.
  */
 class ControlApiEventsTest {

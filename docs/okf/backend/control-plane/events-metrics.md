@@ -357,7 +357,7 @@ timestamp: 2026-07-16T00:00:00Z
     defaults (linear per page); no offline checker tool ships (the JSON `/audit/export` carries every hashed field);
     read auditing (audit rows of who READ the trail) is deferred by D-P8.
   - **Masking on read (D-P8, operator 2026-10-06).** `AuditReadMasking` (`inspecto/.../control/AuditReadMasking.java`)
-    is applied by `GET /audit/search`, `GET /audit/export` (JSON and CSV) and the `inspecto-events` feed
+    is applied by `GET /audit/search`, `GET /audit/export` (JSON and CSV) and the `inspecto-observability` feed
     (`/events`, `/events/search`, `/events/{id}`, `/events/export`). An `AUDIT` / `ACCESS_DENIED` row served to a
     caller WITHOUT `canRevealLinkEntities` (the existing unmask capability, reused) has each attribute / payload
     value whose key names a column any Space Dataset classifies `MSISDN|IMSI|ACCOUNT|PII` replaced by the Space's

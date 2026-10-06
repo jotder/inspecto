@@ -6,7 +6,7 @@ import com.gamma.util.OperationsZone;
  * Parsing an operator-typed time bound, anchored in the {@linkplain OperationsZone operations zone}.
  *
  * <p>Extracted from {@code EventRoutes} in EDG-01 cell 6 (2026-09-08) because it stopped being one route's
- * private helper: the {@code /events*} feed moved to the optional {@code inspecto-events} module, while
+ * private helper: the {@code /events*} feed moved to the optional {@code inspecto-observability} module, while
  * {@link AuditLogRoutes} kept an audit read in core, and both parse bounds the same way. A second copy
  * would be a defect rather than a duplication — a bound read in a different zone hands back a window
  * silently offset by the difference, which is the whole point of the class.

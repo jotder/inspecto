@@ -109,7 +109,7 @@ final class BootstrapRoutes implements RouteModule {
         // what registered, never an edition guess, and never from the stub (hasRoute excludes stubs). Probed on
         // POST /entity-lists, a LITERAL write, not on the GET /entity-lists/([^/]+) catch-all shape.
         f.put("entityList", on.contains("entityList"));
-        // EDITIONS CP-13 second half (EDG-01 cell 6): true only when the optional inspecto-events module
+        // EDITIONS CP-13 second half (EDG-01 cell 6): true only when the optional inspecto-observability module
         // registered the feed. ⚠ Probed on /events/search, a LITERAL path — not on /events/([^/]+), whose
         // regex would also be the shape of a catch-all, and not on /events, which is the one path a future
         // core route is most likely to reclaim. The SPA drops the Events nav entry and falls the Ops lens

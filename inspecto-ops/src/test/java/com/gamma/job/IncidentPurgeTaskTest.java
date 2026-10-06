@@ -27,7 +27,7 @@ class IncidentPurgeTaskTest {
 
     // ⚠ Package com.gamma.job, matching core's — MaintenanceJob, RunContext, RunLogStore and
     // RunArtifactStore are package-private there, so a split package is what lets this moved test drive
-    // them unchanged. The same arrangement inspecto-events and inspecto-metrics use for com.gamma.control.
+    // them unchanged. The same arrangement inspecto-observability and inspecto-observability use for com.gamma.control.
 
     private static JobConfig job(Map<String, String> params) {
         return new JobConfig("m", JobType.MAINTENANCE, null, null, true, false, params);

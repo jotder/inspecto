@@ -188,7 +188,7 @@ class ControlApiPolicyEnforcementTest {
     /**
      * Audit read-out, re-seated off {@code GET /events?type=} (EDG-01 cell 6, 2026-09-08). This class is
      * about ABAC policy decisions being audited with the policy that matched — the events feed was only the
-     * read-out, and it now lives in the optional {@code inspecto-events} module. Serialised to a string so
+     * read-out, and it now lives in the optional {@code inspecto-observability} module. Serialised to a string so
      * the existing {@code contains} assertions are unchanged.
      */
     private String eventsOfType(Ctx c, String type) {

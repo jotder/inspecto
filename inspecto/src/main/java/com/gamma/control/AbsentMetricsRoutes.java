@@ -1,7 +1,7 @@
 package com.gamma.control;
 
 /**
- * The core's answer for {@code GET /metrics} when the optional {@code inspecto-metrics} module is
+ * The core's answer for {@code GET /metrics} when the optional {@code inspecto-observability} module is
  * <b>absent</b> (EDITIONS {@code CP-13}, "not for Personal"; EDG-01 cell 5, 2026-09-07).
  *
  * <p>Same contract as {@link AbsentGeoLinkRoutes} and {@link AbsentExchangeRoutes}: registered LAST through
@@ -16,7 +16,7 @@ package com.gamma.control;
 final class AbsentMetricsRoutes implements RouteModule {
 
     static final String MESSAGE = "The Prometheus metrics endpoint is not installed in this bundle - it is "
-            + "provided by the optional inspecto-metrics module (Professional edition and above). Instrumentation "
+            + "provided by the optional inspecto-observability module (Professional edition and above). Instrumentation "
             + "still runs; only the HTTP exposition is edition-gated.";
 
     @Override

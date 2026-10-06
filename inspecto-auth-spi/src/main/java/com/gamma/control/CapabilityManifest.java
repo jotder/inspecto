@@ -190,7 +190,7 @@ final class CapabilityManifest {
             new Entry("POST", "/enrichment", Roles.CAN_AUTHOR_WORKBENCH),
             // SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1: the preview executes the draft's transform — authoring, not a read.
             new Entry("POST", "/enrichment/preview", Roles.CAN_AUTHOR_WORKBENCH),
-            // EventRoutes (inspecto-events) — gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`, grounded). A saved
+            // EventRoutes (inspecto-observability) — gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`, grounded). A saved
             // view is server-wide (SavedView carries no subject; one store per service), so writing or deleting
             // one is authoring, not a personal convenience. ⚠ The delete is a POST-shaped DELETE. This file had
             // no gate of any kind before — a whole route class the 2026-09-15 sweep never opened.

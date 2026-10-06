@@ -117,7 +117,7 @@ import java.util.regex.Pattern;
  *   GET  /settings/branding                   per-space UI branding {logoDataUrl,caption,footerText}  [v4.10.0]
  *   PUT  /settings/branding                   replace per-space UI branding (write-root gated)         [v4.10.0]
  *   POST /queries/{id}/run                     run a persisted query ($-params resolved, Result Set contract) [v4.8.0]
- *   -- /events* is served by the OPTIONAL inspecto-events module (EDG-01 cell 6, EDITIONS CP-13);
+ *   -- /events* is served by the OPTIONAL inspecto-observability module (EDG-01 cell 6, EDITIONS CP-13);
  *      absent it, AbsentEventsRoutes answers 503 on every path below. Recording is NOT gated.
  *   GET  /events[?limit=]                     recent events, newest-first (live tail)       [v4.2.0]
  *   GET  /events/search[?level=&type=&pipeline=&correlationId=&q=&from=&to=&limit=&offset=] filtered events [v4.2.0]
@@ -569,7 +569,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // /health/details (live.runLease.<scope>), in the log, and as the inspecto_run_lease_db_reachable gauge.
         get ("/ready",  (e, m) -> Map.of("status", "READY",
                 "pipelines", spaces.size() == 0 ? 0 : service().pipelines().size()));
-        // ⚠ GET /metrics moved to the optional inspecto-metrics module (EDG-01 cell 5, EDITIONS CP-13).
+        // ⚠ GET /metrics moved to the optional inspecto-observability module (EDG-01 cell 5, EDITIONS CP-13).
         // Only the EXPOSITION moved — MetricRegistry is called by nine classes across three modules and stays
         // core. It remains in PUBLIC_PATHS and isInfraRoute below so the module's route is reachable
         // unauthenticated at the bare path a scraper expects; absent the module, AbsentMetricsRoutes
@@ -593,7 +593,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 new SpaceRoutes(), new DataSourceRoutes(),   // ExchangeRoutes moved to inspecto-exchange (EDG-01 cell 4)
                 new RunRoutes(),
                 new ConnectionRoutes(), new ViewRoutes(), new PipelineListRoutes(), new PipelineGraphRoutes(), new PipelineInboxRoutes(), new PipelineSettingsRoutes(), new PipelineRenameRoutes(), new PipelineHistoryRoutes(), new PipelineRelatedRoutes(), new PipelineBundleRoutes(), new ComponentRoutes(), new BundleRoutes(),
-                new CatalogRoutes(), new ConfigPreviewRoutes(), new ConfigWriteRoutes(), new ConfigReadRoutes(), new ParserRoutes(),   // EventRoutes -> inspecto-events (cell 6); Object/Note/TagRoutes -> inspecto-ops (cell 7; QueueRoutes retired by RETIRE-HALVES-1)
+                new CatalogRoutes(), new ConfigPreviewRoutes(), new ConfigWriteRoutes(), new ConfigReadRoutes(), new ParserRoutes(),   // EventRoutes -> inspecto-observability (cell 6); Object/Note/TagRoutes -> inspecto-ops (cell 7; QueueRoutes retired by RETIRE-HALVES-1)
                 new QueryRoutes(), new DatasetRoutes(), new SpaceComparisonRoutes(), new BiRoutes(), new KpiRoutes(), new DbBrowserRoutes(), new ReconRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b)
                 new ExpectationRoutes(), new RequirementRoutes(),
                 new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new RiskScoreRoutes(), new AcquisitionRoutes(), new StreamPushRoutes(),

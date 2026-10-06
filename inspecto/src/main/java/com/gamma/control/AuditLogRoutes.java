@@ -13,7 +13,7 @@ import java.util.Set;
 
 /**
  * The <b>audit</b> read, kept in core when the {@code /events*} feed left for the optional
- * {@code inspecto-events} module (EDG-01 cell 6, 2026-09-08).
+ * {@code inspecto-observability} module (EDG-01 cell 6, 2026-09-08).
  *
  * <p>🔴 <b>Why this route exists at all.</b> Cell 6 gates CP-13's feed out of Personal — but
  * {@code EDITIONS.md} §Audit promises Personal "local append-only logs", and the Audit-log screen read that
@@ -247,10 +247,10 @@ final class AuditLogRoutes implements RouteModule {
         if (type == null || type.isBlank())
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "type is required and must be one of " + sorted()
                     + " - this route serves only the audit projection (the full events feed is the "
-                    + "optional inspecto-events module)");
+                    + "optional inspecto-observability module)");
         String canonical = AUDITABLE.stream().filter(t -> t.equalsIgnoreCase(type)).findFirst()
                 .orElseThrow(() -> new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "type '" + type + "' is not auditable - must be one of "
-                        + sorted() + " (the full events feed is the optional inspecto-events module)"));
+                        + sorted() + " (the full events feed is the optional inspecto-observability module)"));
         return EventQuery.builder()
                 .type(canonical)
                 .pipeline(ApiContext.query(ex, "pipeline"))

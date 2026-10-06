@@ -102,10 +102,10 @@ class ControlApiVersionedSurfaceTest {
                 assertEquals(200, get(api, probe).statusCode(), probe + " must answer unversioned");
             }
             // ⚠ /metrics is edition-gated (EDG-01 cell 5): the exposition lives in the optional
-            // inspecto-metrics module, absent here, so the core's stub answers 503 and the module answers 200
+            // inspecto-observability module, absent here, so the core's stub answers 503 and the module answers 200
             // where it is installed. Either way the BARE path is SERVED, which is this test's whole claim —
             // a 404 would mean the route stopped being unversioned. The raw text/plain shape can only be
-            // asserted where there is an exposition to shape: inspecto-metrics' MetricsExpositionTest.
+            // asserted where there is an exposition to shape: inspecto-observability' MetricsExpositionTest.
             int metrics = get(api, "/metrics").statusCode();
             assertTrue(metrics == 200 || metrics == 503,
                     "/metrics must answer unversioned; 404 means it is no longer served bare. got " + metrics);

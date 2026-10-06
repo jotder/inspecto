@@ -285,8 +285,7 @@ $channelsJarSrc = $null
 $backupJarSrc   = $null
 $geoLinkJarSrc  = $null
 $exchangeJarSrc = $null
-$metricsJarSrc  = $null
-$eventsJarSrc   = $null
+$obsJarSrc      = $null
 $opsJarSrc      = $null
 $agentJarSrc    = $null
 $intelligenceJarSrc = $null
@@ -301,8 +300,7 @@ if ($Edition -ne 'Personal') {
     # alongside, Professional and above.
     # EDG-01 cell 3b: inspecto-geo-link (CP-09) rides alongside, Professional and above.
     # EDG-01 cell 4: inspecto-exchange (SEC-10) rides alongside, Professional and above.
-    # EDG-01 cell 5: inspecto-metrics (CP-13, the /metrics exposition), Professional and above.
-    # EDG-01 cell 6: inspecto-events (CP-13's other half, the /events* feed), Professional and above.
+    # EDG-01 cells 5+6 / MODULE-REORG-1 P7: inspecto-observability (CP-13: the /metrics exposition + the /events* feed), Professional and above.
     # EDG-01 cell 7: inspecto-ops (CP-11 operational objects), Professional and above.
     # PKG-5 (operator decision 2026-09-12): the assistant is PROFESSIONAL AND ABOVE. Taken first as
     # "all editions, optional" and narrowed the same day once the sidecar's weight was measured -
@@ -311,7 +309,7 @@ if ($Edition -ne 'Personal') {
     # builds its `sidecar` artifact for the editions that stage it.
     # ASSURE-INTELLIGENCE-BUNDLE-1 (D-P2): inspecto-intelligence (the /agent/* agent, onnxruntime inside)
     # is ENTERPRISE only - also a default-reactor module, listed so this pass builds its `sidecar`.
-    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent,inspecto-la-store-pg,inspecto-intelligence' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent' }
+    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-agent,inspecto-la-store-pg,inspecto-intelligence' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-agent' }
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
@@ -407,21 +405,13 @@ if ($Edition -ne 'Personal') {
     if (-not $exchangeJarSrc -or -not (Test-Path $exchangeJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $exchangeTargetDir\inspecto-exchange-*.jar."
     }
-    # The metrics exposition module (EDG-01 cell 5). THIN.
-    $metricsTargetDir = Join-Path $sandboxRoot 'inspecto-metrics\target'
-    $metricsJarSrc = Get-ChildItem -Path $metricsTargetDir -Filter 'inspecto-metrics-*.jar' -ErrorAction SilentlyContinue |
+    # The observability module (MODULE-REORG-1 P7 / D-MR5): /metrics exposition (cell 5) + /events* feed (cell 6). THIN.
+    $obsTargetDir = Join-Path $sandboxRoot 'inspecto-observability\target'
+    $obsJarSrc = Get-ChildItem -Path $obsTargetDir -Filter 'inspecto-observability-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                       Select-Object -First 1 -ExpandProperty FullName
-    if (-not $metricsJarSrc -or -not (Test-Path $metricsJarSrc)) {
-        throw "$Edition edition requested but no JAR found matching $metricsTargetDir\inspecto-metrics-*.jar."
-    }
-    # The operational events feed module (EDG-01 cell 6). THIN.
-    $eventsTargetDir = Join-Path $sandboxRoot 'inspecto-events\target'
-    $eventsJarSrc = Get-ChildItem -Path $eventsTargetDir -Filter 'inspecto-events-*.jar' -ErrorAction SilentlyContinue |
-                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
-                      Select-Object -First 1 -ExpandProperty FullName
-    if (-not $eventsJarSrc -or -not (Test-Path $eventsJarSrc)) {
-        throw "$Edition edition requested but no JAR found matching $eventsTargetDir\inspecto-events-*.jar."
+    if (-not $obsJarSrc -or -not (Test-Path $obsJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $obsTargetDir\inspecto-observability-*.jar."
     }
     # The operational-objects module (EDG-01 cell 7). NOT thin: the whole com.gamma.ops domain.
     $opsTargetDir = Join-Path $sandboxRoot 'inspecto-ops\target'
@@ -636,27 +626,16 @@ if ($exchangeJarSrc) {
         Write-Host "  verified: RouteModule registration present in the exchange module" -ForegroundColor DarkGray
     } finally { $exZip.Dispose() }
 }
-if ($metricsJarSrc) {
-    Copy-Item $metricsJarSrc "$bundleDir\inspecto-metrics.jar"
-    Write-Host "Bundled Professional-edition metrics module -> inspecto-metrics.jar" -ForegroundColor Green
+if ($obsJarSrc) {
+    Copy-Item $obsJarSrc "$bundleDir\inspecto-observability.jar"
+    Write-Host "Bundled Professional-edition observability module -> inspecto-observability.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $mtZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-metrics.jar")
+    $obsZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-observability.jar")
     try {
-        $spiEntry = $mtZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.control.RouteModule' }
-        if (-not $spiEntry) { throw "inspecto-metrics.jar has no META-INF/services/com.gamma.control.RouteModule - GET /metrics would 503 on a bundle supposed to expose it." }
-        Write-Host "  verified: RouteModule registration present in the metrics module" -ForegroundColor DarkGray
-    } finally { $mtZip.Dispose() }
-}
-if ($eventsJarSrc) {
-    Copy-Item $eventsJarSrc "$bundleDir\inspecto-events.jar"
-    Write-Host "Bundled Professional-edition events feed module -> inspecto-events.jar" -ForegroundColor Green
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $evZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-events.jar")
-    try {
-        $spiEntry = $evZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.control.RouteModule' }
-        if (-not $spiEntry) { throw "inspecto-events.jar has no META-INF/services/com.gamma.control.RouteModule - every /events* path would 503 on a bundle supposed to serve the feed." }
-        Write-Host "  verified: RouteModule registration present in the events module" -ForegroundColor DarkGray
-    } finally { $evZip.Dispose() }
+        $spiEntry = $obsZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.control.RouteModule' }
+        if (-not $spiEntry) { throw "inspecto-observability.jar has no META-INF/services/com.gamma.control.RouteModule - GET /metrics and every /events* path would 503 on a bundle supposed to serve them." }
+        Write-Host "  verified: RouteModule registration present in the observability module" -ForegroundColor DarkGray
+    } finally { $obsZip.Dispose() }
 }
 if ($opsJarSrc) {
     Copy-Item $opsJarSrc "$bundleDir\inspecto-ops.jar"
@@ -970,8 +949,7 @@ CP="inspecto.jar"
 # Cross-space exchange (EDG-01 cell 4): Professional/Enterprise only; same contract as above.
 [ -f inspecto-exchange.jar ] && CP="${CP}:inspecto-exchange.jar"
 # Prometheus scrape endpoint (EDG-01 cell 5): Professional/Enterprise only.
-[ -f inspecto-metrics.jar ] && CP="${CP}:inspecto-metrics.jar"
-[ -f inspecto-events.jar ] && CP="${CP}:inspecto-events.jar"
+[ -f inspecto-observability.jar ] && CP="${CP}:inspecto-observability.jar"
 [ -f inspecto-ops.jar ] && CP="${CP}:inspecto-ops.jar"
 # PKG-5: the assistant, Professional and above. Absent in a Personal bundle, and absent-safe everywhere:
 # OptionalSpi skips a provider that cannot LINK (its dependency needs a newer Java than the product
@@ -1078,8 +1056,7 @@ if exist inspecto-geo-link.jar set "CP=%CP%;inspecto-geo-link.jar"
 rem Cross-space exchange (EDG-01 cell 4) - Professional/Enterprise only.
 if exist inspecto-exchange.jar set "CP=%CP%;inspecto-exchange.jar"
 rem Prometheus scrape endpoint (EDG-01 cell 5) - Professional/Enterprise only.
-if exist inspecto-metrics.jar set "CP=%CP%;inspecto-metrics.jar"
-if exist inspecto-events.jar set "CP=%CP%;inspecto-events.jar"
+if exist inspecto-observability.jar set "CP=%CP%;inspecto-observability.jar"
 if exist inspecto-ops.jar set "CP=%CP%;inspecto-ops.jar"
 if exist inspecto-agent.jar set "CP=%CP%;inspecto-agent.jar"
 if exist inspecto-intelligence.jar set "CP=%CP%;inspecto-intelligence.jar"
@@ -1249,8 +1226,7 @@ fi
 # Cross-space exchange (EDG-01 cell 4): Professional/Enterprise only; same contract as above.
 [ -f inspecto-exchange.jar ] && CP="${CP}:inspecto-exchange.jar"
 # Prometheus scrape endpoint (EDG-01 cell 5): Professional/Enterprise only.
-[ -f inspecto-metrics.jar ] && CP="${CP}:inspecto-metrics.jar"
-[ -f inspecto-events.jar ] && CP="${CP}:inspecto-events.jar"
+[ -f inspecto-observability.jar ] && CP="${CP}:inspecto-observability.jar"
 [ -f inspecto-ops.jar ] && CP="${CP}:inspecto-ops.jar"
 # PKG-5: the assistant, Professional and above. Absent in a Personal bundle, and absent-safe everywhere:
 # OptionalSpi skips a provider that cannot LINK (its dependency needs a newer Java than the product
@@ -1379,8 +1355,7 @@ if exist inspecto-geo-link.jar set "CP=%CP%;inspecto-geo-link.jar"
 rem Cross-space exchange (EDG-01 cell 4) - Professional/Enterprise only.
 if exist inspecto-exchange.jar set "CP=%CP%;inspecto-exchange.jar"
 rem Prometheus scrape endpoint (EDG-01 cell 5) - Professional/Enterprise only.
-if exist inspecto-metrics.jar set "CP=%CP%;inspecto-metrics.jar"
-if exist inspecto-events.jar set "CP=%CP%;inspecto-events.jar"
+if exist inspecto-observability.jar set "CP=%CP%;inspecto-observability.jar"
 if exist inspecto-ops.jar set "CP=%CP%;inspecto-ops.jar"
 if exist inspecto-agent.jar set "CP=%CP%;inspecto-agent.jar"
 if exist inspecto-intelligence.jar set "CP=%CP%;inspecto-intelligence.jar"
@@ -1802,7 +1777,7 @@ if ($DemoAuth) {
         Remove-Item (Join-Path $bundleDir $f) -ErrorAction SilentlyContinue
     }
     $demoJars = @('inspecto.jar', 'inspecto-demo-auth.jar', 'inspecto-policy.jar', 'inspecto-connectors.jar', 'inspecto-notify-channels.jar',
-                  'inspecto-backup.jar', 'inspecto-entity-list.jar', 'inspecto-la-graph.jar', 'inspecto-la-storage.jar', 'inspecto-la-core.jar', 'inspecto-la-api.jar', 'inspecto-la-store-pg.jar', 'inspecto-geo-link.jar', 'inspecto-exchange.jar', 'inspecto-metrics.jar', 'inspecto-events.jar',
+                  'inspecto-backup.jar', 'inspecto-entity-list.jar', 'inspecto-la-graph.jar', 'inspecto-la-storage.jar', 'inspecto-la-core.jar', 'inspecto-la-api.jar', 'inspecto-la-store-pg.jar', 'inspecto-geo-link.jar', 'inspecto-exchange.jar', 'inspecto-observability.jar',
                   'inspecto-ops.jar', 'inspecto-agent.jar', 'inspecto-intelligence.jar', 'postgresql.jar') | Where-Object { Test-Path (Join-Path $bundleDir $_) }
     $demoFlags = '--enable-native-access=ALL-UNNAMED -Dcontrol.bind=127.0.0.1 -Dauth.mode=demo -Dobjects.backend=db -Devents.backend=parquet -Djobs.backend=duckdb'
     $serveDemoBat = @"
@@ -1971,7 +1946,7 @@ if (-not $SkipBootCheck) {
             else { 'java' }
     # The same classpath the generated launchers build -- deliberately re-derived from the staged files
     # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
-    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-entity-list.jar','inspecto-la-graph.jar','inspecto-la-storage.jar','inspecto-la-core.jar','inspecto-la-api.jar','inspecto-la-store-pg.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-metrics.jar','inspecto-events.jar','inspecto-ops.jar','inspecto-agent.jar','inspecto-intelligence.jar','postgresql.jar' |
+    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-entity-list.jar','inspecto-la-graph.jar','inspecto-la-storage.jar','inspecto-la-core.jar','inspecto-la-api.jar','inspecto-la-store-pg.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-observability.jar','inspecto-ops.jar','inspecto-agent.jar','inspecto-intelligence.jar','postgresql.jar' |
         Where-Object { Test-Path (Join-Path $bundleDir $_) })
     # DEMO-AUTH-1: appended AFTER the parsed literal on purpose (see the -DemoAuth param note).
     if ($DemoAuth -and (Test-Path (Join-Path $bundleDir 'inspecto-demo-auth.jar'))) { $cp += 'inspecto-demo-auth.jar' }

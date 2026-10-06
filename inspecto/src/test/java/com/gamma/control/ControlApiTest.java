@@ -305,7 +305,7 @@ class ControlApiTest {
         }
     }
 
-    // ⚠ metricsEndpointIsOpenAndReflectsARun MOVED to inspecto-metrics' MetricsExpositionTest
+    // ⚠ metricsEndpointIsOpenAndReflectsARun MOVED to inspecto-observability' MetricsExpositionTest
     // (EDG-01 cell 5, EDITIONS CP-13). The exposition is no longer in the DEFAULT build, so the assertions
     // only hold where the module is on the classpath — they were moved there intact, not weakened here.
     // On this build the same path answers 503: NoExchangeShipsInThePersonalBuildTest.

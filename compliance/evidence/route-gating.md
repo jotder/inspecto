@@ -180,8 +180,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/entity-lists/([^/]+)/members` | gated | `canManageIncidents` | `inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:92` |
 | POST | `/entity-lists/([^/]+)/register-dataset` | gated | `canAuthorWorkbench` | `inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:99` |
 | POST | `/entity-lists/([^/]+)/retire` | gated | `canManageIncidents` | `inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:94` |
-| POST | `/events/views` | gated | `canAuthorWorkbench` | `inspecto-events/src/main/java/com/gamma/eventsapi/EventRoutes.java:67` |
-| POST | `/events/views/([^/]+)/delete` | gated | `canAuthorWorkbench` | `inspecto-events/src/main/java/com/gamma/eventsapi/EventRoutes.java:69` |
+| POST | `/events/views` | gated | `canAuthorWorkbench` | `inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java:67` |
+| POST | `/events/views/([^/]+)/delete` | gated | `canAuthorWorkbench` | `inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java:69` |
 | POST | `/exchange/grants/([^/]+)/(approve|deny|revoke)` | gated | `canApproveShares` | `inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java:111` |
 | POST | `/exchange/grants/([^/]+)/expiry` | gated | `canApproveShares` | `inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java:117` |
 | POST | `/exchange/grants/([^/]+)/pin` | gated | `canRequestShares` | `inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java:114` |

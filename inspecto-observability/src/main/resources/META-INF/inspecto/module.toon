@@ -1,6 +1,5 @@
----
-id: events
-title: Events feed API
+id: observability
+title: Observability (metrics endpoint + events feed API)
 buildRole: implementation
 offeringRole: optional
 bindingTime: boot

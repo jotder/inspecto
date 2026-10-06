@@ -176,7 +176,7 @@ class ControlApiAgentInvokeTest {
         /**
      * Audit read-outs, re-seated off HTTP (EDG-01 cell 6, 2026-09-08). These tests are about agent-attributed audit stamping,
      * not the events feed — the feed was only ever a convenient way to see what got recorded. It moved to
-     * the optional {@code inspecto-events} module, so on this (default, Personal) build {@code /events}
+     * the optional {@code inspecto-observability} module, so on this (default, Personal) build {@code /events}
      * answers 503; reading the store keeps every assertion and drops the accidental dependency on an
      * edition-gated surface. {@code page(200, null, null)} is the exact call the v1 route made.
      */

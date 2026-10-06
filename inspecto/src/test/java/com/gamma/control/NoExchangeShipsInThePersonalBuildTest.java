@@ -148,7 +148,7 @@ class NoExchangeShipsInThePersonalBuildTest {
             HttpResponse<String> res = client.send(HttpRequest.newBuilder(
                     URI.create("http://localhost:" + c.port + "/metrics")).GET().build(), BodyHandlers.ofString());
             assertEquals(503, res.statusCode(), "expected 'not installed', got: " + res.body());
-            assertTrue(res.body().contains("inspecto-metrics"), "the refusal names the module: " + res.body());
+            assertTrue(res.body().contains("inspecto-observability"), "the refusal names the module: " + res.body());
             // …and it leaks nothing: the body is the refusal, not a scrape.
             assertFalse(res.body().contains("# HELP"), "no Prometheus exposition may appear: " + res.body());
         }
@@ -156,7 +156,7 @@ class NoExchangeShipsInThePersonalBuildTest {
 
     /**
      * EDG-01 <b>cell 6</b> (EDITIONS {@code CP-13}, second half): the whole {@code /events*} feed is the
-     * optional {@code inspecto-events} module, so on the default (Personal) build every path 503s naming it.
+     * optional {@code inspecto-observability} module, so on the default (Personal) build every path 503s naming it.
      *
      * <p>⚠ Concrete URLs, not the patterns — a stub is only real if a real request reaches it. The catch-all
      * {@code /events/([^/]+)} is registered last for a reason, so {@code /events/search},
@@ -178,7 +178,7 @@ class NoExchangeShipsInThePersonalBuildTest {
                 assertEquals(503, res.statusCode(), r[0] + " " + r[1] + " -> " + res.body());
                 JsonNode err = V1Body.of(res.body()).get("error");
                 assertNotNull(err, r[1] + " must carry the v1 error object: " + res.body());
-                assertTrue(err.get("message").asText().contains("inspecto-events"),
+                assertTrue(err.get("message").asText().contains("inspecto-observability"),
                         "the refusal names the module that would fix it: " + err);
             }
         }

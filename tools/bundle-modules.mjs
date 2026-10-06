@@ -62,8 +62,7 @@ const MODULES = [
     { artifactId: 'inspecto-la-api', dir: 'inspecto-la-api', bundleFile: 'inspecto-la-api.jar', from: 'professional' },       // LA separation D-1 step 5b (the Link Analysis routes, written against the ports)
     { artifactId: 'inspecto-geo-link', dir: 'inspecto-geo-link', bundleFile: 'inspecto-geo-link.jar', from: 'professional' },  // cell 3b (CP-09) - since D-1 step 5b the BRIDGE: implements the ports, holds the Alert Rule routes
     { artifactId: 'inspecto-exchange', dir: 'inspecto-exchange', bundleFile: 'inspecto-exchange.jar', from: 'professional' },  // cell 4 (SEC-10)
-    { artifactId: 'inspecto-metrics', dir: 'inspecto-metrics', bundleFile: 'inspecto-metrics.jar', from: 'professional' },     // cell 5 (CP-13, /metrics)
-    { artifactId: 'inspecto-events', dir: 'inspecto-events', bundleFile: 'inspecto-events.jar', from: 'professional' },        // cell 6 (CP-13, /events*)
+    { artifactId: 'inspecto-observability', dir: 'inspecto-observability', bundleFile: 'inspecto-observability.jar', from: 'professional' },  // cells 5+6 (CP-13: /metrics + /events*), merged MODULE-REORG-1 P7
     { artifactId: 'inspecto-ops', dir: 'inspecto-ops', bundleFile: 'inspecto-ops.jar', from: 'professional' },                 // cell 7 (CP-11)
     // PKG-5 (2026-09-12): the assist agent ships Professional and above, as an OPTIONAL component. NB it is
     // a DEFAULT-reactor module, unlike the gated ones around it — package.ps1 lists it in $modules only so
@@ -90,7 +89,7 @@ export function editionProfile(edition) {
 
 /**
  * The first-party modules staged for `edition`, in package.ps1's staging order.
- * Personal 2, Professional 16, Enterprise 19, Preview 19 — first-party only; add PG_SIDECAR for the jar count.
+ * Personal 2, Professional 15, Enterprise 18, Preview 18 — first-party only; add PG_SIDECAR for the jar count.
  * ⚠ Those three numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this
  * very line. They said 2/10/11 from EDG-01 until 2026-09-17, missing inspecto-agent (PKG-5, 2026-09-12);
  * the assertion exists so the next module to arrive cannot leave them wrong again.

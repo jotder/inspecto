@@ -1,6 +1,0 @@
----
-id: metrics
-title: Metrics endpoint
-buildRole: implementation
-offeringRole: optional
-bindingTime: boot

@@ -15,7 +15,7 @@ import java.util.List;
  * <p>⚠ <b>Public since EDG-01 cell 6</b> (2026-09-08), for the same reason {@code RouteModule} went public
  * in cell 3a: this is the shared keyset codec that {@code /events}, {@code /jobs/runs} and {@code /objects}
  * all page with, and one of those three ({@code EventRoutes}) now lives in the optional
- * {@code inspecto-events} module, outside this package. It is a codec, not a seam — an out-of-package route
+ * {@code inspecto-observability} module, outside this package. It is a codec, not a seam — an out-of-package route
  * module must encode cursors identically or its pages drift, so a second implementation would be a defect.
  */
 @com.gamma.api.PublicApi(since = "4.0.0")

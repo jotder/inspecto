@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * {@code /audit/*} — the audit projection that stayed in CORE when the {@code /events*} feed moved to the
- * optional {@code inspecto-events} module (EDG-01 cell 6, 2026-09-08).
+ * optional {@code inspecto-observability} module (EDG-01 cell 6, 2026-09-08).
  *
  * <p>🔴 <b>The refusals are the point of this class, not the reads.</b> This route only earns its place if it
  * cannot be used as the feed: were the type parameter permissive, {@code /audit/search} would serve exactly

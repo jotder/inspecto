@@ -188,7 +188,7 @@ the vendored kernel + eoiagent model transport.
 `inspecto-intelligence` are plain default `<modules>` in the root POM. The profile-gated modules are the
 **nine** edition modules: `inspecto-security`, `inspecto-policy`, and the seven EDG-01 ones
 (`inspecto-notify-channels`, `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`,
-`inspecto-metrics`, `inspecto-events`, `inspecto-ops`) — see [editions model](../editions/editions-model.md). The agent modules build in an
+`inspecto-observability`, `inspecto-observability`, `inspecto-ops`) — see [editions model](../editions/editions-model.md). The agent modules build in an
 ordinary `mvn test` run; they are simply never *bundled*.
 
 ⚠ **THREE reactor sizes, three baselines** (2026-09-08, EDG-01 complete): the default (Personal) build is

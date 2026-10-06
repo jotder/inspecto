@@ -18,7 +18,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * EDG-01 cell 5, the POSITIVE half: with {@code inspecto-metrics} on the classpath, {@code GET /metrics}
+ * EDG-01 cell 5, the POSITIVE half: with {@code inspecto-observability} on the classpath, {@code GET /metrics}
  * answers the Prometheus exposition — open, unversioned, and reflecting a real run.
  *
  * <p>This test <b>moved here from {@code ControlApiTest.metricsEndpointIsOpenAndReflectsARun}</b> rather than

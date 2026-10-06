@@ -55,7 +55,7 @@
 
         <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs / PipelineConfigBatchTest boot a
              real CollectorService + ControlApi in the HTTP tests that move here with the routes (the
-             inspecto-events / inspecto-exchange pattern; test scope is not transitive). -->
+             inspecto-observability / inspecto-exchange pattern; test scope is not transitive). -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-etl</artifactId>

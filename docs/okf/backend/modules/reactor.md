@@ -10,7 +10,7 @@ timestamp: 2026-07-22T00:00:00Z
 # Maven reactor & modularization (as-built)
 
 > 🔴 **THE MODULE LIST BELOW IS STALE — do not read it as the current reactor.** §1 is headed *"Reactor
-> shape (2026-07-22 …)"* and mentions `inspecto-ops`, `inspecto-events`, `inspecto-metrics`,
+> shape (2026-07-22 …)"* and mentions `inspecto-ops`, `inspecto-observability`, `inspecto-observability`,
 > `inspecto-exchange`, `inspecto-geo-link`, `inspecto-backup`, `inspecto-notify-channels`,
 > `inspecto-policy` and `inspecto-intelligence` **zero times** — nine modules, all created after it was
 > written (the EDG-01 edition extractions, through 2026-09-08).

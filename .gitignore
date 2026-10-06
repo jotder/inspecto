@@ -127,8 +127,7 @@ inspecto-consignment-outputs.db.wal
 /inspecto-la-core/target/
 /inspecto-la-api/target/
 /inspecto-exchange/target/
-/inspecto-metrics/target/
-/inspecto-events/target/
+/inspecto-observability/target/
 /inspecto-ops/target/
 /inspecto-security/target/
 /inspecto-policy/target/

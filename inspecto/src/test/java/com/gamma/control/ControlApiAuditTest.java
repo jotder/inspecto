@@ -209,7 +209,7 @@ class ControlApiAuditTest {
     /**
      * The audit read-out, re-seated off HTTP (EDG-01 cell 6, 2026-09-08). These tests are about the AUDIT
      * TRAIL, not the events feed — they only ever used {@code GET /api/v1/events?limit=200} as a convenient
-     * way to see what was recorded. The feed moved to the optional {@code inspecto-events} module, so on
+     * way to see what was recorded. The feed moved to the optional {@code inspecto-observability} module, so on
      * this (default, Personal) build that path now answers 503; reading the store directly keeps the
      * assertions and drops the accidental dependency on an edition-gated surface.
      *
