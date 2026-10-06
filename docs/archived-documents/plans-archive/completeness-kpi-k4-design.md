@@ -1,6 +1,6 @@
 # Completeness KPI — K4, the reader that refuses (`KPI-K4-1`)
 
-> **Status (2026-10-06): HOLD LIFTED — slice A (K1 + K3 + K4) BUILT** (`9492ad5d0` K1 · `1c41f2df1` K3 · `c16c9eab0` K4), as §2–§5 describe. Operator calls recorded: §7-e → `com.gamma.signal.SignalType`; `KPI-UNKNOWN-1` as §5; §7-a → the Collector's template with a job-parameter override. ⚠ **Slice B (K2) is still blocked**: the Collector's `gap_detection.sequence` has no `{seq}` token, so §7-a's answer cannot feed `FileSequenceGaps` as decided — see `BACKLOG.md` §3.5. §8-C (migrating the older literals) and §8-D (UI tile) are not built. This plan stays in the active tier until K2 ships.
+> **Status (2026-10-06): ARCHIVED — K1, K2, K3, K4 BUILT** (`9492ad5d0` K1 · `1c41f2df1` K3 · `c16c9eab0` K4 · `ccd3d6b41` K2). History only; the as-built facts live in `okf/capabilities/observability/observability.md` §3.9 and the still-open items in `BACKLOG.md` §3.5 *Completeness KPI*. §7 below carries the operator answers of 2026-10-06.
 
 > **Status (2026-09-16): DESIGN ONLY — no code written, nothing shipped.** This is the design pass the
 > §2 *Completeness KPI hold* row asks for. That row is the one gate in §2 with **nothing to run**, because
@@ -316,7 +316,9 @@ this is an operator call, not a decision this document takes.
 
 ---
 
-## 7. Open — operator calls, not answered here
+## 7. Operator calls
+
+> **Answered (operator, 2026-10-06):** (a) the Collector's template with an optional job-parameter override — realised by EXTENDING `gap_detection` with an optional `file_template` (`{date}` + `{seq}`) and `seq_scope`, beside the untouched `sequence` / `GapDetector`; the `sequence_template` / `seq_scope` job parameters win; neither set refuses, naming the setting. (b) the default stays `none` and K2 refuses naming `-Dfile.stages.backend`. (e) `com.gamma.signal.SignalType` now. `KPI-UNKNOWN-1` as §5. **Still open, moved to `BACKLOG.md` §3.5:** (c), (d), (f) confirmation of 28/7/0.3, (g) — file gaps are WARN only and open no Incident until it is answered — and (h); §8-C and §8-D.
 
 ⛔ **None of these is invented an answer below. They are queued, not resolved.**
 

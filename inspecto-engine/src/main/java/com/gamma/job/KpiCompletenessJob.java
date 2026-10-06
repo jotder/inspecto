@@ -25,7 +25,7 @@ import java.util.ArrayList;
 
 /**
  * The {@code kpi.completeness} Job Type — the reader that turns the output registry into a completeness
- * answer for one Pipeline (completeness KPI K4; design {@code docs/superpower/completeness-kpi-k4-design.md}).
+ * answer for one Pipeline (completeness KPI K4; design {@code docs/archived-documents/plans-archive/completeness-kpi-k4-design.md}).
  *
  * <p>🔴 <b>It refuses before it reads.</b> Its first act is {@link #requireDurable}: unless this Space's
  * {@code consignmentOutputs} store resolved {@link StoreHealth.Status#UP}, the run throws, naming the

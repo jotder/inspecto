@@ -308,6 +308,10 @@ guarantees.** They are properties of the naming, not of the implementation:
 
 Config: `collector.gap_detection: { enabled: true, sequence: "…" }` — `enabled` defaults to `true` when the
 block is present, and an absent block is `DISABLED`.
+Two optional keys beside it (operator, 2026-10-06) — `file_template` (one date token plus `{seq}`, e.g.
+`CDR_{yyyyMMddHH}_{seq}_*`) and `seq_scope` (`PER_BUCKET` | `CONTINUOUS`, required with it) — drive no
+detector: only the `kpi.completeness` job reads them to count missing files. `sequence` and `GapDetector` are
+unchanged. See `okf/capabilities/observability/observability.md` §3.9.
 
 ### 3.7 Phase E — retrieval: plan once, stage, then land
 

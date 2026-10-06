@@ -508,7 +508,7 @@ host's — the rules are `DAT`'s.
 
 There is no metrics-browsing UI and no backup/restore screen beyond the Jobs form — both by design.
 
-### 3.9 The completeness KPI — design of record (K1/K3/K4 built 2026-10-06; K2 wiring open)
+### 3.9 The completeness KPI — design of record (K1–K4 built 2026-10-06)
 
 ⚠ Distilled 2026-09-09 from `completeness-kpi-plan.md`, archived the same day. The operator hold
 (2026-08-30) was LIFTED 2026-10-06. **As built:** the `kpi.completeness` built-in Job Type
@@ -521,9 +521,19 @@ Parameters: `pipeline` (required), `record_day` (default yesterday in `-Dops.tim
 one Incident per Pipeline through `IncidentAccess` (scope and dedupe key = the pipeline). ⛔ `NO_BASELINE` /
 `NO_OBSERVATION` open nothing. **`KPI-UNKNOWN-1` as built:** an unmeasured day carries no `files`/`rows`
 keys; the null-day bucket rides as `unknownDayFiles`/`unknownDayRows`; `baselineRows` is omitted and
-`deviation` is JSON null where undefined. ⚠ **K2's wiring is not built** — `FileSequenceGaps` still has no
-production caller: the decided template source (the Collector's, with a job-parameter override) is written
-in `GapDetector`'s one-token grammar and has no `{seq}`; see `BACKLOG.md` §3.5.
+`deviation` is JSON null where undefined. **K2 as built (operator, 2026-10-06):** the Collector's `gap_detection` takes an optional `file_template`
+(one `{datePattern}` + one `{seq}` token, e.g. `CDR_{yyyyMMddHH}_{seq}_*`) and `seq_scope`
+(`PER_BUCKET` | `CONTINUOUS`, never defaulted), validated fail-closed by `GapTemplateGrammar` at config
+load and by the `gap-file-template-well-formed` CrossFieldRule at authoring. ⛔ `gap_detection.sequence`
+and the live `GapDetector` are untouched — a one-token template cannot count files. The job's
+`sequence_template` / `seq_scope` parameters win over the Collector's; `check_files` (default true) turns
+the file half off. It refuses before reading when no template is set (naming
+`collector.gap_detection.file_template`) or `fileStages` is not durable (naming `-Dfile.stages.backend`,
+default `none`). Filenames come from `DbFileStageStore.relativePaths` (processing time, padded a day each
+side; throws on failure) into `FileSequenceGaps.analyze`; the payload adds `fileTemplate`, `seqScope`,
+`observedFiles`, `missingFiles` (exact interior holes), `emptyBuckets` (a bucket count, never files) and
+`unmatchedFiles`. ⚠ File gaps raise the Signal to WARN but open no Incident (§7-g open, `BACKLOG.md` §3.5).
+Design archived: `archived-documents/plans-archive/completeness-kpi-k4-design.md`.
 
 **The two deviation bases (operator, 2026-08-30 — ⛔ do not re-ask):**
 
@@ -670,7 +680,7 @@ the form authors the kind), and per-measure limits.
 | OPS-5 provenance conservation **live soak** — no code left; outcome log empty | §2 *OPS-5 provenance conservation* |
 | Deployment-topology live validation (closes OPS-5's "needs a live deploy" too) | §2 *Deployment topology live validation* |
 | Compliance program NFR-7 external sub-items; G6 restore drill record + RTO/RPO targets | §2 *Compliance program (NFR-7)*; §5 *Compliance repo-side artifacts* |
-| Completeness KPI — K2 wiring (the Collector's template has no `{seq}` token — an operator call) and a UI tile; K1/K3/K4 shipped 2026-10-06 | §3.5 *Completeness KPI*; `KPI-UNKNOWN-1` (built); archived plan `docs/archived-documents/plans-archive/completeness-kpi-plan.md` |
+| Completeness KPI residuals — §7-c/d/f/g/h, the `SignalType` literal migration, a UI tile; K1–K4 shipped 2026-10-06 | §3.5 *Completeness KPI residuals*; archived design `docs/archived-documents/plans-archive/completeness-kpi-k4-design.md` |
 | Signal/Decision follow-ons: optional S8 (connector-direct emission, cross-space controller); a general event-triggered consequence policy gate (today `/apply`-only); RFC 6902 AG-UI deltas | §3 P3 *Signal / Decision networks* |
 | Maintenance COULD tier — **the full list, landed 2026-09-10 (Sprint 7.2) from the archived maintenance plan, where it was its only home**: space-to-space comparison (✅ **SHIPPED 2026-09-24** as the `space.comparison` Job Type — `okf/backend/control-plane/jobs.md`; residuals on the board) · predictive maintenance (AGT-5) · AI recommendations (AGT-5 P1+) · self-healing · backup **encryption** and compression tuning (the backup writer is a plain zip: no cipher, no compression-level knob) · **incremental/differential** backup (the writer walks the whole tree every run — no diff, no watermark) · backup **deduplication** · a **health score** (the health route answers UP/DOWN/NOT_CONFIGURED only; a numeric composite was deferred in the plan itself) · **agent-session retention** — ⚠ **blocker re-verified 2026-09-10 and still live**: agent sessions are a `ConcurrentHashMap` cleared on shutdown, and none of the module's four durable rings backs one, so there is nothing to retain yet. ⛔ Two of the plan's COULDs must NOT be carried forward: **growth-trend analysis + archive recommendations SHIPPED** as `storage_trend` (§3 above dates it), and **Dev/Prod maintenance "profile presets"** is refuted as framed — job templates exist, but no Dev/Prod tiering concept exists anywhere in `spaces/`. Its open question *"does archived material need its own retention tier"* is answered by the code: **archive is terminal** — `incident_purge` hard-deletes, and `archive_instead_of_delete` moves files once and never re-walks them | §3 P3 *Job framework* |
 | D8 residuals (soft-bounce retry, SES/SNS, GeoIP, per-user prefs) — `INC`'s, listed for the ledger's sake | §3 P2 *Notifications*, `D8-SUPPRESS-1` |
