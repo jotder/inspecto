@@ -732,8 +732,10 @@ would forge the ownership marker, so a template declares the rule as PENDING ins
   `canWorkIncidents`, so a rule body with an `invoke-api` consequence is refused (422, fail closed) and stays pending
   + audited like every other refusal.
 - **Status.** `GET /alerts/rules/pending` lists `{name, afterRiskScore, dataset}` for what is still waiting; a
-  refusal's reason is in the audit log. There is no SPA surface yet; the rule appears on the Alert Rules page once
-  created.
+  refusal's reason is in the audit log (the route does not serve it). The Alerts page shows them read-only under
+  *Pending Alert Rules* (name, the Risk Score it waits on, Dataset, an unreadable file's `error`), with an empty state, an
+  error state with Retry, and the section hidden when the route answers 404/503; the rule moves to the Alert Rules table
+  once created.
 - **Use.** `payment-fraud` ships `pf_high_risk_account` (`max(score) >= 60` by `model, entity_key`, CRITICAL) after
   `payment_account`. Tests: `PendingAlertRulesTest` (pending, refused + audited, created once, never overwritten, held
   under an approval policy, a `DecisionRuleGuard` refusal stays pending), `ControlApiSpaceTemplateSeedGateTest` (capability and content refusal at apply) and

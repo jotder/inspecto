@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { convertToParamMap, provideRouter } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
@@ -42,6 +43,7 @@ async function create(
     const api = {
         recent: () => of([FIRED]),
         rules: () => of([RULE]),
+        pendingRules: () => of([]),
         evaluate: vi.fn(() => of([FIRED])),
         removeRule: vi.fn(() => of(void 0)),
         ...overrides,
@@ -75,6 +77,47 @@ async function create(
 }
 
 describe('AlertsComponent', () => {
+    const pendingSection = (el: HTMLElement) => el.querySelector('#pending-rules-heading')?.closest('section') ?? null;
+
+    it('lists pending Template Alert Rules read-only with the Risk Score each waits on', async () => {
+        const { fixture } = await create({
+            pendingRules: () =>
+                of([{ name: 'pf_high_risk_account', afterRiskScore: 'payment_account', dataset: 'pf_risk' }]),
+        });
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.pendingState()).toBe('ready');
+        const text = pendingSection(fixture.nativeElement)!.textContent!;
+        expect(text).toContain('pf_high_risk_account');
+        expect(text).toContain('payment_account');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('shows an empty state when nothing is pending', async () => {
+        const { fixture } = await create();
+        fixture.detectChanges();
+        expect(pendingSection(fixture.nativeElement)!.textContent).toContain('No pending Alert Rules');
+    });
+
+    it('shows an error state with retry when the pending route fails', async () => {
+        const { fixture } = await create({
+            pendingRules: () => throwError(() => new HttpErrorResponse({ status: 500 })),
+        });
+        fixture.detectChanges();
+        expect(fixture.componentInstance.pendingState()).toBe('error');
+        expect(pendingSection(fixture.nativeElement)!.textContent).toContain("Couldn't load pending Alert Rules");
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('hides the section when the pending route is absent (404)', async () => {
+        const { fixture } = await create({
+            pendingRules: () => throwError(() => new HttpErrorResponse({ status: 404 })),
+        });
+        fixture.detectChanges();
+        expect(fixture.componentInstance.pendingState()).toBe('hidden');
+        expect(pendingSection(fixture.nativeElement)).toBeNull();
+    });
+
     it('loads fired alerts and the armed rules on init', async () => {
         const { fixture } = await create();
         const c = fixture.componentInstance;

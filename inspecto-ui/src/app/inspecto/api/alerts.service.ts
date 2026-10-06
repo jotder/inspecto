@@ -54,6 +54,19 @@ export interface AlertRule {
     relation?: string | null;
 }
 
+/**
+ * A Space Template's Alert Rule still waiting on its Risk Score's first run (GET /alerts/rules/pending).
+ * A refusal's reason is not served — it is in the audit log (`alert-rule.pending.refused`).
+ */
+export interface PendingAlertRule {
+    name: string;
+    /** The Risk Score model whose first run creates the rule. */
+    afterRiskScore?: string | null;
+    dataset?: string | null;
+    /** Set only when the pending file could not be read. */
+    error?: string | null;
+}
+
 /** Create/update body — the whole rule is authorable; `name` is the identity (immutable on edit). */
 export type AlertRuleUpsert = AlertRule;
 
@@ -73,6 +86,10 @@ export class AlertsService {
 
     rules(): Observable<AlertRule[]> {
         return this.http.get<AlertRule[]>(apiUrl('/alerts/rules'));
+    }
+
+    pendingRules(): Observable<PendingAlertRule[]> {
+        return this.http.get<PendingAlertRule[]>(apiUrl('/alerts/rules/pending'));
     }
 
     // Rule authoring (audit C3; mirrors /decision-rules). Mock-served today — a live server

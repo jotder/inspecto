@@ -7,7 +7,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
-import { AlertRule, AlertsService, apiErrorMessage, FiredAlert, LensService } from 'app/inspecto/api';
+import { AlertRule, AlertsService, apiErrorMessage, FiredAlert, LensService, PendingAlertRule } from 'app/inspecto/api';
+import { HttpErrorResponse } from '@angular/common/http';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
@@ -55,6 +56,22 @@ export class AlertsComponent implements OnInit {
     readonly loading = signal(false);
     readonly loadError = signal(false);
     readonly evaluating = signal(false);
+    readonly pending = signal<PendingAlertRule[]>([]);
+    /** `hidden` = the route is absent (404/503 — an edition without it); `error` = it failed. */
+    readonly pendingState = signal<'loading' | 'ready' | 'error' | 'hidden'>('loading');
+
+    readonly pendingColumnDefs: ColDef<PendingAlertRule>[] = [
+        { field: 'name', headerName: 'Rule', flex: 1, minWidth: 160 },
+        {
+            field: 'afterRiskScore',
+            headerName: 'Waits on Risk Score',
+            flex: 1,
+            minWidth: 160,
+            valueFormatter: (p) => p.value || '—',
+        },
+        { field: 'dataset', headerName: 'Dataset', flex: 1, minWidth: 140, valueFormatter: (p) => p.value || '—' },
+        { field: 'error', headerName: 'Problem', flex: 2, minWidth: 160, valueFormatter: (p) => p.value || '' },
+    ];
 
     // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columnDefs: ColDef<FiredAlert>[] = [
@@ -181,6 +198,17 @@ export class AlertsComponent implements OnInit {
         this.api.rules().subscribe({
             next: (r) => this.rules.set(r),
             error: () => this.rules.set([]),
+        });
+        this.api.pendingRules().subscribe({
+            next: (p) => {
+                this.pending.set(p);
+                this.pendingState.set('ready');
+            },
+            error: (e: unknown) => {
+                this.pending.set([]);
+                const status = e instanceof HttpErrorResponse ? e.status : 0;
+                this.pendingState.set(status === 404 || status === 503 ? 'hidden' : 'error');
+            },
         });
     }
 
