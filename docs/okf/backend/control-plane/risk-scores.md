@@ -109,7 +109,11 @@ and a Job failure's message reaches the run ledger, the logs and the UI. So `Ris
 with the model, the factor, the Dataset and the error class only. It keeps neither the message nor the
 cause.
 
-Limits: a factor that names more than 200 000 entities **fails the run** rather than scoring a subset.
+**Entity cap (operator decision 2026-10-06: configurable + fail).** A factor that names more entities than the cap
+**fails the run** — never a partial run; the message names the cap and how to raise it. The cap is the model's
+optional `maxEntities` (a whole number 1..2 000 000, `RiskScoreModel.MAX_ENTITIES_CEILING`; anything else is refused
+at save, 422), else the system default `-Drisk.score.maxEntities` (default 200 000; a malformed or non-positive value
+keeps 200 000 — the cap can never be disabled). `RiskScoreEvaluator.maxEntities(model)` is the one resolver.
 Evidence reads at most 20 000 rows per factor, and the run log reports `evidenceTruncated` when that cap
 is hit.
 
@@ -171,8 +175,8 @@ evidence rows, under `PREVIEW_POLICY` (512 MB, 2 threads, 10 s). An entity no fa
 holds `canRevealLinkEntities` (`keyMasked` says which). The GET route still serves keys raw.
 
 ⚠ **Truncation fix found here.** The indicator spec carried its own `LIMIT` equal to the executor cap, so the
-"more than N entities — refusing to score a subset" check could never fire: a Job run past 200 000 entities silently
-scored a subset. The spec now asks for cap + 1 rows, so the refusal fires (operator, 2026-10-06).
+"refusing to score a subset" check could never fire: a Job run past the cap silently scored a subset. The spec now
+asks for cap + 1 rows, so the refusal fires. The cap itself is configurable — see *Entity cap* under the Job.
 
 ### Masking — evidence at WRITE time, the key raw (operator decision 2026-09-27)
 

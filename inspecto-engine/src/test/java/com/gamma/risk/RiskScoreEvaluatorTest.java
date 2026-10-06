@@ -75,6 +75,42 @@ class RiskScoreEvaluatorTest {
     }
 
     @Test
+    void aRunOverTheEntityCapFailsAndARaisedPerModelCapPasses(@TempDir Path data) throws Exception {
+        DuckDbUtil.loadDriver();
+        Path dir = Files.createDirectories(data.resolve("notes"));
+        String file = dir.resolve("data.parquet").toString().replace('\\', '/');
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("COPY (SELECT * FROM (VALUES ('m1'), ('m2'), ('m3')) AS v(msisdn)) TO '" + file + "' (FORMAT PARQUET)");
+        }
+        java.util.function.Function<String, String> rel = id -> DatasetRelation.relationSql(Map.of("physicalRef", id), data, null);
+        java.util.function.Function<Object, RiskScoreModel> capped = cap -> {
+            Map<String, Object> m = new java.util.LinkedHashMap<>(Map.of("entityType", "subscriber", "highThreshold", 50,
+                    "factors", List.of(Map.of("id", "n", "dataset", "notes", "key", "msisdn", "measure", "count", "weight", 1))));
+            m.put("maxEntities", cap);
+            return RiskScoreModel.fromMap("cap", m);
+        };
+        // Exactly AT the cap passes (the cap is inclusive); one over FAILS, never a partial run.
+        assertEquals(3, RiskScoreEvaluator.evaluate(capped.apply(3), rel, NO_MASK).scored().size());
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> RiskScoreEvaluator.evaluate(capped.apply(2), rel, NO_MASK));
+        assertTrue(e.getMessage().contains("more than 2 entities"), e.getMessage());
+        assertTrue(e.getMessage().contains("maxEntities") && e.getMessage().contains("-Drisk.score.maxEntities"),
+                "the message says how to raise the cap: " + e.getMessage());
+
+        for (Object bad : List.of(0, -5, 1.5, "lots", RiskScoreModel.MAX_ENTITIES_CEILING + 1))
+            assertThrows(IllegalArgumentException.class, () -> capped.apply(bad), "refused at save: " + bad);
+        assertEquals(RiskScoreModel.MAX_ENTITIES_CEILING, capped.apply(RiskScoreModel.MAX_ENTITIES_CEILING).maxEntities());
+    }
+
+    @Test
+    void theSystemDefaultCapIgnoresABadValueAndNeverDisablesTheCap() {
+        assertEquals(RiskScoreEvaluator.MAX_ENTITIES, RiskScoreEvaluator.defaultMaxEntities(null));
+        assertEquals(500_000, RiskScoreEvaluator.defaultMaxEntities(" 500000 "));
+        for (String bad : List.of("", "abc", "0", "-1", "1.5", "99999999999"))
+            assertEquals(RiskScoreEvaluator.MAX_ENTITIES, RiskScoreEvaluator.defaultMaxEntities(bad), "kept default for '" + bad + "'");
+    }
+
+    @Test
     void aQueryFailureNeverQuotesASourceValue(@TempDir Path data) throws Exception {
         DuckDbUtil.loadDriver();
         Path dir = Files.createDirectories(data.resolve("spend"));

@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
  * entityType: subscriber            (subscriber · account · device · sim · dealer · channel · partner, or free-form)
  * highThreshold: 70                 (a score at or above this is "high")
  * (the scores Datasets are ALWAYS risk_scores_&lt;id&gt; and risk_scores_&lt;id&gt;_latest — not authorable)
+ * maxEntities: 500000          (optional; entity cap for one run, 1..2000000; default -Drisk.score.maxEntities, else 200000)
  * retainDays: 90                 (optional; prune history runs older than this — OR retainRuns: keep the newest N; OFF by default)
  * dataScope: fraud                  (optional; a data-scoped caller must hold it to read a score)
  * factors[n]:
@@ -40,7 +41,10 @@ import java.util.regex.Pattern;
  */
 public record RiskScoreModel(String id, String entityType, double highThreshold, String scoresDataset,
                              String dataScope, String description, List<Factor> factors, WatchList watchList,
-                             Integer retainDays, Integer retainRuns) {
+                             Integer retainDays, Integer retainRuns, Integer maxEntities) {
+
+    /** The highest per-model {@code maxEntities} a model may author (operator, 2026-10-06): 10x the system default. */
+    public static final int MAX_ENTITIES_CEILING = 2_000_000;
 
     /** The named entity types (D-P1). Anything else that is a plain token is accepted as free-form. */
     public static final List<String> ENTITY_TYPES =
@@ -58,7 +62,7 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
     /** The component envelope the store/route adds (name = id, owner, shares) — accepted, never scored. */
     public static final Set<String> ENVELOPE_KEYS = Set.of("name", "owner", "shares");
     private static final Set<String> MODEL_KEYS = Set.of("name", "owner", "shares", "id", "entityType",
-            "highThreshold", "dataScope", "description", "factors", "watchList", "retainDays", "retainRuns");
+            "highThreshold", "dataScope", "description", "factors", "watchList", "retainDays", "retainRuns", "maxEntities");
     private static final Set<String> FACTOR_KEYS = Set.of("id", "label", "dataset", "key", "measure",
             "filters", "weight", "cap", "evidence");
 
@@ -123,7 +127,7 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
     /** This model with every factor narrowed to one entity ({@link Factor#forEntity}) — the S3 preview's input. */
     public RiskScoreModel forEntity(String entityKey) {
         return new RiskScoreModel(id, entityType, highThreshold, scoresDataset, dataScope, description,
-                factors.stream().map(f -> f.forEntity(entityKey)).toList(), watchList, retainDays, retainRuns);
+                factors.stream().map(f -> f.forEntity(entityKey)).toList(), watchList, retainDays, retainRuns, maxEntities);
     }
 
     /** The longest a fed watch entry may live: D-P5 lets only an expiring (at most 24 h) entry skip four-eyes. */
@@ -199,7 +203,17 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
         }
         return new RiskScoreModel(id, entityType, high, scores, scope, Values.trimToNull(m.get("description")), factors,
                 watchList(m.get("watchList")), retain(m.get("retainDays"), "retainDays"),
-                retain(m.get("retainRuns"), "retainRuns"));
+                retain(m.get("retainRuns"), "retainRuns"), maxEntities(m.get("maxEntities")));
+    }
+
+    /** Optional per-model entity cap: a whole number 1..{@link #MAX_ENTITIES_CEILING}; absent = the system default. */
+    private static Integer maxEntities(Object raw) {
+        if (raw == null) return null;
+        double d = number(raw, "risk-score.maxEntities");
+        if (d != Math.rint(d) || d < 1 || d > MAX_ENTITIES_CEILING)
+            throw new IllegalArgumentException("risk-score.maxEntities must be a whole number 1.." + MAX_ENTITIES_CEILING
+                    + ", got " + raw);
+        return (int) d;
     }
 
     /** Optional history retention (a whole number >= 1); absent = keep every run. */

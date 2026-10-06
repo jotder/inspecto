@@ -45,8 +45,30 @@ import java.util.function.Function;
  */
 public final class RiskScoreEvaluator {
 
-    /** Hard ceiling on scored entities per run: past it the run FAILS rather than scoring a silent subset. */
+    /**
+     * Default ceiling on scored entities per run: past the cap the run FAILS rather than scoring a silent subset.
+     * Operator decision 2026-10-06: configurable, never disabled — {@code -D}{@value #MAX_ENTITIES_PROPERTY} sets the
+     * system default (malformed or non-positive keeps this one), a model's {@code maxEntities} overrides it.
+     */
     public static final int MAX_ENTITIES = 200_000;
+    public static final String MAX_ENTITIES_PROPERTY = "risk.score.maxEntities";
+
+    /** The system default cap: the property when it is a positive whole number, else {@link #MAX_ENTITIES}. */
+    static int defaultMaxEntities(String raw) {
+        if (raw == null) return MAX_ENTITIES;
+        try {
+            int v = Integer.parseInt(raw.trim());
+            return v > 0 ? v : MAX_ENTITIES;
+        } catch (NumberFormatException e) {
+            return MAX_ENTITIES;
+        }
+    }
+
+    /** The cap a run of {@code model} uses: the model's own, else the system default. */
+    public static int maxEntities(RiskScoreModel model) {
+        return model.maxEntities() != null ? model.maxEntities()
+                : defaultMaxEntities(System.getProperty(MAX_ENTITIES_PROPERTY));
+    }
     /** Evidence rows read per factor, and kept per entity. */
     static final int MAX_EVIDENCE_ROWS = 20_000;
     static final int EVIDENCE_PER_ENTITY = 3;
@@ -75,7 +97,7 @@ public final class RiskScoreEvaluator {
      */
     public static Run evaluate(RiskScoreModel model, Function<String, String> relationSql, EvidenceMasker masker)
             throws SQLException, IOException {
-        return evaluate(model, relationSql, masker, MAX_ENTITIES, MAX_EVIDENCE_ROWS, SqlSandboxPolicy.defaultPolicy());
+        return evaluate(model, relationSql, masker, maxEntities(model), MAX_EVIDENCE_ROWS, SqlSandboxPolicy.defaultPolicy());
     }
 
     /** The preview's statement fence: a tighter timeout and memory cap than a Job run (S3). */
@@ -115,7 +137,9 @@ public final class RiskScoreEvaluator {
                     f.dataset(), relation, MeasureCompiler.compile(spec), maxEntities, 0, List.of(), List.of()), policy);
             if (r.truncated())
                 throw new IllegalStateException("risk-score '" + model.id() + "' factor '" + f.id()
-                        + "' names more than " + maxEntities + " entities — refusing to score a subset");
+                        + "' names more than " + maxEntities + " entities — refusing to score a subset; raise the cap "
+                        + "with the model's maxEntities (up to " + RiskScoreModel.MAX_ENTITIES_CEILING + ") or the system "
+                        + "default -D" + MAX_ENTITIES_PROPERTY);
             for (Map<String, Object> row : r.rows()) {
                 Object k = row.get(f.key());
                 if (k == null) continue;
