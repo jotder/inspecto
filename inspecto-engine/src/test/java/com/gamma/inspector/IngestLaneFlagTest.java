@@ -73,15 +73,18 @@ class IngestLaneFlagTest {
                         + "the same one the flat lane would perform");
     }
 
-    /** ⚠ What stays refused is the pair the FLAT path also refuses: routing plus somewhere else to go. */
+    /**
+     * Routing plus a second destination is no longer a refusal (operator, 2026-10-06): the applier replicates
+     * the routed rows under every {@code sinks[].database}, so any flat reason left must be about the graph shape.
+     */
     @Test
-    void routedRowsStillRefuseAWriteThatHasSomewhereElseToGo(@TempDir Path dir) throws Exception {
+    void routedRowsNoLongerRefuseAMultiDestinationWrite(@TempDir Path dir) throws Exception {
         DecisionRuleApplier.Result routed = new DecisionRuleApplier.Result(
                 List.of(new com.gamma.etl.PartitionOutput("d=2020-04-03", "dest/part-0.csv", 2L)), List.of());
 
         String reason = ConsignmentIngestStrategy.flatReason(twoDestinations(dir), routed);
-        assertTrue(reason.contains("routed rows") && reason.contains("destinations"),
-                "a multi-destination pipeline still names the refusal the flat path uses: " + reason);
+        assertTrue(reason == null || !reason.contains("routed rows"),
+                "a multi-destination pipeline is no longer kept flat by its routed rows: " + reason);
     }
 
     /** The same pipeline declaring TWO destinations, for the refusal above. */
