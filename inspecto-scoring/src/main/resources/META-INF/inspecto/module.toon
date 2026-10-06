@@ -1,0 +1,10 @@
+id: scoring
+title: Scoring
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+provides:
+  features[1]: scoring
+  contracts[2]: JobTypeProvider,ComponentKindValidator
+requires:
+  modules[1]: entity-list

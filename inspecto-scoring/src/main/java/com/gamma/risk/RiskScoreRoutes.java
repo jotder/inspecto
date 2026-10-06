@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.risk;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,8 +9,13 @@ import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.mask.EvidenceMasker;
-import com.gamma.risk.RiskScoreEvaluator;
-import com.gamma.risk.RiskScoreModel;
+import com.gamma.control.ApiContext;
+import com.gamma.control.ApiException;
+import com.gamma.control.AuditReadMasking;
+import com.gamma.control.ErrorCodes;
+import com.gamma.control.RouteModule;
+import com.gamma.control.RowScope;
+import com.gamma.control.Subject;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.nio.file.Files;
@@ -38,12 +43,15 @@ import java.util.regex.Pattern;
  * The response echoes it as the Space {@code masked:} token (with {@code keyMasked: true}) unless the caller holds
  * {@code canRevealLinkEntities} (D-P8 mask on read, as {@code POST /risk-scores/preview}).
  */
-final class RiskScoreRoutes implements RouteModule {
+public final class RiskScoreRoutes implements RouteModule {
 
     static final String TYPE = "risk-score";
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]*");
     private static final int MAX_KEY = 256;
     private static final ObjectMapper JSON = new ObjectMapper();
+
+    @Override
+    public java.util.Set<String> featureIds() { return java.util.Set.of("scoring"); }
 
     @Override
     public void register(ApiContext api) {
@@ -141,7 +149,7 @@ final class RiskScoreRoutes implements RouteModule {
         out.put("highThreshold", model.highThreshold());
         out.put("saved", content == null);
         List<Map<String, Object>> factors = new java.util.ArrayList<>();
-        for (com.gamma.risk.RiskScorer.FactorResult f : p.scored().factors()) factors.add(f.toMap());
+        for (RiskScorer.FactorResult f : p.scored().factors()) factors.add(f.toMap());
         out.put("factors", factors);
         return out;
     }
@@ -226,7 +234,7 @@ final class RiskScoreRoutes implements RouteModule {
 
     /**
      * Save-time gate for a {@code risk-score} model that needs the Space: run by EVERY writer (the component route and
-     * both bulk writers, through {@link ComponentRoutes#validateKind(ApiContext, String, String, Map)}). Fail closed;
+     * both bulk writers, through {@code ComponentRoutes.validateKind} (through {@link RiskScoreKindValidator})). Fail closed;
      * every refusal is an {@link IllegalArgumentException} the caller maps to 422 (or a per-item bundle failure).
      * <ol>
      *   <li>Every column a factor names (key, measure field, filter fields, evidence) is in its Dataset's Schema.
@@ -245,7 +253,7 @@ final class RiskScoreRoutes implements RouteModule {
         if (model.watchList() != null) {
             // ASSURE-ENTITY-LISTS-1: fail closed at save — the list must exist, be a live watch list, and the edition
             // must carry Entity Lists at all.
-            com.gamma.risk.WatchListFeed feed = com.gamma.risk.WatchListFeed.installed().orElseThrow(() ->
+            com.gamma.entitylist.WatchListFeed feed = com.gamma.entitylist.WatchListFeed.installed().orElseThrow(() ->
                     new IllegalArgumentException("risk-score.watchList needs Entity Lists, which this edition does not carry"));
             try {
                 feed.check(writeRoot, model.watchList().list());
@@ -271,7 +279,7 @@ final class RiskScoreRoutes implements RouteModule {
         Path dataRoot = dataRoots.get();
         for (String out : List.of(model.scoresDataset(), model.latestDataset())) {
             if (dataRoot != null && Files.exists(dataRoot.resolve(out))
-                    && !com.gamma.risk.RiskScoreEvaluator.ownedBy(dataRoot.resolve(out), model.id()))
+                    && !RiskScoreEvaluator.ownedBy(dataRoot.resolve(out), model.id()))
                 throw new IllegalArgumentException("risk-score '" + model.id() + "' would write '" + out
                         + "', which already exists under the data root and is not this model's output");
             Object ref = store.get("dataset", out).map(ComponentRegistry.Component::content)
@@ -281,7 +289,7 @@ final class RiskScoreRoutes implements RouteModule {
                         + "', which is the id of a Dataset over another store");
             // A registered Dataset over the derived store name is refused too — unless that store already IS this
             // model's output (the documented Alert Rule Dataset over _latest), which reads, never collides.
-            boolean ours = dataRoot != null && com.gamma.risk.RiskScoreEvaluator.ownedBy(dataRoot.resolve(out), model.id());
+            boolean ours = dataRoot != null && RiskScoreEvaluator.ownedBy(dataRoot.resolve(out), model.id());
             if (!ours)
                 for (ComponentRegistry.Component ds : store.list("dataset"))
                     if (out.equals(String.valueOf(ds.content().get("physicalRef")).trim()))

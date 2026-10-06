@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-scoring</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Scoring (optional)</name>
+    <description>
+        OPTIONAL add-on module (MODULE-REORG-1 P7, 2026-10-07): the Scoring half of the "Scoring and Lists" add-on of plan
+        §8a (the Lists half is inspecto-entity-list). Risk Scores: the risk-score model and its evaluator (RiskScoreModel,
+        RiskScorer, RiskScoreEvaluator), the risk.score Job Type (RiskScoreJobType), the read and preview routes
+        (RiskScoreRoutes: GET /risk-scores/{model}/{entityKey}, POST /risk-scores/preview) and the save-time checks of the
+        risk-score component kind and of the reserved risk_scores_ output stores (RiskScoreKindValidator). Package
+        com.gamma.risk.
+
+        Contributed through the core's public seams only: com.gamma.control.RouteModule (feature id "scoring"),
+        com.gamma.job.JobTypeProvider (risk.score) and com.gamma.control.ComponentKindValidator. It depends on
+        inspecto-entity-list for one thing, the com.gamma.entitylist.WatchListFeed seam a model's watchList feeds through
+        (the dependency direction is scoring to entity-list, never the reverse).
+
+        What stays in the core: the risk-score config component kind, the pending Alert Rule feature
+        (PendingAlertRules, which reads only the naming facts of com.gamma.alert.RiskScoreOutputs), the
+        risk.score.produced subscriber (by event-type string), the CapabilityManifest rows, the EvidenceMasker
+        (com.gamma.mask) and AbsentRiskScoreRoutes (503 stub).
+
+        Bundled from the Professional edition up (the Standard, Professional, Enterprise and Preview profiles) next to
+        inspecto-entity-list; on Personal the core answers the /risk-scores paths with 503 "not installed",
+        /bootstrap reports features.scoring=false and risk.score is an unknown Job Type. THIN: no shade, no sidecar
+        classifier. Built only under the edition profiles, so a routine "mvn -o clean test" (= Personal) never compiles it.
+    </description>
+
+    <dependencies>
+        <!-- The core: RouteModule/ApiContext/ApiException/WriteGates/HostContext, the engine (Job SPI, ComponentStore,
+             DatasetRelation, EvidenceMasker, RiskScoreOutputs) and DuckDB. Compile scope, as inspecto-reconciliation and
+             inspecto-ops do — a thin jar dropped beside inspecto.jar resolves all of it from there at run time. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- The WatchListFeed seam (com.gamma.entitylist). Always shipped beside this module: both are in the same
+             "Scoring and Lists" add-on (offerings/professional.toon scoringLists). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-entity-list</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs / PipelineConfigBatchTest the moved HTTP
+             tests boot a real CollectorService + ControlApi with. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- EntityFactsForTest (append/read facts) for RiskScoreWatchListFeedTest -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-entity-store</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- MODULE-REORG-1 P5a: platform test kit (FakeApiContext + RouteModuleContract TCK) -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

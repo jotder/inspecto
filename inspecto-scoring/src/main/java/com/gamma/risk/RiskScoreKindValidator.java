@@ -1,6 +1,6 @@
-package com.gamma.control;
+package com.gamma.risk;
 
-import com.gamma.risk.RiskScoreModel;
+import com.gamma.control.ComponentKindValidator;
 
 import java.nio.file.Path;
 import java.util.Map;

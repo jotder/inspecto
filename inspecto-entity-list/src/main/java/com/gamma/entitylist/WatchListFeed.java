@@ -1,4 +1,4 @@
-package com.gamma.risk;
+package com.gamma.entitylist;
 
 import java.io.IOException;
 import java.nio.file.Path;

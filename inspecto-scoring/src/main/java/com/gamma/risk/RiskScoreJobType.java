@@ -1,13 +1,20 @@
-package com.gamma.job;
+package com.gamma.risk;
 
+import com.gamma.job.ArtifactDecl;
+import com.gamma.job.Job;
+import com.gamma.job.JobConfig;
+import com.gamma.job.JobContext;
+import com.gamma.job.JobResult;
+import com.gamma.job.JobTypeDescriptor;
+import com.gamma.job.JobTypeProvider;
+import com.gamma.job.ParamType;
+import com.gamma.job.ParameterDecl;
+import com.gamma.job.ResultSetMeta;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.query.DatasetRelation;
 import com.gamma.pipeline.ViewStore;
-import com.gamma.risk.RiskScoreEvaluator;
-import com.gamma.risk.RiskScoreModel;
-import com.gamma.risk.RiskScorer;
 import com.gamma.signal.Severity;
 
 import java.nio.file.Path;
@@ -24,7 +31,7 @@ import java.util.Map;
  * <p>Reads the component registry from {@link SpaceConfigRoot} (this Space's, never the JVM-wide property) and
  * writes under the injected Space {@code dataDir} — the pair must move together.
  */
-final class RiskScoreJobType implements JobTypeProvider {
+public final class RiskScoreJobType implements JobTypeProvider {
 
     static final JobTypeDescriptor DESCRIPTOR = new JobTypeDescriptor("risk.score", "Risk Score",
             "Scores every entity a saved Risk Score model names (Σ weight × indicator, 0–100, with its factors) "
@@ -34,6 +41,9 @@ final class RiskScoreJobType implements JobTypeProvider {
             List.of(ArtifactDecl.dataset("scores")));
 
     private final String dataDir;
+
+    /** The {@code ServiceLoader} constructor: the Job resolves the Space's data root at run time. */
+    public RiskScoreJobType() { this(null); }
 
     RiskScoreJobType(String dataDir) { this.dataDir = dataDir; }
 
@@ -60,7 +70,8 @@ final class RiskScoreJobType implements JobTypeProvider {
         @Override
         public JobResult run(JobContext ctx) throws Exception {
             long t0 = System.nanoTime();
-            if (dataDir == null || dataDir.isBlank())
+            Path data = dataDir != null && !dataDir.isBlank() ? Path.of(dataDir) : SpaceConfigRoot.currentDataRoot();
+            if (data == null)
                 throw new IllegalStateException("risk.score needs a data root (space dataDir)");
             String modelId = cfg.require("model");
             Path writeRoot = SpaceConfigRoot.requireCurrent("risk.score");
@@ -70,7 +81,6 @@ final class RiskScoreJobType implements JobTypeProvider {
                     .orElseThrow(() -> new IllegalArgumentException("unknown risk-score model '" + modelId + "'"));
             RiskScoreModel model = RiskScoreModel.fromMap(modelId, content);
             ViewStore views = new ViewStore(writeRoot.resolve("views"));
-            Path data = Path.of(dataDir);
 
             RiskScoreEvaluator.Run run = RiskScoreEvaluator.evaluate(model, datasetId -> {
                 Map<String, Object> ds = store.get("dataset", datasetId).map(ComponentRegistry.Component::content)
@@ -103,9 +113,16 @@ final class RiskScoreJobType implements JobTypeProvider {
      */
     static int feedWatchList(Path writeRoot, Path dataDir, RiskScoreModel model, String runId, Instant now,
                              List<RiskScorer.Scored> scored) throws java.io.IOException {
+        return feedWatchList(com.gamma.entitylist.WatchListFeed.installed(), writeRoot, dataDir, model, runId, now, scored);
+    }
+
+    /** {@link #feedWatchList(Path, Path, RiskScoreModel, String, Instant, List)} against an explicit provider (absent = none installed). */
+    static int feedWatchList(java.util.Optional<com.gamma.entitylist.WatchListFeed> provider, Path writeRoot, Path dataDir,
+                             RiskScoreModel model, String runId, Instant now, List<RiskScorer.Scored> scored)
+            throws java.io.IOException {
         RiskScoreModel.WatchList w = model.watchList();
         if (w == null) return 0;
-        com.gamma.risk.WatchListFeed feed = com.gamma.risk.WatchListFeed.installed().orElseThrow(() ->
+        com.gamma.entitylist.WatchListFeed feed = provider.orElseThrow(() ->
                 new IllegalStateException("risk-score '" + model.id() + "' feeds watch list '" + w.list()
                         + "', but Entity Lists are not installed in this edition"));
         List<String> keys = scored.stream().filter(RiskScorer.Scored::high).map(RiskScorer.Scored::entityKey).toList();

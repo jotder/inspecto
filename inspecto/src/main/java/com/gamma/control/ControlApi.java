@@ -596,7 +596,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 new CatalogRoutes(), new ConfigPreviewRoutes(), new ConfigWriteRoutes(), new ConfigReadRoutes(), new ParserRoutes(),   // EventRoutes -> inspecto-observability (cell 6); Object/Note/TagRoutes -> inspecto-ops (cell 7; QueueRoutes retired by RETIRE-HALVES-1)
                 new QueryRoutes(), new DatasetRoutes(), new SpaceComparisonRoutes(), new BiRoutes(), new KpiRoutes(), new DbBrowserRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b); ReconRoutes to inspecto-reconciliation (P7)
                 new ExpectationRoutes(), new RequirementRoutes(),
-                new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new RiskScoreRoutes(), new AcquisitionRoutes(), new StreamPushRoutes(),
+                new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new AcquisitionRoutes(), new StreamPushRoutes(),
                 new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new PendingChangeRoutes(), new ActionRequestRoutes(), new EgressRoutes(), new ApproverRosterRoutes(), new SafetyPolicyRoutes(), new PublicationDestinationRoutes(), new MailAttachmentRoutes(), new NavRoutes(), new AccessRoutes(),
                 new AuditLogRoutes(),   // the audit projection stays CORE though the /events feed is gated (EDG-01 cell 6)
                 new AssistRoutes(), new AgentRoutes(), new SystemRoutes(), new SchedulerRoutes(),
@@ -636,6 +636,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         new AbsentGeoLinkRoutes().register(this);
         new AbsentEntityListRoutes().register(this);
         new AbsentReconRoutes().register(this);
+        new AbsentRiskScoreRoutes().register(this);
         new AbsentExchangeRoutes().register(this);
         new AbsentMetricsRoutes().register(this);
         new AbsentEventsRoutes().register(this);

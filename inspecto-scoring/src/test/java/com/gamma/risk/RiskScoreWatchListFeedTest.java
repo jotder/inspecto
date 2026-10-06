@@ -1,9 +1,9 @@
-package com.gamma.job;
+package com.gamma.risk;
 
 import com.gamma.entitylist.EntityFactsForTest;
 import com.gamma.risk.RiskScoreModel;
 import com.gamma.risk.RiskScorer;
-import com.gamma.risk.WatchListFeed;
+import com.gamma.entitylist.WatchListFeed;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

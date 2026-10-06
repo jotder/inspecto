@@ -115,7 +115,7 @@ run:
 
 The 24 h cap is what lets a Job skip four-eyes (D-P5).
 
-The seam is `com.gamma.risk.WatchListFeed`, an engine SPI that `inspecto-entity-list` provides by `ServiceLoader`
+The seam is `com.gamma.entitylist.WatchListFeed`, an engine SPI that `inspecto-entity-list` provides by `ServiceLoader`
 (`RiskWatchListFeed`). The feed fails closed:
 
 - the save is refused (422) when the list is unknown, retired, not `watch`, or its type is no longer in force;

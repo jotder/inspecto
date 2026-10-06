@@ -9,6 +9,8 @@ timestamp: 2026-09-27T00:00:00Z
 
 # Risk Scores
 
+> **Module (MODULE-REORG-1 P7, 2026-10-07).** Risk Scores are the optional `inspecto-scoring` module (id `scoring`, package `com.gamma.risk`, from Professional up) — a deliberate behaviour change: **Personal no longer ships them**. The module holds `RiskScoreModel`/`RiskScorer`/`RiskScoreEvaluator`, the `risk.score` Job Type (`JobTypeProvider`), `RiskScoreRoutes` (feature id `scoring`) and `RiskScoreKindValidator` (the `ComponentKindValidator` SPI the component save gate loops). Without it `/risk-scores*` answers 503 (`AbsentRiskScoreRoutes`), `/bootstrap` reports `features.scoring=false`, and a `risk-score` component is accepted as opaque config. The core keeps `PendingAlertRules` (reading only the naming/ownership facts in `com.gamma.alert.RiskScoreOutputs`) and the masking resolver `com.gamma.mask.EvidenceMasker`; the `WatchListFeed` seam moved to `inspecto-entity-list` (`com.gamma.entitylist`), so the dependency is scoring → entity-list.
+
 A **Risk Score** (ASSURE-RISK-SCORE-1, WS-22; term chosen by operator decision D-P1) is an explainable
 0–100 number per entity — subscriber, account, device, SIM, dealer, channel, partner, or a free-form
 entity type. It is **computed on the server by a Job**, never by a Step Processor (the operator's hold on

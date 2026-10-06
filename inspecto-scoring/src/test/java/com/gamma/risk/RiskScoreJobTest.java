@@ -1,8 +1,9 @@
-package com.gamma.job;
+package com.gamma.risk;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.ConsignmentEventBus;
+import com.gamma.job.*;
 import com.gamma.risk.RiskCorpus;
 import com.gamma.risk.RiskScoreEvaluator;
 import com.gamma.risk.RiskScorer;
@@ -37,7 +38,10 @@ class RiskScoreJobTest {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @AfterEach
-    void clear() { System.clearProperty("assist.write.root"); }
+    void clear() {
+        System.clearProperty("assist.write.root");
+        System.clearProperty("data.dir");
+    }
 
     private static JobRun await(Supplier<JobRun> s, int runs) throws Exception {
         long deadline = System.nanoTime() + 20_000_000_000L;
@@ -78,6 +82,7 @@ class RiskScoreJobTest {
         Path data = dir.resolve("data");
         RiskCorpus.plant(cfg, data, false);
         System.setProperty("assist.write.root", cfg.toString());
+        System.setProperty("data.dir", data.toString());   // the Space data root a ServiceLoader-built Job resolves at run time
 
         JobConfig job = new JobConfig("score-subs", "risk.score", null, null, true, false,
                 Map.of("model", RiskCorpus.MODEL), null, null);
@@ -134,6 +139,7 @@ class RiskScoreJobTest {
         Path cfg = dir.resolve("config");
         Files.createDirectories(cfg.resolve("registry"));
         System.setProperty("assist.write.root", cfg.toString());
+        System.setProperty("data.dir", dir.resolve("data").toString());   // the Space data root a ServiceLoader-built Job resolves at run time
         JobConfig job = new JobConfig("score-x", "risk.score", null, null, true, false,
                 Map.of("model", "nope"), null, null);
         try (Scheduler s = new Scheduler();
@@ -147,7 +153,7 @@ class RiskScoreJobTest {
         }
     }
 
-    /** ASSURE-ENTITY-LISTS-1: without Entity Lists installed (this module's classpath) a watch-list feed FAILS, never skips. */
+    /** ASSURE-ENTITY-LISTS-1: without Entity Lists installed (an empty provider; this module's own classpath carries them) a watch-list feed FAILS, never skips. */
     @Test
     void aWatchListFeedWithNoEntityListsInstalledFailsInsteadOfSkipping(@TempDir Path dir) {
         Map<String, Object> m = new LinkedHashMap<>();
@@ -158,9 +164,9 @@ class RiskScoreJobTest {
         com.gamma.risk.RiskScoreModel model = com.gamma.risk.RiskScoreModel.fromMap("subs", m);
         List<RiskScorer.Scored> scored = List.of(RiskScorer.score(model, "m1", Map.of("n", 1.0), Map.of()));
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> RiskScoreJobType.feedWatchList(
-                dir, dir, model, "r1", java.time.Instant.now(), scored));
+                java.util.Optional.empty(), dir, dir, model, "r1", java.time.Instant.now(), scored));
         assertTrue(e.getMessage().contains("not installed"), e.getMessage());
-        assertDoesNotThrow(() -> RiskScoreJobType.feedWatchList(dir, dir, com.gamma.risk.RiskScoreModel.fromMap("subs",
+        assertDoesNotThrow(() -> RiskScoreJobType.feedWatchList(java.util.Optional.empty(), dir, dir, com.gamma.risk.RiskScoreModel.fromMap("subs",
                 new LinkedHashMap<>(Map.of("entityType", "subscriber", "highThreshold", 50, "factors", m.get("factors")))),
                 "r1", java.time.Instant.now(), scored), "no watchList: nothing to feed");
     }

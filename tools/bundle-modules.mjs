@@ -69,6 +69,7 @@ const MODULES = [
     { artifactId: 'inspecto-observability', dir: 'inspecto-observability', bundleFile: 'inspecto-observability.jar', from: 'professional' },  // cells 5+6 (CP-13: /metrics + /events*), merged MODULE-REORG-1 P7
     { artifactId: 'inspecto-ops', dir: 'inspecto-ops', bundleFile: 'inspecto-ops.jar', from: 'professional' },                 // cell 7 (CP-11)
     { artifactId: 'inspecto-reconciliation', dir: 'inspecto-reconciliation', bundleFile: 'inspecto-reconciliation.jar', from: 'professional' },  // MODULE-REORG-1 P7: the Reconciliation add-on (recon routes + recon.run; NOT Personal)
+    { artifactId: 'inspecto-scoring', dir: 'inspecto-scoring', bundleFile: 'inspecto-scoring.jar', from: 'professional' },  // MODULE-REORG-1 P7: the Scoring add-on (risk-score routes + risk.score + save checks; NOT Personal)
     // PKG-5 (2026-09-12): the assist agent ships Professional and above, as an OPTIONAL component. NB it is
     // a DEFAULT-reactor module, unlike the gated ones around it — package.ps1 lists it in $modules only so
     // that pass builds its shaded `sidecar` artifact. The staged file is the sidecar, never the thin jar.
@@ -94,7 +95,7 @@ export function editionProfile(edition) {
 
 /**
  * The first-party modules staged for `edition`, in package.ps1's staging order.
- * Personal 2, Professional 20, Enterprise 23, Preview 23 — first-party only; add PG_SIDECAR for the jar count.
+ * Personal 2, Professional 21, Enterprise 24, Preview 24 — first-party only; add PG_SIDECAR for the jar count.
  * ⚠ Those three numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this
  * very line. They said 2/10/11 from EDG-01 until 2026-09-17, missing inspecto-agent (PKG-5, 2026-09-12);
  * the assertion exists so the next module to arrive cannot leave them wrong again.

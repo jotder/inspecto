@@ -1,7 +1,6 @@
 package com.gamma.entitylist;
 
 import com.gamma.control.EntityTypes;
-import com.gamma.risk.WatchListFeed;
 
 import java.io.IOException;
 import java.nio.file.Path;

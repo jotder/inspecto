@@ -311,7 +311,7 @@ if ($Edition -ne 'Personal') {
     # builds its `sidecar` artifact for the editions that stage it.
     # ASSURE-INTELLIGENCE-BUNDLE-1 (D-P2): inspecto-intelligence (the /agent/* agent, onnxruntime inside)
     # is ENTERPRISE only - also a default-reactor module, listed so this pass builds its `sidecar`.
-    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-connectors-kafka,inspecto-telecom-asn1,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-reconciliation,inspecto-agent,inspecto-la-store-pg,inspecto-intelligence' } else { 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-connectors-kafka,inspecto-telecom-asn1,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-reconciliation,inspecto-agent' }
+    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-connectors-kafka,inspecto-telecom-asn1,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-reconciliation,inspecto-scoring,inspecto-agent,inspecto-la-store-pg,inspecto-intelligence' } else { 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-connectors-kafka,inspecto-telecom-asn1,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-reconciliation,inspecto-scoring,inspecto-agent' }
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
@@ -467,6 +467,14 @@ if ($Edition -ne 'Personal') {
                       Select-Object -First 1 -ExpandProperty FullName
     if (-not $reconJarSrc -or -not (Test-Path $reconJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $reconTargetDir\inspecto-reconciliation-*.jar."
+    }
+    # MODULE-REORG-1 P7: the Scoring add-on (Risk Scores). THIN like inspecto-ops / inspecto-entity-list; Professional and above.
+    $scoringTargetDir = Join-Path $sandboxRoot 'inspecto-scoring\target'
+    $scoringJarSrc = Get-ChildItem -Path $scoringTargetDir -Filter 'inspecto-scoring-*.jar' -ErrorAction SilentlyContinue |
+                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                      Select-Object -First 1 -ExpandProperty FullName
+    if (-not $scoringJarSrc -or -not (Test-Path $scoringJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $scoringTargetDir\inspecto-scoring-*.jar."
     }
     if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') {
         $policyTargetDir = Join-Path $sandboxRoot 'inspecto-policy\target'
@@ -660,8 +668,8 @@ if ($entityListJarSrc) {
         $reader = New-Object System.IO.StreamReader($spiEntry.Open())
         try { $spiBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
         if ($spiBody -notmatch [regex]::Escape('com.gamma.entitylist.EntityListRoutes')) { throw "inspecto-entity-list.jar registers no com.gamma.entitylist.EntityListRoutes - the SPI file lists only: $spiBody" }
-        $feedEntry = $elZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.risk.WatchListFeed' }
-        if (-not $feedEntry) { throw "inspecto-entity-list.jar has no META-INF/services/com.gamma.risk.WatchListFeed - watch lists would never feed the risk score." }
+        $feedEntry = $elZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.entitylist.WatchListFeed' }
+        if (-not $feedEntry) { throw "inspecto-entity-list.jar has no META-INF/services/com.gamma.entitylist.WatchListFeed - watch lists would never feed the risk score." }
         Write-Host "  verified: RouteModule and WatchListFeed registrations present in the Entity List module" -ForegroundColor DarkGray
     } finally { $elZip.Dispose() }
 }
@@ -776,6 +784,24 @@ if ($reconJarSrc) {
         }
         Write-Host "  verified: RouteModule, JobTypeProvider and ComponentDeleteHook registrations present in the Reconciliation module" -ForegroundColor DarkGray
     } finally { $rcZip.Dispose() }
+}
+if ($scoringJarSrc) {
+    Copy-Item $scoringJarSrc "$bundleDir\inspecto-scoring.jar"
+    Write-Host "Bundled Scoring module -> inspecto-scoring.jar" -ForegroundColor Green
+    # Thin jar: the only way it ships INERT is a missing META-INF/services entry - the /risk-scores paths would 503, risk.score
+    # would be an unknown Job Type and a risk-score component would be saved unvalidated on a bundle supposed to have them.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $scZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-scoring.jar")
+    try {
+        foreach ($svc in @(@('com.gamma.control.RouteModule', 'com.gamma.risk.RiskScoreRoutes'), @('com.gamma.job.JobTypeProvider', 'com.gamma.risk.RiskScoreJobType'), @('com.gamma.control.ComponentKindValidator', 'com.gamma.risk.RiskScoreKindValidator'))) {
+            $scEntry = $scZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
+            if (-not $scEntry) { throw "inspecto-scoring.jar has no META-INF/services/$($svc[0]) - $($svc[1]) would never be discovered." }
+            $scReader = New-Object System.IO.StreamReader($scEntry.Open())
+            try { $scBody = $scReader.ReadToEnd() } finally { $scReader.Dispose() }
+            if ($scBody -notmatch [regex]::Escape($svc[1])) { throw "inspecto-scoring.jar's $($svc[0]) service file does not list $($svc[1]) - it lists only: $scBody" }
+        }
+        Write-Host "  verified: RouteModule, JobTypeProvider and ComponentKindValidator registrations present in the Scoring module" -ForegroundColor DarkGray
+    } finally { $scZip.Dispose() }
 }
 if ($agentJarSrc) {
     Copy-Item $agentJarSrc "$bundleDir\inspecto-agent.jar"
@@ -1078,6 +1104,7 @@ CP="inspecto.jar"
 [ -f inspecto-observability.jar ] && CP="${CP}:inspecto-observability.jar"
 [ -f inspecto-ops.jar ] && CP="${CP}:inspecto-ops.jar"
 [ -f inspecto-reconciliation.jar ] && CP="${CP}:inspecto-reconciliation.jar"
+[ -f inspecto-scoring.jar ] && CP="${CP}:inspecto-scoring.jar"
 # PKG-5: the assistant, Professional and above. Absent in a Personal bundle, and absent-safe everywhere:
 # OptionalSpi skips a provider that cannot LINK (its dependency needs a newer Java than the product
 # floor of 24), so an older host boots normally and the assist paths answer 503.
@@ -1190,6 +1217,7 @@ rem Prometheus scrape endpoint (EDG-01 cell 5) - Professional/Enterprise only.
 if exist inspecto-observability.jar set "CP=%CP%;inspecto-observability.jar"
 if exist inspecto-ops.jar set "CP=%CP%;inspecto-ops.jar"
 if exist inspecto-reconciliation.jar set "CP=%CP%;inspecto-reconciliation.jar"
+if exist inspecto-scoring.jar set "CP=%CP%;inspecto-scoring.jar"
 if exist inspecto-agent.jar set "CP=%CP%;inspecto-agent.jar"
 if exist inspecto-intelligence.jar set "CP=%CP%;inspecto-intelligence.jar"
 rem ASSURE-INTELLIGENCE-BUNDLE-1: native loaders stay OFFLINE and out of %TEMP% / ~/.djl.ai - everything lands in
@@ -1370,6 +1398,7 @@ fi
 [ -f inspecto-observability.jar ] && CP="${CP}:inspecto-observability.jar"
 [ -f inspecto-ops.jar ] && CP="${CP}:inspecto-ops.jar"
 [ -f inspecto-reconciliation.jar ] && CP="${CP}:inspecto-reconciliation.jar"
+[ -f inspecto-scoring.jar ] && CP="${CP}:inspecto-scoring.jar"
 # PKG-5: the assistant, Professional and above. Absent in a Personal bundle, and absent-safe everywhere:
 # OptionalSpi skips a provider that cannot LINK (its dependency needs a newer Java than the product
 # floor of 24), so an older host boots normally and the assist paths answer 503.
@@ -1504,6 +1533,7 @@ rem Prometheus scrape endpoint (EDG-01 cell 5) - Professional/Enterprise only.
 if exist inspecto-observability.jar set "CP=%CP%;inspecto-observability.jar"
 if exist inspecto-ops.jar set "CP=%CP%;inspecto-ops.jar"
 if exist inspecto-reconciliation.jar set "CP=%CP%;inspecto-reconciliation.jar"
+if exist inspecto-scoring.jar set "CP=%CP%;inspecto-scoring.jar"
 if exist inspecto-agent.jar set "CP=%CP%;inspecto-agent.jar"
 if exist inspecto-intelligence.jar set "CP=%CP%;inspecto-intelligence.jar"
 rem ASSURE-INTELLIGENCE-BUNDLE-1: native loaders stay OFFLINE and out of %TEMP% / ~/.djl.ai - everything lands in
@@ -1925,7 +1955,7 @@ if ($DemoAuth) {
     }
     $demoJars = @('inspecto.jar', 'inspecto-demo-auth.jar', 'inspecto-policy.jar', 'inspecto-connectors.jar', 'inspecto-connectors-kafka.jar', 'inspecto-telecom-asn1.jar', 'inspecto-notify-channels.jar',
                   'inspecto-backup.jar', 'inspecto-entity-list.jar', 'inspecto-la-graph.jar', 'inspecto-la-storage.jar', 'inspecto-la-core.jar', 'inspecto-la-api.jar', 'inspecto-la-store-pg.jar', 'inspecto-geo-link.jar', 'inspecto-exchange.jar', 'inspecto-observability.jar',
-                  'inspecto-ops.jar', 'inspecto-reconciliation.jar', 'inspecto-agent.jar', 'inspecto-intelligence.jar', 'postgresql.jar') | Where-Object { Test-Path (Join-Path $bundleDir $_) }
+                  'inspecto-ops.jar', 'inspecto-reconciliation.jar', 'inspecto-scoring.jar', 'inspecto-agent.jar', 'inspecto-intelligence.jar', 'postgresql.jar') | Where-Object { Test-Path (Join-Path $bundleDir $_) }
     $demoFlags = '--enable-native-access=ALL-UNNAMED -Dcontrol.bind=127.0.0.1 -Dauth.mode=demo -Dobjects.backend=db -Devents.backend=parquet -Djobs.backend=duckdb'
     $serveDemoBat = @"
 @echo off
@@ -2093,7 +2123,7 @@ if (-not $SkipBootCheck) {
             else { 'java' }
     # The same classpath the generated launchers build -- deliberately re-derived from the staged files
     # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
-    $cp = @('inspecto.jar') + @('inspecto-oidc.jar','inspecto-secrets.jar','inspecto-geo-country.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-connectors-kafka.jar','inspecto-telecom-asn1.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-entity-list.jar','inspecto-la-graph.jar','inspecto-la-storage.jar','inspecto-la-core.jar','inspecto-la-api.jar','inspecto-la-store-pg.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-observability.jar','inspecto-ops.jar','inspecto-reconciliation.jar','inspecto-agent.jar','inspecto-intelligence.jar','postgresql.jar' |
+    $cp = @('inspecto.jar') + @('inspecto-oidc.jar','inspecto-secrets.jar','inspecto-geo-country.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-connectors-kafka.jar','inspecto-telecom-asn1.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-entity-list.jar','inspecto-la-graph.jar','inspecto-la-storage.jar','inspecto-la-core.jar','inspecto-la-api.jar','inspecto-la-store-pg.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-observability.jar','inspecto-ops.jar','inspecto-reconciliation.jar','inspecto-scoring.jar','inspecto-agent.jar','inspecto-intelligence.jar','postgresql.jar' |
         Where-Object { Test-Path (Join-Path $bundleDir $_) })
     # DEMO-AUTH-1: appended AFTER the parsed literal on purpose (see the -DemoAuth param note).
     if ($DemoAuth -and (Test-Path (Join-Path $bundleDir 'inspecto-demo-auth.jar'))) { $cp += 'inspecto-demo-auth.jar' }
