@@ -1060,6 +1060,10 @@ export interface EntityListIndex {
  *  Space's `maskingMode` (reveal is not in this slice) — never treat them as raw values to send back. */
 export interface EntityListDetail extends EntityListSummary {
     members: string[];
+    /** ASSURE-ENTITY-LISTS-1: canonical range entries (`prefix:…`, `range:lo..hi`, `cidr:…`), masked like members. */
+    ranges?: string[];
+    /** Every entry carrying an expiry; an expired one is kept (as-of reads) but no longer matches. */
+    expiring?: EntityListExpiring[];
     atSeq: number;
     headHash: string | null;
 }
@@ -1079,7 +1083,32 @@ export interface EntityListCreateRequest {
 export interface EntityListMembersRequest {
     add?: string[];
     remove?: string[];
+    addRanges?: EntityListRangeEntry[];
+    removeRanges?: EntityListRangeEntry[];
+    /** ISO-8601 instant in the future; applies to every entry this call adds. Absent = permanent. */
+    expiresAt?: string;
     reason: string;
+}
+
+/** One authored range entry — exactly one shape. */
+export type EntityListRangeEntry = { prefix: string } | { from: string; to: string } | { cidr: string };
+
+export interface EntityListExpiring {
+    entry: string;
+    kind: 'key' | 'range';
+    expiresAt: string;
+    expired: boolean;
+}
+
+/** `202` from a governed members call: the change became a Pending Change and nothing was written yet. */
+export interface EntityListHeld {
+    status: 'pending';
+    written: false;
+    pendingChange: { id: string };
+}
+
+export function isHeldListChange(r: EntityListMembersResult | EntityListHeld): r is EntityListHeld {
+    return (r as EntityListHeld).status === 'pending';
 }
 
 /** The list after a members call. `changed: 0` = nothing was effective and no fact was written. */
@@ -1388,8 +1417,11 @@ export class InvService {
     }
 
     /** A retired list → 409. */
-    changeEntityListMembers(id: string, req: EntityListMembersRequest): Observable<EntityListMembersResult> {
-        return this.http.post<EntityListMembersResult>(entityListPath(id, '/members'), req);
+    changeEntityListMembers(
+        id: string,
+        req: EntityListMembersRequest,
+    ): Observable<EntityListMembersResult | EntityListHeld> {
+        return this.http.post<EntityListMembersResult | EntityListHeld>(entityListPath(id, '/members'), req);
     }
 
     /** Already retired → 409. */

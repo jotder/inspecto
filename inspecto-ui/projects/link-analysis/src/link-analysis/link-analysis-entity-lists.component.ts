@@ -9,6 +9,7 @@ import {
     EntityListDetail,
     EntityListSummary,
     InvService,
+    isHeldListChange,
     unmatchedCount,
 } from '@inspecto/link-analysis/api/inv.service';
 import { LensService } from '@inspecto/core/api';
@@ -24,6 +25,9 @@ import {
     CreateEntityListDialog,
     CreateEntityListData,
     ENTITY_LIST_PURPOSES,
+    EntityListEntriesData,
+    EntityListEntriesDialog,
+    EntityListEntriesResult,
     EntityListReasonData,
     EntityListReasonDialog,
 } from './link-analysis-entity-lists.dialogs';
@@ -124,6 +128,14 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                                                 [attr.aria-label]="'Add the selected entity to ' + l.title"
                                             >
                                                 Add selection
+                                            </button>
+                                            <button
+                                                mat-button
+                                                [disabled]="busy()"
+                                                (click)="editEntries(l)"
+                                                [attr.aria-label]="'Edit the entries of ' + l.title"
+                                            >
+                                                Edit entries…
                                             </button>
                                             @if (store.active()) {
                                                 <button
@@ -265,12 +277,39 @@ export class LinkAnalysisEntityListsComponent {
         if (!reason) return;
         await this.write('Could not change the Entity List.', async () => {
             const res = await firstValueFrom(this.inv.changeEntityListMembers(list.id, { add: ids, reason }));
+            if (isHeldListChange(res)) {
+                this.notice.set(heldNotice(list.title, res.pendingChange.id));
+                return;
+            }
             this.notice.set(
                 res.changed
                     ? `${res.changed} ${res.changed === 1 ? 'member' : 'members'} added to “${res.title}” — it now has ${res.size}.`
                     : `Nothing changed — “${res.title}” already holds ${ids.length === 1 ? 'that value' : 'those values'}.`,
             );
         });
+    }
+
+    /** Keys, prefixes, ranges and CIDR blocks with an optional expiry — the dialog makes the call and closes with the answer. */
+    async editEntries(list: EntityListSummary): Promise<void> {
+        const res = await firstValueFrom(
+            this.dialog
+                .open<
+                    EntityListEntriesDialog,
+                    EntityListEntriesData,
+                    EntityListEntriesResult | undefined
+                >(EntityListEntriesDialog, { data: { list, typeLabel: this.typeLabel(list.entityType) }, width: '36rem' })
+                .afterClosed(),
+        );
+        if (!res) return;
+        this.error.set('');
+        this.notice.set(
+            isHeldListChange(res)
+                ? heldNotice(list.title, res.pendingChange.id)
+                : res.changed
+                  ? `${res.changed} ${res.changed === 1 ? 'entry' : 'entries'} changed on “${res.title}”.`
+                  : `Nothing changed on “${res.title}”.`,
+        );
+        await this.load();
     }
 
     async retire(list: EntityListSummary): Promise<void> {
@@ -376,4 +415,9 @@ export class LinkAnalysisEntityListsComponent {
         this.unavailable.set(isUnavailable(err));
         this.error.set(entityListErrorMessage(err, fallback, false, forbidden));
     }
+}
+
+/** A governed list change is held, not applied — say so, and name the Pending Change to approve. */
+export function heldNotice(title: string, pendingId: string): string {
+    return `The change to “${title}” is held for approval as ${pendingId} — nothing is applied until it is approved.`;
 }

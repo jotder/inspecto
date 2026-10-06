@@ -292,7 +292,7 @@ describe('InvService (LA-08 multi projection, LA-11 recursive paths)', () => {
     it('changes members at /{id}/members and hands back `changed`; retires with {reason} only', () => {
         let changed: number | undefined;
         svc.changeEntityListMembers('wl/1', { add: ['+44 7700 900123'], reason: 'seen at scene' }).subscribe(
-            (r) => (changed = r.changed),
+            (r) => (changed = (r as { changed?: number }).changed),
         );
         const members = httpMock.expectOne(`${base}/entity-lists/wl%2F1/members`);
         expect(members.request.method).toBe('POST');

@@ -141,8 +141,15 @@ The seam is `com.gamma.risk.WatchListFeed`, an engine SPI that `inspecto-entity-
 ## Residuals (P3 `ASSURE-ENTITY-LISTS-RESIDUALS-1`)
 
 - `excludeBy` / `seedBy` seal exact keys only; range entries do not take part yet. This is Link Analysis-owned. Decided 2026-10-04: DEFER until a customer asks; range / CIDR matching changes the sealed-log format and the replay hash, so it needs its own design.
-- There is no SPA authoring for ranges or expiry. The Investigation tab's Entity Lists section edits exact keys,
-  and the Pending Change diff is the only view of a held list change.
+- ~~There is no SPA authoring for ranges or expiry~~ shipped 2026-10-06: each writable list in the Investigation
+  tab's Entity Lists section has **Edit entries…** (`EntityListEntriesDialog`). It takes one entry per line, and
+  the framework-free `parseEntityListEntries` (`link-analysis/entity-list-entries.ts`) splits them into an exact key,
+  `+4478*` → `{prefix}`, `lo..hi` → `{from, to}`, or a line holding `/` → `{cidr}`. It refuses a bad line by
+  number and sends nothing. The dialog has Add / Remove, and an optional `datetime-local` expiry on an add, which
+  must be in the future. Before the edit it reads the list and shows its `ranges[]` and `expiring[]` as served,
+  so they are masked, and an expired entry is badged. The server stays the gate: it normalises, checks
+  equal-length bounds, and refuses host bits. A `202` hold (from Edit entries or Add selection) is reported as
+  *held for approval as `<pc-id>`*, never as an applied change.
 - ~~A Dataset over a sidecar is not registered automatically~~ shipped 2026-10-04 as an **explicit, manual** action (below).
   A list write still never writes Dataset config.
 - ~~`approverCheck` for a held list change~~ shipped 2026-10-04: every *pending* Pending Change (any kind, so a held

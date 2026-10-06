@@ -5,7 +5,18 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { firstValueFrom } from 'rxjs';
-import { EntityListDetail, EntityListPurpose, InvService } from '@inspecto/link-analysis/api/inv.service';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import {
+    EntityListDetail,
+    EntityListHeld,
+    EntityListMembersRequest,
+    EntityListMembersResult,
+    EntityListPurpose,
+    EntityListSummary,
+    InvService,
+} from '@inspecto/link-analysis/api/inv.service';
+import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
+import { expiryInstant, parseEntityListEntries } from './entity-list-entries';
 import { EntityTypeConfig } from './link-analysis-settings.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
@@ -235,5 +246,183 @@ export class EntityListReasonDialog {
             return;
         }
         this.ref.close(this.form.controls.reason.value.trim());
+    }
+}
+
+// ── Edit entries: exact keys, ranges / CIDR, expiry (ASSURE-ENTITY-LISTS-RESIDUALS-1 (2)) ───────────────
+
+export interface EntityListEntriesData {
+    list: EntityListSummary;
+    /** The Entity Type's label, for the normalisation hint. */
+    typeLabel: string;
+}
+
+/** What the dialog closes with: the server's answer, so the host reports applied vs held. */
+export type EntityListEntriesResult = EntityListMembersResult | EntityListHeld;
+
+/**
+ * Add or remove entries on one list — exact keys, prefixes, same-length ranges and CIDR blocks, one per line
+ * (`parseEntityListEntries`) — with an optional expiry on an add. It reads the list first and shows its current
+ * range entries and expiring entries as served (masked per `maskingMode`). A 422/409 stays in the dialog; a
+ * governed change closes with the `202` Pending Change body.
+ */
+@Component({
+    standalone: true,
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [
+        ReactiveFormsModule,
+        MatButtonModule,
+        MatButtonToggleModule,
+        MatDialogModule,
+        MatFormFieldModule,
+        MatInputModule,
+        InspectoAlertComponent,
+        StatusBadgeComponent,
+    ],
+    template: `
+        <h2 mat-dialog-title>Edit entries — {{ data.list.title }}</h2>
+        <mat-dialog-content class="flex flex-col gap-3 text-sm">
+            @if (detail(); as d) {
+                <section aria-label="Current range and expiring entries" class="flex flex-col gap-1 text-xs">
+                    <p class="text-secondary m-0">
+                        {{ d.size }} {{ d.size === 1 ? 'member' : 'members' }} · {{ (d.ranges ?? []).length }} range
+                        {{ (d.ranges ?? []).length === 1 ? 'entry' : 'entries' }}
+                    </p>
+                    @if ((d.ranges ?? []).length) {
+                        <ul class="m-0 list-none p-0 font-mono" aria-label="Range entries">
+                            @for (r of d.ranges; track r) {
+                                <li>{{ r }}</li>
+                            }
+                        </ul>
+                    }
+                    @if ((d.expiring ?? []).length) {
+                        <ul class="m-0 list-none p-0" aria-label="Expiring entries">
+                            @for (e of d.expiring; track e.entry + e.kind) {
+                                <li class="flex items-center gap-1">
+                                    <span class="font-mono">{{ e.entry }}</span>
+                                    <span class="text-secondary">until {{ e.expiresAt }}</span>
+                                    @if (e.expired) {
+                                        <inspecto-status-badge value="expired" label="Expired"></inspecto-status-badge>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+            }
+            <form class="flex flex-col gap-2" [formGroup]="form" (ngSubmit)="save()">
+                <mat-button-toggle-group formControlName="mode" aria-label="Add or remove entries">
+                    <mat-button-toggle value="add">Add</mat-button-toggle>
+                    <mat-button-toggle value="remove">Remove</mat-button-toggle>
+                </mat-button-toggle-group>
+                <mat-form-field subscriptSizing="dynamic">
+                    <mat-label>Entries, one per line</mat-label>
+                    <textarea matInput rows="6" formControlName="entries"></textarea>
+                    <mat-hint>
+                        A key · a prefix like +4478* · a range like 447800..447899 (same length) · a CIDR block like
+                        10.1.0.0/16. Keys and bounds are normalised as {{ data.typeLabel }}.
+                    </mat-hint>
+                    @if (form.controls.entries.hasError('required') || form.controls.entries.hasError('pattern')) {
+                        <mat-error>Enter at least one entry.</mat-error>
+                    }
+                </mat-form-field>
+                @if (parseErrors().length) {
+                    <ul class="text-warn m-0 pl-4 text-xs" role="alert" aria-label="Refused lines">
+                        @for (e of parseErrors(); track e) {
+                            <li>{{ e }}</li>
+                        }
+                    </ul>
+                }
+                @if (form.controls.mode.value === 'add') {
+                    <mat-form-field subscriptSizing="dynamic">
+                        <mat-label>Expires (optional)</mat-label>
+                        <input matInput type="datetime-local" formControlName="expires" />
+                        <mat-hint>Blank keeps the entries. An expiring add never shortens a permanent entry.</mat-hint>
+                    </mat-form-field>
+                    @if (expiryError()) {
+                        <p class="text-warn m-0 text-xs" role="alert">{{ expiryError() }}</p>
+                    }
+                }
+                <mat-form-field subscriptSizing="dynamic">
+                    <mat-label>Reason</mat-label>
+                    <input matInput formControlName="reason" />
+                    @if (form.controls.reason.hasError('required') || form.controls.reason.hasError('pattern')) {
+                        <mat-error>A reason is required — every change to a list is accounted for.</mat-error>
+                    } @else if (form.controls.reason.hasError('maxlength')) {
+                        <mat-error>At most 1000 characters.</mat-error>
+                    }
+                </mat-form-field>
+            </form>
+            @if (error()) {
+                <inspecto-alert variant="error" title="Entries not changed">{{ error() }}</inspecto-alert>
+            }
+        </mat-dialog-content>
+        <mat-dialog-actions align="end">
+            <button mat-button (click)="requestClose()">Cancel</button>
+            <button mat-flat-button color="primary" [disabled]="busy()" (click)="save()">
+                {{ form.controls.mode.value === 'add' ? 'Add entries' : 'Remove entries' }}
+            </button>
+        </mat-dialog-actions>
+    `,
+})
+export class EntityListEntriesDialog {
+    readonly data = inject<EntityListEntriesData>(MAT_DIALOG_DATA);
+    readonly ref = inject(MatDialogRef<EntityListEntriesDialog, EntityListEntriesResult | undefined>);
+    private inv = inject(InvService);
+    private confirm = inject(InspectoConfirmService);
+
+    readonly form = new FormGroup({
+        mode: new FormControl<'add' | 'remove'>('add', { nonNullable: true }),
+        entries: new FormControl('', {
+            nonNullable: true,
+            validators: [Validators.required, Validators.pattern(NOT_BLANK)],
+        }),
+        expires: new FormControl('', { nonNullable: true }),
+        reason: new FormControl('', {
+            nonNullable: true,
+            validators: [Validators.required, Validators.pattern(NOT_BLANK), Validators.maxLength(1000)],
+        }),
+    });
+    readonly detail = signal<EntityListDetail | null>(null);
+    readonly parseErrors = signal<string[]>([]);
+    readonly expiryError = signal('');
+    readonly busy = signal(false);
+    readonly error = signal('');
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
+
+    constructor() {
+        // Best effort: the current entries are context, not a precondition of the edit.
+        this.inv.getEntityList(this.data.list.id).subscribe({
+            next: (d) => this.detail.set(d),
+            error: () => undefined,
+        });
+    }
+
+    async save(): Promise<void> {
+        if (this.busy()) return;
+        const v = this.form.getRawValue();
+        const parsed = parseEntityListEntries(v.entries);
+        this.parseErrors.set(parsed.errors);
+        const expiry = v.mode === 'add' ? expiryInstant(v.expires) : {};
+        this.expiryError.set(expiry.error ?? '');
+        if (this.form.invalid || parsed.errors.length || expiry.error) {
+            this.form.markAllAsTouched();
+            return;
+        }
+        const reason = v.reason.trim();
+        const req: EntityListMembersRequest =
+            v.mode === 'add'
+                ? { add: parsed.keys, addRanges: parsed.ranges, reason }
+                : { remove: parsed.keys, removeRanges: parsed.ranges, reason };
+        if (expiry.iso) req.expiresAt = expiry.iso;
+        this.busy.set(true);
+        this.error.set('');
+        try {
+            this.ref.close(await firstValueFrom(this.inv.changeEntityListMembers(this.data.list.id, req)));
+        } catch (err) {
+            this.error.set(entityListErrorMessage(err, 'Could not change the Entity List.'));
+        } finally {
+            this.busy.set(false);
+        }
     }
 }

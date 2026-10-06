@@ -192,6 +192,54 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
         expect(inv.retireEntityList).not.toHaveBeenCalled();
     });
 
+    it('Edit entries opens the entries dialog for that list and reports a held change as pending, not applied', async () => {
+        const { inv, dialog, next, el, button, settle } = create();
+        await settle();
+        next.result = { status: 'pending', written: false, pendingChange: { id: 'pc-20261006120000-abcdef' } };
+        button('Edit the entries of Known mules')!.click();
+        await settle();
+        const [, config] = dialog.open.mock.calls[0] as unknown as [
+            unknown,
+            { data: { list: { id: string }; typeLabel: string } },
+        ];
+        expect(config.data.list.id).toBe('mules');
+        expect(config.data.typeLabel).toBe('MSISDN');
+        expect(el.textContent).toContain('held for approval as pc-20261006120000-abcdef');
+        expect(el.textContent).not.toContain('changed on');
+        expect(inv.listEntityLists).toHaveBeenCalledTimes(2);
+    });
+
+    it('Edit entries reports an applied change by count; a cancelled dialog changes nothing', async () => {
+        const { inv, next, el, button, settle } = create();
+        await settle();
+        next.result = undefined;
+        button('Edit the entries of Known mules')!.click();
+        await settle();
+        expect(inv.listEntityLists).toHaveBeenCalledTimes(1);
+        next.result = { ...summary({ id: 'mules' }), members: [], atSeq: 18, headHash: null, changed: 2 };
+        button('Edit the entries of Known mules')!.click();
+        await settle();
+        expect(el.textContent).toContain('2 entries changed on');
+    });
+
+    it('Add selection that is held says so instead of claiming members were added', async () => {
+        const { inv, next, el, store, button, settle } = create();
+        await settle();
+        store.selected.set({
+            id: 'entity:msisdn:+15550001',
+            data: { label: '+1 555 0001', kind: 'entity', spellings: ['+1 555 0001'] },
+        });
+        inv.changeEntityListMembers.mockReturnValue(
+            of({ status: 'pending', written: false, pendingChange: { id: 'pc-1' } }) as never,
+        );
+        next.result = 'seen';
+        await settle();
+        button('Add the selected entity to Known mules')!.click();
+        await settle();
+        expect(el.textContent).toContain('held for approval as pc-1');
+        expect(el.textContent).not.toContain('added to');
+    });
+
     it('retires through a destructive confirm that asks the reason', async () => {
         const { inv, dialog, next, el, button, settle } = create();
         await settle();
