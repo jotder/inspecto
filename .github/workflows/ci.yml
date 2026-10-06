@@ -306,6 +306,16 @@ jobs:
       - name: Guard — a bundle ships only committed Space content
         run: node tools/check-bundle-spaces.mjs
 
+      # Offerings guard (MODULE-REORG-1 P6a): every module has a manifest, every Offering names real modules. Reads git
+      # ls-files + tracked manifests/offerings/*.toon only; no build.
+      - name: Guard — Offerings reference real, manifested modules
+        run: node tools/check-offerings.mjs && node --test tools/check-offerings.test.mjs
+
+      # Module-architecture report (informational, exit 0) + REGRESSION ratchet: split packages and populated closed
+      # registries may only fall vs tools/module-architecture-baseline.json. Never wire --check (non-zero by design).
+      - name: Guard — module-architecture report and no-regression ratchet
+        run: node tools/check-module-architecture.mjs && node tools/check-module-architecture.mjs --json --ratchet && node --test tools/check-module-architecture.test.mjs
+
   test:
     runs-on: ubuntu-latest
     # DAT-6-CI-1 (2026-09-07). The embedded-Postgres harness was removed by operator decision — Postgres is

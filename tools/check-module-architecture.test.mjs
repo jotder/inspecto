@@ -2,7 +2,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { balancedAfter, loc, moduleOf, packageOf, registries, splitPackages, vocabHits } from './check-module-architecture.mjs';
+import { balancedAfter, loc, moduleOf, packageOf, ratchetViolations, registries, splitPackages, vocabHits } from './check-module-architecture.mjs';
 
 test('packageOf reads the package line and ignores commented-out ones', () => {
     assert.equal(packageOf('/* package a.b; */\n// package c.d;\npackage com.x.y;\nclass A {}'), 'com.x.y');
@@ -54,4 +54,10 @@ test('registries measures a fixture and reports a missing file as null', () => {
     assert.equal(by['RBAC capabilities'], 2);
     assert.equal(by['Governable config kinds'], null);
     assert.equal(registries(() => null, []).length, 10);
+});
+
+test('ratchetViolations fails only when a tracked count rises', () => {
+    const base = { splitPackages: 8, populatedRegistries: 8 };
+    assert.deepEqual(ratchetViolations({ splitPackages: 8, populatedRegistries: 7 }, base), []);
+    assert.deepEqual(ratchetViolations({ splitPackages: 9, populatedRegistries: 8 }, base), ['splitPackages: 9 > baseline 8']);
 });

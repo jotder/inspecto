@@ -197,7 +197,7 @@ contribution point, which is what that plan's D-AS3 asked for.
   missing content pack; an unknown include or a cycle. **Always-present rule (documented at the top of the script):**
   decided on manifest `offeringRole`, not `buildRole` — `base`/`internal` modules (only `processor` is staged) are never
   listed and are ignored on both sides; `connectors` is `provider` and ships everywhere, so Personal lists it.
-  Printed as one line in `check-module-architecture.mjs`'s report. **Follow-up: wire into `ci.yml`** (not done here).
+  Printed as one line in `check-module-architecture.mjs`'s report. **Wired into the `ci.yml` guards job (2026-10-07)**, with the architecture report and a `--ratchet` regression gate: `tools/module-architecture-baseline.json` holds `splitPackages` (8) and `populatedRegistries` (8); CI fails only if a count RISES — lower the file as work lands. Per-registry sizes (routes, capabilities) are not ratcheted: they grow legitimately.
 - **Finding — `docs/EDITIONS.md` Packaging row is stale** against the profiles: Professional "NINE optional modules, 12
   staged jars" vs the real 14 optional modules (Personal 2 + 14 = 16 first-party jars, +`postgresql.jar`); the row omits
   `entity-list`, `la-graph`, `la-storage`, `la-core`, `la-api`; Enterprise "10 modules, 13 staged jars" vs 19 first-party

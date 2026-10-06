@@ -168,7 +168,21 @@ function main() {
     const r = gather(i >= 0 ? a[i + 1] : '.');
     if (!a.includes('--json')) console.log(render(r) + `\n\n## 5. Offerings (tools/check-offerings.mjs): ${offeringsStatus(i >= 0 ? a[i + 1] : '.')}\n`);
     console.log(JSON.stringify(summary(r)));
+    if (a.includes('--ratchet')) {
+        const bad = ratchetViolations(ratchetCounts(r), JSON.parse(readFileSync(new URL('./module-architecture-baseline.json', import.meta.url), 'utf8')));
+        if (bad.length) { console.error(`RATCHET FAILED (lower tools/module-architecture-baseline.json as work lands, never raise it): ${bad.join('; ')}`); process.exit(1); }
+    }
     if (a.includes('--check') && (r.splitPackages.length || r.registries.some((x) => x.size))) process.exit(1);
+}
+
+/** Counts the ratchet tracks. A count may only fall; `populatedRegistries` = closed registries still holding entries (size > 0). */
+export function ratchetCounts(r) {
+    return { splitPackages: r.splitPackages.length, populatedRegistries: r.registries.filter((x) => x.size).length };
+}
+
+/** Names every tracked count that rose above its baseline; empty = pass. */
+export function ratchetViolations(counts, baseline) {
+    return Object.entries(baseline).filter(([k, v]) => counts[k] > v).map(([k, v]) => `${k}: ${counts[k]} > baseline ${v}`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();
