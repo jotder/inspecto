@@ -82,7 +82,7 @@
 // ⬇ 51 → 49 on 2026-10-01: found stale (the guard itself printed "improved … lower BASELINE_UNCOVERED" at the pre-SEP-08 tip —
 // armed tests had landed without the ratchet being lowered). Locked in, so a slip back above 49 fails.
 // ⬇ 49 → 47 on 2026-10-01: the D-4 step 6 `/inv/graph/*` routes ship with an armed-Subject test class (`ControlApiGraphRunTest`).
-const BASELINE_UNCOVERED = 47;
+const BASELINE_UNCOVERED = 41;
 
 // Usage:  node tools/check-authgate-coverage.mjs           # report + exit 1 on a ratchet regression
 //         node tools/check-authgate-coverage.mjs --list    # also print every uncovered route
