@@ -201,7 +201,7 @@ public final class PendingAlertRules {
 
     private static Map<String, Object> read(Path f) {
         try {
-            return com.gamma.config.io.ConfigCodec.toMap(Files.readString(f));
+            return com.gamma.util.ToonHelper.load(f.toString());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

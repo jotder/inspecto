@@ -100,7 +100,7 @@ final class TemplateSeedGate {
                 throw refused("pending alert-rule", name, com.gamma.etl.EditionFeatures.refusal(
                         com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
             try {
-                PendingAlertRules.requireDeclarable(config, ConfigCodec.toMap(Files.readString(file)), name);
+                PendingAlertRules.requireDeclarable(config, com.gamma.util.ToonHelper.load(file.toString()), name);
             } catch (IOException | RuntimeException bad) {
                 throw refused("pending alert-rule", name, bad.getMessage());
             }
