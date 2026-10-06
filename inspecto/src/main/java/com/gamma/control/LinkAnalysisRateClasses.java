@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
  * (per subject, 429 {@code RATE_LIMITED}); {@link #EXEMPT} routes are cheap reads or small bounded writes and
  * are not throttled. {@code LinkAnalysisRateClassCoverageTest} walks {@code AbsentGeoLinkRoutes.SURFACE} and
  * {@code AbsentEntityListRoutes.SURFACE} and fails when a route is in neither table, so a new LA route must
- * choose a class. Nothing here is configurable (the existing buckets are fixed too).
+ * choose a class. The classes are fixed; only the Link Analysis budget is tunable, via {@code control.rateLimit.linkAnalysis.*}.
  */
 final class LinkAnalysisRateClasses {
 

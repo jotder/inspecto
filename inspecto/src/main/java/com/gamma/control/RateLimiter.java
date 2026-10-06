@@ -11,8 +11,8 @@ import java.util.function.LongSupplier;
  * instance — no config framework, no external store, matching the project's no-new-dependency bar.
  *
  * <p>Each instance is one budget: a burst of {@code capacity} requests, refilling at {@code refillPerSecond}
- * tokens/second. Three budgets exist ({@link #standard()}, {@link #dashboard()}, {@link #callback()}); all are fixed, not
- * configurable — no existing gate in this file reads a rate-limit config key, so there is no pattern to extend.
+ * tokens/second. Three budgets exist ({@link #standard()}, {@link #dashboard()}, {@link #callback()}); all are fixed except
+ * {@link #linkAnalysis()}, the only tunable budget (via {@code control.rateLimit.linkAnalysis.*}).
  *
  * <p>⚠ {@code /bi/query} has its OWN, larger bucket (operator decision 2026-09-24): every Studio widget fires
  * one {@code POST /bi/query}, so a 10–12 tile dashboard spent half the shared 20-token burst and the next
