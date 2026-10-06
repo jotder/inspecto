@@ -166,6 +166,20 @@ export function decodeProfileProvenance(
 }
 
 /**
+ * A Decode Profile's own `segments` (`segment key → schema ref`, relative to the profile, as authored), or
+ * `{}` when it names none. A Pipeline with no `segments` of its own inherits these whole (`segments` is
+ * replaced whole, never merged — D5), so they are what the drawer shows and what lets such a Pipeline Apply.
+ */
+export function profileSegmentsOf(profile: Record<string, unknown> | null): Record<string, string> {
+    const s = profile?.['segments'];
+    if (!s || typeof s !== 'object' || Array.isArray(s)) return {};
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(s as Record<string, unknown>))
+        if (typeof v === 'string' && v.trim()) out[k] = v;
+    return out;
+}
+
+/**
  * The block the form is SEEDED from on a profile-backed Pipeline: the profile's keys under the Pipeline's
  * own (a blank own key is unset, so the profile's shows). `segments` stays the Pipeline's — it is not a form
  * field, and the segments editor re-hydrates from the Pipeline's own refs. Seeding never makes a value an
@@ -409,6 +423,34 @@ export function withDecodeProfile(
                         </table>
                     } @else {
                         <p class="text-secondary text-xs">Reading the Decode Profile…</p>
+                    }
+                    @if (profileSegmentRows().length) {
+                        <div class="mb-1 mt-2 text-xs font-semibold uppercase opacity-70" id="profile-segments-heading">
+                            Profile segments
+                            @if (ownSegmentsSet()) {
+                                <span class="normal-case font-normal">· replaced by this Pipeline's own</span>
+                            }
+                        </div>
+                        <table
+                            class="w-full table-fixed text-sm"
+                            data-test="profile-segments"
+                            aria-labelledby="profile-segments-heading"
+                        >
+                            <thead class="sr-only">
+                                <tr>
+                                    <th scope="col">Segment key</th>
+                                    <th scope="col">Schema</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (row of profileSegmentRows(); track row[0]) {
+                                    <tr>
+                                        <td class="w-1/3 truncate py-0.5 pr-2 font-mono">{{ row[0] }}</td>
+                                        <td class="truncate py-0.5 font-mono" [title]="row[1]">{{ row[1] }}</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
                     }
                 </section>
             }
@@ -1145,6 +1187,10 @@ export class PipelineParseDefinitionComponent {
     /** The same block, but only when it may re-seed the form — never over edits already made. */
     private readonly profileSeed = signal<Record<string, unknown> | null>(null);
     readonly profileError = signal<string | null>(null);
+    /** The profile's own `segments`, as `[key, ref]` rows for the read-only list. */
+    readonly profileSegmentRows = computed(() => Object.entries(profileSegmentsOf(this.profileValues())));
+    /** Whether the Pipeline's saved block carries its own `segments` (which replace the profile's whole). */
+    readonly ownSegmentsSet = computed(() => Object.keys(this.savedSegmentPaths()).length > 0);
     /** The form's asn1 values and dirty keys, snapshotted on interaction (the editor exposes methods, not signals). */
     private readonly asn1Edit = signal<{ form: Record<string, unknown>; dirty: Set<string> } | null>(null);
 
@@ -1729,6 +1775,17 @@ export class PipelineParseDefinitionComponent {
         // hops in this order because the config must never name a schema file that does not exist yet
         // — the Schema stage's rule, and Onboarding's `savePlugin` does exactly the same.
         const segments = this.segmentsEditor;
+        // A profile-backed Pipeline with NO segments of its own inherits the profile's whole (D5), so an
+        // empty editor is not "no segments" there: apply without a `segments` key. Only once the profile
+        // has been read AND names segments — an unread or segment-less profile still meets the gate.
+        if (
+            segments &&
+            segments.value().length === 0 &&
+            this.frontend() === 'asn1' &&
+            this.profileSegmentRows().length > 0
+        ) {
+            return this.applyWith(this.parsingValue());
+        }
         if (!segments || !segments.validate()) {
             this.editor.error.set(segments?.problem() ?? 'Add at least one segment.');
             return;

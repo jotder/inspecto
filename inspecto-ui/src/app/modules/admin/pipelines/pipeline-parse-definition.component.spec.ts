@@ -2018,6 +2018,49 @@ describe('Decode Profile read-back', () => {
         expect(editor(fixture).rawValue()['asn1__strictness']).toBe('BER');
     });
 
+    /** The profile-backed node with NO segments of its own — it inherits the profile's whole (D5). */
+    function bareProfileNode(): AuthoredNode {
+        const n = profileNode();
+        delete ((n.config!['parsing'] as Record<string, unknown>)['asn1'] as Record<string, unknown>)['segments'];
+        return n;
+    }
+
+    it('lists the profile’s own segments, marked replaced when the Pipeline sets its own', async () => {
+        const fixture = await create(profileNode(), [ASN1_PROFILE_DEF], 0, null, '', 'msc');
+        fixture.detectChanges();
+        const el = (fixture.nativeElement as HTMLElement).querySelector('[data-test="decode-profile"]')!;
+        const table = el.querySelector('[data-test="profile-segments"]');
+        expect(table?.textContent).toContain('mo');
+        expect(table?.textContent).toContain('mo.toon');
+        expect(el.textContent).toContain("replaced by this Pipeline's own");
+        await expectNoA11yViolations(el as HTMLElement);
+    });
+
+    it('applies a profile-backed Pipeline with no segments of its own, writing no segments key', async () => {
+        const fixture = await create(bareProfileNode(), [ASN1_PROFILE_DEF], 0, null, '', 'msc');
+        fixture.detectChanges();
+        const el = (fixture.nativeElement as HTMLElement).querySelector('[data-test="decode-profile"]')!;
+        expect(el.textContent).not.toContain('replaced by');
+
+        pane(fixture).submit();
+        const parsing = fixture.componentInstance.applied!.config!['parsing'] as Record<string, unknown>;
+        const a = parsing['asn1'] as Record<string, unknown>;
+        expect(a['segments']).toBeUndefined();
+        expect(a['profile_file']).toBe('../vendors/acme/acme.decode.toon');
+        expect(schemaWrites).toEqual([]);
+    });
+
+    it('still refuses an empty segment list when the profile names no segments', async () => {
+        profileReply = of({ asn1: { grammar_file: 'acme.asn' } });
+        const fixture = await create(bareProfileNode(), [ASN1_PROFILE_DEF], 0, null, '', 'msc');
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).querySelector('[data-test="profile-segments"]')).toBeNull();
+
+        pane(fixture).submit();
+        expect(fixture.componentInstance.applied).toBeFalsy();
+        expect(editor(fixture).error()).toBe('Add at least one segment.');
+    });
+
     it('reads nothing for a block without a profile', async () => {
         const fixture = await create(asn1Node(), [ASN1_PROFILE_DEF]);
         fixture.detectChanges();

@@ -516,9 +516,14 @@ text (**422**: a `.toon` that is not a profile, or not valid TOON, is refused wi
 ungated (a GET needs no manifest entry) — open to the same users as a built-in's preview. The drawer seeds its
 form with the profile's values under the Pipeline's and lists each key's provenance (*from profile* / *set
 here* / *default*) — see [grammar-config.md](../../frontend/features/grammar-config.md). Save is unchanged.
-⚠ **Residuals:** the profile's `segments` are not shown (the segments editor re-hydrates only the Pipeline's
-own refs), and Apply on a profile-backed Pipeline that carries NO `segments` of its own is refused with *Add
-at least one segment* — the drawer's segments gate predates profiles.
+**Profile segments in the drawer (2026-10-06).** The same section lists the profile's own `segments`
+(key → schema ref, as authored, `profileSegmentsOf`), marked *replaced by this Pipeline's own* when the
+Pipeline carries `segments` (D5: replaced whole). A profile-backed Pipeline with **no** `segments` of its own
+and an empty segments editor now Applies without a `segments` key and writes no segment schema — the
+inherited ones are the profile's. This is checked only once the profile has been read and names segments;
+an unread, unreadable or segment-less profile still meets *Add at least one segment* (the load refuses a
+plugin ingester with no segments anyway). Proof: the *Decode Profile read-back* block of
+`pipeline-parse-definition.component.spec.ts` (list + a11y, Apply without segments, the negative refusal).
 
 **Bundles (D6).** Export ships the profile byte-verbatim as its own satellite beside its grammar and schemas,
 and the Pipeline keeps only `profile_file` (never inlined, which would import as N un-shared copies). Two
