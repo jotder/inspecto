@@ -505,7 +505,10 @@ are the values four-eyes approved (below).
     `EvidenceMasker.schemaClassification` (the one resolver, moved there from `PostgresPublishJobType`) classifies
     behind a factor Dataset's `physicalRef`/`sourceName`, so a renamed or hashed MSISDN is stored as a token. Where
     that lineage cannot be traced the masker **fails closed: every evidence column of that Dataset is masked**.
-    Sibling-Dataset same-name inheritance and view lineage are NOT applied to evidence yet.
+    **Sibling-Dataset inheritance and view lineage apply to evidence too (2026-10-06):** both consumers call the one
+    resolver `EvidenceMasker.lineageClassification` (moved from `PostgresPublishJobType`), so a same-named column
+    another Dataset over the same store classifies is masked, and a view or virtual Dataset over a store with
+    classified columns masks **every** evidence column (the evidence analogue of the publisher's `<dataset>.*` refusal).
   - **Aggregates and Job outputs do not inherit** (decision): a store no pipeline claims (a Job `output_store`
     such as `rollup`, an entity-list sidecar) contributes no classification.
 - ⚠ **Residual:** classification is only as good as the registry and the pipeline schemas.

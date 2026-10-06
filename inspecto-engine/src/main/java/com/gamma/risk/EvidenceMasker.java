@@ -3,6 +3,7 @@ package com.gamma.risk;
 import com.gamma.catalog.PipelineSchemas;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
+import com.gamma.pipeline.ViewStore;
 import com.gamma.util.ColumnClassification;
 import com.gamma.util.SpaceSecretKeys;
 
@@ -58,8 +59,9 @@ public final class EvidenceMasker {
     /** The masker for one model: the sensitive columns of each Dataset its factors read, from the registry. */
     public static EvidenceMasker of(ComponentStore registry, Path configRoot, RiskScoreModel model) {
         Map<String, Set<String>> byDataset = new HashMap<>();
+        ViewStore views = new ViewStore(configRoot.resolve("views"));
         for (RiskScoreModel.Factor f : model.factors())
-            byDataset.computeIfAbsent(f.dataset(), d -> sensitiveColumns(registry, d));
+            byDataset.computeIfAbsent(f.dataset(), d -> sensitiveColumns(registry, views, d));
         return new EvidenceMasker(configRoot, byDataset);
     }
 
@@ -69,12 +71,14 @@ public final class EvidenceMasker {
     }
 
     /**
-     * The Dataset's sensitive columns, lower-cased: its own registry {@code columns[].classification}, plus what the
-     * pipeline schema behind its {@code physicalRef}/{@code sourceName} classifies through the mapping
-     * (ASSURE-CLASSIFICATION-PROPAGATION-1, the resolver {@code publish.postgres} uses). Fails closed: when that
-     * lineage cannot be traced the set holds {@link #UNKNOWN_LINEAGE} and EVERY evidence column is masked.
+     * The Dataset's sensitive columns, lower-cased: its own registry {@code columns[].classification}, plus its
+     * {@link #lineageClassification} — what sibling Datasets over the same store declare for a same-named column, and
+     * what the pipeline schema behind it classifies through the mapping (ASSURE-CLASSIFICATION-PROPAGATION-1, the
+     * resolver {@code publish.postgres} uses). Fails closed: the set holds {@link #UNKNOWN_LINEAGE}, and EVERY evidence
+     * column is masked, when that lineage cannot be traced, or when a view or virtual Dataset reads a store with
+     * classified columns (a rename such as {@code msisdn AS m} cannot be traced statically).
      */
-    static Set<String> sensitiveColumns(ComponentStore registry, String datasetId) {
+    static Set<String> sensitiveColumns(ComponentStore registry, ViewStore views, String datasetId) {
         Set<String> out = new LinkedHashSet<>();
         Map<String, Object> ds = registry.get("dataset", datasetId).map(ComponentRegistry.Component::content).orElse(Map.of());
         if (ds.get("columns") instanceof List<?> cols)
@@ -82,7 +86,45 @@ public final class EvidenceMasker {
                 if (o instanceof Map<?, ?> c && c.get("name") != null && c.get("classification") != null
                         && SENSITIVE.contains(String.valueOf(c.get("classification")).trim().toUpperCase(Locale.ROOT)))
                     out.add(String.valueOf(c.get("name")).trim().toLowerCase(Locale.ROOT));
-        out.addAll(schemaClassification(registry.root().getParent(), datasetStores(ds), SENSITIVE::contains).keySet());
+        Map<String, String> inherited = lineageClassification(datasetId, ds, registry, views);
+        out.addAll(inherited.keySet());
+        if (!inherited.isEmpty() && (str(ds.get("view")) != null || str(ds.get("sql")) != null)) out.add(UNKNOWN_LINEAGE);
+        return out;
+    }
+
+    /**
+     * The classified columns (lower-cased name to class) other Datasets declare over the stores {@code ds} reads: its
+     * {@code physicalRef}, a virtual Dataset's {@code sourceName}, or a view's store and its {@code source_store}
+     * lineage, plus what the pipeline schemas behind them classify ({@link #schemaClassification}); several classes
+     * on one column resolve strictest-wins ({@link ColumnClassification}). The ONE lineage resolver shared by
+     * {@code publish.postgres}, its four-eyes fingerprint, and evidence masking.
+     */
+    public static Map<String, String> lineageClassification(String datasetId, Map<String, ?> ds, ComponentStore store,
+                                                            ViewStore views) {
+        Set<String> stores = new java.util.HashSet<>(datasetStores(ds));
+        String view = str(ds.get("view"));
+        if (view != null) {
+            stores.add(view);
+            views.get(view).ifPresent(v -> {
+                if (v.store() != null) stores.add(v.store());
+                if (v.sourceStores() != null) stores.addAll(v.sourceStores());
+            });
+        }
+        Map<String, String> out = new java.util.TreeMap<>();
+        for (ComponentRegistry.Component c : store.list("dataset")) {
+            if (c.name().equals(datasetId)) continue;
+            Map<String, Object> other = c.content();
+            String otherRef = str(other.get("physicalRef"));
+            if (otherRef == null || !stores.contains(otherRef)) continue;
+            if (other.get("columns") instanceof List<?> cols)
+                for (Object o : cols)
+                    if (o instanceof Map<?, ?> col && col.get("name") != null && col.get("classification") != null) {
+                        String cl = String.valueOf(col.get("classification")).trim().toUpperCase(Locale.ROOT);
+                        if (SENSITIVE.contains(cl))
+                            out.merge(String.valueOf(col.get("name")).toLowerCase(Locale.ROOT), cl, ColumnClassification::stricter);
+                    }
+        }
+        schemaClassification(store.root().getParent(), stores, out);
         return out;
     }
 

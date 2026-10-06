@@ -157,4 +157,53 @@ class EvidenceMaskerTest {
         assertNull(EvidenceMasker.schemaClassification(plain, java.util.Set.of("subs"),
                 EvidenceMasker.SENSITIVE::contains).get("both"), "unclassified inputs classify nothing");
     }
+
+    // ── sibling-Dataset same-name inheritance and view lineage (the publish.postgres rules, now in evidence) ──
+
+    /** A store "topups" that Dataset {@code topups_raw} classifies ({@code msisdn} = MSISDN), plus a factor Dataset
+     *  {@code factorDs} whose evidence is {@code msisdn} and {@code amount}. */
+    private static EvidenceMasker siblingMasker(Path config, Map<String, Object> factorDs) throws Exception {
+        ComponentStore store = new ComponentStore(config.resolve("registry"));
+        store.write("dataset", "topups_raw", Map.of("physicalRef", "topups",
+                "columns", List.of(Map.of("name", "MSISDN", "classification", "msisdn"))));
+        store.write("dataset", "f_ds", factorDs);
+        return EvidenceMasker.of(store, config, RiskScoreModel.fromMap("m", Map.of("entityType", "subscriber",
+                "highThreshold", 50, "factors", List.of(Map.of("id", "f", "dataset", "f_ds", "key", "amount",
+                        "measure", "count", "weight", 1, "evidence", List.of("msisdn", "amount"))))));
+    }
+
+    @Test
+    void aSameNamedColumnInheritsTheClassificationASiblingDatasetDeclares(@TempDir Path space) throws Exception {
+        // NEGATIVE PROBE: f_ds classifies nothing itself; without sibling inheritance msisdn is stored raw
+        EvidenceMasker m = siblingMasker(Files.createDirectories(space.resolve("config")), Map.of("physicalRef", "topups"));
+        assertTrue(String.valueOf(m.mask("f_ds", "msisdn", "9198")).startsWith("masked:"), "inherited from topups_raw");
+        assertEquals(12.5, m.mask("f_ds", "amount", 12.5));
+        assertEquals(List.of("f_ds.msisdn"), m.maskedColumns());
+    }
+
+    @Test
+    void aSiblingOverAnotherStoreLeavesTheColumnRaw(@TempDir Path space) throws Exception {
+        EvidenceMasker m = siblingMasker(Files.createDirectories(space.resolve("config")), Map.of("physicalRef", "other"));
+        assertEquals("9198", m.mask("f_ds", "msisdn", "9198"));
+    }
+
+    @Test
+    void aViewOverAClassifiedStoreFailsClosedAndMasksEveryEvidenceColumn(@TempDir Path space) throws Exception {
+        // NEGATIVE PROBE: the view renames msisdn AS m, which cannot be traced; without view lineage both stay raw
+        Path config = Files.createDirectories(space.resolve("config"));
+        new com.gamma.pipeline.ViewStore(config.resolve("views")).write(new com.gamma.pipeline.ViewDefinition(
+                "topups_v", "p", List.of("topups"), "SELECT msisdn AS m, amount FROM topups", "2026-10-06T00:00:00Z"));
+        EvidenceMasker m = siblingMasker(config, Map.of("view", "topups_v"));
+        assertTrue(String.valueOf(m.mask("f_ds", "m", "9198")).startsWith("masked:"));
+        assertTrue(String.valueOf(m.mask("f_ds", "amount", 12.5)).startsWith("masked:"), "every column: fail closed");
+    }
+
+    @Test
+    void aViewOverAnUnclassifiedStoreIsLeftAlone(@TempDir Path space) throws Exception {
+        Path config = Files.createDirectories(space.resolve("config"));
+        new com.gamma.pipeline.ViewStore(config.resolve("views")).write(new com.gamma.pipeline.ViewDefinition(
+                "plain_v", "p", List.of("plain"), "SELECT amount FROM plain", "2026-10-06T00:00:00Z"));
+        EvidenceMasker m = siblingMasker(config, Map.of("view", "plain_v"));
+        assertEquals(12.5, m.mask("f_ds", "amount", 12.5));
+    }
 }

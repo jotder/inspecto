@@ -447,39 +447,10 @@ public final class PostgresPublishJobType implements JobTypeProvider {
         return out;
     }
 
-    /**
-     * The classified columns (lower-cased name to class) other Datasets declare over the stores {@code ds} reads: its
-     * {@code physicalRef}, a virtual Dataset's {@code sourceName}, or a view's store and its {@code source_store}
-     * lineage, plus what the pipeline schemas behind them classify ({@link EvidenceMasker#schemaClassification});
-     * several classes on one column resolve strictest-wins ({@link ColumnClassification}).
-     */
+    /** {@link EvidenceMasker#lineageClassification}, the one lineage resolver publication and evidence share. */
     static Map<String, String> lineageClassification(String datasetId, Map<String, Object> ds, ComponentStore store,
                                                      ViewStore views) {
-        Set<String> stores = new HashSet<>(EvidenceMasker.datasetStores(ds));
-        String view = str(ds.get("view"));
-        if (view != null) {
-            stores.add(view);
-            views.get(view).ifPresent(v -> {
-                if (v.store() != null) stores.add(v.store());
-                if (v.sourceStores() != null) stores.addAll(v.sourceStores());
-            });
-        }
-        Map<String, String> out = new java.util.TreeMap<>();
-        for (ComponentRegistry.Component c : store.list("dataset")) {
-            if (c.name().equals(datasetId)) continue;
-            Map<String, Object> other = c.content();
-            String otherRef = str(other.get("physicalRef"));
-            if (otherRef == null || !stores.contains(otherRef)) continue;
-            if (other.get("columns") instanceof List<?> cols)
-                for (Object o : cols)
-                    if (o instanceof Map<?, ?> col && col.get("name") != null && col.get("classification") != null) {
-                        String cl = String.valueOf(col.get("classification")).trim().toUpperCase(Locale.ROOT);
-                        if (EvidenceMasker.SENSITIVE.contains(cl))
-                            out.merge(String.valueOf(col.get("name")).toLowerCase(Locale.ROOT), cl, ColumnClassification::stricter);
-                    }
-        }
-        EvidenceMasker.schemaClassification(store.root().getParent(), stores, out);
-        return out;
+        return EvidenceMasker.lineageClassification(datasetId, ds, store, views);
     }
 
     /** Reserved {@link #lineageClassification} key: the store's classification could not be established. */
