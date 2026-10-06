@@ -1140,6 +1140,23 @@ is **refused**, and `withSchema` refuses a non-PostgreSQL URL.
   pool per server (or PgBouncer) is the real answer at scale.
   **Decided (operator, 2026-10-06):** the connection budget is ONE shared pool per process with a per-family cap;
   the build follows the live PG probe.
+- ✅ **Remaining families probed 2026-10-06 (PostgreSQL 18.6, Docker `postgres:latest`, 127.0.0.1 only).**
+  `PostgresSchemaPerSpaceStoresTest` (inspecto) writes the SAME keys into two Spaces' schemas concurrently for
+  status, provenance, dedup ledger, events, file stages, consignment outputs and delivery receipts, and asserts
+  each Space reads back only its own rows (dedup: both Spaces win every key; receipts: one Space's hard bounce is
+  invisible to the other's suppression list). 7/7 green, no isolation defect found.
+- ✅ **Connection budget BUILT 2026-10-06** (the decision above). `JdbcDrivers.source` now hands every
+  `jdbc:postgresql:` store a view over ONE `SharedPoolConnectionSource` pool per process per server+user (key = the
+  URL with `currentSchema` lifted off, so TLS/options still split pools). `-Ddb.pool.process.size` (default 20)
+  sizes it; `-Ddb.pool.size` (default 10) is now the **per-family** cap on concurrent borrows across all Spaces
+  (fair semaphore, fails on `-Ddb.pool.timeoutMs`). Each borrow sets the view's schema (`Connection.setSchema`) or
+  `RESET search_path` for a schema-less view, so a pooled connection never carries the previous Space's schema.
+  The pool closes with its last view (ref-counted). Proven: 40 stores over 20 Space schemas add ≤ 20 server
+  connections (mutation: the old per-store pool adds 40, red); offline `SharedPoolConnectionSourceTest`.
+  ⚠ Outside the budget by design: each `DbEventStore` on PostgreSQL holds one dedicated, never-pooled advisory-lock
+  connection (the chain writer) — N event stores = N extra connections. ⚠ A nested borrow from a DIFFERENT store
+  of the same family on one thread takes a second permit; with a family cap of 1 it fails on the timeout rather
+  than deadlocking. `PooledConnectionSource` is no longer selected by `JdbcDrivers` (kept for its offline tests).
 
 ### 5.1 Flags (all read in `ServiceStores` unless noted)
 

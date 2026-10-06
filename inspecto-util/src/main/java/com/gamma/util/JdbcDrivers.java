@@ -60,12 +60,16 @@ public final class JdbcDrivers {
         }
     }
 
-    /** {@code -Ddb.pool.size} — max pooled connections per Postgres-backed store. */
+    /** {@code -Ddb.pool.size} — per-family cap on concurrent borrows from the shared Postgres pool (across Spaces). */
     public static final String POOL_SIZE_PROPERTY = "db.pool.size";
     /** {@code -Ddb.pool.timeoutMs} — how long a borrow waits before failing. */
     public static final String POOL_TIMEOUT_PROPERTY = "db.pool.timeoutMs";
 
+    /** {@code -Ddb.pool.process.size} — connections in the ONE shared PostgreSQL pool per process per server. */
+    public static final String PROCESS_POOL_SIZE_PROPERTY = "db.pool.process.size";
+
     private static final int DEFAULT_POOL_SIZE = 10;
+    private static final int DEFAULT_PROCESS_POOL_SIZE = 20;
     private static final long DEFAULT_BORROW_TIMEOUT_MS = 30_000L;
 
     /**
@@ -78,9 +82,10 @@ public final class JdbcDrivers {
      *   <li>⛔ {@code jdbc:duckdb:} → <b>exactly one</b> connection ({@link SingleConnectionSource}). Each
      *       store owns a single-writer-locked DuckDB file; a second concurrent connection to it fails to
      *       take the lock. This is not a tuning choice and {@code -Ddb.pool.size} does NOT apply.</li>
-     *   <li>{@code jdbc:postgresql:} → a HikariCP pool, {@code -Ddb.pool.size} (default
-     *       {@value #DEFAULT_POOL_SIZE}). This is the case the pool exists for: many pods, each bounded
-     *       by its pool rather than by how many stores it happens to open.</li>
+     *   <li>{@code jdbc:postgresql:} → a view over ONE shared HikariCP pool per process per server
+     *       ({@code -Ddb.pool.process.size}, default {@value #DEFAULT_PROCESS_POOL_SIZE}), each family label
+     *       capped at {@code -Ddb.pool.size} (default {@value #DEFAULT_POOL_SIZE}) concurrent borrows. A pod is
+     *       bounded by the process pool, not by how many stores and Spaces it happens to open.</li>
      *   <li>anything else → one connection, the conservative shape.</li>
      * </ul>
      *
@@ -89,14 +94,44 @@ public final class JdbcDrivers {
      */
     public static ConnectionSource source(String url, String user, String pass, String label)
             throws SQLException {
-        if (url != null && url.startsWith("jdbc:postgresql:"))
-            return new PooledConnectionSource(url, user, pass, poolSize(), "inspecto-" + label);
+        if (url != null && url.startsWith("jdbc:postgresql:")) {
+            // ONE shared pool per process per server+user, a per-family cap of -Ddb.pool.size (operator
+            // decision 2026-10-06). currentSchema is lifted off the URL and applied per borrow instead.
+            String[] split = splitCurrentSchema(url);
+            return SharedPoolConnectionSource.open(split[0], user, pass, split[1], label,
+                    processPoolSize(), poolSize(), poolBorrowTimeoutMs(), true);
+        }
         return new SingleConnectionSource(connect(url, user, pass));
     }
 
     /** Wrap an already-open connection as a source — for callers handed a connection they own. */
     public static ConnectionSource source(Connection conn) {
         return new SingleConnectionSource(conn);
+    }
+
+    /**
+     * Splits a {@code currentSchema=} parameter off a URL: {@code [url without it, schema or null]}. The other
+     * parameters stay, so a server reached with different TLS or options still gets its own pool.
+     */
+    static String[] splitCurrentSchema(String url) {
+        int q = url.indexOf('?');
+        if (q < 0) return new String[] {url, null};
+        String schema = null;
+        StringBuilder rest = new StringBuilder();
+        for (String kv : url.substring(q + 1).split("&")) {
+            if (kv.toLowerCase(java.util.Locale.ROOT).startsWith("currentschema=")) {
+                schema = kv.substring("currentschema=".length());
+                continue;
+            }
+            if (kv.isEmpty()) continue;
+            rest.append(rest.length() == 0 ? "" : "&").append(kv);
+        }
+        return new String[] {url.substring(0, q) + (rest.length() == 0 ? "" : "?" + rest), schema};
+    }
+
+    /** {@code -Ddb.pool.process.size} — the ONE shared pool's size per process per server, clamped to at least 1. */
+    static int processPoolSize() {
+        return Math.max(1, intProperty(PROCESS_POOL_SIZE_PROPERTY, DEFAULT_PROCESS_POOL_SIZE));
     }
 
     /** {@code -Ddb.pool.size}, clamped to at least 1; invalid values fall back to the default. */
