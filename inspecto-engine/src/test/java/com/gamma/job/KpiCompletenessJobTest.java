@@ -5,6 +5,7 @@ import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.DbConsignmentOutputStore;
 import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.event.EventLog;
+import com.gamma.objects.IncidentAccess;
 import com.gamma.util.Scheduler;
 import com.gamma.signal.SignalType;
 import com.gamma.util.StoreHealth;
@@ -161,5 +162,81 @@ class KpiCompletenessJobTest {
                 SignalType.KPI_COMPLETENESS_EVALUATED);
         assertEquals("NO_OBSERVATION", s.get("status"));
         assertFalse(s.containsKey("rows"));
+    }
+
+    /** K4: a breach emits .breached and opens exactly one Incident across three runs (dedupe on "pipeline"). */
+    @Test
+    void aBreachOpensExactlyOneIncidentAcrossRepeatedRuns() {
+        for (int d = 1; d <= 7; d++) db.record(List.of(out("cdr", "2026-08-0" + d, "/w/" + d + ".parquet", 100)));
+        db.record(List.of(out("cdr", "2026-08-08", "/w/8.parquet", 50)));
+        List<Map<String, String>> open = new java.util.ArrayList<>();
+        IncidentAccess incidents = (title, msg, sev, scope, attrs, key) -> {
+            // IncidentAccess.over's contract: no dedupe value means no dedupe.
+            String v = attrs.get(key);
+            if (v != null && open.stream().anyMatch(a -> v.equals(a.get(key)))) return java.util.Optional.empty();
+            open.add(attrs);
+            return java.util.Optional.of("inc-" + open.size());
+        };
+        for (int i = 0; i < 3; i++) {
+            ServicesContext ctx = new ServicesContext(incidents);
+            job(params("pipeline", "cdr", "record_day", "2026-08-08")).run(ctx);
+            assertTrue(ctx.inner.signals.stream()
+                    .anyMatch(x -> SignalType.KPI_COMPLETENESS_BREACHED.equals(x.get("__type"))));
+        }
+        assertEquals(1, open.size(), "one open Incident per Pipeline, not one per run");
+        assertEquals("cdr", open.get(0).get("pipeline"));
+    }
+
+    /** ⛔ Unknown is not breached: NO_BASELINE emits no .breached and opens no Incident. */
+    @Test
+    void anUnknownDayOpensNoIncident() {
+        db.record(List.of(out("cdr", "2026-08-07", "/w/7.parquet", 100), out("cdr", "2026-08-08", "/w/8.parquet", 1)));
+        List<String> opened = new java.util.ArrayList<>();
+        ServicesContext ctx = new ServicesContext((t, m, sev, sc, at, k) -> {
+            opened.add(t);
+            return java.util.Optional.of("x");
+        });
+        job(params("pipeline", "cdr", "record_day", "2026-08-08")).run(ctx);
+        assertTrue(opened.isEmpty());
+        assertTrue(ctx.inner.signals.stream()
+                .noneMatch(x -> SignalType.KPI_COMPLETENESS_BREACHED.equals(x.get("__type"))));
+    }
+
+    @Test
+    void declaresTheIncidentsGrantAndBothSignals() throws Exception {
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
+                     "audit", null, null, "data")) {
+            JobTypeDescriptor d = js.jobType(KpiCompletenessJob.TYPE).orElseThrow();
+            assertEquals(List.of("incidents"), d.requires());
+            assertTrue(d.emits().contains(SignalType.KPI_COMPLETENESS_BREACHED));
+        }
+    }
+
+    /** A {@link CapturingJobContext} that also grants {@link IncidentAccess}. */
+    private static final class ServicesContext implements JobContext {
+        final CapturingJobContext inner = new CapturingJobContext();
+        private final IncidentAccess incidents;
+
+        ServicesContext(IncidentAccess incidents) { this.incidents = incidents; }
+
+        @Override public String runId() { return inner.runId(); }
+        @Override public String spaceId() { return inner.spaceId(); }
+        @Override public TriggerInfo trigger() { return null; }
+        @Override public Map<String, String> config() { return Map.of(); }
+        @Override public Map<String, String> params() { return Map.of(); }
+        @Override public ArtifactRecorder artifacts() { return null; }
+        @Override public com.gamma.util.RunLog log() { return inner.log(); }
+        @Override public com.gamma.signal.SignalEmitter signals() { return inner.signals(); }
+
+        @Override public PlatformServices services() {
+            return new PlatformServices() {
+                @Override public <T> java.util.Optional<T> find(Class<T> type) {
+                    return type == IncidentAccess.class ? java.util.Optional.of(type.cast(incidents))
+                            : java.util.Optional.empty();
+                }
+                @Override public java.util.Set<Class<?>> granted() { return java.util.Set.of(IncidentAccess.class); }
+            };
+        }
     }
 }

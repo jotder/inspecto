@@ -579,13 +579,16 @@ public final class JobService implements AutoCloseable {
                 List.of("recon.run.completed"), List.of()),
                 c -> new ReconRunJob(c, dataDir, () -> this.objects)));
         // kpi.completeness (completeness KPI K4): one Pipeline's received volume per record-day from the
-        // output registry. Refuses unless this Space's consignmentOutputs store is durable (KpiCompletenessJob).
+        // output registry; on a breach, a kpi.completeness.breached signal and one deduped Incident per
+        // Pipeline (requires: incidents). Cron'd like any job — one *_job.toon per Pipeline. Refuses unless this Space's consignmentOutputs store is durable (KpiCompletenessJob).
         registry.register(JobTypeProvider.of(new JobTypeDescriptor(KpiCompletenessJob.TYPE, "Completeness KPI",
                 "Reads one Pipeline's received volume per record-day from the output registry. Refuses to run "
                         + "unless the Space's output registry is durable; a day it cannot measure is reported "
                         + "as unknown, never as zero.",
                 KpiCompletenessJob.PARAMS,
-                List.of(com.gamma.signal.SignalType.KPI_COMPLETENESS_EVALUATED), List.of()),
+                List.of(com.gamma.signal.SignalType.KPI_COMPLETENESS_EVALUATED,
+                        com.gamma.signal.SignalType.KPI_COMPLETENESS_BREACHED),
+                List.of(), List.of("incidents")),
                 KpiCompletenessJob::new));
         // incident.open (cross-Space consequence D10): open an Incident in THIS Space from the firing Signal,
         // carrying only the payload keys the Job names. Needs the operational-objects module at run time.

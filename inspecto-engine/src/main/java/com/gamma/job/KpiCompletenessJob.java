@@ -4,6 +4,7 @@ import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.DbConsignmentOutputStore;
 import com.gamma.consignment.DbConsignmentOutputStore.DailyVolume;
 import com.gamma.consignment.VolumeBaseline;
+import com.gamma.objects.IncidentAccess;
 import com.gamma.signal.Severity;
 import com.gamma.signal.SignalType;
 import com.gamma.util.OperationsZone;
@@ -13,6 +14,7 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The {@code kpi.completeness} Job Type — the reader that turns the output registry into a completeness
@@ -99,8 +101,36 @@ final class KpiCompletenessJob implements Job {
         payload.put("deviation", a.deviation());                                    // JSON null when undefined
         boolean breach = a.status() == VolumeBaseline.Status.BREACH;
         ctx.signals().emit(SignalType.KPI_COMPLETENESS_EVALUATED, breach ? Severity.WARN : Severity.INFO, payload);
+        // ⛔ Only BREACH is an Incident: NO_BASELINE / NO_OBSERVATION are unknown, not breached.
+        if (breach) {
+            ctx.signals().emit(SignalType.KPI_COMPLETENESS_BREACHED, Severity.WARN, payload);
+            openIncident(ctx, pipeline, recordDay, a);
+        }
         return JobResult.ok(TYPE + " '" + pipeline + "' " + recordDay + ": " + a.status() + ", " + describe(payload),
                 (System.nanoTime() - t0) / 1_000_000L);
+    }
+
+    /**
+     * One open Incident per Pipeline across repeated runs: scope = the pipeline id, deduped centrally by
+     * {@link IncidentAccess} on the {@code pipeline} attribute. An absent grant (a bare registry) leaves the
+     * run signal-only; a dry run gets the framework's recording stand-in and opens nothing.
+     */
+    private static void openIncident(JobContext ctx, String pipeline, String recordDay, VolumeBaseline.Assessment a) {
+        Optional<IncidentAccess> incidents = ctx.services().find(IncidentAccess.class);
+        if (incidents.isEmpty()) {
+            ctx.log().warn("completeness breach not promoted: no incidents service granted", "pipeline", pipeline);
+            return;
+        }
+        Map<String, String> attrs = new LinkedHashMap<>();
+        attrs.put("pipeline", pipeline);
+        attrs.put("recordDay", recordDay);
+        attrs.put("rows", String.valueOf(a.actualRows()));
+        attrs.put("baselineRows", String.valueOf(a.baselineRows()));
+        String pct = String.format(java.util.Locale.ROOT, "%.0f%%", -a.deviation() * 100);
+        incidents.get().openIncident("Completeness: " + pipeline + " " + pct + " below baseline on " + recordDay,
+                "Pipeline " + pipeline + " received " + a.actualRows() + " row(s) on " + recordDay + " against a "
+                        + a.baselineDays() + "-day baseline of " + a.baselineRows() + ".",
+                "WARNING", pipeline, attrs, "pipeline");
     }
 
     /** The target day's volume and the unknown-day bucket — each present only when the store holds it. */
