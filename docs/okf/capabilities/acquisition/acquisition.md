@@ -425,7 +425,7 @@ archive_path: …, tags: {…}, on_unsupported: WARN_AND_CONTINUE }` — `on_uns
 
 ### 3.9 The connector SPI, and the ten resolvable schemes
 
-⚠ **"Eight connectors" is the count of the optional module, not of the registry.** Verified from `META-INF/services/com.gamma.acquire.CollectorConnectorFactory`: **eight** factories ship in `inspecto-connectors` (`sftp`, `ftp`, `ftps`, `db`, `s3`, `kafka`, `azure`, `gcs`), **one** more in `inspecto-engine` (`DatasetCollectorConnectorFactory` → `connector: dataset`, UI-S7), and `local` is the built-in default that needs no jar. So ten values resolve, and a bundle without the sidecar resolves only `local` and `dataset`. *(A ninth entry exists under `inspecto/src/test/resources` — `FakeRemoteConnectorFactory` — and is test-only; do not count it.)*
+⚠ **"Eight connectors" is the count of the optional module, not of the registry.** Verified from `META-INF/services/com.gamma.acquire.CollectorConnectorFactory`: **seven** factories ship in `inspecto-connectors` (`sftp`, `ftp`, `ftps`, `db`, `s3`, `azure`, `gcs`), **one** (`kafka`) in the premium module `inspecto-connectors-kafka` (MODULE-REORG-1 P7, 2026-10-07; Professional and above — Personal has no Kafka), **one** more in `inspecto-engine` (`DatasetCollectorConnectorFactory` → `connector: dataset`, UI-S7), and `local` is the built-in default that needs no jar. So ten values resolve, and a bundle without the sidecar resolves only `local` and `dataset`. *(A ninth entry exists under `inspecto/src/test/resources` — `FakeRemoteConnectorFactory` — and is test-only; do not count it.)*
 
 ⚠ **`https` is a Connection scheme, not a Collector scheme** (2026-09-23). No `CollectorConnectorFactory` serves it: an `https` Connection is the target of the outbound **Webhook sink** (`sink.webhook`, [step-catalog](../../backend/pipeline-graph/step-catalog.md#webhook--sinkwebhook--the-outbound-webhook)), onboarded under the same `canOnboardConnections` grant as every other Connection. That grant is what makes a Connection the egress gate. `host`/`port`/`base_path` build the URL, `password` is the bearer-token reference, and the option `timeout_seconds` sets the request timeout. The sink refuses a tunnel or proxy. A Collector bound to an `https` Connection fails as an unknown scheme.
 
@@ -453,7 +453,7 @@ Eight schemes are registered by `inspecto-connectors`
 | `S3Connector` + `AwsSigV4` | `s3` | **SDK-free** — raw REST on the JDK `HttpClient` |
 | `AzureBlobConnector` + `AzureSharedKey` | `azure` | **SDK-free** |
 | `GcsConnector` + `GcpServiceAccountToken` | `gcs` | **SDK-free** (gson for JSON) |
-| `KafkaConnector` | `kafka` | kafka-clients |
+| `KafkaConnector` (module `inspecto-connectors-kafka`, package `com.gamma.acquire.kafka`; Professional and above) | `kafka` | kafka-clients |
 
 ⚠ Two precisions the sources get wrong in opposite directions. (a) `connectors-runbook.md` (its opening paragraph) and
 `modules/connectors.md:16` once called S3/GCS/Azure "future"; they ship — the current text of both files is
@@ -1049,7 +1049,7 @@ Incidental (the route string is an example for another concern, but they do exer
 
 | File | Providers |
 |---|---|
-| `inspecto-connectors/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | the **eight**: `SftpConnectorFactory`, `FtpConnectorFactory`, `FtpsConnectorFactory`, `DbExportConnectorFactory`, `S3ConnectorFactory`, `KafkaConnectorFactory`, `AzureBlobConnectorFactory`, `GcsConnectorFactory` |
+| `inspecto-connectors/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | the **seven**: `SftpConnectorFactory`, `FtpConnectorFactory`, `FtpsConnectorFactory`, `DbExportConnectorFactory`, `S3ConnectorFactory`, `AzureBlobConnectorFactory`, `GcsConnectorFactory` (`KafkaConnectorFactory` is in `inspecto-connectors-kafka/src/main/resources/META-INF/services/...`) |
 | `inspecto-engine/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | `com.gamma.inspector.DatasetCollectorConnectorFactory` — the ninth scheme, `dataset`, from a different module |
 | `inspecto-secrets/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider` | `com.gamma.secrets.FileKeystoreSecretsProvider` — the SEC-07 edition seam |
 | `inspecto/src/test/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | `com.gamma.service.FakeRemoteConnectorFactory` (test-only remote scheme) |

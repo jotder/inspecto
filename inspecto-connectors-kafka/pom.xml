@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-connectors-kafka</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Kafka stream connector (optional, premium)</name>
+    <description>
+        OPTIONAL Kafka consumer CollectorConnector (a Stream-type Collector, ACQ-5), discovered via the core's
+        CollectorConnectorFactory ServiceLoader seam. Split out of inspecto-connectors (MODULE-REORG-1 P7) because
+        kafka-clients is the one connector footprint that is distinct (the object stores use only the JDK HTTP client
+        and gson; DB export is entangled with the SSH tunnel). Professional and above only - the Personal edition
+        does not ship it.
+    </description>
+
+    <properties>
+        <kafka.version>3.9.2</kafka.version>
+    </properties>
+
+    <dependencies>
+        <!-- The core SPI (CollectorConnector, ConnectionProfile, AcquisitionLedgers, StreamLane...).
+             PROVIDED: this jar is dropped onto a running engine's classpath, exactly as inspecto-connectors. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- slf4j facade: the running engine supplies it (and its binding); never shade a second copy. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Kafka consumer client (Apache 2.0) for the streaming source (ACQ-5). 3.9.x = the last line
+             compatible with brokers back to 2.1 (4.x drops them). MockConsumer ships in this jar, so the
+             tests need no broker. Confined to this module (and now out of inspecto-connectors). -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>${kafka.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Shaded sidecar, same idiom as inspecto-connectors: kafka-clients (+ its lz4/snappy/zstd
+                 transitives) must travel with the drop-in jar. The core is `provided`, so it is excluded by
+                 construction. ServicesResourceTransformer keeps the CollectorConnectorFactory registration. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <!-- Version parent-managed (pluginManagement): still an explicit pin for the offline
+                     reactor, but declared once for all five shading modules. -->
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <!-- `sidecar` so the reactor's own thin artifact stays the installed one and
+                                 only the bundle carries the fat copy. -->
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>sidecar</shadedClassifierName>
+                            <transformers>
+                                <!-- MERGE the ServiceLoader registrations, or the KafkaConnectorFactory line is lost
+                                     and the engine silently finds no Kafka connector. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <!-- Signed jars (BouncyCastle is one): a retained signature throws
+                                             SecurityException at run time. Same filter as the core fat jar. -->
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <!-- Never ship a second logging config; the core owns it. -->
+                                        <exclude>logback.xml</exclude>
+                                        <exclude>module-info.class</exclude>
+                                        <!-- 🔴 A SECOND SLF4J BINDING on one classpath is a real conflict:
+                                             SLF4J picks one non-deterministically and warns, so a bundle
+                                             with this sidecar could silently log through a different
+                                             backend than the core configured. The core owns the binding;
+                                             this sidecar must carry slf4j-api ONLY. Same reasoning as
+                                             inspecto-agent's shade config.
+                                             ⛔ Do not drop these excludes to "fix" a missing-logger
+                                             warning inside the connector - fix the dependency instead. -->
+                                        <exclude>META-INF/services/org.slf4j.spi.SLF4JServiceProvider</exclude>
+                                        <exclude>org/slf4j/impl/**</exclude>
+                                        <exclude>ch/qos/logback/**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

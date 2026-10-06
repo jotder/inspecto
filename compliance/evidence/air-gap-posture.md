@@ -50,7 +50,7 @@ What a careful reader will ask, answered plainly:
 - **Local model access is still a network call.** Ollama is reached over loopback/LAN. "Local" here
   means *not a third-party hosted endpoint*; it does not mean *no sockets*.
 - 🔴 **The product makes deliberate outbound connections where an operator configures them.** The
-  Kafka connector (`inspecto-connectors/src/main/java/com/gamma/acquire/connectors/KafkaConnector.java`,
+  Kafka connector (`inspecto-connectors-kafka/src/main/java/com/gamma/acquire/kafka/KafkaConnector.java`,
   `KafkaConnectorFactory`, `KafkaConnectionWorkbench`) connects to whatever brokers the operator
   configures. That is data acquisition working as designed — but a data-leakage-prevention statement
   that omitted it would be incomplete, and an auditor who found it independently would rightly

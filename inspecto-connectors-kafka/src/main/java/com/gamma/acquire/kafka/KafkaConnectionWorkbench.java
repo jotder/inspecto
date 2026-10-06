@@ -1,4 +1,4 @@
-package com.gamma.acquire.connectors;
+package com.gamma.acquire.kafka;
 
 import com.gamma.acquire.AcquisitionException;
 import com.gamma.acquire.ConnectionProfile;
@@ -30,7 +30,7 @@ import java.util.function.Function;
  * advances or is seen by the real ingest frontier.
  *
  * <p><b>Read-only.</b> The {@code write} probe check is always reported <em>skipped</em> — a workbench must
- * never produce a probe record onto someone's topic (the same discipline as {@link DbConnectionWorkbench}).
+ * never produce a probe record onto someone's topic (the same discipline as {@code DbConnectionWorkbench}).
  */
 final class KafkaConnectionWorkbench implements ConnectionWorkbench {
 

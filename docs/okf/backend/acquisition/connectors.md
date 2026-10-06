@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Collector Connectors
-description: The CollectorConnector SPI and its eight registered schemes (sftp, ftp, ftps, db, s3, kafka, azure, gcs), SSH tunnelling and proxy dial-through, connection profiles, the graded connection workbench, and secret resolution.
+description: The CollectorConnector SPI and its eight registered schemes (sftp, ftp, ftps, db, s3, azure, gcs in `inspecto-connectors`; kafka in the premium `inspecto-connectors-kafka`), SSH tunnelling and proxy dial-through, connection profiles, the graded connection workbench, and secret resolution.
 resource: inspecto-connectors/src/main/java/com/gamma/acquire/connectors
 tags: [acquisition, connectors, sftp, ftp, jdbc, ssh-tunnel, secrets]
 timestamp: 2026-06-28T00:00:00Z
@@ -57,7 +57,7 @@ The ordering is land-then-ack: a source-side `post` action that deletes the remo
 | `S3Connector` | `s3` | **SDK-free** — raw REST + hand-rolled `AwsSigV4` |
 | `AzureBlobConnector` | `azure` | **SDK-free** — raw REST + hand-rolled `AzureSharedKey` |
 | `GcsConnector` | `gcs` | **SDK-free** — raw REST + `GcpServiceAccountToken` (OAuth2) |
-| `KafkaConnector` | `kafka` | kafka-clients |
+| `KafkaConnector` (module `inspecto-connectors-kafka`, package `com.gamma.acquire.kafka`; Professional and above) | `kafka` | kafka-clients |
 
 * **SFTP** — sshj session; SSH host-key pinning (`host_key` / `known_hosts` / `strict_host_key`); bastion via `SshTunnel`.
 * **FTP/FTPS** — passive/binary; FTPS `tls: explicit|implicit` (`PBSZ 0` + `PROT P`); tunnelling needs `options.passive_ports`.

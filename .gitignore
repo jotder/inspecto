@@ -132,6 +132,7 @@ inspecto-consignment-outputs.db.wal
 /inspecto-oidc/target/
 /inspecto-secrets/target/
 /inspecto-geo-country/target/
+/inspecto-connectors-kafka/target/
 /inspecto-policy/target/
 /inspecto-intelligence/target/
 

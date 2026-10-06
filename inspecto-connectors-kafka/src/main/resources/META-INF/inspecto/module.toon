@@ -1,0 +1,7 @@
+id: connectors-kafka
+title: Kafka stream connector
+buildRole: implementation
+offeringRole: provider
+bindingTime: boot
+provides:
+  contracts[1]: CollectorConnectorFactory

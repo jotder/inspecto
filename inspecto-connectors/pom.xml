@@ -31,7 +31,6 @@
         <sshj.version>0.39.0</sshj.version>
         <commons-net.version>3.6</commons-net.version>
         <!-- postgresql.version managed by the parent (M1) — shared with the core test-scope pin. -->
-        <kafka.version>3.9.2</kafka.version>
         <!-- test-only embedded servers -->
         <sshd.version>2.12.1</sshd.version>
         <ftpserver.version>1.2.0</ftpserver.version>
@@ -82,15 +81,6 @@
             <artifactId>postgresql</artifactId>
         </dependency>
 
-        <!-- Kafka consumer client (Apache 2.0) for the streaming source (ACQ-5). 3.9.x = the last line
-             compatible with brokers back to 2.1 (4.x drops them). MockConsumer ships in this jar, so the
-             tests need no broker. Confined to this module. -->
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka-clients</artifactId>
-            <version>${kafka.version}</version>
-        </dependency>
-
         <!-- JSON parsing (Apache 2.0) for the native GCS JSON API + OAuth2 token responses (GcsConnector).
              Version is parent-managed (M1); already on the classpath transitively via the core, declared
              directly here for compile honesty. No new jar reaches the fat JAR. -->
@@ -132,7 +122,7 @@
         <plugins>
             <!-- CONNECTORS-BUNDLE-1 (2026-09-07): the DELIVERY half this module's description promised in
                  its founding commit and nobody ever built. A thin jar is useless as a drop-in — sshj,
-                 commons-net and kafka-clients would be missing. So the sidecar is SHADED. ⚠ The
+                 and commons-net would be missing. So the sidecar is SHADED. ⚠ The
                  javax.mail half of that argument moved out with `SmtpEmailChannel` on 2026-09-07 (EDG-01
                  cell 1) — see `inspecto-notify-channels`, which now carries the identical reasoning for
                  its own shade. Removing the dependency also drops a CDDL/GPLv2+CE artifact from the
@@ -155,7 +145,7 @@
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>sidecar</shadedClassifierName>
                             <transformers>
-                                <!-- The whole point: MERGE the ServiceLoader registrations, or the eight
+                                <!-- The whole point: MERGE the ServiceLoader registrations, or the seven
                                      CollectorConnectorFactory entries and the two DeliveryStatusAdapter
                                      entries are lost. ⚠ SmtpEmailChannel used to be in this list; it moved
                                      to inspecto-notify-channels on 2026-09-07 (EDG-01 cell 1) because this

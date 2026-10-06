@@ -1,0 +1,3 @@
+# Kafka consumer Collector connector (a Stream-type Collector) - discovered by CollectorConnectors.forConfig
+# when this optional premium-connector module is on the classpath.
+com.gamma.acquire.kafka.KafkaConnectorFactory

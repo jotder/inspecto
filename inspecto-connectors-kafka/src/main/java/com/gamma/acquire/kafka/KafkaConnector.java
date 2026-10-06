@@ -1,5 +1,6 @@
-package com.gamma.acquire.connectors;
+package com.gamma.acquire.kafka;
 
+import com.gamma.acquire.PatternFilter;
 import com.gamma.acquire.AcquisitionException;
 import com.gamma.acquire.AcquisitionLedgers;
 import com.gamma.acquire.ConnectionProfile;
@@ -40,7 +41,7 @@ import static com.gamma.acquire.CollectorConnector.Capability.STREAM;
 /**
  * A <b>Kafka topic</b> {@link CollectorConnector} (ACQ-5 — streaming source consumer). Each scan cycle drains the
  * unconsumed backlog of a topic partition into a file, which then flows through the normal Inspecto batch path
- * exactly like any other acquired file — the {@link DbExportConnector} virtual-file pattern applied to a stream.
+ * exactly like any other acquired file — the {@code DbExportConnector} virtual-file pattern applied to a stream.
  *
  * <h3>Offsets live in the acquisition ledger, not a consumer group</h3>
  * The connector uses {@code assign()} + {@code seek()} — no group coordinator, no broker-side commit, minimal

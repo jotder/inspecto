@@ -1,11 +1,11 @@
-package com.gamma.acquire.connectors;
+package com.gamma.acquire;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * Applies a {@link com.gamma.acquire.DiscoveryContext}'s include/exclude patterns to a connector's listing —
+ * Applies a {@link DiscoveryContext}'s include/exclude patterns to a connector's listing —
  * the remote-connector counterpart of the matcher {@code LocalFileSystemConnector} runs over local paths. It
  * tests the protocol-agnostic forward-slash {@code relativePath} so the same pipeline {@code includes:}/
  * {@code excludes:} behave identically across local, SFTP and FTP sources.

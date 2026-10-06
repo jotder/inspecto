@@ -1,5 +1,6 @@
 package com.gamma.acquire.connectors;
 
+import com.gamma.acquire.PatternFilter;
 import com.gamma.acquire.AcquisitionException;
 import com.gamma.acquire.CollectorConnector;
 import com.gamma.acquire.ConnectionProfile;

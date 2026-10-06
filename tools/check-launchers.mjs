@@ -130,7 +130,7 @@ function observe(out) {
 // `expect` / `reject` match an argv entry exactly; a `reject` PREFIX is written with a trailing `=`
 // removed so `-Dauth.mode` catches any value at all, which is the assertion Personal needs.
 const PERSONAL = ['inspecto.jar'];
-const PROFESSIONAL = [...PERSONAL, 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar'];
+const PROFESSIONAL = [...PERSONAL, 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar', 'inspecto-connectors-kafka.jar'];
 const ENTERPRISE = [...PROFESSIONAL, 'inspecto-policy.jar'];
 const OIDC_ENV = {
   AUTH_OIDC_ISSUER: 'https://idp.example/realms/x',
@@ -159,7 +159,7 @@ const SCENARIOS = [
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Devents.backend=parquet'],
     // OBJECTS-BACKEND-DEFAULT-MEMORY-1: Professional runs the engine default (`db`); only Enterprise pins one.
     rejectPrefix: ['-Dauth.oidc.', '-Dobjects.backend'],
-    jarsOnCp: ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar'],
+    jarsOnCp: ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar', 'inspecto-connectors-kafka.jar'],
   },
   {
     // 🔴 THE REGRESSION TEST. SERVEBAT-OPTS-1 lost five of these six flags and kept the last. Any
@@ -175,14 +175,14 @@ const SCENARIOS = [
       // reach the process command line. Asserting the literal is asserting that.
       '-Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}'],
     reject: [`-Dauth.oidc.clientSecret=${OIDC_ENV.AUTH_OIDC_CLIENT_SECRET}`],
-    jarsOnCp: ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar'],
+    jarsOnCp: ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar', 'inspecto-connectors-kafka.jar'],
   },
   {
     name: 'Enterprise — OIDC + secrets + geo + policy jar',
     jars: ENTERPRISE, env: OIDC_ENV, edition: 'Enterprise',
     // OBJECTS-BACKEND-DEFAULT-MEMORY-1 (2026-09-25): PostgreSQL is MANDATORY for the operational objects.
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Devents.backend=parquet', '-Dobjects.backend=postgres'],
-    jarsOnCp: ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar', 'inspecto-policy.jar'],
+    jarsOnCp: ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar', 'inspecto-connectors-kafka.jar', 'inspecto-policy.jar'],
   },
   {
     // Operator flags are appended LAST on purpose, so they cannot clobber the required ones.
@@ -190,7 +190,7 @@ const SCENARIOS = [
     jars: PROFESSIONAL, env: { INSPECTO_JAVA_OPTS: '-Xmx4g -Dui.static.log=DEBUG' }, edition: 'Professional',
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Xmx4g', '-Dui.static.log=DEBUG'],
     lastAfter: { after: '-Dauth.mode=oidc', these: ['-Xmx4g', '-Dui.static.log=DEBUG'] },
-    jarsOnCp: ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar'],
+    jarsOnCp: ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar', 'inspecto-connectors-kafka.jar'],
   },
 ];
 

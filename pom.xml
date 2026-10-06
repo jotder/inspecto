@@ -65,7 +65,7 @@
     </modules>
 
     <!--
-        Edition assembly (docs/EDITIONS.md): inspecto-oidc, inspecto-secrets and inspecto-geo-country (W6 — the Authenticator SPI's OIDC
+        Edition assembly (docs/EDITIONS.md): inspecto-connectors-kafka (premium Kafka connector), inspecto-oidc, inspecto-secrets and inspecto-geo-country (W6 — the Authenticator SPI's OIDC
         implementation), inspecto-notify-channels (CP-15 — the webhook + SMTP transports), inspecto-backup (OPS-06 — the
         backup/backup_verify/restore tasks) inspecto-entity-list (SEP-08 — Entity Lists + the shared entity fact log),
         inspecto-geo-link (CP-09 — the geo map + link analysis
@@ -84,6 +84,8 @@
                 <module>inspecto-oidc</module>
                 <module>inspecto-secrets</module>
                 <module>inspecto-geo-country</module>
+                <!-- MODULE-REORG-1 P7: the Kafka stream connector (premium connector, not Base). -->
+                <module>inspecto-connectors-kafka</module>
                 <!-- EDG-01 cell 1 (2026-09-07): the external notification transports. CP-15 is "not for
                      Personal", and both channels used to reach every bundle — WebhookChannel from
                      inspecto-engine (an unconditional dependency) and SmtpEmailChannel from the
@@ -134,6 +136,8 @@
                 <module>inspecto-oidc</module>
                 <module>inspecto-secrets</module>
                 <module>inspecto-geo-country</module>
+                <!-- MODULE-REORG-1 P7: the Kafka stream connector (premium connector, not Base). -->
+                <module>inspecto-connectors-kafka</module>
                 <module>inspecto-notify-channels</module>
                 <module>inspecto-backup</module>
                 <module>inspecto-entity-list</module>
@@ -163,6 +167,8 @@
                 <module>inspecto-oidc</module>
                 <module>inspecto-secrets</module>
                 <module>inspecto-geo-country</module>
+                <!-- MODULE-REORG-1 P7: the Kafka stream connector (premium connector, not Base). -->
+                <module>inspecto-connectors-kafka</module>
                 <module>inspecto-policy</module>
                 <module>inspecto-notify-channels</module>
                 <module>inspecto-backup</module>
@@ -188,6 +194,8 @@
                 <module>inspecto-oidc</module>
                 <module>inspecto-secrets</module>
                 <module>inspecto-geo-country</module>
+                <!-- MODULE-REORG-1 P7: the Kafka stream connector (premium connector, not Base). -->
+                <module>inspecto-connectors-kafka</module>
                 <module>inspecto-policy</module>
                 <module>inspecto-notify-channels</module>
                 <module>inspecto-backup</module>

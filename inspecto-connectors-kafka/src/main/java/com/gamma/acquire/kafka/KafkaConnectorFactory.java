@@ -1,4 +1,4 @@
-package com.gamma.acquire.connectors;
+package com.gamma.acquire.kafka;
 
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.ConnectionWorkbench;

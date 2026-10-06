@@ -10,11 +10,6 @@ import com.gamma.config.safety.EgressRefusedException;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.inspector.CollectorProcessor;
 import com.sun.net.httpserver.HttpServer;
-import org.apache.kafka.clients.consumer.MockConsumer;
-import org.apache.kafka.clients.consumer.OffsetResetStrategy;
-import org.apache.kafka.common.Node;
-import org.apache.kafka.common.PartitionInfo;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory;
 import org.apache.sshd.common.keyprovider.KeyPairProvider;
 import org.apache.sshd.common.session.Session;
@@ -43,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * file ({@code -Dsystem.config.dir}) says which hosts a run may dial; each test pairs a refusal with an allowed twin
  * and asserts the OBSERVED socket/request count on a real loopback server, not just the exception.
  * T14 (a pipeline placed on disk, no save gate), T8 (a hop other than the target), T7 (the object-store request
- * gate; a 3xx is never followed - see {@code ObjectStoreEgressTest}), T12 (Kafka leader hosts).
+ * gate; a 3xx is never followed - see {@code ObjectStoreEgressTest}) (T12, the Kafka leader hosts, lives in inspecto-connectors-kafka's KafkaEgressTest).
  */
 class SafetyPolicyEgressTest {
 
@@ -160,43 +155,6 @@ class SafetyPolicyEgressTest {
     private static S3Connector s3(int stubPort) {
         return new S3Connector(new ConnectionProfile("o", "s3", "127.0.0.1", stubPort, null, "bucket/in", "AK", "secret",
                 Map.of("region", "us-east-1", "protocol", "http"), null));
-    }
-
-    // ---- T12: Kafka leader hosts -----------------------------------------------------------------------
-
-    private static KafkaConnector kafka(MockConsumer<byte[], byte[]> mock) {
-        Map<String, String> options = new HashMap<>(Map.of("topic", "t"));
-        return new KafkaConnector(new ConnectionProfile("k", "kafka", "127.0.0.1", 9092, null, null, null, null,
-                options, null), props -> mock);
-    }
-
-    @Test
-    void aPartitionLeaderOutsideTheAllowSetIsNeverFetchedFrom() throws Exception {
-        serverPolicy("allow:\n  hosts[1]: 127.0.0.1\n");
-        MockConsumer<byte[], byte[]> mock = new MockConsumer<>(OffsetResetStrategy.EARLIEST);
-        mock.updatePartitions("t", List.of(new PartitionInfo("t", 0, new Node(7, "broker7.denied.test", 9092), null, null)));
-        try (KafkaConnector c = kafka(mock)) {
-            AcquisitionException e = assertThrows(AcquisitionException.class, () -> c.discover(ALL));
-            assertTrue(e.getMessage().contains("broker7.denied.test"), e.getMessage());
-            Path dest = tmp.resolve("slice.ndjson");
-            assertThrows(AcquisitionException.class, () -> c.fetchTo(
-                    new RemoteFile("t-p0-0-1.ndjson", "t-p0-0-1.ndjson", -1, null, null, null, null), dest));
-            assertFalse(Files.exists(dest), "no fetch, no file");
-            assertTrue(mock.assignment().isEmpty(), "the consumer never assigned the partition");
-        }
-    }
-
-    @Test
-    void aLeaderInsideTheAllowSetPassesTheGate() throws Exception {
-        serverPolicy("allow:\n  hosts[1]: 127.0.0.1\n");
-        MockConsumer<byte[], byte[]> mock = new MockConsumer<>(OffsetResetStrategy.EARLIEST);
-        mock.updatePartitions("t", List.of(new PartitionInfo("t", 0, new Node(7, "127.0.0.1", 9092), null, null)));
-        TopicPartition tp = new TopicPartition("t", 0);
-        mock.updateBeginningOffsets(Map.of(tp, 0L));
-        mock.updateEndOffsets(Map.of(tp, 0L));
-        try (KafkaConnector c = kafka(mock)) {
-            assertEquals(List.of(), c.discover(ALL));
-        }
     }
 
     // ---- harness (the same minimal pipeline CollectorProcessorRemoteCycleTest loads) -------------------

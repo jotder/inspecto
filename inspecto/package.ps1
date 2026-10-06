@@ -264,7 +264,7 @@ if (-not $jarSrc -or -not (Test-Path $jarSrc)) {
 # no copy step existed, so SFTP/FTP/FTPS/S3/GCS/Azure/Kafka and SmtpEmailChannel were unreachable in every
 # bundle. Its founding commit described the drop-in ("dropping THIS jar on the classpath is what lights up
 # the sftp:/ftp: schemes") but the delivery half was never built. It ships SHADED (classifier `sidecar`)
-# because a thin jar is useless: sshj/commons-net/kafka-clients would be missing. (The javax.mail half of
+# because a thin jar is useless: sshj/commons-net would be missing. (The javax.mail half of
 # that argument moved to inspecto-notify-channels with SmtpEmailChannel on 2026-09-07, EDG-01 cell 1.)
 $connectorsTargetDir = Join-Path $sandboxRoot 'inspecto-connectors\target'
 $connectorsJarSrc = Get-ChildItem -Path $connectorsTargetDir -Filter 'inspecto-connectors-*-sidecar.jar' -ErrorAction SilentlyContinue |
@@ -311,7 +311,7 @@ if ($Edition -ne 'Personal') {
     # builds its `sidecar` artifact for the editions that stage it.
     # ASSURE-INTELLIGENCE-BUNDLE-1 (D-P2): inspecto-intelligence (the /agent/* agent, onnxruntime inside)
     # is ENTERPRISE only - also a default-reactor module, listed so this pass builds its `sidecar`.
-    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-agent,inspecto-la-store-pg,inspecto-intelligence' } else { 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-agent' }
+    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-connectors-kafka,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-agent,inspecto-la-store-pg,inspecto-intelligence' } else { 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-connectors-kafka,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-agent' }
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
@@ -342,6 +342,14 @@ if ($Edition -ne 'Personal') {
                        Select-Object -First 1 -ExpandProperty FullName
     if (-not $geoCountryJarSrc -or -not (Test-Path $geoCountryJarSrc)) {
         throw "$Edition edition requested but no SHADED JAR found matching inspecto-geo-country\target\inspecto-geo-country-*-sidecar.jar. The thin jar carries no maxmind-db classes."
+    }
+    # MODULE-REORG-1 P7: the Kafka stream connector is its own premium module (kafka-clients is the one
+    # connector footprint that is distinct). SHADED ('-sidecar'): the thin jar carries no kafka-clients.
+    # Professional and above ONLY - Personal's inspecto-connectors.jar no longer registers a Kafka factory.
+    $kafkaJarSrc = Get-ChildItem -Path (Join-Path $sandboxRoot 'inspecto-connectors-kafka\target') -Filter 'inspecto-connectors-kafka-*-sidecar.jar' -ErrorAction SilentlyContinue |
+                       Select-Object -First 1 -ExpandProperty FullName
+    if (-not $kafkaJarSrc -or -not (Test-Path $kafkaJarSrc)) {
+        throw "$Edition edition requested but no SHADED JAR found matching inspecto-connectors-kafka\target\inspecto-connectors-kafka-*-sidecar.jar. The thin jar carries no kafka-clients classes."
     }
     # The channels sidecar (EDG-01 cell 1). SHADED for the same reason the security one is: the thin jar
     # carries no javax.mail, and NotificationService discovering SmtpEmailChannel without it kills boot
@@ -526,6 +534,27 @@ if ($geoCountryJarSrc) {
             throw "inspecto-geo-country.jar has no META-INF/services/com.gamma.control.GeoCountryResolver - the shade dropped the ServicesResourceTransformer."
         }
     } finally { $geoZip.Dispose() }
+}
+if ($kafkaJarSrc) {
+    Copy-Item $kafkaJarSrc "$bundleDir\inspecto-connectors-kafka.jar"
+    Write-Host "Bundled Professional-edition Kafka stream connector -> inspecto-connectors-kafka.jar" -ForegroundColor Green
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $kafkaZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-connectors-kafka.jar")
+    try {
+        if (-not ($kafkaZip.Entries | Where-Object { $_.FullName -like 'org/apache/kafka/*' })) {
+            throw "inspecto-connectors-kafka.jar carries no org/apache/kafka classes - it is a THIN jar; KafkaConnector would fail with NoClassDefFoundError at run time."
+        }
+        $kafkaSpi = $kafkaZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.acquire.CollectorConnectorFactory' }
+        if (-not $kafkaSpi) {
+            throw "inspecto-connectors-kafka.jar has no META-INF/services/com.gamma.acquire.CollectorConnectorFactory - the shade dropped the ServicesResourceTransformer, so no Kafka connector would be discovered."
+        }
+        $kafkaReader = New-Object System.IO.StreamReader($kafkaSpi.Open())
+        $kafkaSvc = $kafkaReader.ReadToEnd()
+        $kafkaReader.Close()
+        if ($kafkaSvc -notmatch 'com\.gamma\.acquire\.kafka\.KafkaConnectorFactory') {
+            throw "inspecto-connectors-kafka.jar's CollectorConnectorFactory service file does not list com.gamma.acquire.kafka.KafkaConnectorFactory."
+        }
+    } finally { $kafkaZip.Dispose() }
 }
 if ($channelsJarSrc) {
     Copy-Item $channelsJarSrc "$bundleDir\inspecto-notify-channels.jar"
@@ -754,7 +783,7 @@ if ($intelligenceJarSrc) {
 }
 # Every edition: remote acquisition is a core product capability (EDITIONS SP-ACQ-02 marks SFTP shipped in
 # all three), so the sidecar is NOT edition-gated. It is inert until a pipeline names a non-local
-# `collector.connector`. NOTE it adds ~32 MB, dominated by BouncyCastle (sshj) and kafka-clients - if
+# `collector.connector`. NOTE it adds ~32 MB, dominated by BouncyCastle (sshj) - kafka-clients left for inspecto-connectors-kafka (Professional+) in P7 - if
 # Personal must stay leaner, gate this copy on $Edition and correct the SP-ACQ rows to match.
 Copy-Item $connectorsJarSrc "$bundleDir\inspecto-connectors.jar"
 Write-Host "Bundled remote connector sidecar -> inspecto-connectors.jar" -ForegroundColor Green
@@ -772,7 +801,7 @@ try {
     $reader = New-Object System.IO.StreamReader($spi.Open())
     $factories = ($reader.ReadToEnd() -split "`n" | Where-Object { $_.Trim() -and -not $_.Trim().StartsWith('#') }).Count
     $reader.Close()
-    if ($factories -lt 8) { throw "inspecto-connectors.jar registers only $factories CollectorConnectorFactory entries (expected 8: sftp/ftp/ftps/db/s3/kafka/azure/gcs)." }
+    if ($factories -ne 7) { throw "inspecto-connectors.jar registers $factories CollectorConnectorFactory entries (expected 7: sftp/ftp/ftps/db/s3/azure/gcs - Kafka lives in inspecto-connectors-kafka.jar since MODULE-REORG-1 P7)." }
     # sshj is the marker for "dependencies really came along" - a thin jar has the classes but not these.
     if (-not ($connZip.Entries | Where-Object { $_.FullName -like 'net/schmizz/sshj/*' })) {
         throw "inspecto-connectors.jar carries no sshj classes - it is a THIN jar; SFTP would fail with NoClassDefFoundError at run time."
@@ -1011,6 +1040,7 @@ fi
 [ -f inspecto-oidc.jar ]   && CP="${CP}:inspecto-oidc.jar"
 [ -f inspecto-secrets.jar ]   && CP="${CP}:inspecto-secrets.jar"
 [ -f inspecto-geo-country.jar ]   && CP="${CP}:inspecto-geo-country.jar"
+[ -f inspecto-connectors-kafka.jar ] && CP="${CP}:inspecto-connectors-kafka.jar"
 [ -f postgresql.jar ]          && CP="${CP}:postgresql.jar"
 exec "$JAVA" "${JAVA_OPTS[@]}" \
           -cp "$CP" com.gamma.inspector.CollectorProcessor \
@@ -1113,6 +1143,7 @@ if exist inspecto-intelligence.jar set "OPTS=%OPTS% -Dai.djl.offline=true -Djava
 if exist inspecto-oidc.jar set "CP=%CP%;inspecto-oidc.jar"
 if exist inspecto-secrets.jar set "CP=%CP%;inspecto-secrets.jar"
 if exist inspecto-geo-country.jar set "CP=%CP%;inspecto-geo-country.jar"
+if exist inspecto-connectors-kafka.jar set "CP=%CP%;inspecto-connectors-kafka.jar"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 "%JAVA%" %OPTS% ^
      -cp "%CP%" com.gamma.inspector.CollectorProcessor ^
@@ -1224,6 +1255,7 @@ if [ -f inspecto-oidc.jar ]; then
     # D-MR6: the secrets provider and the geo-country resolver ship beside the OIDC jar (one SPI each).
     [ -f inspecto-secrets.jar ] && CP="${CP}:inspecto-secrets.jar"
     [ -f inspecto-geo-country.jar ] && CP="${CP}:inspecto-geo-country.jar"
+    [ -f inspecto-connectors-kafka.jar ] && CP="${CP}:inspecto-connectors-kafka.jar"   # MODULE-REORG-1 P7: premium Kafka connector, Professional+
     EDITION="Professional"
     JAVA_OPTS+=("-Dauth.mode=oidc")
     # EVENTS-DURABLE-1 (2026-09-11): Professional+ keeps the API audit trail across restarts. The engine
@@ -1369,6 +1401,7 @@ rem such hazard -- bash expands at execution -- which is why only this half is w
 if exist inspecto-oidc.jar set "CP=inspecto.jar;inspecto-oidc.jar"
 if exist inspecto-oidc.jar if exist inspecto-secrets.jar set "CP=%CP%;inspecto-secrets.jar"
 if exist inspecto-oidc.jar if exist inspecto-geo-country.jar set "CP=%CP%;inspecto-geo-country.jar"
+if exist inspecto-oidc.jar if exist inspecto-connectors-kafka.jar set "CP=%CP%;inspecto-connectors-kafka.jar"
 if exist inspecto-oidc.jar set "EDITION=Professional"
 if exist inspecto-oidc.jar set "OPTS=%OPTS% -Dauth.mode=oidc"
 rem EVENTS-DURABLE-1 (2026-09-11): Professional+ keeps the API audit trail across restarts; see serve.sh.
@@ -1827,7 +1860,7 @@ if ($DemoAuth) {
     foreach ($f in 'serve.sh', 'serve.bat', 'Dockerfile', '.dockerignore', 'inspecto.service', 'install-service.sh', 'install-service.ps1') {
         Remove-Item (Join-Path $bundleDir $f) -ErrorAction SilentlyContinue
     }
-    $demoJars = @('inspecto.jar', 'inspecto-demo-auth.jar', 'inspecto-policy.jar', 'inspecto-connectors.jar', 'inspecto-notify-channels.jar',
+    $demoJars = @('inspecto.jar', 'inspecto-demo-auth.jar', 'inspecto-policy.jar', 'inspecto-connectors.jar', 'inspecto-connectors-kafka.jar', 'inspecto-notify-channels.jar',
                   'inspecto-backup.jar', 'inspecto-entity-list.jar', 'inspecto-la-graph.jar', 'inspecto-la-storage.jar', 'inspecto-la-core.jar', 'inspecto-la-api.jar', 'inspecto-la-store-pg.jar', 'inspecto-geo-link.jar', 'inspecto-exchange.jar', 'inspecto-observability.jar',
                   'inspecto-ops.jar', 'inspecto-agent.jar', 'inspecto-intelligence.jar', 'postgresql.jar') | Where-Object { Test-Path (Join-Path $bundleDir $_) }
     $demoFlags = '--enable-native-access=ALL-UNNAMED -Dcontrol.bind=127.0.0.1 -Dauth.mode=demo -Dobjects.backend=db -Devents.backend=parquet -Djobs.backend=duckdb'
@@ -1997,7 +2030,7 @@ if (-not $SkipBootCheck) {
             else { 'java' }
     # The same classpath the generated launchers build -- deliberately re-derived from the staged files
     # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
-    $cp = @('inspecto.jar') + @('inspecto-oidc.jar','inspecto-secrets.jar','inspecto-geo-country.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-entity-list.jar','inspecto-la-graph.jar','inspecto-la-storage.jar','inspecto-la-core.jar','inspecto-la-api.jar','inspecto-la-store-pg.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-observability.jar','inspecto-ops.jar','inspecto-agent.jar','inspecto-intelligence.jar','postgresql.jar' |
+    $cp = @('inspecto.jar') + @('inspecto-oidc.jar','inspecto-secrets.jar','inspecto-geo-country.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-connectors-kafka.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-entity-list.jar','inspecto-la-graph.jar','inspecto-la-storage.jar','inspecto-la-core.jar','inspecto-la-api.jar','inspecto-la-store-pg.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-observability.jar','inspecto-ops.jar','inspecto-agent.jar','inspecto-intelligence.jar','postgresql.jar' |
         Where-Object { Test-Path (Join-Path $bundleDir $_) })
     # DEMO-AUTH-1: appended AFTER the parsed literal on purpose (see the -DemoAuth param note).
     if ($DemoAuth -and (Test-Path (Join-Path $bundleDir 'inspecto-demo-auth.jar'))) { $cp += 'inspecto-demo-auth.jar' }
