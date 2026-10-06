@@ -69,7 +69,7 @@ final class ServiceStores {
             return null;
         }
         String url = backend.startsWith("jdbc:")
-                ? raw
+                ? OperationalDb.rawBackendUrl(OperationalDb.Family.JOB_RUNS, raw)
                 : OperationalDb.urlFor(OperationalDb.Family.JOB_RUNS, root, root.jobRunDbUrl());
         try {
             DbJobRunStore db = DbJobRunStore.open(url);
@@ -99,7 +99,7 @@ final class ServiceStores {
             return null;
         }
         String url = backend.startsWith("jdbc:")
-                ? raw
+                ? OperationalDb.rawBackendUrl(OperationalDb.Family.PROVENANCE, raw)
                 : OperationalDb.urlFor(OperationalDb.Family.PROVENANCE, root, root.provenanceDbUrl());
         try {
             com.gamma.pipeline.exec.DbProvenanceStore db = com.gamma.pipeline.exec.DbProvenanceStore.open(url);
@@ -144,7 +144,7 @@ final class ServiceStores {
             return null;
         }
         String url = backend.startsWith("jdbc:")
-                ? raw
+                ? OperationalDb.rawBackendUrl(OperationalDb.Family.CONSIGNMENT_OUTPUTS, raw)
                 : OperationalDb.urlFor(OperationalDb.Family.CONSIGNMENT_OUTPUTS, root, root.consignmentOutputsDbUrl());
         try {
             com.gamma.consignment.DbConsignmentOutputStore db = com.gamma.consignment.DbConsignmentOutputStore.open(url);
@@ -176,7 +176,7 @@ final class ServiceStores {
             return null;
         }
         String url = backend.startsWith("jdbc:")
-                ? raw
+                ? OperationalDb.rawBackendUrl(OperationalDb.Family.DEDUP_LEDGER, raw)
                 : OperationalDb.urlFor(OperationalDb.Family.DEDUP_LEDGER, root, root.dedupLedgerDbUrl());
         try {
             com.gamma.consignment.DbDedupLedger db = new com.gamma.consignment.DbDedupLedger(url);
@@ -219,7 +219,7 @@ final class ServiceStores {
             return null;
         }
         String url = backend.startsWith("jdbc:")
-                ? raw
+                ? OperationalDb.rawBackendUrl(OperationalDb.Family.DELIVERY_RECEIPTS, raw)
                 : OperationalDb.urlFor(OperationalDb.Family.DELIVERY_RECEIPTS, root, root.deliveryReceiptsDbUrl());
         try {
             com.gamma.notify.DbDeliveryReceiptStore db = com.gamma.notify.DbDeliveryReceiptStore.open(url, null, null);
@@ -243,7 +243,7 @@ final class ServiceStores {
             return null;
         }
         String url = backend.startsWith("jdbc:")
-                ? raw
+                ? OperationalDb.rawBackendUrl(OperationalDb.Family.FILE_STAGES, raw)
                 : OperationalDb.urlFor(OperationalDb.Family.FILE_STAGES, root, root.fileStagesDbUrl());
         try {
             com.gamma.consignment.DbFileStageStore db = com.gamma.consignment.DbFileStageStore.open(url);
@@ -325,7 +325,7 @@ final class ServiceStores {
         // ⛔ RAW value for the URL, lowercased only for the comparison — a jdbc: value carries a path, a
         // database name and credentials, all case-sensitive on Postgres.
         String url = backend.startsWith("jdbc:")
-                ? raw
+                ? OperationalDb.rawBackendUrl(OperationalDb.Family.RUN_LEASE, raw)
                 : OperationalDb.urlFor(OperationalDb.Family.RUN_LEASE, root, root.runLeaseDbUrl());
         try {
             DbRunLease lease = DbRunLease.open(url, System.getProperty("run.lease.db.user"),
@@ -365,7 +365,7 @@ final class ServiceStores {
         // ⛔ RAW value for the URL, lowercased only for the comparison — a jdbc: value carries a path, a
         // database name and credentials, all case-sensitive on Postgres.
         String url = backend.startsWith("jdbc:")
-                ? raw
+                ? OperationalDb.rawBackendUrl(OperationalDb.Family.INBOX_REGISTRY, raw)
                 : OperationalDb.urlFor(OperationalDb.Family.INBOX_REGISTRY, root.inboxRegistryDbUrl());
         try {
             DbInboxRegistry registry = DbInboxRegistry.open(url,
@@ -392,7 +392,7 @@ final class ServiceStores {
      */
     private static EventStore openDbEventStore(SpaceRoot root, String raw, String backend) {
         String url = backend.startsWith("jdbc:")
-                ? raw
+                ? OperationalDb.rawBackendUrl(OperationalDb.Family.EVENTS, raw)
                 : OperationalDb.urlFor(OperationalDb.Family.EVENTS, root, root.eventsDbUrl());
         com.gamma.event.DbEventStore store;
         try {
@@ -472,7 +472,7 @@ final class ServiceStores {
             return new FileStatusStore();
         }
 
-        String url = rawUrl ? backend : OperationalDb.urlFor(OperationalDb.Family.STATUS, root, root.statusDbUrl());
+        String url = rawUrl ? OperationalDb.rawBackendUrl(OperationalDb.Family.STATUS, backend) : OperationalDb.urlFor(OperationalDb.Family.STATUS, root, root.statusDbUrl());
         try {
             StatusStore db = DbStatusStore.open(url,
                     OperationalDb.userFor(OperationalDb.Family.STATUS), OperationalDb.passwordFor(OperationalDb.Family.STATUS));

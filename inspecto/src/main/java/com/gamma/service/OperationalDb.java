@@ -236,7 +236,7 @@ public final class OperationalDb {
         if (f.mode == Family.Mode.URL_OR_ENGINE) {
             String lower = backend.toLowerCase();
             if (lower.startsWith("jdbc:"))
-                return new Resolved(f, Source.BACKEND_PROPERTY, backend, reportedUser(f));
+                return new Resolved(f, Source.BACKEND_PROPERTY, rawBackendUrl(f, backend), reportedUser(f));
             if (!"duckdb".equals(lower) && !"postgres".equals(lower) && !"postgresql".equals(lower))
                 return new Resolved(f, Source.DISABLED, null, null);
         } else if (!"db".equalsIgnoreCase(backend)
@@ -377,6 +377,24 @@ public final class OperationalDb {
      * The caller still supplies the space default because several openers reach it by a path this class
      * should not know (a legacy root, a {@code jdbc:} backend value that already decided).
      */
+    /**
+     * The one gate for a raw {@code jdbc:} value in a family's own {@code *.backend} (operator, 2026-10-06):
+     * such a value IS the URL and bypasses {@link #urlFor(Family, SpaceRoot, String)}, so a
+     * {@code jdbc:postgresql:} one would never get its Space's {@code currentSchema} and two Spaces would
+     * share tables. Refused fail-closed at store open (startup); a raw {@code jdbc:duckdb:} value — the test
+     * reactor's pins — is returned unchanged. The message names the key, never the value (it can carry
+     * credentials).
+     *
+     * @throws IllegalStateException for a raw {@code jdbc:postgresql:} value
+     */
+    public static String rawBackendUrl(Family family, String raw) {
+        if (raw.toLowerCase(java.util.Locale.ROOT).startsWith("jdbc:postgresql:"))
+            throw new IllegalStateException("-D" + family.backendProperty + " is a raw jdbc:postgresql: URL, which "
+                    + "bypasses the per-Space schema scoping - refused. Set -D" + family.backendProperty
+                    + "=postgres and put the URL in -D" + family.urlProperty + " (or the shared -Dinspecto.db.url).");
+        return raw;
+    }
+
     public static String urlFor(Family family, String spaceDefault) {
         String explicit = System.getProperty(family.urlProperty);
         if (explicit != null && !explicit.isBlank()) return explicit.trim();

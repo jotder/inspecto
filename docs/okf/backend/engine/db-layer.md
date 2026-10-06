@@ -851,7 +851,8 @@ single-tenant layout), so any test booting a `CollectorService` minted this ledg
 pinned to in-memory DuckDB in the **root pom's surefire `systemPropertyVariables`**
 (`-Ddedup.ledger.backend=jdbc:duckdb:`, `-Dconsignment.outputs.backend=jdbc:duckdb:`), which keeps
 the ledger armed against the real `DbDedupLedger` while writing nothing. It is set as the **backend**
-value, not the per-family `*.db.url`: a raw `jdbc:` backend is a first-class source that both
+value, not the per-family `*.db.url`: a raw `jdbc:duckdb:` backend is a first-class source (a raw
+`jdbc:postgresql:` one is refused, operator 2026-10-06, §5.0-c) that both
 `ServiceStores` and `OperationalDb.resolve` short-circuit on, so `urlFor` is never consulted —
 setting `-Ddedup.ledger.db.url` instead defeats the shared `-Dinspecto.db` selection that
 `OperationalDbTest` pins across all fifteen families (it fails that test). Tests needing durable dedup
@@ -1035,7 +1036,7 @@ operator applies flags through their own deployment tooling; this screen tells t
 - ⚠ **Three irregularities the report models rather than flattens:** three different "is it on" spellings
   with three different defaults (`none` / `duckdb` / `memory` / `file`); a **`*.backend` starting with
   `jdbc:` IS the URL** and bypasses `OperationalDb` entirely (a third source beyond per-family and
-  shared); and **URL grain ≠ credential grain** — the four `objects.*` families each carry their own
+  shared; since 2026-10-06 only `jdbc:duckdb:` is accepted there, a raw `jdbc:postgresql:` is refused, operator call); and **URL grain ≠ credential grain** — the four `objects.*` families each carry their own
   `*.db.url` but share one `objects.db.user`/`.password`.
 - ⛔ **A family that sends no credentials reports `user: null`, never the shared one.** Five families
   (`JOB_RUNS`, `PROVENANCE`, `CONSIGNMENT_OUTPUTS`, `FILE_STAGES`, `ACQUISITION_LEDGER`) open via
@@ -1119,8 +1120,13 @@ is **refused**, and `withSchema` refuses a non-PostgreSQL URL.
   (`config() == null`, keeps its unscoped tables); a URL that already carries `currentSchema` (an explicit operator
   choice wins); the cross-pod `INBOX_REGISTRY` (it is opened against the SPACES root and must stay shared; it keeps
   the 2-arg `urlFor`); the legacy acquisition ledger.
-- ⚠ **Deferred:** a raw `jdbc:` value in a family's own `*.backend` (`Source.BACKEND_PROPERTY`) bypasses `urlFor`, so
-  it is not schema-scoped — put the URL in `-D<family>.db.url` or `-Dinspecto.db.url` instead.
+- ⛔ **A raw `jdbc:postgresql:` value in a family's own `*.backend` is REFUSED (operator, 2026-10-06).** Such a
+  value IS the URL and bypasses `urlFor`, so it would never get `currentSchema`. One shared gate,
+  `OperationalDb.rawBackendUrl(Family, raw)`, runs in every `ServiceStores` opener and in `OperationalDb.resolve`, and
+  throws `IllegalStateException` at store open (startup). The message names the key and the alternative,
+  `-D<family>.backend=postgres` plus `-D<family>.db.url` / `-Dinspecto.db.url`, and never echoes the value. A raw
+  `jdbc:duckdb:` value still works unchanged (the root pom's test pins). Pinned by `RawJdbcBackendRefusalTest`
+  (mutation-checked).
 - Proof: `PostgresSchemaPerSpaceTest` (URL rules always run; the two-Spaces-cannot-see-each-other probe needs
   `INSPECTO_TEST_PG_URL` and skips per test). Existing single-schema installs on a shared server will see empty
   tables on first start (breaking change, accepted — nothing after 3.x is in production).
