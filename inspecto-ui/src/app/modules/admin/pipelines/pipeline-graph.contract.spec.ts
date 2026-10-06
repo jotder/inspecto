@@ -25,7 +25,7 @@ describe('bind-kind contract', () => {
     // Pinned so an emptied contract file cannot turn the loop above into a no-op.
     it('covers every node category the backend publishes', () => {
         expect(BIND_KINDS.categories).toEqual(['SOURCE', 'PARSE', 'TRANSFORM', 'SINK', 'CONTROL']);
-        expect(BIND_KINDS.bindableCategories).toEqual(['PARSE']);
+        expect(BIND_KINDS.bindableCategories).toEqual(['SOURCE', 'PARSE']);
     });
 
     it('answers grammar for PARSE and null for every other category', () => {

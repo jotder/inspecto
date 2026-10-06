@@ -1,6 +1,6 @@
 {
   "categories" : [ "SOURCE", "PARSE", "TRANSFORM", "SINK", "CONTROL" ],
-  "bindableCategories" : [ "PARSE" ],
+  "bindableCategories" : [ "SOURCE", "PARSE" ],
   "derivedUse" : {
     "enrichment" : "enrichment/",
     "parser" : "ingester/",
