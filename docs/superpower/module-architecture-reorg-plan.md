@@ -130,7 +130,7 @@ isolation.
 | engine `job` framework | Platform · Base | split framework from feature Job types **only** for types whose feature is Optional |
 | engine `objects` + `ops` object substrate | Implementation · Optional, Professional up (§8a, D-MR11) | **yes** → an **Incidents** module (stores, notes, links, tags, INCIDENT); `Workflow`/`SlaPolicy`/`EscalationRule` → Workflow & SLA — ✅ slice 1 DONE 2026-10-07 (P7): new Base leaf `inspecto-workflow` (module id `workflow`, `buildRole: foundation`, `offeringRole: base`, package `com.gamma.workflow`, no split) holds the three models **plus `ObjectType`** (the engine's `ObjectAccess`/`FindingsSpec`/`IncidentAccess` and the core `ComponentRoutes` need it, so the module must sit below the engine; Base, not optional, and the add-on stays optional only in slice 2). The SLA sweep (`ObjectService.sweepIncidentSla`) still lives in `ops`: slice 2 needs the governed-item contract; CASE/TASK/Case Rules stay in `ops` = Case Management |
 | engine `notify`, `alert`, `query`, `catalog` | Implementation · Base (§8a) | **no** — stay in the engine; enforce package boundaries instead |
-| engine `risk` + `RiskScoreJobType` + `RiskScoreRoutes` | Implementation · Optional (§8a add-on) | **yes** → **Scoring & Lists**, with `entity-list` |
+| engine `risk` + `RiskScoreJobType` + `RiskScoreRoutes` | Implementation · Optional (§8a add-on) | **yes** → **Scoring & Lists**, with `entity-list` — ⏸ **NOT STARTED: survey done 2026-10-07, stopped on three core entanglements; the smallest contracts and the build order are in §6 "P7 Scoring & Lists survey"** |
 | `ReconRunJob` + `ReconRoutes` | Implementation · Optional (§8a add-on) | **yes** → **Reconciliation** — ✅ DONE 2026-10-07 (P7): new `inspecto-reconciliation` (module id `reconciliation`, `offeringRole: optional`, `provides.features: reconciliation`, `contracts: JobTypeProvider, ComponentDeleteHook`, package `com.gamma.recon`, no split package) holds `ReconRoutes` (feature id `reconciliation`), the comparison engine (`ReconService`, `ReconBreaks`, `ReconConfigLoader`, `ReconStateStore` — moved out of engine `com.gamma.query`), `ReconRunJob` + the new `ReconRunJobType` (`recon.run` through the `ServiceLoader` `JobTypeProvider` loop; descriptor `requires: [objects]`, the Job resolves the Space data root from `SpaceConfigRoot` and the Incident seam from `JobContext.services()` at run time), and the tests (`ControlApiRecon*`, `Recon*Test`, `TelcoRaGoldenTest` + `TelcoRaCorpus`). Core kept: the `reconciliation` config component kind (`ComponentStore`/`ComponentRegistry`/`ComponentIntegrity`), the `/recon/` throttling prefix, the CapabilityManifest rows (`withCapability` literals unchanged), and a new `AbsentReconRoutes` 503 stub (**the registry of absent-module stubs grew by one — it is the known closed list**, parity pinned by `ReconAbsentSurfaceParityTest`, absence by `NoReconciliationShipsInThePersonalBuildTest`). Two small contracts were needed and added: `ComponentDeleteHook` in `inspecto-http-spi` (the processor's `DELETE /components/reconciliation/{id}` used to call `ReconStateStore.delete` directly; the module now cleans its own state) and a null-safe grant in `PlatformServiceRegistry` (an `objects` service bound to `null` — no `inspecto-ops` — is granted as absent instead of throwing from `Map.copyOf`, so a bundle without ops keeps `recon.run` signal-only). **BEHAVIOUR CHANGE: the Personal edition no longer ships Reconciliation** (Standard, Professional, Enterprise and Preview profiles / bundles only; EDITIONS CP-10 P cell now `—`). `offerings/professional.toon`: `reconciliation` add-on is now `built`. `openapi-v1.json` is byte-equal (the stub table carries the ten paths); `route-gating.md` regenerated for path/line shift only (no gating changed). |
 | `ActionRequests`, `ActionDispatcher`, `ActionRequestRoutes` | Implementation · Optional (§8a add-on) | **yes** → **Action Requests** |
 | processor platform half (`control` plumbing, `service`) | Platform · Base | no |
@@ -207,6 +207,65 @@ contribution point, which is what that plan's D-AS3 asked for.
   compliance) have no home in an Offering yet — they need a `posture{}` section; capability rows need each manifest's
   `provides.features` plus capability ids (P1-D3, not yet in `provides`); the add-on `status` field is what separates
   "shipped" from "planned" in a generated table. `defaultSpaceSettings` stays `{}` until a real default is decided.
+
+### P7 Scoring & Lists survey (2026-10-07 — read-only; extraction deliberately NOT started)
+
+**Verdict: STOP — the code cannot leave the core behind one small interface.** Reconciliation (same day) needed one
+tiny SPI (`ComponentDeleteHook`) and a null-safe grant; risk scoring is wired into the core in three further places
+that each need their own contract, plus one package move that is a precondition. Forcing it would have shipped a
+module whose absence breaks the save gate, the template seed gate and the pipeline masker.
+
+**What is in scope today.** Engine `risk`: `RiskScoreModel` (311 LOC), `RiskScoreEvaluator` (331), `RiskScorer` (94),
+`WatchListFeed` (36, a `ServiceLoader` seam already implemented by `inspecto-entity-list`'s `RiskWatchListFeed`),
+**`EvidenceMasker` (246 — not scoring at all, see 1)**; engine `job.RiskScoreJobType` (129, package-private, registered
+by `JobService` line 562 with a `dataDir`); processor `control.RiskScoreRoutes` (338, `/risk-scores*`, capability
+literals in `CapabilityManifest` ~line 183); tests `RiskScore*Test`, `RiskScorerTest`, `RiskScoreJobTest`,
+`RiskScoreAlertTest`, `PaymentFraudTemplateGoldenTest`, `ControlApiRiskScoreTest`, `RiskScoreWatchListFeedTest`.
+
+**The three entanglements (each is a real core caller, found by grepping the symbols, not the file list):**
+
+1. **`EvidenceMasker` lives in `com.gamma.risk` but is the platform's masking and classification resolver.** Callers:
+   `RowShaper` + `MaskSpec` (pipeline executor), `PostgresPublishJobType`, `AuditReadMasking` (processor),
+   `EngineDatasetProvider` + `HostCollectorCoveragePort` (`inspecto-geo-link`). It must stay below any scoring
+   module. *Precondition, no contract needed:* move it (with its `EvidenceMaskerTest`) to a new engine
+   package (`com.gamma.mask`), 7 call sites + 4 doc comments, then `com.gamma.risk` holds scoring only.
+2. **The save gate knows `risk-score`.** `ComponentRoutes.validateKind` (a static reached by the authoring route,
+   `BundleRoutes`, `BiTemplates` and `DatasetRegistration`, and by the template stager through the explicit-roots
+   overload) calls `RiskScoreModel.fromMap`, `RiskScoreRoutes.requireStorable` (Schema columns and output-name
+   collisions against the registry) and — for every `dataset` / `sink` — `RiskScoreRoutes.requireNotReserved` (the
+   `risk_scores_*` output stores are reserved). *Smallest contract:* a `ComponentKindValidator` SPI in
+   `inspecto-http-spi` — `String type()`, `void validate(String id, Map content)`, `void requireStorable(Path writeRoot,
+   Supplier<Path> dataRoot, String id, Map content)`, `void requireNotReserved(Path writeRoot, String type, String id,
+   Map content)` — looped over `OptionalSpi` inside `validateKind`. Absent module = the `risk-score` component kind
+   stays accepted as opaque config (as `reconciliation` is today) but nothing validates it; an explicit decision is
+   needed on whether that is acceptable or whether the kind must also be refused when the module is absent.
+3. **`PendingAlertRules` (TEMPLATE-RISK-SCORE-ALERT-RULE-1) is a core feature built on the risk model.**
+   `PendingAlertRules` reads `RiskScoreModel.SCORES_PREFIX/LATEST_SUFFIX` and `RiskScoreEvaluator.ownedBy`;
+   `TemplateSeedGate`, `AlertRoutes` (`GET /alerts/pending`), `ImportCapabilityGuard`, `PendingChanges` and
+   `CollectorService` (the `risk.score.produced` subscriber) all reach it. *Smallest contract:* keep
+   `PendingAlertRules` in the core and move only the **three naming/ownership facts** it needs into a tiny core holder
+   (`SCORES_PREFIX`, `LATEST_SUFFIX`, `ownedBy`) that the module also uses — no SPI — because the pending-rule
+   mechanism is about Alert Rules, not scoring; the alternative (moving the feature into the module behind a
+   `TemplateSeedCheck` + signal-listener SPI) touches five core files and is not recommended.
+
+**Decision on the shape (recorded now so the next session does not re-litigate it): two artifacts, one add-on.**
+Keep `inspecto-entity-list` as it is (its name stays honest) and create **`inspecto-scoring`** (module id `scoring`,
+package `com.gamma.risk`, feature id `scoring`, `RiskScoreRoutes`, `RiskScoreJobType` → `ServiceLoader`
+`JobTypeProvider`, `AbsentRiskScoreRoutes` 503 stub). `offerings/professional.toon` `scoringLists` becomes
+`built` with `modules: [entity-list, scoring]`. Renaming `inspecto-entity-list` to absorb risk would cost a
+full-sweep rename (pom profiles, bundle-modules, package.ps1 ×9 sites, launchers, docs) for no gain, and the
+direction of dependency must be `scoring → entity-list`: **`WatchListFeed` moves down into `inspecto-entity-store`
+or `inspecto-entity-list`** (the module implementing it), not the other way round, or the feed could not be implemented
+without a cycle. Existing feature id `entityList` is untouched (the five legacy keys never change); the new key is
+`scoring`.
+
+**Build order when it is scheduled:** (a) move `EvidenceMasker`; (b) `ComponentKindValidator` + the three-fact holder;
+(c) move `WatchListFeed`; (d) create `inspecto-scoring` as for Reconciliation (`ComponentDeleteHook` is not needed —
+risk output stores are Datasets, not component-side state); (e) the `RiskScoreRoutes` capability literals stay literal in
+the module and the `CapabilityManifest` rows are unchanged; (f) tests: `ControlApiRiskScoreTest`, `RiskScoreJobTest`,
+`RiskScoreAlertTest`, `PaymentFraudTemplateGoldenTest` move with it (the last drives the engine alert path, which the module sees through its
+`inspecto-processor` dependency). **Behaviour change to record when built:** Personal loses `/risk-scores*`
+and the `risk.score` Job Type (it keeps the Entity-List-less `WatchListFeed` absence it has today).
 
 ## 6-A. P0 baseline (recorded 2026-10-06, `node tools/check-module-architecture.mjs`)
 
