@@ -210,7 +210,7 @@ public final class PendingAlertRules {
         Path f = refusalFile(pending);
         if (!Files.isRegularFile(f)) return null;
         try {
-            Map<String, Object> m = com.gamma.config.io.ConfigCodec.toMap(Files.readString(f));
+            Map<String, Object> m = com.gamma.util.ToonHelper.load(f.toString());
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("reason", String.valueOf(m.get("reason")));
             out.put("at", String.valueOf(m.get("at")));
