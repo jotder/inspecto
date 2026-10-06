@@ -1,19 +1,4 @@
 {
-  "alwaysThinkingEnabled": true,
-  "effortLevel": "high",
-  "modelLimits": {
-    "stealth/ox-alpha": {
-      "contextWindow": 1000000,
-      "maxOutputTokens": 128000
-    }
-  },
-  "enabledPlugins": {
-    "apollo@inline": false,
-    "brand-voice@inline": false,
-    "common-room@inline": false,
-    "human-resources@inline": false,
-    "operations@inline": false
-  },
   "permissions": {
     "allow": [
       "Bash(mvn:*)",
@@ -133,5 +118,29 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "apollo@inline": false,
+    "brand-voice@inline": false,
+    "common-room@inline": false,
+    "human-resources@inline": false,
+    "operations@inline": false,
+    "i-have-adhd@i-have-adhd": true
+  },
+  "extraKnownMarketplaces": {
+    "i-have-adhd": {
+      "source": {
+        "source": "github",
+        "repo": "ayghri/i-have-adhd"
+      }
+    }
+  },
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
+  "modelLimits": {
+    "stealth/ox-alpha": {
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
+    }
   }
 }
