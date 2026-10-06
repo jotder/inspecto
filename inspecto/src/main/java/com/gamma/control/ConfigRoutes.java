@@ -511,6 +511,8 @@ final class ConfigRoutes {
             if (PipelineConfig.Step.LOOKUP.equals(kind)) {
                 if (columns != null && cfg.get("target") != null)
                     columns.add(new TypeFlow.Column(String.valueOf(cfg.get("target")), "VARCHAR"));
+            } else if (PipelineConfig.Step.MASK.equals(kind)) {
+                // names survive a mask; only the values change
             } else if (PipelineConfig.Step.HASH.equals(kind)) {
                 // names survive a hash; with keep_original each column gains a <col>_hash beside it
                 if (columns != null && "true".equalsIgnoreCase(String.valueOf(cfg.get("keep_original")))
@@ -607,6 +609,12 @@ final class ConfigRoutes {
                 if (!(cfg.get("columns") instanceof List<?> cols) || cols.stream().allMatch(o -> o == null || o.toString().isBlank()))
                     return "transform.hash needs a non-empty 'columns' list - the columns to hash";
                 return undeclared("transform.hash column", cols, columns);
+            }
+            case PipelineConfig.Step.MASK -> {
+                List<String> problems = com.gamma.pipeline.exec.MaskSpec.problems(cfg);
+                if (!problems.isEmpty()) return "transform.mask: " + problems.get(0);
+                return cfg.get("columns") instanceof List<?> cols
+                        ? undeclared("transform.mask column", cols, columns) : null;
             }
             default -> { return null; }
         }

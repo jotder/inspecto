@@ -297,9 +297,10 @@ free text and nothing enforces it.** There is no enum and no validating `FieldSp
 in `ConfigSpecs` only inside a description string, two lines below a field that *does* use the enum mechanism —
 the UI renders a bare text input, and `SchemaProjection`'s own javadoc says the metadata columns are never read
 by the ETL. Its single consumer copies it to a Catalog node **display** attribute. The two steps that would
-enforce it (`quality.pii.mask`, `quality.compliance.redact`) are `PLANNED` with no implementation, and the
-classification-to-masking join is Enterprise unbuilt work (`EDITIONS.md` SEC-08). ⛔ So a label is a **statement
-of intent, never a control** — do not describe it as protection. ⛔ And `INTERNAL` here is not the API error code
+enforce it are `quality.pii.mask` (the Enterprise-only `mask` Step, built 2026-10-06; it acts only where a
+pipeline authors it) and `quality.compliance.redact` (`PLANNED`). Dataset-wide masking stays unbuilt
+(`EDITIONS.md` SEC-08). ⛔ So a label alone is a **statement of intent, never a control**. Do not describe it as
+protection unless a `mask` Step reads it. ⛔ And `INTERNAL` here is not the API error code
 `INTERNAL` (`ErrorCodes`): one word, two concepts, one layer apart.
 
 ---
@@ -833,7 +834,7 @@ RBAC data scopes, and despite its name it is not the *type of a Case*.
 
 **Dossier** *(Link Analysis; `GET /inv/investigations/{id}/dossier`)* — The **evidential report of an Investigation**: summary, chronological ledger, every exclusion with its author and reason, negative space, and a SHA-256 chain of custody that `POST …/dossier/verify` re-checks against the store. Rendered as JSON, numbered steps, a method statement or one printable HTML page, masked per the Space's **Masking mode**. Built only from the promoted Investigation, never from a **Draft**. ⛔ Not a **Case** and not a **Snapshot**; never "report" or "export" for this object.
 
-**Masking mode** *(Link Analysis; Space setting `maskingMode`, `typed` default | `all` | `none`)* — Which entity ids an Investigation response returns **masked** as `masked:<16 hex>`: `typed` masks ids whose **Entity Type** is a masked type (including by Dataset column classification), `all` masks every id, `none` masks none. Unmasking is the audited, per-entity **reveal** (`POST /inv/investigations/{id}/reveal`, capability `canRevealLinkEntities`). ⛔ Not the `quality.pii.mask` Step (Dataset field redaction, planned), and not a **Decision Rule** action.
+**Masking mode** *(Link Analysis; Space setting `maskingMode`, `typed` default | `all` | `none`)* — Which entity ids an Investigation response returns **masked** as `masked:<16 hex>`: `typed` masks ids whose **Entity Type** is a masked type (including by Dataset column classification), `all` masks every id, `none` masks none. Unmasking is the audited, per-entity **reveal** (`POST /inv/investigations/{id}/reveal`, capability `canRevealLinkEntities`). ⛔ Not the `quality.pii.mask` Step (`transform.mask`, Enterprise-only pipeline field masking), and not a **Decision Rule** action.
 
 **Value Measure** *(Link Analysis; `GET /inv/value-measures`)* — A **Measure** that scores *entities* over the **whole Dataset** in a stated time window (at most 31 days, UTC) against visible thresholds: `passThrough`, `velocity`, `timeToCashOut`, `cashOutConcentration`, `structuring`, `benefitTransfer`, plus the non-alertable `valueWeightedLinks`. An **Alert Rule** can bind one to an Investigation and fires when at least one entity breaches. It accepts no view filter, so a filtered canvas cannot hide a breach. Type vs Instance: the named Measure is the Type; a bound Alert Rule with its thresholds is the Instance. ⛔ Not a BI **Measure** (§7), which aggregates rows to a number and has no entity or threshold.
 

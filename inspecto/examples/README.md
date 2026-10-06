@@ -67,7 +67,7 @@ git-ignored.
 ## Step catalog — one runnable example per Step kind (`07-steps/`)
 
 A pipeline is a chain of **Steps**: `collect → parse → (map) → transform steps… → sink`. The palette
-offers sixteen Step kinds; every one has a worked example below. Two lanes
+offers seventeen Step kinds; every one has a worked example below. Two lanes
 matter for how you run them:
 
 - **Ingest lane** — `collect`, every `parse` frontend, `route` and `sink` execute in the poll cycle, so
@@ -96,6 +96,7 @@ is [`docs/okf/backend/pipeline-graph/step-catalog.md`](../../docs/okf/backend/pi
 | **parse** → `parser.plugin` | Any deployed `StreamingFileIngester` by class, with `segments` + `ingester_config`. | `02-parsing/xml-plugin-frontend` | `run-example 02-parsing/xml-plugin-frontend` |
 | **lookup** → `transform.lookup` | `column:` + `mappings[]` of `key=value` (author literals compiled to a CASE), optional `target:` new column and `default:` for unmatched values — a transcoder over one column. 8 in → 8 out, `STATUS_LABEL` = Open/Done/Void. | `07-steps/lookup` | `serve-example 07-steps/lookup --demo` |
 | **hash** → `transform.hash` | `columns[]` + optional `keep_original:` — each named column becomes `masked:<16 hex>`, an HMAC-SHA-256 under the Space's own key (never in config); equal values hash equal so the column still joins. 8 in → 8 out, `ORDER_ID` hashed. | `07-steps/hash` | `serve-example 07-steps/hash --demo` |
+| **mask** → `transform.mask` 🔒 Enterprise | `classifications[]` + `dataset:` (columns chosen by the registry Dataset's classification, strictest-wins) and/or `columns[]`; `mode: full \| partial \| hash`, `keep_last:`. Refused outside Enterprise (`ERR_EDITION_FEATURE`). 8 in → 8 out, `ORDER_ID` = `**01`… | `07-steps/mask` | `serve-example 07-steps/mask --demo` (Enterprise build) |
 | **transform** → `transform.filter` | `where:` — a SQL predicate over the typed, mapped columns; dropped rows are a counted reject relation. 8 in → 4 out. | `07-steps/filter` | `serve-example 07-steps/filter --demo` |
 | **dedup** → `transform.dedup` | `keys[]` + optional `order_by` (+ `scope:` for a cross-Consignment window): one row per business key, newest first. 12 in → 9 out. | `07-steps/dedup` | `serve-example 07-steps/dedup --demo` |
 | **join** → `transform.join` | `reference:` (a path, or `reference/<pipeline>`) + `on[]`: a LEFT JOIN, unmatched keys keep NULL reference columns. 8 in → 8 out, 6 enriched. | `07-steps/join` | `serve-example 07-steps/join --demo` |

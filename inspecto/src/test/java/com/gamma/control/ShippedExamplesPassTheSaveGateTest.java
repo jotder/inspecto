@@ -76,9 +76,10 @@ class ShippedExamplesPassTheSaveGateTest {
         assertTrue(problems.isEmpty(), "shipped examples the save gate or the loader refuses:\n  "
                 + String.join("\n  ", problems));
         assertEquals(java.util.Set.of(
+                        "07-steps/mask/orders_pipeline.toon steps[0].mask",
                         "_reference/ducklake-sink/orders_pipeline.toon output.ducklake",
                         "_reference/sftp-collector/orders_pipeline.toon collector.post_action.on_success"),
-                editionRefused, "the Professional+ templates a Personal build refuses (G9)");
+                editionRefused, "the Professional+ templates, and the Enterprise-only mask Step (SEC-08), a Personal build refuses (G9)");
     }
 
     @Test

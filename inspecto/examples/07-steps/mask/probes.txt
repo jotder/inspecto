@@ -1,0 +1,16 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: mask (transform.mask, catalog quality.pii.mask) - ENTERPRISE ONLY (board SEC-08). Personal, Standard and
+# Professional refuse it at save and at run with ERR_EDITION_FEATURE; serve this with an Enterprise build.
+#   steps[1]: - mask: { classifications: [ACCOUNT], dataset: orders, mode: partial, keep_last: 2 }
+# The columns are chosen BY CLASSIFICATION: write/registry/datasets/orders.toon (seeded into out/write, the
+# registry) classifies ORDER_ID as ACCOUNT, so ORDER_ID is masked to **01, **02, ... and every other column passes
+# through. A column with several classes is judged by its strictest; columns: [..] masks by name as well.
+# mode: full writes ****, mode: hash writes the Space-keyed masked:<16 hex> token of transform.hash.
+#
+# Expected evidence after the run:
+#   /jobs shows mask_rollup type PIPELINE with lastStatus SUCCESS; /jobs/mask_rollup/runs names the 8 rows the Step
+#   produced into store(s) [rollup]. On disk: out/rollup/*.parquet carries ORDER_ID = **01 .. **08.
+/jobs
+/jobs/mask_rollup/runs

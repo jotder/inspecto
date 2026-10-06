@@ -122,7 +122,7 @@ feeds), `JobTypeProvider` and `MaintenanceTaskProvider` (their scheduled work), 
 
 ⚠ **Two honesty notes before any coverage percentage goes on a slide.** `ExpressionProvider` is declared and
 registered by nothing (`SPEC-DEADSEAM-1`). And the processor catalogue is **119**<!--count:processors-->
-entries of which **35**<!--count:processors-delivered--> are delivered, **18**<!--count:processors-partial-->
+entries of which **36**<!--count:processors-delivered--> are delivered, **18**<!--count:processors-partial-->
 partial, and the rest planned — a palette of inactive tiles a buyer will count. Claim coverage **by category
 covered end to end**, never as a percentage of that palette.
 

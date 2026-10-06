@@ -514,6 +514,51 @@
     "help" : "A duration (60m, 24h, 30s, 7d) or a row count (5 rows).",
     "placeholder" : "60m"
   } ],
+  "transform.mask" : [ {
+    "key" : "classifications",
+    "label" : "Mask classifications",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Mask every column the Dataset classifies as one of these (MSISDN, IMSI, ACCOUNT, PII). A column with several classes is judged by its strictest.",
+    "placeholder" : "PII"
+  }, {
+    "key" : "dataset",
+    "label" : "Classified Dataset",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "The registry Dataset whose column classifications (and their lineage) choose the columns. Required with classifications.",
+    "placeholder" : "subscribers"
+  }, {
+    "key" : "columns",
+    "label" : "Mask columns",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Columns masked by name, in addition to any chosen by classification.",
+    "placeholder" : "EMAIL"
+  }, {
+    "key" : "mode",
+    "label" : "Mode",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "full",
+    "options" : [ {
+      "value" : "full",
+      "label" : "Full (****)"
+    }, {
+      "value" : "partial",
+      "label" : "Partial (keep the last N)"
+    }, {
+      "value" : "hash",
+      "label" : "Hash (Space-keyed token)"
+    } ]
+  }, {
+    "key" : "keep_last",
+    "label" : "Keep last N characters",
+    "type" : "number",
+    "tier" : "optional",
+    "min" : 1.0,
+    "help" : "Partial mode only: how many trailing characters stay visible (default 4). A value no longer than N is masked whole."
+  } ],
   "transform.join" : [ {
     "key" : "reference",
     "label" : "Reference",

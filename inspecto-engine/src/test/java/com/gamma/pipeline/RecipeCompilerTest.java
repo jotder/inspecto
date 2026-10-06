@@ -188,6 +188,20 @@ class RecipeCompilerTest {
         assertFalse(messages.stream().anyMatch(m -> m.contains("pepper")), "a refusal must not echo the salt");
     }
 
+    /** quality.pii.mask (2026-10-06): the compiler and the save gate share MaskSpec.problems — a vault is refused. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void maskRefusesAVaultAndABadMode() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) (List<?>) recipe.get("steps");
+        steps.add(steps.size() - 1, step("mask", new LinkedHashMap<>(Map.of(
+                "columns", List.of("msisdn"), "mode", "reversible", "vault", "v1"))));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class, () -> RecipeCompiler.compile(recipe));
+        List<String> messages = e.refusals().stream().map(PipelineCompileException.Refusal::message).toList();
+        assertTrue(messages.stream().anyMatch(m -> m.contains("'vault'")), messages.toString());
+        assertTrue(messages.stream().anyMatch(m -> m.contains("'reversible'")), messages.toString());
+    }
+
     @Test
     void notYetCompilableVerbsRefuseWithNamedCodesNeverSilently() {
         Map<String, Object> recipe = linearRecipe("/data/db");

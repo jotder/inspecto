@@ -37,6 +37,12 @@ public final class EditionFeatures {
     public static final String ALERT_DISPATCH = "alert.dispatch";
     public static final String SINK_ARCHIVE = "sink.archive";
     public static final String SINK_DUCKLAKE = "sink.ducklake";
+    /**
+     * The PII masking Step ({@code steps:} kind {@code mask}, node {@code transform.mask}) — ENTERPRISE only
+     * (board SEC-08, operator 2026-09-02; built 2026-10-06). Declared by {@code inspecto-policy}, the one module
+     * only the Enterprise (and Preview) flavours bundle.
+     */
+    public static final String PII_MASK = "quality.pii.mask";
 
     /** The finding / error code every refusal carries. Mirrors {@code FindingCodes.ERR_EDITION_FEATURE}. */
     public static final String CODE = "ERR_EDITION_FEATURE";
@@ -64,8 +70,11 @@ public final class EditionFeatures {
             case ALERT_DISPATCH -> "Alert Rules (control.alert.dispatch)";
             case SINK_ARCHIVE -> "the compliance archive (sink.archive — collector.post_action.on_success: MOVE)";
             case SINK_DUCKLAKE -> "DuckLake catalog registration (sink.ducklake — ducklake.enabled: true)";
+            case PII_MASK -> "PII masking (quality.pii.mask — a steps: mask Step)";
             default -> "'" + feature + "'";
         };
+        if (PII_MASK.equals(feature))
+            return what + " is an Enterprise feature — this build does not include it";
         return what + " is a Professional+ feature — this build (Personal) does not include it";
     }
 
@@ -89,7 +98,25 @@ public final class EditionFeatures {
                     if (sinks.get(i) instanceof Map<?, ?> s && enabled(s.get("ducklake")))
                         out.add(new Refusal(SINK_DUCKLAKE, "sinks[" + i + "].ducklake", refusal(SINK_DUCKLAKE)));
         }
+        if (!present(PII_MASK) && draft.get("steps") instanceof List<?> steps)
+            maskRefusals(steps, "steps", out);
         return out;
+    }
+
+    /** Every {@code mask} step in a draft chain, route branches included — a branch is no way around the gate. */
+    private static void maskRefusals(List<?> steps, String prefix, List<Refusal> out) {
+        for (int i = 0; i < steps.size(); i++) {
+            if (!(steps.get(i) instanceof Map<?, ?> entry)) continue;
+            for (Map.Entry<?, ?> e : entry.entrySet()) {
+                String at = prefix + "[" + i + "]." + e.getKey();
+                if (PipelineConfig.Step.MASK.equals(String.valueOf(e.getKey())))
+                    out.add(new Refusal(PII_MASK, at, refusal(PII_MASK)));
+                if (e.getValue() instanceof Map<?, ?> cfg && cfg.get("branches") instanceof List<?> branches)
+                    for (int b = 0; b < branches.size(); b++)
+                        if (branches.get(b) instanceof Map<?, ?> br && br.get("steps") instanceof List<?> sub)
+                            maskRefusals(sub, at + ".branches[" + b + "].steps", out);
+            }
+        }
     }
 
     /** Every absent feature a PARSED pipeline uses — the run-time form (effective per-sink lakes). */
@@ -104,6 +131,11 @@ public final class EditionFeatures {
                     out.add(new Refusal(SINK_DUCKLAKE, "ducklake", refusal(SINK_DUCKLAKE)));
                     break;
                 }
+        if (!present(PII_MASK)) {
+            List<Object> chain = new ArrayList<>();
+            for (PipelineConfig.Step st : cfg.steps()) chain.add(Map.of(st.kind(), st.config()));
+            maskRefusals(chain, "steps", out);
+        }
         return out;
     }
 

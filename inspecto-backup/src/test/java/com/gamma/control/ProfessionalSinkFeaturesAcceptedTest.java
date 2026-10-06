@@ -23,6 +23,8 @@ class ProfessionalSinkFeaturesAcceptedTest {
     void theModuleDeclaresBothSinkFeaturesAndTheSaveGateAcceptsThem() {
         assertTrue(EditionFeatures.present(EditionFeatures.SINK_ARCHIVE), "declared by inspecto-backup");
         assertTrue(EditionFeatures.present(EditionFeatures.SINK_DUCKLAKE), "declared by inspecto-backup");
+        assertFalse(EditionFeatures.present(EditionFeatures.PII_MASK),
+                "PII masking is Enterprise-only (SEC-08) - a Professional module must not declare it");
 
         Map<String, Object> draft = new LinkedHashMap<>();
         draft.put("name", "P");

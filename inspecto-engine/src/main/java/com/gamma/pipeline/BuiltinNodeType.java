@@ -172,6 +172,12 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_HASH("transform.hash", NodeCategory.TRANSFORM, "Hash",
             "Replaces named columns (or adds <col>_hash) with a salted, Space-keyed one-way HMAC token.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "hash"),
+    // PII masking by classification or name (catalog `quality.pii.mask`, SEC-08 ENTERPRISE-only, operator
+    // 2026-10-06). Flat home: steps: kind mask {columns, classifications, dataset, mode, keep_last}. Executes in
+    // RowShaper.mask behind EditionFeatures.PII_MASK; mode hash delegates to transform.hash's Space-keyed token.
+    TRANSFORM_MASK("transform.mask", NodeCategory.TRANSFORM, "Mask (PII)",
+            "Masks columns chosen by classification (strictest-wins) or by name: full, partial (keep the last N) or hash.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "mask"),
     TRANSFORM_SPLIT("transform.split", NodeCategory.TRANSFORM, "Split",
             "Explodes one row into many (UNNEST).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),

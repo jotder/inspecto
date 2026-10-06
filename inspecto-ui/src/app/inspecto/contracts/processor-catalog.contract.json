@@ -467,9 +467,10 @@
     "label" : "PII masking & tokenization",
     "emoji" : "🔒",
     "icon" : "heroicons_outline:eye-slash",
-    "status" : "planned",
-    "note" : "board SEC-08 — Enterprise only",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.mask",
+    "note" : "board SEC-08 — Enterprise only; by classification (strictest-wins) or name, full / partial / hash, no reversible vault (2026-10-06)",
+    "addable" : true
   }, {
     "id" : "quality.crypto.hash",
     "family" : "DQ",

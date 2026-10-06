@@ -473,6 +473,23 @@ public final class NodeAttributes {
                     .help("When on, the original column stays and the token is added as <column>_hash. Off (the default) replaces the value in place."));
 
     /**
+     * {@code transform.mask} (→ {@code steps:} kind {@code mask}, catalog {@code quality.pii.mask}, ENTERPRISE only)
+     * — masks columns chosen by classification and/or by name. ⛔ No vault / reversible-token attribute: masking
+     * is one-way by decision (operator 2026-10-06). Keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_MASK = List.of(
+            NodeAttribute.of("classifications", "Mask classifications", "list", "optional").placeholder("PII")
+                    .help("Mask every column the Dataset classifies as one of these (MSISDN, IMSI, ACCOUNT, PII). A column with several classes is judged by its strictest."),
+            NodeAttribute.of("dataset", "Classified Dataset", "string", "optional").placeholder("subscribers")
+                    .help("The registry Dataset whose column classifications (and their lineage) choose the columns. Required with classifications."),
+            NodeAttribute.of("columns", "Mask columns", "list", "optional").placeholder("EMAIL")
+                    .help("Columns masked by name, in addition to any chosen by classification."),
+            NodeAttribute.of("mode", "Mode", "select", "optional").defaultValue("full")
+                    .options("full", "Full (****)", "partial", "Partial (keep the last N)", "hash", "Hash (Space-keyed token)"),
+            NodeAttribute.of("keep_last", "Keep last N characters", "number", "optional").min(1)
+                    .help("Partial mode only: how many trailing characters stay visible (default 4). A value no longer than N is masked whole."));
+
+    /**
      * {@code transform.join} (→ {@code processing.join}, D-4) — the reference join, authoring-only.
      * {@code reference} names a registered Reference component ({@code reference/<id>}), so the UI
      * renders it as an autocomplete over the registry. Keys proven by {@code NodeConfigNameContractTest}.
@@ -523,7 +540,7 @@ public final class NodeAttributes {
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, SINK_WEBHOOK))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, SINK_WEBHOOK))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -539,6 +556,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_PROFILE.type(), TRANSFORM_PROFILE);
         m.put(BuiltinNodeType.TRANSFORM_RUNNING.type(), TRANSFORM_RUNNING);
         m.put(BuiltinNodeType.TRANSFORM_HASH.type(), TRANSFORM_HASH);
+        m.put(BuiltinNodeType.TRANSFORM_MASK.type(), TRANSFORM_MASK);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);

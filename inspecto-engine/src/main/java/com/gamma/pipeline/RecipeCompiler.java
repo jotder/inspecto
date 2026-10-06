@@ -124,6 +124,7 @@ public final class RecipeCompiler {
                 case "dedup" -> nodes.add(dedup(id, cfg, refusals));
                 case "lookup" -> nodes.add(lookup(id, cfg, refusals));
                 case "hash" -> nodes.add(hash(id, cfg, refusals));
+                case "mask" -> nodes.add(mask(id, cfg, refusals));
                 case "route" -> {
                     route(id, cfg, nodes, branchSinks, routeEdges, refusals);
                     routeSeen = true;
@@ -416,6 +417,15 @@ public final class RecipeCompiler {
         return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_HASH.type(), new LinkedHashMap<>(cfg));
     }
 
+    /** {@code mask: {columns?, classifications?, dataset?, mode?, keep_last?}} → a transform.mask node. The shape
+     *  rules live in {@link com.gamma.pipeline.exec.MaskSpec#problems} — one list, shared with the save gate. */
+    private static PipelineNode mask(String id, Map<String, Object> cfg,
+                                     List<PipelineCompileException.Refusal> refusals) {
+        for (String p : com.gamma.pipeline.exec.MaskSpec.problems(cfg))
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id, p));
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_MASK.type(), new LinkedHashMap<>(cfg));
+    }
+
     private static PipelineNode dedup(String id, Map<String, Object> cfg,
                                       List<PipelineCompileException.Refusal> refusals) {
         Map<String, Object> c = new LinkedHashMap<>(cfg);
@@ -584,6 +594,7 @@ public final class RecipeCompiler {
                     case "dedup" -> stepNode = dedup(stepId, stepCfg, refusals);
                     case "lookup" -> stepNode = lookup(stepId, stepCfg, refusals);
                     case "hash" -> stepNode = hash(stepId, stepCfg, refusals);
+                    case "mask" -> stepNode = mask(stepId, stepCfg, refusals);
                     case "summarize" -> stepNode = summarize(stepId, stepCfg, refusals);
                     case "profile" -> stepNode = profile(stepId, stepCfg, refusals);
                     case "running" -> stepNode = running(stepId, stepCfg, refusals);

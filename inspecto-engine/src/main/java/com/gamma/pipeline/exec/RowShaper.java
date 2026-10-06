@@ -207,6 +207,7 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_PROFILE.type().equals(type)) return profile(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_RUNNING.type().equals(type)) return running(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_HASH.type().equals(type))    return hash(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_MASK.type().equals(type))    return mask(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) return project(conn, node, input, outPrefix);
         // A Record Transformer — authored FIELDS, or the projection slot carrying a lifted schema /
@@ -283,6 +284,36 @@ public final class RowShaper {
             throw new IllegalArgumentException("transform.hash node '" + node.id() + "' needs 'columns' — the columns to hash");
         boolean keep = Boolean.parseBoolean(String.valueOf(node.cfg("keep_original")));
         return tokenize(conn, node, input, p, cols, keep);
+    }
+
+    /**
+     * {@code transform.mask} — masks the columns {@link MaskSpec} chooses (by classification, strictest-wins, and/or
+     * by name): {@code full} → {@code ****}, {@code partial} → stars + the last {@code keep_last} characters (a value
+     * no longer than that is masked whole — "keep the last 4" of a 4-character value is the value), {@code hash} →
+     * {@link #tokenize}. NULL stays NULL. 🔒 ENTERPRISE only: refused here too, not only at save, so a config that
+     * arrives on disk in a smaller build cannot run it.
+     */
+    private static List<Relation> mask(Connection conn, PipelineNode node, String input, String p) throws SQLException {
+        com.gamma.etl.EditionFeatures.require(com.gamma.etl.EditionFeatures.PII_MASK);
+        List<String> available = columnsOf(conn, input);
+        List<String> named = namedColumns(conn, node, input, "columns");
+        MaskSpec spec = MaskSpec.of(node);
+        List<String> cols = spec.resolve(node, available, named, com.gamma.pipeline.SpaceConfigRoot.current());
+        if ("hash".equals(spec.mode())) return tokenize(conn, node, input, p, cols, false);
+        StringBuilder replace = new StringBuilder();
+        for (String c : cols) {
+            if (replace.length() > 0) replace.append(", ");
+            String v = "CAST(" + q(c) + " AS VARCHAR)";
+            String masked = "full".equals(spec.mode()) ? "'****'"
+                    : "CASE WHEN length(" + v + ") <= " + spec.keepLast() + " THEN repeat('*', length(" + v + "))"
+                      + " ELSE repeat('*', length(" + v + ") - " + spec.keepLast() + ") || right(" + v + ", "
+                      + spec.keepLast() + ") END";
+            replace.append("CASE WHEN ").append(q(c)).append(" IS NULL THEN NULL ELSE ").append(masked)
+                    .append(" END AS ").append(q(c));
+        }
+        String data = table(p, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS SELECT * REPLACE (" + replace + ") FROM " + q(input));
+        return List.of(new Relation(PipelineRel.DATA, data));
     }
 
     /** The Space's mask key — refused when the run has no Space, so a hash is never computed unkeyed. */

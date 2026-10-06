@@ -539,6 +539,27 @@ class NodeConfigNameContractTest {
                 "the declared table is exactly the keys this round trip proves");
     }
 
+    /** The mask node's contract (catalog {@code quality.pii.mask}, 2026-10-06) — every declared key survives the save. */
+    @Test
+    void maskAttributesReachTheEngine(@TempDir Path dir) throws Exception {
+        Map<String, Object> edited = new LinkedHashMap<>();
+        edited.put("classifications", List.of("PII", "MSISDN"));
+        edited.put("dataset", "subscribers");
+        edited.put("columns", List.of("ID"));
+        edited.put("mode", "partial");
+        edited.put("keep_last", 3);
+        PipelineConfig.Step step = stepSavedAs(dir, "transform.mask", PipelineConfig.Step.MASK,
+                Map.of("columns", List.of("ID")), edited);
+        assertEquals(List.of("PII", "MSISDN"), step.config().get("classifications"));
+        assertEquals("subscribers", String.valueOf(step.config().get("dataset")));
+        assertEquals(List.of("ID"), step.config().get("columns"));
+        assertEquals("partial", String.valueOf(step.config().get("mode")));
+        assertEquals("3", String.valueOf(step.config().get("keep_last")));
+        assertEquals(List.of("classifications", "dataset", "columns", "mode", "keep_last"),
+                NodeAttributes.forType("transform.mask").stream().map(NodeAttribute::key).toList(),
+                "the declared table is exactly the keys this round trip proves");
+    }
+
     /**
      * Lift a fixture whose chain is {@code steps: [{kind: authored}]}, replace the {@code nodeType} node's config
      * with {@code edited}, strict-lower, save, re-read — returning the one step of {@code kind}.

@@ -76,4 +76,23 @@ class EditionFeaturesTest {
         assertEquals(List.of(EditionFeatures.SINK_ARCHIVE), EditionFeatures.pipelineRefusals(pipeline(dir, true, "MOVE"))
                 .stream().map(EditionFeatures.Refusal::feature).toList());
     }
+
+    /** SEC-08 (2026-10-06): a mask step is Enterprise-only — refused in a draft's chain AND inside a route branch. */
+    @Test
+    void aMaskStepIsRefusedOutsideEnterpriseEvenInsideABranch() {
+        Map<String, Object> draft = new LinkedHashMap<>();
+        draft.put("steps", List.of(
+                Map.of("mask", Map.of("columns", List.of("msisdn"))),
+                Map.of("route", Map.of("branches", List.of(Map.of("key", "b",
+                        "steps", List.of(Map.of("mask", Map.of("columns", List.of("imsi"))))))))));
+        List<EditionFeatures.Refusal> r = EditionFeatures.pipelineRefusals(draft);
+        assertEquals(List.of("steps[0].mask", "steps[1].route.branches[0].steps[0].mask"),
+                r.stream().map(EditionFeatures.Refusal::field).toList());
+        assertTrue(r.get(0).message().contains("Enterprise"), r.get(0).message());
+        assertFalse(EditionFeatures.present(EditionFeatures.PII_MASK), "no provider in this module: absent");
+        EditionFeatures.overrideForTest(Set.of(EditionFeatures.PII_MASK));
+        assertEquals(List.of(), EditionFeatures.pipelineRefusals(draft), "a declared feature lifts the refusal");
+        EditionFeatures.overrideForTest(Set.of(EditionFeatures.SINK_ARCHIVE, EditionFeatures.SINK_DUCKLAKE));
+        assertEquals(2, EditionFeatures.pipelineRefusals(draft).size(), "Professional features do not lift it");
+    }
 }

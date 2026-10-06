@@ -1,0 +1,6 @@
+name: orders
+physicalRef: orders
+columns[3]{name,classification}:
+  ORDER_ID,ACCOUNT
+  REGION,""
+  STATUS,""

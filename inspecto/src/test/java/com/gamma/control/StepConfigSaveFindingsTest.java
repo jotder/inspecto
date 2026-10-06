@@ -111,6 +111,34 @@ class StepConfigSaveFindingsTest {
                 Map.of("filter", Map.of("where", "ID_hash IS NOT NULL AND QTY > 0"))))));
     }
 
+    // ── mask (quality.pii.mask, 2026-10-06) ─────────────────────────────────────
+
+    @Test
+    void aMaskWithNothingToMaskIsRefused(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true,
+                List.of(Map.of("mask", Map.of("mode", "full"))))), "steps[0].mask", "something to mask");
+    }
+
+    @Test
+    void aMaskByClassificationWithoutADatasetOrWithAnUnknownClassIsRefused(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("mask",
+                Map.of("classifications", List.of("PII")))))), "steps[0].mask", "dataset");
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("mask",
+                Map.of("classifications", List.of("SECRET"), "dataset", "d"))))), "steps[0].mask", "'SECRET'");
+    }
+
+    @Test
+    void aMaskVaultKeyIsRefusedByName(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("mask",
+                Map.of("columns", List.of("ID"), "vault", "v"))))), "steps[0].mask", "'vault'");
+    }
+
+    @Test
+    void aMaskOverAnUndeclaredColumnIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("mask",
+                Map.of("columns", List.of("EMAIL"), "mode", "partial"))))), "steps[0].mask", "EMAIL");
+    }
+
     // ── filter ───────────────────────────────────────────────────────────────────
 
     @Test
