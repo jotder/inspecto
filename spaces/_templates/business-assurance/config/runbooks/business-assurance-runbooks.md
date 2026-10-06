@@ -21,7 +21,9 @@ Dataset `ba_revenue_forecast`. The Incident names the day as `key.ds`.
 **What fired.** Three days in a row fell outside the band, so the forecast treated it as a new level. It
 re-based on the actual. The model reports the shift once, on its third day, and does not report the first two
 days as separate breaches. While a run is still shorter than three days, those days show as
-`ba_revenue_outside_band` Alerts. They heal when the run becomes a regime change.
+`ba_revenue_outside_band` Alerts. They heal when the run becomes a regime change. This is accepted
+behaviour: on a live tail a real shift raises up to K - 1 (`regime_k` - 1, two at the default) spike Alerts
+before its single regime Incident, and those spike Alerts heal; treat them as early warning of the shift.
 
 1. Confirm the new level is real: a price change, a lost or new partner, a changed feed.
 2. A step down with no business cause is a loss. Look for the Pipeline or Collector change on that date.

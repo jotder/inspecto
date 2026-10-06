@@ -364,7 +364,8 @@ earlier days are NOT reported as `outside_band` (only a run shorter than K is a 
 `drift_change = 1`, re-bases the level and adds a slope estimate from the CUSUM run to the trend; out-of-band
 days do not feed it, so a spike or a shift never trips it. Consequence for a live tail: a run that is still
 shorter than K reads as `outside_band` and becomes a regime change (its spike Alerts heal) if it reaches K, so
-a real shift can raise up to K − 1 spike Alerts before its one regime Incident. The anchor row must type the
+a real shift can raise up to K − 1 spike Alerts before its one regime Incident — **accepted as designed
+(operator, 2026-10-06)**: the spike Alerts heal, and the pack runbook documents it. The anchor row must type the
 CUSUM state `DOUBLE`: a `0.0` literal is `DECIMAL(2,1)`. At the default `cusum_h` 8 the sum resets before it
 reaches 10, so this matters only when `cusum_h` is raised; the golden test raises it to 12 and fails without the
 cast. ⚠ **Drift bound:** the CUSUM catches a trend change of roughly ≥ 0.2σ/day (+4/day on this corpus, caught on
@@ -417,7 +418,9 @@ dashboard (`telco_fraud_overview`: the four KPI tiles plus one bar Widget per ty
 keyed on the offender — the golden test renders every tile through `/kpis/{id}/value` and `/bi/query`), and `config/runbooks/telco-fraud-runbooks.md` (plain Markdown: there is no
 runbook component kind; parked on demand, decided 2026-10-04: it would be new model + SPA + API surface with no named consumer, so no build until a customer asks), which names the known false-positive sources that have no defence. **Edition gating (decided 2026-10-04): none** — the template ships to all editions (editions are build flavours, the template is plain config; anyone holding the needed capabilities can create it). **Two product gaps decided DEFER 2026-10-04, no build until a customer asks:** a Dataset whose Schema comes from its producing Job (the pack ships zero-row `data/fraud_*/seed.parquet` Schema seeds instead) and an incremental Job Type mode (the Jobs emulate it with daily full-window runs); both are model-level changes touching every pack. Known limits (not product gaps): thresholds are generic defaults (the vendor-specific half
 stays parked); each run reads and rewrites the whole retained sink, and the identity / dealer / voucher / reversal
-sinks keep every entity, so they grow with the subscriber base.
+sinks keep every entity, so they grow with the subscriber base — **sizing documented (operator, 2026-10-06)**:
+size by subscriber count x `retention_days`, since each run rewrites the retained sink (pack runbook §
+*Sizing and retention*).
 
 Detection semantics worth knowing: dialled numbers are normalised to one E.164-digit format (`+` / `00` stripped,
 national `0…` → `home_cc` + NSN) before a prefix list is matched with `starts_with`, entries of any length; a prefix
@@ -441,7 +444,8 @@ candidates); `fraud_simbox` keeps only lines with ≥ `min_candidate_targets` ta
 reversal sinks still keep every entity. ⚠ **The exemption lists are a trust assumption**: `exempt_doc_prefixes`
 matches a prefix of `id_doc`, which the dealer enters, so a made-up `CORP-FAKE` document is exempted (pinned in the
 corpus as a known risk). The lists must come from a verified register, never from a field the monitored party
-controls; matching a registered-document Reference Dataset instead is open. ⚠ **Seeds, and
+controls; matching a verified-register Reference Dataset will be built WHEN a customer supplies one (operator,
+2026-10-06); until then the prefix-spoof risk stays pinned and documented. ⚠ **Seeds, and
 why.** The per-entity Alert Rule save gate (`AlertRoutes.requireGroupingColumns`, run by the template seed gate) and
 the KPI gate both read the Dataset's Schema and fail closed on a Dataset with no data, and the Jobs read their own
 sink; so the template ships a **zero-row seed snapshot** per sink (`data/fraud_<typology>/seed.parquet`), replaced by

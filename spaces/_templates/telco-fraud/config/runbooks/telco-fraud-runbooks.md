@@ -30,13 +30,23 @@ corporate-account register), never from a value the monitored party controls. `e
 PREFIX of `id_doc`, and `id_doc` is entered by the dealer, the party the dealer typology watches: a dealer who
 types `CORP-FAKE` is exempted. The shipped default `CORP-` carries that risk, and the golden corpus pins it (a
 `CORP-FAKE` document with 12 lines raises nothing). Replace it with a list of registered document prefixes, or
-empty it (`none`), before relying on this typology.
+empty it (`none`), before relying on this typology. Matching the exemptions against a verified register
+loaded as a Reference Dataset will be built when a customer supplies such a register; until then the
+prefix-spoof risk stays pinned and documented here.
 
 **Scaling.** A `sql.template` run reads and rewrites its whole sink: every retained window, about
 `retention_days` x the daily candidate rows. Keep the candidates few: `fraud_simbox` keeps only lines with at
 least `min_candidate_targets` voice targets (default 10). `fraud_identity`, `fraud_dealer`, `fraud_voucher` and
 `fraud_reversal` still keep one row per document, dealer, serial or paying line, so their sinks grow with the
 subscriber base.
+
+**Sizing and retention.** Each run rewrites the whole retained sink, so size storage and run time by
+subscriber count x retention: for the entity-keyed sinks (`fraud_identity`, `fraud_dealer`, `fraud_voucher`,
+`fraud_reversal`) plan for about one row per active entity per retained window, that is up to
+(active subscribers, documents, dealers, serials or paying lines) x `retention_days` rows, rewritten on every
+run. The traffic sinks are bounded by daily candidates x `retention_days`. Shorten `retention_days` to cut
+both the sink size and the per-run rewrite; keep it at least as long as an offender should stay alerted, since
+a key heals when its evidence ages out.
 
 **Number formats.** Subscriber numbers are E.164 digits with no `+`. Dialled numbers may be `+<E.164>`,
 `00<E.164>`, national `0<NSN>` or bare E.164. The Jobs normalise all four (`home_cc` supplies the country
