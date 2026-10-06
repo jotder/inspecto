@@ -344,7 +344,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-SNK-14 | 🪝 Outbound webhook dispatcher (`sink.api.webhook`) | Sinks, Storage & Destinations | — | ✅ | ✅ | `sink.webhook` | top-level `webhook:` — JSON batches to an https Connection, at-rest lane, Professional+ |
 | SP-SNK-15 | 🕳️ Dead-letter queue (`sink.dlq`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
 
-**Count:** 119 processors — 36 delivered, 18 partial, 65 planned.
+**Count:** 119 processors — 40 delivered, 18 partial, 61 planned.
 
 | ~~SP-DQ-09~~ | ~~🧹 Whitespace & string sanitizer (`quality.cleanse.trim`)~~ | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.sql` | **FOLDED into SP-XFM-01 (Record Transformer) 2026-09-04** — it is the `text.trim` / `text.pad_left` / `text.replace` rows of that grid, no longer a separate catalog entry |
 | ~~SP-XFM-02~~ | ~~🔄 Field type cast & renamer matrix (`transform.cast`)~~ | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.sql` | **FOLDED into SP-XFM-01 2026-09-04** — cast is the `convert.type` row, rename is the Field-name alias |

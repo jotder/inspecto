@@ -959,16 +959,6 @@ public final class RowShaper {
         return List.of(new Relation(PipelineRel.DATA, data));
     }
 
-    /** The inbound relation's columns and their DuckDB types, in declaration order. */
-    private static Map<String, String> columnTypesOf(Connection conn, String table) throws SQLException {
-        Map<String, String> out = new LinkedHashMap<>();
-        try (Statement st = conn.createStatement();
-             java.sql.ResultSet rs = st.executeQuery("DESCRIBE " + q(table))) {
-            while (rs.next()) out.put(rs.getString("column_name"), rs.getString("column_type"));
-        }
-        return out;
-    }
-
     // ── SQL transformer (one author SELECT over the typed input) ──────────────────
 
     /**

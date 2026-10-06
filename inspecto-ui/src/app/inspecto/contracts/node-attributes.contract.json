@@ -514,6 +514,20 @@
     "help" : "A duration (60m, 24h, 30s, 7d) or a row count (5 rows).",
     "placeholder" : "60m"
   } ],
+  "transform.hash" : [ {
+    "key" : "columns",
+    "label" : "Columns to hash",
+    "type" : "list",
+    "tier" : "required",
+    "help" : "Each named column is replaced by a salted one-way token (masked:<16 hex>), the same within this Space so it can still be joined on.",
+    "placeholder" : "MSISDN"
+  }, {
+    "key" : "keep_original",
+    "label" : "Keep the original column",
+    "type" : "boolean",
+    "tier" : "optional",
+    "help" : "When on, the original column stays and the token is added as <column>_hash. Off (the default) replaces the value in place."
+  } ],
   "transform.mask" : [ {
     "key" : "classifications",
     "label" : "Mask classifications",
@@ -558,6 +572,49 @@
     "tier" : "optional",
     "min" : 1.0,
     "help" : "Partial mode only: how many trailing characters stay visible (default 4). A value no longer than N is masked whole."
+  } ],
+  "transform.explode" : [ {
+    "key" : "column",
+    "label" : "Array column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "A LIST column, or a text/JSON column holding a JSON array (a parser.json feed lands arrays as text).",
+    "placeholder" : "charges"
+  }, {
+    "key" : "as",
+    "label" : "Element column",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "The column each element is written to. Blank = the array column's own name.",
+    "placeholder" : "charge"
+  }, {
+    "key" : "index_column",
+    "label" : "Index column",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "Adds the element's 1-based position. Blank = no index column.",
+    "placeholder" : "charge_no"
+  }, {
+    "key" : "keep_source",
+    "label" : "Keep the array column",
+    "type" : "boolean",
+    "tier" : "optional",
+    "default" : false,
+    "help" : "Keep the original array beside the element (then the element column needs its own name)."
+  }, {
+    "key" : "on_empty",
+    "label" : "Empty or null array",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "keep",
+    "options" : [ {
+      "value" : "keep",
+      "label" : "Keep the row with a null element"
+    }, {
+      "value" : "drop",
+      "label" : "Drop the row"
+    } ],
+    "help" : "What happens to a row whose array is empty, null or not an array."
   } ],
   "transform.matrix.unpivot" : [ {
     "key" : "columns",
