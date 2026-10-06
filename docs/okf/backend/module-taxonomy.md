@@ -9,7 +9,7 @@ timestamp: 2026-10-06T00:00:00Z
 
 # Module taxonomy
 
-> 🟢 **Status (2026-10-06): target model; P0, P1 (part), P2a, P2b, P3a (build-id stamp + boot check; jar split not done), P4a (removal semantics, characterised + fixed) and P5a (test kit + RouteModule TCK) built.** Vocabulary is in `docs/GLOSSARY.md` §15.
+> 🟡 **Status (2026-10-07): in flight; every phase P0..P7 has a shipped slice, none is finished** (phase table and remaining work: the plan header; open items are `MODULE-REORG-*` rows in `docs/BACKLOG.md`). Vocabulary is in `docs/GLOSSARY.md` §15.
 > Built: the per-module manifest (`META-INF/inspecto/module.toon`, all 34 modules), the activator
 > (`com.gamma.module` in `inspecto-util`) and `GET /modules`; the per-Space **Enabled** gate (`modules.toon`, `GET|PUT /settings/modules` — a route of a
 > disabled module answers 404 `MODULE_DISABLED`, `/bootstrap` `features{}` and `GET /modules` `enabledInSpace` follow it).

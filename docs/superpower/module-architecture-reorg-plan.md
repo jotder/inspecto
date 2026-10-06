@@ -1,8 +1,27 @@
 # Module architecture reorganisation — plan (2026-10-06, revised the same day)
 
-> 🟢 **PLAN — analysis only, nothing built; ALL decisions D-MR1…D-MR12 taken (operator, 2026-10-06, §8).**
-> **Progress 2026-10-06:** P0 ✅ shipped; P2b ✅ per-Space Enabled gate (see §6 *P2b as built*); P4a ✅ removal semantics characterised + fixed (see §6 *P4a as built*); P1 partly (governable kinds ✅, `features{}` + SPA nav gating ✅ — see §6 *P1 decision log*). Still open in P1: `OperationalDb.Family` contribution (survey done: `StoreFamily` interface + `StoreFamilyProvider`, update `check-family-count.mjs` and the 15-count tests to core+loaded), contributed OpenAPI fragments, 503 stubs (needs P2 manifests). RBAC capabilities deferred to P2 (P1-D3). Then P2.
-> Row to file on approval: `MODULE-REORG-1` (not yet in `BACKLOG.md`).
+> 🟡 **IN FLIGHT (2026-10-07) — decisions D-MR1…D-MR12 all taken (operator, 2026-10-06, §8); P0..P7 each have a shipped slice, none is finished.** Row: `MODULE-REORG-1` (+ the follow-up rows below). Not shipped as a whole, so the plan stays here.
+>
+> | Phase | State | Commits |
+> |---|---|---|
+> | P0 vocabulary + baseline | shipped | `08c2b2848` |
+> | P1 open the registries | partial (routes, governable kinds, `features{}`/SPA nav shipped) | `0957bc0a5`, `62b82003f` |
+> | P2 manifest + activator + gates | partial (P2a manifest/activator/`GET /modules`; P2b per-Space Enabled; regroup deferred) | `ba3b20b6c`, `657527ae7` |
+> | P3 packaging | partial (P3a build-id stamp + boot check; no thin jars) | `eb9fb19ab` |
+> | P4 removal semantics | partial (P4a characterised + fixed; P4-1..P4-3 filed) | `42c98fd6d` |
+> | P5 test kit + TCKs | partial (P5a kit + RouteModule TCK) | `33feba371` |
+> | P6 Offerings | partial (P6a Offerings as a checked artifact; build not re-plumbed) | `b26188cb3` |
+> | P7 selective moves | partial: observability `0489ac3a0`, security split `33c3e5e4d`, EgressPolicy `4eb64c000`, Kafka `e2783a9bf`, ASN pack `0c0e483d5`, Workflow models `4e863cb6d`, Reconciliation `c5cb8ea4f`, Scoring `064d3114d` + `e51a73bec` + `900e2bc0a`, condition language `e5f22ebe9` + `d3215dcfa`; modules screen `70c2ee075`; CI wiring `c404ee383`; path-agnostic guards `27b210988` | as listed |
+>
+> **Remaining work (each is a BACKLOG row, §4 *Module architecture*):**
+> - **P1** — `MODULE-REORG-P1-FAMILY`: `OperationalDb.Family` as a contribution point; entangled with `ServiceStores`/Incidents, so it goes with the Incidents extraction. Also open, no row yet: contributed OpenAPI fragments per module; `Absent*` 503 stubs synthesised from manifests (needs the thin-jar/Offering packaging of absent modules' manifests); RBAC capabilities contribution (P1-D3, also P2 `provides`).
+> - **P2** — `MODULE-REORG-D-MR2`: directory regroup deferred to a quiet window (recipe in §6 *P2a as built*); capabilities in `provides`.
+> - **P3** — `MODULE-REORG-P3-THIN-JARS`: thin per-module jars, Offering-driven launcher classpath, jdeps-derived jlink set, per-module SBOM; signing needs split packages 8 to 0 (incl. the deliberate telecom-asn1 exception).
+> - **P4** — P4-1..P4-3 already filed (`MODULE-REORG-P4-1`, `-P4-2`, `-P4-3`).
+> - **P5** — `MODULE-REORG-P5-TCKS`: processor-free route tests where impossible today (exchange needs its `register()` host installs moved to a boot hook; other la-api route classes; geo-link `InvestigationMeasureRoutes`); TCKs for Authenticator, TokenRelay, CollectorConnectorFactory, NotificationChannel, DescriptionProvider, MaintenanceTaskProvider, JobTypeProvider.
+> - **P6** — EDITIONS/FEATURE_INVENTORY generation needs a `posture{}` section and capabilities in `provides`; bundle generator driven by Offerings (rides on `MODULE-REORG-P3-THIN-JARS`).
+> - **P7** — `MODULE-REORG-P7-INCIDENTS` (Incidents / Case Management split, Action Requests, Workflow & SLA slice 2 sweep behind a governed-item contract, linked-subject contract; **open design question:** `alert` depends on the object substrate via `ObjectAccess` and Alerts persist ALERT objects, contradicting "Personal has Alerts but no operational objects" unless `ObjectAccess` has a null/in-memory implementation on Personal); `MODULE-REORG-P7-KERNEL` (Decision Kernel steps 1, 3-7: Expectation non_null/range/regex onto the tree, Tag and Case Rule filters, Notification Rules, Risk filters, Escalation match, Access Policies' Conditions text compiled into the tree, retire the duplicate evaluator, Consequence registry); `MODULE-REORG-P7-CONTRACTS` (contract modules shed AccessPolicies/AuditTrail/EventLog/AuditChain/InMemoryEventStore/SecretScrubber/MetricRegistry/Roles family/CapabilityManifest, order per the 2026-10-06 survey).
+> - **Guards / review** — `MODULE-REORG-GUARD-1` (`ImportLoaderInventoryTest` red since P2a; operator decision), `MODULE-REORG-REVIEW-1` (reviewer checklist).
 > Inputs: *Enterprise-Grade Modular Architecture Guidelines* (PDF, 4 pages) and the "System Architecture
 > Topology" mock-up (four layers + a per-module inspector). Operator brief: long-term benefit across
 > development, test, packaging, offering, editioning and deployment of itemized distribution; **no version
