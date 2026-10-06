@@ -183,6 +183,7 @@
                                     <manifestEntries>
                                         <Implementation-Title>${project.artifactId}</Implementation-Title>
                                         <Implementation-Version>${project.version}</Implementation-Version>
+                                        <Inspecto-Build-Id>${inspecto.build.id}</Inspecto-Build-Id>
                                     </manifestEntries>
                                 </transformer>
                                 <!-- Merge JDBC driver service registrations from all dependencies -->

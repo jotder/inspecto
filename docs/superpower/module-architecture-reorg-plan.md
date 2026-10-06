@@ -154,7 +154,7 @@ isolation.
   module and merged at boot (the OpenAPI document becomes a generated artifact, checked for collisions).
 - **Packaging:** thin core jar + one jar per module in `modules/`; the launcher builds the classpath from the
   Offering; per-module SBOM; the `jlink` set derived with `jdeps` from the jars actually shipped; the build-id
-  stamp checked at boot. Per-module jars can then be signed — which requires the split packages gone.
+  stamp checked at boot (**partly done, P3a**: stamped on every jar and checked at boot; the thin-core + `modules/` split is not). Per-module jars can then be signed — which requires the split packages gone.
 - **Test:** a **platform test kit** (real-HTTP control plane over in-memory stores, a fake Space, a fake
   authenticator with two principals for four-eyes) so a Feature's tests do not boot the full processor;
   TCKs for every contract with two or more implementers (`Authenticator`, `TokenRelay`, `RouteModule`,
@@ -326,6 +326,30 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
 - Deferred to later P2 steps: directory/artifactId regroup (D-MR2), per-Space Enabled gate, capabilities in
   `provides` (P1-D3), 503 stubs synthesised from manifests, `/bootstrap` reading the three gates.
 - `route-gating.md` was already stale from the P1 `featureIds()` line shifts; it was regenerated with this change.
+
+### P3a as built (2026-10-07 — the build-id stamp and its boot check; the jar split is NOT done)
+- **Stamp:** manifest attribute `Inspecto-Build-Id` on every module jar, set ONCE in the parent pom: `maven-jar-plugin`
+  `pluginManagement` (pinned 3.4.2, the version the default lifecycle already resolved offline) for thin jars; the
+  sidecar shades keep the project jar's manifest, and the processor's `ManifestResourceTransformer` repeats the entry
+  next to `Implementation-Version` (HOME-VERSION-1). Verified: processor, `inspecto-util` (thin) and the connectors
+  sidecar all carry the same value.
+- **Decision — the value is the git short sha ONLY, from a property:** `-Dinspecto.build.id=<sha>`, default `dev`.
+  No timestamp (a timestamp makes every jar of two builds of one commit differ, and breaks reproducibility) and no
+  `buildnumber-maven-plugin` (not in the offline `~/.m2`). `package.ps1` computes the sha (`git rev-parse --short HEAD`,
+  `dev` without git) and passes it to all three of its `mvn` runs; CI passes the same property.
+  `Inspecto-Module-Id` was **not** added: a jar can hold several manifests and `artifactId` is not the module id.
+- **Boot check:** `ModuleManifests.load(loader, hostClass)` reads each `module.toon` URL's jar manifest (`ModuleManifest.buildId`,
+  filled by the loader, never declared in the file) and the host jar's stamp (`Loaded.hostBuildId`, the jar holding
+  `ModulesRoutes`). `ModuleActivator.resolve(manifests, hostBuildId)` starts a mismatched module INERT, reason
+  `build id <x> does not match host <y>`; its dependants go inert through the existing fixpoint. The loader also adds a
+  diagnostic per mismatch. The activator stays pure (stamps arrive as data).
+- **Never trips on:** an absent stamp, `dev`, an exploded directory (no manifest) or an unknown host — the IDE/test
+  class path is the common case. A module merged into the processor's shaded `module.toon` carries the host's own stamp,
+  so only a sidecar jar can mismatch.
+- **Surface:** `GET /modules` gains `hostBuildId` and per-module `buildId`. `openapi-v1.json` holds a schema-less skeleton for the
+  route, so it did not change. The loader now opens each resource uncached (a cached `jar:` stream left the jar locked on Windows).
+- **Packaging check:** `package.ps1` fails when the staged `inspecto*.jar` files carry more than one distinct non-`dev`
+  build id, or when a fresh build's id differs from the staged one. **Not run end to end** (`package.ps1` was parse-checked only).
 
 ### P2b as built (2026-10-06 — the per-Space Enabled gate, D-MR10)
 - **Document:** `modules.toon` = `disabled: [feature ids]` in the Space config root (absent = all enabled, so a newly

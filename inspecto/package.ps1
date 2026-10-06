@@ -211,6 +211,11 @@ if ($DemoAuth) {
     $bundleDir = Join-Path $sandboxRoot 'inspecto-demo'
 }
 
+# MODULE-REORG-1 P3a: ONE build id for every jar of this bundle - the git short sha, stamped into each jar's manifest
+# as Inspecto-Build-Id by the parent pom (-Dinspecto.build.id). A checkout without git builds as 'dev' (unknown: never a mismatch).
+$buildId = 'dev'
+try { $sha = (& git -C $sandboxRoot rev-parse --short HEAD 2>$null); if ($LASTEXITCODE -eq 0 -and $sha) { $buildId = "$sha".Trim() } } catch { }
+Write-Host "Build id: $buildId" -ForegroundColor DarkGray
 # ── step 1: build ─────────────────────────────────────────────────────────────
 # Built from the repo root with -pl inspecto -am (same idiom as step 1c) because since S5 the
 # core depends on reactor siblings (inspecto-api, …) — a core-alone build from inspecto/
@@ -221,7 +226,7 @@ if (-not $NoBuild) {
     Push-Location $sandboxRoot
     # CONNECTORS-BUNDLE-1: `inspecto-connectors` is NOT upstream of `inspecto`, so `-am` (which walks
     # upstream only) never reaches it - it has to be named explicitly or the sidecar is silently absent.
-    & mvn clean package -pl inspecto,inspecto-connectors -am -DskipTests -q
+    & mvn clean package "-Dinspecto.build.id=$buildId" -pl inspecto,inspecto-connectors -am -DskipTests -q
     if ($LASTEXITCODE -ne 0) { throw "mvn build failed" }
     Pop-Location
     Write-Host "Build complete." -ForegroundColor Green
@@ -315,7 +320,7 @@ if ($Edition -ne 'Personal') {
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
-        & mvn clean package "-P$editionProfile" -pl $modules -am -DskipTests -q
+        & mvn clean package "-P$editionProfile" "-Dinspecto.build.id=$buildId" -pl $modules -am -DskipTests -q
         if ($LASTEXITCODE -ne 0) { throw "mvn build of the $Edition edition modules failed" }
         Pop-Location
     }
@@ -894,6 +899,32 @@ try {
     Write-Host "  verified: $factories connector factories + sshj present in the sidecar" -ForegroundColor DarkGray
 } finally { $connZip.Dispose() }
 
+# -- MODULE-REORG-1 P3a: every staged module jar must carry the SAME Inspecto-Build-Id (plan §2.4 / §5). A jar left over from
+# an older build (-NoBuild, a stale sidecar) would otherwise boot as a mismatched module - inert at run time, silent at
+# package time. 'dev' (an unstamped local build) is unknown, so a git-less checkout still bundles.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$stamps = @{}
+foreach ($stagedJar in Get-ChildItem -Path $bundleDir -Filter 'inspecto*.jar' -File) {
+    $z = [System.IO.Compression.ZipFile]::OpenRead($stagedJar.FullName)
+    try {
+        $mfEntry = $z.GetEntry('META-INF/MANIFEST.MF')
+        $stamp = $null
+        if ($mfEntry) {
+            $mr = New-Object System.IO.StreamReader($mfEntry.Open())
+            try { $m = [regex]::Match($mr.ReadToEnd(), '(?m)^Inspecto-Build-Id:\s*(\S+)'); if ($m.Success) { $stamp = $m.Groups[1].Value } } finally { $mr.Close() }
+        }
+        $stamps[$stagedJar.Name] = $stamp
+    } finally { $z.Dispose() }
+}
+$distinct = @($stamps.Values | Where-Object { $_ -and $_ -ne 'dev' } | Sort-Object -Unique)
+if ($distinct.Count -gt 1) {
+    throw "bundle jars carry different Inspecto-Build-Id values ($($distinct -join ', ')): $(($stamps.GetEnumerator() | Sort-Object Name | ForEach-Object { $_.Name + '=' + $_.Value }) -join '; '). Rebuild without -NoBuild so every jar is stamped by one build."
+}
+if (-not $NoBuild -and $buildId -ne 'dev' -and $distinct.Count -eq 1 -and $distinct[0] -ne $buildId) {
+    throw "bundle jars carry Inspecto-Build-Id $($distinct[0]) but this build is $buildId."
+}
+Write-Host "  verified: $($stamps.Count) module jars, build id $(if ($distinct.Count) { $distinct[0] } else { 'dev (unstamped)' })" -ForegroundColor DarkGray
+
 # ── step 3a: Professional/Enterprise — bundle the PostgreSQL JDBC driver as a sidecar (PG-1) ─────────
 # The fat JAR and its SBOM stay JDBC-driver-free by design (inspecto/pom.xml, inspecto-engine/pom.xml);
 # the driver rides the bundle as postgresql.jar, auto-detected by serve.sh/serve.bat exactly like
@@ -931,7 +962,7 @@ if ($sbomExit -ne 0) { throw "SBOM generation failed (exit $sbomExit) — a bund
 if ($DemoAuth) {
     if (-not $NoBuild) {
         Push-Location $sandboxRoot
-        & mvn package -pl inspecto-demo-auth -am -DskipTests -q
+        & mvn package "-Dinspecto.build.id=$buildId" -pl inspecto-demo-auth -am -DskipTests -q
         if ($LASTEXITCODE -ne 0) { throw "mvn build of inspecto-demo-auth failed" }
         Pop-Location
     }

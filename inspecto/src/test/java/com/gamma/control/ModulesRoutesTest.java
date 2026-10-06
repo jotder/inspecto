@@ -69,6 +69,18 @@ class ModulesRoutesTest {
         assertEquals(List.of("bad.toon: nope"), out.get("diagnostics"));
     }
 
+    @Test
+    void aModuleWhoseBuildIdDiffersFromTheHostIsInertAndReported() {
+        ModuleManifest stale = new ModuleManifest("geo-link", "Geo", "implementation", "optional", "boot",
+                ModuleManifest.Provides.NONE, ModuleManifest.Requires.NONE, null, "old111");
+        Map<String, Object> out = ModulesRoutes.build(new ModuleManifests.Loaded(List.of(stale), List.of("module 'geo-link': x"), "new222"));
+        assertEquals("new222", out.get("hostBuildId"));
+        @SuppressWarnings("unchecked") Map<String, Object> m = (Map<String, Object>) ((List<?>) out.get("modules")).get(0);
+        assertEquals("old111", m.get("buildId"));
+        assertEquals("INERT", m.get("state"));
+        assertEquals(List.of("build id old111 does not match host new222"), m.get("reasons"));
+    }
+
     private static JsonNode byId(JsonNode modules, String id) {
         List<JsonNode> hit = new ArrayList<>();
         for (JsonNode m : modules) if (id.equals(m.get("id").asText())) hit.add(m);

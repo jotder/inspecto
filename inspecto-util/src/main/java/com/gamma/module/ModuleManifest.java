@@ -8,9 +8,23 @@ import java.util.List;
  * here — {@link ModuleActivator} computes it from what actually bound.
  *
  * @param entitlementKey reserved (D-MR3: no licence engine); always nullable and never consulted
+ * @param buildId the {@code Inspecto-Build-Id} of the jar this manifest was read from (P3a); {@code null} when
+ *                unknown — an exploded directory, an unstamped jar or a {@code dev} build. Filled by the loader,
+ *                never declared in {@code module.toon}.
  */
 public record ModuleManifest(String id, String title, String buildRole, String offeringRole, String bindingTime,
-                             Provides provides, Requires requires, String entitlementKey) {
+                             Provides provides, Requires requires, String entitlementKey, String buildId) {
+
+    /** A manifest with no build stamp (tests, parse). */
+    public ModuleManifest(String id, String title, String buildRole, String offeringRole, String bindingTime,
+                          Provides provides, Requires requires, String entitlementKey) {
+        this(id, title, buildRole, offeringRole, bindingTime, provides, requires, entitlementKey, null);
+    }
+
+    public ModuleManifest withBuildId(String stamp) {
+        return new ModuleManifest(id, title, buildRole, offeringRole, bindingTime, provides, requires, entitlementKey, stamp);
+    }
+
 
     public static final List<String> BUILD_ROLES = List.of("foundation", "contract", "platform", "implementation");
     public static final List<String> OFFERING_ROLES = List.of("base", "optional", "provider", "internal");

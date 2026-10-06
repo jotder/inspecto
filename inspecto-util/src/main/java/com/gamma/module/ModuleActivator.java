@@ -15,14 +15,20 @@ public final class ModuleActivator {
     private ModuleActivator() {}
 
     /** One status per manifest, in input order. */
-    public static List<ModuleStatus> resolve(List<ModuleManifest> manifests) {
+    public static List<ModuleStatus> resolve(List<ModuleManifest> manifests) { return resolve(manifests, null); }
+
+    /**
+     * As {@link #resolve(List)}, plus the build-id gate (plan §2.4 "build id matches"): a module whose stamp differs
+     * from {@code hostBuildId} starts INERT. An absent stamp on either side (null) is "unknown", never a mismatch.
+     */
+    public static List<ModuleStatus> resolve(List<ModuleManifest> manifests, String hostBuildId) {
         Set<String> active = new HashSet<>();
-        for (ModuleManifest m : manifests) active.add(m.id());
+        for (ModuleManifest m : manifests) if (!mismatch(m, hostBuildId)) active.add(m.id());
         boolean changed = true;
         while (changed) {
             changed = false;
             for (ModuleManifest m : manifests)
-                if (active.contains(m.id()) && !unmet(m, manifests, active).isEmpty()) {
+                if (active.contains(m.id()) && !unmet(m, manifests, active, hostBuildId).isEmpty()) {
                     active.remove(m.id());
                     changed = true;
                 }
@@ -31,15 +37,24 @@ public final class ModuleActivator {
         for (ModuleManifest m : manifests) {
             boolean on = active.contains(m.id());
             out.add(new ModuleStatus(m.id(), on ? ModuleStatus.State.ACTIVE : ModuleStatus.State.INERT,
-                    on ? List.of() : unmet(m, manifests, active)));
+                    on ? List.of() : unmet(m, manifests, active, hostBuildId)));
         }
         return out;
     }
 
-    private static List<String> unmet(ModuleManifest m, List<ModuleManifest> all, Set<String> active) {
+    static boolean mismatch(ModuleManifest m, String host) {
+        return host != null && m.buildId() != null && !host.equals(m.buildId());
+    }
+
+    static String mismatchReason(ModuleManifest m, String host) {
+        return "build id " + m.buildId() + " does not match host " + host;
+    }
+
+    private static List<String> unmet(ModuleManifest m, List<ModuleManifest> all, Set<String> active, String host) {
         Set<String> known = new HashSet<>();
         for (ModuleManifest x : all) known.add(x.id());
         List<String> reasons = new ArrayList<>();
+        if (mismatch(m, host)) reasons.add(mismatchReason(m, host));
         for (String r : m.requires().modules()) {
             if (!known.contains(r)) reasons.add("requires module '" + r + "', which is not installed");
             else if (!active.contains(r)) reasons.add("requires module '" + r + "', which is inert");

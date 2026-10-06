@@ -14,7 +14,7 @@ import java.util.Set;
 /**
  * The installed-module topology (MODULE-REORG-1 P2a):
  * <pre>
- *   GET /modules   {modules:[{id,title,buildRole,offeringRole,bindingTime,state,reasons,enabledInSpace,provides,requires}], diagnostics:[...]}
+ *   GET /modules   {hostBuildId, modules:[{id,title,buildId,buildRole,offeringRole,bindingTime,state,reasons,enabledInSpace,provides,requires}], diagnostics:[...]}
  * </pre>
  *
  * <p>Built from the manifests ({@code META-INF/inspecto/module.toon}) on the LIVE class path and resolved by
@@ -35,7 +35,7 @@ final class ModulesRoutes implements RouteModule {
 
     private ModuleManifests.Loaded loaded() {
         ModuleManifests.Loaded l = loaded;
-        if (l == null) loaded = l = ModuleManifests.load(ModulesRoutes.class.getClassLoader());
+        if (l == null) loaded = l = ModuleManifests.load(ModulesRoutes.class.getClassLoader(), ModulesRoutes.class);
         return l;
     }
 
@@ -45,7 +45,7 @@ final class ModulesRoutes implements RouteModule {
 
     /** {@code disabled}: the feature ids the current Space switched off; a module is {@code enabledInSpace} unless one of its features is. */
     static Map<String, Object> build(ModuleManifests.Loaded loaded, Set<String> disabled) {
-        List<ModuleStatus> statuses = ModuleActivator.resolve(loaded.manifests());
+        List<ModuleStatus> statuses = ModuleActivator.resolve(loaded.manifests(), loaded.hostBuildId());
         List<Object> modules = new ArrayList<>();
         for (int i = 0; i < statuses.size(); i++) {
             ModuleManifest m = loaded.manifests().get(i);
@@ -56,6 +56,7 @@ final class ModulesRoutes implements RouteModule {
             o.put("buildRole", m.buildRole());
             o.put("offeringRole", m.offeringRole());
             o.put("bindingTime", m.bindingTime());
+            o.put("buildId", m.buildId());
             o.put("state", s.state().name());
             o.put("reasons", s.reasons());
             o.put("enabledInSpace", m.provides().features().stream().noneMatch(disabled::contains));
@@ -73,6 +74,7 @@ final class ModulesRoutes implements RouteModule {
             modules.add(o);
         }
         Map<String, Object> out = new LinkedHashMap<>();
+        out.put("hostBuildId", loaded.hostBuildId());
         out.put("modules", modules);
         out.put("diagnostics", loaded.diagnostics());
         return out;

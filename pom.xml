@@ -268,6 +268,8 @@
     </profiles>
 
     <properties>
+        <!-- MODULE-REORG-1 P3a: the build identity stamped into every jar manifest (Inspecto-Build-Id); see maven-jar-plugin below. -->
+        <inspecto.build.id>dev</inspecto.build.id>
         <!-- Target JDK 24. Uses `release` so the build cannot accidentally rely on a newer JDK's API
              than the target. NOTE: the lean ETL core (inspecto) runs on JDK 24 cleanly. The
              optional inspecto-agent module depends on eoiagent (agent-kernel's replacement,
@@ -573,6 +575,24 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>3.13.0</version>
+                </plugin>
+                <!-- MODULE-REORG-1 P3a: ONE build-id stamp on every module jar (thin jars here; the shaded jars keep
+                     the project jar's manifest, the processor's transformer repeats it). The value is a property,
+                     default `dev` = "unstamped local build" which the boot check treats as unknown, never a mismatch.
+                     package.ps1 / CI pass -Dinspecto.build.id=<git short sha>. No buildnumber plugin: it is not in the
+                     offline repository, and a sha alone (no timestamp) keeps the jars reproducible. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <!-- Pinned to the version Maven 3.9's default lifecycle binding already used (offline repository). -->
+                    <version>3.4.2</version>
+                    <configuration>
+                        <archive>
+                            <manifestEntries>
+                                <Inspecto-Build-Id>${inspecto.build.id}</Inspecto-Build-Id>
+                            </manifestEntries>
+                        </archive>
+                    </configuration>
                 </plugin>
                 <!-- maven-shade-plugin: the fat-jar/sidecar builder. FIVE modules run it — inspecto
                      (the core fat jar) plus the inspecto-agent, inspecto-connectors,
