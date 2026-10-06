@@ -49,13 +49,15 @@ record ApprovalPolicy(Map<String, Rule> rules, int expiresAfterHours, boolean fa
      * The kinds a policy may name: exactly the kinds every authoring writer of which reaches
      * {@code PendingChanges.hold} ({@code ConfigWriteFunnelTest} holds that). The pipeline-shaped config
      * types written through {@code /config/write} + {@code /config/patch} (and, for {@code pipeline}, the
-     * graph, history-restore and the four Pipeline edits), and every {@link ComponentStore} kind but the three
-     * below. Bulk writers (bundle imports, BI template apply) and the Investigation Alert Rule bind refuse under
+     * graph, history-restore and the four Pipeline edits), and every {@link ComponentStore} kind but {@code requirement}
+     * (below). Bulk writers (bundle imports, BI template apply) and the Investigation Alert Rule bind refuse under
      * a policy instead ({@code PendingChanges.holdRefusing}).
      *
      * <p>{@code job} is governable since 2026-09-28 (operator): the six {@code /jobs} writers hold; a Job's
-     * RUN-time writes do not, by decision. ⛔ Deliberately NOT governable: {@code requirement} (a business request's triage lifecycle, not config the engine runs), {@code channel}
-     * and {@code notification-rule} (their {@code NotificationRoutes} writers are not held yet), Connections
+     * RUN-time writes do not, by decision. {@code channel} and {@code notification-rule}
+     * since 2026-10-06: the six {@code /notifications/channels*} + {@code /notifications/rules*} writers hold.
+     * ⛔ Deliberately NOT governable: {@code requirement} (a business request's triage lifecycle, not config the
+     * engine runs), Connections
      * (secret-aware CRUD of their own), and the Space settings documents — {@code approval.toon} above all,
      * since a policy that could hold its own change could never be turned off.
      */
@@ -63,7 +65,7 @@ record ApprovalPolicy(Map<String, Rule> rules, int expiresAfterHours, boolean fa
 
     private static Set<String> governable() {
         Set<String> s = new TreeSet<>(ComponentStore.WRITABLE_TYPES);
-        s.removeAll(Set.of("requirement", "channel", "notification-rule"));
+        s.remove("requirement");
         s.addAll(Set.of("pipeline", "schema", "enrichment", "meta", JobRoutes.KIND));
         // ASSURE-ENTITY-LISTS-1 (D-P5): member / range changes and retire of an Entity List (inspecto-entity-list) hold
         // here; an add-only change whose every entry expires within 24 h applies at once and is reviewed after.

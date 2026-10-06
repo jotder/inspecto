@@ -158,7 +158,8 @@ class ControlApiPendingChangesTest {
             assertEquals(403, send(c, "PUT", "/settings/approval", PACK_POLICY, AUTHOR).statusCode(),
                     "an author cannot lift (or set) the policy");
             assertEquals(422, send(c, "PUT", "/settings/approval",
-                    "{\"approval\":{\"channel\":{\"required\":true}}}", ADMIN).statusCode(), "channel is not governable");
+                    "{\"approval\":{\"requirement\":{\"required\":true}}}", ADMIN).statusCode(),
+                    "requirement is not governable");
             assertEquals(422, send(c, "PUT", "/settings/approval",
                     "{\"approval\":{\"no-such-kind\":{\"required\":true}}}", ADMIN).statusCode());
             assertEquals(422, send(c, "PUT", "/settings/approval",
@@ -260,6 +261,40 @@ class ControlApiPendingChangesTest {
             assertEquals(409, send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER).statusCode(),
                     "already decided");
             assertEquals(409, send(c, "POST", "/pending-changes/" + id + "/decline", "{}", CHECKER).statusCode());
+        }
+    }
+
+    @Test
+    void notificationChannelAndRuleWritesHoldUnderAPolicyAndApplyOnlyOnApproval(@TempDir Path cfg, @TempDir Path tmp)
+            throws Exception {
+        try (Ctx c = open(cfg, tmp)) {
+            // Policy OFF: the probe write goes straight through — so a held write below is the hold, not a refusal.
+            data(send(c, "POST", "/notifications/channels",
+                    "{\"id\":\"ops\",\"kind\":\"EMAIL\",\"target\":\"ops@example.com\"}", AUTHOR), 200);
+            data(send(c, "POST", "/notifications/rules",
+                    "{\"id\":\"r1\",\"eventType\":\"job.custom\",\"category\":\"job\"}", AUTHOR), 200);
+            policy(c, "{\"approval\":{\"channel\":{\"required\":true},\"notification-rule\":{\"required\":true}}}");
+
+            JsonNode created = data(send(c, "POST", "/notifications/channels",
+                    "{\"id\":\"sec\",\"kind\":\"EMAIL\",\"target\":\"sec@example.com\"}", AUTHOR), 202);
+            assertFalse(store(c).exists("channel", "sec"), "a held channel create writes nothing");
+            JsonNode edited = data(send(c, "PUT", "/notifications/channels/ops",
+                    "{\"target\":\"attacker@example.com\"}", AUTHOR), 202);
+            assertEquals("ops@example.com", store(c).get("channel", "ops").orElseThrow().content().get("target"),
+                    "a held channel edit leaves the destination unchanged");
+            data(send(c, "DELETE", "/notifications/rules/r1", null, AUTHOR), 202);
+            assertTrue(store(c).exists("notification-rule", "r1"), "a held rule delete deletes nothing");
+            assertEquals(3, data(send(c, "GET", "/pending-changes?status=pending", null, CHECKER), 200)
+                    .get("total").asInt());
+
+            assertEquals(403, send(c, "POST", "/pending-changes/" + created.at("/pendingChange/id").asText()
+                    + "/approve", "{}", SELF).statusCode(), "four-eyes");
+            for (JsonNode held : List.of(created, edited))
+                assertTrue(data(send(c, "POST", "/pending-changes/" + held.at("/pendingChange/id").asText()
+                        + "/approve", "{}", CHECKER), 200).get("applied").asBoolean());
+            assertTrue(store(c).exists("channel", "sec"));
+            assertEquals("attacker@example.com",
+                    store(c).get("channel", "ops").orElseThrow().content().get("target"), "applied on approval");
         }
     }
 

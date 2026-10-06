@@ -786,7 +786,9 @@ other gate, because the `canAdminister` wrap is a no-op without a Subject and th
 off unauthenticated. **Personal edition therefore cannot change the approval policy through the API.**
 
 **Governable** — `pipeline`, `schema`, `enrichment`, `meta` (the `/config/write` + `/config/patch` types) and
-every `ComponentStore` kind except `requirement`, `channel` and `notification-rule`, and `job` (operator,
+every `ComponentStore` kind except `requirement` — `channel` and `notification-rule` too since 2026-10-06
+(their six `/notifications/channels*` + `/notifications/rules*` writers hold after their 422/404/409 gates; the
+replay applies on approval, so a held channel edit never re-points a destination early) — and `job` (operator,
 2026-09-28): the six `/jobs` writers — create, update, delete, enable, disable, reschedule — hold after their
 gates (the Job spec + `checkJob`, the `event_prune`/`restore` `canAdminister` check, `If-Match`), keyed by the
 Job name; the replay applies as the author, so `JobAuthority.stamp` writes the AUTHOR as `updatedBy`, never the
@@ -861,8 +863,7 @@ history's line diff (`PipelineHistory.diff`) over both contents encoded as TOON.
 route that reaches neither `hold` nor `holdRefusing` unless it is on `NO_HOLD` with a reason. Pinned over
 real HTTP, with an armed Authenticator, by `ControlApiPendingChangesTest`.
 
-⚠ Known limits: the guard's closure stops at the file boundary (a write in another class is invisible);
-`channel` / `notification-rule` are not governable yet. (Four-eyes still forbids self-decline, as in
+⚠ Known limits: the guard's closure stops at the file boundary (a write in another class is invisible). (Four-eyes still forbids self-decline, as in
 Link Analysis; since 2026-09-28 the author instead WITHDRAWS their own change — `POST /pending-changes/{id}/withdraw`,
 status `withdrawn`, author-only, see [auth-security](../editions/auth-security.md).)
 

@@ -13,7 +13,8 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **46<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 32<!--count:backlog-p3--> × P3** —
+> **45<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 31<!--count:backlog-p3--> × P3** —
+> ⬇ **46 → 45 (P3 32 → 31) on 2026-10-06**: closed P3 `ASSURE-MAKER-CHECKER-RESIDUALS-1` — its last item shipped: `channel` and `notification-rule` are governable; the six `/notifications/channels*` + `/notifications/rules*` writers hold and replay on approval. As-built in `okf/backend/config/config-safety.md`.
 > ⬇ **48 → 46 (P3 35 → 33) on 2026-10-04**: closed P3 `LA-SPA-OWED-SURFACES-1` and P3 `LA-INDEX-SPA-SURFACES-1` — every item shipped: the expand rung form sends `linkKinds` and a window override object; Value Measures take a rolling `last` and `agentList`; the bundle export reports `converted`; the start form asks `timeColZone`; the multi-mapping GraphSource authors node / edge `attributes` and a per-edge `filter` and expands; a build can be cancelled and a NEW mapping chosen. As-built in `okf/frontend/features/link-analysis.md`.
 > ⬇ **49 → 48 (P3 36 → 35) on 2026-10-04**: closed P3 `LA-DRAFT-PROMOTE-COST-1` — its last half shipped: the open-Draft cap, the hibernation period and the expiry period are per-Space `drafts` keys of `link-analysis.toon` (`max_open` 50, `hibernate_after_minutes` 60, `expire_after_days` 30), validated 422 on `PUT /settings/link-analysis` and read per call by `DraftAdmission` / `DraftRoutes`; the static `DraftLifecycle` fields are gone. As-built in `okf/frontend/features/link-analysis.md`.
 > ⬇ **50 → 49 (P3 37 → 36) on 2026-10-04**: closed P3 `LA-DRAFT-REBASE-COST-1` as a DECISION, not a build — a set-file delta format cannot make rebase linear because the cost is the sealed `workingSetHash` (sha256 of the whole Working Set, re-derived per renumbered step); linear needs a chained hash that changes every sealed hash and the promote byte pin. Evidence and reopen condition in `archived-documents/plans-archive/la-separation-d7-design.md` §6.
@@ -147,10 +148,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 32<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 31<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 32<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 46<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 31<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 45<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -377,7 +378,6 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 #### API contract & vocabulary
 
-- **P3** · `ASSURE-MAKER-CHECKER-RESIDUALS-1` — **residuals of four-eyes approval** (✅ `ASSURE-MAKER-CHECKER-1` shipped 2026-09-27 after five rounds of adversarial security review: a per-kind Approval Policy, Pending Changes held at every config-writing route, an HMAC-signed record whose key lives outside the config tree, backups and git, apply-as-author with rights re-checked at approval, a pinned replay allowlist, rename / tag / Investigator holds, an `approval-policy.changed` audit; as-built in `okf/backend/editions/auth-security.md` and `okf/backend/config/config-safety.md`). Open: **(1)** `channel` and `notification-rule` are not governable yet (their `NotificationRoutes` writers do not reach the hold); *`job` closed 2026-09-28 (operator): the six `/jobs` writers hold, and a Pipeline rename refuses to rewrite a governed Job trigger;* *(2) closed 2026-09-28: the author withdraws their own waiting change, `POST /pending-changes/{id}/withdraw` → `withdrawn`, plus an SPA Withdraw action;* *(3) closed 2026-09-28: the six `/pending-changes*` operations carry per-status schemas in `openapi-v1.json`, and `GET`/`PUT /settings/approval` are hand-documented too, with an `ApprovalPolicy` schema;* *(4) decided 2026-09-28 (operator): a Job's RUN-time writes (`MaterializeTask` Dataset writes, engine writes) stay unheld — holding them would stall scheduled runs;* *(5) closed 2026-09-28 (operator): `PUT /settings/approval` refuses an empty or absent body (422) and is refused outright (403) with no Authenticator, so Personal cannot change the policy through the API.* Build on demand.
 
 
 ### 3.8 Security, Policy, Editions & Compliance

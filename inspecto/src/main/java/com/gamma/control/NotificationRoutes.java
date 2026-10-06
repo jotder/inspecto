@@ -63,20 +63,20 @@ final class NotificationRoutes implements RouteModule {
         // only match a single segment — "channels/{id}" is two, so there's no collision either way).
         api.get("/notifications/channels", (e, m) -> listChannels(api));
         api.post("/notifications/channels", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> createChannel(api, api.body(e))));
+                (e, m) -> createChannel(api, e, api.body(e))));
         api.put("/notifications/channels/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> updateChannel(api, ApiContext.name(m), api.body(e))));
+                (e, m) -> updateChannel(api, e, ApiContext.name(m), api.body(e))));
         api.delete("/notifications/channels/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> deleteChannel(api, ApiContext.name(m))));
+                (e, m) -> deleteChannel(api, e, ApiContext.name(m))));
         // Authored notification rules admin CRUD (same shape as channels above; registered before the
         // /notifications/{id} routes below for the same reason — "rules/{id}" is two segments).
         api.get("/notifications/rules", (e, m) -> listRules(api));
         api.post("/notifications/rules", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> createRule(api, api.body(e))));
+                (e, m) -> createRule(api, e, api.body(e))));
         api.put("/notifications/rules/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> updateRule(api, ApiContext.name(m), api.body(e))));
+                (e, m) -> updateRule(api, e, ApiContext.name(m), api.body(e))));
         api.delete("/notifications/rules/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> deleteRule(api, ApiContext.name(m))));
+                (e, m) -> deleteRule(api, e, ApiContext.name(m))));
         // ⚠ The archive-by-id catch-all, and it MUST stay last in this module AND must not swallow a
         // sibling sub-resource. Route matching is first-match in registration order across modules
         // (ControlApi's RouteModule list), and NotificationRoutes registers before DeliveryStatusRoutes —
@@ -269,16 +269,17 @@ final class NotificationRoutes implements RouteModule {
     }
 
     /** {@code POST /notifications/channels} — create; 422 missing fields, 409 duplicate id. */
-    private static Object createChannel(ApiContext api, Map<String, Object> body) throws IOException {
+    private static Object createChannel(ApiContext api, HttpExchange e, Map<String, Object> body) throws IOException {
         ComponentStore store = channelStore(api);
         ChannelConfig ch = parse(body, System.currentTimeMillis());
         if (RouteErrors.exists(store, CHANNEL_TYPE, ch.id()))
             throw new ApiException(409, ErrorCodes.CONFLICT, "channel '" + ch.id() + "' already exists (use PUT to update)");
+        PendingChanges.hold(api, e, CHANNEL_TYPE, ch.id(), ch.toMap(), null);   // maker-checker
         return write(store, ch.id(), ch.toMap());
     }
 
     /** {@code PUT /notifications/channels/{id}} — replace; 404 unknown. The id + createdAt are immutable. */
-    private static Object updateChannel(ApiContext api, String id, Map<String, Object> body) throws IOException {
+    private static Object updateChannel(ApiContext api, HttpExchange e, String id, Map<String, Object> body) throws IOException {
         ComponentStore store = channelStore(api);
         Map<String, Object> existing = RouteErrors.existing(store, CHANNEL_TYPE, "channel", id);
         long createdAt = existing.get("createdAt") instanceof Number n ? n.longValue() : System.currentTimeMillis();
@@ -286,13 +287,16 @@ final class NotificationRoutes implements RouteModule {
         patched.putAll(body);
         patched.put("id", id);                 // storage key is bound from the path, never a stale body id
         patched.put("createdAt", createdAt);   // preserve the original creation stamp
-        return write(store, id, parse(patched, createdAt).toMap());
+        Map<String, Object> proposed = parse(patched, createdAt).toMap();
+        PendingChanges.hold(api, e, CHANNEL_TYPE, id, proposed, existing);   // maker-checker
+        return write(store, id, proposed);
     }
 
     /** {@code DELETE /notifications/channels/{id}} — 404 unknown, else {@code {deleted:id}}. */
-    private static Object deleteChannel(ApiContext api, String id) throws IOException {
+    private static Object deleteChannel(ApiContext api, HttpExchange e, String id) throws IOException {
         ComponentStore store = channelStore(api);
-        RouteErrors.existing(store, CHANNEL_TYPE, "channel", id);
+        Map<String, Object> current = RouteErrors.existing(store, CHANNEL_TYPE, "channel", id);
+        PendingChanges.hold(api, e, CHANNEL_TYPE, id, null, current);   // maker-checker
         store.delete(CHANNEL_TYPE, id);
         return Map.of("deleted", id);
     }
@@ -331,27 +335,31 @@ final class NotificationRoutes implements RouteModule {
     }
 
     /** {@code POST /notifications/rules} — create; 422 missing fields, 409 duplicate id. */
-    private static Object createRule(ApiContext api, Map<String, Object> body) throws IOException {
+    private static Object createRule(ApiContext api, HttpExchange e, Map<String, Object> body) throws IOException {
         ComponentStore store = ruleStore(api);
         NotificationRule rule = parseRule(body);
         if (existsRule(store, rule.id()))
             throw new ApiException(409, ErrorCodes.CONFLICT, "rule '" + rule.id() + "' already exists (use PUT to update)");
+        PendingChanges.hold(api, e, RULE_TYPE, rule.id(), rule.toMap(), null);   // maker-checker
         return writeRule(store, rule.id(), rule.toMap());
     }
 
     /** {@code PUT /notifications/rules/{id}} — replace; 404 unknown. The id is immutable (bound from the path). */
-    private static Object updateRule(ApiContext api, String id, Map<String, Object> body) throws IOException {
+    private static Object updateRule(ApiContext api, HttpExchange e, String id, Map<String, Object> body) throws IOException {
         ComponentStore store = ruleStore(api);
-        existingRule(store, id);
+        Map<String, Object> current = existingRule(store, id);
         Map<String, Object> patched = new LinkedHashMap<>(body);
         patched.put("id", id);   // storage key is bound from the path, never a stale body id
-        return writeRule(store, id, parseRule(patched).toMap());
+        Map<String, Object> proposed = parseRule(patched).toMap();
+        PendingChanges.hold(api, e, RULE_TYPE, id, proposed, current);   // maker-checker
+        return writeRule(store, id, proposed);
     }
 
     /** {@code DELETE /notifications/rules/{id}} — 404 unknown, else {@code {deleted:id}}. */
-    private static Object deleteRule(ApiContext api, String id) throws IOException {
+    private static Object deleteRule(ApiContext api, HttpExchange e, String id) throws IOException {
         ComponentStore store = ruleStore(api);
-        existingRule(store, id);
+        Map<String, Object> current = existingRule(store, id);
+        PendingChanges.hold(api, e, RULE_TYPE, id, null, current);   // maker-checker
         store.delete(RULE_TYPE, id);
         return Map.of("deleted", id);
     }
