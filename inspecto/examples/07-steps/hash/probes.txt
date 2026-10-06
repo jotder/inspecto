@@ -1,0 +1,14 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: hash (transform.hash, catalog quality.crypto.hash) - a salted one-way hash of named columns.
+#   steps[1]: - hash: { columns: [ORDER_ID], keep_original: false }
+# ORDER_ID is replaced in place by masked:<16 hex>, an HMAC-SHA-256 under this Space's own key (kept in the
+# Space's secrets directory, never in config). The same id hashes the same within the Space, so the column can
+# still be joined on; another Space hashes it differently. Set keep_original: true to add ORDER_ID_hash instead.
+#
+# Expected evidence after the run:
+#   /jobs shows hash_rollup type PIPELINE with lastStatus SUCCESS; /jobs/hash_rollup/runs names the rows the Step
+#   produced into store(s) [rollup]. On disk: out/rollup/*.parquet carries ORDER_ID = masked:... and no 100x id.
+/jobs
+/jobs/hash_rollup/runs

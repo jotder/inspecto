@@ -511,6 +511,12 @@ final class ConfigRoutes {
             if (PipelineConfig.Step.LOOKUP.equals(kind)) {
                 if (columns != null && cfg.get("target") != null)
                     columns.add(new TypeFlow.Column(String.valueOf(cfg.get("target")), "VARCHAR"));
+            } else if (PipelineConfig.Step.HASH.equals(kind)) {
+                // names survive a hash; with keep_original each column gains a <col>_hash beside it
+                if (columns != null && "true".equalsIgnoreCase(String.valueOf(cfg.get("keep_original")))
+                        && cfg.get("columns") instanceof List<?> hashed)
+                    for (Object o : hashed)
+                        if (o != null) columns.add(new TypeFlow.Column(o + "_hash", "VARCHAR"));
             } else if (!PipelineConfig.Step.FILTER.equals(kind) && !PipelineConfig.Step.DEDUP.equals(kind)) {
                 columns = null;
             }
@@ -590,6 +596,17 @@ final class ConfigRoutes {
                         || com.gamma.pipeline.exec.RunningWindow.isTimeType(type) ? null
                         : "transform.running duration window needs order_by '" + spec.orderBy()
                                 + "' to be a TIMESTAMP or DATE column, not " + type;
+            }
+            case PipelineConfig.Step.HASH -> {
+                // ⛔ A salt / key in config is refused by name: the key is the Space's, and an authored one would
+                // sit in the TOON in the clear — the leak the Step exists to prevent.
+                for (Object k : cfg.keySet())
+                    if (!"columns".equals(k) && !"keep_original".equals(k))
+                        return "transform.hash does not take '" + k + "' - only columns and keep_original; "
+                                + "the hash key is the Space's own and is never authored";
+                if (!(cfg.get("columns") instanceof List<?> cols) || cols.stream().allMatch(o -> o == null || o.toString().isBlank()))
+                    return "transform.hash needs a non-empty 'columns' list - the columns to hash";
+                return undeclared("transform.hash column", cols, columns);
             }
             default -> { return null; }
         }

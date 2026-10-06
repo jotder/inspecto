@@ -308,6 +308,8 @@ public final class PipelineConfig {
         public static final String SUMMARIZE = "summarize";
         /** Per-column profile. Legacy spelling: {@code processing.profile}. */
         public static final String PROFILE = "profile";
+        /** Salted one-way column hash ({@code transform.hash}). No legacy spelling — {@code steps:} only. */
+        public static final String HASH = "hash";
         /** Branch tree. Legacy spelling: the top-level {@code route:} block. */
         public static final String ROUTE = "route";
         /**
@@ -329,8 +331,8 @@ public final class PipelineConfig {
         public static final String RUNNING = "running";
 
         /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them
-         *  ({@link #LOOKUP}, {@link #SQL} and {@link #RUNNING} last: none has a legacy projection at all). */
-        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING);
+         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING} and {@link #HASH} last: none has a legacy projection at all). */
+        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH);
 
         public Step {
             config = (config == null) ? Map.of() : Map.copyOf(config);

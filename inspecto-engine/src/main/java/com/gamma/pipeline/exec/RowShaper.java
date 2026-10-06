@@ -206,6 +206,7 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(type)) return summarize(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_PROFILE.type().equals(type)) return profile(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_RUNNING.type().equals(type)) return running(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_HASH.type().equals(type))    return hash(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) return project(conn, node, input, outPrefix);
         // A Record Transformer — authored FIELDS, or the projection slot carrying a lifted schema /
@@ -259,6 +260,106 @@ public final class RowShaper {
                 : "SELECT *, " + caseExpr + " AS " + q(target) + " FROM " + q(input);
         exec(conn, "CREATE TABLE " + q(data) + " AS " + select);
         return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    // ── hash (salted one-way, Space-keyed) ───────────────────────────────────────
+
+    /**
+     * {@code transform.hash} — replaces each named column with its salted one-way token, or with
+     * {@code keep_original: true} adds {@code <col>_hash} beside it (catalog {@code quality.crypto.hash},
+     * operator 2026-10-06). NULL stays NULL.
+     *
+     * <p>The token is {@link com.gamma.risk.EvidenceMasker#tokenFor} under the Space's own key
+     * ({@code EvidenceMasker.forSpace(SpaceConfigRoot.current())}): {@code masked:<16 hex>} of an HMAC-SHA-256, the
+     * SAME token Link Analysis and audit masking give that value, so a hashed column joins with them and with
+     * itself across runs. 🔴 <b>The key never enters SQL.</b> DuckDB has no HMAC, and inlining the key as a literal
+     * would put it in query text, profiles and error messages; so the distinct values are hashed in Java and
+     * joined back through a scratch map table that is DROPPED before return — no table this leaves behind holds
+     * a raw value next to its token. ⛔ No Space → refused, never an unkeyed hash.
+     */
+    private static List<Relation> hash(Connection conn, PipelineNode node, String input, String p) throws SQLException {
+        List<String> cols = namedColumns(conn, node, input, "columns");
+        if (cols.isEmpty())
+            throw new IllegalArgumentException("transform.hash node '" + node.id() + "' needs 'columns' — the columns to hash");
+        boolean keep = Boolean.parseBoolean(String.valueOf(node.cfg("keep_original")));
+        return tokenize(conn, node, input, p, cols, keep);
+    }
+
+    /** The Space's mask key — refused when the run has no Space, so a hash is never computed unkeyed. */
+    private static com.gamma.risk.EvidenceMasker spaceKey(PipelineNode node) {
+        java.nio.file.Path root = com.gamma.pipeline.SpaceConfigRoot.current();
+        if (root == null)
+            throw new IllegalStateException(node.type() + " node '" + node.id()
+                    + "': no Space config root is bound to this run, so there is no Space key to hash under");
+        return com.gamma.risk.EvidenceMasker.forSpace(root);
+    }
+
+    /** {@code cols} replaced by (or, with {@code keep}, joined as {@code <col>_hash}) their Space-keyed tokens. */
+    static List<Relation> tokenize(Connection conn, PipelineNode node, String input, String p,
+                                   List<String> cols, boolean keep) throws SQLException {
+        com.gamma.risk.EvidenceMasker key = spaceKey(node);
+        List<String> maps = new ArrayList<>();
+        try {
+            StringBuilder replace = new StringBuilder();
+            StringBuilder added = new StringBuilder();
+            StringBuilder joins = new StringBuilder();
+            for (int i = 0; i < cols.size(); i++) {
+                String c = cols.get(i);
+                String map = table(p, "hashmap_" + i);
+                maps.add(map);
+                exec(conn, "CREATE TEMP TABLE " + q(map) + " (v VARCHAR PRIMARY KEY, h VARCHAR)");
+                List<String> distinct = new ArrayList<>();
+                try (Statement st = conn.createStatement();
+                     java.sql.ResultSet rs = st.executeQuery("SELECT DISTINCT CAST(" + q(c) + " AS VARCHAR) FROM "
+                             + q(input) + " WHERE " + q(c) + " IS NOT NULL")) {
+                    while (rs.next()) distinct.add(rs.getString(1));
+                }
+                try (java.sql.PreparedStatement ins = conn.prepareStatement(
+                        "INSERT INTO " + q(map) + " VALUES (?, ?)")) {
+                    for (String v : distinct) {
+                        ins.setString(1, v);
+                        ins.setString(2, key.tokenFor(v));
+                        ins.addBatch();
+                    }
+                    if (!distinct.isEmpty()) ins.executeBatch();
+                }
+                String alias = "m" + i;
+                joins.append(" LEFT JOIN ").append(q(map)).append(' ').append(alias).append(" ON ")
+                        .append(alias).append(".v = CAST(i.").append(q(c)).append(" AS VARCHAR)");
+                if (keep) added.append(", ").append(alias).append(".h AS ").append(q(c + "_hash"));
+                else {
+                    if (replace.length() > 0) replace.append(", ");
+                    replace.append(alias).append(".h AS ").append(q(c));
+                }
+            }
+            String data = table(p, PipelineRel.DATA);
+            String star = keep || replace.length() == 0 ? "i.*" : "i.* REPLACE (" + replace + ")";
+            exec(conn, "CREATE TABLE " + q(data) + " AS SELECT " + star + added + " FROM " + q(input) + " i" + joins);
+            return List.of(new Relation(PipelineRel.DATA, data));
+        } finally {
+            for (String m : maps) exec(conn, "DROP TABLE IF EXISTS " + q(m));
+        }
+    }
+
+    /**
+     * The node's {@code key} list, resolved case-insensitively to the inbound column spelling. ⛔ An unknown name is
+     * REFUSED — hashing or masking four of five named columns would ship the fifth in the clear. The refusal names
+     * the COLUMN, never a value.
+     */
+    private static List<String> namedColumns(Connection conn, PipelineNode node, String input, String key)
+            throws SQLException {
+        List<String> out = new ArrayList<>();
+        if (!(node.cfg(key) instanceof List<?> declared)) return out;
+        List<String> available = columnsOf(conn, input);
+        for (Object o : declared) {
+            String name = o == null ? "" : o.toString().trim();
+            if (name.isEmpty()) continue;
+            String hit = available.stream().filter(a -> a.equalsIgnoreCase(name)).findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException(node.type() + " node '" + node.id()
+                            + "': no column '" + name + "' in the inbound data (have: " + available + ")"));
+            if (!out.contains(hit)) out.add(hit);
+        }
+        return out;
     }
 
     /** The {@code mappings} list as {@code [key, value]} pairs; a malformed entry names itself. */

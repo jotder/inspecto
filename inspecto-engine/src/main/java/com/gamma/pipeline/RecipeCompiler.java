@@ -123,6 +123,7 @@ public final class RecipeCompiler {
                 case "sink" -> nodes.add(sink(id, cfg));
                 case "dedup" -> nodes.add(dedup(id, cfg, refusals));
                 case "lookup" -> nodes.add(lookup(id, cfg, refusals));
+                case "hash" -> nodes.add(hash(id, cfg, refusals));
                 case "route" -> {
                     route(id, cfg, nodes, branchSinks, routeEdges, refusals);
                     routeSeen = true;
@@ -395,6 +396,26 @@ public final class RecipeCompiler {
         return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_LOOKUP.type(), new LinkedHashMap<>(cfg));
     }
 
+    /** {@code hash: {columns[], keep_original?}} → a transform.hash node. Only those two keys: a {@code salt:} or
+     *  {@code key:} is REFUSED by name — the key is the Space's, and a config-borne salt is the leak this Step
+     *  exists to prevent. */
+    private static PipelineNode hash(String id, Map<String, Object> cfg,
+                                     List<PipelineCompileException.Refusal> refusals) {
+        if (!(cfg.get("columns") instanceof List<?> l) || l.isEmpty()
+                || l.stream().anyMatch(o -> o == null || String.valueOf(o).isBlank()))
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "hash needs columns: — a non-empty list of column names"));
+        Object keep = cfg.get("keep_original");
+        if (keep != null && !"true".equalsIgnoreCase(String.valueOf(keep)) && !"false".equalsIgnoreCase(String.valueOf(keep)))
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "hash keep_original: must be true or false"));
+        for (String other : cfg.keySet())
+            if (!"columns".equals(other) && !"keep_original".equals(other))
+                refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
+                        "hash does not understand '" + other + "' (only columns, keep_original — the salt is the Space's, never config)"));
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_HASH.type(), new LinkedHashMap<>(cfg));
+    }
+
     private static PipelineNode dedup(String id, Map<String, Object> cfg,
                                       List<PipelineCompileException.Refusal> refusals) {
         Map<String, Object> c = new LinkedHashMap<>(cfg);
@@ -562,6 +583,7 @@ public final class RecipeCompiler {
                     }
                     case "dedup" -> stepNode = dedup(stepId, stepCfg, refusals);
                     case "lookup" -> stepNode = lookup(stepId, stepCfg, refusals);
+                    case "hash" -> stepNode = hash(stepId, stepCfg, refusals);
                     case "summarize" -> stepNode = summarize(stepId, stepCfg, refusals);
                     case "profile" -> stepNode = profile(stepId, stepCfg, refusals);
                     case "running" -> stepNode = running(stepId, stepCfg, refusals);

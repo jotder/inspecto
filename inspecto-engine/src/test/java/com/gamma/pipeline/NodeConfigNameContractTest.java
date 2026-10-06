@@ -522,6 +522,64 @@ class NodeConfigNameContractTest {
                 "the declared table is exactly the key this round trip proves");
     }
 
+    /**
+     * The hash node's contract (catalog {@code quality.crypto.hash}, 2026-10-06) — a {@code steps:}-only kind, so
+     * the round trip is lift a {@code steps: [hash]} chain → edit both keys → strict lower → {@code toToon} →
+     * {@code PipelineConfig.load}, and the edited step must come back as the ONE {@code hash} step.
+     */
+    @Test
+    void hashAttributesReachTheEngine(@TempDir Path dir) throws Exception {
+        PipelineConfig.Step step = stepSavedAs(dir, "transform.hash", PipelineConfig.Step.HASH,
+                Map.of("columns", List.of("ID")), Map.of("columns", List.of("ID", "EVENT_DATE"), "keep_original", true));
+        assertEquals(List.of("ID", "EVENT_DATE"), step.config().get("columns"),
+                "a hash columns edit typed in the editor must reach the engine");
+        assertEquals("true", String.valueOf(step.config().get("keep_original")));
+        assertEquals(List.of("columns", "keep_original"),
+                NodeAttributes.forType("transform.hash").stream().map(NodeAttribute::key).toList(),
+                "the declared table is exactly the keys this round trip proves");
+    }
+
+    /**
+     * Lift a fixture whose chain is {@code steps: [{kind: authored}]}, replace the {@code nodeType} node's config
+     * with {@code edited}, strict-lower, save, re-read — returning the one step of {@code kind}.
+     */
+    private static PipelineConfig.Step stepSavedAs(Path dir, String nodeType, String kind,
+                                                   Map<String, Object> authored, Map<String, Object> edited)
+            throws Exception {
+        Path toon = writeFixture(dir);
+        Map<String, Object> raw = decode(toon);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> processing = (Map<String, Object>) raw.get("processing");
+        for (String legacy : List.of("dedup", "summarize", "join", "profile")) processing.remove(legacy);
+        raw.remove("route");
+        if (processing.get("csv_settings") instanceof Map<?, ?> csv) {
+            @SuppressWarnings("unchecked") Map<String, Object> c = (Map<String, Object>) csv;
+            c.remove("where");
+        }
+        raw.put("steps", List.of(Map.of(kind, new LinkedHashMap<>(authored))));
+        Path withStep = dir.resolve(kind + "_pipeline.toon");
+        Files.writeString(withStep, ConfigCodec.toToon(raw));
+        raw = decode(withStep);
+        PipelineGraph g = liftEditable(withStep);
+
+        List<PipelineNode> nodes = new ArrayList<>();
+        for (PipelineNode n : g.nodes()) {
+            if (!nodeType.equals(n.type())) { nodes.add(n); continue; }
+            nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), new LinkedHashMap<>(edited), n.use()));
+        }
+        assertEquals(1, nodes.stream().filter(n -> nodeType.equals(n.type())).count(),
+                "the lift presents the " + kind + " step as ONE " + nodeType + " node");
+        Map<String, Object> lowered = PipelineEditable.lower(
+                new PipelineGraph(g.name(), g.active(), nodes, g.edges()), raw, true);
+
+        Path saved = dir.resolve("saved_" + kind + "_pipeline.toon");
+        Files.writeString(saved, ConfigCodec.toToon(lowered));
+        List<PipelineConfig.Step> steps = PipelineConfig.load(saved.toString()).steps().stream()
+                .filter(st -> kind.equals(st.kind())).toList();
+        assertEquals(1, steps.size(), "the saved config carries exactly one " + kind + " step: " + steps);
+        return steps.get(0);
+    }
+
     /** Lift a fixture carrying {@code processing.profile}, set the node's {@code columns}, save, re-read. */
     private static PipelineConfig.Profile profileSavedAs(Path dir, List<String> columns) throws Exception {
         Path toon = writeFixture(dir);

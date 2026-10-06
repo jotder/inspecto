@@ -174,6 +174,20 @@ class RecipeCompilerTest {
         assertTrue(e.refusals().get(0).message().contains("60 parsecs"), e.refusals().get(0).message());
     }
 
+    /** quality.crypto.hash (2026-10-06): an authored salt is refused by name — the key is the Space's, never config. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void hashRefusesAnAuthoredSaltAndAMissingColumnList() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) (List<?>) recipe.get("steps");
+        steps.add(steps.size() - 1, step("hash", new LinkedHashMap<>(Map.of("salt", "pepper"))));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class, () -> RecipeCompiler.compile(recipe));
+        List<String> messages = e.refusals().stream().map(PipelineCompileException.Refusal::message).toList();
+        assertTrue(messages.stream().anyMatch(m -> m.contains("'salt'")), messages.toString());
+        assertTrue(messages.stream().anyMatch(m -> m.contains("columns")), messages.toString());
+        assertFalse(messages.stream().anyMatch(m -> m.contains("pepper")), "a refusal must not echo the salt");
+    }
+
     @Test
     void notYetCompilableVerbsRefuseWithNamedCodesNeverSilently() {
         Map<String, Object> recipe = linearRecipe("/data/db");

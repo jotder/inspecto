@@ -461,6 +461,18 @@ public final class NodeAttributes {
                     .help("A duration (60m, 24h, 30s, 7d) or a row count (5 rows)."));
 
     /**
+     * {@code transform.hash} (→ {@code steps:} kind {@code hash}, catalog {@code quality.crypto.hash}) — a salted
+     * one-way hash of named columns. ⛔ There is deliberately NO salt / key attribute: the key is the Space's
+     * own ({@code EvidenceMasker.forSpace}), so nothing typed here can leak or weaken it. Keys proven by
+     * {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_HASH = List.of(
+            NodeAttribute.of("columns", "Columns to hash", "list", "required").placeholder("MSISDN")
+                    .help("Each named column is replaced by a salted one-way token (masked:<16 hex>), the same within this Space so it can still be joined on."),
+            NodeAttribute.of("keep_original", "Keep the original column", "boolean", "optional")
+                    .help("When on, the original column stays and the token is added as <column>_hash. Off (the default) replaces the value in place."));
+
+    /**
      * {@code transform.join} (→ {@code processing.join}, D-4) — the reference join, authoring-only.
      * {@code reference} names a registered Reference component ({@code reference/<id>}), so the UI
      * renders it as an autocomplete over the registry. Keys proven by {@code NodeConfigNameContractTest}.
@@ -511,7 +523,7 @@ public final class NodeAttributes {
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, SINK_WEBHOOK))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, SINK_WEBHOOK))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -526,6 +538,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), TRANSFORM_SUMMARIZE);
         m.put(BuiltinNodeType.TRANSFORM_PROFILE.type(), TRANSFORM_PROFILE);
         m.put(BuiltinNodeType.TRANSFORM_RUNNING.type(), TRANSFORM_RUNNING);
+        m.put(BuiltinNodeType.TRANSFORM_HASH.type(), TRANSFORM_HASH);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);

@@ -166,6 +166,12 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_PROFILE("transform.profile", NodeCategory.TRANSFORM, "Profile",
             "Per-column row/null/distinct counts and min/max over the inbound data.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "profile"),
+    // Salted one-way hash of named columns (catalog `quality.crypto.hash`, operator 2026-10-06). Flat home:
+    // steps: kind hash {columns, keep_original}. Executes in RowShaper.hash under the Space's own mask key
+    // (EvidenceMasker.forSpace) — the key never reaches config, SQL text, output or logs.
+    TRANSFORM_HASH("transform.hash", NodeCategory.TRANSFORM, "Hash",
+            "Replaces named columns (or adds <col>_hash) with a salted, Space-keyed one-way HMAC token.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "hash"),
     TRANSFORM_SPLIT("transform.split", NodeCategory.TRANSFORM, "Split",
             "Explodes one row into many (UNNEST).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),

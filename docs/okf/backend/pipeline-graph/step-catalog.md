@@ -412,6 +412,52 @@ It does not arm mid-branch (`RouteArming.BRANCH_STEP_KINDS`).
 **Example.** `examples/07-steps/running`: card-payment attempts get a 60-minute attempt count and amount
 sum per `INSTRUMENT_TOKEN`, a single-batch version of the payment pack's instrument velocity.
 
+## `hash` → `transform.hash` — Salted one-way hasher
+
+*Added 2026-10-06 (catalog `quality.crypto.hash`, operator 2026-10-06).*
+
+**Design (decided before build).**
+- **Namespace.** The node type is `transform.hash` with `steps:` kind `hash`, and the catalog id stays
+  `quality.crypto.hash`. `NodeTypeStepKinds.isKnown` only recognises `transform.<kind>`; that is the trap the
+  profile Step hit.
+- **Flat home.** It is `steps:` only (`FlatHome.STEP`) and has no legacy `processing.*` block. Like `lookup` and
+  `sql`, a chain carrying it is never "legacy-shaped".
+- **Key.** The key is the Space's own mask key, `EvidenceMasker.forSpace(SpaceConfigRoot.current())`. It is 32
+  random bytes in `<config root>.secrets/.risk-score-mask.key`, created on first use. The token is
+  `masked:<16 hex>` of an HMAC-SHA-256 (64 bits), the SAME token Link Analysis and audit masking give that
+  value. A hashed column therefore joins with itself across runs and with those surfaces. This key was chosen
+  over `FailureText`'s `value-fingerprint.salt` because that salt is resolved from a `PipelineConfig`'s dirs,
+  which a `RowShaper` node does not hold. It also sits beside config rather than in the Space's secrets
+  (operator, 2026-10-06).
+- **The key never enters SQL.** DuckDB 1.5 has no HMAC, and inlining the key as a literal would put it in
+  query text, profiles and error messages. Instead each column's DISTINCT values are hashed in Java, written to
+  a scratch `TEMP` map table, and LEFT JOINed back. The map is DROPPED in a `finally`: left behind, it would be a
+  reversal table. ⚠ Memory cost: one Java string per distinct value per column per batch. That is acceptable
+  at batch grain and would not be at a whole-history rebuild.
+- **Fail closed.** A run with no Space config root is refused, never hashed unkeyed. An unknown column is
+  refused, because hashing four of five named columns ships the fifth in the clear. A `salt:` / `key:` key is
+  refused at compile and at save. Every refusal names the column and never a value.
+
+**Behaviour.** Each named column is replaced in place by its token (the column becomes VARCHAR), or with
+`keep_original: true` the column stays and `<col>_hash` is added beside it. NULL stays NULL. Row counts never
+change. The same value gives the same token within a Space and a different token in another Space.
+
+**Configuration.**
+
+| Key | Type | Tier | Default | What it does |
+|---|---|---|---|---|
+| `columns` | list | required | — | **Columns to hash.** Each named column is replaced by a salted one-way token (masked:<16 hex>), the same within this Space so it can still be joined on. |
+| `keep_original` | boolean | optional | — | **Keep the original column.** When on, the original column stays and the token is added as <column>_hash. Off (the default) replaces the value in place. |
+
+**Refused at save** (`ConfigRoutes.stepConfigFindings`): no `columns`, any key other than the two above (a
+`salt` by name), or a column the declared schema does not carry.
+
+**Example.** `inspecto/examples/07-steps/hash` hashes `ORDER_ID` (8 rows in, 8 rows out).
+**Tests.** `RowShaperHashTest` checks determinism, the Space-key equality, cross-Space difference and NULL. Its
+leak probes check that no raw value or key bytes appear in any table left behind, and that no value appears in
+refusal text. `StepConfigSaveFindingsTest`, `RecipeCompilerTest` and
+`NodeConfigNameContractTest.hashAttributesReachTheEngine` cover the save gate, compile and round trip.
+
 ## `route` → `transform.route` — Router
 
 **Function.** Content-based routing into operator-defined branches, each writing its own destination.
@@ -888,7 +934,7 @@ file to `archive/archive/…`).
 | Grok / Logstash expression matcher | `parser.pattern.grok` | — |
 | Syslog RFC 5424 / RFC 3164 parser | `parser.pattern.syslog` | — |
 
-## Data Quality, Validation & Cleansing (`DQ`) — 6<!--count:processors-dq-delivered--> delivered · 1<!--count:processors-dq-partial--> partial · 7<!--count:processors-dq-planned--> planned
+## Data Quality, Validation & Cleansing (`DQ`) — 7<!--count:processors-dq-delivered--> delivered · 1<!--count:processors-dq-partial--> partial · 6<!--count:processors-dq-planned--> planned
 
 **Delivered**
 
@@ -897,6 +943,7 @@ file to `archive/archive/…`).
 | Schema registry & structural rejects | `quality.schema.validator` | `parser` — the declared schema on the Parse Step: typed fields, TRY_CAST at ingest, structural rejects → quarantine. ⛔ Only HALF of the old "Schema validator & type coercion" — coercion as an AUTHORING act folded into `transform.record` (2026-09-04). What cannot fold is the schema CONTRACT: the declared source column + target type are the cast-failure audit's denominator, and `SchemaCompatibility` gates edits to them BACKWARD |
 | Exact-key deduplicator (within a Consignment) | `quality.dedup.exact` | `transform.dedup` — `scope: consignment` (default) |
 | Inline stream profiler & statistics | `quality.profiler.inline` | `transform.profile` — per-column row/null/distinct counts and min/max, as a Step (2026-09-15) |
+| One-way salted cryptographic hasher | `quality.crypto.hash` | `transform.hash` — Space-keyed HMAC-SHA-256 token per value, joinable within the Space; the key never leaves the Space's secrets (2026-10-06) |
 | Sliding time-window deduplicator | `quality.dedup.windowed` | `transform.dedup` — D-9: `scope: window(P4D)` + the durable dedup ledger |
 | File-grain duplicate guard (path / checksum / metadata / marker) | `quality.dedup.file` | `acquisition` — Collector `duplicate:` policy + marker dedup — a Guarantee, rides the Collector |
 | Schema drift & new-field detector | `quality.schema.drift` | `parser` — ✅ **Release-ready** (`PROCESSOR-RELEASE-READINESS-1`, 2026-09-24: passes the bar; detection only is the promise, not a gap). ✅ **SHIPPED 2026-09-10.** `SchemaDrift.detect` reads each header-bearing delimited member's header once per batch (`CsvIngestStrategy`, above the lane dispatch, so the native and Java lanes agree) and diffs it against `raw.fields[]`: **width always** (fewer than `maxSelector+1` = rejected rows; more than declared + `skip_tail_columns` = a new field), **names only when the schema was authored from the header** (≥1 declared name occurs in it, case-insensitive — a positional lane may name `customer_id` for "Customer ID", and diffing those would flag every file forever). Detection only: the parse runs unchanged and the REPORT is one `quality.schema_drift` WARN Signal per batch (`SchemaDriftSignal`, `correlationId = batchId`, payload `files[]{file, declaredWidth, observedWidth, observed, added, missing, namesCompared}`), so triage/RCA show it beside the batch's own `pipeline.batch.committed` with no UI change. ⛔ No refusal policy — a detector that cannot see (`has_header: false`, unreadable header) says nothing; a "refuse on new field" knob was put to the operator 2026-09-10 and **refused: detection only** (`BACKLOG.md` §6). |
@@ -916,7 +963,6 @@ file to `archive/archive/…`).
 | Statistical & reservoir sampler | `quality.sample.reservoir` | — |
 | Character map & code page transcoder | `quality.cleanse.transcode` | — |
 | PII masking & tokenization | `quality.pii.mask` | board SEC-08 — Enterprise only |
-| One-way salted cryptographic hasher | `quality.crypto.hash` | — |
 | GDPR / CCPA field redactor | `quality.compliance.redact` | board SEC-08 — Enterprise only |
 
 ## Transformers & Dimensional Modeling (`XFM`) — 6<!--count:processors-xfm-delivered--> delivered · 1<!--count:processors-xfm-partial--> partial · 14<!--count:processors-xfm-planned--> planned

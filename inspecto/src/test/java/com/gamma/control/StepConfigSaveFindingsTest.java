@@ -84,6 +84,33 @@ class StepConfigSaveFindingsTest {
                 Map.of("column", "CODE", "mappings", List.of("1=one")))))), "steps[0].lookup", "CODE");
     }
 
+    // ── hash (quality.crypto.hash, 2026-10-06) ──────────────────────────────────
+
+    @Test
+    void aHashWithNoColumnsIsRefused(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true,
+                List.of(Map.of("hash", Map.of())))), "steps[0].hash", "columns");
+    }
+
+    @Test
+    void aHashCarryingASaltIsRefusedByName(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("hash",
+                Map.of("columns", List.of("ID"), "salt", "pepper"))))), "steps[0].hash", "'salt'");
+    }
+
+    @Test
+    void aHashOverAnUndeclaredColumnIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("hash",
+                Map.of("columns", List.of("MSISDN")))))), "steps[0].hash", "MSISDN");
+    }
+
+    @Test
+    void aFilterOverAKeptHashColumnIsClean(@TempDir Path dir) throws Exception {
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(
+                Map.of("hash", Map.of("columns", List.of("ID"), "keep_original", true)),
+                Map.of("filter", Map.of("where", "ID_hash IS NOT NULL AND QTY > 0"))))));
+    }
+
     // ── filter ───────────────────────────────────────────────────────────────────
 
     @Test
