@@ -272,7 +272,7 @@ public final class RowShaper {
      * {@code keep_original: true} adds {@code <col>_hash} beside it (catalog {@code quality.crypto.hash},
      * operator 2026-10-06). NULL stays NULL.
      *
-     * <p>The token is {@link com.gamma.risk.EvidenceMasker#tokenFor} under the Space's own key
+     * <p>The token is {@link com.gamma.mask.EvidenceMasker#tokenFor} under the Space's own key
      * ({@code EvidenceMasker.forSpace(SpaceConfigRoot.current())}): {@code masked:<16 hex>} of an HMAC-SHA-256, the
      * SAME token Link Analysis and audit masking give that value, so a hashed column joins with them and with
      * itself across runs. 🔴 <b>The key never enters SQL.</b> DuckDB has no HMAC, and inlining the key as a literal
@@ -319,18 +319,18 @@ public final class RowShaper {
     }
 
     /** The Space's mask key — refused when the run has no Space, so a hash is never computed unkeyed. */
-    private static com.gamma.risk.EvidenceMasker spaceKey(PipelineNode node) {
+    private static com.gamma.mask.EvidenceMasker spaceKey(PipelineNode node) {
         java.nio.file.Path root = com.gamma.pipeline.SpaceConfigRoot.current();
         if (root == null)
             throw new IllegalStateException(node.type() + " node '" + node.id()
                     + "': no Space config root is bound to this run, so there is no Space key to hash under");
-        return com.gamma.risk.EvidenceMasker.forSpace(root);
+        return com.gamma.mask.EvidenceMasker.forSpace(root);
     }
 
     /** {@code cols} replaced by (or, with {@code keep}, joined as {@code <col>_hash}) their Space-keyed tokens. */
     static List<Relation> tokenize(Connection conn, PipelineNode node, String input, String p,
                                    List<String> cols, boolean keep) throws SQLException {
-        com.gamma.risk.EvidenceMasker key = spaceKey(node);
+        com.gamma.mask.EvidenceMasker key = spaceKey(node);
         List<String> maps = new ArrayList<>();
         try {
             StringBuilder replace = new StringBuilder();

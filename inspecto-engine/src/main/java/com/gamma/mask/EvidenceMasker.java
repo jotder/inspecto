@@ -1,4 +1,4 @@
-package com.gamma.risk;
+package com.gamma.mask;
 
 import com.gamma.catalog.PipelineSchemas;
 import com.gamma.pipeline.ComponentRegistry;
@@ -56,12 +56,12 @@ public final class EvidenceMasker {
         this.sensitiveByDataset = sensitiveByDataset;
     }
 
-    /** The masker for one model: the sensitive columns of each Dataset its factors read, from the registry. */
-    public static EvidenceMasker of(ComponentStore registry, Path configRoot, RiskScoreModel model) {
+    /** The masker for a set of Datasets: the sensitive columns of each one, from the registry. */
+    public static EvidenceMasker of(ComponentStore registry, Path configRoot, java.util.Collection<String> datasetIds) {
         Map<String, Set<String>> byDataset = new HashMap<>();
         ViewStore views = new ViewStore(configRoot.resolve("views"));
-        for (RiskScoreModel.Factor f : model.factors())
-            byDataset.computeIfAbsent(f.dataset(), d -> sensitiveColumns(registry, views, d));
+        for (String datasetId : datasetIds)
+            byDataset.computeIfAbsent(datasetId, d -> sensitiveColumns(registry, views, d));
         return new EvidenceMasker(configRoot, byDataset);
     }
 

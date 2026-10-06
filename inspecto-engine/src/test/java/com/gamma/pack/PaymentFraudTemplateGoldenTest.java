@@ -19,7 +19,7 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.query.DatasetMeasureProbe;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
-import com.gamma.risk.EvidenceMasker;
+import com.gamma.mask.EvidenceMasker;
 import com.gamma.risk.RiskScoreEvaluator;
 import com.gamma.risk.RiskScoreModel;
 import com.gamma.util.Scheduler;
@@ -98,7 +98,7 @@ class PaymentFraudTemplateGoldenTest {
         RiskScoreModel model = RiskScoreModel.fromMap("payment_account", modelContent);
         var run = RiskScoreEvaluator.evaluate(model, id -> DatasetRelation.relationSql(
                 store.get("dataset", id).map(ComponentRegistry.Component::content).orElseThrow(), data, null),
-                EvidenceMasker.of(store, cfg, model));
+                EvidenceMasker.of(store, cfg, model.datasetIds()));
         RiskScoreEvaluator.write(data, model, RiskScoreEvaluator.version(modelContent), "golden", Instant.now(), run.scored());
 
         // The Risk Score's Alert Rule cannot ship in the template (its Dataset is the Job's own output, which does not

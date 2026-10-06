@@ -267,7 +267,7 @@ class ControlApiRiskScoreTest {
             RiskScoreModel model = RiskScoreModel.fromMap("subs", m);
             var run = com.gamma.risk.RiskScoreEvaluator.evaluate(model, id -> com.gamma.query.DatasetRelation.relationSql(
                     store.get("dataset", id).orElseThrow().content(), c.data, null),
-                    com.gamma.risk.EvidenceMasker.of(store, c.config, model));
+                    com.gamma.mask.EvidenceMasker.of(store, c.config, model.datasetIds()));
             RiskScoreEvaluator.write(c.data, model, "v", "r1", Instant.now(), run.scored());
 
             HttpResponse<String> r = send(c.port, "GET", "/spaces/s1/risk-scores/subs/m1", null, "analyst");
@@ -275,7 +275,7 @@ class ControlApiRiskScoreTest {
             JsonNode d = V1Body.of(r.body());
             // D-P8 mask on read: without canRevealLinkEntities the key is the Space token — the same token masked
             // evidence carries for that value — and the raw key appears nowhere in the body.
-            String token = com.gamma.risk.EvidenceMasker.forSpace(c.config).tokenFor("m1");
+            String token = com.gamma.mask.EvidenceMasker.forSpace(c.config).tokenFor("m1");
             assertEquals(token, d.get("entityKey").asText(), "the entity key is masked for analyst: " + r.body());
             assertTrue(d.get("keyMasked").asBoolean());
             assertFalse(r.body().contains("\"m1\""), "the raw key leaked: " + r.body());

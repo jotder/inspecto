@@ -1,5 +1,6 @@
 package com.gamma.risk;
 
+import com.gamma.mask.EvidenceMasker;
 import com.gamma.query.DatasetRelation;
 import com.gamma.util.DuckDbUtil;
 import org.junit.jupiter.api.Test;
@@ -21,8 +22,7 @@ class RiskScoreEvaluatorTest {
     /** No Dataset in these tests declares a classified column, so the masker masks nothing. */
     private static final EvidenceMasker NO_MASK = EvidenceMasker.of(
             new com.gamma.pipeline.ComponentStore(Path.of("does-not-exist", "registry")), Path.of("does-not-exist", "cfg"),
-            RiskScoreModel.fromMap("none", Map.of("entityType", "x", "highThreshold", 1,
-                    "factors", List.of(Map.of("id", "f", "dataset", "d", "key", "k", "measure", "count", "weight", 1)))));
+            List.of("d"));
 
     @Test
     void aQuoteInsideAFilterValueIsEscapedNotInterpreted(@TempDir Path data) throws Exception {

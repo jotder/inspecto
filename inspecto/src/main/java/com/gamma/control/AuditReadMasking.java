@@ -6,7 +6,7 @@ import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
-import com.gamma.risk.EvidenceMasker;
+import com.gamma.mask.EvidenceMasker;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.nio.file.Path;

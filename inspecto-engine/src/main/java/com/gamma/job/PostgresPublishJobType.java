@@ -14,7 +14,7 @@ import com.gamma.pipeline.ViewStore;
 import com.gamma.pipeline.exec.EgressAllowlist;
 import com.gamma.util.egress.EgressPolicy;
 import com.gamma.query.DatasetRelation;
-import com.gamma.risk.EvidenceMasker;
+import com.gamma.mask.EvidenceMasker;
 import com.gamma.util.ColumnClassification;
 import com.gamma.signal.Severity;
 

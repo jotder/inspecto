@@ -1,4 +1,4 @@
-package com.gamma.risk;
+package com.gamma.mask;
 
 import com.gamma.pipeline.ComponentStore;
 import org.junit.jupiter.api.Assumptions;
@@ -21,9 +21,7 @@ class EvidenceMaskerTest {
         ComponentStore store = new ComponentStore(config.resolve("registry"));
         store.write("dataset", "topups", Map.of("physicalRef", "topups",
                 "columns", List.of(Map.of("name", "topup_id", "classification", "pii"), Map.of("name", "amount"))));
-        return EvidenceMasker.of(store, config, RiskScoreModel.fromMap("m", Map.of("entityType", "subscriber",
-                "highThreshold", 50, "factors", List.of(Map.of("id", "f", "dataset", "topups", "key", "msisdn",
-                        "measure", "count", "weight", 1, "evidence", List.of("topup_id", "amount"))))));
+        return EvidenceMasker.of(store, config, List.of("topups"));
     }
 
     @Test
@@ -88,9 +86,7 @@ class EvidenceMaskerTest {
                 + "    - name: m\n      from: MSISDN\n      fn: keep\n    - name: plan\n      from: PLAN\n      fn: keep\n");
         ComponentStore store = new ComponentStore(config.resolve("registry"));
         store.write("dataset", "cust", Map.of("physicalRef", "cust"));
-        return EvidenceMasker.of(store, config, RiskScoreModel.fromMap("m", Map.of("entityType", "subscriber",
-                "highThreshold", 50, "factors", List.of(Map.of("id", "f", "dataset", "cust", "key", "plan",
-                        "measure", "count", "weight", 1, "evidence", List.of("m", "plan"))))));
+        return EvidenceMasker.of(store, config, List.of("cust"));
     }
 
     @Test
@@ -167,9 +163,7 @@ class EvidenceMaskerTest {
         store.write("dataset", "topups_raw", Map.of("physicalRef", "topups",
                 "columns", List.of(Map.of("name", "MSISDN", "classification", "msisdn"))));
         store.write("dataset", "f_ds", factorDs);
-        return EvidenceMasker.of(store, config, RiskScoreModel.fromMap("m", Map.of("entityType", "subscriber",
-                "highThreshold", 50, "factors", List.of(Map.of("id", "f", "dataset", "f_ds", "key", "amount",
-                        "measure", "count", "weight", 1, "evidence", List.of("msisdn", "amount"))))));
+        return EvidenceMasker.of(store, config, List.of("f_ds"));
     }
 
     @Test

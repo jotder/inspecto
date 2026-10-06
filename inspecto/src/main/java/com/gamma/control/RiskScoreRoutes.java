@@ -8,7 +8,7 @@ import com.gamma.query.DatasetMeasureProbe;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.pipeline.ViewStore;
-import com.gamma.risk.EvidenceMasker;
+import com.gamma.mask.EvidenceMasker;
 import com.gamma.risk.RiskScoreEvaluator;
 import com.gamma.risk.RiskScoreModel;
 import com.sun.net.httpserver.HttpExchange;
@@ -127,7 +127,7 @@ final class RiskScoreRoutes implements RouteModule {
                 Map<String, Object> ds = registry.get("dataset", datasetId).map(ComponentRegistry.Component::content)
                         .orElseThrow(() -> new IllegalArgumentException("risk-score factor names unknown dataset '" + datasetId + "'"));
                 return DatasetRelation.relationSql(ds, dataRoot, views);
-            }, EvidenceMasker.of(registry, writeRoot, model));
+            }, EvidenceMasker.of(registry, writeRoot, model.datasetIds()));
         } catch (IllegalArgumentException | IllegalStateException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }

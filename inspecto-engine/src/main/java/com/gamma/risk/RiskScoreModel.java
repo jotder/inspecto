@@ -147,6 +147,13 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
     /** The latest-run scores Dataset ({@code risk_scores_<id>_latest}). */
     public String latestDataset() { return scoresDataset + LATEST_SUFFIX; }
 
+    /** The ids of the Datasets the factors read. */
+    public Set<String> datasetIds() {
+        Set<String> out = new LinkedHashSet<>();
+        for (Factor f : factors) out.add(f.dataset());
+        return out;
+    }
+
     /** Every column each Dataset must carry: key, measure field, filter fields, evidence (for the Schema check). */
     public Map<String, Set<String>> referencedColumns() {
         Map<String, Set<String>> out = new LinkedHashMap<>();

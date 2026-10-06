@@ -10,7 +10,7 @@ import com.gamma.query.DatasetRead;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
-import com.gamma.risk.EvidenceMasker;
+import com.gamma.mask.EvidenceMasker;
 import com.gamma.sql.SqlSandboxPolicy;
 
 import java.io.IOException;

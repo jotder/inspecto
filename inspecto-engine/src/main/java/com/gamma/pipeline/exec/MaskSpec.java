@@ -4,7 +4,7 @@ import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.ViewStore;
-import com.gamma.risk.EvidenceMasker;
+import com.gamma.mask.EvidenceMasker;
 import com.gamma.util.ColumnClassification;
 
 import java.nio.file.Path;

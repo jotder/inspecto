@@ -68,7 +68,7 @@ class RiskScoreAlertTest {
         ComponentStore store = new ComponentStore(cfg.resolve("registry"));
         var run = RiskScoreEvaluator.evaluate(model, id -> DatasetRelation.relationSql(
                 store.get("dataset", id).map(ComponentRegistry.Component::content).orElseThrow(), data, null),
-                com.gamma.risk.EvidenceMasker.of(store, cfg, model));
+                com.gamma.mask.EvidenceMasker.of(store, cfg, model.datasetIds()));
         RiskScoreEvaluator.write(data, model, RiskScoreEvaluator.version(content), runId, Instant.now(), run.scored());
         return model;
     }

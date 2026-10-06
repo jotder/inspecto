@@ -3,7 +3,7 @@ package com.gamma.pipeline.exec;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.etl.EditionFeatures;
 import com.gamma.pipeline.PipelineNode;
-import com.gamma.risk.EvidenceMasker;
+import com.gamma.mask.EvidenceMasker;
 import com.gamma.util.DuckDbUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

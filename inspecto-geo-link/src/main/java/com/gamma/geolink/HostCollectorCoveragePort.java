@@ -4,7 +4,7 @@ import com.gamma.control.ApiContext;
 import com.gamma.control.HostContext;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.la.core.CollectorCoveragePort;
-import com.gamma.risk.EvidenceMasker;
+import com.gamma.mask.EvidenceMasker;
 import com.gamma.util.Csv;
 
 import java.nio.file.Files;
