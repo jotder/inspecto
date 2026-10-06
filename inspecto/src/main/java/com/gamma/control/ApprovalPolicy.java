@@ -67,9 +67,11 @@ record ApprovalPolicy(Map<String, Rule> rules, int expiresAfterHours, boolean fa
         Set<String> s = new TreeSet<>(ComponentStore.WRITABLE_TYPES);
         s.remove("requirement");
         s.addAll(Set.of("pipeline", "schema", "enrichment", "meta", JobRoutes.KIND));
-        // ASSURE-ENTITY-LISTS-1 (D-P5): member / range changes and retire of an Entity List (inspecto-entity-list) hold
-        // here; an add-only change whose every entry expires within 24 h applies at once and is reviewed after.
-        s.add("entity-list");
+        // Optional modules contribute their own kinds (GovernableKindProvider, MODULE-REORG-1 P1) — e.g.
+        // inspecto-entity-list contributes "entity-list" (ASSURE-ENTITY-LISTS-1, D-P5). Fail-soft discovery;
+        // an absent module's kind is simply not governable.
+        for (GovernableKindProvider p : com.gamma.service.OptionalSpi.all(GovernableKindProvider.class))
+            s.addAll(p.kinds());
         return java.util.Collections.unmodifiableSet(s);
     }
 

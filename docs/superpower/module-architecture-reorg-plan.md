@@ -195,6 +195,26 @@ P1 survey: the built-in route list is at `ControlApi` `:590-604`; optional modul
 `OptionalSpi.all(RouteModule.class)`; registration is first-match so the built-in order is load-bearing — step 1
 needs an `order()` on `RouteModule` and a golden registration-order test.
 
+### P1 decision log
+- **P1-D1 (2026-10-06): the built-in route list stays an explicit list.** Optional modules already load through
+  `OptionalSpi.all(RouteModule.class)` and are appended after the built-ins, so "an Optional feature touches only
+  its own module" already holds for *routes*. Moving the ~58 core built-ins (mostly package-private classes, in a
+  first-match order that is load-bearing) to `ServiceLoader` would cost making them public and buy no itemization.
+  The remaining route-side blocker is the hand-written `Absent*Routes` stubs, which needs the P2 manifests (the
+  surface of an absent module must be known from somewhere that is present). P1 therefore targets the other
+  registries first: capabilities, governable kinds, `OperationalDb.Family`, `features{}` and SPA nav gating.
+- **P1-D2 (2026-10-06): governable kinds opened first** — `GovernableKindProvider` (`inspecto-http-spi`), the processor
+  unions fail-soft providers; `inspecto-entity-list` contributes `entity-list`. An absent module's kind is not
+  governable (a policy naming it is refused 422).
+- **P1-D3 (2026-10-06): RBAC capability contribution DEFERRED to P2.** Only 8 of 216 capabilities are exclusive to
+  an optional module (4 `exchange`, 4 `la-api`); moving them drags `Roles.CAN_*` constants, `SEED` grants and the
+  literal-only scanner guards (`CapabilityManifestTest`, `route-gating-report`, authgate) — guard edits that need the
+  operator — and makes the role vocabulary depend on the classpath. It lands with the P2 manifest, where `provides`
+  names the capabilities and the scanner can be made per-module. Recipe: `CapabilityContributor` SPI in `auth-spi`,
+  contributors use string literals only (class-init cycle `Roles → CapabilityManifest → contributor → Roles`).
+- **P1-D4 (2026-10-06): `features{}` / SPA gating** — `RouteModule.featureIds()` default, collected only after a
+  successful `register()`; five legacy keys kept; SPA `navFeature` replaces the three id sets.
+
 ## 7. Success measures (baseline → target)
 
 | Measure | Today | Target |
