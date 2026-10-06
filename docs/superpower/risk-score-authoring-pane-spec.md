@@ -3,7 +3,7 @@
      okf/backend/control-plane/risk-scores.md and git mv this to archived-documents/plans-archive/. -->
 # Risk Score authoring pane — UX / product spec
 
-**Status:** decisions D-RP1..D-RP10 approved (operator, 2026-10-06); S1 and S3 built, S2 open. **Owns:** residual (2) of BACKLOG row
+**Status:** decisions D-RP1..D-RP10 approved (operator, 2026-10-06); S1, S2a and S3 built, S2b open. **Owns:** residual (2) of BACKLOG row
 `ASSURE-RISK-SCORE-RESIDUALS-1`. **As-built of the model:** [`okf/backend/control-plane/risk-scores.md`](../okf/backend/control-plane/risk-scores.md).
 Vocabulary per [`GLOSSARY.md`](../GLOSSARY.md): *Risk Score*, *Factor*, *indicator* (a Measure), *Dataset*, *Alert Rule*, *Incident*.
 
@@ -103,12 +103,21 @@ masking function, D-P8 = mask on read; D-RP7 (c) reuse the filter builder if the
 cards; D-RP8 (a) pickers show only Datasets with a readable Schema; D-RP9 (a) per-entity Alert Rule is a prefilled
 link; D-RP10 (a) deliver S1 → S2 → S3.
 
-**Progress.** S1 SHIPPED 2026-10-06 (`/risk-scores`, as-built in the OKF concept). S3 SHIPPED 2026-10-06 (`POST /risk-scores/preview` + the detail Preview button; the single-entity filter is an extra factor filter, no new `MeasureCompiler` field — section 8's claim resolved). S2 open; unsaved-content preview from the S2 form reuses the same route with `content`.
+**Progress.** S1 SHIPPED 2026-10-06 (`/risk-scores`, as-built in the OKF concept). S3 SHIPPED 2026-10-06 (`POST /risk-scores/preview` + the detail Preview button; the single-entity filter is an extra factor filter, no new `MeasureCompiler` field — section 8's claim resolved). S2a SHIPPED 2026-10-06 (create / edit form); S2b open; unsaved-content preview from the S2 form reuses the same route with `content`.
+
+**D-RP7 spike result (2026-10-06): (b) bespoke cards.** The only reusable filter editor,
+`inspecto/query/query-condition-group.component.ts`, edits a nested AND/OR `ConditionGroup` with its own operator
+vocabulary (`between`, typed arity). A factor's `filters` are a flat AND of `{field, op, value}` over the
+`MeasureCompiler` operators (`=`, `!=`, `>`, `>=`, `<`, `<=`, `like`, `in`, `isNull`, `notNull`), so reusing it would
+let the author build OR groups and nested groups the model cannot store, and would need a lossy translation both
+ways. `editable-grid` was not used either: a filter list inside a grid cell is the nested shape it does not host.
+The factor editor is `modules/admin/risk-scores/risk-score-factors.component.ts`: one card per factor, a flat
+filter row list, evidence as a multi-select over the Dataset's columns.
 
 ## 8. Unverified claims
 
 - The capability name approvers hold for held component changes (section 2).
-- Whether `editable-grid` can host nested filters, and whether a filter builder is reusable (D-RP7).
+- ~~Whether `editable-grid` can host nested filters, and whether a filter builder is reusable (D-RP7).~~ Settled by the S2 spike: neither fits (see Progress).
 - Whether `MeasureCompiler` can take a single-entity key filter without a new field (section 5).
 - Nav-menu / i18n registration for a new admin route was not inspected.
 - Sizes are estimates from the file inventory, not from a spike.

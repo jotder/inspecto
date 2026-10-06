@@ -231,9 +231,22 @@ pure view model is `inspecto/risk/risk-score-view.ts` (`riskModelView`): identit
 List, retention, one row per factor (dataset, key, measure, filter count, weight, cap, evidence) and the two
 derived Datasets, never authorable. A model with no factors is flagged *Invalid*. **History** opens
 `ComponentHistoryDialog` (restore reloads the list). An entity lookup feeds the existing panel. There is no
-create/edit yet (S2). **Preview (S3, 2026-10-06):** the detail's *Preview* button posts the saved model and the
+create/edit in the S1 view itself. **Preview (S3, 2026-10-06):** the detail's *Preview* button posts the saved model and the
 typed key to `POST /risk-scores/preview` and renders the result through the same panel (`preset` input, no
 load), labelled *preview, not saved*.
+
+**Create / edit (slice S2a, 2026-10-06).** *New Risk Score* (page header) and *Edit* (detail) are
+`risk-score-actions.component.ts`, gated on `canAuthorWorkbench` (D-RP4). They open `risk-score-form.dialog.ts`: one
+`<inspecto-schema-form>` over the flat fields (`riskScoreAttributes` in `inspecto/risk/risk-score-form.ts`, with
+`watchList` and the `retainDays`/`retainRuns` choice flattened) plus the Factor card editor
+(`risk-score-factors.component.ts`, D-RP7 (b) — the condition-group editor authors nested AND/OR the model cannot
+store). The Dataset picker offers only Datasets whose columns resolve (`DatasetRowsService.columns`, D-RP8); key,
+filter and evidence pickers list that Dataset's columns. Save is the generic component CRUD: `POST` on create, `PUT`
+with `If-Match` from a fresh `GET` on edit. Keys the form does not author (`name`, `owner`, `shares`) ride through.
+A 422 is shown verbatim in a banner and placed by `mapRiskRefusal`: `risk-score.factors[i].<field>` marks row `i`
+(the server's 0-based index) and that control; `risk-score.<key>` marks the top-level field. Schema and
+output-collision refusals name no path and stay in the banner. No rule is duplicated client-side beyond
+required/number checks.
 
 **Entity key display (D-RP6, operator 2026-10-06; D-P8 = mask on read).** Every SPA surface that prints an
 entity key goes through ONE function, `displayEntityKey` (`inspecto/risk/risk-score-view.ts`): it keeps the

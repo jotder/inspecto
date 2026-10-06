@@ -4,6 +4,7 @@
         subtitle="Weighted Factors over Datasets that rank entities; a score at or above the high threshold is High."
         [terms]="['Risk Score', 'Dataset', 'Alert Rule', 'Incident']"
     >
+        <app-risk-score-actions actions (changed)="load()"></app-risk-score-actions>
         <button actions mat-icon-button type="button" aria-label="Refresh Risk Scores" (click)="load()">
             <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
         </button>
@@ -52,6 +53,7 @@
                 <div class="flex items-center gap-2">
                     <h2 class="text-lg font-semibold">{{ m.id }}</h2>
                     <button mat-stroked-button type="button" (click)="history(m)">History</button>
+                    <app-risk-score-actions [model]="m.id" (changed)="load()"></app-risk-score-actions>
                 </div>
                 @if (m.description) {
                     <p class="text-secondary mt-1 text-sm">{{ m.description }}</p>

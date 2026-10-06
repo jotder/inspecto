@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { ToastrService } from 'ngx-toastr';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ComponentDef, ComponentsService } from 'app/inspecto/api/components.service';
@@ -75,6 +76,7 @@ function create(list: () => unknown) {
             { provide: ComponentsService, useValue: { list: vi.fn(list) } },
             { provide: RiskScoresService, useValue: { latest, preview } },
             { provide: MatDialog, useValue: { open } },
+            { provide: ToastrService, useValue: {} },
         ],
     });
     TestBed.overrideComponent(RiskScoresComponent, { set: { changeDetection: ChangeDetectionStrategy.Eager } });
