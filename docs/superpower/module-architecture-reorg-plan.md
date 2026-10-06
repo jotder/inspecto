@@ -1,7 +1,7 @@
 # Module architecture reorganisation — plan (2026-10-06, revised the same day)
 
 > 🟢 **PLAN — analysis only, nothing built; ALL decisions D-MR1…D-MR12 taken (operator, 2026-10-06, §8).**
-> **Progress 2026-10-06:** P0 ✅ shipped; P2b ✅ per-Space Enabled gate (see §6 *P2b as built*); P1 partly (governable kinds ✅, `features{}` + SPA nav gating ✅ — see §6 *P1 decision log*). Still open in P1: `OperationalDb.Family` contribution (survey done: `StoreFamily` interface + `StoreFamilyProvider`, update `check-family-count.mjs` and the 15-count tests to core+loaded), contributed OpenAPI fragments, 503 stubs (needs P2 manifests). RBAC capabilities deferred to P2 (P1-D3). Then P2.
+> **Progress 2026-10-06:** P0 ✅ shipped; P2b ✅ per-Space Enabled gate (see §6 *P2b as built*); P4a ✅ removal semantics characterised + fixed (see §6 *P4a as built*); P1 partly (governable kinds ✅, `features{}` + SPA nav gating ✅ — see §6 *P1 decision log*). Still open in P1: `OperationalDb.Family` contribution (survey done: `StoreFamily` interface + `StoreFamilyProvider`, update `check-family-count.mjs` and the 15-count tests to core+loaded), contributed OpenAPI fragments, 503 stubs (needs P2 manifests). RBAC capabilities deferred to P2 (P1-D3). Then P2.
 > Row to file on approval: `MODULE-REORG-1` (not yet in `BACKLOG.md`).
 > Inputs: *Enterprise-Grade Modular Architecture Guidelines* (PDF, 4 pages) and the "System Architecture
 > Topology" mock-up (four layers + a per-module inspector). Operator brief: long-term benefit across
@@ -321,6 +321,30 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
   registry, not in `register()`. Not mocked on purpose. Not attempted: the remaining la-api route classes (many take host-free
   ports and could subclass the TCK next), `inspecto-geo-link` and `inspecto-policy`.
 - **Still open for P5:** the TCKs of §5 other than RouteModule; the "drop the processor dependency from the 7 modules" step.
+
+### P4a as built (2026-10-06 — removal semantics: characterised first, then only what was broken and small)
+Scenario: config naming a capability no installed module provides (stand-ins `zz.absent-module-node`, `zz.absent-module-job`, `zz-absent-action`). Tests: `ModuleRemovalPipelineTest`, `ModuleRemovalJobTest`, `ModuleRemovalRulesTest`, `ModuleRemovalBundleTest` (inspecto) and `ModuleRemovalBackupTest` (inspecto-backup).
+
+| Case | Verdict | Fixed here |
+|---|---|---|
+| Pipeline, flat config with a `steps:` kind no module registers | **INERT** — loads as a listed load failure (`loadError`), never run; `GET /graph/raw` is a loud 422; no read rewrites the file | the load error now says a removed module's file is left untouched and loads again once installed |
+| Pipeline `PUT /graph` with an unregistered node type | **REFUSED-LOUDLY** — 422 `UNSUPPORTED_NODE`, nothing written; dry run is 200 with a `NOT previewed` warning naming the type | the refusal now names the missing module (only for a type nothing registers; a registered-but-not-authorable type keeps its old wording) |
+| Pipeline plain unknown key (`zz_module`) | **REFUSED-LOUDLY** at save (`ERR_UNKNOWN_CONFIG_KEY`), file unchanged; does not name a module | filed `MODULE-REORG-P4-1` |
+| Pipeline author-owned `x-` key | **PRESERVED** through GET `/graph/raw` → PUT `/graph` | — (pinned) |
+| Job of an unregistered type: list, detail | **PRESERVED** — listed with every key (but with a live `nextFire`) | wire flag filed `MODULE-REORG-P4-1` |
+| Job trigger | was a misleading **404** "no job named" for a listed job | now **503 `CAPABILITY_UNAVAILABLE`** naming the type and the missing module |
+| Job enabled save (`PUT`, `reschedule`, `enable`, `POST` of a typo'd type) | was **a 500 after the file had been rewritten AND the job dropped from memory** (`persistJob` wrote, then `upsertJob` threw) — DROPPED | now **422 before any write**; file byte-identical, job stays listed. A *disable* stays allowed and keeps every key |
+| Decision Rule with an unknown consequence action | **PRESERVED** through create / update / simulate (top-level and consequence keys); `apply` reports `skipped` | the `skipped` detail now names the missing module |
+| Alert Rule with an unmodelled key | **DROPPED silently on a 200** (`persisted()` rebuilds from `AlertRule.toMap()`) — pinned by `…IsDroppedBySaveWithA200_pinnedUntilP4Policy` | needs a policy call (Pipeline refuses, Decision Rule keeps): `MODULE-REORG-P4-2` |
+| Space bundle export (whole Space) | **PRESERVED** — a directory walk, no roster; carries `modules.toon` and unknown registry kinds byte-for-byte | — |
+| Bundle clone import (`refuseReserved=false`, new-Space seed) | **PRESERVED** verbatim | — |
+| Bundle import into an existing Space | Job of an absent type **PRESERVED**; `modules.toon` **REFUSED by design** (a Space settings document, as `branding.toon`); a registry entry of a kind no module registers is **REFUSED-LOUDLY and all-or-nothing** (before the first byte) | roster derived from installed modules + module-naming message: `MODULE-REORG-P4-3` |
+| `modules.toon` stored unknown id | **PRESERVED** (P2b, `ModuleSettingsRoutesTest`) | — |
+| Backup / restore (`inspecto-backup`) | **PRESERVED** — `BackupTask` walks the directory (filter: secrets only) and restore writes entries verbatim, so no family roster exists to go stale | — |
+
+- **The bug worth the phase:** the Job save order. `persistJob` wrote the TOON, then `JobService.upsertJob` did `removeJobInternal` and `build`, which throws for an unregistered type. Any authoring verb on an enabled ghost Job therefore rewrote its file (cron re-quoted) and unhosted it until reboot. The docs claimed "`upsertJob` still refuses an unknown type, so a typo is a 4xx" — it was a 500 with a side effect. The gate is one check at the top of `persistJob` (`c.enabled() && jobTypeView(type).isEmpty()`), because `buildDisabled` is lenient by design.
+- **Not changed, deliberately:** the engine's boot-time skip of unregistered Job types (documented, `DEMO-SPACE-PERSONAL-UNBOOTABLE-1`); `ImportPaths`' shape allowlist; the Pipeline unknown-key gate. No route was added (`ApiContractTest` untouched); no guard inventory was edited.
+- **Open (rows filed):** `MODULE-REORG-P4-1` inert-config diagnostics on the wire; `MODULE-REORG-P4-2` Alert Rule unmodelled-key policy; `MODULE-REORG-P4-3` store-family ownership, the bundle kind roster and stopping a disabled module's background work.
 
 ## 7. Success measures (baseline → target)
 

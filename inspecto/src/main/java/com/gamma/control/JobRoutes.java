@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -161,7 +162,7 @@ final class JobRoutes implements RouteModule {
         // Optional ?dryRun=true (MNT-1): a preview fire — the Run reports impact, mutates nothing.
         boolean dryRun = "true".equalsIgnoreCase(ApiContext.query(e, "dryRun"));
         String runId = jobs(api).triggerRun(name, ApiContext.query(e, "actor"), args, dryRun)   // optional ?actor= attributes the fire (T32)
-                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no job named '" + name + "'"));
+                .orElseThrow(() -> notTriggerable(api, name));
         if (ApiContext.v1(e)) {
             e.getResponseHeaders().set("Location", "/api/v1/jobs/runs/" + runId);
             return ApiContext.respondJson(e, 202,
@@ -296,6 +297,16 @@ final class JobRoutes implements RouteModule {
     private JobConfig existingJob(ApiContext api, String name) {
         return jobs(api).jobConfig(name)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no job named '" + name + "'"));
+    }
+
+    /** Why a name that {@code GET /jobs} lists cannot be triggered: unknown (404), or configured but not hosted (503). */
+    private ApiException notTriggerable(ApiContext api, String name) {
+        Optional<JobConfig> cfg = jobs(api).jobConfig(name);
+        if (cfg.isPresent() && jobs(api).jobTypeView(cfg.get().type()).isEmpty())
+            return new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "job '" + name + "' is configured but its type '"
+                    + cfg.get().type() + "' is not registered here — the module that provides it is not installed; "
+                    + "the config is kept unchanged");
+        return new ApiException(404, ErrorCodes.NOT_FOUND, "no job named '" + name + "'");
     }
 
     /** {@code GET /jobs/runs/{runId}} — poll one run's status (W5); 404 once evicted or unknown. */
@@ -471,6 +482,12 @@ final class JobRoutes implements RouteModule {
 
     /** Encode the config as a {@code job { … }} TOON doc, write it atomically, and hot-register it. */
     private void persistJob(ApiContext api, JobConfig c) throws IOException {
+        // MODULE-REORG-1 P4a: refuse BEFORE the write. upsertJob builds an enabled job and throws on an unregistered
+        // type — after the file was already rewritten and the old config dropped from memory (a 500 and a job that
+        // vanished from the list). A DISABLED job of an absent type stays savable: buildDisabled is lenient.
+        if (c.enabled() && jobs(api).jobTypeView(c.type()).isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' has type '" + c.type()
+                    + "', which no installed module registers — nothing was written (an existing config stays as it is)");
         Path target = jobFile(api, c.name());
         byte[] bytes = ConfigCodec.toToon(Map.of("job", c.toMap())).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".job-");

@@ -325,7 +325,7 @@ final class DecisionRoutes implements RouteModule {
             }
             case "route", "tag", "quarantine", "drop" ->
                     detail = "routing action — applied to matching records during the target pipeline's runs";
-            default -> detail = "unknown action '" + action + "'";
+            default -> detail = "unknown action '" + action + "' — no installed module provides it; the rule is kept unchanged";
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("action", action);

@@ -763,7 +763,10 @@ public final class PipelineEditable {
             // still read the closed built-in set, so the palette offered a type save then refused)
             if (!isLowerable(t)) {
                 refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_NODE, n.id(),
-                        "the flat pipeline config has no home for a '" + t + "' node"));
+                        "the flat pipeline config has no home for a '" + t + "' node"
+                                + (PipelineNodeTypes.isKnown(t) ? ""
+                                   : " — no installed module registers that node type (if its module was removed, "
+                                     + "the Pipeline file is untouched; install the module to edit it)")));
                 continue;
             }
             String unhomed = unhomedBinding(n);

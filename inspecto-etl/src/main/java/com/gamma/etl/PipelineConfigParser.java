@@ -696,7 +696,8 @@ final class PipelineConfigParser {
                          && StepKindRegistry.current().isKnown(kind))) {
                 throw new IllegalArgumentException("unknown " + context + " kind '" + kind + "' — expected one of "
                         + PipelineConfig.Step.KINDS + ", or the suffix of a registered node type "
-                        + "(a kind 'k' names 'transform.k')");
+                        + "(a kind 'k' names 'transform.k'). If the module that provides this kind was removed, the "
+                        + "file is left untouched and loads again once that module is installed");
             }
             if (only.getValue() != null && !(only.getValue() instanceof Map<?, ?>)) {
                 throw new IllegalArgumentException(context + " entry '" + kind
