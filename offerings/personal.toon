@@ -1,0 +1,6 @@
+id: personal
+title: Personal
+tier: personal
+modules[1]: connectors
+contentPacks[6]: business-assurance,la-daily-feed,orders-starter,payment-fraud,telco-fraud,telco-ra
+defaultSpaceSettings:

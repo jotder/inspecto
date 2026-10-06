@@ -184,6 +184,30 @@ end, and every `ci.yml` no-build guard before any push.
 The approval-SPI extraction (archived 2026-10-06 as superseded: `archived-documents/plans-archive/approval-spi-extraction-plan.md`) folds into P1: governable kinds become a
 contribution point, which is what that plan's D-AS3 asked for.
 
+### P6a as built (2026-10-06 — Offerings as a checked artifact; additive, the build is NOT re-plumbed)
+- `offerings/{personal,professional,enterprise,preview}.toon` at the repo root: the four editions as the profiles and
+  `bundle-modules.mjs` have them today. Professional `includes` Personal, Enterprise includes Professional, Preview
+  includes Enterprise (verified subset-shaped: Preview's set is byte-identical to Enterprise's, as EDITIONS says).
+  Each lists `modules` (manifest ids), `addons` (built = names modules that exist today; planned = `hostedBy` where the
+  code lives until its P7 move), `contentPacks` (the six `spaces/_templates/*` the bundle ships in every edition;
+  `packs-dev/*` are dev-only and not shipped) and an empty `defaultSpaceSettings` placeholder.
+- `tools/check-offerings.mjs` (+ `.test.mjs`, 15 cases) fails on: a module id with no manifest; an Offering whose module
+  set differs from `bundleModules(edition)` or from the edition pom profile (profile = bundle set minus the default-reactor
+  modules); a `requires.modules` edge leaving the Offering; a built add-on naming a missing or not-included module; a
+  missing content pack; an unknown include or a cycle. **Always-present rule (documented at the top of the script):**
+  decided on manifest `offeringRole`, not `buildRole` — `base`/`internal` modules (only `processor` is staged) are never
+  listed and are ignored on both sides; `connectors` is `provider` and ships everywhere, so Personal lists it.
+  Printed as one line in `check-module-architecture.mjs`'s report. **Follow-up: wire into `ci.yml`** (not done here).
+- **Finding — `docs/EDITIONS.md` Packaging row is stale** against the profiles: Professional "NINE optional modules, 12
+  staged jars" vs the real 14 optional modules (Personal 2 + 14 = 16 first-party jars, +`postgresql.jar`); the row omits
+  `entity-list`, `la-graph`, `la-storage`, `la-core`, `la-api`; Enterprise "10 modules, 13 staged jars" vs 19 first-party
+  (adds `policy`, `la-store-pg`, `intelligence`). `pom.xml` `edition-standard` is a legacy alias of Professional.
+- **What generating EDITIONS / FEATURE_INVENTORY would need (not done, per instruction):** per-edition module and jar
+  counts from the Offering closure (already derivable here); the non-module matrix rows (transport, AuthN, secrets,
+  compliance) have no home in an Offering yet — they need a `posture{}` section; capability rows need each manifest's
+  `provides.features` plus capability ids (P1-D3, not yet in `provides`); the add-on `status` field is what separates
+  "shipped" from "planned" in a generated table. `defaultSpaceSettings` stays `{}` until a real default is decided.
+
 ## 6-A. P0 baseline (recorded 2026-10-06, `node tools/check-module-architecture.mjs`)
 
 ✅ P0 shipped: GLOSSARY §15, OKF `backend/module-taxonomy.md`, the report-only guard (not wired into CI).

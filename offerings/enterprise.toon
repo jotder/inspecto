@@ -1,0 +1,12 @@
+id: enterprise
+title: Enterprise
+tier: enterprise
+includes[1]: professional
+modules[3]: policy,la-store-pg,intelligence
+addons:
+  linkAnalysis:
+    status: built
+    modules[1]: la-store-pg
+  aiAssist:
+    status: built
+    modules[1]: intelligence

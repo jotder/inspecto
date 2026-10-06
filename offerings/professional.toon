@@ -1,0 +1,39 @@
+id: professional
+title: Professional
+tier: professional
+includes[1]: personal
+modules[14]: security,notify-channels,backup,entity-list,la-graph,la-storage,la-core,la-api,geo-link,exchange,metrics,events,ops,agent
+addons:
+  linkAnalysis:
+    status: built
+    modules[5]: la-graph,la-storage,la-core,la-api,geo-link
+  aiAssist:
+    status: built
+    modules[1]: agent
+  integrationDelivery:
+    status: built
+    modules[1]: notify-channels
+  multiEntity:
+    status: built
+    modules[1]: exchange
+  incidents:
+    status: planned
+    hostedBy[2]: engine,ops
+  caseManagement:
+    status: planned
+    hostedBy[1]: ops
+  reconciliation:
+    status: planned
+    hostedBy[1]: engine
+  scoringLists:
+    status: planned
+    hostedBy[2]: engine,entity-list
+  actionRequests:
+    status: planned
+    hostedBy[1]: processor
+  workflowSla:
+    status: planned
+    hostedBy[1]: engine
+  premiumConnectors:
+    status: planned
+    hostedBy[1]: connectors

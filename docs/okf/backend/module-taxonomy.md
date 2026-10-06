@@ -13,7 +13,7 @@ timestamp: 2026-10-06T00:00:00Z
 > Built: the per-module manifest (`META-INF/inspecto/module.toon`, all 34 modules), the activator
 > (`com.gamma.module` in `inspecto-util`) and `GET /modules`; the per-Space **Enabled** gate (`modules.toon`, `GET|PUT /settings/modules` — a route of a
 > disabled module answers 404 `MODULE_DISABLED`, `/bootstrap` `features{}` and `GET /modules` `enabledInSpace` follow it).
-> Not built: directory regroup, offerings. Decisions D-MR1…D-MR12 and phases P0–P7 live in
+> Not built: directory regroup; Offerings exist as a checked artifact only (see below). Decisions D-MR1…D-MR12 and phases P0–P7 live in
 > [module-architecture-reorg-plan.md](../../superpower/module-architecture-reorg-plan.md) until they ship.
 
 ## Manifest format (`META-INF/inspecto/module.toon`)
@@ -57,6 +57,29 @@ each module's state with the reasons, plus loader diagnostics.
   built-ins. Registration is **first-match in order**, so the built-in order is load-bearing.
 - Six hand-written `Absent*Routes` stubs answer 503 for absent optional modules (second closed registry).
 - A duplicate (METHOD, pattern) fails boot.
+
+## Offerings (`offerings/<id>.toon`)
+An Offering composes modules and content; an edition is an Offering that `includes` another. Built in P6a as a
+**checked** artifact — the bundle and pom still derive from `tools/bundle-modules.mjs`, and
+`tools/check-offerings.mjs` fails when an Offering disagrees with it, with the pom profile, or with the manifests.
+```
+id: professional
+title: Professional
+tier: professional
+includes[1]: personal
+modules[14]: security,notify-channels,backup,entity-list,la-graph,la-storage,la-core,la-api,geo-link,exchange,metrics,events,ops,agent
+addons:
+  linkAnalysis:
+    status: built
+    modules[5]: la-graph,la-storage,la-core,la-api,geo-link
+  incidents:
+    status: planned
+    hostedBy[2]: engine,ops
+```
+`modules` use manifest ids; modules with `offeringRole` base or internal are always present and never listed.
+`addons` status `built` names modules that exist today, `planned` names where the code lives until its P7 move.
+`contentPacks[N]` lists Space template ids under `spaces/_templates`; `defaultSpaceSettings:` is an empty
+placeholder. Includes union modules and add-ons. Not yet in CI. Same TOON rules as manifests (no `#` lines).
 
 ## Related
 [Architecture layers](architecture-layers.md) · [Editions model](editions/editions-model.md)
