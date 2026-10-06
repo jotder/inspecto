@@ -36,6 +36,8 @@ public final class ErrorCodes {
     /** 500 — stored evidence disagrees with its own recorded hashes (e.g. a broken identity fact chain, LA-17);
      *  the store is refused rather than silently read. */
     public static final String INTEGRITY_VIOLATION      = "INTEGRITY_VIOLATION";
+    /** 404 — the route belongs to an installed module that this Space has switched off ({@code PUT /settings/modules}); not the 503 of a module that is not installed. */
+    public static final String MODULE_DISABLED          = "MODULE_DISABLED";
     /** 422 — a Safety Policy file in scope exists but cannot be read as a valid policy; every gate and run in scope fails closed. */
     public static final String SAFETY_POLICY_UNREADABLE = "ERR_SAFETY_POLICY_UNREADABLE";
 

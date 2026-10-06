@@ -600,7 +600,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new PendingChangeRoutes(), new ActionRequestRoutes(), new EgressRoutes(), new ApproverRosterRoutes(), new SafetyPolicyRoutes(), new PublicationDestinationRoutes(), new MailAttachmentRoutes(), new NavRoutes(), new AccessRoutes(),
                 new AuditLogRoutes(),   // the audit projection stays CORE though the /events feed is gated (EDG-01 cell 6)
                 new AssistRoutes(), new AgentRoutes(), new SystemRoutes(), new SchedulerRoutes(),
-                new ModulesRoutes()))   // MODULE-REORG-1 P2a: GET /modules — appended LAST (order is load-bearing)
+                new ModulesRoutes(), new ModuleSettingsRoutes()))   // MODULE-REORG-1 P2a/P2b: GET /modules, /settings/modules — appended LAST (order is load-bearing)
             module.register(this);
 
         // Optional-module route groups (EDG-01 cell 3a, 2026-09-07): discovered through
@@ -615,8 +615,18 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // installed. ⛔ Do not go back to a raw ServiceLoader loop: one unloadable module would take
         // every other route module and the boot down with it.
         for (RouteModule module : com.gamma.service.OptionalSpi.all(RouteModule.class)) {
+            int firstNew = routes.size();
             module.register(this);
             registeredFeatures.addAll(module.featureIds());
+            // P2b: remember which feature owns each route this module just added, so a Space that switched the
+            // feature off answers MODULE_DISABLED at dispatch (requireModuleEnabled) instead of reaching the handler.
+            if (!module.featureIds().isEmpty()) {
+                java.util.Set<String> owned = java.util.Set.copyOf(module.featureIds());
+                for (int i = firstNew; i < routes.size(); i++) {
+                    Route r = routes.get(i);
+                    routes.set(i, new Route(r.method(), r.pattern(), r.handler(), owned));
+                }
+            }
             log.info("route module discovered: {}", module.getClass().getName());
         }
         // Absent-module stubs, LAST of all: they register only the paths no discovered module claimed
@@ -1013,6 +1023,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 throw ae;
             }
             authorize(ex, method, path);
+            requireModuleEnabled(r);   // after authenticate + authorize, so a refused caller learns nothing about the Space
             if (idempotency(ex, method, path)) return;   // after every gate, before the handler's side effects
             try {
                 Object result = r.handler.handle(ex, m);
@@ -1076,6 +1087,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 Matcher m = r.pattern.matcher(path);
                 if (!r.method.equals(method) || !m.matches()) continue;
                 authorize(rx, method, path);
+                requireModuleEnabled(r);
                 Object result = r.handler.handle(rx, m);
                 if (result != HANDLED) respond(rx, 200, result);
                 AuditTrail.record(rx, method, path, rx.status() > 0 ? rx.status() : 200);
@@ -1573,6 +1585,31 @@ public final class ControlApi implements AutoCloseable, HostContext {
     /** Absent-module stubs (ApiContext.stub) — in the route table, but NOT counted by hasRoute. */
     private final java.util.Set<String> stubbedRoutes = new java.util.HashSet<>();
 
+    /**
+     * MODULE-REORG-1 P2b (D-MR10), the middle gate Installed -> ENABLED -> Permitted: a route owned by a feature the
+     * CURRENT Space has switched off ({@code modules.toon}) answers 404 {@code MODULE_DISABLED} and never reaches its
+     * handler. Core routes and absent-module stubs own no feature, so they are never touched - a module that is not
+     * installed stays the 503 {@code CAPABILITY_UNAVAILABLE} "not installed".
+     */
+    private void requireModuleEnabled(Route r) {
+        if (r.features().isEmpty()) return;
+        java.util.Set<String> off = disabledFeatures();
+        if (off.isEmpty()) return;
+        for (String f : r.features())
+            if (off.contains(f))
+                throw new ApiException(404, ErrorCodes.MODULE_DISABLED, "the '" + f + "' module is switched off in this Space "
+                        + "(an administrator can enable it with PUT /settings/modules)");
+    }
+
+    @Override public java.util.Set<String> disabledFeatures() {
+        if (registeredFeatures.isEmpty()) return java.util.Set.of();
+        try {
+            return ModuleSettings.disabled(writeRoot());
+        } catch (SpaceManager.NoSpaceHostedException none) {
+            return java.util.Set.of();
+        }
+    }
+
     @Override public java.util.Set<String> registeredFeatures() { return java.util.Collections.unmodifiableSet(registeredFeatures); }
 
     @Override public boolean hasRoute(String method, String pattern) { return registeredRoutes.contains(method + " " + pattern); }
@@ -1583,7 +1620,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
             throw new IllegalStateException("stub " + key + " would shadow or duplicate an existing route - stubs "
                     + "register LAST and only for patterns hasRoute() reports unclaimed.");
         }
-        routes.add(new Route(method, Pattern.compile("^" + pattern + "$"), h));
+        routes.add(new Route(method, Pattern.compile("^" + pattern + "$"), h, java.util.Set.of()));
     }
 
     private void register(String method, String pattern, Handler h) {
@@ -1595,7 +1632,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         }
         requireDeclaredPosture(method, pattern, h);
         recordPosture(method, pattern, h);
-        routes.add(new Route(method, Pattern.compile("^" + pattern + "$"), h));
+        routes.add(new Route(method, Pattern.compile("^" + pattern + "$"), h, java.util.Set.of()));
     }
 
     /** Add this route to the runtime inventory with whatever posture it declared. */
@@ -1655,5 +1692,6 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 || path.equals("/metrics") || path.equals("/metrics/acquisition");
     }
 
-    private record Route(String method, Pattern pattern, Handler handler) {}
+    /** {@code features}: the {@link RouteModule#featureIds()} of the discovered module that registered the route (P2b); empty for core and stub routes. */
+    private record Route(String method, Pattern pattern, Handler handler, java.util.Set<String> features) {}
 }

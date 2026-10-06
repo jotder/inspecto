@@ -280,6 +280,8 @@ final class CapabilityManifest {
             // EgressRoutes (ASSURE-ACTION-REQUESTS-1) — widening where an Action Request may reach is administration.
             new Entry("PUT", "/settings/egress", Roles.CAN_ADMINISTER),
             new Entry("PUT", "/settings/approvers", Roles.CAN_ADMINISTER),
+            // ModuleSettingsRoutes (MODULE-REORG-1 P2b, D-MR10) - switching a module on or off for a Space is administration.
+            new Entry("PUT", "/settings/modules", Roles.CAN_ADMINISTER),
             // SafetyPolicyRoutes (DUCKLE-C6-POLICY-NARROWING-1 S7) - the effective policy names roots and hosts: administration.
             new Entry("GET", "/settings/safety-policy", Roles.CAN_ADMINISTER),
             // PublicationDestinationRoutes (ASSURE-BI-PUBLICATION-1) — where Datasets may be published is administration.

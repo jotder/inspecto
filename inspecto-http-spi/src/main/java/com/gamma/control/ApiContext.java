@@ -253,6 +253,11 @@ public interface ApiContext extends WriteRootProvider {
      */
     boolean hasRoute(String method, String pattern);
 
+    /** Feature ids the CURRENT Space has switched off ({@code modules.toon}, MODULE-REORG-1 P2b); empty when none or unknown. */
+    default java.util.Set<String> disabledFeatures() {
+        return java.util.Set.of();
+    }
+
     /** Feature ids declared by the route modules that registered ({@link RouteModule#featureIds()}). */
     default java.util.Set<String> registeredFeatures() {
         return java.util.Set.of();

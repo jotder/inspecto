@@ -802,7 +802,7 @@ Everything under a `SpaceContext` is per Space: `OperationalDb`, `EventStore`, `
 `ComponentStore` / registry, `JobService` (the scheduler). The per-Space **settings documents** live under
 the Space's config root and are bound by `Roles.ATTR_CONFIG_ROOT`, stamped pre-auth by `ControlApi`
 (`:767`): `roles.toon`, `access-policies.toon` (both **fail closed** when unreadable — `SEC` §3.6, §3.10),
-`branding.toon`, `geo.toon`, `icon-map.toon`, `nav-menus.toon` (missing ⇒ shipped defaults). Store
+`branding.toon`, `geo.toon`, `icon-map.toon`, `nav-menus.toon` (missing ⇒ shipped defaults), `modules.toon` (`disabled: [feature ids]`, `GET|PUT /settings/modules`, `canAdminister`; missing ⇒ every installed module enabled — the per-Space Enabled gate, MODULE-REORG-1 P2b, see [module-taxonomy](../../backend/module-taxonomy.md)). Store
 **backends** are process-global `-D` flags (`-Dinspecto.db=duckdb|postgres`, `-Dstatus.backend`, …) — the
 selection, not the files, is shared, and an unhonourable `postgres` **fails at boot** (`verifySelectable`,
 PG-1). Each Space's root joins the config-path jail as a *discovered* root (`SafetyPolicy.defaultPolicy()` =

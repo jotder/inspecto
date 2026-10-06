@@ -334,6 +334,7 @@ system: the evidence cannot say something the code does not.
 | PUT | `/settings/geo` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:69` |
 | PUT | `/settings/link-analysis` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:72` |
 | PUT | `/settings/mail-attachments` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/MailAttachmentRoutes.java:34` |
+| PUT | `/settings/modules` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/ModuleSettingsRoutes.java:41` |
 | PUT | `/settings/pipeline-history` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:75` |
 | PUT | `/settings/publication-destinations` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/PublicationDestinationRoutes.java:34` |
 | PUT | `/settings/scheduler` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java:77` |

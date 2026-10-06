@@ -19,4 +19,12 @@ public final class TestDiscoveredRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get(PATH, (e, m) -> Map.of("discovered", true, "via", "META-INF/services"));
     }
+
+    /** The feature this test module declares - what the per-Space Enabled gate (P2b) switches off in tests. */
+    public static final String FEATURE = "testDiscovered";
+
+    @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of(FEATURE);
+    }
 }

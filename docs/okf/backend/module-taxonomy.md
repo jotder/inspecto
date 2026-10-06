@@ -9,10 +9,11 @@ timestamp: 2026-10-06T00:00:00Z
 
 # Module taxonomy
 
-> 🟢 **Status (2026-10-06): target model; P0, P1 (part) and P2a built.** Vocabulary is in `docs/GLOSSARY.md` §15.
+> 🟢 **Status (2026-10-06): target model; P0, P1 (part), P2a and P2b built.** Vocabulary is in `docs/GLOSSARY.md` §15.
 > Built: the per-module manifest (`META-INF/inspecto/module.toon`, all 34 modules), the activator
-> (`com.gamma.module` in `inspecto-util`) and `GET /modules`. Not built: directory regroup, per-Space Enabled gate,
-> offerings. Decisions D-MR1…D-MR12 and phases P0–P7 live in
+> (`com.gamma.module` in `inspecto-util`) and `GET /modules`; the per-Space **Enabled** gate (`modules.toon`, `GET|PUT /settings/modules` — a route of a
+> disabled module answers 404 `MODULE_DISABLED`, `/bootstrap` `features{}` and `GET /modules` `enabledInSpace` follow it).
+> Not built: directory regroup, offerings. Decisions D-MR1…D-MR12 and phases P0–P7 live in
 > [module-architecture-reorg-plan.md](../../superpower/module-architecture-reorg-plan.md) until they ship.
 
 ## Manifest format (`META-INF/inspecto/module.toon`)

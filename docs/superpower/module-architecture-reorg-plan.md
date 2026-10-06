@@ -1,7 +1,7 @@
 # Module architecture reorganisation — plan (2026-10-06, revised the same day)
 
 > 🟢 **PLAN — analysis only, nothing built; ALL decisions D-MR1…D-MR12 taken (operator, 2026-10-06, §8).**
-> **Progress 2026-10-06:** P0 ✅ shipped; P1 partly (governable kinds ✅, `features{}` + SPA nav gating ✅ — see §6 *P1 decision log*). Still open in P1: `OperationalDb.Family` contribution (survey done: `StoreFamily` interface + `StoreFamilyProvider`, update `check-family-count.mjs` and the 15-count tests to core+loaded), contributed OpenAPI fragments, 503 stubs (needs P2 manifests). RBAC capabilities deferred to P2 (P1-D3). Then P2.
+> **Progress 2026-10-06:** P0 ✅ shipped; P2b ✅ per-Space Enabled gate (see §6 *P2b as built*); P1 partly (governable kinds ✅, `features{}` + SPA nav gating ✅ — see §6 *P1 decision log*). Still open in P1: `OperationalDb.Family` contribution (survey done: `StoreFamily` interface + `StoreFamilyProvider`, update `check-family-count.mjs` and the 15-count tests to core+loaded), contributed OpenAPI fragments, 503 stubs (needs P2 manifests). RBAC capabilities deferred to P2 (P1-D3). Then P2.
 > Row to file on approval: `MODULE-REORG-1` (not yet in `BACKLOG.md`).
 > Inputs: *Enterprise-Grade Modular Architecture Guidelines* (PDF, 4 pages) and the "System Architecture
 > Topology" mock-up (four layers + a per-module inspector). Operator brief: long-term benefit across
@@ -243,6 +243,36 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
 - Deferred to later P2 steps: directory/artifactId regroup (D-MR2), per-Space Enabled gate, capabilities in
   `provides` (P1-D3), 503 stubs synthesised from manifests, `/bootstrap` reading the three gates.
 - `route-gating.md` was already stale from the P1 `featureIds()` line shifts; it was regenerated with this change.
+
+### P2b as built (2026-10-06 — the per-Space Enabled gate, D-MR10)
+- **Document:** `modules.toon` = `disabled: [feature ids]` in the Space config root (absent = all enabled, so a newly
+  installed module defaults to enabled). `ModuleSettings` (read cache keyed by mtime+size, atomic write) holds the TOON
+  I/O; `ModuleSettingsRoutes` = `GET|PUT /settings/modules` (sibling of `/settings/egress`; `canAdminister`, audit
+  action `module-settings.changed` as an `AUDIT` event, no new EventType). Reserved from import (`ReservedConfigPaths`).
+- **Validation:** an id must be in `registeredFeatures()` (an installed module's `featureIds()`), otherwise 422 — that
+  also covers core feature names such as `authoring`. Stored ids that no installed module declares are **inert**: listed
+  in `inert`, disable nothing, and are re-added by every save, as are unmodelled keys of the file (tested).
+- **Enforcement:** `ControlApi` stamps each route a discovered module registered with that module's feature ids (the new
+  `Route.features`, taken from the route-table slice around `register()`); `requireModuleEnabled` runs after
+  authenticate + authorize (a refused caller learns nothing) and before idempotency/handler, in `routeDispatch` and in
+  `replay`. Answer: **404 `MODULE_DISABLED`** (new `ErrorCodes` constant) vs the 503 `CAPABILITY_UNAVAILABLE` of a module
+  that is not installed. Core routes and absent-module stubs own no feature, so `/bootstrap`, `/modules` and
+  `/settings/modules` can never be disabled. `ApiContext.disabledFeatures()` (default empty) exposes the current Space's set.
+- **Reads:** `/bootstrap` `features{}` = registered AND not disabled (the five legacy keys, plus every other installed
+  feature id under its own key); `GET /modules` gains `enabledInSpace` (per request; the manifest load stays cached).
+- **Deviation (decided here):** a `modules.toon` that cannot be parsed reads as *nothing disabled* with a warning and
+  `unreadable: true` on the GET, and a PUT over it is refused 422 (a save would drop what it holds). Not fail-closed
+  like `approvers.toon`: this gate narrows the product surface only; the Permitted gate (capabilities) is untouched.
+- **Gotchas:** `ConfigWriteFunnelTest` scans a route file for `JToon.encode`, so the TOON write lives in
+  `ModuleSettings`, not the route class (the settings-record pattern; no `NO_SAVE_GATE` row needed). The module
+  test class path carries no optional module, so the tests switch off `TestDiscoveredRoutes` (feature `testDiscovered`).
+  `OpenApiPathsContractTest -Dopenapi.paths.write=true` also reformats three unrelated hand-edited lines; they were
+  restored. The error-code enum in `openapi-v1.json` is hand-kept: `MODULE_DISABLED` added.
+- **Open:** `ImportLoaderInventoryTest.everyFixedNameALoaderReadsIsReservedOrAllowedWithAReason` is RED since P2a
+  (`META-INF/inspecto/module.toon` read by `ModuleManifests.java`): it needs an `ALLOWED` row with a reason (a classpath
+  resource an import cannot plant) — a guard-inventory edit that needs the operator.
+- **Deferred:** a settings screen (SPA) for `/settings/modules`; the SPA still reads `/bootstrap` only. A disabled
+  module's background Jobs and stores are NOT stopped (the gate is on the HTTP surface; P4 owns removal semantics).
 
 ## 7. Success measures (baseline → target)
 

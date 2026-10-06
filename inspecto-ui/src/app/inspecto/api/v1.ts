@@ -23,7 +23,8 @@ export type V1ErrorCode =
     | 'NOT_SUPPORTED'
     | 'PAYLOAD_TOO_LARGE'
     | 'INTEGRITY_VIOLATION'
-    | 'STORE_BUSY';
+    | 'STORE_BUSY'
+    | 'MODULE_DISABLED';
 
 export interface V1EnvelopeMetadata {
     timestamp: string;

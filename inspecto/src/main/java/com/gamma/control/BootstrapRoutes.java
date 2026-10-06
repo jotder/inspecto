@@ -98,26 +98,30 @@ final class BootstrapRoutes implements RouteModule {
         // registered. ⚠ Until 2026-09-07 this was the containerRoot check alone, so a Personal install with
         // -Dspaces.root reported exchange:true and the SPA's Share buttons 404'd on click. Derived from what
         // registered, never guessed; the stub does not count (ApiContext.hasRoute excludes stubs).
-        f.put("exchange", HostContext.of(api).spaces().containerRoot() != null && api.registeredFeatures().contains("exchange"));
+        java.util.Set<String> on = new java.util.HashSet<>(api.registeredFeatures());
+        on.removeAll(api.disabledFeatures());   // MODULE-REORG-1 P2b: installed AND enabled in the current Space
+        f.put("exchange", HostContext.of(api).spaces().containerRoot() != null && on.contains("exchange"));
         // EDITIONS CP-09 (EDG-01 cell 3b): true only when the optional inspecto-geo-link module actually
         // registered its routes — derived, never an edition guess. The SPA hides the two nav entries and
         // the two widget offers on it.
-        f.put("geoLink", api.registeredFeatures().contains("geoLink"));
+        f.put("geoLink", on.contains("geoLink"));
         // SEP-08: true only when the optional inspecto-entity-list module registered its routes — derived from
         // what registered, never an edition guess, and never from the stub (hasRoute excludes stubs). Probed on
         // POST /entity-lists, a LITERAL write, not on the GET /entity-lists/([^/]+) catch-all shape.
-        f.put("entityList", api.registeredFeatures().contains("entityList"));
+        f.put("entityList", on.contains("entityList"));
         // EDITIONS CP-13 second half (EDG-01 cell 6): true only when the optional inspecto-events module
         // registered the feed. ⚠ Probed on /events/search, a LITERAL path — not on /events/([^/]+), whose
         // regex would also be the shape of a catch-all, and not on /events, which is the one path a future
         // core route is most likely to reclaim. The SPA drops the Events nav entry and falls the Ops lens
         // home back to pipelines when this is false, so nobody lands on a screen that only 503s.
-        f.put("events", api.registeredFeatures().contains("events"));
+        f.put("events", on.contains("events"));
         // EDITIONS CP-11 (EDG-01 cell 7): true only when the optional inspecto-ops module registered the
         // operational-object routes. ⚠ Probed on POST /objects — a LITERAL path, and a WRITE, so it cannot
         // be confused with the GET /objects/([^/]+) catch-all that a future core route might reclaim.
         // The SPA hides the Incidents, Cases and Tags nav entries and the cross-entity tag menus on it.
-        f.put("ops", api.registeredFeatures().contains("ops"));
+        f.put("ops", on.contains("ops"));
+        // P2b: every other installed module's feature id, under its own key (a module added tomorrow needs no edit here).
+        for (String id : new java.util.TreeSet<>(api.registeredFeatures())) f.putIfAbsent(id, on.contains(id));
         f.put("authMode", System.getProperty("auth.mode", "none"));
         // UIE-9: the Home exposure notice keys off the real bind, not off authMode alone.
         f.put("loopbackOnly", ControlApi.bindsLoopbackOnly());
