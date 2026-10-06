@@ -450,9 +450,9 @@ over the landed range (the `la.index.build` Job with `allow_full: true`, or `POS
 parsed in parallel by the Pipeline and the full build is one parallel DuckDB sort, so there are no per-day index builds to
 merge. `IndexAppendTest.aThirtyDayBackfillAnswersEveryReadLikeTheDayByDayRunAcrossThreeCompactions` pins that the backfill
 answers every read like the day-by-day run (first day full, append per day, compact at the delta cap) and that a backfill
-missing one day does not. ⚠ While the range lands, each committed batch fires `job.dataset.produced`; a Job run that finds a
-build in flight is one recorded `BUILD_IN_PROGRESS` refusal (a failed Run), not a retry, so disable the daily Job's trigger
-during a backfill, or run the one full build after the last file lands.
+missing one day does not. While the range lands, each committed batch fires `job.dataset.produced`; a Job run that finds a
+build in flight WAITS and re-plans (at most 6 waits, 2 s backoff doubling to 60 s, within `timeout_seconds`, every attempt
+audited), so the daily trigger need not be paused (operator, 2026-10-06).
 
 ## 4. Decisions
 

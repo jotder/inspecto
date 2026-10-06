@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * LA-DAILY-INGEST-1, T5 - "land a day, the index appends": the {@code link-index} bridge (the code {@code la.index.build}
  * calls) against a REAL control plane, the real {@code IndexBuilder} and real Parquet files, one day per file. Proves the
  * mode comes from the server's own {@code plan} (append, compact then append, never a forced full), a refusal is recorded
- * and not retried, and the delegated principal's authority is re-decided on every run.
+ * and not retried (except an in-flight build, which is waited on with a bounded backoff), and the delegated principal's authority is re-decided on every run.
  */
 class ScheduledIndexBuildTest {
 
@@ -37,6 +37,7 @@ class ScheduledIndexBuildTest {
     void reset() {
         DatasetProviders.forTest(null);
         com.gamma.la.api.IndexRoutes.forTest(null);
+        com.gamma.la.api.ScheduledIndexBuild.backoffForTest(0);
     }
 
     private record Ctx(CollectorService svc, ControlApi api, Path root, String store, Path dir) implements AutoCloseable {
@@ -183,7 +184,8 @@ class ScheduledIndexBuildTest {
     }
 
     @Test
-    void aSecondRunWhileABuildIsLiveIsRefusedBuildInProgressAndASlowBuildFailsAsRunningAtTheTimeout(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void aSecondRunWhileABuildIsLiveWaitsBoundedThenIsRefusedBuildInProgressAndASlowBuildFailsAsRunningAtTheTimeout(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        com.gamma.la.api.ScheduledIndexBuild.backoffForTest(20);                  // 20+40+...+640 ms: six waits inside the slow build
         java.util.concurrent.atomic.AtomicBoolean release = new java.util.concurrent.atomic.AtomicBoolean();
         com.gamma.la.api.IndexRoutes.forTest(req -> {
             try {
@@ -208,12 +210,64 @@ class ScheduledIndexBuildTest {
             Outcome dup = run(c, true, "analyst-1");
             assertEquals("REFUSED", dup.result());
             assertEquals("BUILD_IN_PROGRESS", dup.code());
+            assertTrue(dup.message().contains("after 6 waits"), dup.message());
             t.join(20_000);
             assertEquals("RUNNING", slow.get().result(), "still running when the wait ended: the Job fails the Run on this");
             assertFalse(slow.get().ok());
             release.set(true);
         } finally {
             release.set(true);
+        }
+    }
+
+    /** Operator 2026-10-06: a run that meets an in-flight build WAITS (audited) and then builds, so no trigger needs pausing. */
+    @Test
+    void aRunThatMeetsALiveBuildWaitsAuditedAndBuildsOnceTheLiveBuildEnds(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        com.gamma.la.api.ScheduledIndexBuild.backoffForTest(100);
+        java.util.concurrent.atomic.AtomicBoolean release = new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicInteger builds = new java.util.concurrent.atomic.AtomicInteger();
+        com.gamma.la.api.IndexRoutes.forTest(req -> {
+            builds.incrementAndGet();
+            try {
+                while (!release.get()) {
+                    if (req.options().cancel().isCancelled()) throw new com.gamma.la.storage.IndexBuilder.CancelledException();
+                    Thread.sleep(5);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+            return new com.gamma.la.storage.IndexBuilder.Result(1, req.store().directory(), null, 3, 3, 0, 3, 16, Map.of(), 5);
+        });
+        java.util.List<com.gamma.event.Event> seen = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.function.Consumer<com.gamma.event.Event> sub = seen::add;
+        EventLog.current().addSubscriber(sub);
+        try (Ctx c = open(cfg, root, Map.of("owner", "analyst-1", "shares", List.of()))) {
+            land(c.dir.resolve("day0.parquet"), 0);
+            Thread first = new Thread(() -> run(c, true, "analyst-1"));
+            first.start();
+            for (int i = 0; i < 2_000 && builds.get() == 0; i++) Thread.sleep(5);   // the first build is live
+            assertEquals(1, builds.get());
+            Thread opener = new Thread(() -> {
+                try {
+                    Thread.sleep(400);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+                release.set(true);
+            });
+            opener.start();
+            Outcome second = run(c, true, "analyst-1");
+            first.join(20_000);
+            assertEquals("BUILT", second.result(), second.message());
+            assertEquals(2, builds.get(), "the waiting run built once, after the live build ended");
+            var waited = seen.stream().filter(e -> LinkEventTypes.LINK_INDEX_SCHEDULED_RUN.equals(e.type()))
+                    .filter(e -> "true".equals(String.valueOf(e.attributes().get("waiting")))).toList();
+            assertFalse(waited.isEmpty(), "every wait is audited");
+            assertTrue(waited.stream().allMatch(e -> "BUILD_IN_PROGRESS".equals(String.valueOf(e.attributes().get("code")))));
+        } finally {
+            release.set(true);
+            EventLog.current().removeSubscriber(sub);
         }
     }
 

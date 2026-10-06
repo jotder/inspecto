@@ -73,11 +73,42 @@ public final class ScheduledIndexBuild {
     /** Aggregate-only answer: {@code result} is BUILT | UP_TO_DATE | REFUSED | FAILED | RUNNING. */
     public record Outcome(String result, String mode, String code, String message, long edges, long nodes, int deltas) { }
 
-    /** Run one scheduled build now. Never throws for a refusal; an exception means the attempt itself broke. */
+    /** Waits on an in-flight build before giving up (operator, 2026-10-06: wait, never make the operator pause the trigger). */
+    static final int MAX_WAITS = 6;
+    private static final long FIRST_BACKOFF_MS = 2_000L, MAX_BACKOFF_MS = 60_000L;
+    private static volatile long firstBackoffMs = FIRST_BACKOFF_MS;
+
+    /** Test hook: the first backoff in ms (doubling, capped); a value &lt;= 0 restores the default. */
+    public static void backoffForTest(long firstMs) {
+        firstBackoffMs = firstMs <= 0 ? FIRST_BACKOFF_MS : firstMs;
+    }
+
+    /**
+     * Run one scheduled build now. Never throws for a refusal; an exception means the attempt itself broke. When another
+     * build of the same index is in flight ({@code BUILD_IN_PROGRESS}), the run WAITS and re-plans: at most {@link #MAX_WAITS}
+     * times, with a doubling backoff, and never past {@code timeoutMs} from the start. Every attempt is audited; a waited-on
+     * attempt carries {@code waiting=true} and its attempt number. The re-plan may find the index already covers the
+     * Dataset (the in-flight build took the new files), which is {@code UP_TO_DATE}.
+     */
     public static Outcome run(Path writeRoot, Path dataRoot, Request r) {
-        Outcome o = attempt(writeRoot, dataRoot, r);
-        audit(r, o);
-        return o;
+        long start = System.currentTimeMillis(), backoff = firstBackoffMs;
+        for (int waits = 0; ; waits++) {
+            Outcome o = attempt(writeRoot, dataRoot, r);
+            boolean wait = BUILD_IN_PROGRESS.equals(o.code()) && waits < MAX_WAITS
+                    && System.currentTimeMillis() - start + backoff < r.timeoutMs();
+            if (!wait && BUILD_IN_PROGRESS.equals(o.code()) && waits > 0)
+                o = new Outcome(o.result(), o.mode(), o.code(), o.message() + " (still in progress after " + waits + " waits)",
+                        o.edges(), o.nodes(), o.deltas());
+            audit(r, o, wait, waits + 1);
+            if (!wait) return o;
+            try {
+                Thread.sleep(backoff);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return o;
+            }
+            backoff = Math.min(backoff * 2, MAX_BACKOFF_MS);
+        }
     }
 
     // ── the decision ─────────────────────────────────────────────────────────────────────────────────────
@@ -253,7 +284,7 @@ public final class ScheduledIndexBuild {
     }
 
     /** Best effort: an audit failure never fails a build. Never a column name or a row value. */
-    private static void audit(Request r, Outcome o) {
+    private static void audit(Request r, Outcome o, boolean waiting, int attempt) {
         try {
             Event.Builder b = Event.builder(LinkEventTypes.LINK_INDEX_SCHEDULED_RUN).source("inv")
                     .message("link.index.scheduled.run - " + r.dataset() + " - " + o.result().toLowerCase(Locale.ROOT))
@@ -261,6 +292,8 @@ public final class ScheduledIndexBuild {
                     .action("link.index.scheduled.run").actionCategory("analysis")
                     .attr("dataset", r.dataset()).attr("result", o.result()).attr("mode", o.mode() == null ? "" : o.mode());
             if (o.code() != null) b = b.attr("code", o.code());
+            b = b.attr("attempt", String.valueOf(attempt));
+            if (waiting) b = b.attr("waiting", "true");
             EventLog.current().emit(b);
         } catch (RuntimeException ignored) {
             // best effort
