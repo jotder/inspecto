@@ -132,6 +132,7 @@ class CaseRuleEvalJobTest {
         host.register("consignment-status", com.gamma.consignment.ConsignmentStatusAccess.class, null);
         host.register("alerts", com.gamma.alert.AlertAccess.class, null);
         host.register("objects", com.gamma.objects.ObjectAccess.class, null);
+        host.register("link-index", com.gamma.linkindex.LinkIndexAccess.class, null);
         return host;
     }
 
