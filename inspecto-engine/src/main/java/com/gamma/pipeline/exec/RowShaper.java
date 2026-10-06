@@ -205,6 +205,7 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_SPLIT.type().equals(type))    return split(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(type)) return summarize(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_PROFILE.type().equals(type)) return profile(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_RUNNING.type().equals(type)) return running(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) return project(conn, node, input, outPrefix);
         // A Record Transformer — authored FIELDS, or the projection slot carrying a lifted schema /
@@ -550,6 +551,46 @@ public final class RowShaper {
         String data = table(prefix, PipelineRel.DATA);
         exec(conn, "CREATE TABLE " + q(data) + " AS " + select);
         return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /**
+     * {@code transform.running} — rolling count/sum/avg/min/max per key over a time or row window (catalog
+     * {@code transform.analytics.running}, operator 2026-10-06). Every inbound row is kept and gains one column
+     * per measure. {@link RunningWindow} owns the grammar and the SQL; this checks it against the inbound
+     * columns and types. ⛔ State is per run — rows of an earlier batch are not in the window.
+     */
+    private static List<Relation> running(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        RunningWindow.Spec spec;
+        try {
+            spec = RunningWindow.parse(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        Map<String, String> types = columnTypesOf(conn, input);
+        String refusal = RunningWindow.columnRefusal(spec, List.copyOf(types.keySet()));
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        if (spec.isDuration()) {
+            String type = types.entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(spec.orderBy()))
+                    .map(Map.Entry::getValue).findFirst().orElse("");
+            if (!RunningWindow.isTimeType(type))
+                throw new IllegalArgumentException("node '" + node.id() + "': transform.running duration window "
+                        + "needs order_by '" + spec.orderBy() + "' to be a TIMESTAMP or DATE column, not " + type
+                        + " - use a row window ('5 rows') or cast the column upstream");
+        }
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input));
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /** The inbound relation's column names → DuckDB type names, in declaration order — a zero-row read. */
+    private static Map<String, String> columnTypesOf(Connection conn, String table) throws SQLException {
+        Map<String, String> out = new LinkedHashMap<>();
+        try (Statement st = conn.createStatement();
+             java.sql.ResultSet rs = st.executeQuery("DESCRIBE " + q(table))) {
+            while (rs.next()) out.put(rs.getString("column_name"), rs.getString("column_type"));
+        }
+        return out;
     }
 
     /** The inbound relation's column names, in declaration order — a zero-row read, no scan. */

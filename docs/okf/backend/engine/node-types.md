@@ -176,6 +176,7 @@ need the runtime decision (tracked as X5 on [`BACKLOG.md`](../../../BACKLOG.md))
 | `transform.join` | `DATA` | ✅ (verb `transform`) |
 | `transform.lookup` (2026-09-06) | `DATA` — a `CASE` over an inline `key=value` map on one column; changes values, never row counts, so there is no second relation | ✅ (verb `lookup`) |
 | `transform.summarize` | `DATA` | ✅ |
+| `transform.running` (2026-10-06) | `DATA` — every inbound row plus one window-measure column each (`RunningWindow`: count/sum/avg/min/max per key over a time or row window, per run) | ✅ (verb `running`) |
 | `transform.split` | `DATA` | ❌ |
 | `transform.merge` | `DATA` (multi-**input**) | ❌ |
 | `enrichment` | accepts/emits `DATA`; fires the **`on_commit` Signal** (⚠ spelled `ON_COMMIT` in `PipelineRel` until Phase 7 — a Signal, not an edge, per the token model above) | ✅ |

@@ -157,6 +157,12 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // processing.profile {columns} — omit columns to profile every one. Executes in RowShaper.profile.
     // ⛔ The output columns are declared HERE, not taken from DuckDB's own SUMMARIZE: a node whose output
     // SCHEMA changes with the engine version is a downstream break waiting for an upgrade.
+    // Rolling count/sum/avg/min/max per key over a time or row window (catalog `transform.analytics.running`,
+    // operator 2026-10-06). Flat home: a `steps:` entry only — no singular processing.* block. Executes in
+    // RowShaper via RunningWindow, which validates every identifier and owns the one SQL template.
+    TRANSFORM_RUNNING("transform.running", NodeCategory.TRANSFORM, "Running window",
+            "Rolling count/sum/avg/min/max per key over a time or row window; every row is kept.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "running"),
     TRANSFORM_PROFILE("transform.profile", NodeCategory.TRANSFORM, "Profile",
             "Per-column row/null/distinct counts and min/max over the inbound data.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "profile"),

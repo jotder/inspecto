@@ -1,0 +1,6 @@
+job:
+  name: velocity_rollup
+  type: pipeline
+  pipeline_config: payments_pipeline.toon
+  data_dir: out
+  on_pipeline: step_running

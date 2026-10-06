@@ -322,10 +322,15 @@ public final class PipelineConfig {
          * ⚠ No legacy singular spelling, like {@link #SQL} — a chain holding one always takes {@code steps:}.
          */
         public static final String LOOKUP = "lookup";
+        /**
+         * Rolling window calculation ({@code transform.running}, 2026-10-06). Keys: {@code partition_by},
+         * {@code order_by}, {@code window}, {@code measures[{fn, column, as}]}. No legacy spelling.
+         */
+        public static final String RUNNING = "running";
 
         /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them
-         *  ({@link #LOOKUP} and {@link #SQL} last: neither has a legacy projection at all). */
-        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL);
+         *  ({@link #LOOKUP}, {@link #SQL} and {@link #RUNNING} last: none has a legacy projection at all). */
+        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING);
 
         public Step {
             config = (config == null) ? Map.of() : Map.copyOf(config);

@@ -1,0 +1,43 @@
+name: STEP_RUNNING
+active: true
+
+dirs:
+  poll:       out/inbox
+  database:   out/payments/database
+  backup:     out/payments/backup
+  temp:       out/payments/temp
+  errors:     out/payments/errors
+  quarantine: out/payments/quarantine
+  markers:    out/payments/markers
+  status_dir: out/payments/status
+  log_dir:    out/payments/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  schema_file: "schema.toon"
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+output_store: velocity
+
+steps[1]:
+  - running:
+      partition_by[1]: INSTRUMENT_TOKEN
+      order_by: ATTEMPT_TS
+      window: 60m
+      measures[2]:
+        - fn: count
+          as: ATTEMPTS_60M
+        - fn: sum
+          column: AMOUNT
+          as: AMOUNT_60M

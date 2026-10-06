@@ -551,6 +551,67 @@ class NodeConfigNameContractTest {
         return PipelineConfig.load(saved.toString()).profile();
     }
 
+    /**
+     * The running node's contract (2026-10-06): a {@code steps:} entry lifts as ONE {@code transform.running}
+     * node, a form edit to {@code window} reaches the engine, and {@code measures} — a list of MAPS with no
+     * attribute spec — survives lift → edit → strict lower → {@code ConfigCodec.toToon} →
+     * {@code PipelineConfig.load} unchanged.
+     */
+    @Test
+    void runningAttributesReachTheEngine(@TempDir Path dir) throws Exception {
+        Path toon = writeFixture(dir);
+        Map<String, Object> raw = decode(toon);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> processing = (Map<String, Object>) raw.get("processing");
+        for (String legacy : List.of("dedup", "summarize", "join", "profile")) processing.remove(legacy);
+        raw.remove("route");
+        if (processing.get("csv_settings") instanceof Map<?, ?> csv) csv.remove("where");
+        List<Map<String, Object>> measures = List.of(
+                new LinkedHashMap<>(Map.of("fn", "count", "as", "N_60M")),
+                new LinkedHashMap<>(Map.of("fn", "max", "column", "ID", "as", "MAX_ID")));
+        Map<String, Object> running = new LinkedHashMap<>();
+        running.put("partition_by", List.of("ID"));
+        running.put("order_by", "EVENT_DATE");
+        running.put("window", "60m");
+        running.put("measures", measures);
+        raw.put("steps", List.of(Map.of("running", running)));
+        Path withRunning = dir.resolve("running_pipeline.toon");
+        Files.writeString(withRunning, ConfigCodec.toToon(raw));
+        raw = decode(withRunning);
+        PipelineGraph g = liftEditable(withRunning);
+
+        List<PipelineNode> nodes = new ArrayList<>();
+        for (PipelineNode n : g.nodes()) {
+            if (!"transform.running".equals(n.type())) { nodes.add(n); continue; }
+            Map<String, Object> c = new LinkedHashMap<>(n.config());
+            c.put("window", "24h");
+            nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), c, n.use()));
+        }
+        assertEquals(1, nodes.stream().filter(n -> "transform.running".equals(n.type())).count(),
+                "the lift presents a steps: running entry as ONE transform.running node");
+        Map<String, Object> lowered = PipelineEditable.lower(
+                new PipelineGraph(g.name(), g.active(), nodes, g.edges()), raw, true);
+        Path saved = dir.resolve("saved_pipeline.toon");
+        Files.writeString(saved, ConfigCodec.toToon(lowered));
+
+        List<PipelineConfig.Step> steps = PipelineConfig.load(saved.toString()).steps();
+        // the fixture's pre-parse filter lists lift as a filter step of their own; running is the one after
+        List<PipelineConfig.Step> runs = steps.stream().filter(st -> "running".equals(st.kind())).toList();
+        assertEquals(1, runs.size(), "one running step after the save: " + steps);
+        assertEquals("running", steps.get(steps.size() - 1).kind(), "the running step keeps its chain position");
+        Map<String, Object> cfg = runs.get(0).config();
+        assertEquals("24h", cfg.get("window"), "a window edit typed in the editor must reach the engine");
+        assertEquals(List.of("ID"), cfg.get("partition_by"));
+        assertEquals("EVENT_DATE", cfg.get("order_by"));
+        assertEquals(measures, cfg.get("measures"), "the unspecced map list survives the save verbatim");
+        // the engine's own grammar accepts what the save wrote
+        com.gamma.pipeline.exec.RunningWindow.parse(cfg);
+
+        assertEquals(List.of("partition_by", "order_by", "window"),
+                NodeAttributes.forType("transform.running").stream().map(NodeAttribute::key).toList(),
+                "the declared table is exactly the keys this round trip proves; measures stays unspecced");
+    }
+
     // ── the editor's real save path ────────────────────────────────────────────────
 
     /** Lift the fixture, set {@code cfgPath} on the {@code nodeType} node, lower, re-read as the engine does. */

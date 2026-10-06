@@ -129,6 +129,7 @@ public final class RecipeCompiler {
                 }
                 case "summarize" -> nodes.add(summarize(id, cfg, refusals));
                 case "profile" -> nodes.add(profile(id, cfg, refusals));
+                case "running" -> nodes.add(running(id, cfg, refusals));
                 case "webhook" -> nodes.add(webhook(id, cfg, refusals));
                 case "step" -> nodes.add(contributedStep(id, cfg, refusals));
                 default -> refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
@@ -444,6 +445,20 @@ public final class RecipeCompiler {
         return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_PROFILE.type(), node);
     }
 
+    /**
+     * {@code running:} — rolling window measures per key ({@code transform.running}). The grammar is
+     * {@link com.gamma.pipeline.exec.RunningWindow#parse}'s, so the recipe refuses exactly what the run would.
+     */
+    private static PipelineNode running(String id, Map<String, Object> cfg,
+                                        List<PipelineCompileException.Refusal> refusals) {
+        try {
+            com.gamma.pipeline.exec.RunningWindow.parse(cfg);
+        } catch (IllegalArgumentException e) {
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id, e.getMessage()));
+        }
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_RUNNING.type(), new LinkedHashMap<>(cfg));
+    }
+
     private static PipelineNode summarize(String id, Map<String, Object> cfg,
                                           List<PipelineCompileException.Refusal> refusals) {
         Map<String, Object> c = new LinkedHashMap<>(cfg);
@@ -549,6 +564,7 @@ public final class RecipeCompiler {
                     case "lookup" -> stepNode = lookup(stepId, stepCfg, refusals);
                     case "summarize" -> stepNode = summarize(stepId, stepCfg, refusals);
                     case "profile" -> stepNode = profile(stepId, stepCfg, refusals);
+                    case "running" -> stepNode = running(stepId, stepCfg, refusals);
                     case "sql" -> stepNode = sql(stepId, stepCfg, refusals);
                     case "transform" -> {
                         List<PipelineNode> built = new ArrayList<>();

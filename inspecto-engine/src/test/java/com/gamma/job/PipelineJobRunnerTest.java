@@ -975,6 +975,49 @@ class PipelineJobRunnerTest {
         assertEquals(List.of("300", "200"), readColumn(dataDir, "doubled", "amt"), "the SELECT doubled amt");
     }
 
+    /**
+     * A stored {@code running} step executes at rest (2026-10-06): the window measure is written beside every
+     * landed row, through the real TOON spelling of {@code measures} (a list of maps).
+     */
+    @Test
+    void runsAFlatConfigsRunningStepOverItsLandedStore() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = tmp.resolve("running_pipeline.toon");
+        Files.writeString(flat, """
+                name: running_etl
+                active: false
+                output_store: rolled
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - running:
+                      order_by: id
+                      window: 2 rows
+                      measures[2]:
+                        - fn: sum
+                          column: amt
+                          as: amt_2
+                        - fn: count
+                          as: n_2
+                """);
+        String landed = com.gamma.etl.PipelineConfig.load(flat.toString()).identity().pipelineName();
+        seedParquet(dataDir, landed, "(1,150),(2,50),(3,100)");
+
+        JobConfig cfg = new JobConfig("roller", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of(1, 2, 3), readIds(dataDir, "rolled"), "every landed row is kept");
+        assertEquals(List.of("150.0", "200.0", "150.0"), readColumn(dataDir, "rolled", "amt_2"),
+                "each row sums itself and the one before it");
+        assertEquals(List.of("1", "2", "2"), readColumn(dataDir, "rolled", "n_2"));
+    }
+
     // ── A5-at-rest slice 5: transform.join resolves its Reference Dataset for real ──
 
     /** A path-form reference needs no pipeline context at all — the file is self-describing. */

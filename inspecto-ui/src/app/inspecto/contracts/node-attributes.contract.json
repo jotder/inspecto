@@ -492,6 +492,28 @@
     "help" : "Columns to profile. Leave blank to profile every inbound column.",
     "placeholder" : "amount"
   } ],
+  "transform.running" : [ {
+    "key" : "partition_by",
+    "label" : "Partition by",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "The key columns; each key gets its own window. Leave blank to treat the whole batch as one key.",
+    "placeholder" : "INSTRUMENT_TOKEN"
+  }, {
+    "key" : "order_by",
+    "label" : "Order by (time column)",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "The column the window slides along. A duration window needs a TIMESTAMP or DATE column.",
+    "placeholder" : "ATTEMPT_TS"
+  }, {
+    "key" : "window",
+    "label" : "Window",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "A duration (60m, 24h, 30s, 7d) or a row count (5 rows).",
+    "placeholder" : "60m"
+  } ],
   "transform.join" : [ {
     "key" : "reference",
     "label" : "Reference",

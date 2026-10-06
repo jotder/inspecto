@@ -1220,7 +1220,8 @@ public final class PipelineEditable {
             // `sql` IS in KINDS (the parser accepts it standalone) but has no singular block either.
             String kind = STEP_KIND.get(n.type());
             if (kind == null) return false;   // contributed: List.indexOf(null) NPEs on an immutable list
-            if (PipelineConfig.Step.SQL.equals(kind) || PipelineConfig.Step.LOOKUP.equals(kind)) return false;
+            if (PipelineConfig.Step.SQL.equals(kind) || PipelineConfig.Step.LOOKUP.equals(kind)
+                    || PipelineConfig.Step.RUNNING.equals(kind)) return false;
             int position = PipelineConfig.Step.KINDS.indexOf(kind);
             if (position <= previous) return false;
             previous = position;

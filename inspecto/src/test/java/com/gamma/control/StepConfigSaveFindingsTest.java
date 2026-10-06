@@ -321,6 +321,42 @@ class StepConfigSaveFindingsTest {
         assertOneRefusal(check(dir, draft), "processing.profile", "AMOUNT");
     }
 
+    // ── running (transform.running, 2026-10-06) ──────────────────────────────────
+
+    private static Map<String, Object> running(String partition, String orderBy, String window) {
+        return Map.of("running", Map.of("partition_by", List.of(partition), "order_by", orderBy, "window", window,
+                "measures", List.of(Map.of("fn", "count", "as", "N"))));
+    }
+
+    @Test
+    void aRunningKeyTheSchemaDoesNotDeclareIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true,
+                List.of(running("MSISDN", "QTY", "3 rows")))), "steps[0].running", "MSISDN");
+    }
+
+    @Test
+    void aMalformedRunningWindowIsRefusedEvenWithNoSchema(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(running("ID", "QTY", "60x")))),
+                "steps[0].running", "neither a duration");
+    }
+
+    @Test
+    void aDurationWindowOverANumericColumnIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(running("ID", "QTY", "60m")))),
+                "steps[0].running", "TIMESTAMP or DATE");
+    }
+
+    /** VARCHAR fails OPEN: a mapping-derived column reads VARCHAR here whatever it really computes. */
+    @Test
+    void aDurationWindowOverAVarcharColumnIsNotJudged(@TempDir Path dir) throws Exception {
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(running("QTY", "ID", "60m")))));
+    }
+
+    @Test
+    void aValidRunningRowWindowIsClean(@TempDir Path dir) throws Exception {
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(running("ID", "QTY", "5 rows")))));
+    }
+
     // ── severity, silence and the valid shapes ───────────────────────────────────
 
     @Test

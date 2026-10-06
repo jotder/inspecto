@@ -1,0 +1,34 @@
+partitionKey: ATTEMPT_DATE
+raw:
+  name: PAYMENT_ATTEMPTS
+  format: CSV
+  fields[5]{name,selector,type}:
+    ATTEMPT_ID,"0",VARCHAR
+    INSTRUMENT_TOKEN,"1",VARCHAR
+    ATTEMPT_TS,"2",TIMESTAMP
+    AMOUNT,"3",DOUBLE
+    MERCHANT,"4",VARCHAR
+mapping:
+  canonicalName: payment_attempts
+  rawName: PAYMENT_ATTEMPTS
+  fields[6]:
+    - name: ATTEMPT_ID
+      from: ATTEMPT_ID
+      fn: keep
+    - name: INSTRUMENT_TOKEN
+      from: INSTRUMENT_TOKEN
+      fn: keep
+    - name: ATTEMPT_TS
+      from: ATTEMPT_TS
+      fn: keep
+    - name: ATTEMPT_DATE
+      from: ""
+      fn: custom
+      args:
+        expression: "CAST(ATTEMPT_TS AS DATE)"
+    - name: AMOUNT
+      from: AMOUNT
+      fn: keep
+    - name: MERCHANT
+      from: MERCHANT
+      fn: keep

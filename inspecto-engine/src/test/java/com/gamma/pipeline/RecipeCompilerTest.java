@@ -152,6 +152,28 @@ class RecipeCompilerTest {
                 e.refusals().get(0).message());
     }
 
+    /** {@code running:} compiles to a {@code steps:} running entry, and refuses what the run would refuse. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void aRunningStepCompilesAndAMalformedOneRefusesByName() {
+        Map<String, Object> running = new LinkedHashMap<>(Map.of("partition_by", List.of("CARD"),
+                "order_by", "TS", "window", "60m",
+                "measures", List.of(Map.of("fn", "count", "as", "N_60M"))));
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        ((List<Map<String, Object>>) (List<?>) recipe.get("steps")).add(4, step("running", running));
+        Map<String, Object> out = RecipeCompiler.compile(recipe);
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) out.get("steps");
+        assertTrue(steps.stream().anyMatch(s -> running.equals(s.get("running"))), String.valueOf(steps));
+
+        Map<String, Object> bad = linearRecipe("/data/db");
+        Map<String, Object> broken = new LinkedHashMap<>(running);
+        broken.put("window", "60 parsecs");
+        ((List<Map<String, Object>>) (List<?>) bad.get("steps")).add(4, step("running", broken));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class, () -> RecipeCompiler.compile(bad));
+        assertEquals(RecipeCompiler.MALFORMED_STEP, e.refusals().get(0).code());
+        assertTrue(e.refusals().get(0).message().contains("60 parsecs"), e.refusals().get(0).message());
+    }
+
     @Test
     void notYetCompilableVerbsRefuseWithNamedCodesNeverSilently() {
         Map<String, Object> recipe = linearRecipe("/data/db");

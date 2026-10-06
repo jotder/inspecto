@@ -708,8 +708,10 @@
     "label" : "Running calculations & moving averages",
     "emoji" : "📊",
     "icon" : "heroicons_outline:arrow-trending-up",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.running",
+    "note" : "count/sum/avg/min/max per key over a time (60m) or row (5 rows) window, as a Step (2026-10-06); state is per run — cross-batch velocity stays a SQL-over-sink Job",
+    "addable" : true
   }, {
     "id" : "transform.timeseries.forecast",
     "family" : "BI",

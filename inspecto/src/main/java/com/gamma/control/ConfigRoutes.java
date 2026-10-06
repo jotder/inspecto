@@ -367,7 +367,7 @@ final class ConfigRoutes {
     }
 
     /**
-     * The {@code lookup} / {@code profile} / {@code dedup} / {@code filter} step configs, judged at save as
+     * The {@code lookup} / {@code profile} / {@code dedup} / {@code filter} / {@code running} step configs, judged at save as
      * {@code RowShaper} judges them at run ({@code PROCESSOR-RELEASE-READINESS-1} G4): a lookup needs a
      * {@code column} and at least one {@code key=value} mapping, a filter a non-blank {@code where}, a
      * dedup a non-empty {@code keys} list - and a lookup column, dedup key or profile column must be one
@@ -569,6 +569,27 @@ final class ConfigRoutes {
             case PipelineConfig.Step.PROFILE -> {
                 return cfg.get("columns") instanceof List<?> cols
                         ? undeclared("transform.profile column", cols, columns) : null;
+            }
+            case PipelineConfig.Step.RUNNING -> {
+                com.gamma.pipeline.exec.RunningWindow.Spec spec;
+                try {
+                    spec = com.gamma.pipeline.exec.RunningWindow.parse(cfg);
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                if (columns == null) return null;
+                String refusal = com.gamma.pipeline.exec.RunningWindow.columnRefusal(spec,
+                        columns.stream().map(TypeFlow.Column::name).toList());
+                if (refusal != null) return refusal;
+                if (!spec.isDuration()) return null;
+                String type = columns.stream().filter(c -> c.name().equalsIgnoreCase(spec.orderBy()))
+                        .map(TypeFlow.Column::type).findFirst().orElse("");
+                // VARCHAR fails OPEN: a mapping-derived column is typed VARCHAR here whatever it computes
+                // (addMappedColumns), and a save-time check must never refuse a config that runs.
+                return type.isEmpty() || "VARCHAR".equalsIgnoreCase(type)
+                        || com.gamma.pipeline.exec.RunningWindow.isTimeType(type) ? null
+                        : "transform.running duration window needs order_by '" + spec.orderBy()
+                                + "' to be a TIMESTAMP or DATE column, not " + type;
             }
             default -> { return null; }
         }

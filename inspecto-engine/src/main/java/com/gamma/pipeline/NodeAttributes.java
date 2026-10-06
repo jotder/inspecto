@@ -445,6 +445,22 @@ public final class NodeAttributes {
                     .help("Columns to profile. Leave blank to profile every inbound column."));
 
     /**
+     * {@code transform.running} (→ a {@code steps:} entry {@code running}, 2026-10-06) — rolling window measures.
+     *
+     * <p>⚠ {@code measures} has NO spec on purpose, like {@code transform.route}'s {@code branches}: it is a list
+     * of MAPS ({@code {fn, column, as}}) and the {@code list} type is {@code string[]}. Unspecced, the node form
+     * carries it through the additional-config editor verbatim; specced, the form would stringify each map.
+     * Keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_RUNNING = List.of(
+            NodeAttribute.of("partition_by", "Partition by", "list", "optional").placeholder("INSTRUMENT_TOKEN")
+                    .help("The key columns; each key gets its own window. Leave blank to treat the whole batch as one key."),
+            NodeAttribute.of("order_by", "Order by (time column)", "string", "required").placeholder("ATTEMPT_TS")
+                    .help("The column the window slides along. A duration window needs a TIMESTAMP or DATE column."),
+            NodeAttribute.of("window", "Window", "string", "required").placeholder("60m")
+                    .help("A duration (60m, 24h, 30s, 7d) or a row count (5 rows)."));
+
+    /**
      * {@code transform.join} (→ {@code processing.join}, D-4) — the reference join, authoring-only.
      * {@code reference} names a registered Reference component ({@code reference/<id>}), so the UI
      * renders it as an autocomplete over the registry. Keys proven by {@code NodeConfigNameContractTest}.
@@ -495,7 +511,7 @@ public final class NodeAttributes {
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, SINK_WEBHOOK))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, SINK_WEBHOOK))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -509,6 +525,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_DEDUP.type(), TRANSFORM_DEDUP);
         m.put(BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), TRANSFORM_SUMMARIZE);
         m.put(BuiltinNodeType.TRANSFORM_PROFILE.type(), TRANSFORM_PROFILE);
+        m.put(BuiltinNodeType.TRANSFORM_RUNNING.type(), TRANSFORM_RUNNING);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);
