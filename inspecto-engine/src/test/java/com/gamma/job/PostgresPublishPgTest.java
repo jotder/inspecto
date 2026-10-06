@@ -80,7 +80,7 @@ class PostgresPublishPgTest {
             }
         } finally {
             PostgresPublishJobType.beforeCommit = () -> {};
-            PostgresPublishJobType.resolver = com.gamma.pipeline.exec.EgressPolicy.SYSTEM;
+            PostgresPublishJobType.resolver = com.gamma.util.egress.EgressPolicy.SYSTEM;
             PostgresPublishJobType.opener = DriverManager::getConnection;
             PostgresPublishJobType.installApprovalVerifier(null);
             ConnectionRegistry.remove("PG");
@@ -149,7 +149,7 @@ class PostgresPublishPgTest {
                 else assertEquals("FAILED", r.status(), "a host the certificate does not name must fail: " + r.message());
             }
         } finally {
-            PostgresPublishJobType.resolver = com.gamma.pipeline.exec.EgressPolicy.SYSTEM;
+            PostgresPublishJobType.resolver = com.gamma.util.egress.EgressPolicy.SYSTEM;
             PostgresPublishJobType.opener = DriverManager::getConnection;
             PostgresPublishJobType.installApprovalVerifier(null);
             ConnectionRegistry.remove("PGTLS");

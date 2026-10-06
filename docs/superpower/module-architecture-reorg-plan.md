@@ -125,7 +125,7 @@ isolation.
 |---|---|---|
 | api, util, config, sql, etl, acquire, event | Foundation · Base | no |
 | asn-decoders + engine `Asn1ParserPlugin` | Implementation · Provider (Telecom industry pack, §8a) | **yes** — out of Base, so non-telecom installs do not ship it |
-| audit-spi, auth-spi, http-spi | Contract · Base | keep as three; move **policy and state** (`AccessPolicies`, `EgressPolicy`, `AuditTrail`, `InMemoryEventStore`) out; keep `SpiSlot`, DTO validation, `ErrorCodes` |
+| audit-spi, auth-spi, http-spi | Contract · Base | keep as three; move **policy and state** (`AccessPolicies`, `EgressPolicy` — DONE 2026-10-06 → `inspecto-util` `com.gamma.util.egress`, `AuditTrail`, `InMemoryEventStore`) out; keep `SpiSlot`, DTO validation, `ErrorCodes` |
 | engine execution core (`pipeline`, `pipeline.exec`, `consignment`, `inspector`, `enrich`, `parse`, `ingester`, `signal`) | Platform · Base | no |
 | engine `job` framework | Platform · Base | split framework from feature Job types **only** for types whose feature is Optional |
 | engine `objects` + `ops` object substrate | Implementation · Optional, Professional up (§8a, D-MR11) | **yes** → an **Incidents** module (stores, notes, links, tags, INCIDENT); `Workflow`/`SlaPolicy`/`EscalationRule` → Workflow & SLA; CASE/TASK/Case Rules stay in `ops` = Case Management |

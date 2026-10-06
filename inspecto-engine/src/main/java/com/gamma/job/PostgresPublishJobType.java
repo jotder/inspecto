@@ -12,7 +12,7 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.pipeline.exec.EgressAllowlist;
-import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.util.egress.EgressPolicy;
 import com.gamma.query.DatasetRelation;
 import com.gamma.risk.EvidenceMasker;
 import com.gamma.util.ColumnClassification;

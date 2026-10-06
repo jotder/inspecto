@@ -62,7 +62,7 @@ class ControlApiActionRequestsTest {
     private volatile int failFirst;
     private Executor priorExecutor;
     private Supplier<WebhookSinkTransport> priorTransport;
-    private com.gamma.pipeline.exec.EgressPolicy.Resolver priorResolver;
+    private com.gamma.util.egress.EgressPolicy.Resolver priorResolver;
 
     private record Ctx(CollectorService svc, ControlApi api, int port, Path root) implements AutoCloseable {
         public void close() {

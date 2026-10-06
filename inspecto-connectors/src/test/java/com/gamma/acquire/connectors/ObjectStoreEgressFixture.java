@@ -1,6 +1,6 @@
 package com.gamma.acquire.connectors;
 
-import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.util.egress.EgressPolicy;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.net.InetAddress;

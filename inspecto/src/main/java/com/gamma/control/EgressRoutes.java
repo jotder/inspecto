@@ -4,7 +4,7 @@ import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.pipeline.exec.EgressAllowlist;
-import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.util.egress.EgressPolicy;
 import com.gamma.pipeline.exec.ModelEgress;
 import com.gamma.util.AtomicFiles;
 import com.sun.net.httpserver.HttpExchange;

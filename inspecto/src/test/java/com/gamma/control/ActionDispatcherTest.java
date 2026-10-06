@@ -1,6 +1,6 @@
 package com.gamma.control;
 
-import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.util.egress.EgressPolicy;
 import com.gamma.pipeline.exec.WebhookSink;
 import com.gamma.pipeline.exec.WebhookSinkTransport;
 import com.sun.net.httpserver.HttpServer;

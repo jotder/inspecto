@@ -61,7 +61,7 @@ class ControlApiSpaceBundleActionRequestsTest {
     private final List<String> keys = new CopyOnWriteArrayList<>();
     private Executor priorExecutor;
     private Supplier<WebhookSinkTransport> priorTransport;
-    private com.gamma.pipeline.exec.EgressPolicy.Resolver priorResolver;
+    private com.gamma.util.egress.EgressPolicy.Resolver priorResolver;
 
     private record Ctx(SpaceManager spaces, ControlApi api, int port) implements AutoCloseable {
         public void close() {

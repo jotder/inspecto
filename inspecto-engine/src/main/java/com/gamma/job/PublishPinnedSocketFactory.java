@@ -1,6 +1,6 @@
 package com.gamma.job;
 
-import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.util.egress.EgressPolicy;
 
 import javax.net.SocketFactory;
 import java.io.IOException;

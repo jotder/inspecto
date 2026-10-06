@@ -1,5 +1,7 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.util.egress.EgressPolicy;
+
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.URI;

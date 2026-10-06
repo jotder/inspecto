@@ -4,7 +4,7 @@ import com.gamma.acquire.AcquisitionException;
 import com.gamma.config.safety.EgressGate;
 import com.gamma.config.safety.EgressRefusedException;
 import com.gamma.pipeline.exec.EgressAllowlist;
-import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.util.egress.EgressPolicy;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.io.IOException;

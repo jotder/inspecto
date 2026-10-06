@@ -1,5 +1,7 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.util.egress.EgressPolicy;
+
 import com.gamma.api.PublicApi;
 
 import java.net.URI;

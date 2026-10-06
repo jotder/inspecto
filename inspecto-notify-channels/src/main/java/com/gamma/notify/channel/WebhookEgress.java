@@ -1,7 +1,7 @@
 package com.gamma.notify.channel;
 
 import com.gamma.pipeline.exec.EgressAllowlist;
-import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.util.egress.EgressPolicy;
 import com.gamma.pipeline.exec.WebhookSinkTransport;
 
 import javax.net.ssl.SSLSocketFactory;

@@ -60,7 +60,7 @@ class PostgresPublishJobTest {
     @AfterEach
     void tearDown() throws Exception {
         System.clearProperty("assist.write.root");
-        PostgresPublishJobType.resolver = com.gamma.pipeline.exec.EgressPolicy.SYSTEM;
+        PostgresPublishJobType.resolver = com.gamma.util.egress.EgressPolicy.SYSTEM;
         PostgresPublishJobType.opener = DriverManager::getConnection;
         PostgresPublishJobType.beforeCommit = () -> {};
         PostgresPublishJobType.installAuthority(null);
@@ -212,7 +212,7 @@ class PostgresPublishJobTest {
 
     @Test
     void aLoopbackHostIsRefusedByTheEgressPolicy() throws Exception {
-        PostgresPublishJobType.resolver = com.gamma.pipeline.exec.EgressPolicy.SYSTEM;
+        PostgresPublishJobType.resolver = com.gamma.util.egress.EgressPolicy.SYSTEM;
         register("BI", "jdbc:postgresql://127.0.0.1:5432/bi");
         destinations("127.0.0.1");   // listed, so the EGRESS policy is what refuses it
         JobRun r = run(Map.of());

@@ -4,7 +4,7 @@ import com.gamma.agent.kernel.model.ModelProvider;
 import com.gamma.agent.kernel.model.ModelRouter;
 import com.gamma.agent.model.ModelProfile;
 import com.gamma.agent.model.OllamaModelProvider;
-import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.util.egress.EgressPolicy;
 import com.gamma.pipeline.exec.ModelEgress;
 
 import java.time.Duration;

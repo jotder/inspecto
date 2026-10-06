@@ -305,7 +305,7 @@ final class ConnectionRoutes implements RouteModule {
         // ASSURE-ACTION-REQUESTS-1: an https Connection is an egress target — its host must be a DNS name or a
         // canonical IP literal, never userinfo or a decimal / octal / hex / short numeric form.
         if (com.gamma.pipeline.exec.WebhookSink.CONNECTOR.equals(p.connector()) && p.host() != null)
-            com.gamma.pipeline.exec.EgressPolicy.checkHost(p.host());
+            com.gamma.util.egress.EgressPolicy.checkHost(p.host());
     }
 
     /** The on-disk (unmasked, references preserved) {@code connection} block map for {@link ConfigCodec#toToon}. */

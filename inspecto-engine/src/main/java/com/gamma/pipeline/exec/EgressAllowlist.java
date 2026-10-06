@@ -1,5 +1,7 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.util.egress.EgressPolicy;
+
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.ConnectionRegistry;
 import com.gamma.event.Event;

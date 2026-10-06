@@ -1,6 +1,6 @@
 package com.gamma.job;
 
-import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.util.egress.EgressPolicy;
 import com.gamma.util.ToonHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

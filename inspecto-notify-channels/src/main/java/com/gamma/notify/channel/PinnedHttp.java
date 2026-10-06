@@ -72,7 +72,7 @@ final class PinnedHttp {
                 SSLSocket ssl = (SSLSocket) tls.createSocket(raw, bareHost, port, true);
                 SSLParameters p = ssl.getSSLParameters();
                 p.setEndpointIdentificationAlgorithm("HTTPS");
-                if (!com.gamma.pipeline.exec.EgressPolicy.isIpLiteral(bareHost))
+                if (!com.gamma.util.egress.EgressPolicy.isIpLiteral(bareHost))
                     p.setServerNames(List.of(new SNIHostName(bareHost)));
                 ssl.setSSLParameters(p);
                 ssl.startHandshake();

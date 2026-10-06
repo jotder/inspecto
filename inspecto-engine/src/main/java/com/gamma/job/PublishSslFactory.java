@@ -64,7 +64,7 @@ public final class PublishSslFactory extends SSLSocketFactory {
         SSLSocket ssl = (SSLSocket) delegate.createSocket(s, host, port, autoClose);
         SSLParameters p = ssl.getSSLParameters();
         p.setEndpointIdentificationAlgorithm("HTTPS");
-        if (!com.gamma.pipeline.exec.EgressPolicy.isIpLiteral(host)) p.setServerNames(List.of(new SNIHostName(host)));
+        if (!com.gamma.util.egress.EgressPolicy.isIpLiteral(host)) p.setServerNames(List.of(new SNIHostName(host)));
         ssl.setSSLParameters(p);
         return ssl;
     }

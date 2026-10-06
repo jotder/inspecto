@@ -3,7 +3,7 @@ package com.gamma.acquire.connectors;
 import com.gamma.acquire.AcquisitionException;
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.RemoteFile;
-import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.util.egress.EgressPolicy;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpsConfigurator;

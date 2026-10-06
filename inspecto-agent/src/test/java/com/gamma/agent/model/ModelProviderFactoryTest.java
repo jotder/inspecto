@@ -19,7 +19,7 @@ class ModelProviderFactoryTest {
         // The Space's model endpoint allowlist must name the loopback host (ASSIST-MODEL-EGRESS-1).
         ModelRouter r = ModelProviderFactory.create(s,
                 com.gamma.pipeline.exec.ModelEgress.parse(java.util.List.of("localhost")),
-                com.gamma.pipeline.exec.EgressPolicy.SYSTEM);
+                com.gamma.util.egress.EgressPolicy.SYSTEM);
         // available() is a pure config check: enabled + model + baseUrl. No network involved.
         assertTrue(r.providerFor(ModelTier.MEDIUM).available());
         assertFalse(r.providerFor(ModelTier.LARGE).available(), "unmapped tier stays unavailable");

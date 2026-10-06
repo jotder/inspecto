@@ -1,7 +1,7 @@
 package com.gamma.intelligence;
 
 import com.gamma.model.ModelSettings;
-import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.util.egress.EgressPolicy;
 import com.gamma.pipeline.exec.ModelEgress;
 import org.junit.jupiter.api.Test;
 

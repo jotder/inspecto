@@ -1,4 +1,4 @@
-package com.gamma.pipeline.exec;
+package com.gamma.util.egress;
 
 import org.junit.jupiter.api.Test;
 

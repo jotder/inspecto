@@ -1,6 +1,6 @@
 package com.gamma.notify.channel;
 
-import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.util.egress.EgressPolicy;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;

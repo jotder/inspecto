@@ -63,13 +63,13 @@ class LangChain4jProviderPluginTest {
         ProviderSettings s = new ProviderSettings("llamacpp", null, null,
                 Map.of(ModelTier.MEDIUM, "m"), 5);
         ModelRouter r = ModelProviderFactory.create(s,
-                com.gamma.pipeline.exec.ModelEgress.Policy.EMPTY, com.gamma.pipeline.exec.EgressPolicy.SYSTEM);
+                com.gamma.pipeline.exec.ModelEgress.Policy.EMPTY, com.gamma.util.egress.EgressPolicy.SYSTEM);
         assertFalse(r.providerFor(ModelTier.MEDIUM).available());
         assertTrue(r.providerFor(ModelTier.MEDIUM).name().contains("model endpoint refused"),
                 r.providerFor(ModelTier.MEDIUM).name());
         ModelRouter listed = ModelProviderFactory.create(s,
                 com.gamma.pipeline.exec.ModelEgress.parse(java.util.List.of("localhost")),
-                com.gamma.pipeline.exec.EgressPolicy.SYSTEM);
+                com.gamma.util.egress.EgressPolicy.SYSTEM);
         assertTrue(listed.providerFor(ModelTier.MEDIUM).available(), "named loopback default is allowed");
     }
 }

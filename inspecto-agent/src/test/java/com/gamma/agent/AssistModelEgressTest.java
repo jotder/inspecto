@@ -59,7 +59,7 @@ class AssistModelEgressTest {
         int port = startModel();
         enableEnvOllama(port);
         var r = com.gamma.agent.model.ModelProviderFactory.fromEnvironment(
-                com.gamma.pipeline.exec.ModelEgress.Policy.EMPTY, com.gamma.pipeline.exec.EgressPolicy.SYSTEM);
+                com.gamma.pipeline.exec.ModelEgress.Policy.EMPTY, com.gamma.util.egress.EgressPolicy.SYSTEM);
         assertFalse(r.providerFor(ModelTier.MEDIUM).available());
         assertTrue(r.providerFor(ModelTier.MEDIUM).name().contains("model endpoint refused"));
         assertEquals(0, hits.get());
@@ -90,7 +90,7 @@ class AssistModelEgressTest {
     void theClientDialsTheCheckedAddressNotASecondResolution() throws Exception {
         int port = startModel();
         var calls = new AtomicInteger();
-        com.gamma.pipeline.exec.EgressPolicy.Resolver flipping = host -> new InetAddress[]{
+        com.gamma.util.egress.EgressPolicy.Resolver flipping = host -> new InetAddress[]{
                 calls.getAndIncrement() == 0 ? InetAddress.getByAddress(new byte[]{127, 0, 0, 1})
                         : InetAddress.getByAddress(new byte[]{10, 9, 9, 9})};
         EnumMap<ModelTier, String> m = new EnumMap<>(ModelTier.class);
@@ -182,7 +182,7 @@ class AssistModelEgressTest {
         System.setProperty("agentkernel.ollama.enabled", "true");
         System.setProperty("agentkernel.ollama.baseUrl", "http://model.test:" + port);
         var calls = new AtomicInteger();
-        com.gamma.pipeline.exec.EgressPolicy.Resolver flipping = host -> new InetAddress[]{
+        com.gamma.util.egress.EgressPolicy.Resolver flipping = host -> new InetAddress[]{
                 calls.getAndIncrement() == 0 ? InetAddress.getByAddress(new byte[]{127, 0, 0, 1})
                         : InetAddress.getByAddress(new byte[]{10, 9, 9, 9})};
         var r = ModelProviderFactory.fromEnvironment(

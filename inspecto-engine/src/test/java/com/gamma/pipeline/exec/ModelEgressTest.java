@@ -1,5 +1,7 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.util.egress.EgressPolicy;
+
 import org.junit.jupiter.api.Test;
 
 import java.net.InetAddress;

@@ -1,6 +1,6 @@
 package com.gamma.connect.notify;
 
-import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.util.egress.EgressPolicy;
 
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SSLParameters;

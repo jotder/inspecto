@@ -174,8 +174,8 @@ final class ActionRequestRoutes implements RouteModule {
         try {
             java.net.URI u = java.net.URI.create(String.valueOf(view.get("targetUrl")));
             String host = u.getHost() == null ? null : u.getHost().replaceAll("^\\[|\\]$", "");
-            com.gamma.pipeline.exec.EgressPolicy.Allowlist allow = EgressRoutes.allowlist(root);
-            boolean listed = host != null && (allow.namesHost(host) || (com.gamma.pipeline.exec.EgressPolicy.isIpLiteral(host)
+            com.gamma.util.egress.EgressPolicy.Allowlist allow = EgressRoutes.allowlist(root);
+            boolean listed = host != null && (allow.namesHost(host) || (com.gamma.util.egress.EgressPolicy.isIpLiteral(host)
                     && allow.cidrs().stream().anyMatch(c -> c.contains(java.net.InetAddress.ofLiteral(host)))));
             Map<String, Object> e = new LinkedHashMap<>();
             e.put("scheme", u.getScheme());

@@ -1,5 +1,7 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.util.egress.EgressPolicy;
+
 import com.gamma.util.ToonHelper;
 import dev.toonformat.jtoon.JToon;
 import org.junit.jupiter.api.AfterEach;

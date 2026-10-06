@@ -2,7 +2,7 @@ package com.gamma.intelligence;
 
 import com.eoiagent.model.LlmGateway;
 import com.eoiagent.model.OllamaChatAdapter;
-import com.gamma.pipeline.exec.EgressPolicy;
+import com.gamma.util.egress.EgressPolicy;
 import com.gamma.pipeline.exec.ModelEgress;
 import com.eoiagent.model.OpenAiCompatibleChatAdapter;
 import com.eoiagent.model.StubLlmGateway;

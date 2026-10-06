@@ -1,4 +1,4 @@
-package com.gamma.pipeline.exec;
+package com.gamma.util.egress;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
