@@ -19,8 +19,8 @@
 | Separation, option D (D-0…D-6) | built | `LA-APP-REAL-SIGNIN-1`, I1 trust, `LA-INDEX-SCALE-MEASURE-1` (§1) |
 | D-7 parallel analyst sandboxes (Drafts) | built D7-1…D7-7 | team Drafts, Draft SPA surface, linear rebase (§1) |
 | Embed view | deferred | `LA-EMBED-VIEW-1` (§1) |
-| Data preparation (CDR → fast index) | **plan only, nothing built** | LDP-D1…D11, WP0…WP10 (§2) |
-| Daily ingestion (CSV / Hive / database to the index) | **plan only, nothing built** | `LA-DAILY-INGEST-1` T1…T9, decisions D-ING1…D-ING6 answered (D-ING5 file-first), T1/T2/T3/T4/T6 done, T5 built, open: T7 backfill, T8 freshness + duplicate-delivery detection, T9 acceptance run |
+| Data preparation (CDR → fast index) | **plan; spikes SP1, SP2 (indicative), SP4, SP5 measured 2026-10-06; WP3 index builder still unbuilt** | LDP-D1…D11 open, WP0…WP10 (§2) |
+| Daily ingestion (CSV / Hive / database to the index) | **ingest chain built (T1-T6); T7-T9 open** | `LA-DAILY-INGEST-1` T1…T9, decisions D-ING1…D-ING6 answered (D-ING5 file-first), T1/T2/T3/T4/T6 done, T5 built, open: T7 backfill, T8 freshness + duplicate-delivery detection, T9 acceptance run |
 | Investigation store | S0–S7 closed | demand-gated items (§2) |
 | Entity model LA-17 | slice 1 + slice 2 built | SPA member browsing, `excludeBy` range/CIDR (§3) |
 | Live detection | LD-1…LD-7 built | operator confirmation of D-LD2…D-LD18; template sharing (§3) |
