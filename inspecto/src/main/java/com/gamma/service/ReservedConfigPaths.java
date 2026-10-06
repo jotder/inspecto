@@ -44,6 +44,7 @@ public final class ReservedConfigPaths {
             "branding.toon", "geo.toon", "link-analysis.toon", "pipeline-history.toon", "timezone.toon", "icon-map.toon",
             "scheduler.toon", "nav-menus.toon", "notification-preferences.toon", "partition.toon", "space.toon",
             "rename.journal", "dataset-publications.tsv",
+            "day-manifest.tsv",   // LA-DAILY-INGEST-1 T8 per-day delivery manifest; a forged copy could fake or hide re-delivery/gap signals (operator, 2026-10-06)
             "safety-policy.toon",   // DUCKLE-C6 Space Safety Policy tier: an import must not narrow, brick or re-moded it
             "case-link.json");   // LA-24: an imported copy would grant a Case team access (operator 2026-09-30)
 

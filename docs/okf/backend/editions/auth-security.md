@@ -643,7 +643,7 @@ up front), `/pipelines/import` (every satellite, every companion, the pipeline f
 3. **The denylist** `ReservedConfigPaths`: `roles.toon`, `demo-users.toon`, `access-policies.toon`,
    `approval.toon`, `offers.toon`, `grants.toon`, every settings document (`branding`, `geo`,
    `link-analysis`, `pipeline-history`, `icon-map`, `scheduler`, `nav-menus`, `notification-preferences`,
-   `partition`, `space`), `rename.journal`, `dataset-publications.tsv`; the directories `pending-changes/`,
+   `partition`, `space`), `rename.journal`, `dataset-publications.tsv`, `day-manifest.tsv` (LA-DAILY-INGEST-1 T8 delivery manifest, operator 2026-10-06); the directories `pending-changes/`,
    `recon-state/`, `.history/` (anywhere), `audit/`, `agent/`, `expectation-baselines/`,
    `registry/access-catalog/`, `registry/access-profiles/`. `approval.toon` and `pending-changes/` are
    reserved as plain paths ahead of maker-checker, which is not on `master`.
