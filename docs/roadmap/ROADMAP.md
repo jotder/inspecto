@@ -61,7 +61,7 @@ The single most important item for commercialization.
 - **Scope (in):** an `Authenticator` SPI seam in the core; an OIDC/OAuth2 **resource-server** implementation (validate IAM-issued JWTs — issuer/audience/expiry via JWKS); **RBAC + ABAC** enforcement from token claims/groups; HTTPS (keystore; FIPS-provider option for Gov); actor-attributed, tamper-evident audit; the Angular UI as an OIDC Authorization-Code-+-PKCE public client.
 - **Scope (out, by design):** user management, AD/LDAP federation, SAML brokering — these are the **external IAM's** job (Keycloak / WSO2 / Okta / Entra). No identity store in the Java core.
 - **Approach:** incremental hardening on the framework-free core — **explicitly not** a Spring/Quarkus migration. At target user counts a framework buys nothing the IAM + small libraries don't, and a lean dependency tree is a compliance asset.
-- **Packaging:** delivered as the `inspecto-security` Maven module, assembled into the Professional build via a profile; Personal simply doesn't bundle it.
+- **Packaging:** delivered as the `inspecto-oidc` Maven module (formerly `inspecto-security`), assembled into the Professional build via a profile; Personal simply doesn't bundle it.
 - **Dependency:** unblocks revenue. Should precede anything that needs per-tenant or per-role gating.
 - **Exit criteria:** a Professional build authenticates against a reference IAM, enforces a role matrix, serves over HTTPS, and produces an actor-attributed audit log — with the Personal build unchanged and still auth-free.
 

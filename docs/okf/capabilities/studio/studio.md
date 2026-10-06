@@ -948,7 +948,7 @@ query failure. Pinned by `NoGeoLinkShipsInThePersonalBuildTest`.
 | Geo Map Analysis | `inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java`; `inspecto-ui/projects/link-analysis/src/api/geo.service.ts`; `inspecto-ui/projects/link-analysis/src/geo-map/geo-projection.ts`, `geo-map.component.ts`, `geo-view-widget.component.ts`, `colocation-graph.dialog.ts` | [`geo-map.md`](../../frontend/features/geo-map.md) |
 | Edition gate | `inspecto/src/main/java/com/gamma/control/AbsentGeoLinkRoutes.java`, `ApiContext.java`, `BootstrapRoutes.java`; `inspecto-la-api/src/main/resources/META-INF/services/com.gamma.control.RouteModule`; `inspecto-ui/src/app/inspecto/auth/session.service.ts` | `EDITIONS.md` `CP-09`; `PKG` |
 | Saved-view + widget kinds | `inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java` (`WRITABLE_TYPES`); `spaces/demo/config/registry/` | `MET` §3 |
-| Cases (**`INC`'s**) | `inspecto-engine/src/main/java/com/gamma/objects/ObjectType.java`; `inspecto-ops/src/main/java/com/gamma/ops/ObjectService.java`; `inspecto-ui/src/app/modules/admin/objects/cases.routes.ts` | [`incidents/incidents.md`](../incidents/incidents.md) |
+| Cases (**`INC`'s**) | `inspecto-workflow/src/main/java/com/gamma/workflow/ObjectType.java`; `inspecto-ops/src/main/java/com/gamma/ops/ObjectService.java`; `inspecto-ui/src/app/modules/admin/objects/cases.routes.ts` | [`incidents/incidents.md`](../incidents/incidents.md) |
 
 **Gap rows** (a pointer that should exist and does not): 🔴 **this area has effectively no backend
 tier.** The consolidation plan measured it — *Widget Builder* and *Dashboard Builder* appear **zero times**

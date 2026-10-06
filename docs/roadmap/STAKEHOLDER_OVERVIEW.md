@@ -111,7 +111,7 @@ The product is a small Maven reactor of cleanly separated modules:
 | **`inspecto-agent-hosted/`** | Hosted model providers (the cloud-AI SDKs). Omitted entirely from air-gapped builds. |
 | **`inspecto-ui/`** | The Angular operator web console (single-page app), served from the engine process. |
 
-A planned **`inspecto-security/`** module will carry the Standard-edition authentication/authorization code (see Sections 7 and 10).
+The **`inspecto-oidc/`** module (formerly `inspecto-security`) carries the Standard-edition authentication/authorization code (see Sections 7 and 10).
 
 ### 4.2 The layer cake
 
@@ -267,7 +267,7 @@ Inspecto is packaged as **three editions that are build flavors of one codebase*
 | State | local disk | local disk (optional Postgres) | **shared backends** (Postgres / object store) |
 | Scheduler | in-JVM | in-JVM | **distributed coordination** |
 | Compliance scope | none | SOC 2 / ISO 27001 / FedRAMP / HIPAA / PCI | inherits Standard + multi-node controls |
-| Packaging | core fat-JAR | core + `inspecto-security` module, TLS on | + shared-store modules, coordinator |
+| Packaging | core fat-JAR | core + `inspecto-oidc` module (formerly `inspecto-security`), TLS on | + shared-store modules, coordinator |
 
 **Why this model matters commercially:** fixes and features land **once** in the common core and are inherited by every edition. There is no per-edition maintenance fork. Authentication, multi-tenancy, and distribution are *additive* — they bolt onto seams (an `Authenticator` SPI, pluggable state stores, distributed-scheduler hooks) that the architecture already leaves open. The current core is deliberately **auth-free**, which makes Personal genuinely zero-friction and keeps the security code isolated in the edition that needs it.
 
@@ -342,7 +342,7 @@ The architecture choices translate directly into cost-of-ownership advantages th
 | Pipeline-graph platform (authoring + execution) | **In mainline** | NiFi-style Pipelines run as first-class jobs; visual editor shipped |
 | Data-plane provenance / lineage | **In mainline** | Per-edge counts, conservation checks, Sankey overlay (off by default) |
 | Auth-free common core (edition realignment) | **In mainline** | Core is auth-free; security becomes an edition module |
-| Standard edition security (`inspecto-security`) | **Shipped** | OIDC resource-server + RBAC/ABAC behind an SPI — delivered 2026-07-24 as the `inspecto-security` module, assembled into Standard by a Maven profile (`ROADMAP.md` §3.1) |
+| Standard edition security (`inspecto-oidc`, formerly `inspecto-security`) | **Shipped** | OIDC resource-server + RBAC/ABAC behind an SPI — delivered 2026-07-24 as the `inspecto-security` module, assembled into Standard by a Maven profile (`ROADMAP.md` §3.1) |
 | Object-storage connectors (S3 / GCS / Azure / MinIO) | **Shipped** | On the connector SPI, SDK-free — S3/MinIO 2026-07-08, Azure 2026-07-08, GCS 2026-07-22 |
 | Network-share (NFS / SMB) access | **Not a connector — by decision** | ⛔ **Refused as an SPI connector**; the supported pattern is an **OS-mounted share** read as a local path, and a UNC path stays jail-rejected. `ACQ-4` is therefore PARTIAL, not shipped (`okf/capabilities/acquisition/acquisition.md` §2/§6.1) |
 | Unified `parsing:` grammar (JSON / regex frontends) | **Shipped** | Additional thin frontends over the shared backend — delivered 2026-07-07 (`ING-5`) |
