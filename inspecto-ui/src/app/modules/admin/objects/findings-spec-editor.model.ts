@@ -101,6 +101,18 @@ export function usesPattern(type: AttributeType): boolean {
     return type === 'string' || type === 'multiline' || type === 'identifier' || type === 'autocomplete';
 }
 
+/**
+ * The BUILT-IN Impact field every Case Findings form carries (FINDINGS-EDITOR-PER-CASE-TYPE-1, operator,
+ * 2026-10-06): its value IS the Case's typed Impact (`impact.confirmed`). The lead may rename it; the server
+ * refuses (422) a form that removes, re-keys, retypes or otherwise changes it, so the editor locks it.
+ */
+export const IMPACT_KEY = 'impact';
+
+/** Whether `f` is the locked built-in Impact field of a Case form. */
+export function isBuiltInImpact(f: FieldDraft, objectType: string): boolean {
+    return objectType.toLowerCase() === 'case' && f.key === IMPACT_KEY;
+}
+
 /** The key whose flat copy the Case analytics roll-up sums (design §5.4). A Case's money is NOT a Findings
  *  field any more — it is the typed impact (`PUT /objects/{id}/impact`, WS-10). */
 export const ANALYTICS_KEYS: readonly string[] = ['recordsAffected'];

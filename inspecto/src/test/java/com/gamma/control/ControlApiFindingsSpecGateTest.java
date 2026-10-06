@@ -39,10 +39,11 @@ class ControlApiFindingsSpecGateTest {
     private static final String SPEC = """
             {"name":"case","objectType":"case","sections":[
               {"key":"outcome","label":"Outcome","type":"select",
-               "options":[{"value":"WIN","label":"Win"},{"value":"LOSS","label":"Loss"}]}]}
+               "options":[{"value":"WIN","label":"Win"},{"value":"LOSS","label":"Loss"}]},
+              {"key":"impact","type":"number","tier":"required"}]}
             """;
     private static final String SPEC_EDIT = """
-            {"objectType":"case","sections":[{"key":"note","label":"Note","type":"multiline"}]}
+            {"objectType":"case","sections":[{"key":"note","label":"Note","type":"multiline"},{"key":"impact","type":"number","tier":"required"}]}
             """;
 
     /** Bearer = seeded role name; "business-incidents" = a Business desk granted canManageIncidents. */

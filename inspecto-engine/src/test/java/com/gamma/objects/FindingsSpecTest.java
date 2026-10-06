@@ -21,11 +21,32 @@ import static org.junit.jupiter.api.Assertions.*;
 class FindingsSpecTest {
 
     @Test
+    void aCaseSpecMustKeepTheBuiltInImpactFieldAndMayOnlyRelabelIt() {
+        Map<String, Object> summary = Map.of("key", "summary");
+        java.util.function.Function<Map<String, Object>, Map<String, Object>> caseSpec =
+                impact -> Map.of("objectType", "case", "sections", impact == null ? List.of(summary) : List.of(summary, impact));
+        assertThrows(IllegalArgumentException.class, () -> FindingsSpec.fromMap(caseSpec.apply(null)), "removed");
+        for (Map<String, Object> bad : List.of(
+                Map.<String, Object>of("key", "loss", "type", "number", "tier", "required"),
+                Map.<String, Object>of("key", "impact", "type", "string", "tier", "required"),
+                Map.<String, Object>of("key", "impact", "type", "number", "tier", "optional"),
+                Map.<String, Object>of("key", "impact", "type", "number", "tier", "required", "min", 1)))
+            assertThrows(IllegalArgumentException.class, () -> FindingsSpec.fromMap(caseSpec.apply(bad)), bad.toString());
+        FindingsSpec ok = FindingsSpec.fromMap(caseSpec.apply(
+                Map.of("key", "impact", "label", "Confirmed loss", "type", "number", "tier", "required", "required", false)));
+        assertEquals(FindingsSpec.builtInImpact("Confirmed loss"), ok.sections().get(1));
+        // an Incident spec is not a Case form
+        assertDoesNotThrow(() -> FindingsSpec.fromMap(Map.of("objectType", "incident", "sections", List.of(summary))));
+        assertFalse(FindingsSpec.defaultFor(ObjectType.INCIDENT).sections().stream()
+                .anyMatch(s -> FindingsSpec.IMPACT_KEY.equals(s.key())));
+    }
+
+    @Test
     void builtInDefaultIsTodaysHardcodedShape() {
         FindingsSpec spec = FindingsSpec.defaultFor(ObjectType.CASE);
 
         assertEquals("case", spec.objectType());
-        assertEquals(List.of("disposition", "recordsAffected", "summary"),
+        assertEquals(List.of("disposition", "recordsAffected", "summary", FindingsSpec.IMPACT_KEY),
                 spec.sections().stream().map(FindingsSpec.Section::key).toList());
 
         FindingsSpec.Section disposition = spec.sections().get(0);

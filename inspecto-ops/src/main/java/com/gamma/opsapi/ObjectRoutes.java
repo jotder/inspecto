@@ -96,7 +96,7 @@ public final class ObjectRoutes implements RouteModule {
         // to anyone who can see the object (the scope guard still answers 404), recorded in
         // CapabilityManifest.EXEMPTIONS. It writes ONLY attributes.findings + its flat copies and refuses any
         // other key (422), so it is not a way round the canAdminister PATCH below.
-        api.put("/objects/([^/]+)/findings", scoped(api, (e, m) -> saveFindings(api, e, ApiContext.name(m), api.body(e))));
+        api.put("/objects/([^/]+)/findings", scoped(api, (e, m) -> saveFindings(api, e, ApiContext.name(m), exactBody(api, e))));
         // (operator, 2026-09-26, INCIDENT-FINISH-GATE-1) narrow postmortem + category routes on canWorkIncidents:
         // resolving an Incident needs its postmortem, and Accept needs a category, so an analyst who may move an
         // Incident must be able to write these two — and ONLY these two. Each writes one attribute and refuses
@@ -798,6 +798,7 @@ public final class ObjectRoutes implements RouteModule {
             // WS-10: the impact and the Disposition have their own validated, audited writes — the PATCH's
             // free attribute merge would bypass validation, the closed-books rule and the before/after audit.
             refuseOwnedAttributes(attrs);
+            refuseCaseImpactInFindings(api, id, attrs);
             validateFindings(api, id, attrs);
         }
         try {
@@ -835,14 +836,53 @@ public final class ObjectRoutes implements RouteModule {
                         "findings value '" + k + "' must be a scalar");
             blob.put(k.toString(), v);
         });
+        // FINDINGS-EDITOR-PER-CASE-TYPE-1 (operator, 2026-10-06): a Case's built-in Impact field IS its typed
+        // Impact.confirmed — taken out of the blob (never stored there) and written through the impact path below.
+        OperationalObject target = OpsEngine.of(api).get(id).orElse(null);
+        boolean caseImpact = target != null && target.objectType() == ObjectType.CASE
+                && blob.containsKey(FindingsSpec.IMPACT_KEY);
+        Object impactValue = caseImpact ? blob.remove(FindingsSpec.IMPACT_KEY) : null;
         Map<String, String> attrs = new LinkedHashMap<>();
         attrs.put(FINDINGS_ATTR, JsonAttributes.toPayloadJson(blob));
         for (String flat : FINDINGS_FLAT_COPIES) attrs.put(flat, blob.get(flat) == null ? "" : blob.get(flat).toString());
         validateFindings(api, id, attrs);
+        if (caseImpact) saveFindingsImpact(api, ex, target, impactValue);
         try {
             return OpsEngine.of(api).saveFindings(id, attrs, ApiContext.actor(ex)).toMap();
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
+        }
+    }
+
+    /**
+     * Write a Case's built-in Findings Impact field as its typed {@code Impact.confirmed}
+     * (FINDINGS-EDITOR-PER-CASE-TYPE-1, operator, 2026-10-06) — the same gate, validation, closed-books rule and
+     * before/after audit as {@code PUT /objects/{id}/impact}, keeping the stored currency, period, basis and other
+     * amounts. An unchanged value writes nothing and needs no capability, because the panel re-sends every value
+     * on every save; a change needs {@code canWorkIncidents} (403), an invalid amount or one with no currency on
+     * the Case is 422, and a closed Case's confirmed amount is 409.
+     */
+    private static void saveFindingsImpact(ApiContext api, HttpExchange ex, OperationalObject o, Object value) {
+        Impact stored = Impact.fromAttribute(o.attributes().get(Impact.ATTR));
+        String text = value == null ? "" : value instanceof java.math.BigDecimal d ? d.toPlainString() : value.toString().trim();
+        Map<String, Object> body = new LinkedHashMap<>(stored.toMap());
+        body.remove("outstanding");
+        body.put("confirmed", text.isEmpty() ? null : text);
+        Impact next;
+        try {
+            next = Impact.fromBody(body);
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "findings field '" + FindingsSpec.IMPACT_KEY + "' (the Case's Impact): " + bad.getMessage());
+        }
+        if (stored.changedFieldsOtherThan(next, List.of()).isEmpty()) return;
+        ApiContext.requireCapability(ex, "canWorkIncidents");
+        try {
+            OpsEngine.of(api).saveImpact(o.id(), next, ApiContext.actor(ex));
+        } catch (NoSuchElementException notFound) {
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
+        } catch (IllegalStateException closed) {
+            throw new ApiException(409, ErrorCodes.CONFLICT, closed.getMessage());
         }
     }
 
@@ -932,6 +972,17 @@ public final class ObjectRoutes implements RouteModule {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "attribute '" + owned
                         + "' cannot be set here — " + ("impact".equals(owned)
                         ? "use PUT /objects/{id}/impact" : "it is recorded with the Incident's resolve"));
+    }
+
+    /** 422 when a PATCH's Findings blob on a Case carries the built-in Impact field — its one home is the typed
+     *  impact (FINDINGS-EDITOR-PER-CASE-TYPE-1), written by {@code PUT /objects/{id}/findings} or {@code /impact}. */
+    private static void refuseCaseImpactInFindings(ApiContext api, String id, Map<String, String> attrs) {
+        if (!attrs.containsKey(FINDINGS_ATTR) || !findingsBlob(attrs.get(FINDINGS_ATTR)).containsKey(FindingsSpec.IMPACT_KEY))
+            return;
+        OperationalObject o = OpsEngine.of(api).get(id).orElse(null);
+        if (o != null && o.objectType() == ObjectType.CASE)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "findings field '" + FindingsSpec.IMPACT_KEY
+                    + "' is the Case's Impact — use PUT /objects/{id}/findings or PUT /objects/{id}/impact");
     }
 
     private static final String POSTMORTEM_ATTR = "postmortem";

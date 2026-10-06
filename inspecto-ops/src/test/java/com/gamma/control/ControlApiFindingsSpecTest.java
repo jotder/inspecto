@@ -62,7 +62,7 @@ class ControlApiFindingsSpecTest {
         try (Ctx c = open(dir, null)) {
             JsonNode spec = json(send(c.port, "GET", "/findings/CASE", null));
             assertEquals("case", spec.get("objectType").asText());
-            assertEquals(List.of("disposition", "recordsAffected", "summary"),
+            assertEquals(List.of("disposition", "recordsAffected", "summary", "impact"),
                     keys(spec));
             assertEquals(7, spec.get("sections").get(0).get("options").size());
             assertEquals(400, send(c.port, "GET", "/findings/bogus", null).statusCode());
@@ -80,11 +80,12 @@ class ControlApiFindingsSpecTest {
                       {"key":"outcome","label":"Outcome","type":"select","tier":"required",
                        "options":[{"value":"WIN","label":"Win"},{"value":"LOSS","label":"Loss"}]},
                       {"key":"note","label":"Note","type":"multiline","tier":"advanced",
-                       "dependsOn":{"key":"outcome","equals":"LOSS"}}]}
+                       "dependsOn":{"key":"outcome","equals":"LOSS"}},
+                      {"key":"impact","label":"Confirmed impact","type":"number","tier":"required"}]}
                     """).statusCode());
 
             JsonNode authored = json(send(c.port, "GET", "/findings/case", null));
-            assertEquals(List.of("outcome", "note"), keys(authored), "fully replaces, never merges");
+            assertEquals(List.of("outcome", "note", "impact"), keys(authored), "fully replaces, never merges");
             assertEquals("Loss", authored.get("sections").get(0).get("options").get(1).get("label").asText());
             assertEquals("LOSS", authored.get("sections").get(1).get("dependsOn").get("equals").asText());
 
@@ -134,7 +135,7 @@ class ControlApiFindingsSpecTest {
 
             HttpResponse<String> r = send(c.port, "GET", "/findings/case", null);
             assertEquals(200, r.statusCode());
-            assertEquals(List.of("disposition", "recordsAffected", "summary"), keys(json(r)));
+            assertEquals(List.of("disposition", "recordsAffected", "summary", "impact"), keys(json(r)));
         }
     }
 
@@ -270,17 +271,18 @@ class ControlApiFindingsSpecTest {
                     """
                     {"name":"case.sim-box","objectType":"case","caseType":"sim-box","sections":[
                       {"key":"recovery","label":"Recovery route","type":"select","tier":"required","required":true,
-                       "options":[{"value":"BLOCK"},{"value":"BILL"}]}]}
+                       "options":[{"value":"BLOCK"},{"value":"BILL"}]},
+                      {"key":"impact","label":"Confirmed impact","type":"number","tier":"required"}]}
                     """).statusCode());
 
             JsonNode typed = json(send(c.port, "GET", "/findings/case.sim-box", null));
             assertEquals("case.sim-box", typed.get("name").asText());
             assertEquals("sim-box", typed.get("caseType").asText());
-            assertEquals(List.of("recovery"), keys(typed));
+            assertEquals(List.of("recovery", "impact"), keys(typed));
             // A Case type with no spec of its own keeps the generic form — additive, nothing to migrate.
-            assertEquals(List.of("disposition", "recordsAffected", "summary"),
+            assertEquals(List.of("disposition", "recordsAffected", "summary", "impact"),
                     keys(json(send(c.port, "GET", "/findings/case.wangiri", null))));
-            assertEquals(List.of("disposition", "recordsAffected", "summary"),
+            assertEquals(List.of("disposition", "recordsAffected", "summary", "impact"),
                     keys(json(send(c.port, "GET", "/findings/case", null))));
 
             var ops = TestOpsEngine.of(c.svc);
@@ -307,7 +309,8 @@ class ControlApiFindingsSpecTest {
     void aPerTypeSpecIsRejectedWhenItsIdAndContentDisagree(@TempDir Path dir) throws Exception {
         Path writeRoot = dir.resolve("cfg");
         try (Ctx c = open(dir, writeRoot)) {
-            String sections = ",\"sections\":[{\"key\":\"a\"}]}";
+            String sections = ",\"sections\":[{\"key\":\"a\"},"
+                    + "{\"key\":\"impact\",\"type\":\"number\",\"tier\":\"required\"}]}";
             assertEquals(422, send(c.port, "POST", "/components/findings-spec",
                     "{\"name\":\"case\",\"objectType\":\"case\",\"caseType\":\"sim-box\"" + sections).statusCode(),
                     "a caseType under the generic id");
@@ -329,7 +332,8 @@ class ControlApiFindingsSpecTest {
                "options":[{"value":"CARD_NOT_PRESENT","label":"Card not present"},{"value":"ACCOUNT_TAKEOVER","label":"Account takeover"}]},
               {"key":"impactAmount","label":"Impact amount","type":"string","tier":"required","required":false},
               {"key":"recordsAffected","label":"Records affected","type":"string","tier":"required","required":false},
-              {"key":"note","label":"Note","type":"multiline","tier":"optional"}]}
+              {"key":"note","label":"Note","type":"multiline","tier":"optional"},
+              {"key":"impact","label":"Confirmed impact","type":"number","tier":"required"}]}
             """;
 
     private static final ObjectMapper JSON = new ObjectMapper();

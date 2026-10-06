@@ -132,7 +132,47 @@ public record FindingsSpec(String objectType, String caseType, List<Section> sec
                 // home for the same number.
                 section("disposition", "Disposition", "select", dispositions),
                 section("recordsAffected", "Records affected", "string", List.of()),
-                section("summary", "Summary", "multiline", List.of())));
+                section("summary", "Summary", "multiline", List.of())))
+                .withBuiltIns();
+    }
+
+    /**
+     * The key of the BUILT-IN Impact field every Case Findings form carries (FINDINGS-EDITOR-PER-CASE-TYPE-1,
+     * operator, 2026-10-06, option (c)). Its value IS the Case's typed {@code Impact.confirmed}: the
+     * {@code PUT /objects/{id}/findings} route writes it through the impact path and never stores it in the
+     * Findings blob, so there is one home for the money. A lead may rename its label; re-keying, retyping,
+     * removing it or changing any other property is refused (→ 422).
+     */
+    public static final String IMPACT_KEY = "impact";
+
+    /** The built-in Impact field's default label. */
+    public static final String IMPACT_LABEL = "Confirmed impact";
+
+    /** The built-in Impact field carrying {@code label} — the only property a spec may vary. */
+    public static Section builtInImpact(String label) {
+        return new Section(IMPACT_KEY, label, "number", "required", false, null, List.of(),
+                null, null, null, null, null, null);
+    }
+
+    /** This spec with the built-in Impact field appended when it is a Case spec that lacks one. */
+    private FindingsSpec withBuiltIns() {
+        if (!"case".equals(objectType) || sections.stream().anyMatch(s -> IMPACT_KEY.equals(s.key()))) return this;
+        List<Section> all = new ArrayList<>(sections);
+        all.add(builtInImpact(IMPACT_LABEL));
+        return new FindingsSpec(objectType, caseType, all);
+    }
+
+    /** 422 unless a Case spec carries the built-in Impact field unchanged but for its label. */
+    private static void requireBuiltInImpact(List<Section> sections) {
+        Section s = sections.stream().filter(x -> IMPACT_KEY.equals(x.key())).findFirst().orElseThrow(() ->
+                new IllegalArgumentException("a Case findings spec must keep the built-in '" + IMPACT_KEY
+                        + "' field (the Case's Impact) — it cannot be removed or re-keyed; only its label may change"));
+        Section asStored = s.required() != null ? s : new Section(s.key(), s.label(), s.type(), s.tier(), false,
+                s.defaultValue(), s.options(), s.pattern(), s.min(), s.max(), s.dependsOn(), s.help(), s.placeholder());
+        if (!builtInImpact(s.label()).equals(asStored))
+            throw new IllegalArgumentException("the built-in '" + IMPACT_KEY + "' field (the Case's Impact) is "
+                    + "locked: only its label may change, it must stay type 'number', tier 'required', "
+                    + "with no other properties");
     }
 
     private static Section section(String key, String label, String type, List<Option> options) {
@@ -194,6 +234,7 @@ public record FindingsSpec(String objectType, String caseType, List<Section> sec
                 throw new IllegalArgumentException("section '" + s.key() + "' dependsOn unknown key '"
                         + s.dependsOn().key() + "'");
         }
+        if (ot == ObjectType.CASE) requireBuiltInImpact(sections);
         return new FindingsSpec(objectType, caseType, sections);
     }
 

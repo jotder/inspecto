@@ -178,9 +178,19 @@ export function emptyFindings(): Findings {
     return {};
 }
 
-/** Parse the stored findings; null when absent or unreadable. */
+/**
+ * Parse the stored findings; null when absent or unreadable. On a Case the built-in `impact` field is read
+ * from the Case's typed Impact (`impact.confirmed`), never from the blob — the server stores it only there
+ * (FINDINGS-EDITOR-PER-CASE-TYPE-1, operator, 2026-10-06), so an edit made on the Impact panel shows here too.
+ */
 export function parseFindings(o: OperationalObject): Findings | null {
-    const raw = o.attributes?.['findings'];
+    const blob = parseFindingsBlob(o.attributes?.['findings']);
+    const confirmed = o.objectType?.toUpperCase() === 'CASE' ? o.impact?.confirmed : null;
+    if (confirmed == null) return blob;
+    return { ...(blob ?? {}), impact: confirmed };
+}
+
+function parseFindingsBlob(raw: string | undefined): Findings | null {
     if (!raw) return null;
     try {
         const parsed = JSON.parse(raw) as unknown;

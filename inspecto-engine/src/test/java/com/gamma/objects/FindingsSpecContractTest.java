@@ -146,7 +146,8 @@ class FindingsSpecContractTest {
     }
 
     private static Map<String, Object> specWith(Map<String, Object> section) {
-        return Map.of("objectType", "case", "sections", List.of(section));
+        // an Incident spec: a Case spec must also carry the locked built-in Impact field (FINDINGS-EDITOR-PER-CASE-TYPE-1)
+        return Map.of("objectType", "incident", "sections", List.of(section));
     }
 
     /** A value each section key will actually accept — the parser validates most of them. */

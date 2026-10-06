@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OperationalObject } from 'app/inspecto/api';
-import { findingsCaseType, postmortemGaps, slaBadges } from './mail-model';
+import { findingsCaseType, parseFindings, postmortemGaps, slaBadges } from './mail-model';
 
 /** An Incident carrying `postmortem` (raw JSON) and `dueAt`. */
 function incident(postmortem: unknown, dueAt: string | undefined = '1790000000000'): OperationalObject {
@@ -72,6 +72,33 @@ describe('slaBadges (ASSURE-WORKFLOW-SLA-1)', () => {
 
     it('a blank or non-numeric stamp is no SLA', () => {
         expect(slaBadges(obj('IDENTIFIED', { dueAt: '', slaBreachedAt: 'x' }))).toEqual([]);
+    });
+});
+
+describe('parseFindings reads a Case built-in Impact field from its typed Impact', () => {
+    const impact = {
+        suspected: null,
+        confirmed: '1500.25',
+        recovered: null,
+        prevented: null,
+        outstanding: '1500.25',
+        currency: 'EUR',
+        period: null,
+        basis: null,
+    };
+    it('overlays impact.confirmed on a Case, even with no stored blob', () => {
+        const o = { objectType: 'CASE', attributes: {}, impact } as unknown as OperationalObject;
+        expect(parseFindings(o)).toEqual({ impact: '1500.25' });
+        const withBlob = { ...o, attributes: { findings: '{"summary":"s","impact":"9"}' } } as OperationalObject;
+        expect(parseFindings(withBlob)).toEqual({ summary: 's', impact: '1500.25' });
+    });
+    it('leaves an Incident blob alone', () => {
+        const o = {
+            objectType: 'INCIDENT',
+            attributes: { findings: '{"impact":"9"}' },
+            impact,
+        } as unknown as OperationalObject;
+        expect(parseFindings(o)).toEqual({ impact: '9' });
     });
 });
 

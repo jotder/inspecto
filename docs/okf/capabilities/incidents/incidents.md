@@ -558,6 +558,20 @@ mail pane fetches the open Case's type spec (`findingsCaseType` in `mail-model.t
 generic one. Authoring is the generic `/components/findings-spec` CRUD, which the *Findings fields* dialog drives through
 its *Form* picker (shared form, an existing Case type, or a new one; `FINDINGS-EDITOR-PER-CASE-TYPE-1`).
 
+**Every Case Findings form carries a built-in Impact field** (`FINDINGS-EDITOR-PER-CASE-TYPE-1`, option (c),
+operator, 2026-10-06). The section `impact` (`FindingsSpec.IMPACT_KEY`, type `number`, tier `required`,
+`required:false`) is appended to the built-in Case default, and `FindingsSpec.fromMap` refuses (`422`) a Case
+spec (generic or `case.<caseType>`) that drops it, re-keys it, retypes it or changes any property but its
+**label** (`builtInImpact(label)`). Its value **is the Case's typed `Impact.confirmed`**, never a Findings value:
+`PUT /objects/{id}/findings` takes `impact` out of the blob and, when it differs from the stored confirmed amount,
+writes it through `ObjectService.saveImpact` — keeping the stored currency, period, basis and other amounts —
+with the impact route's rules: `canWorkIncidents` (403; an unchanged re-send needs nothing, so Findings stay
+collaboration), `Impact.fromBody` validation (422, including "currency is required" on a Case with none yet),
+the closed-books rule (409) and the `action: impact` before/after audit. The Findings blob never holds it, and
+`PATCH /objects/{id}` refuses a Case blob carrying it (422), so the Impact panel and the Findings field are one
+stored value; the SPA's `parseFindings` reads the field from `impact.confirmed`. Incident specs are unaffected.
+Pinned by `ControlApiFindingsImpactFieldTest` and `FindingsSpecTest`.
+
 **Case Rules** (`CaseRule`, `/cases/rules`) are saved searches that auto-group: when ≥ *threshold* Incidents
 match within a *window* they are grouped under one Case, opened or attached idempotently. Evaluation is on
 demand from the pane **and** schedulable as the `caserule.evaluate` Job Type (`CaseRuleEvalJob`) — the
@@ -729,6 +743,7 @@ earlier one, both appear.
 | 2026-07-24 | Digest is **opt-in per destination**; in-app copies stay per event | Batching is a delivery choice, not a fact about the event |
 | 2026-07-25 | **Retention is a tier** (D5): `CLOSED → ARCHIVED` and `ARCHIVED → purge` are two windows | "Archived" must not mean "about to be deleted" |
 | 2026-07-26 | **D7**: tags become a generic cross-entity concept — *this* system generalized, not a second one; `attributes.tags` becomes a projection | Two tag systems would drift; the old row's claim that nothing wrote `attributes.tags` was simply false |
+| 2026-10-06 (operator) | **A Case's Findings Impact field is built in and IS its typed Impact** (`FINDINGS-EDITOR-PER-CASE-TYPE-1`, option (c) of (a) keep separate / (b) mark any Number field / (c) built-in): one locked `impact` section (label renameable) on every Case form, valued as `Impact.confirmed`, written through the impact path and never stored in the blob | A lead's "Confirmed loss" as a free Number field was a second home for the Case's money that analytics never summed; a marked field (b) could be retyped or removed under the money. `confirmed` is the amount a Findings "loss" names; currency stays on the Impact panel (operator, 2026-10-06) |
 | 2026-07-26 | **D6 / C3**: Findings sections are a `findings-spec` kind that **fully replaces** the default; values validated `422`; the gate lives in `ObjectRoutes` | Field-level merge makes "remove a section" inexpressible; the engine stays store-agnostic |
 | 2026-10-06 | **FINDINGS-PER-CASE-TYPE-1**: per-Case-type Findings spec as component `case.<caseType>`, optional, falls back to the generic spec (operator, 2026-10-06) | A SIM-box form had no home; keying on the existing `caseType` attribute adds no new concept and needs no migration |
 | 2026-07-26 | D8 receipts: **first observation wins**; verification precedes every write; unknown id `202` | A provider retries; a later duplicate must not rewrite history |
@@ -929,6 +944,7 @@ about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 
 | `IncidentAccessTest` | the narrowed seam, dry-run opens nothing |
 | `AlertServicePersistenceTest` | fired alerts persisted as objects when the module is present |
 | `ControlApiFindingsSpecTest` | `GET /findings/{type}`, the `422` value gate, frontend-only keys refused |
+| `ControlApiFindingsImpactFieldTest` | The built-in Case Findings Impact field: 422 on a dropped / re-keyed / retyped / re-tiered / required spec (generic and per-type), a relabel accepted; a Findings save writes `Impact.confirmed` (rest kept, never in the blob, audited) and `objects/analytics` sums it; 403 without `canWorkIncidents` on a change, 200 on an unchanged re-send; 422 with no currency or a negative amount; the PATCH refuses it |
 | `ControlApiImpactTest` | `PUT /objects/{id}/impact`: 401 / 403 `business` (before existence-hiding) / 400 / 422 (ten invalid bodies, an Alert) / 409 `ARCHIVED` then writable after `reopen` / 404; `outstanding` derived and never stored; audit `before`/`after` under the Subject; per-currency analytics. The Personal 503 is `NoOperationalObjectsShipInThePersonalBuildTest` |
 | `ControlApiObjectsTest` · `ControlApiObjectsPageTest` · `ControlApiScopedObjectsTest` | the create contract (≥1 link, `400`/`404`), paging, SEC-7d data scopes |
 | `ControlApiNoteRoutesTest` · `ControlApiTagRoutesTest` · `TagRuleTest` · `ObjectTagProjectionTest` · `TagAssignmentCoreTest` | Annotations: notes, tags as a projection, Tag Rules |

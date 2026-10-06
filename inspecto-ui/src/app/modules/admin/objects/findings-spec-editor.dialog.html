@@ -120,6 +120,7 @@
                     >
                         <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-down"></mat-icon>
                     </button>
+                    @if (!isLocked(f)) {
                     <button
                         mat-icon-button
                         type="button"
@@ -129,7 +130,7 @@
                     >
                         <mat-icon class="icon-size-4" svgIcon="heroicons_outline:trash"></mat-icon>
                     </button>
-                    }
+                    } }
                 </li>
                 } @empty {
                 <li class="text-secondary text-sm">No fields yet.</li>
@@ -147,6 +148,12 @@
         <section aria-labelledby="ff-edit-heading" class="flex min-w-0 flex-col gap-2">
             <h3 id="ff-edit-heading" class="text-xs font-bold uppercase tracking-wider opacity-60">Field</h3>
             @if (selected(); as f) {
+            @if (isLocked(f)) {
+            <inspecto-alert variant="info" title="Built-in: the Case's Impact">
+                This field is the Case's confirmed Impact — the amount Case analytics sum. You can rename it; it
+                can't be removed or changed otherwise.
+            </inspecto-alert>
+            }
             <form [formGroup]="fieldForm" class="flex flex-col gap-3" (submit)="$event.preventDefault()">
                 <mat-form-field subscriptSizing="dynamic">
                     <mat-label>Name</mat-label>
@@ -161,7 +168,7 @@
                     label="Kind of answer"
                     formControlName="type"
                     [options]="controlOptions(f.type)"
-                    [readOnly]="!canEdit()"
+                    [readOnly]="!canEdit() || isLocked(f)"
                 />
 
                 <div class="flex flex-col gap-1">

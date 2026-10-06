@@ -46,6 +46,7 @@ import {
     FieldDraft,
     fieldsAbove,
     fromWire,
+    isBuiltInImpact,
     keyOf,
     newChoice,
     newField,
@@ -344,6 +345,11 @@ export class FindingsSpecEditorDialog {
         );
         if (this.canEdit()) this.fieldForm.enable({ emitEvent: false });
         else this.fieldForm.disable({ emitEvent: false });
+        // The built-in Impact field: only its label may change (the server 422s anything else).
+        if (this.isLocked(f)) {
+            for (const [name, control] of Object.entries(this.fieldForm.controls))
+                if (name !== 'label') control.disable({ emitEvent: false });
+        }
         this.syncing = false;
     }
 
@@ -418,8 +424,14 @@ export class FindingsSpecEditorDialog {
         });
     }
 
+    /** Whether `f` is the Case's built-in Impact field — renameable, never removed or changed otherwise. */
+    isLocked(f: FieldDraft): boolean {
+        return isBuiltInImpact(f, this.data.objectType);
+    }
+
     /** D7: a removed field's values stay stored on the Cases that recorded them, but stop showing. */
     async removeField(f: FieldDraft): Promise<void> {
+        if (this.isLocked(f)) return;
         if (f.key) {
             const analytics = ANALYTICS_KEYS.includes(f.key)
                 ? ' Case analytics will also stop receiving this figure from Cases saved from now on.'

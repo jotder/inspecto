@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **40<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 12<!--count:backlog-p2--> × P2 · 28<!--count:backlog-p3--> × P3** —
+> **39<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 12<!--count:backlog-p2--> × P2 · 27<!--count:backlog-p3--> × P3** —
 > ⬇ **41 → 40 (P3 29 → 28) on 2026-10-06**: closed P3 `ASSURE-AUDIT-CHAIN-RESIDUALS-1` — (5) and (7) accepted as stated limits (operator, 2026-10-06), (8) D-P8 built: `AuditReadMasking` masks classified values in audit rows on read; read auditing deferred. As-built in `okf/backend/control-plane/events-metrics.md`.
 > ⬇ **42 → 41 (P3 30 → 29) on 2026-10-06**: closed P3 `DUCKLE-C6-POLICY-NARROWING-1` — every slice S0–S7 shipped (the last: S6 residuals M6 / `AcquisitionLedger.prune` / T11 / Kafka T12 and the D9 plan-time refusal `ERR_SAFETY_STATE_ADVANCE_REFUSED`; M7 deliberately ungated). As-built in `okf/backend/config/config-safety.md`; plan archived.
 > ⬇ **43 → 42 (P2 13 → 12) on 2026-10-06**: closed P2 *Pipeline graph — flip the intake cap on by default* — `IntakeGovernor` now defaults `ingest.maxFilesPerCycle` to 500 (`0` still means unbounded).
@@ -152,10 +152,10 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 12<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 28<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 27<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 12<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 28<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 40<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 27<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 39<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -402,7 +402,6 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 
 
 - **P3** · `D6-REAL-USER-SESSION-1` — **the D10 think-aloud with a REAL Case-desk lead is still unrun.** The D6 row closed 2026-09-29 as *accepted on proxy (operator 2026-09-29)*: an agent acting as a Case-desk lead drove the *Findings fields* dialog end to end on a `4dbe84d1a` demo build. A proxy cannot tell what a lead who has never seen the product finds confusing. Run the design's §8 protocol (T2, T6, T7, T5 unaided) with a real lead, and record pass or fail per task in `objects.md`. (The plan was archived on 2026-09-29 by operator decision, to `archived-documents/plans-archive/findings-spec-authoring-ui-design.md`.) → `okf/frontend/features/objects.md` (*Proxy acceptance session 2026-09-29*)
-- **P3** · `FINDINGS-EDITOR-PER-CASE-TYPE-1` — **OPERATOR CALL: is a Findings "loss" figure the Case's *Impact*?** The picker half shipped 2026-10-06: the *Findings fields* dialog's *Form* picker edits the shared form, an existing Case type's `case.<caseType>` form, or a new one, and its scope text now says "every Case without its own form" (truth in `okf/frontend/features/objects.md`). Still open, from the 2026-09-29 proxy session: a lead's "Confirmed loss" can only be a plain Number field, separate from the Case's *Impact*. Options: (a) keep them separate and say so in the dialog (a Findings figure is a record, *Impact* the Case's money); (b) let one Number field per form be marked "this is the Case's Impact", feeding the Case's Impact on save (backend + analytics change); (c) offer a built-in *Impact* field the lead can relabel but not re-key.
 - **P2** · **AGT-5 per-tool dry-run seam — BLOCKED-EXTERNAL** (re-gated 2026-09-16). The upstream `DryRunProvider` type ships, but the seam does not: `javap` on the pinned `eoiagent-platform` jar shows `PlatformBuilder` with `approvalHandler(...)` and `approvalDecisionStore(...)` and **no `dryRunProvider(...)`**. **Upstream ask (to `jotder/inspect-agent`): expose `PlatformBuilder.dryRunProvider(DryRunProvider)` and thread it to the gate builder.** Until then `AgentApprovals` stays as the previewer. ⛔ Do not re-discharge on the presence of the type — check the builder. `incident_explain` waits separately on the eoiagent host seam. → `archived-documents/plans-archive/agt-6-plan.md` §4.2 G2
 - **P3** · `AGT-SEGMENT-1` — **the assistant's commercial framing is an unvalidated product read.** The tier packaging (A Explain / B Author-with-approval / C Bounded autonomy), the "Tier A is the wedge" argument and the SHADOW-first on-ramp were never validated against a client segment. ⛔ Decided 2026-09-10: keep the caveat and reopen on the first customer conversation — needs product input, not engineering; the framing is quoted in a stakeholder-facing doc, so it carries its caveat until this closes. → `stakeholders/PRODUCT_CAPABILITIES.md` §"How the ladder is packaged" · `archived-documents/plans-archive/agt-6-plan.md` §2
 

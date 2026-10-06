@@ -49,6 +49,7 @@ interface Opts {
     create?: () => Observable<ComponentDef>;
     update?: () => Observable<ComponentDef>;
     list?: ComponentDef[];
+    spec?: FindingsSpecDef;
 }
 
 async function create(opts: Opts = {}) {
@@ -60,7 +61,7 @@ async function create(opts: Opts = {}) {
         remove: vi.fn(() => of({})),
         list: vi.fn(() => of(opts.list ?? [])),
     };
-    const objects = { findingsSpec: vi.fn(() => of(BUILT_IN)) };
+    const objects = { findingsSpec: vi.fn(() => of(opts.spec ?? BUILT_IN)) };
     const confirm = { confirmDestructive: vi.fn(async () => opts.confirm ?? true), confirm: vi.fn(async () => true) };
     const toastr = { success: vi.fn(), error: vi.fn() };
     TestBed.configureTestingModule({
@@ -250,6 +251,44 @@ describe('FindingsSpecEditorDialog', () => {
         await c.removeField(c.fields()[1]);
         const message = (confirm.confirmDestructive.mock.calls[0] as unknown as [string])[0];
         expect(message).not.toContain('Case analytics');
+    });
+
+    /** FINDINGS-EDITOR-PER-CASE-TYPE-1 (operator, 2026-10-06): the Case's Impact is a built-in, renameable field. */
+    it('locks the built-in Impact field except for its label, and never removes it', async () => {
+        const spec: FindingsSpecDef = {
+            ...BUILT_IN,
+            sections: [
+                ...BUILT_IN.sections,
+                { key: 'impact', label: 'Confirmed impact', type: 'number', tier: 'required', required: false },
+            ],
+        };
+        const { el, c, components, render } = await create({ spec });
+        const impact = c.fields().find((f) => f.key === 'impact')!;
+        c.select(impact.uid);
+        await render();
+        expect(el.textContent).toContain("Built-in: the Case's Impact");
+        expect(c.fieldForm.controls.label.enabled).toBe(true);
+        for (const name of ['type', 'tier', 'required', 'help', 'min', 'max', 'showWhenOn'] as const)
+            expect(c.fieldForm.controls[name].disabled, name).toBe(true);
+        expect(el.querySelector('[aria-label="Remove Confirmed impact"]')).toBeNull();
+        expect(el.querySelector('[aria-label="Remove Summary"]')).not.toBeNull();
+        await c.removeField(impact);
+        expect(c.fields().some((f) => f.key === 'impact')).toBe(true);
+
+        c.fieldForm.controls.label.setValue('Confirmed loss');
+        await render();
+        c.save();
+        const sent = (
+            components.create.mock.calls[0] as unknown as [string, { sections: Record<string, unknown>[] }]
+        )[1];
+        expect(sent.sections.find((s) => s['key'] === 'impact')).toEqual({
+            key: 'impact',
+            label: 'Confirmed loss',
+            type: 'number',
+            tier: 'required',
+            required: false,
+        });
+        await expectNoA11yViolations(el);
     });
 
     it('keeps a field when the removal is declined', async () => {
