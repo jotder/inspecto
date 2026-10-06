@@ -128,7 +128,7 @@ isolation.
 | audit-spi, auth-spi, http-spi | Contract · Base | keep as three; move **policy and state** (`AccessPolicies`, `EgressPolicy` — DONE 2026-10-06 → `inspecto-util` `com.gamma.util.egress`, `AuditTrail`, `InMemoryEventStore`) out; keep `SpiSlot`, DTO validation, `ErrorCodes` |
 | engine execution core (`pipeline`, `pipeline.exec`, `consignment`, `inspector`, `enrich`, `parse`, `ingester`, `signal`) | Platform · Base | no |
 | engine `job` framework | Platform · Base | split framework from feature Job types **only** for types whose feature is Optional |
-| engine `objects` + `ops` object substrate | Implementation · Optional, Professional up (§8a, D-MR11) | **yes** → an **Incidents** module (stores, notes, links, tags, INCIDENT); `Workflow`/`SlaPolicy`/`EscalationRule` → Workflow & SLA; CASE/TASK/Case Rules stay in `ops` = Case Management |
+| engine `objects` + `ops` object substrate | Implementation · Optional, Professional up (§8a, D-MR11) | **yes** → an **Incidents** module (stores, notes, links, tags, INCIDENT); `Workflow`/`SlaPolicy`/`EscalationRule` → Workflow & SLA — ✅ slice 1 DONE 2026-10-07 (P7): new Base leaf `inspecto-workflow` (module id `workflow`, `buildRole: foundation`, `offeringRole: base`, package `com.gamma.workflow`, no split) holds the three models **plus `ObjectType`** (the engine's `ObjectAccess`/`FindingsSpec`/`IncidentAccess` and the core `ComponentRoutes` need it, so the module must sit below the engine; Base, not optional, and the add-on stays optional only in slice 2). The SLA sweep (`ObjectService.sweepIncidentSla`) still lives in `ops`: slice 2 needs the governed-item contract; CASE/TASK/Case Rules stay in `ops` = Case Management |
 | engine `notify`, `alert`, `query`, `catalog` | Implementation · Base (§8a) | **no** — stay in the engine; enforce package boundaries instead |
 | engine `risk` + `RiskScoreJobType` + `RiskScoreRoutes` | Implementation · Optional (§8a add-on) | **yes** → **Scoring & Lists**, with `entity-list` |
 | `ReconRunJob` + `ReconRoutes` | Implementation · Optional (§8a add-on) | **yes** → **Reconciliation** |
@@ -536,7 +536,7 @@ with its own evaluator, measured 2026-10-06:
 | Notification Rule | engine `notify/NotificationRule` | 120 | one event (in memory) |
 | Tag Rule | `ops/tag/TagRule` | 151 | one object (in memory) |
 | Case Rule | `ops/tag/CaseRule` | 91 | one object (in memory) |
-| Escalation Rule | engine `objects/EscalationRule` | 100 | one object over time |
+| Escalation Rule | `inspecto-workflow` `workflow/EscalationRule` | 100 | one object over time |
 | Access Policy | auth-spi `AccessPolicies` + `inspecto-policy` | 349 + 195 | one request (in memory) |
 
 **A shared condition language already exists and is barely used.** `inspecto-util`'s `Conditions` was built for

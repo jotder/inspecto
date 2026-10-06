@@ -6,7 +6,7 @@ import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.StatusStore;
 import com.gamma.objects.FakeObjectAccess;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.query.DatasetMeasureProbe;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

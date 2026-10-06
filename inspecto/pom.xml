@@ -90,6 +90,10 @@
         </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-workflow</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-http-spi</artifactId>
         </dependency>
         <!-- LA separation D-1 step 5a: EntityTypes + LinkAnalysisSettings (SettingsRoutes) live in the host-free store. -->

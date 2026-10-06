@@ -8,7 +8,7 @@ import com.gamma.event.EventLevel;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.objects.ObjectAccess;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.etl.StatusStore;
 import com.gamma.query.DatasetMeasureProbe;
 import com.gamma.signal.Ref;

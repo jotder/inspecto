@@ -48,7 +48,7 @@ public interface ObjectStore extends AutoCloseable {
      * {@link #query} does. An empty answer here means "mint a new one", so a swallowed error would silently
      * duplicate the object it exists to find.
      */
-    List<OperationalObject> findByAttributes(com.gamma.objects.ObjectType type, java.util.Map<String, String> attributes,
+    List<OperationalObject> findByAttributes(com.gamma.workflow.ObjectType type, java.util.Map<String, String> attributes,
                                              int limit);
 
     /**

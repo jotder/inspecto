@@ -1,6 +1,6 @@
 package com.gamma.ops;
 
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.ops.link.LinkRelationship;
 import org.junit.jupiter.api.Test;
 

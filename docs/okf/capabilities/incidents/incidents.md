@@ -118,7 +118,8 @@ fires, the ALERT *object* does not).
 | Link | Module | Personal |
 |---|---|---|
 | Alert Rules, evaluation, fired-alert feed, `ALERT_FIRED` | `inspecto-engine` `com.gamma.alert` + core `AlertRoutes` | ✅ |
-| Promotion seam (`IncidentAccess`), `ObjectType`, `ObjectAccess` SPI, `AnnotationKinds`, `FindingsSpec`, `RcaTemplate` | `inspecto-engine` `com.gamma.objects` (core vocabulary) | present, inert |
+| `ObjectType` | `inspecto-workflow` `com.gamma.workflow` (Base leaf module, MODULE-REORG-1 P7 slice 1) | present |
+| Promotion seam (`IncidentAccess`), `ObjectAccess` SPI, `AnnotationKinds`, `FindingsSpec`, `RcaTemplate` | `inspecto-engine` `com.gamma.objects` (core vocabulary) | present, inert |
 | The objects domain: `ObjectService`, workflows, queues, escalation, notes, tags, Case Rules, `EventObjectBridge`, the three ops Job Types | **`inspecto-ops`** (`com.gamma.ops`, `com.gamma.opsapi`, `com.gamma.opsjob`) | ❌ 49 routes `503` |
 | Notification feed, rules, preferences, receipts, suppression, `mail.send` | `inspecto-engine` `com.gamma.notify` + core routes | ✅ (no transport) |
 | Delivery transports `SmtpEmailChannel`, `WebhookChannel` | **`inspecto-notify-channels`** | ❌ zero channels |
@@ -422,7 +423,7 @@ Updates are **optimistic** (2026-10-04): every object carries a monotonic `versi
   (`ImportCapabilityGuard.GOVERNANCE_ONLY`; the dirs are out of `ImportPaths.REGISTRY_DIRS`, pinned by
   `ImportLoaderInventoryTest.theGovernanceRegistryDirsAreRefusedToEveryImport`). The `*_workflow.toon` /
   `*_escalation.toon` suffix refusals are unchanged.
-  - **Workflow** (`Workflow.fromComponent` / `problems()`, moved to `inspecto-engine` `com.gamma.objects` so core can
+  - **Workflow** (`Workflow.fromComponent` / `problems()`, moved to `inspecto-workflow` `com.gamma.workflow` (formerly engine `com.gamma.objects`) so core can
     validate at save): exactly one initial state, ≥ 1 terminal state, every state reachable, every non-terminal
     state has a way out, no two transitions leave a state by one action; for an Incident a `RESOLVED` state,
     `ARCHIVED` (if present) terminal, every non-terminal state able to FINISH (a path to `RESOLVED` or `ARCHIVED`

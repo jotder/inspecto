@@ -5,7 +5,7 @@ import com.gamma.etl.TestConfigs;
 import com.gamma.job.JobConfig;
 import com.gamma.job.JobRun;
 import com.gamma.job.JobService;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.ops.ObjectService;
 import com.gamma.ops.tag.CaseRule;
 import com.gamma.ops.tag.TagRule;

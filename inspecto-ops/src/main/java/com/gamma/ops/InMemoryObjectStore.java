@@ -70,7 +70,7 @@ public final class InMemoryObjectStore implements ObjectStore {
     }
 
     @Override
-    public synchronized List<OperationalObject> findByAttributes(com.gamma.objects.ObjectType type,
+    public synchronized List<OperationalObject> findByAttributes(com.gamma.workflow.ObjectType type,
                                                                  Map<String, String> attributes, int limit) {
         List<OperationalObject> matched = new ArrayList<>();
         for (OperationalObject o : byId.values()) {

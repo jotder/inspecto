@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.ConnectionRegistry;
 import com.gamma.etl.PipelineConfigBatchTest;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.pipeline.exec.WebhookSinkTransport;
 import com.gamma.service.CollectorService;
 import com.sun.net.httpserver.HttpServer;

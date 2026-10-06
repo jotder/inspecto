@@ -2,7 +2,7 @@ package com.gamma.objects;
 
 import com.gamma.objects.FindingsSpec;
 
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

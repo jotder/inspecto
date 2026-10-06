@@ -53,6 +53,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Workflow, SlaPolicy, EscalationRule, ObjectType (com.gamma.workflow; also reached through the core). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-workflow</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs / PipelineConfigBatchTest boot a
              real CollectorService + ControlApi in the HTTP tests that move here with the routes (the
              inspecto-observability / inspecto-exchange pattern; test scope is not transitive). -->

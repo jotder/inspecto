@@ -148,7 +148,7 @@ class ControlApiFindingsSpecTest {
     @Test
     void aSubmittedFindingsValueIsJudgedAgainstTheEffectiveSpec(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, null)) {
-            var seed = TestOpsEngine.of(c.svc).open(com.gamma.objects.ObjectType.CASE, "bad rows", "d", "HIGH",
+            var seed = TestOpsEngine.of(c.svc).open(com.gamma.workflow.ObjectType.CASE, "bad rows", "d", "HIGH",
                     null, null, null, "corr", Map.of());
             String path = "/objects/" + seed.id();
 
@@ -177,7 +177,7 @@ class ControlApiFindingsSpecTest {
         Path writeRoot = dir.resolve("cfg");
         try (Ctx c = open(dir, writeRoot)) {
             assertEquals(200, send(c.port, "POST", "/components/findings-spec", ROOT_CAUSE_SPEC).statusCode());
-            var seed = TestOpsEngine.of(c.svc).open(com.gamma.objects.ObjectType.CASE, "fraud ring", "d", "HIGH",
+            var seed = TestOpsEngine.of(c.svc).open(com.gamma.workflow.ObjectType.CASE, "fraud ring", "d", "HIGH",
                     null, null, null, "corr", Map.of());
             String path = "/objects/" + seed.id();
 
@@ -208,7 +208,7 @@ class ControlApiFindingsSpecTest {
                       {"key":"loss","label":"Loss","type":"number","tier":"optional","min":0,"required":true,
                        "dependsOn":{"key":"outcome","equals":"LOSS"}}]}
                     """).statusCode());
-            var seed = TestOpsEngine.of(c.svc).open(com.gamma.objects.ObjectType.INCIDENT, "bad rows", "d", "HIGH",
+            var seed = TestOpsEngine.of(c.svc).open(com.gamma.workflow.ObjectType.INCIDENT, "bad rows", "d", "HIGH",
                     null, null, null, "corr", Map.of());
             String path = "/objects/" + seed.id();
 
@@ -238,7 +238,7 @@ class ControlApiFindingsSpecTest {
         Path writeRoot = dir.resolve("cfg");
         try (Ctx c = open(dir, writeRoot)) {
             assertEquals(200, send(c.port, "POST", "/components/findings-spec", ROOT_CAUSE_SPEC).statusCode());
-            var seed = TestOpsEngine.of(c.svc).open(com.gamma.objects.ObjectType.CASE, "fraud ring", "d", "HIGH",
+            var seed = TestOpsEngine.of(c.svc).open(com.gamma.workflow.ObjectType.CASE, "fraud ring", "d", "HIGH",
                     null, null, null, "corr", Map.of());
             String path = "/objects/" + seed.id();
             assertEquals(200, send(c.port, "PATCH", path, findings(Map.of("rootCause", "ACCOUNT_TAKEOVER"))).statusCode());
@@ -286,9 +286,9 @@ class ControlApiFindingsSpecTest {
                     keys(json(send(c.port, "GET", "/findings/case", null))));
 
             var ops = TestOpsEngine.of(c.svc);
-            var simbox = ops.open(com.gamma.objects.ObjectType.CASE, "sim box", "d", "HIGH",
+            var simbox = ops.open(com.gamma.workflow.ObjectType.CASE, "sim box", "d", "HIGH",
                     null, null, null, "c1", Map.of("caseType", "sim-box"));
-            var plain = ops.open(com.gamma.objects.ObjectType.CASE, "other", "d", "HIGH",
+            var plain = ops.open(com.gamma.workflow.ObjectType.CASE, "other", "d", "HIGH",
                     null, null, null, "c2", Map.of());
 
             assertEquals(422, send(c.port, "PATCH", "/objects/" + simbox.id(),

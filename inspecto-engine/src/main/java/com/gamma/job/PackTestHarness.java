@@ -4,7 +4,7 @@ import com.gamma.api.PublicApi;
 import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationAccess;
 import com.gamma.objects.IncidentAccess;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.signal.Severity;
 import com.gamma.signal.SignalEmitter;
 import com.gamma.util.OperationsZone;

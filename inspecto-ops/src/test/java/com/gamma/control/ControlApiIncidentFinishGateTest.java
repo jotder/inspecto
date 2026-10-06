@@ -5,7 +5,7 @@ import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.event.Event;
 import com.gamma.event.EventType;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.ops.OperationalObject;
 import com.gamma.ops.note.NoteKind;
 import com.gamma.service.CollectorService;

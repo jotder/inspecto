@@ -1,6 +1,6 @@
 package com.gamma.ops;
 
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
@@ -174,9 +174,9 @@ class ObjectServiceTest {
     @Test
     void aCustomTerminalStateCannotFinishAnIncidentWithoutTheResolutionGate() {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
-        svc.registerWorkflow(new com.gamma.objects.Workflow(ObjectType.INCIDENT, "IDENTIFIED",
-                java.util.Set.of(new com.gamma.objects.Workflow.Transition("IDENTIFIED", "CLOSED", "close"),
-                        new com.gamma.objects.Workflow.Transition("CLOSED", "IDENTIFIED", "reopen")),
+        svc.registerWorkflow(new com.gamma.workflow.Workflow(ObjectType.INCIDENT, "IDENTIFIED",
+                java.util.Set.of(new com.gamma.workflow.Workflow.Transition("IDENTIFIED", "CLOSED", "close"),
+                        new com.gamma.workflow.Workflow.Transition("CLOSED", "IDENTIFIED", "reopen")),
                 java.util.Set.of("CLOSED")));
         Map<String, String> noDisposition = new java.util.HashMap<>(completePostmortemAttrs(System.currentTimeMillis() + 60_000));
         noDisposition.remove(ObjectService.ATTR_DISPOSITION);
@@ -385,10 +385,10 @@ class ObjectServiceTest {
     /** IMPORT-RESIDUALS-1 (4): every terminal state of the Incident's registered Workflow stops the SLA clock. */
     @Test
     void slaSweepSkipsEveryWorkflowTerminalStateButStillBreachesOpenOnes() {
-        com.gamma.objects.Workflow custom = new com.gamma.objects.Workflow(ObjectType.INCIDENT, "IDENTIFIED",
-                java.util.Set.of(new com.gamma.objects.Workflow.Transition("IDENTIFIED", "DIAGNOSING", "accept"),
-                        new com.gamma.objects.Workflow.Transition("DIAGNOSING", "WONTFIX", "dismiss"),
-                        new com.gamma.objects.Workflow.Transition("DIAGNOSING", "ARCHIVED", "archive")),
+        com.gamma.workflow.Workflow custom = new com.gamma.workflow.Workflow(ObjectType.INCIDENT, "IDENTIFIED",
+                java.util.Set.of(new com.gamma.workflow.Workflow.Transition("IDENTIFIED", "DIAGNOSING", "accept"),
+                        new com.gamma.workflow.Workflow.Transition("DIAGNOSING", "WONTFIX", "dismiss"),
+                        new com.gamma.workflow.Workflow.Transition("DIAGNOSING", "ARCHIVED", "archive")),
                 java.util.Set.of("WONTFIX", "ARCHIVED"));
         InMemoryObjectStore store = new InMemoryObjectStore();
         ObjectService svc = new ObjectService(store, Map.of(ObjectType.INCIDENT, custom));
@@ -421,9 +421,9 @@ class ObjectServiceTest {
     /** ARCHIVED stops the SLA clock even in a workflow where it is NOT terminal (the sweep's documented stop set). */
     @Test
     void slaSweepSkipsArchivedEvenWhereTheWorkflowDoesNotMakeItTerminal() {
-        com.gamma.objects.Workflow custom = new com.gamma.objects.Workflow(ObjectType.INCIDENT, "IDENTIFIED",
-                java.util.Set.of(new com.gamma.objects.Workflow.Transition("IDENTIFIED", "ARCHIVED", "archive"),
-                        new com.gamma.objects.Workflow.Transition("ARCHIVED", "CLOSED", "close")),
+        com.gamma.workflow.Workflow custom = new com.gamma.workflow.Workflow(ObjectType.INCIDENT, "IDENTIFIED",
+                java.util.Set.of(new com.gamma.workflow.Workflow.Transition("IDENTIFIED", "ARCHIVED", "archive"),
+                        new com.gamma.workflow.Workflow.Transition("ARCHIVED", "CLOSED", "close")),
                 java.util.Set.of("CLOSED"));
         assertFalse(custom.isTerminal("ARCHIVED"));
         InMemoryObjectStore store = new InMemoryObjectStore();

@@ -1,7 +1,7 @@
 package com.gamma.ops;
 
 import com.gamma.objects.IncidentAccess;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 
 import org.junit.jupiter.api.Test;
 

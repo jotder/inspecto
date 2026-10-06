@@ -177,7 +177,7 @@ class ControlApiAccessPolicyLintTest {
     @Test
     void f4_theKnownResourceKindsCoverEveryObjectType() {
         // the row-level PEPs pass ObjectType lower-cased — a new type must join the lint vocabulary
-        for (com.gamma.objects.ObjectType t : com.gamma.objects.ObjectType.values())
+        for (com.gamma.workflow.ObjectType t : com.gamma.workflow.ObjectType.values())
             assertTrue(AccessPolicies.RESOURCE_KINDS.contains(t.name().toLowerCase(java.util.Locale.ROOT)), t.name());
     }
 

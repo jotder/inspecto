@@ -17,7 +17,7 @@ import com.gamma.config.io.ConfigCodec;
 import com.gamma.ops.Impact;
 import com.gamma.ops.ObjectQuery;
 import com.gamma.ops.ObjectService;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.ops.OperationalObject;
 import com.gamma.objects.FindingsSpec;
 import com.gamma.ops.link.ObjectLink;

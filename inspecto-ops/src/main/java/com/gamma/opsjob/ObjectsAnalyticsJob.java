@@ -7,7 +7,7 @@ import com.gamma.job.JobResult;
 import com.gamma.job.JobService;
 
 import com.gamma.ops.ObjectService;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.signal.Severity;
 
 import org.slf4j.Logger;

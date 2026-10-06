@@ -8,7 +8,7 @@ import com.gamma.notify.NotificationAccess;
 import com.gamma.notify.NotificationStore;
 import com.gamma.objects.IncidentAccess;
 import com.gamma.objects.FakeObjectAccess;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.util.RunLog;
 import org.junit.jupiter.api.Test;
 

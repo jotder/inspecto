@@ -63,6 +63,10 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-event</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-workflow</artifactId>
+        </dependency>
 
         <!-- DuckDB (parent-managed since WS-D). -->
         <dependency>

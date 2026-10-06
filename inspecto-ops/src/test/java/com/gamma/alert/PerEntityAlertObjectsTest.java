@@ -5,7 +5,7 @@ import com.gamma.catalog.SemanticModel;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.StatusStore;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.ops.InMemoryObjectStore;
 import com.gamma.ops.ObjectQuery;
 import com.gamma.ops.ObjectService;

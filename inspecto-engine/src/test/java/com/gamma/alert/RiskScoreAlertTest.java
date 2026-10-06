@@ -6,7 +6,7 @@ import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.StatusStore;
 import com.gamma.objects.FakeObjectAccess;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.query.DatasetMeasureProbe;

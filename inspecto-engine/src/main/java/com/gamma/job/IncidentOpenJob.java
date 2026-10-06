@@ -1,7 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.objects.ObjectAccess;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

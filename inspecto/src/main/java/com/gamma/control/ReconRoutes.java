@@ -196,7 +196,7 @@ final class ReconRoutes implements RouteModule {
     // ── POST /recon/promote {reconciliation, key, type?, column?, runId?} ───────────
 
     /**
-     * Promote one reconciliation Break to a managed {@link com.gamma.objects.ObjectType#INCIDENT} — {@code BREAK-INCIDENT-1}.
+     * Promote one reconciliation Break to a managed {@link com.gamma.workflow.ObjectType#INCIDENT} — {@code BREAK-INCIDENT-1}.
      *
      * <p>Until this route, a Break could be marked {@code resolved} on the board but could not be handed to
      * Ops at all. ⚠ The backlog row said the tree's only promotion was {@code Alert → Incident}; that was
@@ -331,7 +331,7 @@ final class ReconRoutes implements RouteModule {
         // ⚠ `scope` is the reconciliation id, exactly as promote() passes it to openIncident — that shared
         // spelling is what makes this index findable at all.
         Map<String, String> index = objects.activeAttributeIndex(
-                com.gamma.objects.ObjectType.INCIDENT, safeId, BREAK_ID);
+                com.gamma.workflow.ObjectType.INCIDENT, safeId, BREAK_ID);
 
         Map<String, String> page = index;
         if (index.size() > PROMOTED_CAP) {

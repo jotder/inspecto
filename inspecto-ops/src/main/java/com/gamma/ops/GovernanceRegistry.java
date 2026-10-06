@@ -1,9 +1,9 @@
 package com.gamma.ops;
 
-import com.gamma.objects.EscalationRule;
-import com.gamma.objects.ObjectType;
-import com.gamma.objects.SlaPolicy;
-import com.gamma.objects.Workflow;
+import com.gamma.workflow.EscalationRule;
+import com.gamma.workflow.ObjectType;
+import com.gamma.workflow.SlaPolicy;
+import com.gamma.workflow.Workflow;
 import com.gamma.util.ToonHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

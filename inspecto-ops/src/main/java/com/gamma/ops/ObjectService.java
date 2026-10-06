@@ -1,7 +1,7 @@
 package com.gamma.ops;
 
 import com.gamma.objects.AnnotationKinds;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 
 import com.gamma.event.Event;
 import com.gamma.event.EventLevel;
@@ -20,9 +20,9 @@ import com.gamma.objects.RcaTemplate;
 import com.gamma.ops.tag.CaseRule;
 import com.gamma.ops.tag.Tag;
 import com.gamma.ops.tag.TagRule;
-import com.gamma.objects.EscalationRule;
-import com.gamma.objects.SlaPolicy;
-import com.gamma.objects.Workflow;
+import com.gamma.workflow.EscalationRule;
+import com.gamma.workflow.SlaPolicy;
+import com.gamma.workflow.Workflow;
 import com.gamma.util.JsonAttributes;
 import com.gamma.util.Values;
 

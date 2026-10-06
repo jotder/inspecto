@@ -6,7 +6,7 @@ import com.gamma.event.EventLog;
 import com.gamma.event.EventQuery;
 import com.gamma.event.EventType;
 import com.gamma.event.InMemoryEventStore;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.util.JsonAttributes;
 import org.junit.jupiter.api.BeforeEach;
@@ -269,7 +269,7 @@ class GovernanceSweepTest {
                 Map.<String, Object>of("objectType", "INCIDENT", "on", "breach", "target", "lunch", "notify", true),
                 Map.<String, Object>of("objectType", "INCIDENT", "on", "breach", "reassign", "../etc", "notify", true),
                 Map.<String, Object>of("on", "breach", "notify", true)))
-            assertThrows(IllegalArgumentException.class, () -> com.gamma.objects.EscalationRule.fromComponent("x", new HashMap<>(bad)),
+            assertThrows(IllegalArgumentException.class, () -> com.gamma.workflow.EscalationRule.fromComponent("x", new HashMap<>(bad)),
                     bad.toString());
     }
 

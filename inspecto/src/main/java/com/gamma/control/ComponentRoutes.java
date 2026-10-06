@@ -416,14 +416,14 @@ final class ComponentRoutes implements RouteModule {
     private static void requireNoStrandedObjects(ApiContext api, String type, Map<String, Object> before,
                                                  Map<String, Object> after) {
         if (!WORKFLOW.equals(type)) return;
-        com.gamma.objects.Workflow old;
+        com.gamma.workflow.Workflow old;
         try {
-            old = com.gamma.objects.Workflow.fromMap(before);
+            old = com.gamma.workflow.Workflow.fromMap(before);
         } catch (IllegalArgumentException unreadable) {
             return;   // a stored file that no longer parses is not being served (GovernanceRegistry skips it)
         }
-        com.gamma.objects.Workflow next = after == null ? com.gamma.objects.Workflow.defaultFor(old.objectType())
-                : com.gamma.objects.Workflow.fromMap(after);
+        com.gamma.workflow.Workflow next = after == null ? com.gamma.workflow.Workflow.defaultFor(old.objectType())
+                : com.gamma.workflow.Workflow.fromMap(after);
         com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
         if (objects == null) return;
         List<String> stranded = new java.util.ArrayList<>();
@@ -860,10 +860,10 @@ final class ComponentRoutes implements RouteModule {
 
         // ASSURE-WORKFLOW-SLA-1: reachability, one initial state, declared terminals, no path around the resolution
         // gate (Workflow.problems); an explicit IANA zone and sane targets; an Escalation Rule that does something.
-        if (WORKFLOW.equals(type)) com.gamma.objects.Workflow.fromComponent(id, content);
-        if (SLA_POLICY.equals(type)) com.gamma.objects.SlaPolicy.fromComponent(id, content);
+        if (WORKFLOW.equals(type)) com.gamma.workflow.Workflow.fromComponent(id, content);
+        if (SLA_POLICY.equals(type)) com.gamma.workflow.SlaPolicy.fromComponent(id, content);
         if (ESCALATION_RULE.equals(type)) {
-            com.gamma.objects.EscalationRule rule = com.gamma.objects.EscalationRule.fromComponent(id, content);
+            com.gamma.workflow.EscalationRule rule = com.gamma.workflow.EscalationRule.fromComponent(id, content);
             // The IAM owns identities: a registered PrincipalDirectory vetoes an unknown (or unverifiable) assignee;
             // an offline edition has none, so the id-shape check above is all it gets.
             PrincipalDirectories.requireKnown(rule.reassign(), "escalation-rule.reassign");

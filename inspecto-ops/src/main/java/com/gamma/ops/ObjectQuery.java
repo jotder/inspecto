@@ -1,6 +1,6 @@
 package com.gamma.ops;
 
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 
 import java.util.Locale;
 import static com.gamma.util.Values.trimToNull;

@@ -194,7 +194,7 @@ class ReconRunJobTest {
 
     private static int incidentCount(com.gamma.objects.FakeObjectAccess objects) {
         return (int) objects.opened.stream()
-                .filter(o -> o.kind() == com.gamma.objects.ObjectType.INCIDENT).count();
+                .filter(o -> o.kind() == com.gamma.workflow.ObjectType.INCIDENT).count();
     }
 
     @Test

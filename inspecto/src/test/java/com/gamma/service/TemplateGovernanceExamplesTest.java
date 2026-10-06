@@ -1,8 +1,8 @@
 package com.gamma.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gamma.objects.EscalationRule;
-import com.gamma.objects.SlaPolicy;
+import com.gamma.workflow.EscalationRule;
+import com.gamma.workflow.SlaPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;

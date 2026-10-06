@@ -111,7 +111,7 @@ unaffected because the database, not the monitor, decides them.
 
 > **`ALERT`s are not their own table.** Alerts, incidents, cases and tasks are all rows in
 > `inspecto_ops_objects`, discriminated by the `object_type` column
-> ([`ObjectType`](../../../../inspecto-engine/src/main/java/com/gamma/objects/ObjectType.java): `ALERT, INCIDENT, CASE, TASK`).
+> ([`ObjectType`](../../../../inspecto-workflow/src/main/java/com/gamma/workflow/ObjectType.java): `ALERT, INCIDENT, CASE, TASK`).
 
 Every backend **degrades gracefully**: a failed DB open falls back to in-memory/file and logs a
 warning rather than blocking startup.

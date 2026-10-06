@@ -3,7 +3,7 @@ package com.gamma.control;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.objects.AnnotationKinds;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;

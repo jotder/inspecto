@@ -1,4 +1,4 @@
-package com.gamma.objects;
+package com.gamma.workflow;
 
 import org.junit.jupiter.api.Test;
 

@@ -8,7 +8,7 @@ import com.gamma.expectation.BaselineEvaluator;
 import com.gamma.expectation.BaselineProfileStore;
 import com.gamma.expectation.Expectation;
 import com.gamma.expectation.ExpectationEvaluator;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.signal.Ref;

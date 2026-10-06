@@ -1,5 +1,6 @@
 package com.gamma.objects;
 
+import com.gamma.workflow.ObjectType;
 import com.gamma.api.PublicApi;
 import com.gamma.pipeline.NodeAttribute;
 

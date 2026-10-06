@@ -1,7 +1,7 @@
 package com.gamma.service;
 
 import com.gamma.objects.AnnotationKinds;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.objects.TagAssignment;
 import com.gamma.ops.DbObjectStore;
 import com.gamma.ops.ObjectService;

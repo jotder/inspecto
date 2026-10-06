@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <!-- MODULE-REORG-1 P7 slice 1: the Workflow &amp; SLA models (plan 4 / 8a) - Workflow (a config-driven state
+         machine), SlaPolicy (targets + the business calendar), EscalationRule - plus ObjectType, the 4-value enum
+         ({ALERT, INCIDENT, CASE, TASK}) that all three are keyed by and that inspecto-engine's ObjectAccess /
+         FindingsSpec / IncidentAccess also name. A leaf: only inspecto-api (@PublicApi) and inspecto-util
+         (ToonHelper, Values). BASE, not optional: the engine cannot compile without ObjectType, and the core
+         inspecto module (ComponentRoutes) validates workflow components, so inspecto-engine depends on THIS
+         module, never the reverse. Package com.gamma.workflow is new (no split with com.gamma.objects). The SLA
+         sweep (ObjectService.sweepIncidentSla) stays in inspecto-ops until a governed-item contract exists
+         (slice 2). -->
+    <artifactId>inspecto-workflow</artifactId>
+    <name>Inspecto Workflow &amp; SLA models</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-util</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

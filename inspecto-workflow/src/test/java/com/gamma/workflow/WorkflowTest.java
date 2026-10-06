@@ -1,8 +1,8 @@
-package com.gamma.ops;
+package com.gamma.workflow;
 
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 
-import com.gamma.objects.Workflow;
+import com.gamma.workflow.Workflow;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

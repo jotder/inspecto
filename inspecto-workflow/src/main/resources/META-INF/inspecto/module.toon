@@ -1,0 +1,5 @@
+id: workflow
+title: Workflow and SLA models
+buildRole: foundation
+offeringRole: base
+bindingTime: build

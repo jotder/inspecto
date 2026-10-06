@@ -1,5 +1,6 @@
 package com.gamma.objects;
 
+import com.gamma.workflow.ObjectType;
 import com.gamma.event.Event;
 
 import java.util.ArrayList;

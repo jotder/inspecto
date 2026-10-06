@@ -613,7 +613,7 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
             // state, and reporting "scan failed" would teach an operator something is broken.
             var objects = service.objects().orElse(null);
             if (objects == null) return List.of();
-            for (Map<String, Object> obj : objects.findByStatus(com.gamma.objects.ObjectType.ALERT, "OPEN")) {
+            for (Map<String, Object> obj : objects.findByStatus(com.gamma.workflow.ObjectType.ALERT, "OPEN")) {
                 Map<String, Object> subject = new HashMap<>();
                 String alertId = String.valueOf(obj.get("id"));
                 subject.put("alertId", alertId);

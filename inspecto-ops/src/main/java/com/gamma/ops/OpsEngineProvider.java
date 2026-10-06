@@ -13,7 +13,7 @@ import com.gamma.ops.tag.InMemoryTagAssignmentStore;
 import com.gamma.ops.tag.Tag;
 import com.gamma.ops.tag.TagAssignmentStore;
 import com.gamma.ops.tag.TagRule;
-import com.gamma.objects.Workflow;
+import com.gamma.workflow.Workflow;
 import com.gamma.service.ObjectEngineProvider;
 import com.gamma.service.OperationalDb;
 import com.gamma.service.SpaceRoot;

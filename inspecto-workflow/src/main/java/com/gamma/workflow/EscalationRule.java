@@ -1,4 +1,4 @@
-package com.gamma.objects;
+package com.gamma.workflow;
 
 import java.util.List;
 import java.util.Locale;

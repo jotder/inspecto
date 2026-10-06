@@ -2,8 +2,8 @@ package com.gamma.opsboot;
 
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
-import com.gamma.objects.ObjectType;
-import com.gamma.objects.Workflow;
+import com.gamma.workflow.ObjectType;
+import com.gamma.workflow.Workflow;
 import com.gamma.service.CollectorService;
 import com.gamma.service.SpaceRoot;
 import org.junit.jupiter.api.Test;

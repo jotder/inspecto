@@ -2,7 +2,7 @@ package com.gamma.control;
 
 import com.gamma.event.Event;
 import com.gamma.objects.ObjectAccess;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.service.ObjectEngineProvider;
 import com.gamma.service.SpaceRoot;
 

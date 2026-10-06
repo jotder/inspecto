@@ -2,7 +2,7 @@ package com.gamma.job;
 
 import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.objects.ObjectAccess;
-import com.gamma.objects.ObjectType;
+import com.gamma.workflow.ObjectType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
