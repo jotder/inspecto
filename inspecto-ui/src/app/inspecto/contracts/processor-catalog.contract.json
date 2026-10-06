@@ -577,9 +577,10 @@
     "label" : "Array / object exploder & flattener",
     "emoji" : "💥",
     "icon" : "heroicons_outline:squares-plus",
-    "status" : "planned",
-    "note" : "the grandfathered `transform.split` node type is the read-only ancestor",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.explode",
+    "note" : "one row per element of a LIST or JSON-array column, optional index (2026-10-06); the grandfathered `transform.split` stays the read-only ancestor",
+    "addable" : true
   }, {
     "id" : "transform.join.merge",
     "family" : "XFM",

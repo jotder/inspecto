@@ -1,0 +1,4 @@
+{"call_id":"C1","call_date":"2026-07-01","msisdn":"4479001","charges":[{"code":"VOICE","amount":1.20},{"code":"ROAMING","amount":0.80},{"code":"TAX","amount":0.40}]}
+{"call_id":"C2","call_date":"2026-07-01","msisdn":"4479002","charges":[{"code":"SMS","amount":0.05}]}
+{"call_id":"C3","call_date":"2026-07-01","msisdn":"4479003","charges":[]}
+{"call_id":"C4","call_date":"2026-07-01","msisdn":"4479004","charges":[{"code":"DATA","amount":2.50},{"code":"TAX","amount":0.50}]}

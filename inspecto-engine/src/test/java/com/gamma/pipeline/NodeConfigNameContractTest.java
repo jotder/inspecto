@@ -601,6 +601,60 @@ class NodeConfigNameContractTest {
         return steps.get(0);
     }
 
+    /**
+     * The explode node's contract (operator 2026-10-06) — the round trip {@code FlatHome.STEP} claims: a
+     * {@code steps: - explode:} entry lifts to ONE {@code transform.explode} node, an edit of every declared
+     * key survives the lower, and the re-read chain keeps it as a {@code steps:} entry (there is no legacy
+     * block that could swallow it). The declared keys are exactly the ones the round trip carries.
+     */
+    @Test
+    void explodeAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Path toon = writeFixture(dir);
+        Map<String, Object> raw = decode(toon);
+        raw.put("active", Boolean.FALSE);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> processing = (Map<String, Object>) raw.get("processing");
+        processing.remove("dedup");   // steps: replaces the singular blocks — the fixture carries two
+        if (processing.get("csv_settings") instanceof Map<?, ?> csv) {
+            Map<String, Object> c = new LinkedHashMap<>();
+            csv.forEach((k, v) -> { if (!"where".equals(k)) c.put(String.valueOf(k), v); });
+            processing.put("csv_settings", c);
+        }
+        raw.put("steps", new ArrayList<>(List.of(
+                Map.of("filter", Map.of("where", "ID IS NOT NULL")),
+                Map.of("explode", new LinkedHashMap<>(Map.of("column", "ID"))))));
+
+        PipelineConfig cfg = PipelineConfig.fromMap(raw);
+        PipelineGraph g = PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw));
+        Map<String, Object> edited = new LinkedHashMap<>(Map.of("column", "ID", "as", "item",
+                "index_column", "item_no", "keep_source", true, "on_empty", "drop"));
+        List<PipelineNode> nodes = new ArrayList<>();
+        for (PipelineNode n : g.nodes()) {
+            if (!"transform.explode".equals(n.type())) { nodes.add(n); continue; }
+            nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), edited, n.use()));
+        }
+        assertEquals(1, nodes.stream().filter(n -> "transform.explode".equals(n.type())).count(),
+                "the lift presents the explode step as ONE transform.explode node");
+        Map<String, Object> lowered = PipelineEditable.lower(
+                new PipelineGraph(g.name(), g.active(), nodes, g.edges()), raw, false);
+
+        Path saved = dir.resolve("explode_saved_pipeline.toon");
+        Files.writeString(saved, ConfigCodec.toToon(lowered));
+        List<PipelineConfig.Step> steps = PipelineConfig.fromMap(decode(saved)).steps();
+        List<String> kinds = steps.stream().map(PipelineConfig.Step::kind).toList();
+        assertEquals("explode", kinds.get(kinds.size() - 1), "explode stays last in the chain: " + kinds);
+        assertEquals(1, kinds.stream().filter("explode"::equals).count(), kinds.toString());
+        Map<String, Object> got = steps.get(kinds.size() - 1).config();
+        assertEquals("ID", String.valueOf(got.get("column")));
+        assertEquals("item", String.valueOf(got.get("as")));
+        assertEquals("item_no", String.valueOf(got.get("index_column")));
+        assertEquals("true", String.valueOf(got.get("keep_source")));
+        assertEquals("drop", String.valueOf(got.get("on_empty")));
+        assertEquals(new java.util.TreeSet<>(edited.keySet()), new java.util.TreeSet<>(
+                NodeAttributes.forType("transform.explode").stream().map(NodeAttribute::key).toList()),
+                "every key the round trip carries is declared, and nothing else is");
+    }
+
     /** Lift a fixture carrying {@code processing.profile}, set the node's {@code columns}, save, re-read. */
     private static PipelineConfig.Profile profileSavedAs(Path dir, List<String> columns) throws Exception {
         Path toon = writeFixture(dir);

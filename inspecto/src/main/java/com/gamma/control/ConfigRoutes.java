@@ -574,6 +574,21 @@ final class ConfigRoutes {
                     return "transform.dedup needs a non-empty 'keys' list - the columns that identify a duplicate";
                 return undeclared("transform.dedup key", keys, columns);
             }
+            case PipelineConfig.Step.EXPLODE -> {
+                String column = cfg.get("column") == null ? "" : String.valueOf(cfg.get("column")).trim();
+                if (column.isEmpty()) return "transform.explode needs a 'column' - the array column to explode";
+                for (String key : List.of("as", "index_column")) {
+                    Object v = cfg.get(key);
+                    if (v != null && !String.valueOf(v).isBlank()
+                            && !String.valueOf(v).trim().matches("[A-Za-z_][A-Za-z0-9_]{0,127}"))
+                        return "transform.explode: '" + key + "' value '" + v + "' is not a valid new column name";
+                }
+                Object onEmpty = cfg.get("on_empty");
+                if (onEmpty != null && !String.valueOf(onEmpty).isBlank()
+                        && !List.of("keep", "drop").contains(String.valueOf(onEmpty).trim().toLowerCase()))
+                    return "transform.explode: on_empty must be 'keep' or 'drop', got '" + onEmpty + "'";
+                return undeclared("transform.explode column", List.of(column), columns);
+            }
             case PipelineConfig.Step.PROFILE -> {
                 return cfg.get("columns") instanceof List<?> cols
                         ? undeclared("transform.profile column", cols, columns) : null;

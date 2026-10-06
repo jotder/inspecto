@@ -118,7 +118,7 @@ public final class ProcessorCatalog {
             p("XFM", "transform.matrix.pivot", "🔀", "heroicons_outline:arrows-up-down", "Dynamic pivot / transpose", Status.PLANNED, null, null, null),
             p("XFM", "transform.matrix.unpivot", "🔄", "heroicons_outline:bars-4", "Unpivot / column flattener", Status.PLANNED, null, null, null),
             p("XFM", "transform.analytics.rank", "🏆", "heroicons_outline:trophy", "Rank & Top-N pruner", Status.PLANNED, null, null, null),
-            p("XFM", "transform.explode", "💥", "heroicons_outline:squares-plus", "Array / object exploder & flattener", Status.PLANNED, null, null, "the grandfathered `transform.split` node type is the read-only ancestor"),
+            p("XFM", "transform.explode", "💥", "heroicons_outline:squares-plus", "Array / object exploder & flattener", Status.DELIVERED, "transform.explode", null, "one row per element of a LIST or JSON-array column, optional index (2026-10-06); the grandfathered `transform.split` stays the read-only ancestor"),
             p("XFM", "transform.join.merge", "🤝", "heroicons_outline:arrows-pointing-in", "Presorted stream merge joiner", Status.PLANNED, null, null, "the grandfathered `transform.merge` node type is the read-only ancestor"),
             p("XFM", "transform.dim.scd2", "🏛️", "heroicons_outline:building-library", "Slowly changing dimension (SCD Type 2)", Status.PLANNED, null, null, null),
             p("XFM", "transform.key.surrogate", "🔑", "heroicons_outline:key", "Monotonic surrogate key generator", Status.PLANNED, null, null, null),

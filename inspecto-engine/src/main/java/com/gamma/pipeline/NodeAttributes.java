@@ -389,6 +389,26 @@ public final class NodeAttributes {
                     .help("The literal written when no mapping matches. Leave blank to pass unmatched values through unchanged."));
 
     /**
+     * {@code transform.explode} (operator 2026-10-06): one row per element of a LIST or JSON-array column.
+     * Keys proven by {@code NodeConfigNameContractTest}; the run-time rules live in {@code RowShaper.explode}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_EXPLODE = List.of(
+            NodeAttribute.of("column", "Array column", "string", "required")
+                    .placeholder("charges")
+                    .help("A LIST column, or a text/JSON column holding a JSON array (a parser.json feed lands arrays as text)."),
+            NodeAttribute.of("as", "Element column", "string", "optional")
+                    .placeholder("charge")
+                    .help("The column each element is written to. Blank = the array column's own name."),
+            NodeAttribute.of("index_column", "Index column", "string", "optional")
+                    .placeholder("charge_no")
+                    .help("Adds the element's 1-based position. Blank = no index column."),
+            NodeAttribute.of("keep_source", "Keep the array column", "boolean", "optional").defaultValue(false)
+                    .help("Keep the original array beside the element (then the element column needs its own name)."),
+            NodeAttribute.of("on_empty", "Empty or null array", "select", "optional").defaultValue("keep")
+                    .options("keep", "Keep the row with a null element", "drop", "Drop the row")
+                    .help("What happens to a row whose array is empty, null or not an array."));
+
+    /**
      * {@code transform.route}: {@code mode} is the only scalar. {@code branches} — the list of
      * {@code {key, where, database}} that actually does the routing — has no spec because the
      * {@code list} type is {@code string[]} and these are MAPS.
@@ -540,7 +560,7 @@ public final class NodeAttributes {
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, SINK_WEBHOOK))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, SINK_WEBHOOK))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -557,6 +577,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_RUNNING.type(), TRANSFORM_RUNNING);
         m.put(BuiltinNodeType.TRANSFORM_HASH.type(), TRANSFORM_HASH);
         m.put(BuiltinNodeType.TRANSFORM_MASK.type(), TRANSFORM_MASK);
+        m.put(BuiltinNodeType.TRANSFORM_EXPLODE.type(), TRANSFORM_EXPLODE);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);

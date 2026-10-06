@@ -139,6 +139,40 @@ class StepConfigSaveFindingsTest {
                 Map.of("columns", List.of("EMAIL"), "mode", "partial"))))), "steps[0].mask", "EMAIL");
     }
 
+    // ── explode (operator 2026-10-06) ────────────────────────────────────────────
+
+    @Test
+    void anExplodeWithNoColumnIsRefused(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true,
+                List.of(Map.of("explode", Map.of("as", "item"))))), "steps[0].explode", "column");
+    }
+
+    @Test
+    void anExplodeNewNameThatIsNotAnIdentifierIsRefusedByName(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("explode",
+                Map.of("column", "ID", "index_column", "n; DROP"))))), "steps[0].explode", "'n; DROP'");
+    }
+
+    @Test
+    void anExplodeWithAnUnknownOnEmptyIsRefused(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("explode",
+                Map.of("column", "ID", "on_empty", "skip"))))), "steps[0].explode", "on_empty");
+    }
+
+    @Test
+    void anExplodeOverAnUndeclaredColumnIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("explode",
+                Map.of("column", "CHARGES"))))), "steps[0].explode", "CHARGES");
+    }
+
+    @Test
+    void aWellFormedExplodeIsNotRefused(@TempDir Path dir) throws Exception {
+        assertTrue(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("explode",
+                Map.of("column", "ID", "as", "item", "on_empty", "drop"))))).stream()
+                .noneMatch(f -> FindingCodes.ERR_STEP_CONFIG_INVALID.equals(f.code())),
+                "the positive probe: a valid explode raises no step finding");
+    }
+
     // ── filter ───────────────────────────────────────────────────────────────────
 
     @Test

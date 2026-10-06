@@ -1227,6 +1227,43 @@ class PipelineJobRunnerTest {
     }
 
     /**
+     * A stored {@code kind: explode} step executes at rest (operator 2026-10-06): a JSON array held as text —
+     * what {@code parser.json} lands — becomes one row per element with its 1-based index, and the row whose
+     * array is empty is kept once with a null element (the default {@code on_empty: keep}).
+     */
+    @Test
+    void runsAFlatConfigsExplodeStepAndWritesOneRowPerElement() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = tmp.resolve("ex_pipeline.toon");
+        Files.writeString(flat, """
+                name: ex_etl
+                active: false
+                output_store: exploded
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - explode:
+                      column: amt
+                      as: item
+                      index_column: n
+                """);
+        seedParquet(dataDir, "ex_etl", "(1,'[5,7]'),(2,'[]')");
+
+        JobConfig cfg = new JobConfig("exploder", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of("1|5|1", "1|7|2", "2|null|null"), queryStore(dataDir, "exploded",
+                "SELECT id, CAST(item AS VARCHAR), n FROM %s ORDER BY id, n"),
+                "one row per element in array order; the empty array keeps its row once");
+    }
+
+    /**
      * A {@code webhook:} branch run end to end through the job lane: {@code PipelineLift.stageTwo} makes it a
      * second branch beside {@code output_store:}, {@code PartitionSinkWriter} dispatches it to
      * {@code WebhookSink}, and the edition's transport — here a capturing one, discovered through the real

@@ -1,0 +1,44 @@
+name: STEP_EXPLODE
+active: true
+
+dirs:
+  poll:       out/inbox
+  database:   out/cdr/database
+  backup:     out/cdr/backup
+  temp:       out/cdr/temp
+  errors:     out/cdr/errors
+  quarantine: out/cdr/quarantine
+  markers:    out/cdr/markers
+  status_dir: out/cdr/status
+  log_dir:    out/cdr/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.jsonl"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  schema_file: "schema.toon"
+  csv_settings:
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+parsing:
+  frontend: json
+  json:
+    format: newline
+
+output_store: charge_items
+
+steps[2]:
+  - explode:
+      column: CHARGES
+      as: CHARGE
+      index_column: CHARGE_NO
+      on_empty: keep
+  - sql:
+      sql: "SELECT CALL_ID, CALL_DATE, MSISDN, CHARGE_NO, CHARGE->>'code' AS CHARGE_CODE, TRY_CAST(CHARGE->>'amount' AS DECIMAL(12,4)) AS AMOUNT FROM input"

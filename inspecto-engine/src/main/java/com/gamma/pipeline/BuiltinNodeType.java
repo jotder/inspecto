@@ -178,6 +178,11 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_MASK("transform.mask", NodeCategory.TRANSFORM, "Mask (PII)",
             "Masks columns chosen by classification (strictest-wins) or by name: full, partial (keep the last N) or hash.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "mask"),
+    // One row per array element (operator 2026-10-06). A NEW authorable type beside the grandfathered
+    // transform.split, which stays read-only. Flat home: a steps: entry only. Executes in RowShaper.explode.
+    TRANSFORM_EXPLODE("transform.explode", NodeCategory.TRANSFORM, "Explode",
+            "One row per element of a LIST or JSON-array column.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "explode"),
     TRANSFORM_SPLIT("transform.split", NodeCategory.TRANSFORM, "Split",
             "Explodes one row into many (UNNEST).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),

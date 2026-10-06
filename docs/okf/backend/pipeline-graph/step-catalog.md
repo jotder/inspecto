@@ -236,6 +236,50 @@ holding one always takes the `steps:` form (like `sql`); the recipe verb is `loo
 
 **Example.** `examples/07-steps/lookup` (8 rows, `STATUS_LABEL` = Open/Done/Void) · `spaces/default/config/lookup_step`.
 
+## `explode` → `transform.explode` — Array exploder
+
+*Added 2026-10-06 (operator, 2026-10-06: build `transform.explode` as a NEW type; `transform.split` stays
+the grandfathered, non-authorable ancestor and is not un-grandfathered).*
+
+**Function.** One output row per element of an array column — a CDR's charge items, an order's lines —
+so a nested feed becomes a flat fact table without hand-written SQL.
+
+**Design (decisions, operator, 2026-10-06).**
+- **What explodes.** A DuckDB `LIST` column (any element type, `LIST<STRUCT>` included) is unnested as is.
+  A `VARCHAR` / `JSON` column holding a **JSON array** is cast to `JSON[]` first, so each element lands as
+  a `JSON` value a following `sql` step can pick apart (`elem->>'amount'`). This is the shape every
+  `parser.json` feed produces: the parser lands each key as VARCHAR. A JSON value that is not an array
+  (an object, a scalar, malformed text) is treated like `null` — an empty array — never as an error,
+  because one odd record must not fail the batch. Any other column type (a bare `STRUCT`, a number) is
+  **refused at run, naming the type**: a struct is one value, there is nothing to explode.
+- **Empty / null arrays.** `on_empty: keep` (default) keeps the row once with a `null` element and a `null`
+  index; `on_empty: drop` drops it. Dropping is opt-in because a vanished parent row is silent data loss.
+- **Order and index.** Elements come out in array order; `index_column` (optional) adds the element's
+  **1-based** position. Compiled as `UNNEST(list_transform(arr, (x, i) -> {e: x, i: i}))`, not a `LATERAL`
+  join, because a lateral join does not keep element order.
+- **Identifiers.** `column` must be a column of the inbound relation (checked at run against `DESCRIBE`, and
+  at save against the declared schema when it is known). New names (`as`, `index_column`) must match
+  `[A-Za-z_][A-Za-z0-9_]{0,127}` and must not collide with a kept column or each other. Every name is
+  quoted through `SqlIdent.q`; nothing the author types is spliced into SQL unquoted.
+- **The array column itself.** Dropped by default (`keep_source: false`), so `as` defaults to the source column's
+  own name; `keep_source: true` keeps it beside the element and then needs a distinct `as`.
+- **Lane.** A `steps:` kind with no legacy singular spelling (like `lookup`), so it executes **at rest**
+  with `output_store:`. It is not admitted mid-branch (`RouteArming.BRANCH_STEP_KINDS` unchanged). It
+  amplifies rows, so `ConservationCheck` leaves it out, as it does `transform.split`.
+
+**Configuration.**
+
+| Key | Type | Tier | Default | What it does |
+|---|---|---|---|---|
+| `column` | string | required | — | **Array column.** A LIST column, or a VARCHAR/JSON column holding a JSON array. |
+| `as` | string | optional | the source column's name | **Element column.** The column each element is written to. |
+| `index_column` | string | optional | none | **Index column.** Adds the element's 1-based position. |
+| `keep_source` | boolean | optional | `false` | **Keep the array column.** Keeps the original array beside the element. |
+| `on_empty` | select | optional | `keep` | **Empty or null array.** `keep` the row with a null element, or `drop` it. |
+
+**Example.** `examples/07-steps/explode` — a JSON CDR feed whose `charges` array holds 0–3 charge items,
+exploded and then flattened by a `sql` step.
+
 ## `dedup` → `transform.dedup` — Record deduplicator
 
 **Function.** Record-grain distinct by business key — one row per `keys[]` value. Not file dedup:
@@ -1031,7 +1075,7 @@ file to `archive/archive/…`).
 | Character map & code page transcoder | `quality.cleanse.transcode` | — |
 | GDPR / CCPA field redactor | `quality.compliance.redact` | board SEC-08 — Enterprise only |
 
-## Transformers & Dimensional Modeling (`XFM`) — 6<!--count:processors-xfm-delivered--> delivered · 1<!--count:processors-xfm-partial--> partial · 14<!--count:processors-xfm-planned--> planned
+## Transformers & Dimensional Modeling (`XFM`) — 7<!--count:processors-xfm-delivered--> delivered · 1<!--count:processors-xfm-partial--> partial · 13<!--count:processors-xfm-planned--> planned
 
 **Delivered**
 
@@ -1043,6 +1087,7 @@ file to `archive/archive/…`).
 | Router — case / clone branches with mid-branch steps | `transform.route` | `transform.route` |
 | Group-by summarizer (measures grammar) | `transform.summarize` | `transform.summarize` |
 | Reference-store join (versioned references) | `transform.join` | `transform.join` — at rest only — refused mid-branch (no reference resolver on the ingest lane) |
+| Array / object exploder & flattener | `transform.explode` | `transform.explode` — one row per element of a LIST or JSON-array column, optional index (2026-10-06); the grandfathered `transform.split` stays the read-only ancestor |
 
 **Partial**
 
@@ -1057,7 +1102,6 @@ file to `archive/archive/…`).
 | Dynamic pivot / transpose | `transform.matrix.pivot` | — |
 | Unpivot / column flattener | `transform.matrix.unpivot` | — |
 | Rank & Top-N pruner | `transform.analytics.rank` | — |
-| Array / object exploder & flattener | `transform.explode` | the grandfathered `transform.split` node type is the read-only ancestor |
 | Presorted stream merge joiner | `transform.join.merge` | the grandfathered `transform.merge` node type is the read-only ancestor |
 | Slowly changing dimension (SCD Type 2) | `transform.dim.scd2` | — |
 | Monotonic surrogate key generator | `transform.key.surrogate` | — |

@@ -1,0 +1,15 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: explode (transform.explode) - one row per element of a JSON-array column.
+#   A nested CDR feed: each call carries a charges[] array of 0-3 charge items. parser.json lands the array
+#   as text; explode reads it as JSON[] and writes one row per item (CHARGE) with its 1-based CHARGE_NO, and
+#   a following sql step flattens each item into CHARGE_CODE / AMOUNT.
+# C3 has no charges: on_empty: keep keeps it once with a null CHARGE, so no call disappears. 4 calls in,
+# 7 rows out (3 + 1 + 1 + 2).
+#
+# Expected evidence after the run:
+#   /jobs shows explode_items type PIPELINE with lastStatus SUCCESS; /jobs/explode_items/runs names the rows the
+#   Steps produced into store(s) [charge_items]. On disk: out/charge_items/*.parquet holds 7 rows.
+/jobs
+/jobs/explode_items/runs

@@ -284,7 +284,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-XFM-07 | 🔀 Dynamic pivot / transpose (`transform.matrix.pivot`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
 | SP-XFM-08 | 🔄 Unpivot / column flattener (`transform.matrix.unpivot`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
 | SP-XFM-09 | 🏆 Rank & Top-N pruner (`transform.analytics.rank`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
-| SP-XFM-10 | 💥 Array / object exploder & flattener (`transform.explode`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — | the grandfathered `transform.split` node type is the read-only ancestor |
+| SP-XFM-10 | 💥 Array / object exploder & flattener (`transform.explode`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.explode` | one row per element of a LIST or JSON-array column, optional index (2026-10-06); the grandfathered `transform.split` stays the read-only ancestor |
 | SP-XFM-11 | 🤝 Presorted stream merge joiner (`transform.join.merge`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — | the grandfathered `transform.merge` node type is the read-only ancestor |
 | SP-XFM-12 | 🏛️ Slowly changing dimension (SCD Type 2) (`transform.dim.scd2`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
 | SP-XFM-13 | 🔑 Monotonic surrogate key generator (`transform.key.surrogate`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |

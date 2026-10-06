@@ -546,6 +546,22 @@ class PipelineEditableTest {
                 node("f", "transform.filter", Map.of("where", "GROSS > 0")), node("l", "transform.lookup", cfg));
     }
 
+    /** An explode (operator 2026-10-06) has no singular block either: alone or after a filter it forces steps:. */
+    @Test
+    void anExplodeStepLowersToStepsVerbatimAndForcesTheStepsForm() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("column", "charges");
+        cfg.put("as", "charge");
+        cfg.put("index_column", "charge_no");
+        assertChain(List.of("explode"), node("x", "transform.explode", cfg));
+        Map<String, Object> out = PipelineEditable.lower(graphWith(node("x", "transform.explode", cfg)),
+                new LinkedHashMap<>(), true);
+        Map<?, ?> step = (Map<?, ?>) ((List<?>) out.get("steps")).get(0);
+        assertEquals(cfg, step.get("explode"), "the config travels verbatim");
+        assertChain(List.of("filter", "explode"),
+                node("f", "transform.filter", Map.of("where", "GROSS > 0")), node("x", "transform.explode", cfg));
+    }
+
     /** Lower {@code extra} and assert the {@code steps:} kinds it produced, in order. */
     private static void assertChain(List<String> expected, PipelineNode... extra) {
         Map<String, Object> out = PipelineEditable.lower(graphWith(extra), new LinkedHashMap<>(), true);

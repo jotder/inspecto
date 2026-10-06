@@ -1222,7 +1222,8 @@ public final class PipelineEditable {
             if (kind == null) return false;   // contributed: List.indexOf(null) NPEs on an immutable list
             if (PipelineConfig.Step.SQL.equals(kind) || PipelineConfig.Step.LOOKUP.equals(kind)
                     || PipelineConfig.Step.RUNNING.equals(kind) || PipelineConfig.Step.HASH.equals(kind)
-                    || PipelineConfig.Step.MASK.equals(kind)) return false;
+                    || PipelineConfig.Step.MASK.equals(kind)
+                    || PipelineConfig.Step.EXPLODE.equals(kind)) return false;
             int position = PipelineConfig.Step.KINDS.indexOf(kind);
             if (position <= previous) return false;
             previous = position;

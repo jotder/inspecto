@@ -203,6 +203,7 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_ROUTE.type().equals(type))    return route(conn, node, input, outPrefix);
         if (type.startsWith("transform.dedup"))                      return dedup(conn, node, input, outPrefix, ctx);
         if (BuiltinNodeType.TRANSFORM_SPLIT.type().equals(type))    return split(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_EXPLODE.type().equals(type))  return explode(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(type)) return summarize(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_PROFILE.type().equals(type)) return profile(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_RUNNING.type().equals(type)) return running(conn, node, input, outPrefix);
@@ -804,6 +805,86 @@ public final class RowShaper {
         exec(conn, "CREATE TABLE " + q(data) + " AS SELECT * EXCLUDE(" + q(col) + "), UNNEST(" + q(col)
                 + ") AS " + q(as) + " FROM " + q(input));
         return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    // ── explode (one row per array element) ───────────────────────────────────────
+
+    /** A NEW column name a Step writes: a plain identifier, so a typo cannot read as SQL even before quoting. */
+    static final java.util.regex.Pattern NEW_COLUMN_NAME = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]{0,127}");
+
+    /** The working column the element struct travels in between the two SELECTs of {@link #explode}. */
+    private static final String EXPLODE_TMP = "__explode_x";
+
+    /**
+     * {@code transform.explode} (operator 2026-10-06) — one row per element of {@code column}. A LIST column
+     * is unnested as is; a VARCHAR/JSON column is read as a JSON array ({@code JSON[]}), and a value that is
+     * not one is treated like an empty array. {@code on_empty: keep} (default) keeps an empty/null row once with
+     * a null element; {@code drop} drops it. Elements keep array order and {@code index_column} carries the
+     * 1-based position — compiled through {@code list_transform} rather than a LATERAL join, which reorders.
+     * Every identifier is checked against the inbound columns or {@link #NEW_COLUMN_NAME} and then quoted.
+     */
+    private static List<Relation> explode(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        String what = "transform.explode node '" + node.id() + "'";
+        Map<String, String> types = columnTypesOf(conn, input);
+        String column = strOrNull(node, "column");
+        if (column == null) throw new IllegalArgumentException(what + " needs a 'column' - the array column to explode");
+        String src = types.keySet().stream().filter(c -> c.equalsIgnoreCase(column.trim())).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(what + ": no column '" + column
+                        + "' in the inbound data (have: " + types.keySet() + ")"));
+        boolean keepSource = Boolean.parseBoolean(String.valueOf(node.cfg("keep_source")));
+        String onEmpty = strOrNull(node, "on_empty") == null ? "keep" : strOrNull(node, "on_empty").trim().toLowerCase();
+        if (!onEmpty.equals("keep") && !onEmpty.equals("drop"))
+            throw new IllegalArgumentException(what + ": on_empty must be 'keep' or 'drop', got '" + onEmpty + "'");
+        String as = strOrNull(node, "as") == null ? src : strOrNull(node, "as").trim();
+        String index = strOrNull(node, "index_column") == null ? null : strOrNull(node, "index_column").trim();
+
+        List<String> kept = new ArrayList<>();
+        for (String c : types.keySet()) if (keepSource || !c.equals(src)) kept.add(c);
+        for (String name : index == null ? List.of(as) : List.of(as, index)) {
+            if (!NEW_COLUMN_NAME.matcher(name).matches())
+                throw new IllegalArgumentException(what + ": '" + name
+                        + "' is not a valid new column name (letters, digits and _, not starting with a digit)");
+            if (kept.stream().anyMatch(c -> c.equalsIgnoreCase(name)))
+                throw new IllegalArgumentException(what + ": the new column '" + name
+                        + "' would collide with an inbound column" + (keepSource && name.equalsIgnoreCase(src)
+                        ? " - with keep_source the element column needs its own name ('as')" : ""));
+        }
+        if (index != null && index.equalsIgnoreCase(as))
+            throw new IllegalArgumentException(what + ": 'as' and 'index_column' must differ");
+        if (types.keySet().stream().anyMatch(c -> c.equalsIgnoreCase(EXPLODE_TMP)))
+            throw new IllegalArgumentException(what + ": the inbound data carries the reserved column " + EXPLODE_TMP);
+
+        String type = types.get(src).trim().toUpperCase();
+        String arr;
+        if (type.endsWith("]")) arr = q(src);                                       // LIST / ARRAY
+        else if (type.equals("VARCHAR") || type.equals("JSON"))
+            arr = "TRY_CAST(TRY_CAST(" + q(src) + " AS JSON) AS JSON[])";          // a JSON array as text
+        else throw new IllegalArgumentException(what + ": column '" + src + "' is " + type
+                    + ", not a LIST or a JSON array - there is nothing to explode");
+
+        String pairs = "list_transform(" + arr + ", (x, i) -> {'e': x, 'i': i})";
+        String unnested = onEmpty.equals("keep")
+                ? "CASE WHEN COALESCE(len(" + arr + "), 0) = 0 THEN [{'e': NULL, 'i': NULL}] ELSE " + pairs + " END"
+                : pairs;
+        String inner = "SELECT *, UNNEST(" + unnested + ") AS " + q(EXPLODE_TMP) + " FROM " + q(input);
+        String exclude = keepSource ? q(EXPLODE_TMP) : q(src) + ", " + q(EXPLODE_TMP);
+        String outer = "SELECT * EXCLUDE (" + exclude + "), " + q(EXPLODE_TMP) + ".e AS " + q(as)
+                + (index == null ? "" : ", " + q(EXPLODE_TMP) + ".i AS " + q(index))
+                + " FROM (" + inner + ")";
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + outer);
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /** The inbound relation's columns and their DuckDB types, in declaration order. */
+    private static Map<String, String> columnTypesOf(Connection conn, String table) throws SQLException {
+        Map<String, String> out = new LinkedHashMap<>();
+        try (Statement st = conn.createStatement();
+             java.sql.ResultSet rs = st.executeQuery("DESCRIBE " + q(table))) {
+            while (rs.next()) out.put(rs.getString("column_name"), rs.getString("column_type"));
+        }
+        return out;
     }
 
     // ── SQL transformer (one author SELECT over the typed input) ──────────────────

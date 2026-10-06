@@ -1,0 +1,6 @@
+job:
+  name: explode_items
+  type: pipeline
+  pipeline_config: cdr_pipeline.toon
+  data_dir: out
+  on_pipeline: step_explode

@@ -332,9 +332,16 @@ public final class PipelineConfig {
          */
         public static final String RUNNING = "running";
 
+        /**
+         * Array exploder ({@code transform.explode}, operator 2026-10-06). Keys: {@code column}, optional
+         * {@code as}, {@code index_column}, {@code keep_source}, {@code on_empty}. No legacy singular
+         * spelling, like {@link #LOOKUP} — a chain holding one always takes {@code steps:}.
+         */
+        public static final String EXPLODE = "explode";
+
         /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them
-         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH} and {@link #MASK} last: none has a legacy projection at all). */
-        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK);
+         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH}, {@link #MASK} and {@link #EXPLODE} last: none has a legacy projection at all). */
+        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE);
 
         public Step {
             config = (config == null) ? Map.of() : Map.copyOf(config);

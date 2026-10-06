@@ -125,6 +125,7 @@ public final class RecipeCompiler {
                 case "lookup" -> nodes.add(lookup(id, cfg, refusals));
                 case "hash" -> nodes.add(hash(id, cfg, refusals));
                 case "mask" -> nodes.add(mask(id, cfg, refusals));
+                case "explode" -> nodes.add(explode(id, cfg, refusals));
                 case "route" -> {
                     route(id, cfg, nodes, branchSinks, routeEdges, refusals);
                     routeSeen = true;
@@ -379,6 +380,17 @@ public final class RecipeCompiler {
     /** {@code dedup: {key: […], order_by: …, scope: …}} → the record-grain dedup node ({@code processing.dedup}).
      *  {@code keep:} other than {@code first} is refused — the winner is {@code order_by}'s job. {@code scope}
      *  is D-9's window vocabulary and compiles verbatim; whether it may ARM is the save gates' call. */
+    /** {@code explode: {column, as?, index_column?, keep_source?, on_empty?}} → a transform.explode node, config
+     *  verbatim. Only the missing column is refused here; the names are judged against the real columns at run. */
+    private static PipelineNode explode(String id, Map<String, Object> cfg,
+                                        List<PipelineCompileException.Refusal> refusals) {
+        Object column = cfg.get("column");
+        if (column == null || String.valueOf(column).isBlank())
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "explode needs a column: — the array column to explode"));
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_EXPLODE.type(), new LinkedHashMap<>(cfg));
+    }
+
     /** {@code lookup: {column, mappings[], target?, default?}} → a transform.lookup node, config verbatim. */
     private static PipelineNode lookup(String id, Map<String, Object> cfg,
                                        List<PipelineCompileException.Refusal> refusals) {
@@ -595,6 +607,7 @@ public final class RecipeCompiler {
                     case "lookup" -> stepNode = lookup(stepId, stepCfg, refusals);
                     case "hash" -> stepNode = hash(stepId, stepCfg, refusals);
                     case "mask" -> stepNode = mask(stepId, stepCfg, refusals);
+                    case "explode" -> stepNode = explode(stepId, stepCfg, refusals);
                     case "summarize" -> stepNode = summarize(stepId, stepCfg, refusals);
                     case "profile" -> stepNode = profile(stepId, stepCfg, refusals);
                     case "running" -> stepNode = running(stepId, stepCfg, refusals);
