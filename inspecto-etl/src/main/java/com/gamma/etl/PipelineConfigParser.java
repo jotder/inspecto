@@ -507,7 +507,14 @@ final class PipelineConfigParser {
             boolean enabled = !"false".equalsIgnoreCase(
                     String.valueOf(gap.getOrDefault("enabled", "true")));
             String seq = opt(gap, "sequence", null);
-            gapDetection = new GapDetection(enabled, seq);
+            // K2's file template (operator, 2026-10-06): validated here, fail closed, by the same grammar
+            // the authoring-time CrossFieldRule uses.
+            String fileTemplate = opt(gap, "file_template", null);
+            String seqScope = opt(gap, "seq_scope", null);
+            String refusal = com.gamma.config.spec.GapTemplateGrammar.refusal(fileTemplate, seqScope);
+            if (refusal != null) throw new IllegalArgumentException(refusal);
+            gapDetection = new GapDetection(enabled, seq, fileTemplate,
+                    seqScope == null ? null : seqScope.trim().toUpperCase());
         }
         // A stronger-than-best-effort guarantee needs the fingerprint ledger to actually hold; without it
         // the engine falls back to commit-log replay + markers. Say so rather than silently over-promising.

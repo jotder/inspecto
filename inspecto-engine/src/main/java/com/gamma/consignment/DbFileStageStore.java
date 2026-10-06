@@ -176,6 +176,36 @@ public final class DbFileStageStore implements AutoCloseable, com.gamma.util.Bro
         return out;
     }
 
+    /**
+     * Every distinct {@code relative_path} recorded for {@code sourceId} with {@code fromTs <= recorded_at < toTs}
+     * (both {@code yyyy-MM-dd HH:mm:ss}) — the windowed read the completeness KPI's K2 needs.
+     *
+     * <p>⚠ {@code recorded_at} is PROCESSING time, not the filename's time: callers pad the window and leave
+     * template matching to {@code FileSequenceGaps}. ⛔ Unlike {@link #stages}, a failed read THROWS: an empty
+     * list here would read as "every file is missing" (or nothing to check), never as "could not read".
+     */
+    public List<String> relativePaths(String sourceId, String fromTs, String toTs) {
+        String sql = "SELECT DISTINCT relative_path FROM " + T
+                + " WHERE source_id = ? AND recorded_at >= ? AND recorded_at < ? ORDER BY relative_path";
+        List<String> out = new ArrayList<>();
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, sourceId);
+                    ps.setString(2, fromTs);
+                    ps.setString(3, toTs);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) out.add(rs.getString(1));
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException("file-stages windowed read failed for collector '" + sourceId + "': "
+                    + e.getMessage(), e);
+        }
+        return out;
+    }
+
     private static FileStageRecord map(ResultSet rs) throws SQLException {
         return new FileStageRecord(
                 rs.getString("source_id"), rs.getString("relative_path"), rs.getString("batch_id"),

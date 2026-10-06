@@ -1570,6 +1570,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             created.notificationStore(notifications);              // notification_prune maintenance task
             created.eventStore(events);                            // event_prune maintenance task (COMPLY-3)
             created.objects(this.objects().orElse(null));           // recon.run promotion (seam; empty on Personal)
+            created.pipelineConfigLookup(this::configFor);         // kpi.completeness: the Collector's file template
             created.start();
             jobs = created;
         }

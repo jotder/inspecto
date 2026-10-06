@@ -4,6 +4,11 @@ import com.gamma.consignment.ConsignmentOutput;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.DbConsignmentOutputStore;
 import com.gamma.etl.ConsignmentEventBus;
+import com.gamma.consignment.DbFileStageStore;
+import com.gamma.consignment.FileStage;
+import com.gamma.consignment.FileStageRecord;
+import com.gamma.consignment.FileStages;
+import com.gamma.etl.PipelineConfig;
 import com.gamma.event.EventLog;
 import com.gamma.objects.IncidentAccess;
 import com.gamma.util.Scheduler;
@@ -12,6 +17,11 @@ import com.gamma.util.StoreHealth;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Optional;
 
 import java.util.HashMap;
 import java.util.List;
@@ -47,9 +57,11 @@ class KpiCompletenessJobTest {
                 rows, rows * 100, "2026-08-04T10:00:00Z", ConsignmentOutput.State.LIVE, null, null, producer);
     }
 
+    /** The volume-half tests opt out of K2 explicitly ({@code check_files} defaults to true). */
     static KpiCompletenessJob job(Map<String, String> params) {
+        params.putIfAbsent("check_files", "false");
         return new KpiCompletenessJob(new JobConfig("cdr_completeness", KpiCompletenessJob.TYPE, null, null,
-                true, false, params, null, null));
+                true, false, params, null, null), null);
     }
 
     static Map<String, String> params(String... kv) {
@@ -238,5 +250,120 @@ class KpiCompletenessJobTest {
                 @Override public java.util.Set<Class<?>> granted() { return java.util.Set.of(IncidentAccess.class); }
             };
         }
+    }
+
+    // ── K2: missing files against the Collector's {seq} template (operator, 2026-10-06) ──
+
+    private static final String TEMPLATE = "CDR_{yyyyMMddHH}_{seq}.csv";
+
+    /** A real parsed pipeline whose Collector carries {@code gapBlock} under {@code gap_detection:}. */
+    static PipelineConfig pipelineWith(Path dir, String gapBlock) throws Exception {
+        Path p = com.gamma.etl.PipelineConfigBatchTest.writePipeline(dir, "");
+        Files.writeString(p, Files.readString(p) + "\ncollector:\n  gap_detection:\n" + gapBlock);
+        return PipelineConfig.load(p.toString());
+    }
+
+    private DbFileStageStore stagesWith(String sourceId, String... names) throws Exception {
+        DbFileStageStore st = DbFileStageStore.open("jdbc:duckdb:");
+        List<FileStageRecord> rows = new java.util.ArrayList<>();
+        for (String n : names) rows.add(new FileStageRecord(sourceId, "in/" + n, "b1", FileStage.REGISTERED,
+                "2026-08-04 01:00:00"));
+        st.record(rows);
+        FileStages.use(st);
+        StoreHealth.record(space, KpiCompletenessJob.FILE_FAMILY, StoreHealth.Status.UP, "jdbc:duckdb:", "open");
+        return st;
+    }
+
+    private KpiCompletenessJob fileJob(PipelineConfig pc, String... extra) {
+        Map<String, String> p = params(extra);
+        p.put("pipeline", "cdr");
+        p.put("record_day", "2026-08-04");
+        p.put("check_files", "true");
+        return new KpiCompletenessJob(new JobConfig("cdr_completeness", KpiCompletenessJob.TYPE, null, null,
+                true, false, p, null, null), name -> "cdr".equals(name) ? Optional.of(pc) : Optional.empty());
+    }
+
+    private static Map<String, Object> evaluated(CapturingJobContext ctx) {
+        return ctx.signals.stream().filter(s -> SignalType.KPI_COMPLETENESS_EVALUATED.equals(s.get("__type")))
+                .findFirst().orElseThrow();
+    }
+
+    @Test
+    void theCollectorsFileTemplateCountsAnInteriorHole(@TempDir Path dir) throws Exception {
+        PipelineConfig pc = pipelineWith(dir, "    file_template: \"" + TEMPLATE + "\"\n    seq_scope: PER_BUCKET\n");
+        try (DbFileStageStore st = stagesWith(pc.collector().id(),
+                "CDR_2026080400_1.csv", "CDR_2026080400_2.csv", "CDR_2026080400_4.csv")) {
+            CapturingJobContext ctx = new CapturingJobContext();
+            fileJob(pc).run(ctx);
+            Map<String, Object> s = evaluated(ctx);
+            assertEquals(TEMPLATE, s.get("fileTemplate"));
+            assertEquals(1L, s.get("missingFiles"), "seq 3 is the one interior hole");
+            assertEquals(23, s.get("emptyBuckets"), "hours 01..23 are empty buckets, not a file count");
+            assertEquals(0L, s.get("unmatchedFiles"));
+        } finally {
+            FileStages.use(null);
+        }
+    }
+
+    @Test
+    void theJobParameterOverrideWinsOverTheCollector(@TempDir Path dir) throws Exception {
+        PipelineConfig pc = pipelineWith(dir, "    file_template: \"WRONG_{yyyyMMddHH}_{seq}.csv\"\n    seq_scope: CONTINUOUS\n");
+        try (DbFileStageStore st = stagesWith(pc.collector().id(),
+                "CDR_2026080400_1.csv", "CDR_2026080400_2.csv", "CDR_2026080400_4.csv")) {
+            CapturingJobContext ctx = new CapturingJobContext();
+            fileJob(pc, "sequence_template", TEMPLATE, "seq_scope", "PER_BUCKET").run(ctx);
+            Map<String, Object> s = evaluated(ctx);
+            assertEquals(TEMPLATE, s.get("fileTemplate"));
+            assertEquals("PER_BUCKET", s.get("seqScope"));
+            assertEquals(1L, s.get("missingFiles"));
+            assertEquals(0L, s.get("unmatchedFiles"), "the Collector's WRONG_ template was not used");
+        } finally {
+            FileStages.use(null);
+        }
+    }
+
+    /** gap_detection.sequence (the live detector's one-token template) is NOT a file template. */
+    @Test
+    void noFileTemplateAnywhereRefusesNamingTheSetting(@TempDir Path dir) throws Exception {
+        PipelineConfig pc = pipelineWith(dir, "    enabled: true\n    sequence: \"CDR_{yyyyMMddHH}\"\n");
+        try (DbFileStageStore st = stagesWith(pc.collector().id(), "CDR_2026080400_1.csv")) {
+            CapturingJobContext ctx = new CapturingJobContext();
+            IllegalStateException e = assertThrows(IllegalStateException.class, () -> fileJob(pc).run(ctx));
+            assertTrue(e.getMessage().contains("collector.gap_detection.file_template"), e.getMessage());
+            assertTrue(ctx.signals.isEmpty(), "a refusal emits no number");
+        } finally {
+            FileStages.use(null);
+        }
+    }
+
+    @Test
+    void fileStagesOffRefusesNamingTheToggle(@TempDir Path dir) throws Exception {
+        PipelineConfig pc = pipelineWith(dir, "    file_template: \"" + TEMPLATE + "\"\n    seq_scope: PER_BUCKET\n");
+        // A WORKING store is installed, so only the StoreHealth refusal can stop the run (negative probe).
+        try (DbFileStageStore st = stagesWith(pc.collector().id(), "CDR_2026080400_1.csv")) {
+            StoreHealth.record(space, KpiCompletenessJob.FILE_FAMILY, StoreHealth.Status.NOT_CONFIGURED, "none", "default off");
+            CapturingJobContext ctx = new CapturingJobContext();
+            IllegalStateException e = assertThrows(IllegalStateException.class, () -> fileJob(pc).run(ctx));
+            assertTrue(e.getMessage().contains("-Dfile.stages.backend"), e.getMessage());
+            assertTrue(ctx.signals.isEmpty());
+        } finally {
+            FileStages.use(null);
+        }
+    }
+
+    @Test
+    void anUnknownPipelineRefusesTheFileHalf() {
+        CapturingJobContext ctx = new CapturingJobContext();
+        assertThrows(IllegalStateException.class, () -> new KpiCompletenessJob(new JobConfig("x",
+                KpiCompletenessJob.TYPE, null, null, true, false,
+                params("pipeline", "ghost", "record_day", "2026-08-04", "check_files", "true"), null, null),
+                n -> Optional.empty()).run(ctx));
+    }
+
+    @Test
+    void theParserRefusesAFileTemplateWithoutSeqScope(@TempDir Path dir) {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> pipelineWith(dir, "    file_template: \"" + TEMPLATE + "\"\n"));
+        assertTrue(e.getMessage().contains("seq_scope"), e.getMessage());
     }
 }

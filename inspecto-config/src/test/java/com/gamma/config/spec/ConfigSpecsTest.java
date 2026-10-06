@@ -118,6 +118,25 @@ class ConfigSpecsTest {
         assertTrue(fire(p, id, Map.of("parsing", Map.of("source_timezone", "utc"))).isPresent());
     }
 
+    /** Completeness KPI K2 (operator, 2026-10-06): the Collector's {seq} file template, refused at authoring. */
+    @Test
+    void gapFileTemplateIsWellFormedAndNeedsSeqScope() {
+        ConfigSpec p = ConfigSpecs.pipeline();
+        String id = "gap-file-template-well-formed";
+        java.util.function.Function<Map<String, Object>, Map<String, Object>> gd =
+                m -> Map.of("collector", Map.of("gap_detection", m));
+        assertTrue(fire(p, id, gd.apply(Map.of("sequence", "FEED_{yyyyMMdd}"))).isEmpty(), "absent is legal");
+        assertTrue(fire(p, id, gd.apply(Map.of("file_template", "CDR_{yyyyMMddHH}_{seq}_*",
+                "seq_scope", "PER_BUCKET"))).isEmpty());
+        assertTrue(fire(p, id, gd.apply(Map.of("file_template", "CDR_{yyyyMMddHH}_{seq}_*"))).isPresent(),
+                "never a defaulted scope");
+        assertTrue(fire(p, id, gd.apply(Map.of("file_template", "CDR_{yyyyMMddHH}",
+                "seq_scope", "PER_BUCKET"))).isPresent(), "no {seq} token");
+        assertTrue(fire(p, id, gd.apply(Map.of("file_template", "CDR_{yyyyMMddHH}_{seq}",
+                "seq_scope", "HOURLY"))).isPresent());
+        assertTrue(fire(p, id, gd.apply(Map.of("seq_scope", "CONTINUOUS"))).isPresent(), "scope alone");
+    }
+
     /**
      * Pipeline spec Wave 0, item 4 — one concept, two spellings. A WARNING and never an ERROR: the
      * legacy key still READS, so refusing it would break deployed configs to make a naming point.

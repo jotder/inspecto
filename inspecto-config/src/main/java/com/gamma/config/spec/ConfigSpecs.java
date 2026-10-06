@@ -296,6 +296,15 @@ public final class ConfigSpecs {
                 // ── source-side post-action (PROCESSOR-RELEASE-READINESS-1, sink.archive, 2026-09-24) ──
                 // RemoteAcquisitionHandler.resolvePostAction reads an unknown on_success as RETAIN with a
                 // run-time log line only, so a typo silently archived nothing. No spec defaults, as above.
+                // ── completeness KPI K2 file template (operator, 2026-10-06) — separate from
+                // gap_detection.sequence, whose GapDetector grammar and live detector are untouched ──
+                FieldSpec.of("collector.gap_detection.file_template", "File sequence template", FieldType.STRING,
+                        "Optional template with a date token and a {seq} token, e.g. CDR_{yyyyMMddHH}_{seq}_*. "
+                                + "The kpi.completeness job counts missing files against it. Needs seq_scope."),
+                FieldSpec.enumField("collector.gap_detection.seq_scope", "Sequence scope",
+                        GapTemplateGrammar.SCOPES, null,
+                        "PER_BUCKET when {seq} restarts every time bucket, CONTINUOUS when it runs across "
+                                + "them. Required with file_template; never defaulted."),
                 FieldSpec.enumField("collector.post_action.on_success", "After success",
                         List.of("RETAIN", "DELETE", "MOVE", "RENAME", "TAG"), null,
                         "Remote Collectors only: what happens to the source-side original after a successful "
@@ -504,6 +513,16 @@ public final class ConfigSpecs {
                             String legacy = str(raw, "processing.grammar");
                             return legacy == null || legacy.isBlank();
                         }),
+                // Mirrors the parser's refusal (GapTemplateGrammar is shared, not mirrored).
+                new CrossFieldRule(
+                        "gap-file-template-well-formed",
+                        "collector.gap_detection.file_template must hold one {datePattern} and one {seq} token, "
+                                + "and needs collector.gap_detection.seq_scope (PER_BUCKET | CONTINUOUS); "
+                                + "seq_scope alone is refused.",
+                        Severity.ERROR,
+                        List.of("collector.gap_detection.file_template", "collector.gap_detection.seq_scope"),
+                        raw -> GapTemplateGrammar.refusal(str(raw, "collector.gap_detection.file_template"),
+                                str(raw, "collector.gap_detection.seq_scope")) == null),
                 new CrossFieldRule(
                         "parsing-source-timezone-resolvable",
                         "parsing.source_timezone must be an IANA region id the query engine accepts — "

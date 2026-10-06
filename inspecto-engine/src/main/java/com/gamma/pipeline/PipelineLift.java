@@ -58,9 +58,11 @@ public final class PipelineLift {
 
         // 1. acquisition (entry) + optional gap control edge
         nodes.add(acquisitionNode(cfg));
-        if (cfg.collector().gapDetection().active()) {
+        if (cfg.collector().gapDetection().active() || cfg.collector().gapDetection().hasFileTemplate()) {
             Map<String, Object> gap = new LinkedHashMap<>();
             put(gap, "sequence", cfg.collector().gapDetection().sequence());
+            put(gap, "file_template", cfg.collector().gapDetection().fileTemplate());
+            put(gap, "seq_scope", cfg.collector().gapDetection().seqScope());
             nodes.add(new PipelineNode(GAP, BuiltinNodeType.GAP.type(), "Gap detection", null, gap, null));
             edges.add(new PipelineEdge(ACQ, PipelineRel.GAP, GAP));
         }

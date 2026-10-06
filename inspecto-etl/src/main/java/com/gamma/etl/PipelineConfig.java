@@ -815,9 +815,18 @@ public final class PipelineConfig {
      * <p>{@link #DISABLED} (no {@code source.gap_detection:} block) ⇒ no series check (the legacy behaviour).
      */
     @PublicApi(since = "4.0.0")
-    public record GapDetection(boolean enabled, String sequence) {
+    public record GapDetection(boolean enabled, String sequence, String fileTemplate, String seqScope) {
         /** No gap detection — the legacy behaviour. */
-        public static final GapDetection DISABLED = new GapDetection(false, null);
+        public static final GapDetection DISABLED = new GapDetection(false, null, null, null);
+
+        /** The live detector's template only — no completeness-KPI file template. */
+        public GapDetection(boolean enabled, String sequence) {
+            this(enabled, sequence, null, null);
+        }
+
+        /** Whether a {@code {seq}} file template (completeness KPI K2, operator 2026-10-06) is configured.
+         *  ⚠ Independent of {@link #active()}: it drives no detector, only the {@code kpi.completeness} job. */
+        public boolean hasFileTemplate() { return fileTemplate != null && !fileTemplate.isBlank(); }
         /** Whether gap detection should run (enabled and given a non-blank sequence template). */
         public boolean active() { return enabled && sequence != null && !sequence.isBlank(); }
     }

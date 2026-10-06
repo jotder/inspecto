@@ -589,7 +589,10 @@ public final class JobService implements AutoCloseable {
                 List.of(com.gamma.signal.SignalType.KPI_COMPLETENESS_EVALUATED,
                         com.gamma.signal.SignalType.KPI_COMPLETENESS_BREACHED),
                 List.of(), List.of("incidents")),
-                KpiCompletenessJob::new));
+                c -> new KpiCompletenessJob(c, name -> {
+                    var lookup = this.pipelineLookup;
+                    return lookup == null ? java.util.Optional.empty() : lookup.apply(name);
+                })));
         // incident.open (cross-Space consequence D10): open an Incident in THIS Space from the firing Signal,
         // carrying only the payload keys the Job names. Needs the operational-objects module at run time.
         registry.register(JobTypeProvider.of(new JobTypeDescriptor("incident.open", "Open Incident",
@@ -932,6 +935,14 @@ public final class JobService implements AutoCloseable {
      * its engine. Without it a by-name join refuses naming the missing wiring; a {@code path:} reference
      * never needs it. Set by the hosting service, like {@link #componentRegistry} and {@link #knownPipelines}.
      */
+    /** Pipeline name → loaded config, for {@code kpi.completeness}'s file half (the Collector's template). */
+    private volatile java.util.function.Function<String, java.util.Optional<com.gamma.etl.PipelineConfig>> pipelineLookup;
+
+    public void pipelineConfigLookup(
+            java.util.function.Function<String, java.util.Optional<com.gamma.etl.PipelineConfig>> lookup) {
+        this.pipelineLookup = lookup;
+    }
+
     public void pipelineConfigs(java.util.function.Supplier<List<com.gamma.etl.PipelineConfig>> supplier) {
         this.pipelineConfigs = supplier;
     }

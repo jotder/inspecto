@@ -3,7 +3,12 @@ package com.gamma.job;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.DbConsignmentOutputStore;
 import com.gamma.consignment.DbConsignmentOutputStore.DailyVolume;
+import com.gamma.acquire.FileSequenceGaps;
+import com.gamma.config.spec.GapTemplateGrammar;
+import com.gamma.consignment.DbFileStageStore;
+import com.gamma.consignment.FileStages;
 import com.gamma.consignment.VolumeBaseline;
+import com.gamma.etl.PipelineConfig;
 import com.gamma.objects.IncidentAccess;
 import com.gamma.signal.Severity;
 import com.gamma.signal.SignalType;
@@ -15,6 +20,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.ArrayList;
 
 /**
  * The {@code kpi.completeness} Job Type — the reader that turns the output registry into a completeness
@@ -51,12 +58,28 @@ final class KpiCompletenessJob implements Job {
                     .description("Fewer observed prior days than this and the answer is NO_BASELINE (unknown)").build(),
             ParameterDecl.of("tolerance", ParamType.DECIMAL).label("Tolerance").min(0).max(1)
                     .defaultValue("0.3")
-                    .description("Fraction below the baseline that is still ordinary, in [0,1]").build());
+                    .description("Fraction below the baseline that is still ordinary, in [0,1]").build(),
+            // K2 (operator, 2026-10-06): the template is the Collector's gap_detection.file_template; these
+            // two parameters override it. ⛔ Neither set (and check_files on) refuses — never a silent zero.
+            ParameterDecl.of("check_files", ParamType.BOOLEAN).label("Count missing files").defaultValue("true")
+                    .description("Count missing files against a {seq} template. Off = volume only").build(),
+            ParameterDecl.of("sequence_template", ParamType.STRING).label("File template override")
+                    .description("Overrides the Collector's gap_detection.file_template, e.g. "
+                            + "CDR_{yyyyMMddHH}_{seq}_*").build(),
+            ParameterDecl.of("seq_scope", ParamType.STRING).label("Sequence scope override")
+                    .options("PER_BUCKET", "CONTINUOUS")
+                    .description("Overrides the Collector's gap_detection.seq_scope").build());
+
+    static final String FILE_FAMILY = "fileStages";
+    static final String FILE_TOGGLE = "file.stages.backend";
 
     private final JobConfig cfg;
+    /** Pipeline name → its loaded config (for the Collector's template and id); empty when not wired. */
+    private final Function<String, Optional<PipelineConfig>> pipelines;
 
-    KpiCompletenessJob(JobConfig cfg) {
+    KpiCompletenessJob(JobConfig cfg, Function<String, Optional<PipelineConfig>> pipelines) {
         this.cfg = cfg;
+        this.pipelines = pipelines == null ? n -> Optional.empty() : pipelines;
     }
 
     @Override public String name() { return cfg.name(); }
@@ -74,6 +97,7 @@ final class KpiCompletenessJob implements Job {
         String pipeline = cfg.require("pipeline");
         String recordDay = cfg.opt("record_day", LocalDate.now(OperationsZone.resolve()).minusDays(1).toString());
         LocalDate.parse(recordDay);   // a malformed day fails loudly, never compares as a string
+        FileHalf files = "false".equalsIgnoreCase(cfg.opt("check_files", "true")) ? null : resolveFileHalf(ctx, pipeline);
         if (ctx.dryRun())
             return JobResult.ok(TYPE + " '" + pipeline + "' (dry run): store durable, nothing read",
                     (System.nanoTime() - t0) / 1_000_000L);
@@ -100,7 +124,12 @@ final class KpiCompletenessJob implements Job {
         if (a.baselineRows() >= 0) payload.put("baselineRows", a.baselineRows());   // omitted, never -1 or 0
         payload.put("deviation", a.deviation());                                    // JSON null when undefined
         boolean breach = a.status() == VolumeBaseline.Status.BREACH;
-        ctx.signals().emit(SignalType.KPI_COMPLETENESS_EVALUATED, breach ? Severity.WARN : Severity.INFO, payload);
+        FileSequenceGaps.Report gaps = files == null ? null : readGaps(files, recordDay);
+        if (gaps != null) putGaps(payload, gaps);
+        boolean fileGaps = gaps != null && gaps.hasGaps();
+        // ⚠ File gaps raise the signal's severity but open no Incident: one-vs-two Incidents when both
+        // halves breach is design §7-g, still an operator call.
+        ctx.signals().emit(SignalType.KPI_COMPLETENESS_EVALUATED, breach || fileGaps ? Severity.WARN : Severity.INFO, payload);
         // ⛔ Only BREACH is an Incident: NO_BASELINE / NO_OBSERVATION are unknown, not breached.
         if (breach) {
             ctx.signals().emit(SignalType.KPI_COMPLETENESS_BREACHED, Severity.WARN, payload);
@@ -131,6 +160,54 @@ final class KpiCompletenessJob implements Job {
                 "Pipeline " + pipeline + " received " + a.actualRows() + " row(s) on " + recordDay + " against a "
                         + a.baselineDays() + "-day baseline of " + a.baselineRows() + ".",
                 "WARNING", pipeline, attrs, "pipeline");
+    }
+
+    /** K2's resolved inputs: the template, its scope, and the Collector whose filenames are read. */
+    record FileHalf(String template, FileSequenceGaps.SeqScope scope, String collectorId) {}
+
+    /**
+     * The override parameters win over the Collector's {@code gap_detection} (operator, 2026-10-06). Refuses —
+     * before anything is read — when no template is set anywhere, or when file stages are not durable.
+     */
+    private FileHalf resolveFileHalf(JobContext ctx, String pipeline) {
+        PipelineConfig pc = pipelines.apply(pipeline).orElseThrow(() -> new IllegalStateException(TYPE
+                + " cannot count missing files for '" + pipeline + "': no loaded pipeline config has that name, so "
+                + "its Collector is unknown. Fix the pipeline parameter, or set check_files: false."));
+        PipelineConfig.GapDetection gd = pc.collector().gapDetection();
+        String template = cfg.opt("sequence_template", gd.fileTemplate());
+        String scope = cfg.opt("seq_scope", gd.seqScope());
+        if (template == null || template.isBlank())
+            throw new IllegalStateException(TYPE + " cannot count missing files for '" + pipeline + "': no {seq} "
+                    + "file template is set. Add collector.gap_detection.file_template and seq_scope to the "
+                    + "pipeline, or the sequence_template / seq_scope job parameters, or set check_files: false. "
+                    + "(gap_detection.sequence is the live detector's one-token template and cannot count files.)");
+        String bad = GapTemplateGrammar.refusal(template, scope);
+        if (bad != null) throw new IllegalArgumentException(bad);
+        requireDurable(ctx.spaceId(), FILE_FAMILY, FILE_TOGGLE, "read the Collector's filename history");
+        return new FileHalf(template, FileSequenceGaps.SeqScope.valueOf(scope.trim().toUpperCase()),
+                pc.collector().id());
+    }
+
+    private static FileSequenceGaps.Report readGaps(FileHalf f, String recordDay) {
+        DbFileStageStore stages = FileStages.shared();
+        if (stages == null)
+            throw new IllegalStateException(refusal(FILE_FAMILY, FILE_TOGGLE, "read the Collector's filename history",
+                    "no file-stages registry is installed for this space"));
+        LocalDate day = LocalDate.parse(recordDay);
+        // recorded_at is processing time: pad a day each side, let analyze match and window by the NAME.
+        List<String> names = new ArrayList<>();
+        for (String rel : stages.relativePaths(f.collectorId(), day.minusDays(1) + " 00:00:00", day.plusDays(2) + " 00:00:00"))
+            names.add(rel.substring(rel.lastIndexOf('/') + 1));
+        return FileSequenceGaps.analyze(f.template(), names, day.atStartOfDay(), day.atTime(23, 59, 59), f.scope());
+    }
+
+    static void putGaps(Map<String, Object> payload, FileSequenceGaps.Report r) {
+        payload.put("fileTemplate", r.template());
+        payload.put("seqScope", r.scope().name());
+        payload.put("observedFiles", r.observedFiles());
+        payload.put("missingFiles", r.missingFiles());          // exact interior holes only
+        payload.put("emptyBuckets", r.emptyBuckets().size());   // buckets, never a file count
+        payload.put("unmatchedFiles", r.unmatched());           // non-zero usually means a wrong template
     }
 
     /** The target day's volume and the unknown-day bucket — each present only when the store holds it. */

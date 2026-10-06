@@ -306,6 +306,8 @@ public final class PipelineCompiler {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("enabled", true);
             putIfPresent(m, "sequence", gapNode.cfg("sequence"));
+            putIfPresent(m, "file_template", gapNode.cfg("file_template"));
+            putIfPresent(m, "seq_scope", gapNode.cfg("seq_scope"));
             src.put("gap_detection", m);
         });
 
