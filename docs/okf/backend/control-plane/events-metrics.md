@@ -355,8 +355,19 @@ timestamp: 2026-07-16T00:00:00Z
   - **Residuals (not built):** (the scheduled off-box anchor export is built — `audit_anchor_export`, above;
     its Sink destination is deferred); a `DbEventStore` serves the chain reads through the `EventStore` keyset-walk
     defaults (linear per page); no offline checker tool ships (the JSON `/audit/export` carries every hashed field);
-    per decision D-P8, classification-driven masking of audit rows and read auditing beyond what exists stay
-    out of scope.
+    read auditing (audit rows of who READ the trail) is deferred by D-P8.
+  - **Masking on read (D-P8, operator 2026-10-06).** `AuditReadMasking` (`inspecto/.../control/AuditReadMasking.java`)
+    is applied by `GET /audit/search`, `GET /audit/export` (JSON and CSV) and the `inspecto-events` feed
+    (`/events`, `/events/search`, `/events/{id}`, `/events/export`). An `AUDIT` / `ACCESS_DENIED` row served to a
+    caller WITHOUT `canRevealLinkEntities` (the existing unmask capability, reused) has each attribute / payload
+    value whose key names a column any Space Dataset classifies `MSISDN|IMSI|ACCOUNT|PII` replaced by the Space's
+    `masked:<16 hex>` token — the `EvidenceMasker` resolver (registry `columns[].classification` + schema lineage)
+    and the SAME key and token as Risk Score evidence, so tokens link across both. A masked value (≥ 4 chars) is
+    also replaced inside the row's `message`. Fail closed: an untraceable lineage masks every attribute outside
+    `AuditAttrs.ALL` and every payload value. Other event types pass through; a request with no Subject (Personal)
+    is unrestricted, as every `withCapability` gate is. ⛔ Stored rows stay RAW, so the chain, `/audit/verify` and
+    the anchors are unchanged. ⚠ Matching is by attribute KEY: a classified value carried under an unrelated key
+    (or inside `target_id`) is not detected. Tests: `ControlApiAuditReadMaskingTest`.
   - **Accepted limits (operator, 2026-10-06; `ASSURE-AUDIT-CHAIN-RESIDUALS-1` (5), (7)).** (5) The lock-race fork
     window is a stated limit, not prevented: a writer with unflushed linked rows when its lock is deleted can
     collide with a second writer, and `GET /audit/verify` detects it afterwards as a `duplicate`. (7) A local

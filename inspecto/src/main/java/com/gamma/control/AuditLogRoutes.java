@@ -204,8 +204,9 @@ final class AuditLogRoutes implements RouteModule {
     }
 
     private static Object search(ApiContext api, HttpExchange ex) {
+        // D-P8 (operator 2026-10-06): classified values masked on read for a caller without the unmask capability
         return HostContext.of(api).service().events().query(auditQuery(ex, EventQuery.DEFAULT_LIMIT))
-                .stream().map(Event::toMap).toList();
+                .stream().map(AuditReadMasking.forRequest(api, ex)).map(Event::toMap).toList();
     }
 
     /**
@@ -215,7 +216,8 @@ final class AuditLogRoutes implements RouteModule {
      * auditable types get the audit columns, because both are what the plain projection used to drop.
      */
     private static Object export(ApiContext api, HttpExchange ex) throws IOException {
-        List<Event> rows = HostContext.of(api).service().events().query(auditQuery(ex, EventQuery.MAX_LIMIT));
+        List<Event> rows = HostContext.of(api).service().events().query(auditQuery(ex, EventQuery.MAX_LIMIT))
+                .stream().map(AuditReadMasking.forRequest(api, ex)).toList();   // D-P8
         if (!"csv".equalsIgnoreCase(ApiContext.query(ex, "format"))) {
             return rows.stream().map(Event::toMap).toList();
         }

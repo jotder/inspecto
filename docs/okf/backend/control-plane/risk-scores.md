@@ -157,8 +157,9 @@ objects (SEC-7d), and nothing scopes Dataset rows. The route applies that rule t
 Operator decision, 2026-09-27, under the standing "go with recommendations":
 
 - **The entity key stays raw.** This matches every per-entity Alert and Incident key in the platform, and
-  access to it is governed by `canWorkIncidents` and data scopes. Platform-wide key masking is deferred
-  decision **D-P8**. The read route masks nothing, so every surface shows the same key.
+  access to it is governed by `canWorkIncidents` and data scopes. **D-P8** was decided 2026-10-06 (operator:
+  mask on read, under `canRevealLinkEntities`) and built for audit rows (`AuditReadMasking`); applying it to this
+  key is not built. The read route masks nothing, so every surface shows the same key.
 - **Classified evidence is masked at write time.** It is the widening: an Incident carries only a key and a
   value, while evidence copies source rows. The `risk.score` Job (`EvidenceMasker`, applied inside
   `RiskScoreEvaluator.evaluate`) stores the token and never the raw value, for any evidence column whose
@@ -209,7 +210,7 @@ renders it as a required autocomplete over the saved models (`riskScoreModelOpti
 - ✅ **The watch Entity List is fed (2026-09-28).** An optional `watchList: {list, ttlHours}` (1..24) adds every
   high entity to a `watch` Entity List after each run, expiring `ttlHours` later. It fails closed at save and at
   run. See [Entity Lists — assurance entries](entity-lists.md#the-risk-score-watch-list-feed).
-- **Entity-key masking is D-P8** (deferred; blocked on that decision). The key is raw on every surface.
+- **Entity-key masking** is unblocked (D-P8 decided 2026-10-06) but not built. The key is raw on every surface.
 - There is no authoring pane: models are written through `/components/risk-score`.
 - An indicator is a Measure. There is no free-form arithmetic expression, and no reference to a saved
   Measure component, because none exists.

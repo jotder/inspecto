@@ -2,6 +2,7 @@ package com.gamma.eventsapi;
 
 import com.gamma.control.HostContext;
 import com.gamma.control.ApiContext;
+import com.gamma.control.AuditReadMasking;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.Cursor;
@@ -49,8 +50,8 @@ public final class EventRoutes implements RouteModule {
         // Legacy: the newest ?limit= events from the live-tail ring, byte-for-byte unchanged. On /api/v1
         // the list is instead cursor-paginated over the full retained history (eventsPage), sharing the route.
         api.get("/events", (e, m) -> ApiContext.v1(e) ? eventsPage(api, e)
-                : toMaps(HostContext.of(api).service().events().recent(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))));
-        api.get("/events/search", (e, m) -> toMaps(HostContext.of(api).service().events().query(eventQuery(e, EventQuery.DEFAULT_LIMIT))));
+                : toMaps(api, e, HostContext.of(api).service().events().recent(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))));
+        api.get("/events/search", (e, m) -> toMaps(api, e, HostContext.of(api).service().events().query(eventQuery(e, EventQuery.DEFAULT_LIMIT))));
         api.get("/events/export", (e, m) -> exportEvents(api, e));
         api.get("/events/views", (e, m) -> HostContext.of(api).service().savedViews().list());
         // A saved view is SERVER-WIDE, not per-user: SavedView is (name, filters, createdAt) with no subject,
@@ -65,11 +66,12 @@ public final class EventRoutes implements RouteModule {
                 throw new ApiException(404, ErrorCodes.NOT_FOUND, "no saved view named '" + ApiContext.name(m) + "'");
             return Map.of("name", ApiContext.name(m), "deleted", true);
         }));
-        api.get("/events/([^/]+)", (e, m) -> eventById(api, ApiContext.name(m)));
+        api.get("/events/([^/]+)", (e, m) -> eventById(api, e, ApiContext.name(m)));
     }
 
-    private static List<Map<String, Object>> toMaps(List<Event> events) {
-        return events.stream().map(Event::toMap).toList();
+    /** D-P8 (operator 2026-10-06): audit rows are masked on read for a caller without the unmask capability. */
+    private static List<Map<String, Object>> toMaps(ApiContext api, HttpExchange ex, List<Event> events) {
+        return events.stream().map(AuditReadMasking.forRequest(api, ex)).map(Event::toMap).toList();
     }
 
     /**
@@ -98,7 +100,7 @@ public final class EventRoutes implements RouteModule {
                     last.eventId() == null ? "" : last.eventId()));
         }
         ApiContext.pagination(e, cursor, nextCursor, limit, HostContext.of(api).service().events().count());
-        return toMaps(rows);
+        return toMaps(api, e, rows);
     }
 
     /** Cursor key parts are strings; an unparsable timestamp part means "start from the top" (decode-total). */
@@ -127,10 +129,10 @@ public final class EventRoutes implements RouteModule {
     }
 
     /** {@code GET /events/{id}} — scan the newest events (buffer + Parquet) for an exact id, else 404. */
-    private Object eventById(ApiContext api, String id) {
+    private Object eventById(ApiContext api, HttpExchange ex, String id) {
         return HostContext.of(api).service().events().query(EventQuery.recent(EventQuery.MAX_LIMIT)).stream()
                 .filter(ev -> id.equals(ev.eventId())).findFirst()
-                .map(Event::toMap)
+                .map(AuditReadMasking.forRequest(api, ex)).map(Event::toMap)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no event with id '" + id + "'"));
     }
 
@@ -143,7 +145,8 @@ public final class EventRoutes implements RouteModule {
      * JSON always carries {@code attributes} whole.
      */
     private Object exportEvents(ApiContext api, HttpExchange ex) throws IOException {
-        List<Event> rows = HostContext.of(api).service().events().query(eventQuery(ex, EventQuery.MAX_LIMIT));
+        List<Event> rows = HostContext.of(api).service().events().query(eventQuery(ex, EventQuery.MAX_LIMIT))
+                .stream().map(AuditReadMasking.forRequest(api, ex)).toList();   // D-P8
         if ("csv".equalsIgnoreCase(ApiContext.query(ex, "format"))) {
             String type = ApiContext.query(ex, "type");
             List<String> attributeColumns =
@@ -151,7 +154,7 @@ public final class EventRoutes implements RouteModule {
                             ? AuditAttrs.ALL : List.of();
             return ApiContext.respondText(ex, eventsCsv(rows, attributeColumns), "text/csv; charset=utf-8");
         }
-        return toMaps(rows);
+        return toMaps(api, ex, rows);
     }
 
     private static String eventsCsv(List<Event> rows, List<String> attributeColumns) {

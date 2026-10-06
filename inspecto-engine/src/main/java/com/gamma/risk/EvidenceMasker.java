@@ -65,6 +65,17 @@ public final class EvidenceMasker {
         return new EvidenceMasker(configRoot, byDataset);
     }
 
+    /** A masker for the Space's key alone (no model): read-time audit masking (D-P8) shares the token, so a value
+     *  reads as the same {@code masked:} token in an audit row and in Risk Score evidence. */
+    public static EvidenceMasker forSpace(Path configRoot) {
+        return new EvidenceMasker(configRoot, Map.of());
+    }
+
+    /** The {@code masked:<16 hex>} token of {@code raw} under the Space key (created on first use). */
+    public String tokenFor(String raw) {
+        return token(raw);
+    }
+
     /** {@code <config root>.secrets/.risk-score-mask.key}. */
     public static Path keyFile(Path configRoot) {
         return SpaceSecretKeys.keyFile(configRoot, KEY_FILE);
@@ -78,7 +89,7 @@ public final class EvidenceMasker {
      * column is masked, when that lineage cannot be traced, or when a view or virtual Dataset reads a store with
      * classified columns (a rename such as {@code msisdn AS m} cannot be traced statically).
      */
-    static Set<String> sensitiveColumns(ComponentStore registry, ViewStore views, String datasetId) {
+    public static Set<String> sensitiveColumns(ComponentStore registry, ViewStore views, String datasetId) {
         Set<String> out = new LinkedHashSet<>();
         Map<String, Object> ds = registry.get("dataset", datasetId).map(ComponentRegistry.Component::content).orElse(Map.of());
         if (ds.get("columns") instanceof List<?> cols)
