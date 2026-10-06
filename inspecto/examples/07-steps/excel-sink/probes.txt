@@ -1,0 +1,20 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# SINK: excel (sink.excel) — processor sink.file.excel. The at-rest rows as named sheets of ONE workbook:
+#   excel: { path: reports/orders.xlsx, max_rows: 1000, sheets[3]: Orders · By region · Shipped }
+# Each sheet is a read-only SELECT over the chain's rows as `input` (no sql = every row), checked by
+# SqlGuard at save and at write. Sheet names follow Excel's rule and are refused, never repaired; a sheet
+# over max_rows fails the run instead of being truncated; text cells starting = + - @ | % are written
+# with a ' prefix (inert). At rest, like profile: the ingest lands out/orders/, the commit fires
+# excel_report, which writes the persistent store out/orders_at_rest/ AND the workbook beside it.
+#
+# Expected evidence after the run:
+#   /jobs shows excel_report type PIPELINE with lastStatus SUCCESS. On disk, out/reports/orders.xlsx holds
+#   three sheets, in order:
+#     Orders     8 rows + header (every mapped column, plus the year/month/day partition columns)
+#     By region  4 rows: EAST 2 · NORTH 2 · SOUTH 2 · WEST 2 (REGION is the mapped UPPER(TRIM(REGION)))
+#     Shipped    5 rows: 1001 1003 1005 1007 1008
+#   The job can also be fired by hand: POST /jobs/excel_report/trigger.
+/jobs
+/jobs/excel_report/runs

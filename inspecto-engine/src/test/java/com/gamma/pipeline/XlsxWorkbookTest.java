@@ -1,4 +1,4 @@
-package com.gamma.job;
+package com.gamma.pipeline;
 
 import com.gamma.etl.ExcelExtension;
 import com.gamma.util.DuckDbUtil;
@@ -23,16 +23,16 @@ import static org.junit.jupiter.api.Assertions.*;
  * formula-injection neutraliser shared with CSV. The round-trip SKIPS (never passes) when no excel binary
  * can be loaded, the same rule as {@code PipelineDocumentXlsxTest}.
  */
-class ReportXlsxTest {
+class XlsxWorkbookTest {
 
     @Test
     void neutralisesEveryFormulaLead() {
         for (String s : List.of("=1+1", "+1", "-1", "@SUM(A1)", "\tx", "\rx", "\n=x", "  =x", " \r\n\t@x",
                 "\uFF1D1+1", "\uFF0B1", "\uFF0D1", "\uFF20SUM(A1)", "|calc", "%x", " |calc", "\n\n+1"))
-            assertEquals("'" + s, ReportXlsx.neutralise(s), s);
+            assertEquals("'" + s, XlsxWorkbook.neutralise(s), s);
         for (String s : List.of("plain", "a=b", "1-2", "", "'quoted", "   ", " a|b", "50%", "\nplain"))
-            assertEquals(s, ReportXlsx.neutralise(s), s);
-        assertNull(ReportXlsx.neutralise(null));
+            assertEquals(s, XlsxWorkbook.neutralise(s), s);
+        assertNull(XlsxWorkbook.neutralise(null));
     }
 
     private static void requireExcel() throws Exception {
@@ -65,7 +65,7 @@ class ReportXlsxTest {
         rows.add(row("region", "EU", "amount", 40.5, "count", 2L));
         rows.add(row("region", "US", "amount", -5.0, "count", 1L));
         Path out = dir.resolve("weekly.xlsx");
-        ReportXlsx.write("weekly", rows, out);
+        XlsxWorkbook.write("weekly", rows, out);
 
         List<List<String>> got = readBack(out);
         assertEquals(List.of("region", "amount", "count"), got.get(0));
@@ -84,7 +84,7 @@ class ReportXlsxTest {
                 row("name", "+1", "note", "-2"),
                 row("name", "safe", "note", null));
         Path out = dir.resolve("inj.xlsx");
-        ReportXlsx.write("inj", rows, out);
+        XlsxWorkbook.write("inj", rows, out);
 
         List<List<String>> got = readBack(out);
         assertEquals("'=HYPERLINK(\"http://evil.example\",\"click\")", got.get(1).get(0));
@@ -100,7 +100,7 @@ class ReportXlsxTest {
     void aHeaderThatLooksLikeAFormulaIsNeutralisedToo(@TempDir Path dir) throws Exception {
         requireExcel();
         Path out = dir.resolve("hdr.xlsx");
-        ReportXlsx.write("hdr", List.of(row("=cmd", "x")), out);
+        XlsxWorkbook.write("hdr", List.of(row("=cmd", "x")), out);
         assertEquals("'=cmd", readBack(out).get(0).get(0));
     }
 
@@ -108,7 +108,7 @@ class ReportXlsxTest {
     void anEmptyResultStillWritesAWorkbook(@TempDir Path dir) throws Exception {
         requireExcel();
         Path out = dir.resolve("empty.xlsx");
-        ReportXlsx.write("empty", List.of(), out);
+        XlsxWorkbook.write("empty", List.of(), out);
         assertTrue(Files.size(out) > 0);
     }
 

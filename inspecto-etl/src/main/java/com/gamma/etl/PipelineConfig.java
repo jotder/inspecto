@@ -1246,6 +1246,83 @@ public final class PipelineConfig {
     }
 
     /**
+     * The Excel workbook sink (top-level {@code excel:}) — the authored half of the {@code sink.excel} node
+     * (catalog {@code sink.file.excel}, operator 2026-10-06). Writes the at-rest chain's output as ONE
+     * {@code .xlsx} with a sheet per {@link ExcelSheet}; each sheet's {@code sql} is a read-only query over the
+     * branch's relation under the alias {@code input} (blank = every row) — checked by {@code SqlGuard} at save
+     * and at write, since this module does not carry it.
+     *
+     * <p>Fail-closed by design: sheet names are REFUSED, never repaired (Excel's rule, {@link #sheetNameProblem});
+     * a sheet over {@code max_rows} fails the branch rather than being truncated; {@code path} is relative to the
+     * Space's data root, ends {@code .xlsx} and carries no {@code ..} segment (the run re-checks it with
+     * {@code PathJail}). Executes on the at-rest lane only — {@link #prepare()} refuses it on the ingest lane.
+     */
+    @PublicApi(since = "4.0.0")
+    public record Excel(String path, List<ExcelSheet> sheets, int maxRows) {
+        /** Rows per sheet when {@code max_rows} is absent. */
+        public static final int DEFAULT_MAX_ROWS = 100_000;
+        /** Excel's 1,048,576-row sheet limit, minus the header row. */
+        public static final int MAX_ROWS = 1_048_575;
+        /** Excel's sheet-name length limit. */
+        public static final int MAX_SHEET_NAME = 31;
+        /** Every key the block may carry; anything else is refused. */
+        public static final List<String> KEYS = List.of("path", "sheets", "max_rows");
+        /** Every key one {@code sheets:} entry may carry. */
+        public static final List<String> SHEET_KEYS = List.of("name", "sql");
+
+        /** One sheet: its name and its read-only SELECT over {@code input} ({@code null} = every row). */
+        public record ExcelSheet(String name, String sql) {}
+
+        public Excel {
+            if (path == null || path.isBlank())
+                throw new IllegalArgumentException("excel: needs a 'path' — the workbook's path under the Space's data root");
+            path = path.trim();
+            if (!path.toLowerCase(java.util.Locale.ROOT).endsWith(".xlsx"))
+                throw new IllegalArgumentException("excel.path must end in .xlsx, got: " + path);
+            String slashed = path.replace('\\', '/');
+            if (slashed.startsWith("/") || slashed.contains(":"))
+                throw new IllegalArgumentException("excel.path must be relative to the Space's data root, got: " + path);
+            for (String seg : slashed.split("/"))
+                if (seg.equals(".."))
+                    throw new IllegalArgumentException("excel.path may not leave the Space's data root ('..'), got: " + path);
+            if (sheets == null || sheets.isEmpty())
+                throw new IllegalArgumentException("excel: needs a non-empty 'sheets' list ([{name, sql}])");
+            sheets = List.copyOf(sheets);
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            for (ExcelSheet sh : sheets) {
+                String problem = sheetNameProblem(sh.name());
+                if (problem != null)
+                    throw new IllegalArgumentException("excel.sheets: sheet name '" + sh.name() + "' " + problem);
+                if (!seen.add(sh.name().toLowerCase(java.util.Locale.ROOT)))
+                    throw new IllegalArgumentException("excel.sheets: sheet name '" + sh.name()
+                            + "' is used twice (Excel compares names ignoring case)");
+            }
+            if (maxRows < 1 || maxRows > MAX_ROWS)
+                throw new IllegalArgumentException("excel.max_rows must be between 1 and " + MAX_ROWS + ", got: " + maxRows);
+        }
+
+        /**
+         * Why Excel would refuse {@code name} as a sheet name, or {@code null} when it is valid: 1–31 characters,
+         * none of {@code [ ] : * ? / \\}, no leading or trailing apostrophe, and not the reserved {@code History}.
+         */
+        public static String sheetNameProblem(String name) {
+            if (name == null || name.isBlank()) return "is blank";
+            if (name.length() > MAX_SHEET_NAME)
+                return "is " + name.length() + " characters; Excel allows at most " + MAX_SHEET_NAME;
+            for (char c : name.toCharArray())
+                if ("[]:*?/\\".indexOf(c) >= 0) return "contains '" + c + "', which Excel forbids ([ ] : * ? / \\)";
+            if (name.startsWith("'") || name.endsWith("'")) return "starts or ends with an apostrophe, which Excel forbids";
+            if (name.equalsIgnoreCase("History")) return "is reserved by Excel";
+            return null;
+        }
+
+        /** Parse and validate an {@code excel:} block (or a {@code sink.excel} node's config — the same map). */
+        public static Excel fromMap(Map<?, ?> block) {
+            return PipelineConfigParser.parseExcel(block);
+        }
+    }
+
+    /**
      * The authored half of the projection slot ({@code processing.map}; a Record Transformer,
      * {@code transform.sql}) — the flat file's home
      * for a projection an operator typed into the map node's dialog, added so that
@@ -1427,6 +1504,9 @@ public final class PipelineConfig {
     /** The outbound webhook sink ({@code webhook:}) parsed, and its block verbatim; both {@code null} when absent. */
     private final Webhook webhook;
     private final Map<String, Object> webhookConfig;
+    /** The Excel workbook sink ({@code excel:}) parsed, and its block verbatim; both {@code null} when absent. */
+    private final Excel excel;
+    private final Map<String, Object> excelConfig;
 
     /** Reference join ({@code processing.join}); {@code null} when absent. */
     private final Join join;
@@ -1569,6 +1649,12 @@ public final class PipelineConfig {
     public Webhook webhook() { return webhook; }
     /** The {@code webhook:} block <b>verbatim</b> (the {@code sink.webhook} node's config), or {@code null}. */
     public Map<String, Object> webhookConfig() { return webhookConfig; }
+
+    /** The Excel workbook sink ({@code excel:}), or {@code null} when absent. At-rest lane only, like
+     *  {@link #webhook()}. */
+    public Excel excel() { return excel; }
+    /** The {@code excel:} block <b>verbatim</b> (the {@code sink.excel} node's config), or {@code null}. */
+    public Map<String, Object> excelConfig() { return excelConfig; }
     /**
      * Reference join ({@code processing.join}), or {@code null} when absent. Authoring/round-trip only:
      * {@link #prepare()} refuses an {@code active} pipeline carrying it — the linear batch path has no
@@ -1653,6 +1739,8 @@ public final class PipelineConfig {
         this.profile = b.profile;
         this.webhook = b.webhook;
         this.webhookConfig = b.webhookConfig;
+        this.excel = b.excel;
+        this.excelConfig = b.excelConfig;
         this.join = b.join;
         this.mapConfig = b.mapConfig;
         this.disabledSteps = List.copyOf(b.disabledSteps);
@@ -1747,6 +1835,8 @@ public final class PipelineConfig {
         this.profile = src.profile;
         this.webhook = src.webhook;
         this.webhookConfig = src.webhookConfig;
+        this.excel = src.excel;
+        this.excelConfig = src.excelConfig;
         this.join = src.join;
         this.mapConfig = src.mapConfig;
         this.disabledSteps = src.disabledSteps;
@@ -2119,6 +2209,23 @@ public final class PipelineConfig {
                                                  : "is multi-schema and lands several stores")
                                 + " — the webhook would never be reached; remove one of the two");
         }
+        // excel: the same at-rest-only rule as webhook: (operator, 2026-10-06) — PipelineLift.stageTwo hangs the
+        // sink.excel branch beside the output_store: sink; on any other lane the workbook would never be written.
+        if (active && excel != null) {
+            if (outputStore == null)
+                throw new IllegalStateException(
+                        "excel: does not execute on the linear ingest lane — author a top-level "
+                                + "output_store: and run the chain at rest (pipeline_config: pipeline job), "
+                                + "keep the pipeline inactive (active: false), or remove the excel block");
+            boolean multiSchema = schemas.selector() != null
+                    || (schemas.segments() != null && !schemas.segments().isEmpty());
+            if (route != null || multiSchema)
+                throw new IllegalStateException(
+                        "excel: runs at rest over ONE landed store, but this pipeline "
+                                + (route != null ? "routes rows on the ingest lane (route:)"
+                                                 : "is multi-schema and lands several stores")
+                                + " — the workbook would never be written; remove one of the two");
+        }
         // route: ARMS (branch-aware-executor arming plan S3, 2026-08-26): ConsignmentGraphRunner is wired
         // at the writeAndTrace choke point, so an active route: pipeline executes its branch tree.
         // Arming stays FAIL-CLOSED on every shape that would drop rows silently — the exact
@@ -2247,6 +2354,8 @@ public final class PipelineConfig {
         Profile profile = null;               // per-column profile (processing.profile); null ⇒ none
         Webhook webhook = null;               // outbound webhook sink (webhook:); null ⇒ none
         Map<String, Object> webhookConfig = null;   // the webhook: block verbatim; null ⇒ none
+        Excel excel = null;                   // Excel workbook sink (excel:); null ⇒ none
+        Map<String, Object> excelConfig = null;     // the excel: block verbatim; null ⇒ none
         Join join = null;                     // reference join (processing.join); null ⇒ none
         MapConfig mapConfig = null;           // authored map projection (processing.map); null ⇒ none
         List<String> disabledSteps = List.of();   // processing.disabled_steps (S4/D-13); empty ⇒ all enabled

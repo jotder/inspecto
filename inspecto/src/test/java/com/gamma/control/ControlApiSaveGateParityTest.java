@@ -72,7 +72,12 @@ class ControlApiSaveGateParityTest {
         WEBHOOK_CONNECTION_UNKNOWN(d -> d.put("webhook", map("connection", "ghost_hook")),
                 "webhook.connection", FindingCodes.ERR_WEBHOOK_CONNECTION_UNKNOWN, true),
         WEBHOOK_CONNECTION_NOT_HTTPS(d -> d.put("webhook", map("connection", "files_sftp")),
-                "webhook.connection", FindingCodes.ERR_WEBHOOK_CONNECTION_NOT_HTTPS, false);
+                "webhook.connection", FindingCodes.ERR_WEBHOOK_CONNECTION_NOT_HTTPS, false),
+        EXCEL_BAD_SHEET_NAME(d -> d.put("excel", map("path", "reports/a.xlsx", "sheets", List.of(map("name", "Q3/Q4")))),
+                "excel", FindingCodes.ERR_EXCEL_INVALID, false),
+        EXCEL_SHEET_NOT_A_SELECT(d -> d.put("excel", map("path", "reports/a.xlsx",
+                        "sheets", List.of(map("name", "A", "sql", "DELETE FROM input")))),
+                "excel.sheets[0].sql", FindingCodes.ERR_EXCEL_INVALID, false);
 
         final Consumer<Map<String, Object>> apply;
         final String fieldPath;
@@ -158,6 +163,21 @@ class ControlApiSaveGateParityTest {
         }
     }
 
+    /** A valid excel: block saves — the check refuses the fault, not the block (sink.excel, 2026-10-06). */
+    @Test
+    void aValidExcelBlockSaves(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        Files.createDirectories(wr);
+        try (Ctx c = open(dir, wr)) {
+            Map<String, Object> draft = base(dir, "book_ok");
+            draft.put("excel", map("path", "reports/a.xlsx", "sheets", List.of(map("name", "Q3 and Q4"),
+                    map("name", "A", "sql", "SELECT * FROM input"))));
+            HttpResponse<String> r = save(c, SavePath.WRITE, dir, wr, "book_ok", draft);
+            assertEquals(200, r.statusCode(), r.body());
+            assertFalse(r.body().contains("\"severity\":\"ERROR\""), r.body());
+        }
+    }
+
     /** The graph editor's own shape: a {@code sink.webhook} NODE naming a Connection that does not exist. */
     @Test
     void aWebhookNodeOnAnUnknownConnectionIsRefusedAtTheGraphSave(@TempDir Path dir) throws Exception {
@@ -233,6 +253,7 @@ class ControlApiSaveGateParityTest {
                 Map<String, Object> onDisk = ConfigCodec.toMap(Files.readString(wr.resolve(name + "_pipeline.toon")));
                 if (path == SavePath.PATCH)
                     assertFalse(onDisk.containsKey("bogus_block") || onDisk.containsKey("webhook")
+                            || onDisk.containsKey("excel")
                             || onDisk.containsKey("collector"), "a refused patch leaves the file as it was");
             }
             case VALIDATE -> { }

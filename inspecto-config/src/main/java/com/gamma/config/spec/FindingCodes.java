@@ -115,6 +115,11 @@ public final class FindingCodes {
      *  carried verbatim; the pipeline would otherwise not load at all. */
     public static final String ERR_WEBHOOK_INVALID = "ERR_WEBHOOK_INVALID";
 
+    /** An {@code excel:} block its parser refuses (no path, a path leaving the data root, a bad or duplicate
+     *  sheet name, {@code max_rows} out of bounds, an unknown key) or a sheet whose {@code sql} {@code SqlGuard}
+     *  refuses — the pipeline would otherwise not load, or fail its first run ({@code sink.excel}, 2026-10-06). */
+    public static final String ERR_EXCEL_INVALID = "ERR_EXCEL_INVALID";
+
     // ── Schema ───────────────────────────────────────────────────────────────────────────────
     // (schema-resolution / compatibility findings register here as they are wired)
 

@@ -491,13 +491,19 @@ retired that second gate by running once, BEFORE any path is resolved (422 still
 holds (`ERR_WEBHOOK_CONNECTION_UNKNOWN`), and that Connection must be `https`
 (`ERR_WEBHOOK_CONNECTION_NOT_HTTPS`). Host, tunnel and proxy stay the Connection's own validation.
 
+**The `excel:` block** (`sink.excel`, 2026-10-06) is judged the same way, regardless of `active`: it must parse
+(`ERR_EXCEL_INVALID` — no `path`, a path that is absolute or carries `..`, not `.xlsx`, a sheet name Excel
+refuses or a duplicate, `max_rows` out of bounds, an unknown key; the parser's own message), and every
+sheet's `sql` must pass `SqlGuard` (`ERR_EXCEL_INVALID` on `excel.sheets[i].sql`). The run re-checks the
+path with `PathJail` against the data root, symlinks included.
+
 ⛔ **The one deliberate difference is bundle import, and it is a recorded decision, not drift**
 (`SaveGate.Referents.MAY_ARRIVE_LATER`): a pipeline bundle never carries its Connections (secrets never
 travel) and always lands inactive, so a **missing** Connection — collector or webhook — is a
 `WARN_UNRESOLVED_CONNECTION`, never a refusal. A Connection that exists but is the wrong kind is refused on
 import too. `/validate` drops its `safety` flag: `safetyChecked` is always `true`.
 
-Pinned by `ControlApiSaveGateParityTest`: every fault × every door, one verdict (25 cases + a clean control
+Pinned by `ControlApiSaveGateParityTest`: every fault × every door, one verdict (35 cases + a clean control + a valid `excel:` block
 + the graph editor's own `sink.webhook` node shape). A new check added to `SaveGate` reaches all five doors
 at once; a door that stops calling it goes red there.
 

@@ -219,6 +219,8 @@ public final class RecipeConverter {
         // the outbound webhook: its own verb, verbatim — omitting it here would let the compile back
         // (strict) delete the block, since lower removes a webhook: no node speaks for
         if (config.get("webhook") instanceof Map<?, ?> wh) steps.add(step("webhook", mapOf(wh)));
+        // the Excel workbook: its own verb, verbatim, for the same reason
+        if (config.get("excel") instanceof Map<?, ?> xl) steps.add(step("excel", mapOf(xl)));
 
         recipe.put("steps", steps);
 

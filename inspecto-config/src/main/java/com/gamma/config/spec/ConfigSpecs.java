@@ -140,6 +140,19 @@ public final class ConfigSpecs {
                                 + "the endpoint and the bearer-token reference. Professional/Enterprise only."),
                 FieldSpec.withDefault("webhook.batch_size", "Webhook rows per request", FieldType.INT, 500,
                         "Rows per JSON POST, 1-10000."),
+                // The Excel workbook sink's block (sink.excel, operator 2026-10-06).
+                FieldSpec.of("excel.path", "Excel workbook path", FieldType.STRING,
+                        "Path of the .xlsx the at-rest chain's rows are written to, relative to the Space's data "
+                                + "root (no '..'); replaced on every run."),
+                FieldSpec.listOf("excel.sheets", "Excel sheets",
+                        "One sheet per entry, in order. Required, non-empty.",
+                        List.of(FieldSpec.required("name", "Sheet name", FieldType.STRING,
+                                        "Excel's rule: 1-31 characters, none of [ ] : * ? / and backslash, no "
+                                                + "leading or trailing apostrophe, not History, unique ignoring case."),
+                                FieldSpec.of("sql", "Sheet query", FieldType.SQL,
+                                        "A read-only SELECT over the chain's rows as 'input'; blank = every row."))),
+                FieldSpec.withDefault("excel.max_rows", "Excel rows per sheet", FieldType.INT, 100000,
+                        "Rows per sheet, 1-1048575. A sheet with more fails the run instead of being truncated."),
                 FieldSpec.of("webhook.retry", "Webhook retry", FieldType.MAP,
                         "Per-request retry, the Collector's grammar: count, backoff (EXPONENTIAL/LINEAR/FIXED), "
                                 + "initial_delay, max_delay. Every attempt carries the same Idempotency-Key. "
@@ -152,7 +165,7 @@ public final class ConfigSpecs {
                 FieldSpec.of("output_store", "Stage-2 output store", FieldType.STRING,
                         "Names the store an at-rest chain writes. Required to ARM a pipeline carrying "
                                 + "steps:, processing.dedup, processing.summarize, processing.profile, "
-                                + "processing.join or webhook: — "
+                                + "processing.join, webhook: or excel: — "
                                 + "those execute at rest (a pipeline_config: job), never on the linear "
                                 + "ingest path, and the chain needs an authored name for what it writes."),
                 // ── grammar: one concept, two spellings — `parsing.grammar` is CANONICAL ────────
@@ -480,20 +493,20 @@ public final class ConfigSpecs {
                 new CrossFieldRule(
                         "stage-two-blocks-require-output-store",
                         "An ACTIVE pipeline carrying steps:, processing.dedup, processing.summarize, "
-                                + "processing.profile, processing.join or webhook: must declare a top-level output_store:. Those blocks "
+                                + "processing.profile, processing.join, webhook: or excel: must declare a top-level output_store:. Those blocks "
                                 + "execute at rest (a pipeline_config: job over the landed store), never "
                                 + "on the linear ingest path, so without output_store: they have nowhere "
                                 + "to write and the pipeline refuses to arm. Author output_store:, keep "
                                 + "the pipeline inactive (active: false), or remove the block.",
                         Severity.ERROR,
                         List.of("output_store", "steps", "processing.dedup",
-                                "processing.summarize", "processing.profile", "processing.join", "webhook"),
+                                "processing.summarize", "processing.profile", "processing.join", "webhook", "excel"),
                         raw -> {
                             if (!Boolean.parseBoolean(str(raw, "active"))) return true;
                             boolean needs = false;
                             for (String block : List.of("steps", "processing.dedup",
                                                         "processing.summarize", "processing.profile",
-                                                        "processing.join", "webhook"))
+                                                        "processing.join", "webhook", "excel"))
                                 needs |= authored(raw, block);
                             return !needs || present(raw, "output_store");
                         }),

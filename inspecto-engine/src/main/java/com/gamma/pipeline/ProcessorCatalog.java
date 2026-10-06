@@ -171,7 +171,7 @@ public final class ProcessorCatalog {
             p("SNK", "sink.lake.delta", "🗄️", "heroicons_outline:server-stack", "Delta Lake persistent table sink", Status.PLANNED, null, null, null),
             p("SNK", "sink.lake.iceberg", "🧊", "heroicons_outline:cube", "Apache Iceberg append / upsert sink", Status.PLANNED, null, null, null),
             p("SNK", "sink.db.clickhouse", "📊", "heroicons_outline:chart-bar-square", "ClickHouse / StarRocks analytical sink", Status.PLANNED, null, null, null),
-            p("SNK", "sink.file.excel", "📑", "heroicons_outline:table-cells", "Excel multi-tab report sink", Status.PLANNED, null, null, null),
+            p("SNK", "sink.file.excel", "📑", "heroicons_outline:table-cells", "Excel multi-tab report sink", Status.DELIVERED, "sink.excel", null, "top-level `excel:` — named sheets of one .xlsx under the data root, a read-only SELECT per sheet, at-rest lane"),
             p("SNK", "sink.stream.kafka", "📤", "heroicons_outline:queue-list", "Apache Kafka topic producer", Status.PLANNED, null, null, null),
             p("SNK", "sink.stream.aws", "📨", "heroicons_outline:paper-airplane", "AWS SQS / SNS event publisher", Status.PLANNED, null, null, null),
             p("SNK", "sink.notify.email", "📧", "heroicons_outline:envelope", "Email & report dispatcher", Status.PARTIAL, null, "mail.send", "the `mail.send` JOB + mail channels; not a chain sink"),

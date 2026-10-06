@@ -1,4 +1,4 @@
-package com.gamma.job;
+package com.gamma.pipeline;
 
 import com.gamma.etl.ExcelExtension;
 import com.gamma.util.DuckDbUtil;
@@ -32,10 +32,15 @@ import java.util.Set;
  * evaluated as a formula by a spreadsheet, so {@code =HYPERLINK(...)} in a Dataset becomes a live link in the
  * finance team's inbox. {@link #neutralise} prefixes such a value with {@code '}, the OWASP remedy; it applies
  * to text only — a numeric column is written as numbers, where {@code -5} is a value, not a formula.
+ *
+ * <p><b>One writer, two callers</b> (operator, 2026-10-06): the report job ({@code format: xlsx}) and the
+ * {@code sink.excel} node ({@link com.gamma.pipeline.exec.ExcelSink}, catalog {@code sink.file.excel}). Moved here
+ * from {@code com.gamma.job.ReportXlsx} so the sink reuses the sealed path and the neutraliser instead of copying
+ * them; {@link #writeSheets} adds the many-sheet workbook through {@link XlsxSheetMerger}.
  */
-final class ReportXlsx {
+public final class XlsxWorkbook {
 
-    private ReportXlsx() {}
+    private XlsxWorkbook() {}
 
     /**
      * Prefix a text value a spreadsheet would read as a formula with {@code '}; anything else unchanged. A leading
@@ -44,7 +49,7 @@ final class ReportXlsx {
      * fullwidth forms {@code ＝ ＋ － ＠} (some readers fold them), and {@code |} / {@code %} (DDE and legacy-macro
      * leads). A value that is all spaces is left alone.
      */
-    static String neutralise(String s) {
+    public static String neutralise(String s) {
         if (s == null || s.isEmpty()) return s;
         if (s.charAt(0) == '\t' || s.charAt(0) == '\r') return "'" + s;
         int i = 0;
@@ -56,7 +61,7 @@ final class ReportXlsx {
     private static final String FORMULA_LEADS = "=+-@|%\uFF1D\uFF0B\uFF0D\uFF20";
 
     /** Write {@code rows} to {@code target} as a one-sheet workbook with a header row. */
-    static void write(String sheet, List<Map<String, Object>> rows, Path target) throws Exception {
+    public static void write(String sheet, List<Map<String, Object>> rows, Path target) throws Exception {
         Path dir = target.toAbsolutePath().getParent();
         Files.createDirectories(dir);
         Set<String> header = new LinkedHashSet<>();
@@ -98,6 +103,42 @@ final class ReportXlsx {
                 st.execute("COPY report_out TO '" + target.toAbsolutePath().toString().replace('\\', '/').replace("'", "''")
                         + "' (FORMAT xlsx, HEADER true, SHEET '" + sheetName(sheet).replace("'", "''") + "')");
             }
+        }
+    }
+
+    /** One sheet of a {@link #writeSheets} workbook: its (already valid) name and its rows. */
+    public record Sheet(String name, List<Map<String, Object>> rows) {}
+
+    /**
+     * Write {@code sheets} to {@code target} as ONE workbook, a sheet per entry in order. Each sheet is written
+     * by {@link #write} (sealed connection, neutraliser) to its own one-sheet part beside the target — DuckDB's
+     * writer rewrites the file on every {@code COPY} — then {@link XlsxSheetMerger} stitches the parts into a
+     * temporary file that is moved onto {@code target} atomically, so a reader never sees half a workbook and a
+     * failure leaves the previous one in place.
+     */
+    public static void writeSheets(List<Sheet> sheets, Path target) throws Exception {
+        if (sheets.isEmpty()) throw new IllegalArgumentException("a workbook needs at least one sheet");
+        Path dir = target.toAbsolutePath().getParent();
+        Files.createDirectories(dir);
+        Path parts = Files.createTempDirectory(dir, ".xlsx-parts-");
+        try {
+            List<Path> files = new ArrayList<>();
+            List<String> names = new ArrayList<>();
+            for (int i = 0; i < sheets.size(); i++) {
+                Path part = parts.resolve("part" + i + ".xlsx");
+                write(sheets.get(i).name(), sheets.get(i).rows(), part);
+                files.add(part);
+                names.add(sheetName(sheets.get(i).name()));
+            }
+            Path staged = parts.resolve("workbook.xlsx");
+            XlsxSheetMerger.merge(files, names, staged);
+            Files.move(staged, target.toAbsolutePath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } finally {
+            try (var walk = Files.list(parts)) {
+                for (Path p : walk.toList()) Files.deleteIfExists(p);
+            }
+            Files.deleteIfExists(parts);
         }
     }
 

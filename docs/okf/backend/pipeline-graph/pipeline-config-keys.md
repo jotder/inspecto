@@ -77,12 +77,13 @@ Declares: **spec** = `FieldSpec` in `ConfigSpecs.pipeline()`; **parser-only** = 
 | `parsing` | spec, partially (`parsing.grammar` is the canonical grammar ref; `source_timezone` / `delimited.*` are rule-only) | `mergeParsing` / `resolveGrammarRef` → format frontends | Parse drawer; New-pipeline writes `parsing.frontend` (D3) |
 | `processing` | spec block (see next table) | ingest runtime | Parse drawer + per-key surfaces below |
 | `output` | spec (`format`/`compression`/`filename_column`) | ingest strategies / `PartitionWriter` | sink node config |
-| `output_store` | spec (since 2026-08-31, gap 8) | `PipelineConfig.prepare()` **arming condition** for `steps:`/`dedup`/`summarize`/`join`/`webhook`; `PipelineLift.stageTwo`; `SchedulerAuditTask` orphan report | hand / schema form; required to arm a Stage-2 chain (`stage-two-blocks-require-output-store`, ERROR at save) |
+| `output_store` | spec (since 2026-08-31, gap 8) | `PipelineConfig.prepare()` **arming condition** for `steps:`/`dedup`/`summarize`/`join`/`webhook`/`excel`; `PipelineLift.stageTwo`; `SchedulerAuditTask` orphan report | hand / schema form; required to arm a Stage-2 chain (`stage-two-blocks-require-output-store`, ERROR at save) |
 | `sinks` | spec — a list of objects: `FieldSpec.listOf` with an item spec (`database` required; `format`/`compression`/`filename_column`/`ducklake.*` optional, since an omitted key inherits `output:`), so a non-list, a non-map entry or an entry with no `database` is a 422 at save rather than a load-time throw ([output-sinks](../engine/output-sinks.md)) | `IngestSinkWriter` / `ConsignmentGraphRunner` — `database` is the branch↔sink join key | canvas (multiple destinations) |
 | `route` | parser-only | `ConsignmentGraphRunner` — branch-aware **ingest lane only**; refused inside `steps:` by both paths | canvas route node + branch predicates |
 | `steps` | parser-only — **entry kept deliberately** (no item-schema facility; declaring it would game the ratchet) | `PipelineLift` authored-order chain → at-rest `pipeline_config:` job | Recipe view step cards (`<app-pipeline-step-cards>`) |
 | `trigger` | parser-only | `PipelineScheduler` (`every:`/`cron:` per-tick gate); dataset-commit trigger (`on:dataset`) | canvas trigger nodes (`trigger__every`/`trigger__cron` borrow the top-level keys); `trigger.type` is derived |
 | `webhook` | spec (`connection`/`batch_size`/`retry`, since 2026-09-23) | `PipelineLift.stageTwo` → `sink.webhook` branch → `WebhookSink` (at rest only; `prepare()` refuses the ingest lane); **strict keys**, and an authored `url:`/`token:` is refused by name | the `sink.webhook` node drawer (verbatim) / recipe verb `webhook:` ([step-catalog](step-catalog.md#webhook--sinkwebhook--the-outbound-webhook)) |
+| `excel` | spec (`path`/`sheets`/`max_rows`, since 2026-10-06) | `PipelineLift.stageTwo` → `sink.excel` branch → `ExcelSink` → `XlsxWorkbook` (at rest only; `prepare()` refuses the ingest lane); **strict keys**; sheet names refused (never repaired) by Excel's rule; each sheet's `sql` checked by `SqlGuard` at save and at write | the `sink.excel` node drawer (`path`, `max_rows`; `sheets` as a verbatim additional-config row) / recipe verb `excel:` ([step-catalog](step-catalog.md#excel--sinkexcel--the-excel-workbook-sink)) |
 
 Rules that cut across blocks:
 
@@ -247,6 +248,10 @@ against, round-tripped untouched.
 | `dirs.poll` | spec |
 | `dirs.status_dir` | spec |
 | `dirs.temp` | spec |
+| `excel` | spec |
+| `excel.max_rows` | spec |
+| `excel.path` | spec |
+| `excel.sheets` | spec |
 | `id` | spec |
 | `name` | spec |
 | `output` | spec |

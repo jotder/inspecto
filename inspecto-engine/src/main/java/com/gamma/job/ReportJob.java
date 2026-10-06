@@ -12,6 +12,7 @@ import com.gamma.notify.MailAttachments;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
+import com.gamma.pipeline.XlsxWorkbook;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.MeasureCompiler;
 import com.gamma.query.QueryExecutor;
@@ -48,7 +49,7 @@ import java.util.Set;
  *       (component id, required), {@code measures} (comma-separated {@code agg(field)}/{@code count};
  *       absent = raw rows), {@code group_by} (comma-separated columns), {@code limit} (default 10000).
  *       Renders CSV by default ({@code format: xlsx} a workbook via DuckDB's {@code excel} extension on a
- *       sealed connection, {@link ReportXlsx}; {@code format: png}/{@code pdf} render a table-image snapshot, capped
+ *       sealed connection, {@link XlsxWorkbook}; {@code format: png}/{@code pdf} render a table-image snapshot, capped
  *       at {@link TablePngRenderer#MAX_ROWS} rows — {@code pdf} is the same snapshot wrapped in a
  *       minimal hand-written PDF via {@link PdfRenderer}, no PDF library on the classpath); reports
  *       render JSON.</li>
@@ -58,7 +59,7 @@ import java.util.Set;
  * ({@code json} | {@code csv} | {@code xlsx} | {@code png} | {@code pdf}), {@code recipients} (comma-separated
  * addresses mailed once the artifact is delivered), {@code attach} ({@code true} attaches it), and the
  * dataset-scope params above. Text cells in {@code csv} and {@code xlsx} are formula-neutralised
- * ({@link ReportXlsx#neutralise}).
+ * ({@link XlsxWorkbook#neutralise}).
  */
 final class ReportJob implements Job {
 
@@ -184,7 +185,7 @@ final class ReportJob implements Job {
         if ("xlsx".equals(format)) {
             if (rows == null) throw new IllegalArgumentException(
                     "format xlsx requires scope dataset (rollup reports render as json)");
-            ReportXlsx.write(cfg.name(), rows, artifact);
+            XlsxWorkbook.write(cfg.name(), rows, artifact);
         } else if ("csv".equals(format)) {
             if (rows == null) throw new IllegalArgumentException(
                     "format csv requires scope dataset (rollup reports render as json)");
@@ -293,7 +294,7 @@ final class ReportJob implements Job {
     }
 
     private static String csv(String raw) {
-        String s = ReportXlsx.neutralise(raw);   // CSV injection: the same rule as the workbook
+        String s = XlsxWorkbook.neutralise(raw);   // CSV injection: the same rule as the workbook
         return (s.contains(",") || s.contains("\"") || s.contains("\n"))
                 ? "\"" + s.replace("\"", "\"\"") + "\"" : s;
     }

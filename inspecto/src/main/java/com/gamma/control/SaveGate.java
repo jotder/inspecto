@@ -89,6 +89,7 @@ final class SaveGate {
         // Referential: a collector bound to a Connection this Space does not have throws once per poll.
         if (referents == Referents.MUST_EXIST) f.addAll(ConfigRoutes.unknownConnectionFindings(type, draft, api));
         f.addAll(webhookFindings(type, draft, api, referents));
+        f.addAll(excelFindings(type, draft));
         // A block no component reads is a SILENT LOSS (`DUCKLE-C3-DEAD-PROPERTY-1`).
         f.addAll(AcceptedConfigKeys.unknownKeyFindings(type, draft, Severity.ERROR));
         // TYPEFLOW-CONSUMERS-1 (a): need the declared columns, hence the config's own directory.
@@ -165,6 +166,33 @@ final class SaveGate {
         for (Finding f : before) pre.add(PipelineSupport.findingKey(f));
         return after.stream().filter(f -> f.severity() == Severity.ERROR)
                 .filter(f -> !pre.contains(PipelineSupport.findingKey(f))).toList();
+    }
+
+    /**
+     * The {@code excel:} block ({@code sink.excel}), judged at save as {@code ExcelSink.plan} judges it at run
+     * time: the parser's own refusals (path, sheet names, row cap, keys) and {@code SqlGuard} on every sheet's
+     * {@code sql}. Regardless of {@code active}: a draft that cannot load is not a draft worth keeping.
+     */
+    static List<Finding> excelFindings(String type, Map<String, Object> draft) {
+        if (!"pipeline".equals(type) || draft.get("excel") == null) return List.of();
+        String fix = "keep path (relative, .xlsx), sheets [{name, sql}] and max_rows; sql is one read-only SELECT over input";
+        if (!(draft.get("excel") instanceof Map<?, ?> block))
+            return List.of(new Finding(Severity.ERROR, "excel", "excel: must be a map ({path, sheets, max_rows})",
+                    FindingCodes.ERR_EXCEL_INVALID, fix));
+        PipelineConfig.Excel e;
+        try {
+            e = PipelineConfig.Excel.fromMap(block);
+        } catch (IllegalArgumentException refused) {
+            return List.of(new Finding(Severity.ERROR, "excel", refused.getMessage(), FindingCodes.ERR_EXCEL_INVALID, fix));
+        }
+        List<Finding> out = new ArrayList<>();
+        for (int i = 0; i < e.sheets().size(); i++) {
+            String problem = com.gamma.pipeline.exec.ExcelSink.sqlProblem(e.sheets().get(i).sql());
+            if (problem != null)
+                out.add(new Finding(Severity.ERROR, "excel.sheets[" + i + "].sql", "sheet '"
+                        + e.sheets().get(i).name() + "' refused: " + problem, FindingCodes.ERR_EXCEL_INVALID, fix));
+        }
+        return out;
     }
 
     /**

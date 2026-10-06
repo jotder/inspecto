@@ -56,6 +56,13 @@ public final class DryRunSinkWriter implements PipelineExecutor.SinkWriter {
                     sink.id(), rows < 0 ? "an unknown number of" : String.valueOf(rows), t.webhook().connection());
             return;
         }
+        // sink.excel: check the block and every sheet's SQL as the write would, then write NOTHING.
+        if (BuiltinNodeType.SINK_EXCEL.type().equals(sink.type())) {
+            com.gamma.etl.PipelineConfig.Excel e = ExcelSink.plan(sink);
+            log.info("[PIPELINEJOB] dry run: sink '{}' would write {} sheet(s) to '{}' — nothing written",
+                    sink.id(), e.sheets().size(), e.path());
+            return;
+        }
         if (sink.type().endsWith(".view")) {
             log.info("[PIPELINEJOB] dry run: sink '{}' ({}) is a logical view — nothing to simulate",
                     sink.id(), sink.type());

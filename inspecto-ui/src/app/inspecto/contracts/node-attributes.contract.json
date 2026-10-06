@@ -889,5 +889,21 @@
     "type" : "string",
     "tier" : "advanced",
     "placeholder" : "60s"
+  } ],
+  "sink.excel" : [ {
+    "key" : "path",
+    "label" : "Workbook path",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "Where the .xlsx is written, relative to the Space's data root. Replaced on every run.",
+    "placeholder" : "reports/orders.xlsx"
+  }, {
+    "key" : "max_rows",
+    "label" : "Rows per sheet",
+    "type" : "number",
+    "tier" : "optional",
+    "min" : 1.0,
+    "max" : 1048575.0,
+    "help" : "A sheet with more rows fails the run instead of being cut short. Blank = 100000."
   } ]
 }

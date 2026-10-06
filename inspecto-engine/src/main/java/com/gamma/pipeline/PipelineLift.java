@@ -50,6 +50,8 @@ public final class PipelineLift {
     static final String GAP               = "gap";
     /** The {@code sink.webhook} node ({@code webhook:}) — one per flat file, on both lifts. */
     static final String WEBHOOK           = "webhook";
+    /** The {@code sink.excel} node ({@code excel:}) — one per flat file, on both lifts. */
+    static final String EXCEL             = "excel";
 
     /** Lift a loaded {@link PipelineConfig} into a {@link PipelineGraph}. */
     public static PipelineGraph lift(PipelineConfig cfg) {
@@ -114,6 +116,21 @@ public final class PipelineLift {
                     "POSTs rows to Connection '" + cfg.webhook().connection() + "'",
                     new LinkedHashMap<>(cfg.webhookConfig()), null));
             if (feed != null) edges.add(PipelineEdge.data(feed, WEBHOOK));
+        }
+        // 5. the Excel workbook (excel:) — the same second-branch placement and the same "emit for EVERY file
+        //    carrying the block" rule as the webhook above, for the same silent-edit-loss reason.
+        if (cfg.excelConfig() != null) {
+            String feed = null;
+            for (PipelineEdge e : edges) {
+                if (!PipelineRel.DATA.equals(e.rel())) continue;
+                for (PipelineNode n : nodes)
+                    if (n.id().equals(e.to()) && BuiltinNodeType.SINK_PERSISTENT.type().equals(n.type())
+                            && !QUARANTINE.equals(n.id())) { feed = e.from(); break; }
+                if (feed != null) break;
+            }
+            nodes.add(new PipelineNode(EXCEL, BuiltinNodeType.SINK_EXCEL.type(), "Excel workbook",
+                    "Writes " + cfg.excel().path(), new LinkedHashMap<>(cfg.excelConfig()), null));
+            if (feed != null) edges.add(PipelineEdge.data(feed, EXCEL));
         }
 
         // Phase 4 S4 (D-13): overlay the authored disable list onto the lifted nodes — the flat file's
@@ -205,7 +222,7 @@ public final class PipelineLift {
         String name = cfg.identity().pipelineName();
         List<PipelineConfig.Step> steps = cfg.steps();
         // A webhook alone is a Stage-2 chain worth running: "send what landed" needs no transform.
-        if (steps.isEmpty() && cfg.webhook() == null)
+        if (steps.isEmpty() && cfg.webhook() == null && cfg.excel() == null)
             throw new IllegalArgumentException("pipeline '" + name + "' has no Stage-2 chain to lift");
         String out = cfg.outputStore();
         if (out == null)
@@ -266,6 +283,12 @@ public final class PipelineLift {
             nodes.add(new PipelineNode(WEBHOOK, BuiltinNodeType.SINK_WEBHOOK.type(), "Webhook", null,
                     new LinkedHashMap<>(cfg.webhookConfig()), null));
             edges.add(PipelineEdge.data(upstream, WEBHOOK));
+        }
+        // The Excel workbook: the same second-branch placement (a failed write fails the run).
+        if (cfg.excelConfig() != null) {
+            nodes.add(new PipelineNode(EXCEL, BuiltinNodeType.SINK_EXCEL.type(), "Excel workbook", null,
+                    new LinkedHashMap<>(cfg.excelConfig()), null));
+            edges.add(PipelineEdge.data(upstream, EXCEL));
         }
 
         return new PipelineGraph(name + "_stage2", cfg.active(), nodes, edges);

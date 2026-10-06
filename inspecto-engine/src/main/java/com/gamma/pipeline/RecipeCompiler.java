@@ -17,7 +17,7 @@ import static com.gamma.util.Values.str;
  * finding 2: compile-at-authoring, the registry learns no second format).
  *
  * <p><b>Verb coverage:</b> {@code collect / parse / map / dedup / route / summarize / transform.filter
- * / sink / webhook} — every linear-chain verb except the Signal-bus unification's own. {@code map} folds into
+ * / sink / webhook / excel} — every linear-chain verb except the Signal-bus unification's own. {@code map} folds into
  * the parser node (schema/mapping resolution is parser-owned in the flat config); {@code summarize}
  * and {@code transform.join} (D-4's {@code transform: {join: references/x, on: k}} →
  * {@code processing.join}) execute on the at-rest Stage-2 path — {@code PipelineJobRunner} lifts them
@@ -135,6 +135,7 @@ public final class RecipeCompiler {
                 case "profile" -> nodes.add(profile(id, cfg, refusals));
                 case "running" -> nodes.add(running(id, cfg, refusals));
                 case "webhook" -> nodes.add(webhook(id, cfg, refusals));
+                case "excel" -> nodes.add(excel(id, cfg, refusals));
                 case "step" -> nodes.add(contributedStep(id, cfg, refusals));
                 default -> refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
                         "unknown step verb '" + verb + "'"));
@@ -371,6 +372,19 @@ public final class RecipeCompiler {
             refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
                     "step kind '" + kind + "' is not a loaded pack-contributed step (a built-in kind uses its own verb)"));
         return PipelineNode.of(id, type, rest);
+    }
+
+    /** {@code excel:} → the {@code sink.excel} node ({@code {path, sheets, max_rows}}, verbatim — it lowers to the
+     *  top-level {@code excel:} block), validated beside its own step like {@code webhook:}. */
+    private static PipelineNode excel(String id, Map<String, Object> cfg,
+                                      List<PipelineCompileException.Refusal> refusals) {
+        PipelineNode n = PipelineNode.of(id, BuiltinNodeType.SINK_EXCEL.type(), new LinkedHashMap<>(cfg));
+        try {
+            com.gamma.pipeline.exec.ExcelSink.plan(n);
+        } catch (IllegalStateException e) {
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id, e.getMessage()));
+        }
+        return n;
     }
 
     /** {@code sink} → persistent sink node (keys pass verbatim: table/format/compression/database/…). */

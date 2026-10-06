@@ -68,6 +68,9 @@ final class IngestSinkWriter implements PipelineExecutor.SinkWriter {
         if (com.gamma.pipeline.BuiltinNodeType.SINK_WEBHOOK.type().equals(sink.type()))
             throw new IllegalStateException("sink '" + sink.id() + "' is a webhook, which runs on the at-rest "
                     + "lane only (output_store: + a pipeline_config: job), never on the ingest lane");
+        if (com.gamma.pipeline.BuiltinNodeType.SINK_EXCEL.type().equals(sink.type()))
+            throw new IllegalStateException("sink '" + sink.id() + "' is an Excel workbook, which runs on the "
+                    + "at-rest lane only (output_store: + a pipeline_config: job), never on the ingest lane");
         PipelineConfig.Sink dest = destinationOf(sink);
         // The same re-rooting rule as writeAndTrace's fan-out: dbDir's suffix beyond dirs.database
         // (e.g. the table subdir) is preserved under the destination's own database root.

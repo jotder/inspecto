@@ -127,6 +127,11 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
             WebhookSink.deliver(conn, sink, inputTable, consignmentId);
             return;
         }
+        // sink.excel: a report file under the data root, not a store — no registry row, not counted as resting rows.
+        if (BuiltinNodeType.SINK_EXCEL.type().equals(sink.type())) {
+            ExcelSink.write(conn, sink, inputTable, java.nio.file.Path.of(dataDir));
+            return;
+        }
         if (sink.type().endsWith(".view")) {     // logical store — no bytes; PipelineJobRunner registers its definition
             log.info("[PIPELINEJOB] sink '{}' ({}) is a logical view — no bytes (definition registered by the pipeline job)",
                     sink.id(), sink.type());

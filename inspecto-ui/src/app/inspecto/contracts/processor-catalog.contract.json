@@ -1052,8 +1052,10 @@
     "label" : "Excel multi-tab report sink",
     "emoji" : "📑",
     "icon" : "heroicons_outline:table-cells",
-    "status" : "planned",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "sink.excel",
+    "note" : "top-level `excel:` — named sheets of one .xlsx under the data root, a read-only SELECT per sheet, at-rest lane",
+    "addable" : true
   }, {
     "id" : "sink.stream.kafka",
     "family" : "SNK",

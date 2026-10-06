@@ -78,6 +78,11 @@ public final class PipelineEditable {
     /** A {@code sink.webhook} node whose config the {@code webhook:} parser refuses (no connection, an
      *  authored {@code url:}, an unknown key, a batch size out of bounds) — refused at save, not at the first POST. */
     public static final String WEBHOOK_INVALID = "WEBHOOK_INVALID";
+    /** A second {@code sink.excel} node — the flat file has ONE {@code excel:} block. */
+    public static final String MULTI_EXCEL = "MULTI_EXCEL";
+    /** A {@code sink.excel} node whose config the {@code excel:} parser or a sheet's {@code SqlGuard} check
+     *  refuses (no path, a bad sheet name, a path leaving the data root, a non-SELECT sheet) — refused at save. */
+    public static final String EXCEL_INVALID = "EXCEL_INVALID";
     /** A {@code parser.delimited} node whose {@code parsing.frontend} names a DIFFERENT frontend. */
     public static final String PARSER_FRONTEND_MISMATCH = "PARSER_FRONTEND_MISMATCH";
     /**
@@ -691,8 +696,8 @@ public final class PipelineEditable {
         return c;
     }
 
-    /** A {@code sink.webhook} node's config as the {@code webhook:} block: verbatim, minus the node-level
-     *  {@code enabled} flag (whose flat home is {@code processing.disabled_steps}). */
+    /** A {@code sink.webhook} (or {@code sink.excel}) node's config as its {@code webhook:} ({@code excel:}) block:
+     *  verbatim, minus the node-level {@code enabled} flag (whose flat home is {@code processing.disabled_steps}). */
     private static Map<String, Object> webhookSection(PipelineNode n) {
         Map<String, Object> c = new LinkedHashMap<>(n.config());
         c.remove("enabled");
@@ -741,7 +746,7 @@ public final class PipelineEditable {
         List<PipelineCompileException.Refusal> refusals = new ArrayList<>();
 
         PipelineNode acq = null, parser = null, gap = null, marker = null;
-        PipelineNode primarySink = null, quarantineSink = null, webhook = null;
+        PipelineNode primarySink = null, quarantineSink = null, webhook = null, excel = null;
         // The transform chain in authored order — the five kinds the flat file can hold. Order is node
         // order, which is what the editor sends and what PipelineLift emits; the flat file has no edges,
         // so there is no topology to sort by at this point.
@@ -823,6 +828,18 @@ public final class PipelineEditable {
                     refusals.add(new PipelineCompileException.Refusal(SQL_STEP_EMPTY, n.id(),
                             "a transform.sql node needs a non-blank 'sql' SELECT"));
                 chain.add(n);
+            }
+            else if (BuiltinNodeType.SINK_EXCEL.type().equals(t)) {
+                if (excel != null) refusals.add(new PipelineCompileException.Refusal(MULTI_EXCEL, n.id(),
+                        "the flat pipeline config has one excel: block and '" + excel.id() + "' already holds it"));
+                else {
+                    excel = n;
+                    try {
+                        com.gamma.pipeline.exec.ExcelSink.plan(n);
+                    } catch (IllegalStateException e) {
+                        refusals.add(new PipelineCompileException.Refusal(EXCEL_INVALID, n.id(), e.getMessage()));
+                    }
+                }
             }
             else if (BuiltinNodeType.SINK_WEBHOOK.type().equals(t)) {
                 if (webhook != null) refusals.add(new PipelineCompileException.Refusal(MULTI_WEBHOOK, n.id(),
@@ -1035,6 +1052,13 @@ public final class PipelineEditable {
             out.put("webhook", webhookSection(webhook));
         } else if (strict) {
             out.remove("webhook");
+        }
+
+        // Excel workbook → the top-level excel: block, node config verbatim (it IS the block)
+        if (excel != null) {
+            out.put("excel", webhookSection(excel));
+        } else if (strict) {
+            out.remove("excel");
         }
 
         // authored map projection → processing.map ({columns, rules}). ⚠ Unlike its three neighbours

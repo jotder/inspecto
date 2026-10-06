@@ -217,6 +217,12 @@ public enum BuiltinNodeType implements PipelineNodeType {
     SINK_WEBHOOK("sink.webhook", NodeCategory.SINK, "Webhook",
             "POSTs the batch's rows as JSON to an https Connection, batch_size rows per request.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.SUCCESS, PipelineRel.FAILURE), false, FlatHome.BLOCK),
+    // Excel workbook (catalog `sink.file.excel`, operator 2026-10-06). Flat home: the top-level excel: block
+    // {path, sheets, max_rows}. A commit BRANCH beside the output_store: sink on the at-rest lane, exactly like
+    // sink.webhook; executed by ExcelSink through XlsxWorkbook, the report job's sealed workbook writer.
+    SINK_EXCEL("sink.excel", NodeCategory.SINK, "Excel workbook",
+            "Writes the rows as named sheets of one .xlsx under the Space's data root, one read-only SELECT per sheet.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.SUCCESS, PipelineRel.FAILURE), false, FlatHome.BLOCK),
 
     // ── reporting / notification ────────────────────────────────────────────────────
     GAP("gap", NodeCategory.CONTROL, "Gap detection",

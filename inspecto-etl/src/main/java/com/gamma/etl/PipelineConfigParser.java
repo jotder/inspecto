@@ -161,6 +161,16 @@ final class PipelineConfigParser {
             b.webhookConfig = new LinkedHashMap<>(webhookRaw);
         }
 
+        // ── Excel workbook sink (sink.excel; absent ⇒ none) ── verbatim beside the parsed record, like webhook:
+        Object excelAny = raw.get("excel");
+        if (excelAny != null && !(excelAny instanceof Map))
+            throw new IllegalArgumentException("excel: must be a map ({path, sheets, max_rows})");
+        Map<String, Object> excelRaw = mapAt(raw, "excel");
+        if (excelRaw != null) {
+            b.excel = parseExcel(excelRaw);
+            b.excelConfig = new LinkedHashMap<>(excelRaw);
+        }
+
         // ── entry-node trigger (T13 / §3.6; absent ⇒ default poll = today's behaviour) ──
         // Carried verbatim; the live loop (CollectorService) classifies it via PipelineTrigger into
         // schedule(every/cron) / event / manual. Absent leaves the pipeline on the global poll cycle.
@@ -1551,6 +1561,37 @@ final class PipelineConfigParser {
             }
         }
         return new PipelineConfig.Webhook(conn == null ? null : conn.toString(), batchSize, retry);
+    }
+
+    /**
+     * The {@code excel:} block (also a {@code sink.excel} node's config). Strict about its keys, like
+     * {@code webhook:}: a typo'd {@code maxrows} silently defaulting would move the cap the author chose.
+     */
+    static PipelineConfig.Excel parseExcel(Map<?, ?> block) {
+        if (block == null) throw new IllegalArgumentException("excel: must be a map");
+        for (Object k : block.keySet())
+            if (!PipelineConfig.Excel.KEYS.contains(String.valueOf(k)))
+                throw new IllegalArgumentException("excel: does not understand '" + k + "' (only "
+                        + String.join(" / ", PipelineConfig.Excel.KEYS) + ")");
+        Object path = block.get("path");
+        int maxRows = intOr(block.get("max_rows"), PipelineConfig.Excel.DEFAULT_MAX_ROWS, "excel.max_rows");
+        List<PipelineConfig.Excel.ExcelSheet> sheets = new ArrayList<>();
+        Object list = block.get("sheets");
+        if (list != null && !(list instanceof List<?>))
+            throw new IllegalArgumentException("excel.sheets must be a list ([{name, sql}])");
+        if (list != null) for (Object e : (List<?>) list) {
+            if (!(e instanceof Map<?, ?> m))
+                throw new IllegalArgumentException("excel.sheets: every entry must be a map ({name, sql}), got: " + e);
+            for (Object k : m.keySet())
+                if (!PipelineConfig.Excel.SHEET_KEYS.contains(String.valueOf(k)))
+                    throw new IllegalArgumentException("excel.sheets: does not understand '" + k + "' (only "
+                            + String.join(" / ", PipelineConfig.Excel.SHEET_KEYS) + ")");
+            Object name = m.get("name");
+            Object sql = m.get("sql");
+            sheets.add(new PipelineConfig.Excel.ExcelSheet(name == null ? null : name.toString(),
+                    sql == null || sql.toString().isBlank() ? null : sql.toString()));
+        }
+        return new PipelineConfig.Excel(path == null ? null : path.toString(), sheets, maxRows);
     }
 
     private static String opt(Map<String, Object> m, String key, String def) {

@@ -576,12 +576,28 @@ public final class NodeAttributes {
             NodeAttribute.of("retry__initial_delay", "First retry delay", "string", "advanced").placeholder("1s"),
             NodeAttribute.of("retry__max_delay", "Longest retry delay", "string", "advanced").placeholder("60s"));
 
+    /**
+     * {@code sink.excel} (→ the top-level {@code excel:} block, operator 2026-10-06). ⚠ {@code sheets} — the list
+     * of {@code {name, sql}} maps — has no spec, for the reason {@code transform.route}'s {@code branches} has
+     * none: the {@code list} type is {@code string[]}. The node dialog keeps it as a typed additional-config row
+     * that round-trips verbatim, and the save refuses a missing or invalid one. Keys proven by
+     * {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> SINK_EXCEL = List.of(
+            NodeAttribute.of("path", "Workbook path", "string", "required")
+                    .placeholder("reports/orders.xlsx")
+                    .help("Where the .xlsx is written, relative to the Space's data root. Replaced on every run."),
+            NodeAttribute.of("max_rows", "Rows per sheet", "number", "optional")
+                    .min(1).max(com.gamma.etl.PipelineConfig.Excel.MAX_ROWS)
+                    .help("A sheet with more rows fails the run instead of being cut short. Blank = "
+                            + com.gamma.etl.PipelineConfig.Excel.DEFAULT_MAX_ROWS + "."));
+
     private static final Map<String, List<NodeAttribute>> BY_TYPE = byType();
 
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, SINK_WEBHOOK))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, SINK_WEBHOOK, SINK_EXCEL))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -606,6 +622,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.SINK_MATERIALIZED.type(), OUTPUT);
         m.put(BuiltinNodeType.SINK_VIEW.type(), OUTPUT);
         m.put(BuiltinNodeType.SINK_WEBHOOK.type(), SINK_WEBHOOK);
+        m.put(BuiltinNodeType.SINK_EXCEL.type(), SINK_EXCEL);
         // NOT Map.copyOf: that returns an UNORDERED map, so the committed contract JSON would come out in a
         // different key order on a different JVM run and the drift test would fail at random.
         return java.util.Collections.unmodifiableMap(m);

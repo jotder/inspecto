@@ -157,6 +157,7 @@ public final class PipelineDryRun {
             for (String sinkId : dr.sinkInputs().keySet()) {
                 PipelineNode n = byId.get(sinkId);
                 if (n != null && BuiltinNodeType.SINK_WEBHOOK.type().equals(n.type())) WebhookSink.plan(n);
+                if (n != null && BuiltinNodeType.SINK_EXCEL.type().equals(n.type())) ExcelSink.plan(n);
             }
 
             List<NodeDryRun> nodes = new ArrayList<>();

@@ -499,6 +499,43 @@ class NodeConfigNameContractTest {
     }
 
     /**
+     * The Excel workbook node's contract (operator 2026-10-06): both declared attributes — and the unspecced
+     * {@code sheets} list, which the dialog keeps as a typed additional-config row — survive lift → edit →
+     * lower → re-decode onto the {@link PipelineConfig.Excel} the executor reads.
+     */
+    @Test
+    void excelAttributesReachTheEngine(@TempDir Path dir) throws Exception {
+        Path toon = writeFixture(dir);
+        Map<String, Object> raw = decode(toon);
+        raw.put("excel", new LinkedHashMap<>(Map.of("path", "a.xlsx", "sheets", List.of(Map.of("name", "A")))));
+
+        PipelineConfig cfg = PipelineConfig.fromMap(raw);
+        PipelineGraph g = PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw));
+        List<PipelineNode> nodes = new ArrayList<>();
+        for (PipelineNode n : g.nodes()) {
+            if (!"sink.excel".equals(n.type())) { nodes.add(n); continue; }
+            Map<String, Object> c = new LinkedHashMap<>(n.config());
+            put(c, "path", "reports/q3.xlsx");
+            put(c, "max_rows", 250);
+            c.put("sheets", List.of(Map.of("name", "All"), Map.of("name", "Top", "sql", "SELECT * FROM input LIMIT 5")));
+            nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), c, n.use()));
+        }
+        assertEquals(1, nodes.stream().filter(n -> "sink.excel".equals(n.type())).count(),
+                "the lift presents the excel: block as ONE sink.excel node");
+        Map<String, Object> lowered = PipelineEditable.lower(
+                new PipelineGraph(g.name(), g.active(), nodes, g.edges()), raw, false);
+
+        PipelineConfig.Excel x = PipelineConfig.fromMap(lowered).excel();
+        assertNotNull(x);
+        assertEquals("reports/q3.xlsx", x.path());
+        assertEquals(250, x.maxRows());
+        assertEquals(List.of("All", "Top"), x.sheets().stream().map(PipelineConfig.Excel.ExcelSheet::name).toList());
+        assertEquals("SELECT * FROM input LIMIT 5", x.sheets().get(1).sql());
+        assertEquals(List.of("path", "max_rows"),
+                NodeAttributes.forType("sink.excel").stream().map(NodeAttribute::key).toList());
+    }
+
+    /**
      * The profile node's contract — the round trip {@code BuiltinNodeType.FlatHome} names as the ONE guard on
      * a declared home, and that {@code NodeAttributes.TRANSFORM_PROFILE} claimed as proof before it existed
      * (PROCESSOR-RELEASE-READINESS-1 G7). Full real path: lift → edit → strict lower → {@code ConfigCodec.toToon}

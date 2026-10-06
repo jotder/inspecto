@@ -769,6 +769,67 @@ reach, so they refuse 422 the same way (G8, 2026-09-23; before, they showed the 
 Tests: `WebhookSinkTest`, `WebhookSinkLiftLowerTest`, `PipelineConfigWebhookTest`,
 `HttpWebhookSinkTransportTest` (a JDK `HttpServer` stub), `NodeConfigNameContractTest#webhookAttributesReachTheEngine`.
 
+## `excel` → `sink.excel` — the Excel workbook sink
+
+*Catalog `sink.file.excel`, DELIVERED 2026-10-06. Every edition.*
+
+**Design (operator, 2026-10-06).** The operator named `sink.file.excel`: write one or more relations as
+named **sheets** of a single `.xlsx`, reusing the report job's workbook path (`ASSURE-XLSX-ATTACHMENTS-1`)
+rather than duplicating it. As built:
+
+1. **Node type `sink.excel`, flat home the top-level `excel:` block** — the same shape as `sink.webhook`
+   (catalog id `sink.file.*`, node type `sink.<thing>`). A second commit branch beside the `output_store:`
+   sink, at-rest lane only; `prepare()` refuses an active pipeline whose chain would never reach it
+   (no `output_store:`, a `route:`, a multi-schema layout) and `IngestSinkWriter` throws by name as the backstop.
+2. **"One or more relations" = one or more `sheets:`, each a read-only `sql` over the branch's relation
+   (alias `input`)** — the `transform.sql` rule, checked by `SqlGuard` at load and at save. A sheet with no
+   `sql` is `SELECT * FROM input`.
+3. **One writer, extracted.** `ReportXlsx` moved to `com.gamma.pipeline.XlsxWorkbook` (public) and gained
+   `writeSheets`: each sheet goes through the same sealed DuckDB connection (`excel` loaded explicitly, rows as
+   bound parameters, configuration locked to the output directory) and the same formula neutraliser, then
+   `XlsxSheetMerger` stitches the one-sheet parts — DuckDB's writer rewrites a file on every `COPY`. The
+   report job calls the same class.
+4. **Sheet names are REFUSED, not repaired** — Excel's rule: 1–31 characters, none of `[ ] : * ? / \`, no
+   leading or trailing `'`, not `History`, unique ignoring case. (The report job still sanitises its one name.)
+5. **Row cap per sheet, fail closed.** `max_rows` (default 100000, ceiling 1048575 = Excel's row limit minus the
+   header). A sheet over the cap FAILS the branch; a sink never truncates silently.
+6. **Path jail.** `path` is relative to the Space's data root, ends `.xlsx`, carries no `..` segment (refused at
+   load), and is re-checked at write time with `PathJail.require` against the data root (symlinks included).
+   The workbook is written beside the target and moved into place atomically; each run replaces it.
+7. **Fail closed without the extension.** No loadable `excel` binary ⇒ the write throws with every remedy
+   named (`ExcelExtension`), the branch fails and the source is not finalised.
+
+**Flat home.**
+
+```
+output_store: orders_out
+excel:
+  path: reports/orders.xlsx
+  max_rows: 50000
+  sheets:
+    - {name: Orders}
+    - {name: By region, sql: "SELECT region, count(*) AS orders FROM input GROUP BY region"}
+```
+
+**Configuration.**
+
+| Key | Type | Tier | Default | What it does |
+|---|---|---|---|---|
+| `path` | string | required | — | **Workbook path.** Under the Space's data root, ends `.xlsx`; replaced on every run. |
+| `sheets` | list of `{name, sql}` | required | — | **Sheets.** One sheet per entry, in order; `sql` is a read-only SELECT over `input` (blank = every row). |
+| `max_rows` | number (1–1048575) | optional | `100000` | **Rows per sheet.** A sheet over the cap fails the branch. |
+
+**Code.** `ExcelSink` (plan + write) · `XlsxWorkbook` (the shared writer) · `XlsxSheetMerger` ·
+`PartitionSinkWriter` / `DryRunSinkWriter` (dispatch) · `PipelineConfig.Excel`. Tests: `ExcelSinkTest`,
+`ExcelSinkLiftLowerTest`, `PipelineConfigExcelTest`, `XlsxWorkbookTest`,
+`NodeConfigNameContractTest#excelAttributesReachTheEngine`. Demo: `inspecto/examples/07-steps/excel-sink`.
+
+⚠ **Known edges.** A sheet whose query returns no rows is written with a single `(no rows)` header — the
+shared writer takes its header from the rows, so the column names are lost. `sheets` has no form attribute
+(it is a list of maps; the `list` widget is `string[]`): the drawer keeps it as a typed additional-config row.
+The write-time symlink check (`ExcelSinkTest#aSymlinkOutOfTheDataRootIsRefusedAtWriteTime`) SKIPS on a
+Windows host without symlink rights; the `..`/absolute refusals are pinned everywhere.
+
 ---
 
 ## The delivered processors that are not chain Steps — where their keys live
@@ -1233,7 +1294,7 @@ file to `archive/archive/…`).
 | Alert rule dispatcher | `control.alert.dispatch` | `alert-rule` — Alert Rules over the ledgers → Alerts → channels (board CP-11/CP-15), authored in the Alert Rules pane — not a Step: never on the canvas, so no workbench preview / lift / lower |
 | SLA timeout & heartbeat monitor | `control.sla.monitor` | `completeness-kpi` — completeness KPI + `heartbeat` maintenance task; no SLA object |
 
-## Sinks, Storage & Destinations (`SNK`) — 5<!--count:processors-snk-delivered--> delivered · 3<!--count:processors-snk-partial--> partial · 7<!--count:processors-snk-planned--> planned
+## Sinks, Storage & Destinations (`SNK`) — 6<!--count:processors-snk-delivered--> delivered · 3<!--count:processors-snk-partial--> partial · 6<!--count:processors-snk-planned--> planned
 
 **Delivered**
 
@@ -1244,6 +1305,7 @@ file to `archive/archive/…`).
 | DuckLake catalog (PostgreSQL) sink | `sink.ducklake` | `sink.persistent` — `output.ducklake` — needs the postgresql sidecar (Professional+) |
 | Long-term compliance archive | `sink.archive` | `acquisition` — Collector `post_action: MOVE archive_path` + the `backup` maintenance task |
 | Outbound webhook dispatcher | `sink.api.webhook` | `sink.webhook` — the top-level `webhook:` block: JSON batches to an https Connection, at-rest lane, Professional+ (2026-09-23; [above](#webhook--sinkwebhook--the-outbound-webhook)) |
+| Excel multi-tab report sink | `sink.file.excel` | `sink.excel` — the top-level `excel:` block: named sheets of one .xlsx under the data root, a read-only SELECT per sheet, at-rest lane (2026-10-06; [above](#excel--sinkexcel--the-excel-workbook-sink)) |
 
 **Partial**
 
@@ -1260,7 +1322,6 @@ file to `archive/archive/…`).
 | Delta Lake persistent table sink | `sink.lake.delta` | — |
 | Apache Iceberg append / upsert sink | `sink.lake.iceberg` | — |
 | ClickHouse / StarRocks analytical sink | `sink.db.clickhouse` | — |
-| Excel multi-tab report sink | `sink.file.excel` | — |
 | Apache Kafka topic producer | `sink.stream.kafka` | — |
 | AWS SQS / SNS event publisher | `sink.stream.aws` | — |
 | Dead-letter queue | `sink.dlq` | — |
