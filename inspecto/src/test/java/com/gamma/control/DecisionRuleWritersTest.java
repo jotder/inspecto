@@ -29,8 +29,7 @@ class DecisionRuleWritersTest {
             "BundleRoutes#write", Set.of("BundleRoutes#preparedDecisionRules"),
             "SpaceManager#createFromBundle", Set.of("SpaceRoutes#importSpace"),
             // background template materializer (operator, 2026-10-06); refuses while an approval policy governs
-            // alert-rule/dataset — and runs DecisionRuleGuard.refuseUnattended before its writes
-            "PendingAlertRules#onRiskScoreProduced", Set.of("PendingAlertRules#onRiskScoreProduced"),
+            // alert-rule/dataset — and onRiskScoreProduced runs DecisionRuleGuard.refuseUnattended before its writes
             "PendingAlertRules#ensureLatestDataset", Set.of("PendingAlertRules#onRiskScoreProduced")));
 
     private static final String FIXED_KIND = "writes a fixed kind other than decision-rule";
