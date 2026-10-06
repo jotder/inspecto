@@ -187,6 +187,38 @@ class ControlApiObjectsTest {
     }
 
     @Test
+    void patchWithExpectedVersionRefusesAStaleEdit(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            OperationalObject seed = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "bad rows", "d", "HIGH",
+                    null, null, null, "corr", Map.of());
+            long v0 = json(send(c.port, "GET", "/objects/" + seed.id(), null)).get("version").asLong();
+
+            // matching version → applied, version moves on
+            JsonNode ok = json(send(c.port, "PATCH", "/objects/" + seed.id(),
+                    "{\"priority\":\"MAJOR\",\"version\":" + v0 + "}"));
+            assertEquals("MAJOR", ok.get("priority").asText());
+            long v1 = ok.get("version").asLong();
+            assertNotEquals(v0, v1);
+
+            // stale version (the one held before the edit above) → 409, nothing written
+            HttpResponse<String> stale = send(c.port, "PATCH", "/objects/" + seed.id(),
+                    "{\"priority\":\"LOW\",\"version\":" + v0 + "}");
+            assertEquals(409, stale.statusCode(), stale.body());
+            assertTrue(stale.body().contains("CONFLICT_STALE_VERSION"), stale.body());
+            JsonNode after = json(send(c.port, "GET", "/objects/" + seed.id(), null));
+            assertEquals("MAJOR", after.get("priority").asText(), "a refused stale PATCH writes nothing");
+            assertEquals(v1, after.get("version").asLong());
+
+            // absent version → last-write-wins, unchanged behaviour
+            assertEquals("LOW", json(send(c.port, "PATCH", "/objects/" + seed.id(),
+                    "{\"priority\":\"LOW\"}")).get("priority").asText());
+            // malformed version → 400
+            assertEquals(400, send(c.port, "PATCH", "/objects/" + seed.id(),
+                    "{\"priority\":\"LOW\",\"version\":\"x\"}").statusCode());
+        }
+    }
+
+    @Test
     void workflowReadServesTheEffectiveLifecycle(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             JsonNode caseWf = json(send(c.port, "GET", "/workflows/CASE", null));

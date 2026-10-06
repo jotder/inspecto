@@ -779,7 +779,9 @@ public final class ObjectRoutes implements RouteModule {
      * {@code {priority?, severity?, assignee?, attributes?}} (attributes merge over the stored bag,
      * updates win). The mail view's Prioritize / tagging saves ride this (the postmortem and category moved
      * to their own {@code canWorkIncidents} routes, 2026-09-26). At least one
-     * field → else 400; unknown id → 404. No workflow involvement — status changes stay on
+     * field → else 400; unknown id → 404. Optional {@code version} (the integer a GET returned): if the stored
+     * object has moved on → 409 {@code CONFLICT_STALE_VERSION}, nothing written; absent → last-write-wins
+     * (Postgres multi-user, 2026-10-06). No workflow involvement — status changes stay on
      * {@code /objects/{id}/transition}.
      */
     private Object patchObject(ApiContext api, String id, Map<String, Object> body) {
@@ -794,6 +796,11 @@ public final class ObjectRoutes implements RouteModule {
         String assignee = ApiContext.str(body, "assignee");
         if (priority == null && severity == null && assignee == null && attrs == null)
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include at least one of 'priority', 'severity', 'assignee', 'attributes'");
+        Long expectedVersion = null;
+        Object v = body.get("version");
+        if (v instanceof Number n && n.doubleValue() == n.longValue()) expectedVersion = n.longValue();
+        else if (v != null)
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'version' must be the integer version a GET returned");
         if (attrs != null) {
             // WS-10: the impact and the Disposition have their own validated, audited writes — the PATCH's
             // free attribute merge would bypass validation, the closed-books rule and the before/after audit.
@@ -802,7 +809,7 @@ public final class ObjectRoutes implements RouteModule {
             validateFindings(api, id, attrs);
         }
         try {
-            return OpsEngine.of(api).patch(id, priority, severity, assignee, attrs).toMap();
+            return OpsEngine.of(api).patch(id, expectedVersion, priority, severity, assignee, attrs).toMap();
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }

@@ -359,8 +359,21 @@ public final class ObjectService {
      */
     public OperationalObject patch(String id, String priority, String severity, String assignee,
                                    Map<String, String> attributes) {
+        return patch(id, null, priority, severity, assignee, attributes);
+    }
+
+    /**
+     * {@link #patch(String, String, String, String, Map)} with an optional client-held {@code expectedVersion}
+     * (the {@code version} a GET returned): when non-null and the stored object is at any other version, nothing
+     * is written and {@link ObjectVersionConflictException} is thrown — a client's stale edit is refused rather
+     * than silently re-applied over a newer one. {@code null} keeps the last-write-wins merge.
+     */
+    public OperationalObject patch(String id, Long expectedVersion, String priority, String severity,
+                                   String assignee, Map<String, String> attributes) {
         return retrying(() -> {
             OperationalObject obj = require(id);
+            if (expectedVersion != null && obj.version() != expectedVersion)
+                throw new ObjectVersionConflictException(id, expectedVersion);
             long now = System.currentTimeMillis();
             OperationalObject next = obj;
             if (priority != null) next = next.withPriority(priority, now);
