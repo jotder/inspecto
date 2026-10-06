@@ -17,7 +17,7 @@
             } @else if (error(); as e) {
                 <p class="text-warn text-sm" role="alert">{{ e }}</p>
                 <button mat-stroked-button type="button" class="mt-2" (click)="load()">Retry</button>
-            } @else if (models().length === 0) {
+            } @else if (models().length === 0 && heldCreates().length === 0) {
                 <inspecto-empty-state
                     icon="heroicons_outline:scale"
                     title="No Risk Scores yet"
@@ -25,7 +25,7 @@
                 ></inspecto-empty-state>
             } @else {
                 <ul class="flex flex-col gap-1">
-                    @for (m of models(); track m.id; let first = $first) {
+                    @for (m of models(); track m.id) {
                         <li>
                             <button
                                 type="button"
@@ -41,8 +41,20 @@
                                 @if (m.invalid) {
                                     <inspecto-status-badge value="error" label="Invalid"></inspecto-status-badge>
                                 }
-                                <app-risk-score-held-badge [model]="m.id" [loads]="first"></app-risk-score-held-badge>
+                                <app-risk-score-held-badge [model]="m.id"></app-risk-score-held-badge>
                             </button>
+                        </li>
+                    }
+                    @for (p of heldCreates(); track p.id) {
+                        <li class="rounded-lg px-3 py-2" data-held-create>
+                            <span class="block text-sm font-semibold">{{ p.name }}</span>
+                            <span class="text-secondary block text-xs">
+                                New, proposed by {{ p.author }} · {{ p.createdAt }}
+                            </span>
+                            <inspecto-status-badge value="pending" label="Awaiting approval"></inspecto-status-badge>
+                            <a class="text-primary block text-xs underline" routerLink="/pending-changes">
+                                Review {{ p.name }} in Pending Changes
+                            </a>
                         </li>
                     }
                 </ul>

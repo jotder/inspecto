@@ -8,7 +8,7 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ComponentDef, ComponentsService } from 'app/inspecto/api/components.service';
 import { RiskScoresService } from 'app/inspecto/api/risk-scores.service';
-import { PendingChangesService } from 'app/inspecto/api/pending-changes.service';
+import { PendingChange, PendingChangesService } from 'app/inspecto/api/pending-changes.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { RiskScoresComponent } from './risk-scores.component';
 
@@ -30,7 +30,7 @@ const BROKEN: ComponentDef = {
     content: { id: 'broken' },
 };
 
-function create(list: () => unknown) {
+function create(list: () => unknown, pending: unknown[] = []) {
     const latest = vi.fn(() =>
         of({
             model: 'sim_box',
@@ -80,7 +80,10 @@ function create(list: () => unknown) {
             { provide: RiskScoresService, useValue: { latest, preview } },
             { provide: MatDialog, useValue: { open } },
             { provide: ToastrService, useValue: {} },
-            { provide: PendingChangesService, useValue: { list: () => of({ items: [], total: 0, truncated: false }) } },
+            {
+                provide: PendingChangesService,
+                useValue: { list: () => of({ items: pending, total: pending.length, truncated: false }) },
+            },
         ],
     });
     TestBed.overrideComponent(RiskScoresComponent, { set: { changeDetection: ChangeDetectionStrategy.Eager } });
@@ -162,5 +165,49 @@ describe('RiskScoresComponent', () => {
         const { el } = create(() => throwError(() => ({ status: 500 })));
         expect(el.querySelector('[role="alert"]')?.textContent).toContain('Could not load Risk Scores');
         expect(el.querySelector('inspecto-empty-state')).toBeNull();
+    });
+
+    const held = (name: string, operation: PendingChange['operation'], kind = 'risk-score'): PendingChange =>
+        ({
+            id: 'pc-' + name,
+            kind,
+            name,
+            operation,
+            status: 'pending',
+            author: 'maker1',
+            reason: null,
+            createdAt: '2026-10-06T09:00:00Z',
+        }) as PendingChange;
+
+    it('shows a held create as a read-only Awaiting approval row linked to Pending Changes', async () => {
+        const { fixture, el, latest } = create(() => of([]), [held('new_model', 'create')]);
+        expect(el.querySelector('inspecto-empty-state')).toBeNull();
+        const row = el.querySelector('[data-held-create]') as HTMLElement;
+        expect(row.textContent).toContain('new_model');
+        expect(row.textContent).toContain('maker1');
+        expect(row.textContent).toContain('Awaiting approval');
+        expect(row.querySelector('a')?.getAttribute('href')).toBe('/pending-changes');
+        // not selectable: no button, so no stored model is ever loaded
+        expect(row.querySelector('button')).toBeNull();
+        row.click();
+        fixture.detectChanges();
+        expect(el.querySelector('section h2')).toBeNull();
+        expect(latest).not.toHaveBeenCalled();
+        await expectNoA11yViolations(el);
+    });
+
+    it('shows no held row for an absent, non-risk-score or non-create Pending Change', () => {
+        const { el } = create(() => of([]), [held('other', 'create', 'alert-rule'), held('gone', 'delete')]);
+        expect(el.querySelector('[data-held-create]')).toBeNull();
+        expect(el.querySelector('inspecto-empty-state')).not.toBeNull();
+    });
+
+    it('keeps a held edit of a stored model as a badge only, never a duplicate row', () => {
+        const { el } = create(() => of([MODEL]), [held('sim_box', 'update'), held('sim_box_2', 'create')]);
+        const items = Array.from(el.querySelectorAll('nav li'));
+        expect(items.length).toBe(2);
+        expect(items[0].textContent).toContain('Awaiting approval');
+        expect(el.querySelectorAll('[data-held-create]').length).toBe(1);
+        expect(el.querySelector('[data-held-create]')?.textContent).toContain('sim_box_2');
     });
 });

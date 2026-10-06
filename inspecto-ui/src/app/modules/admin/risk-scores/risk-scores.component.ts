@@ -3,6 +3,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { RouterLink } from '@angular/router';
 import { ComponentDef, ComponentsService } from 'app/inspecto/api/components.service';
 import { apiErrorMessage } from 'app/inspecto/api/api-base';
 import { RiskScore, RiskScoresService } from 'app/inspecto/api/risk-scores.service';
@@ -14,7 +15,7 @@ import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.comp
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { RiskModelView, riskModelView } from 'app/inspecto/risk/risk-score-view';
 import { RiskScoreActionsComponent } from './risk-score-actions.component';
-import { RiskScoreHeldBadgeComponent } from './risk-score-held';
+import { RiskScoreHeldBadgeComponent, RiskScoreHeldStore } from './risk-score-held';
 
 /**
  * Risk Scores — read-only list + detail (ASSURE-RISK-SCORE-RESIDUALS-1 (2), slice S1; D-RP1 own admin route).
@@ -35,6 +36,7 @@ import { RiskScoreHeldBadgeComponent } from './risk-score-held';
         RiskScorePanelComponent,
         RiskScoreActionsComponent,
         RiskScoreHeldBadgeComponent,
+        RouterLink,
     ],
     templateUrl: './risk-scores.component.html',
 })
@@ -42,11 +44,20 @@ export class RiskScoresComponent implements OnInit {
     private components = inject(ComponentsService);
     private dialog = inject(MatDialog);
     private riskScores = inject(RiskScoresService);
+    private held = inject(RiskScoreHeldStore);
 
     readonly loading = signal(true);
     readonly error = signal<string | null>(null);
     readonly models = signal<RiskModelView[]>([]);
     readonly selectedId = signal<string | null>(null);
+    /**
+     * Held CREATES: a pending `risk-score` create whose model is not stored yet. Read-only rows carrying only what the
+     * Pending Change holds; a held edit of a stored model stays a badge on that model's row.
+     */
+    readonly heldCreates = computed(() => {
+        const stored = new Set(this.models().map((m) => m.id));
+        return Object.values(this.held.byModel()).filter((p) => p.operation === 'create' && !stored.has(p.name));
+    });
     readonly selected = computed(() => this.models().find((m) => m.id === this.selectedId()) ?? null);
     /** The entity key typed into the lookup; committed on submit so the panel loads once. */
     readonly entityDraft = new FormControl('', { nonNullable: true });
@@ -62,6 +73,7 @@ export class RiskScoresComponent implements OnInit {
     load(): void {
         this.loading.set(true);
         this.error.set(null);
+        this.held.refresh();
         this.components.list('risk-score').subscribe({
             next: (defs: ComponentDef[]) => {
                 this.models.set(defs.map((d) => riskModelView(d.name, d.content ?? {})));

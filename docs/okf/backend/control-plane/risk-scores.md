@@ -259,7 +259,10 @@ Approval Policy holds answers `202 {status: pending, pendingChange}`, which `Htt
 every caller checks `status === 'pending'` (`heldChange` in `risk-score-form.dialog.ts`; `ComponentHistoryDialog`
 now says "held for approval" instead of "Restored"). The list badges a model *Awaiting approval* from ONE read of
 `GET /pending-changes?status=pending` filtered to `kind: risk-score` (`risk-score-held.ts`); a failed read shows
-nothing — the badge is a hint, never a gate. *Delete* confirms, then `DELETE /components/risk-score/{id}`; the
+nothing — the badge is a hint, never a gate. A held **create** has no stored model, so the pane (which now triggers that read on every
+list load) lists it as a read-only *Awaiting approval* row from what the Pending Change carries — name, author,
+when — with a link to `/pending-changes`; it is not a button, so nothing tries to load a stored model. A held edit
+or delete of a stored model stays a badge on that model's row (`heldCreates` in `risk-scores.component.ts`). *Delete* confirms, then `DELETE /components/risk-score/{id}`; the
 derived Datasets stay and History can restore. **Add per-entity Alert Rule** (D-RP9 (a)) is a LINK, never a second
 write: `/alerts?newRule=1&dataset=risk_scores_<id>_latest&measure=max(score)&by=model,entity_key&comparator=gte&threshold=<high>`
 (`perEntityAlertRuleParams`). The Alerts pane strips the params (`replaceUrl`) and opens the create dialog seeded
