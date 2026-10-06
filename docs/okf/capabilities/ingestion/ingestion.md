@@ -444,6 +444,16 @@ What the platform does when a day is delivered twice (replace vs append of the p
 marker versus a changed file, late-data effect on the Link Analysis Index) is **not part of this contract: see T4**
 (`LA-DAILY-INGEST-1`). Until T4 lands, treat a re-delivered day as unverified.
 
+**Backfill (T7, 2026-10-06).** A 30-90 day initial load is the same door as a daily one: drop the range's daily files into
+the Collector's inbox (each still one event date per file) and let the Pipeline land them; then run ONE `full` index build
+over the landed range (the `la.index.build` Job with `allow_full: true`, or `POST /inv/index` mode `full`). The days are
+parsed in parallel by the Pipeline and the full build is one parallel DuckDB sort, so there are no per-day index builds to
+merge. `IndexAppendTest.aThirtyDayBackfillAnswersEveryReadLikeTheDayByDayRunAcrossThreeCompactions` pins that the backfill
+answers every read like the day-by-day run (first day full, append per day, compact at the delta cap) and that a backfill
+missing one day does not. ⚠ While the range lands, each committed batch fires `job.dataset.produced`; a Job run that finds a
+build in flight is one recorded `BUILD_IN_PROGRESS` refusal (a failed Run), not a retry, so disable the daily Job's trigger
+during a backfill, or run the one full build after the last file lands.
+
 ## 4. Decisions
 
 Dated, one line each, with the reason. Only decisions that still bind are listed; where one reversed an

@@ -452,6 +452,80 @@ class IndexAppendTest {
         assertSameAnswers(full, v2);
     }
 
+    // ---------------------------------------------------------------------------------------------------- T7 backfill
+
+    private static final int DAYS = 30, PER_DAY = 40;
+
+    /** Writes day01..day30.parquet: one event date per file (the feed contract), every row's ts on that date. */
+    private static List<String> plantDays(Path dir) throws Exception {
+        Files.createDirectories(dir);
+        Random rnd = new Random(7);
+        List<String> files = new ArrayList<>();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("SET TimeZone = 'UTC'");
+            st.execute("CREATE TABLE e (d INTEGER, s VARCHAR, t VARCHAR, k VARCHAR, ts TIMESTAMP, w DOUBLE, cell VARCHAR)");
+            try (PreparedStatement ins = c.prepareStatement("INSERT INTO e VALUES (?, ?, ?, ?, CAST(? AS TIMESTAMP), ?, ?)")) {
+                for (int d = 1; d <= DAYS; d++) {
+                    for (int i = 0; i < PER_DAY; i++) {
+                        ins.setInt(1, d);
+                        ins.setString(2, i % 53 == 0 ? null : "N" + (int) (Math.pow(rnd.nextDouble(), 2) * NODES));
+                        ins.setString(3, "N" + rnd.nextInt(NODES));
+                        ins.setString(4, rnd.nextBoolean() ? "call" : "sms");
+                        ins.setString(5, "2026-09-" + String.format("%02d %02d:00:00", d, rnd.nextInt(24)));
+                        ins.setObject(6, (double) rnd.nextInt(100));
+                        ins.setString(7, "c" + rnd.nextInt(5));
+                        ins.addBatch();
+                    }
+                }
+                ins.executeBatch();
+            }
+            for (int d = 1; d <= DAYS; d++) {
+                String name = String.format("day%02d.parquet", d);
+                st.execute("COPY (SELECT s, t, k, ts, w, cell FROM e WHERE d = " + d + ") TO '" + sql(dir.resolve(name)) + "' (FORMAT parquet)");
+                files.add(name);
+            }
+        }
+        return files;
+    }
+
+    /**
+     * T7 (LA-DAILY-INGEST-1, R-07): a 30-day backfill is ONE full build over the landed range, and it must answer every read like
+     * the day-by-day run the scheduled Job performs (first day full, then an append per day, compacting at the delta cap before
+     * the append - the {@code la.index.build} policy). 30 days cross the cap of {@link IndexPlan#MAX_DELTAS} three times.
+     */
+    @Test
+    void aThirtyDayBackfillAnswersEveryReadLikeTheDayByDayRunAcrossThreeCompactions(@TempDir Path tmp) throws Exception {
+        Path data = tmp.resolve("data");
+        List<String> days = plantDays(data);
+        IndexBuilder.Result backfill = buildOver(tmp.resolve("backfill"), data, IndexBuilder.Mode.FULL, days, null);
+
+        Path daily = tmp.resolve("daily");
+        IndexBuilder.Result live = buildOver(daily, data, IndexBuilder.Mode.FULL, days.subList(0, 1), null);
+        int compactions = 0;
+        for (int d = 2; d <= DAYS; d++) {
+            if (live.manifest().deltas().size() >= IndexPlan.MAX_DELTAS) {
+                live = buildOver(daily, data, IndexBuilder.Mode.COMPACT, days.subList(0, d - 1), null);
+                compactions++;
+            }
+            live = buildOver(daily, data, IndexBuilder.Mode.APPEND, days.subList(0, d), null);
+        }
+        assertEquals(3, compactions);
+        assertEquals(DAYS, live.manifest().inputFiles().size());
+        assertEquals(backfill.manifest().inputFiles().stream().map(IndexManifest.InputFile::path).toList(),
+                live.manifest().inputFiles().stream().map(IndexManifest.InputFile::path).toList());
+        assertEquals(backfill.manifest().tables().get("out").rows(), live.manifest().tables().get("out").rows());
+        assertEquals(backfill.manifest().droppedNull(), live.manifest().droppedNull());
+        assertTrue(assertSameAnswers(backfill, live) > 150);
+
+        // negative probe: a backfill that missed ONE day is a different index, and the parity check says so
+        List<String> missing = new ArrayList<>(days);
+        missing.remove(14);
+        IndexBuilder.Result gap = buildOver(tmp.resolve("gap"), data, IndexBuilder.Mode.FULL, missing, null);
+        assertTrue(gap.manifest().tables().get("out").rows() < live.manifest().tables().get("out").rows());
+        IndexBuilder.Result last = live;
+        assertThrows(AssertionError.class, () -> assertSameAnswers(gap, last));
+    }
+
     private static void deleteTree(Path p) throws Exception {
         try (Stream<Path> w = Files.walk(p)) {
             for (Path x : (Iterable<Path>) w.sorted(java.util.Comparator.reverseOrder())::iterator) Files.delete(x);
