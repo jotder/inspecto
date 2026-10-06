@@ -173,6 +173,8 @@ export interface StepProcessor {
     status: 'delivered' | 'partial' | 'planned';
     nodeType?: string;
     capability?: string;
+    /** The optional module that delivers this processor (Telecom ASN.1 pack); when it is not installed the status is `planned`. */
+    requires?: string;
     note?: string;
     addable: boolean;
 }

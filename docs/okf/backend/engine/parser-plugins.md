@@ -77,7 +77,18 @@ somewhere, and that mapping is precisely where a silent drift lives. `max_record
 preview-only key and the ingester ignores it. Nothing operator-authored used the old `xml.` spelling
 (only code, tests and the mock), so this was a clean flip, not a compat layer.
 
-Second plugin: `Asn1ParserPlugin` (engine, registered via the same services file) — **the first
+Second plugin: `Asn1ParserPlugin` — **since 2026-10-07 (MODULE-REORG-1 P7) it lives in the optional
+`inspecto-telecom-asn1` module** (module id `telecom-asn1`, the *Telecom industry pack* Provider, plan §8a),
+registered through THAT module's own `META-INF/services/com.gamma.parse.ParserPlugin`; the engine's services file
+keeps only `XmlParserPlugin`. The module is staged from Professional up and is **NOT shipped in Personal** (a
+deliberate behaviour change): without it `Parsers` has no `asn1`, an `asn1` ingest fails with the
+`PluginIngesters.notLoaded` message (which now names the module), and `parser.asn1.ber` in the Step Processor
+catalog reads *planned / not installed* (`ProcessorCatalog.Pack`, resolved at read time from `Parsers`) rather than
+delivered. ⚠ **Deliberate split package:** `Asn1ParserPlugin`/`Asn1GrammarSource` keep `com.gamma.parse` and
+`Asn1RecordIngester` keeps `com.gamma.ingester`, shared with the engine, because
+`com.gamma.ingester.Asn1RecordIngester` is a persisted config string (`frontend: asn1` synthesises it; hand-written
+`plugin.ingester` names it) — renaming the package would have broken saved Pipelines for no gain. Pinned by
+`Asn1PluginRegistrationTest` (that module). It is — **the first
 hierarchical parser that is `ingestable: true`**, because it names an ingester
 (`com.gamma.ingester.Asn1RecordIngester`, below). Wraps the
 `asn-facade` module's public `Asn1Decoder`/`RecordMapper` (`asn-parser/asn-decoders/asn-facade`,
@@ -265,7 +276,7 @@ preview/authoring*, **and also a first-class `parsing.frontend` value**: `Pipeli
 `parsing.plugin` / `processing.ingester`. Writing the wiring out by hand under `frontend: plugin`
 remains equivalent.
 
-`com.gamma.ingester.Asn1RecordIngester` (engine, alongside `TypedRecordIngester`):
+`com.gamma.ingester.Asn1RecordIngester` (module `inspecto-telecom-asn1`, same package as the engine's `TypedRecordIngester`):
 
 - **Segment key = the decoded record's own name.** For the corpus's union-style vendor grammars
   (a SET/SEQUENCE whose tagged components are the record types) `SchemaBinder.bind` names a record

@@ -120,7 +120,7 @@
     "icon" : "heroicons_outline:queue-list",
     "status" : "partial",
     "nodeType" : "acquisition",
-    "note" : "Per-cycle Collector drain ships: frontier on the ledger watermark, re-keyed on land and durable across a restart, one uncommitted slice per partition, lag exported (STREAM-CONSUMER-1); broker consumer groups out by decision; proven against MockConsumer and a fake connector only, never a real broker",
+    "note" : "**Premium connector, NOT in Personal (MODULE-REORG-1 P7, 2026-10-07): its own module `inspecto-connectors-kafka` (kafka-clients 3.9.x), staged from Professional up — a deliberate behaviour change; Personal's `inspecto-connectors.jar` registers seven factories.** Per-cycle Collector drain ships: frontier on the ledger watermark, re-keyed on land and durable across a restart, one uncommitted slice per partition, lag exported (STREAM-CONSUMER-1); broker consumer groups out by decision; proven against MockConsumer and a fake connector only, never a real broker",
     "addable" : true
   }, {
     "id" : "acquisition.stream.pulsar",
@@ -266,7 +266,8 @@
     "icon" : "heroicons_outline:cpu-chip",
     "status" : "delivered",
     "nodeType" : "parser.asn1",
-    "note" : "asn-parser reactor (decoders, vendor plugins)",
+    "requires" : "inspecto-telecom-asn1",
+    "note" : "Telecom industry pack (inspecto-telecom-asn1) over the asn-parser reactor (decoders, vendor plugins); Professional and above",
     "addable" : true
   }, {
     "id" : "parser.pattern.regex",

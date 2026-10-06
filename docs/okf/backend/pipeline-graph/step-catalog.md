@@ -1123,7 +1123,7 @@ file to `archive/archive/…`).
 | Fixed-width column slicer | `parser.fixedwidth` | `parser.fixedwidth` — text (`record: line`) and fixed-length binary (`record: bytes`) |
 | JSON object & JSON Lines (NDJSON) parser | `parser.json` | `parser.json` |
 | Excel workbook parser | `parser.excel` | `parser.xlsx` — needs the DuckDB `excel` extension in the bundle (multiformat X1) |
-| ASN.1 BER telecom CDR decoder | `parser.asn1.ber` | `parser.asn1` — asn-parser reactor (decoders, vendor plugins) |
+| ASN.1 BER telecom CDR decoder | `parser.asn1.ber` | `parser.asn1` — Telecom industry pack (inspecto-telecom-asn1) over the asn-parser reactor (decoders, vendor plugins); Professional and above. ⚠ Resolved at READ time: with no `asn1` parser registered the served entry is `planned`, carries `requires: inspecto-telecom-asn1`, no node type, and is not addable |
 | Named-group regex extractor | `parser.pattern.regex` | `parser.text_regex` |
 | Custom ingester plugin (segments, multi-event) | `parser.plugin` | `parser.plugin` — ParserPlugin SPI; `segments: {CALL, SMS}` |
 

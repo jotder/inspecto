@@ -311,7 +311,7 @@ if ($Edition -ne 'Personal') {
     # builds its `sidecar` artifact for the editions that stage it.
     # ASSURE-INTELLIGENCE-BUNDLE-1 (D-P2): inspecto-intelligence (the /agent/* agent, onnxruntime inside)
     # is ENTERPRISE only - also a default-reactor module, listed so this pass builds its `sidecar`.
-    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-connectors-kafka,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-agent,inspecto-la-store-pg,inspecto-intelligence' } else { 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-connectors-kafka,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-agent' }
+    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-connectors-kafka,inspecto-telecom-asn1,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-agent,inspecto-la-store-pg,inspecto-intelligence' } else { 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-connectors-kafka,inspecto-telecom-asn1,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-agent' }
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
@@ -350,6 +350,14 @@ if ($Edition -ne 'Personal') {
                        Select-Object -First 1 -ExpandProperty FullName
     if (-not $kafkaJarSrc -or -not (Test-Path $kafkaJarSrc)) {
         throw "$Edition edition requested but no SHADED JAR found matching inspecto-connectors-kafka\target\inspecto-connectors-kafka-*-sidecar.jar. The thin jar carries no kafka-clients classes."
+    }
+    # MODULE-REORG-1 P7: the ASN.1 BER decoder is the Telecom industry pack (inspecto-telecom-asn1). SHADED
+    # ('-sidecar'): the thin jar carries no asn-facade/asn-core classes. Professional and above ONLY - Personal's
+    # inspecto.jar no longer registers an asn1 parser, and the Step Processor catalog reports it not installed.
+    $asn1JarSrc = Get-ChildItem -Path (Join-Path $sandboxRoot 'inspecto-telecom-asn1\target') -Filter 'inspecto-telecom-asn1-*-sidecar.jar' -ErrorAction SilentlyContinue |
+                      Select-Object -First 1 -ExpandProperty FullName
+    if (-not $asn1JarSrc -or -not (Test-Path $asn1JarSrc)) {
+        throw "$Edition edition requested but no SHADED JAR found matching inspecto-telecom-asn1\target\inspecto-telecom-asn1-*-sidecar.jar. The thin jar carries no asn-facade classes."
     }
     # The channels sidecar (EDG-01 cell 1). SHADED for the same reason the security one is: the thin jar
     # carries no javax.mail, and NotificationService discovering SmtpEmailChannel without it kills boot
@@ -555,6 +563,27 @@ if ($kafkaJarSrc) {
             throw "inspecto-connectors-kafka.jar's CollectorConnectorFactory service file does not list com.gamma.acquire.kafka.KafkaConnectorFactory."
         }
     } finally { $kafkaZip.Dispose() }
+}
+if ($asn1JarSrc) {
+    Copy-Item $asn1JarSrc "$bundleDir\inspecto-telecom-asn1.jar"
+    Write-Host "Bundled Professional-edition Telecom ASN.1 decoder -> inspecto-telecom-asn1.jar" -ForegroundColor Green
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $asn1Zip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-telecom-asn1.jar")
+    try {
+        if (-not ($asn1Zip.Entries | Where-Object { $_.FullName -like 'com/gamma/asn/facade/*' })) {
+            throw "inspecto-telecom-asn1.jar carries no com/gamma/asn/facade classes - it is a THIN jar; Asn1ParserPlugin would fail with NoClassDefFoundError at run time."
+        }
+        $asn1Spi = $asn1Zip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.parse.ParserPlugin' }
+        if (-not $asn1Spi) {
+            throw "inspecto-telecom-asn1.jar has no META-INF/services/com.gamma.parse.ParserPlugin - the shade dropped the ServicesResourceTransformer, so no asn1 parser would be discovered."
+        }
+        $asn1Reader = New-Object System.IO.StreamReader($asn1Spi.Open())
+        $asn1Svc = $asn1Reader.ReadToEnd()
+        $asn1Reader.Close()
+        if ($asn1Svc -notmatch 'com\.gamma\.parse\.Asn1ParserPlugin') {
+            throw "inspecto-telecom-asn1.jar's ParserPlugin service file does not list com.gamma.parse.Asn1ParserPlugin."
+        }
+    } finally { $asn1Zip.Dispose() }
 }
 if ($channelsJarSrc) {
     Copy-Item $channelsJarSrc "$bundleDir\inspecto-notify-channels.jar"
@@ -1041,6 +1070,7 @@ fi
 [ -f inspecto-secrets.jar ]   && CP="${CP}:inspecto-secrets.jar"
 [ -f inspecto-geo-country.jar ]   && CP="${CP}:inspecto-geo-country.jar"
 [ -f inspecto-connectors-kafka.jar ] && CP="${CP}:inspecto-connectors-kafka.jar"
+[ -f inspecto-telecom-asn1.jar ] && CP="${CP}:inspecto-telecom-asn1.jar"
 [ -f postgresql.jar ]          && CP="${CP}:postgresql.jar"
 exec "$JAVA" "${JAVA_OPTS[@]}" \
           -cp "$CP" com.gamma.inspector.CollectorProcessor \
@@ -1144,6 +1174,7 @@ if exist inspecto-oidc.jar set "CP=%CP%;inspecto-oidc.jar"
 if exist inspecto-secrets.jar set "CP=%CP%;inspecto-secrets.jar"
 if exist inspecto-geo-country.jar set "CP=%CP%;inspecto-geo-country.jar"
 if exist inspecto-connectors-kafka.jar set "CP=%CP%;inspecto-connectors-kafka.jar"
+if exist inspecto-telecom-asn1.jar set "CP=%CP%;inspecto-telecom-asn1.jar"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 "%JAVA%" %OPTS% ^
      -cp "%CP%" com.gamma.inspector.CollectorProcessor ^
@@ -1256,6 +1287,7 @@ if [ -f inspecto-oidc.jar ]; then
     [ -f inspecto-secrets.jar ] && CP="${CP}:inspecto-secrets.jar"
     [ -f inspecto-geo-country.jar ] && CP="${CP}:inspecto-geo-country.jar"
     [ -f inspecto-connectors-kafka.jar ] && CP="${CP}:inspecto-connectors-kafka.jar"   # MODULE-REORG-1 P7: premium Kafka connector, Professional+
+    [ -f inspecto-telecom-asn1.jar ] && CP="${CP}:inspecto-telecom-asn1.jar"   # MODULE-REORG-1 P7: Telecom ASN.1 decoder, Professional+
     EDITION="Professional"
     JAVA_OPTS+=("-Dauth.mode=oidc")
     # EVENTS-DURABLE-1 (2026-09-11): Professional+ keeps the API audit trail across restarts. The engine
@@ -1402,6 +1434,7 @@ if exist inspecto-oidc.jar set "CP=inspecto.jar;inspecto-oidc.jar"
 if exist inspecto-oidc.jar if exist inspecto-secrets.jar set "CP=%CP%;inspecto-secrets.jar"
 if exist inspecto-oidc.jar if exist inspecto-geo-country.jar set "CP=%CP%;inspecto-geo-country.jar"
 if exist inspecto-oidc.jar if exist inspecto-connectors-kafka.jar set "CP=%CP%;inspecto-connectors-kafka.jar"
+if exist inspecto-oidc.jar if exist inspecto-telecom-asn1.jar set "CP=%CP%;inspecto-telecom-asn1.jar"
 if exist inspecto-oidc.jar set "EDITION=Professional"
 if exist inspecto-oidc.jar set "OPTS=%OPTS% -Dauth.mode=oidc"
 rem EVENTS-DURABLE-1 (2026-09-11): Professional+ keeps the API audit trail across restarts; see serve.sh.
@@ -1860,7 +1893,7 @@ if ($DemoAuth) {
     foreach ($f in 'serve.sh', 'serve.bat', 'Dockerfile', '.dockerignore', 'inspecto.service', 'install-service.sh', 'install-service.ps1') {
         Remove-Item (Join-Path $bundleDir $f) -ErrorAction SilentlyContinue
     }
-    $demoJars = @('inspecto.jar', 'inspecto-demo-auth.jar', 'inspecto-policy.jar', 'inspecto-connectors.jar', 'inspecto-connectors-kafka.jar', 'inspecto-notify-channels.jar',
+    $demoJars = @('inspecto.jar', 'inspecto-demo-auth.jar', 'inspecto-policy.jar', 'inspecto-connectors.jar', 'inspecto-connectors-kafka.jar', 'inspecto-telecom-asn1.jar', 'inspecto-notify-channels.jar',
                   'inspecto-backup.jar', 'inspecto-entity-list.jar', 'inspecto-la-graph.jar', 'inspecto-la-storage.jar', 'inspecto-la-core.jar', 'inspecto-la-api.jar', 'inspecto-la-store-pg.jar', 'inspecto-geo-link.jar', 'inspecto-exchange.jar', 'inspecto-observability.jar',
                   'inspecto-ops.jar', 'inspecto-agent.jar', 'inspecto-intelligence.jar', 'postgresql.jar') | Where-Object { Test-Path (Join-Path $bundleDir $_) }
     $demoFlags = '--enable-native-access=ALL-UNNAMED -Dcontrol.bind=127.0.0.1 -Dauth.mode=demo -Dobjects.backend=db -Devents.backend=parquet -Djobs.backend=duckdb'
@@ -2030,7 +2063,7 @@ if (-not $SkipBootCheck) {
             else { 'java' }
     # The same classpath the generated launchers build -- deliberately re-derived from the staged files
     # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
-    $cp = @('inspecto.jar') + @('inspecto-oidc.jar','inspecto-secrets.jar','inspecto-geo-country.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-connectors-kafka.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-entity-list.jar','inspecto-la-graph.jar','inspecto-la-storage.jar','inspecto-la-core.jar','inspecto-la-api.jar','inspecto-la-store-pg.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-observability.jar','inspecto-ops.jar','inspecto-agent.jar','inspecto-intelligence.jar','postgresql.jar' |
+    $cp = @('inspecto.jar') + @('inspecto-oidc.jar','inspecto-secrets.jar','inspecto-geo-country.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-connectors-kafka.jar','inspecto-telecom-asn1.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-entity-list.jar','inspecto-la-graph.jar','inspecto-la-storage.jar','inspecto-la-core.jar','inspecto-la-api.jar','inspecto-la-store-pg.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-observability.jar','inspecto-ops.jar','inspecto-agent.jar','inspecto-intelligence.jar','postgresql.jar' |
         Where-Object { Test-Path (Join-Path $bundleDir $_) })
     # DEMO-AUTH-1: appended AFTER the parsed literal on purpose (see the -DemoAuth param note).
     if ($DemoAuth -and (Test-Path (Join-Path $bundleDir 'inspecto-demo-auth.jar'))) { $cp += 'inspecto-demo-auth.jar' }

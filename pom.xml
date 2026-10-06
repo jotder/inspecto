@@ -59,6 +59,9 @@
         <module>inspecto-agent-hosted</module>
         <module>inspecto-connectors</module>
         <module>inspecto-intelligence</module>
+        <!-- MODULE-REORG-1 P7: the Telecom ASN.1 decoder (Telecom industry pack). Default reactor so its tests and the
+             inspecto module's ASN.1 tests always run; bundled (bundle-modules.mjs) from Professional up, NOT in Personal. -->
+        <module>inspecto-telecom-asn1</module>
         <!-- DEMO-AUTH-1: default reactor so its tests always run; NO edition bundles it (tools/bundle-modules.mjs
              does not list it) - only `package.ps1 -DemoAuth` stages it, for offline demo builds. -->
         <module>inspecto-demo-auth</module>

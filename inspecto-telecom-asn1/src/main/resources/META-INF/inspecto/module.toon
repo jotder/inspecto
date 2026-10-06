@@ -1,0 +1,7 @@
+id: telecom-asn1
+title: Telecom ASN.1 decoder
+buildRole: implementation
+offeringRole: provider
+bindingTime: boot
+provides:
+  contracts[1]: ParserPlugin

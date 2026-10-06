@@ -15,7 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The {@link Parsers} registry + the built-in adapters: the catalog carries the four engine
- * frontends plus the ServiceLoader-discovered XML and ASN.1 plugins, every built-in's preview runs
+ * frontends plus the ServiceLoader-discovered XML plugin (the ASN.1 plugin left for the optional
+ * inspecto-telecom-asn1 module — see its Asn1PluginRegistrationTest), every built-in's preview runs
  * the real DuckDB read specs, and self-description (grammar schemas) is present and sane.
  */
 class ParsersTest {
@@ -23,23 +24,19 @@ class ParsersTest {
     @Test
     void catalogCarriesBuiltinsThenDiscoveredPlugins() {
         List<String> ids = Parsers.catalog().stream().map(ParserPlugin::id).toList();
-        assertEquals(List.of("delimited", "fixedwidth", "json", "parquet", "xlsx", "text_regex", "xml", "asn1"), ids);
+        assertEquals(List.of("delimited", "fixedwidth", "json", "parquet", "xlsx", "text_regex", "xml"), ids);
     }
 
     @Test
     void ingestabilityTracksWhetherAParserCanActuallyLoadToTables() {
         assertTrue(Parsers.ingestable(Parsers.get("delimited").orElseThrow()));
         assertTrue(Parsers.ingestable(Parsers.get("json").orElseThrow()));
-        // Both shipped plugins are hierarchical, and since the tree→segments bridge landed both also
-        // ingest — each naming its OWN ingester, which is what the flag actually tracks.
+        // The shipped plugin is hierarchical, and since the tree→segments bridge landed it also ingests —
+        // naming its OWN ingester, which is what the flag actually tracks. (ASN.1 is pinned in its module.)
         ParserPlugin xml = Parsers.get("xml").orElseThrow();
         assertTrue(xml.hierarchical());
         assertTrue(Parsers.ingestable(xml), "XmlRecordIngester flattens the record tree onto segments");
         assertEquals("com.gamma.ingester.XmlRecordIngester", xml.ingesterClass().orElseThrow());
-        ParserPlugin asn1 = Parsers.get("asn1").orElseThrow();
-        assertTrue(asn1.hierarchical());
-        assertTrue(Parsers.ingestable(asn1), "Asn1RecordIngester flattens onto segment schemas");
-        assertEquals("com.gamma.ingester.Asn1RecordIngester", asn1.ingesterClass().orElseThrow());
     }
 
     /**
@@ -166,7 +163,7 @@ class ParsersTest {
         IllegalStateException b = assertThrows(IllegalStateException.class,
                 () -> Parsers.register(stub("delimited", null), "evil.jar"));
         assertTrue(b.getMessage().contains("'delimited'"), b.getMessage());
-        assertThrows(IllegalStateException.class, () -> Parsers.register(stub("asn1", null), "evil.jar"),
+        assertThrows(IllegalStateException.class, () -> Parsers.register(stub("xml", null), "evil.jar"),
                 "a classpath (ServiceLoader) parser is as un-replaceable as a built-in");
         assertSame(builtinDelimited, Parsers.get("delimited").orElseThrow(), "the built-in still answers");
         assertEquals(before, ids());

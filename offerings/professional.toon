@@ -2,7 +2,7 @@ id: professional
 title: Professional
 tier: professional
 includes[1]: personal
-modules[16]: oidc,secrets,geo-country,connectors-kafka,notify-channels,backup,entity-list,la-graph,la-storage,la-core,la-api,geo-link,exchange,observability,ops,agent
+modules[17]: oidc,secrets,geo-country,connectors-kafka,telecom-asn1,notify-channels,backup,entity-list,la-graph,la-storage,la-core,la-api,geo-link,exchange,observability,ops,agent
 addons:
   linkAnalysis:
     status: built
@@ -37,3 +37,6 @@ addons:
   premiumConnectors:
     status: built
     modules[1]: connectors-kafka
+  telecomIndustryPack:
+    status: built
+    modules[1]: telecom-asn1

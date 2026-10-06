@@ -1,5 +1,7 @@
 package com.gamma.pipeline;
 
+import com.gamma.parse.Parsers;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -42,6 +44,18 @@ public final class ProcessorCatalog {
     public record Processor(String family, String id, String emoji, String icon, String label, Status status,
                             String nodeType, String capability, String note) {}
 
+    /**
+     * A processor that an OPTIONAL module delivers rather than the engine (MODULE-REORG-1 P7): {@code module} is the
+     * Maven module that must be installed and {@code parserId} the {@link Parsers} id that proves it is — so the
+     * status is resolved at READ time, never frozen at build time. {@link #PROCESSORS} still records what the pack
+     * delivers (the board and the doc counts are generated from it); {@link #asMap()} reports what THIS install has.
+     */
+    public record Pack(String module, String parserId) {}
+
+    /** Processor id → the optional module that delivers it. */
+    private static final Map<String, Pack> PACKS = Map.of(
+            "parser.asn1.ber", new Pack("inspecto-telecom-asn1", "asn1"));
+
     public static final List<Family> FAMILIES = List.of(
             new Family("ACQ", "Collectors & Ingestion", "heroicons_outline:arrow-down-tray"),
             new Family("PRS", "Extraction & Format Parsers", "heroicons_outline:document-text"),
@@ -66,7 +80,7 @@ public final class ProcessorCatalog {
             p("ACQ", "acquisition.file.s3", "☁️", "heroicons_outline:cloud-arrow-down", "AWS S3 object ingest", Status.PARTIAL, "acquisition", null, "Connection kind exists (s3 connector, SDK-free SigV4; covers MinIO / GCS-interop); no proven end-to-end acquisition-node run"),
             p("ACQ", "acquisition.file.azure", "🌐", "heroicons_outline:cloud", "Azure Blob & ADLS Gen2 ingest", Status.PARTIAL, "acquisition", null, "Connection kind exists (azure blob connector); ADLS Gen2 semantics not proven"),
             p("ACQ", "acquisition.file.gcs", "🪣", "heroicons_outline:cloud-arrow-down", "Google Cloud Storage ingest", Status.PARTIAL, "acquisition", null, "Connection kind exists (gcs connector, native JSON API + service-account OAuth2); no proven end-to-end acquisition-node run"),
-            p("ACQ", "acquisition.stream.kafka", "📤", "heroicons_outline:queue-list", "Apache Kafka consumer", Status.PARTIAL, "acquisition", null, "Per-cycle Collector drain ships: frontier on the ledger watermark, re-keyed on land and durable across a restart, one uncommitted slice per partition, lag exported (STREAM-CONSUMER-1); broker consumer groups out by decision; proven against MockConsumer and a fake connector only, never a real broker"),
+            p("ACQ", "acquisition.stream.kafka", "📤", "heroicons_outline:queue-list", "Apache Kafka consumer", Status.PARTIAL, "acquisition", null, "**Premium connector, NOT in Personal (MODULE-REORG-1 P7, 2026-10-07): its own module `inspecto-connectors-kafka` (kafka-clients 3.9.x), staged from Professional up — a deliberate behaviour change; Personal's `inspecto-connectors.jar` registers seven factories.** Per-cycle Collector drain ships: frontier on the ledger watermark, re-keyed on land and durable across a restart, one uncommitted slice per partition, lag exported (STREAM-CONSUMER-1); broker consumer groups out by decision; proven against MockConsumer and a fake connector only, never a real broker"),
             p("ACQ", "acquisition.stream.pulsar", "📨", "heroicons_outline:paper-airplane", "Apache Pulsar consumer", Status.PLANNED, null, null, null),
             p("ACQ", "acquisition.stream.kinesis", "📬", "heroicons_outline:inbox-stack", "AWS Kinesis / SQS ingest", Status.PLANNED, null, null, null),
             p("ACQ", "acquisition.stream.rabbitmq", "🐰", "heroicons_outline:inbox-arrow-down", "RabbitMQ AMQP subscriber", Status.PLANNED, null, null, null),
@@ -83,7 +97,7 @@ public final class ProcessorCatalog {
             p("PRS", "parser.json", "🧬", "heroicons_outline:code-bracket", "JSON object & JSON Lines (NDJSON) parser", Status.DELIVERED, "parser.json", null, null),
             p("PRS", "parser.excel", "📑", "heroicons_outline:table-cells", "Excel workbook parser", Status.DELIVERED, "parser.xlsx", null, "needs the DuckDB `excel` extension in the bundle (multiformat X1)"),
             p("PRS", "parser.xml", "📑", "heroicons_outline:code-bracket-square", "XML / XPath / DOM unpacker", Status.PARTIAL, "parser.plugin", null, "tree→segments bridge ships XML ingests; no XPath selector grammar yet"),
-            p("PRS", "parser.asn1.ber", "📡", "heroicons_outline:cpu-chip", "ASN.1 BER telecom CDR decoder", Status.DELIVERED, BuiltinNodeType.PARSER_ASN1.type(), null, "asn-parser reactor (decoders, vendor plugins)"),
+            p("PRS", "parser.asn1.ber", "📡", "heroicons_outline:cpu-chip", "ASN.1 BER telecom CDR decoder", Status.DELIVERED, BuiltinNodeType.PARSER_ASN1.type(), null, "Telecom industry pack (inspecto-telecom-asn1) over the asn-parser reactor (decoders, vendor plugins); Professional and above"),
             p("PRS", "parser.pattern.regex", "🔎", "heroicons_outline:magnifying-glass", "Named-group regex extractor", Status.DELIVERED, "parser.text_regex", null, null),
             p("PRS", "parser.plugin", "🧩", "heroicons_outline:puzzle-piece", "Custom ingester plugin (segments, multi-event)", Status.DELIVERED, "parser.plugin", null, "ParserPlugin SPI; `segments: {CALL, SMS}`"),
             p("PRS", "parser.keyvalue", "🏷️", "heroicons_outline:tag", "Key-value / logfmt parser", Status.PLANNED, null, null, null),
@@ -192,6 +206,15 @@ public final class ProcessorCatalog {
         }
     }
 
+    static {
+        for (String id : PACKS.keySet()) {
+            Processor p = PROCESSORS.stream().filter(x -> x.id().equals(id)).findFirst()
+                    .orElseThrow(() -> new IllegalStateException("pack-provided processor " + id + " is not in the catalog"));
+            if (p.status() == Status.PLANNED)
+                throw new IllegalStateException(id + " is PLANNED yet names the pack that delivers it");
+        }
+    }
+
     private ProcessorCatalog() {}
 
     /** The catalog as served: {@code {families:[…], processors:[…]}}, in declaration order. */
@@ -214,10 +237,17 @@ public final class ProcessorCatalog {
             m.put("label", p.label());
             m.put("emoji", p.emoji());
             m.put("icon", p.icon());
-            m.put("status", p.status().name().toLowerCase(java.util.Locale.ROOT));
-            if (p.nodeType() != null) m.put("nodeType", p.nodeType());
-            if (p.capability() != null) m.put("capability", p.capability());
-            if (p.note() != null) m.put("note", p.note());
+            Pack pack = PACKS.get(p.id());
+            // Catalog honesty: a pack-provided processor is DELIVERED only where its parser is registered. Absent, it
+            // reads as PLANNED with no node type (so never addable) and a note naming the missing module.
+            boolean absent = pack != null && Parsers.get(pack.parserId()).isEmpty();
+            m.put("status", (absent ? Status.PLANNED : p.status()).name().toLowerCase(java.util.Locale.ROOT));
+            if (p.nodeType() != null && !absent) m.put("nodeType", p.nodeType());
+            if (p.capability() != null && !absent) m.put("capability", p.capability());
+            if (pack != null) m.put("requires", pack.module());
+            if (absent) m.put("note", "not installed in this build - requires the optional module " + pack.module()
+                    + " (Telecom industry pack; Professional and above)");
+            else if (p.note() != null) m.put("note", p.note());
             procs.add(m);
         }
         out.put("processors", procs);

@@ -39,6 +39,18 @@ describe('processor-catalog contract', () => {
         expect(byStatus.reduce((a, b) => a + b, 0)).toBe(catalog.processors.length);
     });
 
+    it('a processor delivered by an optional module names it, and the module-absent state is never addable', () => {
+        // MODULE-REORG-1 P7: the contract describes a fully-equipped install; `requires` names the module whose absence
+        // flips the served status to planned (and withholds the node type, so the palette cannot add it).
+        const ber = catalog.processors.find((p) => p.id === 'parser.asn1.ber');
+        expect(ber?.requires).toBe('inspecto-telecom-asn1');
+        expect(ber?.status).toBe('delivered');
+        for (const p of catalog.processors.filter((x) => x.requires)) {
+            expect(p.requires, p.id).toMatch(/^inspecto-[a-z0-9-]+$/);
+            if (p.status === 'planned') expect(p.addable, p.id).toBe(false);
+        }
+    });
+
     it('every processor carries its own heroicons_outline icon', () => {
         for (const p of catalog.processors) expect(p.icon, p.id).toMatch(/^heroicons_outline:[a-z0-9-]+$/);
         // meaningful, not a family placeholder: the catalog uses many distinct glyphs

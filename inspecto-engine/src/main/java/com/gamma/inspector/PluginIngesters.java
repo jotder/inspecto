@@ -66,6 +66,13 @@ final class PluginIngesters {
     private static IllegalStateException notLoaded(String fqcn) {
         return new IllegalStateException("streaming ingester " + fqcn + " is not on the classpath and no loaded "
                 + "parser names it; if a Job Pack provided it, that pack is not loaded (removed, revoked or "
-                + "refused, see GET /jobs/packs)");
+                + "refused, see GET /jobs/packs)" + moduleHint(fqcn));
+    }
+
+    /** The ASN.1 ingester ships in an optional module, not the engine (MODULE-REORG-1 P7): name it when it is missing. */
+    private static String moduleHint(String fqcn) {
+        return "com.gamma.ingester.Asn1RecordIngester".equals(fqcn)
+                ? "; the ASN.1 decoder is the optional inspecto-telecom-asn1 module (Telecom industry pack, Professional and above - not in Personal)"
+                : "";
     }
 }

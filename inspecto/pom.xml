@@ -134,6 +134,16 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- MODULE-REORG-1 P7: the ASN.1 ParserPlugin left the engine for the Telecom industry-pack module. Tests that drive
+             a real asn1 ingest/preview over the control plane need it on the classpath; it is NEVER a main dependency
+             (Personal does not ship it). Test scope, so the shaded fat jar does not carry it. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-telecom-asn1</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>

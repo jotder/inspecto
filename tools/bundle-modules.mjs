@@ -54,6 +54,7 @@ const MODULES = [
     { artifactId: 'inspecto-secrets', dir: 'inspecto-secrets', bundleFile: 'inspecto-secrets.jar', from: 'professional' },            // D-MR6: the file-keystore SecretsProvider
     { artifactId: 'inspecto-geo-country', dir: 'inspecto-geo-country', bundleFile: 'inspecto-geo-country.jar', from: 'professional' },  // D-MR6: the MaxMind GeoCountryResolver
     { artifactId: 'inspecto-connectors-kafka', dir: 'inspecto-connectors-kafka', bundleFile: 'inspecto-connectors-kafka.jar', from: 'professional' },  // MODULE-REORG-1 P7: the Kafka stream connector (premium, NOT Personal)
+    { artifactId: 'inspecto-telecom-asn1', dir: 'inspecto-telecom-asn1', bundleFile: 'inspecto-telecom-asn1.jar', from: 'professional' },  // MODULE-REORG-1 P7: the Telecom industry-pack ASN.1 decoder (NOT Personal)
     // EDG-01 cell 1 (CP-15). Brings javax.mail — SmtpEmailChannel needs it, and it came here FROM
     // inspecto-connectors, whose pom no longer declares it.
     { artifactId: 'inspecto-notify-channels', dir: 'inspecto-notify-channels', bundleFile: 'inspecto-notify-channels.jar', from: 'professional' },
@@ -92,7 +93,7 @@ export function editionProfile(edition) {
 
 /**
  * The first-party modules staged for `edition`, in package.ps1's staging order.
- * Personal 2, Professional 18, Enterprise 21, Preview 21 — first-party only; add PG_SIDECAR for the jar count.
+ * Personal 2, Professional 19, Enterprise 22, Preview 22 — first-party only; add PG_SIDECAR for the jar count.
  * ⚠ Those three numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this
  * very line. They said 2/10/11 from EDG-01 until 2026-09-17, missing inspecto-agent (PKG-5, 2026-09-12);
  * the assertion exists so the next module to arrive cannot leave them wrong again.

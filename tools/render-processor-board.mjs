@@ -25,6 +25,10 @@ const NOT_FOR_PERSONAL = new Set([
     'enrichment.graph.cluster', 'sink.archive',
     // G9 (455f9822b, operator 2026-09-24): gated to Professional+ through EditionFeatureProvider.
     'sink.ducklake',
+    // MODULE-REORG-1 P7 (2026-10-07): the ASN.1 decoder is the Telecom industry pack (inspecto-telecom-asn1), staged from Professional up.
+    'parser.asn1.ber',
+    // MODULE-REORG-1 P7 (2026-10-07): the Kafka connector is inspecto-connectors-kafka, staged from Professional up.
+    'acquisition.stream.kafka',
 ]);
 const ENTERPRISE_ONLY = new Set(['quality.pii.mask', 'quality.compliance.redact']);
 

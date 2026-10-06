@@ -164,7 +164,7 @@ asn1 · plugin`. Three engines sit behind them:
 | **text_regex** | `read_text` + SQL regex | `record_split: blank_line | <literal>` (2026-08-28) — this is what makes **LDIF block records live** |
 | **xlsx** / excel | DuckDB `excel` extension, **three-layer fail-closed load**; `all_varchar` stamped by ingest | `read_xlsx` `columns` does not exist on 1.5.2.1 — refused, not faked |
 | **parquet** | native | a built-in with **no board row anywhere** |
-| **asn1** | `Asn1ParserPlugin` → `Asn1RecordIngester` (`asn-parser/asn-decoders`) | served 2026-07-31; grammar optional for preview, required for ingest; `frontend: asn1` synthesises the plugin and refuses a co-present `parsing.plugin` |
+| **asn1** | `Asn1ParserPlugin` → `Asn1RecordIngester` (module `inspecto-telecom-asn1`, Professional+, not Personal; over `asn-parser/asn-decoders`) | served 2026-07-31; grammar optional for preview, required for ingest; `frontend: asn1` synthesises the plugin and refuses a co-present `parsing.plugin` |
 | **plugin** | any `StreamingFileIngester` FQCN | `XmlRecordIngester` (2026-08-30) is the tree → segments bridge |
 
 **`ParserPlugin`** (`com.gamma.parse`, `inspecto-engine`, `@PublicApi(since = "4.0.0")`) is the self-describing
@@ -655,7 +655,7 @@ It costs nothing, is pinned, and a hand-authored file may still carry it; the re
 | The planner, the two strategies, union / generation, the commit order | `docs/okf/backend/engine/ingestion.md` (`Concept`) | `inspecto-engine/src/main/java/com/gamma/inspector` | §3.1–§3.2 |
 | The wrap-SPI, `DuckDbRecordSink`, the two `partitions[]` readers, the contract tests | `docs/okf/backend/engine/ingest-wrap-spi.md` (`Seam`) | `inspecto-etl` | §3.4 |
 | The plugin ingester reference: SPI contract, execution modes, segment schema, `FixedWidthRecordIngester` | `docs/okf/backend/engine/plugins.md` (`Reference`) | — | §3.4 |
-| `ParserPlugin`, `Parsers`, ASN.1, the XML bridge, the reactor split | `docs/okf/backend/engine/parser-plugins.md` (`Concept`) | `inspecto-engine/src/main/java/com/gamma/parse` | §3.3–§3.4 |
+| `ParserPlugin`, `Parsers`, ASN.1, the XML bridge, the reactor split | `docs/okf/backend/engine/parser-plugins.md` (`Concept`) | `inspecto-engine/src/main/java/com/gamma/parse` (ASN.1: `inspecto-telecom-asn1`) | §3.3–§3.4 |
 | Every `parsing:` key, per frontend, with the refusals | `docs/okf/backend/config/parsing-options-reference.md` (`Reference`) | — | §3.3 |
 | The three frontends and the live CSV knobs — ⚠ carries the 4.1 `*.grammar.toon` account | `docs/okf/backend/engine/parsing-grammar.md` (`Concept`) | — | flagged with this spec |
 | Unpack — placement, DATA, the verdict, the ledger, identity, traps | `docs/okf/backend/engine/unpack-stage.md` (`Concept`) | `inspecto-etl/src/main/java/com/gamma/etl/unpack` | §3.5 |

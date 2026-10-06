@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-telecom-asn1</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Telecom ASN.1 decoder (optional, industry pack)</name>
+    <description>
+        OPTIONAL Telecom industry-pack module (MODULE-REORG-1 P7, plan 4 / 8a): the ASN.1 BER ParserPlugin
+        (id asn1), its grammar resolver and its streaming record ingester, over the asn-facade API of the nested
+        asn-parser/asn-decoders reactor. Discovered through the engine's com.gamma.parse.ParserPlugin ServiceLoader
+        seam. Packages com.gamma.parse and com.gamma.ingester are SHARED with inspecto-engine on purpose: the
+        ingester class name com.gamma.ingester.Asn1RecordIngester is a persisted config string (pipelines name it),
+        so it must keep resolving. Professional and above only - the Personal edition does not ship it, and
+        the Step Processor catalog then reports parser.asn1.ber as not installed instead of delivered.
+    </description>
+
+    <dependencies>
+        <!-- The engine: ParserPlugin, ParseResult, SpaceConfigRoot, PipelineConfig/StreamingFileIngester (via etl).
+             PROVIDED: this jar is dropped onto a running engine's classpath, exactly as inspecto-connectors-kafka. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- slf4j facade: the running engine supplies it (and its binding); never shade a second copy. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- asn-facade (asn-parser/asn-decoders, a standalone reactor outside the root parent's version
+             management - built earlier in this reactor): the public bytes-to-records API. Depends only on
+             asn-core/asn-schema/asn-transform (never asn-golden/legacy-code, which are harness-only). -->
+        <dependency>
+            <groupId>com.gamma.asn</groupId>
+            <artifactId>asn-facade</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Shaded sidecar, same idiom as inspecto-connectors-kafka: asn-facade (+ asn-core/asn-schema/
+                 asn-transform) must travel with the drop-in jar. The engine is `provided`, so it is excluded by
+                 construction. ServicesResourceTransformer keeps the ParserPlugin registration. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <!-- Version parent-managed (pluginManagement): still an explicit pin for the offline
+                     reactor, but declared once for all five shading modules. -->
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <!-- `sidecar` so the reactor's own thin artifact stays the installed one and
+                                 only the bundle carries the fat copy. -->
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>sidecar</shadedClassifierName>
+                            <transformers>
+                                <!-- MERGE the ServiceLoader registrations, or the Asn1ParserPlugin line is lost
+                                     and the engine silently finds no ASN.1 parser. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <!-- Signed jars (BouncyCastle is one): a retained signature throws
+                                             SecurityException at run time. Same filter as the core fat jar. -->
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <!-- Never ship a second logging config; the core owns it. -->
+                                        <exclude>logback.xml</exclude>
+                                        <exclude>module-info.class</exclude>
+                                        <!-- 🔴 A SECOND SLF4J BINDING on one classpath is a real conflict:
+                                             SLF4J picks one non-deterministically and warns, so a bundle
+                                             with this sidecar could silently log through a different
+                                             backend than the core configured. The core owns the binding;
+                                             this sidecar must carry slf4j-api ONLY. Same reasoning as
+                                             inspecto-agent's shade config.
+                                             ⛔ Do not drop these excludes to "fix" a missing-logger
+                                             warning inside the connector - fix the dependency instead. -->
+                                        <exclude>META-INF/services/org.slf4j.spi.SLF4JServiceProvider</exclude>
+                                        <exclude>org/slf4j/impl/**</exclude>
+                                        <exclude>ch/qos/logback/**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
