@@ -130,7 +130,7 @@ public final class XlsxWorkbook {
                 files.add(part);
                 names.add(sheetName(sheets.get(i).name()));
             }
-            Path staged = parts.resolve("workbook.xlsx");
+            Path staged = parts.resolve("merged-" + java.util.UUID.randomUUID() + ".xlsx");   // no fixed name: an import cannot plant it
             XlsxSheetMerger.merge(files, names, staged);
             Files.move(staged, target.toAbsolutePath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING,
                     java.nio.file.StandardCopyOption.ATOMIC_MOVE);
