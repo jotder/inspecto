@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * in them drives {@code /objects}, whose filter/404/graph-pruning lives in the module's own
  * {@code ObjectRoutes.visibleTo}. What core contributes to that guard is exactly this class's subject —
  * so it runs here, in the default reactor, against {@link FakeObjectEngineProvider} (installed for the
- * {@code CollectorService} constructor only — see {@code ControlApiReconPromoteTest.open}) and a
+ * {@code CollectorService} constructor only — see {@code FakeObjectEngineProvider.fakeObjectEngineClassLoader}) and a
  * {@link ExchangeAttributeScopeTest.FakeExchange} carrying the {@link Subject} the authenticate stage
  * would have stamped.
  */
@@ -53,7 +53,7 @@ class AnnotationTargetsScopeTest {
         CollectorService svc;
         try {
             if (withEngine)
-                Thread.currentThread().setContextClassLoader(ControlApiReconPromoteTest.fakeObjectEngineClassLoader(outer));
+                Thread.currentThread().setContextClassLoader(FakeObjectEngineProvider.fakeObjectEngineClassLoader(outer));
             svc = new CollectorService(List.of(toon), 3600, 1);
         } finally {
             Thread.currentThread().setContextClassLoader(outer);

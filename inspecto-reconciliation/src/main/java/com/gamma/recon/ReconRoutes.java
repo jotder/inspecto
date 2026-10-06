@@ -1,13 +1,16 @@
-package com.gamma.control;
+package com.gamma.recon;
 
+import com.gamma.control.ApiContext;
+import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
+import com.gamma.control.HostContext;
+import com.gamma.control.RouteModule;
+import com.gamma.control.ServerFaults;
+import com.gamma.control.WriteGates;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
-import com.gamma.query.ReconBreaks;
-import com.gamma.query.ReconConfigLoader;
-import com.gamma.query.ReconService;
-import com.gamma.query.ReconStateStore;
 import com.gamma.util.DuckDbUtil;
 
 import java.io.IOException;
@@ -44,11 +47,15 @@ import static com.gamma.util.Values.intOr;
  * (dataset count, unsafe identifier, bad agg/tolerance, {@code ExpressionGuard}-rejected filter) or a
  * failing comparison query → 422. All comparison SQL is server-built — there is no caller-SQL surface.
  */
-final class ReconRoutes implements RouteModule {
+public final class ReconRoutes implements RouteModule {
 
     private static final int GRAIN_LIMIT = 5_000;      // Board grain-row cap (MAX_LIMIT parity)
     private static final int DEFAULT_BREAKS_LIMIT = 200;
     private static final int MAX_LIMIT = 5_000;
+
+    /** MODULE-REORG-1 P7: the feature id /bootstrap reports and a Space may switch off (P2b). */
+    @Override
+    public java.util.Set<String> featureIds() { return java.util.Set.of("reconciliation"); }
 
     @Override
     public void register(ApiContext api) {

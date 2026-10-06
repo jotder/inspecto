@@ -120,6 +120,9 @@ final class BootstrapRoutes implements RouteModule {
         // be confused with the GET /objects/([^/]+) catch-all that a future core route might reclaim.
         // The SPA hides the Incidents, Cases and Tags nav entries and the cross-entity tag menus on it.
         f.put("ops", on.contains("ops"));
+        // MODULE-REORG-1 P7: true only when the optional inspecto-reconciliation module registered the /recon routes.
+        // Present-and-false on a bundle without it (the SPA hides the Reconciliation nav entries on false).
+        f.put("reconciliation", on.contains("reconciliation"));
         // P2b: every other installed module's feature id, under its own key (a module added tomorrow needs no edit here).
         for (String id : new java.util.TreeSet<>(api.registeredFeatures())) f.putIfAbsent(id, on.contains(id));
         f.put("authMode", System.getProperty("auth.mode", "none"));

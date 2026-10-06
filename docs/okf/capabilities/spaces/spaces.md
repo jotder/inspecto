@@ -263,7 +263,7 @@ parked in the plan's §4 (needs real feeds).
   - ⚠ **Breaks are not xDRs.** On the golden corpus, 15 completeness Breaks are **9** distinct lost or short
     xDRs, because a record lost at mediation breaks both pairs. The dashboard shows the xDR count
     (`ra_xdr_lost`).
-- **Golden test.** `inspecto/src/test/java/com/gamma/job/TelcoRaGoldenTest.java` runs the template's
+- **Golden test.** `inspecto-reconciliation/src/test/java/com/gamma/job/TelcoRaGoldenTest.java` runs the template's
   own Jobs and Reconciliations over `TelcoRaCorpus` (seed `20260930`, 600 xDRs). It asserts the exact
   `key|reason` set per control, and one row per finding:
 

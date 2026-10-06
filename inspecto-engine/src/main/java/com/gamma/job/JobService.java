@@ -277,7 +277,7 @@ public final class JobService implements AutoCloseable {
      *  {@code null} (e.g. the bare-{@code JobService} test constructors) disables on-signal dispatch. */
     private volatile EventLog eventLog;
     /** This space's operational-object seam, wired post-construction ({@link #objects(ObjectAccess)}) so
-     *  the {@code recon.run} built-in can promote a breach to an Incident; {@code null} until wired.
+     *  the {@code incident.open} built-in can open an Incident; {@code null} until wired.
      *  ⚠ Typed as the seam, not the domain service: {@code com.gamma.ops} is an optional edition module
      *  (EDG-01 cell 7) and this class is in the mandatory engine. */
     private volatile com.gamma.objects.ObjectAccess objects;
@@ -570,14 +570,9 @@ public final class JobService implements AutoCloseable {
         // publish.postgres (ASSURE-BI-PUBLICATION-1): publish curated Datasets to a Postgres schema for BI tools,
         // full-refresh (atomic swap) or partition-incremental; runs as its author, sensitive columns refused by default.
         registry.register(new PostgresPublishJobType(dataDir));
-        // recon.run (DAT-7 Ops): schedule a saved Reconciliation; emits recon.run.completed with the Break
-        // counts (WARNING when any break exists) — the ledger fact a future Alert Rule watches. Reads the
-        // component registry from -Dassist.write.root at run time, like the maintenance/report jobs.
-        registry.register(JobTypeProvider.of(new JobTypeDescriptor("recon.run", "Reconciliation Run",
-                "Runs a saved Reconciliation over its Datasets and emits a signal carrying the Break counts.",
-                List.of(ParameterDecl.required("reconciliation", ParamType.STRING, "Saved reconciliation component id")),
-                List.of("recon.run.completed"), List.of()),
-                c -> new ReconRunJob(c, dataDir, () -> this.objects)));
+        // ⛔ recon.run is NOT registered here any more (MODULE-REORG-1 P7): it ships in the optional
+        // inspecto-reconciliation module and registers through the ServiceLoader JobTypeProvider loop below.
+        // On a bundle without the module it is simply an unknown Job Type.
         // kpi.completeness (completeness KPI K4): one Pipeline's received volume per record-day from the
         // output registry; on a breach, a kpi.completeness.breached signal and one deduped Incident per
         // Pipeline (requires: incidents). Cron'd like any job — one *_job.toon per Pipeline. Refuses unless this Space's consignmentOutputs store is durable (KpiCompletenessJob).
@@ -841,7 +836,7 @@ public final class JobService implements AutoCloseable {
         this.eventLog = eventLog;
     }
 
-    /** Bind this service to its space's Object Engine so {@code recon.run} can promote a breach to an Incident.
+    /** Bind this service to its space's Object Engine so {@code incident.open} can open an Incident.
      *  Optional; read live by the built-in through a supplier, so ordering vs construction doesn't matter. */
     public void objects(com.gamma.objects.ObjectAccess objects) {
         this.objects = objects;

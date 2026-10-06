@@ -1,5 +1,9 @@
-package com.gamma.job;
+package com.gamma.recon;
 
+import com.gamma.job.Job;
+import com.gamma.job.JobConfig;
+import com.gamma.job.JobContext;
+import com.gamma.job.JobResult;
 import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.objects.ObjectAccess;
 import com.gamma.workflow.ObjectType;
@@ -7,10 +11,6 @@ import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
-import com.gamma.query.ReconBreaks;
-import com.gamma.query.ReconConfigLoader;
-import com.gamma.query.ReconService;
-import com.gamma.query.ReconStateStore;
 import com.gamma.signal.Severity;
 
 import java.nio.file.Path;
@@ -43,7 +43,7 @@ import java.util.function.Supplier;
  * registry from {@link com.gamma.pipeline.SpaceConfigRoot} at run time — THIS space's config root, not
  * the JVM-wide {@code -Dassist.write.root} it used to read (as {@link MaterializeTask}/{@code ReportJob}).
  */
-final class ReconRunJob implements Job {
+public final class ReconRunJob implements Job {
 
     /** Board grain-row cap (MAX_LIMIT parity with ReconRoutes); the Break summary is exact regardless. */
     private static final int GRAIN_LIMIT = 5_000;
@@ -54,7 +54,13 @@ final class ReconRunJob implements Job {
      *  is {@code null} until wired and on the bare-JobService test constructors — then the Job stays signal-only. */
     private final Supplier<ObjectAccess> objects;
 
-    ReconRunJob(JobConfig cfg, String dataDir, Supplier<ObjectAccess> objects) {
+    /**
+     * {@code dataDir} and {@code objects} may be {@code null}: the {@link ReconRunJobType} provider builds the Job from
+     * a {@link JobConfig} alone, so both are then resolved from the running Space at {@link #run(JobContext)} time
+     * (the data root from {@link SpaceConfigRoot#currentDataRoot()}, the Incident seam from the granted
+     * {@code objects} Platform Service).
+     */
+    public ReconRunJob(JobConfig cfg, String dataDir, Supplier<ObjectAccess> objects) {
         this.cfg = cfg;
         this.dataDir = dataDir;
         this.objects = objects;
@@ -72,10 +78,10 @@ final class ReconRunJob implements Job {
     public JobResult run(JobContext ctx) throws Exception {
         long t0 = System.nanoTime();
         // Space-scoped, matching dataDir below — see SpaceConfigRoot (MATERIALIZE-SPACE-ROOT-1).
-        if (dataDir == null || dataDir.isBlank())
+        Path dataRoot = dataDir != null && !dataDir.isBlank() ? Path.of(dataDir) : SpaceConfigRoot.currentDataRoot();
+        if (dataRoot == null)
             throw new IllegalStateException("recon.run needs a data root (-Ddata.dir / space dataDir)");
         Path writeRoot = SpaceConfigRoot.requireCurrent("recon.run");
-        Path dataRoot = Path.of(dataDir);
         String reconId = cfg.require("reconciliation");
 
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
@@ -153,7 +159,7 @@ final class ReconRunJob implements Job {
      */
     private void openIncident(JobContext ctx, String reconId, long missingLeft, long missingRight,
                               long valueBreak, long breaks) {
-        ObjectAccess svc = objects == null ? null : objects.get();
+        ObjectAccess svc = objects != null ? objects.get() : ctx.services().find(ObjectAccess.class).orElse(null);
         if (svc == null) return;
         try {
             if (svc.hasActive(ObjectType.INCIDENT, reconId)) return;   // one open Incident per reconciliation

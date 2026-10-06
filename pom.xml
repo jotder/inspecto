@@ -69,7 +69,7 @@
     </modules>
 
     <!--
-        Edition assembly (docs/EDITIONS.md): inspecto-connectors-kafka (premium Kafka connector), inspecto-oidc, inspecto-secrets and inspecto-geo-country (W6 — the Authenticator SPI's OIDC
+        Edition assembly (docs/EDITIONS.md): inspecto-reconciliation (the Reconciliation add-on), inspecto-connectors-kafka (premium Kafka connector), inspecto-oidc, inspecto-secrets and inspecto-geo-country (W6 — the Authenticator SPI's OIDC
         implementation), inspecto-notify-channels (CP-15 — the webhook + SMTP transports), inspecto-backup (OPS-06 — the
         backup/backup_verify/restore tasks) inspecto-entity-list (SEP-08 — Entity Lists + the shared entity fact log),
         inspecto-geo-link (CP-09 — the geo map + link analysis
@@ -132,6 +132,8 @@
                      the EVENT on Personal but no ALERT object). ⛔ NOT /alerts* — that is AlertsService
                      over config alert RULES, a different domain, and it stays in core. -->
                 <module>inspecto-ops</module>
+                <!-- MODULE-REORG-1 P7: the Reconciliation add-on (Professional and up; absent on Personal). -->
+                <module>inspecto-reconciliation</module>
             </modules>
         </profile>
         <profile>
@@ -153,6 +155,8 @@
                 <module>inspecto-exchange</module>
                 <module>inspecto-observability</module>
                 <module>inspecto-ops</module>
+                <!-- MODULE-REORG-1 P7: the Reconciliation add-on (Professional and up; absent on Personal). -->
+                <module>inspecto-reconciliation</module>
             </modules>
         </profile>
         <!-- Preview: EVERYTHING, for testing/incubation — never a customer-facing tier (docs/EDITIONS.md,
@@ -187,6 +191,8 @@
                 <module>inspecto-exchange</module>
                 <module>inspecto-observability</module>
                 <module>inspecto-ops</module>
+                <!-- MODULE-REORG-1 P7: the Reconciliation add-on (Professional and up; absent on Personal). -->
+                <module>inspecto-reconciliation</module>
             </modules>
         </profile>
         <!-- Enterprise = Professional + the ABAC policy engine (rbac-abac-plan §5): the same one-version
@@ -214,6 +220,8 @@
                 <module>inspecto-exchange</module>
                 <module>inspecto-observability</module>
                 <module>inspecto-ops</module>
+                <!-- MODULE-REORG-1 P7: the Reconciliation add-on (Professional and up; absent on Personal). -->
+                <module>inspecto-reconciliation</module>
             </modules>
         </profile>
         <!-- M5 (A2): JaCoCo lives in the PARENT so every module instruments in one reactor pass —

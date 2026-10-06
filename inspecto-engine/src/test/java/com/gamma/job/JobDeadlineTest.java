@@ -152,14 +152,16 @@ class JobDeadlineTest {
         assertEquals("REJECTED", r.status(), r.message());
     }
 
-    /** The built-in long types default to the ceiling, so their own timeouts still govern (operator 2026-10-06). */
+    /** The built-in long types default to the ceiling, so their own timeouts still govern (operator 2026-10-06).
+     *  (recon.run left this list when it became the inspecto-reconciliation module's Job Type — its 24 h default is
+     *  pinned in that module's ReconRunJobTest.) */
     @Test
     void builtInDefaultsLeaveRoomForTheExistingPerJobTimeouts(@TempDir Path dir) throws Exception {
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString())) {
             JobTypeRegistry reg = registryOf(js);
-            for (String id : List.of("pipeline", "enrich", "maintenance", "recon.run", "consignment.process",
+            for (String id : List.of("pipeline", "enrich", "maintenance", "consignment.process",
                     "objectstore.export", "publish.postgres", "la.index.build"))
                 assertEquals(Duration.ofHours(24), reg.deadline(id), id);
             for (String id : List.of("sample.hello", "report", "alert.evaluate"))

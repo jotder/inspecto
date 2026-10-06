@@ -140,7 +140,9 @@ public final class PlatformServiceRegistry {
                         + "' (available: " + byId.keySet() + ")");
             if (disabled.contains(id))
                 throw new IllegalStateException("Platform Service disabled: '" + id + "'");
-            granted.put(b.type(), b.impl());
+            // A registered service whose implementation is absent in this build (the "objects" seam without inspecto-ops)
+            // is granted as ABSENT, not as a null — Map.copyOf below rejects nulls, and find() already models absence (§3.5).
+            if (b.impl() != null) granted.put(b.type(), b.impl());
             if (b.standIn() != null) standIns.put(b.type(), b.standIn());
         }
         return new Granted(Map.copyOf(granted), Map.copyOf(standIns));

@@ -1,4 +1,4 @@
-package com.gamma.query;
+package com.gamma.recon;
 
 import org.junit.jupiter.api.Test;
 

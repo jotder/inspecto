@@ -142,7 +142,7 @@ class ControlApiActionRequestsTest {
         if (writeRoot != null) System.setProperty("assist.write.root", writeRoot.toString());
         ClassLoader outer = Thread.currentThread().getContextClassLoader();
         try {
-            Thread.currentThread().setContextClassLoader(ControlApiReconPromoteTest.fakeObjectEngineClassLoader(outer));
+            Thread.currentThread().setContextClassLoader(FakeObjectEngineProvider.fakeObjectEngineClassLoader(outer));
             CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
             if (writeRoot != null) seedApproverRoster(writeRoot);   // OIDC-shaped Authenticator: the Space's approver roster decides
             ControlApi api = new ControlApi(svc, 0);

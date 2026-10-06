@@ -1,4 +1,6 @@
-package com.gamma.job;
+package com.gamma.recon;
+
+import com.gamma.job.*;
 
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.etl.ConsignmentEventBus;
@@ -124,7 +126,7 @@ class ReconRunJobTest {
 
         JobResult first = job.run(new CapturingContext(Map.of("reconciliation", "orders_recon")));
         assertFalse(first.message().contains("not recorded"), first.message());
-        com.gamma.query.ReconStateStore.State s1 = new com.gamma.query.ReconStateStore(writeRoot).read("orders_recon");
+        com.gamma.recon.ReconStateStore.State s1 = new com.gamma.recon.ReconStateStore(writeRoot).read("orders_recon");
         assertEquals(1, s1.runs());
         assertNotNull(s1.lastRunAt());
         assertEquals(3, s1.breaks().size());
@@ -134,7 +136,7 @@ class ReconRunJobTest {
         // MEA disappears from A: its Break auto-closes on the next scheduled run; the others keep their sighting
         seedStore(dataDir, "orders_a", "VALUES ('EU','voice',100.0),('EU','data',118.0)");
         job.run(new CapturingContext(Map.of("reconciliation", "orders_recon")));
-        com.gamma.query.ReconStateStore.State s2 = new com.gamma.query.ReconStateStore(writeRoot).read("orders_recon");
+        com.gamma.recon.ReconStateStore.State s2 = new com.gamma.recon.ReconStateStore(writeRoot).read("orders_recon");
         assertEquals(2, s2.runs());
         assertEquals("auto_closed", s2.breaks().stream().filter(b -> b.key().equals("MEA · voice")).findFirst()
                 .orElseThrow().status());
@@ -162,8 +164,8 @@ class ReconRunJobTest {
         JobResult r = new ReconRunJob(cfg, dataDir.toString(), () -> null)
                 .run(new CapturingContext(Map.of("reconciliation", "three_recon")));
         assertFalse(r.message().contains("not recorded"), r.message());
-        com.gamma.query.ReconStateStore.State s = new com.gamma.query.ReconStateStore(writeRoot).read("three_recon");
-        assertEquals(List.of("AB", "AC"), s.breaks().stream().map(com.gamma.query.ReconBreaks.Break::pair).toList(),
+        com.gamma.recon.ReconStateStore.State s = new com.gamma.recon.ReconStateStore(writeRoot).read("three_recon");
+        assertEquals(List.of("AB", "AC"), s.breaks().stream().map(com.gamma.recon.ReconBreaks.Break::pair).toList(),
                 "MEA · voice is missing from B AND from C — one Break per pair");
     }
 
@@ -189,7 +191,7 @@ class ReconRunJobTest {
         assertTrue(r.message().contains("2 break(s)"), "A-B is clean, A-C has 2: " + r.message());
         assertEquals(2L, ((Number) ctx.payload.get().get("breaks")).longValue());
         assertEquals(2L, ((Number) ctx.payload.get().get("missingRight")).longValue());
-        assertEquals(2, new com.gamma.query.ReconStateStore(writeRoot).read("three_recon").breaks().size());
+        assertEquals(2, new com.gamma.recon.ReconStateStore(writeRoot).read("three_recon").breaks().size());
     }
 
     private static int incidentCount(com.gamma.objects.FakeObjectAccess objects) {
@@ -206,14 +208,17 @@ class ReconRunJobTest {
         assertThrows(IllegalArgumentException.class, () -> job.run(new CapturingContext(Map.of())));
     }
 
+    /** recon.run arrives through the module's ServiceLoader JobTypeProvider (P7) and declares the "objects" grant. */
     @Test
-    void reconRunIsRegisteredAsABuiltInType() throws Exception {
-        try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
-                     "audit", null, null, "data")) {
-            assertTrue(js.jobType("recon.run").isPresent(), "recon.run registered as a built-in Job Type");
-            assertEquals("Reconciliation Run", js.jobType("recon.run").get().title());
-        }
+    void reconRunIsContributedThroughTheServiceLoader() {
+        com.gamma.job.JobTypeProvider p = java.util.ServiceLoader.load(com.gamma.job.JobTypeProvider.class).stream()
+                .map(java.util.ServiceLoader.Provider::get).filter(x -> "recon.run".equals(x.id())).findFirst().orElse(null);
+        assertNotNull(p, "recon.run is listed in META-INF/services/com.gamma.job.JobTypeProvider");
+        assertEquals("Reconciliation Run", p.descriptor().title());
+        assertEquals(List.of("objects"), p.descriptor().requires());
+        assertEquals(java.time.Duration.ofHours(24), p.deadline(), "a long-running built-in default, as before the move");
+        assertEquals("recon.run", p.create(new JobConfig("r", "recon.run", null, null, true, false,
+                Map.of("reconciliation", "x"), null, null)).type());
     }
 
     private static void seedStore(Path dataDir, String name, String values) throws Exception {

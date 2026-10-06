@@ -2,7 +2,7 @@ id: professional
 title: Professional
 tier: professional
 includes[1]: personal
-modules[17]: oidc,secrets,geo-country,connectors-kafka,telecom-asn1,notify-channels,backup,entity-list,la-graph,la-storage,la-core,la-api,geo-link,exchange,observability,ops,agent
+modules[18]: oidc,secrets,geo-country,connectors-kafka,telecom-asn1,notify-channels,backup,entity-list,la-graph,la-storage,la-core,la-api,geo-link,exchange,observability,ops,reconciliation,agent
 addons:
   linkAnalysis:
     status: built
@@ -23,8 +23,8 @@ addons:
     status: planned
     hostedBy[1]: ops
   reconciliation:
-    status: planned
-    hostedBy[1]: engine
+    status: built
+    modules[1]: reconciliation
   scoringLists:
     status: planned
     hostedBy[2]: engine,entity-list

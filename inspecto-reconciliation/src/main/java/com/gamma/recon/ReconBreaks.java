@@ -1,4 +1,4 @@
-package com.gamma.query;
+package com.gamma.recon;
 
 import java.io.IOException;
 import java.math.BigDecimal;

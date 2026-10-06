@@ -120,4 +120,14 @@ class PlatformServicesTest {
         // "Restart" = a new registry built at boot: nothing is persisted.
         assertTrue(!registryWithBoth().isDisabled("greeting"));
     }
+
+    /** A service registered with no implementation in this build (the "objects" seam without inspecto-ops) is granted as ABSENT. */
+    @Test
+    void aServiceBoundToNullIsGrantedAsAbsentNotAsANullPointer() {
+        PlatformServiceRegistry reg = new PlatformServiceRegistry();
+        reg.register("greeting", Greeting.class, null);
+        PlatformServices granted = reg.grant(Set.of("greeting"));
+        assertTrue(granted.find(Greeting.class).isEmpty());
+        assertTrue(granted.granted().isEmpty());
+    }
 }

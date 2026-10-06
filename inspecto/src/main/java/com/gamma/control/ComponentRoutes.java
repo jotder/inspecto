@@ -471,11 +471,12 @@ final class ComponentRoutes implements RouteModule {
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
-        // R2-03: a Reconciliation's run state lives beside the registry, not in the component — delete it with
-        // the component, or a re-created Reconciliation of the same id would inherit its Breaks.
-        if ("reconciliation".equals(type)) {
+        // R2-03: state an optional module keeps beside the registry (a Reconciliation's run state) is deleted with
+        // the component, or a re-created component of the same id would inherit it — the module's ComponentDeleteHook.
+        for (ComponentDeleteHook hook : com.gamma.service.OptionalSpi.all(ComponentDeleteHook.class)) {
+            if (!type.equals(hook.type())) continue;
             try {
-                new com.gamma.query.ReconStateStore(api.writeRoot()).delete(id);
+                hook.afterDelete(api.writeRoot(), id);
             } catch (IllegalArgumentException unsafe) {
                 throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, unsafe.getMessage());
             } catch (SecurityException jail) {

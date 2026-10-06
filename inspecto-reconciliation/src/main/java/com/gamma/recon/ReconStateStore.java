@@ -1,4 +1,4 @@
-package com.gamma.query;
+package com.gamma.recon;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;

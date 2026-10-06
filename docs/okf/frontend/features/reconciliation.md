@@ -9,6 +9,15 @@ timestamp: 2026-07-16T00:00:00Z
 
 # Reconciliation
 
+> **Module (MODULE-REORG-1 P7, 2026-10-07).** Everything server-side on this page — the ten `/recon` routes (`ReconRoutes`),
+> the comparison engine (`ReconService`, `ReconBreaks`, `ReconConfigLoader`), the run state (`ReconStateStore`) and the
+> `recon.run` Job Type — lives in the optional **`inspecto-reconciliation`** module (id `reconciliation`, package
+> `com.gamma.recon`; the plan §8a *Reconciliation* add-on), staged from **Professional** up. **Personal no longer ships it**
+> (a deliberate behaviour change): its `/recon` paths answer 503 "not installed" (`AbsentReconRoutes`), `/bootstrap`
+> reports `features.reconciliation=false`, and `recon.run` is an unknown Job Type. The `reconciliation` config component kind
+> stays core — authoring is generic component CRUD; deleting the component deletes its run state through the module's
+> `ComponentDeleteHook`. The tests below moved with it (`inspecto-reconciliation/src/test`).
+
 Route `/reconciliation` (Business + Builder lenses). Vocabulary is locked
 ([`GLOSSARY.md`](../../../GLOSSARY.md) §7): a **Reconciliation** compares **Datasets** on key columns
 with per-column tolerances; a **Break** is
@@ -49,7 +58,7 @@ which kept the lifecycle in the browser). Until then the Board merged the lifecy
 `canAuthorWorkbench` — so a user holding only the `operations` role (`canOperateRuns`) got a **403 on every
 run**: nothing was recorded, the list read *"Last run: never"* and the Breaks page *"No first-seen date"*, and
 resolving a Break was a config write that 403'd too. As built:
-* **Store** — `ReconStateStore` (`inspecto-engine`, `com.gamma.query`): one JSON document per Reconciliation at
+* **Store** — `ReconStateStore` (`inspecto-reconciliation`, `com.gamma.recon`): one JSON document per Reconciliation at
   `<write-root>/recon-state/<id>.json` = `{reconciliation, lastRunAt, runs, breaks[]}` (a Break is the SPA's
   `ReconBreak` shape, carrying its `pair` — below). Atomic write (`AtomicFiles`), one lock for read-merge-write, **fail closed** (a corrupt
   file is 503, never "never run"), the id a bare name and the file jailed with `PathJail.contains` against the
@@ -198,15 +207,14 @@ what drifts first. ⚠ A recorded run writes ONE instant to both the new Breaks'
 * **Reusable** — a Reconciliation renders as a **Widget** and rides bundle export/template flows
   (DAT-7 P3); persisted as the `reconciliation` component kind with real backend routes
   `/recon/columns|run|breaks` (DAT-7 P0 — the query gate pattern from the Data Browser).
-* Runs are manual from the Board (no auto-refresh; each is recorded, above), **or scheduled**: the `recon.run` built-in Job Type
-  (`ReconRunJob`, 2026-07-18) runs a saved `reconciliation` on a `cron:` and emits a `recon.run.completed`
+* Runs are manual from the Board (no auto-refresh; each is recorded, above), **or scheduled**: the `recon.run` Job Type
+  (`ReconRunJob`, 2026-07-18; contributed by `inspecto-reconciliation` through `ReconRunJobType`, a `ServiceLoader` `JobTypeProvider`, since 2026-10-07) runs a saved `reconciliation` on a `cron:` and emits a `recon.run.completed`
   Signal carrying the Break counts (`WARNING` when any break exists) — it builds the identical
   `ReconService.Spec` the interactive route does, via the shared `ReconConfigLoader`. **A breach
   (`breaks > 0`) also opens a managed `ObjectType.INCIDENT`** (2026-07-19), deduped to one open Incident
   per reconciliation (correlationId = the reconciliation id), reusing the `ExpectationRoutes`
-  dedup+open pattern; `ObjectService` reaches `ReconRunJob` via a `Supplier` `JobService` wires
-  post-construction (`JobService.objects(...)`, resolved lazily since the built-in is constructed
-  before the Object Engine exists). Break-level assignment stays with Cases.
+  dedup+open pattern; the job reaches the Object Engine through the `objects` Platform Service its descriptor `requires:`
+  (`JobContext.services()`, resolved at run time; an `inspecto-ops`-less bundle leaves it signal-only). Break-level assignment stays with Cases.
 
 **The rows behind a cardinality break** (`RECON-CARDINALITY-2`, 2026-09-15). A `cardinality_break` carries per-side
 ROW COUNTS; the rows themselves are gone by the time the break is detected, because `ReconService.sideSql`

@@ -73,7 +73,7 @@ class ControlApiSpaceBundleActionRequestsTest {
 
     @BeforeEach
     void arm() throws Exception {
-        ClassLoader fakeObjects = ControlApiReconPromoteTest.fakeObjectEngineClassLoader(
+        ClassLoader fakeObjects = FakeObjectEngineProvider.fakeObjectEngineClassLoader(
                 Thread.currentThread().getContextClassLoader());
         // A Space created through POST /spaces/import boots ON the request thread, so the fake object engine must
         // be discoverable there: every request thread gets the fake engine's classloader before its route runs.

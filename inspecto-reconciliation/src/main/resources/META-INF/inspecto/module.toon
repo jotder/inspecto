@@ -1,0 +1,8 @@
+id: reconciliation
+title: Reconciliation
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+provides:
+  features[1]: reconciliation
+  contracts[2]: JobTypeProvider,ComponentDeleteHook

@@ -678,7 +678,7 @@ class ControlApiReconStateTest {
 
     /** An auto-closed record that has been absent for the whole recurrence window. */
     private static Map<String, Object> goneForTheWindow(Map<String, Object> b) {
-        b.put("absentRuns", com.gamma.query.ReconBreaks.RECURRENCE_WINDOW_RUNS);
+        b.put("absentRuns", com.gamma.recon.ReconBreaks.RECURRENCE_WINDOW_RUNS);
         return b;
     }
 

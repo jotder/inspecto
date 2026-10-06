@@ -1,5 +1,6 @@
-package com.gamma.query;
+package com.gamma.recon;
 
+import com.gamma.query.ExpressionGuard;
 import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlSandboxPolicy;
 

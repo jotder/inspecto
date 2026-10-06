@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-reconciliation</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Reconciliation (optional)</name>
+    <description>
+        OPTIONAL add-on module (MODULE-REORG-1 P7, 2026-10-07): the Reconciliation add-on of plan §8a. Compares Datasets
+        side by side and tracks the Breaks it finds: the ten /recon routes (ReconRoutes: columns, run, breaks, rows,
+        promote, promoted, state, {id}/state, {id}/record, {id}/breaks/status), the comparison engine (ReconService,
+        ReconBreaks, ReconConfigLoader), the per-Reconciliation run state (ReconStateStore, {write root}/recon-state/) and
+        the recon.run Job Type. Package com.gamma.recon.
+
+        Contributed through the core's public seams only: com.gamma.control.RouteModule (feature id "reconciliation"),
+        com.gamma.job.JobTypeProvider (recon.run, requires the "objects" Platform Service so a breach can open an
+        Incident) and com.gamma.control.ComponentDeleteHook (deleting a reconciliation component deletes its run state).
+        The "reconciliation" config component kind itself stays in the core (ComponentStore): authoring a Reconciliation
+        is generic component CRUD, executing it is this module.
+
+        Bundled from the Professional edition up (the Standard, Professional, Enterprise and Preview profiles); on Personal
+        the core answers the /recon paths with 503 "not installed" (AbsentReconRoutes), /bootstrap reports
+        features.reconciliation=false and recon.run is an unknown Job Type. THIN: no shade, no sidecar classifier. Built
+        only under the edition profiles, so a routine "mvn -o clean test" (= Personal) never compiles it.
+    </description>
+
+    <dependencies>
+        <!-- The core: RouteModule/ApiContext/ApiException/WriteGates/HostContext, the engine (Job SPI, ObjectAccess,
+             ComponentStore, DatasetRelation) and DuckDB. Compile scope, as inspecto-entity-list and inspecto-ops do — a
+             thin jar dropped beside inspecto.jar resolves all of it from there at run time. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs / PipelineConfigBatchTest (and
+             ConsignmentEventBus) the moved HTTP tests boot a real CollectorService + ControlApi with. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- MODULE-REORG-1 P5a: platform test kit (FakeApiContext + RouteModuleContract TCK) -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
