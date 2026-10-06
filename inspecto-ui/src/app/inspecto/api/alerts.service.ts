@@ -56,7 +56,7 @@ export interface AlertRule {
 
 /**
  * A Space Template's Alert Rule still waiting on its Risk Score's first run (GET /alerts/rules/pending).
- * A refusal's reason is not served — it is in the audit log (`alert-rule.pending.refused`).
+ * Once a run refused it, `lastRefusal` carries the latest reason and time (the audit log keeps every refusal).
  */
 export interface PendingAlertRule {
     name: string;
@@ -65,6 +65,8 @@ export interface PendingAlertRule {
     dataset?: string | null;
     /** Set only when the pending file could not be read. */
     error?: string | null;
+    /** The latest refusal (reason + ISO time); absent until a run has refused the rule. */
+    lastRefusal?: { reason: string; at: string } | null;
 }
 
 /** Create/update body — the whole rule is authorable; `name` is the identity (immutable on edit). */

@@ -93,6 +93,39 @@ describe('AlertsComponent', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
+    it('shows the latest refusal reason and drops the audit-log hint when a rule was refused', async () => {
+        const { fixture } = await create({
+            pendingRules: () =>
+                of([
+                    {
+                        name: 'pf_high_risk_account',
+                        afterRiskScore: 'payment_account',
+                        dataset: 'pf_risk',
+                        lastRefusal: {
+                            reason: "risk-score 'payment_account' has not written it yet",
+                            at: '2026-10-06T08:00:00Z',
+                        },
+                    },
+                ]),
+        });
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const text = pendingSection(fixture.nativeElement)!.textContent!;
+        expect(text).toContain('has not written it yet');
+        expect(text).toContain('shown per rule');
+        expect(text).not.toContain('audit log');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('keeps the audit-log hint while no rule has been refused', async () => {
+        const { fixture } = await create({
+            pendingRules: () => of([{ name: 'r1', afterRiskScore: 'm', dataset: 'd' }]),
+        });
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(pendingSection(fixture.nativeElement)!.textContent).toContain('audit log');
+    });
+
     it('shows an empty state when nothing is pending', async () => {
         const { fixture } = await create();
         fixture.detectChanges();

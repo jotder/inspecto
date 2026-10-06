@@ -731,14 +731,20 @@ would forge the ownership marker, so a template declares the rule as PENDING ins
   `#onRiskScoreProduced` runs `DecisionRuleGuard.refuseUnattended` — a background writer has no Subject to hold
   `canWorkIncidents`, so a rule body with an `invoke-api` consequence is refused (422, fail closed) and stays pending
   + audited like every other refusal.
-- **Status.** `GET /alerts/rules/pending` lists `{name, afterRiskScore, dataset}` for what is still waiting; a
-  refusal's reason is in the audit log (the route does not serve it). The Alerts page shows them read-only under
-  *Pending Alert Rules* (name, the Risk Score it waits on, Dataset, an unreadable file's `error`), with an empty state, an
+- **Status.** `GET /alerts/rules/pending` lists `{name, afterRiskScore, dataset}` for what is still waiting, plus
+  `lastRefusal: {reason, at}` once a run refused it (`PENDING-REFUSAL-REASON`, operator 2026-10-06). The latest refusal
+  is kept beside the pending file in `<name>.refusal` (temp file + atomic move; the rule body is never touched, and the
+  `.refusal` extension is never listed as a rule) and deleted with it on creation or drop; the AUDIT event is still
+  emitted. The stored reason has the Space's absolute location replaced (`PendingAlertRules#scrub`) and an I/O failure
+  is stored only as `write failed`, so no host path is served; gate reasons name rule/Dataset/column names, never row
+  values. The Alerts page shows them read-only under
+  *Pending Alert Rules* (name, the Risk Score it waits on, Dataset, an unreadable file's `error`, and *Why still pending*
+  — the latest refusal's reason and time, replacing the "see the audit log" hint once any entry has one), with an empty state, an
   error state with Retry, and the section hidden when the route answers 404/503; the rule moves to the Alert Rules table
   once created.
 - **Use.** `payment-fraud` ships `pf_high_risk_account` (`max(score) >= 60` by `model, entity_key`, CRITICAL) after
   `payment_account`. Tests: `PendingAlertRulesTest` (pending, refused + audited, created once, never overwritten, held
-  under an approval policy, a `DecisionRuleGuard` refusal stays pending), `ControlApiSpaceTemplateSeedGateTest` (capability and content refusal at apply) and
+  under an approval policy, a `DecisionRuleGuard` refusal stays pending, `lastRefusal` absent before a run / served after a refusal / gone after success, path scrub), `ControlApiSpaceTemplateSeedGateTest` (capability and content refusal at apply) and
   `PaymentFraudDashboardTest` (the live Space's own `pf_risk_score` run creates and arms it).
 
 ### 3.6 Metadata Bundle v2 (SPC-4) — configuration moves, data never does

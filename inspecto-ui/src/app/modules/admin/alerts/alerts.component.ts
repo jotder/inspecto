@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -71,7 +71,23 @@ export class AlertsComponent implements OnInit {
         },
         { field: 'dataset', headerName: 'Dataset', flex: 1, minWidth: 140, valueFormatter: (p) => p.value || '—' },
         { field: 'error', headerName: 'Problem', flex: 2, minWidth: 160, valueFormatter: (p) => p.value || '' },
+        {
+            colId: 'lastRefusal',
+            headerName: 'Why still pending',
+            flex: 3,
+            minWidth: 220,
+            valueGetter: (p) => p.data?.lastRefusal ?? null,
+            valueFormatter: (p) => {
+                const r = p.value as PendingAlertRule['lastRefusal'];
+                if (!r) return '';
+                const at = new Date(r.at);
+                return `${r.reason} (${isNaN(at.getTime()) ? r.at : at.toLocaleString()})`;
+            },
+        },
     ];
+
+    /** True once any pending rule carries its latest refusal — the reason is then shown per row, not in the audit log. */
+    readonly pendingHasRefusal = computed(() => this.pending().some((p) => !!p.lastRefusal));
 
     // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columnDefs: ColDef<FiredAlert>[] = [

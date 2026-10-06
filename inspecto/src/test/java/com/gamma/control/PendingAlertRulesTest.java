@@ -190,4 +190,52 @@ class PendingAlertRulesTest {
         unknown.put("afterRiskScore", "nope");
         assertThrows(IllegalArgumentException.class, () -> PendingAlertRules.requireDeclarable(config, unknown, RULE));
     }
+
+    // PENDING-REFUSAL-REASON (operator 2026-10-06): the latest refusal is served on the pending entry.
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> lastRefusal() {
+        return (Map<String, Object>) PendingAlertRules.list(config).get(0).get("lastRefusal");
+    }
+
+    @Test
+    void noLastRefusalBeforeAnyRunThenTheReasonAndTimeAfterARefusal() throws Exception {
+        String before = Files.readString(config.resolve(PendingAlertRules.DIR).resolve(RULE + ".toon"));
+        assertFalse(PendingAlertRules.list(config).get(0).containsKey("lastRefusal"), "no run, no refusal");
+        Instant t0 = Instant.now().minusSeconds(1);
+        produced();
+        Map<String, Object> r = lastRefusal();
+        assertNotNull(r, "a refusal is served on the entry");
+        assertTrue(String.valueOf(r.get("reason")).contains("has not written"), r.toString());
+        assertFalse(Instant.parse(String.valueOf(r.get("at"))).isBefore(t0), r.toString());
+        assertEquals(before, Files.readString(config.resolve(PendingAlertRules.DIR).resolve(RULE + ".toon")),
+                "the rule body is not altered");
+        assertEquals(List.of(RULE), PendingAlertRules.list(config).stream().map(m -> m.get("name")).toList(),
+                "the sidecar is never listed as a pending rule");
+        assertEquals(List.of("alert-rule.pending.refused"), actions(), "the AUDIT event is kept");
+        // No host path leaks: neither the Space's absolute location nor the temp root appears.
+        String reason = String.valueOf(r.get("reason"));
+        assertFalse(reason.contains(space.toAbsolutePath().toString()), reason);
+        assertFalse(reason.contains(space.getParent().toAbsolutePath().toString()), reason);
+    }
+
+    @Test
+    void aLaterSuccessRemovesTheEntryAndItsRefusal() throws Exception {
+        produced();
+        assertNotNull(lastRefusal());
+        runRiskScore();
+        assertEquals(List.of(RULE), produced());
+        assertEquals(List.of(), PendingAlertRules.list(config));
+        try (var s = Files.list(config.resolve(PendingAlertRules.DIR))) {
+            assertEquals(List.of(), s.toList(), "no sidecar or temp file is left behind");
+        }
+    }
+
+    @Test
+    void scrubRemovesTheSpacesAbsoluteLocation() {
+        String abs = space.toAbsolutePath().resolve("data").resolve("x.parquet").toString();
+        String scrubbed = PendingAlertRules.scrub(config, "cannot read " + abs);
+        assertFalse(scrubbed.contains(space.toAbsolutePath().toString()), scrubbed);
+        assertTrue(scrubbed.contains("x.parquet"), scrubbed);
+    }
 }

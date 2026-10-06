@@ -43,6 +43,9 @@ import java.util.stream.Stream;
  *       hold {@code canWorkIncidents}, so a rule carrying an {@code invoke-api} consequence is refused (fail closed);</li>
  *   <li>a rule that already exists under that name is never overwritten: the pending entry is dropped and audited.</li>
  * </ul>
+ * The latest refusal's reason and time are also kept beside the pending file, in {@code <name>}{@value #REFUSAL_EXT}
+ * (written atomically; the rule body is never touched), and served by {@code GET /alerts/rules/pending} as
+ * {@code lastRefusal: {reason, at}} — the AUDIT event is still emitted. The stored reason is scrubbed of absolute paths.
  * Creation deletes the pending file, so a rule is materialized at most once. The applier's {@code canAuthorAlertRules}
  * was checked when the template was applied ({@link ImportCapabilityGuard}).
  */
@@ -54,6 +57,8 @@ public final class PendingAlertRules {
     public static final String DIR = "pending/alert-rules";
     /** The key naming the Risk Score model whose first run releases the rule. */
     public static final String AFTER = "afterRiskScore";
+    /** Extension of the sidecar holding a pending rule's latest refusal (not {@code .toon}, so never listed as a rule). */
+    static final String REFUSAL_EXT = ".refusal";
 
     private PendingAlertRules() {}
 
@@ -70,6 +75,8 @@ public final class PendingAlertRules {
             } catch (RuntimeException unreadable) {
                 m.put("error", "unreadable: " + unreadable.getMessage());
             }
+            Map<String, Object> refusal = readRefusal(f);
+            if (refusal != null) m.put("lastRefusal", refusal);
             out.add(m);
         }
         return out;
@@ -110,12 +117,14 @@ public final class PendingAlertRules {
                 body = read(f);
             } catch (RuntimeException unreadable) {
                 audit(events, "alert-rule.pending.refused", name, modelId, "unreadable: " + unreadable.getMessage());
+                recordRefusal(configRoot, f, "the pending file could not be read");
                 continue;
             }
             if (!modelId.equals(body.get(AFTER))) continue;
             try {
                 if (store.exists(AlertRoutes.TYPE, name)) {
                     Files.deleteIfExists(f);
+                    Files.deleteIfExists(refusalFile(f));
                     audit(events, "alert-rule.pending.dropped", name, modelId,
                             "an Alert Rule named '" + name + "' already exists; it was not overwritten");
                     continue;
@@ -130,12 +139,16 @@ public final class PendingAlertRules {
                 store.write(AlertRoutes.TYPE, name, rule.toMap());
                 if (alerts != null) alerts.upsert(rule);
                 Files.deleteIfExists(f);
+                Files.deleteIfExists(refusalFile(f));
                 created.add(name);
                 audit(events, "alert-rule.pending.created", name, modelId, null);
             } catch (ApiException | IllegalArgumentException refused) {
                 audit(events, "alert-rule.pending.refused", name, modelId, refused.getMessage());
+                recordRefusal(configRoot, f, refused.getMessage());
             } catch (IOException | UncheckedIOException io) {
                 audit(events, "alert-rule.pending.refused", name, modelId, "write failed: " + io.getMessage());
+                // An I/O message names host paths: the served reason says only that the write failed.
+                recordRefusal(configRoot, f, "write failed");
             }
         }
         return created;
@@ -155,6 +168,56 @@ public final class PendingAlertRules {
         if (dataRoot.get() == null || !RiskScoreEvaluator.ownedBy(dataRoot.get().resolve(latest), modelId))
             throw new IllegalArgumentException("risk-score '" + modelId + "' has not written '" + latest + "' yet");
         store.write("dataset", latest, ds);
+    }
+
+    private static Path refusalFile(Path pending) {
+        return pending.resolveSibling(nameOf(pending) + REFUSAL_EXT);
+    }
+
+    /**
+     * Keeps {@code reason} as the rule's latest refusal: written to a temp file and atomically moved over the sidecar,
+     * so a reader sees the old or the new record, never a torn one. Best effort — the AUDIT event is the durable record.
+     */
+    private static void recordRefusal(Path configRoot, Path pending, String reason) {
+        Map<String, Object> rec = new LinkedHashMap<>();
+        rec.put("reason", scrub(configRoot, reason));
+        rec.put("at", java.time.Instant.now().toString());
+        Path target = refusalFile(pending);
+        Path tmp = null;
+        try {
+            tmp = Files.createTempFile(target.getParent(), target.getFileName().toString(), ".tmp");
+            Files.writeString(tmp, com.gamma.config.io.ConfigCodec.toToon(rec));
+            Files.move(tmp, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException | RuntimeException e) {
+            log.warn("could not record the refusal of pending Alert Rule '{}': {}", nameOf(pending), e.toString());
+            if (tmp != null) try { Files.deleteIfExists(tmp); } catch (IOException ignored) { /* best effort */ }
+        }
+    }
+
+    /** The reason with the Space's absolute location replaced, so no host path outside the Space is served. */
+    static String scrub(Path configRoot, String reason) {
+        String r = reason == null ? "refused" : reason;
+        Path space = configRoot.toAbsolutePath().normalize().getParent();
+        if (space != null) {
+            r = r.replace(space.toString() + space.getFileSystem().getSeparator(), "")
+                    .replace(space.toString(), "<space>");
+        }
+        return r;
+    }
+
+    private static Map<String, Object> readRefusal(Path pending) {
+        Path f = refusalFile(pending);
+        if (!Files.isRegularFile(f)) return null;
+        try {
+            Map<String, Object> m = com.gamma.config.io.ConfigCodec.toMap(Files.readString(f));
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("reason", String.valueOf(m.get("reason")));
+            out.put("at", String.valueOf(m.get("at")));
+            return out;
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
     }
 
     private static Map<String, Object> ruleBody(Map<String, Object> body, String name) {

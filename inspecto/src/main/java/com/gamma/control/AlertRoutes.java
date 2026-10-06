@@ -43,7 +43,7 @@ final class AlertRoutes implements RouteModule {
                 .map(a -> (Object) a.rules())
                 .orElse(java.util.List.of()));
         // TEMPLATE-RISK-SCORE-ALERT-RULE-1: the deferred Alert Rules still waiting on their Risk Score's first run
-        // (a refusal's reason is in the audit log, action alert-rule.pending.refused). Read like /alerts/rules.
+        // (each entry carries lastRefusal {reason, at} once refused; the AUDIT event is kept). Read like /alerts/rules.
         api.get("/alerts/rules/pending", (e, m) -> api.writeRoot() == null ? java.util.List.of()
                 : PendingAlertRules.list(api.writeRoot()));
         // Gated 2026-09-17: a fired rule emits ALERT_FIRED, which the default NotificationRules dispatch to
