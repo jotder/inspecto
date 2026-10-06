@@ -1,6 +1,6 @@
 /**
  * Authoring model of a `risk-score` component (ASSURE-RISK-SCORE-RESIDUALS-1 (2), slice S2; spec
- * `docs/superpower/risk-score-authoring-pane-spec.md` §3). Framework-free: the form components render what this
+ * `docs/archived-documents/plans-archive/risk-score-authoring-pane-spec.md` §3). Framework-free: the form components render what this
  * returns and hand their values back through {@link toRiskScoreContent}; no rule is duplicated here beyond cheap
  * required/number checks — the server's `RiskScoreModel.fromMap` + `requireStorable` 422s are the gate, and
  * {@link mapRiskRefusal} places their message on the field it names.

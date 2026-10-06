@@ -277,8 +277,14 @@ renders it as a required autocomplete over the saved models (`riskScoreModelOpti
   high entity to a `watch` Entity List after each run, expiring `ttlHours` later. It fails closed at save and at
   run. See [Entity Lists — assurance entries](entity-lists.md#the-risk-score-watch-list-feed).
 - **Entity-key masking (D-P8 = mask on read, operator 2026-10-06).** The SPA displays keys through `displayEntityKey`; the preview route masks on read; the GET route still serves them raw (not built).
-- The authoring pane has a read-only slice (S1) and preview (S3), both 2026-10-06; create/edit (S2) is open, see
-  [`risk-score-authoring-pane-spec.md`](../../../superpower/risk-score-authoring-pane-spec.md).
+- ✅ **Authoring pane shipped (2026-10-06): S1 list + detail, S2a create/edit, S2b held/delete/Alert Rule link, S3
+  preview.** Decisions D-RP1..D-RP10 (operator 2026-10-06): own admin route; schema-form plus bespoke factor cards
+  (D-RP7 spike: the condition-group editor authors nested AND/OR the model cannot store); score stays a binary
+  `highThreshold` — **named score bands deliberately deferred** (D-RP3, nothing consumes them; revisit on demand);
+  no new capability (`canAuthorWorkbench` write / `canWorkIncidents` read); pickers show only Datasets with a
+  readable Schema; the per-entity Alert Rule is a prefilled link, never a second write. Not inspected: the
+  capability approvers hold for held component changes. Plan archived at
+  [`risk-score-authoring-pane-spec.md`](../../../archived-documents/plans-archive/risk-score-authoring-pane-spec.md).
 - An indicator is a Measure. There is no free-form arithmetic expression, and no reference to a saved
   Measure component, because none exists.
 - ✅ **Opt-in history retention (2026-10-04).** Optional model key `retainDays` or `retainRuns` (whole number
