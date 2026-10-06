@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **38<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 11<!--count:backlog-p2--> × P2 · 27<!--count:backlog-p3--> × P3** —
+> **39<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 12<!--count:backlog-p2--> × P2 · 27<!--count:backlog-p3--> × P3** —
 > ⬇ **40 → 39 (P3 28 → 27) on 2026-10-06**: closed P3 `TEMPLATE-RISK-SCORE-ALERT-RULE-1` — deferred seed (operator, 2026-10-06): a Space Template declares an Alert Rule over its own Risk Score output in `config/pending/alert-rules/`; it is created through the normal save gate after the model's first run (`PendingAlertRules`), and `payment-fraud` ships `pf_high_risk_account`. As-built in `okf/capabilities/spaces/spaces.md` §3.5.2. Also: `ASSURE-WORKFLOW-SLA-RESIDUALS-1` (b) is ON DEMAND (operator, 2026-10-06).
 > ⬇ **41 → 40 (P3 29 → 28) on 2026-10-06**: closed P3 `ASSURE-AUDIT-CHAIN-RESIDUALS-1` — (5) and (7) accepted as stated limits (operator, 2026-10-06), (8) D-P8 built: `AuditReadMasking` masks classified values in audit rows on read; read auditing deferred. As-built in `okf/backend/control-plane/events-metrics.md`.
 > ⬇ **42 → 41 (P3 30 → 29) on 2026-10-06**: closed P3 `DUCKLE-C6-POLICY-NARROWING-1` — every slice S0–S7 shipped (the last: S6 residuals M6 / `AcquisitionLedger.prune` / T11 / Kafka T12 and the D9 plan-time refusal `ERR_SAFETY_STATE_ADVANCE_REFUSED`; M7 deliberately ungated). As-built in `okf/backend/config/config-safety.md`; plan archived.
@@ -152,11 +152,11 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 11<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 12<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 27<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 11<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 12<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 27<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 38<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 39<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -436,6 +436,10 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 
 
 ## 4. Engineering platform — build, test, CI & tooling
+
+#### Module architecture
+
+- **P2** · `MODULE-REORG-1` — **reorganise the ~40 Maven modules for itemized distribution; plan complete, all decisions taken (D-MR1…D-MR12, operator 2026-10-06), nothing built.** Three axes per module (build role, offering role, binding time), Offerings composed of a tier + domain-neutral add-ons + function packs + industry packs, the Installed / Enabled per Space / Permitted gates, a TOON manifest per module with an activator, thin per-module jars, removal semantics, a platform test kit and TCKs, one Decision Kernel for the nine rule kinds. Next: the Decision Kernel spike, then P0 (glossary terms + report-only baseline guards). → `superpower/module-architecture-reorg-plan.md`
 
 #### Release & CI
 
