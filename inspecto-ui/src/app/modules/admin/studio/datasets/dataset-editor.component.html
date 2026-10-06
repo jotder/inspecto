@@ -7,6 +7,15 @@
         backLabel="Datasets"
         [inset]="false"
     >
+        @if (dataAsOf(); as asOf) {
+            <inspecto-chip
+                badge
+                variant="soft"
+                tone="neutral"
+                title="Newest event in the data (its event-date column)"
+                >{{ asOf }}</inspecto-chip
+            >
+        }
         <ng-container actions>
             <inspecto-transfer-menu
                 [items]="transferItems"

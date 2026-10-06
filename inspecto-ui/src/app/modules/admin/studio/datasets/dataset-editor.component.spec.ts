@@ -11,7 +11,7 @@ import { Dataset } from './dataset-types';
 import { DatasetsService } from './datasets.service';
 import { DatasetEditorComponent } from './dataset-editor.component';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
-import { LensService } from 'app/inspecto/api';
+import { DbBrowserService, LensService } from 'app/inspecto/api';
 
 /** The rows seam, stubbed: this space's stores, and one page of whichever is picked. */
 function seam(names = ['cdr', 'orders']) {
@@ -35,7 +35,7 @@ function create(
     list: Dataset[] = [],
     existing: Dataset | null = null,
     rowsSeam: unknown = seam(),
-    opts: { canOperateRuns?: boolean; materialize?: unknown; dialog?: unknown } = {},
+    opts: { canOperateRuns?: boolean; materialize?: unknown; dialog?: unknown; dataAsOf?: string | null } = {},
 ) {
     // ⚠ LensService is STUBBED, not real: the header now gates Materialize on canOperateRuns(), and the
     // real service reads SessionService + a localStorage lens that leaks between specs.
@@ -74,6 +74,17 @@ function create(
                 useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
             },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
+            ...(opts.dataAsOf !== undefined
+                ? [
+                      {
+                          provide: DbBrowserService,
+                          useValue: {
+                              datasetFreshness: () =>
+                                  of({ dataset: 'orders', eventDateColumn: 'EVENT_DATE', dataAsOf: opts.dataAsOf }),
+                          },
+                      },
+                  ]
+                : []),
         ],
     });
     // ⚠ MatDialog must be overridden HERE — after configureTestingModule, before the first injection.
@@ -292,7 +303,9 @@ describe('DatasetEditorComponent', () => {
     }
 
     /** Edit mode over one saved dataset — the only mode the Materialize action exists in. */
-    function editing(opts: { canOperateRuns?: boolean; materialize?: unknown; dialog?: unknown } = {}) {
+    function editing(
+        opts: { canOperateRuns?: boolean; materialize?: unknown; dialog?: unknown; dataAsOf?: string | null } = {},
+    ) {
         const live: Dataset = {
             id: 'orders',
             name: 'orders',
@@ -329,6 +342,24 @@ describe('DatasetEditorComponent', () => {
         // spec that only read canOperateRuns() would pass with the button unconditionally visible.
         expect(labels().some((t) => t.includes('Materialize'))).toBe(false);
         expect(labels().some((t) => t.includes('History'))).toBe(true);
+    });
+
+    it('shows a "Data as of" badge from the Dataset event date, and none when it is unknown (T8)', async () => {
+        const known = editing({ dataAsOf: '2026-09-04T00:00:00Z' });
+        await vi.waitFor(() => expect(known.componentInstance.editing()).toBe(true));
+        known.detectChanges();
+        // ⚠ Assert the RENDERED chip in the header, not the signal.
+        expect(known.nativeElement.querySelector('inspecto-chip')?.textContent ?? '').toContain(
+            'Data as of 2026-09-04 00:00 UTC',
+        );
+        await expectNoA11yViolations(known.nativeElement);
+    });
+
+    it('shows no "Data as of" badge when the server cannot say (T8)', async () => {
+        const unknown = editing({ dataAsOf: null });
+        await vi.waitFor(() => expect(unknown.componentInstance.editing()).toBe(true));
+        unknown.detectChanges();
+        expect(unknown.nativeElement.textContent).not.toContain('Data as of');
     });
 
     it('materializes into the target the dialog returns, and reports the run id', async () => {

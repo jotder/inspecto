@@ -65,7 +65,10 @@ public record Alert(String rule, String severity, String pipeline, String metric
         // AGE in seconds, so it gets its own sentence rather than being forced through the comparator
         // phrasing, which would read "freshness is 7200 (threshold gt 0 over 1h)".
         if (r.isFreshnessRule()) {
-            String freshMsg = String.format(java.util.Locale.ROOT,
+            String freshMsg = r.eventDateColumn() != null
+                    ? String.format(java.util.Locale.ROOT, "%s: dataset %s holds no event newer than %ss ago (event-date freshness limit %s)",
+                    r.severity(), scopeLabel, trim(value), r.maximumAge())
+                    : String.format(java.util.Locale.ROOT,
                     "%s: dataset %s has not published for %ss (freshness limit %s)",
                     r.severity(), scopeLabel, trim(value), r.maximumAge());
             return new Alert(r.name(), r.severity(), pipeline, "freshness", value, r.comparator(),
@@ -122,7 +125,9 @@ public record Alert(String rule, String severity, String pipeline, String metric
      */
     static String title(AlertRule r, String scope) {
         if (r.description() != null) return r.description() + " — " + scope;
-        if (r.isFreshnessRule()) return "Dataset " + scope + " has not published within " + r.maximumAge();
+        if (r.isFreshnessRule()) return r.eventDateColumn() != null
+                ? "Dataset " + scope + " has no event within " + r.maximumAge()
+                : "Dataset " + scope + " has not published within " + r.maximumAge();
         String phrase = switch (r.comparator()) {
             case "gt" -> "is above";
             case "gte" -> "is at least";

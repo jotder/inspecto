@@ -847,7 +847,8 @@ public final class PipelineConfig {
         }
 
         /** Whether a {@code {seq}} file template (completeness KPI K2, operator 2026-10-06) is configured.
-         *  ⚠ Independent of {@link #active()}: it drives no detector, only the {@code kpi.completeness} job. */
+         *  ⚠ Independent of {@link #active()}: it drives the {@code kpi.completeness} job and, since
+         *  LA-DAILY-INGEST-1 T8, the windowed file-gap check and the per-day delivery manifest. */
         public boolean hasFileTemplate() { return fileTemplate != null && !fileTemplate.isBlank(); }
         /** Whether gap detection should run (enabled and given a non-blank sequence template). */
         public boolean active() { return enabled && sequence != null && !sequence.isBlank(); }

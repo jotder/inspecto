@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AlertRule, EventRow } from 'app/inspecto/api';
-import { deriveFreshness, freshnessBadge, maximumAgeFor, parseMaximumAge } from './dataset-freshness';
+import { deriveFreshness, freshnessBadge, dataAsOfLabel, maximumAgeFor, parseMaximumAge } from './dataset-freshness';
 
 const NOW = 1_000_000_000;
 const row = (ts: number) => ({ ts }) as EventRow;
@@ -40,5 +40,16 @@ describe('dataset-freshness', () => {
     it('fails to unknown on an empty page or a failed fetch — even with a limit', () => {
         expect(deriveFreshness([], '1h', NOW).state).toBe('unknown');
         expect(deriveFreshness(null, '1h', NOW).state).toBe('unknown');
+    });
+});
+
+describe('dataAsOfLabel (LA-DAILY-INGEST-1 T8)', () => {
+    it('shows the covered-through instant in UTC to the minute', () => {
+        expect(dataAsOfLabel('2026-09-04T00:00:00Z')).toBe('Data as of 2026-09-04 00:00 UTC');
+    });
+    it('shows nothing for null, empty or unparseable values (never "now")', () => {
+        expect(dataAsOfLabel(null)).toBeNull();
+        expect(dataAsOfLabel('')).toBeNull();
+        expect(dataAsOfLabel('not a date')).toBeNull();
     });
 });

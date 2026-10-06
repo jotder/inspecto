@@ -56,9 +56,46 @@ final class DatasetRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/datasets/([^/]+)/rows", (e, m) -> rows(api, e, ApiContext.name(m)));
+        api.get("/datasets/([^/]+)/freshness", (e, m) -> freshness(api, e, ApiContext.name(m)));
         api.post("/datasets/([^/]+)/materialize",
                 ApiContext.withCapability("canOperateRuns",
                         (e, m) -> materialize(api, e, ApiContext.name(m))));
+    }
+
+    /** The Dataset config key naming its event-date column (LA-DAILY-INGEST-1 T8), e.g. {@code eventDate: EVENT_DATE}. */
+    static final String EVENT_DATE_KEY = "eventDate";
+
+    /**
+     * {@code GET /datasets/{id}/freshness} (LA-DAILY-INGEST-1 T8, operator 2026-10-06) - "data as of": the instant the
+     * Dataset's data is covered THROUGH, read from the newest value of the event-date column its config names
+     * ({@code eventDate:}); a DATE counts through its end. {@code {dataset, eventDateColumn, dataAsOf}}, where
+     * {@code dataAsOf} is an ISO-8601 instant or {@code null} (no column named, column absent or not a date/time, empty
+     * Dataset). Never a row value besides that one maximum.
+     *
+     * <p>Read-only, so no capability gate (as {@code /rows}). Fail-closed: write root unset → 503 · unknown or
+     * shared-away Dataset → 404 · an id the store refuses → 400.
+     */
+    private Object freshness(ApiContext api, HttpExchange ex, String id) {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "dataset freshness");
+        Map<String, Object> dataset;
+        try {
+            dataset = new ComponentStore(writeRoot.resolve("registry")).get("dataset", id)
+                    .map(ComponentRegistry.Component::content)
+                    .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + id + "'"));
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
+        }
+        if (!ComponentAccess.canView(ex, dataset))
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + id + "'");
+        Object col = dataset.get(EVENT_DATE_KEY);
+        String column = col instanceof String c && !c.isBlank() ? c.trim() : null;
+        java.util.OptionalLong asOf = column == null ? java.util.OptionalLong.empty()
+                : new com.gamma.query.DatasetMeasureProbe(() -> writeRoot, api::dataRoot).dataAsOf(id, column);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("dataset", id);
+        out.put("eventDateColumn", column);
+        out.put("dataAsOf", asOf.isPresent() ? java.time.Instant.ofEpochMilli(asOf.getAsLong()).toString() : null);
+        return out;
     }
 
     /**

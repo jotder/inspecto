@@ -10,7 +10,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { ComponentsService, LensService, apiErrorMessage } from 'app/inspecto/api';
+import { ComponentsService, DbBrowserService, LensService, apiErrorMessage } from 'app/inspecto/api';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
+import { dataAsOfLabel } from './dataset-freshness';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import {
@@ -54,6 +56,7 @@ const KINDS: DatasetKind[] = ['virtual', 'physical', 'materialized'];
     selector: 'app-dataset-editor',
     standalone: true,
     imports: [
+        ChipComponent,
         InspectoOptionPickerComponent,
         InspectoPageHeaderComponent,
         ReactiveFormsModule,
@@ -85,6 +88,10 @@ export class DatasetEditorComponent implements OnInit {
     private components = inject(ComponentsService);
     private draftHandoff = inject(ImportDraftHandoff);
     private transfer = inject(BundleTransferService);
+    private db = inject(DbBrowserService);
+
+    /** "Data as of" badge text from the Dataset's event-date column (T8); null hides the badge. */
+    readonly dataAsOf = signal<string | null>(null);
     /** Materializing is an OPERATION, not authoring — same capability as any job trigger (§7). */
     readonly lens = inject(LensService);
 
@@ -171,6 +178,14 @@ export class DatasetEditorComponent implements OnInit {
         const pending = this.draftHandoff.take('dataset', this.id);
         if (this.id) {
             this.editing.set(true);
+            // Best effort: a failed read just shows no badge (it is a hint, never a verdict).
+            this.db
+                .datasetFreshness(this.id)
+                .pipe(takeUntilDestroyed(this.destroyRef))
+                .subscribe({
+                    next: (r) => this.dataAsOf.set(dataAsOfLabel(r?.dataAsOf)),
+                    error: () => this.dataAsOf.set(null),
+                });
             if (pending) this.adoptDraft(pending);
             else this.loadExisting(this.id);
         } else {

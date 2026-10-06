@@ -60,6 +60,13 @@ export interface DbAdHocQuery {
  * browsable stores, page through a table's rows, and run guarded read-only SQL. Space-agnostic — the
  * global {@code spaceInterceptor} scopes {@code /db/*} to the active space.
  */
+/** `GET /datasets/{id}/freshness`. `dataAsOf` is an ISO-8601 instant, or null (no column named, none readable, empty). */
+export interface DatasetDataAsOf {
+    dataset: string;
+    eventDateColumn: string | null;
+    dataAsOf: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class DbBrowserService {
     private http = inject(HttpClient);
@@ -85,5 +92,13 @@ export class DbBrowserService {
         return this.http.get<DbResult>(apiUrl(`/datasets/${encodeURIComponent(id)}/rows`), {
             params: toParams({ limit }),
         });
+    }
+
+    /**
+     * "Data as of" (`GET /datasets/{id}/freshness`, LA-DAILY-INGEST-1 T8): the instant the Dataset's data is covered
+     * through, from the newest value of the event-date column its config names (`eventDate:`). `null` when unknown.
+     */
+    datasetFreshness(id: string): Observable<DatasetDataAsOf> {
+        return this.http.get<DatasetDataAsOf>(apiUrl(`/datasets/${encodeURIComponent(id)}/freshness`));
     }
 }

@@ -123,6 +123,35 @@ class FreshnessAlertTest {
         assertEquals("1d", r.maximumAge(), "normalized like every other duration on this record");
     }
 
+    /** LA-DAILY-INGEST-1 T8 (operator 2026-10-06): event-date mode ages the NEWEST EVENT, not the last publication. */
+    @Test
+    void anEventDateRuleAgesTheNewestEventAndIgnoresAFreshPublication(@TempDir Path dir) throws Exception {
+        AlertRule r = AlertRule.fromMap(Map.of("name", "xdr-late", "dataset", "xdr", "maximumAge", "2d",
+                "measure", "max(EVENT_DATE)", "severity", "warning"));
+        assertEquals("EVENT_DATE", r.eventDateColumn());
+        assertTrue(r.isFreshnessRule());
+        assertFalse(r.isMeasureRule());
+        assertEquals(null, freshnessRule("xdr", "2d").eventDateColumn(), "a write-time rule stays write-time");
+        assertThrows(IllegalArgumentException.class, () -> AlertRule.fromMap(Map.of("name", "x", "dataset", "xdr",
+                "maximumAge", "2d", "measure", "sum(EVENT_DATE)")), "only max(column)");
+
+        AlertService svc = service(dir, r);
+        svc.freshnessProbe(ds -> OptionalLong.of(100 * HOUR));               // published "just now": must not matter
+        AtomicLong asOf = new AtomicLong(0L);
+        svc.eventDateProbe((ds, col) -> {
+            assertEquals("xdr", ds);
+            assertEquals("EVENT_DATE", col);
+            return OptionalLong.of(asOf.get());
+        });
+        assertTrue(svc.evaluate(null, 24 * HOUR).isEmpty(), "1 day behind, limit 2d: fresh");
+        List<Alert> fired = svc.evaluate(null, 100 * HOUR);
+        assertEquals(1, fired.size(), "a fresh write over old events is still stale by event date");
+        assertEquals(100 * 3600.0, fired.get(0).value());
+        assertTrue(fired.get(0).message().contains("no event newer than"), fired.get(0).message());
+        asOf.set(99 * HOUR);
+        assertTrue(svc.evaluate(null, 100 * HOUR).isEmpty(), "the newest event caught up: cleared, no fire");
+    }
+
     // ── the three states ─────────────────────────────────────────────────────────────
 
     @Test

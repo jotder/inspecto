@@ -429,7 +429,7 @@ exports a daily CSV or Parquet file with their own scheduler and query, D-ING5) 
 |---|---|
 | File name | one pattern per feed with the day in it, e.g. `XDR_yyyyMMdd.csv` or, with parts, `XDR_yyyyMMdd_partNNNN.csv`; the name of a file is STABLE (a feed rule); the Collector `include` glob and `gap_detection.sequence` use the same pattern |
 | Grain | exactly ONE UTC event date per file; no file spans two dates. MANY files (parts) per event date are allowed, each with its own stable name |
-| Parts | part numbers are ZERO-PADDED (`part0001`; lexical sorting); parts of one day are delivered together, or completeness is signalled (recommended: a per-day manifest or `_SUCCESS` marker file; open design point of roadmap T8, not decided) |
+| Parts | part numbers are ZERO-PADDED (`part0001`; lexical sorting); parts of one day are delivered together, or completeness is signalled. The platform keeps a per-day manifest of what landed (T8, below) |
 | Event-date column | one DATE column (`EVENT_DATE`) equal to the UTC date of the event timestamp; it is the `partitionKey`. The day in the file name and every row's event date agree |
 | Time zone | the event timestamp column is UTC wall clock with no offset in the text; the schema declares `timezone: UTC` |
 | Delimiter, encoding, header | comma (or one declared delimiter), UTF-8, one header row whose names match the schema |
@@ -453,6 +453,18 @@ answers every read like the day-by-day run (first day full, append per day, comp
 missing one day does not. While the range lands, each committed batch fires `job.dataset.produced`; a Job run that finds a
 build in flight WAITS and re-plans (at most 6 waits, 2 s backoff doubling to 60 s, within `timeout_seconds`, every attempt
 audited), so the daily trigger need not be paused (operator, 2026-10-06).
+
+**Delivery checks (T8, operator 2026-10-06).** Declare the feed's parts on the Collector:
+`gap_detection.file_template: "XDR_{yyyyMMdd}_part{seq}*"` + `seq_scope: PER_BUCKET` (both required together; the same
+keys the completeness KPI uses). Then (a) every committed part is recorded in `<markers>/day-manifest.tsv` (day, part,
+rows, bytes); a part re-sent under the same name, the same part under a NEW name (the day's rows are now doubled) or a
+new part for a day after a later day landed is signalled as `collector.delivery.anomaly` (WARN; payload `kind`, `day`,
+`file`, `previousFile`); (b) each poll cycle checks the window from the first known day to the last COMPLETE UTC day, so a
+missing day (including the last one) or a missing part is one `SEQUENCE_GAP` alert. A feed with no part number in its
+name cannot declare `file_template` (the grammar needs `{seq}`). **Data as of:** name the Dataset's event-date column
+(`eventDate: EVENT_DATE` in the Dataset config); `GET /datasets/{id}/freshness` and the Dataset editor's chip then show
+the instant the data is covered through (a DATE through its end), and an Alert Rule with `maximumAge: 2d` +
+`measure: max(EVENT_DATE)` fires when the newest event is older than that, even while files keep arriving.
 
 ## 4. Decisions
 

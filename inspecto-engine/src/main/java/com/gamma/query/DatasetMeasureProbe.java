@@ -224,6 +224,34 @@ public final class DatasetMeasureProbe {
         }
     }
 
+    /**
+     * "Data as of" (LA-DAILY-INGEST-1 T8): the epoch millis the Dataset's data is covered THROUGH, read from its newest
+     * {@code column} value - a DATE counts through its end (day D is covered until D+1 00:00 UTC), a TIMESTAMP is read as
+     * UTC wall clock, a TIMESTAMP WITH TIME ZONE as its instant. Empty when the Dataset is unknown or empty, the column is
+     * absent or not a date/time type, or the read fails - never "now".
+     */
+    public java.util.OptionalLong dataAsOf(String datasetId, String column) {
+        try {
+            if (column == null || !columns(datasetId).contains(column)) return java.util.OptionalLong.empty();
+            String type = columnType(datasetId, column);
+            String col = SqlIdent.q(column);
+            String expr = switch (type) {
+                case "DATE" -> "epoch_ms(CAST(max(" + col + ") AS TIMESTAMP) + INTERVAL 1 DAY)";
+                case "TIMESTAMP", "TIMESTAMP_S", "TIMESTAMP_MS", "TIMESTAMP_NS", "TIMESTAMP WITH TIME ZONE" ->
+                        "epoch_ms(max(" + col + "))";
+                default -> null;
+            };
+            if (expr == null) return java.util.OptionalLong.empty();
+            QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(datasetId, relationSql(datasetId),
+                    "SELECT " + expr + " AS " + SqlIdent.q("v") + " FROM " + SqlIdent.q(datasetId), 1, 0, List.of(), List.of()));
+            Object v = r.rows().isEmpty() ? null : r.rows().get(0).get("v");
+            return v instanceof Number n ? java.util.OptionalLong.of(n.longValue()) : java.util.OptionalLong.empty();
+        } catch (Exception e) {
+            log.warn("data-as-of probe failed over dataset '{}': {}", datasetId, e.getMessage());
+            return java.util.OptionalLong.empty();
+        }
+    }
+
     /** The Dataset's relation SQL, or {@code null} when the Dataset is unknown; throws when there is no registry. */
     private String relationSql(String datasetId) {
         Path root = writeRoot.get();

@@ -177,6 +177,16 @@ public final class AlertService {
         this.freshnessProbe = probe;
     }
 
+    private volatile java.util.function.BiFunction<String, String, java.util.OptionalLong> eventDateProbe;
+
+    /**
+     * Wire the EVENT-DATE freshness reading (LA-DAILY-INGEST-1 T8): {@code (dataset id, column)} → epoch millis the data
+     * is covered through (the newest event; a DATE counts through its end), empty when unknown or the Dataset is empty.
+     */
+    public void eventDateProbe(java.util.function.BiFunction<String, String, java.util.OptionalLong> probe) {
+        this.eventDateProbe = probe;
+    }
+
     /**
      * Wire the Dataset name resolver used in the words of a fired Alert / Incident ({@code Row count on
      * Open cases is above 5} rather than {@code … on cases}). Text only: the Alert's {@code pipeline}, the
@@ -507,9 +517,16 @@ public final class AlertService {
      * would be a second answer to one question.
      */
     private void evaluateFreshness(AlertRule rule, long nowMs, List<Alert> out) {
-        var probe = freshnessProbe;
-        if (probe == null) return;                       // unknown: no clock wired (lean / unit paths)
-        java.util.OptionalLong last = probe.apply(rule.dataset());
+        java.util.OptionalLong last;
+        if (rule.eventDateColumn() != null) {            // event-date mode: age of the newest event, not the last write
+            var byDate = eventDateProbe;
+            if (byDate == null) return;                  // unknown: not wired
+            last = byDate.apply(rule.dataset(), rule.eventDateColumn());
+        } else {
+            var probe = freshnessProbe;
+            if (probe == null) return;                   // unknown: no clock wired (lean / unit paths)
+            last = probe.apply(rule.dataset());
+        }
         if (last.isEmpty()) return;                      // unknown: never published - never "fresh"
 
         String key = rule.name() + "|" + rule.dataset();
@@ -547,7 +564,9 @@ public final class AlertService {
     private void clear(AlertRule rule, String scope, String cooldownKey, long ageMs, long nowMs) {
         lastFired.remove(cooldownKey);   // not merely ignored - the next breach must fire at once
         String message = String.format(Locale.ROOT,
-                "CLEARED: dataset %s published %ds ago, within its %s freshness limit",
+                rule.eventDateColumn() != null
+                        ? "CLEARED: dataset %s holds events as of %ds ago, within its %s event-date freshness limit"
+                        : "CLEARED: dataset %s published %ds ago, within its %s freshness limit",
                 textScope(rule, scope), ageMs / 1000, rule.maximumAge());
         log.info("[ALERT-CLEARED] {}", message);
         Event cleared = Event.builder(EventType.ALERT_CLEARED)

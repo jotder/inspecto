@@ -440,6 +440,8 @@ public class CollectorProcessor {
             // hole in the expected series is reported even when nothing new is ingestable this cycle.
             if (cfg.collector().gapDetection().active() && !discovered.isEmpty())
                 detectGaps(cfg, discovered);
+            // T8: the {seq} file template, over an explicit window (runs on an empty listing too: a missing LAST day)
+            DeliveryCheck.detectFileGaps(cfg, discovered, System.currentTimeMillis());
 
             // Incremental discovery (Phase C4): when source.incremental.watermark is set, drop objects modified
             // strictly before the source's high-watermark so a remote source spends no fetch bandwidth on them;
@@ -499,6 +501,7 @@ public class CollectorProcessor {
                 ready = gateStability(cfg, src, st, inbox, discovered, emitSignals);
                 if (emitSignals && cfg.collector().gapDetection().active() && !discovered.isEmpty())
                     detectGaps(cfg, discovered);
+                if (emitSignals) DeliveryCheck.detectFileGaps(cfg, discovered, System.currentTimeMillis());
                 if (cfg.collector().incremental().enabled() && !ready.isEmpty())
                     ready = watermarkFilter(cfg, ready, emitSignals);
             }

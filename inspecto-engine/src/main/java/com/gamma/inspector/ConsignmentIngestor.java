@@ -655,6 +655,9 @@ public final class ConsignmentIngestor {
             recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.MARKED);
         }
 
+        // T8 (LA-DAILY-INGEST-1): the per-day delivery manifest, after the batch is durable; best effort, never fails it.
+        DeliveryCheck.afterCommit(cfg, batch.batchId(), survivors, lineage, System.currentTimeMillis());
+
         // Fingerprint ledger LAST too (content-based dedup; same stranding-safety reason as markers).
         if (ledgerRecord) {
             com.gamma.config.safety.StateGate.requireAdvance("fingerprint ledger");

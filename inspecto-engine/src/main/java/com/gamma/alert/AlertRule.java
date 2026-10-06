@@ -274,7 +274,10 @@ public record AlertRule(String name, String metric, String comparator, double th
             // ledger-metric vocabulary applies — and a batch (Nb) window is not a clock at all,
             // which is why the shape here is \d+[smhd] and not the metric window's \d+[smhdb].
             require(dataset != null, "alert.maximumAge requires alert.dataset");
-            require(measure == null, "a freshness alert (maximumAge:) must not also declare a measure");
+            // Event-date mode (LA-DAILY-INGEST-1 T8, operator 2026-10-06): `measure: max(<column>)` ages the NEWEST
+            // event date in the data instead of the last publication. Any other measure stays refused.
+            require(measure == null || EVENT_DATE_MEASURE.matcher(measure).matches(),
+                    "a freshness alert (maximumAge:) takes no measure, or max(<event date column>) for event-date freshness");
             require(metric == null, "a freshness alert (maximumAge:) must not also declare a ledger metric");
             require(window == null, "a freshness alert (maximumAge:) takes no window (maximumAge IS the window)");
             require(when == null, "alert.when scopes ledger rows; a freshness alert has none");
@@ -361,6 +364,21 @@ public record AlertRule(String name, String metric, String comparator, double th
      */
     public boolean isFreshnessRule() {
         return maximumAge != null;
+    }
+
+    /** {@code max(<column>)}: the one measure a freshness rule may carry (event-date mode). */
+    private static final java.util.regex.Pattern EVENT_DATE_MEASURE =
+            java.util.regex.Pattern.compile("max\\(\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\)");
+
+    /**
+     * The event-date column of an EVENT-DATE freshness rule ({@code maximumAge} + {@code measure: max(col)}), else
+     * {@code null} (a write-time freshness rule, or not a freshness rule). Event-date mode ages the newest event date in
+     * the data: a DATE counts as covered through its end, so day D is fresh until D+1 00:00 UTC plus {@code maximumAge}.
+     */
+    public String eventDateColumn() {
+        if (maximumAge == null || measure == null) return null;
+        java.util.regex.Matcher m = EVENT_DATE_MEASURE.matcher(measure);
+        return m.matches() ? m.group(1) : null;
     }
 
     /** The elapsed-time span a freshness rule allows between publications. */

@@ -1,2 +1,3 @@
 physicalRef: daily_xdr/database
 description: "Daily telecom XDR records, partitioned by EVENT_DATE (UTC). Synthetic sample."
+eventDate: EVENT_DATE

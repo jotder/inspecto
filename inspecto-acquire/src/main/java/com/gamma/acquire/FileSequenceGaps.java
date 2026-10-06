@@ -181,6 +181,32 @@ public final class FileSequenceGaps {
                 matched, missingTotal, buckets, empty, unmatched);
     }
 
+    /** One file name read against a template: its bucket key (formatted as the template's date token) and {@code {seq}}. */
+    public record Key(String bucket, LocalDateTime start, long seq) {}
+
+    /**
+     * Read one {@code name} against {@code template} (LA-DAILY-INGEST-1 T8, the per-day manifest): its bucket and
+     * sequence number, or empty when the name does not match, is not a real date, or its {@code {seq}} overflows.
+     *
+     * @throws IllegalArgumentException on a malformed template
+     */
+    public static java.util.Optional<Key> match(String template, String name) {
+        Parsed t = parse(template);
+        Matcher m = t.matcher.matcher(name);
+        if (!m.matches()) return java.util.Optional.empty();
+        try {
+            LocalDateTime bucket = LocalDateTime.parse(m.group(1), t.formatter);
+            return java.util.Optional.of(new Key(t.formatter.format(bucket), bucket, Long.parseLong(m.group(2))));
+        } catch (RuntimeException notAKey) {
+            return java.util.Optional.empty();
+        }
+    }
+
+    /** The template's bucket unit (DAYS for {@code yyyyMMdd}); {@code IllegalArgumentException} on a malformed template. */
+    public static ChronoUnit unit(String template) {
+        return parse(template).unit;
+    }
+
     /**
      * The numbers absent between the lowest and highest present.
      *

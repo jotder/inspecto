@@ -74,3 +74,15 @@ export function freshnessBadge(f: DatasetFreshness): { value: string; label: str
             };
     }
 }
+
+/**
+ * The "Data as of" badge text (LA-DAILY-INGEST-1 T8) for `GET /datasets/{id}/freshness`'s `dataAsOf`: the instant the
+ * data is covered THROUGH, shown in UTC to the minute (`2026-09-04 00:00 UTC`). Null (no badge) when there is no value
+ * or it does not parse - never "now".
+ */
+export function dataAsOfLabel(iso: string | null | undefined): string | null {
+    if (!iso) return null;
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) return null;
+    return `Data as of ${new Date(t).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+}
