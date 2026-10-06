@@ -37,6 +37,7 @@ export const OPERATORS: Record<ColumnType, OperatorDef[]> = {
         { op: 'contains', label: 'contains', arity: 1 },
         { op: 'startsWith', label: 'starts with', arity: 1 },
         { op: 'endsWith', label: 'ends with', arity: 1 },
+        { op: 'matches', label: 'matches (regex)', arity: 1 },
         { op: 'in', label: 'in', arity: 'list' },
         ...NULLS,
     ],

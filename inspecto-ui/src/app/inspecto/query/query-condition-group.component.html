@@ -1,4 +1,9 @@
-<div class="rounded-lg border p-2" style="border-color: var(--gamma-border)">
+<div
+    class="rounded-lg border p-2"
+    style="border-color: var(--gamma-border)"
+    role="group"
+    [attr.aria-label]="'Condition group: ' + summary()"
+>
     <div class="mb-2 flex flex-wrap items-center gap-2">
         <mat-button-toggle-group
             [value]="group.op"
@@ -9,7 +14,18 @@
             <mat-button-toggle value="AND">AND</mat-button-toggle>
             <mat-button-toggle value="OR">OR</mat-button-toggle>
         </mat-button-toggle-group>
-        <span class="text-secondary text-xs">match {{ group.op === 'AND' ? 'all' : 'any' }} of</span>
+        <mat-slide-toggle
+            [checked]="group.negate === true"
+            (change)="setNegate($event.checked)"
+            aria-label="NOT: invert this group"
+            matTooltip="Match rows where this group is not true"
+            >NOT</mat-slide-toggle
+        >
+        <span class="text-secondary text-xs"
+            >{{ group.negate ? 'NOT (' : '' }}match {{ group.op === 'AND' ? 'all' : 'any' }} of{{
+                group.negate ? ')' : ''
+            }}</span
+        >
         <span class="flex-1"></span>
         <button mat-stroked-button type="button" (click)="addCondition()">
             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:plus"></mat-icon>
@@ -64,54 +80,98 @@
                             }
                         </mat-select>
                     </mat-form-field>
-                    @switch (arity(asCondition(it))) {
-                        @case (1) {
-                            <mat-form-field subscriptSizing="dynamic" class="w-40">
-                                <mat-label>Value</mat-label>
-                                <input
-                                    matInput
-                                    [type]="inputType(asCondition(it))"
-                                    [value]="asCondition(it).value ?? ''"
-                                    (input)="onValue(asCondition(it), $any($event.target).value)"
-                                />
-                            </mat-form-field>
+                    @if (canCompareField(asCondition(it))) {
+                        <mat-slide-toggle
+                            [checked]="comparesField(asCondition(it))"
+                            (change)="setCompareField(asCondition(it), $event.checked)"
+                            >Compare to another field</mat-slide-toggle
+                        >
+                    }
+                    @if (comparesField(asCondition(it))) {
+                        <mat-form-field subscriptSizing="dynamic" class="w-44">
+                            <mat-label>Other field</mat-label>
+                            <mat-select
+                                [value]="asCondition(it).valueField"
+                                (selectionChange)="onValueField(asCondition(it), $event.value)"
+                                [attr.aria-describedby]="noteId(asCondition(it))"
+                            >
+                                @for (col of columns; track col.name) {
+                                    <mat-option [value]="col.name">{{ col.name }}</mat-option>
+                                }
+                            </mat-select>
+                        </mat-form-field>
+                    } @else {
+                        @switch (arity(asCondition(it))) {
+                            @case (1) {
+                                <mat-form-field subscriptSizing="dynamic" class="w-40">
+                                    <mat-label>Value</mat-label>
+                                    <input
+                                        matInput
+                                        [type]="inputType(asCondition(it))"
+                                        [value]="asCondition(it).value ?? ''"
+                                        (input)="onValue(asCondition(it), $any($event.target).value)"
+                                        [attr.aria-describedby]="noteId(asCondition(it))"
+                                    />
+                                </mat-form-field>
+                            }
+                            @case (2) {
+                                <mat-form-field subscriptSizing="dynamic" class="w-28">
+                                    <mat-label>From</mat-label>
+                                    <input
+                                        matInput
+                                        [type]="inputType(asCondition(it))"
+                                        [value]="asCondition(it).value ?? ''"
+                                        (input)="onValue(asCondition(it), $any($event.target).value)"
+                                    />
+                                </mat-form-field>
+                                <mat-form-field subscriptSizing="dynamic" class="w-28">
+                                    <mat-label>To</mat-label>
+                                    <input
+                                        matInput
+                                        [type]="inputType(asCondition(it))"
+                                        [value]="asCondition(it).value2 ?? ''"
+                                        (input)="onValue2(asCondition(it), $any($event.target).value)"
+                                    />
+                                </mat-form-field>
+                            }
+                            @case ('list') {
+                                <mat-form-field subscriptSizing="dynamic" class="w-56">
+                                    <mat-label>Values</mat-label>
+                                    <input
+                                        matInput
+                                        placeholder="a, b, c"
+                                        [value]="asCondition(it).value ?? ''"
+                                        (input)="onValue(asCondition(it), $any($event.target).value)"
+                                    />
+                                    <mat-hint>comma-separated</mat-hint>
+                                </mat-form-field>
+                            }
                         }
-                        @case (2) {
-                            <mat-form-field subscriptSizing="dynamic" class="w-28">
-                                <mat-label>From</mat-label>
-                                <input
-                                    matInput
-                                    [type]="inputType(asCondition(it))"
-                                    [value]="asCondition(it).value ?? ''"
-                                    (input)="onValue(asCondition(it), $any($event.target).value)"
-                                />
-                            </mat-form-field>
-                            <mat-form-field subscriptSizing="dynamic" class="w-28">
-                                <mat-label>To</mat-label>
-                                <input
-                                    matInput
-                                    [type]="inputType(asCondition(it))"
-                                    [value]="asCondition(it).value2 ?? ''"
-                                    (input)="onValue2(asCondition(it), $any($event.target).value)"
-                                />
-                            </mat-form-field>
-                        }
-                        @case ('list') {
-                            <mat-form-field subscriptSizing="dynamic" class="w-56">
-                                <mat-label>Values</mat-label>
-                                <input
-                                    matInput
-                                    placeholder="a, b, c"
-                                    [value]="asCondition(it).value ?? ''"
-                                    (input)="onValue(asCondition(it), $any($event.target).value)"
-                                />
-                                <mat-hint>comma-separated</mat-hint>
-                            </mat-form-field>
-                        }
+                    }
+                    @if (canIgnoreCase(asCondition(it))) {
+                        <mat-slide-toggle
+                            [checked]="asCondition(it).ignoreCase === true"
+                            (change)="setIgnoreCase(asCondition(it), $event.checked)"
+                            >Ignore case</mat-slide-toggle
+                        >
                     }
                     <button mat-icon-button type="button" (click)="removeAt(i)" aria-label="Remove condition">
                         <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                     </button>
+                    @if (problem(asCondition(it)) || hint(asCondition(it))) {
+                        <p
+                            class="text-xs basis-full"
+                            [id]="uid(asCondition(it))"
+                            [class.text-warn]="problem(asCondition(it))"
+                            [class.text-secondary]="!problem(asCondition(it))"
+                            [attr.role]="problem(asCondition(it)) ? 'alert' : null"
+                        >
+                            @if (problem(asCondition(it))) {
+                                <span class="font-semibold">Problem: </span>
+                            }
+                            {{ problem(asCondition(it)) || hint(asCondition(it)) }}
+                        </p>
+                    }
                 </div>
             }
         }

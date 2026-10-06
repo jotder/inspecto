@@ -692,9 +692,15 @@ Java `ConditionTree` (simulate, Alert Rule `when`, Expectation) and `ConditionSq
 TS twin is kept in step as the reference the builder preview will use, not because anything runs it today.
 `query-sql.ts` (illustrative SQL preview) was NOT extended.
 
-**Follow-ups.** (1) Builder UI: `query-columns.ts` `OPERATORS` + `query-condition-group.component` need
-`matches`, a field picker for `valueField`, an ignore-case toggle and a NOT toggle (out of this lane's
-ownership; a11y work, not a one-line list change); `query-sql.ts` and `sql-ast.ts` should learn the new shapes.
+**Follow-ups.** (1) Builder UI — **DONE 2026-10-07.** The live builder is `query-condition-group.component`
+(mounted by the Alert Rule, Decision Rule, Expectation, Dashboard filter and Pipeline filter editors; the Queries/Dataset
+panel nests it). It gained `matches` (string columns), a per-condition *Compare to another field* switch + field picker
+(`valueField`), an *Ignore case* switch, and a per-group *NOT* switch (group `aria-label` reads `NOT (…)`); the new
+framework-free `query/condition-rules.ts` holds the operator sets, `validateCondition` (a client mirror of Java
+`validate`; its regex check is `new RegExp`, NOT RE2 — advisory, the server is the gate; the error is a `role="alert"` note
+wired by `aria-describedby`) and `describeGroup`. `query-sql.ts` (preview + param compiler) now emits the Java `ConditionSql`
+shapes. `sql-ast.ts` is unchanged on purpose: it only reads SQL into a tree and refuses what it does not recognise. Hosts
+clone the tree and the editor mutates in place, so unmodelled keys survive save (pinned by a round-trip spec).
 (2) Step 1: Expectation `non_null` / `range` onto `isNull` / `between`, and `regex` onto `matches`.
 (3) Steps 3-6: Tag and Case Rule filters (now unblocked: `ignoreCase`), Notification, Risk, Escalation match.
 (4) `DECISION-RULE-SQL-GUARD-1` stays open: the new operators keep today's discipline (quoted identifiers,

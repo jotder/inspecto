@@ -24,19 +24,28 @@ export function compileWhere(where: ConditionGroup, cols: ColumnMeta[]): string 
 
 function compileGroup(group: ConditionGroup, cols: ColumnMeta[]): string {
     const parts = group.items
-        .map((it) => (it.kind === 'group' ? wrap(compileGroup(it, cols)) : compileCondition(it, cols)))
+        .map((it) => (it.kind === 'group' ? wrap(compileGroup(it, cols), it) : compileCondition(it, cols)))
         .filter((s) => s.length > 0);
-    return parts.join(` ${group.op} `);
+    return negated(parts.join(` ${group.op} `), group);
 }
 
-function wrap(s: string): string {
-    return s ? `(${s})` : '';
+/** NOT over a group, as Java `ConditionSql` emits it: COALESCE pins SQL's NULL to false first, so a NULL cell
+ *  is "not matching" and the negation keeps the row — the same answer as the in-memory evaluator. */
+function negated(body: string, g: ConditionGroup): string {
+    return body && g.negate ? `(NOT COALESCE((${body}), FALSE))` : body;
+}
+
+/** Parenthesise a nested group's body — a negated one already carries its own parentheses. */
+function wrap(s: string, g: ConditionGroup): string {
+    return s ? (g.negate ? s : `(${s})`) : '';
 }
 
 function compileCondition(c: Condition, cols: ColumnMeta[]): string {
     if (!c.field || !c.operator) return '';
     const id = quoteIdent(c.field);
     const t = columnType(cols, c.field);
+    const ext = extensionLeaf(c, t);
+    if (ext !== null) return ext;
     switch (c.operator) {
         case 'isNull':
             return `${id} IS NULL`;
@@ -66,6 +75,84 @@ function compileCondition(c: Condition, cols: ColumnMeta[]): string {
             return `${id} ${c.operator} ${lit(c.value, t)}`;
     }
 }
+
+/**
+ * SQL for the Condition Language extensions — `valueField`, `matches`, `ignoreCase` — in the shapes Java
+ * `ConditionSql` emits, or `null` when the leaf uses none of them (the caller then renders it as before).
+ * `''` means "incomplete, contributes nothing". Literals are inlined (never a bind), single quotes doubled.
+ */
+function extensionLeaf(c: Condition, t: ColumnType): string | null {
+    const f = quoteIdent(c.field);
+    if (c.valueField) return fieldsSql(f, c.operator, quoteIdent(c.valueField), c.ignoreCase === true);
+    if (c.operator === 'matches') {
+        if (!c.value) return '';
+        return `regexp_matches(CAST(${f} AS VARCHAR), ${strLit(c.value)}${c.ignoreCase ? ", 'i')" : ')'}`;
+    }
+    if (!c.ignoreCase || t !== 'string') return null;
+    const v = c.value ?? '';
+    if (c.operator === '=' || c.operator === '!=') {
+        return v === ''
+            ? ''
+            : `LOWER(CAST(${f} AS VARCHAR)) ${c.operator === '!=' ? '<>' : '='} ${strLit(v.toLowerCase())}`;
+    }
+    if (c.operator === 'in') {
+        const items = v
+            .split(',')
+            .map((x) => x.trim())
+            .filter(Boolean);
+        return items.length
+            ? `(${items.map((x) => `LOWER(CAST(${f} AS VARCHAR)) = ${strLit(x.toLowerCase())}`).join(' OR ')})`
+            : '';
+    }
+    if (c.operator === 'contains' || c.operator === 'startsWith' || c.operator === 'endsWith') {
+        if (!v) return '';
+        const esc = v.toLowerCase().replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+        const pat = (c.operator === 'startsWith' ? '' : '%') + esc + (c.operator === 'endsWith' ? '' : '%');
+        return `LOWER(CAST(${f} AS VARCHAR)) LIKE ${strLit(pat)} ESCAPE '\\'`;
+    }
+    return null;
+}
+
+/** Field-to-field leaf — a port of Java `ConditionSql.fields` (per-row typing: numbers, else date-like
+ *  instants, else strings; a NULL cell on either side never matches). `g` is an already-quoted identifier. */
+function fieldsSql(f: string, operator: Operator, g: string, ic: boolean): string {
+    const sa = `CAST(${f} AS VARCHAR)`;
+    const sb = `CAST(${g} AS VARCHAR)`;
+    const escLike = (e: string): string => `REPLACE(REPLACE(REPLACE(${e}, '\\', '\\\\'), '%', '\\%'), '_', '\\_')`;
+    switch (operator) {
+        case 'contains':
+            return `(LOWER(${sa}) LIKE '%' || ${escLike(`LOWER(${sb})`)} || '%' ESCAPE '\\')`;
+        case 'startsWith':
+            return `(LOWER(${sa}) LIKE ${escLike(`LOWER(${sb})`)} || '%' ESCAPE '\\')`;
+        case 'endsWith':
+            return `(LOWER(${sa}) LIKE '%' || ${escLike(`LOWER(${sb})`)} ESCAPE '\\')`;
+        case '=':
+        case '!=':
+        case '<':
+        case '<=':
+        case '>':
+        case '>=':
+            break;
+        default:
+            return 'FALSE';
+    }
+    const op = operator === '!=' ? '<>' : operator;
+    const na = `TRY_CAST(${sa} AS DOUBLE)`;
+    const nb = `TRY_CAST(${sb} AS DOUBLE)`;
+    const ta = `TRY_CAST(${sa} AS TIMESTAMP)`;
+    const tb = `TRY_CAST(${sb} AS TIMESTAMP)`;
+    const shape =
+        `regexp_matches(${sa}, '\\d{4}') AND regexp_matches(${sa}, '[-/:T]') AND ` +
+        `regexp_matches(${sb}, '\\d{4}') AND regexp_matches(${sb}, '[-/:T]')`;
+    const str = ic ? `LOWER(${sa}) ${op} LOWER(${sb})` : `${sa} ${op} ${sb}`;
+    return (
+        `(CASE WHEN regexp_full_match(${sa}, '-?\\d+(\\.\\d+)?') AND regexp_full_match(${sb}, '-?\\d+(\\.\\d+)?') ` +
+        `THEN ${na} ${op} ${nb} WHEN ${shape} AND ${ta} IS NOT NULL AND ${tb} IS NOT NULL THEN ${ta} ${op} ${tb} ` +
+        `ELSE ${str} END)`
+    );
+}
+
+const strLit = (v: string): string => `'${v.replace(/'/g, "''")}'`;
 
 /** Quote an identifier DuckDB-style (`"col"`), doubling embedded quotes. Shared with the Studio QuerySpec compiler. */
 export function quoteIdent(name: string): string {
@@ -119,6 +206,8 @@ export function compileSqlWithParams(model: QueryModel, source: QuerySource): Pa
     const condSql = (c: Condition): string => {
         if (!c.field || !c.operator) return '';
         const id = quoteIdent(c.field);
+        const ext = extensionLeaf(c, columnType(cols, c.field));
+        if (ext !== null) return ext;
         switch (c.operator) {
             case 'isNull':
                 return `${id} IS NULL`;
@@ -154,9 +243,9 @@ export function compileSqlWithParams(model: QueryModel, source: QuerySource): Pa
 
     const groupSql = (g: ConditionGroup): string => {
         const parts = g.items
-            .map((it) => (it.kind === 'group' ? wrap(groupSql(it)) : condSql(it)))
+            .map((it) => (it.kind === 'group' ? wrap(groupSql(it), it) : condSql(it)))
             .filter((s) => s.length > 0);
-        return parts.join(` ${g.op} `);
+        return negated(parts.join(` ${g.op} `), g);
     };
 
     const proj =
