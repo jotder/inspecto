@@ -724,12 +724,19 @@ would forge the ownership marker, so a template declares the rule as PENDING ins
   a Space approval policy that holds `alert-rule` or `dataset` changes (a writer outside any request cannot be
   approved) — keeps the file, emits an AUDIT event `alert-rule.pending.refused` with the reason, and is retried on the
   model's next run. `alert-rule.pending.created` / `.dropped` record the other outcomes (actor `system`).
+- **Security inventories (operator, 2026-10-06).** `PendingAlertRules` is a *background template materializer*: it
+  refuses while an approval policy governs `alert-rule`/`dataset`. `PendingAlertRules#ensureLatestDataset` is on
+  `ConfigWriteFunnelTest.WRITERS` with that reason (`#onRiskScoreProduced` reaches `PendingChanges.governs` itself, so
+  the scan counts it as held). Both sites are on `DecisionRuleWritersTest.GUARDED_BY`: before any write
+  `#onRiskScoreProduced` runs `DecisionRuleGuard.refuseUnattended` — a background writer has no Subject to hold
+  `canWorkIncidents`, so a rule body with an `invoke-api` consequence is refused (422, fail closed) and stays pending
+  + audited like every other refusal.
 - **Status.** `GET /alerts/rules/pending` lists `{name, afterRiskScore, dataset}` for what is still waiting; a
   refusal's reason is in the audit log. There is no SPA surface yet; the rule appears on the Alert Rules page once
   created.
 - **Use.** `payment-fraud` ships `pf_high_risk_account` (`max(score) >= 60` by `model, entity_key`, CRITICAL) after
   `payment_account`. Tests: `PendingAlertRulesTest` (pending, refused + audited, created once, never overwritten, held
-  under an approval policy), `ControlApiSpaceTemplateSeedGateTest` (capability and content refusal at apply) and
+  under an approval policy, a `DecisionRuleGuard` refusal stays pending), `ControlApiSpaceTemplateSeedGateTest` (capability and content refusal at apply) and
   `PaymentFraudDashboardTest` (the live Space's own `pf_risk_score` run creates and arms it).
 
 ### 3.6 Metadata Bundle v2 (SPC-4) — configuration moves, data never does

@@ -228,6 +228,10 @@ class ConfigWriteFunnelTest {
             + "four-eyes approval, so an approval policy must not hold it a second time; HMAC-signed, and reserved from "
             + "every import (ReservedConfigPaths)";
 
+    private static final String PENDING_ALERT_RULES = "background template materializer (operator, 2026-10-06); "
+            + "refuses while an approval policy governs alert-rule/dataset — its only caller, "
+            + "PendingAlertRules#onRiskScoreProduced, checks PendingChanges.governs for both kinds first";
+
     /** Writer sites ({@code SimpleClass#method}) that do not reach the hold themselves, each with its reason. */
     static final Map<String, String> WRITERS = new TreeMap<>(Map.ofEntries(
             Map.entry("AccessRoutes#write", HELPER), Map.entry("AlertRoutes#write", HELPER),
@@ -279,7 +283,8 @@ class ConfigWriteFunnelTest {
             Map.entry("ActionRequestRoutes#propose", ACTION_REQUESTS),
             Map.entry("ActionRequestRoutes#decide", ACTION_REQUESTS), Map.entry("ActionRequestRoutes#retry", ACTION_REQUESTS),
             Map.entry("ActionRequestRoutes#markFailed", ACTION_REQUESTS),
-            Map.entry("ActionDispatcher#fail", ACTION_REQUESTS), Map.entry("ActionDispatcher#run", ACTION_REQUESTS)
+            Map.entry("ActionDispatcher#fail", ACTION_REQUESTS), Map.entry("ActionDispatcher#run", ACTION_REQUESTS),
+            Map.entry("PendingAlertRules#ensureLatestDataset", PENDING_ALERT_RULES)
     ));
 
     @Test

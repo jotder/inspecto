@@ -45,7 +45,8 @@ class ImportCapabilityGuardTest {
             "POST /expectations/([^/]+)/baseline/clear", "clears a drift baseline; run state (canOperateRuns)",
             "POST /recon/promote", "opens an Incident from a break (canManageIncidents)",
             "POST /recon/([^/]+)/record", "records a run into recon-state/ (R2-03), not the config",
-            "POST /recon/([^/]+)/breaks/status", "sets a break's status in recon-state/, not the config");
+            "POST /recon/([^/]+)/breaks/status", "sets a break's status in recon-state/, not the config",
+            "POST /risk-scores/preview", "read-only POST (keys stay out of URLs), writes nothing (operator, 2026-10-06)");
 
     private static final Set<String> WRITE_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
 

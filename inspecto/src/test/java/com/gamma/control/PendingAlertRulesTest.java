@@ -156,6 +156,29 @@ class PendingAlertRulesTest {
     }
 
     @Test
+    void aDecisionRuleGuardRefusalKeepsItPendingAndAudited() throws Exception {
+        runRiskScore();
+        Files.writeString(config.resolve(PendingAlertRules.DIR).resolve(RULE + ".toon"), """
+                afterRiskScore: acct
+                dataset: risk_scores_acct_latest
+                measure: "max(score)"
+                comparator: gte
+                threshold: 60
+                severity: CRITICAL
+                consequences[1]{action}:
+                  invoke-api
+                """);
+        assertEquals(List.of(), produced());
+        assertFalse(ruleExists());
+        assertFalse(new ComponentStore(config.resolve("registry")).exists("dataset", "risk_scores_acct_latest"),
+                "the guard runs before any write");
+        assertEquals(1, PendingAlertRules.list(config).size(), "a guard refusal stays pending");
+        assertEquals(List.of("alert-rule.pending.refused"), actions());
+        assertTrue(String.valueOf(audit.get(0).attributes().get("reason")).contains("background writer"),
+                "the refusal names the guard's reason: " + audit.get(0).attributes());
+    }
+
+    @Test
     void theTemplateCheckRefusesARuleThatDoesNotReadItsModelsOutput() {
         Map<String, Object> ok = Map.of("afterRiskScore", MODEL, "dataset", "risk_scores_acct_latest",
                 "measure", "max(score)", "comparator", "gte", "threshold", 60, "severity", "CRITICAL");

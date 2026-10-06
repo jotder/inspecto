@@ -174,6 +174,10 @@ evidence rows, under `PREVIEW_POLICY` (512 MB, 2 threads, 10 s). An entity no fa
 **Entity key (D-P8 mask on read, D-RP6).** The response key is the Space `masked:<16 hex>` token unless the caller
 holds `canRevealLinkEntities` (`keyMasked` says which). The GET route still serves keys raw.
 
+**Import-capability scan (operator, 2026-10-06).** `ImportCapabilityGuardTest` lists `POST /risk-scores/preview` on
+its `ACTS` exemptions — a read-only POST (keys stay out of URLs) that writes nothing — so its `canWorkIncidents` gate
+is not read as a stricter write route of the `risk-score` kind. The kind's import capability is unchanged.
+
 ⚠ **Truncation fix found here.** The indicator spec carried its own `LIMIT` equal to the executor cap, so the
 "refusing to score a subset" check could never fire: a Job run past the cap silently scored a subset. The spec now
 asks for cap + 1 rows, so the refusal fires. The cap itself is configurable — see *Entity cap* under the Job.

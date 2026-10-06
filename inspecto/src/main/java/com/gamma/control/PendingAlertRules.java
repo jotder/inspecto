@@ -39,6 +39,8 @@ import java.util.stream.Stream;
  *       and is retried on the model's next run;</li>
  *   <li>a Space whose approval policy holds {@code alert-rule} writes is refused the same way — a writer outside any
  *       request cannot be approved, so it does not write (as {@link PendingChanges#governs} prescribes);</li>
+ *   <li>{@link DecisionRuleGuard#refuseUnattended} runs before any write: a background writer has no Subject to
+ *       hold {@code canWorkIncidents}, so a rule carrying an {@code invoke-api} consequence is refused (fail closed);</li>
  *   <li>a rule that already exists under that name is never overwritten: the pending entry is dropped and audited.</li>
  * </ul>
  * Creation deletes the pending file, so a rule is materialized at most once. The applier's {@code canAuthorAlertRules}
@@ -122,6 +124,7 @@ public final class PendingAlertRules {
                     if (PendingChanges.governs(configRoot, kind))
                         throw new IllegalArgumentException("this Space's approval policy holds " + kind + " changes, "
                                 + "and a deferred seed cannot be approved — create the rule through the Alert Rules page");
+                DecisionRuleGuard.refuseUnattended(ruleBody(body, name));
                 ensureLatestDataset(configRoot, dataRoot, store, modelId);
                 AlertRule rule = AlertRoutes.parse(configRoot, dataRoot, ruleBody(body, name));
                 store.write(AlertRoutes.TYPE, name, rule.toMap());

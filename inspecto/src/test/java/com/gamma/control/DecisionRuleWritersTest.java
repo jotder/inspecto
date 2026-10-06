@@ -27,7 +27,11 @@ class DecisionRuleWritersTest {
     static final Map<String, Set<String>> GUARDED_BY = new TreeMap<>(Map.of(
             "DecisionRoutes#write", Set.of("DecisionRoutes#create", "DecisionRoutes#update"),
             "BundleRoutes#write", Set.of("BundleRoutes#preparedDecisionRules"),
-            "SpaceManager#createFromBundle", Set.of("SpaceRoutes#importSpace")));
+            "SpaceManager#createFromBundle", Set.of("SpaceRoutes#importSpace"),
+            // background template materializer (operator, 2026-10-06); refuses while an approval policy governs
+            // alert-rule/dataset — and runs DecisionRuleGuard.refuseUnattended before its writes
+            "PendingAlertRules#onRiskScoreProduced", Set.of("PendingAlertRules#onRiskScoreProduced"),
+            "PendingAlertRules#ensureLatestDataset", Set.of("PendingAlertRules#onRiskScoreProduced")));
 
     private static final String FIXED_KIND = "writes a fixed kind other than decision-rule";
     private static final String NOT_CONFIG = "writes no component — operational state or objects";

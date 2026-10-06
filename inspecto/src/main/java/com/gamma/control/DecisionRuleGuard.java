@@ -312,6 +312,18 @@ public final class DecisionRuleGuard {
         return sig.isEmpty() ? null : ContentHash.canonicalJson(Map.of("invokeApi", sig));
     }
 
+    /**
+     * The guard for a BACKGROUND writer (no request, so no Subject — e.g. {@link PendingAlertRules}, operator
+     * 2026-10-06): nobody holds {@code canWorkIncidents}, so any {@code invoke-api} consequence is refused (422).
+     * {@link #checkInvokeApi} with a null exchange would pass the capability check; this fails closed instead.
+     */
+    static void refuseUnattended(Map<String, Object> content) {
+        if (signature(content) != null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an invoke-api consequence cannot be "
+                    + "written by a background writer — no one holding canWorkIncidents authored it; create the rule "
+                    + "through its own page");
+    }
+
     /** The capability and parameter rules for an invoke-api consequence (round-1 findings 3 and 4). */
     @SuppressWarnings("unchecked")
     static void checkInvokeApi(HttpExchange e, Map<String, Object> rule, Map<String, String> carried, boolean live) {
