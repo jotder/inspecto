@@ -1,0 +1,129 @@
+<div class="flex min-w-0 flex-auto flex-col">
+    <inspecto-page-header
+        title="Risk Scores"
+        subtitle="Weighted Factors over Datasets that rank entities; a score at or above the high threshold is High."
+        [terms]="['Risk Score', 'Dataset', 'Alert Rule', 'Incident']"
+    >
+        <button actions mat-icon-button type="button" aria-label="Refresh Risk Scores" (click)="load()">
+            <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+        </button>
+    </inspecto-page-header>
+
+    <div class="flex flex-auto flex-col gap-6 p-6 sm:flex-row sm:p-10">
+        <nav class="sm:w-72" aria-label="Risk Score models">
+            @if (loading()) {
+                <inspecto-skeleton [lines]="4"></inspecto-skeleton>
+            } @else if (error(); as e) {
+                <p class="text-warn text-sm" role="alert">{{ e }}</p>
+                <button mat-stroked-button type="button" class="mt-2" (click)="load()">Retry</button>
+            } @else if (models().length === 0) {
+                <inspecto-empty-state
+                    icon="heroicons_outline:scale"
+                    title="No Risk Scores yet"
+                    message="A Risk Score model is saved as a risk-score component; none are visible in this Space."
+                ></inspecto-empty-state>
+            } @else {
+                <ul class="flex flex-col gap-1">
+                    @for (m of models(); track m.id) {
+                        <li>
+                            <button
+                                type="button"
+                                class="hover:bg-hover w-full rounded-lg px-3 py-2 text-left"
+                                [class.bg-hover]="m.id === selectedId()"
+                                [attr.aria-current]="m.id === selectedId() ? 'true' : null"
+                                (click)="select(m.id)"
+                            >
+                                <span class="block text-sm font-semibold">{{ m.id }}</span>
+                                <span class="text-secondary block text-xs">
+                                    {{ m.entityType || 'entity' }} · {{ m.factors.length }} factors
+                                </span>
+                                @if (m.invalid) {
+                                    <inspecto-status-badge value="error" label="Invalid"></inspecto-status-badge>
+                                }
+                            </button>
+                        </li>
+                    }
+                </ul>
+            }
+        </nav>
+
+        <section class="min-w-0 flex-auto" aria-live="polite">
+            @if (selected(); as m) {
+                <div class="flex items-center gap-2">
+                    <h2 class="text-lg font-semibold">{{ m.id }}</h2>
+                    <button mat-stroked-button type="button" (click)="history(m)">History</button>
+                </div>
+                @if (m.description) {
+                    <p class="text-secondary mt-1 text-sm">{{ m.description }}</p>
+                }
+                @if (m.invalid) {
+                    <p class="text-warn mt-2 text-sm" role="alert">{{ m.invalid }}</p>
+                }
+                <dl class="mt-4 grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
+                    <dt class="text-secondary">Entity type</dt>
+                    <dd>{{ m.entityType || '—' }}</dd>
+                    <dt class="text-secondary">High threshold</dt>
+                    <dd class="tabular-nums">{{ m.highThreshold ?? '—' }}</dd>
+                    <dt class="text-secondary">Data scope</dt>
+                    <dd>{{ m.dataScope || '—' }}</dd>
+                    <dt class="text-secondary">Watch List</dt>
+                    <dd>{{ m.watchList || '—' }}</dd>
+                    <dt class="text-secondary">History retention</dt>
+                    <dd>{{ m.retention }}</dd>
+                </dl>
+
+                <h3 class="mt-6 text-sm font-semibold">Factors</h3>
+                <table class="mt-2 w-full text-left text-sm">
+                    <thead>
+                        <tr class="border-b">
+                            <th scope="col">Factor</th>
+                            <th scope="col">Dataset</th>
+                            <th scope="col">Key</th>
+                            <th scope="col">Measure</th>
+                            <th scope="col">Filters</th>
+                            <th scope="col">Weight</th>
+                            <th scope="col">Cap</th>
+                            <th scope="col">Evidence</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (f of m.factors; track f.id) {
+                            <tr class="border-b">
+                                <td>{{ f.label }}</td>
+                                <td>{{ f.dataset }}</td>
+                                <td>{{ f.key }}</td>
+                                <td class="font-mono">{{ f.measure }}</td>
+                                <td class="tabular-nums">{{ f.filterCount }}</td>
+                                <td class="tabular-nums">{{ f.weight ?? '—' }}</td>
+                                <td class="tabular-nums">{{ f.cap ?? '—' }}</td>
+                                <td>{{ f.evidence.join(', ') || '—' }}</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <h3 class="mt-6 text-sm font-semibold">Derived Datasets</h3>
+                <p class="text-secondary text-sm">
+                    Written by the risk.score Job, never authored: {{ m.outputs.join(' and ') }}. To raise Incidents,
+                    add a per-entity Alert Rule over the latest Dataset.
+                </p>
+
+                <h3 class="mt-6 text-sm font-semibold">Latest score of an entity</h3>
+                <form class="mt-2 flex items-end gap-2" (submit)="$event.preventDefault(); lookUp()">
+                    <label class="flex flex-col text-sm">
+                        Entity key
+                        <input class="rounded border px-2 py-1" autocomplete="off" [formControl]="entityDraft" />
+                    </label>
+                    <button mat-stroked-button type="submit">Look up</button>
+                </form>
+                @if (entityKey(); as k) {
+                    <div class="mt-3">
+                        <inspecto-risk-score-panel [model]="m.id" [entityKey]="k"></inspecto-risk-score-panel>
+                    </div>
+                }
+            } @else if (models().length > 0) {
+                <p class="text-secondary text-sm">Select a Risk Score to see its Factors.</p>
+            }
+        </section>
+    </div>
+</div>

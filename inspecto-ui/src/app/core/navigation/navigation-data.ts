@@ -82,6 +82,13 @@ export const defaultNavigation: GammaNavigationItem[] = [
             },
             { id: 'alerts', title: 'Alerts', type: 'basic', icon: 'heroicons_outline:bell-alert', link: '/alerts' },
             {
+                id: 'risk-scores',
+                title: 'Risk Scores',
+                type: 'basic',
+                icon: 'heroicons_outline:scale',
+                link: '/risk-scores',
+            },
+            {
                 id: 'incidents',
                 title: 'Incidents',
                 type: 'basic',

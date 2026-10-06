@@ -1,6 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { RiskScore, RiskScoresService } from '../api/risk-scores.service';
+import { displayEntityKey } from '../risk/risk-score-view';
 import { StatusBadgeComponent } from './status-badge.component';
 
 /**
@@ -15,7 +16,7 @@ import { StatusBadgeComponent } from './status-badge.component';
     imports: [DecimalPipe, StatusBadgeComponent],
     template: `
         @if (score(); as s) {
-            <section class="rounded-2xl border p-4" [attr.aria-label]="'Risk Score of ' + s.entityKey">
+            <section class="rounded-2xl border p-4" [attr.aria-label]="'Risk Score of ' + shownKey(s.entityKey)">
                 <div class="flex items-center gap-2">
                     <span class="text-sm font-semibold">Risk Score</span>
                     <span class="text-lg font-semibold tabular-nums">{{ s.score | number: '1.0-1' }}</span>
@@ -65,6 +66,7 @@ export class RiskScorePanelComponent {
     readonly entityKey = input.required<string>();
 
     readonly score = signal<RiskScore | null>(null);
+    readonly shownKey = displayEntityKey;
 
     readonly rows = computed(() => {
         const s = this.score();

@@ -3,7 +3,7 @@
      okf/backend/control-plane/risk-scores.md and git mv this to archived-documents/plans-archive/. -->
 # Risk Score authoring pane — UX / product spec
 
-**Status:** draft for one operator interview (decisions D-RP1..D-RP10 below). **Owns:** residual (2) of BACKLOG row
+**Status:** decisions D-RP1..D-RP10 approved (operator, 2026-10-06); S1 built, S2/S3 open. **Owns:** residual (2) of BACKLOG row
 `ASSURE-RISK-SCORE-RESIDUALS-1`. **As-built of the model:** [`okf/backend/control-plane/risk-scores.md`](../okf/backend/control-plane/risk-scores.md).
 Vocabulary per [`GLOSSARY.md`](../GLOSSARY.md): *Risk Score*, *Factor*, *indicator* (a Measure), *Dataset*, *Alert Rule*, *Incident*.
 
@@ -93,6 +93,17 @@ Conventions (angular-ui skill): standalone OnPush components, signals, design-sy
 | D-RP8 | Dataset pickers | (a) only Datasets with a readable Schema (matches `requireStorable`) (b) all, fail at save | **(a)** — column pickers need the Schema anyway; the fail-closed message covers the rest |
 | D-RP9 | Offer the per-entity Alert Rule | (a) link to the Alert Rule dialog with `dataset` / `by` / `threshold` prefilled (b) create it in the same save (c) nothing | **(a)** — separate gate and maker-checker; no hidden second write |
 | D-RP10 | Delivery order | (a) S1, S2, S3 (b) S1+S2 together (c) S3 backend first | **(a)** — each slice is releasable; S1 alone gives the read-only list |
+
+### Decisions recorded
+
+All ten recommendations APPROVED (operator, 2026-10-06): D-RP1 (a) new admin route; D-RP2 (a) schema-form plus a
+custom factor-row editor; D-RP3 (a) keep the binary `highThreshold`; D-RP4 (a) reuse `canAuthorWorkbench` (write) /
+`canWorkIncidents` (read); D-RP5 (a) build `POST /risk-scores/preview`; D-RP6 entity keys rendered through ONE
+masking function, D-P8 = mask on read; D-RP7 (c) reuse the filter builder if the spike allows, else (b) bespoke
+cards; D-RP8 (a) pickers show only Datasets with a readable Schema; D-RP9 (a) per-entity Alert Rule is a prefilled
+link; D-RP10 (a) deliver S1 → S2 → S3.
+
+**Progress.** S1 SHIPPED 2026-10-06 (`/risk-scores`, as-built in the OKF concept). S2 and S3 open.
 
 ## 8. Unverified claims
 

@@ -199,6 +199,19 @@ two places:
 
 A 404 renders nothing.
 
+**The Risk Scores pane (`/risk-scores`, slice S1, 2026-10-06).** `modules/admin/risk-scores/` is a read-only
+list + detail over `GET /components/risk-score` (D-RP1: its own admin route, nav item under Operations). The
+pure view model is `inspecto/risk/risk-score-view.ts` (`riskModelView`): identity, threshold, scope, Watch
+List, retention, one row per factor (dataset, key, measure, filter count, weight, cap, evidence) and the two
+derived Datasets, never authorable. A model with no factors is flagged *Invalid*. **History** opens
+`ComponentHistoryDialog` (restore reloads the list). An entity lookup feeds the existing panel. There is no
+create/edit yet (S2), and no preview (S3).
+
+**Entity key display (D-RP6, operator 2026-10-06; D-P8 = mask on read).** Every SPA surface that prints an
+entity key goes through ONE function, `displayEntityKey` (`inspecto/risk/risk-score-view.ts`): it keeps the
+last four characters and masks the rest. Today the panel's label uses it. ⚠ This is display only — the key
+still travels raw in the read route's URL and response; server-side mask-on-read is not built.
+
 **Authoring the Job.** `risk.score` is in the Jobs palette (`job-attributes.ts`, the declared fallback when
 `GET /jobs/types` is unavailable). Its one parameter, `model`, is declared `STRING` (there is no component-ref
 `ParamType`), so `JOB_PARAM_COMPONENT_REFS` marks it as a reference to the `risk-score` kind: `JobFormDialog`
@@ -210,8 +223,9 @@ renders it as a required autocomplete over the saved models (`riskScoreModelOpti
 - ✅ **The watch Entity List is fed (2026-09-28).** An optional `watchList: {list, ttlHours}` (1..24) adds every
   high entity to a `watch` Entity List after each run, expiring `ttlHours` later. It fails closed at save and at
   run. See [Entity Lists — assurance entries](entity-lists.md#the-risk-score-watch-list-feed).
-- **Entity-key masking** is unblocked (D-P8 decided 2026-10-06) but not built. The key is raw on every surface.
-- There is no authoring pane: models are written through `/components/risk-score`.
+- **Entity-key masking (D-P8 = mask on read, operator 2026-10-06).** The SPA displays keys through `displayEntityKey`; the server still serves them raw (not built).
+- The authoring pane has a read-only slice (S1, 2026-10-06); create/edit (S2) and preview (S3) are open, see
+  [`risk-score-authoring-pane-spec.md`](../../../superpower/risk-score-authoring-pane-spec.md).
 - An indicator is a Measure. There is no free-form arithmetic expression, and no reference to a saved
   Measure component, because none exists.
 - ✅ **Opt-in history retention (2026-10-04).** Optional model key `retainDays` or `retainRuns` (whole number
