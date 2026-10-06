@@ -87,7 +87,8 @@ const BASELINE_UNCOVERED = 41;
 // Usage:  node tools/check-authgate-coverage.mjs           # report + exit 1 on a ratchet regression
 //         node tools/check-authgate-coverage.mjs --list    # also print every uncovered route
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { moduleLabel, reactorModuleDirs } from './reactor-modules.mjs';
 import { join } from 'node:path';
 
 import { sep } from 'node:path';
@@ -115,10 +116,12 @@ function javaFiles(segment) {
   return out.sort();
 }
 
-/** The module a scanned path belongs to — the first path segment — for the printed scope roster. */
+const MODULE_DIRS = reactorModuleDirs((p) => (existsSync(p) ? readFileSync(p, 'utf8') : null));
+
+/** The module a scanned path belongs to — its reactor module (poms, not the first path segment) — for the printed scope roster. */
 function moduleOf(file) {
   const parts = file.split(sep).filter((x) => x && x !== '.');
-  return parts.length ? parts[0] : '.';
+  return parts.length ? (moduleLabel(parts.join('/'), MODULE_DIRS) ?? '.') : '.';
 }
 
 // Same shape as route-gating-report.mjs's REGISTRATION regex — the capability is a literal at the call

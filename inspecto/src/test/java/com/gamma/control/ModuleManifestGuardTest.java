@@ -33,18 +33,20 @@ class ModuleManifestGuardTest {
     private static final Pattern FEATURE_IDS = Pattern.compile("featureIds\\(\\)\\s*\\{[^}]*?Set\\.of\\(([^)]*)\\)");
     private static final Pattern STRING = Pattern.compile("\"([^\"]+)\"");
 
-    private static Path repoRoot() {
-        Path d = Path.of("").toAbsolutePath();
-        while (d != null && !Files.isDirectory(d.resolve("inspecto-util"))) d = d.getParent();
-        assertNotNull(d, "repo root not found from " + Path.of("").toAbsolutePath());
-        return d;
+    private static Path repoRoot() throws IOException {
+        return ReactorModules.root();
     }
 
     private static List<Path> modulesWithMainJava(Path root) throws IOException {
-        try (Stream<Path> s = Files.list(root)) {
-            return s.filter(p -> p.getFileName().toString().startsWith("inspecto"))
-                    .filter(p -> Files.isDirectory(p.resolve("src/main/java"))).sorted().toList();
-        }
+        List<Path> out = ReactorModules.withMainJava(ReactorModules.topLevelModules()).stream()
+                .filter(p -> p.getFileName().toString().startsWith("inspecto")).sorted().toList();
+        assertFalse(out.isEmpty(), "no modules with src/main/java found - reactor discovery broken?");
+        return out;
+    }
+
+    private static Path asnFacade() throws IOException {
+        return ReactorModules.modules().stream().filter(p -> p.getFileName().toString().equals("asn-facade")).findFirst()
+                .orElseThrow(() -> new AssertionError("asn-facade module not found in the reactor"));
     }
 
     private static Path manifestOf(Path module) {
@@ -72,8 +74,34 @@ class ModuleManifestGuardTest {
             if (!inCode.equals(new TreeSet<>(m.provides().features())))
                 problems.add(name + ": provides.features " + m.provides().features() + " != featureIds() in code " + inCode);
         }
-        assertTrue(Files.isRegularFile(manifestOf(root.resolve("asn-parser/asn-decoders/asn-facade"))), "asn-decoders manifest missing");
+        assertTrue(Files.isRegularFile(manifestOf(asnFacade())), "asn-decoders manifest missing");
         assertTrue(problems.isEmpty(), "module manifest problems:\n" + String.join("\n", problems));
+    }
+
+    @Test
+    void discoveredModulesEqualTheTrackedPomsMinusTheRootAndTheScaffoldTemplates() throws IOException {
+        Path root = ReactorModules.root();
+        List<Path> modules = ReactorModules.modules();
+        assertTrue(modules.size() >= 40, "reactor discovery found only " + modules.size() + " modules");
+        Process p = null;
+        try {
+            p = new ProcessBuilder("git", "ls-files", "*pom.xml").directory(root.toFile()).redirectErrorStream(true).start();
+        } catch (IOException e) {
+            org.junit.jupiter.api.Assumptions.assumeTrue(false, "git not available: " + e.getMessage());
+        }
+        String out = new String(p.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        try {
+            org.junit.jupiter.api.Assumptions.assumeTrue(p.waitFor() == 0 && !out.isBlank(), "not a git checkout");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException(e);
+        }
+        Set<Path> tracked = new TreeSet<>();
+        for (String line : out.split("\\R")) {
+            if (line.isBlank() || line.equals("pom.xml") || line.startsWith("tools/templates/")) continue;
+            tracked.add(root.resolve(line).getParent().normalize());
+        }
+        assertEquals(tracked, new TreeSet<>(modules), "reactor <module> entries differ from the tracked module poms");
     }
 
     @Test
@@ -81,7 +109,7 @@ class ModuleManifestGuardTest {
         Path root = repoRoot();
         List<ModuleManifest> all = new ArrayList<>();
         List<Path> mods = new ArrayList<>(modulesWithMainJava(root));
-        mods.add(root.resolve("asn-parser/asn-decoders/asn-facade"));
+        mods.add(asnFacade());
         for (Path module : mods)
             all.add(ModuleManifests.parse(Files.readString(manifestOf(module)).replaceFirst("(?m)^---[ \\t]*\\r?\\n", "").strip()));
         for (ModuleStatus s : ModuleActivator.resolve(all))

@@ -2,6 +2,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { reactorModuleDirs } from './reactor-modules.mjs';
 import { balancedAfter, loc, moduleOf, packageOf, ratchetViolations, registries, splitPackages, vocabHits } from './check-module-architecture.mjs';
 
 test('packageOf reads the package line and ignores commented-out ones', () => {
@@ -60,4 +61,22 @@ test('ratchetViolations fails only when a tracked count rises', () => {
     const base = { splitPackages: 8, populatedRegistries: 8 };
     assert.deepEqual(ratchetViolations({ splitPackages: 8, populatedRegistries: 7 }, base), []);
     assert.deepEqual(ratchetViolations({ splitPackages: 9, populatedRegistries: 8 }, base), ['splitPackages: 9 > baseline 8']);
+});
+
+test('moduleOf survives a regrouped (nested) layout: module = the reactor module dir name, not the first path segment', () => {
+    const poms = {
+        'pom.xml': '<modules><module>features/inspecto-ops</module><module>core/inspecto-util</module><module>asn-parser/asn-decoders</module></modules>'
+            + '<profiles><profile><modules><!-- <module>commented/out</module> --><module>features/inspecto-scoring</module></modules></profile></profiles>',
+        'asn-parser/asn-decoders/pom.xml': '<modules><module>asn-core</module></modules>',
+    };
+    const dirs = reactorModuleDirs((p) => poms[p] ?? null);
+    assert.deepEqual([...dirs].sort(), ['asn-parser/asn-decoders', 'asn-parser/asn-decoders/asn-core', 'core/inspecto-util', 'features/inspecto-ops', 'features/inspecto-scoring']);
+    assert.equal(moduleOf('features/inspecto-ops/src/main/java/A.java', dirs), 'inspecto-ops');
+    assert.equal(moduleOf('features/inspecto-scoring/src/main/java/A.java', dirs), 'inspecto-scoring');
+    assert.equal(moduleOf('asn-parser/asn-decoders/asn-core/src/main/java/A.java', dirs), 'asn-parser');
+    assert.equal(moduleOf('asn-parser/src/main/java/A.java', dirs), 'asn-parser');
+    assert.equal(moduleOf('tools/templates/job/src/main/java/A.java', dirs), 'tools');
+    assert.equal(moduleOf('pom.xml', dirs), null);
+    // the vocabulary rule keys on the module NAME, so it holds under a nested layout
+    assert.match(moduleOf('features/inspecto-la-core/src/main/java/A.java', new Set(['features/inspecto-la-core'])), /^inspecto-la-/);
 });

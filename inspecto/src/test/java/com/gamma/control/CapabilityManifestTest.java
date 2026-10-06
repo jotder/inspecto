@@ -36,19 +36,13 @@ class CapabilityManifestTest {
 
     /**
      * Every reactor module's main source tree, walked recursively — this module's included, so the historic
-     * {@link #ROUTES_DIR} is covered as a special case. Surefire's working directory is the module root,
-     * hence {@code ..} is the reactor root. There is no {@code target/} under {@code src/main/java}, so nothing
+     * {@link #ROUTES_DIR} is covered as a special case. Modules are discovered from the poms
+     * ({@link ReactorModules}), so the scan does not depend on where the module directories sit. There is no {@code target/} under {@code src/main/java}, so nothing
      * needs skipping.
      */
     private static java.util.List<Path> routeSourceRoots() throws IOException {
-        java.util.List<Path> roots = new java.util.ArrayList<>();
-        Path reactor = Path.of("..").toAbsolutePath().normalize();
-        try (Stream<Path> siblings = Files.list(reactor)) {
-            for (Path sibling : siblings.filter(Files::isDirectory).sorted().toList()) {
-                Path src = sibling.resolve(Path.of("src", "main", "java"));
-                if (Files.isDirectory(src)) roots.add(src);
-            }
-        }
+        java.util.List<Path> roots = ReactorModules.mainJavaTrees();
+        assertFalse(roots.isEmpty(), "no module source trees found - reactor discovery broken?");
         return roots;
     }
 

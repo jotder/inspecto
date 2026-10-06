@@ -13,9 +13,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { status as offeringsStatus } from './check-offerings.mjs';
+import { moduleDirOf, moduleLabel, reactorModuleDirs } from './reactor-modules.mjs';
 
-/** The module (top-level dir) of a repo path, or null for root files. */
-export const moduleOf = (path) => (path.includes('/') ? path.slice(0, path.indexOf('/')) : null);
+/**
+ * The module of a repo path, or null for root files. With `dirs` (reactor module dirs from reactor-modules.mjs) it is the
+ * outermost reactor module's directory NAME, so it survives `features/inspecto-ops/...`; without, the top-level dir.
+ */
+export const moduleOf = (path, dirs = new Set()) => moduleLabel(path, dirs);
 
 /** The package declared by Java source text, or null. Comments are ignored. */
 export function packageOf(javaText) {
@@ -103,9 +107,10 @@ export function gather(root) {
     const files = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 }).split('\n').filter(Boolean);
     const cache = new Map();
     const read = (p) => { if (!cache.has(p)) { const f = join(root, p); cache.set(p, existsSync(f) ? readFileSync(f, 'utf8') : null); } return cache.get(p); };
+    const dirs = reactorModuleDirs(read);
     const java = files.filter((f) => /\/src\/main\/java\/.*\.java$/.test(f)).map((path) => {
         const t = read(path) ?? '';
-        return { path, module: moduleOf(path), pkg: packageOf(t), loc: loc(t) };
+        return { path, module: moduleOf(path, dirs), dir: moduleDirOf(path, dirs) ?? path.split('/')[0], pkg: packageOf(t), loc: loc(t) };
     });
     const mods = {};
     for (const j of java) { const m = (mods[j.module] ??= { files: 0, loc: 0 }); m.files++; m.loc += j.loc; }
@@ -125,8 +130,9 @@ export function gather(root) {
         for (const [w, n] of Object.entries(h)) { v[w] = (v[w] ?? 0) + n; v.total += n; }
     }
     // P2a: a module with main Java must ship META-INF/inspecto/module.toon (asn-parser is a nested reactor, checked by ModuleManifestGuardTest)
+    const dirOfModule = Object.fromEntries(java.map((j) => [j.module, j.dir]));
     const withoutManifest = Object.keys(mods).filter((m) => m.startsWith('inspecto')
-        && !files.includes(`${m}/src/main/resources/META-INF/inspecto/module.toon`)).sort();
+        && !files.includes(`${dirOfModule[m]}/src/main/resources/META-INF/inspecto/module.toon`)).sort();
     return {
         splitPackages: splitPackages(java),
         withoutManifest,
