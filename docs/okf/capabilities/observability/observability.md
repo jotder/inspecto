@@ -532,7 +532,15 @@ the file half off. It refuses before reading when no template is set (naming
 default `none`). Filenames come from `DbFileStageStore.relativePaths` (processing time, padded a day each
 side; throws on failure) into `FileSequenceGaps.analyze`; the payload adds `fileTemplate`, `seqScope`,
 `observedFiles`, `missingFiles` (exact interior holes), `emptyBuckets` (a bucket count, never files) and
-`unmatchedFiles`. ⚠ File gaps raise the Signal to WARN but open no Incident (§7-g open, `BACKLOG.md` §3.5).
+`unmatchedFiles`. `check_files` stays default true (fail closed) and the refusal names `check_files: false`
+as the opt-out.
+
+**Incidents and streaks (operator, 2026-10-06).** A volume BREACH **or** a file gap emits
+`kpi.completeness.breached` and opens **one Incident per Pipeline-day** — dedupe attribute `pipelineDay`
+= `<pipeline>@<day>`, scope the pipeline — carrying both findings (`volumeStatus`, `rows`/`baselineRows`,
+`missingFiles`/`emptyBuckets`). ⚠ `IncidentAccess` cannot update, so a later same-day run is suppressed as the
+duplicate. Three or more consecutive days with nothing registered emit `kpi.completeness.unknown_streak`
+at WARN (`unknownStreakDays` in the payload) and open **no** Incident. The 28 / 7 / 0.3 defaults are confirmed.
 Design archived: `archived-documents/plans-archive/completeness-kpi-k4-design.md`.
 
 **The two deviation bases (operator, 2026-08-30 — ⛔ do not re-ask):**
