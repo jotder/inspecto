@@ -67,6 +67,7 @@ import { GeoSettingsService } from '@inspecto/link-analysis/api/geo-settings.ser
 import type { LaDataset } from '@inspecto/link-analysis/la-host';
 import { LA_DATASETS, LA_FEATURES, LA_TAGS, LA_TRANSFER, LaHostSlotComponent } from '@inspecto/link-analysis/la-host';
 import type { LaImportDraft } from '@inspecto/link-analysis/la-host';
+import { draftSavedWarning, recheckDraft } from '@inspecto/link-analysis/investigation/draft-recheck';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { ICON_COLOR_SWATCHES } from '@inspecto/core/theme/chart-tokens';
 import { GeoSourcesService, ProjectedGeo } from './geo-projection';
@@ -927,12 +928,23 @@ export class GeoMapComponent implements OnInit, OnDestroy {
         }
         this.saving.set(true);
         try {
+            // Re-check what is about to be WRITTEN (D3, operator 2026-10-06): advisory — the findings go to the
+            // banner (so a refused Save shows them) and the Save goes ahead either way.
+            const integrity = await recheckDraft(
+                this.transfer,
+                'geo-map-view',
+                view.id,
+                this.viewsService.toContent(view),
+            );
+            if (this.importDraft() === draft) this.importDraft.set({ ...draft, integrity });
             await firstValueFrom(
                 this.viewsService.save(view, { update: draft.targetExists, ifMatch: this.draftIfMatch }),
             );
             this.views.set([...this.views().filter((v) => v.id !== view.id), view]);
             this.clearDraft();
-            this.toastr.success(`Saved view '${view.name}'.`);
+            const warning = draftSavedWarning(view.id, integrity);
+            if (warning) this.toastr.warning(warning);
+            else this.toastr.success(`Saved view '${view.name}'.`);
         } catch (err) {
             this.toastr.error(apiErrorMessage(err, 'Saving the draft failed.'));
         } finally {

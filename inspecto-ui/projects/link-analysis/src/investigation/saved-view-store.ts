@@ -44,6 +44,11 @@ export class SavedViewStore<TView extends { id: string }> {
         return this.codec.fromContent(id, content);
     }
 
+    /** The Component `content` a save of this view writes (the Import-as-draft re-check judges it). */
+    toContent(view: TView): Record<string, unknown> {
+        return this.codec.toContent(view);
+    }
+
     /** Create by default; pass `{update: true}` when the id already exists (save-under-same-name
      *  overwrite) — the backend 409s a create on an existing id. `ifMatch` (update only) is the stored
      *  copy's `contentHash`: the save is refused (409) instead of clobbering a concurrent edit. */

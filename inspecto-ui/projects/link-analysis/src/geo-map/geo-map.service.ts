@@ -71,6 +71,11 @@ export class GeoMapService {
         return this.store.save(view, opts);
     }
 
+    /** The Component `content` a save of this view writes. */
+    toContent(view: GeoMapView): Record<string, unknown> {
+        return this.store.toContent(view);
+    }
+
     /** A view decoded from a Component's `content` (an imported bundle item — Import as draft). */
     fromContent(id: string, content: Record<string, unknown>): GeoMapView {
         return this.store.fromContent(id, content);

@@ -106,7 +106,19 @@ function flushReads(http: HttpTestingController): void {
     }
 }
 
-const writes = (http: HttpTestingController) => http.match((r) => r.method !== 'GET');
+// `POST /bundle/preview` is a POST that writes nothing — the Save's re-check, answered by `recheck` below.
+const writes = (http: HttpTestingController) =>
+    http.match((r) => r.method !== 'GET' && !r.url.endsWith('/bundle/preview'));
+
+/** Answer the Save's reference re-check (D3, operator 2026-10-06), then let the awaited Save reach the wire. */
+async function recheck(http: HttpTestingController, answer: string[] | 'error') {
+    const pre = http.expectOne(`${base}/bundle/preview`);
+    const body = pre.request.body;
+    if (answer === 'error') pre.flush({}, { status: 500, statusText: 'Boom' });
+    else pre.flush({ items: [], integrity: answer });
+    await new Promise((r) => setTimeout(r));
+    return body;
+}
 
 describe('LinkAnalysisComponent — Import as draft', () => {
     it('offers "Import as draft…" in its editor menu (D8)', () => {
@@ -140,6 +152,13 @@ describe('LinkAnalysisComponent — Import as draft', () => {
         expect(writes(http)).toEqual([]); // adopting wrote nothing
 
         const saved = c.saveDraft();
+        expect(writes(http)).toEqual([]); // the re-check runs BEFORE the write
+        const checked = await recheck(http, [FINDING]);
+        // The re-check judges exactly what Save is about to write, as a one-item envelope.
+        expect(checked.items).toEqual([
+            { kind: 'link-analysis-view', id: 'fraud-ring', content: expect.objectContaining({ layout: 'force' }) },
+        ]);
+        expect(c.importDraft()?.integrity).toEqual([FINDING]);
         const [post, ...rest] = writes(http);
         expect(rest).toEqual([]);
         expect(post.request.method).toBe('POST');
@@ -147,10 +166,13 @@ describe('LinkAnalysisComponent — Import as draft', () => {
         expect(post.request.headers.has('If-Match')).toBe(false);
         expect(post.request.body).toMatchObject({ id: 'fraud-ring', name: 'Fraud ring', layout: 'force' });
         http.expectNone(`${base}/bundle/import`);
-        http.expectNone(`${base}/bundle/preview`);
         post.flush({});
         await saved;
         expect(c.importDraft()).toBeNull();
+        // Advisory (D3): saved anyway, and the toast names the finding instead of a plain success.
+        const toastr = TestBed.inject(ToastrService);
+        expect(toastr.warning).toHaveBeenCalledWith(expect.stringContaining(FINDING));
+        expect(toastr.success).not.toHaveBeenCalled();
         expect(c.views().map((v) => v.id)).toContain('fraud-ring');
     });
 
@@ -171,6 +193,10 @@ describe('LinkAnalysisComponent — Import as draft', () => {
         // An edit AFTER adoption is what Save writes — not the content the bundle carried.
         c.layoutId.set('circular');
         const saved = c.saveDraft();
+        const checked = await recheck(http, 'error');
+        expect(checked.items[0].content).toMatchObject({ layout: 'circular' }); // the EDITED content is judged
+        // An unreadable re-check is "not checked" — never clean — and does not block the Save.
+        expect(c.importDraft()?.integrity).toBeNull();
         const [put, ...rest] = writes(http);
         expect(rest).toEqual([]);
         expect(put.request.method).toBe('PUT');

@@ -6,7 +6,12 @@ import { ObjectsService } from 'app/inspecto/api/objects.service';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
-import { ImportDraftBannerComponent, TransferMenuComponent } from 'app/inspecto/transfer';
+import {
+    BundleKind,
+    BundleTransferService,
+    ImportDraftBannerComponent,
+    TransferMenuComponent,
+} from 'app/inspecto/transfer';
 import {
     LA_AI_ASSIST,
     LA_CASES,
@@ -24,6 +29,7 @@ import {
     LaFeatures,
     LaPipelineGraph,
     LaTags,
+    LaTransfer,
     LaWidgets,
 } from '@inspecto/link-analysis';
 import { ComponentsDataProvider } from 'app/modules/admin/catalog/components-data-provider';
@@ -89,7 +95,17 @@ export function provideLaHostServices(): Provider[] {
                 return { open: (target) => void dialog.open(TagAssignmentDialog, { data: target }) };
             },
         },
-        { provide: LA_TRANSFER, useValue: { menu: TransferMenuComponent, banner: ImportDraftBannerComponent } },
+        {
+            provide: LA_TRANSFER,
+            useFactory: (): LaTransfer => {
+                const bundles = inject(BundleTransferService);
+                return {
+                    menu: TransferMenuComponent,
+                    banner: ImportDraftBannerComponent,
+                    recheck: (kind, id, content) => bundles.draftIntegrity(kind as BundleKind, id, content),
+                };
+            },
+        },
         { provide: LA_AI_ASSIST, useValue: { assist: AiAssistComponent, explain: AiExplainComponent } },
         {
             provide: LA_FEATURES,

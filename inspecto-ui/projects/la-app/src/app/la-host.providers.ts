@@ -8,7 +8,12 @@ import { ObjectsService } from '@inspecto/core/api/objects.service';
 import { isSharedRef } from '@inspecto/core/api/shared-ref';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { TagAssignmentDialog } from '@inspecto/core/tags/tag-assignment.dialog';
-import { ImportDraftBannerComponent, TransferMenuComponent } from '@inspecto/core/transfer';
+import {
+    BundleKind,
+    BundleTransferService,
+    ImportDraftBannerComponent,
+    TransferMenuComponent,
+} from '@inspecto/core/transfer';
 import {
     LA_AI_ASSIST,
     LA_CASES,
@@ -27,6 +32,7 @@ import {
     LaFeatures,
     LaPipelineGraph,
     LaTags,
+    LaTransfer,
     LaWidgets,
 } from '@inspecto/link-analysis';
 
@@ -145,7 +151,17 @@ export function provideLaAppHostServices(): Provider[] {
                 return { open: (target) => void dialog.open(TagAssignmentDialog, { data: target }) };
             },
         },
-        { provide: LA_TRANSFER, useValue: { menu: TransferMenuComponent, banner: ImportDraftBannerComponent } },
+        {
+            provide: LA_TRANSFER,
+            useFactory: (): LaTransfer => {
+                const bundles = inject(BundleTransferService);
+                return {
+                    menu: TransferMenuComponent,
+                    banner: ImportDraftBannerComponent,
+                    recheck: (kind, id, content) => bundles.draftIntegrity(kind as BundleKind, id, content),
+                };
+            },
+        },
         { provide: LA_AI_ASSIST, useValue: { assist: AiAssistComponent, explain: AiExplainComponent } },
         {
             provide: LA_FEATURES,

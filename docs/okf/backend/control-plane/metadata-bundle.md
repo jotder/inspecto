@@ -168,7 +168,7 @@ work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
 * **Integrity is advisory (D3).** After the prerequisites, the dialog calls the read-only preview for the target
   alone; the editor's banner lists the findings. An unreadable preview (or an older server with no list) is
   `integrity: null` — shown as *not checked*, never as clean. **Re-checked just before Save** (Dashboard,
-  Widget, Dataset): Save first posts the content it is ABOUT TO WRITE — edits included — as a one-item envelope to
+  Widget, Dataset, and since 2026-10-06 the Link Analysis / Geo views — below): Save first posts the content it is ABOUT TO WRITE — edits included — as a one-item envelope to
   the same read-only preview (`BundleTransferService.draftIntegrity`), puts the fresh findings in the banner, then
   saves regardless (D3: never a block). The editor leaves the page on success, so the outcome goes to a toast
   (`draftSaveWarning`): findings ⇒ a warning naming them; an unreadable re-check ⇒ "could not run"; clean ⇒ the
@@ -224,8 +224,13 @@ work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
   a view's `query.projection.datasetId` against the Datasets and both kinds are in `BundleRoutes.INTEGRITY_KINDS`,
   so the preview's `integrity` list is real for them: the banner shows the dialog's findings as-is (`null` from
   an unreadable preview still reads **not checked**), `/bundle/import` refuses a view that would introduce a
-  dangling Dataset (422, the MNT-16 rule), and `metadata_validate` reports one. Save still runs no re-check —
-  `LaTransfer` exposes no preview to the LA project, so an edit after adoption is unjudged until saved. Its
+  dangling Dataset (422, the MNT-16 rule), and `metadata_validate` reports one. ✅ 2026-10-06 (operator, 2026-10-06:
+  add the re-check): **Save re-checks too.** `LaTransfer` gained an optional `recheck(kind, id, content)` seam;
+  both hosts (`la-host.providers.ts` in the SPA and in `la-app`) wire it to `BundleTransferService.draftIntegrity`.
+  The studio's *Save draft* posts the view it is about to write (`SavedViewStore.toContent`, edits included) to
+  the read-only preview first, puts the fresh findings in the banner, then saves regardless (D3); the toast
+  names the findings or says the check could not run (`investigation/draft-recheck.ts`). A host without the
+  seam, or a failed preview, is `null` — *not checked*, never clean. Its
   Datasets still arrive as D4 prerequisites: `investigationViewRefs` derives them, so the dialog imports them
   first.
 * ⛔ **No `enabled:false` stamp** — a Dataset/Widget/Dashboard has no inactive meaning; a stamped write-through

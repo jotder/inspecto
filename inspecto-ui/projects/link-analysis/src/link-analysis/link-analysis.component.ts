@@ -145,6 +145,7 @@ import {
     LaHostSlotComponent,
 } from '@inspecto/link-analysis/la-host';
 import type { LaImportDraft } from '@inspecto/link-analysis/la-host';
+import { draftSavedWarning, recheckDraft } from '@inspecto/link-analysis/investigation/draft-recheck';
 import {
     MultiProjectedGraph,
     ProjectedGraph,
@@ -1913,12 +1914,23 @@ export class LinkAnalysisComponent implements OnInit {
         if (!view) return;
         this.saving.set(true);
         try {
+            // Re-check what is about to be WRITTEN (D3, operator 2026-10-06): advisory — the findings go to the
+            // banner (so a refused Save shows them) and the Save goes ahead either way.
+            const integrity = await recheckDraft(
+                this.transfer,
+                'link-analysis-view',
+                view.id,
+                this.viewsService.toContent(view),
+            );
+            if (this.importDraft() === draft) this.importDraft.set({ ...draft, integrity });
             await firstValueFrom(
                 this.viewsService.save(view, { update: draft.targetExists, ifMatch: this.draftIfMatch }),
             );
             this.views.set([...this.views().filter((v) => v.id !== view.id), view]);
             this.clearDraft();
-            this.toastr.success(`Saved “${view.name}”.`);
+            const warning = draftSavedWarning(view.id, integrity);
+            if (warning) this.toastr.warning(warning);
+            else this.toastr.success(`Saved “${view.name}”.`);
         } catch (err) {
             this.toastr.error(apiErrorMessage(err, 'Saving the draft failed.'));
         } finally {

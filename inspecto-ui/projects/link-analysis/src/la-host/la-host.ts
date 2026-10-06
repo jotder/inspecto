@@ -145,10 +145,14 @@ export interface LaImportDraft {
  * - `menu` — inputs `items` (`{kind, id}[]`), `allowedKinds`, `label`, `importDraft`; outputs `changed`,
  *   `draftImported` (a {@link LaImportDraft}).
  * - `banner` — inputs `draft` ({@link LaImportDraft}), `stored`; output `discard`.
+ * - `recheck` — the draft's reference re-check just before Save: the content about to be written, judged by
+ *   the host's read-only bundle preview. `null` = could not run ("not checked", never clean). A host without
+ *   it leaves every draft Save "not checked".
  */
 export interface LaTransfer {
     readonly menu: Type<unknown>;
     readonly banner: Type<unknown>;
+    readonly recheck?: (kind: string, id: string, content: Record<string, unknown>) => Observable<string[] | null>;
 }
 
 export const LA_TRANSFER = hostToken<LaTransfer>('LA_TRANSFER', 'the Import / export menu and draft banner');
