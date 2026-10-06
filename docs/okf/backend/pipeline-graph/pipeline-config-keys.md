@@ -239,6 +239,7 @@ against, round-tripped untouched.
 | `collector.circuit_breaker` | spec |
 | `collector.consignment` | spec |
 | `collector.fetch` | spec |
+| `collector.gap_detection` | spec |
 | `collector.post_action` | spec |
 | `collector.retry` | spec |
 | `description` | spec |
