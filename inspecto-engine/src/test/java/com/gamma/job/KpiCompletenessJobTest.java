@@ -130,4 +130,36 @@ class KpiCompletenessJobTest {
             assertTrue(d.emits().contains(SignalType.KPI_COMPLETENESS_EVALUATED), d.emits().toString());
         }
     }
+
+    /** K3: a day at half its rolling baseline breaches; the same day with too little history is unknown. */
+    @Test
+    void assessesTheDayAgainstItsRollingBaseline() {
+        for (int d = 1; d <= 7; d++) db.record(List.of(out("cdr", "2026-08-0" + d, "/w/" + d + ".parquet", 100)));
+        db.record(List.of(out("cdr", "2026-08-08", "/w/8.parquet", 50)));
+        Map<String, Object> s = runAndGetSignal(params("pipeline", "cdr", "record_day", "2026-08-08"),
+                SignalType.KPI_COMPLETENESS_EVALUATED);
+        assertEquals("BREACH", s.get("status"));
+        assertEquals(100L, s.get("baselineRows"));
+        assertEquals(-0.5, (Double) s.get("deviation"), 1e-9);
+        assertEquals(7, s.get("baselineDays"));
+
+        Map<String, Object> steady = runAndGetSignal(params("pipeline", "cdr", "record_day", "2026-08-08",
+                "tolerance", "0.6"), SignalType.KPI_COMPLETENESS_EVALUATED);
+        assertEquals("STEADY", steady.get("status"), "the tolerance parameter reaches assess");
+
+        Map<String, Object> young = runAndGetSignal(params("pipeline", "cdr", "record_day", "2026-08-08",
+                "baseline_window", "3"), SignalType.KPI_COMPLETENESS_EVALUATED);
+        assertEquals("NO_BASELINE", young.get("status"), "3 prior days < the default minimum of 7");
+        assertFalse(young.containsKey("baselineRows"), "no baseline ⇒ the key is absent, never -1 or 0");
+        assertTrue(young.containsKey("deviation") && young.get("deviation") == null);
+    }
+
+    @Test
+    void aDayWithNothingRegisteredIsNoObservationNotABreach() {
+        for (int d = 1; d <= 7; d++) db.record(List.of(out("cdr", "2026-08-0" + d, "/w/" + d + ".parquet", 100)));
+        Map<String, Object> s = runAndGetSignal(params("pipeline", "cdr", "record_day", "2026-08-08"),
+                SignalType.KPI_COMPLETENESS_EVALUATED);
+        assertEquals("NO_OBSERVATION", s.get("status"));
+        assertFalse(s.containsKey("rows"));
+    }
 }

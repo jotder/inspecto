@@ -3,6 +3,7 @@ package com.gamma.job;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.DbConsignmentOutputStore;
 import com.gamma.consignment.DbConsignmentOutputStore.DailyVolume;
+import com.gamma.consignment.VolumeBaseline;
 import com.gamma.signal.Severity;
 import com.gamma.signal.SignalType;
 import com.gamma.util.OperationsZone;
@@ -38,7 +39,17 @@ final class KpiCompletenessJob implements Job {
             ParameterDecl.required("pipeline", ParamType.STRING,
                     "The Pipeline whose received volume is assessed (the producer in the output registry)"),
             ParameterDecl.optional("record_day", ParamType.STRING, null,
-                    "The day assessed, yyyy-MM-dd. Default: yesterday in the operations zone (-Dops.timezone)"));
+                    "The day assessed, yyyy-MM-dd. Default: yesterday in the operations zone (-Dops.timezone)"),
+            // K3: the rolling baseline. 28 / 7 / 0.3 are the design's proposed defaults (§7-f).
+            ParameterDecl.of("baseline_window", ParamType.INTEGER).label("Baseline window (days)")
+                    .min(1).max(366).defaultValue("28")
+                    .description("How many calendar days before the assessed day form its rolling baseline").build(),
+            ParameterDecl.of("min_baseline_days", ParamType.INTEGER).label("Minimum baseline days")
+                    .min(1).max(366).defaultValue("7")
+                    .description("Fewer observed prior days than this and the answer is NO_BASELINE (unknown)").build(),
+            ParameterDecl.of("tolerance", ParamType.DECIMAL).label("Tolerance").min(0).max(1)
+                    .defaultValue("0.3")
+                    .description("Fraction below the baseline that is still ordinary, in [0,1]").build());
 
     private final JobConfig cfg;
 
@@ -69,14 +80,26 @@ final class KpiCompletenessJob implements Job {
         if (store == null)   // belt and braces: nullness detects, StoreHealth explains — same message
             throw new IllegalStateException(refusal(FAMILY, TOGGLE, "read the Pipeline's daily volume",
                     "no output registry is installed for this space"));
-        List<DailyVolume> series = store.dailyVolume(pipeline, recordDay, recordDay);
+        int window = Integer.parseInt(cfg.opt("baseline_window", "28"));
+        int minDays = Integer.parseInt(cfg.opt("min_baseline_days", "7"));
+        double tolerance = Double.parseDouble(cfg.opt("tolerance", "0.3"));
+        String from = LocalDate.parse(recordDay).minusDays(window).toString();
+        // ⛔ The series goes to assess untouched: it already ignores the unknown bucket and treats an absent
+        // day as NO_OBSERVATION. Pre-filtering here would duplicate, then contradict, that pinned rule.
+        List<DailyVolume> series = store.dailyVolume(pipeline, from, recordDay);
+        VolumeBaseline.Assessment a = VolumeBaseline.assess(series, recordDay, window, minDays, tolerance);
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("pipeline", pipeline);
         payload.put("recordDay", recordDay);
+        payload.put("status", a.status().name());
         putVolume(payload, series, recordDay);
-        ctx.signals().emit(SignalType.KPI_COMPLETENESS_EVALUATED, Severity.INFO, payload);
-        return JobResult.ok(TYPE + " '" + pipeline + "' " + recordDay + ": " + describe(payload),
+        payload.put("baselineDays", a.baselineDays());
+        if (a.baselineRows() >= 0) payload.put("baselineRows", a.baselineRows());   // omitted, never -1 or 0
+        payload.put("deviation", a.deviation());                                    // JSON null when undefined
+        boolean breach = a.status() == VolumeBaseline.Status.BREACH;
+        ctx.signals().emit(SignalType.KPI_COMPLETENESS_EVALUATED, breach ? Severity.WARN : Severity.INFO, payload);
+        return JobResult.ok(TYPE + " '" + pipeline + "' " + recordDay + ": " + a.status() + ", " + describe(payload),
                 (System.nanoTime() - t0) / 1_000_000L);
     }
 
