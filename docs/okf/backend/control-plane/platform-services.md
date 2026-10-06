@@ -146,7 +146,8 @@ not write Datasets or send outbound mail).
 
 ## 6. Grounding that refuted the plan (do not re-derive)
 
-1. **The CONTROL trio has no per-node dispatch.** `alert`/`event`/`gap` node kinds are declarations;
+1. **The CONTROL trio had no per-node dispatch.** `alert`/`event`/`gap` node kinds were declarations
+   (`alert` and `event` were deleted as node types, operator, 2026-10-06);
    their semantics run as `EventLog`/bus subscribers wired in `CollectorService`. Those subscribers
    *are* the "engine dispatch" that was rewired through the services.
 2. **`consignment-status` needs no `StatusStore`** — the manifest already carries per-member status —

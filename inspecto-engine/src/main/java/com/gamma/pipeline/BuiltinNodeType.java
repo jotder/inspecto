@@ -35,9 +35,6 @@ public enum BuiltinNodeType implements PipelineNodeType {
     ACQUISITION("acquisition", NodeCategory.SOURCE, "Collect",
             "Collects files (poll/listing); the pipeline entry.",
             Set.of(), Set.of(PipelineRel.DATA, PipelineRel.GAP, PipelineRel.FAILURE), false, FlatHome.BLOCK),
-    ADAPTER("adapter", NodeCategory.SOURCE, "Adapter",
-            "Windows a stream/push source into intermediate files (by time/count/size), then lands them.",
-            Set.of(), Set.of(PipelineRel.DATA), false),
 
     // ── parse ────────────────────────────────────────────────────────────────────
     // A parser may be a plain reader (data) or a selector/segment dispatcher (named routes + unmatched).
@@ -194,15 +191,9 @@ public enum BuiltinNodeType implements PipelineNodeType {
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.SUCCESS, PipelineRel.FAILURE), false, FlatHome.BLOCK),
 
     // ── reporting / notification ────────────────────────────────────────────────────
-    ALERT("alert", NodeCategory.CONTROL, "Alert",
-            "Raises an alert from rule / gap / failure outcomes.",
-            Set.of(PipelineRel.DATA, PipelineRel.GAP, PipelineRel.FAILURE), Set.of(), false),
     GAP("gap", NodeCategory.CONTROL, "Gap detection",
             "Reports sequence gaps as SEQUENCE_GAP events.",
-            Set.of(PipelineRel.GAP), Set.of(), false, FlatHome.BLOCK),
-    EVENT("event", NodeCategory.CONTROL, "Event",
-            "Emits a notification / event.",
-            Set.of(PipelineRel.DATA, PipelineRel.SUCCESS, PipelineRel.FAILURE, PipelineRel.GAP), Set.of(), false);
+            Set.of(PipelineRel.GAP), Set.of(), false, FlatHome.BLOCK);
 
     /**
      * How the flat {@code *_pipeline.toon} can carry an authored node of this type — the fact

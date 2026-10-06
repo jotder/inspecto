@@ -97,9 +97,9 @@ describe('PipelineEditorComponent', () => {
                     },
                     // Unlowerable — must be kept OUT of the palette but IN the type maps (unsupported()).
                     {
-                        type: 'adapter',
+                        type: 'transform.select',
                         category: 'TRANSFORM',
-                        label: 'Adapter',
+                        label: 'Select',
                         description: '',
                         accepts: ['data'],
                         emits: ['data'],
@@ -918,10 +918,10 @@ describe('PipelineEditorComponent', () => {
             const c = make();
             const offered = c.paletteGroups().flatMap((g) => g.types.map((t) => t.type));
             expect(offered).toEqual(['transform.filter']);
-            // The grandfathered `adapter` node still renders + flags on an opened graph: the
+            // An unlowerable `transform.select` node still renders + flags on an opened graph: the
             // unsupported-nodes banner derives from the FULL catalog, not the filtered palette.
             c.select('demo');
-            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, { id: 'legacy', type: 'adapter', config: {} }] }));
+            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, { id: 'legacy', type: 'transform.select', config: {} }] }));
             expect(c.unsupportedNodes().map((n) => n.id)).toEqual(['legacy']);
         });
 

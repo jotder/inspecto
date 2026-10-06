@@ -117,7 +117,6 @@ class PipelineGraphTest {
     void nodeCategoriesGroupTheTaxonomy() {
         // categories drive palette grouping + role checks (not the literal type string)
         assertEquals(NodeCategory.SOURCE,    PipelineNodeTypes.categoryOf("acquisition").orElseThrow());
-        assertEquals(NodeCategory.SOURCE,    PipelineNodeTypes.categoryOf("adapter").orElseThrow());
         assertEquals(NodeCategory.PARSE,     PipelineNodeTypes.categoryOf("parser").orElseThrow());
         assertEquals(NodeCategory.TRANSFORM, PipelineNodeTypes.categoryOf("transform.sql").orElseThrow());
         assertEquals(NodeCategory.CONTROL,   PipelineNodeTypes.categoryOf("gap").orElseThrow());

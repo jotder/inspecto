@@ -86,15 +86,15 @@ class PipelineNodeExecutorTest {
     @Test
     void aDescriptorWithoutAnExecutorSaysSo() throws Exception {
         // transform.dedup.marker is a registered descriptor that RowShaper does shape, so pick a type the
-        // registry knows and the chain does not: `adapter` is a real node type with no shaping branch.
-        assertTrue(PipelineNodeTypes.isKnown("adapter"), "precondition: adapter is a registered descriptor");
-        assertTrue(PipelineNodeExecutors.get("adapter").isEmpty(), "precondition: and has no executor");
+        // registry knows and the chain does not: `gap` is a real node type with no shaping branch.
+        assertTrue(PipelineNodeTypes.isKnown("gap"), "precondition: gap is a registered descriptor");
+        assertTrue(PipelineNodeExecutors.get("gap").isEmpty(), "precondition: and has no executor");
 
         File db = DuckDbUtil.tempDbFile("nodeexec_desc_");
         try (Connection conn = DuckDbUtil.openConnection(db)) {
             ScratchTables.seed(conn, "src", List.of("id"), SAMPLE);
             Exception e = assertThrows(IllegalArgumentException.class,
-                    () -> RowShaper.shape(conn, PipelineNode.of("a", "adapter", Map.of()), "src", "desc"));
+                    () -> RowShaper.shape(conn, PipelineNode.of("a", "gap", Map.of()), "src", "desc"));
             assertTrue(e.getMessage().contains("only its executor is missing"), e.getMessage());
         } finally {
             DuckDbUtil.deleteTempDb(db);

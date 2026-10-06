@@ -201,14 +201,13 @@ class PipelineValidatorTest {
 
     @Test
     void theHandlerExemptionSurvives_outcomesIntoRowConsumersAndDeclaredAcceptorsPass() {
-        // failure → alert (declared acceptor), gap → gap node (declared), failure → sink (row
-        // consumer), unmatched → sink (row consumer, already in linearValid): all legal pairings.
+        // gap → gap node (declared acceptor), failure → sink (row consumer), unmatched → sink (row
+        // consumer, already in linearValid): all legal pairings.
         PipelineGraph g = new PipelineGraph("handlers", true,
-                List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("al", "alert"),
+                List.of(PipelineNode.of("acq", "acquisition"),
                         PipelineNode.of("gd", "gap"), PipelineNode.of("q", "sink.persistent"),
                         PipelineNode.of("sink", "sink.persistent")),
                 List.of(PipelineEdge.data("acq", "sink"),
-                        new PipelineEdge("acq", PipelineRel.FAILURE, "al"),
                         new PipelineEdge("acq", PipelineRel.GAP, "gd"),
                         new PipelineEdge("acq", PipelineRel.FAILURE, "q")));
         PipelineValidator.Result r = PipelineValidator.validate(g);
@@ -229,6 +228,26 @@ class PipelineValidatorTest {
                         PipelineEdge.data("f2", "d2"), PipelineEdge.data("d2", "sink")));
         PipelineValidator.Result r = PipelineValidator.validate(g);
         assertTrue(r.ok(), () -> "" + r.issues());
+    }
+
+    /**
+     * `adapter`, `alert` and `event` were declared node types that nothing ever executed; they were deleted
+     * (operator, 2026-10-06), so a config naming one takes the ordinary unknown-type path. `gap`, still
+     * registered, is the probe that the path does not fire for every CONTROL-ish name.
+     */
+    @Test
+    void theDeletedNodeTypesAreUnknown() {
+        for (String removed : List.of("adapter", "alert", "event")) {
+            assertFalse(PipelineNodeTypes.isKnown(removed), removed);
+            PipelineGraph g = new PipelineGraph("removed", true,
+                    List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("x", removed)),
+                    List.of(new PipelineEdge("acq", PipelineRel.DATA, "x")));
+            assertTrue(codes(PipelineValidator.validate(g)).contains(PipelineValidator.UNKNOWN_TYPE), removed);
+        }
+        PipelineGraph kept = new PipelineGraph("kept", true,
+                List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("x", "gap")),
+                List.of(new PipelineEdge("acq", PipelineRel.GAP, "x")));
+        assertFalse(codes(PipelineValidator.validate(kept)).contains(PipelineValidator.UNKNOWN_TYPE));
     }
 
     @Test

@@ -355,9 +355,9 @@ in-motion/at-rest line stays an engine seam.
 Consignment out (+ rejects)*. **User surface** — ⚠ **`map` was DELETED 2026-09-05** (corrected 2026-09-09; the deletion is recorded further down this same section). `RecipeCompiler`'s verb switch is the recipe vocabulary (the served `GET /pipelines/step-types` table was retired 2026-09-24) and authors **no `transform.map`**: `collect` · `parse`(×7 formats) ·
 `dedup` · `transform` · `summarize` · `sink` — plus self-describing **plugin Steps** (`ConsignmentProcessor`
 SPI, declared grain `RECORD | FILE | BATCH`). ⛔ *Node* (user-facing) → **Step**. The **closed
-`BuiltinNodeType` vocabulary** (**30** ids — ⚠ this said 20 until 2026-09-09 and the list below predates the **7**<!--count:parser-node-types--> per-format parsers — served verbatim by `GET /pipelines/node-types`): the SOURCE pair
-(`acquisition` / `adapter`), `parser`, the TRANSFORM family (`transform.*` + `enrichment`), the three
-`sink.*` kinds, and the CONTROL trio (`gap` / `alert` / `event`) — remains the **compile-target set** the
+`BuiltinNodeType` vocabulary** (**29** ids — ⚠ this said 20 until 2026-09-09 and the list below predates the **7**<!--count:parser-node-types--> per-format parsers — served verbatim by `GET /pipelines/node-types`): the SOURCE entry
+`acquisition`, `parser`, the TRANSFORM family (`transform.*` + `enrichment`), the three
+`sink.*` kinds, and the CONTROL node `gap` (the never-executed `adapter` / `alert` / `event` types were deleted, operator, 2026-10-06) — remains the **compile-target set** the
 verbs lower onto; it leaves the user surface at the amendment's Phase 5 but is still the served palette
 until then. ⚠ **The closure is superseded (D0-B, 2026-08-09, `archived-documents/plans-archive/platform-services-plan.md`
 §5.2; as-built: `okf/backend/control-plane/platform-services.md`):** the enumeration was closed on purpose, but its real guarantee is compiler **totality** — *a
