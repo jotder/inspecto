@@ -69,7 +69,7 @@ const RED = {
         /outside an `if \(\$DemoAuth\)` block/,
     ],
     'an edition $modules build list': [
-        edit('inspecto/package.ps1', "{ 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-policy,", "{ 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-demo-auth,inspecto-policy,"),
+        edit('inspecto/package.ps1', "{ 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-connectors-kafka,", "{ 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-demo-auth,inspecto-connectors-kafka,"),
         /outside an `if \(\$DemoAuth\)` block/,
     ],
     'a staging step under a NEGATED gate': [
