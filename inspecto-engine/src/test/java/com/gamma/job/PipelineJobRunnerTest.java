@@ -1264,6 +1264,43 @@ class PipelineJobRunnerTest {
     }
 
     /**
+     * A stored {@code kind: unpivot} step executes at rest (operator 2026-10-06): {@code id} passes through and
+     * {@code amt} becomes a {@code (field, reading)} row cast to BIGINT. The lift must map the plain kind to
+     * {@code transform.matrix.unpivot} — a {@code transform.unpivot} node would fail as an unknown type.
+     */
+    @Test
+    void runsAFlatConfigsUnpivotStepAndWritesNameValueRows() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = tmp.resolve("up_pipeline.toon");
+        Files.writeString(flat, """
+                name: up_etl
+                active: false
+                output_store: long_form
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - unpivot:
+                      columns[1]: amt
+                      name_column: field
+                      value_column: reading
+                      value_type: BIGINT
+                """);
+        seedParquet(dataDir, "up_etl", "(1,150),(2,50)");
+
+        JobConfig cfg = new JobConfig("unpivoter", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of("1|amt|150|BIGINT", "2|amt|50|BIGINT"), queryStore(dataDir, "long_form",
+                "SELECT id, field, reading, typeof(reading) FROM %s ORDER BY id"));
+    }
+
+    /**
      * A {@code webhook:} branch run end to end through the job lane: {@code PipelineLift.stageTwo} makes it a
      * second branch beside {@code output_store:}, {@code PartitionSinkWriter} dispatches it to
      * {@code WebhookSink}, and the edition's transport — here a capturing one, discovered through the real

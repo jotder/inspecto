@@ -1,0 +1,21 @@
+partitionKey: CALL_DATE
+raw:
+  name: CDR
+  format: CSV
+  fields[6]{name,selector,type}:
+    CALL_ID,"call_id",VARCHAR
+    CALL_DATE,"call_date",DATE
+    MSISDN,"msisdn",VARCHAR
+    CHARGE_VOICE,"charges.voice",VARCHAR
+    CHARGE_SMS,"charges.sms",VARCHAR
+    CHARGE_DATA,"charges.data",VARCHAR
+mapping:
+  canonicalName: cdr
+  rawName: CDR
+  rules[6]{targetColumn,sourceExpression,transformType}:
+    CALL_ID,CALL_ID,DIRECT
+    CALL_DATE,CALL_DATE,DIRECT
+    MSISDN,MSISDN,DIRECT
+    CHARGE_VOICE,CHARGE_VOICE,DIRECT
+    CHARGE_SMS,CHARGE_SMS,DIRECT
+    CHARGE_DATA,CHARGE_DATA,DIRECT

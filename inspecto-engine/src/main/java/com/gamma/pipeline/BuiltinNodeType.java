@@ -183,6 +183,11 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_EXPLODE("transform.explode", NodeCategory.TRANSFORM, "Explode",
             "One row per element of a LIST or JSON-array column.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "explode"),
+    // Wide columns -> (name, value) rows (operator 2026-10-06). The type keeps the catalog id; its steps:
+    // kind is the plain word `unpivot`, so the lift maps kind -> type through typeForStepKind.
+    TRANSFORM_UNPIVOT("transform.matrix.unpivot", NodeCategory.TRANSFORM, "Unpivot",
+            "Wide columns become (name, value) rows.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "unpivot"),
     TRANSFORM_SPLIT("transform.split", NodeCategory.TRANSFORM, "Split",
             "Explodes one row into many (UNNEST).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
@@ -283,6 +288,17 @@ public enum BuiltinNodeType implements PipelineNodeType {
 
     /** The {@code steps:} kind this type lowers to, or {@code null} unless {@link #flatHome()} is {@code STEP}. */
     public String stepKind() { return stepKind; }
+
+    /**
+     * The node type a {@code steps:} kind lifts to: the built-in whose {@link #stepKind()} it is, else
+     * {@code transform.<kind>} (a contributed type). A built-in's type need not be {@code transform.<kind>} -
+     * {@code unpivot} is {@code transform.matrix.unpivot} - so the lift must never concatenate.
+     */
+    public static String typeForStepKind(String kind) {
+        for (BuiltinNodeType t : values())
+            if (t.flatHome == FlatHome.STEP && t.stepKind.equals(kind)) return t.type;
+        return "transform." + kind;
+    }
 
     @Override public String type() { return type; }
     /** Every built-in compiles to SQL inside {@code RowShaper} (S2-1). */

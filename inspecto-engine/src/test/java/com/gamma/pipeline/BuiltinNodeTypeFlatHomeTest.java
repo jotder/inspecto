@@ -32,11 +32,13 @@ class BuiltinNodeTypeFlatHomeTest {
                         t + " declares steps: kind '" + t.stepKind() + "', which PipelineConfig.Step does not know");
                 assertEquals(NodeCategory.TRANSFORM, t.category(), t + ": only a transform lowers into the steps: chain");
                 assertTrue(kinds.add(t.stepKind()), "two node types claim steps: kind '" + t.stepKind() + "'");
+                assertEquals(t.type(), BuiltinNodeType.typeForStepKind(t.stepKind()),
+                        t + ": the lift must map steps: kind '" + t.stepKind() + "' back to this type");
             } else {
                 assertNull(t.stepKind(), t + " carries a steps: kind without a steps: home");
             }
         }
-        assertEquals(12, kinds.size(), "twelve built-in chain kinds as of 2026-10-06 (running, hash, mask, explode) — a change here is a change to the "
+        assertEquals(13, kinds.size(), "thirteen built-in chain kinds as of 2026-10-06 (running, hash, mask, explode, unpivot) — a change here is a change to the "
                 + "flat file's chain vocabulary and must come with its lift/lower: " + kinds);
     }
 

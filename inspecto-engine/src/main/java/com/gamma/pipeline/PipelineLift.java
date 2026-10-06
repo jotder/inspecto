@@ -247,7 +247,7 @@ public final class PipelineLift {
             String kind = step.kind();
             int nth = seen.merge(kind, 1, Integer::sum);
             String id = kind + (nth == 1 ? "" : "__s" + i);   // same id scheme as the ingest-headed lift
-            nodes.add(new PipelineNode(id, "transform." + kind, stepLabel(kind), null,
+            nodes.add(new PipelineNode(id, BuiltinNodeType.typeForStepKind(kind), stepLabel(kind), null,
                     new LinkedHashMap<>(step.config()), null));
             edges.add(PipelineEdge.data(upstream, id));
             upstream = id;
@@ -411,7 +411,7 @@ public final class PipelineLift {
                 int nth = seen.merge(kind, 1, Integer::sum);
                 String id = kind + suffix + (nth == 1 ? "" : "__s" + i);
                 Map<String, Object> sc = new LinkedHashMap<>(step.config());
-                nodes.add(new PipelineNode(id, "transform." + kind, stepLabel(kind), null,
+                nodes.add(new PipelineNode(id, BuiltinNodeType.typeForStepKind(kind), stepLabel(kind), null,
  sc, null));
                 edges.add(PipelineEdge.data(sinkUpstream, id));
                 sinkUpstream = id;
@@ -534,7 +534,7 @@ public final class PipelineLift {
                 String kind = step.kind();
                 int nth = seen.merge(kind, 1, Integer::sum);
                 String id = kind + suffix + "__" + branchKey + (nth == 1 ? "" : "__s" + i);
-                nodes.add(new PipelineNode(id, "transform." + kind, stepLabel(kind), null,
+                nodes.add(new PipelineNode(id, BuiltinNodeType.typeForStepKind(kind), stepLabel(kind), null,
                         new LinkedHashMap<>(step.config()), null));
                 edges.add(new PipelineEdge(upstream, rel, id));
                 upstream = id;

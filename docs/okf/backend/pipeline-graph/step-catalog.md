@@ -280,6 +280,48 @@ so a nested feed becomes a flat fact table without hand-written SQL.
 **Example.** `examples/07-steps/explode` — a JSON CDR feed whose `charges` array holds 0–3 charge items,
 exploded and then flattened by a `sql` step.
 
+## `unpivot` → `transform.matrix.unpivot` — Unpivot / column flattener
+
+*Added 2026-10-06 (operator, 2026-10-06).*
+
+**Function.** Wide columns become `(name, value)` rows — a per-hour `H00 … H23` usage row, a quarterly
+`Q1 … Q4` sheet — so a matrix-shaped feed can be grouped and charted like any long table.
+
+**Design (decisions, operator, 2026-10-06).**
+- **Name.** The node type keeps the catalog id `transform.matrix.unpivot`; its `steps:` kind is the plain
+  word `unpivot` (a dotted TOON key would read as a path). Because the type is not `transform.<kind>`, the
+  lift maps a kind to its type through `BuiltinNodeType.typeForStepKind`, not by string concatenation;
+  `BuiltinNodeTypeFlatHomeTest` pins that every `STEP` case round-trips through it.
+- **Which columns.** Exactly one of `columns` (a list of inbound names) or `columns_pattern` (a Java
+  regular expression, matched with *find* — the same partial-match rule as DuckDB's `COLUMNS('…')` — against
+  each inbound name, in declaration order). The pattern is resolved in Java against `DESCRIBE`, so only
+  real, quoted column names reach SQL. A listed column that does not exist, a pattern that matches nothing,
+  or both keys at once is refused. Every other column passes through unchanged and is repeated per row.
+- **Type coercion (stated rule).** Every unpivoted column is `CAST` to `value_type` **before** the unpivot,
+  so the value column has exactly one declared type whatever the input mix. Default `VARCHAR` — every DuckDB
+  type converts to text, so the default never fails. Allowed: `VARCHAR`, `BOOLEAN`, `INTEGER`, `BIGINT`,
+  `DOUBLE`, `DATE`, `TIMESTAMP`, `DECIMAL(p,s)`. The cast is strict (`CAST`, not `TRY_CAST`): a value that
+  does not convert **fails the run** rather than landing as a silent `null`.
+- **Nulls.** A `null` cell produces no row by default (DuckDB's `UNPIVOT`); `include_nulls: true` keeps it.
+- **Identifiers.** `name_column` (default `name`) and `value_column` (default `value`) must match
+  `[A-Za-z_][A-Za-z0-9_]{0,127}`, differ from each other and from every passed-through column.
+- **Lane.** Like `explode`: a `steps:`-only kind, executed at rest, not admitted mid-branch, and left out of
+  `ConservationCheck` (it multiplies rows).
+
+**Configuration.**
+
+| Key | Type | Tier | Default | What it does |
+|---|---|---|---|---|
+| `columns` | list | optional | — | **Columns to unpivot.** Inbound column names. Exactly one of this or `columns_pattern`. |
+| `columns_pattern` | string | optional | — | **Column name pattern.** A regular expression; every inbound column it matches is unpivoted. |
+| `name_column` | string | optional | `name` | **Name column.** Receives the unpivoted column's name. |
+| `value_column` | string | optional | `value` | **Value column.** Receives the cell value. |
+| `value_type` | select | optional | `VARCHAR` | **Value type.** Every unpivoted column is cast to it first. |
+| `include_nulls` | boolean | optional | `false` | **Keep empty cells.** Emit a row for a `null` cell too. |
+
+**Example.** `examples/07-steps/unpivot` — a nested JSON CDR feed whose per-call charge breakdown arrives as
+wide `charge_*` keys, unpivoted into `(CHARGE_TYPE, AMOUNT)` rows.
+
 ## `dedup` → `transform.dedup` — Record deduplicator
 
 **Function.** Record-grain distinct by business key — one row per `keys[]` value. Not file dedup:
@@ -1075,7 +1117,7 @@ file to `archive/archive/…`).
 | Character map & code page transcoder | `quality.cleanse.transcode` | — |
 | GDPR / CCPA field redactor | `quality.compliance.redact` | board SEC-08 — Enterprise only |
 
-## Transformers & Dimensional Modeling (`XFM`) — 7<!--count:processors-xfm-delivered--> delivered · 1<!--count:processors-xfm-partial--> partial · 13<!--count:processors-xfm-planned--> planned
+## Transformers & Dimensional Modeling (`XFM`) — 8<!--count:processors-xfm-delivered--> delivered · 1<!--count:processors-xfm-partial--> partial · 12<!--count:processors-xfm-planned--> planned
 
 **Delivered**
 
@@ -1088,6 +1130,7 @@ file to `archive/archive/…`).
 | Group-by summarizer (measures grammar) | `transform.summarize` | `transform.summarize` |
 | Reference-store join (versioned references) | `transform.join` | `transform.join` — at rest only — refused mid-branch (no reference resolver on the ingest lane) |
 | Array / object exploder & flattener | `transform.explode` | `transform.explode` — one row per element of a LIST or JSON-array column, optional index (2026-10-06); the grandfathered `transform.split` stays the read-only ancestor |
+| Unpivot / column flattener | `transform.matrix.unpivot` | `transform.matrix.unpivot` — wide columns to (name, value) rows by list or name pattern, cast to one value type (2026-10-06) |
 
 **Partial**
 
@@ -1100,7 +1143,6 @@ file to `archive/archive/…`).
 | Processor | Id | Note |
 |---|---|---|
 | Dynamic pivot / transpose | `transform.matrix.pivot` | — |
-| Unpivot / column flattener | `transform.matrix.unpivot` | — |
 | Rank & Top-N pruner | `transform.analytics.rank` | — |
 | Presorted stream merge joiner | `transform.join.merge` | the grandfathered `transform.merge` node type is the read-only ancestor |
 | Slowly changing dimension (SCD Type 2) | `transform.dim.scd2` | — |

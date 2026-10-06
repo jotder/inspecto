@@ -409,6 +409,27 @@ public final class NodeAttributes {
                     .help("What happens to a row whose array is empty, null or not an array."));
 
     /**
+     * {@code transform.matrix.unpivot} (operator 2026-10-06): wide columns become (name, value) rows. Exactly one
+     * of {@code columns} / {@code columns_pattern}; the run-time rules live in {@code RowShaper.unpivot}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_UNPIVOT = List.of(
+            NodeAttribute.of("columns", "Columns to unpivot", "list", "optional").placeholder("H00")
+                    .help("Inbound columns whose values become rows. Give these OR a name pattern, not both."),
+            NodeAttribute.of("columns_pattern", "Column name pattern", "string", "optional").placeholder("^H[0-9]{2}$")
+                    .help("A regular expression; every inbound column whose name it matches is unpivoted."),
+            NodeAttribute.of("name_column", "Name column", "string", "optional").defaultValue("name")
+                    .help("Receives each unpivoted column's name."),
+            NodeAttribute.of("value_column", "Value column", "string", "optional").defaultValue("value")
+                    .help("Receives the cell value."),
+            NodeAttribute.of("value_type", "Value type", "select", "optional").defaultValue("VARCHAR")
+                    .options("VARCHAR", "Text (never fails)", "BIGINT", "Whole number", "INTEGER", "Integer",
+                            "DOUBLE", "Decimal number (double)", "DECIMAL(18,4)", "Decimal (18,4)",
+                            "BOOLEAN", "Boolean", "DATE", "Date", "TIMESTAMP", "Timestamp")
+                    .help("Every unpivoted column is cast to this first; a value that does not convert fails the run."),
+            NodeAttribute.of("include_nulls", "Keep empty cells", "boolean", "optional").defaultValue(false)
+                    .help("Emit a row for a null cell too. Off: null cells produce no row."));
+
+    /**
      * {@code transform.route}: {@code mode} is the only scalar. {@code branches} — the list of
      * {@code {key, where, database}} that actually does the routing — has no spec because the
      * {@code list} type is {@code string[]} and these are MAPS.
@@ -560,7 +581,7 @@ public final class NodeAttributes {
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, SINK_WEBHOOK))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, SINK_WEBHOOK))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -578,6 +599,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_HASH.type(), TRANSFORM_HASH);
         m.put(BuiltinNodeType.TRANSFORM_MASK.type(), TRANSFORM_MASK);
         m.put(BuiltinNodeType.TRANSFORM_EXPLODE.type(), TRANSFORM_EXPLODE);
+        m.put(BuiltinNodeType.TRANSFORM_UNPIVOT.type(), TRANSFORM_UNPIVOT);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);

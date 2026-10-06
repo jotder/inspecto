@@ -204,6 +204,7 @@ public final class RowShaper {
         if (type.startsWith("transform.dedup"))                      return dedup(conn, node, input, outPrefix, ctx);
         if (BuiltinNodeType.TRANSFORM_SPLIT.type().equals(type))    return split(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_EXPLODE.type().equals(type))  return explode(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_UNPIVOT.type().equals(type))  return unpivot(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(type)) return summarize(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_PROFILE.type().equals(type)) return profile(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_RUNNING.type().equals(type)) return running(conn, node, input, outPrefix);
@@ -810,7 +811,7 @@ public final class RowShaper {
     // ── explode (one row per array element) ───────────────────────────────────────
 
     /** A NEW column name a Step writes: a plain identifier, so a typo cannot read as SQL even before quoting. */
-    static final java.util.regex.Pattern NEW_COLUMN_NAME = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]{0,127}");
+    public static final java.util.regex.Pattern NEW_COLUMN_NAME = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]{0,127}");
 
     /** The working column the element struct travels in between the two SELECTs of {@link #explode}. */
     private static final String EXPLODE_TMP = "__explode_x";
@@ -874,6 +875,87 @@ public final class RowShaper {
                 + " FROM (" + inner + ")";
         String data = table(prefix, PipelineRel.DATA);
         exec(conn, "CREATE TABLE " + q(data) + " AS " + outer);
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    // -- unpivot (wide columns -> (name, value) rows) --------------------------------
+
+    /** The value types {@code transform.matrix.unpivot} casts to - a closed list, so no author text reaches the CAST. */
+    public static final java.util.regex.Pattern UNPIVOT_VALUE_TYPE = java.util.regex.Pattern.compile(
+            "VARCHAR|BOOLEAN|INTEGER|BIGINT|DOUBLE|DATE|TIMESTAMP|DECIMAL\\([0-9]{1,2},[0-9]{1,2}\\)",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /**
+     * {@code transform.matrix.unpivot} (operator 2026-10-06) - the chosen columns become {@code (name, value)}
+     * rows; every other column passes through. Exactly one of {@code columns} (inbound names) or
+     * {@code columns_pattern} (a Java regex matched with {@code find}, like DuckDB's {@code COLUMNS('...')}),
+     * resolved HERE against {@code DESCRIBE} so only real, quoted names reach SQL. Every unpivoted column is
+     * {@code CAST} to {@code value_type} (default VARCHAR) BEFORE the unpivot, so the value column has one
+     * declared type; the cast is strict, so a value that does not convert fails the run instead of landing as
+     * a silent null. A null cell yields no row unless {@code include_nulls}.
+     */
+    private static List<Relation> unpivot(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        String what = "transform.matrix.unpivot node '" + node.id() + "'";
+        Map<String, String> types = columnTypesOf(conn, input);
+        String pattern = strOrNull(node, "columns_pattern");
+        boolean listed = node.cfg("columns") instanceof List<?> l && !l.isEmpty();
+        if (listed == (pattern != null))
+            throw new IllegalArgumentException(what + " needs exactly one of 'columns' or 'columns_pattern'");
+        List<String> chosen = new ArrayList<>();
+        if (listed) {
+            for (Object o : (List<?>) node.cfg("columns")) {
+                String name = o == null ? "" : o.toString().trim();
+                if (name.isEmpty()) continue;
+                String actual = types.keySet().stream().filter(c -> c.equalsIgnoreCase(name)).findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException(what + ": no column '" + name
+                                + "' in the inbound data (have: " + types.keySet() + ")"));
+                if (!chosen.contains(actual)) chosen.add(actual);
+            }
+        } else {
+            java.util.regex.Pattern re;
+            try {
+                re = java.util.regex.Pattern.compile(pattern);
+            } catch (java.util.regex.PatternSyntaxException e) {
+                throw new IllegalArgumentException(what + ": columns_pattern is not a valid regular expression - "
+                        + e.getDescription());
+            }
+            for (String c : types.keySet()) if (re.matcher(c).find()) chosen.add(c);
+        }
+        if (chosen.isEmpty())
+            throw new IllegalArgumentException(what + ": no inbound column matches " + (listed ? "'columns'"
+                    : "columns_pattern '" + pattern + "'") + " (have: " + types.keySet() + ")");
+
+        String nameCol = strOrNull(node, "name_column") == null ? "name" : strOrNull(node, "name_column").trim();
+        String valueCol = strOrNull(node, "value_column") == null ? "value" : strOrNull(node, "value_column").trim();
+        List<String> kept = new ArrayList<>();
+        for (String c : types.keySet()) if (!chosen.contains(c)) kept.add(c);
+        for (String n : List.of(nameCol, valueCol)) {
+            if (!NEW_COLUMN_NAME.matcher(n).matches())
+                throw new IllegalArgumentException(what + ": '" + n
+                        + "' is not a valid new column name (letters, digits and _, not starting with a digit)");
+            if (kept.stream().anyMatch(c -> c.equalsIgnoreCase(n)))
+                throw new IllegalArgumentException(what + ": the new column '" + n
+                        + "' would collide with a passed-through column");
+        }
+        if (nameCol.equalsIgnoreCase(valueCol))
+            throw new IllegalArgumentException(what + ": 'name_column' and 'value_column' must differ");
+        String valueType = strOrNull(node, "value_type") == null ? "VARCHAR" : strOrNull(node, "value_type").trim();
+        if (!UNPIVOT_VALUE_TYPE.matcher(valueType).matches())
+            throw new IllegalArgumentException(what + ": value_type '" + valueType + "' is not one of VARCHAR, "
+                    + "BOOLEAN, INTEGER, BIGINT, DOUBLE, DATE, TIMESTAMP, DECIMAL(p,s)");
+        boolean includeNulls = Boolean.parseBoolean(String.valueOf(node.cfg("include_nulls")));
+
+        StringBuilder cast = new StringBuilder();
+        for (String c : types.keySet()) {
+            if (cast.length() > 0) cast.append(", ");
+            cast.append(chosen.contains(c) ? "CAST(" + q(c) + " AS " + valueType.toUpperCase() + ") AS " + q(c) : q(c));
+        }
+        String in = String.join(", ", chosen.stream().map(RowShaper::q).toList());
+        String select = "SELECT * FROM (SELECT " + cast + " FROM " + q(input) + ") UNPIVOT"
+                + (includeNulls ? " INCLUDE NULLS" : "") + " (" + q(valueCol) + " FOR " + q(nameCol) + " IN (" + in + "))";
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + select);
         return List.of(new Relation(PipelineRel.DATA, data));
     }
 

@@ -1,0 +1,14 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: unpivot (transform.matrix.unpivot) - wide columns become (name, value) rows.
+#   A nested CDR feed: each call carries a charges{voice, sms, data} object. The schema binds the nested keys
+#   (selector charges.voice ...) to CHARGE_VOICE / CHARGE_SMS / CHARGE_DATA; unpivot picks them by
+#   columns_pattern "^CHARGE_" and casts each to DECIMAL(12,4) before turning it into a (CHARGE_TYPE, AMOUNT) row.
+# A missing or null charge yields no row (include_nulls: false). 3 calls in, 6 rows out (3 + 2 + 1).
+#
+# Expected evidence after the run:
+#   /jobs shows unpivot_lines type PIPELINE with lastStatus SUCCESS; /jobs/unpivot_lines/runs names the rows the
+#   Step produced into store(s) [charge_lines]. On disk: out/charge_lines/*.parquet holds 6 rows.
+/jobs
+/jobs/unpivot_lines/runs

@@ -559,6 +559,74 @@
     "min" : 1.0,
     "help" : "Partial mode only: how many trailing characters stay visible (default 4). A value no longer than N is masked whole."
   } ],
+  "transform.matrix.unpivot" : [ {
+    "key" : "columns",
+    "label" : "Columns to unpivot",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Inbound columns whose values become rows. Give these OR a name pattern, not both.",
+    "placeholder" : "H00"
+  }, {
+    "key" : "columns_pattern",
+    "label" : "Column name pattern",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "A regular expression; every inbound column whose name it matches is unpivoted.",
+    "placeholder" : "^H[0-9]{2}$"
+  }, {
+    "key" : "name_column",
+    "label" : "Name column",
+    "type" : "string",
+    "tier" : "optional",
+    "default" : "name",
+    "help" : "Receives each unpivoted column's name."
+  }, {
+    "key" : "value_column",
+    "label" : "Value column",
+    "type" : "string",
+    "tier" : "optional",
+    "default" : "value",
+    "help" : "Receives the cell value."
+  }, {
+    "key" : "value_type",
+    "label" : "Value type",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "VARCHAR",
+    "options" : [ {
+      "value" : "VARCHAR",
+      "label" : "Text (never fails)"
+    }, {
+      "value" : "BIGINT",
+      "label" : "Whole number"
+    }, {
+      "value" : "INTEGER",
+      "label" : "Integer"
+    }, {
+      "value" : "DOUBLE",
+      "label" : "Decimal number (double)"
+    }, {
+      "value" : "DECIMAL(18,4)",
+      "label" : "Decimal (18,4)"
+    }, {
+      "value" : "BOOLEAN",
+      "label" : "Boolean"
+    }, {
+      "value" : "DATE",
+      "label" : "Date"
+    }, {
+      "value" : "TIMESTAMP",
+      "label" : "Timestamp"
+    } ],
+    "help" : "Every unpivoted column is cast to this first; a value that does not convert fails the run."
+  }, {
+    "key" : "include_nulls",
+    "label" : "Keep empty cells",
+    "type" : "boolean",
+    "tier" : "optional",
+    "default" : false,
+    "help" : "Emit a row for a null cell too. Off: null cells produce no row."
+  } ],
   "transform.join" : [ {
     "key" : "reference",
     "label" : "Reference",

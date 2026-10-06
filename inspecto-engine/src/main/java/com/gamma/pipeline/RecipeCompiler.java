@@ -126,6 +126,7 @@ public final class RecipeCompiler {
                 case "hash" -> nodes.add(hash(id, cfg, refusals));
                 case "mask" -> nodes.add(mask(id, cfg, refusals));
                 case "explode" -> nodes.add(explode(id, cfg, refusals));
+                case "unpivot" -> nodes.add(unpivot(id, cfg, refusals));
                 case "route" -> {
                     route(id, cfg, nodes, branchSinks, routeEdges, refusals);
                     routeSeen = true;
@@ -391,6 +392,18 @@ public final class RecipeCompiler {
         return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_EXPLODE.type(), new LinkedHashMap<>(cfg));
     }
 
+    /** {@code unpivot: {columns[] | columns_pattern, name_column?, value_column?, value_type?, include_nulls?}} ->
+     *  a transform.matrix.unpivot node, config verbatim. Exactly one column selector; the rest is judged at run. */
+    private static PipelineNode unpivot(String id, Map<String, Object> cfg,
+                                        List<PipelineCompileException.Refusal> refusals) {
+        boolean list = cfg.get("columns") instanceof List<?> l && !l.isEmpty();
+        boolean pattern = cfg.get("columns_pattern") != null && !String.valueOf(cfg.get("columns_pattern")).isBlank();
+        if (list == pattern)
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "unpivot needs exactly one of columns: or columns_pattern:"));
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_UNPIVOT.type(), new LinkedHashMap<>(cfg));
+    }
+
     /** {@code lookup: {column, mappings[], target?, default?}} → a transform.lookup node, config verbatim. */
     private static PipelineNode lookup(String id, Map<String, Object> cfg,
                                        List<PipelineCompileException.Refusal> refusals) {
@@ -608,6 +621,7 @@ public final class RecipeCompiler {
                     case "hash" -> stepNode = hash(stepId, stepCfg, refusals);
                     case "mask" -> stepNode = mask(stepId, stepCfg, refusals);
                     case "explode" -> stepNode = explode(stepId, stepCfg, refusals);
+                    case "unpivot" -> stepNode = unpivot(stepId, stepCfg, refusals);
                     case "summarize" -> stepNode = summarize(stepId, stepCfg, refusals);
                     case "profile" -> stepNode = profile(stepId, stepCfg, refusals);
                     case "running" -> stepNode = running(stepId, stepCfg, refusals);

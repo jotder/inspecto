@@ -173,6 +173,40 @@ class StepConfigSaveFindingsTest {
                 "the positive probe: a valid explode raises no step finding");
     }
 
+    // ── unpivot (operator 2026-10-06) ────────────────────────────────────────────
+
+    @Test
+    void anUnpivotWithNeitherOrBothSelectorsIsRefused(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("unpivot", Map.of("value_type", "BIGINT"))))),
+                "steps[0].unpivot", "exactly one");
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("unpivot",
+                Map.of("columns", List.of("ID"), "columns_pattern", "^H"))))), "steps[0].unpivot", "exactly one");
+    }
+
+    @Test
+    void anUnpivotWithABadPatternNameOrValueTypeIsRefusedByName(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("unpivot",
+                Map.of("columns_pattern", "(["))))), "steps[0].unpivot", "regular expression");
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("unpivot",
+                Map.of("columns", List.of("ID"), "value_column", "v x"))))), "steps[0].unpivot", "'v x'");
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("unpivot",
+                Map.of("columns", List.of("ID"), "value_type", "BLOB"))))), "steps[0].unpivot", "BLOB");
+    }
+
+    @Test
+    void anUnpivotOverAnUndeclaredColumnIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("unpivot",
+                Map.of("columns", List.of("H07")))))), "steps[0].unpivot", "H07");
+    }
+
+    @Test
+    void aWellFormedUnpivotIsNotRefused(@TempDir Path dir) throws Exception {
+        assertTrue(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("unpivot",
+                Map.of("columns", List.of("ID"), "value_type", "decimal(18,4)"))))).stream()
+                .noneMatch(f -> FindingCodes.ERR_STEP_CONFIG_INVALID.equals(f.code())),
+                "the positive probe: a valid unpivot raises no step finding");
+    }
+
     // ── filter ───────────────────────────────────────────────────────────────────
 
     @Test

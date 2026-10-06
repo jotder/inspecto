@@ -655,6 +655,61 @@ class NodeConfigNameContractTest {
                 "every key the round trip carries is declared, and nothing else is");
     }
 
+    /**
+     * The unpivot node's contract (operator 2026-10-06): {@code steps: - unpivot:} lifts to ONE
+     * {@code transform.matrix.unpivot} node (the kind is NOT the type's suffix — the lift must map it), an edit of
+     * every declared key survives the lower, and the declared keys are exactly the ones the round trip carries.
+     */
+    @Test
+    void unpivotAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Path toon = writeFixture(dir);
+        Map<String, Object> raw = decode(toon);
+        raw.put("active", Boolean.FALSE);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> processing = (Map<String, Object>) raw.get("processing");
+        processing.remove("dedup");
+        if (processing.get("csv_settings") instanceof Map<?, ?> csv) {
+            Map<String, Object> c = new LinkedHashMap<>();
+            csv.forEach((k, v) -> { if (!"where".equals(k)) c.put(String.valueOf(k), v); });
+            processing.put("csv_settings", c);
+        }
+        raw.put("steps", new ArrayList<>(List.of(
+                Map.of("unpivot", new LinkedHashMap<>(Map.of("columns", List.of("ID")))))));
+
+        PipelineGraph g = PipelineCodec.fromMap(PipelineEditable.toMap(PipelineConfig.fromMap(raw), raw));
+        Map<String, Object> edited = new LinkedHashMap<>();
+        edited.put("columns", List.of("ID", "EVENT_DATE"));
+        edited.put("columns_pattern", "");
+        edited.put("name_column", "field");
+        edited.put("value_column", "reading");
+        edited.put("value_type", "DECIMAL(18,4)");
+        edited.put("include_nulls", true);
+        List<PipelineNode> nodes = new ArrayList<>();
+        for (PipelineNode n : g.nodes()) {
+            if (!"transform.matrix.unpivot".equals(n.type())) { nodes.add(n); continue; }
+            nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), edited, n.use()));
+        }
+        assertEquals(1, nodes.stream().filter(n -> "transform.matrix.unpivot".equals(n.type())).count(),
+                "the lift presents the unpivot step as ONE transform.matrix.unpivot node");
+        Map<String, Object> lowered = PipelineEditable.lower(
+                new PipelineGraph(g.name(), g.active(), nodes, g.edges()), raw, false);
+
+        Path saved = dir.resolve("unpivot_saved_pipeline.toon");
+        Files.writeString(saved, ConfigCodec.toToon(lowered));
+        List<PipelineConfig.Step> steps = PipelineConfig.fromMap(decode(saved)).steps();
+        List<String> kinds = steps.stream().map(PipelineConfig.Step::kind).toList();
+        assertEquals("unpivot", kinds.get(kinds.size() - 1), kinds.toString());
+        Map<String, Object> got = steps.get(kinds.size() - 1).config();
+        assertEquals("[ID, EVENT_DATE]", String.valueOf(got.get("columns")));
+        assertEquals("field", String.valueOf(got.get("name_column")));
+        assertEquals("reading", String.valueOf(got.get("value_column")));
+        assertEquals("DECIMAL(18,4)", String.valueOf(got.get("value_type")));
+        assertEquals("true", String.valueOf(got.get("include_nulls")));
+        assertEquals(new java.util.TreeSet<>(edited.keySet()), new java.util.TreeSet<>(
+                NodeAttributes.forType("transform.matrix.unpivot").stream().map(NodeAttribute::key).toList()),
+                "every key the round trip carries is declared, and nothing else is");
+    }
+
     /** Lift a fixture carrying {@code processing.profile}, set the node's {@code columns}, save, re-read. */
     private static PipelineConfig.Profile profileSavedAs(Path dir, List<String> columns) throws Exception {
         Path toon = writeFixture(dir);

@@ -580,7 +580,7 @@ final class ConfigRoutes {
                 for (String key : List.of("as", "index_column")) {
                     Object v = cfg.get(key);
                     if (v != null && !String.valueOf(v).isBlank()
-                            && !String.valueOf(v).trim().matches("[A-Za-z_][A-Za-z0-9_]{0,127}"))
+                            && !com.gamma.pipeline.exec.RowShaper.NEW_COLUMN_NAME.matcher(String.valueOf(v).trim()).matches())
                         return "transform.explode: '" + key + "' value '" + v + "' is not a valid new column name";
                 }
                 Object onEmpty = cfg.get("on_empty");
@@ -588,6 +588,33 @@ final class ConfigRoutes {
                         && !List.of("keep", "drop").contains(String.valueOf(onEmpty).trim().toLowerCase()))
                     return "transform.explode: on_empty must be 'keep' or 'drop', got '" + onEmpty + "'";
                 return undeclared("transform.explode column", List.of(column), columns);
+            }
+            case PipelineConfig.Step.UNPIVOT -> {
+                boolean listed = cfg.get("columns") instanceof List<?> l && !l.isEmpty();
+                Object pattern = cfg.get("columns_pattern");
+                boolean patterned = pattern != null && !String.valueOf(pattern).isBlank();
+                if (listed == patterned)
+                    return "transform.matrix.unpivot needs exactly one of 'columns' or 'columns_pattern'";
+                if (patterned) {
+                    try {
+                        java.util.regex.Pattern.compile(String.valueOf(pattern));
+                    } catch (java.util.regex.PatternSyntaxException e) {
+                        return "transform.matrix.unpivot: columns_pattern is not a valid regular expression - "
+                                + e.getDescription();
+                    }
+                }
+                for (String key : List.of("name_column", "value_column")) {
+                    Object v = cfg.get(key);
+                    if (v != null && !String.valueOf(v).isBlank()
+                            && !com.gamma.pipeline.exec.RowShaper.NEW_COLUMN_NAME.matcher(String.valueOf(v).trim()).matches())
+                        return "transform.matrix.unpivot: '" + key + "' value '" + v + "' is not a valid new column name";
+                }
+                Object vt = cfg.get("value_type");
+                if (vt != null && !String.valueOf(vt).isBlank()
+                        && !com.gamma.pipeline.exec.RowShaper.UNPIVOT_VALUE_TYPE.matcher(String.valueOf(vt).trim()).matches())
+                    return "transform.matrix.unpivot: value_type '" + vt + "' is not one of VARCHAR, BOOLEAN, "
+                            + "INTEGER, BIGINT, DOUBLE, DATE, TIMESTAMP, DECIMAL(p,s)";
+                return listed ? undeclared("transform.matrix.unpivot column", (List<?>) cfg.get("columns"), columns) : null;
             }
             case PipelineConfig.Step.PROFILE -> {
                 return cfg.get("columns") instanceof List<?> cols

@@ -116,7 +116,7 @@ public final class ProcessorCatalog {
             p("XFM", "transform.join", "🤝", "heroicons_outline:link", "Reference-store join (versioned references)", Status.DELIVERED, "transform.join", null, "at rest only — refused mid-branch (no reference resolver on the ingest lane)"),
             p("XFM", "transform.lookup", "🗺️", "heroicons_outline:map", "Lookup & static map transcoder", Status.DELIVERED, "transform.lookup", null, "inline key=value map over one column (2026-09-06); a versioned reference is transform.join"),
             p("XFM", "transform.matrix.pivot", "🔀", "heroicons_outline:arrows-up-down", "Dynamic pivot / transpose", Status.PLANNED, null, null, null),
-            p("XFM", "transform.matrix.unpivot", "🔄", "heroicons_outline:bars-4", "Unpivot / column flattener", Status.PLANNED, null, null, null),
+            p("XFM", "transform.matrix.unpivot", "🔄", "heroicons_outline:bars-4", "Unpivot / column flattener", Status.DELIVERED, "transform.matrix.unpivot", null, "wide columns to (name, value) rows by list or name pattern, cast to one value type (2026-10-06)"),
             p("XFM", "transform.analytics.rank", "🏆", "heroicons_outline:trophy", "Rank & Top-N pruner", Status.PLANNED, null, null, null),
             p("XFM", "transform.explode", "💥", "heroicons_outline:squares-plus", "Array / object exploder & flattener", Status.DELIVERED, "transform.explode", null, "one row per element of a LIST or JSON-array column, optional index (2026-10-06); the grandfathered `transform.split` stays the read-only ancestor"),
             p("XFM", "transform.join.merge", "🤝", "heroicons_outline:arrows-pointing-in", "Presorted stream merge joiner", Status.PLANNED, null, null, "the grandfathered `transform.merge` node type is the read-only ancestor"),

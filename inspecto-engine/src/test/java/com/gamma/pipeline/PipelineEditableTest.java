@@ -562,6 +562,17 @@ class PipelineEditableTest {
                 node("f", "transform.filter", Map.of("where", "GROSS > 0")), node("x", "transform.explode", cfg));
     }
 
+    /** An unpivot (operator 2026-10-06) has no singular block and a type that is NOT transform.<kind>. */
+    @Test
+    void anUnpivotStepLowersToStepsUnderItsPlainKind() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("columns_pattern", "^H[0-9]{2}$");
+        cfg.put("value_type", "BIGINT");
+        assertChain(List.of("unpivot"), node("u", "transform.matrix.unpivot", cfg));
+        assertChain(List.of("filter", "unpivot"),
+                node("f", "transform.filter", Map.of("where", "GROSS > 0")), node("u", "transform.matrix.unpivot", cfg));
+    }
+
     /** Lower {@code extra} and assert the {@code steps:} kinds it produced, in order. */
     private static void assertChain(List<String> expected, PipelineNode... extra) {
         Map<String, Object> out = PipelineEditable.lower(graphWith(extra), new LinkedHashMap<>(), true);

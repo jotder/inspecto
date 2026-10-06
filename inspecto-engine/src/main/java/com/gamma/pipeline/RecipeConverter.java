@@ -173,6 +173,7 @@ public final class RecipeConverter {
                     case PipelineConfig.Step.HASH -> steps.add(step("hash", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.MASK -> steps.add(step("mask", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.EXPLODE -> steps.add(step("explode", new LinkedHashMap<>(cfg)));
+                    case PipelineConfig.Step.UNPIVOT -> steps.add(step("unpivot", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.ROUTE -> {
                         steps.add(step("route", routeStep(cfg, sink, extraSinks, dirs)));
                         routed = true;
@@ -298,6 +299,7 @@ public final class RecipeConverter {
                             case PipelineConfig.Step.HASH -> branchSteps.add(step("hash", new LinkedHashMap<>(cfg)));
                             case PipelineConfig.Step.MASK -> branchSteps.add(step("mask", new LinkedHashMap<>(cfg)));
                             case PipelineConfig.Step.EXPLODE -> branchSteps.add(step("explode", new LinkedHashMap<>(cfg)));
+                            case PipelineConfig.Step.UNPIVOT -> branchSteps.add(step("unpivot", new LinkedHashMap<>(cfg)));
                             default -> branchSteps.add(step(kind, cfg));
                         }
                     }
