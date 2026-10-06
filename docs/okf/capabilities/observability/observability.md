@@ -522,8 +522,11 @@ one Incident per Pipeline through `IncidentAccess` (scope and dedupe key = the p
 `NO_OBSERVATION` open nothing. **`KPI-UNKNOWN-1` as built:** an unmeasured day carries no `files`/`rows`
 keys; the null-day bucket rides as `unknownDayFiles`/`unknownDayRows`; `baselineRows` is omitted and
 `deviation` is JSON null where undefined. **K2 as built (operator, 2026-10-06):** the Collector's `gap_detection` takes an optional `file_template`
-(one `{datePattern}` + one `{seq}` token, e.g. `CDR_{yyyyMMddHH}_{seq}_*`) and `seq_scope`
-(`PER_BUCKET` | `CONTINUOUS`, never defaulted), validated fail-closed by `GapTemplateGrammar` at config
+(one `{datePattern}` + an optional `{seq}` token, e.g. `CDR_{yyyyMMddHH}_{seq}_*`) and `seq_scope`
+(`PER_BUCKET` | `CONTINUOUS`, never defaulted; required only when `{seq}` is present and refused when it is
+absent). A date-only template such as `XDR_{yyyyMMdd}.csv` (operator, 2026-10-06) expects ONE file per date
+bucket: an empty bucket is then exactly one missing file (counted in `missingFiles` as well as `emptyBuckets`) and
+the payload carries no `seqScope`, validated fail-closed by `GapTemplateGrammar` at config
 load and by the `gap-file-template-well-formed` CrossFieldRule at authoring. ⛔ `gap_detection.sequence`
 and the live `GapDetector` are untouched — a one-token template cannot count files. The job's
 `sequence_template` / `seq_scope` parameters win over the Collector's; `check_files` (default true) turns

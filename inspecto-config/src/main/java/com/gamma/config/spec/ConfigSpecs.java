@@ -312,12 +312,14 @@ public final class ConfigSpecs {
                 // ── completeness KPI K2 file template (operator, 2026-10-06) — separate from
                 // gap_detection.sequence, whose GapDetector grammar and live detector are untouched ──
                 FieldSpec.of("collector.gap_detection.file_template", "File sequence template", FieldType.STRING,
-                        "Optional template with a date token and a {seq} token, e.g. CDR_{yyyyMMddHH}_{seq}_*. "
-                                + "The kpi.completeness job counts missing files against it. Needs seq_scope."),
+                        "Optional template with a date token and an optional {seq} token, e.g. CDR_{yyyyMMddHH}_{seq}_* "
+                                + "or XDR_{yyyyMMdd}.csv (date-only: one file per date bucket). The kpi.completeness "
+                                + "job and the delivery check count missing files against it. Needs seq_scope only "
+                                + "when it holds {seq}."),
                 FieldSpec.enumField("collector.gap_detection.seq_scope", "Sequence scope",
                         GapTemplateGrammar.SCOPES, null,
                         "PER_BUCKET when {seq} restarts every time bucket, CONTINUOUS when it runs across "
-                                + "them. Required with file_template; never defaulted."),
+                                + "them. Required when file_template holds {seq}, refused when it does not; never defaulted."),
                 FieldSpec.enumField("collector.post_action.on_success", "After success",
                         List.of("RETAIN", "DELETE", "MOVE", "RENAME", "TAG"), null,
                         "Remote Collectors only: what happens to the source-side original after a successful "
@@ -529,8 +531,9 @@ public final class ConfigSpecs {
                 // Mirrors the parser's refusal (GapTemplateGrammar is shared, not mirrored).
                 new CrossFieldRule(
                         "gap-file-template-well-formed",
-                        "collector.gap_detection.file_template must hold one {datePattern} and one {seq} token, "
-                                + "and needs collector.gap_detection.seq_scope (PER_BUCKET | CONTINUOUS); "
+                        "collector.gap_detection.file_template must hold one {datePattern} and at most one {seq} "
+                                + "token; with {seq} it needs collector.gap_detection.seq_scope (PER_BUCKET | "
+                                + "CONTINUOUS), without {seq} (one file per date bucket) seq_scope is refused; "
                                 + "seq_scope alone is refused.",
                         Severity.ERROR,
                         List.of("collector.gap_detection.file_template", "collector.gap_detection.seq_scope"),

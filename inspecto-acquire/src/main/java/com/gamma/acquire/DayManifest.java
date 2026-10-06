@@ -34,7 +34,8 @@ public final class DayManifest {
 
     public enum Kind { REDELIVERED, RENAMED_CORRECTION, PART_COUNT_CHANGED }
 
-    /** One delivered part. {@code day} is the template's bucket key (e.g. {@code 20260901}). */
+    /** One delivered part. {@code day} is the template's bucket key (e.g. {@code 20260901}); {@code seq} is 0 for a
+     *  date-only file template (one file per day, operator 2026-10-06). */
     public record Part(String day, long seq, String name, long rows, long bytes, long atMillis) {}
 
     /** {@code previous} is the earlier name (RENAMED_CORRECTION) or the earlier row count as text (REDELIVERED). */

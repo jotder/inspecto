@@ -25,7 +25,9 @@ import java.util.Set;
 
 /**
  * LA-DAILY-INGEST-1 T8 (operator 2026-10-06): the per-day delivery manifest and the windowed file-gap check of a feed whose
- * Collector declares {@code gap_detection.file_template} + {@code seq_scope} (e.g. {@code XDR_{yyyyMMdd}_part{seq}*}).
+ * Collector declares {@code gap_detection.file_template} (+ {@code seq_scope} when it holds {@code {seq}}), e.g.
+ * {@code XDR_{yyyyMMdd}_part{seq}*}, or a date-only {@code XDR_{yyyyMMdd}.csv} - one expected file per day, its part
+ * number read as 0 (operator, 2026-10-06).
  *
  * <ul>
  *   <li>{@link #afterCommit} - after a batch is durable, record each member's day, part number and row count in the
@@ -116,7 +118,7 @@ final class DeliveryCheck {
             LocalDateTime lastComplete = current.minus(1, unit);
             if (lastComplete.isBefore(first)) return List.of();
             FileSequenceGaps.Report r = FileSequenceGaps.analyze(gd.fileTemplate(), names, first, lastComplete,
-                    FileSequenceGaps.SeqScope.valueOf(gd.seqScope()));
+                    gd.seqScope() == null ? null : FileSequenceGaps.SeqScope.valueOf(gd.seqScope()));
             List<String> missing = new ArrayList<>(r.emptyBuckets());
             for (FileSequenceGaps.Bucket b : r.buckets())
                 for (Long s : b.missing()) missing.add(b.key() + "#" + s);

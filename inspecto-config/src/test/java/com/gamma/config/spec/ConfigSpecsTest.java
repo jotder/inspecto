@@ -131,7 +131,11 @@ class ConfigSpecsTest {
         assertTrue(fire(p, id, gd.apply(Map.of("file_template", "CDR_{yyyyMMddHH}_{seq}_*"))).isPresent(),
                 "never a defaulted scope");
         assertTrue(fire(p, id, gd.apply(Map.of("file_template", "CDR_{yyyyMMddHH}",
-                "seq_scope", "PER_BUCKET"))).isPresent(), "no {seq} token");
+                "seq_scope", "PER_BUCKET"))).isPresent(), "seq_scope without {seq} (operator, 2026-10-06)");
+        assertTrue(fire(p, id, gd.apply(Map.of("file_template", "XDR_{yyyyMMdd}.csv"))).isEmpty(),
+                "date-only template, one file per day (operator, 2026-10-06)");
+        assertTrue(fire(p, id, gd.apply(Map.of("file_template", "XDR_{yyyyMMdd}_{HH}.csv"))).isPresent(),
+                "two date tokens");
         assertTrue(fire(p, id, gd.apply(Map.of("file_template", "CDR_{yyyyMMddHH}_{seq}",
                 "seq_scope", "HOURLY"))).isPresent());
         assertTrue(fire(p, id, gd.apply(Map.of("seq_scope", "CONTINUOUS"))).isPresent(), "scope alone");

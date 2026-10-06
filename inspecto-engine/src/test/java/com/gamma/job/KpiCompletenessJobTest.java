@@ -373,6 +373,38 @@ class KpiCompletenessJobTest {
         assertTrue(e.getMessage().contains("seq_scope"), e.getMessage());
     }
 
+    /** Operator, 2026-10-06: a date-only template (no {seq}) expects one file per day; a missing day is one missing file. */
+    @Test
+    void aDateOnlyTemplateCountsTheMissingDay(@TempDir Path dir) throws Exception {
+        PipelineConfig pc = pipelineWith(dir, "    file_template: \"XDR_{yyyyMMdd}.csv\"\n");
+        try (DbFileStageStore st = stagesWith(pc.collector().id(), "XDR_20260803.csv", "XDR_20260805.csv")) {
+            CapturingJobContext ctx = new CapturingJobContext();
+            fileJob(pc).run(ctx);
+            Map<String, Object> s = evaluated(ctx);
+            assertEquals("XDR_{yyyyMMdd}.csv", s.get("fileTemplate"));
+            assertFalse(s.containsKey("seqScope"), "no {seq}, no scope");
+            assertEquals(1L, s.get("missingFiles"), "2026-08-04 never arrived");
+            assertEquals(1, s.get("emptyBuckets"));
+        } finally {
+            FileStages.use(null);
+        }
+        PipelineConfig ok = pc;
+        try (DbFileStageStore st = stagesWith(ok.collector().id(), "XDR_20260804.csv")) {
+            CapturingJobContext ctx = new CapturingJobContext();
+            fileJob(ok).run(ctx);
+            assertEquals(0L, evaluated(ctx).get("missingFiles"), "the day's one file arrived");
+        } finally {
+            FileStages.use(null);
+        }
+    }
+
+    @Test
+    void theParserRefusesSeqScopeWithoutASeqToken(@TempDir Path dir) {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> pipelineWith(dir, "    file_template: \"XDR_{yyyyMMdd}.csv\"\n    seq_scope: PER_BUCKET\n"));
+        assertTrue(e.getMessage().contains("no {seq} token"), e.getMessage());
+    }
+
     /** §7-g: a file gap alone (volume STEADY) opens the Pipeline-day Incident, carrying the file finding. */
     @Test
     void aFileGapAloneOpensTheIncident(@TempDir Path dir) throws Exception {

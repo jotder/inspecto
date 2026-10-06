@@ -42,6 +42,12 @@ import java.util.regex.Pattern;
  * run of digits; zero padding is <b>not</b> significant, so {@code _007_} and {@code _7_} are the same
  * sequence number and are never reported as two.
  *
+ * <h3>Date-only templates (operator, 2026-10-06)</h3>
+ * {@code {seq}} is optional. A template with only a date token (e.g. {@code XDR_{yyyyMMdd}.csv}) means <b>one
+ * expected file per date bucket</b>: there is no counter, so no scope, and an empty bucket is then an exact
+ * count of one missing file - it is listed in {@code emptyBuckets} AND counted in {@code missingFiles}.
+ * {@link #match} reports sequence {@code 0} for such a name.
+ *
  * <h3>🔴 What this can and cannot know</h3>
  * Two limits, stated rather than papered over, because a completeness number that overstates its own certainty
  * is worse than no number:
@@ -90,7 +96,9 @@ public final class FileSequenceGaps {
      * The answer to "what is missing over this window".
      *
      * @param missingFiles  🔴 <b>an exact count of interior holes</b>, never an estimate. Empty buckets
-     *                      contribute nothing to it.
+     *                      contribute nothing to it - except for a date-only template, where each empty
+     *                      bucket is exactly one missing file.
+     * @param scope         {@code null} for a date-only template (no {@code {seq}} to scope).
      * @param emptyBuckets  buckets in the window with no matching file at all — reported apart from
      *                      {@code missingFiles} because their file count is unknowable, not zero.
      * @param unmatched     names that did not match the template. Non-zero here usually means the template is
@@ -117,6 +125,9 @@ public final class FileSequenceGaps {
     public static Report analyze(String template, Collection<String> names, LocalDateTime from,
                                  LocalDateTime to, SeqScope scope) {
         Parsed t = parse(template);
+        if (t.hasSeq && scope == null)
+            throw new IllegalArgumentException("a {seq} template needs a sequence scope: " + template);
+        if (!t.hasSeq) scope = null;   // a date-only template has no counter to scope
         if (from == null || to == null) throw new IllegalArgumentException("window bounds are required — "
                 + "an unbounded scan cannot tell an empty period from a missing one");
         if (to.isBefore(from))
@@ -138,7 +149,7 @@ public final class FileSequenceGaps {
             }
             long seq;
             try {
-                seq = Long.parseLong(m.group(2));
+                seq = t.hasSeq ? Long.parseLong(m.group(2)) : 0L;
             } catch (NumberFormatException tooBig) {
                 unmatched++;
                 continue;
@@ -152,7 +163,11 @@ public final class FileSequenceGaps {
         List<String> empty = new ArrayList<>();
         long missingTotal = 0;
 
-        if (scope == SeqScope.CONTINUOUS) {
+        if (!t.hasSeq) {
+            // One expected file per bucket: a seen bucket is complete; nothing to find inside it.
+            for (Map.Entry<LocalDateTime, TreeSet<Long>> e : seen.entrySet())
+                buckets.add(new Bucket(t.formatter.format(e.getKey()), new ArrayList<>(e.getValue()), List.of(), false));
+        } else if (scope == SeqScope.CONTINUOUS) {
             // One series across the window: pool every sequence number, find interior holes once. Bucket
             // boundaries are descriptive here, so a number missing at a boundary is still just missing.
             TreeSet<Long> all = new TreeSet<>();
@@ -176,6 +191,7 @@ public final class FileSequenceGaps {
             if (!seen.containsKey(cursor)) empty.add(t.formatter.format(cursor));
             cursor = cursor.plus(1, t.unit);
         }
+        if (!t.hasSeq) missingTotal = empty.size();   // exact: each empty bucket is one missing file
 
         return new Report(template, scope, t.formatter.format(from), t.formatter.format(to),
                 matched, missingTotal, buckets, empty, unmatched);
@@ -196,7 +212,8 @@ public final class FileSequenceGaps {
         if (!m.matches()) return java.util.Optional.empty();
         try {
             LocalDateTime bucket = LocalDateTime.parse(m.group(1), t.formatter);
-            return java.util.Optional.of(new Key(t.formatter.format(bucket), bucket, Long.parseLong(m.group(2))));
+            return java.util.Optional.of(new Key(t.formatter.format(bucket), bucket,
+                    t.hasSeq ? Long.parseLong(m.group(2)) : 0L));
         } catch (RuntimeException notAKey) {
             return java.util.Optional.empty();
         }
@@ -235,7 +252,7 @@ public final class FileSequenceGaps {
 
     // ── template parsing ─────────────────────────────────────────────────────
 
-    private record Parsed(Pattern matcher, DateTimeFormatter formatter, ChronoUnit unit) {}
+    private record Parsed(Pattern matcher, DateTimeFormatter formatter, ChronoUnit unit, boolean hasSeq) {}
 
     private static Parsed parse(String template) {
         if (template == null || template.isBlank())
@@ -244,12 +261,15 @@ public final class FileSequenceGaps {
         int dClose = template.indexOf('}', dOpen + 1);
         int sOpen = dClose < 0 ? -1 : template.indexOf('{', dClose + 1);
         int sClose = sOpen < 0 ? -1 : template.indexOf('}', sOpen + 1);
-        if (dOpen < 0 || dClose < 0 || sOpen < 0 || sClose < 0)
-            throw new IllegalArgumentException("file sequence template needs a {datePattern} token and a "
-                    + "{seq} token, e.g. \"CDR_{yyyyMMddHH}_{seq}_*\": " + template);
+        if (dOpen < 0 || dClose < 0 || (sOpen >= 0 && sClose < 0))
+            throw new IllegalArgumentException("file sequence template needs a {datePattern} token and an "
+                    + "optional {seq} token, e.g. \"CDR_{yyyyMMddHH}_{seq}_*\" or \"XDR_{yyyyMMdd}.csv\": " + template);
+        boolean hasSeq = sOpen >= 0;
 
         String datePattern = template.substring(dOpen + 1, dClose);
-        String seqToken = template.substring(sOpen + 1, sClose);
+        if ("seq".equals(datePattern))
+            throw new IllegalArgumentException("the first token must be a {datePattern}, not {seq}: " + template);
+        String seqToken = hasSeq ? template.substring(sOpen + 1, sClose) : "seq";
         if (!"seq".equals(seqToken))
             throw new IllegalArgumentException("the second token must be {seq}, not {" + seqToken + "}: "
                     + template);
@@ -257,8 +277,8 @@ public final class FileSequenceGaps {
             throw new IllegalArgumentException("the {…} date token is empty: " + template);
 
         String prefix = template.substring(0, dOpen);
-        String between = template.substring(dClose + 1, sOpen);
-        String suffix = template.substring(sClose + 1);
+        String between = hasSeq ? template.substring(dClose + 1, sOpen) : "";
+        String suffix = template.substring(hasSeq ? sClose + 1 : dClose + 1);
 
         // A trailing '*' means "any suffix"; anything else is literal. Only the trailing position is a
         // wildcard — a '*' elsewhere is a literal character, because guessing at glob semantics here would
@@ -269,7 +289,7 @@ public final class FileSequenceGaps {
         else suffixRegex = Pattern.quote(suffix);
 
         String regex = "^" + Pattern.quote(prefix) + "(" + dateRegex(datePattern) + ")"
-                + Pattern.quote(between) + "(\\d+)" + suffixRegex + "$";
+                + (hasSeq ? Pattern.quote(between) + "(\\d+)" : "") + suffixRegex + "$";
 
         DateTimeFormatterBuilder fb = new DateTimeFormatterBuilder().appendPattern(datePattern);
         if (!has(datePattern, "yu")) fb.parseDefaulting(ChronoField.YEAR, 2000);
@@ -279,7 +299,7 @@ public final class FileSequenceGaps {
         if (!has(datePattern, "m")) fb.parseDefaulting(ChronoField.MINUTE_OF_HOUR, 0);
         if (!has(datePattern, "s")) fb.parseDefaulting(ChronoField.SECOND_OF_MINUTE, 0);
 
-        return new Parsed(Pattern.compile(regex), fb.toFormatter(), stepUnit(datePattern));
+        return new Parsed(Pattern.compile(regex), fb.toFormatter(), stepUnit(datePattern), hasSeq);
     }
 
     /** Each run of pattern letters → {@code \d{len}}; literals quoted. Same rule {@link GapDetector} uses. */

@@ -142,12 +142,30 @@ class FileSequenceGapsTest {
         assertEquals(1, r.missingFiles());
     }
 
+    /** Operator, 2026-10-06: {seq} is optional; a date-only template expects ONE file per bucket. */
+    @Test
+    void aDateOnlyTemplateCountsEachMissingDayAsOneMissingFile() {
+        Report r = FileSequenceGaps.analyze("XDR_{yyyyMMdd}.csv",
+                List.of("XDR_20260901.csv", "XDR_20260902.csv", "XDR_20260904.csv", "XDR_20260904_x.csv", "other.csv"),
+                LocalDateTime.of(2026, 9, 1, 0, 0), LocalDateTime.of(2026, 9, 5, 0, 0), null);
+        assertNull(r.scope(), "a date-only template has no counter to scope");
+        assertEquals(3, r.observedFiles());
+        assertEquals(List.of("20260903", "20260905"), r.emptyBuckets());
+        assertEquals(2, r.missingFiles(), "each empty day is exactly one missing file");
+        assertEquals(2, r.unmatched(), "the literal suffix is exact, no trailing *");
+        assertEquals(0, FileSequenceGaps.match("XDR_{yyyyMMdd}.csv", "XDR_20260901.csv").orElseThrow().seq());
+        assertTrue(FileSequenceGaps.match("XDR_{yyyyMMdd}.csv", "XDR_20260901_part1.csv").isEmpty());
+    }
+
     @Test
     void malformedTemplatesAndWindowsRefuse() {
         var from = LocalDateTime.of(2026, 8, 29, 9, 0);
         assertThrows(IllegalArgumentException.class,
-                () -> FileSequenceGaps.analyze("CDR_{yyyyMMddHH}", List.of(), from, from, SeqScope.PER_BUCKET),
-                "one token is GapDetector's grammar, not this one");
+                () -> FileSequenceGaps.analyze("CDR_{seq}_{yyyyMMddHH}", List.of(), from, from, SeqScope.PER_BUCKET),
+                "the first token must be the date");
+        assertThrows(IllegalArgumentException.class,
+                () -> FileSequenceGaps.analyze(T, List.of(), from, from, null),
+                "a {seq} template never runs without a stated scope");
         assertThrows(IllegalArgumentException.class,
                 () -> FileSequenceGaps.analyze("CDR_{yyyyMMddHH}_{n}_*", List.of(), from, from, SeqScope.PER_BUCKET),
                 "the second token must be {seq}");

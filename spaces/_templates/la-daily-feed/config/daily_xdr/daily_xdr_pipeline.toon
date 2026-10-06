@@ -39,3 +39,4 @@ collector:
   gap_detection:
     enabled: true
     sequence: "XDR_{yyyyMMdd}"
+    file_template: "XDR_{yyyyMMdd}.csv"

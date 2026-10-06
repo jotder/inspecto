@@ -62,7 +62,7 @@ final class KpiCompletenessJob implements Job {
             // K2 (operator, 2026-10-06): the template is the Collector's gap_detection.file_template; these
             // two parameters override it. ⛔ Neither set (and check_files on) refuses — never a silent zero.
             ParameterDecl.of("check_files", ParamType.BOOLEAN).label("Count missing files").defaultValue("true")
-                    .description("Count missing files against a {seq} template. Off = volume only").build(),
+                    .description("Count missing files against the file template ({seq} or date-only). Off = volume only").build(),
             ParameterDecl.of("sequence_template", ParamType.STRING).label("File template override")
                     .description("Overrides the Collector's gap_detection.file_template, e.g. "
                             + "CDR_{yyyyMMddHH}_{seq}_*").build(),
@@ -210,15 +210,17 @@ final class KpiCompletenessJob implements Job {
         String template = cfg.opt("sequence_template", gd.fileTemplate());
         String scope = cfg.opt("seq_scope", gd.seqScope());
         if (template == null || template.isBlank())
-            throw new IllegalStateException(TYPE + " cannot count missing files for '" + pipeline + "': no {seq} "
-                    + "file template is set. Add collector.gap_detection.file_template and seq_scope to the "
-                    + "pipeline, or the sequence_template / seq_scope job parameters, or set check_files: false. "
+            throw new IllegalStateException(TYPE + " cannot count missing files for '" + pipeline + "': no "
+                    + "file template is set. Add collector.gap_detection.file_template (and seq_scope when it holds "
+                    + "{seq}) to the pipeline, or the sequence_template / seq_scope job parameters, or set "
+                    + "check_files: false. "
                     + "(gap_detection.sequence is the live detector's one-token template and cannot count files.)");
         String bad = GapTemplateGrammar.refusal(template, scope);
         if (bad != null) throw new IllegalArgumentException(bad);
         requireDurable(ctx.spaceId(), FILE_FAMILY, FILE_TOGGLE, "read the Collector's filename history");
-        return new FileHalf(template, FileSequenceGaps.SeqScope.valueOf(scope.trim().toUpperCase()),
-                pc.collector().id());
+        // A date-only template (no {seq}, operator 2026-10-06) has no scope: one expected file per bucket.
+        return new FileHalf(template, scope == null || scope.isBlank() ? null
+                : FileSequenceGaps.SeqScope.valueOf(scope.trim().toUpperCase()), pc.collector().id());
     }
 
     private static FileSequenceGaps.Report readGaps(FileHalf f, String recordDay) {
@@ -236,9 +238,9 @@ final class KpiCompletenessJob implements Job {
 
     static void putGaps(Map<String, Object> payload, FileSequenceGaps.Report r) {
         payload.put("fileTemplate", r.template());
-        payload.put("seqScope", r.scope().name());
+        if (r.scope() != null) payload.put("seqScope", r.scope().name());   // absent for a date-only template
         payload.put("observedFiles", r.observedFiles());
-        payload.put("missingFiles", r.missingFiles());          // exact interior holes only
+        payload.put("missingFiles", r.missingFiles());          // exact: interior holes, or empty days of a date-only template
         payload.put("emptyBuckets", r.emptyBuckets().size());   // buckets, never a file count
         payload.put("unmatchedFiles", r.unmatched());           // non-zero usually means a wrong template
     }

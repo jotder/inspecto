@@ -101,6 +101,22 @@ class DeliveryCheckTest {
         assertTrue(DeliveryCheck.detectFileGaps(cfg, List.of(), NOW).isEmpty(), "a persistent gap fires once");
     }
 
+    /** Operator, 2026-10-06: a date-only template ({@code {seq}} optional) - one file per day, a missing day is a gap. */
+    @Test
+    void aDateOnlyTemplateReportsAMissingDay(@TempDir Path dir) throws Exception {
+        Path p = PipelineConfigBatchTest.writePipeline(dir, "");
+        Files.writeString(p, Files.readString(p) + "collector:\n  gap_detection:\n    file_template: \"XDR_{yyyyMMdd}.csv\"\n",
+                java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
+        EventLog.current().addSubscriber(sub);
+        PipelineConfig cfg = PipelineConfig.load(p.toString());
+        List<Consignment.Member> landed = new ArrayList<>();
+        for (int d = 1; d <= 7; d++) if (d != 4) landed.add(member(dir, "XDR_2026090" + d + ".csv", d));
+        assertTrue(DeliveryCheck.afterCommit(cfg, "b", landed, List.of(), NOW).isEmpty());
+        assertEquals(0, DayManifest.read(DeliveryCheck.manifestFile(cfg)).days().get("20260901").get(0).seq());
+        assertEquals(List.of("20260904"), DeliveryCheck.detectFileGaps(cfg, List.of(), NOW), "day 4 never came");
+        assertEquals(1, seen.stream().filter(e -> EventType.SEQUENCE_GAP.equals(e.type())).count());
+    }
+
     @Test
     void withoutAFileTemplateNothingIsRecordedOrReported(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = config(dir, false);

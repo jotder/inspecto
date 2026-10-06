@@ -10,8 +10,10 @@ import java.util.regex.Pattern;
  * fail-closed refusal at config load ({@code PipelineConfigParser}) and the {@code CrossFieldRule} in
  * {@link ConfigSpecs#pipeline()} that turns the same refusal into a 422 at authoring time.
  *
- * <p>⚠ Structural only: a literal prefix, exactly one {@code {datePattern}} token, a {@code {seq}} token,
- * an optional trailing {@code *}. Whether the date pattern itself parses is checked where it is used
+ * <p>⚠ Structural only: a literal prefix, exactly one {@code {datePattern}} token, an OPTIONAL {@code {seq}}
+ * token, an optional trailing {@code *}. A date-only template (e.g. {@code XDR_{yyyyMMdd}.csv}) means one expected
+ * file per date bucket (operator, 2026-10-06); {@code seq_scope} is then refused, because there is no counter for it
+ * to describe. Whether the date pattern itself parses is checked where it is used
  * ({@code FileSequenceGaps}), which lives in a module this one cannot import.
  *
  * <p>⛔ It is separate from {@code gap_detection.sequence}, which keeps {@code GapDetector}'s one-token
@@ -29,7 +31,8 @@ public final class GapTemplateGrammar {
     /**
      * Why the pair is not acceptable, or {@code null} if it is. Both absent is acceptable (no file template).
      * ⛔ {@code seq_scope} is never defaulted: a wrong default invents a gap at every bucket boundary or
-     * hides every real one, so a template without it is refused.
+     * hides every real one, so a {@code {seq}} template without it is refused. A date-only template (no
+     * {@code {seq}}) must NOT carry {@code seq_scope} (operator, 2026-10-06).
      */
     public static String refusal(String template, String scope) {
         boolean hasTemplate = template != null && !template.isBlank();
@@ -45,9 +48,13 @@ public final class GapTemplateGrammar {
             else if (!m.group(1).isBlank()) date++;
             else return "collector.gap_detection.file_template has an empty {} token: " + template;
         }
-        if (seq != 1 || date != 1)
-            return "collector.gap_detection.file_template must hold exactly one {datePattern} and one {seq} "
-                    + "token, e.g. \"CDR_{yyyyMMddHH}_{seq}_*\" — got: " + template;
+        if (seq > 1 || date != 1)
+            return "collector.gap_detection.file_template must hold exactly one {datePattern} token and at most "
+                    + "one {seq} token, e.g. \"CDR_{yyyyMMddHH}_{seq}_*\" or \"XDR_{yyyyMMdd}.csv\" — got: " + template;
+        if (seq == 0)
+            return hasScope ? "collector.gap_detection.seq_scope is set but file_template has no {seq} token — "
+                    + "a date-only template expects one file per date bucket and has no counter to scope; "
+                    + "remove seq_scope or add {seq} to the template" : null;
         if (!hasScope)
             return "collector.gap_detection.file_template needs collector.gap_detection.seq_scope ("
                     + String.join(" | ", SCOPES) + "): whether {seq} restarts per time bucket is a fact "
