@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.gamma.query.MeasureCompiler;
 import com.gamma.query.QueryExecutor;
+import com.gamma.sql.SqlSandboxPolicy;
 import com.gamma.util.DuckDbUtil;
 
 import java.io.IOException;
@@ -74,18 +75,47 @@ public final class RiskScoreEvaluator {
      */
     public static Run evaluate(RiskScoreModel model, Function<String, String> relationSql, EvidenceMasker masker)
             throws SQLException, IOException {
+        return evaluate(model, relationSql, masker, MAX_ENTITIES, MAX_EVIDENCE_ROWS, SqlSandboxPolicy.defaultPolicy());
+    }
+
+    /** The preview's statement fence: a tighter timeout and memory cap than a Job run (S3). */
+    public static final SqlSandboxPolicy PREVIEW_POLICY = SqlSandboxPolicy.withCaps("512MB", 2, 10);
+
+    /**
+     * Score ONE entity without writing anything (ASSURE-RISK-SCORE-RESIDUALS-1 S3, {@code POST /risk-scores/preview}).
+     * Every factor is narrowed to {@code entityKey} ({@link RiskScoreModel#forEntity}), each indicator query may return
+     * at most one row, evidence at most {@link #EVIDENCE_PER_ENTITY} rows per factor, under {@link #PREVIEW_POLICY}.
+     * Classified evidence is masked exactly as a Job run masks it. An entity no factor names scores with every
+     * indicator missing ({@code found = false}).
+     */
+    public static Preview preview(RiskScoreModel model, String entityKey, Function<String, String> relationSql,
+                                  EvidenceMasker masker) throws SQLException, IOException {
+        Run run = evaluate(model.forEntity(entityKey), relationSql, masker, 1, EVIDENCE_PER_ENTITY, PREVIEW_POLICY);
+        for (RiskScorer.Scored s : run.scored())
+            if (entityKey.equals(s.entityKey())) return new Preview(s, true);
+        return new Preview(RiskScorer.score(model, entityKey, Map.of(), null), false);
+    }
+
+    /** A preview's outcome: the scored entity, and whether any factor named it. */
+    public record Preview(RiskScorer.Scored scored, boolean found) {}
+
+    private static Run evaluate(RiskScoreModel model, Function<String, String> relationSql, EvidenceMasker masker,
+                                int maxEntities, int maxEvidenceRows, SqlSandboxPolicy policy)
+            throws SQLException, IOException {
         Map<String, Map<String, Double>> values = new TreeMap<>();              // entity → factor → value
         Map<String, Map<String, List<Map<String, Object>>>> evidence = new LinkedHashMap<>();
         boolean evidenceTruncated = false;
         for (RiskScoreModel.Factor f : model.factors()) {
             String relation = relationSql.apply(f.dataset());
-            MeasureCompiler.Spec spec = f.valueSpec(MAX_ENTITIES);
+            // One row past the cap: the compiled statement carries its own LIMIT, so asking for exactly the cap could
+            // never come back truncated and a run past it silently scored a subset (found by the S3 preview).
+            MeasureCompiler.Spec spec = f.valueSpec(maxEntities + 1);
             String valueId = spec.measures().get(0).id();
             QueryExecutor.Result r = run(model, f, "indicator", new QueryExecutor.Request(
-                    f.dataset(), relation, MeasureCompiler.compile(spec), MAX_ENTITIES, 0, List.of(), List.of()));
+                    f.dataset(), relation, MeasureCompiler.compile(spec), maxEntities, 0, List.of(), List.of()), policy);
             if (r.truncated())
                 throw new IllegalStateException("risk-score '" + model.id() + "' factor '" + f.id()
-                        + "' names more than " + MAX_ENTITIES + " entities — refusing to score a subset");
+                        + "' names more than " + maxEntities + " entities — refusing to score a subset");
             for (Map<String, Object> row : r.rows()) {
                 Object k = row.get(f.key());
                 if (k == null) continue;
@@ -95,8 +125,8 @@ public final class RiskScoreEvaluator {
             }
             if (!f.evidence().isEmpty()) {
                 QueryExecutor.Result ev = run(model, f, "evidence", new QueryExecutor.Request(f.dataset(), relation,
-                        MeasureCompiler.compile(f.evidenceSpec(MAX_EVIDENCE_ROWS)), MAX_EVIDENCE_ROWS, 0,
-                        List.of(), List.of()));
+                        MeasureCompiler.compile(f.evidenceSpec(maxEvidenceRows)), maxEvidenceRows, 0,
+                        List.of(), List.of()), policy);
                 evidenceTruncated |= ev.truncated();
                 for (Map<String, Object> row : ev.rows()) {
                     Object k = row.get(f.key());
@@ -123,9 +153,9 @@ public final class RiskScoreEvaluator {
      * so neither the message nor the cause is carried; the error CLASS and the factor are enough to act on.
      */
     private static QueryExecutor.Result run(RiskScoreModel model, RiskScoreModel.Factor f, String what,
-                                            QueryExecutor.Request req) {
+                                            QueryExecutor.Request req, SqlSandboxPolicy policy) {
         try {
-            return QueryExecutor.run(req);
+            return QueryExecutor.run(req, policy);
         } catch (Exception e) {
             throw new IllegalStateException("risk-score '" + model.id() + "' factor '" + f.id() + "': the " + what
                     + " query over dataset '" + f.dataset() + "' failed (" + e.getClass().getSimpleName()

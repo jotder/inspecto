@@ -183,6 +183,9 @@ final class CapabilityManifest {
             // RiskScoreRoutes (ASSURE-RISK-SCORE-1) — an entity's Risk Score and its factors are read while
             // working the Incident it raised; data scopes and the row PDP apply beneath the gate.
             new Entry("GET", "/risk-scores/([^/]+)/([^/]+)", Roles.CAN_WORK_INCIDENTS),
+            // S3 preview: scores one entity and writes nothing. Previewing UNSAVED content additionally needs
+            // canAuthorWorkbench, checked in the handler (D-RP4, operator 2026-10-06).
+            new Entry("POST", "/risk-scores/preview", Roles.CAN_WORK_INCIDENTS),
             // EnrichmentRoutes
             new Entry("POST", "/enrichment", Roles.CAN_AUTHOR_WORKBENCH),
             // SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1: the preview executes the draft's transform — authoring, not a read.

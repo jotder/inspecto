@@ -30,6 +30,20 @@ export interface RiskScore {
     factors: RiskFactor[];
 }
 
+/** `POST /risk-scores/preview` (S3) — one entity scored now, nothing written; the key may come back masked. */
+export interface RiskScorePreview {
+    model: string;
+    entityType: string;
+    entityKey: string;
+    keyMasked: boolean;
+    found: boolean;
+    score: number;
+    high: boolean;
+    highThreshold: number;
+    saved: boolean;
+    factors: RiskFactor[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class RiskScoresService {
     private http = inject(HttpClient);
@@ -38,5 +52,10 @@ export class RiskScoresService {
         return this.http.get<RiskScore>(
             apiUrl(`/risk-scores/${encodeURIComponent(model)}/${encodeURIComponent(entityKey)}`),
         );
+    }
+
+    /** Preview a SAVED model for one entity (needs only the read capability). */
+    preview(model: string, entityKey: string): Observable<RiskScorePreview> {
+        return this.http.post<RiskScorePreview>(apiUrl('/risk-scores/preview'), { model, entityKey });
     }
 }

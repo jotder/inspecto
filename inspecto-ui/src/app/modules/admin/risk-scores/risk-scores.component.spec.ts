@@ -42,20 +42,45 @@ function create(list: () => unknown) {
             factors: [],
         }),
     );
+    const preview = vi.fn(() =>
+        of({
+            model: 'sim_box',
+            entityType: 'msisdn',
+            entityKey: 'masked:0123456789abcdef',
+            keyMasked: true,
+            found: true,
+            score: 42,
+            high: false,
+            highThreshold: 70,
+            saved: true,
+            factors: [
+                {
+                    indicator: 'calls',
+                    label: 'Short calls',
+                    value: 14,
+                    missing: false,
+                    weight: 3,
+                    capped: false,
+                    contribution: 42,
+                    evidence: [],
+                },
+            ],
+        }),
+    );
     const open = vi.fn(() => ({ afterClosed: () => of(false) }));
     TestBed.configureTestingModule({
         imports: [RiskScoresComponent],
         providers: [
             provideNoopAnimations(),
             { provide: ComponentsService, useValue: { list: vi.fn(list) } },
-            { provide: RiskScoresService, useValue: { latest } },
+            { provide: RiskScoresService, useValue: { latest, preview } },
             { provide: MatDialog, useValue: { open } },
         ],
     });
     TestBed.overrideComponent(RiskScoresComponent, { set: { changeDetection: ChangeDetectionStrategy.Eager } });
     const fixture = TestBed.createComponent(RiskScoresComponent);
     fixture.detectChanges();
-    return { fixture, el: fixture.nativeElement as HTMLElement, latest, open };
+    return { fixture, el: fixture.nativeElement as HTMLElement, latest, preview, open };
 }
 
 describe('RiskScoresComponent', () => {
@@ -95,6 +120,29 @@ describe('RiskScoresComponent', () => {
         expect(open).toHaveBeenCalledWith(expect.anything(), {
             data: { type: 'risk-score', id: 'sim_box', label: 'sim_box' },
         });
+        await expectNoA11yViolations(el);
+    });
+
+    it('previews a saved model for one entity without loading the stored score', async () => {
+        const { fixture, el, latest, preview } = create(() => of([MODEL]));
+        (el.querySelector('nav li button') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        const input = el.querySelector('form input') as HTMLInputElement;
+        input.value = '966501234567';
+        input.dispatchEvent(new Event('input'));
+        (
+            Array.from(el.querySelectorAll('form button')).find((b) =>
+                b.textContent?.includes('Preview'),
+            ) as HTMLButtonElement
+        ).click();
+        fixture.detectChanges();
+        expect(preview).toHaveBeenCalledWith('sim_box', '966501234567');
+        expect(latest).not.toHaveBeenCalled();
+        const panel = el.querySelector('inspecto-risk-score-panel section');
+        expect(panel?.textContent).toContain('42');
+        expect(panel?.textContent).toContain('preview, not saved');
+        expect(panel?.textContent).toContain('Short calls');
+        expect(panel?.textContent).not.toContain('966501234567');
         await expectNoA11yViolations(el);
     });
 

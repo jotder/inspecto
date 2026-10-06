@@ -7,6 +7,9 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.query.DatasetMeasureProbe;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
+import com.gamma.pipeline.ViewStore;
+import com.gamma.risk.EvidenceMasker;
+import com.gamma.risk.RiskScoreEvaluator;
 import com.gamma.risk.RiskScoreModel;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -44,6 +47,110 @@ final class RiskScoreRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/risk-scores/([^/]+)/([^/]+)", ApiContext.withCapability("canWorkIncidents",
                 (e, m) -> latest(api, e, m.group(1), m.group(2))));
+        api.post("/risk-scores/preview", ApiContext.withCapability("canWorkIncidents",
+                (e, m) -> preview(api, e, api.body(e))));
+    }
+
+    /**
+     * {@code POST /risk-scores/preview} (ASSURE-RISK-SCORE-RESIDUALS-1 S3, D-RP4/D-RP5/D-RP6, operator 2026-10-06):
+     * score ONE entity under a saved model ({@code {model, entityKey}}) or unsaved content ({@code {content,
+     * entityKey}}) and write NOTHING — no scores Dataset, no Signal, no watch-list entry. Gates, fail-closed:
+     * <ol>
+     *   <li>{@code canWorkIncidents} (the read gate); unsaved content additionally needs {@code canAuthorWorkbench}
+     *       — running arbitrary factors over the Space's Datasets is authoring, not reading (403).</li>
+     *   <li>Body shape: exactly one of {@code model}/{@code content}, a key of 1..{@value #MAX_KEY} chars (400).</li>
+     *   <li>No write or data root → 503.</li>
+     *   <li>Saved model: unknown, unparseable or outside the caller's data scopes → 404 (as the GET). Content:
+     *       {@code fromMap} + {@link #requireStorable} → 422 with the save-time message; a data-scoped caller may
+     *       only preview content carrying a scope it holds (403).</li>
+     *   <li>Bounded evaluation ({@link RiskScoreEvaluator#preview}): one entity per factor, evidence rows capped,
+     *       a tighter sandbox timeout; a failed query → 422 with the evaluator's value-free message.</li>
+     * </ol>
+     * The entity key is masked in the response for a caller without {@link AuditReadMasking#UNMASK_CAPABILITY}
+     * (D-P8 mask on read) — the same Space token as masked evidence.
+     */
+    private Object preview(ApiContext api, HttpExchange ex, Map<String, Object> body) throws Exception {
+        Object modelRef = body.get("model");
+        Object contentRef = body.get("content");
+        if ((modelRef == null) == (contentRef == null))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "give exactly one of 'model' (a saved id) or 'content'");
+        if (!(body.get("entityKey") instanceof String entityKey) || entityKey.isEmpty() || entityKey.length() > MAX_KEY)
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'entityKey' must be a string of 1.." + MAX_KEY + " characters");
+        Map<String, Object> content;
+        String modelId;
+        if (contentRef != null) {
+            ApiContext.requireCapability(ex, "canAuthorWorkbench");
+            if (!(contentRef instanceof Map<?, ?> raw))
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'content' must be an object");
+            @SuppressWarnings("unchecked") Map<String, Object> c = (Map<String, Object>) raw;
+            content = c;
+            modelId = content.get("id") instanceof String s && !s.isBlank() ? s : "preview";
+        } else {
+            if (!(modelRef instanceof String id) || !SAFE_ID.matcher(id).matches())
+                throw new ApiException(404, ErrorCodes.NOT_FOUND, "no Risk Score model '" + modelRef + "'");
+            modelId = id;
+            content = null;
+        }
+        Path writeRoot = api.writeRoot();
+        Path dataRoot = api.dataRoot();
+        if (writeRoot == null || dataRoot == null)
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "risk-score preview needs a Space write and data root");
+        ComponentStore registry = new ComponentStore(writeRoot.resolve("registry"));
+        RiskScoreModel model;
+        if (content == null) {
+            ApiException hidden = new ApiException(404, ErrorCodes.NOT_FOUND, "no Risk Score model '" + modelId + "'");
+            Map<String, Object> stored = registry.get(TYPE, modelId).map(ComponentRegistry.Component::content)
+                    .orElseThrow(() -> hidden);
+            try {
+                model = RiskScoreModel.fromMap(modelId, stored);
+            } catch (IllegalArgumentException e) {
+                throw hidden;
+            }
+            if (outOfScope(ex, model)) throw hidden;
+        } else {
+            try {
+                model = RiskScoreModel.fromMap(modelId, content);
+                requireStorable(api, model);
+            } catch (IllegalArgumentException e) {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+            }
+            if (outOfScope(ex, model))
+                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
+                        "a data-scoped caller may only preview a model carrying a data scope it holds");
+        }
+        ViewStore views = new ViewStore(writeRoot.resolve("views"));
+        RiskScoreEvaluator.Preview p;
+        try {
+            p = RiskScoreEvaluator.preview(model, entityKey, datasetId -> {
+                Map<String, Object> ds = registry.get("dataset", datasetId).map(ComponentRegistry.Component::content)
+                        .orElseThrow(() -> new IllegalArgumentException("risk-score factor names unknown dataset '" + datasetId + "'"));
+                return DatasetRelation.relationSql(ds, dataRoot, views);
+            }, EvidenceMasker.of(registry, writeRoot, model));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+        }
+        boolean reveal = ApiContext.subject(ex)
+                .map(s -> s.capabilities().contains(AuditReadMasking.UNMASK_CAPABILITY)).orElse(true);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("model", model.id());
+        out.put("entityType", model.entityType());
+        out.put("entityKey", reveal ? entityKey : EvidenceMasker.forSpace(writeRoot).tokenFor(entityKey));
+        out.put("keyMasked", !reveal);
+        out.put("found", p.found());
+        out.put("score", p.scored().score());
+        out.put("high", p.scored().high());
+        out.put("highThreshold", model.highThreshold());
+        out.put("saved", content == null);
+        List<Map<String, Object>> factors = new java.util.ArrayList<>();
+        for (com.gamma.risk.RiskScorer.FactorResult f : p.scored().factors()) factors.add(f.toMap());
+        out.put("factors", factors);
+        return out;
+    }
+
+    /** SEC-7d as the GET applies it: a data-scoped caller reaches only a model carrying a scope it holds. */
+    private static boolean outOfScope(HttpExchange ex, RiskScoreModel model) {
+        return ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s && s.scoped()
+                && (model.dataScope() == null || !s.dataScopes().contains(model.dataScope()));
     }
 
     private static ApiException notFound(String model, String key) {

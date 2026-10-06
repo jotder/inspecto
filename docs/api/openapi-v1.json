@@ -10352,6 +10352,50 @@
         "x-generated" : true
       }
     },
+    "/risk-scores/preview" : {
+      "post" : {
+        "tags" : [ "risk-scores" ],
+        "summary" : "Preview one entity's Risk Score under a saved or unsaved model, writing nothing",
+        "operationId" : "previewRiskScore",
+        "description" : "ASSURE-RISK-SCORE-RESIDUALS-1 S3. Gated on canWorkIncidents; unsaved content also needs canAuthorWorkbench. Body: exactly one of model (a saved id) or content (a risk-score model), plus entityKey (1-256 chars). Every factor is narrowed to the entity; evaluation is bounded (one row per indicator, 3 evidence rows per factor, a 10 s sandbox timeout). No scores Dataset, Signal or watch-list entry is written. Classified evidence is masked; the entity key is masked unless the caller holds canRevealLinkEntities.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "entityKey" ],
+                "properties" : {
+                  "model" : { "type" : "string" },
+                  "content" : { "type" : "object" },
+                  "entityKey" : { "type" : "string", "maxLength" : 256 }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {model, entityType, entityKey, keyMasked, found, score, high, highThreshold, saved, factors[{indicator, label, value, missing, weight, cap, capped, contribution, evidence[]}]}"
+          },
+          "400" : {
+            "description" : "Not exactly one of model/content, or a missing or over-long entityKey."
+          },
+          "403" : {
+            "description" : "The caller lacks canWorkIncidents, or canAuthorWorkbench for unsaved content, or previews content outside its data scopes."
+          },
+          "404" : {
+            "description" : "The saved model is unknown, unparseable or outside the caller's data scopes."
+          },
+          "422" : {
+            "description" : "The content fails the save-time checks, or a factor query fails."
+          },
+          "503" : {
+            "description" : "No Space write or data root."
+          }
+        }
+      }
+    },
     "/risk-scores/{model}/{entityKey}" : {
       "get" : {
         "tags" : [ "risk-scores" ],

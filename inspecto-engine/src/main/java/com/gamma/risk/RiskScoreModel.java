@@ -77,6 +77,17 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
                     m.get("field") == null ? null : String.valueOf(m.get("field")));
         }
 
+        /**
+         * This factor narrowed to ONE entity (S3 preview): an extra {@code key = entityKey} filter, which the
+         * {@link MeasureCompiler} renders as a quoted typed literal like every authored filter value — so the
+         * preview reads that entity's rows, not the whole Dataset.
+         */
+        public Factor forEntity(String entityKey) {
+            List<Map<String, Object>> narrowed = new ArrayList<>(filters == null ? List.of() : filters);
+            narrowed.add(Map.of("field", key, "op", "=", "value", entityKey));
+            return new Factor(id, label, dataset, key, measure, List.copyOf(narrowed), weight, cap, evidence);
+        }
+
         /** The indicator's grouped Measure spec: one value per entity key. */
         public MeasureCompiler.Spec valueSpec(int limit) {
             return MeasureCompiler.parse(specBody(List.of(measureBody()), List.of(key)), limit, limit);
@@ -107,6 +118,12 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
             body.put("orderBy", List.of(Map.of("field", key)));
             return body;
         }
+    }
+
+    /** This model with every factor narrowed to one entity ({@link Factor#forEntity}) — the S3 preview's input. */
+    public RiskScoreModel forEntity(String entityKey) {
+        return new RiskScoreModel(id, entityType, highThreshold, scoresDataset, dataScope, description,
+                factors.stream().map(f -> f.forEntity(entityKey)).toList(), watchList, retainDays, retainRuns);
     }
 
     /** The longest a fed watch entry may live: D-P5 lets only an expiring (at most 24 h) entry skip four-eyes. */

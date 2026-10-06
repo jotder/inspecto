@@ -64,6 +64,8 @@ export class RiskScorePanelComponent {
 
     readonly model = input.required<string>();
     readonly entityKey = input.required<string>();
+    /** A ready score to render instead of loading the latest one (the S3 preview). */
+    readonly preset = input<RiskScore | null>(null);
 
     readonly score = signal<RiskScore | null>(null);
     readonly shownKey = displayEntityKey;
@@ -79,7 +81,9 @@ export class RiskScorePanelComponent {
         effect((onCleanup) => {
             const model = this.model();
             const key = this.entityKey();
-            this.score.set(null);
+            const preset = this.preset();
+            this.score.set(preset);
+            if (preset) return;
             const sub = this.api.latest(model, key).subscribe({
                 next: (s) => this.score.set(s),
                 error: () => this.score.set(null),

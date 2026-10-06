@@ -115,7 +115,28 @@
                         <input class="rounded border px-2 py-1" autocomplete="off" [formControl]="entityDraft" />
                     </label>
                     <button mat-stroked-button type="submit">Look up</button>
+                    <button mat-stroked-button type="button" (click)="preview(m)">Preview</button>
                 </form>
+                <p class="text-secondary mt-1 text-xs">
+                    Preview scores the entity now over the data and writes nothing.
+                </p>
+                @if (previewError(); as e) {
+                    <p class="text-warn mt-2 text-sm" role="alert">{{ e }}</p>
+                }
+                @if (previewed(); as p) {
+                    <div class="mt-3">
+                        @if (!p.found) {
+                            <p class="text-secondary text-sm">
+                                No Factor names this entity; every indicator counts as 0.
+                            </p>
+                        }
+                        <inspecto-risk-score-panel
+                            [model]="m.id"
+                            [entityKey]="p.score.entityKey"
+                            [preset]="p.score"
+                        ></inspecto-risk-score-panel>
+                    </div>
+                }
                 @if (entityKey(); as k) {
                     <div class="mt-3">
                         <inspecto-risk-score-panel [model]="m.id" [entityKey]="k"></inspecto-risk-score-panel>

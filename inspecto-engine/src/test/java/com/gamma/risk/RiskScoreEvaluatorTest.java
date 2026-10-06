@@ -50,6 +50,31 @@ class RiskScoreEvaluatorTest {
     }
 
     @Test
+    void aPreviewScoresOnlyTheNamedEntityAndAnUnknownOneScoresZero(@TempDir Path data) throws Exception {
+        DuckDbUtil.loadDriver();
+        Path dir = Files.createDirectories(data.resolve("notes"));
+        String file = dir.resolve("data.parquet").toString().replace('\\', '/');
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("COPY (SELECT * FROM (VALUES ('m1', 'a'), ('m2', 'b'), ('m2', 'c'), ('m3', 'd')) AS v(msisdn, tag)) TO '"
+                    + file + "' (FORMAT PARQUET)");
+        }
+        RiskScoreModel m = RiskScoreModel.fromMap("p", Map.of("entityType", "subscriber", "highThreshold", 50,
+                "factors", List.of(Map.of("id", "n", "dataset", "notes", "key", "msisdn", "measure", "count",
+                        "weight", 10, "evidence", List.of("tag")))));
+        java.util.function.Function<String, String> rel = id -> DatasetRelation.relationSql(Map.of("physicalRef", id), data, null);
+        // Three entities and a one-entity cap: only the narrowing makes this succeed (without it, the cap trips).
+        RiskScoreEvaluator.Preview p = RiskScoreEvaluator.preview(m, "m2", rel, NO_MASK);
+        assertTrue(p.found());
+        assertEquals("m2", p.scored().entityKey());
+        assertEquals(20.0, p.scored().score(), 1e-9);
+        assertEquals(2, p.scored().factors().get(0).evidence().size());
+
+        RiskScoreEvaluator.Preview none = RiskScoreEvaluator.preview(m, "m9", rel, NO_MASK);
+        assertFalse(none.found());
+        assertEquals(0.0, none.scored().score(), 1e-9);
+    }
+
+    @Test
     void aQueryFailureNeverQuotesASourceValue(@TempDir Path data) throws Exception {
         DuckDbUtil.loadDriver();
         Path dir = Files.createDirectories(data.resolve("spend"));

@@ -152,6 +152,28 @@ Real-HTTP coverage with an armed Subject is in `ControlApiRiskScoreTest`.
 objects (SEC-7d), and nothing scopes Dataset rows. The route applies that rule to the model's optional
 `dataScope`.
 
+## The preview route — `POST /risk-scores/preview` (slice S3, 2026-10-06)
+
+Scores ONE entity now and writes nothing: no scores Dataset, no `_latest`, no Signal, no watch-list entry
+(D-RP5, operator 2026-10-06). Body: exactly one of `model` (a saved id) or `content` (an unsaved model), plus
+`entityKey` (1..256 chars). Gates (D-RP4): `canWorkIncidents` at the route; unsaved `content` additionally needs
+`canAuthorWorkbench` (403), runs `fromMap` + `requireStorable` and answers their message verbatim as 422. A saved
+model that is unknown, unparseable or outside the caller's data scopes is 404 as on the GET; content outside the
+caller's scopes is 403. No write/data root is 503.
+
+**Bounds.** `RiskScoreModel.forEntity` adds a `key = entityKey` filter to every factor (a quoted typed literal
+via `MeasureCompiler`, like any authored filter value), so only that entity's rows are read.
+`RiskScoreEvaluator.preview` then allows at most ONE indicator row per factor and `EVIDENCE_PER_ENTITY` (3)
+evidence rows, under `PREVIEW_POLICY` (512 MB, 2 threads, 10 s). An entity no factor names comes back with
+`found: false` and every indicator missing. Evidence is masked exactly as a Job run masks it.
+
+**Entity key (D-P8 mask on read, D-RP6).** The response key is the Space `masked:<16 hex>` token unless the caller
+holds `canRevealLinkEntities` (`keyMasked` says which). The GET route still serves keys raw.
+
+⚠ **Truncation fix found here.** The indicator spec carried its own `LIMIT` equal to the executor cap, so the
+"more than N entities — refusing to score a subset" check could never fire: a Job run past 200 000 entities silently
+scored a subset. The spec now asks for cap + 1 rows, so the refusal fires (operator, 2026-10-06).
+
 ### Masking — evidence at WRITE time, the key raw (operator decision 2026-09-27)
 
 Operator decision, 2026-09-27, under the standing "go with recommendations":
@@ -205,7 +227,9 @@ pure view model is `inspecto/risk/risk-score-view.ts` (`riskModelView`): identit
 List, retention, one row per factor (dataset, key, measure, filter count, weight, cap, evidence) and the two
 derived Datasets, never authorable. A model with no factors is flagged *Invalid*. **History** opens
 `ComponentHistoryDialog` (restore reloads the list). An entity lookup feeds the existing panel. There is no
-create/edit yet (S2), and no preview (S3).
+create/edit yet (S2). **Preview (S3, 2026-10-06):** the detail's *Preview* button posts the saved model and the
+typed key to `POST /risk-scores/preview` and renders the result through the same panel (`preset` input, no
+load), labelled *preview, not saved*.
 
 **Entity key display (D-RP6, operator 2026-10-06; D-P8 = mask on read).** Every SPA surface that prints an
 entity key goes through ONE function, `displayEntityKey` (`inspecto/risk/risk-score-view.ts`): it keeps the
@@ -223,8 +247,8 @@ renders it as a required autocomplete over the saved models (`riskScoreModelOpti
 - ✅ **The watch Entity List is fed (2026-09-28).** An optional `watchList: {list, ttlHours}` (1..24) adds every
   high entity to a `watch` Entity List after each run, expiring `ttlHours` later. It fails closed at save and at
   run. See [Entity Lists — assurance entries](entity-lists.md#the-risk-score-watch-list-feed).
-- **Entity-key masking (D-P8 = mask on read, operator 2026-10-06).** The SPA displays keys through `displayEntityKey`; the server still serves them raw (not built).
-- The authoring pane has a read-only slice (S1, 2026-10-06); create/edit (S2) and preview (S3) are open, see
+- **Entity-key masking (D-P8 = mask on read, operator 2026-10-06).** The SPA displays keys through `displayEntityKey`; the preview route masks on read; the GET route still serves them raw (not built).
+- The authoring pane has a read-only slice (S1) and preview (S3), both 2026-10-06; create/edit (S2) is open, see
   [`risk-score-authoring-pane-spec.md`](../../../superpower/risk-score-authoring-pane-spec.md).
 - An indicator is a Measure. There is no free-form arithmetic expression, and no reference to a saved
   Measure component, because none exists.

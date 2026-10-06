@@ -5,6 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { ComponentDef, ComponentsService } from 'app/inspecto/api/components.service';
 import { apiErrorMessage } from 'app/inspecto/api/api-base';
+import { RiskScore, RiskScoresService } from 'app/inspecto/api/risk-scores.service';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -36,6 +37,7 @@ import { RiskModelView, riskModelView } from 'app/inspecto/risk/risk-score-view'
 export class RiskScoresComponent implements OnInit {
     private components = inject(ComponentsService);
     private dialog = inject(MatDialog);
+    private riskScores = inject(RiskScoresService);
 
     readonly loading = signal(true);
     readonly error = signal<string | null>(null);
@@ -45,6 +47,9 @@ export class RiskScoresComponent implements OnInit {
     /** The entity key typed into the lookup; committed on submit so the panel loads once. */
     readonly entityDraft = new FormControl('', { nonNullable: true });
     readonly entityKey = signal<string | null>(null);
+    /** The S3 preview: scored now over the data, nothing written. */
+    readonly previewed = signal<{ score: RiskScore; found: boolean } | null>(null);
+    readonly previewError = signal<string | null>(null);
 
     ngOnInit(): void {
         this.load();
@@ -69,11 +74,30 @@ export class RiskScoresComponent implements OnInit {
         this.selectedId.set(id);
         this.entityDraft.reset();
         this.entityKey.set(null);
+        this.previewed.set(null);
+        this.previewError.set(null);
     }
 
     lookUp(): void {
         const k = this.entityDraft.value.trim();
+        this.previewed.set(null);
         this.entityKey.set(k || null);
+    }
+
+    preview(m: RiskModelView): void {
+        const k = this.entityDraft.value.trim();
+        if (!k) return;
+        this.entityKey.set(null);
+        this.previewed.set(null);
+        this.previewError.set(null);
+        this.riskScores.preview(m.id, k).subscribe({
+            next: (p) =>
+                this.previewed.set({
+                    found: p.found,
+                    score: { ...p, modelVersion: '', runId: '', scoredAt: 'preview, not saved' },
+                }),
+            error: (err) => this.previewError.set(apiErrorMessage(err, 'Could not preview this Risk Score.')),
+        });
     }
 
     history(m: RiskModelView): void {
