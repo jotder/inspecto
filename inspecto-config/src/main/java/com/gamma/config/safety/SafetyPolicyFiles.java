@@ -24,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * or {@code mode} in a Space file all throw {@link SafetyPolicyUnreadableException}. The server file may name
  * Spaces whose policy is <em>required</em> ({@code require_spaces}, D7): a named Space with no file is
  * unreadable too, because naming is what makes a deletion detectable. An un-named absent Space file narrows
- * nothing. Parsed files are cached by (mtime, size), the {@code AccessPolicies.load} shape.
+ * nothing. Parsed files are cached by (mtime, size), the {@code AccessPolicyStore.load} shape.
  */
 public final class SafetyPolicyFiles {
 

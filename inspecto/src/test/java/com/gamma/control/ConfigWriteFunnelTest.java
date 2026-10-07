@@ -234,6 +234,8 @@ class ConfigWriteFunnelTest {
 
     /** Writer sites ({@code SimpleClass#method}) that do not reach the hold themselves, each with its reason. */
     static final Map<String, String> WRITERS = new TreeMap<>(Map.ofEntries(
+            Map.entry("AccessRoutes#savePolicies", "access policies: " + NOT_GOVERNED + " — the Access Policies "
+                    + "document (AccessPolicyStore) is not a ComponentStore kind, and the route is gated by canConfigureAccess"),
             Map.entry("AccessRoutes#write", HELPER), Map.entry("AlertRoutes#write", HELPER),
             Map.entry("BundleRoutes#write", HELPER + "; /bundle/import refuses (holdRefusing) before any item"),
             Map.entry("DecisionRoutes#write", HELPER), Map.entry("ExpectationRoutes#write", HELPER),

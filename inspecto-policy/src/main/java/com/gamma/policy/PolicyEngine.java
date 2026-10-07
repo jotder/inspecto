@@ -2,6 +2,7 @@ package com.gamma.policy;
 
 import com.gamma.control.AccessDecider;
 import com.gamma.control.AccessPolicies;
+import com.gamma.control.AccessPolicyStore;
 import com.gamma.control.ComponentAccess;
 import com.gamma.control.Subject;
 import com.gamma.event.EventLog;
@@ -73,7 +74,7 @@ public final class PolicyEngine implements AccessDecider {
     @Override
     public Decision decide(HttpExchange ex, Subject subject, String action, String route,
                            String resourceKind, Map<String, Object> resource) {
-        AccessPolicies.Doc doc = AccessPolicies.effective(ex);
+        AccessPolicies.Doc doc = AccessPolicyStore.effective(ex);
         if (doc.unreadable()) {
             LOG.warn("access-policies doc unreadable — DENY {} {} for '{}' (fail-closed until fixed)",
                     action, route, subject.id());
@@ -100,7 +101,7 @@ public final class PolicyEngine implements AccessDecider {
     @Override
     public Explanation explain(HttpExchange ex, Subject subject, String action, String route,
                                String resourceKind, Map<String, Object> resource) {
-        AccessPolicies.Doc doc = AccessPolicies.effective(ex);
+        AccessPolicies.Doc doc = AccessPolicyStore.effective(ex);
         if (doc.unreadable())
             return new Explanation(Decision.DENY, "<policies-unreadable>", List.of());
         return evaluate(ex, doc.policies(), subject, action, route, resourceKind, resource);

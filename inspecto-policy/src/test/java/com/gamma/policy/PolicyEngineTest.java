@@ -142,7 +142,7 @@ class PolicyEngineTest {
                         "when", "subject.id == 'mallory'"));
         writePolicies(diskRoot, doc);
         List<com.gamma.control.AccessPolicies.Policy> draft =
-                com.gamma.control.AccessPolicies.load(diskRoot).policies();   // the same validated policies
+                com.gamma.control.AccessPolicyStore.load(diskRoot).policies();   // the same validated policies
         for (String who : List.of("ana", "mallory"))
             for (String action : List.of("read", "write", "operate")) {
                 Explanation simulated = onExchange(draftRoot,

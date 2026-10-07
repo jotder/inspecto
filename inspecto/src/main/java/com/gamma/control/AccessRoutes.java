@@ -104,7 +104,7 @@ final class AccessRoutes implements RouteModule {
         ETags.requireMatch(ex, ETags.of(ContentHash.of(roles(api))));
         Map<String, Roles.Def> authored = Roles.validate(body.get("roles"));
         List<String> attributeClaims = Roles.attributeClaims(body.get("identity"));
-        AccessPolicies.requireLoadableUnder(root, attributeClaims);   // F1: never deny-all as a side effect
+        AccessPolicyStore.requireLoadableUnder(root, attributeClaims);   // F1: never deny-all as a side effect
         Roles.write(root, authored, attributeClaims);
         return ETags.respond(ex, roles(api));
     }
@@ -127,7 +127,7 @@ final class AccessRoutes implements RouteModule {
      *  policy overrides is shadowed (shown once, as authored). An unreadable doc is surfaced — the engine
      *  denies, fail-closed. Seeds appear only on the Enterprise edition (the engine supplies them). */
     private Object policies(ApiContext api, HttpExchange ex) {
-        AccessPolicies.Doc doc = AccessPolicies.load(api.writeRoot());
+        AccessPolicies.Doc doc = AccessPolicyStore.load(api.writeRoot());
         Map<String, Object> out = new LinkedHashMap<>();
         if (doc.unreadable()) {
             out.put("policies", List.of());
@@ -151,7 +151,7 @@ final class AccessRoutes implements RouteModule {
                 .map(AccessDecider::seededPolicies).orElse(List.of());
         seeds.stream().filter(p -> !authored.contains(p.name())).forEach(p -> rows.add(policyShape(p, "seed")));
         out.put("policies", rows);
-        out.put("warnings", AccessPolicies.lint(doc.policies(), Roles.effective(api.writeRoot()).keySet(), seeds)
+        out.put("warnings", AccessPolicyStore.lint(doc.policies(), Roles.effective(api.writeRoot()).keySet(), seeds)
                 .stream().map(AccessRoutes::warningShape).toList());
         // the authoring vocabulary for resourceKinds (F4) — served so the SPA never mirrors it
         out.put("resourceKinds", AccessPolicies.RESOURCE_KINDS.stream().sorted().toList());
@@ -222,9 +222,9 @@ final class AccessRoutes implements RouteModule {
         Path root = WriteGates.requireWriteRoot(api, "access policy write");
         ETags.requireMatch(ex, ETags.of(ContentHash.of(policies(api, ex))));
         List<AccessPolicies.Policy> policies =
-                AccessPolicies.validate(body.get("policies"), Roles.load(root).attributeClaims());
+                AccessPolicyStore.validate(body.get("policies"), Roles.load(root).attributeClaims());
         requireNoSelfLockout(ex, policies);
-        AccessPolicies.write(root, policies);
+        AccessPolicyStore.write(root, policies);
         return ETags.respond(ex, policies(api, ex));
     }
 
@@ -242,7 +242,7 @@ final class AccessRoutes implements RouteModule {
     private Object previewPolicies(ApiContext api, HttpExchange ex, Map<String, Object> body) {
         Path root = api.writeRoot();
         List<AccessPolicies.Policy> draft =
-                AccessPolicies.validate(body.get("policies"), Roles.load(root).attributeClaims());
+                AccessPolicyStore.validate(body.get("policies"), Roles.load(root).attributeClaims());
         Map<String, Object> out = new LinkedHashMap<>();
         AccessDecider decider = AccessDeciders.active().orElse(null);
         if (decider == null) {
@@ -251,7 +251,7 @@ final class AccessRoutes implements RouteModule {
             return out;
         }
         String route = trimOrEmpty(body.get("route")).isBlank() ? "/" : trimOrEmpty(body.get("route")).trim();
-        AccessPolicies.Doc current = AccessPolicies.load(root);
+        AccessPolicies.Doc current = AccessPolicyStore.load(root);
         Set<String> kinds = new java.util.TreeSet<>();
         for (AccessPolicies.Policy p : current.policies()) kinds.addAll(p.resourceKinds());
         for (AccessPolicies.Policy p : draft) kinds.addAll(p.resourceKinds());
@@ -297,7 +297,7 @@ final class AccessRoutes implements RouteModule {
         out.put("actions", actions);
         out.put("kinds", List.copyOf(kinds));
         out.put("cells", cells);
-        out.put("warnings", AccessPolicies.lint(draft, roles.keySet(), seeds).stream()
+        out.put("warnings", AccessPolicyStore.lint(draft, roles.keySet(), seeds).stream()
                 .map(AccessRoutes::warningShape).toList());
         return out;
     }

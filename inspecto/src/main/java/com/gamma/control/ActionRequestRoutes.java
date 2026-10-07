@@ -255,7 +255,7 @@ final class ActionRequestRoutes implements RouteModule {
         // Only AUTHORED Access Policies count; the seeded space-isolation policies (inspecto-policy) do not. Safe today:
         // they engage only when an IdP 'space' claim is mapped, and the only Authenticator that enumerates principals
         // (so the only way to reach OK) is Demo sign-in, which carries no claims. Revisit if an enumerating IdP lands.
-        boolean rowPolicies = !AccessPolicies.load(root).policies().isEmpty() || AccessPolicies.load(root).unreadable();
+        boolean rowPolicies = !AccessPolicyStore.load(root).policies().isEmpty() || AccessPolicyStore.load(root).unreadable();
         Map<String, Roles.Def> defs = Roles.effective(root);
         boolean scopedHolder = false;
         for (Map.Entry<String, List<String>> p : who.entrySet()) {
