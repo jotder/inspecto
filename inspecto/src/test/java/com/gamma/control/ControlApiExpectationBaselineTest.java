@@ -22,6 +22,7 @@ import java.sql.Connection;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Optional;
+import com.gamma.access.Roles;
 
 import static org.junit.jupiter.api.Assertions.*;
 

@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.access;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -15,12 +15,12 @@ import java.util.Set;
  *
  * <p>Keep entries grouped by route class, in registration order — the test reports diffs by entry.
  */
-final class CapabilityManifest {
+public final class CapabilityManifest {
     private CapabilityManifest() {}
 
-    record Entry(String method, String pattern, String capability) {}
+    public record Entry(String method, String pattern, String capability) {}
 
-    static final List<Entry> ENTRIES = List.of(
+    public static final List<Entry> ENTRIES = List.of(
             // Incident creation (operator, 2026-09-16) — one act, one capability, three routes
             new Entry("POST", "/recon/promote", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/objects", Roles.CAN_MANAGE_INCIDENTS),
@@ -407,16 +407,16 @@ final class CapabilityManifest {
      * class registers for a missing optional module go through {@code api.stub}, not these methods, so
      * they are exempt by construction ({@code absent-module-stub}).
      */
-    record Exemption(String method, String pattern, String category, String reason) {}
+    public record Exemption(String method, String pattern, String category, String reason) {}
 
     /**
      * A mutating route whose posture is an OPEN OPERATOR CALL (compliance plan step 2a). Recorded here so it is
      * a visible third state, not a silent one — ⛔ step 3's fail-closed default cannot land while this list is
      * non-empty, and the test pins the list so it can only shrink.
      */
-    record Pending(String method, String pattern, String question) {}
+    public record Pending(String method, String pattern, String question) {}
 
-    static final List<Exemption> EXEMPTIONS = List.of(
+    public static final List<Exemption> EXEMPTIONS = List.of(
             // §1 identity flow — these ARE the login; a capability gate here is circular.
             new Exemption("POST", "/auth/exchange", "identity-flow", "mints the session; nothing to be authorised by yet"),
             new Exemption("POST", "/auth/refresh", "identity-flow", "rotates the session the caller already holds"),
@@ -530,12 +530,12 @@ final class CapabilityManifest {
      * <p>⛔ Keep this table and its test: "ungated" must stay a RECORDED state. The next unlisted mutating
      * route belongs here, not nowhere.
      */
-    static final List<Pending> PENDING_OPERATOR_CALLS = List.of();
+    public static final List<Pending> PENDING_OPERATOR_CALLS = List.of();
 
     /** The declared capability gating {@code method path}, or null when the route is ungated —
      *  the A3 authorize stage classifies {@code operate} actions off this (a state-changing call
      *  whose gate is {@code canOperateRuns} is an operation, not an authoring write). */
-    static String capabilityFor(String method, String path) {
+    public static String capabilityFor(String method, String path) {
         for (Entry e : ENTRIES)
             if (e.method().equals(method) && path.matches(e.pattern())) return e.capability();
         return null;
@@ -547,19 +547,19 @@ final class CapabilityManifest {
      * boot check uses. Matching is on the registered pattern STRING, exactly as the route class spells it,
      * so an exemption can never accidentally widen to a route it was not written for.
      */
-    static boolean isExempt(String method, String pattern) {
+    public static boolean isExempt(String method, String pattern) {
         return exemptionFor(method, pattern) != null;
     }
 
     /** The recorded exemption for {@code (method, pattern)}, or {@code null} — the inventory needs its
      *  category and reason, not merely the fact that one exists. */
-    static Exemption exemptionFor(String method, String pattern) {
+    public static Exemption exemptionFor(String method, String pattern) {
         for (Exemption e : EXEMPTIONS)
             if (e.method().equals(method) && e.pattern().equals(pattern)) return e;
         return null;
     }
 
-    static Set<String> capabilities() {
+    public static Set<String> capabilities() {
         Set<String> out = new LinkedHashSet<>();
         for (Entry e : ENTRIES) out.add(e.capability());
         return out;

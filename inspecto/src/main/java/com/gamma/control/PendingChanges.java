@@ -29,6 +29,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import com.gamma.access.Roles;
+import com.gamma.access.AccessGrants;
+import com.gamma.access.ComponentAccess;
 
 /**
  * <b>Maker-checker for human config changes</b> (`ASSURE-MAKER-CHECKER-1`, WS-13): the hold every authoring

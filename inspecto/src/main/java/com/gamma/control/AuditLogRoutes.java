@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
+import com.gamma.access.WriteGates;
 
 /**
  * The <b>audit</b> read, kept in core when the {@code /events*} feed left for the optional

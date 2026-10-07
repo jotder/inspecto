@@ -1,6 +1,6 @@
 package com.gamma.oidc;
 
-import com.gamma.control.Roles;
+import com.gamma.access.Roles;
 import com.nimbusds.jwt.JWTClaimsSet;
 
 import java.text.ParseException;

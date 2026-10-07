@@ -8,7 +8,7 @@ import com.gamma.control.EntityTypes;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.control.RouteModule;
-import com.gamma.control.WriteGates;
+import com.gamma.access.WriteGates;
 import com.gamma.entitystore.EntityFactLog;
 import com.gamma.entitystore.EntityListFacts;
 import com.gamma.entitystore.EntityRegistry;

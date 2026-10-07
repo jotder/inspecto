@@ -14,7 +14,7 @@ import com.gamma.control.ApiException;
 import com.gamma.control.AuditReadMasking;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
-import com.gamma.control.RowScope;
+import com.gamma.access.RowScope;
 import com.gamma.control.Subject;
 import com.sun.net.httpserver.HttpExchange;
 

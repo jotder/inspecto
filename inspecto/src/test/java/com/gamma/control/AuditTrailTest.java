@@ -1,6 +1,8 @@
 package com.gamma.control;
 
 import org.junit.jupiter.api.Test;
+import com.gamma.access.CapabilityManifest;
+import com.gamma.access.AuditTrail;
 
 import static org.junit.jupiter.api.Assertions.*;
 

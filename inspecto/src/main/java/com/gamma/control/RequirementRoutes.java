@@ -10,6 +10,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.gamma.access.ComponentAccess;
+import com.gamma.access.WriteGates;
 
 /**
  * Requirements intake ({@code /requirements*}, UI-6 + SEC-7(c)) — the backend for the Business→Builder

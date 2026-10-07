@@ -30,7 +30,7 @@ import { reactorModuleDirs } from './reactor-modules.mjs';
 /** THE TABLE (data). group -> module directories, decided from each module's META-INF/inspecto/module.toon buildRole + offeringRole. */
 export const TABLE = {
     spi: ['inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi'],                                   // buildRole contract
-    platform: ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-sql', 'inspecto-etl', 'inspecto-event', 'inspecto-workflow',
+    platform: ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-sql', 'inspecto-etl', 'inspecto-event', 'inspecto-workflow', 'inspecto-access',
                'inspecto-acquire', 'inspecto-entity-store', 'inspecto-engine'],                              // buildRole foundation|platform, offeringRole base
     features: ['inspecto-agent', 'inspecto-backup', 'inspecto-entity-list', 'inspecto-exchange', 'inspecto-intelligence', 'inspecto-observability',
                'inspecto-ops', 'inspecto-reconciliation', 'inspecto-scoring'],                               // implementation + offeringRole optional

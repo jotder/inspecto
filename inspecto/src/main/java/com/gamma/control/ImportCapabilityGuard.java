@@ -11,6 +11,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import com.gamma.access.Roles;
+import com.gamma.access.CapabilityManifest;
 
 /**
  * <b>An import is never a way around the direct route's gate</b> ({@code IMPORT-CONNECTION-JOB-GATE-1}, session

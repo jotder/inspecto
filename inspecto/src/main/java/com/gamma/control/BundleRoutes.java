@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import com.gamma.access.WriteGates;
 
 /**
  * Metadata Bundle v2 — selective, config-only transfer of Component definitions between instances

@@ -25,19 +25,19 @@ const GROUP = 'com.gamma.inspector';
 export const ALLOWED = {
     'inspecto-la-graph': [],                                                                                   // the JDK only
     'inspecto-audit-spi': ['inspecto-api', 'inspecto-util'],
-    'inspecto-auth-spi': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi'],
-    'inspecto-http-spi': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
-    'inspecto-entity-store': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi'],
+    'inspecto-auth-spi': ['inspecto-api', 'inspecto-util', 'inspecto-config'],
+    'inspecto-http-spi': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
+    'inspecto-entity-store': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi'],
     // D-1 step 5b: the host-free halves of Link Analysis. inspecto-sql is host-free too (SqlGuard / SqlSandboxPolicy: it reaches only
     // api, config and util). inspecto-http-spi arrives through inspecto-entity-store, so la-core reaches it transitively whether or not it names it.
-    'inspecto-la-core': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph'],
+    'inspecto-la-core': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph'],
     // D-3 step 2: the Link Analysis index store. la-core's closure plus la-core itself; la-core must NEVER reach it (la-api depends on it since D-3 step 4).
-    'inspecto-la-storage': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core'],
+    'inspecto-la-storage': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core'],
     // D-3 step 4: la-api now depends on la-storage (the index build service + manifest); the reverse edge, and la-core -> la-storage, stay banned.
-    'inspecto-la-api': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core', 'inspecto-la-storage'],
+    'inspecto-la-api': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core', 'inspecto-la-storage'],
     // LA-INVESTIGATION-STORE-DESIGN-1 S2 (D-IS7): the Postgres InvestigationStore - la-core's closure plus la-core itself. JDBC only (java.sql); the driver is the host's. la-core must NEVER reach it.
-    'inspecto-la-store-pg': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core'],
-    'inspecto-oidc': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
+    'inspecto-la-store-pg': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-sql', 'inspecto-la-graph', 'inspecto-la-core'],
+    'inspecto-oidc': ['inspecto-access', 'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
     'inspecto-secrets': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
     'inspecto-geo-country': ['inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-audit-spi', 'inspecto-auth-spi'],
 };

@@ -89,7 +89,7 @@ export function registries(read, files) {
     add('Feature flags (features{})', br, sizeOf(br, (t) => count(t, /\bhasRoute\s*\(/g)), 'hasRoute probes');
     const nav = 'inspecto-ui/src/app/core/navigation/navigation.service.ts';
     add('SPA nav gating', nav, sizeOf(nav, (t) => [...t.matchAll(/static readonly \w+_NAV_IDS\s*=\s*new Set\(\[([^\]]*)\]/g)].reduce((n, m) => n + count(m[1], /'[^']+'/g), 0)), 'hard-coded nav ids');
-    const cm = 'spi/inspecto-auth-spi/src/main/java/com/gamma/control/CapabilityManifest.java';
+    const cm = 'platform/inspecto-access/src/main/java/com/gamma/access/CapabilityManifest.java';
     add('RBAC capabilities', cm, sizeOf(cm, (t) => count(t, /\bnew Entry\s*\(/g)), 'ENTRIES');
     const ap = 'inspecto/src/main/java/com/gamma/control/ApprovalPolicy.java';
     add('Governable config kinds', ap, sizeOf(ap, (t) => { const m = /private static Set<String> governable\(\)\s*\{([\s\S]*?)\n    \}/.exec(t); return m ? count(m[1], /\bs\.(add|addAll|remove)\s*\(/g) : 0; }), 'hand-edit sites in the computed set');

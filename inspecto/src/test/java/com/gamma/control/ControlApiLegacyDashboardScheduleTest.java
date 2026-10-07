@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import com.gamma.access.ComponentAccess;
 
 import static org.junit.jupiter.api.Assertions.*;
 

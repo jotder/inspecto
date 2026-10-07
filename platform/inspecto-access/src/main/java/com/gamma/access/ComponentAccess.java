@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.access;
 
 import com.sun.net.httpserver.HttpExchange;
 
@@ -8,6 +8,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import com.gamma.control.ApiException;
+import com.gamma.control.Authenticator;
+import com.gamma.control.ErrorCodes;
+import com.gamma.control.RequestAttrs;
+import com.gamma.control.Subject;
 import static com.gamma.util.Values.trimOrEmpty;
 
 /**
@@ -45,14 +50,14 @@ public final class ComponentAccess {
     public static final String ATTR_HELD_ROLES = "inspecto.access.heldRoles";
 
     /** The {@link #ATTR_HELD_ROLES} write seam for the security module's {@link Authenticator} — the
-     *  one out-of-package writer. Request-scoped via {@link ApiContext#attr}, never the JDK's exchange
+     *  one out-of-package writer. Request-scoped via {@code ApiContext.attr}, never the JDK's exchange
      *  map (shared across in-flight requests on pre-JDK-26 runtimes — see RequestAttrs.REQUEST_SCOPES). */
     public static void heldRoles(HttpExchange ex, Set<String> roles) {
         RequestAttrs.attr(ex, ATTR_HELD_ROLES, roles);
     }
 
-    static final String OWNER = "owner";
-    static final String SHARES = "shares";
+    public static final String OWNER = "owner";
+    public static final String SHARES = "shares";
 
     private static final int MAX_SHARES = 100;
 
@@ -105,7 +110,7 @@ public final class ComponentAccess {
     }
 
     /** 404 (indistinguishable from absence) unless the request may view the component. */
-    static void requireView(HttpExchange ex, String type, String id, Map<String, Object> content) {
+    public static void requireView(HttpExchange ex, String type, String id, Map<String, Object> content) {
         if (!canView(ex, content))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no " + type + " component '" + id + "'");
     }
@@ -120,7 +125,7 @@ public final class ComponentAccess {
 
     /** Delete gate: unrestricted components keep today's behavior; a restricted (shared) component
      *  may only be deleted by its owner / an access admin — an edit share is not ownership. */
-    static void requireDelete(HttpExchange ex, String type, String id, Map<String, Object> content) {
+    public static void requireDelete(HttpExchange ex, String type, String id, Map<String, Object> content) {
         requireView(ex, type, id, content);
         if (content.containsKey(SHARES) && level(ex, content) < OWN)
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
@@ -132,7 +137,7 @@ public final class ComponentAccess {
      *  OWNER-IS-CREATOR (operator, 2026-09-28): a body {@code owner} naming anyone but the caller is a 403
      *  unless the caller holds canConfigureAccess or canAdminister, since owner-routed alerting would
      *  otherwise let a creator address a rule's alerts to anyone. */
-    static Map<String, Object> onCreate(HttpExchange ex, Map<String, Object> content) {
+    public static Map<String, Object> onCreate(HttpExchange ex, Map<String, Object> content) {
         Map<String, Object> out = new LinkedHashMap<>(content);
         if (RequestAttrs.attr(ex, RequestAttrs.ATTR_SUBJECT) instanceof Subject s && !out.containsKey(OWNER))
             out.put(OWNER, s.id());
@@ -157,7 +162,7 @@ public final class ComponentAccess {
      * validate (422), and reject envelope changes from anyone but the owner / an access admin (403).
      * Returns the content to persist.
      */
-    static Map<String, Object> onUpdate(HttpExchange ex, String type, String id,
+    public static Map<String, Object> onUpdate(HttpExchange ex, String type, String id,
                                         Map<String, Object> current, Map<String, Object> incoming) {
         requireEdit(ex, type, id, current);
         Map<String, Object> merged = new LinkedHashMap<>(incoming);

@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import com.gamma.access.WriteGates;
 
 /**
  * The per-Space <b>module Enabled gate</b> over HTTP (MODULE-REORG-1 P2b, D-MR10) - the middle gate

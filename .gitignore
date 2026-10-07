@@ -138,6 +138,7 @@ inspecto-consignment-outputs.db.wal
 /providers/inspecto-connectors-kafka/target/
 /providers/inspecto-telecom-asn1/target/
 /platform/inspecto-workflow/target/
+/platform/inspecto-access/target/
 /providers/inspecto-policy/target/
 /features/inspecto-intelligence/target/
 

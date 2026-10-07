@@ -19,6 +19,7 @@ import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.gamma.access.WriteGates;
 import static com.gamma.util.Values.mapAt;
 
 /**

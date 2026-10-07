@@ -17,6 +17,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.gamma.access.WriteGates;
 
 /**
  * Decision Rule routes ({@code /decision-rules*}) — the business-logic/routing third of the Rules

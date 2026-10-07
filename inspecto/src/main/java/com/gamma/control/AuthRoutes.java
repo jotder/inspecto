@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpsExchange;
 
 import java.io.IOException;
 import java.util.Map;
+import com.gamma.access.AuditTrail;
 
 /**
  * Backend-mediated OIDC session routes ({@code /auth/*}, W6d): the SPA does Authorization Code +

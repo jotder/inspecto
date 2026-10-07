@@ -98,7 +98,7 @@ off-spec, 403 on the PATCH).
 **RBAC shipped end-to-end (workstream R, R0–R5, 2026-07-23).** The groundwork above is now a working
 server-side authorization system, all behind the existing SPIs (core stays auth-free):
 
-- **Data-driven roles (R1).** Role→capability/data-scope grants are authorable: core `com.gamma.control.Roles`
+- **Data-driven roles (R1).** Role→capability/data-scope grants are authorable: `com.gamma.access.Roles` (`platform/inspecto-access`)
   holds the seed table + doc grammar; `ControlApi` stamps the bound space's config root
   (`Roles.ATTR_CONFIG_ROOT`) pre-auth and `Roles.effective(ex)` overlays a per-space `roles.toon` **per role
   name** (authored `[]` revokes; unnamed seed roles keep defaults), mtime-cached so edits apply next request,

@@ -13,6 +13,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.gamma.access.ComponentAccess;
+import com.gamma.access.WriteGates;
 
 /**
  * Alert execution engine routes ({@code /alerts*}, v4.1 B5): read-only listings of recent alerts and

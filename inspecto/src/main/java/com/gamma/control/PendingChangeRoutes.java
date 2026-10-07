@@ -14,6 +14,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import com.gamma.access.Roles;
+import com.gamma.access.ComponentAccess;
+import com.gamma.access.WriteGates;
+import com.gamma.access.CapabilityManifest;
 
 /**
  * The Pending Change inbox and the approval policy (`ASSURE-MAKER-CHECKER-1` S1/S3) — see {@link PendingChanges}

@@ -49,6 +49,7 @@
         <module>platform/inspecto-etl</module>
         <module>spi/inspecto-audit-spi</module>
         <module>spi/inspecto-auth-spi</module>
+        <module>platform/inspecto-access</module>
         <module>spi/inspecto-http-spi</module>
         <module>platform/inspecto-entity-store</module>
         <module>platform/inspecto-event</module>
@@ -389,6 +390,11 @@
                 <artifactId>inspecto-auth-spi</artifactId>
                 <version>${project.version}</version>
                 <type>test-jar</type>
+            </dependency>
+            <dependency>
+                <groupId>com.gamma.inspector</groupId>
+                <artifactId>inspecto-access</artifactId>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.gamma.inspector</groupId>

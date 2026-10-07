@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.access;
 
 import com.gamma.api.PublicApi;
 import com.gamma.util.AtomicFiles;
@@ -19,6 +19,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import com.gamma.control.ApiException;
+import com.gamma.control.Authenticator;
+import com.gamma.control.ErrorCodes;
+import com.gamma.control.RequestAttrs;
+import com.gamma.control.Subject;
 import static com.gamma.util.Values.trimOrEmpty;
 
 /**
@@ -53,7 +58,7 @@ public final class Roles {
     public static final String ATTR_CONFIG_ROOT = "inspecto.roles.configRoot";
 
     /** Bind this request's config root (the {@link #ATTR_CONFIG_ROOT} write seam — ControlApi's
-     *  authenticate stage, and tests standing in for it). Request-scoped via {@link ApiContext#attr},
+     *  authenticate stage, and tests standing in for it). Request-scoped via {@code ApiContext.attr},
      *  never the JDK's exchange map (shared across in-flight requests on pre-JDK-26 runtimes). */
     public static void configRoot(com.sun.net.httpserver.HttpExchange ex, java.nio.file.Path root) {
         RequestAttrs.attr(ex, ATTR_CONFIG_ROOT, root);
@@ -66,7 +71,7 @@ public final class Roles {
         return RequestAttrs.attr(ex, ATTR_CONFIG_ROOT) instanceof java.nio.file.Path p ? p : null;
     }
 
-    static final String FILE = "roles.toon";
+    public static final String FILE = "roles.toon";
 
     // ── capability vocabulary (must stay congruent with the withCapability route gates; R4 will
     //    pin that congruence with a manifest test) ─────────────────────────────────────────────
@@ -174,7 +179,7 @@ public final class Roles {
 
     /** The capability vocabulary = exactly what the route gates demand ({@link CapabilityManifest},
      *  R4) — the 422 validation set for authored roles and Access-Catalog action nodes. */
-    static final Set<String> KNOWN_CAPABILITIES = Set.copyOf(CapabilityManifest.capabilities());
+    public static final Set<String> KNOWN_CAPABILITIES = Set.copyOf(CapabilityManifest.capabilities());
 
     private static final int MAX_ROLES = 200;
     private static final int MAX_SCOPES = 64;
@@ -210,7 +215,7 @@ public final class Roles {
      * space and is not a build activity, so the builder roles that may edit a pipeline no longer get menu
      * curation for free. {@code power} is the seeded role closest to "owns this space's presentation".
      */
-    static final Map<String, Def> SEED = seed();
+    public static final Map<String, Def> SEED = seed();
 
     private static Map<String, Def> seed() {
         Set<String> builder = Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_REQUEST_SHARES);
@@ -243,7 +248,7 @@ public final class Roles {
     /** The authored doc (authored roles only, no seed merge) + the {@code identity.attributeClaims}
      *  allowlist (ABAC A1 — which verified IdP claims an {@link Authenticator} may copy onto
      *  {@link Subject#attributes()}; empty = no attributes, ever) + its readability. */
-    record Doc(Map<String, Def> authored, List<String> attributeClaims, boolean unreadable) {
+    public record Doc(Map<String, Def> authored, List<String> attributeClaims, boolean unreadable) {
         static final Doc ABSENT = new Doc(Map.of(), List.of(), false);
     }
 
@@ -260,7 +265,7 @@ public final class Roles {
     /** The effective table for {@code configRoot}: authored roles overlaid on {@link #SEED} per role
      *  name; seed-only when {@code configRoot} is null or no doc exists; empty (all grants suspended,
      *  fail-closed) when a doc exists but cannot be read. */
-    static Map<String, Def> effective(Path configRoot) {
+    public static Map<String, Def> effective(Path configRoot) {
         Doc doc = load(configRoot);
         if (doc.unreadable()) return Map.of();
         if (doc.authored().isEmpty()) return SEED;
@@ -271,7 +276,7 @@ public final class Roles {
 
     /** The authored doc at {@code configRoot} (mtime/size-cached — an on-disk edit or an
      *  {@code AccessRoutes} PUT is picked up on the next read, no restart). */
-    static Doc load(Path configRoot) {
+    public static Doc load(Path configRoot) {
         if (configRoot == null) return Doc.ABSENT;
         Path file = configRoot.resolve(FILE);
         if (!Files.exists(file)) return Doc.ABSENT;
@@ -311,7 +316,7 @@ public final class Roles {
 
     /** Parse+validate a {@code roles} list (wire {@code dataScopes} and on-disk {@code data_scopes}
      *  both accepted) into name → {@link Def}. Throws {@link ApiException} 422 on any violation. */
-    static Map<String, Def> validate(Object rolesObj) {
+    public static Map<String, Def> validate(Object rolesObj) {
         if (!(rolesObj instanceof List<?> raw))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "role settings require a 'roles' list");
         if (raw.size() > MAX_ROLES)
@@ -345,7 +350,7 @@ public final class Roles {
 
     /** Parse+validate an optional {@code identity} block ({@code {attributeClaims: [claim, …]}}) into
      *  the claim allowlist. Throws {@link ApiException} 422 on any violation. */
-    static List<String> attributeClaims(Object identityObj) {
+    public static List<String> attributeClaims(Object identityObj) {
         if (identityObj == null) return List.of();
         if (!(identityObj instanceof Map<?, ?> identity))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'identity' must be an object {attributeClaims: [claim, ...]}");
@@ -385,7 +390,7 @@ public final class Roles {
 
     /** Write {@code authored} (+ the optional {@code identity.attributeClaims} allowlist) as
      *  {@value #FILE} under {@code configRoot} (snake-case on disk). */
-    static void write(Path configRoot, Map<String, Def> authored, List<String> attributeClaims) throws IOException {
+    public static void write(Path configRoot, Map<String, Def> authored, List<String> attributeClaims) throws IOException {
         List<Map<String, Object>> roles = authored.entrySet().stream().map(e -> {
             Map<String, Object> r = new LinkedHashMap<String, Object>();
             r.put("name", e.getKey());

@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.gamma.access.WriteGates;
 
 /**
  * The seam an optional module uses to REGISTER a Dataset over a store it owns — through the SAME validated save path a

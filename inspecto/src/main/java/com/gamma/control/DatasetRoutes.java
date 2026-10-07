@@ -17,6 +17,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.gamma.access.ComponentAccess;
+import com.gamma.access.WriteGates;
 
 /**
  * Dataset actions ({@code POST /datasets/{id}/materialize}) plus the Dataset's own row page

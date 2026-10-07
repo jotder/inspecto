@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.gamma.access.WriteGates;
 
 /**
  * The curated widget/dashboard template gallery (BI-8): starter component sets an operator applies to

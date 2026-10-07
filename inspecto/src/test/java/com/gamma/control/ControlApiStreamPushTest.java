@@ -30,6 +30,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Stream;
+import com.gamma.access.AuditTrail;
 
 import static org.junit.jupiter.api.Assertions.*;
 

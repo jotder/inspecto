@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
+import com.gamma.access.Roles;
+import com.gamma.access.ComponentAccess;
 
 /**
  * The shared HTTP plumbing a {@link RouteModule} needs to register and serve routes without

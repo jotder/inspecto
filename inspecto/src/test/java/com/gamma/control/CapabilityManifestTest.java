@@ -12,6 +12,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import com.gamma.access.Roles;
+import com.gamma.access.CapabilityManifest;
 
 import static org.junit.jupiter.api.Assertions.*;
 

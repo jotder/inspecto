@@ -1,5 +1,7 @@
 package com.gamma.control;
 
+import com.gamma.access.CapabilityManifest;
+import com.gamma.access.Roles;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;

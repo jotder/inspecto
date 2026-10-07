@@ -300,7 +300,7 @@ additive, not colliding.
 
 ### 3.9 Write gates pass a shared mount unchanged
 
-`WriteGates.requireWriteRoot` (`inspecto-auth-spi/src/main/java/com/gamma/control/WriteGates.java:19-25`) jails
+`WriteGates.requireWriteRoot` (`platform/inspecto-access/src/main/java/com/gamma/access/WriteGates.java:19-25`) jails
 against `-Dassist.write.root`; `WriteGates.jail` (`:54-59`) delegates to `PathJail.contains`
 (`inspecto-config/src/main/java/com/gamma/config/safety/PathJail.java:142-159`) over `SafetyPolicy.defaultPolicy()` roots
 (`SafetyPolicy.java:83-92`). Both are pure path-containment checks with no host or process identity: a

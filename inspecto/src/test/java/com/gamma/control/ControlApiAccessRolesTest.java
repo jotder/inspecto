@@ -18,6 +18,7 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import com.gamma.access.Roles;
 
 import static org.junit.jupiter.api.Assertions.*;
 

@@ -6,6 +6,7 @@ import com.gamma.service.PipelineRelated;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.nio.file.Path;
+import com.gamma.access.WriteGates;
 
 /**
  * {@code GET /pipelines/{name}/related} — everything related to one pipeline (pipeline spec §12 gap 5,

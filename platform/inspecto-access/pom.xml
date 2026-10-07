@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <!-- MODULE-REORG-1 P7-CONTRACTS (plan D-MR1): the access POLICY and state that used to sit inside the auth contract -
+         Roles (roles.toon), AccessGrants, ComponentAccess, WriteGates, CapabilityManifest, AuditTrail, RowScope and
+         AccessPolicyStore. inspecto-auth-spi keeps only the contracts (Subject, AccessDecider, Authenticator, ...); this
+         module holds the behaviour that reads and writes files and emits audit events. BASE, not optional: ApiContext
+         (inspecto-http-spi) stands on Roles / ComponentAccess, so http-spi depends on THIS module, never the reverse.
+         It must NOT depend on the core inspecto module (optional modules import it). Package com.gamma.access is new. -->
+    <artifactId>inspecto-access</artifactId>
+    <name>Inspecto access (roles, grants, row scope, write gates, audit trail, capability manifest)</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-util</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-config</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-audit-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-auth-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.access;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -7,10 +7,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import com.gamma.control.AccessDecider;
+import com.gamma.control.AccessDeciders;
+import com.gamma.control.Subject;
 
-import static com.gamma.control.ComponentAccess.AsOwner.ALLOWED;
-import static com.gamma.control.ComponentAccess.AsOwner.DENIED;
-import static com.gamma.control.ComponentAccess.AsOwner.ROLE_ONLY;
+import static com.gamma.access.ComponentAccess.AsOwner.ALLOWED;
+import static com.gamma.access.ComponentAccess.AsOwner.DENIED;
+import static com.gamma.access.ComponentAccess.AsOwner.ROLE_ONLY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;

@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import com.gamma.access.WriteGates;
 
 /**
  * The Space's {@link ApproverRoster} over HTTP — the egress allowlist's shape ({@link EgressRoutes}).

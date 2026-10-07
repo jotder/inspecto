@@ -45,7 +45,7 @@ test('registries measures a fixture and reports a missing file as null', () => {
         'inspecto/src/main/java/com/gamma/control/ControlApi.java': 'for (RouteModule module : List.of(new AaRoutes(), new BbRoutes(), new CcRoutes())) {}',
         'inspecto/src/main/java/com/gamma/control/BootstrapRoutes.java': 'api.hasRoute("GET","/a"); api.hasRoute("GET","/b");',
         'inspecto-ui/src/app/core/navigation/navigation.service.ts': "private static readonly OPS_NAV_IDS = new Set(['a', 'b']);\nprivate static readonly EVENTS_NAV_IDS = new Set(['c']);",
-        'spi/inspecto-auth-spi/src/main/java/com/gamma/control/CapabilityManifest.java': 'new Entry("POST","/a","c"), new Entry("GET","/b","d")',
+        'platform/inspecto-access/src/main/java/com/gamma/access/CapabilityManifest.java': 'new Entry("POST","/a","c"), new Entry("GET","/b","d")',
     };
     const by = Object.fromEntries(registries((p) => src[p] ?? null, files).map((r) => [r.name, r.size]));
     assert.equal(by['Built-in route list'], 3);

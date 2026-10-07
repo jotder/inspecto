@@ -9,7 +9,7 @@ import java.util.Map;
 /**
  * The PDP seam (ABAC A3, {@code docs/superpower/rbac-abac-plan.md} §2): an edition-supplied decider
  * consulted at the two PEPs — the route-level authorize stage (after authentication, before the
- * handler) and the row-level {@link RowScope} filter. Discovered via
+ * handler) and the row-level {@code RowScope} filter. Discovered via
  * {@code META-INF/services/com.gamma.control.AccessDecider} exactly like {@link Authenticator}:
  * the core ships none, Personal/Standard classpaths resolve empty and behave byte-identically; the
  * Enterprise {@code inspecto-policy} module registers its policy engine.

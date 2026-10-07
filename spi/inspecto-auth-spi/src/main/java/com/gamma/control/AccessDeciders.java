@@ -5,12 +5,12 @@ import java.util.Optional;
 /**
  * Resolves the edition's {@link AccessDecider}, mirroring {@link Authenticators}' "absent module ⇒
  * no-op wins" pattern: Personal/Standard ship no {@code META-INF/services} registration, so
- * {@link #active()} is empty and both PEPs (the authorize stage, {@link RowScope}) skip policy
+ * {@link #active()} is empty and both PEPs (the authorize stage, {@code RowScope}) skip policy
  * evaluation entirely. Typed facade over a {@link SpiSlot}, which owns the caching/first-wins semantics.
  *
  * <p>🔴 <b>Fail-CLOSED, for the same reason as {@link Authenticators} (operator decision 2026-09-13).</b>
  * "Absent ⇒ no-op wins" is only safe where absence costs a feature. Here both PEPs read absence as
- * <em>allow</em> — {@code ControlApi.authorize} returns early and {@link RowScope#visible} returns
+ * <em>allow</em> — {@code ControlApi.authorize} returns early and {@code RowScope.visible} returns
  * {@code true} — and {@code PolicyEngine}'s seeded policies are {@code space-isolation} /
  * {@code space-isolation-rows}. So a registered-but-unloadable {@code inspecto-policy} would stop
  * enforcing the <b>multi-tenant Space boundary</b>, at route and row level, silently.
@@ -21,19 +21,19 @@ import java.util.Optional;
  * is not a feature: losing it silently is worse than refusing to boot. Absence when <em>nothing is
  * registered</em> is still legitimate and still resolves empty — that is the Personal/Standard path.
  */
-final class AccessDeciders {
+public final class AccessDeciders {
     private AccessDeciders() {}
 
     private static final SpiSlot<AccessDecider> SLOT = new SpiSlot<>(AccessDecider.class, true);
 
-    static Optional<AccessDecider> active() {
+    public static Optional<AccessDecider> active() {
         return SLOT.active();
     }
 
     /** Test seam (mirrors {@link Authenticators#forTest}): force {@link #active()} for the rest of this
      *  JVM's tests. A test must restore {@code null} in its teardown so later classes see the
      *  classpath-scanned behaviour again. */
-    static void forTest(AccessDecider d) {
+    public static void forTest(AccessDecider d) {
         SLOT.forTest(d);
     }
 }

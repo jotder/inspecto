@@ -8,6 +8,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.List;
+import com.gamma.access.CapabilityManifest;
 
 import static org.junit.jupiter.api.Assertions.*;
 

@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import com.gamma.access.Roles;
+import com.gamma.access.CapabilityManifest;
 
 import static org.junit.jupiter.api.Assertions.*;
 

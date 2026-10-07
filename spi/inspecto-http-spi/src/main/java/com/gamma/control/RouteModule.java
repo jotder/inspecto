@@ -1,12 +1,13 @@
 package com.gamma.control;
 
+
 /**
  * A cohesive group of related control-plane routes. Implementations register their routes onto the
  * shared {@link ApiContext}; {@link ControlApi} composes them and stays a thin host — new feature
  * groups are added without editing the dispatcher (open/closed).
  *
  * <p><b>Public since 2026-09-07 (EDG-01 cell 3a).</b> Until then this, {@link ApiContext}, {@link Handler},
- * {@link ApiException} and {@link WriteGates} were all package-private, so a route group could only ever
+ * {@link ApiException} and {@code WriteGates} were all package-private, so a route group could only ever
  * live in {@code com.gamma.control} — which is why every "not for Personal" feature shipped in every
  * bundle. Now an optional module may implement it and register the class in
  * {@code META-INF/services/com.gamma.control.RouteModule}; {@link ControlApi} discovers such modules with

@@ -22,6 +22,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.gamma.access.WriteGates;
 
 /**
  * Public / embedded dashboard sharing (BI-6), <b>fail-closed</b>: the whole surface is inert unless

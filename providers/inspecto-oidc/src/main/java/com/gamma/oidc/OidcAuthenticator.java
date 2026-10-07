@@ -1,9 +1,9 @@
 package com.gamma.oidc;
 
-import com.gamma.control.AccessGrants;
+import com.gamma.access.AccessGrants;
 import com.gamma.control.Authenticator;
-import com.gamma.control.ComponentAccess;
-import com.gamma.control.Roles;
+import com.gamma.access.ComponentAccess;
+import com.gamma.access.Roles;
 import com.gamma.control.Subject;
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;

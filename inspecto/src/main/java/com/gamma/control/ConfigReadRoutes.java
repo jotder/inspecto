@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.gamma.access.WriteGates;
 
 /**
  * Declarative-config read/delete routes ({@code DELETE /config/&#123;type&#125;/&#123;name&#125;},

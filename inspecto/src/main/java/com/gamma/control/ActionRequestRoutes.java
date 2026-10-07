@@ -14,6 +14,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import com.gamma.access.Roles;
+import com.gamma.access.WriteGates;
+import com.gamma.access.AccessPolicyStore;
 
 /**
  * The Action Request surface ({@code ASSURE-ACTION-REQUESTS-1}) — see {@link ActionRequests} for the model and

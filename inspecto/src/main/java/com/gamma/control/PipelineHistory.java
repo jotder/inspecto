@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import com.gamma.access.WriteGates;
 
 /**
  * A Pipeline's persisted config history ({@code PIPELINE-CONFIG-HISTORY-1}, operator decision 2026-09-24):

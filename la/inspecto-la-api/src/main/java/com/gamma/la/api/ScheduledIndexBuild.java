@@ -1,6 +1,6 @@
 package com.gamma.la.api;
 
-import com.gamma.control.ComponentAccess;
+import com.gamma.access.ComponentAccess;
 import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventLog;

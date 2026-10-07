@@ -2,6 +2,7 @@ package com.gamma.control;
 
 import com.gamma.config.safety.PathJail;
 import java.nio.file.Path;
+import com.gamma.access.WriteGates;
 
 /**
  * The reserved-config-target guard for the {@code /config/*} write and read routes ({@code CONFIG-WRITE-REGISTRY-1}).

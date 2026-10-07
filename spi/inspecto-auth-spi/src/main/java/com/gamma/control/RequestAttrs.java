@@ -6,8 +6,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The request-scoped attribute names, their per-request storage, and the identity helpers that read them —
- * the part of the old {@code ApiContext} static surface that the auth classes ({@link Subject}, {@link Roles},
- * {@link ComponentAccess}, {@link RowScope}, {@code AccessDecider}, {@code AuditTrail}…) stand on.
+ * the part of the old {@code ApiContext} static surface that the auth classes ({@link Subject}, {@code Roles},
+ * {@code ComponentAccess}, {@code RowScope}, {@code AccessDecider}, {@code AuditTrail}…) stand on.
  *
  * <p>Extracted in D-1 step 3 so those classes no longer name {@code ApiContext}: that interface references them
  * ({@code Subject}, {@code Roles}, {@code ComponentAccess}, {@code Authenticator}) and a back-reference made the two

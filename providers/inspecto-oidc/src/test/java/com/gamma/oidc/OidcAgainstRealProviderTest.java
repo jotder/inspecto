@@ -187,7 +187,7 @@ class OidcAgainstRealProviderTest {
             withProperties(jwks, issuer, audienceOf(token), () -> {
                 Optional<Subject> subject = new OidcAuthenticator().authenticate(bearer(token));
                 assertTrue(subject.isPresent(), "a live user token must authenticate");
-                assertTrue(subject.get().capabilities().contains(com.gamma.control.Roles.CAN_AUTHOR_WORKBENCH),
+                assertTrue(subject.get().capabilities().contains(com.gamma.access.Roles.CAN_AUTHOR_WORKBENCH),
                         "group 'pipeline-developer' must map through Roles.SEED to real capabilities — got "
                                 + subject.get().capabilities());
             });

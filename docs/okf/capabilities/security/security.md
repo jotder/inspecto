@@ -259,7 +259,7 @@ serves `POST /auth/exchange | /auth/refresh | /auth/logout`, delegating to the `
 
 ### 3.6 Roles: a seeded, authorable, fail-closed table
 
-`com.gamma.control.Roles` (core) holds the **seed table** and the doc grammar. Role *assignment* is the IdP's
+`com.gamma.access.Roles` (`platform/inspecto-access`) holds the **seed table** and the doc grammar. Role *assignment* is the IdP's
 (claims); role *definitions* are data. `Roles.effective(ex)` overlays the bound Space's `roles.toon`
 (`Roles.FILE`, `Roles.java:62`) **per role name** — an authored `[]` revokes a seed role, unnamed seed roles
 keep their defaults — mtime-cached so edits apply on the next request with no restart. **Fail-closed:** an

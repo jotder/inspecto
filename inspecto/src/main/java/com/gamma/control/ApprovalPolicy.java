@@ -15,6 +15,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import com.gamma.access.Roles;
+import com.gamma.access.CapabilityManifest;
 
 /**
  * A Space's per-kind approval policy (`ASSURE-MAKER-CHECKER-1` S1): which config kinds a change must be

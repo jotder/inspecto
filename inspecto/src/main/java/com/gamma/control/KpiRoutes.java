@@ -18,6 +18,9 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.gamma.access.Roles;
+import com.gamma.access.ComponentAccess;
+import com.gamma.access.WriteGates;
 
 /**
  * KPI definitions (`ASSURE-KPI-DEFINITIONS-1`, WS-20). A KPI is a {@code kpi} registry component — authored,

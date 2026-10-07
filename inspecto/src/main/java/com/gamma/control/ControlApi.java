@@ -29,6 +29,10 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import com.gamma.access.Roles;
+import com.gamma.access.ComponentAccess;
+import com.gamma.access.CapabilityManifest;
+import com.gamma.access.AuditTrail;
 
 /**
  * Embedded REST control plane for a running {@link CollectorService} (M3). Built on the

@@ -24,6 +24,10 @@
         </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-access</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-util</artifactId>
         </dependency>
         <dependency>
@@ -60,6 +64,7 @@
                                         <exclude>com.gamma.inspector:*:*:*:runtime</exclude>
                                     </excludes>
                                     <includes>
+                                        <include>com.gamma.inspector:inspecto-access</include>
                                         <include>com.gamma.inspector:inspecto-api</include>
                                         <include>com.gamma.inspector:inspecto-audit-spi</include>
                                         <include>com.gamma.inspector:inspecto-auth-spi</include>

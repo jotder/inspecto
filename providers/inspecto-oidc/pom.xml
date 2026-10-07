@@ -42,6 +42,12 @@
             <version>${project.version}</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-access</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <!-- The core, for TESTS only: AuthenticatorDiscoveryFailClosedTest boots a real CollectorService. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
@@ -103,6 +109,7 @@
                                         <exclude>com.gamma.inspector:*:*:*:runtime</exclude>
                                     </excludes>
                                     <includes>
+                                        <include>com.gamma.inspector:inspecto-access</include>
                                         <include>com.gamma.inspector:inspecto-api</include>
                                         <include>com.gamma.inspector:inspecto-audit-spi</include>
                                         <include>com.gamma.inspector:inspecto-auth-spi</include>

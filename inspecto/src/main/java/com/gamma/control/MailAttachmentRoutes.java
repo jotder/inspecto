@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.gamma.access.WriteGates;
 
 /**
  * A Space's <b>attachment recipient domain allowlist</b> (operator decision 2026-09-29, ASSURE-XLSX-ATTACHMENTS-1),

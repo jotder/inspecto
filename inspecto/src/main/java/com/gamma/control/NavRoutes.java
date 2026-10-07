@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import com.gamma.access.WriteGates;
 
 /**
  * Per-space Menu tree (Menu Builder) — the real backend for the contract the UI froze mock-first

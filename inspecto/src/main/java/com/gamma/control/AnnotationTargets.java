@@ -8,6 +8,8 @@ import com.sun.net.httpserver.HttpExchange;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import com.gamma.access.ComponentAccess;
+import com.gamma.access.RowScope;
 
 /**
  * The one existence-and-authorization gate for anything addressed as a {@code (targetKind, targetId)}

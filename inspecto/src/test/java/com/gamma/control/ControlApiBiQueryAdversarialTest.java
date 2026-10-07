@@ -13,6 +13,7 @@ import java.net.URI;
 import java.net.http.*;
 import java.nio.file.Path;
 import java.util.*;
+import com.gamma.access.ComponentAccess;
 
 import static org.junit.jupiter.api.Assertions.*;
 

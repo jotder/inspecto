@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import com.gamma.access.RowScope;
 
 import static org.junit.jupiter.api.Assertions.*;
 

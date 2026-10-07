@@ -13,6 +13,7 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import com.gamma.access.Roles;
 
 /**
  * Embedded-intelligence routes ({@code /agent*}, AGT-5 P0): open a session, then ask it questions.

@@ -25,6 +25,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import com.gamma.access.Roles;
+import com.gamma.access.WriteGates;
 
 /**
  * In-app notification feed routes ({@code /notifications*}, Phase B2): the bell-icon feed, the unread

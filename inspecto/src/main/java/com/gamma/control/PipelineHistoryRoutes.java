@@ -16,6 +16,8 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.gamma.access.WriteGates;
+import com.gamma.access.CapabilityManifest;
 
 /**
  * A Pipeline's config history ({@code PIPELINE-CONFIG-HISTORY-1}): list the kept versions, read one, diff two

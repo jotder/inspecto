@@ -250,7 +250,7 @@ the quarantine reasons are in
 
 **Layer 2 — provenance rows** (§3.4).
 
-**Layer 3 — the who-did-what trail.** `AuditTrail` (`spi/inspecto-auth-spi/src/main/java/com/gamma/control/AuditTrail.java`)
+**Layer 3 — the who-did-what trail.** `AuditTrail` (`platform/inspecto-access/src/main/java/com/gamma/access/AuditTrail.java`)
 is **one central interceptor called from `ControlApi.dispatch`** — not per handler. It records every
 successful state-changing request (`POST`/`PUT`/`PATCH`/`DELETE` — `PATCH` only since 2026-09-26: before, the
 classifier admitted three methods, so the admin-only `PATCH /objects/{id}` priority / severity / assignee edit
@@ -772,7 +772,7 @@ the form authors the kind), and per-measure limits.
 | Signal envelope & read side | `platform/inspecto-engine/src/main/java/com/gamma/signal/Signal.java`, `Signals.java`, `PipelineConsignmentSignal.java` | [`signal-backbone.md`](../../backend/control-plane/signal-backbone.md) §S0–S2 |
 | Feed routes (optional) · fallbacks · audit read | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java`; `inspecto/src/main/java/com/gamma/control/AbsentModuleRoutes.java`, `AbsentModuleRoutes.java`, `AuditLogRoutes.java`, `SignalRoutes.java` | `EDITIONS.md` CP-13, §Audit; [`events.md`](../../frontend/features/events.md) |
 | Metrics | `spi/inspecto-audit-spi/src/main/java/com/gamma/metrics/MetricRegistry.java`; `features/inspecto-observability/src/main/java/com/gamma/metricsapi/MetricsRoutes.java`; `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java`; `platform/inspecto-engine/src/main/java/com/gamma/inspector/AcquisitionTelemetry.java` | `ADVANCED_GUIDE.md` §7 (`/metrics` catalog) |
-| Audit trail | `spi/inspecto-auth-spi/src/main/java/com/gamma/control/AuditTrail.java` (called from `ControlApi.dispatch`) | `compliance/controls-matrix.md` AU-9, ISO 8.15–8.17 |
+| Audit trail | `platform/inspecto-access/src/main/java/com/gamma/access/AuditTrail.java` (called from `ControlApi.dispatch`) | `compliance/controls-matrix.md` AU-9, ISO 8.15–8.17 |
 | Provenance & conservation | `platform/inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java`, `ProvenanceStores.java`, `ConservationCheck.java`; `platform/inspecto-engine/src/main/java/com/gamma/job/PipelineJobRunner.java` (`reportConservation`); `inspecto/src/main/java/com/gamma/control/LineageRoutes.java`, `JobRoutes.java` (`/provenance*`); `platform/inspecto-engine/src/main/java/com/gamma/notify/NotificationRules.java` | `docs/ops/provenance-conservation-verification.md` |
 | Reporting, status, health | `inspecto/src/main/java/com/gamma/report/ReportService.java`; `inspecto/src/main/java/com/gamma/control/RunRoutes.java`, `HealthDetails.java`, `SystemRoutes.java`; `inspecto/src/main/java/com/gamma/service/InboxStatus.java`, `ServiceStores.java`, `OperationalDb.java`; `platform/inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java` | [`operations-reference.md`](../../backend/build-run/operations-reference.md) §Reports, §Status backend |
 | Maintenance & retention | `platform/inspecto-engine/src/main/java/com/gamma/job/MaintenanceJob.java`, `MaintenanceTaskProvider.java`, `EventPruneTask.java`; `features/inspecto-backup/src/main/java/com/gamma/backup/BackupTask.java`, `BackupTaskProvider.java`; `features/inspecto-ops/src/main/java/com/gamma/opsjob/OpsMaintenanceTasks.java`; `spaces/demo/config/jobs/*.toon` | [`jobs.md`](../../backend/control-plane/jobs.md) §Maintenance; `operations-reference.md` §Retention & purging; `docs/ops/backup-restore-runbook.md` |

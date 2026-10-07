@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import com.gamma.access.ComponentAccess;
 
 import static org.junit.jupiter.api.Assertions.*;
 

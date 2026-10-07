@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.gamma.access.WriteGates;
 
 /**
  * A Space's <b>publication destination allowlist</b> (ASSURE-BI-PUBLICATION-1, operator 2026-09-29): the exact hosts

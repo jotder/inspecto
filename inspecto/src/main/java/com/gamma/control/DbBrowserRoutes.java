@@ -23,6 +23,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
+import com.gamma.access.WriteGates;
 import static com.gamma.util.Values.intOr;
 
 /**

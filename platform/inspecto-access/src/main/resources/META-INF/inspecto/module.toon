@@ -1,0 +1,5 @@
+id: access
+title: Access policy (roles, grants, row scope, audit trail)
+buildRole: platform
+offeringRole: base
+bindingTime: build

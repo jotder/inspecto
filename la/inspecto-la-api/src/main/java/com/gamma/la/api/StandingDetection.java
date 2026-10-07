@@ -1,9 +1,9 @@
 package com.gamma.la.api;
 
-import com.gamma.control.ComponentAccess;
+import com.gamma.access.ComponentAccess;
 import com.gamma.control.EntityTypes;
 import com.gamma.control.LinkAnalysisSettings;
-import com.gamma.control.RowScope;
+import com.gamma.access.RowScope;
 import com.gamma.control.Subject;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.InvestigationMembers;

@@ -9,7 +9,7 @@
 ## 1. What the audit trail contains — and what it does not
 
 Audit records are ordinary **Events** with `type = AUDIT`, captured at a single seam
-(`inspecto/.../control/AuditTrail.java`) called once from `ControlApi.dispatch` after a request
+(`platform/inspecto-access/src/main/java/com/gamma/access/AuditTrail.java`) called once from `ControlApi.dispatch` after a request
 resolves. One seam means every current **and future** mutating route is covered without per-handler
 wiring — there is no list of audited endpoints to fall out of date.
 

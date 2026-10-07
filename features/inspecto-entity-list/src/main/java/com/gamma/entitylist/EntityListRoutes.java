@@ -8,7 +8,7 @@ import com.gamma.control.ErrorCodes;
 import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.control.PendingChanges;
 import com.gamma.control.RouteModule;
-import com.gamma.control.WriteGates;
+import com.gamma.access.WriteGates;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventLog;
 import com.gamma.audit.EventType;

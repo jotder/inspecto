@@ -8,7 +8,7 @@ import java.util.logging.Logger;
  * and no resolver on the classpath — the Personal edition, since the {@code maxmind-db} binding ships in inspecto-geo-country — the property is inert:
  * one WARN, no attributes, no error.
  */
-final class GeoCountryResolvers {
+public final class GeoCountryResolvers {
 
     private static final Logger LOG = Logger.getLogger(GeoCountryResolvers.class.getName());
     private static final SpiSlot<GeoCountryResolver> SLOT = new SpiSlot<>(GeoCountryResolver.class);
@@ -17,7 +17,7 @@ final class GeoCountryResolvers {
 
     private GeoCountryResolvers() {}
 
-    static Optional<GeoCountryResolver> active() {
+    public static Optional<GeoCountryResolver> active() {
         if (testOverride != null) return Optional.of(testOverride);
         String db = System.getProperty("geoip.db");
         if (db == null || db.isBlank()) return Optional.empty();

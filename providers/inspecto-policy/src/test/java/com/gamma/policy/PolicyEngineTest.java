@@ -3,8 +3,8 @@ package com.gamma.policy;
 import com.gamma.control.AccessDecider.Decision;
 import com.gamma.control.AccessDecider.Explanation;
 import com.gamma.control.AccessDecider.Evaluation;
-import com.gamma.control.ComponentAccess;
-import com.gamma.control.Roles;
+import com.gamma.access.ComponentAccess;
+import com.gamma.access.Roles;
 import com.gamma.control.Subject;
 import com.gamma.audit.EventLog;
 import com.sun.net.httpserver.HttpServer;
@@ -142,7 +142,7 @@ class PolicyEngineTest {
                         "when", "subject.id == 'mallory'"));
         writePolicies(diskRoot, doc);
         List<com.gamma.control.AccessPolicies.Policy> draft =
-                com.gamma.control.AccessPolicyStore.load(diskRoot).policies();   // the same validated policies
+                com.gamma.access.AccessPolicyStore.load(diskRoot).policies();   // the same validated policies
         for (String who : List.of("ana", "mallory"))
             for (String action : List.of("read", "write", "operate")) {
                 Explanation simulated = onExchange(draftRoot,

@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.access;
 
 import com.gamma.control.AccessPolicies.Doc;
 import com.gamma.control.AccessPolicies.Policy;
@@ -22,6 +22,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import com.gamma.control.AccessDecider;
+import com.gamma.control.AccessPolicies;
+import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
+import com.gamma.control.RequestAttrs;
 import static com.gamma.control.AccessPolicies.ACTIONS;
 import static com.gamma.control.AccessPolicies.RESOURCE_KINDS;
 import static com.gamma.util.Values.trimOrEmpty;
@@ -115,7 +120,7 @@ public final class AccessPolicyStore {
      *  save-time guards of policy-authoring-ux-design.md §4: an unknown key (F8), a reference outside
      *  the bound vocabulary (F2 — {@code attributeClaims} is the {@code roles.toon} allowlist, the only
      *  claims a Subject can carry), and an untargeted deny with no condition (F9). */
-    static List<Policy> validate(Object policiesObj, java.util.Collection<String> attributeClaims) {
+    public static List<Policy> validate(Object policiesObj, java.util.Collection<String> attributeClaims) {
         if (!(policiesObj instanceof List<?> raw))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "access policies require a 'policies' list");
         if (raw.size() > MAX_POLICIES)
@@ -212,7 +217,7 @@ public final class AccessPolicyStore {
     /** F1 (the roles side): would the on-disk policies doc still load if the claim allowlist became
      *  {@code attributeClaims}? A roles save that drops a claim a policy references would otherwise
      *  turn the policies doc unreadable — deny-all — as a side effect; it is refused (422) instead. */
-    static void requireLoadableUnder(Path configRoot, java.util.Collection<String> attributeClaims) {
+    public static void requireLoadableUnder(Path configRoot, java.util.Collection<String> attributeClaims) {
         Doc now = load(configRoot);
         if (now.unreadable()) return;   // already failing closed — the roles save does not change that
         for (Policy p : now.policies()) {
@@ -234,7 +239,7 @@ public final class AccessPolicyStore {
      * replaces a built-in one of the same name (F6). Returned by the GET and the PUT alike, so a
      * hand-edited doc shows them too.
      */
-    static List<Warning> lint(List<Policy> policies, Set<String> roleNames, List<Policy> seeds) {
+    public static List<Warning> lint(List<Policy> policies, Set<String> roleNames, List<Policy> seeds) {
         List<Warning> out = new java.util.ArrayList<>();
         for (Policy p : policies) {
             Map<String, Set<String>> refs = Conditions.refs(p.when());
@@ -279,7 +284,7 @@ public final class AccessPolicyStore {
     // ── persistence (canonical TOON, crash-safe — AccessRoutes' PUT) ────────────────
 
     /** Write {@code policies} as {@value #FILE} under {@code configRoot} (snake-case on disk). */
-    static void write(Path configRoot, List<Policy> policies) throws IOException {
+    public static void write(Path configRoot, List<Policy> policies) throws IOException {
         List<Map<String, Object>> rows = policies.stream().map(p -> {
             Map<String, Object> r = new LinkedHashMap<String, Object>();
             r.put("name", p.name());

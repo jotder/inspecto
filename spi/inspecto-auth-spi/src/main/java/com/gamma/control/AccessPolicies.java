@@ -21,7 +21,7 @@ import java.util.Set;
  *
  * <p><b>Fail-closed</b> (enforced by {@code AccessPolicyStore}): conditions are parsed at load time, so a doc that no longer parses — TOON
  * damage or a condition edit that breaks the grammar — marks the whole doc unreadable; the engine
- * must treat that as deny-loudly, never as "no policies" (mirrors {@link Roles}' suspended grants).
+ * must treat that as deny-loudly, never as "no policies" (mirrors {@code Roles}' suspended grants).
  * Authoring-time violations are 422s, so an unparseable doc can only arise from on-disk edits.
  */
 @PublicApi(since = "4.0.0")
@@ -61,7 +61,7 @@ public final class AccessPolicies {
     /** The authored doc + its readability (unreadable ⇒ the engine denies loudly, never skips).
      *  {@code error} names what made it unreadable — the policy and the failed check (null when readable). */
     public record Doc(List<Policy> policies, boolean unreadable, String error) {
-        static final Doc ABSENT = new Doc(List.of(), false, null);
+        public static final Doc ABSENT = new Doc(List.of(), false, null);
 
         public Doc {
             policies = List.copyOf(policies);

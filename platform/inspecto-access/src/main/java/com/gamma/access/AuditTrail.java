@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.access;
 
 import com.gamma.audit.AuditAttrs;
 import com.gamma.audit.Event;
@@ -8,11 +8,13 @@ import com.sun.net.httpserver.HttpExchange;
 
 import java.util.List;
 import java.util.regex.Pattern;
+import com.gamma.control.GeoCountryResolvers;
+import com.gamma.control.RequestAttrs;
 
 /**
  * The security audit trail's capture point — turns a state-changing Control API request into one
  * append-only audit {@link Event} ({@code type = }{@link EventType#AUDIT}). Called once from
- * {@link ControlApi#dispatch} after a request resolves, so it covers every current and future
+ * {@code ControlApi.dispatch} after a request resolves, so it covers every current and future
  * mutating route from a single seam (no per-handler wiring) and the engine core stays
  * identity-agnostic — actor/IP/User-Agent are read only here, at the HTTP edge.
  *
@@ -33,12 +35,12 @@ import java.util.regex.Pattern;
  *
  * @since 4.0.0
  */
-final class AuditTrail {
+public final class AuditTrail {
 
     private AuditTrail() {}
 
     /** A classified action: its dotted name and coarse category, or {@code null} when not auditable. */
-    record Action(String name, String category) {}
+    public record Action(String name, String category) {}
 
     /**
      * Record an audit event for a resolved request, if it is auditable. Never throws — auditing must
@@ -46,7 +48,7 @@ final class AuditTrail {
      *
      * @param path the route path with the {@code /api} and {@code /spaces/{id}} prefixes already stripped
      */
-    static void record(HttpExchange ex, String method, String path, int status) {
+    public static void record(HttpExchange ex, String method, String path, int status) {
         try {
             Action action = classify(method, path);
             if (action == null) return;
@@ -105,14 +107,14 @@ final class AuditTrail {
      * @param ok      whether the server granted it; a refusal is an {@link EventType#ACCESS_DENIED} row
      * @param status  the HTTP status the caller received
      */
-    static void authentication(HttpExchange ex, String action, boolean ok, int status) {
+    public static void authentication(HttpExchange ex, String action, boolean ok, int status) {
         authentication(ex, action, ok, status, RequestAttrs.actor(ex));
     }
 
     /** As above, naming the {@code actor} explicitly — {@code /auth/exchange} passes the Subject the minted token
-     *  resolves to (or {@code unknown}), because on that public route {@link ApiContext#actor} would be the
+     *  resolves to (or {@code unknown}), because on that public route {@code ApiContext.actor} would be the
      *  caller-written {@code X-Actor} header, and trigger T5 keys on this row's actor. */
-    static void authentication(HttpExchange ex, String action, boolean ok, int status, String actor) {
+    public static void authentication(HttpExchange ex, String action, boolean ok, int status, String actor) {
         try {
             String path = ex.getRequestURI().getPath();
             EventLog.current().emit(located(ex, Event.builder(ok ? EventType.AUDIT : EventType.ACCESS_DENIED))
@@ -157,7 +159,7 @@ final class AuditTrail {
      *  (401/403) on a route that <em>did</em> match is recorded for <em>every</em> method, GET included —
      *  the path is unambiguously an API call, and a refused read is a record worth keeping
      *  (`AUDIT-REFUSAL-GAP-1`). Never throws. */
-    static void accessDenied(HttpExchange ex, String method, String path, int status) {
+    public static void accessDenied(HttpExchange ex, String method, String path, int status) {
         try {
             String actor = RequestAttrs.actor(ex);
             // The capability a 403 was refused FOR, when a capability check is what refused it. Set by
@@ -196,7 +198,7 @@ final class AuditTrail {
      * @param resourceId   the resolved row's id at the row level, else null
      * @param policy       the matched Access Policy name (or a fail-closed marker), null when unnamed
      */
-    static void policyDecision(HttpExchange ex, boolean granted, String abacAction, String route,
+    public static void policyDecision(HttpExchange ex, boolean granted, String abacAction, String route,
                                String resourceType, String resourceId, String policy) {
         try {
             String actor = RequestAttrs.actor(ex);
@@ -221,7 +223,7 @@ final class AuditTrail {
      * Map a resolved request to an auditable {@link Action}, or {@code null} when it carries no audit
      * value. Pure (no I/O) so it is unit-testable. The {@code path} has prefixes stripped.
      */
-    static Action classify(String method, String path) {
+    public static Action classify(String method, String path) {
         if (path == null || path.isEmpty()) return null;
         // Export actions are GET but auditable (Category B); nothing else GET is. A read-shaped POST is a
         // READ that carries a body, so it is classified exactly like a GET (R2-12, operator 2026-09-26):

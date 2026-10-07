@@ -1,9 +1,14 @@
-package com.gamma.control;
+package com.gamma.access;
 
 import com.gamma.api.PublicApi;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.util.Map;
+import com.gamma.control.AccessDecider;
+import com.gamma.control.AccessDeciders;
+import com.gamma.control.RequestAttrs;
+import com.gamma.control.Subject;
+import com.gamma.control.SweepExchange;
 
 /**
  * The row-level PEP (ABAC A3): generalizes {@code ObjectRoutes}' SEC-7d visibility filter — "an

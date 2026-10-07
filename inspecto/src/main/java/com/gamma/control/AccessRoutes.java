@@ -13,6 +13,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import com.gamma.access.Roles;
+import com.gamma.access.ComponentAccess;
+import com.gamma.access.WriteGates;
+import com.gamma.access.AccessPolicyStore;
 import static com.gamma.util.Values.trimOrEmpty;
 
 /**

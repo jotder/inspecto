@@ -6,7 +6,7 @@ import com.gamma.control.ErrorCodes;
 import com.gamma.control.HostContext;
 import com.gamma.control.RouteModule;
 import com.gamma.control.ServerFaults;
-import com.gamma.control.WriteGates;
+import com.gamma.access.WriteGates;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;

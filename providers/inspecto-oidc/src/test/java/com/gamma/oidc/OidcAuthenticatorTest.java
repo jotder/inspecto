@@ -1,7 +1,7 @@
 package com.gamma.oidc;
 
 import com.gamma.control.Authenticator;
-import com.gamma.control.Roles;
+import com.gamma.access.Roles;
 import com.gamma.control.Subject;
 import dev.toonformat.jtoon.JToon;
 import org.junit.jupiter.api.io.TempDir;
@@ -329,7 +329,7 @@ class OidcAuthenticatorTest {
         CountDownLatch done = new CountDownLatch(1);
         server.createContext("/", ex -> {
             authenticator(ISSUER, AUDIENCE).authenticate(ex);
-            stamped.set(com.gamma.control.ComponentAccess.heldRoles(ex));
+            stamped.set(com.gamma.access.ComponentAccess.heldRoles(ex));
             ex.sendResponseHeaders(204, -1);
             ex.close();
             done.countDown();

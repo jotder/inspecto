@@ -11,17 +11,17 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 
 /**
- * The inert exchange a caller-less run hands the PDP ({@link RowScope#visibleAs}) so an {@link AccessDecider}, whose
+ * The inert exchange a caller-less run hands the PDP ({@code RowScope.visibleAs}) so an {@link AccessDecider}, whose
  * contract is "judge this exchange", has something to read its request-scoped facts from (the bound config root).
  * It carries no socket, no body and no headers: every transport method is a no-op or an empty answer. Request-scoped
  * attributes live in {@link RequestAttrs}' per-exchange scope as for any request, and the caller drops that scope
  * when it is done. Package-private on purpose: nothing else may fabricate an exchange.
  */
-final class SweepExchange extends HttpExchange {
+public final class SweepExchange extends HttpExchange {
     private final Headers none = new Headers();
     private final URI uri;
 
-    SweepExchange(String path) {
+    public SweepExchange(String path) {
         this.uri = URI.create(path);
     }
 

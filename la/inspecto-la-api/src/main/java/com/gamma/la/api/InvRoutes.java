@@ -6,12 +6,12 @@ import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.SnapshotStore;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
-import com.gamma.control.ComponentAccess;
+import com.gamma.access.ComponentAccess;
 import com.gamma.control.EntityTypes;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.control.RouteModule;
-import com.gamma.control.WriteGates;
+import com.gamma.access.WriteGates;
 
 import com.gamma.audit.Event;
 import com.gamma.audit.EventLog;

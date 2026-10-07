@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.access;
 
 import com.gamma.api.PublicApi;
 import com.gamma.util.ToonHelper;
@@ -15,6 +15,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import com.gamma.control.Authenticator;
+import com.gamma.control.RequestAttrs;
+import com.gamma.control.Subject;
 
 /**
  * Server-side Access-Profile enforcement (RBAC R2, {@code docs/superpower/rbac-abac-plan.md} §3):
@@ -58,7 +61,7 @@ public final class AccessGrants {
 
     /** The capabilities denied to a subject holding {@code roleNames} (case-insensitive) under
      *  {@code configRoot}'s catalog + role profiles. Empty when there is nothing to enforce. */
-    static Set<String> deniedCapabilities(Path configRoot, Collection<String> roleNames) {
+    public static Set<String> deniedCapabilities(Path configRoot, Collection<String> roleNames) {
         if (configRoot == null || roleNames == null || roleNames.isEmpty()) return Set.of();
 
         // Union semantics short-circuit: a role with no saved profile allows everywhere.

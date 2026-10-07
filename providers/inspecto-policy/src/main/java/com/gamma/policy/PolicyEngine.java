@@ -2,8 +2,8 @@ package com.gamma.policy;
 
 import com.gamma.control.AccessDecider;
 import com.gamma.control.AccessPolicies;
-import com.gamma.control.AccessPolicyStore;
-import com.gamma.control.ComponentAccess;
+import com.gamma.access.AccessPolicyStore;
+import com.gamma.access.ComponentAccess;
 import com.gamma.control.Subject;
 import com.gamma.audit.EventLog;
 import com.gamma.util.Conditions;

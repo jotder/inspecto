@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.gamma.access.WriteGates;
 
 /**
  * A Space's <b>egress allowlist</b> ({@code ASSURE-ACTION-REQUESTS-1}, verification finding 1c): the host names and
