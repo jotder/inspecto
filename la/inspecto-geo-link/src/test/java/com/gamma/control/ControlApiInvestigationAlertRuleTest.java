@@ -216,6 +216,26 @@ class ControlApiInvestigationAlertRuleTest {
     }
 
     /**
+     * MODULE-REORG-P4-2 characterisation (no change): the bind body is a CLOSED shape, so a key outside it - a typo, or an
+     * {@code x-} annotation - is refused 422 naming the key (it is never dropped behind a 200) and nothing is armed. The
+     * Investigation owns the rule, so there is deliberately no annotation lane here.
+     */
+    @Test
+    void anUnmodelledKeyIsRefusedNamingItAndNothingIsArmed(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            caseA(c, null);
+            String path = "/inv/investigations/case-a/alert-rules";
+            for (String key : List.of("zz_cfg", "x-team")) {
+                HttpResponse<String> r = send(c.port, "POST", path,
+                        BIG_RING.substring(0, BIG_RING.length() - 1) + ",\"" + key + "\":1}", null);
+                assertEquals(422, r.statusCode(), r.body());
+                assertTrue(r.body().contains("'" + key + "' is not a field"), r.body());
+            }
+            assertTrue(c.alerts().rules().isEmpty(), "nothing armed by a refused binding");
+        }
+    }
+
+    /**
      * Owner-only (a non-owner who MAY author Alert Rules is still refused — 404, as absence) and
      * {@code canAuthorAlertRules} (tested WITH a Subject, since with none {@code withCapability} is a no-op).
      */

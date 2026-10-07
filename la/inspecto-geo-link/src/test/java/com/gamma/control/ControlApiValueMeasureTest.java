@@ -218,6 +218,29 @@ class ControlApiValueMeasureTest {
         }
     }
 
+    /**
+     * MODULE-REORG-P4-2 characterisation (no change): a key outside the value-measure block's settings, or outside a
+     * value-measure rule's body, is refused 422 naming it - never kept, never dropped behind a 200 - and nothing is armed.
+     */
+    @Test
+    void anUnmodelledKeyIsRefusedNamingIt(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            ok(c, "POST", "/inv/investigations", CREATE);
+            String path = "/inv/investigations/case-v/alert-rules";
+            for (String key : List.of("zz_cfg", "x-team")) {
+                HttpResponse<String> inBlock = send(c.port, "POST", path,
+                        STRUCTURING_RULE.replace("\"valueCol\"", "\"" + key + "\":1,\"valueCol\""), null);
+                assertEquals(422, inBlock.statusCode(), inBlock.body());
+                assertTrue(inBlock.body().contains("'" + key + "' is not a setting of structuring"), inBlock.body());
+                HttpResponse<String> inRule = send(c.port, "POST", path,
+                        STRUCTURING_RULE.replace("\"severity\"", "\"" + key + "\":1,\"severity\""), null);
+                assertEquals(422, inRule.statusCode(), inRule.body());
+                assertTrue(inRule.body().contains("'" + key + "' is not a field of a value-measure Alert Rule"), inRule.body());
+            }
+            assertTrue(c.alerts().rules().isEmpty(), "nothing armed by a refused binding");
+        }
+    }
+
     // ── agentList: cashOutConcentration restricted to an `agent` Entity List ─────────────────────────────
 
     private void entityList(Ctx c, String id, String type, String... members) throws Exception {
