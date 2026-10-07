@@ -10,7 +10,7 @@ import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import com.gamma.service.BundleExporter;
 import com.gamma.service.BundleImporter;
 import com.gamma.service.DataSourceBundle;

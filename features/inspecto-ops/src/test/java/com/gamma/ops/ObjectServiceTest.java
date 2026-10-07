@@ -2,11 +2,11 @@ package com.gamma.ops;
 
 import com.gamma.workflow.ObjectType;
 
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventQuery;
-import com.gamma.event.EventType;
-import com.gamma.event.InMemoryEventStore;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventQuery;
+import com.gamma.audit.EventType;
+import com.gamma.audit.InMemoryEventStore;
 import com.gamma.ops.link.ObjectLink;
 import com.gamma.ops.note.NoteKind;
 import com.gamma.ops.note.ObjectNote;

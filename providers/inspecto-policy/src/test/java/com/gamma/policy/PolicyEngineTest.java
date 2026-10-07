@@ -6,7 +6,7 @@ import com.gamma.control.AccessDecider.Evaluation;
 import com.gamma.control.ComponentAccess;
 import com.gamma.control.Roles;
 import com.gamma.control.Subject;
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import com.sun.net.httpserver.HttpServer;
 import dev.toonformat.jtoon.JToon;
 import org.junit.jupiter.api.Test;

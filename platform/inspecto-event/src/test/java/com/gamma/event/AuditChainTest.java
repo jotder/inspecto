@@ -16,6 +16,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.gamma.audit.AuditAttrs;
+import com.gamma.audit.AuditChain;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLevel;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventQuery;
+import com.gamma.audit.EventStore;
+import com.gamma.audit.EventType;
+import com.gamma.audit.InMemoryEventStore;
 
 /**
  * ASSURE-AUDIT-CHAIN-1 at the seam that builds the chain: {@link EventLog#emit} links every AUDIT /

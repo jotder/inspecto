@@ -7,9 +7,9 @@ import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.control.WorkingSetWidgets;
 
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.SpaceContext;
@@ -82,7 +82,7 @@ public final class ExchangeRoutes implements RouteModule {
         com.gamma.control.SharedItemConsumers.install((type, id) -> {
             Exchange ex = Exchange.under(HostContext.of(api).spaces().containerRoot());
             if (!ex.enabled()) return java.util.List.of();
-            String owner = com.gamma.event.EventLog.currentSpaceId();
+            String owner = com.gamma.audit.EventLog.currentSpaceId();
             return ex.grants().stream()
                     .filter(g -> ShareGrant.ACTIVE.equals(g.status())
                             && type.equals(g.kind()) && id.equals(g.item()) && owner.equals(g.owner()))

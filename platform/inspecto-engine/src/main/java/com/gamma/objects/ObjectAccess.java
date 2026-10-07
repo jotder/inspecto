@@ -2,7 +2,7 @@ package com.gamma.objects;
 
 import com.gamma.workflow.ObjectType;
 import com.gamma.api.PublicApi;
-import com.gamma.event.Event;
+import com.gamma.audit.Event;
 
 import java.util.List;
 import java.util.Map;

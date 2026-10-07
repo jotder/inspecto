@@ -18,11 +18,11 @@ import com.gamma.pipeline.DeletionFence;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineStore;
 import com.gamma.pipeline.PipelineLift;
-import com.gamma.event.Event;
-import com.gamma.event.EventLevel;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventStore;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLevel;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventStore;
+import com.gamma.audit.EventType;
 import com.gamma.event.SavedViewStore;
 import com.gamma.inspector.MultiCollectorProcessor;
 import com.gamma.inspector.CollectorProcessor;
@@ -589,7 +589,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // durable event store: an in-memory ring forgets every publication on restart anyway, and a floor
         // there would write a file into the working directory of every legacy/test boot.
         com.gamma.query.DatasetFreshnessProbe freshness = new com.gamma.query.DatasetFreshnessProbe(events,
-                events instanceof com.gamma.event.InMemoryEventStore ? null
+                events instanceof com.gamma.audit.InMemoryEventStore ? null
                         : java.nio.file.Path.of(System.getProperty("jobs.audit.dir", root.auditDir()))
                                 .resolve(com.gamma.query.DatasetFreshnessProbe.FLOOR_FILE));
         this.freshnessSubscriber = freshness.subscriber();
@@ -634,7 +634,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.eventLog.addSubscriber(notificationSubscriber);
         // ses-sns §8: the built-in security triggers (T1–T4) read the audit rows of this log and emit
         // SECURITY_TRIGGERED back into it, which the builtin-security-triggered rule turns into a notification.
-        final com.gamma.event.EventLog triggerLog = this.eventLog;
+        final com.gamma.audit.EventLog triggerLog = this.eventLog;
         this.securityTriggers = new com.gamma.notify.SecurityTriggers(triggerLog, triggerLog::emit);
         this.eventLog.addSubscriber(securityTriggers);
         // TEMPLATE-RISK-SCORE-ALERT-RULE-1: a template's PENDING Alert Rule over a Risk Score output is created,
@@ -800,7 +800,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     private final com.gamma.alert.AlertService alerting;
 
     /** The EventLog→ObjectService bridge (Phase D2); held so {@link #close()} can de-register it. */
-    private final java.util.function.Consumer<com.gamma.event.Event> eventObjectBridge;
+    private final java.util.function.Consumer<com.gamma.audit.Event> eventObjectBridge;
 
     /** In-app notification feed (Phase B2) and its event→feed engine; the subscriber is held so
      *  {@link #close()} can de-register it (mirrors {@link #eventObjectBridge}). */
@@ -810,13 +810,13 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     private final com.gamma.notify.NotificationPreferences notificationPreferences;
     private final com.gamma.notify.NotificationService notificationService;
     private final com.gamma.notify.DeliveryReceiptStore deliveryReceipts;
-    private final java.util.function.Consumer<com.gamma.event.Event> notificationSubscriber;
+    private final java.util.function.Consumer<com.gamma.audit.Event> notificationSubscriber;
     private final com.gamma.notify.SecurityTriggers securityTriggers;
-    private final java.util.function.Consumer<com.gamma.event.Event> pendingAlertRuleSubscriber;
+    private final java.util.function.Consumer<com.gamma.audit.Event> pendingAlertRuleSubscriber;
 
     /** {@code risk.score.produced} → {@link com.gamma.control.PendingAlertRules#onRiskScoreProduced} for its model. */
-    private void onRiskScoreProduced(com.gamma.event.Event e) {
-        if (!com.gamma.event.EventType.SIGNAL.equals(e.type())) return;
+    private void onRiskScoreProduced(com.gamma.audit.Event e) {
+        if (!com.gamma.audit.EventType.SIGNAL.equals(e.type())) return;
         com.gamma.signal.Signal sig = com.gamma.signal.Signal.fromEvent(e);
         if (!"risk.score.produced".equals(sig.type()) || !(sig.payload().get("model") instanceof String model)) return;
         java.nio.file.Path writeRoot = root.config();
@@ -839,8 +839,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     private volatile boolean freshnessSweepLive;
     /** The DUCKLE-C1 freshness probe's and the S3b dataset-write trigger's EventLog subscribers — held so
      *  {@link #close()} can de-register them (the default Space's log is the process-wide global one). */
-    private java.util.function.Consumer<com.gamma.event.Event> freshnessSubscriber;
-    private volatile java.util.function.Consumer<com.gamma.event.Event> datasetWriteSubscriber;
+    private java.util.function.Consumer<com.gamma.audit.Event> freshnessSubscriber;
+    private volatile java.util.function.Consumer<com.gamma.audit.Event> datasetWriteSubscriber;
 
     /**
      * DUCKLE-C1 residual (1): arm the minute-cadence freshness sweep while any Alert Rule with

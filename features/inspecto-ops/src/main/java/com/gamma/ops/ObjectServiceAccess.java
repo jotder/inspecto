@@ -1,6 +1,6 @@
 package com.gamma.ops;
 
-import com.gamma.event.Event;
+import com.gamma.audit.Event;
 import com.gamma.objects.ObjectAccess;
 import com.gamma.workflow.ObjectType;
 import com.gamma.objects.TagAssignment;

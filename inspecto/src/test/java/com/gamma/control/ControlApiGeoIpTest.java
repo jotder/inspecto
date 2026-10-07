@@ -1,9 +1,9 @@
 package com.gamma.control;
 
 import com.gamma.etl.PipelineConfigBatchTest;
-import com.gamma.event.AuditAttrs;
-import com.gamma.event.Event;
-import com.gamma.event.EventType;
+import com.gamma.audit.AuditAttrs;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventType;
 import com.gamma.notify.Notification;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.AfterEach;

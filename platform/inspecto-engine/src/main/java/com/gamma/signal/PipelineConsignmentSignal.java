@@ -1,7 +1,7 @@
 package com.gamma.signal;
 
 import com.gamma.etl.ConsignmentEvent;
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;

@@ -3,7 +3,7 @@ package com.gamma.la.core;
 /**
  * The audit event types Link Analysis and the Geo studio emit — what an analyst looked at, asked for, sealed or revealed.
  *
- * <p>Moved out of {@code com.gamma.event.EventType} (the audit SPI) in D-1, Decision 3 (2026-10-01): the platform audit
+ * <p>Moved out of {@code com.gamma.audit.EventType} (the audit SPI) in D-1, Decision 3 (2026-10-01): the platform audit
  * layer should not enumerate one product's events, and the standalone LA product must be able to add its own. The values
  * are the SAME strings as before — an event type is persisted in the audit trail, so a rename would orphan history —
  * and {@code EventType} constants keep serving every platform event. Use as {@code Event.builder(LinkEventTypes.LINK_PROJECTED)…}.

@@ -8,7 +8,7 @@ import static com.gamma.util.Values.trimToNull;
 /**
  * A filter + page over the {@link ObjectStore} — the query model behind {@code GET /objects}. Every
  * field is optional except the paging bounds; {@code null} means "no constraint on this dimension".
- * Mirrors {@link com.gamma.event.EventQuery}: the same instance drives both {@link #matches} (the
+ * Mirrors {@link com.gamma.audit.EventQuery}: the same instance drives both {@link #matches} (the
  * in-memory store) and SQL {@code WHERE} generation ({@code DbObjectStore}), so both backends return
  * the same rows.
  *

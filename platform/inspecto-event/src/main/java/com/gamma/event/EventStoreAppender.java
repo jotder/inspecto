@@ -6,6 +6,9 @@ import ch.qos.logback.core.AppenderBase;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLevel;
+import com.gamma.audit.EventLog;
 
 /**
  * Logback appender that turns every captured SLF4J log record into an {@link Event} on

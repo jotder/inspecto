@@ -1,6 +1,6 @@
 package com.gamma.notify;
 
-import com.gamma.event.Event;
+import com.gamma.audit.Event;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

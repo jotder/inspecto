@@ -39,7 +39,7 @@ public final class EventLogLeakDetector implements BeforeAllCallback, AfterAllCa
 
     private static int count() {
         try {
-            Class<?> log = Class.forName("com.gamma.event.EventLog");
+            Class<?> log = Class.forName("com.gamma.audit.EventLog");
             Object global = log.getMethod("global").invoke(null);
             Method m = log.getMethod("subscriberCount");
             return (int) m.invoke(global);

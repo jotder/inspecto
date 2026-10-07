@@ -1,7 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.etl.PipelineConfigBatchTest;
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import com.gamma.geolink.ScheduledLinkIndexBuilder;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.LinkEventTypes;
@@ -154,8 +154,8 @@ class ScheduledIndexBuildTest {
 
     @Test
     void theOwnersAuthorityIsRedecidedEveryRunAndEveryRefusalIsAudited(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        List<com.gamma.event.Event> seen = new java.util.concurrent.CopyOnWriteArrayList<>();
-        java.util.function.Consumer<com.gamma.event.Event> sub = seen::add;
+        List<com.gamma.audit.Event> seen = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.function.Consumer<com.gamma.audit.Event> sub = seen::add;
         EventLog.current().addSubscriber(sub);
         try (Ctx c = open(cfg, root, Map.of("owner", "analyst-1", "shares", List.of(
                 Map.of("subjectType", "role", "subjectId", "analysts", "access", "view"))))) {
@@ -177,7 +177,7 @@ class ScheduledIndexBuildTest {
             var audited = seen.stream()
                     .filter(e -> LinkEventTypes.LINK_INDEX_SCHEDULED_RUN.equals(e.type())).toList();
             assertTrue(audited.size() >= 5, "every attempt, built or refused, is audited: " + audited.size());
-            assertTrue(audited.stream().allMatch(e -> "index-build:xdr_index".equals(String.valueOf(e.attributes().get(com.gamma.event.AuditAttrs.ACTOR)))));
+            assertTrue(audited.stream().allMatch(e -> "index-build:xdr_index".equals(String.valueOf(e.attributes().get(com.gamma.audit.AuditAttrs.ACTOR)))));
         } finally {
             EventLog.current().removeSubscriber(sub);
         }
@@ -239,8 +239,8 @@ class ScheduledIndexBuildTest {
             }
             return new com.gamma.la.storage.IndexBuilder.Result(1, req.store().directory(), null, 3, 3, 0, 3, 16, Map.of(), 5);
         });
-        java.util.List<com.gamma.event.Event> seen = new java.util.concurrent.CopyOnWriteArrayList<>();
-        java.util.function.Consumer<com.gamma.event.Event> sub = seen::add;
+        java.util.List<com.gamma.audit.Event> seen = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.function.Consumer<com.gamma.audit.Event> sub = seen::add;
         EventLog.current().addSubscriber(sub);
         try (Ctx c = open(cfg, root, Map.of("owner", "analyst-1", "shares", List.of()))) {
             land(c.dir.resolve("day0.parquet"), 0);

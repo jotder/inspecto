@@ -157,7 +157,7 @@ class ControlApiAuthSessionV1Test {
 
             // Read the store in process: /events is itself behind the gate under test.
             List<java.util.Map<String, Object>> events = c.svc.events().page(200, null, null).stream()
-                    .map(com.gamma.event.Event::toMap).toList();
+                    .map(com.gamma.audit.Event::toMap).toList();
             assertTrue(authEvent(events, "auth.exchange", "AUDIT", 200), "a granted exchange is an AUDIT row");
             assertTrue(authEvent(events, "auth.exchange", "ACCESS_DENIED", 401), "a refused exchange is an ACCESS_DENIED row");
             assertTrue(authEvent(events, "auth.refresh", "AUDIT", 200), "a granted refresh is audited");

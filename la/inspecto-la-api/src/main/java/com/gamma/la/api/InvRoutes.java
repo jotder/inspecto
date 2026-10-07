@@ -13,8 +13,8 @@ import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.control.RouteModule;
 import com.gamma.control.WriteGates;
 
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
 import com.gamma.sql.SqlGuard;
 import com.gamma.sql.SqlSandboxPolicy;
 import com.gamma.util.DuckDbUtil;

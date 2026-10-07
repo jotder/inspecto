@@ -1,7 +1,7 @@
 package com.gamma.inspector;
 
 import com.gamma.etl.PipelineConfig;
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import com.gamma.parse.Asn1ParserPlugin;
 import com.gamma.parse.ParseResult;
 import com.gamma.pipeline.SpaceConfigRoot;

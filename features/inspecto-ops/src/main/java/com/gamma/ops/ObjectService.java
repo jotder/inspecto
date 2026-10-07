@@ -3,10 +3,10 @@ package com.gamma.ops;
 import com.gamma.objects.AnnotationKinds;
 import com.gamma.workflow.ObjectType;
 
-import com.gamma.event.Event;
-import com.gamma.event.EventLevel;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLevel;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 import com.gamma.ops.link.InMemoryLinkStore;
 import com.gamma.ops.link.LinkRelationship;
 import com.gamma.ops.link.LinkStore;
@@ -1727,7 +1727,7 @@ public final class ObjectService {
      * notes and edges pointing at an id that can no longer be resolved — invisible orphans, the failure
      * mode this ordering exists to prevent.
      *
-     * <p>⚠ <b>A purge is not "all trace removed" (MNT-14 G3).</b> {@link com.gamma.event.EventStore} is append-only by
+     * <p>⚠ <b>A purge is not "all trace removed" (MNT-14 G3).</b> {@link com.gamma.audit.EventStore} is append-only by
      * contract, so the object's {@link EventType#OBJECT_ACTIVITY} history — including the purge itself,
      * emitted below — outlives it permanently. That is the intended behaviour: the audit log is not the
      * record being retention-managed. Anyone answering a legal/DPA erasure question needs to know this.

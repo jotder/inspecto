@@ -8,8 +8,8 @@ import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.objects.FakeObjectAccess;
 import com.gamma.workflow.ObjectType;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 import com.gamma.etl.StatusStore;
 import com.gamma.signal.Signal;
 import org.junit.jupiter.api.Test;
@@ -101,7 +101,7 @@ class AlertServiceTest {
                 List.of(rule("error_rate", "gt", 0.05, "1h", null)), configs(cfg), store(ledger));
 
         List<Signal> signals = new CopyOnWriteArrayList<>();
-        Consumer<com.gamma.event.Event> sub = e -> {
+        Consumer<com.gamma.audit.Event> sub = e -> {
             if (EventType.SIGNAL.equals(e.type())) signals.add(Signal.fromEvent(e));
         };
         EventLog.current().addSubscriber(sub);

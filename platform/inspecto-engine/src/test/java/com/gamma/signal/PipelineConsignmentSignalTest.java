@@ -3,7 +3,7 @@ package com.gamma.signal;
 import com.gamma.etl.ConsignmentAuditWriter;
 import com.gamma.etl.ConsignmentEvent;
 import com.gamma.etl.LineageRow;
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

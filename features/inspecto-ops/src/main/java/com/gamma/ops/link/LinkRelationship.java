@@ -2,7 +2,7 @@ package com.gamma.ops.link;
 
 /**
  * Well-known {@link ObjectLink#relationship()} constants for the Phase-4 correlation graph. Like
- * {@link com.gamma.event.EventType}, the relationship is a free-form {@code String} (the model is
+ * {@link com.gamma.audit.EventType}, the relationship is a free-form {@code String} (the model is
  * extensible) — these are conventions rather than a closed enum, so a caller may coin a new
  * relationship without touching this class. Values are normalised to upper-case by {@link ObjectLink}.
  *

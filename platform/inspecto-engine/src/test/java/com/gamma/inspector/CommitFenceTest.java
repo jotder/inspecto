@@ -6,7 +6,7 @@ import com.gamma.etl.Consignment;
 import com.gamma.etl.ConsignmentAuditWriter;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.SchemaSelector;
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import com.gamma.signal.Signals;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

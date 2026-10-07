@@ -1,8 +1,8 @@
 package com.gamma.service;
 
 import com.gamma.etl.StatusStore;
-import com.gamma.event.EventStore;
-import com.gamma.event.InMemoryEventStore;
+import com.gamma.audit.EventStore;
+import com.gamma.audit.InMemoryEventStore;
 import com.gamma.event.ParquetEventStore;
 import com.gamma.pipeline.PipelineStore;
 import com.gamma.job.DbJobRunStore;

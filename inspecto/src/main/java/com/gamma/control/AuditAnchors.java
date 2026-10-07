@@ -1,9 +1,9 @@
 package com.gamma.control;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.gamma.event.AuditChain;
-import com.gamma.event.Event;
-import com.gamma.event.EventStore;
+import com.gamma.audit.AuditChain;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

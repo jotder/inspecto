@@ -1,6 +1,6 @@
 package com.gamma.exchange;
 
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import com.gamma.exchange.ExchangeSnapshots.SnapshotMeta;
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.pipeline.ComponentStore;

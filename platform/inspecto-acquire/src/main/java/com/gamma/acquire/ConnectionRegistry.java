@@ -4,7 +4,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 
 /**
  * Process-wide registry of {@link ConnectionProfile}s by id (Data Acquisition roadmap Phase E wiring) — the

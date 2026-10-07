@@ -1,6 +1,6 @@
 package com.gamma.pipeline;
 
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

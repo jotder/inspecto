@@ -1,6 +1,6 @@
 package com.gamma.control;
 
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 
 import java.io.IOException;
 import java.nio.file.Path;

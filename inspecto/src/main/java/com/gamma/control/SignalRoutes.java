@@ -1,8 +1,8 @@
 package com.gamma.control;
 
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;
 import com.gamma.signal.Signals;
@@ -60,7 +60,7 @@ final class SignalRoutes implements RouteModule {
         if (type == null || type.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "type is required");
         Long since = parseEpochMs(ApiContext.query(e, "since"), "since");
         Long until = parseEpochMs(ApiContext.query(e, "until"), "until");
-        int page = com.gamma.event.EventQuery.MAX_LIMIT;
+        int page = com.gamma.audit.EventQuery.MAX_LIMIT;
         List<Signal> found = Signals.query(HostContext.of(api).service().events(), type, since, until, null, null, page);
         java.util.Set<String> datasets = new java.util.HashSet<>();
         for (Signal sig : found) {

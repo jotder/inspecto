@@ -1,9 +1,9 @@
 package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.gamma.event.Event;
-import com.gamma.event.EventQuery;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventQuery;
+import com.gamma.audit.EventType;
 import com.gamma.inspector.ConcurrencyBroker;
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.service.SpaceManager;

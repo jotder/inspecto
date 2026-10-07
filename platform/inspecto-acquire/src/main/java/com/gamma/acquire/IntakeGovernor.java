@@ -1,6 +1,6 @@
 package com.gamma.acquire;
 
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

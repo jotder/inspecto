@@ -1,8 +1,8 @@
 package com.gamma.job;
 
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;
 import org.junit.jupiter.api.Test;

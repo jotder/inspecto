@@ -1,4 +1,4 @@
-package com.gamma.event;
+package com.gamma.audit;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

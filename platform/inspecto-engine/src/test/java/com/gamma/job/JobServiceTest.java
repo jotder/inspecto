@@ -726,7 +726,7 @@ class JobServiceTest {
         ConsignmentEventBus bus = new ConsignmentEventBus();
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(cfgs, bus, s, null, auditDir.toString())) {
-            js.eventLog(com.gamma.event.EventLog.create());
+            js.eventLog(com.gamma.audit.EventLog.create());
             js.start();
             bus.publish(new ConsignmentEvent("UPSTREAM", "b1", "SUCCESS", List.of("p=1"), 1L, 1L, 0));
             await(() -> js.lastRunOf("on_event").orElse(null));
@@ -771,7 +771,7 @@ class JobServiceTest {
                 "coalesce", "false"))).toMap().get(JobConfig.COALESCE).toString(), "the key round-trips");
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(cfgs, new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
-            com.gamma.event.EventLog log = com.gamma.event.EventLog.create();
+            com.gamma.audit.EventLog log = com.gamma.audit.EventLog.create();
             js.eventLog(log);
             js.start();
             for (int i = 0; i < 20; i++) log.emit(probe(i));
@@ -791,7 +791,7 @@ class JobServiceTest {
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(new JobConfig("each", "maintenance", null, null, true, false,
                      each, "probe.burst", null)), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
-            com.gamma.event.EventLog log = com.gamma.event.EventLog.create();
+            com.gamma.audit.EventLog log = com.gamma.audit.EventLog.create();
             js.eventLog(log);
             js.start();
             js.setMaxPendingSignalRuns(0);
@@ -808,7 +808,7 @@ class JobServiceTest {
         }
     }
 
-    private static com.gamma.event.Event probe(int i) {
+    private static com.gamma.audit.Event probe(int i) {
         return new com.gamma.signal.Signal(null, "probe.burst", java.time.Instant.now(), com.gamma.signal.Severity.INFO,
                 com.gamma.signal.Ref.of("test", "probe"), null, null, null, null, null, "probe",
                 Map.of("i", i), 1).toEvent();

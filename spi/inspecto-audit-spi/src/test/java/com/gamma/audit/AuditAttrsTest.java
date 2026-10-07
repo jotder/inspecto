@@ -1,4 +1,4 @@
-package com.gamma.event;
+package com.gamma.audit;
 
 import org.junit.jupiter.api.Test;
 

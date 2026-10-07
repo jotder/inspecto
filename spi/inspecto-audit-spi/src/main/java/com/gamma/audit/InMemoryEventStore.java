@@ -1,4 +1,4 @@
-package com.gamma.event;
+package com.gamma.audit;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;

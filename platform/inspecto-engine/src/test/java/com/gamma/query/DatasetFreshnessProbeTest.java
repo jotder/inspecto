@@ -1,8 +1,8 @@
 package com.gamma.query;
 
-import com.gamma.event.Event;
-import com.gamma.event.EventQuery;
-import com.gamma.event.EventStore;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventQuery;
+import com.gamma.audit.EventStore;
 import com.gamma.signal.DatasetWriteSignal;
 import com.gamma.signal.Ref;
 import org.junit.jupiter.api.Test;
@@ -56,7 +56,7 @@ class DatasetFreshnessProbeTest {
     void anEventThatIsNotADatasetWriteIsNotAPublication() {
         DatasetFreshnessProbe probe = new DatasetFreshnessProbe((EventStore) null);
         var sub = probe.subscriber();
-        sub.accept(Event.builder(com.gamma.event.EventType.ALERT_FIRED)
+        sub.accept(Event.builder(com.gamma.audit.EventType.ALERT_FIRED)
                 .ts(9_000L).message("dataset sales_ds is unhappy").build());
         assertTrue(probe.apply("sales_ds").isEmpty(),
                 "only dataset.write announces a publication — ⛔ an alert ABOUT a Dataset is not one");

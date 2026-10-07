@@ -98,7 +98,7 @@ class AuditLogRoutesTest {
             assertEquals(200, res.statusCode(), res.body());
             String header = res.body().lines().findFirst().orElse("");
             assertTrue(header.startsWith("timestamp,level,type,source,pipeline,correlationId,message"), header);
-            for (String col : com.gamma.event.AuditAttrs.ALL) {
+            for (String col : com.gamma.audit.AuditAttrs.ALL) {
                 assertTrue(header.contains(col), "audit column '" + col + "' missing from: " + header);
             }
         }

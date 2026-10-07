@@ -2,8 +2,8 @@ package com.gamma.control;
 
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
-import com.gamma.event.Event;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventType;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

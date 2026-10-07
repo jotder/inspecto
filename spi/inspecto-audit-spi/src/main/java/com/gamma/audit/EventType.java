@@ -1,4 +1,4 @@
-package com.gamma.event;
+package com.gamma.audit;
 
 /**
  * Well-known {@link Event#type()} constants. {@code Event.type} is a free-form {@code String} (the

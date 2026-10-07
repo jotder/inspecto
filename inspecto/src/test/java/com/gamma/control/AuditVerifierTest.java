@@ -1,10 +1,10 @@
 package com.gamma.control;
 
-import com.gamma.event.AuditAttrs;
-import com.gamma.event.AuditChain;
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.AuditAttrs;
+import com.gamma.audit.AuditChain;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 import com.gamma.event.ParquetEventStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

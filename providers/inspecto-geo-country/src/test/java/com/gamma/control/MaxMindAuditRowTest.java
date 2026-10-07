@@ -1,7 +1,7 @@
 package com.gamma.control;
 
-import com.gamma.event.AuditAttrs;
-import com.gamma.event.EventType;
+import com.gamma.audit.AuditAttrs;
+import com.gamma.audit.EventType;
 import com.gamma.geocountry.TestMmdb;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.AfterEach;

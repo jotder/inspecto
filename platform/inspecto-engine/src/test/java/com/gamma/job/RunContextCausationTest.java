@@ -1,7 +1,7 @@
 package com.gamma.job;
 
-import com.gamma.event.EventLog;
-import com.gamma.event.InMemoryEventStore;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.InMemoryEventStore;
 import com.gamma.signal.Signal;
 import com.gamma.signal.Signals;
 import com.gamma.signal.Severity;
@@ -45,7 +45,7 @@ class RunContextCausationTest {
         // which is one of the two failures that kept CI red for 100 consecutive runs.
         // Filtering on the correlation id is not circular: it is precisely what proves correlation survived
         // the emit — if it did not, this finds zero and the size assertion fails.
-        List<Signal> emitted = store.query(com.gamma.event.EventQuery.recent(100)).stream()
+        List<Signal> emitted = store.query(com.gamma.audit.EventQuery.recent(100)).stream()
                 .map(Signal::fromEvent)
                 .filter(s -> "job.run.started".equals(s.type()) && "corr-1".equals(s.correlationId()))
                 .toList();
@@ -74,7 +74,7 @@ class RunContextCausationTest {
 
         // Same isolation as above — `findFirst()` on the type alone could pick up another class's emission
         // and assert against the wrong signal. It had not failed yet; that is luck, not coverage.
-        Signal s = store.query(com.gamma.event.EventQuery.recent(100)).stream()
+        Signal s = store.query(com.gamma.audit.EventQuery.recent(100)).stream()
                 .map(Signal::fromEvent)
                 .filter(x -> "job.run.started".equals(x.type()) && "r1".equals(x.correlationId()))
                 .findFirst().orElseThrow();

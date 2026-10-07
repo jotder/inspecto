@@ -1,9 +1,9 @@
 package com.gamma.service;
 
-import com.gamma.event.Event;
-import com.gamma.event.EventLevel;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLevel;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 
 import java.io.IOException;
 import java.nio.file.Files;

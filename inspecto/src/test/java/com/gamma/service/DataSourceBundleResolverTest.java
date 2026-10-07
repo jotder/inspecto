@@ -1,6 +1,6 @@
 package com.gamma.service;
 
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.MDC;

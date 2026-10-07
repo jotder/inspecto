@@ -1,10 +1,10 @@
 package com.gamma.service;
 
-import com.gamma.event.AuditChain;
+import com.gamma.audit.AuditChain;
 import com.gamma.event.DbEventStore;
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 import com.gamma.util.JdbcDrivers;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;

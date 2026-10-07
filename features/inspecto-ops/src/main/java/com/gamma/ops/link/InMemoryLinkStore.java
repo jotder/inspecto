@@ -5,7 +5,7 @@ import java.util.List;
 
 /**
  * In-memory {@link LinkStore} — the explicit memory opt-in (mirrors {@link com.gamma.ops.InMemoryObjectStore} and
- * {@link com.gamma.event.InMemoryEventStore}). Append-only; reads return newest-first. All access is
+ * {@link com.gamma.audit.InMemoryEventStore}). Append-only; reads return newest-first. All access is
  * guarded on the instance monitor (low-volume traffic), so it is safe to share across threads.
  *
  * @since 4.0.0

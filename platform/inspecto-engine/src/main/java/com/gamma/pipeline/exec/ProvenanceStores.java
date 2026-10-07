@@ -1,7 +1,7 @@
 package com.gamma.pipeline.exec;
 
 import com.gamma.api.PublicApi;
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

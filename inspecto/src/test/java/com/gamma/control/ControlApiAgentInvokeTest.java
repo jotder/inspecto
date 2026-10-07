@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
-import com.gamma.event.Event;
+import com.gamma.audit.Event;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

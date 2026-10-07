@@ -1,9 +1,9 @@
 package com.gamma.control;
 
 import com.gamma.config.io.ConfigCodec;
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 import com.gamma.job.JobConfig;
 import com.gamma.job.JobService;
 import com.sun.net.httpserver.HttpExchange;

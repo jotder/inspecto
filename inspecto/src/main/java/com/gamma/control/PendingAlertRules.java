@@ -2,10 +2,10 @@ package com.gamma.control;
 
 import com.gamma.alert.AlertRule;
 import com.gamma.alert.AlertService;
-import com.gamma.event.Event;
-import com.gamma.event.EventLevel;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLevel;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.alert.RiskScoreOutputs;
 import org.slf4j.Logger;

@@ -9,8 +9,8 @@ import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.control.Subject;
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;

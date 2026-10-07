@@ -105,7 +105,7 @@ class ControlApiEventsTest {
             HttpResponse<String> auditCsv = send(c.port, "GET", "/events/export?format=csv&type=AUDIT", null);
             assertEquals(200, auditCsv.statusCode());
             assertEquals("timestamp,level,type,source,pipeline,correlationId,message,"
-                            + String.join(",", com.gamma.event.AuditAttrs.ALL),
+                            + String.join(",", com.gamma.audit.AuditAttrs.ALL),
                     auditCsv.body().lines().findFirst().orElse(""),
                     "audit-shaped header derives its columns from AuditAttrs.ALL");
             assertTrue(auditCsv.body().contains("appUser"),

@@ -26,7 +26,7 @@ import java.util.UUID;
  * (kept under its historical name so the shipped {@code /objects/{id}/comments} JSON is unchanged);
  * {@link #targetId()} is the kind-agnostic reading of the same component.
  *
- * <p>Like an {@link com.gamma.event.Event} and an {@link com.gamma.ops.link.ObjectLink}, a note is an
+ * <p>Like an {@link com.gamma.audit.Event} and an {@link com.gamma.ops.link.ObjectLink}, a note is an
  * immutable, append-only fact: created and read, never mutated.
  *
  * @since 4.0.0

@@ -3,7 +3,7 @@ package com.gamma.signal;
 /**
  * The home for dotted <b>Signal types</b> (operator, 2026-10-06 — completeness KPI §7-e).
  *
- * <p>⛔ Not {@link com.gamma.event.EventType}: that class holds {@code Event.type} values ({@code UPPER_SNAKE}).
+ * <p>⛔ Not {@link com.gamma.audit.EventType}: that class holds {@code Event.type} values ({@code UPPER_SNAKE}).
  * A {@link Signal} persists as an Event of type {@code SIGNAL} and its dotted type rides in the attributes,
  * so the two vocabularies stay in separate classes.
  *

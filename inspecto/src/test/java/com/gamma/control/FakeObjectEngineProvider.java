@@ -179,7 +179,7 @@ public final class FakeObjectEngineProvider implements ObjectEngineProvider {
         }
 
         @Override
-        public Optional<java.util.function.Consumer<com.gamma.event.Event>> eventSubscriber() {
+        public Optional<java.util.function.Consumer<com.gamma.audit.Event>> eventSubscriber() {
             return Optional.empty();
         }
 

@@ -18,7 +18,7 @@ section in the *same* change:
 
 | If you change… | Update section |
 |---|---|
-| A `com.gamma.event.EventType` (add/emit/attrs) | §6 Event catalog + the component's "Events" line |
+| A `com.gamma.audit.EventType` (add/emit/attrs) | §6 Event catalog + the component's "Events" line |
 | A `MetricRegistry` metric (name/labels) | §7 Metrics catalog |
 | A persisted artifact (CSV ledger, DuckDB table, dir layout) | §8 Persistence & state |
 | A `System.getProperty(...)` flag | §9 Config flags |
@@ -259,7 +259,7 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
 
 ---
 
-## 6. Reference — Event catalog (`com.gamma.event.EventType`)
+## 6. Reference — Event catalog (`com.gamma.audit.EventType`)
 
 `EventType` is a constants class; `Event.type` is a free-form string (these are conventions, not a closed enum).
 `Event` fields: `eventId, ts(ms), level, type, source, pipeline, correlationId, message, attributes(Map)`.

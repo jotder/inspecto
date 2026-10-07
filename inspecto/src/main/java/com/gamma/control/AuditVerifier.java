@@ -1,8 +1,8 @@
 package com.gamma.control;
 
-import com.gamma.event.AuditChain;
-import com.gamma.event.Event;
-import com.gamma.event.EventStore;
+import com.gamma.audit.AuditChain;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventStore;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -232,9 +232,9 @@ final class AuditVerifier {
             // a VERIFIED prune record: the only thing that may account for anchored rows being gone
             // all three, as EventPruneTask writes them: a row merely NAMED events.pruned (any emitter can pick an
             // action string) is not a prune
-            if (PRUNE_ACTION.equals(cur.attributes().get(com.gamma.event.AuditAttrs.ACTION))
+            if (PRUNE_ACTION.equals(cur.attributes().get(com.gamma.audit.AuditAttrs.ACTION))
                     && "job".equals(cur.source())
-                    && "retention".equals(cur.attributes().get(com.gamma.event.AuditAttrs.ACTION_CATEGORY))) {
+                    && "retention".equals(cur.attributes().get(com.gamma.audit.AuditAttrs.ACTION_CATEGORY))) {
                 try {
                     LocalDate d = LocalDate.parse(cur.attributes().get(PRUNE_BEFORE));
                     if (prunedBefore == null || d.isAfter(prunedBefore)) prunedBefore = d;

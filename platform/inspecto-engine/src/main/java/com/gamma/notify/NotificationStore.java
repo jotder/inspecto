@@ -6,7 +6,7 @@ import java.util.Optional;
 /**
  * Persistence seam for in-app {@link Notification}s — the feed behind the "bell icon". Mirrors the
  * {@link com.gamma.ops.ObjectStore} pattern (mutable records with real state transitions), not the
- * append-only {@link com.gamma.event.EventStore}: a notification is marked read and archived over its
+ * append-only {@link com.gamma.audit.EventStore}: a notification is marked read and archived over its
  * life. Two backends sit behind it — {@link InMemoryNotificationStore} (the lean default) and a future
  * DuckDB-backed store — selected at startup; routes depend only on this interface.
  *

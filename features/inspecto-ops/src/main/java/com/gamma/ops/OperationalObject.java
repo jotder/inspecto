@@ -9,7 +9,7 @@ import java.util.UUID;
 /**
  * One mutable operational object — Layer 2 of the Operational Intelligence Platform
  * ({@code docs/superpowers/specs/2026-06-13-operational-intelligence-roadmap.md}). Where an
- * {@link com.gamma.event.Event} is an immutable fact ("what happened"), an {@code OperationalObject}
+ * {@link com.gamma.audit.Event} is an immutable fact ("what happened"), an {@code OperationalObject}
  * is a managed thing that <b>changes state</b> ("should I care / am I handling it"): its
  * {@link #status()} walks a {@link com.gamma.workflow.Workflow} (e.g. an {@link ObjectType#ALERT}
  * goes {@code OPEN → ACKNOWLEDGED → RESOLVED}). Because the row mutates it lives in a table store

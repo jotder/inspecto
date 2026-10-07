@@ -1,6 +1,6 @@
 package com.gamma.control;
 
-import com.gamma.event.EventType;
+import com.gamma.audit.EventType;
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.service.SpaceId;
 import com.gamma.service.SpaceManager;

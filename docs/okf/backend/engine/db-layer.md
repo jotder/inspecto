@@ -527,7 +527,7 @@ event_id, ts_ms (BIGINT), type, source, pipeline, correlation_id,
 message, attributes (JSON), payload (JSON), level  -- + partition cols year, month, day (VARCHAR)
 ```
 
-`level` ∈ [`EventLevel`](../../../../spi/inspecto-audit-spi/src/main/java/com/gamma/event/EventLevel.java). There is **no
+`level` ∈ [`EventLevel`](../../../../spi/inspecto-audit-spi/src/main/java/com/gamma/audit/EventLevel.java). There is **no
 JDBC/Postgres event table** — events were Parquet-only. ⚠ **That changed 2026-09-12 (D6 / phase A3):**
 `DbEventStore` adds `events.backend=db`. The Parquet layout below is unchanged and remains the default
 durable backend for a single node; the database backend exists because Parquet is written by exactly one

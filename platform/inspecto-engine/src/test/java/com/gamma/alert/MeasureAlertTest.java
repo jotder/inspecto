@@ -6,10 +6,10 @@ import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.StatusStore;
-import com.gamma.event.Event;
-import com.gamma.event.EventLevel;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLevel;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -28,9 +28,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class MeasureAlertTest {
 
     /** Subscribers this class adds to the event log — removed after each test so none leak into the fork. */
-    private final java.util.List<java.util.function.Consumer<com.gamma.event.Event>> subscribed = new java.util.ArrayList<>();
+    private final java.util.List<java.util.function.Consumer<com.gamma.audit.Event>> subscribed = new java.util.ArrayList<>();
 
-    private void subscribe(java.util.function.Consumer<com.gamma.event.Event> s) {
+    private void subscribe(java.util.function.Consumer<com.gamma.audit.Event> s) {
         subscribed.add(s);
         EventLog.current().addSubscriber(s);
     }

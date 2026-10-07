@@ -13,7 +13,7 @@ import com.gamma.acquire.retry.RetryPolicy;
 import com.gamma.etl.FileNames;
 import com.gamma.etl.MarkerManager;
 import com.gamma.etl.PipelineConfig;
-import com.gamma.event.EventType;
+import com.gamma.audit.EventType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -473,8 +473,8 @@ class SourceConfigIntegrationTest {
 
     @Test
     void gapDetectionEmitsSequenceGapOnTheRunPath(@TempDir Path dir) throws Exception {
-        com.gamma.event.InMemoryEventStore events = new com.gamma.event.InMemoryEventStore(1000);
-        com.gamma.event.EventLog.global().installStore(events);
+        com.gamma.audit.InMemoryEventStore events = new com.gamma.audit.InMemoryEventStore(1000);
+        com.gamma.audit.EventLog.global().installStore(events);
         com.gamma.acquire.GapTracker.shared().reset("GAP_SRC");
 
         PipelineConfig cfg = PipelineConfig.load(writePipeline(dir, """
@@ -490,8 +490,8 @@ class SourceConfigIntegrationTest {
 
         CollectorProcessor.run(cfg);
 
-        List<com.gamma.event.Event> gaps = events.recent(1000).stream()
-                .filter(e -> com.gamma.event.EventType.SEQUENCE_GAP.equals(e.type()))
+        List<com.gamma.audit.Event> gaps = events.recent(1000).stream()
+                .filter(e -> com.gamma.audit.EventType.SEQUENCE_GAP.equals(e.type()))
                 // installStore DRAINS the previous store, so earlier tests' gaps (DeliveryCheckTest, T8) ride along
                 .filter(e -> "cdr_{yyyyMMddHH}.csv".equals(String.valueOf(e.attributes().get("sequence"))))
                 .toList();
@@ -505,7 +505,7 @@ class SourceConfigIntegrationTest {
         // the poll loop re-runs each cycle; a persistent gap must not re-fire
         CollectorProcessor.run(cfg);
         long after = events.recent(1000).stream()
-                .filter(e -> com.gamma.event.EventType.SEQUENCE_GAP.equals(e.type()))
+                .filter(e -> com.gamma.audit.EventType.SEQUENCE_GAP.equals(e.type()))
                 .filter(e -> "cdr_{yyyyMMddHH}.csv".equals(String.valueOf(e.attributes().get("sequence")))).count();
         assertEquals(1, after, "a persistent gap fires once, not every poll cycle");
     }

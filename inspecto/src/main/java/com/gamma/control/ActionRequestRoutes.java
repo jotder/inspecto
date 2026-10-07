@@ -1,6 +1,6 @@
 package com.gamma.control;
 
-import com.gamma.event.EventLevel;
+import com.gamma.audit.EventLevel;
 import com.gamma.objects.ObjectAccess;
 import com.gamma.pipeline.exec.WebhookSink;
 import com.sun.net.httpserver.HttpExchange;

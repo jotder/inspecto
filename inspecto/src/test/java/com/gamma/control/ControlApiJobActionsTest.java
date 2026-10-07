@@ -155,14 +155,14 @@ class ControlApiJobActionsTest {
 
     /** Drive the shared apply seam as an engine-driven caller would: bound to {@code space}, {@code automatic=true}. */
     private static JsonNode applyAutomatically(Ctx c, String space, String rule, String job) {
-        org.slf4j.MDC.put(com.gamma.event.EventLog.SPACE_MDC_KEY, space);
+        org.slf4j.MDC.put(com.gamma.audit.EventLog.SPACE_MDC_KEY, space);
         try {
             java.util.Map<String, Object> result = DecisionRoutes.applyConsequences(c.api, rule, java.util.Map.of(
                     "consequences", java.util.List.of(java.util.Map.of("action", "start-job",
                             "target", java.util.Map.of("id", job)))), true, "appUser");
             return JSON.valueToTree(result).get("executed").get(0);
         } finally {
-            org.slf4j.MDC.remove(com.gamma.event.EventLog.SPACE_MDC_KEY);
+            org.slf4j.MDC.remove(com.gamma.audit.EventLog.SPACE_MDC_KEY);
         }
     }
 

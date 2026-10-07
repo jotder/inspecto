@@ -1,8 +1,8 @@
 package com.gamma.notify;
 
-import com.gamma.event.AuditAttrs;
-import com.gamma.event.Event;
-import com.gamma.event.EventType;
+import com.gamma.audit.AuditAttrs;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventType;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;

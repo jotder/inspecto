@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 
 /**
  * Engine-side readiness gate (Data Acquisition roadmap Phase B): holds a discovered file back until it has

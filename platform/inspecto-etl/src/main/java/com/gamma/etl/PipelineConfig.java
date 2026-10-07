@@ -831,7 +831,7 @@ public final class PipelineConfig {
      * Sequence-gap detection for a source (Data Acquisition roadmap Phase D; additive, {@code source.gap_detection:}).
      * When {@link #active()} the engine, after discovery, checks the observed file names against the
      * {@link #sequence} strftime-style template (e.g. {@code "CDR_{yyyyMMddHH}"}) and emits an
-     * {@link com.gamma.event.EventType#SEQUENCE_GAP} event per missing key — so "no file silently missed" is a
+     * {@link com.gamma.audit.EventType#SEQUENCE_GAP} event per missing key — so "no file silently missed" is a
      * recorded, queryable operational fact. See {@link com.gamma.acquire.GapDetector}.
      *
      * <p>{@link #DISABLED} (no {@code source.gap_detection:} block) ⇒ no series check (the legacy behaviour).

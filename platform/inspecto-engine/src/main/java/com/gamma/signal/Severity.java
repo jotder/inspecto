@@ -1,7 +1,7 @@
 package com.gamma.signal;
 
 import com.gamma.api.PublicApi;
-import com.gamma.event.EventLevel;
+import com.gamma.audit.EventLevel;
 
 /**
  * A {@link Signal}'s severity (job-framework §8.1; the six-level ladder from {@code openapi-v1.json}).

@@ -5,7 +5,7 @@ import java.util.Optional;
 
 /**
  * Persistence seam for {@link OperationalObject}s — the "Object Engine" of the Operational
- * Intelligence Platform. The counterpart to {@link com.gamma.event.EventStore}, but with the opposite
+ * Intelligence Platform. The counterpart to {@link com.gamma.audit.EventStore}, but with the opposite
  * contract: events are append-only facts, objects are <b>mutable</b> records whose status changes over
  * their lifecycle, so this interface has a real {@link #update}.
  *

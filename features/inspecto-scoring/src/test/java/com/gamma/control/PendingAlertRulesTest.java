@@ -1,8 +1,8 @@
 package com.gamma.control;
 
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.risk.RiskScoreEvaluator;
 import com.gamma.risk.RiskScoreModel;
@@ -87,7 +87,7 @@ class PendingAlertRulesTest {
     }
 
     private List<String> actions() {
-        return audit.stream().map(e -> String.valueOf(e.attributes().get(com.gamma.event.AuditAttrs.ACTION))).toList();
+        return audit.stream().map(e -> String.valueOf(e.attributes().get(com.gamma.audit.AuditAttrs.ACTION))).toList();
     }
 
     @Test

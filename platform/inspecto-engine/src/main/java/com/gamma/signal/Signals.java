@@ -1,9 +1,9 @@
 package com.gamma.signal;
 
-import com.gamma.event.Event;
-import com.gamma.event.EventQuery;
-import com.gamma.event.EventStore;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventQuery;
+import com.gamma.audit.EventStore;
+import com.gamma.audit.EventType;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;

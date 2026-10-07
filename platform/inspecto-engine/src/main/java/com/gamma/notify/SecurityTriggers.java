@@ -1,9 +1,9 @@
 package com.gamma.notify;
 
-import com.gamma.event.AuditAttrs;
-import com.gamma.event.Event;
-import com.gamma.event.EventLevel;
-import com.gamma.event.EventType;
+import com.gamma.audit.AuditAttrs;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLevel;
+import com.gamma.audit.EventType;
 
 import java.util.ArrayDeque;
 import java.util.LinkedHashMap;
@@ -14,7 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The built-in security trigger evaluator (ses-sns-adapter-design §8, T1–T4). An {@link com.gamma.event.EventLog}
+ * The built-in security trigger evaluator (ses-sns-adapter-design §8, T1–T4). An {@link com.gamma.audit.EventLog}
  * subscriber that turns the audit rows the control plane already writes into {@link EventType#SECURITY_TRIGGERED}
  * events, which the built-in {@code builtin-security-triggered} Notification Rule maps to category {@code security}.
  *

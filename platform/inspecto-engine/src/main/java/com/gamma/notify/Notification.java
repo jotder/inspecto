@@ -9,7 +9,7 @@ import java.util.UUID;
 
 /**
  * One in-app notification in the user's feed — the mutable counterpart to an append-only
- * {@link com.gamma.event.Event}. A notification is rendered from a {@link NotificationRule} when a
+ * {@link com.gamma.audit.Event}. A notification is rendered from a {@link NotificationRule} when a
  * triggering event occurs, then lives through a {@link NotificationState} lifecycle (unread → read →
  * archived). A notification is either <b>broadcast</b> ({@code recipient == null} — every reader's feed, the
  * historic and still the usual case) or <b>addressed</b> to one Subject id: an owned Alert Rule's alerts
@@ -19,7 +19,7 @@ import java.util.UUID;
  * @param ts         creation time, epoch millis (UTC)
  * @param category   user-facing grouping (e.g. {@code pipeline}, {@code job}, {@code ops}) — also the
  *                   preference key that gates delivery
- * @param sourceType the {@link com.gamma.event.EventType} that triggered it (provenance/diagnostics)
+ * @param sourceType the {@link com.gamma.audit.EventType} that triggered it (provenance/diagnostics)
  * @param sourceId   the triggering event's correlation/event id, or {@code null}
  * @param title      short rendered headline
  * @param body       rendered detail line
@@ -33,7 +33,7 @@ public record Notification(String id, long ts, String category, String sourceTyp
                            String title, String body, NotificationState state, String dedupeKey,
                            Long readAt, String recipient) {
 
-    /** The triggering {@link com.gamma.event.Event} attribute that addresses a notification to one Subject. */
+    /** The triggering {@link com.gamma.audit.Event} attribute that addresses a notification to one Subject. */
     public static final String RECIPIENT_ATTR = "recipient";
 
     private static final DateTimeFormatter ISO =

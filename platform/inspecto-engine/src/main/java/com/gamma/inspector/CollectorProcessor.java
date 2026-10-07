@@ -17,7 +17,7 @@ import com.gamma.acquire.StabilityGate;
 import com.gamma.acquire.retry.RetryPolicy;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.*;
-import com.gamma.event.EventType;
+import com.gamma.audit.EventType;
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.util.LogSetup;
 import org.slf4j.Logger;
@@ -250,7 +250,7 @@ public class CollectorProcessor {
         // pool of size N deadlocks once N supervisors wait on children queued in the same pool.
         int maxConcurrent  = Math.max(1, cfg.processing().threads());
         ConcurrencyBroker broker = ConcurrencyBroker.shared();
-        String spaceId     = com.gamma.event.EventLog.currentSpaceId();
+        String spaceId     = com.gamma.audit.EventLog.currentSpaceId();
         String pipelineId  = cfg.identity().pipelineName();
         int priority       = cfg.processing().priority();
         String pool        = cfg.processing().pool();

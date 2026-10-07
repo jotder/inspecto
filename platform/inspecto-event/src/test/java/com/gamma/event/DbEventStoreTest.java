@@ -11,6 +11,11 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLevel;
+import com.gamma.audit.EventQuery;
+import com.gamma.audit.EventType;
+import com.gamma.audit.InMemoryEventStore;
 
 /**
  * {@link DbEventStore} — the shared event backend behind {@code -Devents.backend=db} (D6).

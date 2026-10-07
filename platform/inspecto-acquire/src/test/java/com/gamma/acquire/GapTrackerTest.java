@@ -1,6 +1,6 @@
 package com.gamma.acquire;
 
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 

@@ -275,13 +275,13 @@ class RetentionSweepSeamTest {
         OperationalObject peer = e.objects.open(ObjectType.INCIDENT, "peer", "d", "WARNING", null, java.util.Map.of());
         String id = expiredWithDependents(e, "expired", peer.id());
 
-        List<com.gamma.event.Event> seen = new java.util.ArrayList<>();
-        java.util.function.Consumer<com.gamma.event.Event> sub = seen::add;
-        com.gamma.event.EventLog.global().addSubscriber(sub);
+        List<com.gamma.audit.Event> seen = new java.util.ArrayList<>();
+        java.util.function.Consumer<com.gamma.audit.Event> sub = seen::add;
+        com.gamma.audit.EventLog.global().addSubscriber(sub);
         try {
             e.objects.purge(id, "incident_purge");
         } finally {
-            com.gamma.event.EventLog.global().removeSubscriber(sub);
+            com.gamma.audit.EventLog.global().removeSubscriber(sub);
         }
 
         assertTrue(seen.stream().anyMatch(ev -> "purge".equals(ev.attributes().get("action"))

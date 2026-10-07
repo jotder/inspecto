@@ -249,7 +249,7 @@ class ControlApiActionRequestsTest {
         });
     }
 
-    private static List<com.gamma.event.Event> noApproverEvents(List<com.gamma.event.Event> seen, String id) {
+    private static List<com.gamma.audit.Event> noApproverEvents(List<com.gamma.audit.Event> seen, String id) {
         return seen.stream().filter(e -> e.attributes().containsValue("action-request.no-eligible-approver")
                 && id.equals(e.attributes().get("actionRequest"))).toList();
     }
@@ -258,9 +258,9 @@ class ControlApiActionRequestsTest {
 
     @Test
     void anIdpThatCannotEnumerateItsPrincipalsReadsTheApproverRoster(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
-        List<com.gamma.event.Event> seen = new CopyOnWriteArrayList<>();
-        java.util.function.Consumer<com.gamma.event.Event> sub = seen::add;
-        com.gamma.event.EventLog.global().addSubscriber(sub);
+        List<com.gamma.audit.Event> seen = new CopyOnWriteArrayList<>();
+        java.util.function.Consumer<com.gamma.audit.Event> sub = seen::add;
+        com.gamma.audit.EventLog.global().addSubscriber(sub);
         try (Ctx c = open(cfg, tmp, true)) {
             String id = propose(c, incident(c));
             assertEquals("ok", data(send(c, "GET", "/action-requests/" + id, null, AUTHOR), 200).get("approverCheck").asText(),
@@ -284,16 +284,16 @@ class ControlApiActionRequestsTest {
             JsonNode done = data(send(c, "POST", "/action-requests/" + none + "/approve", "{}", "Bearer grouped"), 200);
             assertEquals("grp-1", done.get("approver").asText(), "a group claim match decides");
         } finally {
-            com.gamma.event.EventLog.global().removeSubscriber(sub);
+            com.gamma.audit.EventLog.global().removeSubscriber(sub);
         }
     }
 
     @Test
     void anEnumeratedDirectoryWhoseOnlyApproverIsTheMakerReadsNoneEligibleAndWarnsOnce(@TempDir Path cfg, @TempDir Path tmp)
             throws Exception {
-        List<com.gamma.event.Event> seen = new CopyOnWriteArrayList<>();
-        java.util.function.Consumer<com.gamma.event.Event> sub = seen::add;
-        com.gamma.event.EventLog.global().addSubscriber(sub);
+        List<com.gamma.audit.Event> seen = new CopyOnWriteArrayList<>();
+        java.util.function.Consumer<com.gamma.audit.Event> sub = seen::add;
+        com.gamma.audit.EventLog.global().addSubscriber(sub);
         try (Ctx c = open(cfg, tmp, true)) {
             String inc = incident(c);
             enumerating(Map.of("author-1", List.of("admin"), "analyst-2", List.of("operations")));
@@ -301,9 +301,9 @@ class ControlApiActionRequestsTest {
             assertEquals("none-eligible", data(send(c, "GET", "/action-requests/" + id, null, AUTHOR), 200)
                     .get("approverCheck").asText());
             data(send(c, "GET", "/action-requests", null, AUTHOR), 200);
-            List<com.gamma.event.Event> warn = noApproverEvents(seen, id);
+            List<com.gamma.audit.Event> warn = noApproverEvents(seen, id);
             assertEquals(1, warn.size(), "one warning, at raise — reads never re-emit");
-            assertEquals(com.gamma.event.EventLevel.WARN, warn.get(0).level());
+            assertEquals(com.gamma.audit.EventLevel.WARN, warn.get(0).level());
             assertEquals("pending", data(send(c, "GET", "/action-requests/" + id, null, AUTHOR), 200).get("status").asText(),
                     "never auto-declined");
 
@@ -313,7 +313,7 @@ class ControlApiActionRequestsTest {
             String ok = propose(c, inc);
             assertTrue(noApproverEvents(seen, ok).isEmpty());
         } finally {
-            com.gamma.event.EventLog.global().removeSubscriber(sub);
+            com.gamma.audit.EventLog.global().removeSubscriber(sub);
         }
     }
 
@@ -822,24 +822,24 @@ class ControlApiActionRequestsTest {
     /** RESIDUALS-1 (3): the fail-closed skip is audited once per skip (WARN, rule name only); it still raises nothing. */
     @Test
     void aSkipForUnknownMakersEmitsOneWarnAuditAndStillFailsClosed(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
-        List<com.gamma.event.Event> seen = new CopyOnWriteArrayList<>();
-        java.util.function.Consumer<com.gamma.event.Event> sub = seen::add;
-        com.gamma.event.EventLog.global().addSubscriber(sub);
+        List<com.gamma.audit.Event> seen = new CopyOnWriteArrayList<>();
+        java.util.function.Consumer<com.gamma.audit.Event> sub = seen::add;
+        com.gamma.audit.EventLog.global().addSubscriber(sub);
         try (Ctx c = open(cfg, tmp, true)) {
             new com.gamma.pipeline.ComponentStore(c.root.resolve("registry")).write("decision-rule", "legacy",
                     Map.of("name", "legacy", "enabled", true, "consequences",
                             List.of(Map.of("action", "invoke-api", "params", Map.of("connection", "hook")))));
             JsonNode one = data(send(c, "POST", "/decision-rules/legacy/apply", "{}", AUTHOR), 200).at("/executed/0");
             assertEquals("skipped", one.get("status").asText(), one.toString());
-            List<com.gamma.event.Event> warn = seen.stream().filter(e -> e.attributes()
+            List<com.gamma.audit.Event> warn = seen.stream().filter(e -> e.attributes()
                     .containsValue("action-request.skipped-unknown-makers")).toList();
             assertEquals(1, warn.size(), "exactly one audit for the one skip");
-            assertEquals(com.gamma.event.EventLevel.WARN, warn.get(0).level());
+            assertEquals(com.gamma.audit.EventLevel.WARN, warn.get(0).level());
             assertEquals("legacy", warn.get(0).attributes().get("decisionRule"));
             assertEquals(0, data(send(c, "GET", "/action-requests", null, CHECKER), 200).get("total").asInt(),
                     "still fails closed — no request raised");
         } finally {
-            com.gamma.event.EventLog.global().removeSubscriber(sub);
+            com.gamma.audit.EventLog.global().removeSubscriber(sub);
         }
     }
 

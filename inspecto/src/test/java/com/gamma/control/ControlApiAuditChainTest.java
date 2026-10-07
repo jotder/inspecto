@@ -3,8 +3,8 @@ package com.gamma.control;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
-import com.gamma.event.AuditChain;
-import com.gamma.event.Event;
+import com.gamma.audit.AuditChain;
+import com.gamma.audit.Event;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -220,7 +220,7 @@ class ControlApiAuditChainTest {
     void aFreshServiceDoesNotInheritAClosedServicesAuditRows(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir.resolve("a"), false)) {
             for (int i = 0; i < 3; i++)
-                c.svc().eventLog().emit(Event.builder(com.gamma.event.EventType.AUDIT).message("closed-svc-" + i));
+                c.svc().eventLog().emit(Event.builder(com.gamma.audit.EventType.AUDIT).message("closed-svc-" + i));
         }
         try (Ctx c = open(dir.resolve("b"), true)) {
             assertTrue(c.svc().events().recent(Integer.MAX_VALUE).stream()

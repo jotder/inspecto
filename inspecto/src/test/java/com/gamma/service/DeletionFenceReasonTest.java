@@ -3,13 +3,13 @@ package com.gamma.service;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
-import com.gamma.event.Event;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventType;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.PipelineStores;
 
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

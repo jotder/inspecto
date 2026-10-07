@@ -5,7 +5,7 @@ import com.gamma.control.AccessPolicies;
 import com.gamma.control.AccessPolicyStore;
 import com.gamma.control.ComponentAccess;
 import com.gamma.control.Subject;
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import com.gamma.util.Conditions;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;

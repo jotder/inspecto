@@ -1,9 +1,9 @@
 package com.gamma.job;
 
-import com.gamma.event.Event;
-import com.gamma.event.EventLevel;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLevel;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 import com.gamma.pipeline.PipelineEdge;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineNode;

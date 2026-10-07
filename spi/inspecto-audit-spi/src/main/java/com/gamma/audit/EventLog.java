@@ -1,4 +1,4 @@
-package com.gamma.event;
+package com.gamma.audit;
 
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.util.CurrentSpace;

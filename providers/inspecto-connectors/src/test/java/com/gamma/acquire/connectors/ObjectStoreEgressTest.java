@@ -259,7 +259,7 @@ class ObjectStoreEgressTest {
             Path spaceRoot = tmp.resolve("spaceA/config");
             com.gamma.pipeline.exec.EgressAllowlist.migrate(spaceRoot, List.of("store.lan"));
             com.gamma.pipeline.SpaceConfigRoot.register("spaceA", spaceRoot);
-            org.slf4j.MDC.put(com.gamma.event.EventLog.SPACE_MDC_KEY, "spaceA");
+            org.slf4j.MDC.put(com.gamma.audit.EventLog.SPACE_MDC_KEY, "spaceA");
             Map<String, String> mdc = org.slf4j.MDC.getCopyOfContextMap();
             org.slf4j.MDC.clear();
             try (var pool = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
@@ -273,7 +273,7 @@ class ObjectStoreEgressTest {
                 }).get();
                 assertEquals(EXPECTED, got);
                 // negative: a named Space that never allowlisted it is refused on the same thread shape
-                Map<String, String> other = Map.of(com.gamma.event.EventLog.SPACE_MDC_KEY, "spaceB");
+                Map<String, String> other = Map.of(com.gamma.audit.EventLog.SPACE_MDC_KEY, "spaceB");
                 var ex = assertThrows(java.util.concurrent.ExecutionException.class, () -> pool.submit(() -> {
                     org.slf4j.MDC.setContextMap(other);
                     try {
@@ -299,7 +299,7 @@ class ObjectStoreEgressTest {
         resolveTo(PRIVATE);
         String prior = System.getProperty("assist.write.root");
         System.clearProperty("assist.write.root");
-        org.slf4j.MDC.remove(com.gamma.event.EventLog.SPACE_MDC_KEY);
+        org.slf4j.MDC.remove(com.gamma.audit.EventLog.SPACE_MDC_KEY);
         Path launch = Files.createDirectories(tmp.resolve("launch"));
         try {
             Files.writeString(launch.resolve("minio_connection.toon"),

@@ -4,7 +4,7 @@ import com.gamma.acquire.AcquisitionLedgers;
 import com.gamma.config.safety.DiscoveredRoots;
 import com.gamma.acquire.ConnectionRegistry;
 import com.gamma.acquire.StabilityGate;
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import com.gamma.notify.NotificationPreferenceOverrides;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

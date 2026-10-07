@@ -1,7 +1,7 @@
 package com.gamma.notify;
 
-import com.gamma.event.Event;
-import com.gamma.event.EventLevel;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLevel;
 import com.gamma.query.ConditionTree;
 import com.gamma.util.Values;
 
@@ -19,7 +19,7 @@ import java.util.Map;
  * {@link ChannelConfig}) and checked ahead of the built-ins by {@link NotificationRules#forEvent}.
  *
  * @param id                unique identifier (storage key for authored rules; a synthetic slug for built-ins)
- * @param eventType         the {@link com.gamma.event.EventType} this rule fires on (case-insensitive)
+ * @param eventType         the {@link com.gamma.audit.EventType} this rule fires on (case-insensitive)
  * @param minLevel          minimum severity, or {@code null} for any
  * @param category          notification category (also the preference key gating delivery)
  * @param titleTemplate     {@code {{var}}} template for the headline

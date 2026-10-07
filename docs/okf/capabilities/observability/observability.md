@@ -99,7 +99,7 @@ Incident's history is exempt from that window by decision (MNT-14 G3, §4); no s
 
 ### 3.1 The signal ledger
 
-**Bus and store.** `EventLog` (`spi/inspecto-audit-spi/src/main/java/com/gamma/event/EventLog.java`) is the
+**Bus and store.** `EventLog` (`spi/inspecto-audit-spi/src/main/java/com/gamma/audit/EventLog.java`) is the
 event bus: `global()` plus one instance per space, `current()` routing by the calling thread's `space` MDC
 and falling back to global. **Emission is synchronous on the publishing thread**; `emit()` runs every
 subscriber inline, uses no SLF4J (re-entrant capture), and swallows subscriber errors. **This is the
@@ -109,7 +109,7 @@ its own virtual-thread executor — `FailureReactor`'s and `SignalIngress`'s pat
 subscriber to run inline. `emit()` is also the **single secret-scrub seam**: `SecretScrubber.scrub(event)`
 runs before anything is persisted.
 
-`EventStore` (`spi/inspecto-audit-spi/src/main/java/com/gamma/event/EventStore.java`) is the append-only store
+`EventStore` (`spi/inspecto-audit-spi/src/main/java/com/gamma/audit/EventStore.java`) is the append-only store
 contract — `append`, `query`, `recent`, keyset `page(limit, afterTs, afterId)` ordered `ts DESC, eventId
 DESC`, `count()`, and `prune(LocalDate before, dryRun)` which deletes **whole UTC day-partitions** and
 returns `-1` when the backend keeps nothing durable. **Three** backends, chosen by `-Devents.backend`
@@ -179,7 +179,7 @@ could be forgotten or leak — it falls out of the comparison, and there is **no
 later run. ⚠ The badge is **advisory**: when any of its three feeds fails the dashboard renders nothing
 stale rather than painting every tile suspect.
 
-**The type catalog is the `EventType` enum** (`spi/inspecto-audit-spi/src/main/java/com/gamma/event/EventType.java`)
+**The type catalog is the `EventType` enum** (`spi/inspecto-audit-spi/src/main/java/com/gamma/audit/EventType.java`)
 — quote the enum, never a page. Families: `LOG`, `AUDIT`, `ACCESS_DENIED`, service/pipeline lifecycle,
 `BATCH_*`, `FILE_*` (acquisition), `JOB_*`, `SIGNAL`, `PIPELINE_CONSERVATION_IMBALANCE` (legacy alias
 `FLOW_CONSERVATION_IMBALANCE`), `EXCHANGE_*`, `ALERT_FIRED`, `REPORT_READY`, `EXPECTATION_FAILED`, `OBJECT_*`.
@@ -768,7 +768,7 @@ the form authors the kind), and per-measure limits.
 
 | Concern | Code | Docs |
 |---|---|---|
-| Bus, store, types, scrubbing | `spi/inspecto-audit-spi/src/main/java/com/gamma/event/EventLog.java`, `EventStore.java`, `InMemoryEventStore.java`, `EventType.java`, `SecretScrubber.java`; `platform/inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java`, `SavedViewStore.java` | [`events-metrics.md`](../../backend/control-plane/events-metrics.md) |
+| Bus, store, types, scrubbing | `spi/inspecto-audit-spi/src/main/java/com/gamma/audit/EventLog.java`, `EventStore.java`, `InMemoryEventStore.java`, `EventType.java`, `SecretScrubber.java`; `platform/inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java`, `SavedViewStore.java` | [`events-metrics.md`](../../backend/control-plane/events-metrics.md) |
 | Signal envelope & read side | `platform/inspecto-engine/src/main/java/com/gamma/signal/Signal.java`, `Signals.java`, `PipelineConsignmentSignal.java` | [`signal-backbone.md`](../../backend/control-plane/signal-backbone.md) §S0–S2 |
 | Feed routes (optional) · fallbacks · audit read | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java`; `inspecto/src/main/java/com/gamma/control/AbsentEventsRoutes.java`, `AbsentMetricsRoutes.java`, `AuditLogRoutes.java`, `SignalRoutes.java` | `EDITIONS.md` CP-13, §Audit; [`events.md`](../../frontend/features/events.md) |
 | Metrics | `spi/inspecto-audit-spi/src/main/java/com/gamma/metrics/MetricRegistry.java`; `features/inspecto-observability/src/main/java/com/gamma/metricsapi/MetricsRoutes.java`; `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java`; `platform/inspecto-engine/src/main/java/com/gamma/inspector/AcquisitionTelemetry.java` | `ADVANCED_GUIDE.md` §7 (`/metrics` catalog) |

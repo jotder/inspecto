@@ -6,9 +6,9 @@ import com.gamma.etl.ConsignmentEvent;
 import com.gamma.pipeline.DeletionFence;
 import com.gamma.pipeline.PipelineStore;
 import com.gamma.pipeline.exec.TriggerCoalescer;
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.util.Scheduler;
@@ -105,7 +105,7 @@ public final class JobService implements AutoCloseable {
      *  after this service); read at run time by the {@code notification_prune} maintenance task. */
     private volatile com.gamma.notify.NotificationStore notificationStore;
     /** This space's durable event store — the {@code event_prune} maintenance task's target (COMPLY-3). */
-    private volatile com.gamma.event.EventStore eventStore;
+    private volatile com.gamma.audit.EventStore eventStore;
     /** This space's delivery receipts (D8), attached post-construction like the feed above; read at run
      *  time by the {@code receipt_prune} maintenance task. */
     private volatile com.gamma.notify.DeliveryReceiptStore deliveryReceiptStore;
@@ -1723,12 +1723,12 @@ public final class JobService implements AutoCloseable {
 
     /** The durable event store the {@code event_prune} maintenance task ages out (COMPLY-3), or empty when
      *  the host never attached one. Distinct from {@link #eventLog}, which is the emit side. */
-    public Optional<com.gamma.event.EventStore> eventStore() {
+    public Optional<com.gamma.audit.EventStore> eventStore() {
         return Optional.ofNullable(eventStore);
     }
 
     /** Attach this space's event store post-construction (opened by the host after this service exists). */
-    public void eventStore(com.gamma.event.EventStore store) {
+    public void eventStore(com.gamma.audit.EventStore store) {
         this.eventStore = store;
     }
 

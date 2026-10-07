@@ -1,6 +1,6 @@
 package com.gamma.job;
 
-import com.gamma.event.EventStore;
+import com.gamma.audit.EventStore;
 
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -40,7 +40,7 @@ final class EventPruneTask {
         // ASSURE-AUDIT-CHAIN-1: record what was ACTUALLY removed, as an AUDIT row on the chain (so it is linked,
         // anchored and verified like every other). /audit/verify accepts anchored rows being gone ONLY for days
         // before the cutoff a verified prune record names — a configured-but-unrun job accounts for nothing.
-        host.attachedEventLog().ifPresent(log -> log.emit(com.gamma.event.Event.builder(com.gamma.event.EventType.AUDIT)
+        host.attachedEventLog().ifPresent(log -> log.emit(com.gamma.audit.Event.builder(com.gamma.audit.EventType.AUDIT)
                 .source("job").message("event_prune removed " + n + " day-partition(s) before " + cutoff)
                 .actor("job:" + cfg.name()).actorType("system")
                 .action("events.pruned").actionCategory("retention")

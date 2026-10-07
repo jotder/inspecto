@@ -1,6 +1,6 @@
 package com.gamma.control;
 
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import com.gamma.job.JobService;
 import com.gamma.workflow.ObjectType;
 import com.gamma.pipeline.ComponentRegistry;
@@ -354,8 +354,8 @@ final class DecisionRoutes implements RouteModule {
         try {
             EventLog log = EventLog.current();
             if (log == null) return;
-            log.emit(com.gamma.event.Event.builder(com.gamma.event.EventType.AUDIT).source("audit")
-                    .level(com.gamma.event.EventLevel.WARN)
+            log.emit(com.gamma.audit.Event.builder(com.gamma.audit.EventType.AUDIT).source("audit")
+                    .level(com.gamma.audit.EventLevel.WARN)
                     .message("Decision Rule '" + ruleName + "' raised no Action Request: the version history cannot name "
                             + "the makers of its invoke-api consequence (unstamped version or history pruned) — failed closed")
                     .actor(automatic ? "decision-rule:" + ruleName : actor).actorType(automatic ? "system" : "user")
@@ -463,12 +463,12 @@ final class DecisionRoutes implements RouteModule {
         EventLog el = EventLog.current();
         if (el == null) return;
         Ref who = actor == null || actor.isBlank() ? null : Ref.of("user", actor);
-        com.gamma.event.Event ev = new Signal(null, type, Instant.now(), Severity.INFO, Ref.parseCompact(source), null,
+        com.gamma.audit.Event ev = new Signal(null, type, Instant.now(), Severity.INFO, Ref.parseCompact(source), null,
                 null, null, EventLog.currentSpaceId(), who, type, payload, 1).toEvent();
         if (!extraAttrs.isEmpty()) {
             Map<String, String> attrs = new LinkedHashMap<>(ev.attributes());
             attrs.putAll(extraAttrs);
-            ev = new com.gamma.event.Event(ev.eventId(), ev.ts(), ev.level(), ev.type(), ev.source(), ev.pipeline(),
+            ev = new com.gamma.audit.Event(ev.eventId(), ev.ts(), ev.level(), ev.type(), ev.source(), ev.pipeline(),
                     ev.correlationId(), ev.message(), attrs, ev.payload());
         }
         el.emit(ev);

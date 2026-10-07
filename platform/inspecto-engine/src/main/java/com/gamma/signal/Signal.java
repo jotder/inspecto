@@ -1,8 +1,8 @@
 package com.gamma.signal;
 
 import com.gamma.api.PublicApi;
-import com.gamma.event.Event;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventType;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;

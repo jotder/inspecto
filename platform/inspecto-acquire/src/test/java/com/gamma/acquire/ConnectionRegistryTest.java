@@ -3,7 +3,7 @@ package com.gamma.acquire;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 
 import java.util.Map;
 

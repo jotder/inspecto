@@ -1,7 +1,7 @@
 package com.gamma.inspector;
 
 import com.gamma.etl.PipelineConfig;
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import com.gamma.signal.Signal;
 import com.gamma.signal.Signals;
 import org.junit.jupiter.api.AfterEach;

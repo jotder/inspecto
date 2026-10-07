@@ -2,9 +2,9 @@ package com.gamma.control;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.gamma.config.safety.PathJail;
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
+import com.gamma.audit.EventType;
 import com.gamma.notify.NotificationTemplate;
 import com.gamma.util.AtomicFiles;
 
@@ -251,7 +251,7 @@ public final class ActionRequests {
     }
 
     static void audit(String actor, String actorType, String action, String message, Map<String, Object> rec,
-                      com.gamma.event.EventLevel level) {
+                      com.gamma.audit.EventLevel level) {
         try {
             EventLog log = EventLog.current();
             if (log == null) return;

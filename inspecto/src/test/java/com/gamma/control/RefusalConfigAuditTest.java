@@ -1,7 +1,7 @@
 package com.gamma.control;
 
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

@@ -25,8 +25,8 @@ import com.gamma.control.WriteGates;
 import com.gamma.entitystore.EntityFactLog;
 import com.gamma.entitystore.EntityListFacts;
 import com.gamma.entitystore.EntityRegistry;
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 

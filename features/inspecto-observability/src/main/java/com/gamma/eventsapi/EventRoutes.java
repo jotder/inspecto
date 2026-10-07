@@ -8,11 +8,11 @@ import com.gamma.control.ErrorCodes;
 import com.gamma.control.Cursor;
 import com.gamma.control.RouteModule;
 import com.gamma.control.TimeBounds;
-import com.gamma.event.AuditAttrs;
-import com.gamma.event.Event;
-import com.gamma.event.EventLevel;
-import com.gamma.event.EventQuery;
-import com.gamma.event.EventType;
+import com.gamma.audit.AuditAttrs;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLevel;
+import com.gamma.audit.EventQuery;
+import com.gamma.audit.EventType;
 import com.gamma.event.SavedView;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -84,7 +84,7 @@ public final class EventRoutes implements RouteModule {
      * history (buffer + Parquet), newest first (keyset {@code (ts, eventId)}). The opaque {@code cursor}
      * resumes strictly after the previous page's last row, so pages don't drift as new events land —
      * unlike the legacy view, which only ever serves the live-tail ring. Events are high-volume, so the
-     * keyset runs store-side ({@link com.gamma.event.EventStore#page}) — the SQL-predicate variant of the
+     * keyset runs store-side ({@link com.gamma.audit.EventStore#page}) — the SQL-predicate variant of the
      * {@code /jobs/runs} adopter, not the in-route {@code /objects} one. The v1 envelope's
      * {@code metadata.pagination} carries {@code cursor/nextCursor/limit/total}.
      */

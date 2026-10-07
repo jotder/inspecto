@@ -9,7 +9,7 @@ import com.gamma.consignment.FileStage;
 import com.gamma.consignment.FileStageRecord;
 import com.gamma.consignment.FileStages;
 import com.gamma.etl.PipelineConfig;
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import com.gamma.objects.IncidentAccess;
 import com.gamma.util.Scheduler;
 import com.gamma.signal.SignalType;

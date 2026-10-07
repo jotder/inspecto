@@ -1,7 +1,7 @@
 package com.gamma.notify;
 
-import com.gamma.event.Event;
-import com.gamma.event.EventType;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +16,7 @@ import java.util.function.Supplier;
 
 /**
  * Turns operational {@link Event}s into in-app {@link Notification}s. Registered as an
- * {@link com.gamma.event.EventLog} subscriber, so it sees every emitted event and applies the active
+ * {@link com.gamma.audit.EventLog} subscriber, so it sees every emitted event and applies the active
  * {@link NotificationRules}.
  *
  * <h3>Off-thread by design</h3>
@@ -170,7 +170,7 @@ public final class NotificationService implements NotificationAccess, AutoClosea
         return deliveryId;
     }
 
-    /** The {@link com.gamma.event.EventLog} subscriber. Cheap + non-blocking: filter, then hand off. */
+    /** The {@link com.gamma.audit.EventLog} subscriber. Cheap + non-blocking: filter, then hand off. */
     public void onEvent(Event e) {
         if (e == null || EventType.LOG.equals(e.type())) return;   // skip the high-volume capture stream
         rules.forEvent(e).ifPresent(rule -> {

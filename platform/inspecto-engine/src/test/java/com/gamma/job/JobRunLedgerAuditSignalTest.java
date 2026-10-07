@@ -1,6 +1,6 @@
 package com.gamma.job;
 
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import com.gamma.signal.AuditWriteSignal;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;

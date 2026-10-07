@@ -1,6 +1,6 @@
 package com.gamma.signal;
 
-import com.gamma.event.InMemoryEventStore;
+import com.gamma.audit.InMemoryEventStore;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;

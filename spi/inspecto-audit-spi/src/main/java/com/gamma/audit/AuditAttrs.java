@@ -1,4 +1,4 @@
-package com.gamma.event;
+package com.gamma.audit;
 
 /**
  * Well-known {@link Event#attributes()} keys for audit-trail facts ({@code type = }{@link EventType#AUDIT}).

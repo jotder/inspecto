@@ -2,8 +2,8 @@ package com.gamma.la.api;
 
 import com.gamma.control.ComponentAccess;
 import com.gamma.control.LinkAnalysisSettings;
-import com.gamma.event.Event;
-import com.gamma.event.EventLog;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLog;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.InputFingerprint;

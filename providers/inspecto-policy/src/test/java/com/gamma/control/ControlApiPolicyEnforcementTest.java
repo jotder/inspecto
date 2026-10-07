@@ -5,7 +5,7 @@ import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.workflow.ObjectType;
 import com.gamma.ops.OperationalObject;
-import com.gamma.event.EventQuery;
+import com.gamma.audit.EventQuery;
 import com.gamma.service.CollectorService;
 import dev.toonformat.jtoon.JToon;
 import org.junit.jupiter.api.AfterEach;

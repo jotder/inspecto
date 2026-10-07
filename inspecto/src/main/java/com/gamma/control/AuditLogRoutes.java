@@ -1,9 +1,9 @@
 package com.gamma.control;
 
-import com.gamma.event.AuditAttrs;
-import com.gamma.event.Event;
-import com.gamma.event.EventQuery;
-import com.gamma.event.EventType;
+import com.gamma.audit.AuditAttrs;
+import com.gamma.audit.Event;
+import com.gamma.audit.EventQuery;
+import com.gamma.audit.EventType;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -144,7 +144,7 @@ final class AuditLogRoutes implements RouteModule {
                 policy(api, root, false), actor);
         // its OWN audit event, chained like every other, carrying what the break records (beside the generic
         // POST row the dispatch seam writes)
-        com.gamma.event.EventLog.current().emit(com.gamma.event.Event.builder(EventType.AUDIT)
+        com.gamma.audit.EventLog.current().emit(com.gamma.audit.Event.builder(EventType.AUDIT)
                 .source("audit").message(actor + " audit.rebaseline at seq " + b.firstSeq() + ": " + reason.trim())
                 .actor(actor).actorType(ApiContext.actorType(ex))
                 .action("audit.rebaseline").actionCategory("configuration")

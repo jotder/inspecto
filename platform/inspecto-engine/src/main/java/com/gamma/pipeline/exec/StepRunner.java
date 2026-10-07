@@ -1,7 +1,7 @@
 package com.gamma.pipeline.exec;
 
 import com.gamma.etl.TypeFlow;
-import com.gamma.event.EventLog;
+import com.gamma.audit.EventLog;
 import com.gamma.job.PlatformServices;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineNodeType;
