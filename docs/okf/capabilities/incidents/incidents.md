@@ -109,7 +109,10 @@ lives in `inspecto-engine`, `AlertRoutes` in core, and the fired-alert feed is a
 every edition evaluates rules and serves `GET /alerts`. What Personal loses is the **object** half: no
 `ALERT` object is opened (`ObjectAccess` is empty), no Incident is promoted (`IncidentAccess` returns empty),
 and `EventObjectBridge` is absent — which is exactly why `SP-CTL-02` is 🟡 on Personal (the gap *event*
-fires, the ALERT *object* does not).
+fires, the ALERT *object* does not). **Working a fired Alert (2026-10-07):** rule-fired Alerts live in the Alert-owned
+store, not as objects, so an operator works one with `POST /alerts/{id}/ack` and `POST /alerts/{id}/resolve` (core
+`AlertRoutes`, `canWorkIncidents`, every edition) — the `id` and lifecycle `state` ride each `GET /alerts` entry; an unknown
+id is 404, a move illegal from the Alert's state (a second ack, anything after RESOLVED) is 422.
 
 ## 3. Specification
 

@@ -625,6 +625,37 @@ Alert records now live in an Alert-owned **store**, behind the unchanged-in-spir
   type (`governance-model`) is now moot for rule-fired Alerts. **Not verified:** live PostgreSQL (`PostgresSchemaPerSpaceTest`
   skips without a database; the DDL is plain `VARCHAR`/`BIGINT`).
 
+### P7 Incidents slice 3 as built (2026-10-07 — operator ack / resolve routes for stored Alerts)
+
+**Regression fixed:** slice 2 moved rule-fired Alerts out of `GET /objects`, so `POST /objects/{id}/ack|resolve` no longer
+reached them and Personal never had a route. **Survey of what an operator could do to an ALERT object before:** ack / resolve /
+transition / assign / notes / tags through `ObjectRoutes` (`canWorkIncidents` for ack, resolve, transition, assign; Workflow
+`OPEN -ack-> ACKNOWLEDGED -resolve-> RESOLVED`, plus `OPEN -resolve-> RESOLVED`), and the Objects detail pane offered ack / resolve
+buttons (`object-detail.component.ts`). The Alerts pane (`alerts.service.ts`) only ever read `GET /alerts*` — it never had an
+ack / resolve affordance, so **no SPA change was made** (follow-up filed). Assign / notes / tags have no stored-Alert equivalent
+(not in scope).
+
+- **Routes** (core `AlertRoutes`): `POST /alerts/([^/]+)/ack` and `.../resolve`, `withCapability("canWorkIncidents", ...)` —
+  the SAME capability the object routes used. Two `CapabilityManifest` entries; `canWorkIncidents` is in the ops-side roles, and on a
+  build with no Subject (Personal) the gate is a no-op, exactly like every other capability. Actor = the authenticated Subject, else
+  the body's `actor`, else `operator` (a body field never re-attributes a Subject's act). **Unknown id -> 404 `NOT_FOUND`; a move
+  illegal from the state (second ack, any move after RESOLVED) -> 422** — what `ObjectRoutes` answered, not 200-idempotent. 200 returns
+  `{id, state, title, severity, scope, openedAt, closedAt, closedBy, incidentId}`.
+- **Port:** `AlertRecords.acknowledgeAlert / findAlert / recentAlertRows`; `AlertStore.get / recentRows` (`recentFired` is now a
+  default over `recentRows`). The state change goes through `AlertService.acknowledge / resolve` -> the port; no `*store*.write(` in the
+  route class (`ConfigWriteFunnelTest`, `DecisionRuleWritersTest` unchanged and green).
+- **`GET /alerts` reflects state:** each entry the store holds a record for gains **optional `id` and `state`** (OPEN / ACKNOWLEDGED /
+  RESOLVED); the ring is still the source of order and the documented members are unchanged (`/alerts` is an undocumented generated
+  skeleton in `openapi-v1.json`). The join is by `Alert` value equality against `recentAlertRows(capacity)` — one query per GET. An
+  Alert the store de-duplicated into an already-open record has no row of its own and carries no `id`. Incident promotion link untouched.
+- **Audit:** no classifier change — `AuditTrail.classify` keys on the last path segment (`ack` -> acknowledged, `resolve` -> resolved),
+  so the new paths are audited already; pinned by `ControlApiAlertAckTest` (one AUDIT row, capability + actor).
+- **Evidence:** `ControlApiAlertAckTest` (8 tests, real HTTP, Personal-shaped classpath: 401, 403, 200 ack then resolve, 404 both verbs,
+  422 repeat, resolve-without-ack, Subject not re-attributable, state in `GET /alerts`, audit row, no-Authenticator honour-system actor).
+  `openapi-v1.json` +2 generated skeleton paths (hand-kept schema block left byte-identical); `route-gating.md` regenerated (lines moved + 2 rows).
+- **Still open (BACKLOG):** an Alerts-pane ack / resolve affordance; the `alert_triage` agent acking through the new route; the with-ops
+  HTTP twin of the test lives only as this Personal-shaped class (the ops module's `ObjectRoutes` is not involved in these routes).
+
 ### P7 contracts: access module as built (2026-10-07, `9dc9df34c` — the auth contract sheds policy and state)
 
 New Base module **`platform/inspecto-access`** (id `access`, `platform`/`base`, package **`com.gamma.access`**). Moved out of
