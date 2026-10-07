@@ -137,7 +137,7 @@ public final class ModuleManifests {
                 oneOf(root, "offeringRole", ModuleManifest.OFFERING_ROLES),
                 oneOf(root, "bindingTime", ModuleManifest.BINDING_TIMES),
                 new ModuleManifest.Provides(list(p, "features"), list(p, "contracts"), list(p, "capabilities"),
-                        list(p, "configKinds"), list(p, "storeFamilies"), list(p, "routes")),
+                        list(p, "configKinds"), list(p, "storeFamilies"), list(p, "routes"), list(p, "consequences")),
                 new ModuleManifest.Requires(list(r, "modules"), list(r, "contracts")),
                 ent.isEmpty() ? null : ent, null, absent.isEmpty() ? null : absent);
     }

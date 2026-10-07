@@ -44,10 +44,19 @@ public record ModuleManifest(String id, String title, String buildRole, String o
      *               the EXACT regex string passed to {@code ApiContext} (P3b) and the order is the registration order
      *               (first-match: a catch-all stays last). Read by the host to synthesise the 503 "not installed"
      *               stubs when the module is absent; kept honest by a parity test in each module.
+     * @param consequences the Decision Rule action ids the module contributes ({@code ConsequenceProvider}); an install
+     *               that leaves the module out reports those actions {@code unavailable} (not unknown).
      */
     public record Provides(List<String> features, List<String> contracts, List<String> capabilities,
-                           List<String> configKinds, List<String> storeFamilies, List<String> routes) {
-        public static final Provides NONE = new Provides(List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+                           List<String> configKinds, List<String> storeFamilies, List<String> routes,
+                           List<String> consequences) {
+        public static final Provides NONE = new Provides(List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+
+        /** Without {@code consequences} (the Decision Rule actions a module contributes; none declared). */
+        public Provides(List<String> features, List<String> contracts, List<String> capabilities,
+                        List<String> configKinds, List<String> storeFamilies, List<String> routes) {
+            this(features, contracts, capabilities, configKinds, storeFamilies, routes, List.of());
+        }
     }
 
     public record Requires(List<String> modules, List<String> contracts) {

@@ -98,6 +98,26 @@ class ModuleRemovalRulesTest {
         }
     }
 
+    private static final String INCIDENT_RULE = "{\"name\":\"inc_rule\",\"targetType\":\"pipeline\",\"target\":\"orders\","
+            + "\"consequences\":[{\"action\":\"create-incident\",\"params\":{\"title\":\"t\"}},"
+            + "{\"action\":\"emit-signal\",\"params\":{\"type\":\"x.y\"}}],"
+            + "\"when\":{\"kind\":\"group\",\"op\":\"AND\",\"items\":[]}}";
+
+    @Test
+    void aKnownButAbsentActionIsUnavailableNamingTheModule_notExecuted_andCoreActionsStillRun(
+            @TempDir Path cfg, @TempDir Path wr) throws Exception {
+        try (Ctx c = open(cfg, wr)) {
+            assertEquals(200, send(c.port, "POST", "/decision-rules", INCIDENT_RULE).statusCode());
+            HttpResponse<String> r = send(c.port, "POST", "/decision-rules/inc_rule/apply", "{}");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode executed = V1Body.of(r.body()).get("executed");
+            assertEquals("unavailable", executed.get(0).get("status").asText(), r.body());
+            String detail = executed.get(0).get("detail").asText();
+            assertTrue(detail.contains("create-incident") && detail.contains("inspecto-ops"), detail);
+            assertEquals("executed", executed.get(1).get("status").asText(), "a core action still runs: " + r.body());
+        }
+    }
+
     @Test
     void anUnmodelledKeyOnAnAlertRuleIsDroppedBySaveWithA200_pinnedUntilP4Policy(@TempDir Path cfg, @TempDir Path wr)
             throws Exception {

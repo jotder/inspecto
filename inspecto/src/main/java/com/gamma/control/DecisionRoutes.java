@@ -1,5 +1,8 @@
 package com.gamma.control;
 
+import com.gamma.decision.ConsequenceContext;
+import com.gamma.decision.ConsequenceProvider;
+import com.gamma.decision.Consequences;
 import com.gamma.event.EventLog;
 import com.gamma.job.JobService;
 import com.gamma.workflow.ObjectType;
@@ -183,158 +186,90 @@ final class DecisionRoutes implements RouteModule {
         return result;
     }
 
+    /** The registry of consequence providers: the built-ins plus every installed module's (fail-soft ServiceLoader). */
+    private static volatile Consequences registry;
+
+    static Consequences consequences() {
+        Consequences r = registry;
+        if (r == null) registry = r = Consequences.load(DecisionRoutes.class.getClassLoader());
+        return r;
+    }
+
+    /** The module (known manifest) that declares {@code action} in {@code provides.consequences}, if any. */
+    private static com.gamma.module.ModuleManifest declaringModule(String action) {
+        return com.gamma.module.KnownModules.load(DecisionRoutes.class.getClassLoader()).manifests().stream()
+                .filter(m -> m.provides().consequences().contains(action)).findFirst().orElse(null);
+    }
+
+    /**
+     * One consequence through the registry. STATUS CONTRACT: {@code executed} / {@code skipped} are the provider's
+     * own; {@code unavailable} means the action is known but nothing installed can run it (its module is absent, or
+     * a service it requires is) — never reported as executed; an action nobody declared is {@code skipped}.
+     */
     private static Map<String, Object> executeOne(ApiContext api, String ruleName, Map<String, Object> rule,
                                                   Map<String, Object> c, boolean automatic, String actor,
                                                   Map<String, Object> record) {
         String action = String.valueOf(c.get("action"));
-        String status = "skipped";
-        String detail;
-        String runId = null;
-        String actionRequestId = null;
-        switch (action) {
-            case "emit-signal" -> {
-                String type = paramStr(c, "type", "decision-rule." + ruleName);
-                Map<String, Object> payload = new LinkedHashMap<>();
-                payload.put("rule", ruleName);
-                payloadMap(c).forEach((key, field) -> payload.put(key, record.get(String.valueOf(field))));
-                String offerTo = params(c).get(OFFER_TO) instanceof String to ? to : null;
-                emitSignal(actor, type, "decision-rule:" + ruleName, payload,
-                        offerTo == null ? Map.of() : Map.of(SignalOfferGrants.ATTR_OFFER_TO, offerTo));
-                status = "executed";
-                detail = "emitted signal '" + type + "'" + (offerTo == null ? "" : " offered to '" + offerTo + "'");
-            }
-            case "create-alert" -> {
-                String alertName = paramStr(c, "rule", ruleName);
-                String severity = paramStr(c, "severity", "warning");
-                // Always record the decision on the ledger.
-                emitSignal(actor, "decision-rule.create-alert", "decision-rule:" + ruleName,
-                        Map.of("alert", alertName, "severity", severity));
-                status = "executed";
-                // Author a real Alert Rule (S6) through the exact same validation/persistence path as the
-                // human-facing POST /alerts/rules, when the consequence's params carry enough of an
-                // alert-rule body to be valid (metric+comparator+threshold+window, or dataset+measure —
-                // see AlertRule's constructor). A consequence that (like the pre-S6 stub shape) only
-                // carries {rule, severity} — not enough to author a real rule — stays ledger-signal-only,
-                // exactly as before; this is a deliberate, conservative scope cut (see event-signal-backbone
-                // plan S6 report) rather than inventing defaults for fields with no sane default
-                // (a threshold, a window).
-                String authoredDetail = null;
-                if (looksLikeAlertRuleBody(c)) {
-                    Map<String, Object> alertBody = new LinkedHashMap<>(params(c));
-                    alertBody.putIfAbsent("name", alertName);
-                    alertBody.putIfAbsent("severity", severity.toUpperCase(java.util.Locale.ROOT));
-                    try {
-                        AlertRoutes.authorFromConsequence(api, alertBody);
-                        authoredDetail = "authored Alert Rule '" + alertName + "'";
-                    } catch (ApiException | IOException authoringFailure) {
-                        authoredDetail = "could not author Alert Rule '" + alertName + "': " + authoringFailure.getMessage();
-                    }
-                }
-                // High-severity (critical/error) decisions also open a managed Incident, deduped to one
-                // open Incident per rule (correlationId = the rule), so they enter triage — the same
-                // signal→Incident wiring the alert/recon paths use. Lower severities stay a ledger signal
-                // (+ the authored rule, when authored) only.
-                String corr = "decision-rule:" + ruleName;
-                String incidentDetail = null;
-                // ⚠ Through the seam since EDG-01 cell 7, and empty on a bundle without inspecto-ops —
-                // in which case no Incident is raised and the decision still executes and audits.
-                com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
-                if (isHighSeverity(severity)) {
-                    // ⛔ Three outcomes, not two. An absent module must NOT be reported as "already open":
-                    // that is a different fact, and an operator reading it would believe an Incident exists.
-                    if (objects == null) {
-                        incidentDetail = "decision '" + alertName + "' — no Incident opened, operational "
-                                + "objects are not installed in this bundle";
-                    } else if (!objects.hasActive(ObjectType.INCIDENT, corr)) {
-                        objects.open(ObjectType.INCIDENT, "Decision Rule " + alertName,
-                                "Raised by Decision Rule '" + ruleName + "'", severity, corr,
-                                Map.of("rule", ruleName, "decisionRule", ruleName, "severity", severity));
-                        incidentDetail = "opened Incident for '" + alertName + "' (" + severity + ")";
-                    } else {
-                        incidentDetail = "decision '" + alertName + "' — Incident already open";
-                    }
-                }
-                detail = java.util.stream.Stream.of(authoredDetail, incidentDetail)
-                        .filter(java.util.Objects::nonNull)
-                        .reduce((a, b) -> a + "; " + b)
-                        .orElse("recorded create-alert signal for '" + alertName + "' (" + severity + ")");
-            }
-            case "start-job" -> {
-                String jobId = targetId(c);
-                JobService svc = HostContext.of(api).service().jobService().orElse(null);
-                // A disabled job is "not scheduled", not "not runnable" (operator 2026-09-25): an AUTOMATIC
-                // application skips it; a PERSON's apply runs it like Run now. JobService builds disabled
-                // jobs (so /jobs/{name}/trigger works), which is why the automatic skip is gated here.
-                boolean disabled = jobId != null && svc != null
-                        && svc.jobConfig(jobId).map(j -> !j.enabled()).orElse(false);
-                if (disabled && automatic) {
-                    detail = "job '" + jobId + "' is disabled — not started";
-                } else if (jobId != null && svc != null
-                        && (runId = svc.triggerRun(jobId, automatic ? "decision-rule:" + ruleName : actor,
-                                Map.of()).orElse(null)) != null) {
-                    status = "executed";
-                    detail = "triggered job '" + jobId + "'" + (disabled ? " (disabled — run on a manual apply)" : "");
-                } else {
-                    detail = "no such job '" + jobId + "'";
-                }
-            }
-            case "trigger-pipeline" -> {
-                String pipelineId = targetId(c);
-                if (pipelineId != null && HostContext.of(api).service().triggerRunAsync(pipelineId).isPresent()) {
-                    status = "executed";
-                    detail = "triggered pipeline '" + pipelineId + "'";
-                } else {
-                    detail = "no such pipeline '" + pipelineId + "'";
-                }
-            }
-            case "create-incident" -> {
-                // Explicit, author-selected Incident consequence — the generalized form of the
-                // create-alert high-severity auto-promotion above, usable at any severity and
-                // without also authoring an Alert Rule. Deduped to one open Incident per rule
-                // (correlationId = the rule), the same signal→Incident wiring the alert/recon
-                // paths use; a matching Incident already being open is a successful no-op.
-                String corr = "decision-rule:" + ruleName;
-                String title = paramStr(c, "title", "Decision Rule " + ruleName);
-                String severity = paramStr(c, "severity", "error");
-                status = "executed";
-                com.gamma.objects.ObjectAccess objs = HostContext.of(api).service().objects().orElse(null);
-                // ⛔ Same three-way split as create-alert above: "not installed" is not "already open".
-                if (objs == null) {
-                    detail = "no Incident opened for rule '" + ruleName + "' — operational objects are not "
-                            + "installed in this bundle";
-                } else if (!objs.hasActive(ObjectType.INCIDENT, corr)) {
-                    objs.open(ObjectType.INCIDENT, title,
-                            "Raised by Decision Rule '" + ruleName + "'", severity, corr,
-                            Map.of("rule", ruleName, "decisionRule", ruleName, "severity", severity));
-                    detail = "opened Incident '" + title + "' (" + severity + ")";
-                } else {
-                    detail = "Incident already open for rule '" + ruleName + "'";
-                }
-            }
-            case "invoke-api" -> {
-                // ASSURE-ACTION-REQUESTS-1: never a direct call — a PENDING Action Request on the rule's Incident,
-                // which a second person approves before ActionDispatcher sends it.
-                String[] made = proposeActionRequest(api, ruleName, rule, c, automatic, actor);
-                status = made[0];
-                detail = made[1];
-                actionRequestId = made[2];
-            }
-            case "render-widget", "generate-report" -> {
-                emitSignal(actor, "decision-rule." + action, "decision-rule:" + ruleName, Map.of("action", action));
-                status = "executed";
-                detail = "recorded " + action + " stub signal (execution engine not built yet)";
-            }
-            case "route", "tag", "quarantine", "drop" ->
-                    detail = "routing action — applied to matching records during the target pipeline's runs";
-            default -> detail = "unknown action '" + action + "' — no installed module provides it; the rule is kept unchanged";
+        ConsequenceContext ctx = new HostConsequenceContext(api, ruleName, rule, automatic, actor, record);
+        ConsequenceProvider.Result res;
+        ConsequenceProvider provider = consequences().find(action).orElse(null);
+        if (provider != null) {
+            String missing = provider.requires().stream().filter(r -> !ctx.has(r)).findFirst().orElse(null);
+            res = missing != null
+                    ? ConsequenceProvider.Result.unavailable("'" + action + "' requires platform service '" + missing + "', which is not available")
+                    : provider.execute(ctx, c);
+        } else if ("invoke-api".equals(action)) {
+            // ASSURE-ACTION-REQUESTS-1: never a direct call — a PENDING Action Request on the rule's Incident,
+            // which a second person approves before ActionDispatcher sends it. Stays here until Action Requests
+            // is a module.
+            String[] made = proposeActionRequest(api, ruleName, rule, c, automatic, actor);
+            res = new ConsequenceProvider.Result(made[0], made[1], made[2] == null ? Map.of() : Map.of("actionRequestId", made[2]));
+        } else {
+            com.gamma.module.ModuleManifest declared = declaringModule(action);
+            res = declared != null
+                    ? ConsequenceProvider.Result.unavailable("'" + action + "' is not available: "
+                            + com.gamma.module.KnownModules.absentMessage(declared))
+                    : ConsequenceProvider.Result.skipped("unknown action '" + action
+                            + "' — no installed module provides it; the rule is kept unchanged");
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("action", action);
-        out.put("status", status);
-        out.put("detail", detail);
-        if (runId != null) out.put("runId", runId);
-        if (actionRequestId != null) out.put("actionRequestId", actionRequestId);
+        out.put("status", res.status());
+        out.put("detail", res.detail());
+        out.putAll(res.extras());
         return out;
+    }
+
+    /** The host's narrow view for a {@link ConsequenceProvider}: this Space's ledger, jobs, pipelines and objects. */
+    private record HostConsequenceContext(ApiContext api, String ruleName, Map<String, Object> rule, boolean automatic,
+                                          String actor, Map<String, Object> record) implements ConsequenceContext {
+        @Override public java.util.Optional<com.gamma.objects.ObjectAccess> objects() {
+            return HostContext.of(api).service().objects();
+        }
+        @Override public boolean has(String serviceId) {
+            return switch (serviceId) {
+                case "objects" -> objects().isPresent();
+                case "jobs" -> HostContext.of(api).service().jobService().isPresent();
+                default -> false;
+            };
+        }
+        @Override public void emitSignal(String type, String source, Map<String, Object> payload, String offerTo) {
+            DecisionRoutes.emitSignal(actor, type, source, payload,
+                    offerTo == null ? Map.of() : Map.of(SignalOfferGrants.ATTR_OFFER_TO, offerTo));
+        }
+        @Override public boolean jobDisabled(String jobId) {
+            return HostContext.of(api).service().jobService()
+                    .flatMap(svc -> svc.jobConfig(jobId)).map(j -> !j.enabled()).orElse(false);
+        }
+        @Override public java.util.Optional<String> triggerJob(String jobId, String requestedBy) {
+            return HostContext.of(api).service().jobService().flatMap(svc -> svc.triggerRun(jobId, requestedBy, Map.of()));
+        }
+        @Override public boolean triggerPipeline(String pipelineId) {
+            return HostContext.of(api).service().triggerRunAsync(pipelineId).isPresent();
+        }
+        @Override public void authorAlertRule(Map<String, Object> body) throws Exception {
+            AlertRoutes.authorFromConsequence(api, body);
+        }
     }
 
     /**
@@ -371,7 +306,7 @@ final class DecisionRoutes implements RouteModule {
                                                  Map<String, Object> c, boolean automatic, String actor) {
         com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
         if (objects == null)
-            return new String[] {"skipped", "no Action Request — operational objects are not installed in this "
+            return new String[] {"unavailable", "no Action Request — operational objects are not installed in this "
                     + "bundle, so there is no Incident to raise it on", null};
         Path root = api.writeRoot();
         if (root == null)
@@ -417,16 +352,6 @@ final class DecisionRoutes implements RouteModule {
         }
     }
 
-    private static String targetId(Map<String, Object> c) {
-        return c.get("target") instanceof Map<?, ?> t && t.get("id") != null ? String.valueOf(t.get("id")) : null;
-    }
-
-    /** Whether a decision severity warrants a managed Incident (critical / error) rather than a ledger signal. */
-    private static boolean isHighSeverity(String severity) {
-        return severity != null
-                && (severity.equalsIgnoreCase("critical") || severity.equalsIgnoreCase("error"));
-    }
-
     @SuppressWarnings("unchecked")
     private static String paramStr(Map<String, Object> c, String key, String fallback) {
         if (c.get("params") instanceof Map<?, ?> p && p.get(key) != null) return String.valueOf(p.get(key));
@@ -437,19 +362,6 @@ final class DecisionRoutes implements RouteModule {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> params(Map<String, Object> c) {
         return c.get("params") instanceof Map<?, ?> p ? (Map<String, Object>) p : Map.of();
-    }
-
-    /** Whether a {@code create-alert} consequence's {@code params} carry enough of an alert-rule body
-     *  to attempt real authoring (see {@link com.gamma.alert.AlertRule}'s constructor): either a ledger
-     *  metric rule ({@code comparator}+{@code threshold}+{@code metric}+{@code window}) or a measure rule
-     *  ({@code comparator}+{@code threshold}+{@code dataset}+{@code measure}). The pre-S6 stub shape
-     *  ({@code rule}, {@code severity} only) does not, and stays ledger-signal-only. */
-    private static boolean looksLikeAlertRuleBody(Map<String, Object> c) {
-        Map<String, Object> p = params(c);
-        boolean hasComparatorAndThreshold = p.get("comparator") != null && p.get("threshold") != null;
-        boolean ledgerMetric = p.get("metric") != null && p.get("window") != null;
-        boolean measureRule = p.get("dataset") != null && p.get("measure") != null;
-        return hasComparatorAndThreshold && (ledgerMetric || measureRule);
     }
 
     /** A Decision Rule's Signal, stamped with the Space whose ledger records it and the person who applied
