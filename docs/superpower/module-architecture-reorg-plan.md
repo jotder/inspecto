@@ -20,7 +20,7 @@
 > - **P4** — P4-1..P4-3 already filed (`MODULE-REORG-P4-1`, `-P4-2`, `-P4-3`).
 > - **P5** — `MODULE-REORG-P5-TCKS`: processor-free route tests where impossible today (exchange needs its `register()` host installs moved to a boot hook; other la-api route classes; geo-link `InvestigationMeasureRoutes`); TCKs for Authenticator, TokenRelay, CollectorConnectorFactory, NotificationChannel, DescriptionProvider, MaintenanceTaskProvider, JobTypeProvider.
 > - **P6** — EDITIONS/FEATURE_INVENTORY generation needs a `posture{}` section and capabilities in `provides`; bundle generator driven by Offerings (rides on `MODULE-REORG-P3-THIN-JARS`).
-> - **P7** — `MODULE-REORG-P7-INCIDENTS` (Incidents / Case Management split, Action Requests, Workflow & SLA slice 2 sweep behind a governed-item contract, linked-subject contract; **open design question:** `alert` depends on the object substrate via `ObjectAccess` and Alerts persist ALERT objects, contradicting "Personal has Alerts but no operational objects" unless `ObjectAccess` has a null/in-memory implementation on Personal); `MODULE-REORG-P7-KERNEL` (Decision Kernel steps 1, 3-7: Expectation non_null/range/regex onto the tree, Tag and Case Rule filters, Notification Rules, Risk filters, Escalation match, Access Policies' Conditions text compiled into the tree, retire the duplicate evaluator, Consequence registry); `MODULE-REORG-P7-CONTRACTS` (contract modules shed AccessPolicies/AuditTrail/EventLog/AuditChain/InMemoryEventStore/SecretScrubber/MetricRegistry/Roles family/CapabilityManifest, order per the 2026-10-06 survey; the access cluster and the event cluster are DONE 2026-10-07, see §6).
+> - **P7** — `MODULE-REORG-P7-INCIDENTS` (Incidents / Case Management split, Action Requests, Workflow & SLA slice 2 sweep behind a governed-item contract, linked-subject contract; **open design question:** `alert` depends on the object substrate via `ObjectAccess` and Alerts persist ALERT objects, contradicting "Personal has Alerts but no operational objects" unless `ObjectAccess` has a null/in-memory implementation on Personal); `MODULE-REORG-P7-KERNEL` (Decision Kernel steps 1, 3-7: Expectation non_null/range/regex onto the tree, Tag and Case Rule filters, Notification Rules, Risk filters, Escalation match, Access Policies' Conditions text compiled into the tree, retire the duplicate evaluator, Consequence registry — **slice 1 DONE 2026-10-07**, see §8b); `MODULE-REORG-P7-CONTRACTS` (contract modules shed AccessPolicies/AuditTrail/EventLog/AuditChain/InMemoryEventStore/SecretScrubber/MetricRegistry/Roles family/CapabilityManifest, order per the 2026-10-06 survey; the access cluster and the event cluster are DONE 2026-10-07, see §6).
 > - **Guards / review** — `MODULE-REORG-GUARD-1` (DONE 2026-10-07 — `ImportLoaderInventoryTest` row + `ReactorModules` loops, `RouteInventoryTest` gate moved), `MODULE-REORG-REVIEW-1` (reviewer checklist).
 > Inputs: *Enterprise-Grade Modular Architecture Guidelines* (PDF, 4 pages) and the "System Architecture
 > Topology" mock-up (four layers + a per-module inspector). Operator brief: long-term benefit across
@@ -1059,6 +1059,59 @@ Consequence registry — not deleted code.
 field-to-field, case-insensitive, `matches`); (3) Tag and Case Rule filters; (4) Notification Rules; (5) Risk
 filters; (6) Escalation match; (7) Access Policies' `Conditions` text compiled into the tree (last:
 security-sensitive); then retire the duplicate evaluator.
+
+### Consequence registry slice 1 as built (2026-10-07) — `MODULE-REORG-P7-KERNEL`
+
+The string switch in `DecisionRoutes.executeOne` is gone for every action except `invoke-api`; consequences are
+looked up in a registry. Commits `4ac4aa0e3` (SPI + registry + built-ins), `1b11157e9` (ops provider, manifest,
+status contract), `0983c0bf4` (catalog route), `85ff6dfd1` (SPA).
+
+- **SPI** `com.gamma.decision.ConsequenceProvider` (engine; a new package, so no split): `id()`, `displayName()`,
+  `group()` (`platform|routing|notify|object|integration`), `requires()` (host service ids), and
+  `execute(ConsequenceContext, Map consequence)`. ⚠ It takes the WHOLE consequence map, not just `params`:
+  the routing actions read `destination` and `start-job` reads `target`. No `paramSchema()` — the editor's
+  one-secondary-input model lives in `consequence.ts` (`consequenceInputSpec`) and a schema would duplicate it.
+- **`ConsequenceContext`** is the narrow host view (rule, actor, `automatic`, matched record, `objects()`,
+  `emitSignal`, `triggerJob`/`jobDisabled`, `triggerPipeline`, `authorAlertRule`, `has(serviceId)`); `HostContext`
+  and `ApiContext` never cross it. The implementation is a private record inside `DecisionRoutes`. Only `objects`
+  is a service id: `start-job` deliberately declares none, because `jobService()` is empty on a space with no jobs
+  (that is "no such job", not an absent module).
+- **Registry** `Consequences.load(loader)`: built-ins first, then `ServiceLoader` providers, fail-soft (a provider
+  that fails to load, or reuses an id, is logged and skipped; a module can never displace a built-in).
+- **Built-ins** (`BuiltInConsequences`): `emit-signal`, `create-alert`, `start-job`, `trigger-pipeline`,
+  `render-widget`, `generate-report`, and the four routing actions, whose providers only DESCRIBE them
+  (`DecisionRuleApplier` still executes them per batch; `execute` reports `skipped`, as before).
+  `create-incident` moved to `features/inspecto-ops` (`CreateIncidentConsequence`; service file + `module.toon`
+  `provides.consequences` + `contracts`). `invoke-api` stays in `DecisionRoutes` until Action Requests is a module.
+- **`provides.consequences`** is a new `ModuleManifest.Provides` list (parsed by `ModuleManifests`; the 6-arg
+  constructor stays). Known-modules copies carry it, so an install without ops still knows `create-incident` exists.
+- **Status contract (breaking, operator 2026-10-07).**
+
+| Situation | `status` | `detail` |
+|---|---|---|
+| provider ran | `executed` | the provider's own |
+| nothing to do on demand (routing actions; `start-job` on a disabled job when automatic; no such job / pipeline) | `skipped` | the provider's own |
+| provider present, a `requires()` service missing | `unavailable` | `requires platform service '<id>'` |
+| action declared by a known-modules manifest `provides.consequences`, module not installed (e.g. `create-incident` on Personal) | `unavailable` | the module's `absentMessage` |
+| `invoke-api` with no operational objects | `unavailable` | no Incident to raise it on |
+| action nobody ever declared | `skipped` | `unknown action ... no installed module provides it` (P4a pin unchanged) |
+
+  The bug this fixes: an absent ops module used to report `create-incident` as `executed`. Rule save is unchanged
+  (unknown/absent actions and every key are PRESERVED, pinned by `ModuleRemovalRulesTest`); no `warnings` field was
+  added to the save response — the catalog route and the editor carry the warning instead.
+- **`GET /decision-rules/consequences`** (ungated like its sibling `GET /decision-rules`):
+  `[{id, displayName, group, available, reason?, module?, requires?}]`, ordered by group
+  (routing, platform, notify, object, integration) then registration order. Absent-module rows have
+  `displayName = id` and `group = platform` (a manifest names ids only, not groups).
+- **SPA.** `PLATFORM_ACTIONS` is deleted; the editor loads the catalog. Unavailable actions show `(not installed)` as
+  text, are disabled in the select for new choices, and a stored rule naming one renders an inline warning. Two
+  defects found on the way and fixed: `consequenceInputSpec` threw for an action it did not know (the editor could
+  not open such a rule), and saving would have rebuilt the consequence and dropped its params — an unavailable row
+  is now saved back exactly as stored.
+- **Not on the registry yet:** Alert Rule actions, Tag/Case rule effects, Notification channels, Escalation target;
+  `invoke-api` until Action Requests is a module. Condition Language: step 5 (Risk filters) is approved to proceed
+  with an additive optional `when` on `MeasureCompiler.Spec`; step 7 (Access Policies' `Conditions`) is DECLINED for
+  now — the tree is fail-open where `Conditions` fails closed; revisit only on operator request.
 
 ### Decision Kernel step 2 as built (2026-10-07) — the Condition Language tree extensions
 

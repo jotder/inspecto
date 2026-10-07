@@ -89,6 +89,15 @@ default `Decision Rule <name>`) with no Alert Rule authoring, deduped to one ope
 same rule). Non-breaking — `create-alert`'s existing high-severity auto-promotion is unchanged; authors
 who want an Incident at a warning severity, or without an Alert Rule, now pick `create-incident`
 instead of relying on the `create-alert` side effect.
+**Consequence registry (2026-10-07).** Every action is a `com.gamma.decision.ConsequenceProvider` looked up in
+`Consequences` (built-ins plus `ServiceLoader` providers from installed modules); `create-incident` is contributed
+by `inspecto-ops`, `invoke-api` still lives in `DecisionRoutes`. `apply` reports one of three statuses per
+consequence: `executed`, `skipped` (nothing to do, or an action nobody ever declared), or `unavailable` (a KNOWN
+action, declared in a module manifest's `provides.consequences`, whose module or required service is not
+installed; the detail names the module). An absent module is never reported `executed`. Saving a rule still
+preserves unknown/absent actions. `GET /decision-rules/consequences` lists every action with `available`,
+`reason` and `module`; the SPA editor reads it. Plan: `superpower/module-architecture-reorg-plan.md` section 8b.
+
 The **record-routing** consequences (`route`/`tag`/`quarantine`/`drop`) are applied by the engine
 itself, per batch, via `com.gamma.etl.DecisionRuleApplier` — invoked from
 `ConsignmentIngestStrategy.writeAndTrace`, the shared tail of every ingest path (Java parse engine +
