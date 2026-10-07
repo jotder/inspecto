@@ -1,6 +1,6 @@
 package com.gamma.service;
 
-import com.gamma.acquire.SecretResolver;
+import com.gamma.auth.secrets.SecretResolver;
 
 import java.util.List;
 import java.util.function.Function;

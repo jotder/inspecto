@@ -1,6 +1,6 @@
 package com.gamma.la.core;
 
-import com.gamma.acquire.SecretResolver;
+import com.gamma.auth.secrets.SecretResolver;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.SpiSlot;

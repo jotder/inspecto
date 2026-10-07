@@ -19,7 +19,7 @@
  * **A. A cited repo path resolves.** Every backticked token that looks like a repo-relative path with a
  *    source or doc extension must exist — resolved against one of BASES, or matching the tail of a
  *    tracked file. The tail rule is not a loophole: docs cite Java by its PACKAGE path
- *    (`com/gamma/acquire/SecretResolver.java`) and UI files by their app-relative one, and a citation
+ *    (`com/gamma/auth/secrets/SecretResolver.java`) and UI files by their app-relative one, and a citation
  *    that uniquely identifies a real file is an honest citation however much of the prefix it omits.
  *
  * **B. No current doc names a type the repo declares renamed.** The old names are PARSED from the

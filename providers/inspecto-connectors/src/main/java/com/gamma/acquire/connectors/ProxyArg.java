@@ -33,7 +33,7 @@ final class ProxyArg {
         StringBuilder sb = new StringBuilder(proxy.host()).append(':').append(proxy.port());
         if (withCredentials && proxy.username() != null && !proxy.username().isBlank()) {
             sb.append(':').append(proxy.username()).append(':')
-              .append(proxy.password() == null ? "" : com.gamma.acquire.SecretResolver.resolve(proxy.password()));
+              .append(proxy.password() == null ? "" : com.gamma.auth.secrets.SecretResolver.resolve(proxy.password()));
         }
         return sb.toString();
     }

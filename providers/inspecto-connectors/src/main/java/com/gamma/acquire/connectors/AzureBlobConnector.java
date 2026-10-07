@@ -7,7 +7,7 @@ import com.gamma.acquire.ConnectionWorkbench;
 import com.gamma.acquire.DiscoveryContext;
 import com.gamma.acquire.PostAction;
 import com.gamma.acquire.RemoteFile;
-import com.gamma.acquire.SecretResolver;
+import com.gamma.auth.secrets.SecretResolver;
 import com.gamma.acquire.CollectorConnector;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;

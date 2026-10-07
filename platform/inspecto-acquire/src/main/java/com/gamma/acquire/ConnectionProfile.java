@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import static com.gamma.util.Values.trimToNull;
+import com.gamma.auth.secrets.SecretResolver;
 
 /**
  * A reusable remote-system connection profile (Data Acquisition — connection profiles). One profile describes

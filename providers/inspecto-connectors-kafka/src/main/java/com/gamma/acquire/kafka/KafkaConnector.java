@@ -7,7 +7,7 @@ import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.DiscoveryContext;
 import com.gamma.acquire.PostAction;
 import com.gamma.acquire.RemoteFile;
-import com.gamma.acquire.SecretResolver;
+import com.gamma.auth.secrets.SecretResolver;
 import com.gamma.acquire.CollectorConnector;
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.config.safety.EgressGate;

@@ -2,7 +2,7 @@ package com.gamma.oidc;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gamma.acquire.SecretResolver;
+import com.gamma.auth.secrets.SecretResolver;
 import com.gamma.control.TokenRelay;
 
 import java.net.URI;

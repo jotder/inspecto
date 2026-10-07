@@ -1,6 +1,6 @@
 package com.gamma.job;
 
-import com.gamma.acquire.SecretResolver;
+import com.gamma.auth.secrets.SecretResolver;
 
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SSLContext;

@@ -1,4 +1,4 @@
-package com.gamma.acquire;
+package com.gamma.auth.secrets;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

@@ -1084,7 +1084,7 @@ signature** — it describes all fifteen:
   implicitly public the way an interface's would be).
 - ⛔ **Routing a leaf module's backend read through `OperationalDb` is a MODULE CYCLE.** `inspecto-acquire`
   is a deliberate leaf; `inspecto/pom.xml:96` depends **on it**, and `OperationalDb.java:3` imports
-  `com.gamma.acquire.SecretResolver`. `Family` is invisible from the leaf and cannot be made visible
+  `com.gamma.auth.secrets.SecretResolver`. `Family` is invisible from the leaf and cannot be made visible
   without inverting that dependency.
 - ⚠ **`Resolved` is not value-identical to what an opener needs**: it discards the raw backend string, and
   [`AcquisitionLedgers.java:152-156`](../../../../platform/inspecto-acquire/src/main/java/com/gamma/acquire/AcquisitionLedgers.java)

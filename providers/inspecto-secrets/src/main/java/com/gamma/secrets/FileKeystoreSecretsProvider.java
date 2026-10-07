@@ -1,7 +1,7 @@
 package com.gamma.secrets;
 
-import com.gamma.acquire.SecretResolver;
-import com.gamma.acquire.SecretsProvider;
+import com.gamma.auth.secrets.SecretResolver;
+import com.gamma.auth.secrets.SecretsProvider;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;

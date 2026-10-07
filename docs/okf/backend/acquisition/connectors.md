@@ -172,7 +172,7 @@ the stub-server tests use to present `127.0.0.1` as an allowlisted LAN address).
   SFTP/FTP tests set: each case dials the real driver through `MiniHttpConnectRelay` / `MiniSocks5Relay` at a
   bare listener and asserts the relay was asked for the database — the handshake failing afterwards is the
   expected shape, the CONNECT having happened is the claim.
-* **Secrets are never literals** — `SecretResolver` (`com/gamma/acquire/SecretResolver.java`) resolves
+* **Secrets are never literals** — `SecretResolver` (`com/gamma/auth/secrets/SecretResolver.java`) resolves
   `${ENV:VAR}` / `${SYS:prop}` / `${FILE:/path}` / `${KEYSTORE:alias}` / `${NAME}` at connect time, never at
   load; `isResolvable()` powers the test endpoint without exposing values. **SEC-07 (2026-09-06): `${FILE}` and
   `${KEYSTORE}` are Standard + Enterprise** — the `SecretsProvider` SPI in the core is served by

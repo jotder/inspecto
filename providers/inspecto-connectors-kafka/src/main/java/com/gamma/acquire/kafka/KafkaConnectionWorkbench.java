@@ -3,7 +3,7 @@ package com.gamma.acquire.kafka;
 import com.gamma.acquire.AcquisitionException;
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.ConnectionWorkbench;
-import com.gamma.acquire.SecretResolver;
+import com.gamma.auth.secrets.SecretResolver;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;

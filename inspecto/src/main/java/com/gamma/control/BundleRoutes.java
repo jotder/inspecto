@@ -60,7 +60,7 @@ import java.util.Set;
  *
  * <p><b>{@code connection} is reference-only, secrets stripped</b> (BACKLOG decision D2). A connection
  * item carries the profile's shape (connector/host/port/database/base path/username, tunnel, proxy) and any
- * secret expressed as a {@code ${ENV:…}}-style {@link com.gamma.acquire.SecretResolver} reference — but
+ * secret expressed as a {@code ${ENV:…}}-style {@link com.gamma.auth.secrets.SecretResolver} reference — but
  * <b>no secret value in any form, not even bundle-encrypted</b>, because bundles land in git, CI and support
  * tickets. A literal credential is <em>omitted</em> at export, never masked
  * ({@link com.gamma.acquire.ConnectionProfile#toBundleMap()}): a {@code ***} sentinel would be a persisted
@@ -873,7 +873,7 @@ final class BundleRoutes implements RouteModule {
     private static void checkSecret(String field, Object value) {
         if (value == null) return;
         String s = String.valueOf(value);
-        if (s.isBlank() || com.gamma.acquire.SecretResolver.isReference(s)) return;
+        if (s.isBlank() || com.gamma.auth.secrets.SecretResolver.isReference(s)) return;
         throw new IllegalArgumentException("connection '" + field + "' must be a ${…} secret reference — a "
                 + "bundle may not carry a secret value (it carried " + s.length() + " literal characters)");
     }

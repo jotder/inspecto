@@ -2,7 +2,7 @@ package com.gamma.job;
 
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.ConnectionRegistry;
-import com.gamma.acquire.SecretResolver;
+import com.gamma.auth.secrets.SecretResolver;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;

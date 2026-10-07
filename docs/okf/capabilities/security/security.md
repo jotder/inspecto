@@ -726,7 +726,7 @@ and `callback.a11y.spec.ts`, `core/navigation/navigation.service.spec.ts` (modul
 |---|---|
 | `providers/inspecto-oidc/src/main/resources/META-INF/services/com.gamma.control.Authenticator` | `com.gamma.oidc.OidcAuthenticator` |
 | `providers/inspecto-oidc/src/main/resources/META-INF/services/com.gamma.control.TokenRelay` | `com.gamma.oidc.OidcTokenRelay` |
-| `providers/inspecto-secrets/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider` | `com.gamma.secrets.FileKeystoreSecretsProvider` |
+| `providers/inspecto-secrets/src/main/resources/META-INF/services/com.gamma.auth.secrets.SecretsProvider` | `com.gamma.secrets.FileKeystoreSecretsProvider` |
 | `providers/inspecto-policy/src/main/resources/META-INF/services/com.gamma.control.AccessDecider` | `com.gamma.policy.PolicyEngine` |
 
 ### 8.6 Guards

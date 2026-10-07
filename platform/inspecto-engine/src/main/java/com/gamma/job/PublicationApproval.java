@@ -2,7 +2,7 @@ package com.gamma.job;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.acquire.ConnectionProfile;
-import com.gamma.acquire.SecretResolver;
+import com.gamma.auth.secrets.SecretResolver;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;

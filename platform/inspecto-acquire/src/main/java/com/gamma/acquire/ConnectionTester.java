@@ -5,6 +5,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import com.gamma.auth.secrets.SecretResolver;
 
 /**
  * Tests whether a {@link ConnectionProfile}'s endpoint is reachable (Data Acquisition — connection profiles),

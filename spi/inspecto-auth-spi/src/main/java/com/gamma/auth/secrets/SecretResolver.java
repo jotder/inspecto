@@ -1,4 +1,4 @@
-package com.gamma.acquire;
+package com.gamma.auth.secrets;
 
 import java.util.List;
 import java.util.ServiceLoader;

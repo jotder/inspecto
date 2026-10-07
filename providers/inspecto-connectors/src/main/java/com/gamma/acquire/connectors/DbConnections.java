@@ -1,7 +1,7 @@
 package com.gamma.acquire.connectors;
 
 import com.gamma.acquire.ConnectionProfile;
-import com.gamma.acquire.SecretResolver;
+import com.gamma.auth.secrets.SecretResolver;
 import net.schmizz.sshj.SSHClient;
 
 import java.io.IOException;

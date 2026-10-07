@@ -545,8 +545,8 @@ if ($secretsJarSrc) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $secretsZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-secrets.jar")
     try {
-        if (-not ($secretsZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.acquire.SecretsProvider' })) {
-            throw "inspecto-secrets.jar has no META-INF/services/com.gamma.acquire.SecretsProvider - the file-keystore secrets provider would never be discovered."
+        if (-not ($secretsZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.auth.secrets.SecretsProvider' })) {
+            throw "inspecto-secrets.jar has no META-INF/services/com.gamma.auth.secrets.SecretsProvider - the file-keystore secrets provider would never be discovered."
         }
     } finally { $secretsZip.Dispose() }
 }

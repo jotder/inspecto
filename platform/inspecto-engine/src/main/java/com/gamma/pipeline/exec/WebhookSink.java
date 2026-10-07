@@ -5,7 +5,7 @@ import com.gamma.util.egress.EgressPolicy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.ConnectionRegistry;
-import com.gamma.acquire.SecretResolver;
+import com.gamma.auth.secrets.SecretResolver;
 import com.gamma.acquire.retry.RetryPolicy;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.PipelineConfig;

@@ -581,7 +581,7 @@ against a repeat. Round-trip equality holds only for `${…}` *references*: mask
 (`toBundleMap`) a literal is deliberate loss.
 
 **Secrets are never literals.** `SecretResolver`
-(`spi/inspecto-auth-spi/src/main/java/com/gamma/acquire/SecretResolver.java`) expands **five** forms at connect
+(`spi/inspecto-auth-spi/src/main/java/com/gamma/auth/secrets/SecretResolver.java`) expands **five** forms at connect
 time, never at load — and `isResolvable()` answers the same question for a connection test without
 exposing the value:
 
@@ -599,7 +599,7 @@ resolved value is **never logged**.
 ⚠ **SEC-07 (2026-09-06): `${FILE}` and `${KEYSTORE}` are Standard + Enterprise only.** They are served by
 the `SecretsProvider` SPI in the core, whose implementation is `inspecto-secrets`'s
 `FileKeystoreSecretsProvider`, discovered by ServiceLoader
-(`providers/inspecto-secrets/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider`). A bundle
+(`providers/inspecto-secrets/src/main/resources/META-INF/services/com.gamma.auth.secrets.SecretsProvider`). A bundle
 without that module — Personal — **refuses the scheme with an `IllegalStateException` naming the edition,
 never a silent `null`**; a connection test surfaces that refusal as its failure. A Vault/KMS scope is the
 Enterprise follow-on. ⚠ `connectors-runbook.md` (formerly `integrations.md`) once listed only 2 of the 5 forms and omitted this gate; its
@@ -1051,7 +1051,7 @@ Incidental (the route string is an example for another concern, but they do exer
 |---|---|
 | `providers/inspecto-connectors/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | the **seven**: `SftpConnectorFactory`, `FtpConnectorFactory`, `FtpsConnectorFactory`, `DbExportConnectorFactory`, `S3ConnectorFactory`, `AzureBlobConnectorFactory`, `GcsConnectorFactory` (`KafkaConnectorFactory` is in `providers/inspecto-connectors-kafka/src/main/resources/META-INF/services/...`) |
 | `platform/inspecto-engine/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | `com.gamma.inspector.DatasetCollectorConnectorFactory` — the ninth scheme, `dataset`, from a different module |
-| `providers/inspecto-secrets/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider` | `com.gamma.secrets.FileKeystoreSecretsProvider` — the SEC-07 edition seam |
+| `providers/inspecto-secrets/src/main/resources/META-INF/services/com.gamma.auth.secrets.SecretsProvider` | `com.gamma.secrets.FileKeystoreSecretsProvider` — the SEC-07 edition seam |
 | `inspecto/src/test/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | `com.gamma.service.FakeRemoteConnectorFactory` (test-only remote scheme) |
 
 `platform/inspecto-engine/src/test/java/com/gamma/inspector/DatasetCollectorConnectorFactoryTest.theFactoryIsServiceLoaderDiscoverable()`
