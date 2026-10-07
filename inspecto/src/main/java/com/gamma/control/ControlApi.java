@@ -614,7 +614,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // and its paths fall through to the absent-module stubs below, exactly as if it were not
         // installed. ⛔ Do not go back to a raw ServiceLoader loop: one unloadable module would take
         // every other route module and the boot down with it.
-        for (RouteModule module : com.gamma.service.OptionalSpi.all(RouteModule.class)) {
+        for (RouteModule module : com.gamma.spi.OptionalSpi.all(RouteModule.class)) {
             int firstNew = routes.size();
             module.register(this);
             registeredFeatures.addAll(module.featureIds());

@@ -14,7 +14,7 @@
     <!-- LA separation D-1 step 3 (docs/archived-documents/plans-archive/la-separation-d1-design.md): the LOWER half of the control contract —
          RequestAttrs, WriteRootProvider, ApiException, ErrorCodes, SpiSlot, WriteGates, Subject, Roles, ComponentAccess, RowScope,
          AccessDecider(s), AccessPolicies, AuditTrail, AccessGrants, Authenticator(s), CapabilityManifest, GeoCountryResolver(s),
-         and com.gamma.service.OptionalSpi (the fail-soft ServiceLoader seam SpiSlot uses; a split package with inspecto-processor).
+         and com.gamma.spi.OptionalSpi (the fail-soft ServiceLoader seam SpiSlot uses; a split package with inspecto-processor).
          A pure move out of inspecto-processor: package com.gamma.control is unchanged (a split package, Decision 2). It references
          NO ApiContext and no host class — inspecto-http-spi depends on THIS module, never the reverse. -->
     <artifactId>inspecto-auth-spi</artifactId>

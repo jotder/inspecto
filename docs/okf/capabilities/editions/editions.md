@@ -204,7 +204,7 @@ it is now two modules, not three, and the assistant routes answer 503 only where
 refusable. The blocker was that `CollectorService.start()` called `ServiceLoader.load(AssistAgent.class)`
 **unguarded**: an unloadable jar raises `UnsupportedClassVersionError`, an `Error` that `ServiceLoader`
 propagates rather than wrapping, so staging the assistant would have made **the whole server fail to boot**
-on a Java 24 host because an *optional* component could not load. `com.gamma.service.OptionalSpi` now
+on a Java 24 host because an *optional* component could not load. `com.gamma.spi.OptionalSpi` now
 treats unloadable as an absence at all six discovery sites, and the floor question dissolves: the bundle's
 stated Java requirement stays **24**, and on an older host the product starts normally with the assistant
 simply absent. → §3.6
@@ -328,7 +328,7 @@ the floor.
 🔴 **That framing was wrong, and it is what kept `PKG-5` refused for months.** "Bundling would raise the
 bundle's floor from 24 to 25" assumes the floor is a property of the BUNDLE. It is a property of the
 **module**, and it binds only a host that actually loads it. Since 2026-09-12 an optional module that
-cannot link is skipped with a warning (`com.gamma.service.OptionalSpi`) and its routes answer 503 — the
+cannot link is skipped with a warning (`com.gamma.spi.OptionalSpi`) and its routes answer 503 — the
 ordinary absence contract. So the assistant ships in Professional and Enterprise, the bundle's **stated system
 requirement stays 24**, and a customer on 24 gets the product without the assistant instead of a product
 that will not start. ⛔ Do not re-refuse this on floor grounds.

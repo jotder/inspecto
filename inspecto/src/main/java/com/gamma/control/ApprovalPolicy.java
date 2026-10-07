@@ -70,7 +70,7 @@ record ApprovalPolicy(Map<String, Rule> rules, int expiresAfterHours, boolean fa
         // Optional modules contribute their own kinds (GovernableKindProvider, MODULE-REORG-1 P1) — e.g.
         // inspecto-entity-list contributes "entity-list" (ASSURE-ENTITY-LISTS-1, D-P5). Fail-soft discovery;
         // an absent module's kind is simply not governable.
-        for (GovernableKindProvider p : com.gamma.service.OptionalSpi.all(GovernableKindProvider.class))
+        for (GovernableKindProvider p : com.gamma.spi.OptionalSpi.all(GovernableKindProvider.class))
             s.addAll(p.kinds());
         return java.util.Collections.unmodifiableSet(s);
     }

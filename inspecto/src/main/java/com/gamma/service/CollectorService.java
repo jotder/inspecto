@@ -51,6 +51,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
+import com.gamma.spi.OptionalSpi;
 
 /**
  * Long-running service that hosts the ETL: it loads a registry of pipeline configs,

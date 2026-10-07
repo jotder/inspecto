@@ -208,7 +208,7 @@ Filed 2026-10-01 (D-1 of the Link Analysis separation). Two things looked like p
   `mvn compile -pl inspecto -am` finished in 9 s with exit 0 — the dependants (`-geo-link`, `-ops`, …) were never
   recompiled, so their stale classes still matched the OLD interface. Only `clean` makes the dependants get seen.
 - **A closure script is a prediction.** The first one said a contract was 20 classes; it was 46, and the compiler found four
-  fully-qualified inline references (`com.gamma.service.OptionalSpi.first(…)`) that no import scan can see.
+  fully-qualified inline references (`com.gamma.spi.OptionalSpi.first(…)`) that no import scan can see.
 
 ```
 node tools/java-closure.mjs --seeds ApiContext,Subject --stop CollectorService,SpaceManager   # PREDICT what a cut drags along

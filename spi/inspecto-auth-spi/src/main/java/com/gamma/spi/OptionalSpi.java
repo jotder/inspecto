@@ -1,4 +1,4 @@
-package com.gamma.service;
+package com.gamma.spi;
 
 import java.util.ArrayList;
 import java.util.Iterator;

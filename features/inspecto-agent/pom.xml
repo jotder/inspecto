@@ -112,7 +112,7 @@
 
          ⚠ The eoiagent-* dependencies are compiled to JAVA 25 bytecode (class-file major 69, measured
          2026-09-12) while this product's floor is 24. That is DELIBERATELY not a build-time problem:
-         the jar is staged in every bundle, and on a host too old to load it com.gamma.service.OptionalSpi
+         the jar is staged in every bundle, and on a host too old to load it com.gamma.spi.OptionalSpi
          skips the provider with a warning and the assistant's routes answer 503 — the ordinary
          absence contract. ⛔ Do not "fix" this by gating the module on a Java version; the whole point
          is that the bundle's stated requirement stays 24. -->

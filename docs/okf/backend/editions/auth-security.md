@@ -460,7 +460,7 @@ ever wanted, it needs a guard around the SPI resolution, not a config flag.
 The sentence above used to end *"— `SpiSlot.active()` has no try/catch, which is also why a missing
 transitive there is a boot failure (SEC-SIDECAR-BOOT-1)"*. **That was true when written (2026-09-07) and
 false by the time anyone relied on it.** `PKG-5` later routed `SpiSlot.active()` through
-`com.gamma.service.OptionalSpi`, whose entire purpose is to catch `ServiceConfigurationError` /
+`com.gamma.spi.OptionalSpi`, whose entire purpose is to catch `ServiceConfigurationError` /
 `LinkageError` so an unloadable OPTIONAL module is an *absence* rather than a boot failure — correct for
 the assistant sidecar compiled against a newer JDK, and the exact opposite of what this SPI needs.
 

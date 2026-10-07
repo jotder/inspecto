@@ -59,7 +59,7 @@ public final class SpiSlot<T> {
     public Optional<T> active() {
         Optional<T> c = cached;
         if (c != null) return c;
-        if (!failClosed) return cached = com.gamma.service.OptionalSpi.first(spi);
+        if (!failClosed) return cached = com.gamma.spi.OptionalSpi.first(spi);
         // Deliberately NOT OptionalSpi: it catches ServiceConfigurationError, which is exactly what
         // ServiceLoader wraps a provider constructor's throw in.
         var providers = ServiceLoader.load(spi).stream().toList();

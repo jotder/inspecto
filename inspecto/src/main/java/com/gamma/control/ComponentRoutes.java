@@ -473,7 +473,7 @@ final class ComponentRoutes implements RouteModule {
         }
         // R2-03: state an optional module keeps beside the registry (a Reconciliation's run state) is deleted with
         // the component, or a re-created component of the same id would inherit it — the module's ComponentDeleteHook.
-        for (ComponentDeleteHook hook : com.gamma.service.OptionalSpi.all(ComponentDeleteHook.class)) {
+        for (ComponentDeleteHook hook : com.gamma.spi.OptionalSpi.all(ComponentDeleteHook.class)) {
             if (!type.equals(hook.type())) continue;
             try {
                 hook.afterDelete(api.writeRoot(), id);
@@ -760,14 +760,14 @@ final class ComponentRoutes implements RouteModule {
         validateKind(type, id, content);
         // An optional module's own kinds and reserved store names (the risk-score kind and its risk_scores_ outputs):
         // absent module = the kind stays opaque config and nothing is reserved.
-        for (ComponentKindValidator v : com.gamma.service.OptionalSpi.all(ComponentKindValidator.class)) {
+        for (ComponentKindValidator v : com.gamma.spi.OptionalSpi.all(ComponentKindValidator.class)) {
             if (v.type().equals(type)) v.validateInSpace(writeRoot, dataRoot, id, content);
             if ("dataset".equals(type) || "sink".equals(type)) v.requireNotReserved(writeRoot, type, id, content);
         }
     }
 
     static void validateKind(String type, String id, Map<String, Object> content) {
-        for (ComponentKindValidator v : com.gamma.service.OptionalSpi.all(ComponentKindValidator.class))
+        for (ComponentKindValidator v : com.gamma.spi.OptionalSpi.all(ComponentKindValidator.class))
             if (v.type().equals(type)) v.validate(id, content);
         if ("findings-spec".equals(type)) {
             // The store stamps name=id, and GET /findings/{type} resolves by that id, so validate the

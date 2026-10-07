@@ -19,6 +19,7 @@ import javax.tools.ToolProvider;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import com.gamma.spi.OptionalSpi;
 
 /**
  * {@link OptionalSpi} — the optional-module absence contract must survive a jar that is <b>present but

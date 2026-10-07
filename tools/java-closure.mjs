@@ -12,7 +12,7 @@
 //   1. COMMENT STRIPPING by regex. A `/*` inside a STRING LITERAL ("**/*.java") opens a fake block comment that
 //      swallows real code up to the next `*/`. This tool tokenises: string, char and text-block literals are consumed
 //      whole, so only genuine comments are dropped.
-//   2. FULLY-QUALIFIED INLINE REFERENCES. `com.gamma.service.OptionalSpi.first(spi)` needs no import, so an import-
+//   2. FULLY-QUALIFIED INLINE REFERENCES. `com.gamma.spi.OptionalSpi.first(spi)` needs no import, so an import-
 //      and-same-package scan never sees it. This tool resolves them too.
 // Still invisible to it (so still the compiler's job): reflection / Class.forName strings, ServiceLoader providers,
 // annotation-processor output, and a class named only inside a string.

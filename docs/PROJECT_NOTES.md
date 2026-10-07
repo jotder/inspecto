@@ -1266,7 +1266,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   wrapping in a `ServiceConfigurationError`. Nothing up the stack caught it, and there was **no**
   `LinkageError` handling anywhere in `inspecto`'s main tree. Discovered 2026-09-12 scoping `PKG-5`:
   staging the assistant would have made the server fail to boot on a host whose Java was older than the
-  assistant's dependency needs. Fixed by `com.gamma.service.OptionalSpi`, which all six discovery sites
+  assistant's dependency needs. Fixed by `com.gamma.spi.OptionalSpi`, which all six discovery sites
   now use. ⛔ It deliberately does **not** catch `RuntimeException` from a provider's constructor —
   unloadable is an absence, misbehaving is a defect, and widening the catch turns a bug into a silent
   absence. 🔴 The lesson generalises past this fix: **"optional" is a property of the FAILURE HANDLING,
