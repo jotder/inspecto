@@ -1,0 +1,12 @@
+# JDK modules the jlinked bundle runtime needs that `jdeps` CANNOT see (tools/jlink-modules.mjs unions
+# this file with jdeps' result). One module per line, `module   # why`. Every entry needs a WHY.
+# jdeps misses: Class.forName strings, ServiceLoader providers resolved at run time, JDBC DriverManager
+# lookups, native loaders, reflection. A module here that is NOT a real JDK module fails `--check`.
+# Add an entry the day a runtime-only failure shows a module absent from the zip's runtime/bin/java.
+java.management      # JMX MXBeans read reflectively (ManagementFactory) by the observability/memory probes
+jdk.management       # com.sun.management: the host RAM size behind the DuckDB memory_limit default (GAP-4)
+jdk.crypto.ec        # TLS / JDBC / OIDC JWKS EC ciphers are provider-loaded (ServiceLoader), invisible to jdeps
+jdk.zipfs            # .zip access through NIO FileSystems is a ServiceLoader provider
+jdk.unsupported      # sun.misc.Unsafe used reflectively by shaded libraries (netty/onnx/duckdb-style loaders)
+java.net.http        # HttpClient reached from sidecars through reflection/ServiceLoader in places jdeps cannot trace
+jdk.httpserver       # com.sun.net.httpserver is the Control API server; ServiceLoader-created HttpServerProvider

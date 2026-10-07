@@ -1901,6 +1901,20 @@ if (-not $NoRuntime) {
     # (sun.misc.Unsafe), java.net.http (HttpClient), jdk.zipfs (.zip via NIO), java.management (JMX),
     # jdk.management (com.sun.management: the RAM size behind the DuckDB memory_limit default, GAP-4).
     $runtimeModules = 'java.base,java.compiler,java.desktop,java.naming,java.scripting,java.sql,jdk.httpserver,jdk.crypto.ec,jdk.unsupported,java.net.http,jdk.zipfs,java.management,jdk.management'
+    # P3c (MODULE-REORG-P3-THIN-JARS): the set is now ALSO derived - jdeps over every staged jar UNION
+    # tools/jlink-runtime-extra.txt, held against tools/jlink-modules.lock. WARN-AND-USE-UNION: the runtime
+    # is the hand list above UNION the derived set, so this can only ever ADD a module, never shrink a
+    # working runtime. The delta is printed; once a few bundles show it empty the hand list can be retired.
+    $derivedOut = & node (Join-Path $sandboxRoot 'tools\jlink-modules.mjs') --edition $Edition --staged-dir $bundleDir --runtime-modules $runtimeModules --emit 2>&1
+    $derivedOut | ForEach-Object { Write-Host "  [jlink-modules] $_" -ForegroundColor DarkGray }
+    if ($LASTEXITCODE -ne 0) { Write-Warning "jlink-modules: derived set differs from the hand list or the lock (see above) - using the UNION." }
+    $derivedLine = $derivedOut | Where-Object { "$_" -like 'JLINK_MODULES=*' } | Select-Object -Last 1
+    if ($derivedLine) {
+        $runtimeModules = (($runtimeModules -split ',') + (("$derivedLine" -replace '^JLINK_MODULES=', '') -split ',') | Where-Object { $_ } | Sort-Object -Unique) -join ','
+        Write-Host "  runtime modules (hand UNION derived): $runtimeModules" -ForegroundColor DarkGray
+    } else {
+        Write-Warning "jlink-modules produced no module set - using the hand list only."
+    }
 
     # Locate a jlink: prefer the resolved GraalVM cache, then JAVA_HOME, then PATH.
     # 🔴 OPS-07 (2026-09-14): all three probes used to hardcode `jlink.exe`, and the JAVA_HOME one a
