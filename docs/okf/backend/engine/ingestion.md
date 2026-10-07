@@ -2,7 +2,7 @@
 type: Concept
 title: Ingestion (StreamingFileIngester + consignment coordination)
 description: The single emit-based ingestion SPI, its union/generation modes, and the consignment coordinators.
-resource: inspecto-etl/src/main/java/com/gamma/etl/StreamingFileIngester.java
+resource: platform/inspecto-etl/src/main/java/com/gamma/etl/StreamingFileIngester.java
 tags: [engine, ingestion, spi, streaming, consignment]
 timestamp: 2026-06-28T00:00:00Z
 ---
@@ -15,14 +15,14 @@ timestamp: 2026-06-28T00:00:00Z
 
 ## The SPI
 
-`StreamingFileIngester` (`inspecto-etl/src/main/java/com/gamma/etl/StreamingFileIngester.java`) is the **only**
+`StreamingFileIngester` (`platform/inspecto-etl/src/main/java/com/gamma/etl/StreamingFileIngester.java`) is the **only**
 plugin ingestion SPI (the old whole-file `FileIngester` was removed in v3.11.0). Implementations decode a
 file and push records one at a time via `RecordSink.emit()`; the framework owns DuckDB table creation,
 transform, partitioned write, and lineage.
 
 ## Two execution modes
 
-`StreamingPluginIngestStrategy` (`inspecto-engine/src/main/java/com/gamma/inspector/StreamingPluginIngestStrategy.java`)
+`StreamingPluginIngestStrategy` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/StreamingPluginIngestStrategy.java`)
 picks a mode per Consignment by inspecting member file sizes, with no extra I/O:
 
 * **Union mode** (`UnionModeIngester`) — all members are below `processing.streaming.large_file_bytes`. Each
@@ -38,7 +38,7 @@ Selectors (parsed in `PipelineConfigParser`): `processing.streaming.large_file_b
 
 ## Consignment coordination
 
-* `CollectorProcessor` (`inspecto-engine/src/main/java/com/gamma/inspector/CollectorProcessor.java`) — the per-source ETL
+* `CollectorProcessor` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/CollectorProcessor.java`) — the per-source ETL
   entry point, split into two halves (B3b): **`acquire(cfg)`** runs the [acquisition](../acquisition/framework.md)
   phases (remote fetch-and-land; a no-op for a `local` collector), and **`ingest(cfg, onCommit)`** scans the
   inbox → groups into `Consignment`s via `ConsignmentPlanner` — whose audit label is the selected schema's
@@ -56,7 +56,7 @@ Selectors (parsed in `PipelineConfigParser`): `processing.streaming.large_file_b
   [acquisition](../acquisition/framework.md). Ingest always walks the local inbox: a remote-fetched file, once
   landed, is discovered exactly like a locally-pushed one, so `countPending` is now the exact landed backlog
   (no remote approximation).
-* `ConsignmentIngestor` (`inspecto-engine/src/main/java/com/gamma/inspector/ConsignmentIngestor.java`) — a thin, stateless
+* `ConsignmentIngestor` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/ConsignmentIngestor.java`) — a thin, stateless
   coordinator: pick a [`ConsignmentIngestStrategy`](transforms-seams.md) (CSV or plugin), run `ingest()` → an
   `IngestOutcome`, then the path-agnostic tail `commit()` (DuckLake register → manifest → backup originals →
   markers → ledger, in that crash-safe order) and `writeAudit()`. Never throws for a Consignment failure — audit is
@@ -64,6 +64,6 @@ Selectors (parsed in `PipelineConfigParser`): `processing.streaming.large_file_b
   Consignment leaves no "already processed" record and its files are rediscovered next poll (retry is
   implicit); what is recorded about a Consignment either way — ledgers, provenance, live gauges, and how
   an operator audits a failed file or record — is [consignment status flow](consignment-status-flow.md).
-* `MultiCollectorProcessor` (`inspecto-engine/src/main/java/com/gamma/inspector/MultiCollectorProcessor.java`) — the outer
+* `MultiCollectorProcessor` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/MultiCollectorProcessor.java`) — the outer
   orchestrator running many `.toon` sources concurrently in one JVM, bounded by `Semaphore(sources.max)`.
   Total worker pressure = `sources.max × processing.threads × duckdb_threads`.

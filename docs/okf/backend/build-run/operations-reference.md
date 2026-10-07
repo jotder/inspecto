@@ -28,7 +28,7 @@ timestamp: 2026-07-16T00:00:00Z
 > - ⛔ **`-Dui.static.log=DEBUG` does not exist** — no such key in any Java source, so the two places
 >   that tell you to turn it on to make an abort visible cannot work.
 > - ⚠ **`java -jar` and `mvn clean package`** are both wrong for this repo: the launcher uses `-cp`
->   (RUNSH-CP-1) and packaging is `-pl inspecto,inspecto-connectors -am -DskipTests -q`. See
+>   (RUNSH-CP-1) and packaging is `-pl inspecto,:inspecto-connectors -am -DskipTests -q`. See
 >   [build & test](build-test.md).
 > - ⚠ The **`Issue Tracker`** section heading (§ below) predates the shipped Issue → **Incident** rename;
 >   the same file already says Incident elsewhere.

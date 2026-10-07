@@ -22,7 +22,7 @@ curl localhost:8080/health                        # 4. restart the engine, then 
 fails with *"cannot find symbol: class PipelineNodeExecutor"*. Install a current one first:
 
 ```bash
-mvn -o install -DskipTests -pl inspecto-engine -am
+mvn -o install -DskipTests -pl :inspecto-engine -am
 ```
 
 ## A node type is TWO registrations

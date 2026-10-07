@@ -2,7 +2,7 @@
 type: Capability
 title: Data plane (DAT)
 description: Datasets over partitioned Parquet and the relations they resolve to; Query as a Component with $-Parameters and a Result Set; the guarded SQL execution stack (SqlSandbox, SqlGuard, ExpressionGuard); /bi/query and time grains; Matrix materialization and superseded-revision retention; the DuckDB runtime and its timezone rules; the operational-store roster and Postgres; DuckLake, the warehouse runbook and object-storage export. The requirement of record for the DAT area, its specification, its decisions, and what was refused.
-resource: inspecto-engine/src/main/java/com/gamma/query, inspecto-sql/src/main/java/com/gamma/sql, inspecto/src/main/java/com/gamma/service/OperationalDb.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/query, platform/inspecto-sql/src/main/java/com/gamma/sql, inspecto/src/main/java/com/gamma/service/OperationalDb.java
 tags: [dat, capability, dataset, query, parameters, result-set, bi-query, sql-guard, expression-guard, matrix, materialize, duckdb, postgres, operational-db, ducklake, warehouse, timezone]
 timestamp: 2026-09-08T00:00:00Z
 ---
@@ -94,7 +94,7 @@ was refused) and `okf/backend/control-plane/queries.md` §3.3–§3.5. *(Provena
 - **The Postgres store count was stated as 6, 7, 10 and 11 across one page.** Measured: `OperationalDb.Family`
   is **fifteen** families (twelve until 2026-09-12, when D6 added `EVENTS` and B1 added `RUN_LEASE`;
   `INBOX_REGISTRY` followed on 2026-09-13);
-  `PostgresStateStoreTest` (`inspecto-ops/src/test/java/com/gamma/service/`) round-trips
+  `PostgresStateStoreTest` (`features/inspecto-ops/src/test/java/com/gamma/service/`) round-trips
   **fifteen** store classes — note, tag assignment, job run, file stage, consignment output, status, provenance,
   object, link, and since 2026-09-12 event, delivery receipt, dedup ledger and the run lease, plus the
   acquisition ledger and the inbox registry — ✅ **so nothing is uncovered** (re-measured 2026-09-16; this
@@ -133,7 +133,7 @@ selection (§3.8). Everything below either lays a relation over the first class 
 A `dataset` is a `ComponentStore` component (no `ConfigSpecs.dataset()` exists — written as a raw map, by
 convention) whose SPA shape is `DatasetConfig {kind: physical | virtual | materialized, sourceName, query?,
 physicalRef?, columns[{name, type, role}], measures[], calculated[], viz?}`. **`DatasetRelation`**
-(`inspecto-engine/src/main/java/com/gamma/query/DatasetRelation.java`) turns it into the **trusted relation**
+(`platform/inspecto-engine/src/main/java/com/gamma/query/DatasetRelation.java`) turns it into the **trusted relation**
 SQL every consumer runs against: a `view` Dataset renders its `sink.view` definition (`ViewStore`,
 `@PublicApi`); a `physicalRef` Dataset reads the store through **`SqlViews`** — the one owner of read
 options (`union_by_name=true`; `hive_partitioning` deliberately **off**, since turning it on would surface
@@ -174,18 +174,18 @@ with no row is *unknown, never absent*.
 
 ### 3.3 The guarded execution stack
 
-Every SQL reaches DuckDB through **`QueryExecutor`** (`inspecto-engine/src/main/java/com/gamma/query/QueryExecutor.java`)
-inside a **`SqlSandbox`** (`inspecto-sql/src/main/java/com/gamma/sql/SqlSandbox.java`): `open()` sets
+Every SQL reaches DuckDB through **`QueryExecutor`** (`platform/inspecto-engine/src/main/java/com/gamma/query/QueryExecutor.java`)
+inside a **`SqlSandbox`** (`platform/inspecto-sql/src/main/java/com/gamma/sql/SqlSandbox.java`): `open()` sets
 `autoinstall_known_extensions=false`, `autoload_known_extensions=false`, `memory_limit`, `threads`;
 `seal()` adds `enable_external_access=false` + `lock_configuration=true`. **Only `SqlOracle` seals**;
 `QueryExecutor` and the Data Browser run **unsealed by design**, because the trusted relation legitimately
 reads Parquet. Two guards, two grains:
 
-- **`SqlGuard`** (`inspecto-sql/src/main/java/com/gamma/sql/SqlGuard.java`) validates a **whole statement**: a single read-only
+- **`SqlGuard`** (`platform/inspecto-sql/src/main/java/com/gamma/sql/SqlGuard.java`) validates a **whole statement**: a single read-only
   `SELECT` / `WITH`; blocked functions (`read_*`, `write_*`, `*_scan`, `copy`, `getenv`, `glob`, `system`,
   `shell`, …); blocked keywords (DDL / DML / `attach` / `install` / `load` / `pragma` / `set`, …);
   string-literal-aware comment stripping; an unterminated comment is a rejection.
-- **`ExpressionGuard`** (`inspecto-engine/src/main/java/com/gamma/query/ExpressionGuard.java`) validates a **fragment** — the
+- **`ExpressionGuard`** (`platform/inspecto-engine/src/main/java/com/gamma/query/ExpressionGuard.java`) validates a **fragment** — the
   calculated-column expression spliced inside the trusted relation — with three cooperating rules: a **closed
   token alphabet** (plain identifiers, numeric and single-quoted literals, arithmetic and comparison
   operators, parens, commas; no semicolons, double quotes, comments, backslashes; 500 chars), a **keyword
@@ -211,7 +211,7 @@ and Expectations) — and declares `$`-parameters for **SQL only** (a structured
 deliberate cut).
 
 **`POST /queries/{id}/run`** (`QueryRoutes.java:43`): `422` unless `type: sql`; **`Parameters.resolve`**
-(`inspecto-engine/src/main/java/com/gamma/query/Parameters.java`) substitutes the built-ins `$today`, `$now`, `$day(n)`,
+(`platform/inspecto-engine/src/main/java/com/gamma/query/Parameters.java`) substitutes the built-ins `$today`, `$now`, `$day(n)`,
 `$current_user`, `$role` and user-declared `$name` (+ offset), leaves `:name` and `${ENV:KEY}` untouched, and
 **leaves an unknown token verbatim** (the save-time rejection of unknown tokens is the *job* parameter
 contract, a different namespace — `PIP`); then `SqlGuard.check`; dataset via `DatasetRelation`; **offset
@@ -224,7 +224,7 @@ three parameter namespaces are deliberately distinct and each resolver ignores t
 `BiRoutes` (`inspecto/src/main/java/com/gamma/control/BiRoutes.java`): **`POST /bi/query`**,
 `GET|POST /bi/templates` (+ apply, capability-gated). ⛔ `GET /bi/datasets` was **retired 2026-09-14**
 (`RETIRE-HALVES-1`) — no client ever listed Datasets through it. `/bi/query` takes a **spec** — measures, dimensions,
-filters, an optional `grains` map — and **`MeasureCompiler`** (`inspecto-engine/src/main/java/com/gamma/query/MeasureCompiler.java`)
+filters, an optional `grains` map — and **`MeasureCompiler`** (`platform/inspecto-engine/src/main/java/com/gamma/query/MeasureCompiler.java`)
 compiles it over the Dataset's trusted relation: `AGGS` = `count · countDistinct · sum · avg · min · max`,
 `GRAINS` = `day · week · month`. **Time grain travels on the wire** (2026-08-14): a grain naming a column that is
 not grouped is a **`422`, not a silent no-op**; the bucket is emitted as `STRFTIME(DATE_TRUNC(...))` **and
@@ -242,7 +242,7 @@ speaks, and it **fails honestly** on what it cannot map (named-Measure SQL, `OR`
 
 ### 3.6 Matrix materialization
 
-**`MaterializeTask`** (`inspecto-engine/src/main/java/com/gamma/job/MaterializeTask.java`, `task: materialize`
+**`MaterializeTask`** (`platform/inspecto-engine/src/main/java/com/gamma/job/MaterializeTask.java`, `task: materialize`
 on the maintenance runner): params `dataset`, `target`, `measures`, `group_by`, `limit` (default 1 000 000);
 compiles a spec-based `SELECT` through `MeasureCompiler` or takes a raw snapshot over the source Dataset's
 trusted relation; `COPY … TO … (FORMAT PARQUET)` into `.tmp`; **hide-old to `.stale` → `ATOMIC_MOVE` reveal →
@@ -309,7 +309,7 @@ proof, and the two defects it surfaced (a broken committed job, a space that doe
 
 ### 3.7 The DuckDB runtime
 
-`DuckDbUtil` (`inspecto-util/src/main/java/com/gamma/util/DuckDbUtil.java`): driver load, `tempDbFile`,
+`DuckDbUtil` (`platform/inspecto-util/src/main/java/com/gamma/util/DuckDbUtil.java`): driver load, `tempDbFile`,
 `applyDuckDbSettings` (`temp_directory`, `memory_limit`, `max_temp_directory_size`), **`memoryLimit()`
 precedence = per-config → the served `scheduler.toon` value → `-Dprocessing.duckdb.memory_limit` → DuckDB's
 code default `defaultMemoryLimit()`** (40 % RAM ÷ 4, ≥ 1 GiB — GAP-4, 2026-09-26; until then DuckDB's own
@@ -383,7 +383,7 @@ Query Library's execution path** (§2).
 
 ### 3.10 DuckLake, the warehouse runbook, object-storage export
 
-- **`DuckLakeRegistrar`** (`inspecto-etl/src/main/java/com/gamma/etl/DuckLakeRegistrar.java`), gated by
+- **`DuckLakeRegistrar`** (`platform/inspecto-etl/src/main/java/com/gamma/etl/DuckLakeRegistrar.java`), gated by
   `output.ducklake.enabled`: load `ducklake`, `ATTACH 'ducklake:<catalog_url>' … DATA_PATH`, register
   the **already-written local** Parquet paths; **best-effort, non-fatal**; opens its own throwaway DuckDB, never
   a sealed connection. It **registers, it does not relocate** — bytes stay put. *(⚠ "No test class exists" stood
@@ -628,7 +628,7 @@ A whole Space on S3 (no atomic rename); `hadoop-client` for HDFS (⛔ never — 
 | Retention and the operational flags | `docs/okf/backend/build-run/operations-reference.md` (`Reference`) §Retention | — | the operator's view |
 | Studio Datasets, Query Library, the rows seam | `docs/okf/frontend/features/studio.md` (`Feature`) | `inspecto-ui/src/app/modules/admin/studio/` | §3.11 |
 | The Data Browser | `docs/okf/frontend/features/catalog.md` (`Feature`) §Data Browser | — | §3.9 |
-| ⚠ **No page owns `SqlSandbox` / `SqlGuard` / `SqlOracle` as a subject**, no page owns `DatasetRelation` beyond `db-layer.md`'s seam table, and no frontend page exists for Datasets or the Query Library outside `studio.md` | *(gap)* | `inspecto-sql/src/main/java/com/gamma/sql` · `inspecto-engine/src/main/java/com/gamma/query` | §3.2–§3.3 of this spec |
+| ⚠ **No page owns `SqlSandbox` / `SqlGuard` / `SqlOracle` as a subject**, no page owns `DatasetRelation` beyond `db-layer.md`'s seam table, and no frontend page exists for Datasets or the Query Library outside `studio.md` | *(gap)* | `platform/inspecto-sql/src/main/java/com/gamma/sql` · `platform/inspecto-engine/src/main/java/com/gamma/query` | §3.2–§3.3 of this spec |
 
 ---
 

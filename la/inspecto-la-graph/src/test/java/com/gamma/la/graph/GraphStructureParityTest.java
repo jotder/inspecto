@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class GraphStructureParityTest {
 
-    private static final Path FIXTURE = Path.of("..", "inspecto-ui", "projects", "link-analysis", "src", "graph",
+    private static final Path FIXTURE = Path.of("..", "..", "inspecto-ui", "projects", "link-analysis", "src", "graph",
             "graph-structure-parity.fixture.json");
 
     private static JsonNode fx;

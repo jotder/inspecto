@@ -23,7 +23,7 @@ import static com.gamma.la.core.InvestigationEvaluator.canonical;
  * InvestigationStore design S0 (docs/archived-documents/plans-archive/investigation-store-design.md section 13): how big is a sealed Working Set
  * file, how much does a log of N steps cost, how long does reading and prefix-hashing a 2,000-step log take on the filesystem.
  * Never runs in the default suite: needs {@code -Dinspecto.bench.s0=true}. Results print as {@code S0 ...} lines.
- * Run: {@code mvn -o -Pedition-enterprise -pl inspecto-la-api -am test -Dtest=InvestigationStoreSizeBench
+ * Run: {@code mvn -o -Pedition-enterprise -pl :inspecto-la-api -am test -Dtest=InvestigationStoreSizeBench
  * -Dinspecto.bench.s0=true -Dsurefire.failIfNoSpecifiedTests=false}.
  */
 @Tag("bench")

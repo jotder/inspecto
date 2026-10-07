@@ -2,7 +2,7 @@
 type: Concept
 title: Job vs Pipeline Step — capability boundary
 description: The full capability comparison between a Job (at-rest Executable, Java, open registry) and a Pipeline Step (in-motion graph node, compiled to SQL; Step-kind registry opening per D0-B), with the binding boundary rule and the traps that blur it.
-resource: inspecto-engine/src/main/java/com/gamma/job/JobContext.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/job/JobContext.java
 tags: [control-plane, jobs, pipeline-graph, steps, executables, boundary, plugins]
 timestamp: 2026-08-09T00:00:00Z
 ---

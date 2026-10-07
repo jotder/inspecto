@@ -9,8 +9,8 @@
  *
  * It had rotted. The first run of this guard found 14 broken links in the current tier, in four flavours,
  * none of them visible to a reader:
- *   - five in `okf/backend/engine/db-layer.md` pointing at `inspecto-engine/` for classes a module split
- *     had moved to `inspecto-ops/` (DbObjectStore, DbLinkStore, DbNoteStore, PostgresStateStoreTest), plus
+ *   - five in `okf/backend/engine/db-layer.md` pointing at `platform/inspecto-engine/` for classes a module split
+ *     had moved to `features/inspecto-ops/` (DbObjectStore, DbLinkStore, DbNoteStore, PostgresStateStoreTest), plus
  *     ObjectType, which moved package inside its own module;
  *   - one naming a class that has never existed under that name — `StreamingPluginBatchStrategy` for what
  *     the code calls `StreamingPluginIngestStrategy`;

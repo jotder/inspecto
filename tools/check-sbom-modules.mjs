@@ -154,7 +154,7 @@ if (!maximalCheck.same) {
 
 // Per-edition membership comes from $modules, which names reactor DIRECTORIES.
 for (const edition of ['Professional', 'Enterprise', 'Preview']) {
-    const expected = set(editionOnlyModules(edition).map((m) => m.dir));
+    const expected = set(editionOnlyModules(edition).map((m) => `:${m.artifactId}`));
     const check = diff(set(psModules[edition]), expected);
     if (!check.same) {
         problems.push(

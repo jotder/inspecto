@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * <pre>{@code
  * INSPECTO_TEST_S3_ENDPOINT=127.0.0.1:9000 \
  * INSPECTO_TEST_S3_KEY=minioadmin INSPECTO_TEST_S3_SECRET=minioadmin \
- * mvn -o -B test -pl inspecto-etl -am \
+ * mvn -o -B test -pl :inspecto-etl -am \
  *     -Dtest=PartitionWriterObjectStoreTest -Dsurefire.failIfNoSpecifiedTests=false
  * }</pre>
  *

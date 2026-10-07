@@ -25,7 +25,7 @@ import java.util.function.Function;
  * <p>Needs {@code -Dinspecto.bench.dir=<dir>} (parquet inputs and indexes go there, outside the repo). Knobs
  * {@code inspecto.bench.*}: {@code idxDir} (index parent, default = dir; used by tools/bench-duckdb.ps1 for a per-label index), {@code edges} (10000000), {@code deltaEdges} (100000 per appended file), {@code maxDeltas} (8),
  * {@code buildMemory} (8GB), {@code samples} (60 keys per series), {@code skipDeltas} (false). Results print as
- * {@code SCALE ...} lines. Run: {@code mvn -o -pl inspecto-la-storage test -Dtest=IndexScaleBench
+ * {@code SCALE ...} lines. Run: {@code mvn -o -pl :inspecto-la-storage test -Dtest=IndexScaleBench
  * -Dinspecto.bench.dir=<dir> -Dinspecto.bench.edges=10000000 -Dsurefire.failIfNoSpecifiedTests=false}.
  *
  * <p>Corpus: the D-S5 skew (source ~ nodes * u^3, target ~ nodes * u^2, nodes = edges / 5), written as parquet files of at most

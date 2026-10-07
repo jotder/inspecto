@@ -61,7 +61,7 @@ matrix is authoritative for the Edition column**; this table mirrors it.
 | `SPC-2` | Whole-Space zip export / import with dry-run preview | Must | ✅ SHIPPED | All |
 | `SPC-3` | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | 🟡 **MECHANISM SHIPPED, CONTENT PARTIAL** — the server-side catalog exists; **five** templates ship (`orders-starter`; since 2026-09-30 the `business-assurance`, `telco-fraud` and `telco-ra` content packs — `telco-ra` is the generic half of Telecom RA, §3.5 — and `payment-fraud` slice 1, §3.5.1); Financial Audit and Link Analysis do not exist in any shipped artifact (§2 corrections) | All |
 | `SPC-4` | **Metadata Bundle v2**: selective config-only transfer with refs, provenance / `contentHash`, `requires`, drift fit-check | Should | ✅ SHIPPED 2026-07-07 (+ `authored-pipeline`, `job`, `saved-view` 2026-07-18; `connection` 2026-07-25; `enrichment` 2026-08-31) | All |
-| `SPC-5` | Per-tenant ABAC | Could | ✅ SHIPPED 2026-07-24 (two seeded policies; engage only when a `space` claim is mapped) ⚠ **Named for grep:** the decision seam those policies enforce through is `AccessDecider` (`inspecto-policy/.../PolicyEngine.java`, exercised by `ControlApiAccessDeciderTest`) — until 2026-09-09 that name appeared only in `REQUIREMENTS.md`. | E |
+| `SPC-5` | Per-tenant ABAC | Could | ✅ SHIPPED 2026-07-24 (two seeded policies; engage only when a `space` claim is mapped) ⚠ **Named for grep:** the decision seam those policies enforce through is `AccessDecider` (`providers/inspecto-policy/.../PolicyEngine.java`, exercised by `ControlApiAccessDeciderTest`) — until 2026-09-09 that name appeared only in `REQUIREMENTS.md`. | E |
 
 **Corrections this table makes to its predecessor**, each verified against source:
 
@@ -263,7 +263,7 @@ parked in the plan's §4 (needs real feeds).
   - ⚠ **Breaks are not xDRs.** On the golden corpus, 15 completeness Breaks are **9** distinct lost or short
     xDRs, because a record lost at mediation breaks both pairs. The dashboard shows the xDR count
     (`ra_xdr_lost`).
-- **Golden test.** `inspecto-reconciliation/src/test/java/com/gamma/job/TelcoRaGoldenTest.java` runs the template's
+- **Golden test.** `features/inspecto-reconciliation/src/test/java/com/gamma/job/TelcoRaGoldenTest.java` runs the template's
   own Jobs and Reconciliations over `TelcoRaCorpus` (seed `20260930`, 600 xDRs). It asserts the exact
   `key|reason` set per control, and one row per finding:
 
@@ -1018,12 +1018,12 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 |---|---|---|---|
 | `SpaceManager` / `SpaceContext` / `SpaceMigrator`, MDC isolation, the seven CRUD routes and the two 409s | `docs/okf/backend/control-plane/multi-space.md` (`Concept`) | `SpaceManager.java` | §3.1–§3.3 |
 | Bundle v2 end to end — endpoints, apply order, the boundary, `connection` and `enrichment` | `docs/okf/backend/control-plane/metadata-bundle.md` (`Concept`) | `BundleRoutes.java` | §3.6 |
-| Offers, grants, snapshots, `_shared/`, D9 | `docs/okf/backend/control-plane/exchange-sharing.md` (`Concept`) | `inspecto-exchange/` | §3.7 |
+| Offers, grants, snapshots, `_shared/`, D9 | `docs/okf/backend/control-plane/exchange-sharing.md` (`Concept`) | `features/inspecto-exchange/` | §3.7 |
 | Per-Space file topology, `OperationalDb`, PG-1, the CWD traps | `docs/okf/backend/engine/db-layer.md` (`Reference`) §4–§5 | `inspecto-engine` | §3.8 |
-| The Space-root jail: `PathJail`, declared ∪ discovered roots | `docs/okf/backend/config/config-safety.md` (`Concept`) | `inspecto-config/` | §3.8, §6.6 |
+| The Space-root jail: `PathJail`, declared ∪ discovered roots | `docs/okf/backend/config/config-safety.md` (`Concept`) | `platform/inspecto-config/` | §3.8, §6.6 |
 | The Spaces layout and the migrator CLI | `docs/okf/backend/config/configuration.md` (`Reference`) §Spaces | — | §3.2 |
 | The two Space gotchas — MDC across workers; paths resolve against the CWD | `docs/okf/backend/gotchas/cross-cutting.md` (`Reference`) | — | §3.3, §3.8 |
-| The seeded isolation policies | `docs/okf/capabilities/security/security.md` §3.10 · `docs/okf/backend/editions/auth-security.md` | `inspecto-policy/` | §3.9 |
+| The seeded isolation policies | `docs/okf/capabilities/security/security.md` §3.10 · `docs/okf/backend/editions/auth-security.md` | `providers/inspecto-policy/` | §3.9 |
 | The Spaces admin view and the template gallery | `docs/okf/frontend/features/spaces.md` (`Feature`) | `inspecto-ui/src/app/modules/admin/spaces` | §3.10 |
 | `SpacesService`, the `spaceInterceptor`, `SERVER_GLOBAL` | `docs/okf/frontend/conventions/multi-space.md` (`Convention`) | `inspecto-ui/src/app/inspecto/api/space.interceptor.ts` | §3.10 |
 | ⚠ **No concept file covers the whole-Space zip export / import** (`DataSourceRoutes`, `BundleExporter`, `BundleImporter`) or the template catalog's file format | *(gap — one paragraph each in this spec, §3.4 and §3.5)* | `inspecto/src/main/java/com/gamma/service/BundleExporter.java` · `BundleImporter.java` | the code |

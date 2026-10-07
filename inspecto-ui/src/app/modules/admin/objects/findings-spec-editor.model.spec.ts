@@ -157,7 +157,7 @@ describe('fromWire / toWire', () => {
 });
 
 /**
- * One case per `FindingsSpec.fromMap` rule (`inspecto-engine/.../objects/FindingsSpec.java`), each phrased
+ * One case per `FindingsSpec.fromMap` rule (`platform/inspecto-engine/.../objects/FindingsSpec.java`), each phrased
  * against the field's LABEL, as the server never does — its messages name the key.
  */
 describe('validateDraft', () => {

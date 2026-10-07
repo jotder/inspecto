@@ -2,7 +2,7 @@
 type: Concept
 title: Embedded intelligence (AGT-5)
 description: The deliberative AI layer, distinct from the reflex assist agent — a multi-turn agent with an investigation tier, an authoring tier and a gated-action tier, plus the autonomy ladder.
-resource: inspecto-intelligence/src/main/java
+resource: features/inspecto-intelligence/src/main/java
 tags: [agent, intelligence, autonomy, investigation, authoring, agt-5]
 timestamp: 2026-07-21T00:00:00Z
 ---

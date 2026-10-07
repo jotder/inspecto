@@ -4,7 +4,7 @@
 //
 // WHY THIS EXISTS. Found 2026-09-10 while running scale-out spike S4: an agent reported that
 // `StabilityGate.java` "silently drops out of a naive content grep across the module". Measured, it
-// was worse than reported — `rg -l --glob '*.java' 'SHARED' inspecto-acquire/` listed
+// was worse than reported — `rg -l --glob '*.java' 'SHARED' platform/inspecto-acquire/` listed
 // CircuitBreaker, GapTracker and IntakeGovernor and NOT StabilityGate, although
 // `StabilityGate.SHARED` is declared in it. ripgrep classifies a file containing a NUL byte as
 // binary and skips it when recursing (it still searches it when the path is named explicitly, which

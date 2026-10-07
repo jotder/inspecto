@@ -2,7 +2,7 @@
 type: Reference
 title: Parsing options reference
 description: The parser frontend/DuckDB backend model, what the engine exposes today versus raw DuckDB, and a corrected + extended `read_csv` option reference grounded in this engine's actual config and SPI.
-resource: inspecto-etl/src/main/java/com/gamma/etl/StreamingFileIngester.java
+resource: platform/inspecto-etl/src/main/java/com/gamma/etl/StreamingFileIngester.java
 tags: [parsing, duckdb, read-csv, frontend, options, spi]
 timestamp: 2026-07-16T00:00:00Z
 ---

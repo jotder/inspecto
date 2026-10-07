@@ -27,7 +27,7 @@ class RecipeConverterTest {
 
     /** Repo spaces/ tree, resolved from the module dir; absent in a bare-module checkout ⇒ skip. */
     private static Path spacesRoot() {
-        return Path.of("..", "spaces").toAbsolutePath().normalize();
+        return Path.of("..", "..", "spaces").toAbsolutePath().normalize();
     }
 
     private static List<Path> pipelineFixtures() throws IOException {

@@ -1310,7 +1310,7 @@ class JobPackManagerTest {
         Path classes = Files.createDirectories(stage.resolve("classes"));
 
         // The engine's own code source, plus the running test classpath: a StepContext signature names
-        // inspecto-etl/inspecto-util types (TypeFlow, RunLog) that live in other jars.
+        // platform/inspecto-etl/inspecto-util types (TypeFlow, RunLog) that live in other jars.
         String apiCp = Path.of(JobTypeProvider.class.getProtectionDomain().getCodeSource().getLocation().toURI())
                 + java.io.File.pathSeparator + System.getProperty("java.class.path");
         JavaCompiler jc = ToolProvider.getSystemJavaCompiler();

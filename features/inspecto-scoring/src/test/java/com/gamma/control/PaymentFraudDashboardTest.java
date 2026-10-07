@@ -63,7 +63,7 @@ class PaymentFraudDashboardTest {
 
     @Test
     void everyDashboardTileRendersThePlantedValuesAfterTheGoldenRun(@TempDir Path root) throws Exception {
-        Path template = Path.of("..", "spaces", "_templates", "payment-fraud").toAbsolutePath().normalize();
+        Path template = Path.of("..", "..", "spaces", "_templates", "payment-fraud").toAbsolutePath().normalize();
         assertTrue(Files.isDirectory(template), "the shipped template is missing: " + template);
         copyTree(template, root.resolve("_templates").resolve("payment-fraud"));
         SpaceManager spaces = SpaceManager.discover(root);

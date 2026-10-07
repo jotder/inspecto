@@ -2,7 +2,7 @@
 type: Concept
 title: Inspecto ↔ eoiagent integration
 description: Inspecto consumes eoiagent as a narrow model transport (EoiGatewayModelProvider over LlmGateway), with the reasoning layer vendored in inspecto-agent — not the full Agent-OS embed.
-resource: inspecto-agent/src/main/java/com/gamma/agent/
+resource: features/inspecto-agent/src/main/java/com/gamma/agent/
 tags: [agentic, eoiagent, inspecto, model-transport, assist, intelligence]
 timestamp: 2026-07-16T00:00:00Z
 ---
@@ -13,7 +13,7 @@ Since 2026-07-07 (the agent-kernel replacement), Inspecto's integration is **del
 a model transport, *not* the full eoiagent host embed:
 
 * **Vendored reasoning layer** — the discontinued agent-kernel's orchestration layer lives in-tree at
-  `inspecto-agent/src/main/java/com/gamma/agent/kernel/**` (`SyncOrchestrator`, `Orchestrations`;
+  `features/inspecto-agent/src/main/java/com/gamma/agent/kernel/**` (`SyncOrchestrator`, `Orchestrations`;
   `ModelProfile` at `com.gamma.agent.model`). The historical `agentkernel.*` sysprop names are kept
   for deployment compatibility.
 * **Transport bridge** — `EoiGatewayModelProvider` bridges the vendored `ModelProvider` seam onto

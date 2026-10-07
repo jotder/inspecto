@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class EntityTypesTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final Path FIXTURE = Path.of("..", "inspecto-ui", "src", "app", "inspecto", "graph",
+    private static final Path FIXTURE = Path.of("..", "..", "inspecto-ui", "src", "app", "inspecto", "graph",
             "entity-normaliser-parity.fixture.json");
 
     @Test

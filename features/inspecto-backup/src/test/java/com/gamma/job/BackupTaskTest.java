@@ -306,7 +306,7 @@ class BackupTaskTest {
      */
     @Test
     void theSidecarIsNeverWrittenInPlace() throws Exception {
-        String src = Files.readString(repoFile("inspecto-backup/src/main/java/com/gamma/backup/BackupTask.java"));
+        String src = Files.readString(repoFile("features/inspecto-backup/src/main/java/com/gamma/backup/BackupTask.java"));
         int at = src.indexOf("Path sidecar = backupDir.resolve");
         assertTrue(at > 0, "the sidecar write moved — re-anchor this scan before trusting it");
         String write = src.substring(at, src.indexOf("long zipBytes", at));

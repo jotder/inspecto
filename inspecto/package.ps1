@@ -226,7 +226,7 @@ if (-not $NoBuild) {
     Push-Location $sandboxRoot
     # CONNECTORS-BUNDLE-1: `inspecto-connectors` is NOT upstream of `inspecto`, so `-am` (which walks
     # upstream only) never reaches it - it has to be named explicitly or the sidecar is silently absent.
-    & mvn clean package "-Dinspecto.build.id=$buildId" -pl inspecto,inspecto-connectors -am -DskipTests -q
+    & mvn clean package "-Dinspecto.build.id=$buildId" -pl inspecto,:inspecto-connectors -am -DskipTests -q
     if ($LASTEXITCODE -ne 0) { throw "mvn build failed" }
     Pop-Location
     Write-Host "Build complete." -ForegroundColor Green
@@ -271,11 +271,11 @@ if (-not $jarSrc -or -not (Test-Path $jarSrc)) {
 # the sftp:/ftp: schemes") but the delivery half was never built. It ships SHADED (classifier `sidecar`)
 # because a thin jar is useless: sshj/commons-net would be missing. (The javax.mail half of
 # that argument moved to inspecto-notify-channels with SmtpEmailChannel on 2026-09-07, EDG-01 cell 1.)
-$connectorsTargetDir = Join-Path $sandboxRoot 'inspecto-connectors\target'
+$connectorsTargetDir = Join-Path $sandboxRoot 'providers\inspecto-connectors\target'
 $connectorsJarSrc = Get-ChildItem -Path $connectorsTargetDir -Filter 'inspecto-connectors-*-sidecar.jar' -ErrorAction SilentlyContinue |
           Select-Object -First 1 -ExpandProperty FullName
 if (-not $connectorsJarSrc -or -not (Test-Path $connectorsJarSrc)) {
-    throw "Connector sidecar not found matching $connectorsTargetDir\inspecto-connectors-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -pl inspecto-connectors -am -DskipTests"
+    throw "Connector sidecar not found matching $connectorsTargetDir\inspecto-connectors-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -pl :inspecto-connectors -am -DskipTests"
 }
 
 # ── step 1c: Professional/Enterprise editions — build the optional edition modules ─────────────────
@@ -316,7 +316,7 @@ if ($Edition -ne 'Personal') {
     # builds its `sidecar` artifact for the editions that stage it.
     # ASSURE-INTELLIGENCE-BUNDLE-1 (D-P2): inspecto-intelligence (the /agent/* agent, onnxruntime inside)
     # is ENTERPRISE only - also a default-reactor module, listed so this pass builds its `sidecar`.
-    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-connectors-kafka,inspecto-telecom-asn1,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-reconciliation,inspecto-scoring,inspecto-agent,inspecto-la-store-pg,inspecto-intelligence' } else { 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-connectors-kafka,inspecto-telecom-asn1,inspecto-notify-channels,inspecto-backup,inspecto-entity-list,inspecto-la-graph,inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link,inspecto-exchange,inspecto-observability,inspecto-ops,inspecto-reconciliation,inspecto-scoring,inspecto-agent' }
+    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { ':inspecto-oidc,:inspecto-secrets,:inspecto-geo-country,:inspecto-connectors-kafka,:inspecto-telecom-asn1,:inspecto-policy,:inspecto-notify-channels,:inspecto-backup,:inspecto-entity-list,:inspecto-la-graph,:inspecto-la-storage,:inspecto-la-core,:inspecto-la-api,:inspecto-geo-link,:inspecto-exchange,:inspecto-observability,:inspecto-ops,:inspecto-reconciliation,:inspecto-scoring,:inspecto-agent,:inspecto-la-store-pg,:inspecto-intelligence' } else { ':inspecto-oidc,:inspecto-secrets,:inspecto-geo-country,:inspecto-connectors-kafka,:inspecto-telecom-asn1,:inspecto-notify-channels,:inspecto-backup,:inspecto-entity-list,:inspecto-la-graph,:inspecto-la-storage,:inspecto-la-core,:inspecto-la-api,:inspecto-geo-link,:inspecto-exchange,:inspecto-observability,:inspecto-ops,:inspecto-reconciliation,:inspecto-scoring,:inspecto-agent' }
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
@@ -324,7 +324,7 @@ if ($Edition -ne 'Personal') {
         if ($LASTEXITCODE -ne 0) { throw "mvn build of the $Edition edition modules failed" }
         Pop-Location
     }
-    $oidcTargetDir = Join-Path $sandboxRoot 'inspecto-oidc\target'
+    $oidcTargetDir = Join-Path $sandboxRoot 'providers\inspecto-oidc\target'
     # SEC-SIDECAR-BOOT-1 (2026-09-07): the SHADED jar, not the thin one. Until now this copied the plain
     # 16 KB artifact, which carries no com/nimbusds classes at all - so every Professional/Enterprise bundle
     # died at boot, because ControlApi resolves the Authenticator SPI during startup through an unguarded
@@ -338,37 +338,37 @@ if ($Edition -ne 'Personal') {
     # MODULE-REORG-1 D-MR6: inspecto-security became three provider modules. The secrets provider has no
     # third-party dependency (THIN jar, like inspecto-backup); the geo-country resolver carries maxmind-db
     # (SHADED, '-sidecar', same reasoning as the OIDC one above).
-    $secretsJarSrc = Get-ChildItem -Path (Join-Path $sandboxRoot 'inspecto-secrets\target') -Filter 'inspecto-secrets-*.jar' -ErrorAction SilentlyContinue |
+    $secretsJarSrc = Get-ChildItem -Path (Join-Path $sandboxRoot 'providers\inspecto-secrets\target') -Filter 'inspecto-secrets-*.jar' -ErrorAction SilentlyContinue |
                        Where-Object { $_.Name -notmatch '(sources|javadoc|tests)\.jar$' } | Select-Object -First 1 -ExpandProperty FullName
     if (-not $secretsJarSrc -or -not (Test-Path $secretsJarSrc)) {
-        throw "$Edition edition requested but no jar found matching inspecto-secrets\target\inspecto-secrets-*.jar."
+        throw "$Edition edition requested but no jar found matching providers\inspecto-secrets\target\inspecto-secrets-*.jar."
     }
-    $geoCountryJarSrc = Get-ChildItem -Path (Join-Path $sandboxRoot 'inspecto-geo-country\target') -Filter 'inspecto-geo-country-*-sidecar.jar' -ErrorAction SilentlyContinue |
+    $geoCountryJarSrc = Get-ChildItem -Path (Join-Path $sandboxRoot 'providers\inspecto-geo-country\target') -Filter 'inspecto-geo-country-*-sidecar.jar' -ErrorAction SilentlyContinue |
                        Select-Object -First 1 -ExpandProperty FullName
     if (-not $geoCountryJarSrc -or -not (Test-Path $geoCountryJarSrc)) {
-        throw "$Edition edition requested but no SHADED JAR found matching inspecto-geo-country\target\inspecto-geo-country-*-sidecar.jar. The thin jar carries no maxmind-db classes."
+        throw "$Edition edition requested but no SHADED JAR found matching providers\inspecto-geo-country\target\inspecto-geo-country-*-sidecar.jar. The thin jar carries no maxmind-db classes."
     }
     # MODULE-REORG-1 P7: the Kafka stream connector is its own premium module (kafka-clients is the one
     # connector footprint that is distinct). SHADED ('-sidecar'): the thin jar carries no kafka-clients.
     # Professional and above ONLY - Personal's inspecto-connectors.jar no longer registers a Kafka factory.
-    $kafkaJarSrc = Get-ChildItem -Path (Join-Path $sandboxRoot 'inspecto-connectors-kafka\target') -Filter 'inspecto-connectors-kafka-*-sidecar.jar' -ErrorAction SilentlyContinue |
+    $kafkaJarSrc = Get-ChildItem -Path (Join-Path $sandboxRoot 'providers\inspecto-connectors-kafka\target') -Filter 'inspecto-connectors-kafka-*-sidecar.jar' -ErrorAction SilentlyContinue |
                        Select-Object -First 1 -ExpandProperty FullName
     if (-not $kafkaJarSrc -or -not (Test-Path $kafkaJarSrc)) {
-        throw "$Edition edition requested but no SHADED JAR found matching inspecto-connectors-kafka\target\inspecto-connectors-kafka-*-sidecar.jar. The thin jar carries no kafka-clients classes."
+        throw "$Edition edition requested but no SHADED JAR found matching providers\inspecto-connectors-kafka\target\inspecto-connectors-kafka-*-sidecar.jar. The thin jar carries no kafka-clients classes."
     }
     # MODULE-REORG-1 P7: the ASN.1 BER decoder is the Telecom industry pack (inspecto-telecom-asn1). SHADED
     # ('-sidecar'): the thin jar carries no asn-facade/asn-core classes. Professional and above ONLY - Personal's
     # inspecto.jar no longer registers an asn1 parser, and the Step Processor catalog reports it not installed.
-    $asn1JarSrc = Get-ChildItem -Path (Join-Path $sandboxRoot 'inspecto-telecom-asn1\target') -Filter 'inspecto-telecom-asn1-*-sidecar.jar' -ErrorAction SilentlyContinue |
+    $asn1JarSrc = Get-ChildItem -Path (Join-Path $sandboxRoot 'providers\inspecto-telecom-asn1\target') -Filter 'inspecto-telecom-asn1-*-sidecar.jar' -ErrorAction SilentlyContinue |
                       Select-Object -First 1 -ExpandProperty FullName
     if (-not $asn1JarSrc -or -not (Test-Path $asn1JarSrc)) {
-        throw "$Edition edition requested but no SHADED JAR found matching inspecto-telecom-asn1\target\inspecto-telecom-asn1-*-sidecar.jar. The thin jar carries no asn-facade classes."
+        throw "$Edition edition requested but no SHADED JAR found matching providers\inspecto-telecom-asn1\target\inspecto-telecom-asn1-*-sidecar.jar. The thin jar carries no asn-facade classes."
     }
     # The channels sidecar (EDG-01 cell 1). SHADED for the same reason the security one is: the thin jar
     # carries no javax.mail, and NotificationService discovering SmtpEmailChannel without it kills boot
     # with NoClassDefFoundError: javax/mail/Message. The '-sidecar' glob is deliberate - a bare
     # 'inspecto-notify-channels-*.jar' matches BOTH artifacts and would pick one by luck.
-    $channelsTargetDir = Join-Path $sandboxRoot 'inspecto-notify-channels\target'
+    $channelsTargetDir = Join-Path $sandboxRoot 'providers\inspecto-notify-channels\target'
     $channelsJarSrc = Get-ChildItem -Path $channelsTargetDir -Filter 'inspecto-notify-channels-*-sidecar.jar' -ErrorAction SilentlyContinue |
                        Select-Object -First 1 -ExpandProperty FullName
     if (-not $channelsJarSrc -or -not (Test-Path $channelsJarSrc)) {
@@ -376,7 +376,7 @@ if ($Edition -ne 'Personal') {
     }
     # The backup module (EDG-01 cell 2). THIN like inspecto-policy - nothing beyond the core - so the plain
     # artifact is the right one and there is no -sidecar classifier to prefer.
-    $backupTargetDir = Join-Path $sandboxRoot 'inspecto-backup\target'
+    $backupTargetDir = Join-Path $sandboxRoot 'features\inspecto-backup\target'
     $backupJarSrc = Get-ChildItem -Path $backupTargetDir -Filter 'inspecto-backup-*.jar' -ErrorAction SilentlyContinue |
                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                      Select-Object -First 1 -ExpandProperty FullName
@@ -384,7 +384,7 @@ if ($Edition -ne 'Personal') {
         throw "$Edition edition requested but no JAR found matching $backupTargetDir\inspecto-backup-*.jar."
     }
     # The Entity List module (SEP-08). THIN like inspecto-geo-link, which depends on it.
-    $entityListTargetDir = Join-Path $sandboxRoot 'inspecto-entity-list\target'
+    $entityListTargetDir = Join-Path $sandboxRoot 'features\inspecto-entity-list\target'
     $entityListJarSrc = Get-ChildItem -Path $entityListTargetDir -Filter 'inspecto-entity-list-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                       Select-Object -First 1 -ExpandProperty FullName
@@ -396,7 +396,7 @@ if ($Edition -ne 'Personal') {
     # D-4 step 4: inspecto-la-graph (the ported graph algorithms, JDK only) is la-core's runtime dependency - InMemoryGraphEngine
     # calls it - so it is staged beside it and MUST be on the explicit launcher classpath (a staged jar missing from the
     # classpath is a Link Analysis engine that fails with NoClassDefFoundError the first time a graph run is asked for).
-    $laGraphTargetDir = Join-Path $sandboxRoot 'inspecto-la-graph\target'
+    $laGraphTargetDir = Join-Path $sandboxRoot 'la\inspecto-la-graph\target'
     $laGraphJarSrc = Get-ChildItem -Path $laGraphTargetDir -Filter 'inspecto-la-graph-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                       Select-Object -First 1 -ExpandProperty FullName
@@ -404,21 +404,21 @@ if ($Edition -ne 'Personal') {
         throw "$Edition edition requested but no JAR found matching $laGraphTargetDir\inspecto-la-graph-*.jar."
     }
     # D-3 step 2: inspecto-la-storage (the index store skeleton) is staged like la-graph; la-api depends on it from a later step.
-    $laStorageTargetDir = Join-Path $sandboxRoot 'inspecto-la-storage\target'
+    $laStorageTargetDir = Join-Path $sandboxRoot 'la\inspecto-la-storage\target'
     $laStorageJarSrc = Get-ChildItem -Path $laStorageTargetDir -Filter 'inspecto-la-storage-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                       Select-Object -First 1 -ExpandProperty FullName
     if (-not $laStorageJarSrc -or -not (Test-Path $laStorageJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $laStorageTargetDir\inspecto-la-storage-*.jar."
     }
-    $laCoreTargetDir = Join-Path $sandboxRoot 'inspecto-la-core\target'
+    $laCoreTargetDir = Join-Path $sandboxRoot 'la\inspecto-la-core\target'
     $laCoreJarSrc = Get-ChildItem -Path $laCoreTargetDir -Filter 'inspecto-la-core-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                       Select-Object -First 1 -ExpandProperty FullName
     if (-not $laCoreJarSrc -or -not (Test-Path $laCoreJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $laCoreTargetDir\inspecto-la-core-*.jar."
     }
-    $laApiTargetDir = Join-Path $sandboxRoot 'inspecto-la-api\target'
+    $laApiTargetDir = Join-Path $sandboxRoot 'la\inspecto-la-api\target'
     $laApiJarSrc = Get-ChildItem -Path $laApiTargetDir -Filter 'inspecto-la-api-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                       Select-Object -First 1 -ExpandProperty FullName
@@ -426,7 +426,7 @@ if ($Edition -ne 'Personal') {
         throw "$Edition edition requested but no JAR found matching $laApiTargetDir\inspecto-la-api-*.jar."
     }
     # The geo/link module (EDG-01 cell 3b). THIN like inspecto-policy and inspecto-backup.
-    $geoLinkTargetDir = Join-Path $sandboxRoot 'inspecto-geo-link\target'
+    $geoLinkTargetDir = Join-Path $sandboxRoot 'la\inspecto-geo-link\target'
     $geoLinkJarSrc = Get-ChildItem -Path $geoLinkTargetDir -Filter 'inspecto-geo-link-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                       Select-Object -First 1 -ExpandProperty FullName
@@ -434,7 +434,7 @@ if ($Edition -ne 'Personal') {
         throw "$Edition edition requested but no JAR found matching $geoLinkTargetDir\inspecto-geo-link-*.jar."
     }
     # The exchange module (EDG-01 cell 4). THIN like policy/backup/geo-link.
-    $exchangeTargetDir = Join-Path $sandboxRoot 'inspecto-exchange\target'
+    $exchangeTargetDir = Join-Path $sandboxRoot 'features\inspecto-exchange\target'
     $exchangeJarSrc = Get-ChildItem -Path $exchangeTargetDir -Filter 'inspecto-exchange-*.jar' -ErrorAction SilentlyContinue |
                        Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                        Select-Object -First 1 -ExpandProperty FullName
@@ -442,7 +442,7 @@ if ($Edition -ne 'Personal') {
         throw "$Edition edition requested but no JAR found matching $exchangeTargetDir\inspecto-exchange-*.jar."
     }
     # The observability module (MODULE-REORG-1 P7 / D-MR5): /metrics exposition (cell 5) + /events* feed (cell 6). THIN.
-    $obsTargetDir = Join-Path $sandboxRoot 'inspecto-observability\target'
+    $obsTargetDir = Join-Path $sandboxRoot 'features\inspecto-observability\target'
     $obsJarSrc = Get-ChildItem -Path $obsTargetDir -Filter 'inspecto-observability-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                       Select-Object -First 1 -ExpandProperty FullName
@@ -450,14 +450,14 @@ if ($Edition -ne 'Personal') {
         throw "$Edition edition requested but no JAR found matching $obsTargetDir\inspecto-observability-*.jar."
     }
     # The operational-objects module (EDG-01 cell 7). NOT thin: the whole com.gamma.ops domain.
-    $opsTargetDir = Join-Path $sandboxRoot 'inspecto-ops\target'
+    $opsTargetDir = Join-Path $sandboxRoot 'features\inspecto-ops\target'
     # PKG-5: the SHADED `sidecar` artifact, never the thin jar. A thin inspecto-agent.jar on the
     # bundle classpath is present but cannot link (eoiagent-*/langchain4j missing), so the assistant
     # would look installed and silently do nothing. The glob therefore pins '-sidecar'.
-    $agentTargetDir = Join-Path $sandboxRoot 'inspecto-agent\target'
+    $agentTargetDir = Join-Path $sandboxRoot 'features\inspecto-agent\target'
     $agentJarSrc = Get-ChildItem -Path $agentTargetDir -Filter 'inspecto-agent-*-sidecar.jar' -ErrorAction SilentlyContinue |
         Select-Object -First 1 -ExpandProperty FullName
-    if (-not $agentJarSrc) { throw "Assistant sidecar not found matching $agentTargetDir\inspecto-agent-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -pl inspecto-agent -am -DskipTests" }
+    if (-not $agentJarSrc) { throw "Assistant sidecar not found matching $agentTargetDir\inspecto-agent-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -pl :inspecto-agent -am -DskipTests" }
 
     $opsJarSrc = Get-ChildItem -Path $opsTargetDir -Filter 'inspecto-ops-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
@@ -466,7 +466,7 @@ if ($Edition -ne 'Personal') {
         throw "$Edition edition requested but no JAR found matching $opsTargetDir\inspecto-ops-*.jar."
     }
     # MODULE-REORG-1 P7: the Reconciliation add-on. THIN like inspecto-ops / inspecto-entity-list; Professional and above.
-    $reconTargetDir = Join-Path $sandboxRoot 'inspecto-reconciliation\target'
+    $reconTargetDir = Join-Path $sandboxRoot 'features\inspecto-reconciliation\target'
     $reconJarSrc = Get-ChildItem -Path $reconTargetDir -Filter 'inspecto-reconciliation-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                       Select-Object -First 1 -ExpandProperty FullName
@@ -474,7 +474,7 @@ if ($Edition -ne 'Personal') {
         throw "$Edition edition requested but no JAR found matching $reconTargetDir\inspecto-reconciliation-*.jar."
     }
     # MODULE-REORG-1 P7: the Scoring add-on (Risk Scores). THIN like inspecto-ops / inspecto-entity-list; Professional and above.
-    $scoringTargetDir = Join-Path $sandboxRoot 'inspecto-scoring\target'
+    $scoringTargetDir = Join-Path $sandboxRoot 'features\inspecto-scoring\target'
     $scoringJarSrc = Get-ChildItem -Path $scoringTargetDir -Filter 'inspecto-scoring-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                       Select-Object -First 1 -ExpandProperty FullName
@@ -482,7 +482,7 @@ if ($Edition -ne 'Personal') {
         throw "$Edition edition requested but no JAR found matching $scoringTargetDir\inspecto-scoring-*.jar."
     }
     if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') {
-        $policyTargetDir = Join-Path $sandboxRoot 'inspecto-policy\target'
+        $policyTargetDir = Join-Path $sandboxRoot 'providers\inspecto-policy\target'
         $policyJarSrc = Get-ChildItem -Path $policyTargetDir -Filter 'inspecto-policy-*.jar' -ErrorAction SilentlyContinue |
                          Select-Object -First 1 -ExpandProperty FullName
         if (-not $policyJarSrc -or -not (Test-Path $policyJarSrc)) {
@@ -490,7 +490,7 @@ if ($Edition -ne 'Personal') {
         }
         # LA-INVESTIGATION-STORE-DESIGN-1 S6 (D-IS7): the optional PostgreSQL Investigation store - a THIN jar (plain JDBC, the
         # driver is postgresql.jar). Enterprise and Preview only; `investigations.backend=db` selects it, the default stays the filesystem.
-        $laStorePgTargetDir = Join-Path $sandboxRoot 'inspecto-la-store-pg\target'
+        $laStorePgTargetDir = Join-Path $sandboxRoot 'la\inspecto-la-store-pg\target'
         $laStorePgJarSrc = Get-ChildItem -Path $laStorePgTargetDir -Filter 'inspecto-la-store-pg-*.jar' -ErrorAction SilentlyContinue |
                            Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                            Select-Object -First 1 -ExpandProperty FullName
@@ -498,10 +498,10 @@ if ($Edition -ne 'Personal') {
             throw "$Edition edition requested but no JAR found matching $laStorePgTargetDir\inspecto-la-store-pg-*.jar."
         }
         # ASSURE-INTELLIGENCE-BUNDLE-1: the SHADED `sidecar`, never the thin jar (same trap as PKG-5).
-        $intelligenceTargetDir = Join-Path $sandboxRoot 'inspecto-intelligence\target'
+        $intelligenceTargetDir = Join-Path $sandboxRoot 'features\inspecto-intelligence\target'
         $intelligenceJarSrc = Get-ChildItem -Path $intelligenceTargetDir -Filter 'inspecto-intelligence-*-sidecar.jar' -ErrorAction SilentlyContinue |
             Select-Object -First 1 -ExpandProperty FullName
-        if (-not $intelligenceJarSrc) { throw "Intelligence sidecar not found matching $intelligenceTargetDir\inspecto-intelligence-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -pl inspecto-intelligence -am -DskipTests" }
+        if (-not $intelligenceJarSrc) { throw "Intelligence sidecar not found matching $intelligenceTargetDir\inspecto-intelligence-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -pl :inspecto-intelligence -am -DskipTests" }
     }
 }
 
@@ -926,7 +926,7 @@ if (-not $NoBuild -and $buildId -ne 'dev' -and $distinct.Count -eq 1 -and $disti
 Write-Host "  verified: $($stamps.Count) module jars, build id $(if ($distinct.Count) { $distinct[0] } else { 'dev (unstamped)' })" -ForegroundColor DarkGray
 
 # ── step 3a: Professional/Enterprise — bundle the PostgreSQL JDBC driver as a sidecar (PG-1) ─────────
-# The fat JAR and its SBOM stay JDBC-driver-free by design (inspecto/pom.xml, inspecto-engine/pom.xml);
+# The fat JAR and its SBOM stay JDBC-driver-free by design (inspecto/pom.xml, platform/inspecto-engine/pom.xml);
 # the driver rides the bundle as postgresql.jar, auto-detected by serve.sh/serve.bat exactly like
 # inspecto-oidc.jar. Personal ships DuckDB only — OperationalDb.verifySelectable fails a
 # -Dinspecto.db=postgres boot there, naming this sidecar as the thing to drop in.
@@ -962,13 +962,13 @@ if ($sbomExit -ne 0) { throw "SBOM generation failed (exit $sbomExit) — a bund
 if ($DemoAuth) {
     if (-not $NoBuild) {
         Push-Location $sandboxRoot
-        & mvn package "-Dinspecto.build.id=$buildId" -pl inspecto-demo-auth -am -DskipTests -q
+        & mvn package "-Dinspecto.build.id=$buildId" -pl :inspecto-demo-auth -am -DskipTests -q
         if ($LASTEXITCODE -ne 0) { throw "mvn build of inspecto-demo-auth failed" }
         Pop-Location
     }
-    $demoJar = Get-ChildItem (Join-Path $sandboxRoot 'inspecto-demo-auth\target') -Filter 'inspecto-demo-auth-*.jar' |
+    $demoJar = Get-ChildItem (Join-Path $sandboxRoot 'providers\inspecto-demo-auth\target') -Filter 'inspecto-demo-auth-*.jar' |
         Where-Object { $_.Name -notmatch '(sources|javadoc|tests)\.jar$' } | Select-Object -First 1
-    if (-not $demoJar) { throw "no inspecto-demo-auth jar under inspecto-demo-auth\target - build it first or drop -NoBuild" }
+    if (-not $demoJar) { throw "no inspecto-demo-auth jar under providers\inspecto-demo-auth\target - build it first or drop -NoBuild" }
     Remove-Item (Join-Path $bundleDir 'inspecto-oidc.jar') -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $bundleDir 'inspecto-secrets.jar') -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $bundleDir 'inspecto-geo-country.jar') -ErrorAction SilentlyContinue
@@ -2176,7 +2176,7 @@ if (-not $SkipBootCheck) {
         } finally { $zip.Dispose() }
     }
     if ($providerHits.Count -gt 1) {
-        throw "PACKAGING SMOKE FAILED: $($providerHits.Count) jars on the bundle classpath carry META-INF/services/org.slf4j.spi.SLF4JServiceProvider ($($providerHits -join ', ')) -- exactly one SLF4J binding may exist on the assembled classpath. Check the shade excludes in the listed sidecars' pom.xml (see inspecto-agent/pom.xml for the reference exclude block)."
+        throw "PACKAGING SMOKE FAILED: $($providerHits.Count) jars on the bundle classpath carry META-INF/services/org.slf4j.spi.SLF4JServiceProvider ($($providerHits -join ', ')) -- exactly one SLF4J binding may exist on the assembled classpath. Check the shade excludes in the listed sidecars' pom.xml (see features/inspecto-agent/pom.xml for the reference exclude block)."
     }
     Write-Host "  verified: $($providerHits.Count) SLF4JServiceProvider registration(s) on the bundle classpath" -ForegroundColor DarkGray
     # ASSURE-INTELLIGENCE-BUNDLE-1: a VERSION SPLIT between the core jar and a sidecar for the libraries both

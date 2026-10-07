@@ -14,7 +14,7 @@
 //     file templates + token stamping need nothing but Node, which the vocabulary guard already
 //     assumes. Zero dependencies, same as its neighbours check-vocabulary.mjs / check-secrets.mjs.
 //   * COORDINATES ARE READ FROM THE REPO, never hardcoded. The generated pom pins the engine
-//     groupId/artifactId/version the pack was scaffolded from, read out of inspecto-engine/pom.xml
+//     groupId/artifactId/version the pack was scaffolded from, read out of platform/inspecto-engine/pom.xml
 //     at generation time — so an artifactId or version change cannot leave this script emitting a
 //     dependency that does not resolve.
 //   * TOKENS ARE {{name}}, NOT ${name}. A generated pom.xml legitimately contains Maven's own
@@ -85,7 +85,7 @@ function tag(xml, name) {
 }
 
 function engineCoordinates() {
-    const enginePom = join(repoRoot, 'inspecto-engine', 'pom.xml');
+    const enginePom = join(repoRoot, 'platform', 'inspecto-engine', 'pom.xml');
     if (!existsSync(enginePom)) fail(`cannot find ${relative(repoRoot, enginePom)} — run this from the repo`);
     const xml = readFileSync(enginePom, 'utf8');
     const parent = xml.slice(xml.indexOf('<parent>'), xml.indexOf('</parent>'));

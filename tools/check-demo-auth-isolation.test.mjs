@@ -19,8 +19,8 @@ const FILES = [
     'tools/bundle-modules.mjs',
     'inspecto/package.ps1',
     'pom.xml',
-    'inspecto-connectors/pom.xml',
-    'inspecto-demo-auth/pom.xml',
+    'providers/inspecto-connectors/pom.xml',
+    'providers/inspecto-demo-auth/pom.xml',
     '.github/workflows/ci.yml',
 ];
 
@@ -60,7 +60,7 @@ const RED = {
         edit(
             'tools/bundle-modules.mjs',
             "    // Enterprise only.",
-            "    { artifactId: 'inspecto-demo-auth', dir: 'inspecto-demo-auth', bundleFile: 'inspecto-demo-auth.jar', from: 'enterprise' },\n    // Enterprise only.",
+            "    { artifactId: 'inspecto-demo-auth', dir: 'providers/inspecto-demo-auth', bundleFile: 'inspecto-demo-auth.jar', from: 'enterprise' },\n    // Enterprise only.",
         ),
         /bundle-modules\.mjs ships inspecto-demo-auth\.jar/,
     ],
@@ -69,7 +69,7 @@ const RED = {
         /outside an `if \(\$DemoAuth\)` block/,
     ],
     'an edition $modules build list': [
-        edit('inspecto/package.ps1', "{ 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-connectors-kafka,", "{ 'inspecto-oidc,inspecto-secrets,inspecto-geo-country,inspecto-demo-auth,inspecto-connectors-kafka,"),
+        edit('inspecto/package.ps1', "{ ':inspecto-oidc,:inspecto-secrets,:inspecto-geo-country,:inspecto-connectors-kafka,", "{ ':inspecto-oidc,:inspecto-secrets,:inspecto-geo-country,:inspecto-demo-auth,:inspecto-connectors-kafka,"),
         /outside an `if \(\$DemoAuth\)` block/,
     ],
     'a staging step under a NEGATED gate': [
@@ -86,7 +86,7 @@ const RED = {
         /demo launcher classpath/,
     ],
     'a shipped module depending on it': [
-        edit('inspecto-connectors/pom.xml', '<dependencies>',
+        edit('providers/inspecto-connectors/pom.xml', '<dependencies>',
             '<dependencies>\n<dependency><groupId>com.gamma.inspector</groupId><artifactId>inspecto-demo-auth</artifactId></dependency>'),
         /inspecto-connectors\/pom\.xml declares a dependency/,
     ],

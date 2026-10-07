@@ -2,7 +2,7 @@
 type: Concept
 title: Auth & Security
 description: Auth-free core; the Authenticator/Subject/TokenRelay/AccessDecider SPIs; the shipped inspecto-oidc module (split into inspecto-oidc, inspecto-secrets, inspecto-geo-country by D-MR6) (Professional, OIDC via Keycloak/WSO2, data-driven roles, Access-Profile + sharing enforcement); the Enterprise inspecto-policy ABAC engine (authored Access Policies, space isolation, decision audit); the separate -Dassist.write.root write-gate.
-resource: inspecto-oidc/, inspecto-policy/
+resource: providers/inspecto-oidc/, providers/inspecto-policy/
 tags: [auth, security, spi, oidc, keycloak, wso2, bff, write-gate, rbac, abac, policy-engine, edition-professional, edition-enterprise]
 timestamp: 2026-07-24T00:00:00Z
 ---
@@ -16,7 +16,7 @@ is no token paste / guard / interceptor. The removed hand-rolled bearer-token pl
 
 **Professional re-adds auth via SPIs + the shipped `inspecto-oidc` module.** The core defines three SPIs in
 `com.gamma.control`: **`Authenticator`** (validates a request, yields a subject), **`Subject`** (a record of
-`id` + capabilities), and **`TokenRelay`**. `inspecto-oidc/` (artifactId `inspecto-oidc`, **34**
+`id` + capabilities), and **`TokenRelay`**. `providers/inspecto-oidc/` (artifactId `inspecto-oidc`, **34**
 tests — measured 2026-09-08: 24 + 7 + 3; an earlier "41" was never true of the tree) implements them: `OidcAuthenticator` (Nimbus JOSE+JWT), `RoleMapper` (roles from IAM claims), and
 `OidcTokenRelay`. It joins the reactor **only under the `edition-professional` Maven profile** (with `edition-standard` retained as an alias) — the default
 build never compiles it (verify with `-Pedition-professional`); because it's a

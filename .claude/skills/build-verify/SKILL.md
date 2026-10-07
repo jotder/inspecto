@@ -90,7 +90,7 @@ print(f"MODULES={len(mods)} TOTAL={tot} failures={f} errors={e} skipped={sk}")
 EOF
 ```
 ⚠ Use `**/target/…`, not `*/target/…` — the five `asn-*` modules are nested under
-`asn-parser/asn-decoders/`, so a single-level glob silently reports **21 modules / 4429**, which looks
+`providers/asn-parser/asn-decoders/`, so a single-level glob silently reports **21 modules / 4429**, which looks
 like a plausible total rather than an obviously broken one. Measured 2026-09-15: the recursive form gives
 **26 / 4501**, agreeing exactly with a correct log read.
 
@@ -120,7 +120,7 @@ skip counts summing to 16 is a cheap check that you caught all four.
 ### ⚠ Narrowing to specific tests — commas, never `+`
 
 ```powershell
-mvn -o -pl inspecto-engine -am test -Dtest=FooTest,BarTest -Dsurefire.failIfNoSpecifiedTests=false
+mvn -o -pl :inspecto-engine -am test -Dtest=FooTest,BarTest -Dsurefire.failIfNoSpecifiedTests=false
 ```
 This Surefire (3.2.5) needs a **comma-separated** class list. A `+`-joined list
 (`-Dtest=FooTest+BarTest`) silently runs only *some* of them and still reports **BUILD SUCCESS** —
@@ -131,7 +131,7 @@ fail the reactor before it reaches the module under test. **A narrowed run is ne
 
 ⚠ **`-am` is also what makes it COMPILE**, not just a Surefire concern: without it, `-pl <module>`
 resolves that module's siblings from the **installed `.m2` jars**, which are stale the moment a sibling
-gains a member in your working tree. Observed 2026-08-04 — `-pl inspecto-engine` failed with
+gains a member in your working tree. Observed 2026-08-04 — `-pl :inspecto-engine` failed with
 `cannot find symbol: method where()` on `PipelineConfig.CsvSettings` (added in `8e6e605d`, never
 `install`ed), which reads like a broken edit rather than a stale dependency. Always pass `-am`.
 

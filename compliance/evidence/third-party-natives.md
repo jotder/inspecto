@@ -48,7 +48,7 @@ on Linux the system libstdc++ is used). **Exercised:** `inspecto-intelligence` `
 through `OnnxEmbeddingAdapter`, so the ubuntu CI reactor loads and runs `libonnxruntime.so`, `libonnxruntime4j_jni.so` and
 `libtokenizers.so` (skipped, with the reason printed, only where the jars carry no native for the os/arch). No CI job runs macOS.
 
-**Shade merge (`NATIVE-LICENCE-SHADE-MERGE-1`, shipped 2026-10-03).** `inspecto-intelligence/pom.xml` concatenates colliding `META-INF/LICENSE`, `LICENSE.txt` and `LICENSE.md` (`AppendingTransformer`) and merges `NOTICE*` (`ApacheNoticeResourceTransformer`), so no artifact's licence file is dropped first-wins. `check-native-licences` requires a shipped text for every DLL; the only exception is a `textPending` that names an open backlog row.
+**Shade merge (`NATIVE-LICENCE-SHADE-MERGE-1`, shipped 2026-10-03).** `features/inspecto-intelligence/pom.xml` concatenates colliding `META-INF/LICENSE`, `LICENSE.txt` and `LICENSE.md` (`AppendingTransformer`) and merges `NOTICE*` (`ApacheNoticeResourceTransformer`), so no artifact's licence file is dropped first-wins. `check-native-licences` requires a shipped text for every DLL; the only exception is a `textPending` that names an open backlog row.
 
 **onnxruntime (`NATIVE-LICENCE-ONNXRUNTIME-TEXT-1`, shipped 2026-10-03).** Its own MIT `LICENSE` is in neither the jar nor
 the sources jar, so it was fetched from `github.com/microsoft/onnxruntime` at tag `v1.20.0` (operator-approved) and ships as

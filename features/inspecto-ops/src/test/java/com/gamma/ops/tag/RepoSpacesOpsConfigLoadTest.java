@@ -33,8 +33,8 @@ class RepoSpacesOpsConfigLoadTest {
 
     @Test
     void everyAuthoredOpsConfigLoadsWithItsRealLoader() throws IOException {
-        // surefire's CWD is the inspecto-ops/ module dir; the spaces tree is a repo-root sibling.
-        Path root = Path.of("..", "spaces").toAbsolutePath().normalize();
+        // surefire's CWD is the features/inspecto-ops/ module dir; the spaces tree is a repo-root sibling.
+        Path root = Path.of("..", "..", "spaces").toAbsolutePath().normalize();
         assertTrue(Files.isDirectory(root),
                 "found NO spaces/ tree at " + root + " — the walk-up is broken, not the corpus");
 

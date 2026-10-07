@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class MapNodeKeyContractTest {
 
-    private static final String ROW_SHAPER = "inspecto-engine/src/main/java/com/gamma/pipeline/exec/RowShaper.java";
+    private static final String ROW_SHAPER = "platform/inspecto-engine/src/main/java/com/gamma/pipeline/exec/RowShaper.java";
 
     /**
      * The map-path region of RowShaper: {@code columnsOf} (the projection), {@code csvSettingsOf} and

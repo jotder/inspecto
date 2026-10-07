@@ -2,7 +2,7 @@
 type: Concept
 title: Component Registry
 description: Reusable grammar/transform/sink components (now + dataset/widget/dashboard/query), the /components + /pipelines routes, ETag optimistic concurrency, preview and safe-delete.
-resource: inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java
 tags: [components, registry, grammar, transform, sink, etag, routes]
 timestamp: 2026-07-07T00:00:00Z
 ---
@@ -23,7 +23,7 @@ live under `<write-root>/registry/<type>/` as TOON files, addressed by `<type>/<
   was **widened in W3** to also persist `dataset`, `widget`, `dashboard`, and `query` — the seam that lets the
   UI's Studio kinds store for real instead of mock-only. (The UI also persists a `rule` type, used by the
   data-table rule save — see the UI bundle.)
-* **Storage**: `ComponentStore` (`inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java`) — CRUD over the
+* **Storage**: `ComponentStore` (`platform/inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java`) — CRUD over the
   registry dir; `ComponentRegistry` holds the `Component` record (`type`, `name`, `ref`, `content`).
 * **Optimistic concurrency** (W3): `ContentHash` (mirrors the UI's `content-hash.ts`, parity-pinned by test)
   hashes each component's content; `/components` responses carry an **`ETag`**, reads honour

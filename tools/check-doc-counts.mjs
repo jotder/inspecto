@@ -29,6 +29,7 @@ import { bundleModules, editionOnlyModules } from './bundle-modules.mjs';
 import { join, relative, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { trackedPaths } from './tracked-paths.mjs';
+import { reactorModuleDirs } from './reactor-modules.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CONTRACTS = 'inspecto-ui/src/app/inspecto/contracts';
@@ -97,13 +98,13 @@ const MANIFEST = {
         // HAVE attribute specs (11 of them), which is the very ambiguity that made "node types" a
         // five-way count. The enum is the roster, so parse the enum.
         derive: () => {
-            const src = read('inspecto-engine/src/main/java/com/gamma/pipeline/BuiltinNodeType.java');
+            const src = read('platform/inspecto-engine/src/main/java/com/gamma/pipeline/BuiltinNodeType.java');
             const body = src.split('implements PipelineNodeType {')[1];
             if (!body) throw new Error('BuiltinNodeType: enum body not found — re-anchor this parse');
             const m = body.match(/^ {4}[A-Z][A-Z0-9_]*\("[^"]+"/gm) || [];
             return m.length;
         },
-        source: 'inspecto-engine/src/main/java/com/gamma/pipeline/BuiltinNodeType.java',
+        source: 'platform/inspecto-engine/src/main/java/com/gamma/pipeline/BuiltinNodeType.java',
     },
     'node-types-with-attributes': {
         floor: 1,
@@ -138,15 +139,15 @@ const MANIFEST = {
     'parsing-frontend-tokens': {
         floor: 5,
         what: 'parsing.frontend tokens accepted at config load (aliases counted: fixed_width, excel)',
-        derive: () => javaSetOf('inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java',
+        derive: () => javaSetOf('platform/inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java',
             'FRONTENDS'),
-        source: 'inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java',
+        source: 'platform/inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java',
     },
     'builtin-parsers': {
         floor: 3,
         what: 'DuckDB-native built-in parsers served by GET /parsers (NOT the plugin ids, NOT the tokens)',
-        derive: () => javaSetOf('inspecto-engine/src/main/java/com/gamma/parse/BuiltinParsers.java', 'IDS'),
-        source: 'inspecto-engine/src/main/java/com/gamma/parse/BuiltinParsers.java',
+        derive: () => javaSetOf('platform/inspecto-engine/src/main/java/com/gamma/parse/BuiltinParsers.java', 'IDS'),
+        source: 'platform/inspecto-engine/src/main/java/com/gamma/parse/BuiltinParsers.java',
     },
     'parser-node-types': {
         floor: 4,
@@ -154,12 +155,12 @@ const MANIFEST = {
         // Re-homed 2026-09-24 from step-types.contract.json, retired with GET /pipelines/step-types
         // (STEP-TYPES-DEAD-CLIENT-MIRRORS-1). Same enum parse as `node-types`, narrowed to `parser.`.
         derive: () => {
-            const src = read('inspecto-engine/src/main/java/com/gamma/pipeline/BuiltinNodeType.java');
+            const src = read('platform/inspecto-engine/src/main/java/com/gamma/pipeline/BuiltinNodeType.java');
             const body = src.split('implements PipelineNodeType {')[1];
             if (!body) throw new Error('BuiltinNodeType: enum body not found — re-anchor this parse');
             return (body.match(/^ {4}[A-Z][A-Z0-9_]*\("parser\.[^"]+"/gm) || []).length;
         },
-        source: 'inspecto-engine/src/main/java/com/gamma/pipeline/BuiltinNodeType.java',
+        source: 'platform/inspecto-engine/src/main/java/com/gamma/pipeline/BuiltinNodeType.java',
     },
     // A FIFTH set, found while placing the markers above: the frontends the UI ships its OWN schema-form
     // specs for (plugin parsers render the served `grammarSchema` instead). The union type is the owner;
@@ -277,8 +278,8 @@ function backlogRanks() {
 
 /** Every .java under an inspecto* module's src/main, repo-relative. */
 function javaMainFiles(out = []) {
-    for (const mod of readdirSync(ROOT)) {
-        if (!mod.startsWith('inspecto')) continue;
+    for (const mod of reactorModuleDirs((p) => (existsSync(join(ROOT, p)) ? readFileSync(join(ROOT, p), 'utf8') : null))) {
+        if (!mod.split('/').pop().startsWith('inspecto')) continue;
         const main = join(ROOT, mod, 'src', 'main');
         (function rec(d) {
             let es; try { es = readdirSync(d); } catch { return; }
@@ -337,7 +338,7 @@ function json(rel) { return JSON.parse(read(rel)); }
 // An allow-list answers "did we remember to add this tree?"; a deny-list answers "is there a reason
 // to skip this tree?" — and only the second fails loudly when someone adds a fourth doc-bearing
 // directory. Widening cost NO findings and no noise: it took the walk from 493 markdown files to
-// 529, and the 36 it gained (`asn-parser/docs/` ×10, `inspecto-agent/docs/` ×14, `inspecto/README.md`,
+// 529, and the 36 it gained (`providers/asn-parser/docs/` ×10, `features/inspecto-agent/docs/` ×14, `inspecto/README.md`,
 // `inspecto-ui/README.md`, `tools/templates/*/README.md`, …) carry ZERO `<!--count:*-->` markers
 // today — measured, not assumed. The point is that a marker placed in one of them is now POLICED
 // instead of silently unguarded.

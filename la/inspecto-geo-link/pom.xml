@@ -8,7 +8,7 @@
         <groupId>com.gamma.inspector</groupId>
         <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-SNAPSHOT</version>
-        <relativePath>../pom.xml</relativePath>
+        <relativePath>../../pom.xml</relativePath>
     </parent>
 
     <artifactId>inspecto-geo-link</artifactId>
@@ -89,7 +89,7 @@
         </dependency>
     </dependencies>
     <!-- LA-COVERAGE-FLOOR-HOME-1: the Link Analysis routes are tested HERE (real-HTTP ControlApi tests need geo-link's
-         fixtures), but jacoco credits a class only to the module that owns it, so inspecto-la-api/-core/-graph/-storage
+         fixtures), but jacoco credits a class only to the module that owns it, so la/inspecto-la-api/-core/-graph/-storage
          read near zero. This writes target/site/jacoco-aggregate/jacoco.csv covering those modules' classes with this
          module's execution data; tools/check-coverage.mjs keeps the better row per class, so nothing double counts. -->
     <profiles>

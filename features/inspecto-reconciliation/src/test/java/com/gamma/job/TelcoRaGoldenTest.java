@@ -46,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class TelcoRaGoldenTest {
 
-    private static final Path TEMPLATE = Path.of("..", "spaces", "_templates", "telco-ra").toAbsolutePath().normalize();
+    private static final Path TEMPLATE = Path.of("..", "..", "spaces", "_templates", "telco-ra").toAbsolutePath().normalize();
     private static final TelcoRaCorpus CORPUS = TelcoRaCorpus.generate();
     /** Rated calls under the duplicate PLAN_B DATA tariff row: a property of the fixed seed, pinned. */
     private static final long AMBIGUOUS = 12;

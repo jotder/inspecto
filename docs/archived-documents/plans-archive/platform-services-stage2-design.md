@@ -178,7 +178,7 @@ this pack's types" to "Runs granted this pack's services".
 
 ## 5. Phased slices and test plan
 
-Each slice is independently green; unit tests per change (`-pl inspecto-engine -Dtest=A,B` — commas).
+Each slice is independently green; unit tests per change (`-pl :inspecto-engine -Dtest=A,B` — commas).
 
 | # | Slice | Verify (test first where it reproduces a defect) |
 |---|---|---|

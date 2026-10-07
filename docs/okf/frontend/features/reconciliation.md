@@ -16,7 +16,7 @@ timestamp: 2026-07-16T00:00:00Z
 > (a deliberate behaviour change): its `/recon` paths answer 503 "not installed" (`AbsentReconRoutes`), `/bootstrap`
 > reports `features.reconciliation=false`, and `recon.run` is an unknown Job Type. The `reconciliation` config component kind
 > stays core — authoring is generic component CRUD; deleting the component deletes its run state through the module's
-> `ComponentDeleteHook`. The tests below moved with it (`inspecto-reconciliation/src/test`).
+> `ComponentDeleteHook`. The tests below moved with it (`features/inspecto-reconciliation/src/test`).
 
 Route `/reconciliation` (Business + Builder lenses). Vocabulary is locked
 ([`GLOSSARY.md`](../../../GLOSSARY.md) §7): a **Reconciliation** compares **Datasets** on key columns

@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class BusinessAssuranceSinkDatasetTest {
 
-    private static final Path PACK = Path.of("..", "spaces", "_templates", "business-assurance").toAbsolutePath().normalize();
+    private static final Path PACK = Path.of("..", "..", "spaces", "_templates", "business-assurance").toAbsolutePath().normalize();
     private static final Path CFG = PACK.resolve("config");
 
     /** Empty feeds typed like the stores the Jobs read (the same columns the pack's corpus views produce). */

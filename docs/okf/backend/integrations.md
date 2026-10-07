@@ -2,7 +2,7 @@
 type: Reference
 title: DuckLake & the warehouse query layer
 description: Registering pipeline output in a DuckLake catalog, and the warehouse query layer that exposes it to DBeaver and other SQL clients through pg_duckdb.
-resource: inspecto-etl/src/main/java/com/gamma/etl/DuckLakeRegistrar.java
+resource: platform/inspecto-etl/src/main/java/com/gamma/etl/DuckLakeRegistrar.java
 tags: [integrations, ducklake, warehouse, pg-duckdb]
 timestamp: 2026-07-16T00:00:00Z
 ---

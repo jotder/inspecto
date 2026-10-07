@@ -45,7 +45,7 @@ const update = process.argv.includes('--update');
 //
 // ⚠ DERIVED from the same run, never hand-listed. A literal groupId constant looks obviously right
 // and is obviously wrong the moment the reactor gains a module under a new group: this repo builds
-// BOTH `com.gamma.inspector:*` and `com.gamma.asn:*` (asn-parser/), and the one-group constant this
+// BOTH `com.gamma.inspector:*` and `com.gamma.asn:*` (providers/asn-parser/), and the one-group constant this
 // replaced silently treated seven in-repo artifacts as third-party.
 const MODULE_BANNER = /^\[INFO\] --- \S+ \([^)]*\) @ ([\w.-]+) ---/;
 

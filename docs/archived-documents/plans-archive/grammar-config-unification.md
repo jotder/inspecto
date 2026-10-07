@@ -81,7 +81,7 @@ duplicated UI, so slices 4–6 can be reverted without re-opening a defect.
   **CONFIRMED RED**, and the failure is the harsher of the two predicted halves:
   `PipelineCompile graph cannot be lowered: [PARSER_NO_SCHEMA(parse) → the parser names no
   schema_file / schemas / segments]` — a grammar-bound node isn't merely dropped, it can't be saved
-  at all. (`mvn -o test -pl inspecto-engine -am -Dtest=PipelineEditableTest` → 10 run, 1 error.
+  at all. (`mvn -o test -pl :inspecto-engine -am -Dtest=PipelineEditableTest` → 10 run, 1 error.
   ⚠ `-am` is required; without it `-pl` resolves siblings from a stale local repo and test-compile
   fails on unrelated files.)
 - Defect B needs **no new test** — `UnifiedParsingBlockTest.parsingKeysOverrideLegacyCsvSettings`

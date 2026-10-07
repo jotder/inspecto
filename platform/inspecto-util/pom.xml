@@ -8,7 +8,7 @@
         <groupId>com.gamma.inspector</groupId>
         <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-SNAPSHOT</version>
-        <relativePath>../pom.xml</relativePath>
+        <relativePath>../../pom.xml</relativePath>
     </parent>
 
     <!-- Low-level utility layer (WS-D increment 1, modularization plan §2.3): com.gamma.util —

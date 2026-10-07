@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
  * does not depend on WHERE the module directories sit (repo root today, grouped one level down after a regroup).
  * The root is the OUTERMOST ancestor of {@code user.dir} whose {@code pom.xml} declares {@code <modules>}; module
  * directories are resolved recursively from every {@code <module>} entry in that pom — default list, every profile
- * list, and nested aggregators (e.g. {@code asn-parser/asn-decoders}). Comments are stripped before reading.
+ * list, and nested aggregators (e.g. {@code providers/asn-parser/asn-decoders}). Comments are stripped before reading.
  * Copy of the lookup the sibling-enumerating guards used to hand-roll ({@code Files.list("..")}).
  */
 public final class ReactorModules {
@@ -59,7 +59,7 @@ public final class ReactorModules {
 
     /**
      * Every {@code src/main/java} tree to scan: each top-level module's, plus the tree of any pom-less directory that
-     * sits ABOVE a module (the legacy {@code asn-parser/src/main/java} beside its nested {@code asn-decoders} reactor).
+     * sits ABOVE a module (the legacy {@code providers/asn-parser/src/main/java} beside its nested {@code asn-decoders} reactor).
      */
     public static List<Path> mainJavaTrees() throws IOException {
         Path root = root();

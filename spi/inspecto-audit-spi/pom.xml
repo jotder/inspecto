@@ -8,7 +8,7 @@
         <groupId>com.gamma.inspector</groupId>
         <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-SNAPSHOT</version>
-        <relativePath>../pom.xml</relativePath>
+        <relativePath>../../pom.xml</relativePath>
     </parent>
 
     <!-- LA separation D-1 step 2 (docs/archived-documents/plans-archive/la-separation-d1-design.md): the audit SPI — Event,

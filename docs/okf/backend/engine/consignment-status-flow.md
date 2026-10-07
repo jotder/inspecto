@@ -2,7 +2,7 @@
 type: Concept
 title: Consignment status flow (the flowfile question)
 description: What is recorded about a Consignment as it moves — per-lane identity, status, provenance, live gauges — and how an operator audits a failed file or record.
-resource: inspecto-etl/src/main/java/com/gamma/etl/ConsignmentAuditWriter.java
+resource: platform/inspecto-etl/src/main/java/com/gamma/etl/ConsignmentAuditWriter.java
 tags: [engine, consignment, observability, audit, provenance, quarantine, status]
 timestamp: 2026-08-13T00:00:00Z
 ---

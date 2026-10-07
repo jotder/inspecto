@@ -19,7 +19,7 @@ import java.util.Locale;
 /**
  * MEASUREMENT harness, not a test (SP4, roadmap Data preparation): the cost of dropping Entity List members before they count,
  * as a SQL anti-join over a skewed edge relation on Parquet. Never runs by default; run with
- * <pre>mvn -o test -pl inspecto-entity-store -am -Dtest=ListPruningSp4Bench -Dsurefire.failIfNoSpecifiedTests=false
+ * <pre>mvn -o test -pl :inspecto-entity-store -am -Dtest=ListPruningSp4Bench -Dsurefire.failIfNoSpecifiedTests=false
  *   -Dbench.run=true -DargLine="--enable-native-access=ALL-UNNAMED -Xmx6g"</pre>
  * Optional: {@code -Dbench.dir=<dir>} (default {@code target/sp4-bench}), {@code -Dbench.edges=10000000},
  * {@code -Dbench.lists=1x1000,1x10000,1x1000000,10x100000,50x100000,50x1000000} (LISTSxMEMBERS), {@code -Dbench.inMax=2000}

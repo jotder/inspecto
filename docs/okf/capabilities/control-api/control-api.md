@@ -2,7 +2,7 @@
 type: Capability
 title: Control API (API)
 description: The versioned HTTP control plane — the /api/v1 envelope and error catalog, correlation, gzip, ETag concurrency and idempotency, cursor pagination, /bootstrap, the OpenAPI contract and its test, route registration and the RouteModule SPI, static SPA serving, the gateway blueprints, and the Java embedding API stability policy. The requirement of record for the API area, its specification, its decisions, and what was refused.
-resource: inspecto/src/main/java/com/gamma/control, inspecto-api/src/main/java/com/gamma/api/PublicApi.java
+resource: inspecto/src/main/java/com/gamma/control, platform/inspecto-api/src/main/java/com/gamma/api/PublicApi.java
 tags: [api, capability, control-api, v1, envelope, error-codes, etag, idempotency, cursor, openapi, route-module, public-api, semver]
 timestamp: 2026-09-08T00:00:00Z
 ---
@@ -720,7 +720,7 @@ mutation paths.
 
 | File | Providers |
 |---|---|
-| `inspecto-ops/src/main/resources/META-INF/services/com.gamma.control.RouteModule` | `ObjectRoutes`, `NoteRoutes`, `QueueRoutes`, `TagRoutes` — the first external adopters of the public SPI |
+| `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.control.RouteModule` | `ObjectRoutes`, `NoteRoutes`, `QueueRoutes`, `TagRoutes` — the first external adopters of the public SPI |
 | the same service name in `inspecto-geo-link`, `inspecto-exchange`, `inspecto-observability`, `inspecto-observability` | the other four gated families |
 
 ### 8.4 Cross-language wire vocabularies — `inspecto-ui/src/app/inspecto/contracts/`

@@ -128,7 +128,7 @@ class ObjectsBackendEditionBootTest {
      */
     @Test
     void demoLauncherFlags_areTheOnesTheDemoBootCaseUses() throws Exception {
-        String ps1 = Files.readString(Path.of("..", "inspecto", "package.ps1"));
+        String ps1 = Files.readString(Path.of("..", "..", "inspecto", "package.ps1"));
         String line = ps1.lines().filter(l -> l.trim().startsWith("$demoFlags ="))
                 .findFirst().orElseThrow(() -> new AssertionError("no $demoFlags in package.ps1"));
         for (String flag : new String[]{"--enable-native-access=ALL-UNNAMED", "-Dcontrol.bind=127.0.0.1",
@@ -144,7 +144,7 @@ class ObjectsBackendEditionBootTest {
      */
     @Test
     void demoLauncherJars_coverTheEnterpriseClasspath() throws Exception {
-        String ps1 = Files.readString(Path.of("..", "inspecto", "package.ps1"));
+        String ps1 = Files.readString(Path.of("..", "..", "inspecto", "package.ps1"));
         String cp = ps1.lines().filter(l -> l.trim().startsWith("$cp = @('inspecto.jar')"))
                 .findFirst().orElseThrow(() -> new AssertionError("no boot-smoke $cp in package.ps1"));
         int start = ps1.indexOf("$demoJars = @(");

@@ -12,7 +12,7 @@ description: >
 ## Where tests live
 
 - **Backend:** `src/test/java` mirrors `src/main/java` package-for-package in every Maven module.
-  Test class = `<Class>Test.java` next to the mirrored package (e.g. `inspecto-engine/src/test/java/com/gamma/pipeline/ComponentStoreTest.java`). No separate IT/integration suffix — integration-style tests are plain `*Test` classes.
+  Test class = `<Class>Test.java` next to the mirrored package (e.g. `platform/inspecto-engine/src/test/java/com/gamma/pipeline/ComponentStoreTest.java`). No separate IT/integration suffix — integration-style tests are plain `*Test` classes.
 - **Control-plane (`inspecto` module):** `inspecto/src/test/java/com/gamma/control/…` — routes get a
   dedicated test class per resource area.
 - **UI:** co-located `*.spec.ts` beside the source file in `inspecto-ui/src/app/**`; route-level spec at

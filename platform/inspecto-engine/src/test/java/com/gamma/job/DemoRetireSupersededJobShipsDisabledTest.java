@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class DemoRetireSupersededJobShipsDisabledTest {
 
     /** Surefire's working directory is the module root; the demo Space sits one level up. */
-    private static final Path JOB = Path.of("..", "spaces", "demo", "config", "jobs", "retire_superseded_job.toon");
+    private static final Path JOB = Path.of("..", "..", "spaces", "demo", "config", "jobs", "retire_superseded_job.toon");
 
     private static JobConfig committed() throws Exception {
         // ASSERTION, not an assumption: a renamed or moved file must fail here, not pass vacuously.

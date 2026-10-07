@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MetaKeyCoverageContractTest {
 
     private static final String PARSER =
-            "inspecto-engine/src/main/java/com/gamma/catalog/SemanticModel.java";
+            "platform/inspecto-engine/src/main/java/com/gamma/catalog/SemanticModel.java";
 
     /** The top-level keys {@code SemanticModel.load} reads off the loaded config map. */
     private static Set<String> keysTheParserReads() throws IOException {

@@ -2,7 +2,7 @@
 type: Reference
 title: Remote connectors — operator runbook
 description: Copy-pasteable connection profiles and the verification sequence for SFTP/FTP/FTPS, DB export, and the bastion/host-key options — the how-to tier under the Connectors concept.
-resource: inspecto-connectors/src/main/java/com/gamma/acquire/connectors
+resource: providers/inspecto-connectors/src/main/java/com/gamma/acquire/connectors
 tags: [acquisition, connectors, sftp, ftps, bastion, host-key, db-export, runbook]
 timestamp: 2026-09-08T00:00:00Z
 ---

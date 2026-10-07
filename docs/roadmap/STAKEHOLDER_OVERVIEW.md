@@ -106,12 +106,12 @@ The product is a small Maven reactor of cleanly separated modules:
 | Module | Role |
 |---|---|
 | **`inspecto/`** (engine core) | The Stage-1/Stage-2 engine, control plane, scheduler, metrics, audit, flow-graph runtime, and operational-intelligence layer. Ships as the self-contained fat JAR. |
-| **`inspecto-connectors/`** | Remote connectors (SFTP, FTP/FTPS, database export) and their network dependencies — kept *out* of the core so the core stays lean. Discovered at runtime via the connector SPI. |
-| **`inspecto-agent/`** | The optional AI assist agent (config/schedule/SQL/diagnose skills), built on a reusable agent library. |
-| **`inspecto-agent-hosted/`** | Hosted model providers (the cloud-AI SDKs). Omitted entirely from air-gapped builds. |
+| **`providers/inspecto-connectors/`** | Remote connectors (SFTP, FTP/FTPS, database export) and their network dependencies — kept *out* of the core so the core stays lean. Discovered at runtime via the connector SPI. |
+| **`features/inspecto-agent/`** | The optional AI assist agent (config/schedule/SQL/diagnose skills), built on a reusable agent library. |
+| **`providers/inspecto-agent-hosted/`** | Hosted model providers (the cloud-AI SDKs). Omitted entirely from air-gapped builds. |
 | **`inspecto-ui/`** | The Angular operator web console (single-page app), served from the engine process. |
 
-The **`inspecto-oidc/`** module (formerly `inspecto-security`) carries the Standard-edition authentication/authorization code (see Sections 7 and 10).
+The **`providers/inspecto-oidc/`** module (formerly `inspecto-security`) carries the Standard-edition authentication/authorization code (see Sections 7 and 10).
 
 ### 4.2 The layer cake
 

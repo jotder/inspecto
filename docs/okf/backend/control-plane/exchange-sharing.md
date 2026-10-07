@@ -2,7 +2,7 @@
 type: Concept
 title: Exchange — Cross-Space Sharing
 description: Grant-mediated, read-only Dataset/Widget sharing across Spaces — offer/request/approve ledger, snapshot/live delivery, version pin + drift, the sharing.component UI.
-resource: inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java
+resource: features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java
 tags: [control-plane, multi-space, exchange, sharing]
 timestamp: 2026-09-25T00:00:00Z
 ---

@@ -18,7 +18,7 @@ Credentials here are dev-only and deliberately trivial.
 ```bash
 MAVEN_OPTS="-Duser.timezone=Asia/Kolkata" \
 INSPECTO_TEST_PG_URL='jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres' \
-mvn -o -B test -Pedition-enterprise -pl inspecto-ops -am \
+mvn -o -B test -Pedition-enterprise -pl :inspecto-ops -am \
     -Dtest=PostgresStateStoreTest -Dsurefire.failIfNoSpecifiedTests=false -DforkCount=0
 ```
 
@@ -85,7 +85,7 @@ keytool -importcert -noprompt -alias wso2is -file wso2is.crt -keystore ts.jks -s
 
 ```bash
 MAVEN_OPTS="-Djavax.net.ssl.trustStore=$PWD/ts.jks -Djavax.net.ssl.trustStorePassword=changeit" \
-mvn -o -B test -Pedition-enterprise -pl inspecto-oidc -am -DforkCount=0 \
+mvn -o -B test -Pedition-enterprise -pl :inspecto-oidc -am -DforkCount=0 \
     -Dtest=OidcAgainstRealProviderTest -Dsurefire.failIfNoSpecifiedTests=false \
     -Dinspecto.test.oidc.issuer=https://localhost:9443/oauth2/token \
     -Dinspecto.test.oidc.clientId=inspecto_spa_client \
@@ -142,7 +142,7 @@ docker exec minio mc mb -p local/inspecto-lakehouse
 
 INSPECTO_TEST_S3_ENDPOINT=127.0.0.1:9000 \
 INSPECTO_TEST_S3_KEY=minioadmin INSPECTO_TEST_S3_SECRET=minioadmin \
-mvn -o -B test -pl inspecto-etl -am \
+mvn -o -B test -pl :inspecto-etl -am \
     -Dtest=PartitionWriterObjectStoreTest -Dsurefire.failIfNoSpecifiedTests=false
 ```
 

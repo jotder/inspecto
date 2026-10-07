@@ -765,7 +765,7 @@ reach, so they refuse 422 the same way (G8, 2026-09-23; before, they showed the 
 | `retry.max_delay` | duration | advanced | `60s` | **Longest retry delay.** |
 
 **Code.** `WebhookSink` (plan + deliver) · `WebhookSinkTransport` (SPI) · `PartitionSinkWriter` /
-`DryRunSinkWriter` (dispatch) · `PipelineConfig.Webhook` · `inspecto-notify-channels/…/HttpWebhookSinkTransport`.
+`DryRunSinkWriter` (dispatch) · `PipelineConfig.Webhook` · `providers/inspecto-notify-channels/…/HttpWebhookSinkTransport`.
 Tests: `WebhookSinkTest`, `WebhookSinkLiftLowerTest`, `PipelineConfigWebhookTest`,
 `HttpWebhookSinkTransportTest` (a JDK `HttpServer` stub), `NodeConfigNameContractTest#webhookAttributesReachTheEngine`.
 

@@ -246,7 +246,7 @@ class EnrichmentTransformSandboxTest {
     @Test
     void shippedSpaceEnrichmentTransformsPassTheGuard() throws Exception {
         EnrichmentConfig shipped = EnrichmentConfig.load(
-                Path.of("..", "spaces", "demo", "config", "orders", "orders_daily_enrich.toon").toString());
+                Path.of("..", "..", "spaces", "demo", "config", "orders", "orders_daily_enrich.toon").toString());
         assertEquals(shipped.transformSql().strip(), EnrichmentEngine.guardedTransform(shipped));
     }
 

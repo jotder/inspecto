@@ -34,7 +34,7 @@ Captured:
 
 Beyond the common Event fields (`eventId`, `ts`, `timestamp`, `level`, `type`, `source`,
 `pipeline`, `correlationId`, `message`), an `AUDIT` event carries these under **`attributes`**
-(`inspecto-event/.../AuditAttrs.java`):
+(`platform/inspecto-event/.../AuditAttrs.java`):
 
 | Attribute | Meaning |
 |---|---|

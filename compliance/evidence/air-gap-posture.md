@@ -27,11 +27,11 @@ Network-level isolation remains the operator's deployment responsibility.
 
 | Mechanism | Evidence |
 |---|---|
-| Hosted-provider SDK classes are **absent from the classpath**, proven by test | `inspecto-agent/src/test/java/com/gamma/agent/EgressGuardTest.java:14-30` asserts `ClassNotFoundException` for `dev.langchain4j.model.openai.OpenAiChatModel`, the Anthropic / Google / Vertex models, and `com.openai.client.OpenAIClient` |
-| `inspecto-agent` ships **local-only** model support and excludes the hosted SDK transitively | `inspecto-agent/pom.xml:46-58` — `langchain4j-core` + `langchain4j-ollama` only, with `langchain4j-open-ai` explicitly excluded; the comment states the intent: *the air-gapped guarantee stays a packaging fact* |
-| Hosted providers live in a **separate optional module** behind an SPI | `inspecto-agent-hosted`, via `HostedProviderPlugin` (`inspecto-agent/src/main/java/com/gamma/agent/model/HostedProviderPlugin.java:8-13`); absent that jar, `ModelProviderFactory` finds no plugin |
+| Hosted-provider SDK classes are **absent from the classpath**, proven by test | `features/inspecto-agent/src/test/java/com/gamma/agent/EgressGuardTest.java:14-30` asserts `ClassNotFoundException` for `dev.langchain4j.model.openai.OpenAiChatModel`, the Anthropic / Google / Vertex models, and `com.openai.client.OpenAIClient` |
+| `inspecto-agent` ships **local-only** model support and excludes the hosted SDK transitively | `features/inspecto-agent/pom.xml:46-58` — `langchain4j-core` + `langchain4j-ollama` only, with `langchain4j-open-ai` explicitly excluded; the comment states the intent: *the air-gapped guarantee stays a packaging fact* |
+| Hosted providers live in a **separate optional module** behind an SPI | `inspecto-agent-hosted`, via `HostedProviderPlugin` (`features/inspecto-agent/src/main/java/com/gamma/agent/model/HostedProviderPlugin.java:8-13`); absent that jar, `ModelProviderFactory` finds no plugin |
 | Both AI modules are optional and edition-scoped | root `pom.xml:19-25, 54-57, 66-82` (`edition-standard` / `edition-enterprise` profiles) |
-| The RAG embedding model runs **in-JVM with weights bundled in the jar** — no network at ingest | `inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoKnowledgeSources.java:11-17`; corpus is one local file, `docs/GLOSSARY.md` |
+| The RAG embedding model runs **in-JVM with weights bundled in the jar** — no network at ingest | `features/inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoKnowledgeSources.java:11-17`; corpus is one local file, `docs/GLOSSARY.md` |
 
 **This is the differentiator worth stating to an auditor:** absence-by-packaging is a stronger control
 than a runtime toggle, because it cannot be misconfigured at deploy time and it is verifiable by
@@ -50,7 +50,7 @@ What a careful reader will ask, answered plainly:
 - **Local model access is still a network call.** Ollama is reached over loopback/LAN. "Local" here
   means *not a third-party hosted endpoint*; it does not mean *no sockets*.
 - 🔴 **The product makes deliberate outbound connections where an operator configures them.** The
-  Kafka connector (`inspecto-connectors-kafka/src/main/java/com/gamma/acquire/kafka/KafkaConnector.java`,
+  Kafka connector (`providers/inspecto-connectors-kafka/src/main/java/com/gamma/acquire/kafka/KafkaConnector.java`,
   `KafkaConnectorFactory`, `KafkaConnectionWorkbench`) connects to whatever brokers the operator
   configures. That is data acquisition working as designed — but a data-leakage-prevention statement
   that omitted it would be incomplete, and an auditor who found it independently would rightly

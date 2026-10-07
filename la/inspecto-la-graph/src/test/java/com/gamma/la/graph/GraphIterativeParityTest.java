@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class GraphIterativeParityTest {
 
-    private static final Path FIXTURE = Path.of("..", "inspecto-ui", "projects", "link-analysis", "src", "graph",
+    private static final Path FIXTURE = Path.of("..", "..", "inspecto-ui", "projects", "link-analysis", "src", "graph",
             "graph-iterative-parity.fixture.json");
     private static final List<String> GRAPHS = List.of("main", "cliques", "hitsGraph", "edgeless", "empty",
             "louvainRand0", "louvainRand296");

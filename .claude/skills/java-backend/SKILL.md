@@ -2,7 +2,7 @@
 name: java-backend
 description: >
   Senior Backend Architect rules for the inspecto Java engine + control plane (modules
-  inspecto/, inspecto-agent/, inspecto-agent-hosted/, inspecto-connectors/). MUST be read and
+  inspecto/, features/inspecto-agent/, providers/inspecto-agent-hosted/, providers/inspecto-connectors/). MUST be read and
   applied BEFORE generating or modifying ANY backend artifact — engine code, control API routes,
   SPI implementations, TOON config, edition wiring, or backend tests. Encodes the framework-free
   design (JDK HttpServer, manual DI, ServiceLoader SPI), the edition model (Personal/Standard/
@@ -66,7 +66,7 @@ Dir == artifactId for every module **except** `inspecto/` → `inspecto-processo
 | `inspecto-oidc` | **Optional, `-Pedition-standard` / `-Pedition-enterprise` only**: `Authenticator` SPI impl (OIDC/Nimbus JWKS). |
 | `inspecto-policy` | **Optional, `-Pedition-enterprise` only**: ABAC policy engine. |
 
-`asn-parser/asn-decoders` is a **separate reactor** aggregated by the root pom only so
+`providers/asn-parser/asn-decoders` is a **separate reactor** aggregated by the root pom only so
 `com.gamma.asn:asn-facade` resolves from the build; it inherits nothing from `inspecto-parent`.
 
 ⚠ The last two are **profile-gated and invisible to a bare `mvn -o clean test`** — see *Verify loop*.

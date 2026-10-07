@@ -2,7 +2,7 @@
 type: Reference
 title: Object-storage export (S3 / HDFS) — the push post-action and its posture
 description: As built 2026-09-24 (EXPORT-1) — the objectstore.export Job Type pushes a directory under the Space data root to an S3-compatible Connection after a successful run (skip-unchanged, manifest last, fail-closed); plus the grounded posture facts and the options by ambition.
-resource: inspecto-engine/src/main/java/com/gamma/job/ObjectStoreExportJobType.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/job/ObjectStoreExportJobType.java
 tags: [export, object-storage, s3, hdfs, job-type, post-action]
 timestamp: 2026-09-24T00:00:00Z
 ---

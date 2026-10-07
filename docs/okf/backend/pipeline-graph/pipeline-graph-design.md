@@ -2,7 +2,7 @@
 type: Architecture
 title: Pipeline graph — the backend model
 description: A Pipeline is authored and stored as a flat TOON file and the graph is DERIVED, never stored — the token rule, the two graphs to keep distinct, node types and the sink family, and the lift.
-resource: inspecto-engine/src/main/java/com/gamma/pipeline
+resource: platform/inspecto-engine/src/main/java/com/gamma/pipeline
 tags: [pipeline-graph, lift, node-types, derived, tokens, sinks]
 timestamp: 2026-08-15T00:00:00Z
 ---

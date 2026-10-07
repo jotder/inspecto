@@ -168,7 +168,7 @@ ten-tile Dashboard would fetch and discard ten pages.
 Server side, `BiRoutes` (`inspecto/src/main/java/com/gamma/control/BiRoutes.java`) registers
 `POST /bi/query`, `GET /bi/templates` and the capability-gated
 `POST /bi/templates/{id}/apply`. A query is compiled by **`MeasureCompiler`**
-(`inspecto-engine/src/main/java/com/gamma/query/MeasureCompiler.java`) from
+(`platform/inspecto-engine/src/main/java/com/gamma/query/MeasureCompiler.java`) from
 `Spec(dataset, measures, groupBy, grains, filters, orderBy, limit)` into **one** SELECT built only from
 validated identifiers and typed literals — six aggregations (`count`, `countDistinct`, `sum`, `avg`,
 `min`, `max`) and three grains (`day`, `week`, `month`). The compiled text then passes `SqlGuard.check`
@@ -367,7 +367,7 @@ component — a Measure (`dataset` + `measure` shorthand + the `timeField` a per
 `MeasureCompiler.GRAINS`, which are grouping grains), `comparison` (`previous` / `last-year` / `none`),
 `unit` / `format`, an optional IANA `timezone`, and the R3 `owner`. Authored through `/components/kpi`, so it gets history and restore and
 reaches the maker-checker hold; validated fail closed by `KpiDefinition.fromMap`
-(`inspecto-engine/src/main/java/com/gamma/query/KpiDefinition.java`) on every door, and at the authoring doors
+(`platform/inspecto-engine/src/main/java/com/gamma/query/KpiDefinition.java`) on every door, and at the authoring doors
 the Dataset must exist AND be readable by the author, with the measure field and `timeField` in its Schema, and the `timeField` a `DATE`, `TIMESTAMP` or
 `TIMESTAMPTZ` column (`KpiRoutes.requireMeasure`). `GET /kpis/{id}/value?asOf=` (`KpiEvaluator`) evaluates the period **to date**
 against the SAME elapsed length of the comparison period (a month read on the 13th compares 13 days with 13
@@ -405,7 +405,7 @@ has not filled yet, so no shipped template carries a KPI pack. A bundle-imported
 `params: {reportKind, dashboardId, format, recipients}`. ⚠ Dispatch keys on `params.dashboardId` being
 present, **not** on `type === 'report'`, because that type predates C6 and covers other report jobs.
 
-Server side, `ReportJob` (`inspecto-engine/src/main/java/com/gamma/job/ReportJob.java`) takes `out_dir`
+Server side, `ReportJob` (`platform/inspecto-engine/src/main/java/com/gamma/job/ReportJob.java`) takes `out_dir`
 and `format`, path-jails the directory, and writes `<job>_<timestamp>.<ext>`:
 
 | Format | Requires | Renderer |
@@ -555,7 +555,7 @@ are the values four-eyes approved (below).
 
 **Approval: a content fingerprint (decision 2026-09-29)**
 - **One mechanism (`APPROVAL-FINGERPRINT-UNIFY-1`, closed 2026-10-01).** `ApprovalFingerprint`
-  (`inspecto-engine/src/main/java/com/gamma/job/ApprovalFingerprint.java`) owns what `PublicationApproval` and `AttachApprovals` used to
+  (`platform/inspecto-engine/src/main/java/com/gamma/job/ApprovalFingerprint.java`) owns what `PublicationApproval` and `AttachApprovals` used to
   duplicate: the key-sorted SHA-256 (`hash`), the nonce and the common record fields (`newNonce`, `baseRecord`), and
   the fail-closed verifier `Gate` (no verifier installed, a `false`, or an exception all mean not honoured). A
   data-egress Job type supplies ONLY what to hash and where its record lives; the next one uses the same three calls
@@ -729,7 +729,7 @@ protocol for a future customer archive, and **no code in the tree references it 
 place-table Geocoder sits behind a pluggable seam.
 
 **Data plane.** A **GeoSource** projects Dataset rows to GeoPoints (lat/lon column mapping) or to
-weighted great-circle **od-routes**. Server side (`inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java`):
+weighted great-circle **od-routes**. Server side (`la/inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java`):
 `POST /geo/projection` filters valid WGS84 coordinates with `TRY_CAST` and reports a `skipped` count;
 `POST /geo/routes` folds origin/destination/kind with a summed `weight`. **Plain SQL only** — no `ST_*`
 call exists anywhere in the tree. The client cap is `GEO_POINT_CAP = 5000` on both paths.
@@ -747,10 +747,10 @@ that resolves an `objectRef` also offers "View in graph", the shared investigati
 
 An `AlertRule` in measure form is
 `alert { dataset:, measure: agg(field), comparator, threshold, severity }`
-(`inspecto-engine/src/main/java/com/gamma/alert/AlertRule.java`). Its constructor **requires** the
+(`platform/inspecto-engine/src/main/java/com/gamma/alert/AlertRule.java`). Its constructor **requires** the
 legacy ledger-metric field, `window` and `when` to be absent, which is how "no per-rule filters" is
 enforced rather than merely documented. `DatasetMeasureProbe`
-(`inspecto-engine/src/main/java/com/gamma/query/DatasetMeasureProbe.java`) is the headless evaluator —
+(`platform/inspecto-engine/src/main/java/com/gamma/query/DatasetMeasureProbe.java`) is the headless evaluator —
 the same compile-then-sandbox pattern as §3.3 reduced to a scalar — and it **degrades to empty rather
 than throwing**, so a broken Dataset cannot take down the sweep. `AlertService` evaluates these on every
 sweep and fires the existing `ALERT_FIRED` path; the Alert object and its notification are `INC`'s.
@@ -764,7 +764,7 @@ Gallery or KPI gallery. `EDITIONS` `CP-08` is ✅ in all three editions and is c
 
 **The two investigation studios are Professional+** (`CP-09`, EDG-01 cell 3b, 2026-09-07).
 `inspecto-la-api` contributes `GeoRoutes` and `InvRoutes` (and the rest of the Link Analysis routes) through the public `RouteModule`
-ServiceLoader seam (`inspecto-la-api/src/main/resources/META-INF/services/com.gamma.control.RouteModule`); `inspecto-geo-link` is the
+ServiceLoader seam (`la/inspecto-la-api/src/main/resources/META-INF/services/com.gamma.control.RouteModule`); `inspecto-geo-link` is the
 bridge (it binds the Dataset and Case ports and holds the Alert Rule routes).
 Absent the module, core `AbsentGeoLinkRoutes` claims the five paths and answers `503` naming what is not
 installed. The SPA reads `bootstrap.features.geoLink` into a session signal and **hides** the two nav
@@ -938,17 +938,17 @@ query failure. Pinned by `NoGeoLinkShipsInThePersonalBuildTest`.
 |---|---|---|
 | Plugin seam, registry, render dispatch | `inspecto-ui/src/app/inspecto/viz/viz-types.ts`, `viz-registry.ts`, `viz-components.ts`, `viz-render.component.ts`, `plugins/index.ts` (+ `standard.plugins.ts`, `table.plugin.ts`, `kpi.plugin.ts`, `bubble.plugin.ts`, `gauge.plugin.ts`, `scatter.plugin.ts`, `funnel.plugin.ts`, `view.plugins.ts`) | [`studio.md`](../../frontend/features/studio.md) |
 | Spec, grain, result and rows seams | `inspecto-ui/src/app/inspecto/viz/query-spec.ts`, `time-grain.ts`, `result-set.ts`, `show-me.ts`, `dataset-result.service.ts`, `dataset-rows.service.ts`; `inspecto-ui/src/app/inspecto/api/bi-query.service.ts` | [`queries.md`](../../backend/control-plane/queries.md); `DAT` §3 |
-| Headless BI + templates | `inspecto/src/main/java/com/gamma/control/BiRoutes.java`, `BiTemplates.java`; `inspecto-engine/src/main/java/com/gamma/query/MeasureCompiler.java` | `EDITIONS.md` `CP-08` |
+| Headless BI + templates | `inspecto/src/main/java/com/gamma/control/BiRoutes.java`, `BiTemplates.java`; `platform/inspecto-engine/src/main/java/com/gamma/query/MeasureCompiler.java` | `EDITIONS.md` `CP-08` |
 | Share tokens + embed | `inspecto/src/main/java/com/gamma/control/ShareTokens.java`, `ShareRoutes.java`; `inspecto-ui/src/app/modules/admin/share/share-viewer.component.ts`, `inspecto-ui/src/app/inspecto/api/share.service.ts` | `SEC` §3 (public paths) |
 | Studio panes | `inspecto-ui/src/app/modules/admin/studio/studio.routes.ts`; `queries/`, `widgets/`, `dashboards/`, `templates/`, `link-analysis/`, `geo-map/` | [`studio.md`](../../frontend/features/studio.md) |
 | Dashboards | `inspecto-ui/src/app/modules/admin/studio/dashboards/dashboard-types.ts`, `dashboard-editor.component.ts`, `dashboard-filter-bar.component.ts`, `dashboard-drill-drawer.component.ts` | [`dashboard.md`](../../frontend/features/dashboard.md) |
-| KPIs, Reports, delivery | `inspecto-ui/src/app/modules/admin/kpi-reports/kpi-reports.component.ts`; `inspecto-engine/src/main/java/com/gamma/job/ReportJob.java`, `TablePngRenderer.java`, `PdfRenderer.java` | [`kpi-reports.md`](../../frontend/features/kpi-reports.md) |
-| Measure alerting | `inspecto-engine/src/main/java/com/gamma/alert/AlertRule.java`, `AlertService.java`; `inspecto-engine/src/main/java/com/gamma/query/DatasetMeasureProbe.java`; `spaces/demo/config/registry/alert-rules/orders_low_volume.toon` | `INC` §3 (the Alert object) |
-| Link Analysis | `inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java`; `inspecto-ui/projects/link-analysis/src/api/inv.service.ts`; `inspecto-ui/projects/link-analysis/src/graph/graph-analysis.ts`, `graph-source.ts`, `graph-export.ts`, `graph-history.ts` (pure libs); `inspecto-ui/src/app/inspecto/graph/graph-view.component.ts` (**the host component + `GRAPH_LAYOUTS`**); `inspecto-ui/projects/link-analysis/src/link-analysis/entity-projection.ts`, `graph-sources.ts`, `pattern-packs.ts`, `link-analysis-toolbox.component.ts`, `link-view-widget.component.ts` | [`link-analysis.md`](../../frontend/features/link-analysis.md) |
-| Geo Map Analysis | `inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java`; `inspecto-ui/projects/link-analysis/src/api/geo.service.ts`; `inspecto-ui/projects/link-analysis/src/geo-map/geo-projection.ts`, `geo-map.component.ts`, `geo-view-widget.component.ts`, `colocation-graph.dialog.ts` | [`geo-map.md`](../../frontend/features/geo-map.md) |
-| Edition gate | `inspecto/src/main/java/com/gamma/control/AbsentGeoLinkRoutes.java`, `ApiContext.java`, `BootstrapRoutes.java`; `inspecto-la-api/src/main/resources/META-INF/services/com.gamma.control.RouteModule`; `inspecto-ui/src/app/inspecto/auth/session.service.ts` | `EDITIONS.md` `CP-09`; `PKG` |
-| Saved-view + widget kinds | `inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java` (`WRITABLE_TYPES`); `spaces/demo/config/registry/` | `MET` §3 |
-| Cases (**`INC`'s**) | `inspecto-workflow/src/main/java/com/gamma/workflow/ObjectType.java`; `inspecto-ops/src/main/java/com/gamma/ops/ObjectService.java`; `inspecto-ui/src/app/modules/admin/objects/cases.routes.ts` | [`incidents/incidents.md`](../incidents/incidents.md) |
+| KPIs, Reports, delivery | `inspecto-ui/src/app/modules/admin/kpi-reports/kpi-reports.component.ts`; `platform/inspecto-engine/src/main/java/com/gamma/job/ReportJob.java`, `TablePngRenderer.java`, `PdfRenderer.java` | [`kpi-reports.md`](../../frontend/features/kpi-reports.md) |
+| Measure alerting | `platform/inspecto-engine/src/main/java/com/gamma/alert/AlertRule.java`, `AlertService.java`; `platform/inspecto-engine/src/main/java/com/gamma/query/DatasetMeasureProbe.java`; `spaces/demo/config/registry/alert-rules/orders_low_volume.toon` | `INC` §3 (the Alert object) |
+| Link Analysis | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java`; `inspecto-ui/projects/link-analysis/src/api/inv.service.ts`; `inspecto-ui/projects/link-analysis/src/graph/graph-analysis.ts`, `graph-source.ts`, `graph-export.ts`, `graph-history.ts` (pure libs); `inspecto-ui/src/app/inspecto/graph/graph-view.component.ts` (**the host component + `GRAPH_LAYOUTS`**); `inspecto-ui/projects/link-analysis/src/link-analysis/entity-projection.ts`, `graph-sources.ts`, `pattern-packs.ts`, `link-analysis-toolbox.component.ts`, `link-view-widget.component.ts` | [`link-analysis.md`](../../frontend/features/link-analysis.md) |
+| Geo Map Analysis | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java`; `inspecto-ui/projects/link-analysis/src/api/geo.service.ts`; `inspecto-ui/projects/link-analysis/src/geo-map/geo-projection.ts`, `geo-map.component.ts`, `geo-view-widget.component.ts`, `colocation-graph.dialog.ts` | [`geo-map.md`](../../frontend/features/geo-map.md) |
+| Edition gate | `inspecto/src/main/java/com/gamma/control/AbsentGeoLinkRoutes.java`, `ApiContext.java`, `BootstrapRoutes.java`; `la/inspecto-la-api/src/main/resources/META-INF/services/com.gamma.control.RouteModule`; `inspecto-ui/src/app/inspecto/auth/session.service.ts` | `EDITIONS.md` `CP-09`; `PKG` |
+| Saved-view + widget kinds | `platform/inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java` (`WRITABLE_TYPES`); `spaces/demo/config/registry/` | `MET` §3 |
+| Cases (**`INC`'s**) | `platform/inspecto-workflow/src/main/java/com/gamma/workflow/ObjectType.java`; `features/inspecto-ops/src/main/java/com/gamma/ops/ObjectService.java`; `inspecto-ui/src/app/modules/admin/objects/cases.routes.ts` | [`incidents/incidents.md`](../incidents/incidents.md) |
 
 **Gap rows** (a pointer that should exist and does not): 🔴 **this area has effectively no backend
 tier.** The consolidation plan measured it — *Widget Builder* and *Dashboard Builder* appear **zero times**

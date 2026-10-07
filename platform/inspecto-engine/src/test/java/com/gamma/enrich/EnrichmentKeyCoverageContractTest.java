@@ -45,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class EnrichmentKeyCoverageContractTest {
 
     private static final String PARSER =
-            "inspecto-engine/src/main/java/com/gamma/enrich/EnrichmentConfig.java";
+            "platform/inspecto-engine/src/main/java/com/gamma/enrich/EnrichmentConfig.java";
 
     /** The parser locals that hold the three censused sub-blocks, in {@code EnrichmentConfig.fromMap}. */
     private static final Map<String, String> NESTED_LOCALS =

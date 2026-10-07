@@ -198,9 +198,9 @@ const DOC_ALLOW = {
     // "source of truth") but cannot spare as a BARE table-column header, where no trailing noun follows.
     'CLAUDE.md::source-acquisition-entity':
         'Subject matter, exactly as GLOSSARY below: the repo-root instructions DECLARE the bans, so the hard-bans bullet must be able to print "⛔ *Source* (acquisition entity) → **Collector**". The ⛔ line-skip does not reach it because the bullet wraps.',
-    'inspecto-agent/docs/AGENT_KERNEL_K0_K1_PLAN.md::source-acquisition-entity':
+    'features/inspecto-agent/docs/AGENT_KERNEL_K0_K1_PLAN.md::source-acquisition-entity':
         'Different concept: the §3.1 work-unit table\'s "Source" column says where each unit comes FROM (port from UCC vs. new) — provenance of code, not an acquisition entity.',
-    'inspecto-engine/src/test/resources/pipeline-document.golden.md::source-acquisition-entity':
+    'platform/inspecto-engine/src/test/resources/pipeline-document.golden.md::source-acquisition-entity':
         'Different concept, and a GOLDEN FIXTURE: the Map table\'s "Source" column is the mapping\'s input expression (`CAST(AMOUNT AS DOUBLE)`), the data-origin sense. The text is EMITTED by the document generator and must stay byte-exact for its test — if that header is ever renamed, it is renamed in the generator and this file follows, never the reverse.',
 
     'docs/PROJECT_NOTES.md::bare-flow':
@@ -519,28 +519,28 @@ function isSentence(fragment) {
 // Same `<path>::<ruleId>` keying and the same self-retirement as CONFIG_ALLOW: an entry that stops
 // suppressing anything is debt that has been PAID and must be deleted.
 const SOURCE_ALLOW = {
-    'inspecto-audit-spi/src/main/java/com/gamma/event/EventType.java::flow-identifier':
+    'spi/inspecto-audit-spi/src/main/java/com/gamma/event/EventType.java::flow-identifier':
         'Deliberate Tier-2 read-alias: FLOW_CONSERVATION_IMBALANCE_LEGACY must keep the pre-rename spelling — it exists to match events already persisted under the old type. Renaming it would defeat its purpose.',
-    'inspecto-ops/src/main/java/com/gamma/ops/EventObjectBridge.java::flow-identifier':
+    'features/inspecto-ops/src/main/java/com/gamma/ops/EventObjectBridge.java::flow-identifier':
         'Reads the Tier-2 legacy alias above so pre-rename events still promote — the whole point of the alias.',
 
     // ── the sanctioned lowercase "flow of value" sense: NOT the Pipeline entity ────────────────────
-    'inspecto-engine/src/main/java/com/gamma/signal/Signal.java::source-key-message':
+    'platform/inspecto-engine/src/main/java/com/gamma/signal/Signal.java::source-key-message':
         'SRC_KIND/SRC_ID/SRC_REL/SRC_VIA are Signal PAYLOAD KEYS ("source.kind", "source.id", …) — a published wire contract consumers read, not text an operator reads. Renaming them would break every Signal already stored.',
 
-    'inspecto-engine/src/main/java/com/gamma/query/ExpressionGuard.java::flow-identifier':
+    'platform/inspecto-engine/src/main/java/com/gamma/query/ExpressionGuard.java::flow-identifier':
         'FLOW_KEYWORDS is the SQL **control-flow** keyword set (CASE/WHEN/…) — English sense, nothing to do with a Pipeline.',
     'inspecto-ui/src/app/modules/admin/studio/datasets/calculated-column-guard.ts::flow-identifier':
         'The TS twin of ExpressionGuard.FLOW_KEYWORDS — same SQL control-flow sense.',
     'inspecto-ui/projects/link-analysis/src/graph/graph-analysis.ts::flow-identifier':
         'maxFlow is the **max-flow/min-cut** graph algorithm — the mathematical sense, and the only correct name for it.',
-    'inspecto-la-core/src/main/java/com/gamma/la/core/Algorithm.java::flow-identifier':
+    'la/inspecto-la-core/src/main/java/com/gamma/la/core/Algorithm.java::flow-identifier':
         'The catalogue entry for the max-flow/min-cut graph algorithm — the mathematical sense, kept under the name graph-analysis.ts exports so the id matches the browser.',
-    'inspecto-la-core/src/main/java/com/gamma/la/core/Algorithm.java::flow-message':
+    'la/inspecto-la-core/src/main/java/com/gamma/la/core/Algorithm.java::flow-message':
         'The label of that same algorithm ("Max flow / min cut") — the graph-theory term an analyst expects, nothing to do with a Pipeline.',
-    'inspecto-la-core/src/main/java/com/gamma/la/core/InMemoryGraphEngine.java::flow-identifier':
+    'la/inspecto-la-core/src/main/java/com/gamma/la/core/InMemoryGraphEngine.java::flow-identifier':
         'Dispatches to GraphPaths.maxFlow — the max-flow/min-cut algorithm, the only correct name for it.',
-    'inspecto-la-graph/src/main/java/com/gamma/la/graph/GraphPaths.java::flow-identifier':
+    'la/inspecto-la-graph/src/main/java/com/gamma/la/graph/GraphPaths.java::flow-identifier':
         'The Java port of graph-analysis.ts maxFlow — the same **max-flow/min-cut** algorithm, kept under the same name so the parity fixture reads identically on both sides.',
     'inspecto-ui/projects/link-analysis/src/link-analysis/link-analysis-toolbox.component.html::flow-identifier':
         'The template half of the max-flow toolbox below (flowFrom/flowTo/runFlow) — same algorithmic sense.',

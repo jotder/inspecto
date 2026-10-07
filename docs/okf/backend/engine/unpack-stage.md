@@ -2,7 +2,7 @@
 type: Concept
 title: Unpack stage — decompression at the Collector
 description: Where decompression sits and why that placement is the whole trick — the two things that are DATA, why a skipped entry is not silence, and the operator-signed archive verdict. Zero change to the Consignment model.
-resource: inspecto-etl/src/main/java/com/gamma/etl/unpack
+resource: platform/inspecto-etl/src/main/java/com/gamma/etl/unpack
 tags: [unpack, decompression, collector, archive, consignment]
 timestamp: 2026-08-22T00:00:00Z
 ---

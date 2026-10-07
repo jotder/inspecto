@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  *
  * <p>Never runs in the default suite: it needs {@code -Dinspecto.bench.dir=<dir>} (generated Parquet goes there —
  * keep it under {@code .claude/worktrees/}, never commit it). Example:
- * {@code mvn -o test -pl inspecto-geo-link -Dtest=InvTraversalBench -Dsurefire.failIfNoSpecifiedTests=false
+ * {@code mvn -o test -pl :inspecto-geo-link -Dtest=InvTraversalBench -Dsurefire.failIfNoSpecifiedTests=false
  * -Dinspecto.bench.dir=C:/sandbox/inspecto-clean/.claude/worktrees/bench-data}
  * (optional {@code -Dinspecto.bench.sizes=1000000,10000000,100000000}).
  *

@@ -273,7 +273,7 @@ class ConfigMigratorTest {
 
     /** The repo's committed spaces, as {@code LiftLowerFixtureSweepTest} reaches them. */
     private static Path spacesRoot() {
-        return Path.of("..", "spaces").toAbsolutePath().normalize();
+        return Path.of("..", "..", "spaces").toAbsolutePath().normalize();
     }
 
     private static List<Path> committedSchemas() throws Exception {

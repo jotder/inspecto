@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ShippedCatalogSamplesTest {
 
     // Module CWD is inspecto/; the shipped events samples live in the default space at the repo root.
-    private static final Path EVENTS = Path.of("..", "spaces", "default", "config", "events");
+    private static final Path EVENTS = Path.of("..", "..", "spaces", "default", "config", "events");
 
     @Test
     void describedSchemaProjectsDomainColumns() throws Exception {

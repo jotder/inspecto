@@ -18,7 +18,7 @@ timestamp: 2026-07-22T00:00:00Z
 > **The reactor is 23 modules in the default (Personal) build, 31 with `-Pedition-standard`, 32 with
 > `-Pedition-enterprise`.** ⚠ *(Corrected 2026-09-09: this read “23 today: 14 default + 9
 > profile-scoped”, which adds up by coincidence. 14 is the count of `<modules>` ENTRIES, one of which is
-> the `asn-parser/asn-decoders` aggregator contributing itself + 8 children; with the root POM that
+> the `providers/asn-parser/asn-decoders` aggregator contributing itself + 8 children; with the root POM that
 > makes 23 built modules, and the 9 profile-scoped ones then take the total to 32.)* `pom.xml` is the only current
 > source — rebuild the list from it, never from this page. ⚠ `backend/architecture.md` used to call this
 > page "the authoritative map"; that deference has been corrected.
@@ -39,17 +39,17 @@ Build order (root `pom.xml`, parent `inspecto-parent`):
 
 | # | Directory | artifactId | Role |
 |---|---|---|---|
-| 1 | `inspecto-api/` | `inspecto-api` | **Leaf, dependency-free**: only `com.gamma.api.PublicApi`, the stability-contract annotation. Behavior code never lives here. |
-| 2 | `inspecto-util/` | `inspecto-util` | **Leaf w.r.t. `com.gamma`** (imports nothing from other core packages): `com.gamma.util` — the DuckDB access point (`DuckDbUtil` + JDBC/summarize/schema helpers), CSV/TOON I/O, file movers/walkers, tar/gzip, bounded history, `DottedPath`. Deps: duckdb_jdbc + opencsv + univocity + commons-compress + commons-lang3 + gson + jtoon + jackson. (The `ura` CLI `MainApp` — the one class in the old `com.gamma.util` that reached into core — was relocated to `com.gamma.inspector.MainApp` so this stays a clean leaf; see playbook rule 6.) |
-| 3 | `inspecto-config/` | `inspecto-config` | `com.gamma.config` — spec / io (TOON codec) / safety. Deps: fp-api + fp-util + jtoon + jackson (fp-util since 2026-09-23: `ConfigCodec.toMap` delegates to `ToonHelper.decode`, the one strict TOON decode — `CONFIGCODEC-LENIENT-IS-STRICT-1`; util stays the leaf, so the edge runs this way). |
-| 4 | `inspecto-sql/` | `inspecto-sql` | **Foundational leaf**: `com.gamma.sql` — the read-only DuckDB SQL sandbox (`SqlSandbox`/`SqlSandboxPolicy`), `SqlOracle`, `SqlGuard`, `SqlViews`. Deps: fp-api + fp-config + fp-util only (no external deps; DuckDB via `util.DuckDbUtil`). |
-| 5 | `inspecto-etl/` | `inspecto-etl` | **Foundation leaf (WS-D increment 2, 2026-07-22)**: `com.gamma.etl` — `PipelineConfig`, the CSV/fixed-width ingesters, batch planning/commit/manifest, quarantine, lineage, partitioned Parquet output. Deps: fp-api + fp-util + univocity, duckdb, jtoon, jackson, slf4j, commons-compress, gson (no logback — etl doesn't own an appender). Publishes a **test-jar** (`com.gamma.etl.TestConfigs` + `PipelineConfigBatchTest`, the shared `PipelineConfig` builders). |
-| 6 | `inspecto-event/` | `inspecto-event` | **Leaf-pair (WS-D increment 3, 2026-07-22)**: `com.gamma.event` + `com.gamma.metrics` — the Operational-Intelligence event store (`EventLog`/`EventStore`/`EventStoreAppender`, `ParquetEventStore`, saved views, secret scrubbing) and the metric registry it depends on; mutually cyclic with each other, not with anything else. Deps: fp-api/util/sql/**etl** + duckdb, jackson, slf4j, **logback-classic**. Owns `logback.xml` + `EventStoreAppender`. |
-| 7 | `inspecto-acquire/` | `inspecto-acquire` | **Leaf (WS-D increment 4, 2026-07-22)**: `com.gamma.acquire` — connectors, connection profiles/registry/workbench, the fingerprint ledger, stability gate, gap detection, retry/circuit-breaker/rate-limit policies. No longer SCC-trapped once `etl` became a foundation leaf. Deps: fp-api/config/util/**etl**/**event**. |
-| 8 | `inspecto-engine/` | `inspecto-engine` | **The remaining engine cluster**: `signal`, `query`, `pipeline`, `inspector`, `ingester`, `ops`, `job`, `enrich`, `alert`, `notify`, `catalog`. Deps: fp-api/util/config/sql/**etl**(+test-jar)/**event**/**acquire** + duckdb, jtoon, jackson, slf4j. Owns both `META-INF/services` files (`catalog.spi.DescriptionProvider`, `notify.NotificationChannel`). No longer owns logback-classic or a test-jar publish (both moved with event/etl). |
+| 1 | `platform/inspecto-api/` | `inspecto-api` | **Leaf, dependency-free**: only `com.gamma.api.PublicApi`, the stability-contract annotation. Behavior code never lives here. |
+| 2 | `platform/inspecto-util/` | `inspecto-util` | **Leaf w.r.t. `com.gamma`** (imports nothing from other core packages): `com.gamma.util` — the DuckDB access point (`DuckDbUtil` + JDBC/summarize/schema helpers), CSV/TOON I/O, file movers/walkers, tar/gzip, bounded history, `DottedPath`. Deps: duckdb_jdbc + opencsv + univocity + commons-compress + commons-lang3 + gson + jtoon + jackson. (The `ura` CLI `MainApp` — the one class in the old `com.gamma.util` that reached into core — was relocated to `com.gamma.inspector.MainApp` so this stays a clean leaf; see playbook rule 6.) |
+| 3 | `platform/inspecto-config/` | `inspecto-config` | `com.gamma.config` — spec / io (TOON codec) / safety. Deps: fp-api + fp-util + jtoon + jackson (fp-util since 2026-09-23: `ConfigCodec.toMap` delegates to `ToonHelper.decode`, the one strict TOON decode — `CONFIGCODEC-LENIENT-IS-STRICT-1`; util stays the leaf, so the edge runs this way). |
+| 4 | `platform/inspecto-sql/` | `inspecto-sql` | **Foundational leaf**: `com.gamma.sql` — the read-only DuckDB SQL sandbox (`SqlSandbox`/`SqlSandboxPolicy`), `SqlOracle`, `SqlGuard`, `SqlViews`. Deps: fp-api + fp-config + fp-util only (no external deps; DuckDB via `util.DuckDbUtil`). |
+| 5 | `platform/inspecto-etl/` | `inspecto-etl` | **Foundation leaf (WS-D increment 2, 2026-07-22)**: `com.gamma.etl` — `PipelineConfig`, the CSV/fixed-width ingesters, batch planning/commit/manifest, quarantine, lineage, partitioned Parquet output. Deps: fp-api + fp-util + univocity, duckdb, jtoon, jackson, slf4j, commons-compress, gson (no logback — etl doesn't own an appender). Publishes a **test-jar** (`com.gamma.etl.TestConfigs` + `PipelineConfigBatchTest`, the shared `PipelineConfig` builders). |
+| 6 | `platform/inspecto-event/` | `inspecto-event` | **Leaf-pair (WS-D increment 3, 2026-07-22)**: `com.gamma.event` + `com.gamma.metrics` — the Operational-Intelligence event store (`EventLog`/`EventStore`/`EventStoreAppender`, `ParquetEventStore`, saved views, secret scrubbing) and the metric registry it depends on; mutually cyclic with each other, not with anything else. Deps: fp-api/util/sql/**etl** + duckdb, jackson, slf4j, **logback-classic**. Owns `logback.xml` + `EventStoreAppender`. |
+| 7 | `platform/inspecto-acquire/` | `inspecto-acquire` | **Leaf (WS-D increment 4, 2026-07-22)**: `com.gamma.acquire` — connectors, connection profiles/registry/workbench, the fingerprint ledger, stability gate, gap detection, retry/circuit-breaker/rate-limit policies. No longer SCC-trapped once `etl` became a foundation leaf. Deps: fp-api/config/util/**etl**/**event**. |
+| 8 | `platform/inspecto-engine/` | `inspecto-engine` | **The remaining engine cluster**: `signal`, `query`, `pipeline`, `inspector`, `ingester`, `ops`, `job`, `enrich`, `alert`, `notify`, `catalog`. Deps: fp-api/util/config/sql/**etl**(+test-jar)/**event**/**acquire** + duckdb, jtoon, jackson, slf4j. Owns both `META-INF/services` files (`catalog.spi.DescriptionProvider`, `notify.NotificationChannel`). No longer owns logback-classic or a test-jar publish (both moved with event/etl). |
 | 9 | `inspecto/` | `inspecto-processor` | The core / composition root: `service`, `control`, `report`, `assist`, `exchange`, `expectation`, `intelligence`, `model`; ships the shaded fat JAR. Depends DOWN on fp-api/util/config/sql/**etl**(+test-jar)/**event**/**acquire**/**engine**. |
-| 10–13 | `inspecto-agent/`, `-agent-hosted/`, `-connectors/`, `-intelligence/` | `inspecto-*` | Siblings; each depends on core (and resolves the leaf/etl/event/acquire/engine modules transitively). |
-| (opt) | `inspecto-oidc/` | `inspecto-oidc` | Standard-edition only, behind `-Pedition-standard` — not in the default `<modules>`. |
+| 10–13 | `features/inspecto-agent/`, `-agent-hosted/`, `-connectors/`, `-intelligence/` | `inspecto-*` | Siblings; each depends on core (and resolves the leaf/etl/event/acquire/engine modules transitively). |
+| (opt) | `providers/inspecto-oidc/` | `inspecto-oidc` | Standard-edition only, behind `-Pedition-standard` — not in the default `<modules>`. |
 
 Binding constraints (unchanged by the split): framework-free (JDK HttpServer, manual DI,
 ServiceLoader SPI); **one deployable** — modularization is reactor-internal, the fat
@@ -494,7 +494,7 @@ that increment 1 made `etl` a foundation leaf. Plan: `docs/archived-documents/pl
   gap detection), `CommitLogTest.realRunRecordsCommit` (one method, `com.gamma.inspector.CollectorProcessor.run`),
   and `PhaseFConfigTest.postActionResolvesArchiveDateTemplate` (one method, `com.gamma.acquire.PostAction`
   — tests `acquire`'s own class, not etl at all).
-- **Resolution:** `SourceConfigTest` moved whole to `inspecto-engine/src/test/java/com/gamma/acquire/`
+- **Resolution:** `SourceConfigTest` moved whole to `platform/inspecto-engine/src/test/java/com/gamma/acquire/`
   (an explicit operator call — not split into etl-only/integration slices, so `fp-etl` ships with no
   direct integration coverage beyond the trimmed `ConfigFromMapTest`, which is fine: the moved test still
   runs, just from `fp-engine`). The two one-method leaks became new small files:
@@ -544,7 +544,7 @@ by the same inline-FQN scan, both main and test trees).
 - **`SourceConfigTest` moved a second time.** It had already been relocated into the `acquire` test
   package in increment 2 (because it's a genuine acquire+etl+event+inspector integration suite, not an
   etl unit test). With `acquire` itself now extracted, and `inspector` staying behind in `fp-engine`,
-  the test moved again — this time into `inspecto-engine/src/test/java/com/gamma/inspector/` as
+  the test moved again — this time into `platform/inspecto-engine/src/test/java/com/gamma/inspector/` as
   `SourceConfigIntegrationTest`. Same test, same operator call (don't split it), second address — a
   concrete illustration of why an integration test that spans multiple packages should be named for
   what it tests, not for whichever package happens to house it at the time.

@@ -33,7 +33,7 @@ One directory per case:
 INTENTIONAL decoder change:
 
 ```
-mvn -o -q test -pl asn-parser/asn-decoders/asn-golden -am -Dtest=SyntheticCorpusTest -Dasn.synthetic.write=true
+mvn -o -q test -pl providers/asn-parser/asn-decoders/asn-golden -am -Dtest=SyntheticCorpusTest -Dasn.synthetic.write=true
 ```
 
 then review the diff — a changed expectation is a behaviour change and needs a reason in the commit.

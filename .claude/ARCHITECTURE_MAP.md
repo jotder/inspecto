@@ -10,9 +10,9 @@ Inspecto (repo `inspecto`) — Java 27 build / Maven `release=27`, multi-module 
 | Dir | artifactId | Role |
 |---|---|---|
 | `inspecto/` | `inspecto-processor` | Lean engine + control plane (fat-JAR `inspecto.jar`). No network/AI deps. |
-| `inspecto-agent/` | `inspecto-agent` | Assist skills on `agent-kernel` (the 7-skill catalog). |
-| `inspecto-agent-hosted/` | `inspecto-agent-hosted` | Hosted model providers (langchain4j Anthropic/OpenAI/Gemini). |
-| `inspecto-connectors/` | `inspecto-connectors` | **Optional** remote source connectors (SFTP/sshj, FTP/commons-net). ServiceLoader-discovered. |
+| `features/inspecto-agent/` | `inspecto-agent` | Assist skills on `agent-kernel` (the 7-skill catalog). |
+| `providers/inspecto-agent-hosted/` | `inspecto-agent-hosted` | Hosted model providers (langchain4j Anthropic/OpenAI/Gemini). |
+| `providers/inspecto-connectors/` | `inspecto-connectors` | **Optional** remote source connectors (SFTP/sshj, FTP/commons-net). ServiceLoader-discovered. |
 | `inspecto-ui/` | — | Angular SPA (Material/Tailwind, ag-Grid, Chart.js, AntV G6); dev serve `:4204`. |
 
 ## Key packages (under `inspecto/src/main/java/com/gamma/`)

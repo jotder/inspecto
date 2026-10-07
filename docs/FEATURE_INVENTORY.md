@@ -332,7 +332,7 @@ not committable), and `hive_partitioning` is **off**, matching `DatasetRelation`
   delimiter via `str_split`, and matches `pattern` (auto-prefixed `(?s)`) against each trimmed
   record's full text, so a capture group may span what were previously separate physical lines.
   `ComponentPreview.textRegexSelect` mirrors the same block-mode SQL for UI previews. Default
-  (line-per-record) behavior is unchanged. See `inspecto-etl/src/test/java/com/gamma/etl/TextRegexTest.java`
+  (line-per-record) behavior is unchanged. See `platform/inspecto-etl/src/test/java/com/gamma/etl/TextRegexTest.java`
   (`blankLineRecordSplitSpansMultipleLines`, `literalDelimiterRecordSplitIsAccepted`).
 - ~~No subscriber `.dat` / plugin-binary sample data in the repo — synthesize for those examples.~~
   **Partly stale, corrected 2026-07-22**: subscriber `.dat` samples shipped from then until 2026-09-06, when the

@@ -2,7 +2,7 @@
 type: Reference
 title: Plugin ingester
 description: When to reach for the plugin ingester, the `StreamingFileIngester` SPI contract (columns, emit, quarantine, segment keys), and the union/generation execution modes the framework picks by file size.
-resource: inspecto-etl/src/main/java/com/gamma/etl/StreamingFileIngester.java
+resource: platform/inspecto-etl/src/main/java/com/gamma/etl/StreamingFileIngester.java
 tags: [plugins, spi, ingester, streaming, segments, quarantine]
 timestamp: 2026-07-16T00:00:00Z
 ---
@@ -67,7 +67,7 @@ public class MyCdrIngester implements StreamingFileIngester {
 
 ### Execution modes — the framework picks by file size
 
-The same ingester serves both ingestion shapes; the [`StreamingPluginIngestStrategy`](../../../../inspecto-engine/src/main/java/com/gamma/inspector/StreamingPluginIngestStrategy.java) chooses one **per batch** with zero extra I/O (member sizes are already known):
+The same ingester serves both ingestion shapes; the [`StreamingPluginIngestStrategy`](../../../../platform/inspecto-engine/src/main/java/com/gamma/inspector/StreamingPluginIngestStrategy.java) chooses one **per batch** with zero extra I/O (member sizes are already known):
 
 | Mode | When | What it does | Output |
 |---|---|---|---|

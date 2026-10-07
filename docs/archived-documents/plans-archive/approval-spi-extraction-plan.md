@@ -87,7 +87,7 @@ full reactor runs once, at handoff or before the push.
    `PendingChangesLockTimeoutTest`, `PendingChangesMultiPodTest`, `ControlApiActionRequestsTest` and
    `ConfigWriteFunnelTest` on a clean tree and record the counts. → verify: all green before any edit.
 2. **S1 — move `Held` and the contract.** Add `ApprovalGate` and `Held` to the home chosen in D-AS1; make
-   `PendingChanges` implement it; change the two `catch` sites. → verify: `-pl inspecto-http-spi,inspecto
+   `PendingChanges` implement it; change the two `catch` sites. → verify: `-pl :inspecto-http-spi,inspecto
    -Dtest=ControlApiPendingChangesTest,PendingChangesKeyTest`.
 3. **S2 — switch the 42 call sites, then repair the guard.** 🔴 `ConfigWriteFunnelTest` finds holds with the
    regex `PendingChanges\.hold\w*\(` (lines 61 and 142). A rename makes it **match nothing and pass** —

@@ -36,6 +36,6 @@ export function moduleDirOf(path, dirs) {
 /** The module label of a repo path: its reactor module's directory name; else the first path segment; null for root files. */
 export function moduleLabel(path, dirs) {
     const d = moduleDirOf(path, dirs);
-    if (d) return LABEL_ALIAS[d] ?? d.slice(d.lastIndexOf('/') + 1);
+    if (d) return Object.entries(LABEL_ALIAS).find(([k]) => d === k || d.endsWith(`/${k}`))?.[1] ?? d.slice(d.lastIndexOf('/') + 1);
     return path.includes('/') ? path.slice(0, path.indexOf('/')) : null;
 }

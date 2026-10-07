@@ -116,7 +116,7 @@ is why the citation guard flags a doc that talks about a file as if it were ther
 **The gates themselves are real and are the server's.** `AgentRoutes.java:68` states them and
 `:96-104` implement them — module absent → **503**, unknown tool → **404**, a MUTATING tool → **403**, and
 a refused argument → **422** carrying its message. Result shapes come from `InspectoTools`
-(`inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoTools.java`), pinned by
+(`features/inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoTools.java`), pinned by
 `InspectoToolsTest`; the route surface is pinned by `AgentRoutesTest`.
 
 ⚠ **What the deletion cost is the offline exercise of the degrade paths**, which is what this section

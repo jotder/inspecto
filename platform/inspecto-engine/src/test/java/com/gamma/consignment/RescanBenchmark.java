@@ -48,7 +48,7 @@ import java.util.stream.Collectors;
  * {@code PipelineBenchmark} and its siblings stay out), and the {@code assumeTrue} below is the
  * second line of defence for whoever eventually widens {@code <includes>}. Run explicitly:
  * <pre>
- *   mvn -o -pl inspecto-engine -Dtest=RescanBenchmark -DfailIfNoTests=false \
+ *   mvn -o -pl :inspecto-engine -Dtest=RescanBenchmark -DfailIfNoTests=false \
  *       -Dbench.run=true -Dbench.rows=20000000 test
  * </pre>
  *

@@ -163,7 +163,7 @@ exactly **one** MCP tool, `codegraph_explore`, plus a CLI.
 - ⛔ **`codegraph affected <files...>` is BROKEN — never use it to pick tests.** Tested 2026-09-19 on
   v1.6.0: `affected inspecto-ui/src/app/inspecto/api/config.service.ts` — an **Angular** service —
   returns **953 Java test files**, led by `asn-parser` ASN.1 decoder tests that cannot possibly be
-  affected; `affected inspecto-sql/.../SqlGuard.java` returns **1078** when the whole repo holds
+  affected; `affected platform/inspecto-sql/.../SqlGuard.java` returns **1078** when the whole repo holds
   **1059** test files. It fails toward over-reporting, so selecting `-Dtest=` targets from it silently
   becomes a full-reactor run — the opposite of the unit-test-per-change rule above. Use `impact` plus
   judgement, or the module the change lives in. (`CODEGRAPH-AFFECTED-UNUSABLE-1`)

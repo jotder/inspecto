@@ -8,7 +8,7 @@
         <groupId>com.gamma.inspector</groupId>
         <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-SNAPSHOT</version>
-        <relativePath>../pom.xml</relativePath>
+        <relativePath>../../pom.xml</relativePath>
     </parent>
 
     <artifactId>inspecto-ops</artifactId>
@@ -77,7 +77,7 @@
         </dependency>
 
         <!-- PostgreSQL JDBC driver (version managed by the parent, M1) — test scope only, exactly as
-             inspecto/ and inspecto-engine/ declare it. PostgresStateStoreTest lives in THIS module and
+             inspecto/ and platform/inspecto-engine/ declare it. PostgresStateStoreTest lives in THIS module and
              loads the driver through DriverManager; test scope is not transitive, so inheriting it from
              a dependency was never possible. Without this the class does not skip cleanly — it ERRORS
              with "No suitable driver found" the moment -Dinspecto.test.pg.url is supplied, which is how

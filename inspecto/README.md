@@ -79,7 +79,7 @@ A two-module Maven reactor (parent POM at the repo root) plus a standalone web U
 | Module | Role |
 |---|---|
 | `inspecto/` | The lean, deployable ETL engine + control plane (this README). The fat-JAR; **stays zero-new-dependency**. |
-| `inspecto-agent/` | **Optional** embedded assist agent. All AI/LLM dependencies (LangChain4j, Ollama, hosted SDKs) live here only. Loaded in-process by `SourceService` via `ServiceLoader` when present. |
+| `features/inspecto-agent/` | **Optional** embedded assist agent. All AI/LLM dependencies (LangChain4j, Ollama, hosted SDKs) live here only. Loaded in-process by `SourceService` via `ServiceLoader` when present. |
 | `inspecto-ui/` | **Optional** operator web console — *Inspector* (Angular + Material/Tailwind SPA: ag-Grid, Chart.js, AntV G6). Its Node/npm toolchain is **not** part of the Maven reactor; `package.ps1` builds it and bundles `dist/` next to the JAR, served by `ControlApi` from `-Dui.dir`. See the [User Guide](../docs/USER_GUIDE.md) (screen by screen) and [`inspecto-ui/README.md`](../inspecto-ui/README.md). |
 
 ```powershell

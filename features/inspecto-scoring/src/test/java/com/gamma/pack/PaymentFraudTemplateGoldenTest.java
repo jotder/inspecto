@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class PaymentFraudTemplateGoldenTest {
 
-    private static final Path TEMPLATE = Path.of("..", "spaces", "_templates", "payment-fraud").toAbsolutePath().normalize();
+    private static final Path TEMPLATE = Path.of("..", "..", "spaces", "_templates", "payment-fraud").toAbsolutePath().normalize();
     private static final List<String> FEEDS = List.of("payment_attempts", "sim_changes", "disputes");
     private static final List<String> FEATURE_JOBS = List.of("pf_device_small_amounts", "pf_bin_declines",
             "pf_instrument_velocity", "pf_sim_swap_payments", "pf_account_activity", "pf_daily_summary", "pf_attempt_labels");

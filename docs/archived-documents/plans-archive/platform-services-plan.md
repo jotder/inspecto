@@ -315,7 +315,7 @@ pointer** until S2-3 unlocks it (honest, not aspirational); `new service` likewi
 
 Ordering: S1-1 → S1-2 precede S1-3..7; S1-8 needs S1-1..3 only. Stage 2 and 3 are independent of
 each other. ⚠ **BUILD note:** the offline reactor and the vocabulary guard both have known defects
-(BUILD-1, VOCAB-1 in `docs/BACKLOG.md` §6) — per-module `mvn -o -pl inspecto-engine clean test` is
+(BUILD-1, VOCAB-1 in `docs/BACKLOG.md` §6) — per-module `mvn -o -pl :inspecto-engine clean test` is
 the trustworthy loop until BUILD-1 is fixed; do not trust a green guard without checking it actually
 scanned.
 

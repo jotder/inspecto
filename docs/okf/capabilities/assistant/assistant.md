@@ -71,7 +71,7 @@ and — under an explicit human gate — acts.
 |---|---|---|---|---|
 | **AGT-1** | **Assistant** skills — seven, read-only/draft-only, abstain-only escalation | Must | ✅ Built and tested. The seven are `DiagnoseAndAlertSkill`, `ExplainEntitySkill`, `KpiToSqlSkill`, `NlToScheduleSkill`, `ReportNarrativeSkill`, `ReportSqlSkill`, `SuggestConfigSkill` | 🔴 **CORRECTION — no edition.** The row says `All`; `EDITIONS` `CP-14` says `—/—/—` and is right. See §3.10 |
 | **AGT-2** | Pluggable model transport: eoiagent gateway bridge + native Ollama provider; hosted providers isolated in `inspecto-agent-hosted` | Must | ✅ Built and tested | 🔴 **CORRECTION — no edition** (§3.10) |
-| **AGT-3** | Air-gap guarantee: hosted SDKs physically absent from air-gapped builds | Must | ✅ Built and tested, and the invariant is asserted by a test ⚠ **Named for grep:** the assertion lives in `EgressGuardTest` (`inspecto-agent/src/test/java/com/gamma/agent/EgressGuardTest.java`). | **All** — this one *is* edition-wide, but trivially: the guarantee is that the code is **absent**, and in a stock bundle the whole layer is absent (§3.10) |
+| **AGT-3** | Air-gap guarantee: hosted SDKs physically absent from air-gapped builds | Must | ✅ Built and tested, and the invariant is asserted by a test ⚠ **Named for grep:** the assertion lives in `EgressGuardTest` (`features/inspecto-agent/src/test/java/com/gamma/agent/EgressGuardTest.java`). | **All** — this one *is* edition-wide, but trivially: the guarantee is that the code is **absent**, and in a stock bundle the whole layer is absent (§3.10) |
 | **AGT-4** | Model Settings pane + per-tier connectivity probes | Should | ✅ Built and tested | 🔴 **CORRECTION — the pane ships, the thing it configures does not** (§3.10) |
 | **AGT-5** | Embedded intelligence: context grounding, tool belt, autonomy ladder | Should | ✅ P0–P5 complete 2026-07-21 + polish. The belt is **23 tools**, pinned by `InspectoPackTest`'s `assertEquals(23, tools.size())` — the board is right and the concept page is not (§3.5) | 🔴 **CORRECTION — no edition.** The row's `All (L3 = S+, opt-in)` describes a gating that no bundle can reach (§3.10) |
 | **AGT-6a** | "AI behind every screen" — inline natural-language authoring on every pane, reusing the shipped draft tools | Should | 🟡 **CORRECTION — more is shipped than "PLANNED" suggests.** The mechanism is live: `<inspecto-ai-assist>` runs six draft tools on **five real panes** (pipeline editor, Query Library, Expectations, Dashboard Builder, Link-Analysis query panel), and `<inspecto-ai-explain>` is adopted by **twelve** panes. Deterministic single-tool dispatch shipped 2026-07-26. The live plan is blunter than the board: it records **D1–D4 and D8–D11 answered** and **all of A1–A5 shipped**, and stays open only for the `kpi_report_builder` host. The board still says "ready to schedule pending D1–D4". What remains is the *ambition* — every screen — not the capability | — |
@@ -136,7 +136,7 @@ rides under `flow`) — aliasing it is a decision, not a one-liner.
 **The SPI is core, the implementation is not.** `AssistAgent`
 (`inspecto/src/main/java/com/gamma/assist/spi/AssistAgent.java`) is discovered by `ServiceLoader`; the
 core JAR carries the interface and nothing that implements it (§3.10). `UccAssistAgent`
-(`inspecto-agent/src/main/java/com/gamma/agent/UccAssistAgent.java`) registers **seven** skills:
+(`features/inspecto-agent/src/main/java/com/gamma/agent/UccAssistAgent.java`) registers **seven** skills:
 `DiagnoseAndAlertSkill`, `ExplainEntitySkill`, `KpiToSqlSkill`, `NlToScheduleSkill`,
 `ReportNarrativeSkill`, `ReportSqlSkill`, `SuggestConfigSkill`.
 
@@ -168,7 +168,7 @@ aggregate "AI is up". ⚠ In a stock bundle the pane's own routes are part of th
 #### 3.4a How a tier resolves to a concrete model — and why it is NOT hardware-detected
 
 Two paths, in precedence order, both in `ModelProviderFactory.fromPersisted()`
-(`inspecto-agent/.../model/ModelProviderFactory.java:30-34`):
+(`features/inspecto-agent/.../model/ModelProviderFactory.java:30-34`):
 
 1. **Persisted settings win.** `AssistModelSettings.load()` reads `config/assist-settings.properties`
    (core-side twin: `inspecto/.../model/ModelSettingsStore.java:28-74`) — an operator-entered provider
@@ -571,12 +571,12 @@ what it promises is absence.
 | Concern | Code | Docs |
 |---|---|---|
 | Assist SPI + routes | `inspecto/src/main/java/com/gamma/assist/spi/AssistAgent.java` | [`assist-agent.md`](../../backend/agent/assist-agent.md) |
-| Reflex agent + skills | `inspecto-agent/src/main/java/com/gamma/agent/UccAssistAgent.java`; `inspecto-agent/src/main/java/com/gamma/agent/skill/AlertRuleTool.java`, `SqlOracleTool.java` | same |
-| Hosted providers (quarantined) | `inspecto-agent-hosted/` | [`hosted-providers.md`](../../backend/agent/hosted-providers.md) |
-| Deliberative agent | `inspecto-intelligence/src/main/java/com/gamma/intelligence/InspectoIntelligenceAgent.java`, `GatewayFactory.java` | [`embedded-intelligence.md`](../../backend/agent/embedded-intelligence.md) |
-| The tool belt | `inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoTools.java`, `ArgumentDeriver.java`, `GlossaryLoader.java` | same |
-| Gated actions | `inspecto-intelligence/src/main/java/com/gamma/intelligence/action/ComponentActions.java`, `OperationalActions.java` | same §P3 |
-| Signal projections | `inspecto-engine/src/main/java/com/gamma/signal/AgUiProjection.java`, `Signals.java` | [`signal-backbone.md`](../../backend/control-plane/signal-backbone.md) §S3–S7 |
+| Reflex agent + skills | `features/inspecto-agent/src/main/java/com/gamma/agent/UccAssistAgent.java`; `features/inspecto-agent/src/main/java/com/gamma/agent/skill/AlertRuleTool.java`, `SqlOracleTool.java` | same |
+| Hosted providers (quarantined) | `providers/inspecto-agent-hosted/` | [`hosted-providers.md`](../../backend/agent/hosted-providers.md) |
+| Deliberative agent | `features/inspecto-intelligence/src/main/java/com/gamma/intelligence/InspectoIntelligenceAgent.java`, `GatewayFactory.java` | [`embedded-intelligence.md`](../../backend/agent/embedded-intelligence.md) |
+| The tool belt | `features/inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoTools.java`, `ArgumentDeriver.java`, `GlossaryLoader.java` | same |
+| Gated actions | `features/inspecto-intelligence/src/main/java/com/gamma/intelligence/action/ComponentActions.java`, `OperationalActions.java` | same §P3 |
+| Signal projections | `platform/inspecto-engine/src/main/java/com/gamma/signal/AgUiProjection.java`, `Signals.java` | [`signal-backbone.md`](../../backend/control-plane/signal-backbone.md) §S3–S7 |
 | Packaging truth | `pom.xml` (`eoiagent.version`, `maven.compiler.release`), `package.ps1`, `.github/workflows/ci.yml` | [`build-test.md`](../../backend/build-run/build-test.md) §bundling; `EDITIONS.md` `CP-14` |
 | Client surfaces | `inspecto-ui/src/app/modules/admin/assist/`, `agent-chat/`, `approvals/`, `autonomy/`, `model-settings/`; `inspecto-ui/src/app/inspecto/ai-assist/`, `inspecto-ui/src/app/inspecto/a2ui/` | [`assist.md`](../../frontend/features/assist.md), [`model-settings.md`](../../frontend/features/model-settings.md), [`inline-ai-authoring.md`](../../frontend/features/inline-ai-authoring.md) |
 | The upstream (black box) | groupId `com.eoiagent`, repo `jotder/inspect-agent` | [`okf/agentic/`](../../agentic/index.md) — ⚠ stale, see §2 |

@@ -29,7 +29,7 @@ class ShippedDatePartitionsAreDateTypedTest {
     /** Runtime state (gitignored) — not shipped. */
     private static final Set<String> NOT_SHIPPED_SPACES = Set.of("_shared", "uat");
 
-    private static final Path REPO = Path.of("..").toAbsolutePath().normalize();
+    private static final Path REPO = Path.of("..", "..").toAbsolutePath().normalize();
 
     @Test
     void noShippedPipelineDatePartitionsAFieldDeclaredNonDate(@TempDir Path tmp) throws Exception {

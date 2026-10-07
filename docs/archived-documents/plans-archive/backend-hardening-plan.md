@@ -65,7 +65,7 @@ Only external reference to the class is a javadoc mention (`SpaceLayoutContract`
 **Why it cannot break:** the catch still swallows — execution continues identically. The only new
 observable is a log line. Interface contract ("ingest never throws", l.41-46) untouched.
 
-**Verify:** `mvn -q -pl inspecto-engine -am test`; grep test output for no new failures.
+**Verify:** `mvn -q -pl :inspecto-engine -am test`; grep test output for no new failures.
 
 **Rollback:** single-file revert.
 
@@ -98,8 +98,8 @@ only the *error-path* `printStackTrace` calls (l. around catch blocks), leave us
 corpus tests `assumeTrue`-skip without data, so log-format assertions cannot exist there (verify
 with `grep -rn "printStackTrace" asn-parser/src/test || true` → expected empty).
 
-**Verify:** `mvn -q -pl asn-parser/asn-decoders -am test && mvn -q -pl inspecto-util -am test &&
-mvn -q -pl inspecto-engine -am test`.
+**Verify:** `mvn -q -pl asn-parser/asn-decoders -am test && mvn -q -pl :inspecto-util -am test &&
+mvn -q -pl :inspecto-engine -am test`.
 
 **Rollback:** per-module reverts; do asn-parser last so a failure there doesn't block items 1-2.
 

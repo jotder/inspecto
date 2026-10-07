@@ -31,9 +31,9 @@ is the defensible one. An auditor who disproves an overclaim discredits the cont
 
 | Claim | Evidence |
 |---|---|
-| Each flush writes a **new** file; nothing is overwritten | `inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java:166-168` — the base name is `"events_" + timestamp + "_" + flushSeq`; `:81-82` states the uniqueness is deliberate ("no overwrite") |
-| No delete/overwrite/truncate path exists against the event directory | No `Files.delete`, `deleteIfExists` or truncate call anywhere in `inspecto-event`. ⚠ The one nearby `delete` — `/events/views/{name}/delete`, since EDG-01 cell 6 (2026-09-08) at `inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` — removes a **saved query view**, not event data (`AuditTrail.java:158`). ⛔ That route is now in an OPTIONAL module absent from Personal, which only narrows this surface further; event recording and the core audit read (`AuditLogRoutes`) are unaffected |
-| One dispatch seam | `EventLog.emit` (`inspecto-audit-spi/src/main/java/com/gamma/event/EventLog.java:142`) is the sole entry point; the SLF4J capture appender (`EventStoreAppender.java:44`), direct callers and the batch-event bridge all route through it |
+| Each flush writes a **new** file; nothing is overwritten | `platform/inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java:166-168` — the base name is `"events_" + timestamp + "_" + flushSeq`; `:81-82` states the uniqueness is deliberate ("no overwrite") |
+| No delete/overwrite/truncate path exists against the event directory | No `Files.delete`, `deleteIfExists` or truncate call anywhere in `inspecto-event`. ⚠ The one nearby `delete` — `/events/views/{name}/delete`, since EDG-01 cell 6 (2026-09-08) at `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` — removes a **saved query view**, not event data (`AuditTrail.java:158`). ⛔ That route is now in an OPTIONAL module absent from Personal, which only narrows this surface further; event recording and the core audit read (`AuditLogRoutes`) are unaffected |
+| One dispatch seam | `EventLog.emit` (`spi/inspecto-audit-spi/src/main/java/com/gamma/event/EventLog.java:142`) is the sole entry point; the SLF4J capture appender (`EventStoreAppender.java:44`), direct callers and the batch-event bridge all route through it |
 | The API contract excludes update/delete | `EventStore.java:15-16` — "intentionally no update or delete" |
 | A transient write failure retries rather than silently dropping | `ParquetEventStore.java:170-186`; the drop path itself logs at ERROR (`:182`) |
 
@@ -94,7 +94,7 @@ control as "immutability".
 
 | Claim | Evidence |
 |---|---|
-| Every `AUDIT` / `ACCESS_DENIED` record carries `audit_seq`, `audit_prev_hash` and `audit_hash` (SHA-256 over a canonical encoding, prevHash included), in one total order per Space | `inspecto-audit-spi/src/main/java/com/gamma/event/AuditChain.java`; linked in `EventLog.emit` under one monitor with the append |
+| Every `AUDIT` / `ACCESS_DENIED` record carries `audit_seq`, `audit_prev_hash` and `audit_hash` (SHA-256 over a canonical encoding, prevHash included), in one total order per Space | `spi/inspecto-audit-spi/src/main/java/com/gamma/event/AuditChain.java`; linked in `EventLog.emit` under one monitor with the append |
 | An edit, deletion, insertion, reordering or tail truncation is named by seq and reason | `GET /audit/verify` → `inspecto/src/main/java/com/gamma/control/AuditVerifier.java`; each case tampered directly in the Parquet store in `AuditVerifierTest` |
 | Each finished UTC day is pinned by an HMAC-SHA256 anchor kept outside every import, export, Exchange and backup, and exportable off the box | `inspecto/src/main/java/com/gamma/control/AuditAnchors.java`; `GET /audit/anchors`; `<config root>.secrets/audit-anchors.jsonl` |
 | No audit row leaves the chain silently: an unlinkable row is marked, counted and announced, a corrupt store file is reported, a second writer on one directory is refused | `AuditChainTest`, `AuditVerifierTest` (`unlinked`, `unreadable-file`, `duplicate-event`) |

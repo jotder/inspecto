@@ -1,13 +1,13 @@
 ---
 type: Module
-title: Connectors Module (inspecto-connectors/)
+title: Connectors Module (providers/inspecto-connectors/)
 description: Remote source connectors (SFTP/FTP/FTPS/DB) and all network dependencies, kept out of the core.
-resource: inspecto-connectors/
+resource: providers/inspecto-connectors/
 tags: [module, connectors, network, sftp, ftp, jdbc]
 timestamp: 2026-06-28T00:00:00Z
 ---
 
-# Connectors Module (`inspecto-connectors/`)
+# Connectors Module (`providers/inspecto-connectors/`)
 
 artifactId `inspecto-connectors`. Holds **all network dependencies** (sshj + BouncyCastle for SFTP,
 Apache commons-net for FTP/FTPS, the PostgreSQL JDBC driver,

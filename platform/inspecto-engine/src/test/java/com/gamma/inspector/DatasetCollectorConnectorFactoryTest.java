@@ -104,7 +104,7 @@ class DatasetCollectorConnectorFactoryTest {
      */
     @Test
     void theShippedDemoFeedResolvesItsDatasetDespiteTheDatasetsPrefix(@TempDir Path dir) throws Exception {
-        Path demo = Path.of("..", "spaces", "demo", "config").toAbsolutePath().normalize();
+        Path demo = Path.of("..", "..", "spaces", "demo", "config").toAbsolutePath().normalize();
         Path shipped = demo.resolve("orders/orders_by_region_feed_pipeline.toon");
         assertTrue(Files.readString(shipped).contains("dataset: datasets/orders_by_region"),
                 "precondition: the shipped file still uses the prefixed spelling");

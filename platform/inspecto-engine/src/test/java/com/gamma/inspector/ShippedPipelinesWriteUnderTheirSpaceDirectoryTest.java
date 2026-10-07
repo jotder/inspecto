@@ -30,13 +30,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * and a test loading a shipped config wrote stray {@code spaces/}, {@code out/}, {@code templates/} trees under
  * the module dir — which fooled repo-root walkers like {@code MappingMigrationTest}.
  *
- * <p>⚠ No CWD trickery is needed: surefire's working directory is the MODULE dir ({@code inspecto-engine/}),
+ * <p>⚠ No CWD trickery is needed: surefire's working directory is the MODULE dir ({@code platform/inspecto-engine/}),
  * never the Space's. Each Space is copied VERBATIM into a temp {@code spaces/} tree — nothing is rewritten, which
  * is the point: the copy is only correct if a relative data path means "under my Space".
  */
 class ShippedPipelinesWriteUnderTheirSpaceDirectoryTest {
 
-    private static final Path REPO = Path.of("..").toAbsolutePath().normalize();
+    private static final Path REPO = Path.of("..", "..").toAbsolutePath().normalize();
 
     /** Runtime state (gitignored) — not shipped. {@code _templates} IS shipped and must resolve the same way. */
     private static final Set<String> NOT_SHIPPED_SPACES = Set.of("_shared", "uat");

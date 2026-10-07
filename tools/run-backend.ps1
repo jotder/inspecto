@@ -84,7 +84,7 @@ $addModule = {
 foreach ($e in $entries) {
     if ($e -match '[\\/]com[\\/]gamma[\\/]inspector[\\/]([^\\/]+)[\\/]') {
         $artifact = $Matches[1]
-        $dir = if ($artifact -eq 'inspecto-processor') { 'inspecto' } else { $artifact }
+        $dir = if ($artifact -eq 'inspecto-processor') { 'inspecto' } else { $f = Get-ChildItem -Path $repo -Directory -Depth 1 -Filter $artifact | Select-Object -First 1; if ($f) { [IO.Path]::GetRelativePath($repo, $f.FullName) } else { $artifact } }
         & $addModule $dir
     }
 }

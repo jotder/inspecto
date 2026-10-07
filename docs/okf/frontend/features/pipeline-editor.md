@@ -252,7 +252,7 @@ closing D1–D9 (full history: `NodeConfigNameContractTest` docblock and git his
 ### Step config specs are SERVED; the client table is a fallback
 
 `GET /pipelines/node-types` carries `attributes[]` per type (authored in
-`inspecto-engine/.../pipeline/NodeAttributes.java`); the drawer prefers them and
+`platform/inspecto-engine/.../pipeline/NodeAttributes.java`); the drawer prefers them and
 `pipelines/node-attributes.ts` is the fallback until the catalog resolves.
 
 - **A served empty array ≠ absent**: empty = the server says the type has no schema (honoured, never

@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * every demo Pipeline failed to register.
  *
  * <p>⚠ No CWD trickery is needed to reproduce that: surefire's working directory is the MODULE directory
- * ({@code inspecto-etl/}), not the repo root — exactly the "launched from somewhere else" condition. Each
+ * ({@code platform/inspecto-etl/}), not the repo root — exactly the "launched from somewhere else" condition. Each
  * space is copied into a temp dir (so the proof is also that it RELOCATES) and each config loaded by its
  * absolute path, so the only thing that can make a ref miss is a ref that means something relative to the
  * CWD.
@@ -41,7 +41,7 @@ class ShippedPipelinesLoadFromAnyWorkingDirectoryTest {
     private static final Set<String> NOT_SHIPPED_SPACES = Set.of("_shared", "uat");
 
     private static Path spacesRoot() {
-        return Path.of("..", "spaces").toAbsolutePath().normalize();
+        return Path.of("..", "..", "spaces").toAbsolutePath().normalize();
     }
 
     @Test

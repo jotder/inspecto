@@ -112,7 +112,7 @@ foreach ($w in $Workloads) {
         }
         for ($i = 0; $i -lt $Warmup + $Reps; $i++) {
             $m = [ordered]@{}
-            Read-IndexScale (Invoke-Mvn 'inspecto-la-storage' 'IndexScaleBench' $props "$w-$i") $m
+            Read-IndexScale (Invoke-Mvn ':inspecto-la-storage' 'IndexScaleBench' $props "$w-$i") $m
             foreach ($k in $m.Keys) { if ($i -ge $Warmup -or $k -eq 'build_ms') { foreach ($v in $m[$k]) { Add-Sample $metrics $k $v } } }   # build happens once, in rep 0
         }
     }
@@ -120,7 +120,7 @@ foreach ($w in $Workloads) {
         $props = @('-Dbench.run=true', "-Dbench.rows=$([int](1000000 * $Scale))", '-Dbench.days=30', '-Dbench.format=PARQUET')
         for ($i = 0; $i -lt $Warmup + $Reps; $i++) {
             $m = [ordered]@{}
-            Read-PluginIngest (Invoke-Mvn 'inspecto-engine' 'PluginIngestBenchmark' $props "$w-$i") $m
+            Read-PluginIngest (Invoke-Mvn ':inspecto-engine' 'PluginIngestBenchmark' $props "$w-$i") $m
             if ($i -ge $Warmup) { foreach ($k in $m.Keys) { foreach ($v in $m[$k]) { Add-Sample $metrics $k $v } } }
         }
     }

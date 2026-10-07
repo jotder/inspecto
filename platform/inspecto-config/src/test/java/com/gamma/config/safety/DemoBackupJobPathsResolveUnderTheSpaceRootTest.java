@@ -32,7 +32,7 @@ class DemoBackupJobPathsResolveUnderTheSpaceRootTest {
 
     /** The demo Space's config root — the base {@code SpaceConfigRoot.current()} yields at run time. */
     private static Path demoConfig() {
-        return Path.of("..", "spaces", "demo", "config").toAbsolutePath().normalize();
+        return Path.of("..", "..", "spaces", "demo", "config").toAbsolutePath().normalize();
     }
 
     private static String value(String jobFile, String dottedPath) throws IOException {

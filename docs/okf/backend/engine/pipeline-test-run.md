@@ -424,16 +424,16 @@ and when a probe leaves a test green, suspect the test, not the probe.
 
 ## Code
 
-- `inspecto-engine/…/inspector/PipelineTestRun.java` — `run` (binds `RAW_INPUT`), `Result.rawRows`, `sampleRows`, `deleteScratch`
-- `inspecto-etl/…/etl/DataTransformer.java` — `RAW_INPUT` / `RawInputObserver`, checked in `materialize`
-- `inspecto-etl/…/etl/PipelineConfig.java` — `forScratchRun(Path)`
+- `platform/inspecto-engine/…/inspector/PipelineTestRun.java` — `run` (binds `RAW_INPUT`), `Result.rawRows`, `sampleRows`, `deleteScratch`
+- `platform/inspecto-etl/…/etl/DataTransformer.java` — `RAW_INPUT` / `RawInputObserver`, checked in `materialize`
+- `platform/inspecto-etl/…/etl/PipelineConfig.java` — `forScratchRun(Path)`
 - `inspecto/…/control/PipelineGraphRoutes.java` — `testRun`, `testRunRoot`, `graphFor`, `fileList`, `runResult`
-- `inspecto-acquire/…/acquire/LocalConnectionWorkbench.java` — `jail(Path, String)`
+- `platform/inspecto-acquire/…/acquire/LocalConnectionWorkbench.java` — `jail(Path, String)`
 - `inspecto/…/control/PipelineInboxRoutes.java` — `list`, `upload` (INBOX-UPLOAD-1); test `ControlApiPipelineInboxTest` (8, real HTTP)
-- `inspecto-engine/…/pipeline/exec/PipelineExecutor.java` — `dryRun(…, stopAtNodeId)`, `ancestorsOf`
-- `inspecto-engine/…/pipeline/exec/PipelineDryRun.java` — `run(…, stopAtNodeId)`, `notExecutedWarnings`, the `WebhookSink.plan` loop in `runSeeded`
-- `inspecto-util/…/util/DuckDbUtil.java` — `withoutPendingQueryPreamble`
-- `inspecto-engine/…/query/QueryExecutor.java` — `run` (the plain-`Statement` view registration and no-bind query)
+- `platform/inspecto-engine/…/pipeline/exec/PipelineExecutor.java` — `dryRun(…, stopAtNodeId)`, `ancestorsOf`
+- `platform/inspecto-engine/…/pipeline/exec/PipelineDryRun.java` — `run(…, stopAtNodeId)`, `notExecutedWarnings`, the `WebhookSink.plan` loop in `runSeeded`
+- `platform/inspecto-util/…/util/DuckDbUtil.java` — `withoutPendingQueryPreamble`
+- `platform/inspecto-engine/…/query/QueryExecutor.java` — `run` (the plain-`Statement` view registration and no-bind query)
 - Tests: `PipelineTestRunTest` (8), `ControlApiPipelineTestRunTest` (8, real HTTP),
   `ControlApiPipelineTestRunDemoTest` (3, real HTTP over the shipped demos vs a real ingest),
   `PipelineDryRunTest` (15, of which 5 pin the cutoff), `ControlApiDryRunBlindSpotsTest` (2, real HTTP — G8)

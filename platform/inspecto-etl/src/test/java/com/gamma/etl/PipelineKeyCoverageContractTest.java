@@ -62,7 +62,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class PipelineKeyCoverageContractTest {
 
-    private static final String PARSER = "inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java";
+    private static final String PARSER = "platform/inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java";
 
     /**
      * The blocks the parser reads that the spec does not declare. ⚠ This list may only ever SHRINK.

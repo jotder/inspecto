@@ -38,7 +38,7 @@ AI-driven autonomy without redesign.
 | Section | What it is | Where |
 |---|---|---|
 | **Angular UI** | The one operator console (all Lenses); requires a live control plane | `inspecto-ui/` |
-| **Java backend** | Engine + control plane + connectors + agent + security modules | `inspecto/`, `inspecto-connectors/`, `inspecto-agent/`, `inspecto-agent-hosted/`, `inspecto-oidc/` |
+| **Java backend** | Engine + control plane + connectors + agent + security modules | `inspecto/`, `providers/inspecto-connectors/`, `features/inspecto-agent/`, `providers/inspecto-agent-hosted/`, `providers/inspecto-oidc/` |
 | **Agentic framework** | **eoiagent** — reusable, embeddable agent platform (separate repo); Inspecto's model transport since 2026-07-07; the kernel reasoning layer is vendored in `inspecto-agent` | upstream repo `jotder/inspect-agent` (`com.eoiagent:*`) — ⚠ corrected 2026-09-09; this cell named a machine-local path |
 
 ### 1.2 Personas (Lenses) and editions

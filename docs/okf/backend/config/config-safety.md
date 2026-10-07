@@ -2,14 +2,14 @@
 type: Concept
 title: Config Safety Validator
 description: The hard-fail gate that path-jails writes, bounds numeric config, and allow-lists output formats.
-resource: inspecto-config/src/main/java/com/gamma/config/safety/ConfigSafetyValidator.java
+resource: platform/inspecto-config/src/main/java/com/gamma/config/safety/ConfigSafetyValidator.java
 tags: [config, safety, validation, path-jail, security]
 timestamp: 2026-06-28T00:00:00Z
 ---
 
 # Config Safety Validator
 
-`ConfigSafetyValidator` (`inspecto-config/src/main/java/com/gamma/config/safety/ConfigSafetyValidator.java`) is a
+`ConfigSafetyValidator` (`platform/inspecto-config/src/main/java/com/gamma/config/safety/ConfigSafetyValidator.java`) is a
 purely-static, zero-dependency hard-fail gate (since v3.5.0). `check(configType, rawMap, policy)` returns
 `ERROR`-severity `Finding`s for any violation. It enforces three things:
 
@@ -602,7 +602,7 @@ a standing refusal (BACKLOG §6).
 
 ## The accepted-key census — which config types have one, and why not the rest
 
-`AcceptedConfigKeys` (`inspecto-config/src/main/java/com/gamma/config/spec/AcceptedConfigKeys.java`) is the
+`AcceptedConfigKeys` (`platform/inspecto-config/src/main/java/com/gamma/config/spec/AcceptedConfigKeys.java`) is the
 second gate folded into the same 422 at every save path — since G3 (2026-09-23) through the one shared
 gate `SaveGate.check`, see [one save gate](#one-save-gate-for-every-door--savegate-2026-09-23) below:
 **a key no component reads is refused** with
@@ -629,7 +629,7 @@ hypothetical; each of these has confirmed undeclared-but-engine-read keys:
 ⇒ **A type earns a census only when its parser's reads can be PROVEN from source**, and the proof is a
 ratchet test that fails when the two authorities drift.
 
-**`alert` earned one (2026-09-16).** `AlertRule.fromMap` (`inspecto-engine/.../alert/AlertRule.java:115-128`)
+**`alert` earned one (2026-09-16).** `AlertRule.fromMap` (`platform/inspecto-engine/.../alert/AlertRule.java:115-128`)
 is the easiest case in the codebase: one flat block of literal `alert.get("…")` calls, no dynamic key
 access, no nested sub-parsers. Seven of its ten keys are declared by `ConfigSpecs.alert()`; the other
 three are `AcceptedConfigKeys.ALERT_PARSER_ONLY` — `alert.dataset`, `alert.measure` (the BI-5
@@ -643,7 +643,7 @@ and the checker descends one level into it. `censusedParents(type)` is per-type 
 
 **`meta` earned one (2026-09-16), and it is the case that shows the test is about GRANULARITY, not
 about the word `entrySet`.** The one reader of a `*_meta.toon` is `SemanticModel.load`
-(`inspecto-engine/.../catalog/SemanticModel.java:95-138`; its only caller is `ServiceBootstrap:154`),
+(`platform/inspecto-engine/.../catalog/SemanticModel.java:95-138`; its only caller is `ServiceBootstrap:154`),
 and at the level the census works — the **top level** — it is five literal `raw.get("…")` reads:
 `name`, `tables`, `kpis`, `reports`, `domain`. All five are declared by `ConfigSpecs.meta()`, so
 **`meta` has no parser-only list at all** — five reads, five accounted for.
@@ -662,7 +662,7 @@ carry exactly the six declared keys, so nothing on disk regresses — pinned, no
 top-level block is undeclared — `references` — and that is the whole of
 `AcceptedConfigKeys.ENRICHMENT_PARSER_ONLY`.
 
-`EnrichmentConfig` (`inspecto-engine/.../enrich/EnrichmentConfig.java:143-236`) reaches the root map
+`EnrichmentConfig` (`platform/inspecto-engine/.../enrich/EnrichmentConfig.java:143-236`) reaches the root map
 through seven literal reads — `name`, `transform`, `transform_file`, `references`, `triggers`, and
 `ToonHelper.requireSection(raw, "input"|"output")` — with no `keySet`/`entrySet`/`forEach` over the
 root. Seven reads, seven accounted for. Every **other** component that reads a `*_enrich.toon` map

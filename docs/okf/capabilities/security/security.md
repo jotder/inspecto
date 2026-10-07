@@ -2,7 +2,7 @@
 type: Capability
 title: Security (SEC)
 description: Who may call what — the auth-free core, the Authenticator/Subject/TokenRelay/AccessDecider/SecretsProvider SPIs, the Standard OIDC + RBAC module, the Enterprise ABAC policy engine, secrets, HTTPS and the write-root gate. The requirement of record for the SEC area, its specification, its decisions, and what was refused.
-resource: inspecto-oidc/, inspecto-policy/
+resource: providers/inspecto-oidc/, providers/inspecto-policy/
 tags: [sec, capability, security, oidc, rbac, abac, capabilities, roles, access-policy, secrets, https, write-gate]
 timestamp: 2026-09-08T00:00:00Z
 ---
@@ -75,7 +75,7 @@ feature × edition matrix is authoritative for the Edition column**; this table 
 **Corrections this table makes to its predecessor**, each verified against source:
 
 - **`SEC-3` named "Keycloak token relay".** The class is `OidcTokenRelay`
-  (`inspecto-oidc/src/main/java/com/gamma/oidc/OidcTokenRelay.java`) — D15 renamed it on 2026-07-25
+  (`providers/inspecto-oidc/src/main/java/com/gamma/oidc/OidcTokenRelay.java`) — D15 renamed it on 2026-07-25
   because no IdP vendor is of record (§4). `PROJECT_NOTES.md` §3 and `ROADMAP.md` §3.1 carried the old name
   too; all three are fixed in the same change as this spec.
 - **`SEC-8` read `SHIPPED`.** The requirement names a Vault option and the Vault/KMS half is unbuilt by an
@@ -95,7 +95,7 @@ citing either. The EDITIONS rows are the edition truth and are corrected here in
 
 | EDITIONS row | What it said | What the build does |
 |---|---|---|
-| `SEC-09` note | Personal events carry `actor=anonymous` | The unauthenticated default actor is **`appUser`** (`RequestAttrs.actor`, `inspecto-auth-spi/src/main/java/com/gamma/control/RequestAttrs.java`; `ApiContext.actor` delegates to it): an authenticated `Subject.id()` first, else `agent:<session>`, else the `X-Actor` header, else `appUser`. No `anonymous` string exists in the tree |
+| `SEC-09` note | Personal events carry `actor=anonymous` | The unauthenticated default actor is **`appUser`** (`RequestAttrs.actor`, `spi/inspecto-auth-spi/src/main/java/com/gamma/control/RequestAttrs.java`; `ApiContext.actor` delegates to it): an authenticated `Subject.id()` first, else `agent:<session>`, else the `X-Actor` header, else `appUser`. No `anonymous` string exists in the tree |
 | `SEC-11` note | "client-migration-gated" | The API-v1 sunset apparatus was deleted 2026-07-25; `BACKLOG.md` §2 restated the gate 2026-09-07 as **the next MAJOR tag** |
 | `SEC-12` (end-session redirect) | `— / 🔲 / 🔲`, "nobody has asked" | **Half built.** The SPA implements RP-Initiated Logout (`SessionService.logout()` redirects to `endSessionUrl` with `client_id` + `post_logout_redirect_uri`, 2026-07-26) and reads `boot.auth?.endSessionUrl ?? environment.oidc.endSessionUrl`. **The server never publishes an `auth` block** — `BootstrapRoutes` emits only `features.authMode`; no Java file contains `authorizeUrl` or `endSessionUrl` — so the only working path is the build-time `environment.ts` value. 🟡 for S/E: works, but configured at UI build time, not at deployment |
 
@@ -210,7 +210,7 @@ streams stay capability-gated by design. `attributes` (ABAC A1) holds only the c
 
 ### 3.4 The OIDC authenticator
 
-`OidcAuthenticator` (`inspecto-oidc/src/main/java/com/gamma/oidc/OidcAuthenticator.java`) is a
+`OidcAuthenticator` (`providers/inspecto-oidc/src/main/java/com/gamma/oidc/OidcAuthenticator.java`) is a
 **vendor-agnostic resource server**: Nimbus JOSE+JWT `RemoteJWKSet` + `DefaultJWTProcessor`, RS256, no vendor
 SDK. Configuration is system properties only:
 
@@ -343,7 +343,7 @@ Personal since EDG-01 cell 4; its mechanism is `exchange-sharing.md`.
 
 ### 3.10 Enterprise ABAC — the Access Policy engine
 
-`inspecto-policy` registers `PolicyEngine` (`inspecto-policy/src/main/java/com/gamma/policy/PolicyEngine.java:52`)
+`inspecto-policy` registers `PolicyEngine` (`providers/inspecto-policy/src/main/java/com/gamma/policy/PolicyEngine.java:52`)
 on the `AccessDecider` SPI. Personal and Standard never bundle it and behave byte-identically.
 
 - **Attributes (A1).** `roles.toon` `identity: {attributeClaims: [...]}` is an **allowlist**; the
@@ -651,12 +651,12 @@ the logs were deleted 2026-07-26 before export).
 
 | Mechanism | Owning file | `resource:` | Read it for |
 |---|---|---|---|
-| The whole posture, RBAC R0–R5, ABAC A1–A5, the 2026-07-25 decisions, the boot precondition | `docs/okf/backend/editions/auth-security.md` (`Concept`) | `inspecto-oidc/, inspecto-policy/` | the long-form narrative every row above was distilled from |
-| The Standard module's classes, properties, shading and boot behaviour | `docs/okf/backend/modules/security.md` (`Concept`) | `inspecto-oidc/` | `audience` warn-only, `SEC-SIDECAR-BOOT-1`, why the sidecar is shaded |
+| The whole posture, RBAC R0–R5, ABAC A1–A5, the 2026-07-25 decisions, the boot precondition | `docs/okf/backend/editions/auth-security.md` (`Concept`) | `providers/inspecto-oidc/, providers/inspecto-policy/` | the long-form narrative every row above was distilled from |
+| The Standard module's classes, properties, shading and boot behaviour | `docs/okf/backend/modules/security.md` (`Concept`) | `providers/inspecto-oidc/` | `audience` warn-only, `SEC-SIDECAR-BOOT-1`, why the sidecar is shaded |
 | Edition gating as a mechanism; the EDG-01 recipe items | `docs/okf/backend/editions/editions-model.md` (`Concept`) | `pom.xml` | how a module joins a profile and what the compiler cannot see |
 | Request dispatch, `PUBLIC_PATHS`, the envelope, error codes | `docs/okf/backend/control-plane/control-api.md` · `api-v1.md` (`Concept`) | `inspecto/src/main/java/com/gamma/control` | the contract SEC gates inside |
-| Intra-Space shares and the cross-Space Exchange lifecycle | `docs/okf/backend/control-plane/exchange-sharing.md` (`Concept`) | `inspecto-exchange/` | the `ShareGrant` state machine and the attribute-scope pin |
-| The write-root jail, `PathJail`, `ConfigSafetyValidator` | `docs/okf/backend/config/config-safety.md` (`Concept`) | `inspecto-config/` | what happens *inside* the root once §3.13 lets a write through |
+| Intra-Space shares and the cross-Space Exchange lifecycle | `docs/okf/backend/control-plane/exchange-sharing.md` (`Concept`) | `features/inspecto-exchange/` | the `ShareGrant` state machine and the attribute-scope pin |
+| The write-root jail, `PathJail`, `ConfigSafetyValidator` | `docs/okf/backend/config/config-safety.md` (`Concept`) | `platform/inspecto-config/` | what happens *inside* the root once §3.13 lets a write through |
 | Actor attribution, `AuditTrail`, `access.denied` in the ledger | `docs/okf/backend/control-plane/events-metrics.md` (`Concept`) | `inspecto/src/main/java/com/gamma/control` | how a decision becomes an event |
 | 🔴 **The UI seam has no concept file.** `LensService`, `SessionService`, the Access / Roles / Policies editors and the sign-in flow are documented only in source and in this spec | *(none — gap)* | `inspecto-ui/src/app/inspecto/api/lens.service.ts` · `session.service.ts` · `inspecto-ui/src/app/modules/admin/access/` | the code. Same class of gap the plan flagged for `INC`'s missing backend concept; filed under `UI`/Surfaces, not here |
 
@@ -724,10 +724,10 @@ and `callback.a11y.spec.ts`, `core/navigation/navigation.service.spec.ts` (modul
 
 | File | Provider |
 |---|---|
-| `inspecto-oidc/src/main/resources/META-INF/services/com.gamma.control.Authenticator` | `com.gamma.oidc.OidcAuthenticator` |
-| `inspecto-oidc/src/main/resources/META-INF/services/com.gamma.control.TokenRelay` | `com.gamma.oidc.OidcTokenRelay` |
-| `inspecto-secrets/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider` | `com.gamma.secrets.FileKeystoreSecretsProvider` |
-| `inspecto-policy/src/main/resources/META-INF/services/com.gamma.control.AccessDecider` | `com.gamma.policy.PolicyEngine` |
+| `providers/inspecto-oidc/src/main/resources/META-INF/services/com.gamma.control.Authenticator` | `com.gamma.oidc.OidcAuthenticator` |
+| `providers/inspecto-oidc/src/main/resources/META-INF/services/com.gamma.control.TokenRelay` | `com.gamma.oidc.OidcTokenRelay` |
+| `providers/inspecto-secrets/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider` | `com.gamma.secrets.FileKeystoreSecretsProvider` |
+| `providers/inspecto-policy/src/main/resources/META-INF/services/com.gamma.control.AccessDecider` | `com.gamma.policy.PolicyEngine` |
 
 ### 8.6 Guards
 

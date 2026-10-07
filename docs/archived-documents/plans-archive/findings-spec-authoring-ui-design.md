@@ -332,7 +332,7 @@ whether an authored one exists, and for its `contentHash`). A badge in the dialo
 ## 7. Slices
 
 Each slice ships with the tests named in §8 and runs **unit-level** per the CLAUDE.md rule (`npx ng test
---include=…`, `-pl inspecto-ops -Dtest=ControlApiFindingsSpecTest`).
+--include=…`, `-pl :inspecto-ops -Dtest=ControlApiFindingsSpecTest`).
 
 | Slice | Content | Blocks on |
 |---|---|---|

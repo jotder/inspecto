@@ -80,15 +80,15 @@ class DuckLakeRegistrationSiteContractTest {
      * register the same files twice. Adding a third site means proving it cannot overlap the other two.
      */
     private static final List<String> EXPECTED_SITES = List.of(
-            "inspecto-engine/src/main/java/com/gamma/inspector/ConsignmentIngestor.java",
-            "inspecto-engine/src/main/java/com/gamma/job/PipelineJobRunner.java");
+            "platform/inspecto-engine/src/main/java/com/gamma/inspector/ConsignmentIngestor.java",
+            "platform/inspecto-engine/src/main/java/com/gamma/job/PipelineJobRunner.java");
 
     /** Module main-source roots that could hold a call site. */
     private static final List<String> MAIN_ROOTS = List.of(
-            "inspecto/src/main/java", "inspecto-engine/src/main/java", "inspecto-etl/src/main/java",
-            "inspecto-acquire/src/main/java", "inspecto-ops/src/main/java", "inspecto-event/src/main/java",
-            "inspecto-config/src/main/java", "inspecto-util/src/main/java", "inspecto-sql/src/main/java",
-            "inspecto-connectors/src/main/java", "inspecto-processor/src/main/java");
+            "inspecto/src/main/java", "platform/inspecto-engine/src/main/java", "platform/inspecto-etl/src/main/java",
+            "platform/inspecto-acquire/src/main/java", "features/inspecto-ops/src/main/java", "platform/inspecto-event/src/main/java",
+            "platform/inspecto-config/src/main/java", "platform/inspecto-util/src/main/java", "platform/inspecto-sql/src/main/java",
+            "providers/inspecto-connectors/src/main/java", "inspecto-processor/src/main/java");
 
     @Test
     void theCatalogRegistrationHasExactlyItsDeclaredProductionCallSites() throws IOException {

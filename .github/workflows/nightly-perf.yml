@@ -39,7 +39,7 @@ jobs:
 
       - name: PluginIngestBenchmark at 1M rows, floor 50,000 rows/s
         run: >-
-          mvn --batch-mode --no-transfer-progress -pl inspecto-engine -am test
+          mvn --batch-mode --no-transfer-progress -pl :inspecto-engine -am test
           -Dtest=PluginIngestBenchmark -Dsurefire.failIfNoSpecifiedTests=false
           -Dbench.run=true -Dbench.rows=1000000 -Dbench.days=30 -Dbench.format=PARQUET
           -Dbench.floorRowsPerSec=50000
@@ -49,4 +49,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nightly-perf
-          path: inspecto-engine/target/surefire-reports/*PluginIngestBenchmark*
+          path: platform/inspecto-engine/target/surefire-reports/*PluginIngestBenchmark*

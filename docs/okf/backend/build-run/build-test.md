@@ -271,7 +271,7 @@ Node 22 for this step because the guard uses `fs.globSync`.
 
 🔴 **Check for a live build BEFORE every `mvn`, not just when you remember.** ⚠ Recorded twice on
 2026-09-08 because writing it down once did not prevent the second occurrence: a targeted
-`mvn -pl asn-parser/asn-decoders/asn-core test` was fired while a full-reactor coverage run was in
+`mvn -pl providers/asn-parser/asn-decoders/asn-core test` was fired while a full-reactor coverage run was in
 flight, so both wrote `asn-core/target/` at once and that module's numbers had to be treated as
 suspect. A `-pl` run feels harmless precisely because it is small — but it shares `target/` with
 whatever the reactor is doing to the same module. `ps -W | grep -iE 'java\.exe|mvn'` costs nothing;
@@ -329,7 +329,7 @@ days, while `EDITIONS.md` marked SFTP shipped in all three editions. Two details
 
 ⚠ `-am` walks **upstream only**, and `inspecto-connectors` depends *on* the core — so it is unreachable
 from `-pl inspecto -am` and has to be named: the packaging build is now
-`mvn clean package -pl inspecto,inspecto-connectors -am`. Miss that and the sidecar is silently absent.
+`mvn clean package -pl inspecto,:inspecto-connectors -am`. Miss that and the sidecar is silently absent.
 `package.ps1` therefore **verifies the staged jar** (8 factories registered, sshj present, javax.mail
 present) rather than trusting the copy — the connector tests all live *inside* the module, where the
 classpath is trivially correct, so they can never go red for a packaging gap. That is exactly how this
@@ -339,7 +339,7 @@ survived undetected.
 launch classpath yourself — there is no `package.ps1` switch for it:
 
 ```bash
-mvn -o clean package -pl inspecto-agent -am -DskipTests
+mvn -o clean package -pl :inspecto-agent -am -DskipTests
 ```
 
 ✅ **The runtime-floor conflict is GONE as of 2026-09-17.** It was: the agent modules need a **JDK
@@ -436,7 +436,7 @@ this file is a claim, checked by `tools/check-backlog-homes.mjs`.
 
 - ~~**`EDITION-GATED-TESTS-IN-WRONG-HOME-1`**~~ ✅ **CLOSED 2026-09-25 (this commit)** — test classes that
   guarded CORE behaviour from inside `inspecto-ops`, which the default reactor never builds
-  (`mvn -o -pl inspecto-ops -am test` does not even resolve without `-Pedition-standard`). Severity was LOW:
+  (`mvn -o -pl :inspecto-ops -am test` does not even resolve without `-Pedition-standard`). Severity was LOW:
   `ci.yml:364` runs `-Pedition-enterprise` with tests, so CI always ran them — the exposure was the local
   `mvn -o clean test` loop only. `RepoSpacesConfigValidationTest` moved to `inspecto`; `ControlApiDbBrowserTest`,
   `ControlApiDecisionRulesTest` and `PostgresStateStoreTest` SPLIT (ops siblings `ControlApiDbBrowserOpsTablesTest`,
@@ -456,8 +456,8 @@ clean tree passes at 1802 links over 529 files.
 ✅ **CLOSED 2026-09-17 — `tools/check-doc-counts.mjs` now has the same shape as its sibling:** `ROOTS = ['.']`
 minus the identical `SKIP_DIRS` deny-list. The walk went from **493** markdown files to **529** (in-scope, after
 the `docs/archived-documents` exemption: **253 → 289**), gaining 36 files in nine previously-invisible trees —
-`inspecto-agent/docs/` ×14, `asn-parser/docs/` ×10, `tools/templates/*/README.md` ×3, plus `inspecto/README.md`,
-`inspecto-ui/README.md`, `dev-infra/`, `spaces/`, `inspecto-engine/`, `inspecto-intelligence/`. The widening cost
+`features/inspecto-agent/docs/` ×14, `providers/asn-parser/docs/` ×10, `tools/templates/*/README.md` ×3, plus `inspecto/README.md`,
+`inspecto-ui/README.md`, `dev-infra/`, `spaces/`, `platform/inspecto-engine/`, `features/inspecto-intelligence/`. The widening cost
 **no findings and no noise**: those 36 carry ZERO `<!--count:*-->` markers, so the row's "latent, not live"
 assessment held exactly. The 68 marked statements and their derived values are unchanged.
 

@@ -2,7 +2,7 @@
 type: Concept
 title: Parser plugins (the self-describing Parser framework)
 description: One SPI unifying the two transparent parse engines — DuckDB-native built-ins and custom Java decoders — served to the UI with grammar schemas and a tree-capable preview.
-resource: inspecto-engine/src/main/java/com/gamma/parse/ParserPlugin.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/parse/ParserPlugin.java
 tags: [concept, engine, parsing, spi, plugins]
 timestamp: 2026-07-30T00:00:00Z
 ---
@@ -91,9 +91,9 @@ delivered. ⚠ **Deliberate split package:** `Asn1ParserPlugin`/`Asn1GrammarSour
 `Asn1PluginRegistrationTest` (that module). It is — **the first
 hierarchical parser that is `ingestable: true`**, because it names an ingester
 (`com.gamma.ingester.Asn1RecordIngester`, below). Wraps the
-`asn-facade` module's public `Asn1Decoder`/`RecordMapper` (`asn-parser/asn-decoders/asn-facade`,
+`asn-facade` module's public `Asn1Decoder`/`RecordMapper` (`providers/asn-parser/asn-decoders/asn-facade`,
 depended on as `com.gamma.asn:asn-facade:0.1.0-SNAPSHOT`, installed to the local repo from the
-separate `asn-parser/asn-decoders` reactor — not yet resolved from this build, see the coordinate
+separate `providers/asn-parser/asn-decoders` reactor — not yet resolved from this build, see the coordinate
 note below). Grammar: `asn1.grammar` (the ASN.1 module text) **or** `asn1.grammar_file` (a stored
 `.asn` module, 2026-09-23 — see below) / `asn1.root_type` / `asn1.strictness`
 (BER/DER/CER) / `asn1.file_header_length` / `asn1.record_header_length` / `asn1.max_value_bytes`
@@ -309,19 +309,19 @@ Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
   keeps them that way, e.g. `mtnOCC.asn`). One vendor's decode settings have a home since 2026-09-25: the
   **Decode Profile** (below).
 - ~~**The Maven coordinate split**~~ **RESOLVED 2026-08-01.** The root `pom.xml` now aggregates
-  `asn-parser/asn-decoders`, so `com.gamma.asn:asn-facade` resolves from the reactor and the manual
+  `providers/asn-parser/asn-decoders`, so `com.gamma.asn:asn-facade` resolves from the reactor and the manual
   `mvn install` is gone (verified with the local repo's `com/gamma/asn` deleted: 23 modules,
   asn-facade [7/23] before inspecto-engine, `mvn -o clean test` green, 2178 tests). Aggregation
   only — that tree keeps its own parent and inherits nothing from `inspecto-parent`. *(First
   documented as done 2026-07-31, but that pom edit was never committed — the `<modules>` entry was
   lost across a shift and re-landed 2026-08-01; a fresh `~/.m2` still needed the manual install in
   between.)* The OLD `asn-parser-v2:1.2.1`
-  (`asn-parser/pom.xml`) is **deleted**: zero consumers, and its parent
+  (`providers/asn-parser/pom.xml`) is **deleted**: zero consumers, and its parent
   `com.gamma.asn.decoders:asn-decoders:1.1.3-dev` existed nowhere, so it could not build.
-  ⚠ **`asn-parser/src/main/java` survives the deletion and must not be cleaned up as an orphan** —
+  ⚠ **`providers/asn-parser/src/main/java` survives the deletion and must not be cleaned up as an orphan** —
   `legacy-code/pom.xml` compiles it via `<sourceDirectory>../../src/main/java</sourceDirectory>`
   (45 files, confirmed in the build log). It retires with `legacy-code` after Phase 4.
-- ⚠ **`asn-parser/src/test/` is a tree of manual scratch programs, NOT tests** (operator decision
+- ⚠ **`providers/asn-parser/src/test/` is a tree of manual scratch programs, NOT tests** (operator decision
   2026-09-24, `LEGACY-ASN-SRC-TREE-UNBUILT-1`: rename, don't wire). No `testSourceDirectory` points
   at it, so its 21 files compile on no build path. The six that carried `*Test` names were renamed
   to the `*Harness` convention so nothing claims coverage it lacks: `Test` → `SchemaCsvHarness`,
@@ -330,7 +330,7 @@ Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
   `FixedLengthFileReaderHarness`, `RTDMS_ASN_Test` → `RTDMS_ASN_Harness`. `asn-golden`'s
   `GoldenCapture` cites `RTDMS_ASN_Harness.<method>` as provenance for 7 of its 9 golden cases —
   rename that file again only together with those comments. Real ASN.1 coverage lives in the
-  `asn-parser/asn-decoders` modules.
+  `providers/asn-parser/asn-decoders` modules.
 - ⚠ **Corpus-backed tests are opt-in AND data-gated** (DATA-GOV-1). `RealGrammarsTest` (asn-schema)
   and `ParityCheckTest` (asn-golden) `assumeTrue` on **both** `-Dasn.corpus.tests=true` **and** the
   operator data being present on disk, so by default — and on any corpus-less checkout, including a

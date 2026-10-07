@@ -394,7 +394,7 @@ and reverted on its own.
 | **S3** 🔒 The fetch (own commit, own review) | `SnsSigningCerts` real fetcher, the address check, the cache, the budget, single-flight. `SnsSubscriptionConfirmer`. | T-S11 host: `sns.s3.amazonaws.com`, `sns.us-east-1.amazonaws.com.evil.com`, `sns.eu-west-1.amazonaws.com` for an ARN in us-east-1, userinfo `https://x@sns…`, port `:8443`, `http://` are all refused **before** the Fetcher is called. T-S12 address: a resolver fake returning `127.0.0.1`, `169.254.169.254`, `::ffff:169.254.169.254`, `10.0.0.1` (with D3 off) is refused. T-S13: a 302 is refused and not followed (local HTTPS stub). T-S14: a 20 KiB body is refused at 16 KiB. T-S15: a slow stub is cut at 5 s. T-S16: the 13th distinct miss in an hour makes no request. T-S17: a certificate that does not chain, is expired, has the wrong subject, or a 1024-bit key is refused. T-S7: the hostname-verification-disabled property stops the adapter arming. T-S18: SubscribeURL with extra parameters or a different TopicArn is refused. T-S19: pinned mode makes **zero** Fetcher calls. |
 | **S4** Documents | OKF concept section; `DEPLOY` note (set SignatureVersion 2 on the topic, and the URL to paste); BACKLOG row updated; this plan archived. | doc guards |
 
-Run the tests with `-pl inspecto-connectors -Dtest=…` and `-pl inspecto -Dtest=ControlApiDeliveryStatusTest`
+Run the tests with `-pl :inspecto-connectors -Dtest=…` and `-pl inspecto -Dtest=ControlApiDeliveryStatusTest`
 (comma-separated, never `+`). The **route change in S0 touches a shared seam** (`rawBody` is used by every
 body-reading route), so S0 also runs the `inspecto` module suite.
 

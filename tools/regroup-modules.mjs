@@ -145,7 +145,7 @@ export function rewriteGitignore(text, file, ctx) {
     return R(out, n);
 }
 
-/** `dir: 'inspecto-oidc'` (tools/bundle-modules.mjs and its twins). */
+/** `dir: 'providers/inspecto-oidc'` (tools/bundle-modules.mjs and its twins). */
 export function rewriteDirEntries(text, file, ctx) {
     if (!/^(tools|scripts)\//.test(file.np)) return R(text, 0);
     let n = 0;
@@ -153,7 +153,7 @@ export function rewriteDirEntries(text, file, ctx) {
     return R(out, n);
 }
 
-/** Quoted dir-name path ARGUMENTS: join(ROOT, 'inspecto-engine', 'pom.xml') -> join(ROOT, 'platform', 'inspecto-engine', ...); PowerShell Join-Path $r 'inspecto-oidc' -> 'providers\inspecto-oidc'. */
+/** Quoted dir-name path ARGUMENTS: join(ROOT, 'platform', 'inspecto-engine', 'pom.xml') -> join(ROOT, 'platform', 'inspecto-engine', ...); PowerShell Join-Path $r 'providers\inspecto-oidc' -> 'providers\inspecto-oidc'. */
 export function rewriteQuotedPathArgs(text, file, ctx) {
     if (!['tools', 'scripts', 'workflow', 'claude'].includes(file.cls)) return R(text, 0);
     let n = 0;
@@ -186,7 +186,7 @@ export function rewriteMavenProjectLists(text, file, ctx) {
     return R(out, n);
 }
 
-/** `cd inspecto-ops` / `working-directory: inspecto-ops` in scripts, workflows, docs. */
+/** `cd features/inspecto-ops` / `working-directory: features/inspecto-ops` in scripts, workflows, docs. */
 export function rewriteDirContexts(text, file, ctx) {
     let n = 0;
     const out = text.replace(new RegExp(`(\\bcd\\s+|working-directory:\\s*)(["']?)(${ctx.alt})(?![\\w/\\\\.-])`, 'g'),
@@ -228,13 +228,13 @@ export function rewriteRelativeCitations(text, file, ctx) {
     return R(out, n, notes);
 }
 
-/** The generic one: a module dir token at a path position (`inspecto-ops/src/...`, `inspecto-oidc\target`, `$ROOT/inspecto-ops/`) -> `group/` + token, with the separator the text already uses. */
+/** The generic one: a module dir token at a path position (`features/inspecto-ops/src/...`, `providers\inspecto-oidc\target`, `$ROOT/features/inspecto-ops/`) -> `group/` + token, with the separator the text already uses. */
 export function rewriteModulePaths(text, file, ctx) {
     if (file.np.startsWith(ARCHIVE) || file.cls === 'docs-plans' || file.cls === 'gitignore' || file.cls === 'root-pom') return R(text, 0);
     let n = 0; const notes = [];
     const put = (d, sep) => { n++; return `${ctx.moves.get(d)}${sep}${d}`; };
     const code = /\.(mjs|js|ts)$/.test(file.np);
-    // `/inspecto-la-core reaches inspecto-la-storage/` is a JS regex literal ending in a slash, not a path
+    // `/inspecto-la-core reaches la/inspecto-la-storage/` is a JS regex literal ending in a slash, not a path
     const inRegex = (i) => code && /(?:^|[(,=:!&|?;])\s*\/(?![/*])[^/]*$/.test(text.slice(text.lastIndexOf('\n', i - 1) + 1, i));
     let out = text.replace(ctx.reGeneric, (m, d, i) => (inRegex(i) ? (notes.push(`${file.np}:${lineOf(text, i)} ${d}/ inside a regex literal - left as is`), m) : put(d, text[i + d.length])));
     out = out.replace(ctx.reVar, (m, pre, d, i, whole) => `${pre}${put(d, whole[i + pre.length + d.length])}`);
@@ -243,7 +243,7 @@ export function rewriteModulePaths(text, file, ctx) {
 
 /** Java: cwd-relative repo paths in code of a MOVED module gain one `..` (surefire runs in the module dir); `../<moved module>` gains its group everywhere. */
 export function rewriteJavaRelativePaths(text, file, ctx) {
-    if (file.cls !== 'java' || file.np.startsWith('asn-parser/') || file.np.startsWith('providers/asn-parser/')) return R(text, 0);
+    if (file.cls !== 'java' || file.np.startsWith('providers/asn-parser/') || file.np.startsWith('providers/asn-parser/')) return R(text, 0);
     const moved = movedUnit(file.np, ctx.moves) != null;
     let n = 0; const notes = [];
     const grp = (d) => ctx.moves.get(d);
@@ -290,7 +290,7 @@ export const EXACT_PATCHES = [
     {
         file: 'tools/check-module-architecture.test.mjs',
         why: "the registries() fixture is keyed on the registry file's REAL path",
-        from: "'inspecto-auth-spi/src/main/java/com/gamma/control/CapabilityManifest.java': 'new Entry",
+        from: "'spi/inspecto-auth-spi/src/main/java/com/gamma/control/CapabilityManifest.java': 'new Entry",
         to: "'spi/inspecto-auth-spi/src/main/java/com/gamma/control/CapabilityManifest.java': 'new Entry",
     },
     {

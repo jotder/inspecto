@@ -68,7 +68,7 @@ The single most important item for commercialization.
 ### 3.2 Object-storage & network-share connectors (T2) · Effort: **M–L** · ✅ **SHIPPED (object storage) 2026-07-22**
 
 > **Delivered (ACQ-4).** `s3` (AWS / MinIO / GCS-interop), `azure` (Blob + Azurite) and native `gcs`
-> connectors on the existing `CollectorConnector` SPI in `inspecto-connectors/` — all three **SDK-free**:
+> connectors on the existing `CollectorConnector` SPI in `providers/inspecto-connectors/` — all three **SDK-free**:
 > raw REST over `java.net.http.HttpClient` with hand-rolled SigV4 / Shared Key / service-account OAuth2 on
 > plain JDK crypto, so no cloud SDK jar enters the build and it stays air-gappable. The etag/version
 > follow-on landed with them (listing ETag → `RemoteFile.etag`, GCS `generation` → `RemoteFile.version`,

@@ -2,14 +2,14 @@
 type: Concept
 title: Jobs & Scheduling
 description: JobService — cron, event-triggered, and manual jobs, with an off-bus virtual-thread handoff.
-resource: inspecto-engine/src/main/java/com/gamma/job/JobService.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/job/JobService.java
 tags: [control-plane, jobs, scheduling, cron, triggers, async-runs]
 timestamp: 2026-07-07T00:00:00Z
 ---
 
 # Jobs & Scheduling
 
-`JobService` (`inspecto-engine/src/main/java/com/gamma/job/JobService.java`) hosts a registry of jobs and a
+`JobService` (`platform/inspecto-engine/src/main/java/com/gamma/job/JobService.java`) hosts a registry of jobs and a
 virtual-thread `workers` executor. Four trigger modes:
 
 * **Cron** — jobs with a `cron` field are armed on the shared `Scheduler`. **2026-07-20**: `Scheduler.cron()`
@@ -716,8 +716,8 @@ two-sided seam:
 
 | Side | Type | Who writes it |
 |---|---|---|
-| Author | [`ConsignmentProcessor`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/ConsignmentProcessor.java) — `id()` + `process(ProcessorContext)` | third party, discovered by `ServiceLoader` |
-| Framework | [`ConsignmentProcessJobType`](../../../../inspecto-engine/src/main/java/com/gamma/job/ConsignmentProcessJobType.java) — a `JobTypeProvider` | this repo, registered in `JobService` beside the other built-ins |
+| Author | [`ConsignmentProcessor`](../../../../platform/inspecto-engine/src/main/java/com/gamma/consignment/ConsignmentProcessor.java) — `id()` + `process(ProcessorContext)` | third party, discovered by `ServiceLoader` |
+| Framework | [`ConsignmentProcessJobType`](../../../../platform/inspecto-engine/src/main/java/com/gamma/job/ConsignmentProcessJobType.java) — a `JobTypeProvider` | this repo, registered in `JobService` beside the other built-ins |
 
 **Authors never touch `Job` or `JobContext`.** Nothing new was added to the Job framework for this: registration
 reuses the existing `JobTypeProvider` seam (a class-based provider, as `SqlTemplateJobType` already is), so
@@ -741,7 +741,7 @@ every third-party processor binds to. `ArtifactRecorder` is deliberately *not* d
 
 ### Reading is a narrow seam, not a `Connection`
 
-[`ConsignmentReader`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/ConsignmentReader.java)
+[`ConsignmentReader`](../../../../platform/inspecto-engine/src/main/java/com/gamma/consignment/ConsignmentReader.java)
 exposes `query(sql)` + `relations()`, **not** the JDBC `Connection` the plan originally specified. A raw handle
 makes the read-modify-write §5.1 forbids trivially expressible, so the plan's own acceptance test ("a write
 attempt fails") is unsatisfiable with one — and it leaks a far larger surface than the `job()` accessor rejected
@@ -762,7 +762,7 @@ defence against hostile in-process code.**
 
 ### Summaries are guarded, then written
 
-[`SummaryEmitter`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/SummaryEmitter.java) enforces
+[`SummaryEmitter`](../../../../platform/inspecto-engine/src/main/java/com/gamma/consignment/SummaryEmitter.java) enforces
 §7.2 at the seam, because non-composable measures produce *quietly* wrong numbers: `count` is mandatory on every
 row, and every `Measure` must declare its `Composability` (`ADDITIVE` / `BUCKETED` / `COMPUTED_FROM_DETAIL`) —
 undeclared is refused, never assumed. A measure whose name says it is not additive (`avg`, `ratio`, `p95`,

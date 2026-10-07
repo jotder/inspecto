@@ -2,7 +2,7 @@
 type: Architecture
 title: Stage-1 architecture & design
 description: The M..N multiplexer ingest path — design philosophy and scope, the architecture, the directory layout, and the two-step process. Scoped deliberately against architecture-layers.md, which owns the platform-wide layer model.
-resource: inspecto-etl/src/main/java/com/gamma/etl
+resource: platform/inspecto-etl/src/main/java/com/gamma/etl
 tags: [architecture, stage1, multiplexer, ingest, layout]
 timestamp: 2026-07-16T00:00:00Z
 ---

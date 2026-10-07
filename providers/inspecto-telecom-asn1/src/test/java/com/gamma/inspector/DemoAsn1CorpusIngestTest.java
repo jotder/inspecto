@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class DemoAsn1CorpusIngestTest {
 
-    private static final Path REPO = Path.of("..").toAbsolutePath().normalize();
+    private static final Path REPO = Path.of("..", "..").toAbsolutePath().normalize();
 
     /** msc_cdr (ASN.1 BER): 13 records → moCallRecord 5 · mtCallRecord 4 · moSMSRecord 3, ssActionRecord junk. */
     @Test

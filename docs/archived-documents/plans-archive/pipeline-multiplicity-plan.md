@@ -449,8 +449,8 @@ blocks projected into the lift's order. As-built notes:
 - ⚠ **`steps()` has no consumer yet, by design.** The flat path still reads `dedup()` / `csv.rowWhere()`;
   the graph path walks the graph. A `steps:` file is authoring-only until A5, the posture `sinks:` has
   had since it shipped, and the accessor javadoc says so.
-- ⚠ **Cross-module gotcha:** `-pl inspecto-engine` resolves `inspecto-etl` from `~/.m2`, not the reactor,
-  so new symbols are invisible until `mvn -o install -pl inspecto-etl`. Bit once here; will bite A3.
+- ⚠ **Cross-module gotcha:** `-pl :inspecto-engine` resolves `inspecto-etl` from `~/.m2`, not the reactor,
+  so new symbols are invisible until `mvn -o install -pl :inspecto-etl`. Bit once here; will bite A3.
 
 **A3 + A4 — ✅ SHIPPED 2026-08-11.** `lower()` emits `steps:` only for a chain the singular keys cannot
 hold; `MULTI_DEDUP`/`MULTI_ROUTE`/`MULTI_SUMMARIZE`/`MULTI_JOIN` deleted; filters no longer merged into

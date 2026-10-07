@@ -1,8 +1,8 @@
 ---
 name: backend-explorer
 description: >
-  Read-only locator and explainer for the inspecto Java backend (modules inspecto/, inspecto-agent/,
-  inspecto-agent-hosted/, inspecto-connectors/). Use to find where something is defined, trace a
+  Read-only locator and explainer for the inspecto Java backend (modules inspecto/, features/inspecto-agent/,
+  providers/inspecto-agent-hosted/, providers/inspecto-connectors/). Use to find where something is defined, trace a
   call/SPI/ServiceLoader wiring, or answer "how does X work / which files touch Y" in the engine,
   control plane, ETL, acquire, ops, or config layers. Returns a tight conclusion (files + line refs +
   short explanation), NOT file dumps — so the main thread spends few tokens. Do NOT use for the

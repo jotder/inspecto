@@ -2,7 +2,7 @@
 type: Concept
 title: Pipeline Live Execution
 description: Running an authored Pipeline as a JobType.PIPELINE job — source_store seeds, sink writing, conservation checks.
-resource: inspecto-engine/src/main/java/com/gamma/job/PipelineJobRunner.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/job/PipelineJobRunner.java
 tags: [pipeline-graph, execution, job, source-store, conservation]
 timestamp: 2026-07-07T00:00:00Z
 ---
@@ -18,7 +18,7 @@ shipped 2026-06-18/19):
 
 ## `PipelineJobRunner.run()`
 
-`PipelineJobRunner` (`inspecto-engine/src/main/java/com/gamma/job/PipelineJobRunner.java`):
+`PipelineJobRunner` (`platform/inspecto-engine/src/main/java/com/gamma/job/PipelineJobRunner.java`):
 
 1. Load the `PipelineGraph` from `PipelineStore`.
 2. `seedsOf(g)` — find every node with a non-blank `source_store` cfg key; **throws if none** (zero seeds is

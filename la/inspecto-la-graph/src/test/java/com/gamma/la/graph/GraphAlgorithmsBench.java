@@ -27,7 +27,7 @@ import java.util.function.Function;
  * MEASUREMENT harness, not a test: sets the SYNC/JOB thresholds of {@code docs/archived-documents/plans-archive/la-separation-d4-design.md}
  * (§3 catalogue, §6 "JOB/SYNC split is an estimate"). Never runs in the default suite: it needs
  * {@code -Dinspecto.bench=true}. Example:
- * {@code mvn -o test -Pedition-enterprise -pl inspecto-la-graph -am -Dtest=GraphAlgorithmsBench
+ * {@code mvn -o test -Pedition-enterprise -pl :inspecto-la-graph -am -Dtest=GraphAlgorithmsBench
  * -Dinspecto.bench=true -Dsurefire.failIfNoSpecifiedTests=false} (optional {@code -Dinspecto.bench.out=<file>} for
  * the markdown table, {@code -Dinspecto.bench.timeoutSec=60}, {@code -Dinspecto.bench.only=kCore,linkPrediction} to
  * run just the algorithms whose name starts with one of the listed prefixes).

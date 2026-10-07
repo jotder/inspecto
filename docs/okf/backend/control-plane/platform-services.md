@@ -2,7 +2,7 @@
 type: Concept
 title: Platform Services — the plugin envelope
 description: The named seam through which a Job (and later a Step) reaches engine facilities — a flat typed lookup filtered by a declared `requires:` list, validated at registration, substituted under a dry run — plus the pack scaffolder and test harness that make it authorable.
-resource: inspecto-engine/src/main/java/com/gamma/job/PlatformServices.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/job/PlatformServices.java
 tags: [control-plane, jobs, plugins, packs, platform-services, grants, scaffolding]
 timestamp: 2026-08-10T00:00:00Z
 ---
@@ -104,7 +104,7 @@ node tools/scaffold.mjs new step      --id acme.score     --name "Acme Score"
 - **No archetype**, because archetypes resolve from a repository and this build is air-gapped: plain
   file templates under `tools/templates/` plus `{{token}}` stamping, zero dependencies, beside its
   neighbours `check-vocabulary.mjs` / `check-secrets.mjs`.
-- **The engine coordinates are read out of `inspecto-engine/pom.xml` at generation time**, never
+- **The engine coordinates are read out of `platform/inspecto-engine/pom.xml` at generation time**, never
   hardcoded, so an artifactId or version change cannot leave the script emitting a dependency that
   does not resolve.
 - **`new service` and `new step`** both emit real packs: `new step` opened at S2-3 (§7c), `new service` at

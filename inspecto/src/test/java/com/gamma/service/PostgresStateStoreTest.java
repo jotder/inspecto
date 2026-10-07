@@ -75,7 +75,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * <h2>Runbook — the command that actually works (proven 2026-09-12, PG 18.6 in Docker)</h2>
  *
  * <pre>{@code
- * MAVEN_OPTS="-Duser.timezone=Asia/Kolkata"  * INSPECTO_TEST_PG_URL='jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres'  * mvn -o -B test -Pedition-enterprise -pl inspecto-ops -am  *     -Dtest=PostgresStateStoreTest -Dsurefire.failIfNoSpecifiedTests=false -DforkCount=0
+ * MAVEN_OPTS="-Duser.timezone=Asia/Kolkata"  * INSPECTO_TEST_PG_URL='jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres'  * mvn -o -B test -Pedition-enterprise -pl :inspecto-ops -am  *     -Dtest=PostgresStateStoreTest -Dsurefire.failIfNoSpecifiedTests=false -DforkCount=0
  * }</pre>
  *
  * <p>That shape is not arbitrary. The obvious command fails three times over, and because this class
@@ -83,10 +83,10 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * connected even with a server present:
  *
  * <ol>
- *   <li>🔴 <b>The driver was missing from this module.</b> {@code inspecto/} and {@code inspecto-engine/}
+ *   <li>🔴 <b>The driver was missing from this module.</b> {@code inspecto/} and {@code platform/inspecto-engine/}
  *       declare {@code org.postgresql:postgresql} at test scope, and <b>test scope is not transitive</b>
  *       — so the module that OWNS this test had no driver and died with
- *       {@code No suitable driver found}. Fixed 2026-09-12 by declaring it in {@code inspecto-ops/pom.xml}.
+ *       {@code No suitable driver found}. Fixed 2026-09-12 by declaring it in {@code features/inspecto-ops/pom.xml}.
  *       ⚠ A skipping test cannot tell you its classpath is broken.</li>
  *   <li>🔴 <b>{@code -D...&password=...} loses the password on Windows.</b> {@code mvn.cmd} re-parses
  *       the argument list, so the {@code &} splits the URL and the driver connects with no password

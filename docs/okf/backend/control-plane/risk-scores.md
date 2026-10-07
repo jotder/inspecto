@@ -2,7 +2,7 @@
 type: Concept
 title: Risk Scores — weighted-factor scoring per entity
 description: The risk-score component kind, the risk.score Job that writes the scores Dataset, GET /risk-scores/{model}/{entityKey}, and Incident priority through a per-entity Alert Rule.
-resource: inspecto-engine/src/main/java/com/gamma/risk/RiskScoreEvaluator.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/risk/RiskScoreEvaluator.java
 tags: [control-plane, risk-score, job, alert-rule, incident, assurance, ws-22]
 timestamp: 2026-09-27T00:00:00Z
 ---

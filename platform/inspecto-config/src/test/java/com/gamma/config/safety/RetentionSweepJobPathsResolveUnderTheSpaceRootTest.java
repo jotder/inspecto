@@ -38,7 +38,7 @@ class RetentionSweepJobPathsResolveUnderTheSpaceRootTest {
 
     /** The reactor root — surefire's working directory is the MODULE directory, never the repo root. */
     private static Path repoRoot() {
-        return Path.of("..").toAbsolutePath().normalize();
+        return Path.of("..", "..").toAbsolutePath().normalize();
     }
 
     /** The demo Space's config root — the base {@code SpaceConfigRoot.current()} yields at run time. */

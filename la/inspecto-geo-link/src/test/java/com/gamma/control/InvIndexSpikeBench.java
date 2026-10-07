@@ -35,7 +35,7 @@ import java.util.stream.Stream;
  * <p>Never runs in the default suite: it needs BOTH {@code -Dinspecto.bench=true} and {@code -Dinspecto.bench.dir=<dir>}
  * (the dir holds {@code edges_<n>.parquet} from {@link InvTraversalBench}; the index is built under it as
  * {@code d3idx_<n>}). Keep the dir under {@code .claude/worktrees/}, never commit it. Example:
- * {@code mvn -o test -Pedition-enterprise -pl inspecto-geo-link -am -Dtest=InvIndexSpikeBench#d3Build
+ * {@code mvn -o test -Pedition-enterprise -pl :inspecto-geo-link -am -Dtest=InvIndexSpikeBench#d3Build
  * -Dsurefire.failIfNoSpecifiedTests=false -Dinspecto.bench=true -Dinspecto.bench.dir=... -Dinspecto.bench.sizes=1000000}.
  * Results append to {@code <dir>/results_d3s1.txt}.
  */

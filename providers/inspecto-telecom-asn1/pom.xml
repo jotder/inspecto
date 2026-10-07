@@ -8,7 +8,7 @@
         <groupId>com.gamma.inspector</groupId>
         <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-SNAPSHOT</version>
-        <relativePath>../pom.xml</relativePath>
+        <relativePath>../../pom.xml</relativePath>
     </parent>
 
     <artifactId>inspecto-telecom-asn1</artifactId>
@@ -18,7 +18,7 @@
     <description>
         OPTIONAL Telecom industry-pack module (MODULE-REORG-1 P7, plan 4 / 8a): the ASN.1 BER ParserPlugin
         (id asn1), its grammar resolver and its streaming record ingester, over the asn-facade API of the nested
-        asn-parser/asn-decoders reactor. Discovered through the engine's com.gamma.parse.ParserPlugin ServiceLoader
+        providers/asn-parser/asn-decoders reactor. Discovered through the engine's com.gamma.parse.ParserPlugin ServiceLoader
         seam. Packages com.gamma.parse and com.gamma.ingester are SHARED with inspecto-engine on purpose: the
         ingester class name com.gamma.ingester.Asn1RecordIngester is a persisted config string (pipelines name it),
         so it must keep resolving. Professional and above only - the Personal edition does not ship it, and
@@ -42,7 +42,7 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- asn-facade (asn-parser/asn-decoders, a standalone reactor outside the root parent's version
+        <!-- asn-facade (providers/asn-parser/asn-decoders, a standalone reactor outside the root parent's version
              management - built earlier in this reactor): the public bytes-to-records API. Depends only on
              asn-core/asn-schema/asn-transform (never asn-golden/legacy-code, which are harness-only). -->
         <dependency>

@@ -2,7 +2,7 @@
 type: Reference
 title: Pipeline config keys — the single block census
 description: Every top-level block of <name>_pipeline.toon — who declares it (ConfigSpecs vs parser-only), who reads it, which surface authors it — plus the coverage census and the PipelineKeyCoverageContractTest ratchet.
-resource: inspecto-etl/src/test/java/com/gamma/etl/PipelineKeyCoverageContractTest.java
+resource: platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineKeyCoverageContractTest.java
 tags: [pipeline-graph, config, pipeline, config-spec, parser, coverage, ratchet]
 timestamp: 2026-09-01T00:00:00Z
 ---

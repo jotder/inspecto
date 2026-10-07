@@ -2,7 +2,7 @@
 type: Concept
 title: Step Processor catalog vs. real node executors — the mapping/transform family
 description: Why 5 catalog "processors" collapsed onto three node types with no per-processor Java class, and how 3.5 of them were then FOLDED into one entry — Record Transformer (transform.record → transform.sql) — with the schema-contract half that could not fold; plus the transform.sql executor, TypeFlow.describe and the SQL_STEP_UNAUDITED boundary.
-resource: inspecto-engine/src/main/java/com/gamma/pipeline/ProcessorCatalog.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/pipeline/ProcessorCatalog.java
 tags: [engine, catalog, transform, node-types, gotcha]
 timestamp: 2026-09-04T00:00:00Z
 ---
@@ -110,7 +110,7 @@ As built:
   and the view is dropped in a `finally`. It runs on the same sealed [`SqlSandbox`](duckdb.md) connection
   `EXPR` uses — no file/network access, no extension autoload.
 * **Derived output schema without execution:** `TypeFlow.describe(List<Column> inputColumns, String sql)`
-  (`inspecto-etl/.../TypeFlow.java:92-111`) generalizes `transformedColumns`: an in-memory connection, a
+  (`platform/inspecto-etl/.../TypeFlow.java:92-111`) generalizes `transformedColumns`: an in-memory connection, a
   scratch table literally named `input` shaped by the **upstream Step's typed schema**, then `DESCRIBE
   <sql>` → `[{name, type}]`. A binder/parse failure surfaces as `IllegalArgumentException` carrying
   DuckDB's message verbatim (it names the offending column — that IS the validation). No rows are ever
@@ -217,7 +217,7 @@ registry that do not exist. **Parked on demand (operator 2026-10-04)** until a n
   `columns`, a lift-derived `schema`, or a mapping component's `rules`; `RowShaper.isProjection` sends any of
   those through `project()` (compiled by `RecordTransform`), and only a HAND-WRITTEN `sql` key takes the
   opaque-SQL path. `RowShaper.MAP_NODE_CONFIG_KEYS` pins the vocabulary.
-* **Engine:** `DataTransformer.materialize()` (`inspecto-etl/.../DataTransformer.java:50`) builds the
+* **Engine:** `DataTransformer.materialize()` (`platform/inspecto-etl/.../DataTransformer.java:50`) builds the
   transformed table. Type coercion is `TRY_CAST`; a failed cast is counted + WARN-logged and the row is
   **kept with NULL** (`DataTransformer.java:202-204`) — it is NOT routed to quarantine, despite the catalog
   note for `quality.schema.validator` implying a reject path.
@@ -234,7 +234,7 @@ registry that do not exist. **Parked on demand (operator 2026-10-04)** until a n
   dialog edits `rules[{targetColumn, sourceExpression, transformType}]` over the **shared**
   `<inspecto-editable-grid>` (`mapping-editor.dialog.ts:30,121-128`).
 * **Persistence:** rules save as a sidecar CSV next to the schema file — `x_schema.toon` → `x_mapping.csv`
-  — via `MappingCsv.siblingFor()` (`inspecto-util/.../MappingCsv.java:34-42`), pushed through
+  — via `MappingCsv.siblingFor()` (`platform/inspecto-util/.../MappingCsv.java:34-42`), pushed through
   `PUT /pipelines/{name}/graph`.
 * **Dispatch:** hardcoded in `RowShaper.shape()` (`RowShaper.java:171-173`) → `project(...)`, after the
   optional `PipelineNodeExecutor` SPI seam (`RowShaper.java:162-163`) is checked and found empty.

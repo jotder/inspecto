@@ -2,7 +2,7 @@
 type: Capability
 title: Ingestion & parsing (ING)
 description: Stage-1 — how inbox files become Consignments and committed Parquet: the poll and planner, the batch-atomic commit, the two ingest strategies and their union/generation modes, the parse frontends behind one parsing block (ten tokens, eight formats), the Parser-plugin SPI and the wrap-SPI, Grammars and Grammar Templates, the Unpack stage and its archive verdict, schema casting and quarantine, Expectations, and the source time zone. The requirement of record for the ING area, its specification, its decisions, and what was refused.
-resource: inspecto-engine/src/main/java/com/gamma/inspector, inspecto-etl/src/main/java/com/gamma/etl, inspecto-engine/src/main/java/com/gamma/parse
+resource: platform/inspecto-engine/src/main/java/com/gamma/inspector, platform/inspecto-etl/src/main/java/com/gamma/etl, platform/inspecto-engine/src/main/java/com/gamma/parse
 tags: [ing, capability, ingestion, parsing, consignment, commit, grammar, parser-plugin, streaming-file-ingester, unpack, archive, quarantine, expectation, asn1, xml, xlsx, source-timezone]
 timestamp: 2026-09-08T00:00:00Z
 ---
@@ -107,10 +107,10 @@ file inside a `FAILED` Consignment is normal), and collapsing them loses the que
 
 ### 3.1 The Consignment: from inbox to a unit of work
 
-`CollectorProcessor.ingest(cfg, onCommit)` (`inspecto-engine/src/main/java/com/gamma/inspector/CollectorProcessor.java:95`)
+`CollectorProcessor.ingest(cfg, onCommit)` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/CollectorProcessor.java:95`)
 scans the local inbox — a remote-fetched file, once landed, is discovered exactly like a locally-pushed one —
 expands Archives through **Unpack** (§3.5, at `:117`, *before* planning), then **`ConsignmentPlanner`**
-(`inspecto-etl/src/main/java/com/gamma/etl/ConsignmentPlanner.java`) cuts the candidate list into Consignments
+(`platform/inspecto-etl/src/main/java/com/gamma/etl/ConsignmentPlanner.java`) cuts the candidate list into Consignments
 bounded by **`collector.consignment: {max_files, max_bytes, order}`** — the canonical home since 2026-09-02
 (CONSIGNMENT-HOME-1; `processing.batch.*` is dual-read and healed on save, nothing writes it), with `order`
 **`mtime`** (arrival) by default, `name` as the opt-in for feeds with unreliable stamps, and anything else
@@ -137,7 +137,7 @@ The plugin strategy picks a **mode per Consignment by member size, with no extra
 generations of **`flush_records`** rows (default 5 000 000), each generation transformed, written and dropped,
 so peak heap stays one generation regardless of file size (`<stem>_gNNNNN_out.*`, a valid Hive layout).
 
-**The write is staged and revealed.** `PartitionWriter` (`inspecto-etl/src/main/java/com/gamma/etl/PartitionWriter.java:158-208`)
+**The write is staged and revealed.** `PartitionWriter` (`platform/inspecto-etl/src/main/java/com/gamma/etl/PartitionWriter.java:158-208`)
 `COPY`s into a staging directory, then reveals by atomic rename — `COPY … PARTITION_BY` for a keyed schema,
 a single-file `COPY` for an **unkeyed** one (E1: the `year=1900/month=01/day=01` sentinel bucket is retired; an
 unkeyed segment writes a **flat** store). `CommitLog` records committed ids (read back by streaming, since the log only grows); `MarkerManager` writes the
@@ -164,7 +164,7 @@ asn1 · plugin`. Three engines sit behind them:
 | **text_regex** | `read_text` + SQL regex | `record_split: blank_line | <literal>` (2026-08-28) — this is what makes **LDIF block records live** |
 | **xlsx** / excel | DuckDB `excel` extension, **three-layer fail-closed load**; `all_varchar` stamped by ingest | `read_xlsx` `columns` does not exist on 1.5.2.1 — refused, not faked |
 | **parquet** | native | a built-in with **no board row anywhere** |
-| **asn1** | `Asn1ParserPlugin` → `Asn1RecordIngester` (module `inspecto-telecom-asn1`, Professional+, not Personal; over `asn-parser/asn-decoders`) | served 2026-07-31; grammar optional for preview, required for ingest; `frontend: asn1` synthesises the plugin and refuses a co-present `parsing.plugin` |
+| **asn1** | `Asn1ParserPlugin` → `Asn1RecordIngester` (module `inspecto-telecom-asn1`, Professional+, not Personal; over `providers/asn-parser/asn-decoders`) | served 2026-07-31; grammar optional for preview, required for ingest; `frontend: asn1` synthesises the plugin and refuses a co-present `parsing.plugin` |
 | **plugin** | any `StreamingFileIngester` FQCN | `XmlRecordIngester` (2026-08-30) is the tree → segments bridge |
 
 **`ParserPlugin`** (`com.gamma.parse`, `inspecto-engine`, `@PublicApi(since = "4.0.0")`) is the self-describing
@@ -369,7 +369,7 @@ count. ⚠ **No UI exists** (§2).
 
 ### 3.8 The source time zone at parse
 
-`SourceZones` (`inspecto-etl/src/main/java/com/gamma/etl/SourceZones.java`) is the one home: precedence
+`SourceZones` (`platform/inspecto-etl/src/main/java/com/gamma/etl/SourceZones.java`) is the one home: precedence
 `raw.fields[].timezone_column > raw.fields[].timezone > parsing.source_timezone > none`; compiled as
 `timezone('UTC', timezone(Z, <naive-parse>))` to naive UTC at `SchemaFieldTypes.castSql`,
 `TransformCompiler.dateExpr` and `concatDt`; `TIMESTAMPTZ` with no zone source and `%z` / `%Z` formats are
@@ -652,13 +652,13 @@ It costs nothing, is pinned, and a hand-authored file may still carry it; the re
 
 | Mechanism | Owning file | `resource:` | Read it for |
 |---|---|---|---|
-| The planner, the two strategies, union / generation, the commit order | `docs/okf/backend/engine/ingestion.md` (`Concept`) | `inspecto-engine/src/main/java/com/gamma/inspector` | §3.1–§3.2 |
+| The planner, the two strategies, union / generation, the commit order | `docs/okf/backend/engine/ingestion.md` (`Concept`) | `platform/inspecto-engine/src/main/java/com/gamma/inspector` | §3.1–§3.2 |
 | The wrap-SPI, `DuckDbRecordSink`, the two `partitions[]` readers, the contract tests | `docs/okf/backend/engine/ingest-wrap-spi.md` (`Seam`) | `inspecto-etl` | §3.4 |
 | The plugin ingester reference: SPI contract, execution modes, segment schema, `FixedWidthRecordIngester` | `docs/okf/backend/engine/plugins.md` (`Reference`) | — | §3.4 |
-| `ParserPlugin`, `Parsers`, ASN.1, the XML bridge, the reactor split | `docs/okf/backend/engine/parser-plugins.md` (`Concept`) | `inspecto-engine/src/main/java/com/gamma/parse` (ASN.1: `inspecto-telecom-asn1`) | §3.3–§3.4 |
+| `ParserPlugin`, `Parsers`, ASN.1, the XML bridge, the reactor split | `docs/okf/backend/engine/parser-plugins.md` (`Concept`) | `platform/inspecto-engine/src/main/java/com/gamma/parse` (ASN.1: `inspecto-telecom-asn1`) | §3.3–§3.4 |
 | Every `parsing:` key, per frontend, with the refusals | `docs/okf/backend/config/parsing-options-reference.md` (`Reference`) | — | §3.3 |
 | The three frontends and the live CSV knobs — ⚠ carries the 4.1 `*.grammar.toon` account | `docs/okf/backend/engine/parsing-grammar.md` (`Concept`) | — | flagged with this spec |
-| Unpack — placement, DATA, the verdict, the ledger, identity, traps | `docs/okf/backend/engine/unpack-stage.md` (`Concept`) | `inspecto-etl/src/main/java/com/gamma/etl/unpack` | §3.5 |
+| Unpack — placement, DATA, the verdict, the ledger, identity, traps | `docs/okf/backend/engine/unpack-stage.md` (`Concept`) | `platform/inspecto-etl/src/main/java/com/gamma/etl/unpack` | §3.5 |
 | Status flow — gauges, ledgers, quarantine, drill-down, the two-facts rule | `docs/okf/backend/engine/consignment-status-flow.md` (`Concept`) | — | §3.6 |
 | Stage-1 module map, dedup's exit, the at-rest chain, orphan audit | `docs/okf/backend/engine/stage1-architecture.md` (`Architecture`) | — | §3.2 |
 | `route:` on the poll path, the lane flag, the engagement predicate | `docs/okf/backend/engine/branch-aware-ingest.md` (`Concept`) | — | §3.2 |
@@ -692,7 +692,7 @@ rule), `Asn1ParserPlugin` tests, `RealGrammarsTest` · `ParityCheckTest` (`asn-p
 `ExcelExtension` tests, `SourceZones` tests, `PipelineConfigParser` tests (`FRONTENDS`, alias precedence,
 `records_path`, refusals at load).
 
-### 8.3 Unpack — `inspecto-etl/src/test/java/com/gamma/etl/unpack/`
+### 8.3 Unpack — `platform/inspecto-etl/src/test/java/com/gamma/etl/unpack/`
 
 `UnpackStage`, `UnpackLimits`, `UnpackLedger`, `UnpackOrigins` tests; `CompressionTest.inlineVocabularyIsOwnedByPlugins`
 (the one-way drift guard); the zip-slip jail pinned with a **re-packed** archive; the `EMPTY` vs `UNREADABLE`

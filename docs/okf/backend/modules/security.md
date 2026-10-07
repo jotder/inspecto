@@ -2,7 +2,7 @@
 type: Concept
 title: Security module (inspecto-oidc, with inspecto-secrets and inspecto-geo-country split out by D-MR6)
 description: Professional-edition OIDC resource server behind the Authenticator/Subject/TokenRelay SPIs — Nimbus JWKS, RoleMapper, vendor-neutral OIDC token relay; reactor-gated behind the edition-professional profile.
-resource: inspecto-oidc/
+resource: providers/inspecto-oidc/
 tags: [module, security, oidc, editions, professional, spi]
 timestamp: 2026-07-07T00:00:00Z
 ---

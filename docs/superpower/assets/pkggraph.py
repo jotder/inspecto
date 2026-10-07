@@ -2,7 +2,7 @@
 
 Usage:  python docs/superpower/assets/pkggraph.py <src-root>
   e.g.  python docs/superpower/assets/pkggraph.py .                       (whole reactor)
-        python docs/superpower/assets/pkggraph.py inspecto-engine/src/main/java
+        python docs/superpower/assets/pkggraph.py platform/inspecto-engine/src/main/java
 
 Used to measure and verify the C1/C2 cycle cuts (2026-08-27) and the whole-reactor
 census recorded in docs/okf/backend/modules/reactor.md.

@@ -16,7 +16,7 @@ import java.util.stream.Stream;
  * MEASUREMENT harness, not a test (SP4 / risk R-09): what one read of the identity fact log costs at 10^4, 10^5, 10^6 facts —
  * the REAL {@link EntityFactLog#read} (list directory, read every file, parse JSON, SHA-256, check the chain) — then the fold
  * ({@link EntityRegistry#fold}) and the head-hash cache prototype ({@link Sp4FactLogs.HeadCached}). Run with
- * <pre>mvn -o test -pl inspecto-entity-store -am -Dtest=FactLogReplaySp4Bench -Dsurefire.failIfNoSpecifiedTests=false
+ * <pre>mvn -o test -pl :inspecto-entity-store -am -Dtest=FactLogReplaySp4Bench -Dsurefire.failIfNoSpecifiedTests=false
  *   -Dbench.run=true -DargLine="--enable-native-access=ALL-UNNAMED -Xmx6g"</pre>
  * Optional {@code -Dbench.dir=<dir>} (default {@code target/sp4-bench}) and {@code -Dbench.facts=10000,100000,1000000}.
  * ⚠ The files are written just before they are read, so the OS file cache is WARM: a cold-disk read is slower than any number

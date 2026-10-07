@@ -2,7 +2,7 @@
 type: Capability
 title: Acquisition & connectivity (ACQ)
 description: How data reaches the platform — Connections, Collectors, and the acquisition framework's poll cycle. The requirement of record for the ACQ area, its specification, its decisions, and what was refused.
-resource: inspecto-acquire/src/main/java/com/gamma/acquire
+resource: platform/inspecto-acquire/src/main/java/com/gamma/acquire
 tags: [acq, capability, acquisition, connections, collectors, connectors, ledger]
 timestamp: 2026-09-08T00:00:00Z
 ---
@@ -109,7 +109,7 @@ example files it describes use `collector:`.
 
 ### 3.2 The poll cycle and its two timers
 
-`CollectorProcessor` (`inspecto-engine/src/main/java/com/gamma/inspector/CollectorProcessor.java`) is the
+`CollectorProcessor` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/CollectorProcessor.java`) is the
 entry point, in three public shapes: `run(cfg)` (`:70`) = `acquire` then `ingest` in one cycle — the
 one-shot CLI / `reprocess` / manual path; `acquire(cfg)` (`:257`) = phases A–F, fetch-and-land only;
 `ingest(cfg, onCommit)` (`:95`) = the inbox walk. `acquire` is a **no-op for a `local` collector**.
@@ -176,7 +176,7 @@ authoritatively, so a spurious notify is harmless. Audited as **`collector.notif
 
 ### 3.4 Phase B — the readiness / stability gate
 
-`StabilityGate` (`inspecto-acquire/src/main/java/com/gamma/acquire/StabilityGate.java`) holds back
+`StabilityGate` (`platform/inspecto-acquire/src/main/java/com/gamma/acquire/StabilityGate.java`) holds back
 half-written files — the requirement's stated "biggest production problem". Order of decision:
 
 1. Ask `connector.readiness(file)` → `READY` / `NOT_READY` / `UNKNOWN`
@@ -212,7 +212,7 @@ space** (keyed on `EventLog.currentSpaceId()`), so two spaces' sightings never c
 ### 3.5 Phase C — duplicate prevention, change policy, watermarks
 
 The fingerprint repository is the `AcquisitionLedger` SPI
-(`inspecto-acquire/src/main/java/com/gamma/acquire/AcquisitionLedger.java`), keyed `(sourceId,
+(`platform/inspecto-acquire/src/main/java/com/gamma/acquire/AcquisitionLedger.java`), keyed `(sourceId,
 relativePath)`. Unlike the append-only OI stores it **upserts** — a file's latest fingerprint replaces the
 prior one for its key. Four operations: `find`, `record`, `highWatermark(sourceId)` (file-level, Phase C4),
 `dbWatermark`/advance (row-level, DB export). `LedgerEntry` carries `sourceId, relativePath, name, size,
@@ -277,7 +277,7 @@ dual-read, canonical-first, and nothing writes it any more (`:213-224`).
 
 ### 3.6 Phase D — gap detection
 
-`GapDetector` (`inspecto-acquire/src/main/java/com/gamma/acquire/GapDetector.java`) is pure decision logic:
+`GapDetector` (`platform/inspecto-acquire/src/main/java/com/gamma/acquire/GapDetector.java`) is pure decision logic:
 given a sequence template and the names one discovery cycle observed, it computes which expected keys are
 missing. Template grammar = a literal prefix/suffix around a single `{…}` token holding a
 `DateTimeFormatter` pattern, e.g. `CDR_{yyyyMMddHH}` ⇒ an hourly series. The **finest** field present sets
@@ -396,7 +396,7 @@ rather than deadlocking; clock and sleep are injectable.
 
 ### 3.8 Phase F — retry, circuit breaker, post-action
 
-`RetryPolicy` (`inspecto-acquire/src/main/java/com/gamma/acquire/retry/RetryPolicy.java`) wraps the
+`RetryPolicy` (`platform/inspecto-acquire/src/main/java/com/gamma/acquire/retry/RetryPolicy.java`) wraps the
 connectivity-sensitive connector calls — `discover` and per-file `fetchTo` — so a flaky endpoint gets
 bounded retries instead of failing the whole cycle on the first hiccup. The base delay before the *n*th
 retry grows from `initial_delay` toward `max_delay` on the configured curve, is clamped to `max_delay`, and
@@ -405,7 +405,7 @@ pollers retrying in lockstep. Sleep and jitter source are injectable; `RetryPoli
 one attempt. Config `collector.retry: { count: 0, backoff: EXPONENTIAL, initial_delay: 1s, max_delay: 60s }`
 (EXPONENTIAL/FIXED); an absent block is a single attempt.
 
-`CircuitBreaker` (`inspecto-acquire/src/main/java/com/gamma/acquire/CircuitBreaker.java`) is **per-source**,
+`CircuitBreaker` (`platform/inspecto-acquire/src/main/java/com/gamma/acquire/CircuitBreaker.java`) is **per-source**,
 keyed by `collector.id` on a process-wide `shared()` instance. On repeated connectivity failure it trips
 `OPEN` and the engine *skips* that source for a cooldown rather than hammering a dead endpoint every cycle;
 after the cooldown a single `HALF_OPEN` trial runs — success closes it, another failure re-opens it. The
@@ -443,7 +443,7 @@ optional `inspecto-connectors` jar:
   per instance, like a connector.
 
 Eight schemes are registered by `inspecto-connectors`
-(`inspecto-connectors/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory`):
+(`providers/inspecto-connectors/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory`):
 
 | Class | Scheme | Library |
 |---|---|---|
@@ -581,7 +581,7 @@ against a repeat. Round-trip equality holds only for `${…}` *references*: mask
 (`toBundleMap`) a literal is deliberate loss.
 
 **Secrets are never literals.** `SecretResolver`
-(`inspecto-auth-spi/src/main/java/com/gamma/acquire/SecretResolver.java`) expands **five** forms at connect
+(`spi/inspecto-auth-spi/src/main/java/com/gamma/acquire/SecretResolver.java`) expands **five** forms at connect
 time, never at load — and `isResolvable()` answers the same question for a connection test without
 exposing the value:
 
@@ -599,7 +599,7 @@ resolved value is **never logged**.
 ⚠ **SEC-07 (2026-09-06): `${FILE}` and `${KEYSTORE}` are Standard + Enterprise only.** They are served by
 the `SecretsProvider` SPI in the core, whose implementation is `inspecto-secrets`'s
 `FileKeystoreSecretsProvider`, discovered by ServiceLoader
-(`inspecto-secrets/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider`). A bundle
+(`providers/inspecto-secrets/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider`). A bundle
 without that module — Personal — **refuses the scheme with an `IllegalStateException` naming the edition,
 never a silent `null`**; a connection test surfaces that refusal as its failure. A Vault/KMS scope is the
 Enterprise follow-on. ⚠ `connectors-runbook.md` (formerly `integrations.md`) once listed only 2 of the 5 forms and omitted this gate; its
@@ -611,7 +611,7 @@ missing profile yields `null` and the factory decides.
 
 ### 3.11 Host-key policy
 
-`HostKeyPolicy` (`inspecto-connectors/src/main/java/com/gamma/acquire/connectors/HostKeyPolicy.java`) is
+`HostKeyPolicy` (`providers/inspecto-connectors/src/main/java/com/gamma/acquire/connectors/HostKeyPolicy.java`) is
 derived from the profile's `options` (`:45-51`). Three knobs, purely additive — with none of them set the
 legacy accept-on-connect behaviour is unchanged (and logged at debug, `:79`):
 
@@ -706,7 +706,7 @@ jailed segment-wise (no absolute paths, no `..` above the base) by the shared `A
 
 ### 3.14 Observability
 
-Events (`inspecto-event/.../EventType.java:61-83`), all emitted through `AcquisitionTelemetry` with
+Events (`platform/inspecto-event/.../EventType.java:61-83`), all emitted through `AcquisitionTelemetry` with
 `CollectorProcessor`'s FQN as the event `source` so the stream stayed byte-identical when the emitters moved
 out: `FILE_DISCOVERED` · `FILE_STABLE` · `FILE_FETCHED` (carries `bytes`) · `FILE_VALIDATED` ·
 `FILE_FETCH_FAILED` · `FILE_QUARANTINED` · `FILE_CHANGED` · `FILE_ARCHIVED` (carries `action`) ·
@@ -954,18 +954,18 @@ pair is not "reconciled" by flattening one of them.
 
 | Mechanism | Owning file | `resource:` | Read it for |
 |---|---|---|---|
-| Poll cycle, phases A–F, back-pressure | `docs/okf/backend/acquisition/framework.md` (`Concept`) | `inspecto-acquire/src/main/java/com/gamma/acquire` | the two-timer / two-guard split, the manual-run overlap gotcha, B4 vs `IntakeGovernor` |
-| Connector SPI, 8 schemes, profiles, secrets, workbench, proxy chain | `docs/okf/backend/acquisition/connectors.md` (`Concept`) | `inspecto-connectors/src/main/java/com/gamma/acquire/connectors` | stage-then-land, SDK-free auth per store, the four dial-through ships, workbench disciplines |
-| The 14 numbered requirement areas | `docs/okf/backend/acquisition/data-acquisition-framework.md` (`Reference`) | `inspecto-acquire/src/main/java/com/gamma/acquire` | requirement-of-record wording + the mounted-share security note |
-| Operator runbook: profile YAML, host-key table, FTPS, bastion, db-export | `docs/okf/backend/acquisition/connectors-runbook.md` (`Reference`) | `inspecto-connectors/src/main/java/com/gamma/acquire/connectors` | the copy-pasteable profile shapes and the `curl` verification sequence |
-| Module boundary + dependency confinement | `docs/okf/backend/modules/connectors.md` (`Module`) | `inspecto-connectors/` | why the jar is optional and what `ServiceLoader` gives you |
+| Poll cycle, phases A–F, back-pressure | `docs/okf/backend/acquisition/framework.md` (`Concept`) | `platform/inspecto-acquire/src/main/java/com/gamma/acquire` | the two-timer / two-guard split, the manual-run overlap gotcha, B4 vs `IntakeGovernor` |
+| Connector SPI, 8 schemes, profiles, secrets, workbench, proxy chain | `docs/okf/backend/acquisition/connectors.md` (`Concept`) | `providers/inspecto-connectors/src/main/java/com/gamma/acquire/connectors` | stage-then-land, SDK-free auth per store, the four dial-through ships, workbench disciplines |
+| The 14 numbered requirement areas | `docs/okf/backend/acquisition/data-acquisition-framework.md` (`Reference`) | `platform/inspecto-acquire/src/main/java/com/gamma/acquire` | requirement-of-record wording + the mounted-share security note |
+| Operator runbook: profile YAML, host-key table, FTPS, bastion, db-export | `docs/okf/backend/acquisition/connectors-runbook.md` (`Reference`) | `providers/inspecto-connectors/src/main/java/com/gamma/acquire/connectors` | the copy-pasteable profile shapes and the `curl` verification sequence |
+| Module boundary + dependency confinement | `docs/okf/backend/modules/connectors.md` (`Module`) | `providers/inspecto-connectors/` | why the jar is optional and what `ServiceLoader` gives you |
 | Section map | `docs/okf/backend/acquisition/index.md` | *(none — index, exempt by charter)* | navigation only |
 
 ---
 
 ## 8. Verification
 
-### 8.1 Decision-logic and ledger unit tests — `inspecto-acquire/src/test/java/com/gamma/acquire/`
+### 8.1 Decision-logic and ledger unit tests — `platform/inspecto-acquire/src/test/java/com/gamma/acquire/`
 
 22 classes. The acquisition core is deliberately built as pure, injectable-clock decision logic, so almost
 every invariant in §3 is provable without a network or a sleep.
@@ -995,7 +995,7 @@ every invariant in §3 is provable without a network or a sleep.
 | `LocalConnectionWorkbenchTest` | probe/explore/sample, **path jailing**, CSV vs. raw-line fallback |
 | `LocalFileSystemConnectorTest` | discover/open/fetchTo/post-action + ready-marker readiness |
 
-### 8.2 Connector, workbench and proxy tests — `inspecto-connectors/src/test/java/com/gamma/acquire/connectors/`
+### 8.2 Connector, workbench and proxy tests — `providers/inspecto-connectors/src/test/java/com/gamma/acquire/connectors/`
 
 17 acquisition test classes plus 2 relay fixtures. ⚠ The two `com/gamma/connect/notify/*DeliveryStatusAdapterTest`
 classes also live in this module but are a **notification** subject, not ACQ.
@@ -1023,10 +1023,10 @@ classes also live in this module but are a **notification** subject, not ACQ.
   because FTP opens a *second* passive data connection through the same factory; `MiniHttpConnectRelay`
   additionally records the auth header. 🔴 These relays are the only thing that caught the
   `createSocket()`-vs-`connect()` bypass of §3.12: the happy path still returned the right file.
-- Test infrastructure declared in `inspecto-connectors/pom.xml`: Apache MINA `sshd-core` + `sshd-sftp` and
+- Test infrastructure declared in `providers/inspecto-connectors/pom.xml`: Apache MINA `sshd-core` + `sshd-sftp` and
   Apache `ftpserver-core` (all `<scope>test</scope>`) give **real in-process SSH/SFTP and FTP servers**;
   kafka-clients' in-jar `MockConsumer` means the suite needs no broker; the one committed test resource is
-  `inspecto-connectors/src/test/resources/ftps-test-keystore.jks`.
+  `providers/inspecto-connectors/src/test/resources/ftps-test-keystore.jks`.
 
 ### 8.3 Control-plane real-HTTP route tests — `inspecto/src/test/java/com/gamma/control/`
 
@@ -1049,12 +1049,12 @@ Incidental (the route string is an example for another concern, but they do exer
 
 | File | Providers |
 |---|---|
-| `inspecto-connectors/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | the **seven**: `SftpConnectorFactory`, `FtpConnectorFactory`, `FtpsConnectorFactory`, `DbExportConnectorFactory`, `S3ConnectorFactory`, `AzureBlobConnectorFactory`, `GcsConnectorFactory` (`KafkaConnectorFactory` is in `inspecto-connectors-kafka/src/main/resources/META-INF/services/...`) |
-| `inspecto-engine/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | `com.gamma.inspector.DatasetCollectorConnectorFactory` — the ninth scheme, `dataset`, from a different module |
-| `inspecto-secrets/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider` | `com.gamma.secrets.FileKeystoreSecretsProvider` — the SEC-07 edition seam |
+| `providers/inspecto-connectors/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | the **seven**: `SftpConnectorFactory`, `FtpConnectorFactory`, `FtpsConnectorFactory`, `DbExportConnectorFactory`, `S3ConnectorFactory`, `AzureBlobConnectorFactory`, `GcsConnectorFactory` (`KafkaConnectorFactory` is in `providers/inspecto-connectors-kafka/src/main/resources/META-INF/services/...`) |
+| `platform/inspecto-engine/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | `com.gamma.inspector.DatasetCollectorConnectorFactory` — the ninth scheme, `dataset`, from a different module |
+| `providers/inspecto-secrets/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider` | `com.gamma.secrets.FileKeystoreSecretsProvider` — the SEC-07 edition seam |
 | `inspecto/src/test/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | `com.gamma.service.FakeRemoteConnectorFactory` (test-only remote scheme) |
 
-`inspecto-engine/src/test/java/com/gamma/inspector/DatasetCollectorConnectorFactoryTest.theFactoryIsServiceLoaderDiscoverable()`
+`platform/inspecto-engine/src/test/java/com/gamma/inspector/DatasetCollectorConnectorFactoryTest.theFactoryIsServiceLoaderDiscoverable()`
 (`:97`) is the only test that loads the SPI through `ServiceLoader`.
 
 ### 8.5 Runnable examples

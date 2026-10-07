@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * nothing here reaches a production registry. Gated on {@code -Dbench.run=true} like the other benchmarks
  * in this tree, so the default suite skips it. Run:
  * <pre>
- *   mvn -o -pl inspecto-engine -am test -Dtest=BridgeSpikeBenchmark -Dsurefire.failIfNoSpecifiedTests=false \
+ *   mvn -o -pl :inspecto-engine -am test -Dtest=BridgeSpikeBenchmark -Dsurefire.failIfNoSpecifiedTests=false \
  *       -Dbench.run=true -Dbench.rows=2000000 -Dbench.cols=10,50 -Dbench.runs=5
  * </pre>
  */

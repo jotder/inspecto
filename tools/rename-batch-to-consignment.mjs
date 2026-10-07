@@ -44,7 +44,7 @@
  *    same commit if you want the served surface renamed too, but do NOT hard-break either.
  *
  * ── After running, in this order ───────────────────────────────────────────────────────────────────
- *   1. mvn -o -pl inspecto-engine -am test -Dtest='NodeAttributesContractTest,StepTypesContractTest'
+ *   1. mvn -o -pl :inspecto-engine -am test -Dtest='NodeAttributesContractTest,StepTypesContractTest'
  *      → regenerate BOTH committed contracts if they move:
  *        -Dnode.attributes.write=true   and the step-types equivalent.
  *      🔴 Regenerate BOTH or the FULL reactor goes red after a green targeted run.

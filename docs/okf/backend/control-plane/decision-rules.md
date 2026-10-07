@@ -28,7 +28,7 @@ cell, never together with `value`); `ignoreCase: true` on `= != in contains star
 possessive quantifiers). `ConditionTree.validate` (called by `requireGroupRoot`) refuses misuse and bad
 patterns; full detail in `docs/superpower/module-architecture-reorg-plan.md` §8b "Decision Kernel step 2 as built".
 
-`com.gamma.query.ConditionTree` (`inspecto-engine/src/main/java/com/gamma/query/ConditionTree.java`) is a
+`com.gamma.query.ConditionTree` (`platform/inspecto-engine/src/main/java/com/gamma/query/ConditionTree.java`) is a
 **pure, dependency-free port of the browser evaluator** (`inspecto-ui/.../query/query-eval.ts`) plus
 its type inference (`query-columns.ts`). It exists so the backend counts row matches with *exactly*
 the semantics the authoring UI previews offline — same case-insensitive substring ops, same

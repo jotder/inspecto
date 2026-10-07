@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class DemoCorpusIngestTest {
 
-    private static final Path REPO = Path.of("..").toAbsolutePath().normalize();
+    private static final Path REPO = Path.of("..", "..").toAbsolutePath().normalize();
 
     /** in_recharges (fixed-width): 16 lines → header + trailer dropped → accepted 10 · rejected 4. */
     @Test

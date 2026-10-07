@@ -29,7 +29,7 @@ import java.util.function.Function;
  * caught per store and logged at WARN, leaving the store {@code null} — so a deployment pointed at
  * Postgres came up "healthy" with job reporting, provenance and Objects silently switched OFF rather
  * than moved. The shipped {@code inspecto.jar} carries no JDBC driver by design (see
- * {@code inspecto-engine/pom.xml}: "runtime stays JDBC-driver-free"); the driver rides the
+ * {@code platform/inspecto-engine/pom.xml}: "runtime stays JDBC-driver-free"); the driver rides the
  * <b>Standard/Enterprise bundle as the {@code postgresql.jar} sidecar</b> (PG-1, decided 2026-08-14),
  * which {@code serve.sh}/{@code serve.bat} auto-detect and add to the classpath — the same mechanism
  * as {@code inspecto-oidc.jar}, so the fat JAR and its SBOM stay driver-free. On a Personal

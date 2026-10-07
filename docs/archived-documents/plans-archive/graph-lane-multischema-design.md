@@ -110,7 +110,7 @@ name is not mistaken for a segment key.
 
 ## 7. Verification
 
-`mvn -o -Dingest.lane=graph -pl inspecto-engine -am -Dsurefire.failIfNoSpecifiedTests=false test` ⇒
+`mvn -o -Dingest.lane=graph -pl :inspecto-engine -am -Dsurefire.failIfNoSpecifiedTests=false test` ⇒
 `ConsignmentIngestorPluginTest`, `ConsignmentIngestorPluginDeepTest`, `TypedRecordIngesterTest` green
 (12 of the 13). `DecisionRuleWiringTest` stays red until `GRAPH-LANE-RULE-ROUTED-1` lands. Then re-run the
 whole suite under the flag — the gate is one flag, so run it, do not reason about it.

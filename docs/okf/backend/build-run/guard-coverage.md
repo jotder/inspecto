@@ -125,7 +125,7 @@ rules: the scope is where the silent exemptions live.
 ✅ **A third instance, 2026-09-08 — and a MEASUREMENT is the same shape as a guard.** The first
 code-coverage baseline reported "repo-wide 82.92%" across 21 modules — the true figure is **81.01%**. Nine more code modules produced no
 report at all — not because coverage was low, but because they were **never instrumented**:
-`asn-parser/asn-decoders/pom.xml` is a separate root (`com.gamma.asn`) that the inspecto reactor only
+`providers/asn-parser/asn-decoders/pom.xml` is a separate root (`com.gamma.asn`) that the inspecto reactor only
 **aggregates**, and a Maven profile is inherited through `<parent>`, never through aggregation. So ~13 300
 lines across 91 files — about a tenth of the codebase — sat outside a number presented as repo-wide, and
 `mvn -Pcoverage` exited 0 the whole time. 🔴 **A reported number tells you nothing about what it declined
@@ -168,7 +168,7 @@ root-`*.md` pass. ⚠ **Widening cost nothing in noise**: 451 → 529 files, 1,8
 the seven `SKILL.md` links). ⛔ One trap in the widening itself: with `ROOTS = ['.']` every path reads
 `./docs/…`, so the `ARCHIVE_PREFIX` `startsWith` test stops matching and the 570-link archive exemption
 silently evaporates — `slash()` now strips the `./`. Falsified both ways: RED at 32 on the pre-fix tree,
-and RED again from a one-line mutation in `asn-parser/docs/` (a tree the old scope could never see).
+and RED again from a one-line mutation in `providers/asn-parser/docs/` (a tree the old scope could never see).
 
 ## A third shape: the guard whose subject is a NUMBER a human wrote
 
@@ -364,7 +364,7 @@ The fourth shape again, and this time against the rule this page already states.
 was refused by the pre-push citation guard:
 
 ```
-SESSION_STATUS.local.md:20  path does not resolve:  inspecto-event/EventType.java
+SESSION_STATUS.local.md:20  path does not resolve:  platform/inspecto-event/EventType.java
 ```
 
 `SESSION_STATUS.local.md` is **untracked and gitignored** (`.gitignore:124`, `*.local.md`) and is
@@ -391,8 +391,8 @@ Measured 2026-09-22 by writing a gitignored `PROBE.local.md` at the repo root an
 ⚠ **The first probe of this was INVALID and reported a clean pass.** It cited
 `inspecto-nope/DoesNotExist.java`, whose first segment is not a real directory, so the guard never
 treated the token as a repository path at all — every guard exited 0 and the hole looked absent. Only a
-probe whose first segment exists reproduces — `inspecto-event/NopeDoesNotExist.java` never existed,
-but `inspecto-event/` does, which is the whole difference — and the same
+probe whose first segment exists reproduces — `platform/inspecto-event/NopeDoesNotExist.java` never existed,
+but `platform/inspecto-event/` does, which is the whole difference — and the same
 citation in a **tracked** doc failing is what proves the probe valid rather than the guard broken. ⇒ A
 negative result from a probe that could not have succeeded is not evidence.
 
@@ -462,7 +462,7 @@ That is a real change to `ci.yml` job structure and is owed a decision, not a dr
 
 ## Instance, 2026-09-27: coverage switched OFF while the floors step still demanded it (`CI-JACOCO-JDK27-1`)
 On 2026-09-18 `maven.compiler.release` went to 27, and jacoco 0.8.13 cannot parse class file v71. The fix set
-`<skip>true</skip>` in both `coverage` profiles (the root `pom.xml` and `asn-parser/asn-decoders/pom.xml`).
+`<skip>true</skip>` in both `coverage` profiles (the root `pom.xml` and `providers/asn-parser/asn-decoders/pom.xml`).
 `ci.yml`'s *Coverage floors* step still ran `check-coverage.mjs --backend`, which fails on purpose when
 `jacoco.csv` is missing, so CI could not pass from that day on. Nobody saw it for nine days: every run before
 `d46739d55` died earlier, in the reactor. **Restored 2026-09-27** with jacoco **0.8.15** (ASM 9.10.1 reads

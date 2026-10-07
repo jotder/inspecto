@@ -1454,7 +1454,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   [`okf/backend/build-run/build-test.md`](okf/backend/build-run/build-test.md)
   §*What the bundle contains — and what it deliberately does not*: the per-edition jar table, why the
   agent cannot arrive by accident (`-pl inspecto -am` builds upstream only; the agent modules are
-  downstream), the `mvn -o clean package -pl inspecto-agent -am` recipe for running with it, and the
+  downstream), the `mvn -o clean package -pl :inspecto-agent -am` recipe for running with it, and the
   JDK-floor warning. ⛔ **Do not "just add a `package.ps1` switch"** — the modules need a **JDK 25+**
   runtime (class-file v69) while the `-NoRuntime` flavor documents a **Java 24+** target, so a switch
   is a real decision, not a missing line. Re-open only if that floor is resolved.

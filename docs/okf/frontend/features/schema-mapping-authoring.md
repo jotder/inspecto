@@ -182,7 +182,7 @@ catalog and by persisting `fields[]`.
   both merged back on read so the UI always sees the conflated document. A field with a key the CSV cannot hold
   (`timezone`, `partitions`, …) keeps the whole list inline; the sibling is then removed.
 - **Editing an existing schema is real and gated:** a backward-compatibility diff,
-  `SchemaCompatibility.check(existing, draft)` (`inspecto-config/.../safety/SchemaCompatibility.java:48-82`),
+  `SchemaCompatibility.check(existing, draft)` (`platform/inspecto-config/.../safety/SchemaCompatibility.java:48-82`),
   flags removed fields, non-widening type changes, and moved selectors as ERROR findings, mapped back onto
   grid cells by field name (`schema-editor.dialog.ts:145-161,279-285`) with an inline alert and a "Save
   anyway (skip compatibility check)" escape hatch (`:108-111,218-225`, `compatibility:"none"` param,

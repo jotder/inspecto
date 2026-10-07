@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class RefusalQuarantineTest {
 
-    private static final Path ORDERS = Path.of("..", "spaces", "_templates", "orders-starter").toAbsolutePath().normalize();
+    private static final Path ORDERS = Path.of("..", "..", "spaces", "_templates", "orders-starter").toAbsolutePath().normalize();
 
     private static PipelineConfig cfg(Path dir, boolean on) throws Exception {
         Path toon = Files.createDirectories(dir).resolve("p.toon");
@@ -406,7 +406,7 @@ class RefusalQuarantineTest {
         assertEquals(30, PipelineConfig.load(toon.toString()).refusal().retentionDays());
     }
 
-    private static final Path PAY =Path.of("..", "spaces", "_templates", "payment-fraud").toAbsolutePath().normalize();
+    private static final Path PAY =Path.of("..", "..", "spaces", "_templates", "payment-fraud").toAbsolutePath().normalize();
 
     /** Round 4: an exempt list that covers EVERY raw field would switch the scan off silently — refused at load. */
     @Test

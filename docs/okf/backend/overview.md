@@ -29,10 +29,10 @@ The directory names were renamed 2026-06-12 and the Maven **artifactIds followed
 | Dir | Role | artifactId / jar |
 |---|---|---|
 | `inspecto/` | engine + control plane (lean core) | `inspecto-processor` / `inspecto.jar` |
-| `inspecto-connectors/` | remote connectors (SFTP/FTP/FTPS/DB) — all network deps | `inspecto-connectors` |
-| `inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `inspecto-agent` |
-| `inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `inspecto-agent-hosted` |
-| `inspecto-oidc/` | Standard-only OIDC auth (reactor-gated: `edition-standard` profile) | `inspecto-oidc` |
+| `providers/inspecto-connectors/` | remote connectors (SFTP/FTP/FTPS/DB) — all network deps | `inspecto-connectors` |
+| `features/inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `inspecto-agent` |
+| `providers/inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `inspecto-agent-hosted` |
+| `providers/inspecto-oidc/` | Standard-only OIDC auth (reactor-gated: `edition-standard` profile) | `inspecto-oidc` |
 | `inspecto-ui/` | Angular SPA (served by the engine) | — (npm) |
 
 See [Modules](./modules) for each one.

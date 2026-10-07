@@ -91,7 +91,7 @@ class JobWritersTest {
     @Test
     void theLoaderAndTheApprovalShareOneTemplateDiscovery() throws IOException {
         String loader = Files.readString(Path.of("src/main/java/com/gamma/service/ServiceBootstrap.java"));
-        String approvals = Files.readString(Path.of("../inspecto-engine/src/main/java/com/gamma/job/AttachApprovals.java"));
+        String approvals = Files.readString(Path.of("../platform/inspecto-engine/src/main/java/com/gamma/job/AttachApprovals.java"));
         String guard = Files.readString(Path.of("src/main/java/com/gamma/control/JobWriteGuard.java"));
         assertTrue(loader.contains("JobTemplate.discover("), "ServiceBootstrap loads templates through JobTemplate.discover");
         assertTrue(!loader.contains("\"_job_template.toon\""), "the loader keeps no second discovery of its own");

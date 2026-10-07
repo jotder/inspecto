@@ -2,7 +2,7 @@
 type: Concept
 title: TOON Configuration
 description: ConfigCodec (JToon), the three config file types, PipelineConfigParser, and the tabular-array serialization gotcha.
-resource: inspecto-config/src/main/java/com/gamma/config/io/ConfigCodec.java
+resource: platform/inspecto-config/src/main/java/com/gamma/config/io/ConfigCodec.java
 tags: [config, toon, jtoon, parser, gotcha]
 timestamp: 2026-09-23T00:00:00Z
 ---
@@ -11,10 +11,10 @@ timestamp: 2026-09-23T00:00:00Z
 
 All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key reference: [`configuration.md`](configuration.md).
 
-* **`ConfigCodec`** (`inspecto-config/src/main/java/com/gamma/config/io/ConfigCodec.java`) — thin JToon wrapper:
+* **`ConfigCodec`** (`platform/inspecto-config/src/main/java/com/gamma/config/io/ConfigCodec.java`) — thin JToon wrapper:
   `toMap` (**strict** decode) and `toToon` (canonical encode). Nothing else.
   **One decode seam, and it is strict** (`CONFIGCODEC-LENIENT-IS-STRICT-1`, 2026-09-23). The seam is
-  `ToonHelper.decode` (`inspecto-util/src/main/java/com/gamma/util/ToonHelper.java`); `ConfigCodec.toMap`
+  `ToonHelper.decode` (`platform/inspecto-util/src/main/java/com/gamma/util/ToonHelper.java`); `ConfigCodec.toMap`
   delegates to it and `ToonHelper.load(path)` wraps it, prefixing the path to any decode refusal
   (`<path>: line N: …`). It lives in `inspecto-util`, not `inspecto-config`, because util is the
   documented `com.gamma` leaf ([reactor](../modules/reactor.md)) and `ToonHelper`/`SchemaExtractor` read
@@ -90,7 +90,7 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   found"), not `NoSuchFileException` — both are `IOException`. `PipelineConfigParser.readToon` still reads
   and prefixes by hand (same message shape); `ComponentStore`'s history read decodes text it also needs for
   CSV kinds and swallows every error.
-* **`PipelineConfigParser`** (`inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java`,
+* **`PipelineConfigParser`** (`platform/inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java`,
   package-private) — parses a decoded map into an immutable `PipelineConfig` (entry points
   `PipelineConfig.load(path)` / `fromMap(map)`). Pure parse, no filesystem side-effects (`prepare()` does
   those).

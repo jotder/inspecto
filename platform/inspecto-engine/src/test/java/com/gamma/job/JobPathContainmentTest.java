@@ -148,7 +148,7 @@ class JobPathContainmentTest {
     }
 
     // ── backup / backup_verify / restore ─────────────────────────────────────────
-    // MOVED 2026-09-07 (EDG-01 cell 2) to inspecto-backup/src/test/java/com/gamma/job/BackupPathContainmentTest.java
+    // MOVED 2026-09-07 (EDG-01 cell 2) to features/inspecto-backup/src/test/java/com/gamma/job/BackupPathContainmentTest.java
     // with the tasks themselves (OPS-06 is "not for Personal"). The verify case that used to sit after
     // the report-delivery one moved too.
 

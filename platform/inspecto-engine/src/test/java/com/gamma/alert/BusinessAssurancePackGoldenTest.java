@@ -45,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class BusinessAssurancePackGoldenTest {
 
-    private static final Path PACK = Path.of("..", "spaces", "_templates", "business-assurance").toAbsolutePath().normalize();
+    private static final Path PACK = Path.of("..", "..", "spaces", "_templates", "business-assurance").toAbsolutePath().normalize();
     private static final Path CFG = PACK.resolve("config");
     /** The noise sigma the corpus is built with. */
     private static final double SIGMA = 20.0;

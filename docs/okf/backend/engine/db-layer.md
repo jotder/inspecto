@@ -2,7 +2,7 @@
 type: Reference
 title: Database / persistence layer
 description: How state is stored on disk — the three data classes, the operational store inventory and relational schemas, the per-space file topology, and how to run operational data on Postgres.
-resource: inspecto-ops/src/main/java/com/gamma/ops
+resource: features/inspecto-ops/src/main/java/com/gamma/ops
 tags: [persistence, duckdb, postgres, schema, topology, stores]
 timestamp: 2026-07-16T00:00:00Z
 ---
@@ -48,12 +48,12 @@ business data (the file lake) and config (TOON) are documented in
 
 | Concern | File |
 |---|---|
-| Connection factory (driver-by-URL-scheme) | [`util/JdbcDrivers.java`](../../../../inspecto-util/src/main/java/com/gamma/util/JdbcDrivers.java) |
-| DuckDB engine helpers (ETL path) | [`util/DuckDbUtil.java`](../../../../inspecto-util/src/main/java/com/gamma/util/DuckDbUtil.java) |
+| Connection factory (driver-by-URL-scheme) | [`util/JdbcDrivers.java`](../../../../platform/inspecto-util/src/main/java/com/gamma/util/JdbcDrivers.java) |
+| DuckDB engine helpers (ETL path) | [`util/DuckDbUtil.java`](../../../../platform/inspecto-util/src/main/java/com/gamma/util/DuckDbUtil.java) |
 | Composition root (reads `-D` toggles, opens stores) | [`service/ServiceStores.java`](../../../../inspecto/src/main/java/com/gamma/service/ServiceStores.java) |
 | Per-space file locations | [`service/SpaceRoot.java`](../../../../inspecto/src/main/java/com/gamma/service/SpaceRoot.java) |
-| Business-data read-relation builder | [`sql/SqlViews.java`](../../../../inspecto-sql/src/main/java/com/gamma/sql/SqlViews.java) |
-| Dataset → physical store resolution | [`query/DatasetRelation.java`](../../../../inspecto-engine/src/main/java/com/gamma/query/DatasetRelation.java) |
+| Business-data read-relation builder | [`sql/SqlViews.java`](../../../../platform/inspecto-sql/src/main/java/com/gamma/sql/SqlViews.java) |
+| Dataset → physical store resolution | [`query/DatasetRelation.java`](../../../../platform/inspecto-engine/src/main/java/com/gamma/query/DatasetRelation.java) |
 
 **`SqlViews` owns the read OPTIONS; nobody concatenates their own `read_*(`.** Three entry points, one
 option list (`over`): `reader(format, glob, hive)`, `reader(format, List<String>, hive)`, and
@@ -95,30 +95,30 @@ unaffected because the database, not the monitor, decides them.
 
 | Domain | Interface | DB impl | Backend toggle (`-D…`) | Default |
 |---|---|---|---|---|
-| Operational objects (ALERT / INCIDENT / CASE / TASK) | `ops/ObjectStore` | [`DbObjectStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/DbObjectStore.java) | `objects.backend=db\|postgres\|memory` | **`db`** (was `memory` until 2026-09-25 — `OBJECTS-BACKEND-DEFAULT-MEMORY-1`; `postgres` = Enterprise, mandatory, fail-closed; `memory` = explicit opt-in) |
-| Correlation links | `ops/link/LinkStore` | [`DbLinkStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/link/DbLinkStore.java) | `objects.backend` (shared) | **`db`** |
-| Notes / evidence | `ops/note/NoteStore` | [`DbNoteStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/note/DbNoteStore.java) | `objects.backend` (shared) | **`db`** |
-| Events (append-only facts) | `event/EventStore` | [`ParquetEventStore`](../../../../inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java) *(Parquet, not JDBC)* · [`DbEventStore`](../../../../inspecto-event/src/main/java/com/gamma/event/DbEventStore.java) *(JDBC, since 2026-09-12)* | `events.backend=memory\|parquet\|db\|postgres\|jdbc:…` | `memory` |
+| Operational objects (ALERT / INCIDENT / CASE / TASK) | `ops/ObjectStore` | [`DbObjectStore`](../../../../features/inspecto-ops/src/main/java/com/gamma/ops/DbObjectStore.java) | `objects.backend=db\|postgres\|memory` | **`db`** (was `memory` until 2026-09-25 — `OBJECTS-BACKEND-DEFAULT-MEMORY-1`; `postgres` = Enterprise, mandatory, fail-closed; `memory` = explicit opt-in) |
+| Correlation links | `ops/link/LinkStore` | [`DbLinkStore`](../../../../features/inspecto-ops/src/main/java/com/gamma/ops/link/DbLinkStore.java) | `objects.backend` (shared) | **`db`** |
+| Notes / evidence | `ops/note/NoteStore` | [`DbNoteStore`](../../../../features/inspecto-ops/src/main/java/com/gamma/ops/note/DbNoteStore.java) | `objects.backend` (shared) | **`db`** |
+| Events (append-only facts) | `event/EventStore` | [`ParquetEventStore`](../../../../platform/inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java) *(Parquet, not JDBC)* · [`DbEventStore`](../../../../platform/inspecto-event/src/main/java/com/gamma/event/DbEventStore.java) *(JDBC, since 2026-09-12)* | `events.backend=memory\|parquet\|db\|postgres\|jdbc:…` | `memory` |
 | Ingest status / audit projection | `etl/StatusStore` | [`DbStatusStore`](../../../../inspecto/src/main/java/com/gamma/service/DbStatusStore.java) | `status.backend=file\|db` | **`db`** (flipped 2026-08-31; this row said `file` until 2026-09-08) |
-| Job-run reporting | *(class is the API)* | [`DbJobRunStore`](../../../../inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java) | `jobs.backend=none\|duckdb\|postgres` | `none` |
-| Pipeline-run provenance (per-edge counts) | *(class is the API)* | [`DbProvenanceStore`](../../../../inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java) | `provenance.backend=none\|duckdb\|postgres` | `none` |
-| Acquisition / dedup ledger + export watermark | `acquire/AcquisitionLedger` | [`DbAcquisitionLedger`](../../../../inspecto-acquire/src/main/java/com/gamma/acquire/DbAcquisitionLedger.java) | `acquire.ledger.backend=memory\|db` *(via `AcquisitionLedgers`, not `ServiceStores`)* | `memory` |
-| Consignment output-file registry | *(class is the API)* | [`DbConsignmentOutputStore`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbConsignmentOutputStore.java) | `consignment.outputs.backend=none\|duckdb\|postgres` | **`duckdb`** — the only default-on store; see below |
-| Per-file stage-progression registry (Phase 4 §2.4) | *(class is the API)* | [`DbFileStageStore`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbFileStageStore.java) | `file.stages.backend=none\|duckdb\|postgres` | `none` |
-| Windowed record-dedup ledger (D-9) | *(class is the API)* | [`DbDedupLedger`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbDedupLedger.java) | `dedup.ledger.backend=none\|duckdb\|postgres` | **`duckdb`** — default-on like `consignment_outputs`: a default-off dedup ledger silently emits the duplicates it was configured to drop; costs nothing while no pipeline declares `scope: window(...)` |
+| Job-run reporting | *(class is the API)* | [`DbJobRunStore`](../../../../platform/inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java) | `jobs.backend=none\|duckdb\|postgres` | `none` |
+| Pipeline-run provenance (per-edge counts) | *(class is the API)* | [`DbProvenanceStore`](../../../../platform/inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java) | `provenance.backend=none\|duckdb\|postgres` | `none` |
+| Acquisition / dedup ledger + export watermark | `acquire/AcquisitionLedger` | [`DbAcquisitionLedger`](../../../../platform/inspecto-acquire/src/main/java/com/gamma/acquire/DbAcquisitionLedger.java) | `acquire.ledger.backend=memory\|db` *(via `AcquisitionLedgers`, not `ServiceStores`)* | `memory` |
+| Consignment output-file registry | *(class is the API)* | [`DbConsignmentOutputStore`](../../../../platform/inspecto-engine/src/main/java/com/gamma/consignment/DbConsignmentOutputStore.java) | `consignment.outputs.backend=none\|duckdb\|postgres` | **`duckdb`** — the only default-on store; see below |
+| Per-file stage-progression registry (Phase 4 §2.4) | *(class is the API)* | [`DbFileStageStore`](../../../../platform/inspecto-engine/src/main/java/com/gamma/consignment/DbFileStageStore.java) | `file.stages.backend=none\|duckdb\|postgres` | `none` |
+| Windowed record-dedup ledger (D-9) | *(class is the API)* | [`DbDedupLedger`](../../../../platform/inspecto-engine/src/main/java/com/gamma/consignment/DbDedupLedger.java) | `dedup.ledger.backend=none\|duckdb\|postgres` | **`duckdb`** — default-on like `consignment_outputs`: a default-off dedup ledger silently emits the duplicates it was configured to drop; costs nothing while no pipeline declares `scope: window(...)` |
 | Fleet-wide inbox registry (`INBOX-REGISTRY-CROSS-POD-1`) | *(class is the API)* | [`DbInboxRegistry`](../../../../inspecto/src/main/java/com/gamma/service/DbInboxRegistry.java) | `inbox.registry.backend=none\|duckdb\|postgres\|jdbc:…` | `none` — off, the inbox audit compares only the Spaces this pod hosts, exactly as before |
 | Pipeline execution watermarks | `pipeline/exec/PipelineWatermarkStore` | **none** — in-memory/file only | — | — |
 
 > **`ALERT`s are not their own table.** Alerts, incidents, cases and tasks are all rows in
 > `inspecto_ops_objects`, discriminated by the `object_type` column
-> ([`ObjectType`](../../../../inspecto-workflow/src/main/java/com/gamma/workflow/ObjectType.java): `ALERT, INCIDENT, CASE, TASK`).
+> ([`ObjectType`](../../../../platform/inspecto-workflow/src/main/java/com/gamma/workflow/ObjectType.java): `ALERT, INCIDENT, CASE, TASK`).
 
 Every backend **degrades gracefully**: a failed DB open falls back to in-memory/file and logs a
 warning rather than blocking startup.
 
 > **Why `consignment_outputs` defaults on** *(2026-08-10, addressing D1 — at the time the only one; since then the dedup ledger (D-9, 2026-09-01) and `status` (2026-08-31) default on too — `okf/capabilities/data-plane/data-plane.md` §3.8)*. `consignment_outputs` was the only
 > row above that opens without being asked, and the reason is a bug, not the addressing feature it was
-> built for. [`ReprocessCommand`](../../../../inspecto-engine/src/main/java/com/gamma/inspector/ReprocessCommand.java)
+> built for. [`ReprocessCommand`](../../../../platform/inspecto-engine/src/main/java/com/gamma/inspector/ReprocessCommand.java)
 > refuses to reprocess a Consignment whose output a compaction merged away — re-ingesting rows that still
 > exist inside the merged file **duplicates them silently** — and that refusal is decidable only from this
 > table's `COMPACTED_AWAY` rows. Default-off meant the fix was switched off in every deployment. Turning it
@@ -527,7 +527,7 @@ event_id, ts_ms (BIGINT), type, source, pipeline, correlation_id,
 message, attributes (JSON), payload (JSON), level  -- + partition cols year, month, day (VARCHAR)
 ```
 
-`level` ∈ [`EventLevel`](../../../../inspecto-audit-spi/src/main/java/com/gamma/event/EventLevel.java). There is **no
+`level` ∈ [`EventLevel`](../../../../spi/inspecto-audit-spi/src/main/java/com/gamma/event/EventLevel.java). There is **no
 JDBC/Postgres event table** — events were Parquet-only. ⚠ **That changed 2026-09-12 (D6 / phase A3):**
 `DbEventStore` adds `events.backend=db`. The Parquet layout below is unchanged and remains the default
 durable backend for a single node; the database backend exists because Parquet is written by exactly one
@@ -658,10 +658,10 @@ there NULL matches NULL**. So a single-statement migration silently drops every 
 the exact data loss the nullable-`run_id` decision exists to avoid, arriving through the migration instead
 of the constraint. ⛔ Do not merge the two inserts back together.
 
-**How a Run id gets here** (slice 3, 2026-09-13): [`RunIds`](../../../../inspecto-engine/src/main/java/com/gamma/job/RunIds.java)
+**How a Run id gets here** (slice 3, 2026-09-13): [`RunIds`](../../../../platform/inspecto-engine/src/main/java/com/gamma/job/RunIds.java)
 is the **single** generator — a second one at the Collector was refused so "run id" could not mean two
 things depending on the path. Work outside `JobService` carries
-[`StandaloneRunContext`](../../../../inspecto-engine/src/main/java/com/gamma/job/StandaloneRunContext.java),
+[`StandaloneRunContext`](../../../../platform/inspecto-engine/src/main/java/com/gamma/job/StandaloneRunContext.java),
 a deliberately inert `JobContext` (no log, no signals, no artifacts) that exists to carry identity, not to
 make a CLI invocation look scheduled. ⚠ **One Run spans a whole poll cycle, not one Consignment** —
 `GLOSSARY.md` §6-A binds `Run ⊇ Consignment ⊇ File`, so `CollectorProcessor.ingest` mints one id and every
@@ -762,8 +762,8 @@ fail-open contract as `record()`.
 
 | Mutator | Caller | Contract |
 |---|---|---|
-| `markCompactedAway(paths)` | [`PartitionCompactor`](../../../../inspecto-engine/src/main/java/com/gamma/job/PartitionCompactor.java), **after** the reveal + cleanup | Path-keyed, because one merged file absorbs many Consignments. **Inserts no replacement row** — no single `consignment_id` owns the merged file, and `(state, partition_key)` is all §6.2's partition rewrite needs |
-| `supersede(consignmentId)` | [`ReprocessCommand`](../../../../inspecto-engine/src/main/java/com/gamma/inspector/ReprocessCommand.java), beside `ManifestStore.supersede` | Moves **only `LIVE`** rows; a `COMPACTED_AWAY` row keeps that state, since it is the evidence that tells a reprocess to rewrite the partition rather than unlink a path that is gone |
+| `markCompactedAway(paths)` | [`PartitionCompactor`](../../../../platform/inspecto-engine/src/main/java/com/gamma/job/PartitionCompactor.java), **after** the reveal + cleanup | Path-keyed, because one merged file absorbs many Consignments. **Inserts no replacement row** — no single `consignment_id` owns the merged file, and `(state, partition_key)` is all §6.2's partition rewrite needs |
+| `supersede(consignmentId)` | [`ReprocessCommand`](../../../../platform/inspecto-engine/src/main/java/com/gamma/inspector/ReprocessCommand.java), beside `ManifestStore.supersede` | Moves **only `LIVE`** rows; a `COMPACTED_AWAY` row keeps that state, since it is the evidence that tells a reprocess to rewrite the partition rather than unlink a path that is gone |
 
 This closes a **silent data-duplication bug**: `ReprocessCommand` used to `deleteIfExists` a path compaction had
 already unlinked (a no-op), restore the members, and re-ingest rows still present inside the merged file. It now
@@ -966,7 +966,7 @@ portable (`VARCHAR`/`BIGINT`, composite PKs, no auto-increment, no upserts — e
 and there is a **real embedded-Postgres round-trip test**
 ([`PostgresStateStoreTest`](../../../../inspecto/src/test/java/com/gamma/service/PostgresStateStoreTest.java),
 moved to `inspecto` 2026-09-17 so it runs in the DEFAULT reactor — the four `com.gamma.ops` store cases stayed
-behind as [`PostgresOpsStoreTest`](../../../../inspecto-ops/src/test/java/com/gamma/service/PostgresOpsStoreTest.java))
+behind as [`PostgresOpsStoreTest`](../../../../features/inspecto-ops/src/test/java/com/gamma/service/PostgresOpsStoreTest.java))
 covering **9 of the 12 families** (note, tag assignment, job run, file stage, consignment output, status, provenance,
 object, link) — **the dedup ledger, the acquisition ledger and delivery receipts are the three it does not cover**
 (measured 2026-09-08; this sentence said "6 of the 9" and named two covered stores as uncovered). Both DDLs are portable by construction (`VARCHAR`/`BIGINT`/`INTEGER`, no PK, no upsert), but that
@@ -991,7 +991,7 @@ acquisition ledger. Personal sets nothing at all.
   `OperationalDb.verifySelectable`), naming the missing property or driver. It used to be caught *per
   store*, logged WARN, and leave that store `null` — so a deployment pointed at Postgres came up
   "healthy" with job reporting, provenance and Objects **switched off rather than moved**. The shipped
-  `inspecto.jar` bundles **no JDBC driver** (`inspecto-engine/pom.xml`: *"runtime stays JDBC-driver-free
+  `inspecto.jar` bundles **no JDBC driver** (`platform/inspecto-engine/pom.xml`: *"runtime stays JDBC-driver-free
   by design"*) and that stays true — **the driver rides the Standard/Enterprise bundle as the
   `postgresql.jar` sidecar** (PG-1 Open 1, decided 2026-08-14): `package.ps1` copies it from the local
   Maven repo (version = the parent pom's `postgresql.version`), and `serve.sh`/`serve.bat` auto-detect
@@ -1087,7 +1087,7 @@ signature** — it describes all fifteen:
   `com.gamma.acquire.SecretResolver`. `Family` is invisible from the leaf and cannot be made visible
   without inverting that dependency.
 - ⚠ **`Resolved` is not value-identical to what an opener needs**: it discards the raw backend string, and
-  [`AcquisitionLedgers.java:152-156`](../../../../inspecto-acquire/src/main/java/com/gamma/acquire/AcquisitionLedgers.java)
+  [`AcquisitionLedgers.java:152-156`](../../../../platform/inspecto-acquire/src/main/java/com/gamma/acquire/AcquisitionLedgers.java)
   needs it **verbatim** for its `StoreHealth` message. Substituting it — even inside the package — would
   change an invalid-value message.
 - ⇒ **What a real de-duplication would cost:** a public, `SpaceRoot`-free accessor (e.g.
@@ -1173,11 +1173,11 @@ is **refused**, and `withSchema` refuses a non-PostgreSQL URL.
 | Status | `-Dstatus.backend=db` | `-Dstatus.db.url` | `-Dstatus.db.user` / `.password` |
 | Jobs | `-Djobs.backend=postgres` | `-Djobs.db.url` | (in URL) |
 | Provenance | `-Dprovenance.backend=postgres` | `-Dprovenance.db.url` | (in URL) |
-| Acquisition ledger | `-Dacquire.ledger.backend=db` | (property in [`AcquisitionLedgers`](../../../../inspecto-acquire/src/main/java/com/gamma/acquire/AcquisitionLedgers.java)) | — |
+| Acquisition ledger | `-Dacquire.ledger.backend=db` | (property in [`AcquisitionLedgers`](../../../../platform/inspecto-acquire/src/main/java/com/gamma/acquire/AcquisitionLedgers.java)) | — |
 | Consignment outputs | `-Dconsignment.outputs.backend=postgres` | `-Dconsignment.outputs.db.url` | (in URL) |
 | File stages | `-Dfile.stages.backend=postgres` | `-Dfile.stages.db.url` | (in URL) |
 | Delivery receipts | `-Ddelivery.receipts.backend=postgres` | `-Ddelivery.receipts.db.url` | (in URL) |
-| Delivery receipts | `notify/DeliveryReceiptStore` | [`DbDeliveryReceiptStore`](../../../../inspecto-engine/src/main/java/com/gamma/notify/DbDeliveryReceiptStore.java) | `delivery.receipts.backend=duckdb\|postgres\|jdbc:…` | `none` (in-memory) |
+| Delivery receipts | `notify/DeliveryReceiptStore` | [`DbDeliveryReceiptStore`](../../../../platform/inspecto-engine/src/main/java/com/gamma/notify/DbDeliveryReceiptStore.java) | `delivery.receipts.backend=duckdb\|postgres\|jdbc:…` | `none` (in-memory) |
 | Events | `-Devents.backend=db` (or `postgres`, or a raw `jdbc:`) | `-Devents.db.url` | (in URL) — `-Devents.db.user` / `.password` |
 
 Point each URL at `jdbc:postgresql://…`; the three ops URLs may share one database/schema (table names
@@ -1271,7 +1271,7 @@ The **Data Browser** pane (a per-space DB client) browses these stores live. Bac
   `ControlApiDbBrowserTest.operationalRowReadsRequireCanAuthorWorkbench` is what pins it. The Data Browser
   pane hides operational groups from a caller without `canAuthorWorkbench` instead of letting a click 403.
 - **Operational tables** (§3) browse through each store's own `ConnectionSource` via
-  [`util/BrowsableStore.java`](../../../../inspecto-util/src/main/java/com/gamma/util/BrowsableStore.java) —
+  [`util/BrowsableStore.java`](../../../../platform/inspecto-util/src/main/java/com/gamma/util/BrowsableStore.java) —
   a browse read borrows like any other operation and appears only when that capability runs on
   a `db`/`postgres` backend. ⚠ `browseConnection()` and `browseMonitor()` were **removed** 2026-09-14
   (`OPS-03`): a pooled store has no single long-lived connection to hand back, and exclusion moved onto

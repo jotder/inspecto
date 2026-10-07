@@ -2,7 +2,7 @@
 type: Reference
 title: Data acquisition — the original requirement
 description: The requirement-of-record for remote file collection — connectivity, discovery, stability detection, duplicate prevention, change detection and collection guarantees, as 14 numbered requirement areas. Phases A-F shipped; this states what was asked for, not the as-built.
-resource: inspecto-acquire/src/main/java/com/gamma/acquire
+resource: platform/inspecto-acquire/src/main/java/com/gamma/acquire
 tags: [acquisition, requirements, discovery, stability, dedup, watermark, guarantees]
 timestamp: 2026-07-16T00:00:00Z
 ---

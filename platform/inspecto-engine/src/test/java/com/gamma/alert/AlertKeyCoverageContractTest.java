@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AlertKeyCoverageContractTest {
 
     private static final String PARSER =
-            "inspecto-engine/src/main/java/com/gamma/alert/AlertRule.java";
+            "platform/inspecto-engine/src/main/java/com/gamma/alert/AlertRule.java";
 
     /** The {@code alert.*} leaves the parser reads, as the spec-relative dotted paths the checker uses. */
     private static Set<String> keysTheParserReads() throws IOException {

@@ -2,7 +2,7 @@
 type: Practice
 title: Multi-location ingest — the composition pattern
 description: Ingesting from several locations is done by composing existing pieces, never by widening acquisition — the pattern, and why the awkward questions fall out by construction.
-resource: inspecto-etl/src/main/java/com/gamma/etl
+resource: platform/inspecto-etl/src/main/java/com/gamma/etl
 tags: [multi-location, composition, acquisition, pattern]
 timestamp: 2026-08-25T00:00:00Z
 ---

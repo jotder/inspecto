@@ -2,7 +2,7 @@
 type: Concept
 title: Pipeline node types & the node-type plugin seam
 description: The PipelineNodeType ServiceLoader seam, what a descriptor does and does NOT carry, and why the transform.* family cannot simply collapse into one SQL node.
-resource: inspecto-engine/src/main/java/com/gamma/pipeline/PipelineNodeType.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/pipeline/PipelineNodeType.java
 tags: [engine, pipeline, plugins, spi, node-types]
 timestamp: 2026-08-29T00:00:00Z
 ---
@@ -72,7 +72,7 @@ time**. The seam was descriptor-only in the literal sense: you could describe a 
   --name "Acme Redact"` generates a complete, buildable plugin — both halves, both service files, and a
   test that runs the Step through `RowShaper.shape` the way the engine will (template:
   `tools/templates/nodetype/`). ⚠ Building it outside the reactor resolves `inspecto-engine` from
-  `~/.m2`, so install a current one first (`mvn -o install -DskipTests -pl inspecto-engine -am`) or it
+  `~/.m2`, so install a current one first (`mvn -o install -DskipTests -pl :inspecto-engine -am`) or it
   fails with *"cannot find symbol: class PipelineNodeExecutor"*.
 * ⛔ **`scaffold.mjs new step` is a different thing** — that kind is *pack-hosted* (isolated
   classloader, `StepExecutor` + `StepContext`, services ceiling, watchdog), shipped by platform-services
@@ -80,7 +80,7 @@ time**. The seam was descriptor-only in the literal sense: you could describe a 
   on the engine **classpath**, like a Consignment Processor: it gets no hot deploy, no isolated classloader
   and no watchdog. ⛔ Since S2-3 (D-2) a **pack** carrying a `PipelineNodeExecutor` is rejected whole;
   the raw-`Connection` executor is classpath-only.
-* The in-repo test fixture `FakeNodeExecutor` (`inspecto-engine/src/test`) contributes `transform.take`
+* The in-repo test fixture `FakeNodeExecutor` (`platform/inspecto-engine/src/test`) contributes `transform.take`
   through the executor service file. ⚠ It deliberately registers **no descriptor**, and that is a finding worth
   keeping: **the served node-type catalog is a COMMITTED CONTRACT** (`NodeAttributesContractTest` vs
   `inspecto-ui/.../node-attributes.contract.json`), so a test-scope `PipelineNodeType` provider either fails

@@ -48,7 +48,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * <pre>{@code
  * keytool -importcert -noprompt -alias wso2is -file wso2is.crt -keystore ts.jks -storepass changeit
  * MAVEN_OPTS="-Djavax.net.ssl.trustStore=<abs>/ts.jks -Djavax.net.ssl.trustStorePassword=changeit" \
- * mvn -o -B test -Pedition-enterprise -pl inspecto-oidc -am -DforkCount=0 \
+ * mvn -o -B test -Pedition-enterprise -pl :inspecto-oidc -am -DforkCount=0 \
  *     -Dtest=OidcAgainstRealProviderTest -Dsurefire.failIfNoSpecifiedTests=false \
  *     -Dinspecto.test.oidc.issuer=... -Dinspecto.test.oidc.clientId=... -Dinspecto.test.oidc.clientSecret=...
  * }</pre>

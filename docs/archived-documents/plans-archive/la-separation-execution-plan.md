@@ -35,7 +35,7 @@ Question: can the browser algorithms run server side with identical results?
   stated epsilon per algorithm. ⚠ Louvain is order-sensitive — pin the node order in the fixture or accept
   partition-equivalence rather than label equality; decide per algorithm and write it on the fixture.
 - **2.4 Mutation check.** ✅ DONE — ~60 mutants across the lanes. For each ported algorithm, break the Java port and confirm the parity test goes red for the right values.
-- **Test:** `-pl inspecto-geo-link -am -Dtest=<classes>` (commas), JDK 27; UI via `npx ng test`. Unit level only; full gate at handoff.
+- **Test:** `-pl :inspecto-geo-link -am -Dtest=<classes>` (commas), JDK 27; UI via `npx ng test`. Unit level only; full gate at handoff.
 
 **Gate:** ✅ MET 2026-10-01 — D-S4 recorded as PASS in the feasibility plan §7.10.1 / §7.13. Stage 3 (plan D-1) is next.
 

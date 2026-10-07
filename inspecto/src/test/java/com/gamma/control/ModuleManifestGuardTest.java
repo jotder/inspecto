@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@code META-INF/inspecto/module.toon}, and each manifest's {@code provides.features} equals the ids the
  * module's RouteModules return from {@code featureIds()} — so the manifest cannot drift from the code.
  * Manifests are read from the SOURCE tree (not the class path), so a module that is not on this test's class path
- * is still checked. The {@code asn-parser/asn-decoders/asn-facade} manifest is a nested reactor and is checked for
+ * is still checked. The {@code providers/asn-parser/asn-decoders/asn-facade} manifest is a nested reactor and is checked for
  * existence only.
  */
 class ModuleManifestGuardTest {

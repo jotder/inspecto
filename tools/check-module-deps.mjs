@@ -15,6 +15,7 @@
 // Both layers are falsified in tools/check-module-deps.test.mjs.
 
 import { existsSync, readFileSync } from 'node:fs';
+import { reactorModuleDirs } from './reactor-modules.mjs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -59,7 +60,8 @@ export function directDeps(pomText) {
 }
 
 function readPom(root, module) {
-    const p = join(root, module, 'pom.xml');
+    const dirs = [...reactorModuleDirs((q) => (existsSync(join(root, q)) ? readFileSync(join(root, q), 'utf8') : null))];
+    const p = join(root, dirs.find((d) => d === module || d.endsWith(`/${module}`)) ?? module, 'pom.xml');
     return existsSync(p) ? readFileSync(p, 'utf8') : null;
 }
 

@@ -29,7 +29,7 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * DATA-GOV-1's committed complement (2026-09-06): the synthetic corpus under {@code asn-parser/corpus-synthetic/}
+ * DATA-GOV-1's committed complement (2026-09-06): the synthetic corpus under {@code providers/asn-parser/corpus-synthetic/}
  * runs on EVERY reactor build — no opt-in flag, no real file. Each case = a hand-written grammar, a hex-text BER
  * file, a framing spec and the {@code RecordMapper} maps the new stack must produce for it.
  *

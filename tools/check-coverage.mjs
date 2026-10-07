@@ -28,7 +28,7 @@ const FLOORS = {
 };
 
 // ⚠ SCOPE FLOOR (2026-09-09). The header above closes the case of ZERO reports. It does not close the
-// case of a FEW: `csvs.length === 0` is satisfied by a SINGLE module's CSV, so `-pl inspecto-engine
+// case of a FEW: `csvs.length === 0` is satisfied by a SINGLE module's CSV, so `-pl :inspecto-engine
 // -Pcoverage` followed by this guard reported a repo-wide pass over one module — measured here at
 // 1 report / 427 instructions, printed as "every floor met". That is the same shape the header warns
 // about, only harder to see: a guard that accepts a FRACTION of its input rather than none of it.

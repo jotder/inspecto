@@ -2,7 +2,7 @@
 type: Capability
 title: Component metamodel & Catalog (MET)
 description: Everything authored is a Component — the kind registry and ComponentStore, config specs, ETag concurrency, version history, delete protection and integrity, the single ref derivation; the Catalog read model (MetadataGraph, NodeKind, IdScheme, the four graph planes); the Schema and Mapping registry with fail-closed field types; and Stream/Reference onboarding. The requirement of record for the MET area, its specification, its decisions, and what was refused.
-resource: inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java, inspecto-engine/src/main/java/com/gamma/catalog
+resource: platform/inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java, platform/inspecto-engine/src/main/java/com/gamma/catalog
 tags: [met, capability, component, component-store, kind-registry, catalog, metadata-graph, node-kind, id-scheme, schema, mapping, field-types, onboarding, lineage]
 timestamp: 2026-09-08T00:00:00Z
 ---
@@ -74,7 +74,7 @@ column**; this table mirrors it.
 - **`MET-1`'s shape is a frontend model, stated as if it were the store.** Five documents spell the Component
   five ways (`{kind, name, …}`, `{kind, id, …}`, `{kind; id; name; space?; …}`, `{kind, id, config}`); the
   persisted record is `ComponentRegistry.Component(type, name, path, content)`
-  (`inspecto-engine/src/main/java/com/gamma/pipeline/ComponentRegistry.java:95`) — no `kind`, `config`,
+  (`platform/inspecto-engine/src/main/java/com/gamma/pipeline/ComponentRegistry.java:95`) — no `kind`, `config`,
   `parts` or `wiring` field exists server-side, and the recursive shape lives in the SPA's
   `component-model/`. The requirement is met *as a model*; the row now says where the model lives.
 - **`MET-3`'s "delete-protection" is narrower than "feeding".** `ComponentRoutes.deleteComponent`
@@ -96,7 +96,7 @@ column**; this table mirrors it.
 **Two standing notes no status token can carry:**
 
 1. 🔴 **The Schema's mapping block has two spellings and the decision is unmade.** The engine **prefers
-   `mapping.fields[]`** (`DataTransformer.recordFields`, `inspecto-etl/src/main/java/com/gamma/etl/DataTransformer.java:266-273`,
+   `mapping.fields[]`** (`DataTransformer.recordFields`, `platform/inspecto-etl/src/main/java/com/gamma/etl/DataTransformer.java:266-273`,
    falling back to `rules[]` via `RecordTransform.fromMappingRules`) since `transform.map` was deleted on
    2026-09-05; the **generators still emit `rules[]` + `transformType`** (`SchemaExtractor.java:193`,
    `ConfigPreviewRoutes.java:335`); **zero of the 22–24 committed `*_schema.toon` are migrated**; and
@@ -115,7 +115,7 @@ column**; this table mirrors it.
 
 ### 3.1 The Component model, as stored and as modelled
 
-**Stored.** `ComponentStore` (`inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java`,
+**Stored.** `ComponentStore` (`platform/inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java`,
 `@PublicApi(since = "4.0.0")`) persists `<write-root>/registry/<typeDir>/<id>.toon` — `.csv` for the CSV
 kinds (`mapping`) — and `ComponentRegistry` scans it into `Component(type, name, path, content)`.
 **`WRITABLE_TYPES` is 24 kinds:** `grammar`, `schema`, `mapping`, `transform`, `sink`, `dataset`, `widget`,
@@ -134,7 +134,7 @@ mapping | none` — is the SPA's `component-model/` (`component-kind.ts`, `compo
 with strategy seams as **string keys** (`editorKey` / `runnerKey`) so the model imports no Angular.
 Adoption D0 → P4 completed 2026-06-28.
 
-**Declared config schemas.** `ConfigSpecs.TYPES` (`inspecto-config/src/main/java/com/gamma/config/spec/ConfigSpecs.java:31-33`)
+**Declared config schemas.** `ConfigSpecs.TYPES` (`platform/inspecto-config/src/main/java/com/gamma/config/spec/ConfigSpecs.java:31-33`)
 is **nine** types — `pipeline, enrichment, job, schema, meta, alert, expectation, widget, dashboard` — served
 by `/config/spec/{type}` and on `/bootstrap.configSpecs`; a `ConfigSpec` is `(type, fields, rules)`, a
 `FieldSpec` typed by `FieldType` ∈ `STRING · INT · LONG · BOOL · ENUM · FILEPATH · CRON · SQL · MAP · LIST`.
@@ -175,7 +175,7 @@ kinds, by design.
 **Server-side delete protection** (`deleteComponent`, `:322-344`): `404` if absent; **`409`** if
 `PipelineReferences.referencedBy` finds a pipeline `use:` reference; **`409`** if `activeConsumers` finds a
 cross-Space Exchange grant. That is the whole set. **`ComponentIntegrity`**
-(`inspecto-engine/src/main/java/com/gamma/pipeline/ComponentIntegrity.java`) is pure functions over an
+(`platform/inspecto-engine/src/main/java/com/gamma/pipeline/ComponentIntegrity.java`) is pure functions over an
 in-memory universe — `brokenRefs` (widget → dataset / query, dashboard tile → widget, reconciliation →
 dataset), `brokenPipelineRefs` (expectation / decision-rule `target`), `duplicates` (content-identical apart
 from name) — consumed by the `metadata_validate` maintenance task and the bundle-import pre-check (MNT-16:
@@ -233,7 +233,7 @@ declared binding reaches a catalog node. Keep the two apart — answering `unbou
 unresolvable ref would make one Dataset describe itself two ways on two routes.
 
 All of the above is covered by `MetadataGraphStudioLayerTest`
-(`inspecto-engine/src/test/java/com/gamma/catalog/MetadataGraphStudioLayerTest.java`).
+(`platform/inspecto-engine/src/test/java/com/gamma/catalog/MetadataGraphStudioLayerTest.java`).
 
 `CatalogRoutes` (`inspecto/src/main/java/com/gamma/control/CatalogRoutes.java`): `GET /catalog` (tables) ·
 `/catalog/streams` (`:30`, **per-Collector** data-origin nodes shaped to the UI `MetadataNode` contract —
@@ -254,7 +254,7 @@ reference`, `reference: {load: replace | upsert | scd2, key[], refresh_seconds}`
 |---|---|---|---|
 | **P1 artifact** | Components | Component / Part — `part-of`, `uses` | the derived Registry (`refsForComponent`) — rendered as the Catalog's **Usage** tab |
 | **P2 lineage** | data assets | Asset — the nine `EdgeKind`s | `MetadataGraphService` — the **Lineage** tab |
-| **P2′ provenance** | a Consignment's records through Steps | Step — `flowed-through` (+ row counts) | `DbProvenanceStore` (`inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java`) + `GET /lineage?store=` |
+| **P2′ provenance** | a Consignment's records through Steps | Step — `flowed-through` (+ row counts) | `DbProvenanceStore` (`platform/inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java`) + `GET /lineage?store=` |
 | **P3 entity / link** | records as business entities | Entity / Link | the Entity Projection over a Dataset — frontend-first; the backend projection is **open** |
 
 Two collisions were resolved and must not regress: lineage `USES` → **`CONSUMES`** so it stops colliding with
@@ -269,18 +269,18 @@ screen*, and the glossary's Catalog definition ("Schemas and Datasets") predates
 
 - **Schema config** (`<name>_schema.toon`, pipeline-owned): `raw.fields[] {name, selector, type, description,
   unit, classification}` + the `mapping:` block. **`raw.fields[].type` is fail-closed** —
-  `SchemaFieldTypes` (`inspecto-etl/src/main/java/com/gamma/etl/SchemaFieldTypes.java`, operator decision
+  `SchemaFieldTypes` (`platform/inspecto-etl/src/main/java/com/gamma/etl/SchemaFieldTypes.java`, operator decision
   2026-08-22) is the one vocabulary: every DuckDB scalar reachable by `TRY_CAST` from text is honoured and
   compiles to a known cast; a type outside it is **refused at config load** (`Identifiers.validateSchema`)
   rather than degraded to `VARCHAR` — before 2026-08-22 a `type: BIGINT` silently produced a string column.
   `classification` is a free string (`PII` / `INTERNAL` by convention, SCH-03) — **metadata only, nothing
   enforces masking on it** (SEC-08, Enterprise-only, unbuilt); no enum and no owner page exists (§5).
-- **Resolution.** `PipelineConfigParser.resolveSchemaRef` (`inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java:1232-1239`):
+- **Resolution.** `PipelineConfigParser.resolveSchemaRef` (`platform/inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java:1232-1239`):
   beside the config only, via `PathJail.resolveConfigRef` (never the CWD, since 2026-09-23); `schema/<id>` → `registry/schemas/<id>.toon`, `grammar/<id>` →
   `registry/grammars/<id>.toon`, `mapping/<id>` → `registry/mappings/<id>.csv`; `ConfigSafetyValidator` and
   `ConfigRoutes` call the same resolver. ⚠ **No `registry/schemas/` directory exists in any committed
   Space** — every shipped schema is pipeline-owned.
-- **Generation.** `SchemaExtractor` (`inspecto-util/src/main/java/com/gamma/util/SchemaExtractor.java`, CLI
+- **Generation.** `SchemaExtractor` (`platform/inspecto-util/src/main/java/com/gamma/util/SchemaExtractor.java`, CLI
   `create-schema`) infers `<source>_schema.toon` + `<source>_pipeline.toon` from a sample by DuckDB type
   inference; `ConfigPreviewRoutes` serves `/config/preview/schema` (TRY_CAST a draft against sample rows),
   `/config/suggest/schema` and `/config/schema/derived` (DESCRIBE over a saved pipeline's output). Both
@@ -497,7 +497,7 @@ A draft is server state (an inactive pipeline); "⚠ Do not implement" stands in
 | `ComponentStore`, the kinds, routes, ETags, preview, safe delete | `docs/okf/backend/components/component-registry.md` (`Concept`) | `ComponentStore.java` | §3.1–§3.4 — ⚠ 4 KB; corrected with this spec, still owed a fuller page |
 | The `use:` seam, `bindKindFor`, the palette contract, `transform.sql` internals | `docs/okf/backend/engine/catalog-vs-executors.md` · `node-types.md` (`Concept`) | `inspecto-engine` | how a kind is bound and executed |
 | The TOON key reference incl. the schema config and its `mapping:` block (**documents the emitted `rules[]` shape**) | `docs/okf/backend/config/configuration.md` (`Reference`) | — | §3.7 — read with §2 note 1 |
-| `schema_file` / `grammar` / `mapping` resolution and the jail | `docs/okf/backend/config/config-safety.md` (`Concept`) | `inspecto-config/` | §3.7 |
+| `schema_file` / `grammar` / `mapping` resolution and the jail | `docs/okf/backend/config/config-safety.md` (`Concept`) | `platform/inspecto-config/` | §3.7 |
 | Draft lifecycle, previews, the register pair, Reference production | `docs/okf/backend/control-plane/onboarding-authoring.md` (`Seam`) | — | §3.8 |
 | Bundle refs, `APPLY_ORDER`, `ComponentIntegrity` in the import pre-check | `docs/okf/backend/control-plane/metadata-bundle.md` (`Concept`) | `BundleRoutes.java` | §3.4 |
 | The layer table naming `catalog` as L2 | `docs/okf/backend/architecture-layers.md` (`Architecture`) | — | the one structural line on the read model |
@@ -505,8 +505,8 @@ A draft is server state (an inactive pipeline); "⚠ Do not implement" stands in
 | Onboarding as the editor's checklist; stream bundle import | `docs/okf/frontend/features/onboarding.md` (`Feature`) | — | §3.8 |
 | The schema / mapping grids, the compatibility gate's UI | `docs/okf/frontend/features/schema-mapping-authoring.md` (`Feature`) | — | §3.7 |
 | The Components pane | `docs/okf/frontend/features/components.md` (`Feature`, 0.9 KB) | — | §3.9 — ⚠ a stub |
-| 🔴 **No concept file owns the Catalog read model** (`com.gamma.catalog`: `MetadataGraph*`, `NodeKind`, `EdgeKind`, `IdScheme`, `CatalogOverlay`) | *(gap)* | `inspecto-engine/src/main/java/com/gamma/catalog` | §3.5–§3.6 of this spec are the only account |
-| 🔴 **No page owns `SchemaFieldTypes`** or the classification vocabulary | *(gap)* | `inspecto-etl/src/main/java/com/gamma/etl/SchemaFieldTypes.java` | §3.7 |
+| 🔴 **No concept file owns the Catalog read model** (`com.gamma.catalog`: `MetadataGraph*`, `NodeKind`, `EdgeKind`, `IdScheme`, `CatalogOverlay`) | *(gap)* | `platform/inspecto-engine/src/main/java/com/gamma/catalog` | §3.5–§3.6 of this spec are the only account |
+| 🔴 **No page owns `SchemaFieldTypes`** or the classification vocabulary | *(gap)* | `platform/inspecto-etl/src/main/java/com/gamma/etl/SchemaFieldTypes.java` | §3.7 |
 
 ---
 

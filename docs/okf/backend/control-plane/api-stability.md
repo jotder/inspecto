@@ -2,7 +2,7 @@
 type: Reference
 title: API stability policy
 description: What the `@PublicApi` marker means and does not mean, the release baseline (nothing after 3.x has shipped), and the running draft of release notes for the pending MAJOR.
-resource: inspecto-api/src/main/java/com/gamma/api/PublicApi.java
+resource: platform/inspecto-api/src/main/java/com/gamma/api/PublicApi.java
 tags: [api, stability, publicapi, semver, release]
 timestamp: 2026-07-16T00:00:00Z
 ---
@@ -13,7 +13,7 @@ timestamp: 2026-07-16T00:00:00Z
 > Part of the [Inspecto](../../../../inspecto/README.md) documentation.
 
 The framework distinguishes its **stable public API** from internal implementation.
-Types, methods, and constructors marked [`@com.gamma.api.PublicApi`](../../../../inspecto-api/src/main/java/com/gamma/api/PublicApi.java)
+Types, methods, and constructors marked [`@com.gamma.api.PublicApi`](../../../../platform/inspecto-api/src/main/java/com/gamma/api/PublicApi.java)
 are the surface external code may depend on; everything else is internal and may
 change in any release.
 

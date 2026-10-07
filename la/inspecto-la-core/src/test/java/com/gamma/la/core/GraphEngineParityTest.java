@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class GraphEngineParityTest {
 
-    private static final Path DIR = Path.of("..", "inspecto-ui", "projects", "link-analysis", "src", "graph");
+    private static final Path DIR = Path.of("..", "..", "inspecto-ui", "projects", "link-analysis", "src", "graph");
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final InMemoryGraphEngine ENGINE = new InMemoryGraphEngine();
     private static final Set<Algorithm> EXERCISED = EnumSet.noneOf(Algorithm.class);

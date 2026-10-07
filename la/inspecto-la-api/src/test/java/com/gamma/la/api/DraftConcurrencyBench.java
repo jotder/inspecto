@@ -48,7 +48,7 @@ import static com.gamma.la.core.InvestigationEvaluator.canonical;
  * (the index and the Space go there, outside the repo; an index already built for the same edge count is reused). Knobs
  * {@code inspecto.bench.*}: {@code edges} (5000000), {@code drafts} (50), {@code active} (20), {@code seconds} (15 per phase),
  * {@code thinkMs} (2000 mean think time of the think-time phase), {@code longSteps} (500, the long Draft for rehydrate and
- * promote), {@code buildMemory} (8GB). Results print as {@code D-S5R ...} lines. Run: {@code mvn -o -pl inspecto-la-api test
+ * promote), {@code buildMemory} (8GB). Results print as {@code D-S5R ...} lines. Run: {@code mvn -o -pl :inspecto-la-api test
  * -Dtest=DraftConcurrencyBench -Dinspecto.bench.dir=<dir> -Dsurefire.failIfNoSpecifiedTests=false}.
  */
 @Tag("bench")

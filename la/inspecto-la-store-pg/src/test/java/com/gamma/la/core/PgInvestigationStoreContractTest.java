@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * <pre>{@code
  * MAVEN_OPTS="-Duser.timezone=Asia/Kolkata" \
  * INSPECTO_TEST_PG_URL='jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres' \
- * mvn -o -B test -Pedition-enterprise -pl inspecto-la-store-pg -am \
+ * mvn -o -B test -Pedition-enterprise -pl :inspecto-la-store-pg -am \
  *     -Dtest=PgInvestigationStoreContractTest -Dsurefire.failIfNoSpecifiedTests=false -DforkCount=0
  * }</pre>
  * The three traps are those of {@code PostgresStateStoreTest}: the env var (a {@code -D} URL loses its password to {@code &} on Windows),

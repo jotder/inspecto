@@ -2,7 +2,7 @@
 type: Reference
 title: Performance assessment & bottleneck analysis
 description: Measured stage-isolated benchmark results (JDK 26 / DuckDB 1.5.2 via PipelineBenchmark) — why ingest is the bottleneck, how its cost scales with total cells, the root causes, the concurrency model and the native-path resolution.
-resource: inspecto-etl/src/test/java/com/gamma/etl/PipelineBenchmark.java
+resource: platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineBenchmark.java
 tags: [performance, benchmark, duckdb, ingest, concurrency, bottleneck]
 timestamp: 2026-07-16T00:00:00Z
 ---
@@ -243,7 +243,7 @@ is forced alongside `skip_tail_columns > 0`.
 
 This prices an `EXECUTED` pipeline Step, which is imperative JVM code between map and the write,
 against the fused flat lane. The source is `BridgeSpikeBenchmark` in
-`inspecto-engine/src/test/java/com/gamma/pipeline/exec/`, run on JDK 27 and DuckDB 1.5.2 with 12
+`platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/`, run on JDK 27 and DuckDB 1.5.2 with 12
 cores, an in-memory database and 2M mixed-type rows. Figures are the median of 5 warm runs, node plus
 the same Parquet `COPY`.
 
@@ -266,7 +266,7 @@ seam adds nothing to the bridge. That day's host was about twice as fast as the 
 Reproduce:
 
 ```
-mvn -o -pl inspecto-engine -am test -Dtest=BridgeSpikeBenchmark -Dsurefire.failIfNoSpecifiedTests=false     -Dbench.run=true -Dbench.rows=2000000 -Dbench.cols=10,50 -Dbench.runs=5
+mvn -o -pl :inspecto-engine -am test -Dtest=BridgeSpikeBenchmark -Dsurefire.failIfNoSpecifiedTests=false     -Dbench.run=true -Dbench.rows=2000000 -Dbench.cols=10,50 -Dbench.runs=5
 ```
 
 ## Very large single files (3.10.0)
@@ -331,7 +331,7 @@ benchmark asserts union-mode throughput against that property (unset = no floor,
 unchanged).
 
 Measured baseline the floor came from — three runs on 2026-09-29, 12-core Windows dev host, JDK 27,
-`mvn -o -pl inspecto-engine -am test -Dtest=PluginIngestBenchmark ... -Dbench.rows=1000000`:
+`mvn -o -pl :inspecto-engine -am test -Dtest=PluginIngestBenchmark ... -Dbench.rows=1000000`:
 
 | run | union rows/s | generation (4 gens) rows/s |
 |---|---|---|
@@ -396,8 +396,8 @@ lower-is-better, `_rps`/`_qps` higher-is-better.
 | `readers` | `DuckDbBench.java` | 1/4/8 concurrent readers (`duplicate()` connections) on one file-backed database |
 | `csv` | `DuckDbBench.java` | 2M-row `read_csv`, transform SQL, `COPY ... PARTITION_BY` parquet (the `DuckDbCsvIngester` shape) |
 | `store` | `DuckDbBench.java` | file-backed INSERT / `ON CONFLICT` throughput in the dedup-ledger, status, events and status re-sync shapes (same SQL idioms as the `Db*Store` classes, not the classes themselves) |
-| `la1m`, `la10m`, `la100m` | `IndexScaleBench` via `mvn -o -pl inspecto-la-storage` | index build (once per label), one-hop (1 and 20 keys), hub key, depth-2 walk; p50/p95 per rep. 1M/10M reuse the `-ScaleDir` data and build a per-label index under `<OutDir>`; `la100m` is **read-only** on the existing `idx-100000000` |
-| `engine` | `PluginIngestBenchmark` via `mvn -o -pl inspecto-engine` | the engine's real streaming ingest, transform and partitioned parquet write, union and generation modes (1M rows x `-Scale`) |
+| `la1m`, `la10m`, `la100m` | `IndexScaleBench` via `mvn -o -pl :inspecto-la-storage` | index build (once per label), one-hop (1 and 20 keys), hub key, depth-2 walk; p50/p95 per rep. 1M/10M reuse the `-ScaleDir` data and build a per-label index under `<OutDir>`; `la100m` is **read-only** on the existing `idx-100000000` |
+| `engine` | `PluginIngestBenchmark` via `mvn -o -pl :inspecto-engine` | the engine's real streaming ingest, transform and partitioned parquet write, union and generation modes (1M rows x `-Scale`) |
 
 Gotchas: the two `mvn` workloads use `-Dduckdb.version=<v>` and the sibling jars already in `~/.m2` (no `-am`), and report no
 peak RSS; the harness cannot see which DuckDB the forked JVM loaded beyond that property, so read `duckdbVersion` from the

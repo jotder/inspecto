@@ -590,7 +590,7 @@ tier boundary in its own right, independent of persistence and JSON.**
 No version bump: every surface above is dual-read/dual-emit, so no existing space, `*_job.toon`, or API
 caller stops working — the same "no contract/data in the wild yet" rationale the earlier no-bump Tier 1
 UI/backend rename used, just achieved here by aliasing rather than by there being nothing to break.
-Verified: `mvn -o clean test -pl inspecto-event,inspecto-engine,inspecto -am` → 650/650, plus new tests
+Verified: `mvn -o clean test -pl :inspecto-event,:inspecto-engine,inspecto -am` → 650/650, plus new tests
 (`PipelineJobRunnerTest.runsFlowWithTheCanonicalPipelineKeyNotJustTheLegacyFlowKey`,
 `ControlApiProvenanceTest`'s `?pipeline=` assertions) alongside the many pre-existing `flow:`-keyed tests,
 which now double as legacy-path regression coverage.

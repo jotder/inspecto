@@ -61,7 +61,7 @@ class ToolCapabilitiesCoverageTest {
      */
     @Test
     void rowReadersShareTheOperationalRowReadCapability() throws Exception {
-        String src = Files.readString(Path.of("..", "inspecto", "src", "main", "java", "com", "gamma", "control",
+        String src = Files.readString(Path.of("..", "..", "inspecto", "src", "main", "java", "com", "gamma", "control",
                 "DbBrowserRoutes.java"));
         assertTrue(src.contains("ApiContext.requireCapability(ex, \"" + ToolCapabilities.AUTHOR + "\")"),
                 "DbBrowserRoutes' operational-row gate must be " + ToolCapabilities.AUTHOR);

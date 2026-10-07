@@ -14,7 +14,7 @@ import java.util.Optional;
  *   <li><b>Checkout mode:</b> otherwise, walk up to 6 levels from the working directory looking for a
  *       directory that has both {@code docs/} and {@code inspecto-ui/} children — needed because those are
  *       siblings of this module's own directory and Maven's per-module working directory (e.g.
- *       {@code inspecto-intelligence/} under the reactor) is not the repo root. Works whether launched from
+ *       {@code features/inspecto-intelligence/} under the reactor) is not the repo root. Works whether launched from
  *       the repo root (production) or a module directory (Maven test).</li>
  * </ul>
  */

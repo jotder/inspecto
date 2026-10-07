@@ -2,7 +2,7 @@
 type: Concept
 title: Signal Backbone (canonical envelope, agent context fabric, gated agentic write)
 description: The one canonical Signal envelope + type catalog + addressing grammar, projected to notification templating, agent diagnostic context, AG-UI streaming, A2UI artifacts, and the gated agentic write path.
-resource: inspecto-engine/src/main/java/com/gamma/signal/Signal.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/signal/Signal.java
 tags: [control-plane, signal, agent, a2ui, ag-ui, agentic-write, deadlock]
 timestamp: 2026-07-19T00:00:00Z
 ---
@@ -17,7 +17,7 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
 
 ## The canonical envelope (S0)
 
-* **`Signal`** (`inspecto-engine/src/main/java/com/gamma/signal/Signal.java`) — 13-field record: `signalId,
+* **`Signal`** (`platform/inspecto-engine/src/main/java/com/gamma/signal/Signal.java`) — 13-field record: `signalId,
   type (dotted string), at:Instant, severity, source:Ref, subject:Ref, correlationId, causationId,
   space, actor:Ref, message, payload:Map<String,Object>, schemaVersion`. `toEvent()`/`fromEvent()` are
   a true, lossless round-trip onto the `Event` ledger (`EventType.SIGNAL`) — payload rides as a real
@@ -29,14 +29,14 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
   direction, by design — documented precedent, not a bug).
 * No `@PublicApi` version bump was required (decided explicitly: 4.x unreleased) — `Signal`'s and
   `Event`'s shapes were free to change within this major.
-* **`Signals`** (`inspecto-engine/src/main/java/com/gamma/signal/Signals.java`) — the static, stateless read
+* **`Signals`** (`platform/inspecto-engine/src/main/java/com/gamma/signal/Signals.java`) — the static, stateless read
   side: `query(EventStore, type, sinceMs, untilMs, minSeverity, correlationId, limit)` (type is exact
   or a `prefix.*` glob; severity floor and correlationId filter in-store) and `matches(...)` (the
   shared predicate reused by both the in-store query page and a live push subscriber).
 
 ## One bus, one type catalog, one addressing grammar (S1–S2)
 
-* **`EventLogAuditSink`** (`inspecto-agent/.../kernel/observe/EventLogAuditSink.java`) bridges the
+* **`EventLogAuditSink`** (`features/inspecto-agent/.../kernel/observe/EventLogAuditSink.java`) bridges the
   previously-discarded `AgentEvent` island onto the canonical ledger as `agent.run.started|completed|
   failed`, `agent.model.called`, `agent.tool.called|completed`, `agent.human.decided` — all carrying
   `correlationId = capabilityId`, `source = Ref("agent-capability", capabilityId)`.
@@ -45,7 +45,7 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
 * **`ConsignmentAuditWriter`** additively emits `pipeline.batch.committed|failed` Signals alongside the
   pre-existing `ConsignmentEvent` fan-out (both fire; `ConsignmentEventBus` itself is untouched — see the
   run-claim hand-off note below for why a full bus migration was deliberately not attempted).
-* **`DottedPath`** (`inspecto-util/src/main/java/com/gamma/util/DottedPath.java`) — one shared `a.b.c`
+* **`DottedPath`** (`platform/inspecto-util/src/main/java/com/gamma/util/DottedPath.java`) — one shared `a.b.c`
   resolver now used by `{{template}}` interpolation (`NotificationTemplate`), `$signal.<path>` job
   binds (`ParameterResolver`), and `when:` guards (`WhenGuard`) — replacing three independently
   duplicated flat-lookup implementations. `NotificationRule.context(Event)` gained `ts`/`time`/
@@ -69,7 +69,7 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
   causation assembly as a flat list. **Both share one engine primitive**: `signal_timeline` calls
   `Signals.causationOrder`, a depth-first (pre-order) flatten of the same `assembleTree` forest (dedup
   done 2026-07-22, `BACKLOG.md` §5).
-* **`AgUiProjection`** (`inspecto-engine/src/main/java/com/gamma/signal/AgUiProjection.java`) — pure mapping
+* **`AgUiProjection`** (`platform/inspecto-engine/src/main/java/com/gamma/signal/AgUiProjection.java`) — pure mapping
   from a domain Signal type to an AG-UI event type (`agent.run.started`→`RUN_STARTED`, etc.,
   `CUSTOM` for anything uncatalogued). Domain type names stay dotted/canonical internally; AG-UI is
   a thin edge adapter, never adopted wholesale (decision D3: "AG-UI-shaped, domain-named").
@@ -92,7 +92,7 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
 
 ## Agent context fabric (S5)
 
-* Two new tools on the agent's read-only belt (`inspecto-intelligence/.../pack/InspectoTools.java`,
+* Two new tools on the agent's read-only belt (`features/inspecto-intelligence/.../pack/InspectoTools.java`,
   same `FunctionTool` pattern as `status_get`): **`signals_query`** (filtered ledger slice — type
   glob, time window, severity floor, correlationId) and **`signal_timeline`** (causation-ordered
   reconstruction for one correlationId, via the shared `Signals.causationOrder` flatten of `assembleTree`:
@@ -100,14 +100,14 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
   followed depth-first by its causal children; cycle members surface as roots, never dropped). Every
   entry carries a citable `signalId`. This is what makes "why did pipeline X fail?" and "narrate your
   own last run" (from the `agent.*` facts above) answerable.
-* **`ContextBroker`** (`inspecto-intelligence/.../context/ContextBroker.java`) — the first real
+* **`ContextBroker`** (`features/inspecto-intelligence/.../context/ContextBroker.java`) — the first real
   implementation of `embedded-intelligence-plan.md` §2's situation frame: deterministic, budget-bound
   (`FRAME_BUDGET_CHARS`, overlay evicted oldest-first) composition of identity (role) + focus (page
   context) + a live Signal overlay (recent WARN+, newest first) + a knowledge pointer. Wired into
   session open via eoiagent's `SessionRequest.attributes` map (the least-invasive seam found; the
   attributes map is a supply-side seam — actually surfacing it into the model's prompt is the eoiagent
   host layer's concern, not this repo's).
-* **`SignalIngress`** (`inspecto-intelligence/.../context/SignalIngress.java`) — a run-claim-safe
+* **`SignalIngress`** (`features/inspecto-intelligence/.../context/SignalIngress.java`) — a run-claim-safe
   `EventLog` subscriber (bounded queue, sheds rather than blocks, own daemon virtual-thread executor —
   mirrors `FailureReactor`'s pattern) retaining a window of *elevated* signals (severity ≥ ERROR, or
   the canonical failure types). **Shipped tested but deliberately unwired**: its ERROR+/failure floor

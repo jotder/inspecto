@@ -2,7 +2,7 @@
 type: Concept
 title: Execution lanes
 description: The single owner of "which lanes exist" — every way a Pipeline executes (ingest flat, ingest graph fork, at-rest job, scratch, parked-then-drained), what triggers each, the divert predicate, what runs, what it writes, and which concept owns the mechanism.
-resource: inspecto-engine/src/main/java/com/gamma/inspector/ConsignmentIngestStrategy.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/inspector/ConsignmentIngestStrategy.java
 tags: [pipeline-graph, execution, lanes, ingest, job, scratch, park, drain]
 timestamp: 2026-09-01T00:00:00Z
 ---

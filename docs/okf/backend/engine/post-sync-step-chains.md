@@ -2,7 +2,7 @@
 type: Concept
 title: Post-sync step chains (the open DAG)
 description: What runs over a Consignment AFTER sync — an authored, ordered chain of ConsignmentProcessor steps whose carrier is the Consignment output registry, whose emitted tables register back onto the same Consignment, and whose schema propagates through TypeFlow rather than being re-declared.
-resource: inspecto-engine/src/main/java/com/gamma/job/ConsignmentProcessJobType.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/job/ConsignmentProcessJobType.java
 tags: [engine, consignment, post-sync, derived-table, processor, chain, registry, plugin-step, retention]
 timestamp: 2026-09-06T00:00:00Z
 ---
@@ -35,7 +35,7 @@ before anything is durable. The post-sync lane is the Consignment-addressed one,
 
 ## 2. The carrier: `ProcessorContext` over the registry
 
-`inspecto-engine/src/main/java/com/gamma/consignment/ProcessorContext.java` is the Consignment-scoped
+`platform/inspecto-engine/src/main/java/com/gamma/consignment/ProcessorContext.java` is the Consignment-scoped
 façade the framework resolves and hands to a processor: `consignmentId()` (resolved by the framework,
 never the author), `outputs()` (every file this Consignment wrote — the **addressing authority**),
 `read()` (a `ConsignmentReader`: read-only SQL over lazy views of this Consignment's files),
@@ -50,7 +50,7 @@ never the author), `outputs()` (every file this Consignment wrote — the **addr
 
 ### Schema propagates; it is never re-declared
 
-`inspecto-etl/src/main/java/com/gamma/etl/TypeFlow.java` derives a Step's output schema by DuckDB
+`platform/inspecto-etl/src/main/java/com/gamma/etl/TypeFlow.java` derives a Step's output schema by DuckDB
 `DESCRIBE` over the *identical* SELECT it executes, without executing it — DuckDB is the type authority
 and the Parquet footer carries the same types. So a derived table's schema **is** the base table's schema
 after the SQL: nothing declares it, nothing can drift. The declared `raw.fields[]` belongs to the
@@ -62,7 +62,7 @@ after the SQL: nothing declares it, nothing can drift. The declared `raw.fields[
 `DerivedTable(name, sql, partitionBy)` · `DerivedTableEmitter` (`@PublicApi`) ·
 `GuardedDerivedTableEmitter` (validates + collects) · `DerivedTableWriter` (materialises after
 `process()` returns and registers the files onto the **same Consignment**) — all under
-`inspecto-engine/src/main/java/com/gamma/consignment/`.
+`platform/inspecto-engine/src/main/java/com/gamma/consignment/`.
 
 The four registry contract points, settled:
 
@@ -87,7 +87,7 @@ Gotchas found by building it:
 
 ## 4. Stage 3 — the ordered chain
 
-`ConsignmentProcessJobType` (`inspecto-engine/src/main/java/com/gamma/job/`): the `processor`
+`ConsignmentProcessJobType` (`platform/inspecto-engine/src/main/java/com/gamma/job/`): the `processor`
 parameter is **one id or an ordered comma-separated chain** (`mask,rollup,report`); `chain_config` is an
 optional, positionally aligned JSON array of `{"config": {...}}` (`ParamType.JSON`, the vocabulary's
 first nested shape; `ProcessorContext.config()` defaults to an empty map for standalone runs and

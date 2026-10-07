@@ -21,4 +21,4 @@
   Consolidated from `docs/PROJECT_NOTES.md`, the topic docs (`ADVANCED_GUIDE`, `EDITIONS`, `configuration`,
   `data_acquisition_framework`, `flow-graph-design`, `flow-live-execution-plan`, `performance`,
   `parsing-options-reference`, `delimited-grammar-design`, `plugins`, `BRANCHING`) and a source sweep of the
-  `inspecto/`, `inspecto-connectors/`, `inspecto-agent/`, and `inspecto-agent-hosted/` modules.
+  `inspecto/`, `providers/inspecto-connectors/`, `features/inspecto-agent/`, and `providers/inspecto-agent-hosted/` modules.

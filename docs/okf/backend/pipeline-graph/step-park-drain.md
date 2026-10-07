@@ -2,7 +2,7 @@
 type: Concept
 title: Per-Step enabled — park and drain
 description: Switching off a route-branch sink parks its Consignments durably at the boundary; a drain completes them through the real commit tail.
-resource: inspecto-engine/src/main/java/com/gamma/inspector/DrainCommand.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/inspector/DrainCommand.java
 tags: [pipeline-graph, park, drain, route, consignment, disabled-steps]
 timestamp: 2026-08-29T00:00:00Z
 ---

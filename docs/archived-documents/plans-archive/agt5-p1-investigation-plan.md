@@ -96,7 +96,7 @@ entries → row-count/duration/status/schema-delta comparison), `config_versions
 (ComponentStore history → unified structural diff, scoped to stores that actually keep history —
 verify PipelineStore parity first), `anomaly_scan` (D6). All `mutating=false`, `READ_METADATA`,
 `FunctionTool` pattern, unit tests per tool in `InspectoToolsTest` style.
-*Verify: `mvn -o test -pl inspecto-intelligence` green.*
+*Verify: `mvn -o test -pl :inspecto-intelligence` green.*
 
 **B — Upstream goalKind seam (eoiagent repo). ✅ SHIPPED** (see the B-note above for the 0.2.0-SNAPSHOT
 version deviation). D1 change + eoiagent's own tests + `mvn install`

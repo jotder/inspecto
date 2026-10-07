@@ -502,10 +502,10 @@ whichever edition was staged last, which reads exactly like a real failure.
 | The workstreams C1–C6 | §3.10 of this spec — **the definitions live here now** | current |
 | The plan's provenance | `docs/archived-documents/plans-archive/compliance-certifications-plan.md` | ⛔ **ARCHIVED 2026-09-09** — a DRAFT, and several of its unratified claims are refuted in the current tier; read its banner before quoting anything from it |
 | Bill of materials · signing · dependency review | `tools/sbom.mjs`, `tools/check-dependencies.mjs`, `tools/dependencies.lock`, `.github/workflows/release.yml`, `.github/workflows/ci.yml`, `inspecto/package.ps1` | `PKG`, `TOOL` |
-| Audit trail · retention | `inspecto-auth-spi/src/main/java/com/gamma/control/AuditTrail.java`; `inspecto-audit-spi/src/main/java/com/gamma/event/EventStore.java` | `OPS` |
-| Access control · secrets | `inspecto-auth-spi/src/main/java/com/gamma/control/CapabilityManifest.java`, `Roles.java`; `inspecto-auth-spi/src/main/java/com/gamma/acquire/SecretResolver.java` | `SEC` |
-| Configuration safety | `inspecto-config/src/main/java/com/gamma/config/safety/ConfigSafetyValidator.java`, `PathJail.java` | `PIP`, `SEC` |
-| Processing integrity | `inspecto/src/main/java/com/gamma/expectation/ExpectationEvaluator.java`; `inspecto-etl/src/main/java/com/gamma/etl/QuarantineManager.java`; `inspecto-engine/src/main/java/com/gamma/consignment/GuardedSummaryEmitter.java` | `ING`, `PIP` |
+| Audit trail · retention | `spi/inspecto-auth-spi/src/main/java/com/gamma/control/AuditTrail.java`; `spi/inspecto-audit-spi/src/main/java/com/gamma/event/EventStore.java` | `OPS` |
+| Access control · secrets | `spi/inspecto-auth-spi/src/main/java/com/gamma/control/CapabilityManifest.java`, `Roles.java`; `spi/inspecto-auth-spi/src/main/java/com/gamma/acquire/SecretResolver.java` | `SEC` |
+| Configuration safety | `platform/inspecto-config/src/main/java/com/gamma/config/safety/ConfigSafetyValidator.java`, `PathJail.java` | `PIP`, `SEC` |
+| Processing integrity | `inspecto/src/main/java/com/gamma/expectation/ExpectationEvaluator.java`; `platform/inspecto-etl/src/main/java/com/gamma/etl/QuarantineManager.java`; `platform/inspecto-engine/src/main/java/com/gamma/consignment/GuardedSummaryEmitter.java` | `ING`, `PIP` |
 | Change-management gates | `.github/workflows/branch-policy.yml`, `ui.yml`; `tools/check-vocabulary.mjs` | `TOOL`, `UI` |
 
 **Gap rows.** This area has **no `okf/` concept tier, and that is correct** — the matrix *is* the

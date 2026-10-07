@@ -906,7 +906,7 @@ class MaintenanceLibraryTest {
     }
 
     // ── backup / backup_verify / restore ─────────────────────────────────────────
-    // MOVED 2026-09-07 (EDG-01 cell 2) to inspecto-backup/src/test/java/com/gamma/job/BackupTaskTest.java,
+    // MOVED 2026-09-07 (EDG-01 cell 2) to features/inspecto-backup/src/test/java/com/gamma/job/BackupTaskTest.java,
     // with the class they exercise: OPS-06 is "not for Personal", so BackupTask left inspecto-engine and
     // the three tasks now reach MaintenanceJob only through the MaintenanceTaskProvider seam. On THIS
     // classpath `task: backup` is an unknown task — pinned by NoBackupTaskShipsInThePersonalBuildTest.

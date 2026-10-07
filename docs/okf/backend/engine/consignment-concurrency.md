@@ -2,7 +2,7 @@
 type: Concept
 title: Consignment concurrency — the four-layer hierarchy
 description: How many Consignments execute at once (per Pipeline, per space, per server), how priority shares slots without starving anyone, which knobs hot-apply, and why the run budget is NOT redundant with the broker.
-resource: inspecto-engine/src/main/java/com/gamma/inspector/ConcurrencyBroker.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/inspector/ConcurrencyBroker.java
 tags: [engine, consignment, concurrency, scheduler, priority, backpressure, operations]
 timestamp: 2026-08-25T00:00:00Z
 ---

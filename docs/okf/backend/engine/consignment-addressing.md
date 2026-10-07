@@ -2,7 +2,7 @@
 type: Concept
 title: Consignment addressing
 description: The one addressing rule everything follows — event time at write, the Selector, revisions that keep a recompute safe, and the completeness watermark. Fail-open by construction.
-resource: inspecto-engine/src/main/java/com/gamma/consignment
+resource: platform/inspecto-engine/src/main/java/com/gamma/consignment
 tags: [consignment, addressing, revisions, watermark, selector, event-time]
 timestamp: 2026-08-20T00:00:00Z
 ---

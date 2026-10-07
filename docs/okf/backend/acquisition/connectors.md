@@ -2,7 +2,7 @@
 type: Concept
 title: Collector Connectors
 description: The CollectorConnector SPI and its eight registered schemes (sftp, ftp, ftps, db, s3, azure, gcs in `inspecto-connectors`; kafka in the premium `inspecto-connectors-kafka`), SSH tunnelling and proxy dial-through, connection profiles, the graded connection workbench, and secret resolution.
-resource: inspecto-connectors/src/main/java/com/gamma/acquire/connectors
+resource: providers/inspecto-connectors/src/main/java/com/gamma/acquire/connectors
 tags: [acquisition, connectors, sftp, ftp, jdbc, ssh-tunnel, secrets]
 timestamp: 2026-06-28T00:00:00Z
 ---
@@ -11,7 +11,7 @@ timestamp: 2026-06-28T00:00:00Z
 
 ## The SPI (in the core; implemented in [connectors](../modules/connectors.md))
 
-* `CollectorConnector` (`inspecto-acquire/src/main/java/com/gamma/acquire/CollectorConnector.java`) — `discover`,
+* `CollectorConnector` (`platform/inspecto-acquire/src/main/java/com/gamma/acquire/CollectorConnector.java`) — `discover`,
   `readiness`, `open` (stream bytes), `fetchTo` (materialise the bytes at the destination it is given —
   see below), `post` (RETAIN/DELETE/MOVE/RENAME/TAG), and a `Capability` enum. *(Renamed from
   `SourceConnector` per the Source→Collector glossary flip.)* <!-- vocab-allow: cites the rename itself -->
@@ -47,7 +47,7 @@ mechanism) and should be on the same filesystem, or the rename degrades to a non
 The ordering is land-then-ack: a source-side `post` action that deletes the remote original runs only
 *after* the local copy is durably in the inbox.
 
-## Concrete connectors (`inspecto-connectors/`)
+## Concrete connectors (`providers/inspecto-connectors/`)
 
 | Class | Scheme | Library |
 |---|---|---|

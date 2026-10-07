@@ -2,7 +2,7 @@
 type: Concept
 title: Entity Lists — assurance entries (ranges, CIDR, expiry, sidecar, four-eyes)
 description: What ASSURE-ENTITY-LISTS-1 (WS-12) added on top of the LA-17 Entity List — range and CIDR entries, expiring entries, the Parquet sidecar Dataset, the match route, the maker-checker hold, and the Risk Score watch-list feed.
-resource: inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java
+resource: features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java
 tags: [control-plane, entity-list, assurance, ws-12, maker-checker, risk-score, link-analysis]
 timestamp: 2026-09-28T00:00:00Z
 ---

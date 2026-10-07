@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class LiftLowerFixtureSweepTest {
 
     private static Path spacesRoot() {
-        return Path.of("..", "spaces").toAbsolutePath().normalize();
+        return Path.of("..", "..", "spaces").toAbsolutePath().normalize();
     }
 
     private static List<Path> pipelineFixtures() throws IOException {

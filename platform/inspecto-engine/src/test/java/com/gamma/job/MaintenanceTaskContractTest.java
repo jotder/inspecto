@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MaintenanceTaskContractTest {
 
     private static final String MAINTENANCE_JOB =
-            "inspecto-engine/src/main/java/com/gamma/job/MaintenanceJob.java";
+            "platform/inspecto-engine/src/main/java/com/gamma/job/MaintenanceJob.java";
 
     /** The switch's own text, from its opening to the {@code default} arm that asks the providers. */
     private static final String REGION_START = "return switch (task) {";

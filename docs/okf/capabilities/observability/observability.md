@@ -99,7 +99,7 @@ Incident's history is exempt from that window by decision (MNT-14 G3, §4); no s
 
 ### 3.1 The signal ledger
 
-**Bus and store.** `EventLog` (`inspecto-audit-spi/src/main/java/com/gamma/event/EventLog.java`) is the
+**Bus and store.** `EventLog` (`spi/inspecto-audit-spi/src/main/java/com/gamma/event/EventLog.java`) is the
 event bus: `global()` plus one instance per space, `current()` routing by the calling thread's `space` MDC
 and falling back to global. **Emission is synchronous on the publishing thread**; `emit()` runs every
 subscriber inline, uses no SLF4J (re-entrant capture), and swallows subscriber errors. **This is the
@@ -109,7 +109,7 @@ its own virtual-thread executor — `FailureReactor`'s and `SignalIngress`'s pat
 subscriber to run inline. `emit()` is also the **single secret-scrub seam**: `SecretScrubber.scrub(event)`
 runs before anything is persisted.
 
-`EventStore` (`inspecto-audit-spi/src/main/java/com/gamma/event/EventStore.java`) is the append-only store
+`EventStore` (`spi/inspecto-audit-spi/src/main/java/com/gamma/event/EventStore.java`) is the append-only store
 contract — `append`, `query`, `recent`, keyset `page(limit, afterTs, afterId)` ordered `ts DESC, eventId
 DESC`, `count()`, and `prune(LocalDate before, dryRun)` which deletes **whole UTC day-partitions** and
 returns `-1` when the backend keeps nothing durable. **Three** backends, chosen by `-Devents.backend`
@@ -179,21 +179,21 @@ could be forgotten or leak — it falls out of the comparison, and there is **no
 later run. ⚠ The badge is **advisory**: when any of its three feeds fails the dashboard renders nothing
 stale rather than painting every tile suspect.
 
-**The type catalog is the `EventType` enum** (`inspecto-audit-spi/src/main/java/com/gamma/event/EventType.java`)
+**The type catalog is the `EventType` enum** (`spi/inspecto-audit-spi/src/main/java/com/gamma/event/EventType.java`)
 — quote the enum, never a page. Families: `LOG`, `AUDIT`, `ACCESS_DENIED`, service/pipeline lifecycle,
 `BATCH_*`, `FILE_*` (acquisition), `JOB_*`, `SIGNAL`, `PIPELINE_CONSERVATION_IMBALANCE` (legacy alias
 `FLOW_CONSERVATION_IMBALANCE`), `EXCHANGE_*`, `ALERT_FIRED`, `REPORT_READY`, `EXPECTATION_FAILED`, `OBJECT_*`.
 ⛔ **Do not grow the enum for new business signals** — they ride `Signal` on one `SIGNAL` Event
 (completeness-KPI plan §5, standing).
 
-**The Signal envelope.** `Signal` (`inspecto-engine/src/main/java/com/gamma/signal/Signal.java`) is a
+**The Signal envelope.** `Signal` (`platform/inspecto-engine/src/main/java/com/gamma/signal/Signal.java`) is a
 **13-field record**: `signalId, type (dotted), at, severity, source:Ref, subject:Ref, correlationId,
 causationId, space, actor:Ref, message, payload:Map, schemaVersion`. `toEvent()`/`fromEvent()` are a
 lossless round-trip onto `EventType.SIGNAL` — the payload rides as a structured map, never JSON in a string.
 `Ref` is `{kind, id, rel, via}`; `Severity` has six levels (`TRACE…CRITICAL`, wire-serialised lowercase),
 mapping onto the five-level `EventLevel` with `CRITICAL→ERROR` the one lossy direction, by design.
 ⚠ `GLOSSARY.md` §8 described a seven-field envelope as "binding" — corrected 2026-09-08 to point here.
-`Signals` (`inspecto-engine/src/main/java/com/gamma/signal/Signals.java`) is the stateless read side:
+`Signals` (`platform/inspecto-engine/src/main/java/com/gamma/signal/Signals.java`) is the stateless read side:
 `query(store, type|prefix.*, since, until, minSeverity, correlationId, limit)`, the shared `matches()`
 predicate, and `assembleTree()`. **Producers do thread `causationId`**: `JobService.emitSignal` carries the
 id of the Signal that triggered a Run (a mirror's root is deliberately `null`) — `signal-backbone.md`'s
@@ -203,7 +203,7 @@ id of the Signal that triggered a Run (a mirror's root is deliberately `null`) �
 
 | Route | Home | Edition | Notes |
 |---|---|---|---|
-| `GET /events[?limit]`, `/events/search[?level&type&pipeline&correlationId&q&from&to&limit&offset]`, `/events/{id}`, `/events/export[?format=csv\|json&…]`, `GET\|POST /events/views`, `POST /events/views/{id}/delete` | `inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` | S/E | Absent the module, `AbsentEventsRoutes` (core) answers `503` naming it on every path. **Recording is not gated.** `/bootstrap.features.events` tells the SPA |
+| `GET /events[?limit]`, `/events/search[?level&type&pipeline&correlationId&q&from&to&limit&offset]`, `/events/{id}`, `/events/export[?format=csv\|json&…]`, `GET\|POST /events/views`, `POST /events/views/{id}/delete` | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` | S/E | Absent the module, `AbsentEventsRoutes` (core) answers `503` naming it on every path. **Recording is not gated.** `/bootstrap.features.events` tells the SPA |
 | `GET /signals`, `/signals/tree?correlationId=&limit=`, `/signals/stream` (SSE with heartbeat comments) | `inspecto/src/main/java/com/gamma/control/SignalRoutes.java` | All | `correlationId` is **required** on the tree (400 otherwise — "a tree without an anchor is an unbounded forest"); `/signals/stream` has **no SPA consumer** (§5) |
 | `GET /audit/search`, `/audit/export?format=csv` | `inspecto/src/main/java/com/gamma/control/AuditLogRoutes.java` | All | Fail-closed to `type=AUDIT\|ACCESS_DENIED`; the auditor's evidence CSV (§3.3) |
 
@@ -212,17 +212,17 @@ Saved views persist through `SavedViewStore` (`inspecto-event`). The SPA's `Even
 
 ### 3.2 Metrics
 
-`MetricRegistry` (`inspecto-audit-spi/src/main/java/com/gamma/metrics/MetricRegistry.java`) holds counters,
+`MetricRegistry` (`spi/inspecto-audit-spi/src/main/java/com/gamma/metrics/MetricRegistry.java`) holds counters,
 gauges and histograms keyed by name + sorted labels; `scrape()` runs registered collectors and renders
 Prometheus text. It is **core and stays core** — it has dependants across the engine; what EDG-01 gated is
 the HTTP exposition only. The `space` label is supplied by callers; the registry has no space awareness.
 
 Two exposure surfaces:
 
-* **`GET /metrics`** — `inspecto-observability/src/main/java/com/gamma/metricsapi/MetricsRoutes.java`, S/E.
+* **`GET /metrics`** — `features/inspecto-observability/src/main/java/com/gamma/metricsapi/MetricsRoutes.java`, S/E.
   Unversioned and in `PUBLIC_PATHS` (**unauthenticated by design**: a scraper carries no token). Absent the
   module, core `AbsentMetricsRoutes` answers `503`. Pinned by `MetricsExpositionTest`
-  (`inspecto-observability/src/test/java/com/gamma/control/MetricsExpositionTest.java`).
+  (`features/inspecto-observability/src/test/java/com/gamma/control/MetricsExpositionTest.java`).
 * **`GET /metrics/acquisition`** — `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java`,
   All. The acquisition family as JSON for the Overview tiles (`ACQ_METRICS`: files discovered / downloaded
   / failed, post-action failures, watermark skips, bytes, fetch seconds, active connections, files
@@ -250,7 +250,7 @@ the quarantine reasons are in
 
 **Layer 2 — provenance rows** (§3.4).
 
-**Layer 3 — the who-did-what trail.** `AuditTrail` (`inspecto-auth-spi/src/main/java/com/gamma/control/AuditTrail.java`)
+**Layer 3 — the who-did-what trail.** `AuditTrail` (`spi/inspecto-auth-spi/src/main/java/com/gamma/control/AuditTrail.java`)
 is **one central interceptor called from `ControlApi.dispatch`** — not per handler. It records every
 successful state-changing request (`POST`/`PUT`/`PATCH`/`DELETE` — `PATCH` only since 2026-09-26: before, the
 classifier admitted three methods, so the admin-only `PATCH /objects/{id}` priority / severity / assignee edit
@@ -353,12 +353,12 @@ store-level upper bound, G3 a record-level exemption within it. Both are true at
 
 ### 3.4 Provenance & conservation
 
-During an at-rest Pipeline run, `PipelineJobRunner` (`inspecto-engine/src/main/java/com/gamma/job/PipelineJobRunner.java`)
+During an at-rest Pipeline run, `PipelineJobRunner` (`platform/inspecto-engine/src/main/java/com/gamma/job/PipelineJobRunner.java`)
 collects one `ProvenanceRow(pipelineId, batchId, nodeId, rel, rowCount, runTs)` per (node, relationship)
 through `PipelineExecutor.ProvenanceCollector` **while the scratch relations are live**, persists them via
-`DbProvenanceStore` (`inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java`, per
+`DbProvenanceStore` (`platform/inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java`, per
 space through `ProvenanceStores`), then runs `ConservationCheck.imbalances(graph, counts)`
-(`inspecto-engine/src/main/java/com/gamma/pipeline/exec/ConservationCheck.java`) and emits one
+(`platform/inspecto-engine/src/main/java/com/gamma/pipeline/exec/ConservationCheck.java`) and emits one
 `PIPELINE_CONSERVATION_IMBALANCE` Event per non-amplifying node whose records in ≠ records out
 (`kind` = LOSS/ERROR or AMPLIFICATION/WARN). The built-in Notification Rule
 `builtin-conservation-imbalance` (`NotificationRules.java`, `ops` category, `minLevel=WARN`) surfaces
@@ -389,7 +389,7 @@ same `StatusStore` (file or db, identically):
 | `GET /runs/{name}/{batches\|files\|lineage\|quarantine\|commits\|outputs\|errors\|pending}` | the Run-detail tabs (`RunRoutes.java`); quarantine rows are **synthesised** from the `<reason>/<filename>` layout and carry no batch id or timestamp |
 | `GET /health`, `GET /ready` | liveness / readiness, public, unversioned |
 | `GET /health/details` | per-subsystem `UP`/`DOWN`/`NOT_CONFIGURED` (`HealthDetails.java`: configStore, dataStore, pipelines, scheduler, jobRunsProjection); DOWN iff any subsystem DOWN; **auth-gated, deliberately not public** (MNT-15) |
-| `GET /jobs/metrics`, `/jobs/runs`, `/jobs/failures` | the T27 job-execution projection over `DbJobRunStore` (`inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java`); **`404` unless `-Djobs.backend=duckdb\|postgres`**; the Jobs pane's Reporting mode degrades to an explained "reporting disabled" |
+| `GET /jobs/metrics`, `/jobs/runs`, `/jobs/failures` | the T27 job-execution projection over `DbJobRunStore` (`platform/inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java`); **`404` unless `-Djobs.backend=duckdb\|postgres`**; the Jobs pane's Reporting mode degrades to an explained "reporting disabled" |
 | `POST /jobs/runs/{runId}/replay` | 🔴 **NOT gated by `-Djobs.backend` — this row grouped it with the projection routes until 2026-09-09 and that is the wrong cause.** Replay resolves the original run through `JobService.runById` → `liveRuns`, an in-memory map capped at `LIVE_RUN_CAP` and lost on restart. The two failure modes are **opposite**: replay WORKS with the projection off for a run still in memory, and `404`s with the projection ON for one that has been evicted. Owner: [`okf/capabilities/pipeline-execution/pipeline-execution.md`](../pipeline-execution/pipeline-execution.md) §2.3 |
 | `GET /system/operational-db`, `POST /system/operational-db/test` | what this deployment actually uses per store family, and a real `SELECT 1` against a proposed JDBC URL; `canConfigureAccess`; **no PUT exists** (the pane's spec asserts it) |
 
@@ -404,7 +404,7 @@ artifacts (`-Djobs.runlog.maxEntries`, default 10,000); `runlog_prune` is its re
 ### 3.6 Maintenance & retention
 
 **System maintenance is tasks on the `maintenance` Job Type — never shell scripts or OS cron** (2026-07-12).
-`MaintenanceJob` (`inspecto-engine/src/main/java/com/gamma/job/MaintenanceJob.java`) dispatches on the
+`MaintenanceJob` (`platform/inspecto-engine/src/main/java/com/gamma/job/MaintenanceJob.java`) dispatches on the
 `task` parameter (default `cleanup`); each task is its own `*Task` class in `com.gamma.job`.
 
 | Task | Deletes / does | Home | Notes |
@@ -423,7 +423,7 @@ artifacts (`-Djobs.runlog.maxEntries`, default 10,000); `runlog_prune` is its re
 | `backup`, `backup_verify`, `restore` | timestamped zip + SHA-256 sidecar manifest via `Checksums`; hash-first verify (fail-closed); manifest-validated restore with **zip-slip jail** and conflict preview — archive-based, the whole config tree, *not* bundle import | **`inspecto-backup`** (`BackupTaskProvider`) | Professional+/Enterprise (`OPS-06`, cell 2, 2026-09-07). On Personal: *unknown maintenance task*, refused loudly. Pinned by `NoBackupTaskShipsInThePersonalBuildTest` |
 | `incident_purge` | Archived Incidents with notes, links, tag edges — **the only task that deletes operator business records** | **`inspecto-ops`** (`OpsMaintenanceTasks`) | MNT-14; `retention_days` required, `max_count` default 1000; legal hold fail-safe and re-checked inside `purge()`; G3 — the audit history survives. **Nothing schedules it, and nothing should** |
 
-The **`MaintenanceTaskProvider`** ServiceLoader seam (`inspecto-engine/src/main/java/com/gamma/job/MaintenanceTaskProvider.java`):
+The **`MaintenanceTaskProvider`** ServiceLoader seam (`platform/inspecto-engine/src/main/java/com/gamma/job/MaintenanceTaskProvider.java`):
 the built-in `switch` always wins first; its `default` arm consults discovered providers before throwing
 *unknown maintenance task*; **a task claimed by two providers is refused fail-closed**, never resolved by
 classpath order. Findings emit `maintenance.*` Signals for Alert Rules.
@@ -450,7 +450,7 @@ Runbook: `docs/ops/backup-restore-runbook.md`.
 → `GET|PUT /system/scheduler` (`SchedulerRoutes.java`, `canOperateRuns`) — and `-Djobs.maxConcurrentRuns`
 is a *bootstrap default* consulted only when nothing is stored (⛔ a key served by the settings tier must
 not also be read from `-D` at use time). The same document carries the Consignment broker's globals:
-`ConcurrencyBroker` (`inspecto-engine/src/main/java/com/gamma/inspector/ConcurrencyBroker.java`) grants
+`ConcurrencyBroker` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/ConcurrencyBroker.java`) grants
 **weighted shares, never precedence** — FIFO per Pipeline, `stride = 6 / priority` (1–3), so a priority-1
 Pipeline provably keeps a non-zero share; `IntakeGovernor` holds the intake caps (`intakeMaxFilesPerCycle`,
 per-space `maxConcurrentConsignments`). The Scheduler-settings pane shows each value's provenance chip
@@ -768,15 +768,15 @@ the form authors the kind), and per-measure limits.
 
 | Concern | Code | Docs |
 |---|---|---|
-| Bus, store, types, scrubbing | `inspecto-audit-spi/src/main/java/com/gamma/event/EventLog.java`, `EventStore.java`, `InMemoryEventStore.java`, `EventType.java`, `SecretScrubber.java`; `inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java`, `SavedViewStore.java` | [`events-metrics.md`](../../backend/control-plane/events-metrics.md) |
-| Signal envelope & read side | `inspecto-engine/src/main/java/com/gamma/signal/Signal.java`, `Signals.java`, `PipelineConsignmentSignal.java` | [`signal-backbone.md`](../../backend/control-plane/signal-backbone.md) §S0–S2 |
-| Feed routes (optional) · fallbacks · audit read | `inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java`; `inspecto/src/main/java/com/gamma/control/AbsentEventsRoutes.java`, `AbsentMetricsRoutes.java`, `AuditLogRoutes.java`, `SignalRoutes.java` | `EDITIONS.md` CP-13, §Audit; [`events.md`](../../frontend/features/events.md) |
-| Metrics | `inspecto-audit-spi/src/main/java/com/gamma/metrics/MetricRegistry.java`; `inspecto-observability/src/main/java/com/gamma/metricsapi/MetricsRoutes.java`; `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java`; `inspecto-engine/src/main/java/com/gamma/inspector/AcquisitionTelemetry.java` | `ADVANCED_GUIDE.md` §7 (`/metrics` catalog) |
-| Audit trail | `inspecto-auth-spi/src/main/java/com/gamma/control/AuditTrail.java` (called from `ControlApi.dispatch`) | `compliance/controls-matrix.md` AU-9, ISO 8.15–8.17 |
-| Provenance & conservation | `inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java`, `ProvenanceStores.java`, `ConservationCheck.java`; `inspecto-engine/src/main/java/com/gamma/job/PipelineJobRunner.java` (`reportConservation`); `inspecto/src/main/java/com/gamma/control/LineageRoutes.java`, `JobRoutes.java` (`/provenance*`); `inspecto-engine/src/main/java/com/gamma/notify/NotificationRules.java` | `docs/ops/provenance-conservation-verification.md` |
-| Reporting, status, health | `inspecto/src/main/java/com/gamma/report/ReportService.java`; `inspecto/src/main/java/com/gamma/control/RunRoutes.java`, `HealthDetails.java`, `SystemRoutes.java`; `inspecto/src/main/java/com/gamma/service/InboxStatus.java`, `ServiceStores.java`, `OperationalDb.java`; `inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java` | [`operations-reference.md`](../../backend/build-run/operations-reference.md) §Reports, §Status backend |
-| Maintenance & retention | `inspecto-engine/src/main/java/com/gamma/job/MaintenanceJob.java`, `MaintenanceTaskProvider.java`, `EventPruneTask.java`; `inspecto-backup/src/main/java/com/gamma/backup/BackupTask.java`, `BackupTaskProvider.java`; `inspecto-ops/src/main/java/com/gamma/opsjob/OpsMaintenanceTasks.java`; `spaces/demo/config/jobs/*.toon` | [`jobs.md`](../../backend/control-plane/jobs.md) §Maintenance; `operations-reference.md` §Retention & purging; `docs/ops/backup-restore-runbook.md` |
-| Caps & scheduler | `inspecto-engine/src/main/java/com/gamma/job/JobService.java`; `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java`; `inspecto-engine/src/main/java/com/gamma/inspector/ConcurrencyBroker.java`; `inspecto-util/src/main/java/com/gamma/util/OperationsZone.java` | `jobs.md` §Total-concurrency; [`duckdb.md`](../../backend/engine/duckdb.md) (memory half) |
+| Bus, store, types, scrubbing | `spi/inspecto-audit-spi/src/main/java/com/gamma/event/EventLog.java`, `EventStore.java`, `InMemoryEventStore.java`, `EventType.java`, `SecretScrubber.java`; `platform/inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java`, `SavedViewStore.java` | [`events-metrics.md`](../../backend/control-plane/events-metrics.md) |
+| Signal envelope & read side | `platform/inspecto-engine/src/main/java/com/gamma/signal/Signal.java`, `Signals.java`, `PipelineConsignmentSignal.java` | [`signal-backbone.md`](../../backend/control-plane/signal-backbone.md) §S0–S2 |
+| Feed routes (optional) · fallbacks · audit read | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java`; `inspecto/src/main/java/com/gamma/control/AbsentEventsRoutes.java`, `AbsentMetricsRoutes.java`, `AuditLogRoutes.java`, `SignalRoutes.java` | `EDITIONS.md` CP-13, §Audit; [`events.md`](../../frontend/features/events.md) |
+| Metrics | `spi/inspecto-audit-spi/src/main/java/com/gamma/metrics/MetricRegistry.java`; `features/inspecto-observability/src/main/java/com/gamma/metricsapi/MetricsRoutes.java`; `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java`; `platform/inspecto-engine/src/main/java/com/gamma/inspector/AcquisitionTelemetry.java` | `ADVANCED_GUIDE.md` §7 (`/metrics` catalog) |
+| Audit trail | `spi/inspecto-auth-spi/src/main/java/com/gamma/control/AuditTrail.java` (called from `ControlApi.dispatch`) | `compliance/controls-matrix.md` AU-9, ISO 8.15–8.17 |
+| Provenance & conservation | `platform/inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java`, `ProvenanceStores.java`, `ConservationCheck.java`; `platform/inspecto-engine/src/main/java/com/gamma/job/PipelineJobRunner.java` (`reportConservation`); `inspecto/src/main/java/com/gamma/control/LineageRoutes.java`, `JobRoutes.java` (`/provenance*`); `platform/inspecto-engine/src/main/java/com/gamma/notify/NotificationRules.java` | `docs/ops/provenance-conservation-verification.md` |
+| Reporting, status, health | `inspecto/src/main/java/com/gamma/report/ReportService.java`; `inspecto/src/main/java/com/gamma/control/RunRoutes.java`, `HealthDetails.java`, `SystemRoutes.java`; `inspecto/src/main/java/com/gamma/service/InboxStatus.java`, `ServiceStores.java`, `OperationalDb.java`; `platform/inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java` | [`operations-reference.md`](../../backend/build-run/operations-reference.md) §Reports, §Status backend |
+| Maintenance & retention | `platform/inspecto-engine/src/main/java/com/gamma/job/MaintenanceJob.java`, `MaintenanceTaskProvider.java`, `EventPruneTask.java`; `features/inspecto-backup/src/main/java/com/gamma/backup/BackupTask.java`, `BackupTaskProvider.java`; `features/inspecto-ops/src/main/java/com/gamma/opsjob/OpsMaintenanceTasks.java`; `spaces/demo/config/jobs/*.toon` | [`jobs.md`](../../backend/control-plane/jobs.md) §Maintenance; `operations-reference.md` §Retention & purging; `docs/ops/backup-restore-runbook.md` |
+| Caps & scheduler | `platform/inspecto-engine/src/main/java/com/gamma/job/JobService.java`; `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java`; `platform/inspecto-engine/src/main/java/com/gamma/inspector/ConcurrencyBroker.java`; `platform/inspecto-util/src/main/java/com/gamma/util/OperationsZone.java` | `jobs.md` §Total-concurrency; [`duckdb.md`](../../backend/engine/duckdb.md) (memory half) |
 | Baseline Expectations | `inspecto/src/main/java/com/gamma/expectation/BaselineEvaluator.java`, `BaselineProfileStore.java`, `Expectation.java` (`Baseline`); `inspecto/src/main/java/com/gamma/control/ExpectationRoutes.java`; tests `BaselineEvaluatorTest`, `BaselineProfileStoreTest`, `ControlApiExpectationBaselineTest` | §3.10; [`step-catalog.md`](../../backend/pipeline-graph/step-catalog.md) § Expectations |
 | Launch flags | `inspecto/src/main/java/com/gamma/control/ControlApi.java` (`PUBLIC_PATHS`, `isInfraRoute`, `-Dcontrol.bind`) | [`operations.md`](../../backend/build-run/operations.md) |
 | UI consumers | `inspecto-ui/src/app/modules/admin/{events,audit-logs,dashboard,runs,run-detail,jobs,processing-status,settings}/`, `inspecto-ui/src/app/app.routes.ts` | [`events.md`](../../frontend/features/events.md), [`runs.md`](../../frontend/features/runs.md), [`run-detail.md`](../../frontend/features/run-detail.md), [`dashboard.md`](../../frontend/features/dashboard.md), [`jobs.md`](../../frontend/features/jobs.md) |

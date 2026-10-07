@@ -2,7 +2,7 @@
 type: Capability
 title: Alerts & Incidents (INC)
 description: The Alert → Incident → Case chain — Alert Rules and fired Alerts, promotion into managed Incidents, the operational-objects domain (lifecycle, SLA, escalation, queues, Cases, Findings, annotations, retention), notifications, and Diagnosis. The requirement of record for the INC area, its specification, its decisions, and what was refused.
-resource: inspecto-ops/, inspecto-engine/src/main/java/com/gamma/alert, inspecto-engine/src/main/java/com/gamma/notify, inspecto-ui/src/app/modules/admin/notification-center/
+resource: features/inspecto-ops/, platform/inspecto-engine/src/main/java/com/gamma/alert, platform/inspecto-engine/src/main/java/com/gamma/notify, inspecto-ui/src/app/modules/admin/notification-center/
 tags: [inc, capability, alerts, alert-rules, incidents, cases, queues, escalation, sla, notifications, diagnosis, findings, retention]
 timestamp: 2026-09-08T00:00:00Z
 ---
@@ -127,7 +127,7 @@ fires, the ALERT *object* does not).
 
 ### 3.2 Alert Rules
 
-`AlertRule` (`inspecto-engine/src/main/java/com/gamma/alert/AlertRule.java`) is one record with **two
+`AlertRule` (`platform/inspecto-engine/src/main/java/com/gamma/alert/AlertRule.java`) is one record with **two
 shapes**: the ledger-metric shape — `metric` ∈ `error_rate | failed_batches | rejected_files | duration_ms`,
 comparator, threshold, `window`, optional `onPipeline` — and the **Measure shape** (BI-5, 2026-09-06) —
 `dataset` (a Dataset component id) + `measure` (`count | agg(field)`, agg ∈ count / countDistinct / sum /
@@ -261,7 +261,7 @@ exists so `alert.evaluate` holds a real grant, and its dry-run stand-in must rep
 ### 3.3 From an Alert to an Incident — five promotion paths, one seam
 
 Every path that opens an Incident automatically does so through **`IncidentAccess`**
-(`inspecto-engine/src/main/java/com/gamma/objects/IncidentAccess.java`) — a Platform Service `incidents`,
+(`platform/inspecto-engine/src/main/java/com/gamma/objects/IncidentAccess.java`) — a Platform Service `incidents`,
 relocated to core and **narrowed** in EDG-01 cell 7 to return `Optional<String>` (the id) rather than the
 object; the dry-run substitute records and opens nothing; on Personal it is empty and every caller
 degrades to "no object".
@@ -361,7 +361,7 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
 `InMemoryObjectStore` (`OpsEngineProvider.java:94-124` picks per store on `durable()`).
 Updates are **optimistic** (2026-10-04): every object carries a monotonic `version`, a stale write fails with `ObjectVersionConflictException`, `ObjectService` retries pure read-modify-writes and the edge answers a persistent loss as `409 CONFLICT_STALE_VERSION` — see `backend/engine/db-layer.md` §3.1. No client change is needed for server-side races; `PATCH /objects/{id}` does not yet accept an expected `version` (deferred — a client editing a whole object from a stale read still merges, it does not fail).
 
-- **Workflows** (`inspecto-workflow/src/main/java/com/gamma/workflow/Workflow.java:150-192`): ALERT
+- **Workflows** (`platform/inspecto-workflow/src/main/java/com/gamma/workflow/Workflow.java:150-192`): ALERT
   `OPEN → ACKNOWLEDGED → RESOLVED`; **INCIDENT `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`**, `reopen`
   from `RESOLVED|ARCHIVED → DIAGNOSING`, only `ARCHIVED` terminal; CASE `OPEN → INVESTIGATING → ESCALATED →
   RESOLVED → CLOSED`. `GET /workflows/{type}` serves the BFS-ordered states so a TOON-overridden workflow
@@ -670,7 +670,7 @@ Shipped 2026-06-29 as an **in-process MVP**, deliberately without a broker: `Not
 
 ### 3.9 Diagnosis
 
-`FailureReactor` (`inspecto-agent/src/main/java/com/gamma/agent/diagnose/FailureReactor.java:17-33`)
+`FailureReactor` (`features/inspecto-agent/src/main/java/com/gamma/agent/diagnose/FailureReactor.java:17-33`)
 subscribes to the `ConsignmentEventBus` for FAILED consignments and diagnoses them off-thread (bounded
 queue + virtual threads) through `HeuristicDiagnoser` and, when a model is configured, `ModelDiagnoser`;
 results land in `DiagnosisStore`, a **ring of 256**, and are served read-only by `GET /assist/diagnoses`.
@@ -916,22 +916,22 @@ and a default purge deletes business records.
 | Mechanism | Owning file | `resource:` | Read it for |
 |---|---|---|---|
 | Alert-rule authoring, severity promotion, the `ESCALATED_FROM` edge, notifications end to end (channels, rules, digest, receipts, suppression) | `docs/okf/backend/control-plane/events-metrics.md` (`Concept`) | `inspecto/src/main/java/com/gamma/control` | the long-form account §3.2, §3.3 and §3.8 were distilled from |
-| `caserule.evaluate`, `objects.analytics`, `mail.send`, **`incident_purge`** (D5 tiers, G3, the abstract cascade) | `docs/okf/backend/control-plane/jobs.md` (`Concept`) | `inspecto-engine/src/main/java/com/gamma/job` | the retention account and the Job Types |
+| `caserule.evaluate`, `objects.analytics`, `mail.send`, **`incident_purge`** (D5 tiers, G3, the abstract cascade) | `docs/okf/backend/control-plane/jobs.md` (`Concept`) | `platform/inspecto-engine/src/main/java/com/gamma/job` | the retention account and the Job Types |
 | `create-alert` / `create-incident` consequences; Alert Rule `when` | `docs/okf/backend/control-plane/decision-rules.md` (`Concept`) | `inspecto/src/main/java/com/gamma/control` | how a Decision Rule opens an object |
-| Tags as a cross-entity graph; the Incident/Case adopter; Tag Rules | `docs/okf/backend/control-plane/tags.md` (`Concept`) | `inspecto-ops/src/main/java/com/gamma/ops/tag` | addressing, the central store, the projection |
+| Tags as a cross-entity graph; the Incident/Case adopter; Tag Rules | `docs/okf/backend/control-plane/tags.md` (`Concept`) | `features/inspecto-ops/src/main/java/com/gamma/ops/tag` | addressing, the central store, the projection |
 | `inspecto_ops_objects`, durable vs in-memory stores, **"queues: none"**, `DbDeliveryReceiptStore` | `docs/okf/backend/engine/db-layer.md` (`Concept`) | `inspecto-engine` | what persists |
 | Edition gating as a mechanism; the cell-7 recipe items 18–27 | `docs/okf/backend/editions/editions-model.md` (`Concept`) | `pom.xml` | `ObjectAccess` + `ObjectEngineProvider`, the census traps |
 | The SLA sweep flags and the lifecycle walkthrough | `docs/okf/backend/build-run/operations-reference.md` (`Reference`) §Retention · §SLA | — | the operator's curl sequence (rewritten with this spec) |
 | The Incidents & Cases UI: mail shell, create contract, optimistic triage, Findings spec, D7 | `docs/okf/frontend/features/objects.md` (`Feature`) | `inspecto-ui/src/app/modules/admin/objects` | the only page titled for the domain |
 | Alerts pane · Diagnoses pane · Events pane | `docs/okf/frontend/features/alerts.md` · `diagnoses.md` · `events.md` (`Feature`) | `inspecto-ui/src/app/modules/admin/{alerts,diagnoses}` | ⚠ the first two are stubs under 1 KB |
-| 🔴 **The operational-objects backend has no concept file.** `ObjectService`, the three workflows, categorization, the I1 gate, the SLA sweep, `EscalationPolicy`, queues and watchers, merge/split, Case Rules, `IncidentAccess`, `EventObjectBridge` are documented only in source, in eight scattered backend pages, and in this spec | *(none — gap; the plan predicted it: "no dedicated backend concept file exists anywhere")* | `inspecto-ops/src/main/java/com/gamma/ops` | the code. The `control-plane/index.md` enumeration has no Incident / Case / Objects entry at all |
+| 🔴 **The operational-objects backend has no concept file.** `ObjectService`, the three workflows, categorization, the I1 gate, the SLA sweep, `EscalationPolicy`, queues and watchers, merge/split, Case Rules, `IncidentAccess`, `EventObjectBridge` are documented only in source, in eight scattered backend pages, and in this spec | *(none — gap; the plan predicted it: "no dedicated backend concept file exists anywhere")* | `features/inspecto-ops/src/main/java/com/gamma/ops` | the code. The `control-plane/index.md` enumeration has no Incident / Case / Objects entry at all |
 | 🔴 **Notification Center and preferences have no feature page** | *(none — gap)* | `inspecto-ui/src/app/modules/admin/notification-center` | the code |
 
 ---
 
 ## 8. Verification
 
-### 8.1 The objects domain — `inspecto-ops/src/test/` (39 files; runs only under `-Pedition-standard|enterprise`)
+### 8.1 The objects domain — `features/inspecto-ops/src/test/` (39 files; runs only under `-Pedition-standard|enterprise`)
 
 ⚠ **The default `mvn -o clean test` does not compile `inspecto-ops`.** A green default build proves nothing
 about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 at HEAD.
@@ -988,10 +988,10 @@ contents, merge, create contract, linking, postmortem, tagging); `alerts.compone
 
 | File | Provider |
 |---|---|
-| `inspecto-ops/src/main/resources/META-INF/services/com.gamma.service.ObjectEngineProvider` | `com.gamma.ops.OpsEngineProvider` — the host-declared handle that makes `ObjectAccess` non-empty |
-| `inspecto-ops/src/main/resources/META-INF/services/com.gamma.control.RouteModule` | `ObjectRoutes`, `NoteRoutes`, `QueueRoutes`, `TagRoutes` — the 49 paths `AbsentObjectRoutes` stands in for |
-| `inspecto-ops/src/main/resources/META-INF/services/com.gamma.job.JobTypeProvider` · `com.gamma.job.MaintenanceTaskProvider` | `OpsJobTypes$CaseRuleEvaluate`, `OpsJobTypes$ObjectsAnalytics` · `OpsMaintenanceTasks` (`incident_purge`) |
-| `inspecto-notify-channels/src/main/resources/META-INF/services/com.gamma.notify.NotificationChannel` | `SmtpEmailChannel`, `WebhookChannel` |
+| `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.service.ObjectEngineProvider` | `com.gamma.ops.OpsEngineProvider` — the host-declared handle that makes `ObjectAccess` non-empty |
+| `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.control.RouteModule` | `ObjectRoutes`, `NoteRoutes`, `QueueRoutes`, `TagRoutes` — the 49 paths `AbsentObjectRoutes` stands in for |
+| `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.job.JobTypeProvider` · `com.gamma.job.MaintenanceTaskProvider` | `OpsJobTypes$CaseRuleEvaluate`, `OpsJobTypes$ObjectsAnalytics` · `OpsMaintenanceTasks` (`incident_purge`) |
+| `providers/inspecto-notify-channels/src/main/resources/META-INF/services/com.gamma.notify.NotificationChannel` | `SmtpEmailChannel`, `WebhookChannel` |
 
 ### 8.5 Runnable examples
 

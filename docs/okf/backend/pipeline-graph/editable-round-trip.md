@@ -2,7 +2,7 @@
 type: Concept
 title: The editable round-trip (lift / lower)
 description: How the pipeline editor's graph becomes the canonical *_pipeline.toon and back — PipelineEditable, refusal codes, use-ref homes, the parser family, route branches, settings, dry-run.
-resource: inspecto-engine/src/main/java/com/gamma/pipeline/PipelineEditable.java
+resource: platform/inspecto-engine/src/main/java/com/gamma/pipeline/PipelineEditable.java
 tags: [concept, pipelines, lift, lower, round-trip, authoring]
 timestamp: 2026-09-01T00:00:00Z
 ---
@@ -25,7 +25,7 @@ dedicated pair, **not** `PipelineCompiler.toConfigMap` — that class is the Pha
 gate (it consumes the live `PipelineConfig` sub-records a `PipelineLift` carries). The editable pair
 speaks the **config-file vocabulary end to end**, so nothing typed crosses the HTTP boundary:
 
-- **[`PipelineEditable`](../../../../inspecto-engine/src/main/java/com/gamma/pipeline/PipelineEditable.java)**
+- **[`PipelineEditable`](../../../../platform/inspecto-engine/src/main/java/com/gamma/pipeline/PipelineEditable.java)**
   — `toMap(cfg, raw)` lifts topology via `PipelineLift` but swaps each node's config for the **verbatim
   raw-map section** it owns (from the decoded file); `lower(g, existing, strict)` writes those sections
   back over the existing file. **Ownership rule:** a present node owns its section wholesale (a cleared
@@ -35,7 +35,7 @@ speaks the **config-file vocabulary end to end**, so nothing typed crosses the H
   ignored by the lower — their truth is the registered `*_enrich.toon` companion (never a mirror; the D7
   split-brain lesson).
 - **Named refusals, not silent truncation.**
-  [`PipelineCompileException`](../../../../inspecto-engine/src/main/java/com/gamma/pipeline/PipelineCompileException.java)
+  [`PipelineCompileException`](../../../../platform/inspecto-engine/src/main/java/com/gamma/pipeline/PipelineCompileException.java)
   carries stable codes — `UNSUPPORTED_NODE` (a node type the flat config has no home for),
   `UNSUPPORTED_BINDING` (a home for the *node*, but not for the `use:` component ref it carries — see
   below), ~~`MULTI_SINK`~~ 🔴 **(DELETED — not a live refusal; corrected 2026-09-09.** Its constant went with the pipeline spec's Wave 0 when `sinks:` became a plural block — see `PipelineCompileException`'s Javadoc and `pipeline-editable.ts`. A >1-destination list now SAVES and is refused at `PipelineConfig.prepare()`: an execution-time refusal, not an authoring one.)

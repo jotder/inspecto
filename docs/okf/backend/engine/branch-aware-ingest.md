@@ -2,7 +2,7 @@
 type: Concept
 title: Branch-aware ingest — `route:` on the poll-driven path
 description: How an armed `route:` executes on the poll-driven lane — the lane fork, the engagement predicate, fail-closed arming in `PipelineConfig.prepare()`, and what is deliberately not built.
-resource: inspecto-etl/src/main/java/com/gamma/etl/PipelineConfig.java
+resource: platform/inspecto-etl/src/main/java/com/gamma/etl/PipelineConfig.java
 tags: [route, branch, ingest, arming, fail-closed, lanes]
 timestamp: 2026-09-24T00:00:00Z
 ---

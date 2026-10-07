@@ -30,7 +30,7 @@ class MainAppMigrateConfigsArgsTest {
     void theDocumentedApplyFormWritesTheRegistryUnderTheConfigRootNotIntoADirectoryCalledApply(
             @TempDir Path dir) throws Exception {
         // A COMMITTED schema, so this pins the real corpus shape rather than a hand-built one.
-        Path src = Path.of("..", "spaces", "demo", "config", "orders", "orders_schema.toon")
+        Path src = Path.of("..", "..", "spaces", "demo", "config", "orders", "orders_schema.toon")
                 .toAbsolutePath().normalize();
         assumeTrue(Files.isRegularFile(src), "committed fixture must exist: " + src);
 

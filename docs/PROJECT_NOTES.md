@@ -40,21 +40,21 @@ Authoritative shape, version management, and the module-extraction playbook:
 
 | Dir | Role | artifactId / jar |
 |---|---|---|
-| `inspecto-api/` | dependency-free leaf: the `@PublicApi` annotation | `inspecto-api` |
-| `inspecto-util/` | leaf: DuckDB access + CSV/file/tar helpers + `CronExpression` | `inspecto-util` |
-| `inspecto-config/` | config spec / codec (TOON) / safety | `inspecto-config` |
-| `inspecto-sql/` | sandboxed DuckDB SQL (`SqlSandbox`/`SqlOracle`/`SqlGuard`/`SqlViews`) | `inspecto-sql` |
-| `inspecto-etl/` | `com.gamma.etl` — pipeline config + batch ingest (foundation leaf below engine) | `inspecto-etl` |
-| `inspecto-event/` | `com.gamma.event`+`metrics` — Operational-Intelligence event store + metrics | `inspecto-event` |
-| `inspecto-acquire/` | `com.gamma.acquire` — file/remote acquisition, ledger, stability/gap/retry | `inspecto-acquire` |
-| `inspecto-engine/` | the remaining engine cluster (`pipeline`/`job`/`inspector`/… ) below core | `inspecto-engine` |
+| `platform/inspecto-api/` | dependency-free leaf: the `@PublicApi` annotation | `inspecto-api` |
+| `platform/inspecto-util/` | leaf: DuckDB access + CSV/file/tar helpers + `CronExpression` | `inspecto-util` |
+| `platform/inspecto-config/` | config spec / codec (TOON) / safety | `inspecto-config` |
+| `platform/inspecto-sql/` | sandboxed DuckDB SQL (`SqlSandbox`/`SqlOracle`/`SqlGuard`/`SqlViews`) | `inspecto-sql` |
+| `platform/inspecto-etl/` | `com.gamma.etl` — pipeline config + batch ingest (foundation leaf below engine) | `inspecto-etl` |
+| `platform/inspecto-event/` | `com.gamma.event`+`metrics` — Operational-Intelligence event store + metrics | `inspecto-event` |
+| `platform/inspecto-acquire/` | `com.gamma.acquire` — file/remote acquisition, ledger, stability/gap/retry | `inspecto-acquire` |
+| `platform/inspecto-engine/` | the remaining engine cluster (`pipeline`/`job`/`inspector`/… ) below core | `inspecto-engine` |
 | `inspecto/` | control plane + composition root (lean core), ships the fat JAR | `inspecto-processor` / `inspecto.jar` |
-| `inspecto-connectors/` | remote connectors (SFTP/FTP/FTPS/DB), all network deps | `inspecto-connectors` |
-| `inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `inspecto-agent` |
-| `inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `inspecto-agent-hosted` |
-| `inspecto-intelligence/` | embedded-intelligence agent (eoiagent-backed) | `inspecto-intelligence` |
-| `inspecto-oidc/` | Professional/Enterprise OIDC auth, `-Pedition-professional` only (not in default `<modules>`) | `inspecto-oidc` |
-| `inspecto-policy/` | Enterprise ABAC policy engine (`AccessDecider` impl), `-Pedition-enterprise` only (= professional + this) | `inspecto-policy` |
+| `providers/inspecto-connectors/` | remote connectors (SFTP/FTP/FTPS/DB), all network deps | `inspecto-connectors` |
+| `features/inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `inspecto-agent` |
+| `providers/inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `inspecto-agent-hosted` |
+| `features/inspecto-intelligence/` | embedded-intelligence agent (eoiagent-backed) | `inspecto-intelligence` |
+| `providers/inspecto-oidc/` | Professional/Enterprise OIDC auth, `-Pedition-professional` only (not in default `<modules>`) | `inspecto-oidc` |
+| `providers/inspecto-policy/` | Enterprise ABAC policy engine (`AccessDecider` impl), `-Pedition-enterprise` only (= professional + this) | `inspecto-policy` |
 | `inspecto-ui/` | Angular SPA (gamma/Fuse template), serves from the engine | — (npm; dev :4204) |
 
 agent-kernel is GONE (discontinued upstream, replaced 2026-07-07): its reasoning layer is vendored at
@@ -278,7 +278,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 - ⚠ **A PER-MODULE GREEN IS NOT A TREE GREEN** (2026-09-16/17, hit four times). `inspecto-exchange` is
   edition-gated, so no lane's `mvn -o -pl inspecto -am test` compiles it — it failed a combined run every
   lane had passed. A cross-field rule change in `inspecto-config` went red three modules downstream in
-  `inspecto-intelligence`. ⛔ `mvn -o -pl inspecto-ops -am` does not even RESOLVE without
+  `inspecto-intelligence`. ⛔ `mvn -o -pl :inspecto-ops -am` does not even RESOLVE without
   `-Pedition-professional`, which is why the repo's only sweep over every committed Space config never ran in
   a default build. ⇒ Gate on `tools/check-reactor-verdict.mjs`, never on a sum of surefire reports.
 
@@ -406,7 +406,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 - ⚠ **COUNT THE REACTOR BY SUMMING SUREFIRE REPORTS, NOT BY PARSING THE LOG** — `**/target/surefire-reports/
   *.txt`, one file per class, is authoritative and sidesteps the `[WARNING]`-level-module trap entirely. Use
-  `**`, not `*`: the five `asn-*` modules are nested under `asn-parser/asn-decoders/`, so a single-level glob
+  `**`, not `*`: the five `asn-*` modules are nested under `providers/asn-parser/asn-decoders/`, so a single-level glob
   reports **21 modules / 4429** — a plausible-looking total rather than an obviously broken one (true: 26 /
   4508). ⚠ And when a total does not reconcile, **suspect the BASELINE'S PROVENANCE first**: an "unexplained
   +2" on 2026-09-15 was entirely a briefing error — the baseline had been measured when a test class held 9
@@ -440,7 +440,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   reactor run died in `inspecto-engine` with `NoClassDefFoundError` for `com.gamma.util.CurrentSpace` and
   `SingleConnectionSource` — classes that compile fine, declared at **compile scope**, in a module that had
   reported SUCCESS seconds earlier. Cause: another session ran `mvn clean` in the **same working tree**,
-  deleting `inspecto-util/target/classes` mid-run. ⛔ **Before debugging a classpath error, `ls -la` the
+  deleting `platform/inspecto-util/target/classes` mid-run. ⛔ **Before debugging a classpath error, `ls -la` the
   missing `.class` and compare its mtime to your run** — a file re-created *during* your build is the tell.
   Then simply re-run: it did not reproduce, and the suite passed 4475/0. ⚠ The same race can corrupt any
   measurement taken here; a lone anomalous failure deserves one re-run before it earns a bug report.
@@ -619,7 +619,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 - 🔴 **A skipping test can hide a broken harness, not just absent coverage.** `PostgresStateStoreTest`
   skipped cleanly from 2026-09-07 while `inspecto-ops` had **no JDBC driver at all** — `inspecto/` and
-  `inspecto-engine/` declare it test-scope and **test scope is not transitive**. When a skip's
+  `platform/inspecto-engine/` declare it test-scope and **test scope is not transitive**. When a skip's
   precondition finally arrives, treat the code as untested rather than as coverage that merely paused.
 
 - 🔴 **A doc rewrite silently retracts the claims other rows depend on.** Twice on 2026-09-12/13: the
@@ -717,7 +717,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 - 🔴 **`| grep -v spec` to "skip the tests" silently discards 77 % OF THIS REPOSITORY**, because the product
   name **`inspecto` contains the substring `spec`** (i-n-**s-p-e-c**-t-o). Measured 2026-09-10: **3,015 of
   3,923** tracked files have `inspecto` in their path, and **every one** is dropped by that filter — the whole
-  client and every Java module. What survives is `docs/`, `asn-parser/`, `compliance/` and `.github/`, so the
+  client and every Java module. What survives is `docs/`, `providers/asn-parser/`, `compliance/` and `.github/`, so the
   sweep looks like it ran and reports a plausible, tiny answer. ⇒ Exclude test files by a **path-anchored**
   pattern (`grep -v '\.spec\.ts$'`, `grep -v '/src/test/'`) or with ripgrep's `--glob '!*.spec.ts'`, never by
   the bare word. ⚠ This one produced a confident "no `EventSource` anywhere in the client" while the client
@@ -864,7 +864,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   (49.6%) and `asn-golden` (4.4%) on their own numbers instead of the one repo-wide floor.
   🔴 **The first baseline was wrong in a way that looked right** — "82.92% across 21 modules" while nine
   more modules were never instrumented, because a Maven profile is inherited through `<parent>` and
-  never through aggregation, and `asn-parser/asn-decoders/pom.xml` is a separate root the reactor merely
+  never through aggregation, and `providers/asn-parser/asn-decoders/pom.xml` is a separate root the reactor merely
   aggregates. A tenth of the codebase sat outside a "repo-wide" number while `mvn -Pcoverage` exited 0.
 
   ⚠ **`node tools/check-sbom-modules.mjs` joined 2026-09-09** (`f2eaeec8`). 🔴 **This sentence said it
@@ -953,7 +953,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 - **A change to a SERVED catalog is not verifiable from the module that computes it**, and
   `mvn -o test -pl <module>` cannot be trusted on its own. Proved 2026-08-10: adding a second
   `transform` entry to `PipelineProjection.RECIPE_VERBS` (inspecto-engine) was verified with
-  `-pl inspecto-engine`, where `StepTypesContractTest` lives — and left `master` RED for four commits,
+  `-pl :inspecto-engine`, where `StepTypesContractTest` lives — and left `master` RED for four commits,
   because the *same* catalog is asserted again one module up by `ControlApiPipelinesTest` at the route
   level. Route-level contracts live in the module that **serves** them, so a catalog change needs a
   reactor-wide run. Two mechanical traps make module-scoped runs worse than useless here:
@@ -1423,17 +1423,17 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 - 🔴 **A PROBE THAT CANNOT RETURN A HIT REPORTS "ABSENT" AND EXITS 0. Silence is not evidence.**
   Three instances in one shift (2026-09-16), two of them by the same person, one committed before it was
   caught:
-  - `git ls-tree HEAD asn-parser/` run from a **module subdirectory** prints nothing and **exits 0**,
+  - `git ls-tree HEAD providers/asn-parser/` run from a **module subdirectory** prints nothing and **exits 0**,
     because `ls-tree` pathspecs are CWD-relative. The subtree is fully tracked (70 files). That false claim
     reached five agent briefings, a board row and a commit message — and **five agents independently
     "confirmed" it, because they all ran the probe they were given.**
-  - `ls -d legacy-code` at the repo root, for a claim about `asn-parser/asn-decoders/legacy-code/`. The pom
+  - `ls -d legacy-code` at the repo root, for a claim about `providers/asn-parser/asn-decoders/legacy-code/`. The pom
     exists, is a declared `<module>`, and its `<sourceDirectory>../../src/main/java</sourceDirectory>` is
     exactly the tree the rows said it compiles. A row was FILED and COMMITTED on that zero, then retracted.
   - The mirror error: `grep poi` over the poms returns **nine hits, every one a substring of
     "point"/"policy"** — a false POSITIVE. Match `org.apache.poi` or `<artifactId>poi`.
-  - **THIRD occurrence, 2026-09-17, same lineage:** a row claimed `asn-parser/src/` holds *“66 Java files that
-    no pom compiles (`asn-parser/pom.xml` does not exist)”* — true about that filename, and irrelevant.
+  - **THIRD occurrence, 2026-09-17, same lineage:** a row claimed `providers/asn-parser/src/` holds *“66 Java files that
+    no pom compiles (`providers/asn-parser/pom.xml` does not exist)”* — true about that filename, and irrelevant.
     `legacy-code/pom.xml`, one level down, sets `<sourceDirectory>../../src/main/java</sourceDirectory>`,
     which resolves to exactly that tree; `legacy-code` is an unconditional `<module>`, and its
     `target/classes` holds **41 `.class` files** from a real build. ⛔ **Its remedy was “delete the tree”.**
@@ -1854,7 +1854,7 @@ The real carrier corpus (~57 MB, two carriers, only in working trees) moves to a
 archive on company storage, fetched by script**, access held by the data-agreement owner; the parity harness runs
 wherever the archive is provisioned. A **small synthetic subset is committed for CI smoke** — a complement, not a
 replacement: every parity defect so far came from real files. **The synthetic subset SHIPPED 2026-09-06**
-(`asn-parser/corpus-synthetic/` + `SyntheticCorpusTest` in asn-golden, always-on: two cases — back-to-back records
+(`providers/asn-parser/corpus-synthetic/` + `SyntheticCorpusTest` in asn-golden, always-on: two cases — back-to-back records
 with OPTIONAL/SEQUENCE OF/CHOICE, and the Huawei file shape with a 50-byte header, 4-byte record headers and 0x00
 fill; BER as hex text so the `*.ber` ban stands; regenerate with `-Dasn.synthetic.write=true`). It pinned one
 reader rule on the way: fill bytes are skipped BEFORE a record header, so a header must not start with 0x00/0xFF.
