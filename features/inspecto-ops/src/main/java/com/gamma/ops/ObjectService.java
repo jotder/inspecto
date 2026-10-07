@@ -805,7 +805,7 @@ public final class ObjectService {
      */
     public TagVocabularyChange renameTag(String from, String to) {
         Tag existing = tag(from).orElseThrow(() -> new NoSuchElementException("no tag named '" + from + "'"));
-        Tag renamed = new Tag(to, existing.createdAt());   // validates the new name before anything mutates
+        Tag renamed = new Tag(to, existing.createdAt(), existing.extra());   // validates the new name before anything mutates
         if (renamed.name().equals(existing.name())) return new TagVocabularyChange(0, 0, List.of());
 
         // Collect the affected objects BEFORE the rename — afterwards the old name has no edges left.
@@ -817,7 +817,7 @@ public final class ObjectService {
         List<String> followed = new java.util.ArrayList<>();
         for (TagRule rule : tagRules()) {
             if (!rule.tag().equals(existing.name())) continue;
-            tagRules.put(rule.name(), new TagRule(rule.name(), renamed.name(), rule.filter(), rule.createdAt()));
+            tagRules.put(rule.name(), new TagRule(rule.name(), renamed.name(), rule.filter(), rule.createdAt(), rule.extra()));
             followed.add(rule.name());
         }
         return new TagVocabularyChange(edges, reprojectAll(affected), List.copyOf(followed));

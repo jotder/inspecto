@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A <strong>Tag Rule</strong> (GLOSSARY §9) — a saved search that applies a {@link Tag}, the Gmail-filter
@@ -28,9 +29,18 @@ import java.util.Map;
  * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
-public record TagRule(String name, String tag, Filter filter, long createdAt) {
+public record TagRule(String name, String tag, Filter filter, long createdAt, Map<String, Object> extra) {
+
+    /** The keys a {@code tag_rule { … }} block models (the filter fields may be nested or flattened); any other key rides in {@link #extra}. */
+    public static final Set<String> MODELLED = Set.of("name", "tag", "filter", "createdAt",
+            "type", "q", "status", "priority", "severity", "category");
+
+    public TagRule(String name, String tag, Filter filter, long createdAt) {
+        this(name, tag, filter, createdAt, Map.of());
+    }
 
     public TagRule {
+        extra = extra == null || extra.isEmpty() ? Map.of() : java.util.Collections.unmodifiableMap(new LinkedHashMap<>(extra));
         if (name == null || name.isBlank()) throw new IllegalArgumentException("tag rule name is required");
         name = name.trim();
         if (tag == null || tag.isBlank()) throw new IllegalArgumentException("tag rule needs a 'tag' to apply");
@@ -52,6 +62,7 @@ public record TagRule(String name, String tag, Filter filter, long createdAt) {
         m.put("tag", tag);
         m.put("filter", filter.toMap());
         m.put("createdAt", createdAt);
+        extra.forEach(m::putIfAbsent);   // MODULE-REORG-P4-2: author-owned x- annotations ride through
         return m;
     }
 
@@ -80,7 +91,8 @@ public record TagRule(String name, String tag, Filter filter, long createdAt) {
                 // informational only
             }
         }
-        return new TagRule(Values.trimToNull(m.get("name")), Values.trimToNull(m.get("tag")), filter, at > 0 ? at : System.currentTimeMillis());
+        return new TagRule(Values.trimToNull(m.get("name")), Values.trimToNull(m.get("tag")), filter, at > 0 ? at : System.currentTimeMillis(),
+                Extras.of(m, MODELLED));
     }
 
     /**
@@ -92,6 +104,9 @@ public record TagRule(String name, String tag, Filter filter, long createdAt) {
      * {@link #tree()}, which {@link #matches} evaluates through the Condition Language.
      */
     public record Filter(String type, String q, String status, String priority, String severity, String category) {
+
+        /** The six criteria a filter block may hold. */
+        public static final java.util.Set<String> KEYS = java.util.Set.of("type", "q", "status", "priority", "severity", "category");
 
         /** Validates {@code type} eagerly so a bad value rejects at authoring time, not at match time. */
         public Filter {

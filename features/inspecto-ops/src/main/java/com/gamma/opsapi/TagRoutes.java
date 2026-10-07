@@ -1,6 +1,7 @@
 package com.gamma.opsapi;
 
 import com.gamma.control.AnnotationTargets;
+import com.gamma.control.AuthorKeys;
 import com.gamma.control.RouteErrors;
 import com.gamma.control.WidgetTags;
 
@@ -22,6 +23,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -188,6 +190,7 @@ public final class TagRoutes implements RouteModule {
     /** {@code POST /tags} — create a tag; body {@code {name}}. Duplicate → 409; persisted as {@code <name>_tag.toon}. */
     private Object createTag(ApiContext api, Map<String, Object> body) throws IOException {
         WriteGates.requireWriteRoot(api, "tag write");
+        AuthorKeys.requireModelled("a tag", body, Tag.MODELLED);   // MODULE-REORG-P4-2: x- kept, any other key refused
         Tag tag;
         try {
             tag = Tag.fromMap(body);
@@ -226,8 +229,11 @@ public final class TagRoutes implements RouteModule {
         WidgetTags.refuseUnderPolicy(api, widgets);   // maker-checker: before the tag file or any edge moves
         ObjectService.TagVocabularyChange changed;
         try {
-            persist(api, target, Map.of("tag", Map.of("name", to.trim(),
-                    "createdAt", System.currentTimeMillis())), ".tag-");
+            Map<String, Object> destination = new LinkedHashMap<>();
+            destination.put("name", to.trim());
+            destination.put("createdAt", System.currentTimeMillis());
+            OpsEngine.of(api).tag(from).ifPresent(source -> source.extra().forEach(destination::putIfAbsent));   // the annotations move with the tag
+            persist(api, target, Map.of("tag", destination), ".tag-");
             changed = OpsEngine.of(api).renameTag(from, to);
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
@@ -281,6 +287,7 @@ public final class TagRoutes implements RouteModule {
      */
     private Object saveTagRule(ApiContext api, Map<String, Object> body) throws IOException {
         WriteGates.requireWriteRoot(api, "tag rule write");
+        requireModelledRule("a tag rule", body, TagRule.MODELLED);
         TagRule rule;
         try {
             rule = TagRule.fromMap(body);
@@ -312,6 +319,21 @@ public final class TagRoutes implements RouteModule {
             return Map.of("matched", result.matched(), "updated", result.updated());
         } catch (NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
+        }
+    }
+
+    /**
+     * MODULE-REORG-P4-2: a Tag Rule / Case Rule body keeps its {@code x-} annotations and refuses any other key it does
+     * not model (422 naming it) instead of dropping it behind a 200; the nested {@code filter} may hold only the six
+     * criteria (an {@code x-} key inside it has no place to live, so it is refused too).
+     */
+    static void requireModelledRule(String what, Map<String, Object> body, java.util.Set<String> modelled) {
+        AuthorKeys.requireModelled(what, body, modelled);
+        if (body.get("filter") instanceof Map<?, ?> f) {
+            List<String> bad = f.keySet().stream().map(String::valueOf).filter(k -> !TagRule.Filter.KEYS.contains(k)).sorted().toList();
+            if (!bad.isEmpty())
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, com.gamma.config.spec.FindingCodes.ERR_UNKNOWN_CONFIG_KEY
+                        + ": " + what + " filter key(s) " + bad + " are not criteria; the criteria are " + TagRule.Filter.KEYS);
         }
     }
 

@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A <strong>Case Rule</strong> (GLOSSARY §9 — rule-raised cases, C5): auto-grouping of Incidents into
@@ -25,9 +26,19 @@ import java.util.Map;
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record CaseRule(String name, String title, TagRule.Filter filter, int threshold,
-                       long windowMinutes, String category, String tags, long createdAt) {
+                       long windowMinutes, String category, String tags, long createdAt, Map<String, Object> extra) {
+
+    /** The keys a {@code case_rule { … }} block models (the filter fields may be nested or flattened); any other key rides in {@link #extra}. */
+    public static final Set<String> MODELLED = Set.of("name", "title", "filter", "threshold", "windowMinutes", "category",
+            "tags", "createdAt", "type", "q", "status", "priority", "severity");
+
+    public CaseRule(String name, String title, TagRule.Filter filter, int threshold,
+                    long windowMinutes, String category, String tags, long createdAt) {
+        this(name, title, filter, threshold, windowMinutes, category, tags, createdAt, Map.of());
+    }
 
     public CaseRule {
+        extra = extra == null || extra.isEmpty() ? Map.of() : java.util.Collections.unmodifiableMap(new LinkedHashMap<>(extra));
         if (name == null || name.isBlank()) throw new IllegalArgumentException("case rule name is required");
         name = name.trim();
         if (title == null || title.isBlank()) throw new IllegalArgumentException("case rule needs a 'title' for the raised case");
@@ -56,6 +67,7 @@ public record CaseRule(String name, String title, TagRule.Filter filter, int thr
         if (category != null) m.put("category", category);
         if (tags != null) m.put("tags", tags);
         m.put("createdAt", createdAt);
+        extra.forEach(m::putIfAbsent);   // MODULE-REORG-P4-2: author-owned x- annotations ride through
         return m;
     }
 
@@ -77,7 +89,7 @@ public record CaseRule(String name, String title, TagRule.Filter filter, int thr
                 Values.trimToNull(f.get("priority")), Values.trimToNull(f.get("severity")), Values.trimToNull(f.get("category")));
         return new CaseRule(Values.trimToNull(m.get("name")), Values.trimToNull(m.get("title")), filter,
                 (int) longOr(m.get("threshold"), 2), longOr(m.get("windowMinutes"), 1440),
-                Values.trimToNull(m.get("category")), Values.trimToNull(m.get("tags")), longOr(m.get("createdAt"), System.currentTimeMillis()));
+                Values.trimToNull(m.get("category")), Values.trimToNull(m.get("tags")), longOr(m.get("createdAt"), System.currentTimeMillis()), Extras.of(m, MODELLED));
     }
 
     private static long longOr(Object v, long def) {

@@ -202,6 +202,7 @@ public final class ObjectRoutes implements RouteModule {
      */
     private Object saveCaseRule(ApiContext api, Map<String, Object> body) throws IOException {
         WriteGates.requireWriteRoot(api, "case rule write");
+        TagRoutes.requireModelledRule("a case rule", body, CaseRule.MODELLED);
         CaseRule rule;
         try {
             rule = CaseRule.fromMap(body);

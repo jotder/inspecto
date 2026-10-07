@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A user-created tag (GLOSSARY §9) — a free-form label attached to {@link com.gamma.ops.OperationalObject}s
@@ -20,9 +21,17 @@ import java.util.Map;
  * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
-public record Tag(String name, long createdAt) {
+public record Tag(String name, long createdAt, Map<String, Object> extra) {
+
+    /** The keys a {@code tag { … }} block models; any other key rides in {@link #extra} (route refuses non-{@code x-} ones). */
+    public static final Set<String> MODELLED = Set.of("name", "createdAt");
+
+    public Tag(String name, long createdAt) {
+        this(name, createdAt, Map.of());
+    }
 
     public Tag {
+        extra = extra == null || extra.isEmpty() ? Map.of() : java.util.Collections.unmodifiableMap(new LinkedHashMap<>(extra));
         if (name == null || name.isBlank()) throw new IllegalArgumentException("tag name is required");
         name = name.trim();
         if (name.contains(",")) throw new IllegalArgumentException("tag names may not contain commas");
@@ -33,6 +42,7 @@ public record Tag(String name, long createdAt) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("name", name);
         m.put("createdAt", createdAt);
+        extra.forEach(m::putIfAbsent);   // MODULE-REORG-P4-2: author-owned x- annotations ride through
         return m;
     }
 
@@ -58,6 +68,6 @@ public record Tag(String name, long createdAt) {
             }
         }
         Object name = m.get("name");
-        return new Tag(name == null ? null : name.toString(), at > 0 ? at : System.currentTimeMillis());
+        return new Tag(name == null ? null : name.toString(), at > 0 ? at : System.currentTimeMillis(), Extras.of(m, MODELLED));
     }
 }
