@@ -84,6 +84,18 @@ class ModuleRemovalJobTest {
     }
 
     @Test
+    void anAbsentTypeJobIsListedAsNotHostedWithAReasonAndNoNextFire(@TempDir Path root) throws Exception {
+        spaceWithGhostJob(root);   // enabled, cron "0 3 * * *": it would show a live nextFire if it could fire
+        try (Ctx c = open(root)) {
+            JsonNode ghost = find(V1Body.of(send(c.port, "GET", BASE + "/jobs", null).body()), "ghost");
+            assertFalse(ghost.get("hosted").asBoolean(), ghost.toString());
+            assertTrue(ghost.get("reason").asText().contains("zz.absent-module-job")
+                    && ghost.get("reason").asText().contains("no installed module"), ghost.toString());
+            assertTrue(ghost.get("nextFire").asText().isEmpty(), "a job that can never fire has no next fire: " + ghost);
+        }
+    }
+
+    @Test
     void aTriggerNamesTheMissingTypeInsteadOfPretendingTheJobDoesNotExist(@TempDir Path root) throws Exception {
         spaceWithGhostJob(root);
         try (Ctx c = open(root)) {

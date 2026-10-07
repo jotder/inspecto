@@ -62,6 +62,16 @@ function jobNameCell(job: JobView | undefined): HTMLElement {
     cell.className = 'inline-flex items-center gap-2';
     cell.append(job?.name ?? '');
     if (job?.system) cell.insertAdjacentHTML('beforeend', statusBadgeHtml('system', 'System'));
+    if (job?.hosted === false) {
+        // MODULE-REORG-P4-1: the badge is text (never colour alone) and the reason follows it as screen-reader text, so a
+        // job that can never fire says so and why.
+        cell.insertAdjacentHTML('beforeend', statusBadgeHtml('warning', 'Not installed'));
+        const reason = document.createElement('span');
+        reason.className = 'sr-only';
+        reason.textContent = job.reason ?? 'The module that provides this job type is not installed.';
+        cell.title = reason.textContent;
+        cell.append(reason);
+    }
     return cell;
 }
 

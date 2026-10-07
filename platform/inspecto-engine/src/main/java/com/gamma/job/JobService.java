@@ -328,10 +328,12 @@ public final class JobService implements AutoCloseable {
      *  trigger (P1c) so a signal-driven job is distinguishable from a manual one in the list; the
      *  {@code when} guard is detail-only. {@code system} marks a job the platform arms and disarms
      *  itself ({@link #upsertSystemJob}) — listed like any other so it is never a hidden thread, but
-     *  owned by the platform, not by an author. */
+     *  owned by the platform, not by an author. {@code hosted} is false for a Job whose Job Type nothing registers
+     *  here (an optional module or Job Pack that is not installed): its config is kept, it can never fire, so
+     *  {@code nextFire} is empty and {@code reason} says why (MODULE-REORG-P4-1); {@code reason} is null when hosted. */
     public record JobView(String name, String type, String cron, String onPipeline, String onSignal,
                           boolean enabled, String lastStatus, String lastRunTime, String nextFire,
-                          boolean system) {}
+                          boolean system, boolean hosted, String reason) {}
 
     public JobService(List<JobConfig> configs, ConsignmentEventBus bus, Scheduler scheduler,
                       ReportRunner reports, String auditDir) {
@@ -1877,14 +1879,17 @@ public final class JobService implements AutoCloseable {
         for (JobConfig c : configs) {
             JobRun last = ledger.lastRun(c.name());
             String nextFire = "";
-            if (c.enabled() && c.hasCron()) {
+            boolean hosted = registry.has(c.type());
+            if (hosted && c.enabled() && c.hasCron()) {
                 CronExpression expr = crons.getOrDefault(c.name(), c.cronExpression());
                 nextFire = expr.next(now).format(TS);
             }
             out.add(new JobView(c.name(), c.type(), c.cron(), c.onPipeline(), c.onSignal(), c.enabled(),
                     last == null ? "" : last.status(),
                     last == null ? "" : last.endTime(),
-                    nextFire, systemJobs.contains(c.name())));
+                    nextFire, systemJobs.contains(c.name()), hosted,
+                    hosted ? null : "job type '" + c.type() + "' is not registered here: no installed module or Job Pack "
+                            + "provides it, so this job cannot run (its config is kept and works once one is installed)"));
         }
         return out;
     }

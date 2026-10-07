@@ -217,6 +217,10 @@ export interface JobView {
      *  backend 409s edit / reschedule / enable / disable / delete on one; it stays triggerable. List-only:
      *  `GET /jobs/{name}` does not carry it. */
     system?: boolean;
+    /** False when no installed module or Job Pack registers this job's type: the config is kept but the job can never
+     *  fire (`nextFire` is empty, `reason` says why). List-only; absent on an older server (treated as hosted). */
+    hosted?: boolean;
+    reason?: string | null;
 }
 
 export interface JobRun {

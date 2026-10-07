@@ -550,6 +550,21 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
 - **Not done (recorded on the row).** The same sweep for the other `toMap()`-rebuilding writers (Expectation, Notification Rule, KPI) is not started; each
   needs its own look at what its door stores.
 
+**Step B - `MODULE-REORG-P4-1` (the smallest additive wire change).**
+- **`GET /jobs` list.** `JobView` gains `hosted` (boolean) and `reason` (text, null when hosted). A Job whose type nothing registers (an optional module or Job Pack
+  that is not installed) now lists `hosted:false`, a `reason` naming the type, and an EMPTY `nextFire` (it used to show a live one for a job that can never fire).
+  `hosted` is `JobTypeRegistry.has(type)`, the same test the boot skip and the 503 trigger use, so the three surfaces cannot disagree. Pinned by
+  `ModuleRemovalJobTest.anAbsentTypeJobIsListedAsNotHostedWithAReasonAndNoNextFire` and `JobServiceTest` (hosted case). No route added; `ApiContractTest` and
+  `OpenApiPathsContractTest` untouched (the list is a schema-less skeleton).
+- **Deliberately generic reason, no `missingModule` field.** The manifests do not declare job types (`provides` has features, contracts, capabilities, config kinds,
+  store families, routes, consequences). Adding `provides.jobTypes` means a new `Provides` component plus a declaration in every module that contributes a Job Type
+  and a parity test each - not cheap, and a Job Pack type has no module at all. So the reason says "no installed module or Job Pack provides it".
+- **SPA.** The Jobs list name cell shows a "Not installed" status badge (text, not colour alone) and the reason as screen-reader text plus a tooltip; an older server
+  that sends no `hosted` shows nothing. `jobs.component.spec.ts` pins the badge, the reason text and the no-badge cases.
+- **Not done (remaining on the row).** `GET /jobs/{name}` is the raw stored config (its ETag and the PUT round trip hash it), so a `hosted` flag does not belong
+  there; a Pipeline refused for a plain unknown key still does not name a module (there is no module to name for a typo); and the `GET /modules` section of
+  inert references (config files naming a module that is not installed, fed by the manifests) is not built.
+
 ### P4a as built (2026-10-06 — removal semantics: characterised first, then only what was broken and small)
 Scenario: config naming a capability no installed module provides (stand-ins `zz.absent-module-node`, `zz.absent-module-job`, `zz-absent-action`). Tests: `ModuleRemovalPipelineTest`, `ModuleRemovalJobTest`, `ModuleRemovalRulesTest`, `ModuleRemovalBundleTest` (inspecto) and `ModuleRemovalBackupTest` (inspecto-backup).
 
@@ -559,7 +574,7 @@ Scenario: config naming a capability no installed module provides (stand-ins `zz
 | Pipeline `PUT /graph` with an unregistered node type | **REFUSED-LOUDLY** — 422 `UNSUPPORTED_NODE`, nothing written; dry run is 200 with a `NOT previewed` warning naming the type | the refusal now names the missing module (only for a type nothing registers; a registered-but-not-authorable type keeps its old wording) |
 | Pipeline plain unknown key (`zz_module`) | **REFUSED-LOUDLY** at save (`ERR_UNKNOWN_CONFIG_KEY`), file unchanged; does not name a module | filed `MODULE-REORG-P4-1` |
 | Pipeline author-owned `x-` key | **PRESERVED** through GET `/graph/raw` → PUT `/graph` | — (pinned) |
-| Job of an unregistered type: list, detail | **PRESERVED** — listed with every key (but with a live `nextFire`) | wire flag filed `MODULE-REORG-P4-1` |
+| Job of an unregistered type: list, detail | **PRESERVED** — listed with every key (but with a live `nextFire`) | wire flag shipped in *P4b as built* below |
 | Job trigger | was a misleading **404** "no job named" for a listed job | now **503 `CAPABILITY_UNAVAILABLE`** naming the type and the missing module |
 | Job enabled save (`PUT`, `reschedule`, `enable`, `POST` of a typo'd type) | was **a 500 after the file had been rewritten AND the job dropped from memory** (`persistJob` wrote, then `upsertJob` threw) — DROPPED | now **422 before any write**; file byte-identical, job stays listed. A *disable* stays allowed and keeps every key |
 | Decision Rule with an unknown consequence action | **PRESERVED** through create / update / simulate (top-level and consequence keys); `apply` reports `skipped` | the `skipped` detail now names the missing module |

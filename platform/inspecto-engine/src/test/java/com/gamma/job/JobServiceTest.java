@@ -692,6 +692,7 @@ class JobServiceTest {
             assertEquals("0 2 * * *", v.cron());
             assertTrue(v.enabled());
             assertFalse(v.nextFire().isBlank(), "a cron job shows its next fire time");
+            assertTrue(v.hosted() && v.reason() == null, "a job whose type is registered is hosted, with no reason");
         }
     }
 

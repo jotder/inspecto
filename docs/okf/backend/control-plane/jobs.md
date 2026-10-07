@@ -1025,3 +1025,8 @@ assertion is `logged("thershold")` — the typo'd key by name. Mutation-proved b
 (`if (false && …)`): that one assertion goes red on an **empty** run log, 11/12 of the class still green. Its
 neighbour `assertEquals("SUCCESS", …)` — which pins "reporting it never becomes a rejection" — **passed under
 the mutant**, and is recorded here as the half of the test that cannot detect the regression.
+
+⚠ **A Job whose type nothing registers is listed `hosted:false` (`MODULE-REORG-P4-1`, 2026-10-07).** `GET /jobs` used to list it with a live `nextFire` though it
+could never fire. `JobView` now carries `hosted` and `reason`; an unhosted job has an empty `nextFire` and a reason naming the type ("no installed module or Job
+Pack provides it"), and the Jobs pane badges it "Not installed". The reason is generic because module manifests declare no job types. The detail read
+(`GET /jobs/{name}`) stays the raw config on purpose. Pinned by `ModuleRemovalJobTest` and `jobs.component.spec.ts`.

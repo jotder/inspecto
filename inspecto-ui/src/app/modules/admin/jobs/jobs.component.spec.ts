@@ -138,6 +138,27 @@ describe('JobsComponent', () => {
         expect(shown(authored)).toEqual(['Run now', 'Disable', 'Reschedule', 'Edit', 'Delete']);
     });
 
+    it('badges a job whose type no installed module provides "Not installed", with the reason as text (P4-1)', () => {
+        const c = create('ok').componentInstance;
+        const nameCol = c.columnDefs.find((d) => d.field === 'name')!;
+        const cell = (data: JobView) => (nameCol.cellRenderer as (p: { data: JobView }) => HTMLElement)({ data });
+        const ghost = {
+            name: 'ghost',
+            type: 'zz.absent',
+            enabled: true,
+            hosted: false,
+            reason: "job type 'zz.absent' is not registered here",
+        } as JobView;
+        const el = cell(ghost);
+        expect(el.textContent).toContain('Not installed');
+        // The reason is announced with the row (not colour-only) and offered as a tooltip.
+        expect(el.querySelector('.sr-only')?.textContent).toBe("job type 'zz.absent' is not registered here");
+        expect(el.title).toBe("job type 'zz.absent' is not registered here");
+        // A hosted job, and one from an older server that says nothing, carry no badge.
+        expect(cell({ ...ghost, hosted: true, reason: null }).textContent).toBe('ghost');
+        expect(cell({ name: 'old', type: 'x', enabled: true } as JobView).textContent).toBe('old');
+    });
+
     it('opens the detail side panel on a name route param and closes it when the param clears (R5)', () => {
         const params = new BehaviorSubject<ParamMap>(convertToParamMap({}));
         const fixture = create('ok', of([]), params);
