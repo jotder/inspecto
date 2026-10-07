@@ -19,6 +19,7 @@ class ConsequencesTest {
         final List<String> signals = new ArrayList<>();
         final List<String> offers = new ArrayList<>();
         boolean disabledJob;
+        Map<String, Object> authored;
         Ctx(boolean automatic) { this.automatic = automatic; }
         public String ruleName() { return "r1"; }
         public String actor() { return "alice"; }
@@ -34,7 +35,7 @@ class ConsequencesTest {
         public boolean jobDisabled(String id) { return disabledJob; }
         public Optional<String> triggerJob(String id, String by) { return "j1".equals(id) ? Optional.of("run-1") : Optional.empty(); }
         public boolean triggerPipeline(String id) { return "p1".equals(id); }
-        public void authorAlertRule(Map<String, Object> body) { }
+        public void authorAlertRule(Map<String, Object> body) { authored = body; }
     }
 
     private static Map<String, Object> c(String action, Map<String, Object> more) {
@@ -103,6 +104,18 @@ class ConsequencesTest {
                 c("create-alert", Map.of("params", Map.of("severity", "critical"))));
         assertEquals(Result.EXECUTED, r.status());
         assertTrue(r.detail().contains("not installed"), r.detail());
+    }
+
+    @Test
+    void createAlertAuthorsAnAlertRuleBodyWithoutItsRuleNameAlias() {
+        Ctx ctx = new Ctx(false);
+        Result r = Consequences.builtIns().find("create-alert").orElseThrow().execute(ctx,
+                c("create-alert", Map.of("params", Map.of("rule", "my-alert", "metric", "error_rate", "window", "1h",
+                        "comparator", "gt", "threshold", 0.1, "severity", "warning"))));
+        assertEquals(Result.EXECUTED, r.status());
+        assertEquals("my-alert", ctx.authored.get("name"));
+        // 'rule' is the consequence's alias for the name; as an Alert Rule key it is now refused (MODULE-REORG-P4-2)
+        assertFalse(ctx.authored.containsKey("rule"), ctx.authored.toString());
     }
 
     @Test
