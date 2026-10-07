@@ -423,7 +423,44 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
   `IllegalState`. Blocker for dropping its processor dependency: those installs belong in a boot hook that receives the Space
   registry, not in `register()`. Not mocked on purpose. Not attempted: the remaining la-api route classes (many take host-free
   ports and could subclass the TCK next), `inspecto-geo-link` and `inspecto-policy`.
-- **Still open for P5:** the TCKs of §5 other than RouteModule; the "drop the processor dependency from the 7 modules" step.
+- **Still open for P5:** the TCKs of §5 other than RouteModule (done in P5b below); the "drop the processor dependency from the 7 modules" step.
+
+### P5b as built (2026-10-07 — the other SPI TCKs; tests + test-jar plumbing only, one production fix)
+- **Homes (the SPI's own test-jar, consumers declare `type test-jar`, scope test, managed in the root pom):** `inspecto-acquire`
+  (`com.gamma.acquire.testkit`: `CollectorConnectorFactoryContract`, `ExportConnectorFactoryContract`), `inspecto-auth-spi`
+  (`com.gamma.control.testkit`: `AuthenticatorContract`, `TokenRelayContract`), `inspecto-engine` (`com.gamma.notify.testkit`,
+  `com.gamma.job.testkit`, `com.gamma.catalog.spi.testkit`, `com.gamma.parse.testkit`: `NotificationChannelContract`,
+  `JobTypeProviderContract`, `MaintenanceTaskProviderContract`, `DescriptionProviderContract`, `ParserPluginContract`). Each
+  contract's Javadoc states, per test, the defect it catches. `registered()` is a seam over `ServiceLoader` so a self-test can
+  plant a duplicate.
+- **Each assertion is proven able to fail:** `ConnectorFactoryTckSelfTest` (11), `AuthTckSelfTest` (13), `JobTckSelfTest` (13),
+  `NotificationChannelTckSelfTest` (7), `DescriptionProviderTckSelfTest` (6), `ParserPluginTckSelfTest` (9) run every contract
+  against a deliberately broken in-test implementer (and a sound one) and expect `AssertionFailedError`. Contract methods are
+  package-private, so a self-test lives in the contract's package.
+- **Driven (concrete subclasses, 38 classes over 15 modules):** collect factories `sftp ftp ftps db s3 azure gcs` (connectors),
+  `kafka`, `dataset` (engine), export `s3`; `OidcAuthenticator`/`OidcTokenRelay` (in-memory JWKS, a stand-in IAM that refuses every
+  grant) and `DemoAuthenticator`/`DemoTokenRelay`; `WebhookChannel`, `SmtpEmailChannel` (unconfigured instances only, no message leaves);
+  Job Types `mail.send sql.template object.store.export postgres.publish consignment.process` (engine), `CaseRuleEvaluate`,
+  `ObjectsAnalytics` (ops), `ReconRunJobType`, `RiskScoreJobType`; maintenance `OpsMaintenanceTasks`, `BackupTaskProvider`,
+  `AuditAnchorExportProvider`; describers `NoopDescriptionProvider`, `AiDescriptionProvider` (over `FakeModelProvider`); parsers
+  `XmlParserPlugin`, `Asn1ParserPlugin`.
+- **Bug found and fixed (production, minimal):** `OpsMaintenanceTasks.run` ignored its `task` argument and ran `incident_purge` for ANY name,
+  so a mistyped `task:` executed a purge (dry-run or not). It now throws `IllegalArgumentException` like `BackupTaskProvider`'s switch default.
+  No other implementer failed a contract, including the 100 000-level nested XML / BER samples (no stack overflow).
+- **Not driven, with the blocker (this is the finding):**
+  - **`create(...)` of every `CollectorConnectorFactory`, `workbench`, and egress/SSRF behaviour** - needs a `PipelineConfig` and a real or faked endpoint; the
+    contract covers `scheme()` and `validate()` only. The two test-fixture factories (`FakeRemoteConnectorFactory`, `FakeOffsetTailConnectorFactory`, processor test tree) are not subclassed.
+  - **`JobTypeProvider.create(config)` and running a Job**, and the existence check that each `requires:` id names a Platform Service this host registers: those ids are
+    registered only in `CollectorService` (processor), so `JobTypeProviderContract.knownPlatformServices()` defaults to empty; a hand-kept mirror would drift. Uniqueness of
+    ids across ALL providers is checked only against the module's own `ServiceLoader` view - no module's test class path holds every provider; `JobTypeRegistry`'s
+    duplicate guard remains the runtime backstop. The engine built-ins registered with `JobTypeProvider.of(..)` inside `JobService.registerBuiltins` (and `AlertEvaluateJob`,
+    `IncidentOpenJob` etc.) need a `JobService` and are not subclassed; `tools/templates/job`'s provider is a template, not buildable here.
+  - **Maintenance tasks' real work:** every task runs in `dryRun` against a bare context (no `JobService`/`JobContext`), so for `BackupTaskProvider` and
+    `AuditAnchorExportProvider` the "never returns null" check is vacuous (both refuse by exception without their host); dispatch rules are what is proven.
+  - **Positive paths** of `Authenticator`/`TokenRelay` (a valid credential yields a Subject/Tokens), a delivered notification, an AI description from a live model: implementation-specific
+    and kept in each module's own tests. `NotificationChannel` has two implementers only (the in-app store is not a channel).
+  - `DescriptionProviderContract.concurrentUseAgreesWithSerialUse` assumes a deterministic provider; a live model is out of scope.
+- **Still open for P5:** the "drop the processor dependency from the 7 modules" step; Exchange's boot hook (see P5a).
 
 ### P4a as built (2026-10-06 — removal semantics: characterised first, then only what was broken and small)
 Scenario: config naming a capability no installed module provides (stand-ins `zz.absent-module-node`, `zz.absent-module-job`, `zz-absent-action`). Tests: `ModuleRemovalPipelineTest`, `ModuleRemovalJobTest`, `ModuleRemovalRulesTest`, `ModuleRemovalBundleTest` (inspecto) and `ModuleRemovalBackupTest` (inspecto-backup).
