@@ -35,6 +35,17 @@
     </description>
 
     <dependencies>
+        <!-- MODULE-REORG-P5-TCKS: replaces the inspecto-processor edge; this module imports no processor class (the processor stays test scope). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-acquire</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- test-jar carries the EventLogLeakDetector (auto-registered JUnit extension). -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
@@ -49,6 +60,7 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-processor</artifactId>
             <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
 
         <dependency>

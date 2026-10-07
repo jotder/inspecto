@@ -30,6 +30,13 @@
     <!-- langchain4j.version is managed by the parent (M1) — one pin for all three AI modules. -->
 
     <dependencies>
+        <!-- MODULE-REORG-P5-TCKS: replaces the inspecto-processor edge; this module imports no processor class. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <!-- The agent module: HostedProviderPlugin SPI, ProviderSettings, the vendored
              ModelProvider seam this module implements, and (transitively) the eoiagent
              Lc4jChatGateway transport the providers ride. -->
@@ -41,12 +48,6 @@
         <!-- `provided`, as inspecto-agent scopes it (provided is not transitive): the agent's provider
              factory checks endpoints with the core's ModelEgress (ASSIST-MODEL-EGRESS-1). The core is
              always on a bundle's classpath as inspecto.jar, so this only feeds compile and test. -->
-        <dependency>
-            <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-processor</artifactId>
-            <version>${project.version}</version>
-            <scope>provided</scope>
-        </dependency>
 
         <!-- Hosted SDK adapters (LangChain4j). Grok and llama.cpp ride the OpenAI-compatible
              client, so three artifacts cover all five hosted/local-server providers. -->

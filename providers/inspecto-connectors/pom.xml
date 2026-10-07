@@ -37,17 +37,25 @@
     </properties>
 
     <dependencies>
+        <!-- MODULE-REORG-P5-TCKS: replaces the inspecto-processor edge; this module imports no processor class. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-acquire</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- MODULE-REORG-P5-TCKS: replaces the inspecto-processor edge; this module imports no processor class. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <!-- The core: the SourceConnector SPI, ConnectionProfile, SecretResolver, RetrievalPlan.
              PROVIDED on purpose (CONNECTORS-BUNDLE-1, 2026-09-07): this jar is dropped onto a running
              engine's classpath, where `inspecto.jar` already supplies all of it. Compile scope would drag
              the whole ~97 MB core and its deps into the shaded sidecar below. Same idiom as
              `tools/templates/processor/pom.xml`, the scaffold for third-party plugin modules. -->
-        <dependency>
-            <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-processor</artifactId>
-            <version>${project.version}</version>
-            <scope>provided</scope>
-        </dependency>
 
         <!-- slf4j facade. Seven classes here call LoggerFactory directly, and it used to arrive as a
              transitive of the core — which `provided` above no longer propagates, so the module has to

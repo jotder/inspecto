@@ -27,11 +27,42 @@
     </description>
 
     <dependencies>
+        <!-- MODULE-REORG-P5-TCKS: replaces the inspecto-processor edge; this module imports no processor class (the processor stays test scope). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- MODULE-REORG-P5-TCKS: replaces the inspecto-processor edge; this module imports no processor class (the processor stays test scope). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-access</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- MODULE-REORG-P5-TCKS: replaces the inspecto-processor edge; this module imports no processor class (the processor stays test scope). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- MODULE-REORG-P5-TCKS: replaces the inspecto-processor edge; this module imports no processor class (the processor stays test scope). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-event</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- MODULE-REORG-P5-TCKS: replaces the inspecto-processor edge; this module imports no processor class (the processor stays test scope). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-util</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- The core: the AccessDecider SPI, Subject, and the AccessPolicies document store. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-processor</artifactId>
             <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
 
         <!-- The shared Conditions grammar (already transitive via the core; declared for direct use). -->

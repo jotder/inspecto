@@ -28,14 +28,22 @@
     </properties>
 
     <dependencies>
-        <!-- The core SPI (CollectorConnector, ConnectionProfile, AcquisitionLedgers, StreamLane...).
-             PROVIDED: this jar is dropped onto a running engine's classpath, exactly as inspecto-connectors. -->
+        <!-- MODULE-REORG-P5-TCKS: replaces the inspecto-processor edge; this module imports no processor class. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>inspecto-processor</artifactId>
+            <artifactId>inspecto-acquire</artifactId>
             <version>${project.version}</version>
             <scope>provided</scope>
         </dependency>
+        <!-- MODULE-REORG-P5-TCKS: replaces the inspecto-processor edge; this module imports no processor class. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- The core SPI (CollectorConnector, ConnectionProfile, AcquisitionLedgers, StreamLane...).
+             PROVIDED: this jar is dropped onto a running engine's classpath, exactly as inspecto-connectors. -->
 
         <!-- slf4j facade: the running engine supplies it (and its binding); never shade a second copy. -->
         <dependency>
