@@ -60,13 +60,10 @@ public final class AlertService {
     private volatile List<AlertRule> rules;
     private final ConfigSource configs;
     private final StatusStore status;
-    /** Object store for persisting fired alerts as managed objects (Phase 2); {@code null} = events-only. */
-    /** The {@code LinkRelationship} name for an escalation edge — the enum itself lives in the module. */
-    private static final String ESCALATED_FROM = "ESCALATED_FROM";
-
-    private final ObjectAccess objects;
-    /** The {@code incidents} Platform Service view over {@link #objects} (S1-4) — high-severity
-     *  promotion opens through the same interface a granted Run uses; {@code null} = events-only. */
+    /** Persisted Alert records (Phase 2) — {@link NoAlertRecords} = events-only (no ops module). */
+    private final AlertRecords records;
+    /** The {@code incidents} Platform Service (S1-4) — high-severity promotion opens through the same
+     *  interface a granted Run uses; opens nothing when events-only. */
     private final com.gamma.objects.IncidentAccess incidents;
     private final Deque<Alert> fired = new ArrayDeque<>();
     private final int capacity;
@@ -140,11 +137,23 @@ public final class AlertService {
 
     AlertService(List<AlertRule> rules, ConfigSource configs, StatusStore status,
                  ObjectAccess objects, int capacity) {
+        this(rules, configs, status, AlertRecords.of(java.util.Optional.ofNullable(objects)),
+                AlertRecords.incidentsOf(java.util.Optional.ofNullable(objects)), capacity);
+    }
+
+    /** MODULE-REORG-P7-INCIDENTS slice 1: the Alert records port + Incident promotion, wired explicitly. */
+    public AlertService(List<AlertRule> rules, ConfigSource configs, StatusStore status,
+                        AlertRecords records, com.gamma.objects.IncidentAccess incidents) {
+        this(rules, configs, status, records, incidents, DEFAULT_CAPACITY);
+    }
+
+    AlertService(List<AlertRule> rules, ConfigSource configs, StatusStore status,
+                 AlertRecords records, com.gamma.objects.IncidentAccess incidents, int capacity) {
         this.rules = List.copyOf(rules);
         this.configs = configs;
         this.status = status;
-        this.objects = objects;
-        this.incidents = objects == null ? null : com.gamma.objects.IncidentAccess.over(() -> objects);
+        this.records = records;
+        this.incidents = incidents;
         this.capacity = Math.max(1, capacity);
     }
 
@@ -264,23 +273,22 @@ public final class AlertService {
             // …and its cooldown: a re-created rule that is still breaching must raise its Alert at once, not sit in
             // a dead rule's cooldown with no Alert open (and later "clear" an Alert it never raised).
             lastFired.remove(old.name() + "|" + old.dataset());
-            if (objects == null) return;
             try {
-                String alertId = objects.activeAttributeIndex(ObjectType.ALERT, old.dataset(), "rule").get(old.name());
-                if (alertId != null) objects.transition(alertId, "resolve", actor(old) + ":rule-changed");
+                String alertId = records.activeAlertIndex(old.dataset(), "rule").get(old.name());
+                if (alertId != null) records.resolveAlert(alertId, actor(old) + ":rule-changed");
             } catch (RuntimeException e) {
                 log.warn("could not retire the open Alert of alert rule {}: {}", old.name(), e.getMessage());
             }
             return;
         }
-        if (!old.isGrouped() || objects == null) return;
+        if (!old.isGrouped()) return;
         String prefix = old.name() + "|";
         String actor = actor(old) + ":rule-changed";
         try {
             int retired = 0;
             for (Map.Entry<String, String> e
-                    : objects.activeAttributeIndex(ObjectType.ALERT, old.dataset(), ALERT_KEY).entrySet())
-                if (e.getKey().startsWith(prefix) && objects.transition(e.getValue(), "resolve", actor)) retired++;
+                    : records.activeAlertIndex(old.dataset(), ALERT_KEY).entrySet())
+                if (e.getKey().startsWith(prefix) && records.resolveAlert(e.getValue(), actor)) retired++;
             if (retired > 0)
                 log.info("alert rule {} changed: resolved {} per-key Alert(s) of its old keys; their Incidents stay "
                         + "with triage", old.name(), retired);
@@ -619,9 +627,8 @@ public final class AlertService {
      *  instance, whether it left an ALERT open (the restart case — see {@link #openMeasures}). */
     private boolean measureOpen(AlertRule rule, String measureKey) {
         return openMeasures.computeIfAbsent(measureKey, k -> {
-            if (objects == null) return Boolean.FALSE;
             try {
-                return objects.hasActiveMatching(ObjectType.ALERT, rule.dataset(), Map.of("rule", rule.name()));
+                return records.hasActiveAlert(rule.dataset(), rule.name());
             } catch (RuntimeException e) {
                 log.warn("could not read the open Alert of alert rule {}: {}", rule.name(), e.getMessage());
                 return Boolean.FALSE;
@@ -669,10 +676,9 @@ public final class AlertService {
         } catch (RuntimeException e) {
             log.warn("could not emit alert-rule.cleared signal for {}: {}", rule.name(), e.getMessage());
         }
-        if (objects == null) return;
         try {
-            String alertId = objects.activeAttributeIndex(ObjectType.ALERT, scope, "rule").get(rule.name());
-            if (alertId != null) objects.transition(alertId, "resolve", actor(rule));
+            String alertId = records.activeAlertIndex(scope, "rule").get(rule.name());
+            if (alertId != null) records.resolveAlert(alertId, actor(rule));
             // the Incident is left to the human who records its Disposition
         } catch (RuntimeException e) {
             log.warn("could not resolve the Alert of rule {}: {}", rule.name(), e.getMessage());
@@ -753,10 +759,9 @@ public final class AlertService {
      */
     private java.util.Set<String> seedOpenKeys(AlertRule rule) {
         java.util.Set<String> open = new java.util.LinkedHashSet<>();
-        if (objects == null) return open;
         try {
             String prefix = rule.name() + "|";
-            for (String v : objects.activeAttributeIndex(ObjectType.ALERT, rule.dataset(), ALERT_KEY).keySet())
+            for (String v : records.activeAlertIndex(rule.dataset(), ALERT_KEY).keySet())
                 if (v.startsWith(prefix)) open.add(v.substring(prefix.length()));
         } catch (RuntimeException e) {
             log.warn("could not read the open keys of alert rule {}: {}", rule.name(), e.getMessage());
@@ -775,12 +780,12 @@ public final class AlertService {
         }
 
         Map<String, String> alerts() {
-            if (alerts == null) alerts = objects.activeAttributeIndex(ObjectType.ALERT, scope, ALERT_KEY);
+            if (alerts == null) alerts = records.activeAlertIndex(scope, ALERT_KEY);
             return alerts;
         }
 
         Map<String, String> incidents() {
-            if (incidents == null) incidents = objects.activeAttributeIndex(ObjectType.INCIDENT, scope, ALERT_KEY);
+            if (incidents == null) incidents = records.activeIncidentIndex(scope, ALERT_KEY);
             return incidents;
         }
     }
@@ -820,7 +825,6 @@ public final class AlertService {
      */
     private void persistKeyObjects(AlertRule rule, String key, Map<String, Object> keyValues, Alert alert,
                                    String label, double value, String eventId, ObjectIndex index) {
-        if (objects == null) return;
         try {
             String alertKey = rule.name() + "|" + key;
             if (index.alerts().containsKey(alertKey)) return;   // opened by an earlier sweep and still active
@@ -842,7 +846,7 @@ public final class AlertService {
             }
             if (eventId != null) attrs.put("causedByEvent", eventId);
             String title = storm ? Alert.stormTitle(rule, label, (long) value) : Alert.title(rule, label);
-            String alertObjectId = objects.open(ObjectType.ALERT, title, alert.message(), rule.severity(),
+            String alertObjectId = records.openAlert(title, alert.message(), rule.severity(),
                     rule.dataset(), attrs);
             if (!isHighSeverity(rule.severity())) return;
             java.util.Optional<String> incidentId = incidents.openIncident(title, alert.message(),
@@ -855,11 +859,11 @@ public final class AlertService {
                 // on the Incident being worked.
                 String existing = index.incidents().get(alertKey);
                 if (existing != null) {
-                    objects.transition(existing, "reopen", actor(rule));
+                    records.reopenIncident(existing, actor(rule));
                     incidentId = java.util.Optional.of(existing);
                 }
             }
-            incidentId.ifPresent(id -> objects.link(id, alertObjectId, ESCALATED_FROM, actor(rule)));
+            incidentId.ifPresent(id -> records.linkEscalation(id, alertObjectId, actor(rule)));
         } catch (RuntimeException e) {
             log.warn("could not persist alert objects for rule {} key {}: {}", rule.name(), key, e.getMessage());
         }
@@ -906,11 +910,10 @@ public final class AlertService {
         } catch (RuntimeException e) {
             log.warn("could not emit alert-rule.cleared signal for {}: {}", rule.name(), e.getMessage());
         }
-        if (objects == null) return;
         try {
             String alertKey = rule.name() + "|" + key;
             String alertId = index.alerts().get(alertKey);
-            if (alertId != null) objects.transition(alertId, "resolve", actor(rule));
+            if (alertId != null) records.resolveAlert(alertId, actor(rule));
             // the Incident is left to the human who records its Disposition — see the javadoc
         } catch (RuntimeException e) {
             log.warn("could not resolve the objects of rule {} key {}: {}", rule.name(), key, e.getMessage());
@@ -1010,12 +1013,11 @@ public final class AlertService {
      */
     private void persistAlertObject(AlertRule rule, Alert alert, String pipeline, double value,
                                     String eventId) {
-        if (objects == null) return;
         try {
             // ⚠ The seam's compound-key form (EDG-01 cell 7). This used to filter active() by the
             // "rule" attribute in-process; hasActiveMatching does the same match on the module's side,
             // which is what lets core stop naming OperationalObject.
-            if (objects.hasActiveMatching(ObjectType.ALERT, pipeline, Map.of("rule", rule.name()))) return;
+            if (records.hasActiveAlert(pipeline, rule.name())) return;
             Map<String, String> attrs = new LinkedHashMap<>();
             attrs.put("rule", rule.name());
             if (rule.metric() != null) attrs.put("metric", rule.metric());
@@ -1030,7 +1032,7 @@ public final class AlertService {
             attrs.putAll(alert.evidence());   // A3: e.g. the agent list version the sweep read
             if (eventId != null) attrs.put("causedByEvent", eventId);
             String title = Alert.title(rule, textScope(rule, pipeline));
-            String alertObjectId = objects.open(ObjectType.ALERT,
+            String alertObjectId = records.openAlert(
                     title, alert.message(), rule.severity(), pipeline, attrs);
             promoteToIncident(rule, alert, title, pipeline, attrs, alertObjectId);
         } catch (RuntimeException e) {
@@ -1069,9 +1071,9 @@ public final class AlertService {
             // A scalar Measure rule heals (healMeasure), so a relapse meets its still-active Incident exactly as a
             // `by` key does (persistKeyObjects): re-open it if an operator RESOLVED it (`reopen` answers false from
             // IDENTIFIED/DIAGNOSING), and link the relapse Alert to it either way.
-            String existing = objects.activeAttributeIndex(ObjectType.INCIDENT, pipeline, "rule").get(rule.name());
+            String existing = records.activeIncidentIndex(pipeline, "rule").get(rule.name());
             if (existing != null) {
-                objects.transition(existing, "reopen", actor(rule));
+                records.reopenIncident(existing, actor(rule));
                 incidentId = java.util.Optional.of(existing);
             }
         }
@@ -1081,8 +1083,7 @@ public final class AlertService {
                 // opened object, and it only ever wanted .id().
                 // ⚠ "ESCALATED_FROM" as a String: LinkRelationship is domain vocabulary and stays in the
                 // optional module, so the seam names the relationship rather than importing the enum.
-                .ifPresent(id -> objects.link(id, alertObjectId,
-                        ESCALATED_FROM, "alert-rule:" + rule.name()));
+                .ifPresent(id -> records.linkEscalation(id, alertObjectId, "alert-rule:" + rule.name()));
     }
 
     /** Whether a rule severity warrants an Incident (critical / error) rather than staying an alert. */

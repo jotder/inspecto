@@ -534,8 +534,12 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // runtime even when no Alert Rule was loaded at boot — empty until a rule is added. Subscribed
         // here (before start()) so it sees the first terminal batch. Phase 2: also persists each fired
         // alert as a managed ALERT object via the Object Engine above.
+        // MODULE-REORG-P7-INCIDENTS slice 1: ops present -> Alert records over its objects; absent
+        // (Personal) -> the events-only no-op records (no ALERT / INCIDENT object is ever written).
+        java.util.Optional<com.gamma.objects.ObjectAccess> alertObjects =
+                this.objectEngine.map(ObjectEngineProvider.ObjectEngine::access);
         this.alerting = new com.gamma.alert.AlertService(alertRules, configSource, this.status,
-                this.objectEngine.map(ObjectEngineProvider.ObjectEngine::access).orElse(null));
+                com.gamma.alert.AlertRecords.of(alertObjects), com.gamma.alert.AlertRecords.incidentsOf(alertObjects));
         // BI-5: measure rules evaluate a Dataset measure via the headless BI evaluator. Both roots
         // resolve lazily and PER SPACE (MEASURE-PROBE-SPACE-ROOT-1): the registry is this Space's config
         // root (the default Space alone falls back to -Dassist.write.root), and the data root follows the
