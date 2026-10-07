@@ -1,5 +1,6 @@
 package com.gamma.service;
 
+import com.gamma.control.ReactorModules;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -101,6 +102,9 @@ class ImportLoaderInventoryTest {
                 + "<write root>/la-index/... - a derived artefact, outside the config tree and never read as config");
         ALLOWED.put("audit-anchoring.json", "the durable \"anchoring started\" record (AuditAnchors) in "
                 + "<config root>.secrets/ beside the key — a SIBLING of the config tree, so no import reaches it");
+        ALLOWED.put("META-INF/inspecto/module.toon", "a classpath resource read from module jars by ModuleManifests, "
+                + "not a Space file: an import cannot plant it because it is read from the classpath, never from a "
+                + "Space config root (" + REPO + ")");
         for (String p : List.of("reference.key", "inspecto.idempotency.key"))
             ALLOWED.put(p, NOT_A_FILE);
     }
@@ -110,31 +114,27 @@ class ImportLoaderInventoryTest {
     private static Found scan() throws IOException {
         Set<String> paths = new TreeSet<>();
         Map<String, List<String>> where = new LinkedHashMap<>();
-        Path reactor = Path.of("..").toAbsolutePath().normalize();
-        try (Stream<Path> siblings = Files.list(reactor)) {
-            for (Path sibling : siblings.filter(Files::isDirectory).sorted().toList()) {
-                Path src = sibling.resolve(Path.of("src", "main", "java"));
-                if (!Files.isDirectory(src)) continue;
-                try (Stream<Path> files = Files.walk(src)) {
-                    for (Path f : files.filter(p -> p.toString().endsWith(".java")).sorted().toList()) {
-                        String text = Files.readString(f);
-                        String at = reactor.relativize(f).toString().replace('\\', '/');
-                        List<String> found = new ArrayList<>();
-                        Matcher c = CHAIN.matcher(text);
-                        while (c.find()) {
-                            List<String> segs = new ArrayList<>();
-                            Matcher s = SEG.matcher(c.group(1));
-                            while (s.find()) segs.add(s.group(1));
-                            found.add(String.join("/", segs));
-                        }
-                        Matcher a = AGENT.matcher(text);
-                        while (a.find()) found.add("agent/" + a.group(1));
-                        Matcher n = NAME.matcher(text);
-                        while (n.find()) found.add(n.group(1));
-                        for (String p : found) {
-                            paths.add(p);
-                            where.computeIfAbsent(p, k -> new ArrayList<>()).add(at);
-                        }
+        Path reactor = ReactorModules.root();
+        for (Path src : ReactorModules.mainJavaTrees()) {
+            try (Stream<Path> files = Files.walk(src)) {
+                for (Path f : files.filter(p -> p.toString().endsWith(".java")).sorted().toList()) {
+                    String text = Files.readString(f);
+                    String at = reactor.relativize(f).toString().replace('\\', '/');
+                    List<String> found = new ArrayList<>();
+                    Matcher c = CHAIN.matcher(text);
+                    while (c.find()) {
+                        List<String> segs = new ArrayList<>();
+                        Matcher s = SEG.matcher(c.group(1));
+                        while (s.find()) segs.add(s.group(1));
+                        found.add(String.join("/", segs));
+                    }
+                    Matcher a = AGENT.matcher(text);
+                    while (a.find()) found.add("agent/" + a.group(1));
+                    Matcher n = NAME.matcher(text);
+                    while (n.find()) found.add(n.group(1));
+                    for (String p : found) {
+                        paths.add(p);
+                        where.computeIfAbsent(p, k -> new ArrayList<>()).add(at);
                     }
                 }
             }
@@ -197,17 +197,13 @@ class ImportLoaderInventoryTest {
 
     private static Map<String, List<String>> suffixScan() throws IOException {
         Map<String, List<String>> where = new TreeMap<>();
-        Path reactor = Path.of("..").toAbsolutePath().normalize();
-        try (Stream<Path> siblings = Files.list(reactor)) {
-            for (Path sibling : siblings.filter(Files::isDirectory).sorted().toList()) {
-                Path src = sibling.resolve(Path.of("src", "main", "java"));
-                if (!Files.isDirectory(src)) continue;
-                try (Stream<Path> files = Files.walk(src)) {
-                    for (Path f : files.filter(p -> p.toString().endsWith(".java")).sorted().toList()) {
-                        Matcher m = SUFFIX.matcher(Files.readString(f));
-                        String at = reactor.relativize(f).toString().replace('\\', '/');
-                        while (m.find()) where.computeIfAbsent(m.group(1), k -> new ArrayList<>()).add(at);
-                    }
+        Path reactor = ReactorModules.root();
+        for (Path src : ReactorModules.mainJavaTrees()) {
+            try (Stream<Path> files = Files.walk(src)) {
+                for (Path f : files.filter(p -> p.toString().endsWith(".java")).sorted().toList()) {
+                    Matcher m = SUFFIX.matcher(Files.readString(f));
+                    String at = reactor.relativize(f).toString().replace('\\', '/');
+                    while (m.find()) where.computeIfAbsent(m.group(1), k -> new ArrayList<>()).add(at);
                 }
             }
         }
