@@ -13,7 +13,7 @@ import com.gamma.entitystore.EntityFactLog;
 import com.gamma.entitystore.EntityListFacts;
 import com.gamma.entitystore.EntityRegistry;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.gamma.audit.EventType;
 import com.gamma.sql.SqlGuard;
 import com.gamma.sql.SqlSandboxPolicy;
@@ -490,7 +490,7 @@ public final class EntityIdentityRoutes implements RouteModule {
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
                     .action("entity.identity.changed").actionCategory("analysis")
                     .attr("kind", kind).attr("seq", seq).attr("assertionSeq", assertionSeq).attr("groupSize", groupSize);
-            EventLog.current().emit(b);
+            EventSink.current().emit(b);
         } catch (RuntimeException ignored) {
             // best effort — the fact is already sealed and that is what matters
         }

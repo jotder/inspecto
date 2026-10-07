@@ -13,7 +13,7 @@ import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -201,7 +201,7 @@ public final class InvestigationCoverageRoutes implements RouteModule {
 
     private static void emit(HttpExchange ex, String id, String dataset, int expected, int missing) {
         try {
-            EventLog.current().emit(Event.builder(LinkEventTypes.LINK_INVESTIGATION_COVERAGE).source("inv")
+            EventSink.current().emit(Event.builder(LinkEventTypes.LINK_INVESTIGATION_COVERAGE).source("inv")
                     .message("link.investigation.coverage — " + id + ": " + missing + " of " + expected + " days missing")
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
                     .action("link.investigation.coverage").actionCategory("analysis")

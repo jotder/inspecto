@@ -5,7 +5,7 @@ import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.gamma.la.core.DraftCheckpoints;
 import com.gamma.la.core.DraftLifecycle;
 import com.gamma.la.core.DraftStore;
@@ -157,7 +157,7 @@ public final class DraftAdmission {
                     .actor("system").actorType("system").action("link.draft.expired").actionCategory("analysis")
                     .attr("investigationId", inv.id()).attr("draftId", draftId).attr("draftActor", header.get("actor"))
                     .attr("baseStep", header.get("baseStep")).attr("step", head[0]).attr("idleDays", idleDays).attr("unpinned", unpinned);
-            EventLog.current().emit(b);
+            EventSink.current().emit(b);
         } catch (RuntimeException ignored) {
             // best effort, as every Draft event: the expiry is already recorded
         }

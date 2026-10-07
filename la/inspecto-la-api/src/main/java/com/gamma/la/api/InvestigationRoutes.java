@@ -26,7 +26,7 @@ import com.gamma.entitystore.EntityFactLog;
 import com.gamma.entitystore.EntityListFacts;
 import com.gamma.entitystore.EntityRegistry;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -2366,7 +2366,7 @@ public final class InvestigationRoutes implements RouteModule {
             Event.Builder b = Event.builder(type).source("inv").message(message)
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
                     .action(action).actionCategory("analysis");
-            EventLog.current().emit(attrs.apply(b));
+            EventSink.current().emit(attrs.apply(b));
         } catch (RuntimeException ignored) {
             // best effort — the step is already sealed and that is what matters
         }

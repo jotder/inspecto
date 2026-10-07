@@ -9,7 +9,7 @@ import com.gamma.control.RouteModule;
 import com.gamma.control.Subject;
 import com.gamma.access.WriteGates;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.gamma.la.core.Algorithm;
 import com.gamma.la.core.GraphBudget;
 import com.gamma.la.core.GraphEngine;
@@ -691,7 +691,7 @@ public final class GraphRunRoutes implements RouteModule {
     private static void emit(String type, HttpExchange ex, RunView v, int nodes, int edges) {
         try {
             Event.Builder b = base(type, v, ApiContext.actor(ex), ApiContext.actorType(ex)).attr("nodes", nodes).attr("edges", edges);
-            EventLog.current().emit(b);
+            EventSink.current().emit(b);
         } catch (RuntimeException ignored) {
             // best effort
         }
@@ -715,7 +715,7 @@ public final class GraphRunRoutes implements RouteModule {
                         .attr("maxEdges", v.budget().maxEdges()).attr("timeoutMs", v.budget().timeoutMs());
             }
             if (v.failure() != null) b = b.attr("failure", v.failure());
-            EventLog.current().emit(b);
+            EventSink.current().emit(b);
         } catch (RuntimeException ignored) {
             // best effort
         }

@@ -10,7 +10,7 @@ import com.gamma.control.RouteModule;
 import com.gamma.control.Subject;
 import com.gamma.access.WriteGates;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.FingerprintBudget;
@@ -523,7 +523,7 @@ public final class IndexRoutes implements RouteModule {
 
     private static void emitStarted(HttpExchange ex, RunView v) {
         try {
-            EventLog.current().emit(base(LinkEventTypes.LINK_INDEX_BUILD_STARTED, v, ApiContext.actor(ex), ApiContext.actorType(ex)));
+            EventSink.current().emit(base(LinkEventTypes.LINK_INDEX_BUILD_STARTED, v, ApiContext.actor(ex), ApiContext.actorType(ex)));
         } catch (RuntimeException ignored) {
             // best effort
         }
@@ -551,7 +551,7 @@ public final class IndexRoutes implements RouteModule {
             }
             b = b.attr("mode", v.mode().name().toLowerCase(Locale.ROOT));
             if (v.failure() != null) b = b.attr("failure", v.failure());
-            EventLog.current().emit(b);
+            EventSink.current().emit(b);
         } catch (RuntimeException ignored) {
             // best effort
         }

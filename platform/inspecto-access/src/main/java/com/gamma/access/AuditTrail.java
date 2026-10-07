@@ -2,7 +2,7 @@ package com.gamma.access;
 
 import com.gamma.audit.AuditAttrs;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.gamma.audit.EventType;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -44,7 +44,7 @@ public final class AuditTrail {
 
     /**
      * Record an audit event for a resolved request, if it is auditable. Never throws — auditing must
-     * not disturb the response (the underlying {@link EventLog#emit} already swallows sink failures).
+     * not disturb the response (the underlying {@link EventSink#emit} already swallows sink failures).
      *
      * @param path the route path with the {@code /api} and {@code /spaces/{id}} prefixes already stripped
      */
@@ -88,7 +88,7 @@ public final class AuditTrail {
                 event.attr("approvedBy", pc.get("approvedBy"));
                 event.attr("pendingChange", pc.get("id"));
             }
-            EventLog.current().emit(event);
+            EventSink.current().emit(event);
         } catch (RuntimeException ignore) {
             // best effort — the audit trail must never break the request
         }
@@ -117,7 +117,7 @@ public final class AuditTrail {
     public static void authentication(HttpExchange ex, String action, boolean ok, int status, String actor) {
         try {
             String path = ex.getRequestURI().getPath();
-            EventLog.current().emit(located(ex, Event.builder(ok ? EventType.AUDIT : EventType.ACCESS_DENIED))
+            EventSink.current().emit(located(ex, Event.builder(ok ? EventType.AUDIT : EventType.ACCESS_DENIED))
                     .source("audit")
                     .message(actor + " " + action + (ok ? "" : " (refused, HTTP " + status + ")"))
                     .actor(actor).actorType(RequestAttrs.actorType(ex))
@@ -179,7 +179,7 @@ public final class AuditTrail {
                     .attr(AuditAttrs.HTTP_PATH, path)
                     .attr(AuditAttrs.HTTP_STATUS, status);
             if (capability != null) event.attr(AuditAttrs.CAPABILITY, capability);
-            EventLog.current().emit(event);
+            EventSink.current().emit(event);
         } catch (RuntimeException ignore) {
             // best effort
         }
@@ -203,7 +203,7 @@ public final class AuditTrail {
         try {
             String actor = RequestAttrs.actor(ex);
             String verb = granted ? "access.granted" : "access.denied";
-            EventLog.current().emit(located(ex, Event.builder(granted ? EventType.AUDIT : EventType.ACCESS_DENIED))
+            EventSink.current().emit(located(ex, Event.builder(granted ? EventType.AUDIT : EventType.ACCESS_DENIED))
                     .source("audit")
                     .message(actor + " " + verb + " " + abacAction + " " + route
                             + (policy == null ? "" : " (policy " + policy + ")"))

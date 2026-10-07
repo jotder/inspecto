@@ -5,7 +5,7 @@ import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.gamma.la.core.InvestigationEvaluator;
 import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.LinkEventTypes;
@@ -79,7 +79,7 @@ public final class InvestigationComparisonRoutes implements RouteModule {
     static void emit(HttpExchange ex, String id, String dataset, Map<String, Object> raw) {
         try {
             Map<String, Object> links = (Map<String, Object>) raw.get("links");
-            EventLog.current().emit(Event.builder(LinkEventTypes.LINK_INVESTIGATION_COMPARED).source("inv")
+            EventSink.current().emit(Event.builder(LinkEventTypes.LINK_INVESTIGATION_COMPARED).source("inv")
                     .message("link.investigation.compared - " + id)
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
                     .action("link.investigation.compared").actionCategory("analysis")

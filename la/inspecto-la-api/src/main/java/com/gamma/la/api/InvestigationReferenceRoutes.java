@@ -8,7 +8,7 @@ import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -176,7 +176,7 @@ public final class InvestigationReferenceRoutes implements RouteModule {
             Event.Builder b = Event.builder(type).source("inv").message(message)
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
                     .action(action).actionCategory("analysis");
-            EventLog.current().emit(attrs.apply(b));
+            EventSink.current().emit(attrs.apply(b));
         } catch (RuntimeException ignored) {
             // best effort — the reference is already appended
         }

@@ -9,7 +9,7 @@ import com.gamma.control.RouteModule;
 import com.gamma.access.WriteGates;
 
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.gamma.audit.EventType;
 
 import com.gamma.util.DuckDbUtil;
@@ -200,7 +200,7 @@ public final class GeoRoutes implements RouteModule {
     private static void audit(HttpExchange ex, String type, String action, String datasetId,
                               String sizeKey, int size, boolean truncated, long skipped) {
         try {
-            EventLog.current().emit(Event.builder(type).source("geo")
+            EventSink.current().emit(Event.builder(type).source("geo")
                     .message(action + " " + datasetId + " — " + size + " " + sizeKey
                             + (truncated ? " (truncated)" : ""))
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))

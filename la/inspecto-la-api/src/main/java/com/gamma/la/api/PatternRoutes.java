@@ -13,7 +13,7 @@ import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.access.WriteGates;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.gamma.la.core.BranchingPatternEngine.Edge;
 import com.gamma.la.core.PatternQueryCompiler.Compiled;
 import com.gamma.la.core.PatternQueryCompiler.Stage;
@@ -462,7 +462,7 @@ public final class PatternRoutes implements RouteModule {
                     .target("dataset", datasetId)
                     .attr("dataset", datasetId).attr("matches", matches).attr("truncated", truncated);
             if (refusal != null) b.attr("refusal", refusal);
-            EventLog.current().emit(b);
+            EventSink.current().emit(b);
         } catch (RuntimeException ignore) {
             // best effort — the audit must never fail the analyst's query
         }

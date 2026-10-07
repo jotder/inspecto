@@ -3,7 +3,7 @@ package com.gamma.la.api;
 import com.gamma.access.ComponentAccess;
 import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.InputFingerprint;
@@ -294,7 +294,7 @@ public final class ScheduledIndexBuild {
             if (o.code() != null) b = b.attr("code", o.code());
             b = b.attr("attempt", String.valueOf(attempt));
             if (waiting) b = b.attr("waiting", "true");
-            EventLog.current().emit(b);
+            EventSink.current().emit(b);
         } catch (RuntimeException ignored) {
             // best effort
         }

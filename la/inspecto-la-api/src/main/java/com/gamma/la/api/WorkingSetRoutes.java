@@ -9,7 +9,7 @@ import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -323,7 +323,7 @@ public final class WorkingSetRoutes implements RouteModule {
                     .message("link.investigation.working_set.read — " + id)
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
                     .action("link.investigation.working_set.read").actionCategory("analysis");
-            EventLog.current().emit(attrs.apply(b));
+            EventSink.current().emit(attrs.apply(b));
         } catch (RuntimeException ignored) {
             // best effort — the read already succeeded
         }

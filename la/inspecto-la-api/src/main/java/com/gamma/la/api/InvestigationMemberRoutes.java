@@ -7,7 +7,7 @@ import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.control.Subject;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.gamma.la.core.InvestigationMembers;
 import com.gamma.la.core.InvestigationMembers.Entry;
 import com.gamma.la.core.InvestigationMembers.Op;
@@ -159,7 +159,7 @@ public final class InvestigationMemberRoutes implements RouteModule {
             Event.Builder b = Event.builder(type).source("inv").message(message)
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
                     .action(action).actionCategory("analysis");
-            EventLog.current().emit(attrs.apply(b));
+            EventSink.current().emit(attrs.apply(b));
         } catch (RuntimeException ignored) {
             // best effort — the membership change is already recorded
         }

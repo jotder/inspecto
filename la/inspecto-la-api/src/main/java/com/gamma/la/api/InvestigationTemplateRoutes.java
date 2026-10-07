@@ -12,7 +12,7 @@ import com.gamma.control.RouteModule;
 import com.gamma.control.Subject;
 import com.gamma.access.WriteGates;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -336,7 +336,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
             Event.Builder b = Event.builder(type).source("inv").message(message)
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
                     .action(action).actionCategory("analysis");
-            EventLog.current().emit(attrs.apply(b));
+            EventSink.current().emit(attrs.apply(b));
         } catch (RuntimeException ignored) {
             // best effort — the template (or the new Investigation) is already written
         }

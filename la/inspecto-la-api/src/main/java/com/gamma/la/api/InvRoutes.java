@@ -14,7 +14,7 @@ import com.gamma.control.RouteModule;
 import com.gamma.access.WriteGates;
 
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.audit.EventSink;
 import com.gamma.sql.SqlGuard;
 import com.gamma.sql.SqlSandboxPolicy;
 import com.gamma.util.DuckDbUtil;
@@ -237,7 +237,7 @@ public final class InvRoutes implements RouteModule {
             Event.Builder b = Event.builder(type).source("inv").message(message)
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
                     .action(action).actionCategory("analysis");
-            EventLog.current().emit(attrs.apply(b));
+            EventSink.current().emit(attrs.apply(b));
         } catch (RuntimeException ignored) {
             // audit is best effort; the snapshot is already sealed and that is what matters
         }
@@ -311,7 +311,7 @@ public final class InvRoutes implements RouteModule {
         });
 
         try {
-            EventLog.current().emit(Event.builder(LinkEventTypes.LINK_SCHEMA_INSPECTED).source("inv")
+            EventSink.current().emit(Event.builder(LinkEventTypes.LINK_SCHEMA_INSPECTED).source("inv")
                     .message("link.schema.inspected — " + relationships.size() + " relationships over "
                             + columnsByDataset.size() + " datasets")
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
@@ -461,7 +461,7 @@ public final class InvRoutes implements RouteModule {
         }
 
         try {
-            EventLog.current().emit(Event.builder(LinkEventTypes.LINK_OVERLAP_PROFILED).source("inv")
+            EventSink.current().emit(Event.builder(LinkEventTypes.LINK_OVERLAP_PROFILED).source("inv")
                     .message("link.overlap.profiled — " + pairs.size() + " pairs over " + profiles.size()
                             + " columns in " + scanned + " datasets")
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
@@ -1136,7 +1136,7 @@ public final class InvRoutes implements RouteModule {
                 if (!source.staleCodes().isEmpty()) b.attr("indexStaleReasons", String.join(",", source.staleCodes()));
             }
             if (targetNode != null) b.attr("targetNode", targetNode);
-            EventLog.current().emit(b);
+            EventSink.current().emit(b);
         } catch (RuntimeException ignore) {
             // best effort — the audit must never fail the analyst's query
         }
@@ -1169,7 +1169,7 @@ public final class InvRoutes implements RouteModule {
                     b.attr("sourceReason", source.reason().name());
                 }
             }
-            EventLog.current().emit(b);
+            EventSink.current().emit(b);
         } catch (RuntimeException ignore) {
             // best effort — the audit must never fail the analyst's query
         }
