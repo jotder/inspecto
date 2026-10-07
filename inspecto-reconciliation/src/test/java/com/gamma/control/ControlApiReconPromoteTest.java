@@ -5,6 +5,7 @@ import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -21,6 +22,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -53,6 +56,11 @@ class ControlApiReconPromoteTest {
     private final HttpClient client = HttpClient.newHttpClient();
 
     private static final String RECON = "orders_recon";
+
+    @AfterEach
+    void disarm() {
+        Authenticators.forTest(null);
+    }
 
     private record Ctx(CollectorService svc, ControlApi api, int port) implements AutoCloseable {
         public void close() { api.close(); svc.close(); }
@@ -361,5 +369,45 @@ class ControlApiReconPromoteTest {
                     "⛔ an ARCHIVED Incident must NOT read as promoted — promote() would open a fresh one, so "
                             + "the offer and the dedupe would disagree");
         }
+    }
+
+    /**
+     * The gate on {@code POST /recon/promote} (operator, 2026-09-16) — MOVED here from core's
+     * {@code RouteInventoryTest}, which can no longer see this route (it lives in this module, not on the
+     * processor's test classpath). Two proofs: the runtime route inventory declares {@code canManageIncidents},
+     * and — armed with a real Subject, without which {@code withCapability} is a NO-OP — a caller lacking it gets
+     * 403 and opens no Incident while one holding it gets through.
+     */
+    @Test
+    void promoteIsGatedByCanManageIncidents(@TempDir Path cfg, @TempDir Path wr) throws Exception {
+        try (Ctx c = open(cfg, wr)) {
+            JsonNode inventory = V1Body.of(client.send(HttpRequest.newBuilder(URI.create(
+                    "http://localhost:" + c.port + "/api/v1/audit/route-inventory")).GET().build(),
+                    BodyHandlers.ofString()).body());
+            String declared = null;
+            for (JsonNode r : inventory.path("routes"))
+                if ("POST".equals(r.path("method").asText()) && "/recon/promote".equals(r.path("pattern").asText()))
+                    declared = r.path("capability").asText();
+            assertEquals("canManageIncidents", declared, "the inventory must declare the gate on POST /recon/promote");
+
+            Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+                case "Bearer manager" -> Optional.of(new Subject("mgr", Set.of("canManageIncidents")));
+                case "Bearer other" -> Optional.of(new Subject("oth", Set.of("canOperateRuns")));
+                default -> Optional.empty();
+            });
+            String body = "{\"reconciliation\":\"" + RECON + "\",\"key\":\"EU|voice\",\"type\":\"value_break\"}";
+            assertEquals(401, promoteAs(c.port, body, null).statusCode(), "no credential");
+            assertEquals(403, promoteAs(c.port, body, "Bearer other").statusCode(), "lacks canManageIncidents");
+            assertEquals(0, incidents(c).size(), "a refusal opens no Incident");
+            assertEquals(200, promoteAs(c.port, body, "Bearer manager").statusCode());
+            assertEquals(1, incidents(c).size());
+        }
+    }
+
+    private HttpResponse<String> promoteAs(int port, String body, String authorization) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/recon/promote"))
+                .header("Content-Type", "application/json");
+        if (authorization != null) b.header("Authorization", authorization);
+        return client.send(b.method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 }

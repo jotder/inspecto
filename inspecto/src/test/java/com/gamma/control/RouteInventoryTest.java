@@ -64,7 +64,7 @@ class RouteInventoryTest {
                     "every route falls in exactly one posture - a fourth state is the hole this control closed");
 
             // a known gated route and a known exemption both report correctly
-            assertEquals("canManageIncidents", posture(body, "POST", "/recon/promote").path("capability").asText());
+            assertEquals("canConfigureAccess", posture(body, "PUT", "/access/roles").path("capability").asText());
             assertEquals("read-shaped",
                     posture(body, "POST", "/queries/([^/]+)/run").path("exemptionCategory").asText());
         }
