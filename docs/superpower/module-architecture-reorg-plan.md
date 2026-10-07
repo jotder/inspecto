@@ -18,7 +18,7 @@
 > - **P2** — `MODULE-REORG-D-MR2`: directory regroup DONE 2026-10-07 (directories only; layout in §8 D-MR2); capabilities in `provides` remain.
 > - **P3** — `MODULE-REORG-P3-THIN-JARS`: thin per-module jars, Offering-driven launcher classpath, jdeps-derived jlink set, per-module SBOM; signing needs split packages 8 to 0 (incl. the deliberate telecom-asn1 exception). **8 -> 3 done 2026-10-07** (acquire `70e70379d`, service `dd5712511`, entitylist `d0e4db143`, event `4e0f7bc5b`, intelligence `67bc0c97f`); left: `com.gamma.control` (4 modules) + the two deliberate telecom-asn1 splits (`ingester`, `parse`).
 > - **P4** — P4-1..P4-3 already filed (`MODULE-REORG-P4-1`, `-P4-2`, `-P4-3`).
-> - **P5** — `MODULE-REORG-P5-TCKS`: processor-free route tests where impossible today (exchange needs its `register()` host installs moved to a boot hook; other la-api route classes; geo-link `InvestigationMeasureRoutes`); TCKs for Authenticator, TokenRelay, CollectorConnectorFactory, NotificationChannel, DescriptionProvider, MaintenanceTaskProvider, JobTypeProvider.
+> - **P5** — `MODULE-REORG-P5-TCKS` (P5a + P5b + P5c shipped 2026-10-07; remaining blockers per class in P5c): processor-free route tests (exchange's host installs now live in `HostBootHook`; 16 more la-api route classes and geo-link `InvestigationMeasureRoutes` driven by the RouteModule TCK); TCKs for Authenticator, TokenRelay, CollectorConnectorFactory, NotificationChannel, DescriptionProvider, MaintenanceTaskProvider, JobTypeProvider.
 > - **P6** — EDITIONS/FEATURE_INVENTORY generation needs a `posture{}` section and capabilities in `provides`; bundle generator driven by Offerings (rides on `MODULE-REORG-P3-THIN-JARS`).
 > - **P7** — `MODULE-REORG-P7-INCIDENTS` (Incidents / Case Management split, Action Requests, Workflow & SLA slice 2 sweep behind a governed-item contract, linked-subject contract; **open design question:** `alert` depends on the object substrate via `ObjectAccess` and Alerts persist ALERT objects, contradicting "Personal has Alerts but no operational objects" unless `ObjectAccess` has a null/in-memory implementation on Personal); `MODULE-REORG-P7-KERNEL` (Decision Kernel steps 1, 3-7: Expectation non_null/range/regex onto the tree, Tag and Case Rule filters, Notification Rules, Risk filters, Escalation match, Access Policies' Conditions text compiled into the tree, retire the duplicate evaluator, Consequence registry — **slice 1 DONE 2026-10-07**, see §8b); `MODULE-REORG-P7-CONTRACTS` (contract modules shed AccessPolicies/AuditTrail/EventLog/AuditChain/InMemoryEventStore/SecretScrubber/MetricRegistry/Roles family/CapabilityManifest, order per the 2026-10-06 survey; the access cluster and the event cluster are DONE 2026-10-07, see §6).
 > - **Guards / review** — `MODULE-REORG-GUARD-1` (DONE 2026-10-07 — `ImportLoaderInventoryTest` row + `ReactorModules` loops, `RouteInventoryTest` gate moved), `MODULE-REORG-REVIEW-1` (reviewer checklist).
@@ -397,7 +397,7 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
   `ops` 49, `reconciliation` 10, `scoring` 2. Quote every entry in the TOON inline array: a `[^/]+`, a space or a `(` needs it (round-trip pinned in `ModuleManifestsTest`).
 - **Parity guard per module** (replaces the four hand-kept `Absent*Routes.SURFACE` parity tests and adds three): `ModuleRoutesParity` (http-spi test kit)
   registers the module's own discovered `RouteModule`s on a `FakeApiContext` and asserts registered == `provides.routes` in BOTH directions. `exchange` is the
-  exception: its `register()` needs host services, so its test boots `ControlApi` and filters the non-stub `/exchange` routes (MODULE-REORG-P5-TCKS).
+  exception until P5c: its `register()` needed host services, so its test booted `ControlApi`; since P5c it uses the fake context like the others.
 - **`absentMessage`** (optional manifest key): the 503 text for an absent module. Kept the old per-module texts so clients and the `No*Ships*` tests (which
   assert the module name appears) are unaffected; `la-api` and `geo-link` both carry the geo-link text (a Personal client is told what to install); the metrics and events texts
   merged into one for `observability`. Default when absent: `<title> is not installed in this bundle - provided by the optional <id> module.`
@@ -503,7 +503,30 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
   - **Positive paths** of `Authenticator`/`TokenRelay` (a valid credential yields a Subject/Tokens), a delivered notification, an AI description from a live model: implementation-specific
     and kept in each module's own tests. `NotificationChannel` has two implementers only (the in-app store is not a channel).
   - `DescriptionProviderContract.concurrentUseAgreesWithSerialUse` assumes a deterministic provider; a live model is out of scope.
-- **Still open for P5:** the "drop the processor dependency from the 7 modules" step; Exchange's boot hook (see P5a).
+- **Still open for P5:** the "drop the processor dependency from the 7 modules" step; Exchange's boot hook (see P5a). **Both done in P5c below.**
+
+### P5c as built (2026-10-07 — Exchange boot hook, 17 more route classes on the TCK, 7 processor edges dropped/demoted)
+- **Exchange host-install design.** `ExchangeRoutes.register()` now only registers routes, so it runs on any `ApiContext`. The four installs it used to make
+  (`SharedRefResolver`, `ExchangeSignalForwarder` tap, `SignalOfferGrants`, `SharedItemConsumers`) moved to `ExchangeBootHook implements HostBootHook`
+  (`META-INF/services/com.gamma.control.HostBootHook`, discovered fail-soft with `OptionalSpi.all`, called once by the `ControlApi` constructor right after
+  the discovered route modules register, before the absent-module stubs). **Deviation from the design note:** the interface lives in the processor beside
+  `HostContext` (`com.gamma.control.HostBootHook`, `afterRoutes(SpaceManager)`), not in `inspecto-http-spi`: its one argument is a host type the SPI cannot name,
+  and the narrowest honest context is the Space registry (every install needed only that). It is the 37th SPI extension point (`spi-extension-points` 36 to 37, four doc lines).
+  The hook is not gated by per-Space `featureIds` (the old installs were not either).
+- **Proofs.** `ExchangeBootHookTest` (real `ControlApi` boot, seams reset to `NONE` and the forwarder tap removed first): all four are installed at boot.
+  A host WITHOUT the module is pinned by the existing `NoExchangeShipsInThePersonalBuildTest` (every seam `NONE`, zero taps). `ExchangeRoutesContractTest` (5, nothing exempt:
+  every Exchange write is gated) and `ExchangeRoutesManifestParityTest` (now `ModuleRoutesParity.assertParity`, no boot). `ControlApiExchange*` (real behaviour) unchanged and green.
+- **Route classes converted (`*RoutesContractTest` over `RouteModuleContract`, 5 tests each):** la-api `Pattern`, `ValueMeasure`, `Investigation`, `Dossier`, `DossierBundle`,
+  `InvestigationReference`, `WorkingSet`, `InvestigationTemplate`, `InvestigationCoverage`, `InvestigationComparison`, `InvestigationCase`, `EntityIdentity`, `GraphRun`, `Index`,
+  `InvestigationMember`, `Draft` (with `Geo`/`Inv` from P5a that is all 18 la-api RouteModules), and geo-link `InvestigationMeasureRoutes`. Exemptions (6 classes) copy
+  the `CapabilityManifest.EXEMPTIONS` reasons. All 17 needed only the `ApiContext` at `register()` (request-time host needs are fine). **No class remains blocked.**
+  geo-link's parity test already existed (`GeoLinkAbsentSurfaceParityTest`).
+- **Edges (`inspecto-processor`).** Dropped outright (no processor class imported in main OR test), real deps declared in its place with the same `provided` scope:
+  `inspecto-connectors`, `inspecto-connectors-kafka` (acquire, engine), `inspecto-agent-hosted`, `inspecto-notify-channels` (engine). Demoted to `test` scope (main imports none, tests boot it):
+  `inspecto-backup` (+ acquire, engine), `inspecto-demo-auth` (+ auth-spi, access, util, provided), `inspecto-policy` (+ http-spi, access, etl, event, util). `inspecto-geo-country` and
+  `inspecto-oidc` were already test scope. The "7" was really 9 main-clean modules; none of the five that stay have the guard's `ALLOWED` rows (no new allowed edge needed).
+  Every other module still imports processor classes (`HostContext`, `ControlApi`, `PendingChanges`, `ServerFaults`, `Cursor`, ...) and keeps the edge.
+- **Gate:** full reactor 9023 tests, 50/50 modules, one transient Windows `AccessDeniedException` in `ControlApiRestoreJobGateTest` (green 3/3 alone).
 
 ### P4a as built (2026-10-06 — removal semantics: characterised first, then only what was broken and small)
 Scenario: config naming a capability no installed module provides (stand-ins `zz.absent-module-node`, `zz.absent-module-job`, `zz-absent-action`). Tests: `ModuleRemovalPipelineTest`, `ModuleRemovalJobTest`, `ModuleRemovalRulesTest`, `ModuleRemovalBundleTest` (inspecto) and `ModuleRemovalBackupTest` (inspecto-backup).
