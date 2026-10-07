@@ -22,6 +22,7 @@
 > - **P6** — EDITIONS/FEATURE_INVENTORY generation needs a `posture{}` section and capabilities in `provides`; bundle generator driven by Offerings (rides on `MODULE-REORG-P3-THIN-JARS`).
 > - **P7** — `MODULE-REORG-P7-INCIDENTS` (Incidents / Case Management split, Action Requests, Workflow & SLA slice 2 sweep behind a governed-item contract, linked-subject contract; **open design question:** `alert` depends on the object substrate via `ObjectAccess` and Alerts persist ALERT objects, contradicting "Personal has Alerts but no operational objects" unless `ObjectAccess` has a null/in-memory implementation on Personal); `MODULE-REORG-P7-KERNEL` (Decision Kernel steps 1, 3-7: Expectation non_null/range/regex onto the tree, Tag and Case Rule filters, Notification Rules, Risk filters, Escalation match, Access Policies' Conditions text compiled into the tree, retire the duplicate evaluator, Consequence registry — **slice 1 DONE 2026-10-07**, see §8b); `MODULE-REORG-P7-CONTRACTS` (contract modules shed AccessPolicies/AuditTrail/EventLog/AuditChain/InMemoryEventStore/SecretScrubber/MetricRegistry/Roles family/CapabilityManifest, order per the 2026-10-06 survey; the access cluster and the event cluster are DONE 2026-10-07, see §6).
 > - **Guards / review** — `MODULE-REORG-GUARD-1` (DONE 2026-10-07 — `ImportLoaderInventoryTest` row + `ReactorModules` loops, `RouteInventoryTest` gate moved), `MODULE-REORG-REVIEW-1` (reviewer checklist).
+> - **Decision Kernel** — `MODULE-REORG-P7-KERNEL`: steps 1, 3, 4, 5 (additive `when`, `b9c3271fc`) and 6 (`952538fe9`) shipped; step 7 declined; left: the Risk and Escalation Rule editors' `when` UI, duplicate-evaluator retirement (see section 8b, "step 5 / step 6 as built").
 > Inputs: *Enterprise-Grade Modular Architecture Guidelines* (PDF, 4 pages) and the "System Architecture
 > Topology" mock-up (four layers + a per-module inspector). Operator brief: long-term benefit across
 > development, test, packaging, offering, editioning and deployment of itemized distribution; **no version
@@ -1228,7 +1229,7 @@ a case variant, a longer type, `_` vs `.`, `%`, a quote / semicolon / comment ty
 Residual: `=` ignore-case folds with `toLowerCase(Locale.ROOT)` where the old matcher used `equalsIgnoreCase` (differs only for
 exotic Unicode case pairs).
 
-### Decision Kernel step 5 — Risk factor `filters` (FINDINGS, NOT BUILT: needs a larger contract)
+### Decision Kernel step 5 — Risk factor `filters` (FINDINGS; superseded by "step 5 / step 6 as built" below)
 
 Stopped here on purpose. Risk `filters` are not an in-memory single-row matcher: `RiskScoreModel.Factor.filters` is a list of
 `{field, op, value}` handed to the **shared BI query contract** `MeasureCompiler` (`Spec.filters`, `filterTerm`), which builds a
@@ -1245,6 +1246,54 @@ sets `filters`; tests (`RiskCorpus`, `RiskScoreModelTest`, `ControlApiRiskScore*
 and the UI QuerySpec — not as a Risk-only edit. Step 6 (Escalation match) was not started; note
 `EscalationRule` itself holds no matcher (`on: breach | age`, `afterMinutes`, `target`) — the match lives in the `ObjectService`
 sweep, and `inspecto-workflow` would need the tree on its classpath.
+
+### Decision Kernel step 5 / step 6 as built (2026-10-07) — `MODULE-REORG-P7-KERNEL`
+
+**Step 5 — Risk filters, ADDITIVE (operator-approved 2026-10-07; `b9c3271fc`).** The flat BI `filters` were NOT converted:
+`ConditionSql` types a literal from its operand text and wraps columns in `CAST`/`TRY_CAST`, which defeats Parquet pushdown and
+changes semantics. Instead `MeasureCompiler.Spec` gained an optional `when` (a `ConditionTree` group, secondary 7-arg constructor so
+every existing caller is source-compatible); `parse` reads `when` and runs `requireGroupRoot` + `validate`; `compile` appends
+`AND ConditionSql.predicate(when)` after the untouched flat terms (an empty/absent tree changes no SQL). `BiRoutes`'
+bound-query rewrap carries `when` through. `RiskScoreModel.Factor` gained `when` (key added to `FACTOR_KEYS`), threaded through
+`specBody`; `forEntity` still appends the flat `{key,=,entity}` filter and keeps `when`; `referencedColumns` walks the tree
+(`field` and `valueField`, groups `items`/`conditions`, any depth) for the Schema check. Nothing in the SPA changed.
+- **Parity corpus** (`RiskScoreWhenParityTest`, 10 tests, seeded Parquet through the real executor in UTC; `MeasureCompilerWhenTest`,
+  6): identical entity ids, counts AND Risk scores for flat vs `when` on `=` / `!=` with NULL and `''` cells, DATE and TIMESTAMPTZ
+  `>=`, and hostile values (`'`, `\`, `;--`, `_`, an injection string).
+- **Deliberate differences, PINNED (do not "fix" either side):** (1) typing by OPERAND TEXT - a `when` operand `007` looks numeric so
+  it compares `TRY_CAST(col AS DOUBLE)` and matches `7`, `07`, `007`; flat `007` is an exact string; (2) `''` is null only in `when`
+  (`isNull` sees `''`, flat `IS NULL` does not); (3) flat `like` passes `%`/`_` as wildcards, `when contains` escapes them; (4) flat
+  `in` takes a list so a value may hold a comma, `when in` splits one string on commas.
+- **Hostile input:** a hostile column name in `when` is quoted by `SqlIdent.q` (binder error, no injection; the flat path refuses it at
+  parse); values are escaped by `ConditionSql`; a bare-leaf, non-object or lookahead-regex `when` is refused at save. No string-building
+  was widened (DECISION-RULE-SQL-GUARD-1 stays open).
+- **SqlGuard finding:** the Risk SQL path is NOT `SqlGuard`-checked. `RiskScoreEvaluator` compiles with `MeasureCompiler` and calls
+  `QueryExecutor.run(Request, SqlSandboxPolicy)`; the sandbox policy is the boundary and the compiler emits only quoted identifiers and
+  escaped literals. (`BiRoutes` guards its route-built text; Risk does not.) Unchanged by this step; flagged for the guard row.
+- **Follow-up (UI, not done):** mount the `query-condition-group` editor in `risk-score-factors.component` so a factor's `when` is
+  authorable; until then a factor edited in the SPA is rebuilt from modeled state and would DROP an authored `when` (the
+  rebuild-from-modeled-state trap, section 9) - author `when` in TOON/API only, or land the UI first.
+
+**Step 6 — Escalation match (`952538fe9`).** `EscalationRule` (inspecto-workflow, which must not depend on the engine) gained an
+OPAQUE `Map<String,Object> when` and a pure-map `matchTree()` that folds the `priority` sugar into an AND leaf
+(`priority = P`, `ignoreCase`) beside `when`; `null` when the rule narrows nothing. Validation with `ConditionTree.requireGroupRoot`
+sits where the engine is reachable: `GovernanceRegistry` (load: an invalid rule is not served / last valid stays) and
+`ComponentRoutes` (write: 422). `ObjectService.escalate` replaces the hand-written priority check with
+`ConditionTree.matched(matchTree, [escalationContext(cur, now)])`; the trigger marker, the `rule@marker` fire-once ledger and
+`sweepIncidentSla` stay bespoke. Context fields: `type`, `status` (workflow state upper-cased, NOT folded like TagRule's), `priority`
+(trimmed), `severity`, `category`, `assignee`, `ageMinutes`, `minutesToDue`, `resolutionBreached`, `responseBreached`, `escalated`
+(0/1). `minutesToDue` is `Integer.MAX_VALUE` with no deadline: the Condition Language reads a blank cell as 0 (JS `Number('')`), so
+an empty value would have matched `minutesToDue <= 10` as due NOW (found by the test, pinned). Parity: priority-only rules keep their
+exact semantics (case variants, padded value, null priority never matches, equality not prefix) - `GovernanceSweepTest` (17) +
+`ObjectServiceTest` (35). UI follow-up: `governance-model.ts` rebuilds a rule from modeled fields and would drop `when` on a SPA save.
+
+**Known flake - `SafetyPolicyFilesTest.aRunPinsItsPolicyAtPlanTimeAndTheNextRunSeesTheTightenedFile:191` (fixed `5556bf0b3`).** Not
+reproducible in three quiet runs (15/15 each). Root cause is a real test-timing assumption: `SafetyPolicyFiles.load` caches a parsed
+file by `(mtime millis, size)`, and the test rewrites `max_threads: 4` to `max_threads: 1` - the SAME byte length - so a rewrite landing
+in the same mtime tick read as "unchanged" and returned the stale 4 ("expected 1 but was 4"). Not caused by a concurrent `ng test`; any
+load makes the tick collision likelier. Fix, assertion untouched: the test's `write` helper stamps every rewrite strictly later than the
+file it replaces. The production cache key is unchanged (a same-size same-millisecond hand edit is a theoretical stale read there too;
+not worth a content hash).
 
 ### Target picture
 ![Inspecto target module architecture](assets/module-target-architecture.svg)
