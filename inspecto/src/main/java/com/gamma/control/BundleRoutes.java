@@ -899,7 +899,10 @@ final class BundleRoutes implements RouteModule {
             long createdAt = content.get("createdAt") instanceof Number n ? n.longValue()
                     : System.currentTimeMillis();
             if (id == null || id.isBlank()) throw new IllegalArgumentException("saved-view id is required");
-            return store.save(new SavedView(id, filters, createdAt)).toMap();
+            // MODULE-REORG-P4-2: x- annotations ride through an import; any other unmodelled key fails the item naming it
+            String refusal = AuthorKeys.refusal("a saved view", content, SavedView.MODELLED);
+            if (refusal != null) throw new IllegalArgumentException(refusal);
+            return store.save(new SavedView(id, filters, createdAt, SavedView.extraOf(content))).toMap();
         }
         public Map<String, Object> normalized(String id, Map<String, Object> content) {
             long createdAt = content.get("createdAt") instanceof Number n ? n.longValue() : 0L;
@@ -909,7 +912,7 @@ final class BundleRoutes implements RouteModule {
                             e -> String.valueOf(e.getKey()), e -> String.valueOf(e.getValue()),
                             (a, b) -> b, LinkedHashMap::new))
                     : Map.of();
-            return new SavedView(id, filters, createdAt).toMap();   // createdAt-less imports hash as 0 ⇒ drift, honestly
+            return new SavedView(id, filters, createdAt, SavedView.extraOf(content)).toMap();   // createdAt-less imports hash as 0 ⇒ drift, honestly
         }
     }
 

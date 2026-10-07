@@ -89,7 +89,7 @@ public final class SavedViewStore {
                 Map<String, String> filters = m.get("filters") instanceof Map<?, ?> raw
                         ? toStringMap(raw) : Map.of();
                 long createdAt = m.get("createdAt") instanceof Number n ? n.longValue() : 0L;
-                views.put(name, new SavedView(name, filters, createdAt));
+                views.put(name, new SavedView(name, filters, createdAt, SavedView.extraOf(m)));
             }
         } catch (Exception e) {
             log.warn("Could not load saved views from {}: {}", file, e.getMessage());

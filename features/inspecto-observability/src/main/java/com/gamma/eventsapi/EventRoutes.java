@@ -1,5 +1,6 @@
 package com.gamma.eventsapi;
 
+import com.gamma.control.AuthorKeys;
 import com.gamma.control.HostContext;
 import com.gamma.control.ApiContext;
 import com.gamma.control.AuditReadMasking;
@@ -185,15 +186,22 @@ public final class EventRoutes implements RouteModule {
         return v;
     }
 
+    private static final java.util.Set<String> SAVED_VIEW_KEYS =
+            java.util.Set.of("name", "level", "type", "pipeline", "correlationId", "q", "from", "to");
+
     /** {@code POST /events/views} — upsert a saved view from {@code {name, level?, type?, pipeline?, correlationId?, q?, from?, to?}}. */
     private Object saveView(ApiContext api, Map<String, Object> reqBody) {
         String viewName = ApiContext.str(reqBody, "name");
+        // MODULE-REORG-P4-2: the body is flat (name + the search keys); an x- annotation is kept, any other key is refused
+        // (a nested `filters` object or a client `createdAt` used to be dropped behind a 200).
+        AuthorKeys.requireModelled("a saved view", reqBody, SAVED_VIEW_KEYS);
         if (viewName == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'name'");
         Map<String, String> filters = new LinkedHashMap<>();
         for (String k : List.of("level", "type", "pipeline", "correlationId", "q", "from", "to")) {
             String v = ApiContext.str(reqBody, k);
             if (v != null) filters.put(k, v);
         }
-        return HostContext.of(api).service().savedViews().save(new SavedView(viewName, filters, System.currentTimeMillis())).toMap();
+        return HostContext.of(api).service().savedViews()
+                .save(new SavedView(viewName, filters, System.currentTimeMillis(), AuthorKeys.carry(reqBody, new LinkedHashMap<>()))).toMap();
     }
 }
