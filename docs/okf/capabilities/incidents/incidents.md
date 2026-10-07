@@ -176,7 +176,7 @@ neither key, and the rule takes the scalar path below. How it runs:
   rows come back. Wired in `CollectorService` beside the scalar probe (same per-Space roots).
 - **Edge-triggered per key, not cooldown-throttled** — a key that starts breaching raises ONE Alert and (at
   critical/error) ONE Incident; while it stays breached nothing is raised; `AlertService.openKeys` is the edge
-  detector, seeded on a rule's first sweep from its still-active ALERT objects so a restart neither re-raises
+  detector, seeded on a rule's first sweep from its still-active Alert records (the Alert store since 2026-10-07 — no longer ALERT objects; db-layer.md §3.14) so a restart neither re-raises
   nor forgets. Dedupe attribute `alertKey = <rule>|<col=value,…>` — the INJECTIVE `AlertService.keyId`: in a
   value `\ , = |` are backslash-escaped and SQL NULL is `\0`, so two keys that read alike (`a="x, b=y", b="z"`
   vs `a="x", b="y, b=z"`) or NULL vs the string `null` never share an Incident; the readable `keyLabel`

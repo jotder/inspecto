@@ -14,7 +14,7 @@
 > | P7 selective moves | partial: observability `0489ac3a0`, security split `33c3e5e4d`, EgressPolicy `4eb64c000`, Kafka `e2783a9bf`, ASN pack `0c0e483d5`, Workflow models `4e863cb6d`, access module `9dc9df34c`, Reconciliation `c5cb8ea4f`, Scoring `064d3114d` + `e51a73bec` + `900e2bc0a`, condition language `e5f22ebe9` + `d3215dcfa`; modules screen `70c2ee075`; CI wiring `c404ee383`; path-agnostic guards `27b210988` | as listed |
 >
 > **Remaining work (each is a BACKLOG row, §4 *Module architecture*):**
-> - **P1** — `MODULE-REORG-P1-FAMILY`: `OperationalDb.Family` as a contribution point; entangled with `ServiceStores`/Incidents, so it goes with the Incidents extraction. Also open, no row yet: contributed OpenAPI fragments per module; RBAC capabilities contribution (P1-D3, also P2 `provides`).
+> - **P1** — `MODULE-REORG-P1-FAMILY`: `OperationalDb.Family` as a contribution point; entangled with `ServiceStores`/Incidents, so it goes with the Incidents extraction. (The roster grew to **16** on 2026-10-07 with `ALERTS`, P7 slice 2 — one more hand-edited count.) Also open, no row yet: contributed OpenAPI fragments per module; RBAC capabilities contribution (P1-D3, also P2 `provides`).
 > - **P2** — `MODULE-REORG-D-MR2`: directory regroup DONE 2026-10-07 (directories only; layout in §8 D-MR2); capabilities in `provides` remain.
 > - **P3** — `MODULE-REORG-P3-THIN-JARS`: thin per-module jars, Offering-driven launcher classpath, jdeps-derived jlink set, per-module SBOM; signing needs split packages 8 to 0 (incl. the deliberate telecom-asn1 exception). **8 -> 3 done 2026-10-07** (acquire `70e70379d`, service `dd5712511`, entitylist `d0e4db143`, event `4e0f7bc5b`, intelligence `67bc0c97f`); left: `com.gamma.control` (4 modules) + the two deliberate telecom-asn1 splits (`ingester`, `parse`).
 > - **P4** — P4-1..P4-3 already filed (`MODULE-REORG-P4-1`, `-P4-2`, `-P4-3`).
@@ -565,7 +565,65 @@ the physical backend) and not "ledger" (Signal / batch ledgers); `Records` colli
   objects into Personal, contradicting `NoOperationalObjectsShipInThePersonalBuildTest`; **(c)** accept events-only
   (status quo; Personal never remembers). **Recommendation (a), in two steps:** step 1 = this port (done); step 2 = an
   `AlertRecords` implementation over an alert-owned store, behind the same port, with the ALERT export/import path.
-  Not decided; nothing here forecloses (b)/(c).
+  **DECIDED 2026-10-07 (operator): option (a)** — built as slice 2 below.
+
+### P7 Incidents slice 2 as built (2026-10-07 — Alerts leave the object substrate; Personal keeps Alert history)
+
+**Operator decision (2026-10-07):** Personal MUST keep Alert history and restart-safe de-duplication — option (a). The
+Alert records now live in an Alert-owned **store**, behind the unchanged-in-spirit `AlertRecords` port, on EVERY edition.
+
+- **Name:** the persistence interface is **`AlertStore`** (`com.gamma.alert`, GLOSSARY: *store* = the physical backend; a
+  role-word compound is ordinary engineering, §0). Not "ledger" (Signal / batch ledgers). Implementations
+  **`DbAlertStore`** (plain JDBC, portable `VARCHAR`/`BIGINT` DDL, one table `inspecto_alerts`, `db-layer.md` §3.14) and
+  **`InMemoryAlertStore`**. `AlertRecords.of(AlertStore, Optional<ObjectAccess>)` returns the single implementation
+  **`StoredAlertRecords`**; `ObjectBackedAlertRecords` and `NoAlertRecords` are **deleted** (the `NO_INCIDENTS`
+  "opens nothing" constant moved onto the port). The store owns the Alert half; ops, when present, supplies only the Incident
+  half (`activeIncidentIndex`, `reopenIncident`, the link).
+- **Family `ALERTS`** — the 16th `OperationalDb.Family` (`alerts.backend`, default **`db`**, `Mode.DB_FLAG`,
+  `alerts.db.url/.user/.password`, `SpaceRoot.alertsDbUrl()` -> `<space>/duckdb/inspecto-alerts.db`; PostgreSQL through the shared
+  `-Dinspecto.db=postgres`, schema-per-Space like its siblings). **P1-FAMILY registry grew by one hand-edit**: the two count
+  tripwires (`OperationalDbTest`, `ControlApiSystemRoutesTest`) 15 -> 16 and the seven prose mentions
+  (`check-family-count.mjs`) — the cost row `MODULE-REORG-P1-FAMILY` exists to remove. Surefire pins
+  `-Dalerts.backend=memory` in the root pom (no test creates a DuckDB file).
+- **The CWD trap, answered.** `LegacySpaceRoot.alertsDbUrl()` resolves under `-Dassist.write.root/duckdb/` when one is set (the
+  operator named that directory); with none it has no directory of its own, so `ServiceStores.openAlertStore` keeps the Alerts
+  **in memory, loudly (`StoreHealth` DEGRADED)** rather than create `inspecto-alerts.db` in the working directory.
+  Production Personal runs under a Space (`DirSpaceRoot`), so it is durable. Pinned by `AlertStoreWiringTest`. An explicit
+  `-Dalerts.backend=db` whose URL cannot open fails boot; the default degrades to memory (alerting never stops a boot).
+- **`ESCALATED_FROM` is now a cross-store reference.** `ObjectAccess.linkSubject(fromId, subjectKind, subjectId, relationship, actor)`
+  (default no-op) / `ObjectService.linkSubject` add an edge whose far end is NOT an object (`toType` `ALERT`, no existence
+  check on it); the Alert row keeps `incident_id`. `ObjectService.link` now shares one `addLink` with it, behaviour unchanged.
+  The incident detail's link payload is **unchanged** (`{from, fromType, to, toType: "ALERT", relationship}`); `GET
+  /objects/{id}/graph` lists the edge but has no node for the Alert (it never had one for a deleted object). The UI resolves no
+  link target by id, so nothing in the SPA moved (no SPA change, no SPA test run). The OBJECT_LINKED event still emits.
+- **Behaviour changes, loud:** (1) **Personal keeps Alert history across restarts** — `GET /alerts` is still the in-memory ring
+  (`AlertService.recent`, shape byte-compatible: `ApiContractTest` / openapi byte-equal), but the ring is **re-seeded at
+  construction from `AlertRecords.recentFired`** (the fired `Alert.toMap()` is stored). (2) **A restart no longer re-fires an
+  open Alert** for ledger / freshness / measure / investigation rules: `fire()` finds no cooldown memory but an open record, so it
+  starts the cooldown clock and fires nothing (a persisting breach re-announces on the normal cadence; a heal resolves the record,
+  so a relapse still fires at once). (3) The **freshness all-clear now resolves the Alert** (it could not — `ObjectAccess` had no
+  transition) and also fires from the open record after a restart. (4) **No `OBJECT_OPENED`/object events for rule-fired
+  Alerts** and no ALERT row in `GET /objects` / the Objects UI for them (gap / imbalance ALERTs from the Event bridge remain).
+- **One-shot migration (`AlertMigration`, wired in `CollectorService` before `AlertService` reads the store):** when the Alert
+  store is EMPTY and ops is present, every still-active (OPEN / ACKNOWLEDGED) ALERT object is copied into the store **under its own
+  id** (so an existing Incident `ESCALATED_FROM` edge keeps pointing at it), keeping state, scope, severity, title/message,
+  attributes and `createdAt`; the gap / imbalance ALERTs (`rule` = `sequence_gap` / `conservation_imbalance`) are skipped, resolved
+  ALERTs are history and stay. Idempotent (non-empty store = skip), never deletes (the object rows stay), logs the count. Needs a
+  new read: `ObjectAccess.activeDetail(kind)` (default empty). Evidence: `AlertMigrationOpsTest` (real seeded `ObjectService`).
+- **What still references `ObjectType.ALERT` (deliberate, nothing broken):** `Workflow.defaultFor(ALERT)` (the Alert store reuses
+  that workflow for its transitions); `EventObjectBridge` (gap / imbalance events open ALERT objects — **kept**: it is not an Alert
+  Rule firing, it does not duplicate the store, and moving it needs the ops module to depend on `AlertRecords`, a bigger contract);
+  `ObjectType.ALERT` in `ObjectRoutes` validation, `FindingsSpec` default, the SPA `governance-model` (governed types) and
+  `InspectoIntelligenceAgent.scanRemediableState` (`findByStatus(ALERT, OPEN)`) — **left**: the agent's `alert_triage` ack goes over
+  `POST /objects/{id}/ack`, so it now sees only the bridge's ALERT objects, **not rule-fired Alerts** (a narrowed read; a real
+  fix is an Alert ack/resolve route + store read — see the open items). The enum value stays: persisted ALERT rows and the SPA
+  need it.
+- **Still open (filed in BACKLOG `MODULE-REORG-P7-INCIDENTS`):** no operator **ack / resolve route** for a stored Alert (it used
+  to be `POST /objects/{id}/ack|resolve`; ledger-metric Alerts have no heal edge, so their record stays open until a rule change or
+  a route exists — the in-process cooldown still re-announces them); no retention for resolved rows; the intelligence agent's
+  `alert_triage` over stored Alerts; moving the Event bridge's ALERTs into the store; the Workflow/SLA governance of the ALERT
+  type (`governance-model`) is now moot for rule-fired Alerts. **Not verified:** live PostgreSQL (`PostgresSchemaPerSpaceTest`
+  skips without a database; the DDL is plain `VARCHAR`/`BIGINT`).
 
 ### P7 contracts: access module as built (2026-10-07, `9dc9df34c` — the auth contract sheds policy and state)
 
