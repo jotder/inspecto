@@ -273,6 +273,78 @@ class GovernanceSweepTest {
                     bad.toString());
     }
 
+    // ── Escalation Rule match = priority sugar AND an authored `when` (Decision Kernel step 6) ──────
+
+    private static Map<String, Object> cond(String field, String operator, String value) {
+        return Map.of("kind", "condition", "field", field, "operator", operator, "value", value);
+    }
+
+    @SafeVarargs
+    private static Map<String, Object> allOf(Map<String, Object>... items) {
+        return Map.of("kind", "group", "op", "AND", "items", List.of(items));
+    }
+
+    @Test
+    void aPriorityOnlyRuleKeepsItsExactMatchSemanticsOverTheTree() throws Exception {
+        // authored in lower case: fromComponent upper-cases it; a stored priority is compared trimmed and case-insensitively
+        components.write("escalation-rule", "crit", Map.of("objectType", "INCIDENT", "on", "breach",
+                "priority", "critical", "reassign", "boss"));
+        long now = System.currentTimeMillis();
+        Map<String, String> due = Map.of(ObjectService.ATTR_DUE_AT, Long.toString(now - 1));
+        stored("a", "IDENTIFIED", "CRITICAL", now - 10_000, due);
+        stored("b", "IDENTIFIED", " critical ", now - 10_000, due);
+        stored("c", "IDENTIFIED", "Critical", now - 10_000, due);
+        stored("d", "IDENTIFIED", null, now - 10_000, due);                 // a null priority never matches a priority rule
+        stored("e", "IDENTIFIED", "MAJOR", now - 10_000, due);
+        stored("f", "IDENTIFIED", "CRITICALS", now - 10_000, due);          // equality, not a prefix
+        svc.sweepIncidentSla(now);
+        for (String id : List.of("a", "b", "c")) assertEquals("boss", store.get(id).orElseThrow().assignee(), id);
+        for (String id : List.of("d", "e", "f")) assertEquals("alice", store.get(id).orElseThrow().assignee(), id);
+    }
+
+    @Test
+    void aWhenTreeNarrowsTheRuleOverTheObjectContextAndIsAndedWithPriority() throws Exception {
+        components.write("escalation-rule", "old-diag", Map.of("objectType", "INCIDENT", "on", "breach", "reassign", "boss",
+                "priority", "MAJOR",
+                "when", allOf(cond("status", "=", "DIAGNOSING"), cond("ageMinutes", ">=", "30"), cond("resolutionBreached", "=", "1"))));
+        long now = System.currentTimeMillis();
+        Map<String, String> due = Map.of(ObjectService.ATTR_DUE_AT, Long.toString(now - 1));
+        stored("hit", "DIAGNOSING", "MAJOR", now - 3_600_000, due);
+        stored("young", "DIAGNOSING", "MAJOR", now - 60_000, due);           // age < 30m
+        stored("wrongState", "IDENTIFIED", "MAJOR", now - 3_600_000, due);
+        stored("wrongPriority", "DIAGNOSING", "MINOR", now - 3_600_000, due);
+        svc.sweepIncidentSla(now);
+        assertEquals("boss", store.get("hit").orElseThrow().assignee());
+        for (String id : List.of("young", "wrongState", "wrongPriority"))
+            assertEquals("alice", store.get(id).orElseThrow().assignee(), id);
+        svc.sweepIncidentSla(now + 1);
+        assertEquals(1, eventsFor(EventType.OBJECT_ESCALATED, "hit").size(), "the fire-once ledger is still the sweep's own");
+    }
+
+    @Test
+    void aWhenOnMinutesToDueAndEscalatedSeesTheDeadlineAndTheLedger() throws Exception {
+        components.write("escalation-rule", "pre-breach", Map.of("objectType", "INCIDENT", "on", "age", "afterMinutes", 1,
+                "notify", true, "when", allOf(cond("minutesToDue", "<=", "10"), cond("escalated", "=", "0"))));
+        long now = System.currentTimeMillis();
+        stored("soon", "IDENTIFIED", "MINOR", now - 3_600_000, Map.of(ObjectService.ATTR_DUE_AT, Long.toString(now + 5 * 60_000)));
+        stored("later", "IDENTIFIED", "MINOR", now - 3_600_000, Map.of(ObjectService.ATTR_DUE_AT, Long.toString(now + 60 * 60_000)));
+        stored("nodue", "IDENTIFIED", "MINOR", now - 3_600_000, Map.of());      // no deadline: minutesToDue is a huge sentinel (a blank cell would read as 0 = due now)
+        svc.sweepIncidentSla(now);
+        assertEquals(1, eventsFor(EventType.OBJECT_ESCALATED, "soon").size());
+        assertEquals(0, eventsFor(EventType.OBJECT_ESCALATED, "later").size());
+        assertEquals(0, eventsFor(EventType.OBJECT_ESCALATED, "nodue").size());
+    }
+
+    @Test
+    void aMalformedWhenIsRefusedOnParseAndNotServedOnLoad() throws Exception {
+        assertThrows(IllegalArgumentException.class, () -> com.gamma.workflow.EscalationRule.fromComponent("x",
+                new HashMap<>(Map.of("objectType", "INCIDENT", "on", "breach", "notify", true, "when", "age > 5"))));
+        // a bare leaf root would match every object (fail-open): the loader refuses it, so the rule is not served
+        components.write("escalation-rule", "bare", Map.of("objectType", "INCIDENT", "on", "breach", "notify", true,
+                "when", cond("status", "=", "X")));
+        assertTrue(new GovernanceRegistry(registry).snapshot().escalationRules().isEmpty());
+    }
+
     // ── Cases are swept like Incidents (operator 2026-10-03) ───────────────────────────────────────
 
     private OperationalObject storedCase(String id, String status, String priority, long createdAt) {

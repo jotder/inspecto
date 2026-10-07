@@ -176,6 +176,11 @@ class ControlApiGovernanceComponentsTest {
                     SLA.replace("Europe/London", "+01:00"), "admin").statusCode(), "an offset is not an IANA zone");
             assertEquals(422, send(c, "POST", "/components/escalation-rule",
                     "{\"id\":\"noop\",\"objectType\":\"INCIDENT\",\"on\":\"breach\"}", "admin").statusCode());
+            // a bare-leaf `when` root would match every object (fail-open): the Condition Language check refuses it
+            assertEquals(422, send(c, "POST", "/components/escalation-rule",
+                    "{\"id\":\"bare\",\"objectType\":\"INCIDENT\",\"on\":\"breach\",\"notify\":true,"
+                            + "\"when\":{\"kind\":\"condition\",\"field\":\"status\",\"operator\":\"=\",\"value\":\"X\"}}",
+                    "admin").statusCode());
             ComponentStore store = new ComponentStore(c.root.resolve("registry"));
             assertTrue(store.list("workflow").isEmpty() && store.list("sla-policy").isEmpty()
                     && store.list("escalation-rule").isEmpty(), "a refusal writes nothing");

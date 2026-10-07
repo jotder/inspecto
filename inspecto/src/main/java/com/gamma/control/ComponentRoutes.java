@@ -870,6 +870,7 @@ final class ComponentRoutes implements RouteModule {
         if (SLA_POLICY.equals(type)) com.gamma.workflow.SlaPolicy.fromComponent(id, content);
         if (ESCALATION_RULE.equals(type)) {
             com.gamma.workflow.EscalationRule rule = com.gamma.workflow.EscalationRule.fromComponent(id, content);
+            com.gamma.query.ConditionTree.requireGroupRoot(rule.when());      // the shape of `when`; the workflow module cannot see the engine
             // The IAM owns identities: a registered PrincipalDirectory vetoes an unknown (or unverifiable) assignee;
             // an offline edition has none, so the id-shape check above is all it gets.
             PrincipalDirectories.requireKnown(rule.reassign(), "escalation-rule.reassign");

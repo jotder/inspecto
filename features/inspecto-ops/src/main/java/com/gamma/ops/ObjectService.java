@@ -1214,11 +1214,36 @@ public final class ObjectService {
      * {@link EventType#OBJECT_ESCALATED} event (WARN when the rule notifies, which the built-in notification rule
      * picks up; INFO otherwise). Bounded by {@link #MAX_ESCALATIONS_PER_SWEEP}.
      */
+    /**
+     * The row an Escalation Rule's {@code when} is evaluated over: {@code type}, {@code status} (the workflow state,
+     * upper-cased, NOT folded), {@code priority} (trimmed), {@code severity}, {@code category} (the attribute),
+     * {@code assignee}, {@code ageMinutes}, {@code minutesToDue} (negative once overdue; {@code Integer.MAX_VALUE} with no deadline, because the
+     * Condition Language reads a blank cell as 0 and an empty value would look due NOW),
+     * {@code resolutionBreached}/{@code responseBreached}/{@code escalated} as 0/1. Absent text is empty.
+     */
+    static Map<String, Object> escalationContext(OperationalObject o, long now) {
+        Map<String, Object> row = new java.util.LinkedHashMap<>();
+        row.put("type", o.objectType().name());
+        row.put("status", o.status() == null ? "" : o.status().trim().toUpperCase(java.util.Locale.ROOT));
+        row.put("priority", o.priority() == null ? "" : o.priority().trim());
+        row.put("severity", o.severity() == null ? "" : o.severity());
+        row.put("category", o.attributes().getOrDefault("category", ""));
+        row.put("assignee", o.assignee() == null ? "" : o.assignee());
+        row.put("ageMinutes", Math.floorDiv(now - o.createdAt(), 60_000L));
+        long due = parseEpoch(o.attributes().get(ATTR_DUE_AT));
+        row.put("minutesToDue", due > 0 ? Math.floorDiv(due - now, 60_000L) : (long) Integer.MAX_VALUE);
+        row.put("resolutionBreached", o.attributes().containsKey(ATTR_SLA_BREACHED_AT) ? 1 : 0);
+        row.put("responseBreached", o.attributes().containsKey(ATTR_SLA_RESPONSE_BREACHED_AT) ? 1 : 0);
+        row.put("escalated", "true".equals(o.attributes().get("escalated")) ? 1 : 0);
+        return row;
+    }
+
     private void escalate(OperationalObject o, List<EscalationRule> rules, long now, int[] done) {
         OperationalObject cur = o;
         for (EscalationRule r : rules) {
             if (done[0] >= MAX_ESCALATIONS_PER_SWEEP) return;
-            if (r.priority() != null && (cur.priority() == null || !r.priority().equalsIgnoreCase(cur.priority().trim()))) continue;
+            Map<String, Object> match = r.matchTree();       // the priority sugar ANDed with the authored `when`
+            if (match != null && com.gamma.query.ConditionTree.matched(match, List.of(escalationContext(cur, now))) != 1) continue;
             String marker = switch (r.on()) {
                 case BREACH -> cur.attributes().get("response".equals(r.target()) ? ATTR_SLA_RESPONSE_BREACHED_AT : ATTR_SLA_BREACHED_AT);
                 case AGE -> now - cur.createdAt() >= r.afterMinutes() * 60_000L ? "age" : null;

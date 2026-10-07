@@ -66,11 +66,18 @@ final class GovernanceRegistry {
         java.util.Set<Path> seen = new java.util.HashSet<>();
         changed |= scan("workflows", Workflow::fromComponent, workflows, seen);
         changed |= scan("sla-policies", SlaPolicy::fromComponent, policies, seen);
-        changed |= scan("escalation-rules", EscalationRule::fromComponent, rules, seen);
+        changed |= scan("escalation-rules", GovernanceRegistry::escalationRule, rules, seen);
         changed |= files.keySet().retainAll(seen);
         if (changed) current = build(workflows, policies, rules);
         loaded = true;
         return current;
+    }
+
+    /** Parse + the Condition Language check of the rule's {@code when} (the workflow module cannot reach the engine). */
+    private static Object escalationRule(String id, Map<String, Object> c) {
+        EscalationRule r = EscalationRule.fromComponent(id, c);
+        com.gamma.query.ConditionTree.requireGroupRoot(r.when());
+        return r;
     }
 
     private boolean scan(String dir, BiFunction<String, Map<String, Object>, Object> parse, Map<String, Object> out,

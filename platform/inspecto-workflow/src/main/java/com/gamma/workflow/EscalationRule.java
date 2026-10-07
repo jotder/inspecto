@@ -17,14 +17,20 @@ import java.util.regex.Pattern;
  * on: breach            # breach | age
  * target: resolution    # breach only: resolution | response
  * afterMinutes: 120     # age only: wall-clock minutes since the object was opened
- * priority: CRITICAL    # optional: only objects of this priority
+ * priority: CRITICAL    # optional: only objects of this priority (sugar: ANDed into {@link #matchTree()})
+ * when:                 # optional: a condition group (the Condition Language) over the object's context -
+ *   kind: group         #   type status priority severity category assignee ageMinutes minutesToDue
+ *   op: AND             #   resolutionBreached responseBreached (0/1) escalated (0/1); ANDed with priority
+ *   items[1]:
+ *     - {kind: condition, field: ageMinutes, operator: ">=", value: "30"}
  * reassign: duty-manager
  * notify: true
  * raisePriority: true   # one step up the ladder LOW → MINOR → MAJOR → CRITICAL, never past CRITICAL
  * </pre>
  */
 public record EscalationRule(String id, ObjectType objectType, Trigger on, String target, Long afterMinutes,
-                             String priority, String reassign, boolean notifies, boolean raisePriority) {
+                             String priority, String reassign, boolean notifies, boolean raisePriority,
+                             Map<String, Object> when) {
 
     public enum Trigger { BREACH, AGE }
 
@@ -77,10 +83,47 @@ public record EscalationRule(String id, ObjectType objectType, Trigger on, Strin
             throw new IllegalArgumentException("escalation-rule.reassign must be a user id");
         boolean notify = bool(c.get("notify"), "notify");
         boolean raise = bool(c.get("raisePriority"), "raisePriority");
+        // Opaque here (this module must not depend on the engine, which owns the Condition Language): the shape is
+        // validated with ConditionTree wherever the rule is written and wherever it is loaded.
+        Map<String, Object> when = null;
+        if (c.get("when") != null) {
+            if (!(c.get("when") instanceof Map<?, ?> w))
+                throw new IllegalArgumentException("escalation-rule.when must be a condition group object");
+            if (!w.isEmpty()) {
+                when = new java.util.LinkedHashMap<>();
+                for (Map.Entry<?, ?> e : w.entrySet()) when.put(String.valueOf(e.getKey()), e.getValue());
+            }
+        }
         if (reassign == null && !notify && !raise)
             throw new IllegalArgumentException("an Escalation Rule must do something: reassign, notify or raisePriority");
         return new EscalationRule(id, type, trigger, target, after,
-                priority == null ? null : priority.toUpperCase(Locale.ROOT), reassign, notify, raise);
+                priority == null ? null : priority.toUpperCase(Locale.ROOT), reassign, notify, raise, when);
+    }
+
+    /**
+     * The match as ONE condition group, or {@code null} when the rule narrows nothing: the {@code priority} sugar
+     * (a case-insensitive {@code =} leaf, so a null or blank priority never matches) ANDed with {@link #when}.
+     * Evaluated by the SLA sweep over the object's context row; the trigger ({@code on}) and the fire-once ledger
+     * stay the sweep's own.
+     */
+    public Map<String, Object> matchTree() {
+        if (priority == null && when == null) return null;
+        List<Object> items = new java.util.ArrayList<>();
+        if (priority != null) {
+            Map<String, Object> leaf = new java.util.LinkedHashMap<>();
+            leaf.put("kind", "condition");
+            leaf.put("field", "priority");
+            leaf.put("operator", "=");
+            leaf.put("value", priority);
+            leaf.put("ignoreCase", true);
+            items.add(leaf);
+        }
+        if (when != null) items.add(when);
+        Map<String, Object> group = new java.util.LinkedHashMap<>();
+        group.put("kind", "group");
+        group.put("op", "AND");
+        group.put("items", items);
+        return group;
     }
 
     private static boolean bool(Object o, String key) {
