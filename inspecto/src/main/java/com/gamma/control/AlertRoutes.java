@@ -238,6 +238,14 @@ final class AlertRoutes implements RouteModule {
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
+        // MODULE-REORG-P4-2: a key the rule does not model is never silently dropped. An author-owned `x-` key is an
+        // annotation and is carried through every save (AlertRule.extra); any other is refused loudly, as a Pipeline
+        // refuses it - so a typo is not mistaken for a setting that was applied.
+        List<String> unknown = rule.extra().keySet().stream().filter(k -> !k.startsWith(AlertRule.AUTHOR_PREFIX)).toList();
+        if (!unknown.isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, FindingCodes.ERR_UNKNOWN_CONFIG_KEY
+                    + ": alert rule key(s) " + unknown + " are not part of an Alert Rule and would not be kept; "
+                    + "remove them, or prefix an annotation with '" + AlertRule.AUTHOR_PREFIX + "' to keep it");
         // LA-23: a rule over an Investigation's Working Set must pass that Investigation's owner-only / PDP gate,
         // which only the Link Analysis module can apply — and only its route records the binding the evaluator
         // requires, so a rule written here would be armed yet never evaluate. Refused loudly, with the way in.

@@ -31,9 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code skipped} naming the action and the missing module, and executes nothing.
  *
  * <p>An Alert Rule has no module-contributed action type, but its write rebuilds the stored file from the
- * modelled {@code AlertRule} - so a key it does not model is DROPPED, silently, on a 200. That is the section 9 trap
- * ("silent loss on save") in its pure form and is pinned here as today's behaviour; it needs a policy call (refuse
- * like a Pipeline, or preserve like a Decision Rule) and is filed as MODULE-REORG-P4-2.
+ * modelled {@code AlertRule}; a key it does not model used to be DROPPED, silently, on a 200 (the section 9 trap).
+ * MODULE-REORG-P4-2 decided: an {@code x-} key is kept, any other is refused 422 (see
+ * {@code AlertRuleUnmodelledKeysTest}).
  */
 class ModuleRemovalRulesTest {
 
@@ -119,17 +119,16 @@ class ModuleRemovalRulesTest {
     }
 
     @Test
-    void anUnmodelledKeyOnAnAlertRuleIsDroppedBySaveWithA200_pinnedUntilP4Policy(@TempDir Path cfg, @TempDir Path wr)
+    void anUnmodelledKeyOnAnAlertRuleIsRefusedLoudly_notDroppedWithA200(@TempDir Path cfg, @TempDir Path wr)
             throws Exception {
         try (Ctx c = open(cfg, wr)) {
             HttpResponse<String> r = send(c.port, "POST", "/alerts/rules", "{\"name\":\"plain-alert\","
                     + "\"metric\":\"error_rate\",\"comparator\":\"gt\",\"threshold\":0.1,\"window\":\"1h\","
                     + "\"severity\":\"WARNING\",\"zz_cfg\":\"keep\"}");
-            assertEquals(200, r.statusCode(), r.body());
-            Map<String, Object> stored = ToonHelper.load(wr.resolve("registry/alert-rules/plain-alert.toon").toString());
-            assertFalse(stored.containsKey("zz_cfg"),
-                    "TODAY the write rebuilds from AlertRule.toMap and drops what it does not model "
-                            + "(MODULE-REORG-P4-2) - if this fails the policy landed: flip the assertion");
+            // MODULE-REORG-P4-2 (was: 200 with the key gone from the file) - the policy is in AlertRuleUnmodelledKeysTest
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("zz_cfg"), r.body());
+            assertFalse(java.nio.file.Files.exists(wr.resolve("registry/alert-rules/plain-alert.toon")), "nothing written");
         }
     }
 

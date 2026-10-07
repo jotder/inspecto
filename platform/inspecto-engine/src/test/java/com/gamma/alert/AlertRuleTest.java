@@ -32,6 +32,20 @@ class AlertRuleTest {
     }
 
     @Test
+    void unmodelledKeysRideThroughFromMapAndToMap_neverOverridingAModelledOne() {
+        Map<String, Object> m = valid();
+        m.put("x-team", "noc");
+        m.put("zz_cfg", Map.of("k", "v"));
+        m.put("shares", java.util.List.of("bob"));   // the R3 envelope: carried by the save routes, not by the record
+        AlertRule r = AlertRule.fromMap(m);
+        assertEquals(java.util.Set.of("x-team", "zz_cfg"), r.extra().keySet());
+        assertEquals("noc", r.toMap().get("x-team"));
+        assertEquals(r, AlertRule.fromMap(r.toMap()), "toMap round-trips the extras");
+        assertEquals("error_rate", new AlertRule("n", "error_rate", "gt", 0.1, "1h", "WARNING", null, null, null, null,
+                null, null, null, null, null, 0, null, null, 0, Map.of("metric", "hijack")).toMap().get("metric"));
+    }
+
+    @Test
     void parsesAValidRule() {
         AlertRule r = AlertRule.fromMap(valid());
         assertEquals("high-error-rate", r.name());

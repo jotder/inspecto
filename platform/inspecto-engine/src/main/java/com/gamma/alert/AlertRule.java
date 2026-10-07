@@ -112,7 +112,17 @@ public record AlertRule(String name, String metric, String comparator, double th
                         String dataset, String measure, Object when, String maximumAge,
                         String investigation, String relation, String description,
                         List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure,
-                        int healAfterSweeps) {
+                        int healAfterSweeps, Map<String, Object> extra) {
+
+    /**
+     * Every key {@link #fromMap} models (and the R3 {@code shares} envelope key, which the save routes carry
+     * themselves). A key outside this set is carried in {@link #extra} (MODULE-REORG-P4-2).
+     */
+    static final Set<String> MODELLED = Set.of("name", "metric", "comparator", "threshold", "window", "severity",
+            "onPipeline", "dataset", "measure", "when", "maximumAge", "investigation", "relation", "description",
+            "by", "stormCap", "owner", "valueMeasure", "healAfterSweeps", "shares");
+    /** The prefix of an author-owned annotation key: kept through every save, never refused. */
+    public static final String AUTHOR_PREFIX = "x-";
 
     /** The {@code stormCap} a {@code by} rule takes when it declares none. */
     public static final int DEFAULT_STORM_CAP = 100;
@@ -149,6 +159,17 @@ public record AlertRule(String name, String metric, String comparator, double th
     public static final Set<String> VALUE_MEASURES = Set.of("passThrough", "velocity", "timeToCashOut",
             "cashOutConcentration", "structuring", "benefitTransfer");
 
+    /** Every pre-{@code extra} caller of the full shape (no unmodelled keys). */
+    public AlertRule(String name, String metric, String comparator, double threshold,
+                     String window, String severity, String onPipeline,
+                     String dataset, String measure, Object when, String maximumAge,
+                     String investigation, String relation, String description,
+                     List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure,
+                     int healAfterSweeps) {
+        this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, maximumAge,
+                investigation, relation, description, by, stormCap, owner, valueMeasure, healAfterSweeps, null);
+    }
+
     /** Every pre-{@code healAfterSweeps} caller of the full shape (the default: heal on the first healthy sweep). */
     public AlertRule(String name, String metric, String comparator, double threshold,
                      String window, String severity, String onPipeline,
@@ -156,7 +177,7 @@ public record AlertRule(String name, String metric, String comparator, double th
                      String investigation, String relation, String description,
                      List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure) {
         this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, maximumAge,
-                investigation, relation, description, by, stormCap, owner, valueMeasure, 0);
+                investigation, relation, description, by, stormCap, owner, valueMeasure, 0, null);
     }
 
     /** Every pre-{@code valueMeasure} (pre-LA-18) caller of the full shape. */
@@ -217,6 +238,8 @@ public record AlertRule(String name, String metric, String comparator, double th
 
     public AlertRule {
         require(name != null && !name.isBlank(), "alert.name is required");
+        extra = (extra == null || extra.isEmpty()) ? Map.of()
+                : java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(extra));
         description = (description == null || description.isBlank()) ? null : description.trim();
         owner = (owner == null || owner.isBlank()) ? UNOWNED : owner.trim();
         metric = lower(metric);
@@ -417,7 +440,16 @@ public record AlertRule(String name, String metric, String comparator, double th
                 str(alert.get("owner")),
                 valueMeasureBlock(alert.get("valueMeasure")),
                 alert.get("healAfterSweeps") == null ? 0
-                        : wholeNumber(alert.get("healAfterSweeps"), "alert.healAfterSweeps"));
+                        : wholeNumber(alert.get("healAfterSweeps"), "alert.healAfterSweeps"),
+                unmodelled(alert));
+    }
+
+    /** The keys of {@code alert} this record does not model, in authored order (MODULE-REORG-P4-2). */
+    private static Map<String, Object> unmodelled(Map<String, Object> alert) {
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, Object> e : alert.entrySet())
+            if (!MODELLED.contains(e.getKey())) out.put(e.getKey(), e.getValue());
+        return out;
     }
 
     /**
@@ -467,7 +499,7 @@ public record AlertRule(String name, String metric, String comparator, double th
         };
     }
 
-    /** JSON-ready view for {@code GET /alerts/rules}. */
+    /** JSON-ready view for {@code GET /alerts/rules}; also the stored shape, so it carries {@link #extra} too. */
     public Map<String, Object> toMap() {
         Map<String, Object> m = new java.util.LinkedHashMap<>();
         m.put("name", name);
@@ -494,6 +526,7 @@ public record AlertRule(String name, String metric, String comparator, double th
         // sharing envelope's (ComponentAccess) - persisting the appUser placeholder there would make it look
         // claimed, and R3 lets only an owner or an access admin change a claimed envelope.
         if (isOwned()) m.put("owner", owner);
+        extra.forEach(m::putIfAbsent);   // unmodelled keys ride along; never override a modelled one
         return m;
     }
 

@@ -528,6 +528,28 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
   Every other module still imports processor classes (`HostContext`, `ControlApi`, `PendingChanges`, `ServerFaults`, `Cursor`, ...) and keeps the edge.
 - **Gate:** full reactor 9023 tests, 50/50 modules, one transient Windows `AccessDeniedException` in `ControlApiRestoreJobGateTest` (green 3/3 alone).
 
+### P4b as built (2026-10-07 — Alert Rule unmodelled-key policy, then inert-config diagnostics on the wire)
+
+**Step A - `MODULE-REORG-P4-2` (policy decided by the operator-away rule; recorded, not asked).**
+- **Policy.** An author-owned `x-` key is an annotation and is KEPT by every door that stores a rule and returned by `GET /alerts/rules`; any other
+  unmodelled key is REFUSED 422 `ERR_UNKNOWN_CONFIG_KEY`, naming the key, nothing written. Why: the Pipeline precedent (refuse, `x-` allowed) is the least
+  surprising for a typo (`threshhold` must not look applied), and the Decision Rule precedent (keep everything) is reserved for rules whose consequence
+  config belongs to modules. The grep that decided it: all 24 shipped Alert Rule TOONs (`spaces/_templates/*`, `spaces/demo`) carry only modelled keys; the
+  one non-modelled key in any (`afterRiskScore`, `pending/alert-rules/`) is the deferred-seed marker `PendingAlertRules.ruleBody` strips before the rule parses.
+  So no shipped config needed carry-forward of a non-`x-` key.
+- **Mechanism.** `AlertRule` gains an `extra` map (the 20th record component; the 19-argument constructor stays). `fromMap` fills it with every key outside
+  `AlertRule.MODELLED` (the modelled keys plus the R3 `shares` envelope key, which the save routes carry themselves); `toMap` emits it after the modelled keys with
+  `putIfAbsent`, so an extra can never override a modelled key. `fromMap` stays lenient (a hand-edited stored rule still arms); the refusal is in
+  `AlertRoutes.parse`, which every write door already runs (`POST|PUT /alerts/rules`, `/components/alert-rule`, a bundle import item, a Decision Rule's
+  `create-alert`, a Space Template seed, a deferred Risk Score rule). PUT is replace-with-posted: what the client sent is stored, so a key it stops sending is gone.
+- **Held saves and import.** `PendingChanges.hold` is given the `persisted(...)` map, which now carries the extras, so the approved write keeps them (pinned);
+  a bundle import writes the item's content as-is after `parse`, so an `x-` key rides and an unknown key fails that ITEM naming it (pinned).
+- **Tests.** `AlertRuleUnmodelledKeysTest` (4, real HTTP with a Subject: refusal by name, create/update/GET/PUT-replace, held-then-approved, bundle import),
+  `AlertRuleTest.unmodelledKeysRideThroughFromMapAndToMap_neverOverridingAModelledOne`, and `ModuleRemovalRulesTest`'s former "dropped, pinned until P4 policy"
+  test flipped to "refused loudly". The pin was the RED characterisation: it passed against the old code (200, key gone), the `x-` cases failed on it.
+- **Not done (recorded on the row).** The same sweep for the other `toMap()`-rebuilding writers (Expectation, Notification Rule, KPI) is not started; each
+  needs its own look at what its door stores.
+
 ### P4a as built (2026-10-06 — removal semantics: characterised first, then only what was broken and small)
 Scenario: config naming a capability no installed module provides (stand-ins `zz.absent-module-node`, `zz.absent-module-job`, `zz-absent-action`). Tests: `ModuleRemovalPipelineTest`, `ModuleRemovalJobTest`, `ModuleRemovalRulesTest`, `ModuleRemovalBundleTest` (inspecto) and `ModuleRemovalBackupTest` (inspecto-backup).
 
@@ -541,7 +563,7 @@ Scenario: config naming a capability no installed module provides (stand-ins `zz
 | Job trigger | was a misleading **404** "no job named" for a listed job | now **503 `CAPABILITY_UNAVAILABLE`** naming the type and the missing module |
 | Job enabled save (`PUT`, `reschedule`, `enable`, `POST` of a typo'd type) | was **a 500 after the file had been rewritten AND the job dropped from memory** (`persistJob` wrote, then `upsertJob` threw) — DROPPED | now **422 before any write**; file byte-identical, job stays listed. A *disable* stays allowed and keeps every key |
 | Decision Rule with an unknown consequence action | **PRESERVED** through create / update / simulate (top-level and consequence keys); `apply` reports `skipped` | the `skipped` detail now names the missing module |
-| Alert Rule with an unmodelled key | **DROPPED silently on a 200** (`persisted()` rebuilds from `AlertRule.toMap()`) — pinned by `…IsDroppedBySaveWithA200_pinnedUntilP4Policy` | needs a policy call (Pipeline refuses, Decision Rule keeps): `MODULE-REORG-P4-2` |
+| Alert Rule with an unmodelled key | **DROPPED silently on a 200** (`persisted()` rebuilds from `AlertRule.toMap()`) — pinned by `…IsDroppedBySaveWithA200_pinnedUntilP4Policy` | policy decided and shipped in *P4b as built* below (`x-` kept, other keys refused) |
 | Space bundle export (whole Space) | **PRESERVED** — a directory walk, no roster; carries `modules.toon` and unknown registry kinds byte-for-byte | — |
 | Bundle clone import (`refuseReserved=false`, new-Space seed) | **PRESERVED** verbatim | — |
 | Bundle import into an existing Space | Job of an absent type **PRESERVED**; `modules.toon` **REFUSED by design** (a Space settings document, as `branding.toon`); a registry entry of a kind no module registers is **REFUSED-LOUDLY and all-or-nothing** (before the first byte) | roster derived from installed modules + module-naming message: `MODULE-REORG-P4-3` |

@@ -229,3 +229,9 @@ gates + real simulate), `com.gamma.control.ControlApiExpectationTest` (`conditio
 `com.gamma.control.ControlApiAlertRuleWriteTest` (ComponentStore-backed CRUD gates). UI:
 `attribute-spec.spec.ts` (`notEquals`), `expectation-form.dialog.spec.ts`/
 `alert-rule-form.dialog.spec.ts` (condition-tree wiring + save payload).
+
+⚠ **Unmodelled keys on an Alert Rule (`MODULE-REORG-P4-2`, 2026-10-07).** A save used to rebuild the stored file from the modelled `AlertRule`, so a key
+the rule does not model vanished behind a 200. Now an author-owned `x-` key is kept through create, update (PUT replaces: send it back or lose it), a held
+save once approved, and a bundle import, and `GET /alerts/rules` returns it; any other unknown key is refused 422 `ERR_UNKNOWN_CONFIG_KEY` naming it, with
+nothing written (`AlertRoutes.parse`, every write door). Loading stays lenient: a hand-edited stored rule with a stray key still arms and lists it.
+Pinned by `AlertRuleUnmodelledKeysTest`.
