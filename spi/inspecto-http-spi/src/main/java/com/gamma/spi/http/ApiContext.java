@@ -1,12 +1,12 @@
 package com.gamma.spi.http;
 
-import com.gamma.control.ApiException;
-import com.gamma.control.Authenticator;
-import com.gamma.control.Authenticators;
-import com.gamma.control.ErrorCodes;
-import com.gamma.control.RequestAttrs;
-import com.gamma.control.Subject;
-import com.gamma.control.WriteRootProvider;
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.Authenticator;
+import com.gamma.spi.auth.Authenticators;
+import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.spi.auth.RequestAttrs;
+import com.gamma.spi.auth.Subject;
+import com.gamma.spi.auth.WriteRootProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;

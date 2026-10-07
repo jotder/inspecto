@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.spi.auth;
 
 import com.gamma.api.PublicApi;
 import com.gamma.util.Conditions;

@@ -203,7 +203,7 @@
             </modules>
         </profile>
         <!-- Enterprise = Professional + the ABAC policy engine (rbac-abac-plan §5): the same one-version
-             reactor gains inspecto-policy (com.gamma.control.AccessDecider via ServiceLoader).
+             reactor gains inspecto-policy (com.gamma.spi.auth.AccessDecider via ServiceLoader).
              "mvn -o clean test -Pedition-enterprise" builds/tests all optional modules. -->
         <profile>
             <id>edition-enterprise</id>

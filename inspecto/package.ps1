@@ -8,7 +8,7 @@
 #
 # -Edition Enterprise is Professional + inspecto-policy (the ABAC AccessDecider SPI implementation),
 # bundled as inspecto-policy.jar. It needs NO extra flag: the module is discovered purely
-# through META-INF/services/com.gamma.control.AccessDecider, so being on the classpath is what
+# through META-INF/services/com.gamma.spi.auth.AccessDecider, so being on the classpath is what
 # turns policy evaluation on. serve.sh/serve.bat auto-detect it the same way they do the OIDC jar.
 #
 # -Edition Professional (default: Personal; 'Standard' accepted as legacy alias) additionally builds
@@ -531,7 +531,7 @@ if ($oidcJarSrc) {
         if (-not ($secZip.Entries | Where-Object { $_.FullName -like 'com/nimbusds/*' })) {
             throw "inspecto-oidc.jar carries no com/nimbusds classes - OidcAuthenticator would throw NoClassDefFoundError while ControlApi resolves the Authenticator SPI, and the bundle would not boot."
         }
-        foreach ($spi in @('com.gamma.control.Authenticator', 'com.gamma.control.TokenRelay')) {
+        foreach ($spi in @('com.gamma.spi.auth.Authenticator', 'com.gamma.spi.auth.TokenRelay')) {
             if (-not ($secZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$spi" })) {
                 throw "inspecto-oidc.jar has no META-INF/services/$spi - the shade dropped the ServicesResourceTransformer, so the bundle would silently fall back to auth-free."
             }
@@ -559,8 +559,8 @@ if ($geoCountryJarSrc) {
         if (-not ($geoZip.Entries | Where-Object { $_.FullName -like 'com/maxmind/*' })) {
             throw "inspecto-geo-country.jar carries no com/maxmind classes - MaxMindGeoCountryResolver would throw NoClassDefFoundError when the core resolves the GeoCountryResolver SPI."
         }
-        if (-not ($geoZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.control.GeoCountryResolver' })) {
-            throw "inspecto-geo-country.jar has no META-INF/services/com.gamma.control.GeoCountryResolver - the shade dropped the ServicesResourceTransformer."
+        if (-not ($geoZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.auth.GeoCountryResolver' })) {
+            throw "inspecto-geo-country.jar has no META-INF/services/com.gamma.spi.auth.GeoCountryResolver - the shade dropped the ServicesResourceTransformer."
         }
     } finally { $geoZip.Dispose() }
 }
@@ -976,7 +976,7 @@ if ($DemoAuth) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $z = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $bundleDir 'inspecto-demo-auth.jar'))
     try {
-        foreach ($svc in 'META-INF/services/com.gamma.control.Authenticator', 'META-INF/services/com.gamma.control.TokenRelay') {
+        foreach ($svc in 'META-INF/services/com.gamma.spi.auth.Authenticator', 'META-INF/services/com.gamma.spi.auth.TokenRelay') {
             if (-not ($z.Entries | Where-Object { $_.FullName -eq $svc })) { throw "inspecto-demo-auth.jar lacks $svc" }
         }
     } finally { $z.Dispose() }
@@ -1391,7 +1391,7 @@ if [ -f inspecto-oidc.jar ]; then
     # the backend expands ${ENV:...} at use, so the secret never appears on the process command line.
     [ -n "${AUTH_OIDC_CLIENT_SECRET:-}" ] && JAVA_OPTS+=('-Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}')
     # inspecto-policy.jar present ⇒ Enterprise (Professional + ABAC). No flag: the module is found
-    # via META-INF/services/com.gamma.control.AccessDecider, so the classpath entry IS the switch.
+    # via META-INF/services/com.gamma.spi.auth.AccessDecider, so the classpath entry IS the switch.
     if [ -f inspecto-policy.jar ]; then
         CP="${CP}:inspecto-policy.jar"
         EDITION="Enterprise"
@@ -1535,7 +1535,7 @@ if exist inspecto-oidc.jar if not "%AUTH_OIDC_CLIENT_ID%"=="" set "OPTS=%OPTS% -
 rem Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value.
 if exist inspecto-oidc.jar if not "%AUTH_OIDC_CLIENT_SECRET%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}"
 rem inspecto-policy.jar present => Enterprise (Professional + ABAC). No flag needed: the module
-rem is found via META-INF/services/com.gamma.control.AccessDecider, so the classpath IS the switch.
+rem is found via META-INF/services/com.gamma.spi.auth.AccessDecider, so the classpath IS the switch.
 if exist inspecto-oidc.jar if exist inspecto-policy.jar set "CP=%CP%;inspecto-policy.jar"
 if exist inspecto-oidc.jar if exist inspecto-policy.jar set "EDITION=Enterprise"
 rem OBJECTS-BACKEND-DEFAULT-MEMORY-1 (2026-09-25): Enterprise REQUIRES PostgreSQL for Incidents, Cases,

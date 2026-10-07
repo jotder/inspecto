@@ -1,6 +1,6 @@
 package com.gamma.geocountry;
 
-import com.gamma.control.GeoCountryResolver;
+import com.gamma.spi.auth.GeoCountryResolver;
 import com.gamma.util.egress.EgressPolicy;
 import com.maxmind.db.Reader;
 import org.slf4j.Logger;

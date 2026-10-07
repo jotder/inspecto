@@ -2,8 +2,8 @@ package com.gamma.la.api;
 
 import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.FsInvestigationStore;
-import com.gamma.control.ApiException;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.la.core.DraftStore;
 import com.gamma.la.core.InvestigationEvaluator;
 import org.junit.jupiter.api.Test;

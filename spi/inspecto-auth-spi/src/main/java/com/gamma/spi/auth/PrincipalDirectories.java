@@ -1,14 +1,14 @@
-package com.gamma.control;
+package com.gamma.spi.auth;
 
 import java.util.Optional;
 
 /** The active {@link PrincipalDirectory}, or none (no IAM on this edition). Typed facade over a {@link SpiSlot}. */
-final class PrincipalDirectories {
+public final class PrincipalDirectories {
     private PrincipalDirectories() {}
 
     private static final SpiSlot<PrincipalDirectory> SLOT = new SpiSlot<>(PrincipalDirectory.class);
 
-    static Optional<PrincipalDirectory> active() {
+    public static Optional<PrincipalDirectory> active() {
         return SLOT.active();
     }
 
@@ -16,7 +16,7 @@ final class PrincipalDirectories {
      * Refuse a user id the IAM does not know. No directory registered ⇒ returns (nothing to ask); a directory that
      * says no, or cannot answer, ⇒ {@link IllegalArgumentException} (a 422 — fail closed).
      */
-    static void requireKnown(String userId, String what) {
+    public static void requireKnown(String userId, String what) {
         Optional<PrincipalDirectory> d = active();
         if (d.isEmpty() || userId == null) return;
         boolean known;
@@ -30,7 +30,7 @@ final class PrincipalDirectories {
     }
 
     /** Test seam; {@code null} restores discovery. */
-    static void forTest(PrincipalDirectory d) {
+    public static void forTest(PrincipalDirectory d) {
         SLOT.forTest(d);
     }
 }

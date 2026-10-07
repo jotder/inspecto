@@ -1,5 +1,7 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.util.DuckDbUtil;

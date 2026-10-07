@@ -232,7 +232,7 @@ via `META-INF/services`. Personal/Professional never bundle it and behave byte-i
   is vendor-agnostic (`-Dauth.oidc.issuer` / `.jwksUri` / `.audience` / `.rolesClaim`, generic RS256 Nimbus
   processing, no vendor SDK). Two **vendor-shaped residuals** were defects against this decision; both are
   now **fixed (2026-07-25)**:
-  * **`KeycloakTokenRelay` → `OidcTokenRelay`** (class + `META-INF/services/com.gamma.control.TokenRelay` +
+  * **`KeycloakTokenRelay` → `OidcTokenRelay`** (class + `META-INF/services/com.gamma.spi.auth.TokenRelay` +
     `OidcTokenRelayTest`), matching `OidcAuthenticator`'s neutral naming.
   * **`auth.oidc.tokenEndpoint` is now mandatory with no default.** The old fallback derived
     `<auth.oidc.issuer>/protocol/openid-connect/token` — one vendor's path layout baked into the product.

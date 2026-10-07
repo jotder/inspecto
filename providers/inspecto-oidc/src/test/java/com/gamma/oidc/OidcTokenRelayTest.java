@@ -1,6 +1,6 @@
 package com.gamma.oidc;
 
-import com.gamma.control.TokenRelay;
+import com.gamma.spi.auth.TokenRelay;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

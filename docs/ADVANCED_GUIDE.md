@@ -425,7 +425,7 @@ the paths are written version-free for brevity, so read `GET /jobs` as `GET /api
 unversioned business path is not served, and `/api/<anything-not-v1>` returns a JSON 404 rather than
 the SPA shell. The v1 transport contract (`docs/okf/capabilities/control-api/control-api.md` §3; provenance `docs/archived-documents/plans-archive/api-contract-design.md`): responses wrapped
 in the `{data, metadata, links, permissions, diagnostics}` envelope, errors as
-`{error:{errorCode, message, …}}` with machine-readable codes (`control/ErrorCodes.java`), gzip
+`{error:{errorCode, message, …}}` with machine-readable codes (`spi/auth/ErrorCodes.java`), gzip
 negotiated ≥ 1 KiB. Every request gets a `Correlation-ID` (caller-supplied or issued), echoed as a
 response header and inherited by events logged during the request. The only unversioned routes are the
 infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.

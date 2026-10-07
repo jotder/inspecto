@@ -3,12 +3,12 @@ package com.gamma.opsapi;
 import com.gamma.control.HostContext;
 import com.gamma.control.RouteErrors;
 import com.gamma.access.RowScope;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.Subject;
 
 import com.gamma.spi.http.ApiContext;
-import com.gamma.control.ApiException;
+import com.gamma.spi.auth.ApiException;
 import com.gamma.control.Cursor;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.Handler;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.access.WriteGates;

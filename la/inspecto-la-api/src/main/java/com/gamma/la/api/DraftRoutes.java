@@ -2,11 +2,11 @@ package com.gamma.la.api;
 
 import com.gamma.la.core.InvestigationStore;
 import com.gamma.spi.http.ApiContext;
-import com.gamma.control.ApiException;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.spi.http.RouteModule;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.Subject;
 import com.gamma.la.core.DraftLifecycle;
 import com.gamma.la.core.DraftStore;
 import com.gamma.la.core.InvestigationEvaluator;

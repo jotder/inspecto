@@ -1,6 +1,6 @@
 package com.gamma.control.testkit;
 
-import com.gamma.control.TokenRelay;
+import com.gamma.spi.auth.TokenRelay;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

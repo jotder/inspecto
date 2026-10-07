@@ -1,8 +1,8 @@
 package com.gamma.oidc;
 
-import com.gamma.control.Authenticator;
+import com.gamma.spi.auth.Authenticator;
 import com.gamma.access.Roles;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.Subject;
 import dev.toonformat.jtoon.JToon;
 import org.junit.jupiter.api.io.TempDir;
 import com.nimbusds.jose.JWSAlgorithm;

@@ -1,10 +1,10 @@
 package com.gamma.entitylist;
 
 import com.gamma.spi.http.ApiContext;
-import com.gamma.control.ApiException;
+import com.gamma.spi.auth.ApiException;
 import com.gamma.control.DatasetRegistration;
 import com.gamma.entitystore.EntityTypes;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.control.PendingChanges;
 import com.gamma.spi.http.RouteModule;

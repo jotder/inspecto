@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.spi.auth;
 
 import java.util.Optional;
 
@@ -31,7 +31,7 @@ public final class Authenticators {
      *  the classpath scan (the core's own test classpath carries no {@code Authenticator} registration,
      *  so a real Standard-edition gate can only be exercised this way). Production code never calls this;
      *  a test must restore {@code null} in its teardown so later test classes see Personal behaviour again. */
-    static void forTest(Authenticator a) {
+    public static void forTest(Authenticator a) {
         SLOT.forTest(a);
     }
 }

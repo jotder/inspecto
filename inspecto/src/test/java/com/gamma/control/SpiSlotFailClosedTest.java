@@ -1,5 +1,7 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.Authenticator;
+import com.gamma.spi.auth.SpiSlot;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;

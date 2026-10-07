@@ -95,7 +95,7 @@ citing either. The EDITIONS rows are the edition truth and are corrected here in
 
 | EDITIONS row | What it said | What the build does |
 |---|---|---|
-| `SEC-09` note | Personal events carry `actor=anonymous` | The unauthenticated default actor is **`appUser`** (`RequestAttrs.actor`, `spi/inspecto-auth-spi/src/main/java/com/gamma/control/RequestAttrs.java`; `ApiContext.actor` delegates to it): an authenticated `Subject.id()` first, else `agent:<session>`, else the `X-Actor` header, else `appUser`. No `anonymous` string exists in the tree |
+| `SEC-09` note | Personal events carry `actor=anonymous` | The unauthenticated default actor is **`appUser`** (`RequestAttrs.actor`, `spi/inspecto-auth-spi/src/main/java/com/gamma/spi/auth/RequestAttrs.java`; `ApiContext.actor` delegates to it): an authenticated `Subject.id()` first, else `agent:<session>`, else the `X-Actor` header, else `appUser`. No `anonymous` string exists in the tree |
 | `SEC-11` note | "client-migration-gated" | The API-v1 sunset apparatus was deleted 2026-07-25; `BACKLOG.md` §2 restated the gate 2026-09-07 as **the next MAJOR tag** |
 | `SEC-12` (end-session redirect) | `— / 🔲 / 🔲`, "nobody has asked" | **Half built.** The SPA implements RP-Initiated Logout (`SessionService.logout()` redirects to `endSessionUrl` with `client_id` + `post_logout_redirect_uri`, 2026-07-26) and reads `boot.auth?.endSessionUrl ?? environment.oidc.endSessionUrl`. **The server never publishes an `auth` block** — `BootstrapRoutes` emits only `features.authMode`; no Java file contains `authorizeUrl` or `endSessionUrl` — so the only working path is the build-time `environment.ts` value. 🟡 for S/E: works, but configured at UI build time, not at deployment |
 
@@ -724,10 +724,10 @@ and `callback.a11y.spec.ts`, `core/navigation/navigation.service.spec.ts` (modul
 
 | File | Provider |
 |---|---|
-| `providers/inspecto-oidc/src/main/resources/META-INF/services/com.gamma.control.Authenticator` | `com.gamma.oidc.OidcAuthenticator` |
-| `providers/inspecto-oidc/src/main/resources/META-INF/services/com.gamma.control.TokenRelay` | `com.gamma.oidc.OidcTokenRelay` |
+| `providers/inspecto-oidc/src/main/resources/META-INF/services/com.gamma.spi.auth.Authenticator` | `com.gamma.oidc.OidcAuthenticator` |
+| `providers/inspecto-oidc/src/main/resources/META-INF/services/com.gamma.spi.auth.TokenRelay` | `com.gamma.oidc.OidcTokenRelay` |
 | `providers/inspecto-secrets/src/main/resources/META-INF/services/com.gamma.auth.secrets.SecretsProvider` | `com.gamma.secrets.FileKeystoreSecretsProvider` |
-| `providers/inspecto-policy/src/main/resources/META-INF/services/com.gamma.control.AccessDecider` | `com.gamma.policy.PolicyEngine` |
+| `providers/inspecto-policy/src/main/resources/META-INF/services/com.gamma.spi.auth.AccessDecider` | `com.gamma.policy.PolicyEngine` |
 
 ### 8.6 Guards
 

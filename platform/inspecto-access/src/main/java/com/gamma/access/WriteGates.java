@@ -3,9 +3,9 @@ package com.gamma.access;
 import com.gamma.config.safety.PathJail;
 
 import java.nio.file.Path;
-import com.gamma.control.ApiException;
-import com.gamma.control.ErrorCodes;
-import com.gamma.control.WriteRootProvider;
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.spi.auth.WriteRootProvider;
 
 /**
  * The shared fail-closed write-gate chain (write-root 503 → unsafe name 422 → path jail 403 →

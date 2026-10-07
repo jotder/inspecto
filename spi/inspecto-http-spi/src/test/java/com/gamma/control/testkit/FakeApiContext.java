@@ -2,7 +2,7 @@ package com.gamma.control.testkit;
 
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.Handler;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.Subject;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpContext;
 import com.sun.net.httpserver.HttpExchange;

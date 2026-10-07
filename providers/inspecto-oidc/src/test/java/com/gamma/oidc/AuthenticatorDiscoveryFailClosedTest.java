@@ -1,6 +1,6 @@
 package com.gamma.oidc;
 
-import com.gamma.control.Authenticator;
+import com.gamma.spi.auth.Authenticator;
 import com.gamma.spi.OptionalSpi;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

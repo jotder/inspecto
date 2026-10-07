@@ -5,7 +5,7 @@
  * only at the interceptor, `apiErrorMessage`, and the mock layer's response edge.
  */
 
-/** Machine-readable error codes — kept in lockstep with `com.gamma.control.ErrorCodes` (backend-pinned by ApiContractTest). */
+/** Machine-readable error codes — kept in lockstep with `com.gamma.spi.auth.ErrorCodes` (backend-pinned by ApiContractTest). */
 export type V1ErrorCode =
     | 'MALFORMED_REQUEST'
     | 'NOT_FOUND'

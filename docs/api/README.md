@@ -43,4 +43,4 @@ if/when the file becomes unwieldy — that decision is reversible, the paths jus
 - Every response is `Envelope` (success) or `ErrorResponse` (non-2xx) — no bare payloads on v1.
 - Every request/response carries `Correlation-ID`.
 - DTO shapes only — no engine/entity leakage; secrets never on the wire (masked, `***`).
-- `ErrorCode` enum ↔ `com.gamma.control.ErrorCodes` stay in lockstep (test-pinned in both directions).
+- `ErrorCode` enum ↔ `com.gamma.spi.auth.ErrorCodes` stay in lockstep (test-pinned in both directions).

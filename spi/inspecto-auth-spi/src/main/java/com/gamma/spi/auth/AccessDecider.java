@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.spi.auth;
 
 import com.gamma.api.PublicApi;
 import com.sun.net.httpserver.HttpExchange;
@@ -10,7 +10,7 @@ import java.util.Map;
  * The PDP seam (ABAC A3, {@code docs/superpower/rbac-abac-plan.md} §2): an edition-supplied decider
  * consulted at the two PEPs — the route-level authorize stage (after authentication, before the
  * handler) and the row-level {@code RowScope} filter. Discovered via
- * {@code META-INF/services/com.gamma.control.AccessDecider} exactly like {@link Authenticator}:
+ * {@code META-INF/services/com.gamma.spi.auth.AccessDecider} exactly like {@link Authenticator}:
  * the core ships none, Personal/Standard classpaths resolve empty and behave byte-identically; the
  * Enterprise {@code inspecto-policy} module registers its policy engine.
  *
@@ -33,7 +33,7 @@ public interface AccessDecider {
      * clears it before every {@code decide} and reads it immediately after, so a decider that never
      * stamps simply audits an unnamed decision. Value is a {@link String}.
      */
-    String ATTR_MATCHED_POLICY = "com.gamma.control.AccessDecider.matchedPolicy";
+    String ATTR_MATCHED_POLICY = "com.gamma.spi.auth.AccessDecider.matchedPolicy";
 
     /** Stamp the matched policy name ({@code null} clears) — the decider-side write seam. Request-scoped
      *  via {@code ApiContext#attr}, never the JDK's exchange map (shared across in-flight requests on

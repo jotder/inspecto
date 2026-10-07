@@ -1,7 +1,7 @@
 package com.gamma.la.store.pg;
 
-import com.gamma.control.ApiException;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.InvestigationStoreProvider;
 import com.gamma.util.ConnectionSource;

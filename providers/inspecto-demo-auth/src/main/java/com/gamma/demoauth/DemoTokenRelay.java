@@ -1,6 +1,6 @@
 package com.gamma.demoauth;
 
-import com.gamma.control.TokenRelay;
+import com.gamma.spi.auth.TokenRelay;
 
 import java.nio.file.Path;
 import java.util.ArrayList;

@@ -1,6 +1,6 @@
 package com.gamma.geocountry;
 
-import com.gamma.control.GeoCountryResolver;
+import com.gamma.spi.auth.GeoCountryResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

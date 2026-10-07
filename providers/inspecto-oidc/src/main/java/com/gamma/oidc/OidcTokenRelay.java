@@ -3,7 +3,7 @@ package com.gamma.oidc;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.auth.secrets.SecretResolver;
-import com.gamma.control.TokenRelay;
+import com.gamma.spi.auth.TokenRelay;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -20,7 +20,7 @@ import java.util.Optional;
  * The Standard edition's {@link TokenRelay} (W6d): redeems Authorization-Code+PKCE codes and refresh
  * tokens against the IAM's token endpoint, server-to-server — so the browser only ever holds the
  * short-lived access token while the refresh token stays in the control plane's {@code httpOnly}
- * cookie. Registered via {@code META-INF/services/com.gamma.control.TokenRelay}.
+ * cookie. Registered via {@code META-INF/services/com.gamma.spi.auth.TokenRelay}.
  *
  * <p>Vendor-neutral by construction (BACKLOG D15: there is no IdP of record — the IdP is a per-client
  * deployment choice). Nothing here knows a vendor's URL layout: the token endpoint is <b>required

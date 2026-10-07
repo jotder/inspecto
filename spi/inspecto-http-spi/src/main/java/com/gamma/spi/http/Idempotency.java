@@ -1,8 +1,8 @@
 package com.gamma.spi.http;
 
-import com.gamma.control.Authenticator;
-import com.gamma.control.Authenticators;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.Authenticator;
+import com.gamma.spi.auth.Authenticators;
+import com.gamma.spi.auth.Subject;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.ByteArrayInputStream;

@@ -1,7 +1,7 @@
 package com.gamma.spi.http;
 
-import com.gamma.control.ErrorCodes;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.spi.auth.Subject;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.time.Instant;

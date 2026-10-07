@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.ApiException;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;

@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.spi.auth;
 
 import java.util.Optional;
 

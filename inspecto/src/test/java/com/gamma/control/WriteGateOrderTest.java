@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.ApiException;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;

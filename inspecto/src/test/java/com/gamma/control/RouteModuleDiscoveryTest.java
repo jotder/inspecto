@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.RouteModule;
 import com.fasterxml.jackson.databind.JsonNode;

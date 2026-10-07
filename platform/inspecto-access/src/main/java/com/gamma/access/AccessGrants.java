@@ -15,9 +15,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import com.gamma.control.Authenticator;
-import com.gamma.control.RequestAttrs;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.Authenticator;
+import com.gamma.spi.auth.RequestAttrs;
+import com.gamma.spi.auth.Subject;
 
 /**
  * Server-side Access-Profile enforcement (RBAC R2, {@code docs/superpower/rbac-abac-plan.md} §3):

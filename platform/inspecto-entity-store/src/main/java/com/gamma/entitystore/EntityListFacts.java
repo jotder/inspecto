@@ -1,9 +1,9 @@
 package com.gamma.entitystore;
 
 import com.gamma.spi.http.ApiContext;
-import com.gamma.control.ApiException;
+import com.gamma.spi.auth.ApiException;
 import com.gamma.entitystore.EntityTypes;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.sun.net.httpserver.HttpExchange;
 

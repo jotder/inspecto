@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.spi.auth;
 
 import com.gamma.api.PublicApi;
 
@@ -9,7 +9,7 @@ import java.util.Optional;
  * sees the refresh token — {@link AuthRoutes} keeps it in an {@code httpOnly} cookie and calls this
  * relay to mint access tokens against the IAM's token endpoint. Like {@link Authenticator}, this is
  * an edition seam: the Standard edition's {@code inspecto-oidc} module contributes the Keycloak
- * implementation via {@code META-INF/services/com.gamma.control.TokenRelay}; the auth-free core ships
+ * implementation via {@code META-INF/services/com.gamma.spi.auth.TokenRelay}; the auth-free core ships
  * none, so the {@code /auth/*} routes answer {@code 503 CAPABILITY_UNAVAILABLE} on Personal.
  */
 @PublicApi(since = "4.0.0")

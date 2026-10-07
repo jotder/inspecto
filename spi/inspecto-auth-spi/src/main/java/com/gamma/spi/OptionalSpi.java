@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * swallowing it would turn a bug into a silent absence — the failure mode this codebase has been bitten by
  * repeatedly. Unloadable is an absence; misbehaving is not.
  *
- * @see com.gamma.control.SpiSlot the control plane's cached single-provider facade, which delegates here
+ * @see com.gamma.spi.auth.SpiSlot the control plane's cached single-provider facade, which delegates here
  */
 public final class OptionalSpi {
 

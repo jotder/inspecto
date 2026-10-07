@@ -1,6 +1,6 @@
 package com.gamma.la.api;
 
-import com.gamma.control.ApiException;
+import com.gamma.spi.auth.ApiException;
 import com.gamma.la.core.Algorithm;
 import com.gamma.la.core.GraphBudget;
 import com.gamma.la.core.GraphEngine;

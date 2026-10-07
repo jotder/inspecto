@@ -10,12 +10,12 @@ import com.gamma.query.QueryExecutor;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.mask.EvidenceMasker;
 import com.gamma.spi.http.ApiContext;
-import com.gamma.control.ApiException;
+import com.gamma.spi.auth.ApiException;
 import com.gamma.control.AuditReadMasking;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.access.RowScope;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.Subject;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.nio.file.Files;

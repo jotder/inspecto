@@ -1,6 +1,6 @@
 package com.gamma.demoauth;
 
-import com.gamma.control.TokenRelay;
+import com.gamma.spi.auth.TokenRelay;
 import com.gamma.control.testkit.TokenRelayContract;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;

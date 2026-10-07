@@ -8,8 +8,8 @@ import com.sun.net.httpserver.HttpExchange;
 
 import java.util.List;
 import java.util.regex.Pattern;
-import com.gamma.control.GeoCountryResolvers;
-import com.gamma.control.RequestAttrs;
+import com.gamma.spi.auth.GeoCountryResolvers;
+import com.gamma.spi.auth.RequestAttrs;
 
 /**
  * The security audit trail's capture point — turns a state-changing Control API request into one

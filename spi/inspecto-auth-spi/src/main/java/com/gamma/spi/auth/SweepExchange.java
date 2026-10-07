@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.spi.auth;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpContext;

@@ -140,8 +140,8 @@ Eight ServiceLoader SPIs, all loaded by core:
 | SPI interface | Loader | Implementations (module) | `@PublicApi` |
 |---|---|---|---|
 | `acquire.CollectorConnectorFactory` | `acquire/CollectorConnectors.java:38` | Sftp/Ftp/Ftps/DbExport/S3/Kafka (connectors) | no |
-| `control.Authenticator` | `control/Authenticators.java:21` | `OidcAuthenticator` (security) | no |
-| `control.TokenRelay` | `control/TokenRelays.java:19` | `OidcTokenRelay` (security) | no |
+| `spi.auth.Authenticator` | `spi/auth/Authenticators.java:21` | `OidcAuthenticator` (security) | no |
+| `spi.auth.TokenRelay` | `control/TokenRelays.java:19` | `OidcTokenRelay` (security) | no |
 | `assist.spi.AssistAgent` | `service/CollectorService.java:604` | `UccAssistAgent` (agent) | **yes** (3.0.0) |
 | `intelligence.spi.IntelligenceAgent` | `service/CollectorService.java:609` | `InspectoIntelligenceAgent` (intelligence) | no |
 | `catalog.spi.DescriptionProvider` | `catalog/MetadataGraphService.java:62` | `Noop` (core), `AiDescriptionProvider` (agent) | no |

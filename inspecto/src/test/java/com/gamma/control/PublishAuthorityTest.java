@@ -1,5 +1,8 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.Authenticator;
+import com.gamma.spi.auth.Authenticators;
+import com.gamma.spi.auth.Subject;
 import com.gamma.job.JobConfig;
 import com.gamma.job.PostgresPublishJobType;
 import dev.toonformat.jtoon.JToon;

@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.spi.auth;
 
 /**
  * Machine-readable error codes for the v1 error object (docs/superpower/api-contract-design.md §5).

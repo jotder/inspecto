@@ -1,5 +1,7 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.Authenticators;
+import com.gamma.spi.auth.Subject;
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.service.SpaceManager;
 import org.junit.jupiter.api.AfterEach;

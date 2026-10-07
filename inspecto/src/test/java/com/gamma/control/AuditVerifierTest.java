@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.ApiException;
 import com.gamma.audit.AuditAttrs;
 import com.gamma.audit.AuditChain;
 import com.gamma.audit.Event;

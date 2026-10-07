@@ -1,5 +1,8 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.Authenticator;
+import com.gamma.spi.auth.Authenticators;
+import com.gamma.spi.auth.Subject;
 import com.gamma.audit.Event;
 import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;

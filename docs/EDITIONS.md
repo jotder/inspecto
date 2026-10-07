@@ -102,7 +102,7 @@ Professional/Enterprise editions re-introduce it out-of-band (see below) behind 
 SPI seam, so the engine keeps no auth code and fixes/features land once in common. This realigns
 the code with the model already described here: editions add modules; they are never branches.
 
-**Status (2026-07-06, W6):** the `Authenticator` SPI (`com.gamma.control.Authenticator`/`Subject`)
+**Status (2026-07-06, W6):** the `Authenticator` SPI (`com.gamma.spi.auth.Authenticator`/`Subject`)
 and the AuthN/AuthZ gate in `ControlApi.dispatch` are shipped in the core (edition-neutral — a no-op
 when no implementation is on the classpath). The `inspecto-oidc` module ships the Professional
 implementation (`OidcAuthenticator`, Nimbus JOSE+JWT + JWKS) and is reactor-gated behind the
@@ -126,7 +126,7 @@ assessment + 7-phase hardening roadmap is maintained alongside this repo's plann
 
 **Shipped — the ABAC policy engine (rbac-abac-plan §4):** the `edition-enterprise` Maven profile
 (= `edition-professional` + `inspecto-policy`). The module registers a `PolicyEngine` on the core's
-`com.gamma.control.AccessDecider` ServiceLoader seam; authored per-space Access Policies
+`com.gamma.spi.auth.AccessDecider` ServiceLoader seam; authored per-space Access Policies
 (`access-policies.toon`, the shared `Conditions` grammar) then evaluate at the route-level authorize
 stage (deny = 403) and the row-level `RowScope` filter (deny = the SEC-7d 404/filtered contract).
 Personal and Professional never bundle the module and behave byte-identically. Build/test:
@@ -139,7 +139,7 @@ a **superset of Professional** (mirroring the profile relation), so it builds `i
 `inspecto-policy.jar`. The generated `serve.sh`/`serve.bat` auto-detect edition from the bundle
 contents exactly as they already did for Professional: security jar ⇒ `Professional` (+ `-Dauth.mode=oidc`),
 plus policy jar ⇒ `Enterprise`. **No new runtime flag exists or is needed** — `inspecto-policy` is found
-solely through `META-INF/services/com.gamma.control.AccessDecider`, so the classpath entry *is* the
+solely through `META-INF/services/com.gamma.spi.auth.AccessDecider`, so the classpath entry *is* the
 switch. Personal bundles remain byte-for-byte unchanged. Since 2026-09-29 (`ASSURE-INTELLIGENCE-BUNDLE-1`)
 Enterprise also stages `inspecto-intelligence.jar` (CP-14 `/agent/*`), found the same way through
 `META-INF/services/com.gamma.intelligence.spi.IntelligenceAgent` and loaded through `OptionalSpi`, so a host

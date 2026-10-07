@@ -1,6 +1,6 @@
 package com.gamma.la.core;
 
-import com.gamma.control.SpiSlot;
+import com.gamma.spi.auth.SpiSlot;
 
 import java.util.Optional;
 

@@ -1,8 +1,8 @@
 package com.gamma.la.core;
 
-import com.gamma.control.ApiException;
+import com.gamma.spi.auth.ApiException;
 import com.gamma.control.ApiExceptionPeek;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ErrorCodes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

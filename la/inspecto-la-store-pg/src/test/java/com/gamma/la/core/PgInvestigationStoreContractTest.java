@@ -153,9 +153,9 @@ class PgInvestigationStoreContractTest extends InvestigationStoreContract {
         }, schema);
         s.create("o", "{}");
         down[0] = true;
-        com.gamma.control.ApiException e = assertThrows(com.gamma.control.ApiException.class, () -> s.header("o"));
+        com.gamma.spi.auth.ApiException e = assertThrows(com.gamma.spi.auth.ApiException.class, () -> s.header("o"));
         assertEquals(503, com.gamma.control.ApiExceptionPeek.status(e));
-        assertEquals(com.gamma.control.ErrorCodes.CAPABILITY_UNAVAILABLE, com.gamma.control.ApiExceptionPeek.code(e));
+        assertEquals(com.gamma.spi.auth.ErrorCodes.CAPABILITY_UNAVAILABLE, com.gamma.control.ApiExceptionPeek.code(e));
         down[0] = false;
         assertEquals("{}", s.header("o").orElseThrow(), "the same store serves again: nothing was cached about the outage");
     }
@@ -167,7 +167,7 @@ class PgInvestigationStoreContractTest extends InvestigationStoreContract {
         System.setProperty(InvestigationStores.URL_PROPERTY, "jdbc:postgresql://127.0.0.1:1/none?connectTimeout=2");
         try {
             for (int attempt = 0; attempt < 2; attempt++) {
-                com.gamma.control.ApiException e = assertThrows(com.gamma.control.ApiException.class,
+                com.gamma.spi.auth.ApiException e = assertThrows(com.gamma.spi.auth.ApiException.class,
                         () -> InvestigationStores.of(java.nio.file.Path.of("spaces", "s1", "config")));
                 assertEquals(503, com.gamma.control.ApiExceptionPeek.status(e));
                 assertTrue(e.getMessage().contains("cannot be used"), e.getMessage());

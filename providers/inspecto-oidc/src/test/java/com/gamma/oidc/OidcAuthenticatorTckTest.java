@@ -1,6 +1,6 @@
 package com.gamma.oidc;
 
-import com.gamma.control.Authenticator;
+import com.gamma.spi.auth.Authenticator;
 import com.gamma.control.testkit.AuthenticatorContract;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;

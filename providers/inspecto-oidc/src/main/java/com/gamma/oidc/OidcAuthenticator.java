@@ -1,10 +1,10 @@
 package com.gamma.oidc;
 
 import com.gamma.access.AccessGrants;
-import com.gamma.control.Authenticator;
+import com.gamma.spi.auth.Authenticator;
 import com.gamma.access.ComponentAccess;
 import com.gamma.access.Roles;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.Subject;
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.source.JWKSource;
@@ -29,7 +29,7 @@ import java.util.Set;
  * OIDC resource-server {@link Authenticator} (W6, Standard edition): validates a Bearer JWT's
  * signature against the IAM's published JWKS, plus issuer/audience/expiry — "defense in depth, never
  * trust the gateway blindly" (docs/superpower/api-contract-design.md §8). Discovered via
- * {@code META-INF/services/com.gamma.control.Authenticator}; {@code ControlApi} eagerly resolves the
+ * {@code META-INF/services/com.gamma.spi.auth.Authenticator}; {@code ControlApi} eagerly resolves the
  * active {@code Authenticator} at startup, so a misconfigured deployment (missing
  * {@code -Dauth.oidc.issuer}/{@code -Dauth.oidc.jwksUri}) fails to boot rather than silently accepting
  * every request. Any parse/verify failure — bad signature, wrong issuer/audience, expired, malformed —

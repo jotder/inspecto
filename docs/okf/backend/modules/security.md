@@ -12,7 +12,7 @@ timestamp: 2026-07-07T00:00:00Z
 A profile-gated Maven module (`inspecto-oidc`, in the `edition-professional`/`edition-enterprise` profiles only — with `edition-standard` retained as an alias — `pom.xml:76`, `:115`), shipped W6 (2026-07-06). It supplies the
 **Professional/Enterprise** auth implementation; the common core stays auth-free.
 
-* **SPI seam (in core)** — `com.gamma.control.Authenticator` / `Subject` (id + capabilities) /
+* **SPI seam (in core)** — `com.gamma.spi.auth.Authenticator` / `Subject` (id + capabilities) /
   `TokenRelay`, discovered via `ServiceLoader`. **No-op wins**: with no provider on the classpath the
   Personal edition is byte-for-byte unchanged.
 * **Contents** — `OidcAuthenticator` (OIDC resource server on Nimbus JOSE+JWT / JWKS),

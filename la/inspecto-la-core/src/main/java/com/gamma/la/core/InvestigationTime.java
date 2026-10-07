@@ -1,8 +1,8 @@
 package com.gamma.la.core;
 
 import com.gamma.config.spec.SourceZoneGrammar;
-import com.gamma.control.ApiException;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
 
 import java.time.DateTimeException;
 import java.time.DayOfWeek;

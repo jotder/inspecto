@@ -6,8 +6,8 @@ import com.gamma.control.RouteErrors;
 import com.gamma.control.WidgetTags;
 
 import com.gamma.spi.http.ApiContext;
-import com.gamma.control.ApiException;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.access.WriteGates;
 

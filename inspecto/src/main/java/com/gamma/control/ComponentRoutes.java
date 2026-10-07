@@ -1,5 +1,10 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.spi.auth.PrincipalDirectories;
+import com.gamma.spi.auth.PrincipalDirectory;
+import com.gamma.spi.auth.Subject;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.ComponentDeleteHook;
 import com.gamma.spi.http.ComponentKindValidator;

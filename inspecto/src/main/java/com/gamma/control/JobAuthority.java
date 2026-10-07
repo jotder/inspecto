@@ -1,5 +1,8 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.Authenticator;
+import com.gamma.spi.auth.Authenticators;
+import com.gamma.spi.auth.Subject;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.audit.Event;

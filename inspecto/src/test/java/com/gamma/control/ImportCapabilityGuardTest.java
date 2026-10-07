@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.ApiException;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import org.junit.jupiter.api.Test;

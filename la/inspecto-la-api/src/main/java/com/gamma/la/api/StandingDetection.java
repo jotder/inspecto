@@ -4,7 +4,7 @@ import com.gamma.access.ComponentAccess;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.access.RowScope;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.Subject;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.InvestigationMembers;
 import com.gamma.la.core.InvestigationStore;

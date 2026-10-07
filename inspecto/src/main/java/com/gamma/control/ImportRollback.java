@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.ApiException;
 import com.gamma.service.ImportJournal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

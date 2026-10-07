@@ -1,5 +1,9 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.Authenticator;
+import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.spi.auth.Subject;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.intelligence.AgentAnswerSink;

@@ -8,11 +8,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import com.gamma.control.ApiException;
-import com.gamma.control.Authenticator;
-import com.gamma.control.ErrorCodes;
-import com.gamma.control.RequestAttrs;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.Authenticator;
+import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.spi.auth.RequestAttrs;
+import com.gamma.spi.auth.Subject;
 import static com.gamma.util.Values.trimOrEmpty;
 
 /**

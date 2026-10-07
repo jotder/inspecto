@@ -1,6 +1,6 @@
 package com.gamma.la.api;
 
-import com.gamma.control.ApiException;
+import com.gamma.spi.auth.ApiException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

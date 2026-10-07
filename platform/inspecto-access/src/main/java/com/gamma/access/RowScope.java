@@ -4,11 +4,11 @@ import com.gamma.api.PublicApi;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.util.Map;
-import com.gamma.control.AccessDecider;
-import com.gamma.control.AccessDeciders;
-import com.gamma.control.RequestAttrs;
-import com.gamma.control.Subject;
-import com.gamma.control.SweepExchange;
+import com.gamma.spi.auth.AccessDecider;
+import com.gamma.spi.auth.AccessDeciders;
+import com.gamma.spi.auth.RequestAttrs;
+import com.gamma.spi.auth.Subject;
+import com.gamma.spi.auth.SweepExchange;
 
 /**
  * The row-level PEP (ABAC A3): generalizes {@code ObjectRoutes}' SEC-7d visibility filter — "an

@@ -1,6 +1,6 @@
 package com.gamma.demoauth;
 
-import com.gamma.control.Authenticator;
+import com.gamma.spi.auth.Authenticator;
 import com.gamma.control.testkit.AuthenticatorContract;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;

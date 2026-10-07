@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.spi.auth;
 
 import com.gamma.api.PublicApi;
 
@@ -7,7 +7,7 @@ import java.util.Optional;
 /**
  * Resolves a client IP to an ISO 3166-1 country for the audit trail (ses-sns-adapter-design §6, decision D12).
  * An edition seam like {@link TokenRelay}: an implementation arrives via
- * {@code META-INF/services/com.gamma.control.GeoCountryResolver}; the core ships none.
+ * {@code META-INF/services/com.gamma.spi.auth.GeoCountryResolver}; the core ships none.
  *
  * <p><b>D12 (operator, 2026-09-28): operator-supplied, country only.</b> Inspecto bundles no GeoIP database and
  * never downloads one. The operator points {@code -Dgeoip.db=<path to .mmdb>} at a database they obtained under a

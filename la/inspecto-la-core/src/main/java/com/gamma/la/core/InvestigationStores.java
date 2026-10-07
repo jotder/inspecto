@@ -1,9 +1,9 @@
 package com.gamma.la.core;
 
 import com.gamma.auth.secrets.SecretResolver;
-import com.gamma.control.ApiException;
-import com.gamma.control.ErrorCodes;
-import com.gamma.control.SpiSlot;
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.spi.auth.SpiSlot;
 
 import java.io.IOException;
 import java.nio.file.Path;

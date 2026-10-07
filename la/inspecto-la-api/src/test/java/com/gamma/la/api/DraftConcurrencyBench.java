@@ -2,7 +2,7 @@ package com.gamma.la.api;
 
 import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.FsInvestigationStore;
-import com.gamma.control.ApiException;
+import com.gamma.spi.auth.ApiException;
 import com.gamma.control.ApiExceptionPeek;
 import com.gamma.la.core.DraftCheckpoints;
 import com.gamma.la.core.DraftLifecycle;

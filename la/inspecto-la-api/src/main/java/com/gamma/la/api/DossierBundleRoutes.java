@@ -3,8 +3,8 @@ package com.gamma.la.api;
 import com.gamma.la.core.InvestigationStore;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.spi.http.ApiContext;
-import com.gamma.control.ApiException;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.RouteModule;
 import com.sun.net.httpserver.HttpExchange;
 

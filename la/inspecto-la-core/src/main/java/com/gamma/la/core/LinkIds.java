@@ -1,7 +1,7 @@
 package com.gamma.la.core;
 
-import com.gamma.control.ApiException;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;

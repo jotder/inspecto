@@ -1,5 +1,7 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.Authenticators;
+import com.gamma.spi.auth.Subject;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;

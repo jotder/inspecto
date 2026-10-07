@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.spi.auth;
 
 import java.util.Optional;
 import java.util.logging.Logger;
@@ -31,7 +31,7 @@ public final class GeoCountryResolvers {
     }
 
     /** Test seam: a resolver used regardless of {@code -Dgeoip.db}; {@code null} restores discovery. */
-    static void forTest(GeoCountryResolver r) {
+    public static void forTest(GeoCountryResolver r) {
         testOverride = r;
     }
 }

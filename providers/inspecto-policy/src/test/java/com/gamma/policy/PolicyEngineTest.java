@@ -1,11 +1,11 @@
 package com.gamma.policy;
 
-import com.gamma.control.AccessDecider.Decision;
-import com.gamma.control.AccessDecider.Explanation;
-import com.gamma.control.AccessDecider.Evaluation;
+import com.gamma.spi.auth.AccessDecider.Decision;
+import com.gamma.spi.auth.AccessDecider.Explanation;
+import com.gamma.spi.auth.AccessDecider.Evaluation;
 import com.gamma.access.ComponentAccess;
 import com.gamma.access.Roles;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.Subject;
 import com.gamma.event.EventLog;
 import com.sun.net.httpserver.HttpServer;
 import dev.toonformat.jtoon.JToon;
@@ -141,7 +141,7 @@ class PolicyEngineTest {
                 Map.of("name", "freeze-mallory", "effect", "deny", "target", Map.of("actions", List.of("write")),
                         "when", "subject.id == 'mallory'"));
         writePolicies(diskRoot, doc);
-        List<com.gamma.control.AccessPolicies.Policy> draft =
+        List<com.gamma.spi.auth.AccessPolicies.Policy> draft =
                 com.gamma.access.AccessPolicyStore.load(diskRoot).policies();   // the same validated policies
         for (String who : List.of("ana", "mallory"))
             for (String action : List.of("read", "write", "operate")) {
@@ -164,9 +164,9 @@ class PolicyEngineTest {
 
     @Test
     void seededPoliciesExposesTheSpaceIsolationDenies() {
-        List<String> names = ENGINE.seededPolicies().stream().map(com.gamma.control.AccessPolicies.Policy::name).toList();
+        List<String> names = ENGINE.seededPolicies().stream().map(com.gamma.spi.auth.AccessPolicies.Policy::name).toList();
         assertEquals(List.of("space-isolation", "space-isolation-rows"), names);
-        assertTrue(ENGINE.seededPolicies().stream().allMatch(com.gamma.control.AccessPolicies.Policy::deny),
+        assertTrue(ENGINE.seededPolicies().stream().allMatch(com.gamma.spi.auth.AccessPolicies.Policy::deny),
                 "the seeds are denies");
     }
 

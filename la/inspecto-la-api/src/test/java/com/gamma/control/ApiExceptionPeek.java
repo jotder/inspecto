@@ -1,5 +1,7 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.ApiException;
+
 /**
  * Test-scope split-package peek at {@link ApiException}'s package-private status and code (the same technique the module's
  * sibling tests use for package-private control-plane members): Link Analysis tests assert WHICH refusal a port-less route

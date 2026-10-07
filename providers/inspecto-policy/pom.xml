@@ -19,7 +19,7 @@
         OPTIONAL Enterprise-edition AccessDecider (ABAC A3, docs/superpower/rbac-abac-plan.md §4):
         evaluates the space's authored Access Policies (access-policies.toon, the shared Conditions
         grammar) at the core's two PEPs -- the route-level authorize stage and the row-level RowScope
-        filter. Discovered by the core's ServiceLoader seam (com.gamma.control.AccessDecider) --
+        filter. Discovered by the core's ServiceLoader seam (com.gamma.spi.auth.AccessDecider) --
         dropping THIS jar on the classpath is what turns policy evaluation on; Personal and Professional
         never bundle it and keep their existing behaviour byte-identically. Dependency-free beyond the
         core (the condition evaluator is hand-rolled in inspecto-util). Only built as part of the

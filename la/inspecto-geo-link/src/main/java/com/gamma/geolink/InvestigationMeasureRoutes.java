@@ -13,8 +13,8 @@ import com.gamma.control.HostContext;
 import com.gamma.alert.AlertRule;
 import com.gamma.alert.AlertService;
 import com.gamma.spi.http.ApiContext;
-import com.gamma.control.ApiException;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.audit.Event;
 import com.gamma.event.EventLog;
@@ -275,9 +275,9 @@ public final class InvestigationMeasureRoutes implements RouteModule {
                     + "]: the masking basis of Dataset '" + inv.dataset() + "' could not be determined");
         var subject = ApiContext.subject(ex);
         StandingDetection.Authority authority = new StandingDetection.Authority("sweep:" + id, String.valueOf(owner),
-                subject.map(com.gamma.control.Subject::capabilities).orElse(Set.of()),
-                subject.map(com.gamma.control.Subject::dataScopes).orElse(null),
-                subject.map(com.gamma.control.Subject::attributes).orElse(Map.of()), inv.dataset(), masking, actor,
+                subject.map(com.gamma.spi.auth.Subject::capabilities).orElse(Set.of()),
+                subject.map(com.gamma.spi.auth.Subject::dataScopes).orElse(null),
+                subject.map(com.gamma.spi.auth.Subject::attributes).orElse(Map.of()), inv.dataset(), masking, actor,
                 Instant.now().toString());
         StandingDetection.Verdict verdict = StandingDetection.check(inv.writeRoot(), inv.store(), id, inv.header(), authority);
         if (!verdict.allowed())

@@ -1,10 +1,10 @@
 package com.gamma.demoauth;
 
 import com.gamma.access.AccessGrants;
-import com.gamma.control.Authenticator;
+import com.gamma.spi.auth.Authenticator;
 import com.gamma.access.ComponentAccess;
 import com.gamma.access.Roles;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.Subject;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.nio.file.Path;

@@ -1,5 +1,8 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.Authenticator;
+import com.gamma.spi.auth.Authenticators;
+import com.gamma.spi.auth.Subject;
 import com.gamma.exchange.Exchange;
 import com.gamma.exchange.ShareGrant;
 import com.gamma.metrics.MetricRegistry;

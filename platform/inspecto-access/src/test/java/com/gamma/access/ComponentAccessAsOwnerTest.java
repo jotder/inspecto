@@ -7,9 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-import com.gamma.control.AccessDecider;
-import com.gamma.control.AccessDeciders;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.AccessDecider;
+import com.gamma.spi.auth.AccessDeciders;
+import com.gamma.spi.auth.Subject;
 
 import static com.gamma.access.ComponentAccess.AsOwner.ALLOWED;
 import static com.gamma.access.ComponentAccess.AsOwner.DENIED;

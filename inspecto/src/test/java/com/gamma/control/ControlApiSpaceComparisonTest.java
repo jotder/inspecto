@@ -1,5 +1,8 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.Authenticator;
+import com.gamma.spi.auth.Authenticators;
+import com.gamma.spi.auth.Subject;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.service.SpaceId;

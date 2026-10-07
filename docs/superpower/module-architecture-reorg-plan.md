@@ -855,6 +855,42 @@ table is unchanged.
 - **Guard rows: none.** One doc-count figure moved: the derived `spi-extension-points` count is **35** (was 34) because `EventSink`
   is found through `ServiceLoader`; the four doc lines were updated, the guard untouched.
 
+### P7 contracts: com.gamma.control split as built (2026-10-07, `a8cb2d0a8` + `876810123` + `AUTHSHA` — the contract modules leave the core's package)
+
+**Split packages 3 -> 2** (`com.gamma.control` no longer spans modules; the two left are the deliberate `telecom-asn1` packages
+`ingester` and `parse`). The core processor KEEPS `com.gamma.control` (ControlApi, the routes, `HostContext`, `TokenRelays`, ...).
+One commit per module, smallest first, all by a node mover (word-boundary FQCN rewrite incl. `import static`, javadoc, string
+literals, `META-INF/services` FILE NAMES, doc path citations; explicit imports added where same-package access vanished).
+
+| Module | Classes moved | New package |
+|---|---|---|
+| `inspecto-entity-store` (2 + 2 tests) | `EntityTypes`, `LinkAnalysisSettings` | `com.gamma.entitystore` (the store already owned it) |
+| `inspecto-http-spi` (8) | `ApiContext`, `Envelope`, `Handler`, `RouteModule`, `Idempotency`, `GovernableKindProvider`, `ComponentKindValidator`, `ComponentDeleteHook` | `com.gamma.spi.http` |
+| `inspecto-auth-spi` (17) | `AccessDecider`, `AccessDeciders`, `AccessPolicies`, `ApiException`, `Authenticator`, `Authenticators`, `ErrorCodes`, `GeoCountryResolver`, `GeoCountryResolvers`, `PrincipalDirectories`, `PrincipalDirectory`, `RequestAttrs`, `SpiSlot`, `Subject`, `SweepExchange`, `TokenRelay`, `WriteRootProvider` | `com.gamma.spi.auth` |
+
+**Naming.** `com.gamma.spi.<contract>` for the two SPI modules (parallel to `OptionalSpi` in `com.gamma.spi`); the secrets contract
+keeps `com.gamma.auth.secrets` (a different concern, moved earlier). `RequestAttrs` moved WITH the rest of auth-spi: it stays in
+auth-spi (not http-spi) because `Subject.stampIssuer` / `AccessDecider.matchedPolicy` call it while http-spi depends on auth-spi —
+moving it up would be a cycle. That is the whole of the old "`RequestAttrs` stays" residue; nothing about it is open.
+
+**Persisted names / service files.** 18 `META-INF/services` files renamed (12 for http-spi: `RouteModule` x9 + `GovernableKindProvider`,
+`ComponentDeleteHook`, `ComponentKindValidator`; 6 for auth-spi: `Authenticator` x2, `TokenRelay` x2, `GeoCountryResolver`,
+`AccessDecider`); `inspecto/package.ps1` verifies them by interface FQCN and follows (the mover rewrote it). `HostBootHook` and the
+`SpiSlotFailClosedTest$*` test files name core types and stay. No user-visible persisted data (spaces, templates, docs examples,
+TOON) names any moved FQCN. Doc path citations to the old `com/gamma/control/<SpiClass>` paths were rewritten.
+
+**Members made public** (package-private only because the package was split): entity-store — `LinkAnalysisSettings.EMPTY`, `read`,
+`write`, `maskingMode`; `EntityTypes.parse`, `shape`. http-spi — `Envelope` (class + `shape`), `Idempotency` (class, `PER_CALLER_CAP`,
+`MAX_REQUEST_BYTES`, `MAX_PRINCIPALS`, `HEADER_CACHED`, `Entry`, `Pending`, `Store` + its methods, `cacheable`, `headerKey`,
+`principal`, `keyFor`, `canonical`, `bodyHash`, `capture`, `replay`). auth-spi — `Authenticators` (class, `active`, `forTest`),
+`ErrorCodes.defaultFor`, `ApiException.status` / `errorCode`, `PrincipalDirectories` (class + `active`, `requireKnown`, `forTest`),
+`GeoCountryResolvers.forTest`.
+
+**Gotchas.** (a) A word-match import adder also matched prose: auth-spi javadoc `{@link ApiContext}` (a class auth-spi cannot see)
+got an import and broke the module; those links became `{@code}`. `Handler` in a test that imports `java.util.logging.Handler`
+got a second, ambiguous import. (b) `ControlApiIdempotencyScopeTest` stays in the core test tree (package `com.gamma.control`), so it
+is why `Idempotency.Store` internals are public rather than the test moving.
+
 ## 7. Success measures (baseline → target)
 
 | Measure | Today | Target |

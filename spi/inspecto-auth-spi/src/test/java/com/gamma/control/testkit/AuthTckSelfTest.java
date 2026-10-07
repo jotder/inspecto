@@ -1,8 +1,8 @@
 package com.gamma.control.testkit;
 
-import com.gamma.control.Authenticator;
-import com.gamma.control.Subject;
-import com.gamma.control.TokenRelay;
+import com.gamma.spi.auth.Authenticator;
+import com.gamma.spi.auth.Subject;
+import com.gamma.spi.auth.TokenRelay;
 import com.sun.net.httpserver.HttpExchange;
 import org.junit.jupiter.api.Test;
 import org.opentest4j.AssertionFailedError;

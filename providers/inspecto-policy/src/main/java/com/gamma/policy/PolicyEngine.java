@@ -1,10 +1,10 @@
 package com.gamma.policy;
 
-import com.gamma.control.AccessDecider;
-import com.gamma.control.AccessPolicies;
+import com.gamma.spi.auth.AccessDecider;
+import com.gamma.spi.auth.AccessPolicies;
 import com.gamma.access.AccessPolicyStore;
 import com.gamma.access.ComponentAccess;
-import com.gamma.control.Subject;
+import com.gamma.spi.auth.Subject;
 import com.gamma.event.EventLog;
 import com.gamma.util.Conditions;
 import com.sun.net.httpserver.HttpExchange;
@@ -20,7 +20,7 @@ import java.util.Map;
  * The Enterprise PDP (ABAC A3, {@code docs/superpower/rbac-abac-plan.md} §4): evaluates the bound
  * space's authored Access Policies ({@link AccessPolicies} — already parsed, mtime-fresh) against a
  * {@code subject.* / resource.* / env.*} attribute context assembled per decision. Registered via
- * {@code META-INF/services/com.gamma.control.AccessDecider}; dropping this jar on the classpath is
+ * {@code META-INF/services/com.gamma.spi.auth.AccessDecider}; dropping this jar on the classpath is
  * what turns policy evaluation on.
  *
  * <p><b>Combining (plan §2):</b> deny overrides — the first matching {@code deny} wins; otherwise a

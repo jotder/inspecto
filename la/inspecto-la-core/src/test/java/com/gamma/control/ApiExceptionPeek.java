@@ -1,5 +1,7 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.ApiException;
+
 /**
  * Test-scope split-package peek at {@link ApiException}'s package-private status and code. Published in la-core's test-jar so the
  * Postgres module's tests can assert WHICH refusal the store raises without the control plane that serialises it.

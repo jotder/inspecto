@@ -1,6 +1,6 @@
 package com.gamma.spi.http;
 
-import com.gamma.control.ApiException;
+import com.gamma.spi.auth.ApiException;
 
 
 /**

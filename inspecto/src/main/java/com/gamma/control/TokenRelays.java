@@ -1,5 +1,8 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.Authenticators;
+import com.gamma.spi.auth.SpiSlot;
+import com.gamma.spi.auth.TokenRelay;
 import java.util.Optional;
 
 /**

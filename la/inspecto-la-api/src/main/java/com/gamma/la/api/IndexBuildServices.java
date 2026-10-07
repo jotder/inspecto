@@ -1,7 +1,7 @@
 package com.gamma.la.api;
 
-import com.gamma.control.ApiException;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.la.storage.IndexBuildService;
 
 import java.nio.file.Files;

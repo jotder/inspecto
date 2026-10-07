@@ -19,7 +19,7 @@
         OPTIONAL Professional-edition Authenticator (W6, docs/EDITIONS.md "Security direction"): an OIDC
         resource server that validates IAM-issued (Keycloak/WSO2/Okta/Entra) JWTs via Nimbus JOSE+JWT
         + JWKS and resolves claims -> Roles -> Capabilities (docs/superpower/rbac-groundwork.md).
-        Discovered by the core's ServiceLoader seam (com.gamma.control.Authenticator) -- dropping THIS
+        Discovered by the core's ServiceLoader seam (com.gamma.spi.auth.Authenticator) -- dropping THIS
         jar on the classpath (+ -Dauth.oidc.issuer / -Dauth.oidc.jwksUri) is what turns authentication
         on. The Personal edition never bundles it and stays auth-free -- exactly how inspecto-connectors
         and inspecto-agent-hosted isolate their own optional dependencies from the lean core. Only built

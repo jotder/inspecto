@@ -1,8 +1,8 @@
 package com.gamma.access;
 
-import com.gamma.control.AccessPolicies.Doc;
-import com.gamma.control.AccessPolicies.Policy;
-import com.gamma.control.AccessPolicies.Warning;
+import com.gamma.spi.auth.AccessPolicies.Doc;
+import com.gamma.spi.auth.AccessPolicies.Policy;
+import com.gamma.spi.auth.AccessPolicies.Warning;
 import com.gamma.util.AtomicFiles;
 import com.gamma.util.Conditions;
 import com.gamma.util.ToonHelper;
@@ -22,13 +22,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import com.gamma.control.AccessDecider;
-import com.gamma.control.AccessPolicies;
-import com.gamma.control.ApiException;
-import com.gamma.control.ErrorCodes;
-import com.gamma.control.RequestAttrs;
-import static com.gamma.control.AccessPolicies.ACTIONS;
-import static com.gamma.control.AccessPolicies.RESOURCE_KINDS;
+import com.gamma.spi.auth.AccessDecider;
+import com.gamma.spi.auth.AccessPolicies;
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
+import com.gamma.spi.auth.RequestAttrs;
+import static com.gamma.spi.auth.AccessPolicies.ACTIONS;
+import static com.gamma.spi.auth.AccessPolicies.RESOURCE_KINDS;
 import static com.gamma.util.Values.trimOrEmpty;
 
 /**

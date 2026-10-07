@@ -1,5 +1,8 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.Authenticator;
+import com.gamma.spi.auth.Authenticators;
+import com.gamma.spi.auth.Subject;
 import dev.toonformat.jtoon.JToon;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;

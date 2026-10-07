@@ -1,5 +1,7 @@
 package com.gamma.control;
 
+import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.config.safety.PathJail;
 import java.nio.file.Path;
 import com.gamma.access.WriteGates;

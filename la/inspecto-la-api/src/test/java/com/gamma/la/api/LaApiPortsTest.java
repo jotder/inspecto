@@ -1,8 +1,8 @@
 package com.gamma.la.api;
 
-import com.gamma.control.ApiException;
+import com.gamma.spi.auth.ApiException;
 import com.gamma.control.ApiExceptionPeek;
-import com.gamma.control.ErrorCodes;
+import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.la.core.CasePort;
 import com.gamma.la.core.CasePorts;
 import com.gamma.la.core.DatasetProviders;
