@@ -45,6 +45,8 @@ class DecisionRuleWritersTest {
                     + "(archive=false) — no body content, the stamps and invoke-api consequences are the stored ones"),
             Map.entry("DecisionRoutes#delete", "deletes; a deleted rule's history is purged with it"),
             Map.entry("ComponentRoutes#deleteComponent", "deletes; a deleted rule's history is purged with it"),
+            Map.entry("AccessRoutes#savePolicies", FIXED_KIND + " (Access Policies document, AccessPolicyStore)"),
+            Map.entry("ReconComponentDeleteHook#afterDelete", NOT_CONFIG),
             Map.entry("AccessRoutes#deleteProfile", FIXED_KIND + " (access-profile delete)"),
             Map.entry("AlertRoutes#delete", FIXED_KIND + " (alert-rule delete)"),
             Map.entry("ExpectationRoutes#delete", FIXED_KIND + " (expectation delete)"),
