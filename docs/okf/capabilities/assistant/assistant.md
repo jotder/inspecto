@@ -573,7 +573,7 @@ what it promises is absence.
 | Assist SPI + routes | `inspecto/src/main/java/com/gamma/assist/spi/AssistAgent.java` | [`assist-agent.md`](../../backend/agent/assist-agent.md) |
 | Reflex agent + skills | `features/inspecto-agent/src/main/java/com/gamma/agent/UccAssistAgent.java`; `features/inspecto-agent/src/main/java/com/gamma/agent/skill/AlertRuleTool.java`, `SqlOracleTool.java` | same |
 | Hosted providers (quarantined) | `providers/inspecto-agent-hosted/` | [`hosted-providers.md`](../../backend/agent/hosted-providers.md) |
-| Deliberative agent | `features/inspecto-intelligence/src/main/java/com/gamma/intelligence/InspectoIntelligenceAgent.java`, `GatewayFactory.java` | [`embedded-intelligence.md`](../../backend/agent/embedded-intelligence.md) |
+| Deliberative agent | `features/inspecto-intelligence/src/main/java/com/gamma/intelligence/agent/InspectoIntelligenceAgent.java`, `GatewayFactory.java` | [`embedded-intelligence.md`](../../backend/agent/embedded-intelligence.md) |
 | The tool belt | `features/inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoTools.java`, `ArgumentDeriver.java`, `GlossaryLoader.java` | same |
 | Gated actions | `features/inspecto-intelligence/src/main/java/com/gamma/intelligence/action/ComponentActions.java`, `OperationalActions.java` | same §P3 |
 | Signal projections | `platform/inspecto-engine/src/main/java/com/gamma/signal/AgUiProjection.java`, `Signals.java` | [`signal-backbone.md`](../../backend/control-plane/signal-backbone.md) §S3–S7 |

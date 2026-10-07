@@ -1,4 +1,4 @@
-package com.gamma.intelligence;
+package com.gamma.intelligence.agent;
 
 import com.eoiagent.core.AgentAnswer;
 import com.eoiagent.core.Citation;
@@ -62,6 +62,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import com.gamma.intelligence.AgentAnswerSink;
+import com.gamma.intelligence.AgentAskRequest;
+import com.gamma.intelligence.AgentAskResult;
+import com.gamma.intelligence.AgentSessionRequest;
+import com.gamma.intelligence.AgentSessionResult;
 
 /**
  * The {@link IntelligenceAgent} provider (AGT-5, P0): assembles the {@link InspectoPack} on the

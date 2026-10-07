@@ -1,4 +1,4 @@
-package com.gamma.intelligence;
+package com.gamma.intelligence.agent;
 
 import com.eoiagent.core.RunId;
 import com.eoiagent.core.ToolCall;
@@ -20,6 +20,10 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.gamma.intelligence.agent.InspectoIntelligenceAgent;
+import com.gamma.intelligence.AgentAskRequest;
+import com.gamma.intelligence.AgentSessionRequest;
+import com.gamma.intelligence.AgentSessionResult;
 
 /**
  * Round-2 verification, 2026-09-29: a read-only user's SESSION could make the model call a gated tool and get

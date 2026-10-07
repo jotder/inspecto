@@ -1,4 +1,4 @@
-package com.gamma.intelligence;
+package com.gamma.intelligence.agent;
 
 import com.eoiagent.model.LlmGateway;
 import com.eoiagent.model.OllamaChatAdapter;

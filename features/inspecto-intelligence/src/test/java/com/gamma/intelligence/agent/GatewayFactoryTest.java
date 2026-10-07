@@ -1,4 +1,4 @@
-package com.gamma.intelligence;
+package com.gamma.intelligence.agent;
 
 import com.gamma.model.ModelSettings;
 import com.gamma.util.egress.EgressPolicy;

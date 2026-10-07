@@ -1,4 +1,4 @@
-package com.gamma.intelligence;
+package com.gamma.intelligence.agent;
 
 import com.eoiagent.core.RunId;
 import com.eoiagent.core.ToolCall;
@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.gamma.intelligence.agent.InspectoIntelligenceAgent;
 
 /**
  * AGT-6a A5.2 — the bounded repair loop for {@code component_draft}.

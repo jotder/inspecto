@@ -1,4 +1,4 @@
-package com.gamma.intelligence;
+package com.gamma.intelligence.agent;
 
 import com.eoiagent.core.AgentAnswer;
 import com.eoiagent.core.AnswerKind;
@@ -13,6 +13,10 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.gamma.intelligence.AgentAskRequest;
+import com.gamma.intelligence.AgentAskResult;
+import com.gamma.intelligence.AgentSessionRequest;
+import com.gamma.intelligence.AgentSessionResult;
 
 /**
  * End-to-end test of the AGT-5 (P0) session lifecycle, deterministic and offline via
