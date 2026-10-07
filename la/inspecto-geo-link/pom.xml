@@ -24,7 +24,7 @@
         WHY THIS MODULE EXISTS (EDG-01 cell 3b, 2026-09-07). CP-09 was decided "not for Personal" on
         2026-09-02 and both route groups nonetheless shipped in every bundle because they sat in the core.
         Dropping THIS jar on the classpath is what makes the five paths exist; without it the core answers
-        them with 503 "not installed" (AbsentGeoLinkRoutes) and /bootstrap reports features.geoLink=false,
+        them with 503 "not installed" (AbsentModuleRoutes) and /bootstrap reports features.geoLink=false,
         on which the SPA hides the two nav entries and the two widget offers.
 
         THIN, like inspecto-policy: nothing beyond what the core already supplies (the query engine, the

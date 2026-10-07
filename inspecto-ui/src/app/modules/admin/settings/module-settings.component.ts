@@ -237,7 +237,8 @@ export class ModuleSettingsComponent implements OnInit {
         };
         this.api.modules().subscribe({
             next: (r) => {
-                modules = r.modules ?? [];
+                // Known-but-absent modules (state 'not-installed') are not installed: nothing here to show or switch.
+                modules = (r.modules ?? []).filter((m) => m.state !== 'not-installed');
                 done();
             },
             error: fail,

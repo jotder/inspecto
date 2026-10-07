@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>Three facts, each of which a plausible-looking regression would break on its own:
  * <ol>
  *   <li>every geo/inv path answers <b>503 with the edition message</b> — not 404 (which would mean
- *       {@link AbsentGeoLinkRoutes} lost a path), not 200 (which would mean the module is back in Personal);</li>
+ *       {@link AbsentModuleRoutes} lost a path), not 200 (which would mean the module is back in Personal);</li>
  *   <li>{@code /bootstrap} reports {@code features.geoLink == false}, so the SPA hides the entries;</li>
  *   <li>{@code ServiceLoader} finds NO {@code RouteModule} except the test-tree one — the module has not
  *       leaked onto this classpath.</li>
@@ -60,11 +60,11 @@ class NoGeoLinkShipsInThePersonalBuildTest {
     @Test
     void everyGeoLinkPathAnswers503NotInstalledOnThePersonalBuild(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            // 🔴 Reads AbsentGeoLinkRoutes.SURFACE rather than repeating it. This test used to carry its
+            // 🔴 Reads AbsentModuleRoutes.surface("la-api", "geo-link") rather than repeating it. This test used to carry its
             // own five-entry copy, and on 2026-09-22 that copy was found two routes behind the stub table and
             // four behind the module: it passed by never touching the paths that had drifted. A test with a
             // private copy of the list it is checking cannot detect the drift it exists to detect.
-            for (String[] r : AbsentGeoLinkRoutes.SURFACE) {
+            for (String[] r : AbsentModuleRoutes.surface("la-api", "geo-link")) {
                 // A pattern's path parameter (LA-10's /inv/investigations/([^/]+)/...) is not a legal URI — probe
                 // it with a concrete segment, exactly as a client would reach it.
                 HttpResponse<String> res = send(c.port, r[0], r[1].replace("([^/]+)", "probe"), "{}");

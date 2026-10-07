@@ -10,7 +10,8 @@ export interface InstalledModule {
     buildRole: string;
     offeringRole: 'base' | 'optional' | 'provider' | 'internal' | string;
     bindingTime: string;
-    state: 'ACTIVE' | 'INERT';
+    /** `not-installed` = a known module of the source tree that this bundle does not carry (P3b). */
+    state: 'ACTIVE' | 'INERT' | 'not-installed';
     reasons: string[];
     provides: { features: string[] };
     requires: { modules: string[] };

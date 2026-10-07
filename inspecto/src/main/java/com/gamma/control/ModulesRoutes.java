@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.module.KnownModules;
 import com.gamma.module.ModuleActivator;
 import com.gamma.module.ModuleManifest;
 import com.gamma.module.ModuleManifests;
@@ -27,10 +28,11 @@ import java.util.Set;
 final class ModulesRoutes implements RouteModule {
 
     private volatile ModuleManifests.Loaded loaded;
+    private volatile List<ModuleManifest> known;
 
     @Override
     public void register(ApiContext api) {
-        api.get("/modules", (e, m) -> ETags.respond(e, build(loaded(), api.disabledFeatures())));
+        api.get("/modules", (e, m) -> ETags.respond(e, build(loaded(), api.disabledFeatures(), known())));
     }
 
     private ModuleManifests.Loaded loaded() {
@@ -39,13 +41,30 @@ final class ModulesRoutes implements RouteModule {
         return l;
     }
 
+    /** Every module of the source tree (P3b), whether installed or not; read once. */
+    private List<ModuleManifest> known() {
+        List<ModuleManifest> k = known;
+        if (k == null) known = k = KnownModules.load(ModulesRoutes.class.getClassLoader()).manifests();
+        return k;
+    }
+
     static Map<String, Object> build(ModuleManifests.Loaded loaded) {
         return build(loaded, Set.of());
     }
 
-    /** {@code disabled}: the feature ids the current Space switched off; a module is {@code enabledInSpace} unless one of its features is. */
     static Map<String, Object> build(ModuleManifests.Loaded loaded, Set<String> disabled) {
-        List<ModuleStatus> statuses = ModuleActivator.resolve(loaded.manifests(), loaded.hostBuildId());
+        return build(loaded, disabled, List.of());
+    }
+
+    /**
+     * {@code disabled}: the feature ids the current Space switched off; a module is {@code enabledInSpace} unless one of
+     * its features is. {@code known}: every module of the source tree; those not among the installed manifests are
+     * listed {@code state: "not-installed"} and make a dependant that requires one go INERT, naming it.
+     */
+    static Map<String, Object> build(ModuleManifests.Loaded loaded, Set<String> disabled, List<ModuleManifest> known) {
+        List<ModuleManifest> absent = KnownModules.absent(known, loaded.manifests());
+        List<ModuleStatus> statuses = ModuleActivator.resolve(loaded.manifests(), loaded.hostBuildId(),
+                absent.stream().map(ModuleManifest::id).collect(java.util.stream.Collectors.toSet()));
         List<Object> modules = new ArrayList<>();
         for (int i = 0; i < statuses.size(); i++) {
             ModuleManifest m = loaded.manifests().get(i);
@@ -73,10 +92,42 @@ final class ModulesRoutes implements RouteModule {
             o.put("requires", q);
             modules.add(o);
         }
+        for (ModuleManifest m : absent) {
+            Map<String, Object> o = describe(m, "not-installed");
+            String why = "module " + m.id() + " is not on the class path";
+            o.put("reason", why);
+            o.put("reasons", List.of(why));
+            o.put("enabledInSpace", false);
+            modules.add(o);
+        }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("hostBuildId", loaded.hostBuildId());
         out.put("modules", modules);
         out.put("diagnostics", loaded.diagnostics());
         return out;
+    }
+
+    /** The descriptive fields of a manifest that has no status (a known-but-absent module). */
+    private static Map<String, Object> describe(ModuleManifest m, String state) {
+        Map<String, Object> o = new LinkedHashMap<>();
+        o.put("id", m.id());
+        o.put("title", m.title());
+        o.put("buildRole", m.buildRole());
+        o.put("offeringRole", m.offeringRole());
+        o.put("bindingTime", m.bindingTime());
+        o.put("buildId", null);
+        o.put("state", state);
+        Map<String, Object> p = new LinkedHashMap<>();
+        p.put("features", m.provides().features());
+        p.put("contracts", m.provides().contracts());
+        p.put("capabilities", m.provides().capabilities());
+        p.put("configKinds", m.provides().configKinds());
+        p.put("storeFamilies", m.provides().storeFamilies());
+        o.put("provides", p);
+        Map<String, Object> q = new LinkedHashMap<>();
+        q.put("modules", m.requires().modules());
+        q.put("contracts", m.requires().contracts());
+        o.put("requires", q);
+        return o;
     }
 }

@@ -19,7 +19,7 @@ masking and `excludeBy` / `seedBy` are in
 no second store. 🔁 **SEP-08 (2026-10-01):** the store, the seven routes (`/entity-lists…`, renamed from `/inv/entity-lists…`) and the
 one shared, hash-chained fact log (`EntityFactLog`, `EntityRegistry`, package `com.gamma.entitylist`) now live in the optional
 **`inspecto-entity-list`** module, bundled in exactly the editions that ship `inspecto-geo-link` and absent on Personal
-(`AbsentEntityListRoutes` answers the seven routes 503; `/bootstrap` `features.entityList` is `false`). Link Analysis
+(`AbsentModuleRoutes` answers the seven routes 503; `/bootstrap` `features.entityList` is `false`). Link Analysis
 (`inspecto-geo-link`) depends on it — its `/inv/entity-identities*` routes, `EntityMasking` and the Investigation list-ops
 append to and read the SAME log through it; the reverse dependency does not exist. The on-disk format and paths are
 unchanged (`audit/entity-facts/`, `mask.key`), so a Space created before the move still verifies its chain. The masking

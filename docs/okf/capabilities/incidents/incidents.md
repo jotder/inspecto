@@ -77,7 +77,7 @@ out of Personal (2026-09-08) and amended two neighbouring `EDITIONS.md` rows but
   `/tags*`, `/workflows/{type}`, `/findings/{type}`, `/cases/rules*`, `/rca/templates` — is the
   optional `inspecto-ops` module since EDG-01 cell 7 (⛔ `/queues*` was in this list until
   `RETIRE-HALVES-1` retired it, 2026-09-14). A Personal bundle answers **46 paths `503`** naming
-  the module (`AbsentObjectRoutes`), reports `features.ops = false`, and hides the Incidents, Case Manager
+  the module (`AbsentModuleRoutes`), reports `features.ops = false`, and hides the Incidents, Case Manager
   and Tags navigation. `EDITIONS.md` CP-11 recorded this on the day; `OPS-01` and `SP-CTL-02` were amended
   on the day; these two rows were not. `BACKLOG.md` §5 lists `INC-3` as an edition-column mismatch and
   misses the two larger ones.
@@ -687,7 +687,7 @@ Incident" is unbuilt (§2, §5).
 the module's `RouteModule`, `JobTypeProvider` and `MaintenanceTaskProvider` registrations, is the whole switch. Because the objects domain was **constructed by mandatory core**, cell 7
 also needed a host-declared `ObjectEngineProvider` handle beside the seam — opening the stores needs
 `SpaceRoot` / `OperationalDb` from the module above the engine. With the module absent:
-`AbsentObjectRoutes` answers **49 paths `503`** naming the module; `BootstrapRoutes` sets `features.ops =
+`AbsentModuleRoutes` answers **49 paths `503`** naming the module; `BootstrapRoutes` sets `features.ops =
 api.hasRoute("POST", "/objects")` (`:82`) — derived from what registered, not declared; the SPA drops the
 `incidents`, `cases`, `tags` nav ids and the Incidents / Case Manager / Incident-detail panes render an
 explained `<inspecto-alert>` ("Operational objects not installed"), never a toast; `DecisionRoutes`
@@ -989,7 +989,7 @@ contents, merge, create contract, linking, postmortem, tagging); `alerts.compone
 | File | Provider |
 |---|---|
 | `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.service.ObjectEngineProvider` | `com.gamma.ops.OpsEngineProvider` — the host-declared handle that makes `ObjectAccess` non-empty |
-| `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.control.RouteModule` | `ObjectRoutes`, `NoteRoutes`, `QueueRoutes`, `TagRoutes` — the 49 paths `AbsentObjectRoutes` stands in for |
+| `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.control.RouteModule` | `ObjectRoutes`, `NoteRoutes`, `QueueRoutes`, `TagRoutes` — the 49 paths `AbsentModuleRoutes` stands in for |
 | `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.job.JobTypeProvider` · `com.gamma.job.MaintenanceTaskProvider` | `OpsJobTypes$CaseRuleEvaluate`, `OpsJobTypes$ObjectsAnalytics` · `OpsMaintenanceTasks` (`incident_purge`) |
 | `providers/inspecto-notify-channels/src/main/resources/META-INF/services/com.gamma.notify.NotificationChannel` | `SmtpEmailChannel`, `WebhookChannel` |
 
@@ -1016,7 +1016,7 @@ baseline (23 modules / 3777 tests, `features.ops = false`) are the edition guard
 | Gap | Evidence |
 |---|---|
 | **No test exercises Diagnosis → Incident** | there is no such path to test (§3.9) |
-| **No test that a Personal bundle answers all 49 object paths `503`** | `AbsentObjectRoutes` is exercised by the cell-7 baseline run, not by a route-by-route assertion |
+| **No test that a Personal bundle answers all 49 object paths `503`** | `AbsentModuleRoutes` is exercised by the cell-7 baseline run, not by a route-by-route assertion |
 | ~~**`mail.send` on a transport-less bundle has no failing test**~~ ✅ **STALE 2026-09-17** | ~~its success is the recorded behaviour~~ — it returns **SKIPPED** since `ad29e683`, so the recorded behaviour changed and this line no longer describes the code |
 | **No end-to-end SMTP or webhook delivery against a real endpoint** | both transports are tested against in-process fakes; delivery-status webhooks against synthetic signatures |
 | **No committed Case Rule or Tag Rule** | `*_case_rule.toon` / `*_tag_rule.toon`: zero files (§8.5) |

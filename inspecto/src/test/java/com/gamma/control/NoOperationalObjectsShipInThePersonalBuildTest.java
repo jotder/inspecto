@@ -7,18 +7,14 @@ import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -36,12 +32,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>The distinction it defends is 503-not-404</b>, and it is a product promise rather than a detail:
  * a 503 naming {@code inspecto-ops} tells an operator the feature exists and their bundle lacks it, so the
- * UI renders an explained panel; a 404 says the endpoint was never real. {@link AbsentObjectRoutes} exists
+ * UI renders an explained panel; a 404 says the endpoint was never real. {@code AbsentModuleRoutes} (from the ops manifest) exists
  * only to make that difference, and until now nothing checked that it does.
  *
  * <p>Three failures this catches, each from a plausible change:
  * <ol>
- *   <li><b>404</b> on any path — {@code AbsentObjectRoutes.SURFACE} lost an entry, or a route module
+ *   <li><b>404</b> on any path — {@code provides.routes} of the ops manifest lost an entry, or a route module
  *       renamed a path and only one side was updated;</li>
  *   <li><b>200</b> on any path — {@code inspecto-ops} has leaked onto the Personal classpath;</li>
  *   <li>{@code /bootstrap}'s {@code features.ops} turning true — the stubs started counting as routes.
@@ -50,10 +46,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       {@link ApiContext#hasRoute}, which {@code BootstrapRoutes:82} derives the flag from.</li>
  * </ol>
  *
- * <p>⚠ <b>The path list below is deliberately its own copy, not read from {@code AbsentObjectRoutes}.</b>
+ * <p>⚠ <b>The path list below is deliberately its own copy, not read from the manifest's {@code provides.routes}.</b>
  * Deriving it from the class under test would make the first assertion circular — it would prove only that
  * every path this class stubs is stubbed. An independent list is what turns "the stub list lost a path"
- * into a 404 here, which is the same reasoning {@code AbsentExchangeRoutes}' javadoc gives for its own
+ * into a 404 here, which is the same reasoning the old stub classes' javadoc gave for its own
  * sibling test. The cost of an independent copy is that it can drift the *other* way, so the last test
  * pins the two counts together by reading the stub's source.
  *
@@ -78,9 +74,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * bundle; a 404 means the stub and the module's surface drifted apart. Both are the defect, not the test.
  */
 class NoOperationalObjectsShipInThePersonalBuildTest {
-
-    private static final String ABSENT_OBJECT_ROUTES =
-            "inspecto/src/main/java/com/gamma/control/AbsentObjectRoutes.java";
 
     /**
      * Every path {@code inspecto-ops} owns, with the regex captures filled in — an independent transcription
@@ -190,34 +183,16 @@ class NoOperationalObjectsShipInThePersonalBuildTest {
 
     /**
      * The independent list above cannot notice a path ADDED to the stub, so pin the two counts together by
-     * reading the stub's own source — the idiom {@code MapNodeKeyContractTest} uses for the same reason.
+     * reading the stub surface itself - now {@code provides.routes} of the ops manifest (MODULE-REORG-1 P3b), where
+     * this test used to scan the source of the old AbsentObjectRoutes class.
      */
     @Test
-    void theStubSurfaceAndThisTestStayInStep() throws IOException {
-        String source = Files.readString(repoFile(ABSENT_OBJECT_ROUTES));
-        int from = source.indexOf("SURFACE = {");
-        int to = source.indexOf("};", from);
-        assertTrue(from > 0 && to > from,
-                "AbsentObjectRoutes.SURFACE moved or was renamed — re-anchor this scan before trusting it");
-
-        Matcher rows = Pattern.compile("\\{\"(?:GET|POST|DELETE|PUT|PATCH)\",\\s*\"[^\"]+\"\\}")
-                .matcher(source.substring(from, to));
-        int stubbed = 0;
-        while (rows.find()) stubbed++;
+    void theStubSurfaceAndThisTestStayInStep() {
+        int stubbed = AbsentModuleRoutes.surface("ops").size();
 
         assertEquals(stubbed, SURFACE.length,
-                "AbsentObjectRoutes stubs " + stubbed + " path(s) and this test exercises " + SURFACE.length
+                "the ops manifest stubs " + stubbed + " path(s) and this test exercises " + SURFACE.length
                         + ". A path added to the stub without a case here is untested; one removed from the "
                         + "stub turns into a 404 on Personal. Update both.");
-    }
-
-    /** Walk up from the module's CWD to the repo root, so the path works under surefire and an IDE alike. */
-    private static Path repoFile(String relative) {
-        Path dir = Path.of("").toAbsolutePath();
-        for (int up = 0; up < 4 && dir != null; up++, dir = dir.getParent()) {
-            Path candidate = dir.resolve(relative);
-            if (Files.exists(candidate)) return candidate;
-        }
-        throw new AssertionError("cannot locate " + relative + " from " + Path.of("").toAbsolutePath());
     }
 }

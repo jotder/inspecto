@@ -24,9 +24,11 @@ title: Case management and objects
 buildRole: implementation      # foundation | contract | platform | implementation
 offeringRole: optional         # base | optional | provider | internal
 bindingTime: boot              # build | boot | space | run
+absentMessage: "Operational objects are not installed in this bundle ..."   # optional: the 503 text when the module is absent
 provides:
   features[1]: ops             # must equal the code's RouteModule.featureIds() (guard-tested)
   contracts[3]: JobTypeProvider,MaintenanceTaskProvider,ObjectEngineProvider
+  routes[2]: "GET /objects","GET /objects/([^/]+)"   # METHOD path, the exact regex registered, in registration order (parity-tested)
 requires:
   modules[1]: la-core          # only real runtime edges; empty sections are omitted
 ```
@@ -34,6 +36,13 @@ The leading `---` line separates manifests when a shade merges them (the process
 syntax — the `#` notes above are for this page only; never put one in a manifest. A module is **INERT** when a
 required module is absent or inert, or a required contract is provided by no active module; `GET /modules` reports
 each module's state with the reasons, plus loader diagnostics.
+
+**`provides.routes` and known-modules (P3b).** An optional module declares its HTTP surface; a module-side parity test
+(`ModuleRoutesParity`) keeps it equal to what the module registers. The processor's build copies EVERY module's manifest
+(installed in this edition or not) to `META-INF/inspecto/known-modules/<id>.toon` + `index.txt` (`tools/KnownModules.java`, run
+from `inspecto/pom.xml`), so a bundle that left a module out still answers its paths `503 CAPABILITY_UNAVAILABLE` naming the
+module (`AbsentModuleRoutes`, text from `absentMessage`), and `GET /modules` lists it `not-installed`. The eight hand-written
+`Absent*Routes` classes are gone: a new optional module's stubs, parity and OpenAPI paths need only its manifest.
 
 ## Three axes (a module is classified on all three)
 | Axis | Values |

@@ -165,6 +165,34 @@
     <build>
         <plugins>
             <!--
+                MODULE-REORG-1 P3b: ship the manifest of EVERY module in the source tree (installed in this edition or
+                not) as META-INF/inspecto/known-modules/<id>.toon + index.txt, so the host can synthesise the 503
+                "not installed" stubs of an absent module and report it on GET /modules. A Java source launcher
+                (tools/KnownModules.java) because the offline repo has no antrun/assembly copy-with-rename.
+                ${java.home} = the JDK running Maven, so no PATH dependency.
+            -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.6.4</version>
+                <executions>
+                    <execution>
+                        <id>known-modules</id>
+                        <phase>process-resources</phase>
+                        <goals><goal>exec</goal></goals>
+                        <configuration>
+                            <executable>${java.home}/bin/java</executable>
+                            <arguments>
+                                <argument>${project.basedir}/../tools/KnownModules.java</argument>
+                                <argument>${project.basedir}/..</argument>
+                                <argument>${project.build.outputDirectory}/META-INF/inspecto/known-modules</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
                 Fat JAR — bundles all runtime dependencies into a single deployable JAR.
                 Build with:  mvn clean package
                 Run ETL:     java -cp inspecto-processor-<version>.jar com.gamma.inspector.CollectorProcessor  <pipeline.toon>

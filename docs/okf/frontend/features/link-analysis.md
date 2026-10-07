@@ -608,7 +608,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../archived-documents/plans-ar
     `POST /objects` cannot build this — it needs an existing link target, which a fresh space lacks.
     Everything refusable is checked before the first write; the writes run under compensation
     (`ObjectService.openCaseFromEntities` removes every object it created, with links/notes/tag edges, if
-    any write throws; reused objects are never touched). Personal: 503 via `AbsentObjectRoutes`, and the
+    any write throws; reused objects are never touched). Personal: 503 via `AbsentModuleRoutes`, and the
     dialog disables the option with the reason (`SessionService.opsEnabled()`); a 403 surfaces as the
     server's message.
   - **Order: seal → create the Case → attach.** A refused Case leaves the snapshot sealed and unattached and
@@ -1055,7 +1055,7 @@ finishes within the inline wait, else `202` + `Location` · `GET /inv/graph/runs
 `inlineNodeCeiling` is awaited `INLINE_WAIT_MS` = 3 000 ms; above it the request never waits. A queue-full submit is `503 STORE_BUSY`
 (retryable), a missing write root `503 CONTROL_PLANE_READ_ONLY`. Reads and the list re-run `openForRead` on the run's Investigation every
 time (lose the Investigation, lose the run: 404). The four route gates are done: `openapi-v1.json`, `CapabilityManifest`, the
-`AbsentGeoLinkRoutes.SURFACE` mirror, and real-HTTP tests with an armed Authenticator.
+`the la-api and geo-link manifests' `provides.routes`` mirror, and real-HTTP tests with an armed Authenticator.
 
 **Capability and settings.** Starting a run needs **`canRunLinkGraphAnalysis`** (`Roles.CAN_RUN_LINK_GRAPH_ANALYSIS`, a literal in
 `withCapability`; seeded to `operations` / `support` / `power` / `admin`, `super` by the all-capabilities convention; listed in
@@ -1291,7 +1291,7 @@ Design and decisions D6-1…D6-7: [`la-separation-d6-design.md`](../../../archiv
   needs it yet). See `docs/archived-documents/plans-archive/la-separation-d7-design.md` sections 4 and 12.
 * **Dossier bundle.** `GET /inv/investigations/{id}/dossier/bundle?at=&snapshots=` returns `inspecto-dossier-bundle/1`: the masked Dossier, the masked references, `custody {manifestRoot, referencesCount, referencesHash}` and a SHA-256 `seal` over the canonical JSON of everything but `seal` and `generatedAt`. `POST …/dossier/bundle/verify` (body a bundle, or `{bundle}`) answers `{verified, sealIntact, rootMatches, referencesIntact, referencesAddedSince, problems, custody}`: the seal, the embedded manifest root, that the bundle's references are still the first N of the store, then the SAME manifest comparison `/dossier/verify` runs (`DossierRoutes.verifyManifest`). A failure is a result, not an error. Audited `LINK_DOSSIER_EXPORTED` / `LINK_DOSSIER_BUNDLE_VERIFIED`.
 * **Masking, R3, four-eyes.** Masked per `maskingMode` as it leaves (references too); the manifest and `referencesHash` hash the RAW store, so the root is identical masked or not and a masked bundle verifies; the seal covers what shipped. Read gate = the Dossier's (owner or Case member, R3 on the Dataset and every snapshot, the Enterprise PDP). A pending sensitive expand is not in the sealed log, so it is not in the bundle.
-* **Gotchas.** The offline-checkable part is the seal and the manifest's own root; whether the store still agrees needs the verify route. `DossierRoutes` was split (`parseAt`, `parseSnapshotIds`, `maskedDossier`, `verifyManifest`) so the Dossier, its verify and the bundle share one build. The new `POST …/references` is a `CapabilityManifest` entry, the bundle verify a read-shaped exemption, all four routes are in `AbsentGeoLinkRoutes` and `openapi-v1.json`.
+* **Gotchas.** The offline-checkable part is the seal and the manifest's own root; whether the store still agrees needs the verify route. `DossierRoutes` was split (`parseAt`, `parseSnapshotIds`, `maskedDossier`, `verifyManifest`) so the Dossier, its verify and the bundle share one build. The new `POST …/references` is a `CapabilityManifest` entry, the bundle verify a read-shaped exemption, all four routes are in `AbsentModuleRoutes` and `openapi-v1.json`.
 * **Not built.** The embeddable view (URL + scoped token): `LA-EMBED-VIEW-1`. Trust between installations (I1): no live call exists to need it.
 * **Scheduled build (`la.index.build`, LA-DAILY-INGEST-1 T5, 2026-10-06).** A Job Type, triggered by `job.dataset.produced`, refreshes the Index of one configured Dataset mapping through the `link-index` Platform Service (`LinkIndexAccess` in the engine; the `inspecto-geo-link` bridge `ScheduledLinkIndexBuilder` binds it to `ScheduledIndexBuild` in `inspecto-la-api`; no new route). It runs as the delegated principal `index-build:<job>` holding only `canBuildLinkIndex`; its authority is the Job's recorded `owner` user id, re-decided every run like standing detection (owner must still view the Dataset by id or `user` share; a role share is refused). `attr_cols` must be a comma-separated string (a TOON array fails closed as `MAPPING_INVALID`). It runs only the mode `plan` recommends (`append`; `compact` then `append` at the 8-delta cap; `full` only with `allow_full`), through the same `IndexBuildService` as the route, and a server refusal is one recorded `REFUSED` (the Run fails with the code), never a retry. Audit `LINK_INDEX_SCHEDULED_RUN`. Details, config shape and residuals: [`link-analysis-roadmap.md`](../../../superpower/link-analysis-roadmap.md) "T5 as built". The `owner` is server-stamped on save from the saving Subject's id unless the saver holds `canConfigureAccess` (`JobAuthority.stamp`, at every write door including Space Template seeding and a type-less `template:` instance; the run reads every input (owner, dataset, mapping, allow_full, timeout) only from the saved config, never trigger args / signal bind / manual params; no Subject: typed value kept).
 
@@ -1518,7 +1518,7 @@ a live call (and so the trust relationship I1) is needed only by a feature that 
 * **D6-7** no trust between installations (I1) is unbuilt: a reference is a pointer, a bundle a file, verification local.
 * Proof: `ControlApiDossierBundleTest` (real HTTP, armed Authenticator), key negatives mutation-checked (seal always true, references
   unmasked, references prefix unchecked, POST not owner-only, URL scheme and credential checks removed, `trusted` flipped). The route table:
-  `POST …/references` is a `CapabilityManifest` entry, the bundle verify a read-shaped exemption, all four routes in `AbsentGeoLinkRoutes`
+  `POST …/references` is a `CapabilityManifest` entry, the bundle verify a read-shaped exemption, all four routes in `AbsentModuleRoutes`
   and `openapi-v1.json`.
 
 **Still open - filed on the board (`docs/BACKLOG.md` §3.12), separation phases.** `LA-INDEX-SPA-SURFACES-1` · `LA-INDEX-SCALE-MEASURE-1` ·
@@ -1559,7 +1559,7 @@ Alert-Rule code is bridge code by nature. An unbound port makes its feature repo
 have `forTestAbsent`. Routes, URLs and `openapi-v1.json` did not change. `PendingChanges` stays host-side.
 
 **Gotchas.**
-* A new module is one more place the hand-kept mirrors (`AbsentGeoLinkRoutes.SURFACE`, `CapabilityManifest`, the bundle
+* A new module is one more place the hand-kept mirrors (`the la-api and geo-link manifests' `provides.routes``, `CapabilityManifest`, the bundle
   module lists) must agree: add it to `tools/bundle-modules.mjs` and the static profile list in `pom.xml` in the SAME commit.
 * An import closure is a prediction, not proof. The first closure script treated a `/*` inside a string literal as a
   comment and undercounted 46 → 20 classes; it also could not see fully-qualified inline references, which the compiler
@@ -1766,7 +1766,7 @@ entities and links only (an `e–f` pair in the Dataset that was never admitted,
 Working Set already holds, so it names nothing new (a `masking_mode: all` test pins no raw id leaks). Access: `openForRead` (owner / Case member, R3, PDP) + the R3 gate on
 the Dataset read; audited best-effort as `LINK_INVESTIGATION_COMPARED`. *Dossier:* `GET …/dossier` carries an extra `comparison` section ONLY when the same window
 parameters are passed; it is labelled `sealed: false` and sits OUTSIDE the manifest and integrity check (the rest of the Dossier reads no Dataset, and the manifest root is
-unchanged by it); the `steps`/`method` renderings and the HTML print do not include it. Gates cleared: `AbsentGeoLinkRoutes`, `openapi-v1.json`, the RouteModule service
+unchanged by it); the `steps`/`method` renderings and the HTML print do not include it. Gates cleared: `AbsentModuleRoutes`, `openapi-v1.json`, the RouteModule service
 file; a GET needs no `authgate` bare literal, `CapabilityManifest` row or `route-gating` entry (read route). Test: `ControlApiInvestigationComparisonTest`.
 Both open questions (per-side `window: inherit`; event-count *activity* diffs) were built into the sealed `compare` op below (2026-10-05); the read route gained `mode=activity` on 2026-10-05 (below).
 
@@ -1832,7 +1832,7 @@ render, and the Dossier stamps `linkId` on its link annotations.
   not-equivalent are acceptable (no compat path); the Dossier line states the full outcome.
 * **Naming (D-E1):** *Investigation* / *Investigation Template*; the Assistant's RCA run took *Triage* instead
   (`GLOSSARY-CASE-1`, closed).
-* **`SEP-02` (separation plan, decided 2026-10-01):** keep `AbsentGeoLinkRoutes.SURFACE`, guarded in both
+* **`SEP-02` (separation plan, decided 2026-10-01):** keep `the la-api and geo-link manifests' `provides.routes``, guarded in both
   directions by `GeoLinkAbsentSurfaceParityTest`; revisit when the standalone LA host exists. A module-contributed
   list cannot serve the stub, which must exist precisely when the module is NOT on the classpath.
 
@@ -1905,7 +1905,7 @@ Method: grep of OKF for key identifiers (spot-check only). Already in OKF, so no
 10. Discard deletes `log.jsonl` + `sets/` (sealed rows may be personal data) but keeps header + marker + per-step audit events (fingerprints/counts, never rows). (d7 sec 4)
 11. Fork atomicity: staged in `drafts/.fork-*` (leading dot never matches `DRAFT_ID`), pins taken first and released on failure, one-per-member check + pin + rename under the Investigation's `drafts` lock; server-generated `draft-<uuid>` matched EXACTLY (422 otherwise); fork answers 201 + Location, not 202. (d7 sec 4)
 12. Rebase facts: header REWRITTEN (not write-once) with `rebases[]`; steps carry `rebasedFrom`; optimistic commit takes main lock THEN Draft lock; `DraftRebase.verify` runs outside the main lock; rebase at the current head is legal (renews an expired pin); `IndexedRead.select(..., pinned)` / `IndexedExpand.attempt(..., pinned)` take `mappingHash -> version` and a no-longer-published pinned version reads as "no index" (flat Dataset answers). (d7 sec 4 D7-5)
-13. SEP-02 decision: keep the hand-kept `AbsentGeoLinkRoutes.SURFACE` guarded by `GeoLinkAbsentSurfaceParityTest` (a drift incident is recorded in its header); a build-time generated surface descriptor was weighed and not chosen. (feasibility sec 4 D-0)
+13. SEP-02 decision: keep the hand-kept `the la-api and geo-link manifests' `provides.routes`` guarded by `GeoLinkAbsentSurfaceParityTest` (a drift incident is recorded in its header); a build-time generated surface descriptor was weighed and not chosen. (feasibility sec 4 D-0)
 14. D-3 step-1 hash facts: DuckDB `hash()` is deterministic across connections/processes but not reproducible in Java; `md5_number_lower(x) % N` matches Java MD5 on 1004/1004 ids at ~16% slower build; only an equality on ONE key prunes row groups (frontier of 50 keys: IN 3.2 s, VALUES join 4.2 s, per-key UNION ALL 2.2 s). (feasibility 7.10.1) [likely in OKF *Index design record*; verify]
 15. D-S4 traps: closed-graph assumption (a dangling edge leaks a phantom neighbour); multigraph rules (degree counts parallel edges and a self-loop twice; kCore/triangles/cliques collapse them); `hits` tie noise; `GraphAlgorithms.Edge` carries no weight so weighted functions take an edge-id map; an iterative mutant can hang the suite (parity tests need a timeout). OKF has only `label propagation` and `canonical-v1`. (feasibility 7.13)
 16. SPA D-5 prep: `LA_FEATURES` is the only host token with a SAFE default (all off, never throws); `no-restricted-imports` ignores `ImportExpression`, hence the `no-restricted-syntax` selector set `laDynamicImportSelectors` + `la-dynamic-import-lint.test.mjs`; `<inspecto-la-host-slot>` (`LaHostSlotComponent`, `ngDoCheck` inputs, subscribed outputs) exists because `NgComponentOutlet` cannot apply inputs/outputs. (feasibility 7.12) [verify OKF *SPA separation record*]
@@ -1968,4 +1968,4 @@ Already covered there (skip): LD refusal codes, `standing` binding, `canViewAs`,
 - Decision register D-LD1..D-LD18 and status (only D-LD1 operator-decided); D-LD8 `canConfigureAccess` never honoured; D-LD9 only tightening refuses; D-LD16 edit drops `standing`, write order component, binding, re-arm. [only a pointer exists today]
 - `GET /inv/investigation-templates` -> `{templates:[{id,title,createdAt,dataset,investigation,parameters,ops}]}` (counts; a Personal host lists all); disable response `{rule,investigation,enabled:false,wasEnabled}`; PUT adds `replaced:true`, `standingDetection:"disabled: ..."`, 404 not bound, 409 armed rule edited out of band. Events `LINK_STANDING_DETECTION_DISABLED`, `LINK_INVESTIGATION_ALERT_RULE_EDITED {rule,investigationId,standingDetectionDropped}`.
 - `la.detect` is authored as `config/jobs/<name>.toon` `job:{name,type:la.detect,schedule:"<cron>"}`; Signal `la.detect.completed {job,fired,rules[]}`; `AlertAccess.evaluateInvestigationRules()` default = the full sweep. `RowScope.visibleAs` uses an inert package-private `SweepExchange`. Enable reads the ARMED rule (a stored copy hashes differently after the TOON number round-trip).
-- Gates cleared per new route: `CapabilityManifest`, `AbsentGeoLinkRoutes.SURFACE`, `docs/api/openapi-v1.json`, `compliance/evidence/route-gating.md`, auth-gate baseline; `JobWritersTest` row for the PUT only; `ConfigWriteFunnelTest.WRITERS` / `DecisionRuleWritersTest` list `sealList` / `sealResolution` as fact-log readers (operator-approved 2026-09-30).
+- Gates cleared per new route: `CapabilityManifest`, `the la-api and geo-link manifests' `provides.routes``, `docs/api/openapi-v1.json`, `compliance/evidence/route-gating.md`, auth-gate baseline; `JobWritersTest` row for the PUT only; `ConfigWriteFunnelTest.WRITERS` / `DecisionRuleWritersTest` list `sealList` / `sealResolution` as fact-log readers (operator-approved 2026-09-30).

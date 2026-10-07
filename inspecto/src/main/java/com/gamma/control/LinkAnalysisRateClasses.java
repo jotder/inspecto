@@ -11,8 +11,8 @@ import java.util.regex.Pattern;
  *
  * <p>Two classes, both explicit: {@link #EXPENSIVE} routes spend the {@link RateLimiter#linkAnalysis()} bucket
  * (per subject, 429 {@code RATE_LIMITED}); {@link #EXEMPT} routes are cheap reads or small bounded writes and
- * are not throttled. {@code LinkAnalysisRateClassCoverageTest} walks {@code AbsentGeoLinkRoutes.SURFACE} and
- * {@code AbsentEntityListRoutes.SURFACE} and fails when a route is in neither table, so a new LA route must
+ * are not throttled. {@code LinkAnalysisRateClassCoverageTest} walks the {@code provides.routes} of the la-api, geo-link and
+ * entity-list manifests (AbsentModuleRoutes.surface) and fails when a route is in neither table, so a new LA route must
  * choose a class. The classes are fixed; only the Link Analysis budget is tunable, via {@code control.rateLimit.linkAnalysis.*}.
  */
 final class LinkAnalysisRateClasses {

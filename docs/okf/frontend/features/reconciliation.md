@@ -13,7 +13,7 @@ timestamp: 2026-07-16T00:00:00Z
 > the comparison engine (`ReconService`, `ReconBreaks`, `ReconConfigLoader`), the run state (`ReconStateStore`) and the
 > `recon.run` Job Type — lives in the optional **`inspecto-reconciliation`** module (id `reconciliation`, package
 > `com.gamma.recon`; the plan §8a *Reconciliation* add-on), staged from **Professional** up. **Personal no longer ships it**
-> (a deliberate behaviour change): its `/recon` paths answer 503 "not installed" (`AbsentReconRoutes`), `/bootstrap`
+> (a deliberate behaviour change): its `/recon` paths answer 503 "not installed" (`AbsentModuleRoutes`), `/bootstrap`
 > reports `features.reconciliation=false`, and `recon.run` is an unknown Job Type. The `reconciliation` config component kind
 > stays core — authoring is generic component CRUD; deleting the component deletes its run state through the module's
 > `ComponentDeleteHook`. The tests below moved with it (`features/inspecto-reconciliation/src/test`).

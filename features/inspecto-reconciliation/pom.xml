@@ -29,7 +29,7 @@
         is generic component CRUD, executing it is this module.
 
         Bundled from the Professional edition up (the Standard, Professional, Enterprise and Preview profiles); on Personal
-        the core answers the /recon paths with 503 "not installed" (AbsentReconRoutes), /bootstrap reports
+        the core answers the /recon paths with 503 "not installed" (AbsentModuleRoutes), /bootstrap reports
         features.reconciliation=false and recon.run is an unknown Job Type. THIN: no shade, no sidecar classifier. Built
         only under the edition profiles, so a routine "mvn -o clean test" (= Personal) never compiles it.
     </description>

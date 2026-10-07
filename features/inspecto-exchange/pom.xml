@@ -25,7 +25,7 @@
         WHY THIS MODULE EXISTS (EDG-01 cell 4, 2026-09-07). SEC-10 was decided "not for Personal" on
         2026-09-02 and all of it shipped in every bundle because it sat in the core. Dropping THIS jar on the
         classpath is what makes the 11 paths exist and what installs the shared-ref resolver; without it the
-        core answers those paths with 503 "not installed" (AbsentExchangeRoutes), /bootstrap reports
+        core answers those paths with 503 "not installed" (AbsentModuleRoutes), /bootstrap reports
         features.exchange=false, and SharedRefResolver stays NONE so every shared ref fails closed.
 
         ⚠ The six /exchange capability entries stay in the core's CapabilityManifest by decision: deriving the

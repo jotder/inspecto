@@ -3,6 +3,7 @@ title: Observability (metrics endpoint + events feed API)
 buildRole: implementation
 offeringRole: optional
 bindingTime: boot
+absentMessage: "The Prometheus metrics endpoint and the operational events feed are not installed in this bundle - they are provided by the optional inspecto-observability module (Professional edition and above). Instrumentation still runs and events are still RECORDED, including the audit trail; only reading them back over HTTP is edition-gated."
 provides:
   features[1]: events
   routes[8]: "GET /metrics","GET /events","GET /events/search","GET /events/export","GET /events/views","POST /events/views","POST /events/views/([^/]+)/delete","GET /events/([^/]+)"

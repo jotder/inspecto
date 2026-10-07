@@ -31,7 +31,7 @@
         What stays in the core: the risk-score config component kind, the pending Alert Rule feature
         (PendingAlertRules, which reads only the naming facts of com.gamma.alert.RiskScoreOutputs), the
         risk.score.produced subscriber (by event-type string), the CapabilityManifest rows, the EvidenceMasker
-        (com.gamma.mask) and AbsentRiskScoreRoutes (503 stub).
+        (com.gamma.mask) and AbsentModuleRoutes (503 stub).
 
         Bundled from the Professional edition up (the Standard, Professional, Enterprise and Preview profiles) next to
         inspecto-entity-list; on Personal the core answers the /risk-scores paths with 503 "not installed",

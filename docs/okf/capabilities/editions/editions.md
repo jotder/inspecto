@@ -977,7 +977,7 @@ class names against `git ls-files` and the module tree.
 
 The work-queue family was retired on 2026-09-14 (created `a5b89a89`, moved to `inspecto-ops` `e8d98918`,
 deleted `519673a7`), and EDG-01 cell 7 is now **three** route families, not four. Three shipped strings still
-promise it, and none is test-asserted: `AbsentObjectRoutes.java:27` — the Personal-edition **503 body** — plus
+promise it, and none is test-asserted: `AbsentModuleRoutes.java` — the Personal-edition **503 body** — plus
 `inspecto-ui/.../admin/objects/object-mail.component.html:4` and `.../admin/tags/tags.component.html:4`, each
 reading "notes, links, tags **and queues** are provided by the…".
 
@@ -989,7 +989,7 @@ change class and needs the `angular-ui` skill.
 `ec49b7bda` (the Standard→Professional rename, 2026-09-18), which rewrote each sentence and dropped "and queues" in
 passing — so the row sat open over fixed copy for six days. They now read "…notes, links and tags are provided by
 the…". A repo-wide grep for "and queues" finds no other shipped copy. The closing change fixed the one leftover:
-the `SURFACE` array's Javadoc in `AbsentObjectRoutes.java` still said "four moved route families"; it lists three
+the `SURFACE` array's Javadoc in `AbsentModuleRoutes.java` still said "four moved route families"; it lists three
 (Object/Note/Tag). ⚠ Lesson: a copy row names a STRING, so grep the string before editing — the cited line numbers
 still matched, only the words had moved.
 

@@ -30,7 +30,7 @@
 
         Contributed through the core's public com.gamma.control.RouteModule ServiceLoader seam and bundled in exactly the
         editions that ship inspecto-geo-link (Standard, Professional, Enterprise, Preview); on Personal the core answers
-        the six routes with 503 "not installed" (AbsentEntityListRoutes) and /bootstrap reports features.entityList=false.
+        the six routes with 503 "not installed" (AbsentModuleRoutes) and /bootstrap reports features.entityList=false.
 
         THIN, like inspecto-ops / inspecto-geo-link: nothing beyond what the core already supplies, so no shade and no
         sidecar classifier. Built only under the "edition-standard"/"-professional"/"-enterprise"/"-preview" profiles (see

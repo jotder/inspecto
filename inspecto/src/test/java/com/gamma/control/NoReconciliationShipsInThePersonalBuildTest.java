@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>Two facts, each of which a plausible-looking regression would break on its own:
  * <ol>
  *   <li>every {@code /recon/*} path answers <b>503 with the edition message</b> — not 404 (which would mean
- *       {@link AbsentReconRoutes} lost a path), not 200 (which would mean the module is back in Personal);</li>
+ *       {@link AbsentModuleRoutes} lost a path), not 200 (which would mean the module is back in Personal);</li>
  *   <li>{@code /bootstrap} reports {@code features.reconciliation == false}, so a client hides the surface.</li>
  * </ol>
  * That no {@code RouteModule} leaked onto this classpath is asserted once for every optional module by
@@ -60,9 +60,9 @@ class NoReconciliationShipsInThePersonalBuildTest {
     @Test
     void everyReconPathAnswers503NotInstalledOnThePersonalBuild(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            // Reads AbsentReconRoutes.SURFACE rather than repeating it — a test with a private copy of the
+            // Reads AbsentModuleRoutes.surface("reconciliation") rather than repeating it — a test with a private copy of the
             // list it is checking cannot detect the drift it exists to detect (see NoGeoLinkShips…).
-            for (String[] r : AbsentReconRoutes.SURFACE) {
+            for (String[] r : AbsentModuleRoutes.surface("reconciliation")) {
                 HttpResponse<String> res = send(c.port, r[0], r[1].replace("([^/]+)", "probe"), "{}");
                 assertEquals(503, res.statusCode(), r[0] + " " + r[1] + " -> " + res.body());
                 JsonNode err = V1Body.of(res.body()).get("error");

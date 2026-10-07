@@ -11,18 +11,27 @@ import java.util.List;
  * @param buildId the {@code Inspecto-Build-Id} of the jar this manifest was read from (P3a); {@code null} when
  *                unknown — an exploded directory, an unstamped jar or a {@code dev} build. Filled by the loader,
  *                never declared in {@code module.toon}.
+ * @param absentMessage optional (P3b): the 503 text the host serves for this module's {@code provides.routes} when the
+ *                module is not installed; {@code null} = the host's default sentence naming the module
  */
 public record ModuleManifest(String id, String title, String buildRole, String offeringRole, String bindingTime,
-                             Provides provides, Requires requires, String entitlementKey, String buildId) {
+                             Provides provides, Requires requires, String entitlementKey, String buildId,
+                             String absentMessage) {
 
     /** A manifest with no build stamp (tests, parse). */
     public ModuleManifest(String id, String title, String buildRole, String offeringRole, String bindingTime,
                           Provides provides, Requires requires, String entitlementKey) {
-        this(id, title, buildRole, offeringRole, bindingTime, provides, requires, entitlementKey, null);
+        this(id, title, buildRole, offeringRole, bindingTime, provides, requires, entitlementKey, null, null);
+    }
+
+    /** A manifest with a build stamp and no absent message. */
+    public ModuleManifest(String id, String title, String buildRole, String offeringRole, String bindingTime,
+                          Provides provides, Requires requires, String entitlementKey, String buildId) {
+        this(id, title, buildRole, offeringRole, bindingTime, provides, requires, entitlementKey, buildId, null);
     }
 
     public ModuleManifest withBuildId(String stamp) {
-        return new ModuleManifest(id, title, buildRole, offeringRole, bindingTime, provides, requires, entitlementKey, stamp);
+        return new ModuleManifest(id, title, buildRole, offeringRole, bindingTime, provides, requires, entitlementKey, stamp, absentMessage);
     }
 
 

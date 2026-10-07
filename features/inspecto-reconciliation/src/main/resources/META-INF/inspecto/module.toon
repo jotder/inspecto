@@ -3,6 +3,7 @@ title: Reconciliation
 buildRole: implementation
 offeringRole: optional
 bindingTime: boot
+absentMessage: "Reconciliation is not installed in this bundle - it is provided by the optional inspecto-reconciliation module (Professional edition and above)."
 provides:
   features[1]: reconciliation
   contracts[2]: JobTypeProvider,ComponentDeleteHook

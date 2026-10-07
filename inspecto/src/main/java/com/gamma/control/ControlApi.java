@@ -118,7 +118,7 @@ import java.util.regex.Pattern;
  *   PUT  /settings/branding                   replace per-space UI branding (write-root gated)         [v4.10.0]
  *   POST /queries/{id}/run                     run a persisted query ($-params resolved, Result Set contract) [v4.8.0]
  *   -- /events* is served by the OPTIONAL inspecto-observability module (EDG-01 cell 6, EDITIONS CP-13);
- *      absent it, AbsentEventsRoutes answers 503 on every path below. Recording is NOT gated.
+ *      absent it, AbsentModuleRoutes answers 503 on every path below. Recording is NOT gated.
  *   GET  /events[?limit=]                     recent events, newest-first (live tail)       [v4.2.0]
  *   GET  /events/search[?level=&type=&pipeline=&correlationId=&q=&from=&to=&limit=&offset=] filtered events [v4.2.0]
  *   GET  /events/{id}                         one event by id                               [v4.2.0]
@@ -572,7 +572,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // ⚠ GET /metrics moved to the optional inspecto-observability module (EDG-01 cell 5, EDITIONS CP-13).
         // Only the EXPOSITION moved — MetricRegistry is called by nine classes across three modules and stays
         // core. It remains in PUBLIC_PATHS and isInfraRoute below so the module's route is reachable
-        // unauthenticated at the bare path a scraper expects; absent the module, AbsentMetricsRoutes
+        // unauthenticated at the bare path a scraper expects; absent the module, AbsentModuleRoutes
         // answers 503 there instead.
 
         // The API contract itself (HARD-4): byte-equal to docs/api/openapi-v1.json at build time.
@@ -633,14 +633,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // (hasRoute), so an optional feature's paths answer 503 "not installed" rather than 404 — the
         // EDITIONS §4 contract for every client, not just the SPA. Order matters: after discovery, or the
         // stub would win first-match and the module's real handler would never run.
-        new AbsentGeoLinkRoutes().register(this);
-        new AbsentEntityListRoutes().register(this);
-        new AbsentReconRoutes().register(this);
-        new AbsentRiskScoreRoutes().register(this);
-        new AbsentExchangeRoutes().register(this);
-        new AbsentMetricsRoutes().register(this);
-        new AbsentEventsRoutes().register(this);
-        new AbsentObjectRoutes().register(this);
+        new AbsentModuleRoutes().register(this);   // P3b: one generic stub, read from the known manifests
         announceRouteInventory();
     }
 

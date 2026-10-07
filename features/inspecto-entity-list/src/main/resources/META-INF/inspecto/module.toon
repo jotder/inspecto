@@ -4,6 +4,7 @@ title: Entity lists
 buildRole: implementation
 offeringRole: optional
 bindingTime: boot
+absentMessage: "Entity Lists are not installed in this bundle - they are provided by the optional inspecto-entity-list module (Professional edition and above)."
 provides:
   features[1]: entityList
   contracts[2]: GovernableKindProvider,WatchListFeed

@@ -14,7 +14,7 @@ const mod = (
     id: string,
     offeringRole: string,
     features: string[],
-    state: 'ACTIVE' | 'INERT' = 'ACTIVE',
+    state: 'ACTIVE' | 'INERT' | 'not-installed' = 'ACTIVE',
 ): InstalledModule => ({
     id,
     title: id.toUpperCase(),
@@ -36,6 +36,7 @@ function setup(opts: { canAdminister?: boolean; save?: ModuleSettingsService['sa
                     mod('engine', 'base', ['authoring']),
                     mod('recon', 'optional', ['reconciliation', 'breaks']),
                     mod('geo', 'provider', ['geoLink'], 'INERT'),
+                    mod('absent', 'optional', ['scoring'], 'not-installed'),
                 ],
                 diagnostics: [],
             }),
@@ -74,6 +75,7 @@ describe('ModuleSettingsComponent', () => {
             'Base Modules (1)',
         ]);
         expect(el.querySelectorAll('h1').length).toBe(1);
+        expect(el.textContent).not.toContain('ABSENT'); // a known-but-absent module (P3b) is not listed
         const toggles = el.querySelectorAll('mat-slide-toggle');
         expect(toggles.length).toBe(2); // recon + geo; the Base module has none
         expect(el.querySelector('mat-slide-toggle[data-module="engine"]')).toBeNull();

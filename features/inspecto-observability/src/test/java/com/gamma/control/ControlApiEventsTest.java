@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p><b>Moved here from {@code inspecto} with {@link EventRoutes}</b> (EDG-01 cell 6, 2026-09-08), not
  * deleted: these assertions are the feed's contract and still hold — just no longer of the DEFAULT
- * (Personal) build, where the module is absent and {@code AbsentEventsRoutes} answers 503. The halves are
+ * (Personal) build, where the module is absent and {@code AbsentModuleRoutes} answers 503. The halves are
  * paired on purpose: this class proves the feed WITH the module,
  * {@code NoExchangeShipsInThePersonalBuildTest} proves the 503 WITHOUT it, so a path that drifted out of
  * step fails one of them.

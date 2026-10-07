@@ -32,7 +32,7 @@ import java.util.Map;
  * mean an {@code if} inside a core route — the one mechanism EDITIONS §Assembly bans.
  *
  * <p>⚠ <b>This is a visible product change, unlike cell 5.</b> Personal loses the Events <i>screen</i>, not
- * an endpoint nobody browses. Absent this module the core's {@code AbsentEventsRoutes} answers every
+ * an endpoint nobody browses. Absent this module the core's {@code AbsentModuleRoutes} answers every
  * {@code /events*} path with 503 naming the module, {@code /bootstrap} reports
  * {@code features.events=false}, the UI drops the nav entry, and the Ops lens home falls back to
  * {@code pipelines} so an Ops user does not land on a dead screen.

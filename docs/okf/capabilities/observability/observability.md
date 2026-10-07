@@ -203,7 +203,7 @@ id of the Signal that triggered a Run (a mirror's root is deliberately `null`) �
 
 | Route | Home | Edition | Notes |
 |---|---|---|---|
-| `GET /events[?limit]`, `/events/search[?level&type&pipeline&correlationId&q&from&to&limit&offset]`, `/events/{id}`, `/events/export[?format=csv\|json&…]`, `GET\|POST /events/views`, `POST /events/views/{id}/delete` | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` | S/E | Absent the module, `AbsentEventsRoutes` (core) answers `503` naming it on every path. **Recording is not gated.** `/bootstrap.features.events` tells the SPA |
+| `GET /events[?limit]`, `/events/search[?level&type&pipeline&correlationId&q&from&to&limit&offset]`, `/events/{id}`, `/events/export[?format=csv\|json&…]`, `GET\|POST /events/views`, `POST /events/views/{id}/delete` | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` | S/E | Absent the module, `AbsentModuleRoutes` (core) answers `503` naming it on every path. **Recording is not gated.** `/bootstrap.features.events` tells the SPA |
 | `GET /signals`, `/signals/tree?correlationId=&limit=`, `/signals/stream` (SSE with heartbeat comments) | `inspecto/src/main/java/com/gamma/control/SignalRoutes.java` | All | `correlationId` is **required** on the tree (400 otherwise — "a tree without an anchor is an unbounded forest"); `/signals/stream` has **no SPA consumer** (§5) |
 | `GET /audit/search`, `/audit/export?format=csv` | `inspecto/src/main/java/com/gamma/control/AuditLogRoutes.java` | All | Fail-closed to `type=AUDIT\|ACCESS_DENIED`; the auditor's evidence CSV (§3.3) |
 
@@ -221,7 +221,7 @@ Two exposure surfaces:
 
 * **`GET /metrics`** — `features/inspecto-observability/src/main/java/com/gamma/metricsapi/MetricsRoutes.java`, S/E.
   Unversioned and in `PUBLIC_PATHS` (**unauthenticated by design**: a scraper carries no token). Absent the
-  module, core `AbsentMetricsRoutes` answers `503`. Pinned by `MetricsExpositionTest`
+  module, core `AbsentModuleRoutes` answers `503`. Pinned by `MetricsExpositionTest`
   (`features/inspecto-observability/src/test/java/com/gamma/control/MetricsExpositionTest.java`).
 * **`GET /metrics/acquisition`** — `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java`,
   All. The acquisition family as JSON for the Overview tiles (`ACQ_METRICS`: files discovered / downloaded
@@ -770,7 +770,7 @@ the form authors the kind), and per-measure limits.
 |---|---|---|
 | Bus, store, types, scrubbing | `spi/inspecto-audit-spi/src/main/java/com/gamma/audit/EventLog.java`, `EventStore.java`, `InMemoryEventStore.java`, `EventType.java`, `SecretScrubber.java`; `platform/inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java`, `SavedViewStore.java` | [`events-metrics.md`](../../backend/control-plane/events-metrics.md) |
 | Signal envelope & read side | `platform/inspecto-engine/src/main/java/com/gamma/signal/Signal.java`, `Signals.java`, `PipelineConsignmentSignal.java` | [`signal-backbone.md`](../../backend/control-plane/signal-backbone.md) §S0–S2 |
-| Feed routes (optional) · fallbacks · audit read | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java`; `inspecto/src/main/java/com/gamma/control/AbsentEventsRoutes.java`, `AbsentMetricsRoutes.java`, `AuditLogRoutes.java`, `SignalRoutes.java` | `EDITIONS.md` CP-13, §Audit; [`events.md`](../../frontend/features/events.md) |
+| Feed routes (optional) · fallbacks · audit read | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java`; `inspecto/src/main/java/com/gamma/control/AbsentModuleRoutes.java`, `AbsentModuleRoutes.java`, `AuditLogRoutes.java`, `SignalRoutes.java` | `EDITIONS.md` CP-13, §Audit; [`events.md`](../../frontend/features/events.md) |
 | Metrics | `spi/inspecto-audit-spi/src/main/java/com/gamma/metrics/MetricRegistry.java`; `features/inspecto-observability/src/main/java/com/gamma/metricsapi/MetricsRoutes.java`; `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java`; `platform/inspecto-engine/src/main/java/com/gamma/inspector/AcquisitionTelemetry.java` | `ADVANCED_GUIDE.md` §7 (`/metrics` catalog) |
 | Audit trail | `spi/inspecto-auth-spi/src/main/java/com/gamma/control/AuditTrail.java` (called from `ControlApi.dispatch`) | `compliance/controls-matrix.md` AU-9, ISO 8.15–8.17 |
 | Provenance & conservation | `platform/inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java`, `ProvenanceStores.java`, `ConservationCheck.java`; `platform/inspecto-engine/src/main/java/com/gamma/job/PipelineJobRunner.java` (`reportConservation`); `inspecto/src/main/java/com/gamma/control/LineageRoutes.java`, `JobRoutes.java` (`/provenance*`); `platform/inspecto-engine/src/main/java/com/gamma/notify/NotificationRules.java` | `docs/ops/provenance-conservation-verification.md` |

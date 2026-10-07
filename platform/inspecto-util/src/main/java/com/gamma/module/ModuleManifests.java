@@ -87,7 +87,7 @@ public final class ModuleManifests {
     }
 
     /** Uncached, so reading a manifest never leaves its jar open (a locked file on Windows). */
-    private static java.io.InputStream openUncached(URL url) throws IOException {
+    static java.io.InputStream openUncached(URL url) throws IOException {
         java.net.URLConnection c = url.openConnection();
         c.setUseCaches(false);
         return c.getInputStream();
@@ -131,6 +131,7 @@ public final class ModuleManifests {
         Map<String, Object> p = section(root, "provides");
         Map<String, Object> r = section(root, "requires");
         String ent = text(root, "entitlementKey");
+        String absent = text(root, "absentMessage");
         return new ModuleManifest(id, title.isEmpty() ? id : title,
                 oneOf(root, "buildRole", ModuleManifest.BUILD_ROLES),
                 oneOf(root, "offeringRole", ModuleManifest.OFFERING_ROLES),
@@ -138,7 +139,7 @@ public final class ModuleManifests {
                 new ModuleManifest.Provides(list(p, "features"), list(p, "contracts"), list(p, "capabilities"),
                         list(p, "configKinds"), list(p, "storeFamilies"), list(p, "routes")),
                 new ModuleManifest.Requires(list(r, "modules"), list(r, "contracts")),
-                ent.isEmpty() ? null : ent);
+                ent.isEmpty() ? null : ent, null, absent.isEmpty() ? null : absent);
     }
 
     private static String oneOf(Map<String, Object> m, String key, List<String> allowed) {

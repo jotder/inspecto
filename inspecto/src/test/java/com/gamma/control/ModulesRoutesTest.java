@@ -49,7 +49,12 @@ class ModulesRoutesTest {
             assertTrue(processor.get("reasons").isArray());
             assertNotNull(byId(body.get("modules"), "util"));
             for (JsonNode m : body.get("modules"))
-                assertEquals("ACTIVE", m.get("state").asText(), "nothing on the test class path may be inert: " + m);
+                assertTrue("ACTIVE".equals(m.get("state").asText()) || "not-installed".equals(m.get("state").asText()),
+                        "nothing on the test class path may be inert: " + m);
+            JsonNode scoring = byId(body.get("modules"), "scoring");   // optional, and not on the processor's test class path
+            assertNotNull(scoring, "a known-but-absent module must be listed: " + body);
+            assertEquals("not-installed", scoring.get("state").asText());
+            assertEquals("module scoring is not on the class path", scoring.get("reason").asText());
         } finally {
             api.close();
             svc.close();
@@ -67,6 +72,25 @@ class ModulesRoutesTest {
         assertEquals(2, reasons.size(), reasons.toString());
         assertTrue(reasons.get(0).contains("'la-api'") && reasons.get(1).contains("'identity'"), reasons.toString());
         assertEquals(List.of("bad.toon: nope"), out.get("diagnostics"));
+    }
+
+    @Test
+    void aDependantOfAKnownButAbsentModuleGoesInertNamingIt() {
+        ModuleManifest scoring = new ModuleManifest("scoring", "Scoring", "implementation", "optional", "boot",
+                ModuleManifest.Provides.NONE, new ModuleManifest.Requires(List.of("entity-list"), List.of()), null);
+        ModuleManifest entityList = new ModuleManifest("entity-list", "Entity Lists", "implementation", "optional", "boot",
+                ModuleManifest.Provides.NONE, ModuleManifest.Requires.NONE, null);
+        Map<String, Object> out = ModulesRoutes.build(new ModuleManifests.Loaded(List.of(scoring), List.of()),
+                java.util.Set.of(), List.of(scoring, entityList));
+        List<?> modules = (List<?>) out.get("modules");
+        assertEquals(2, modules.size(), "the installed one plus the absent one: " + modules);
+        @SuppressWarnings("unchecked") Map<String, Object> dependant = (Map<String, Object>) modules.get(0);
+        assertEquals("INERT", dependant.get("state"));
+        assertEquals(List.of("requires module 'entity-list', which is not on the class path"), dependant.get("reasons"));
+        @SuppressWarnings("unchecked") Map<String, Object> absent = (Map<String, Object>) modules.get(1);
+        assertEquals("entity-list", absent.get("id"));
+        assertEquals("not-installed", absent.get("state"));
+        assertEquals("module entity-list is not on the class path", absent.get("reason"));
     }
 
     @Test

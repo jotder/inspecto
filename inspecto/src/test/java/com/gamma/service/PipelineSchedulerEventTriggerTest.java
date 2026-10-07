@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * end-to-end through the public seam: no-trigger rides every cycle, {@code schedule:{every}} gates by
  * cadence, {@code cron} is not due at start, {@code manual} is off the loop, an {@code event} trigger fires
  * on its upstream's commit, and the {@code on: dataset} fence holds. A class-name search says "untested";
- * the behaviour is covered under a collaborator's name. ⚠ Same shape as the {@code AbsentExchangeRoutes}
+ * the behaviour is covered under a collaborator's name. ⚠ Same shape as the {@code AbsentModuleRoutes}
  * miss earlier in this programme — <b>grep the behaviour, not the identifier</b>.
  *
  * <p><b>So this class does not duplicate that. It covers the filters those end-to-end tests cannot reach

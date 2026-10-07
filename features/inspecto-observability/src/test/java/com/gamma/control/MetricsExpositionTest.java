@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>This test <b>moved here from {@code ControlApiTest.metricsEndpointIsOpenAndReflectsARun}</b> rather than
  * being deleted. Its assertions are the contract a scraper depends on and they are still true — just no
  * longer true of the DEFAULT (Personal) build, where the module is absent and the core's
- * {@code AbsentMetricsRoutes} answers 503 instead. The two halves are deliberately paired: this class proves
+ * {@code AbsentModuleRoutes} answers 503 instead. The two halves are deliberately paired: this class proves
  * the exposition WITH the module, {@code NoExchangeShipsInThePersonalBuildTest} proves the 503 WITHOUT it.
  * A path that drifted out of step would fail one of them.
  *

@@ -13,9 +13,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Every Link Analysis route must have an explicit rate-limit class: EXPENSIVE (throttled) or EXEMPT (listed
  * in {@link LinkAnalysisRateClasses}). Adding a route to either absent-surface table without classifying it
- * fails here. {@code GeoLinkAbsentSurfaceParityTest} pins the SURFACE tables to the live module routes.
+ * fails here. {@code GeoLinkAbsentSurfaceParityTest} / {@code LaApiRoutesManifestParityTest} pin the manifests' {@code provides.routes} to the live module routes.
  */
 class LinkAnalysisRateClassCoverageTest {
+
+    private static Set<String> keys(java.util.List<String[]> t) { return keys(t.toArray(new String[0][])); }
 
     private static Set<String> keys(String[][] t) {
         Set<String> out = new TreeSet<>();
@@ -25,8 +27,8 @@ class LinkAnalysisRateClassCoverageTest {
 
     @Test
     void everyLinkAnalysisRouteIsClassifiedExactlyOnce() {
-        Set<String> surface = new TreeSet<>(keys(AbsentGeoLinkRoutes.SURFACE));
-        surface.addAll(keys(AbsentEntityListRoutes.SURFACE));
+        Set<String> surface = new TreeSet<>(keys(AbsentModuleRoutes.surface("la-api", "geo-link")));
+        surface.addAll(keys(AbsentModuleRoutes.surface("entity-list")));
         Set<String> expensive = keys(LinkAnalysisRateClasses.EXPENSIVE);
         Set<String> exempt = keys(LinkAnalysisRateClasses.EXEMPT);
 

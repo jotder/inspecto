@@ -3,6 +3,7 @@ title: Scoring
 buildRole: implementation
 offeringRole: optional
 bindingTime: boot
+absentMessage: "Risk Scores are not installed in this bundle - they are provided by the optional inspecto-scoring module (Professional edition and above)."
 provides:
   features[1]: scoring
   contracts[2]: JobTypeProvider,ComponentKindValidator

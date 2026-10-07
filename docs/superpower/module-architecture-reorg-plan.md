@@ -7,14 +7,14 @@
 > | P0 vocabulary + baseline | shipped | `08c2b2848` |
 > | P1 open the registries | partial (routes, governable kinds, `features{}`/SPA nav shipped) | `0957bc0a5`, `62b82003f` |
 > | P2 manifest + activator + gates | partial (P2a manifest/activator/`GET /modules`; P2b per-Space Enabled; directory regroup DONE 2026-10-07, `61d156298` + `77a7419f0`) | `ba3b20b6c`, `657527ae7` |
-> | P3 packaging | partial (P3a build-id stamp + boot check; no thin jars) | `eb9fb19ab` |
+> | P3 packaging | partial (P3a build-id stamp + boot check; P3b manifest-synthesised 503 stubs + known-modules; no thin jars) | `eb9fb19ab`, P3b (below) |
 > | P4 removal semantics | partial (P4a characterised + fixed; P4-1..P4-3 filed) | `42c98fd6d` |
 > | P5 test kit + TCKs | partial (P5a kit + RouteModule TCK) | `33feba371` |
 > | P6 Offerings | partial (P6a Offerings as a checked artifact; build not re-plumbed) | `b26188cb3` |
 > | P7 selective moves | partial: observability `0489ac3a0`, security split `33c3e5e4d`, EgressPolicy `4eb64c000`, Kafka `e2783a9bf`, ASN pack `0c0e483d5`, Workflow models `4e863cb6d`, Reconciliation `c5cb8ea4f`, Scoring `064d3114d` + `e51a73bec` + `900e2bc0a`, condition language `e5f22ebe9` + `d3215dcfa`; modules screen `70c2ee075`; CI wiring `c404ee383`; path-agnostic guards `27b210988` | as listed |
 >
 > **Remaining work (each is a BACKLOG row, §4 *Module architecture*):**
-> - **P1** — `MODULE-REORG-P1-FAMILY`: `OperationalDb.Family` as a contribution point; entangled with `ServiceStores`/Incidents, so it goes with the Incidents extraction. Also open, no row yet: contributed OpenAPI fragments per module; `Absent*` 503 stubs synthesised from manifests (needs the thin-jar/Offering packaging of absent modules' manifests); RBAC capabilities contribution (P1-D3, also P2 `provides`).
+> - **P1** — `MODULE-REORG-P1-FAMILY`: `OperationalDb.Family` as a contribution point; entangled with `ServiceStores`/Incidents, so it goes with the Incidents extraction. Also open, no row yet: contributed OpenAPI fragments per module; RBAC capabilities contribution (P1-D3, also P2 `provides`).
 > - **P2** — `MODULE-REORG-D-MR2`: directory regroup DONE 2026-10-07 (directories only; layout in §8 D-MR2); capabilities in `provides` remain.
 > - **P3** — `MODULE-REORG-P3-THIN-JARS`: thin per-module jars, Offering-driven launcher classpath, jdeps-derived jlink set, per-module SBOM; signing needs split packages 8 to 0 (incl. the deliberate telecom-asn1 exception). **8 -> 3 done 2026-10-07** (acquire `70e70379d`, service `dd5712511`, entitylist `d0e4db143`, event `4e0f7bc5b`, intelligence `67bc0c97f`); left: `com.gamma.control` (4 modules) + the two deliberate telecom-asn1 splits (`ingester`, `parse`).
 > - **P4** — P4-1..P4-3 already filed (`MODULE-REORG-P4-1`, `-P4-2`, `-P4-3`).
@@ -369,6 +369,29 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
   route, so it did not change. The loader now opens each resource uncached (a cached `jar:` stream left the jar locked on Windows).
 - **Packaging check:** `package.ps1` fails when the staged `inspecto*.jar` files carry more than one distinct non-`dev`
   build id, or when a fresh build's id differs from the staged one. **Not run end to end** (`package.ps1` was parse-checked only).
+
+### P3b as built (2026-10-07 — 503 stubs synthesised from manifests; the jar split is still NOT done)
+- **`provides.routes`** (`ModuleManifest.Provides.routes`): `"METHOD path"` strings, `path` = the exact regex registered, in registration
+  order (first-match: a catch-all stays after the literals it would swallow). Filled for the 8 optional modules that had a hand-written
+  stub: `la-api` (69) + `geo-link` (6, `InvestigationMeasureRoutes`), `entity-list` 7, `exchange` 12, `observability` 8 (`/metrics` + the events feed),
+  `ops` 49, `reconciliation` 10, `scoring` 2. Quote every entry in the TOON inline array: a `[^/]+`, a space or a `(` needs it (round-trip pinned in `ModuleManifestsTest`).
+- **Parity guard per module** (replaces the four hand-kept `Absent*Routes.SURFACE` parity tests and adds three): `ModuleRoutesParity` (http-spi test kit)
+  registers the module's own discovered `RouteModule`s on a `FakeApiContext` and asserts registered == `provides.routes` in BOTH directions. `exchange` is the
+  exception: its `register()` needs host services, so its test boots `ControlApi` and filters the non-stub `/exchange` routes (MODULE-REORG-P5-TCKS).
+- **`absentMessage`** (optional manifest key): the 503 text for an absent module. Kept the old per-module texts so clients and the `No*Ships*` tests (which
+  assert the module name appears) are unaffected; `la-api` and `geo-link` both carry the geo-link text (a Personal client is told what to install); the metrics and events texts
+  merged into one for `observability`. Default when absent: `<title> is not installed in this bundle - provided by the optional <id> module.`
+- **known-modules:** `tools/KnownModules.java` (run by `exec-maven-plugin` 3.6.4 at `process-resources` in `inspecto/pom.xml`, `${java.home}` java; Maven because every
+  build must have it, a Java source launcher because the offline repo has no antrun/assembly copy-with-rename) copies EVERY `module.toon` of the source tree to
+  `META-INF/inspecto/known-modules/<id>.toon` plus `index.txt` (40 manifests; shaded jar verified). `KnownModules.load` (inspecto-util) reads them.
+  `AbsentModuleRoutesTest` asserts the copy equals the source tree's manifests id-for-id and record-for-record.
+- **`AbsentModuleRoutes`** (processor) replaces the 8 classes: for each known manifest in index order it stubs every route `hasRoute` says unclaimed. Deliberately NOT
+  filtered by "module not active": `hasRoute` is the exact old semantics, so a module on the class path that failed to link still answers 503, and nothing changes for an installed one.
+  Stub order across modules is now alphabetical by module id (was a hand-picked list); `AbsentModuleRoutesTest.noStubShadowsALaterStub` proves no stub shadows a later one.
+  `openapi-v1.json` is byte-identical (`ApiContractTest`, `OpenApiPathsContractTest`).
+- **`GET /modules`:** known-but-absent modules are listed `state: "not-installed"` with `reason` (and `reasons`) `module <id> is not on the class path`, `enabledInSpace: false`;
+  `ModuleActivator.resolve(..., knownAbsent)` makes a dependant go INERT with `requires module 'x', which is not on the class path`. The SPA's Modules screen filters the new state out.
+- **Registry ratchet:** Absent stubs 8 -> 0, `populatedRegistries` 8 -> 7 (`tools/module-architecture-baseline.json`).
 
 ### P2b as built (2026-10-06 — the per-Space Enabled gate, D-MR10)
 - **Document:** `modules.toon` = `disabled: [feature ids]` in the Space config root (absent = all enabled, so a newly
