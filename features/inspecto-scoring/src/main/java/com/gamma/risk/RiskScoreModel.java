@@ -64,15 +64,18 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
     private static final Set<String> MODEL_KEYS = Set.of("name", "owner", "shares", "id", "entityType",
             "highThreshold", "dataScope", "description", "factors", "watchList", "retainDays", "retainRuns", "maxEntities");
     private static final Set<String> FACTOR_KEYS = Set.of("id", "label", "dataset", "key", "measure",
-            "filters", "weight", "cap", "evidence");
+            "filters", "when", "weight", "cap", "evidence");
 
     /**
      * One factor: {@code contribution = weight × indicator}, then held to at most {@code cap} when one is set.
      *
      * @param filters as authored ({@code {field, op, value}} maps) — compiled by {@link MeasureCompiler}
+     * @param when    optional structured condition group (the {@code ConditionTree} shape), ANDed after the flat
+     *                {@code filters}; {@code null} = none. Typed by operand text, '' = null (see {@code ConditionSql})
      */
     public record Factor(String id, String label, String dataset, String key, String measure,
-                         List<Map<String, Object>> filters, double weight, Double cap, List<String> evidence) {
+                         List<Map<String, Object>> filters, Map<String, Object> when, double weight, Double cap,
+                         List<String> evidence) {
 
         /** The compiled Measure (validated at parse). */
         public MeasureCompiler.Measure compiledMeasure() {
@@ -89,7 +92,7 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
         public Factor forEntity(String entityKey) {
             List<Map<String, Object>> narrowed = new ArrayList<>(filters == null ? List.of() : filters);
             narrowed.add(Map.of("field", key, "op", "=", "value", entityKey));
-            return new Factor(id, label, dataset, key, measure, List.copyOf(narrowed), weight, cap, evidence);
+            return new Factor(id, label, dataset, key, measure, List.copyOf(narrowed), when, weight, cap, evidence);
         }
 
         /** The indicator's grouped Measure spec: one value per entity key. */
@@ -119,6 +122,7 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
             body.put("measures", measures);
             body.put("groupBy", groupBy);
             body.put("filters", filters);
+            if (when != null) body.put("when", when);
             body.put("orderBy", List.of(Map.of("field", key)));
             return body;
         }
@@ -162,9 +166,21 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
             cols.add(f.key());
             if (f.compiledMeasure().field() != null) cols.add(f.compiledMeasure().field());
             for (Map<String, Object> flt : f.filters()) cols.add(String.valueOf(flt.get("field")));
+            conditionColumns(f.when(), cols);
             cols.addAll(f.evidence());
         }
         return out;
+    }
+
+    /** Every {@code field} and {@code valueField} a condition tree names, at any depth (groups: items | conditions). */
+    private static void conditionColumns(Object node, Set<String> into) {
+        if (!(node instanceof Map<?, ?> m)) return;
+        for (String k : List.of("field", "valueField")) {
+            String c = Values.trimToNull(m.get(k));
+            if (c != null) into.add(c);
+        }
+        for (String k : List.of("items", "conditions"))
+            if (m.get(k) instanceof List<?> l) for (Object o : l) conditionColumns(o, into);
     }
 
     /**
@@ -277,6 +293,14 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
                 filters.add(copy);
             }
         }
+        Map<String, Object> when = null;
+        if (fm.get("when") != null) {
+            if (!(fm.get("when") instanceof Map<?, ?> wm))
+                throw new IllegalArgumentException(at + ".when must be a condition group object");
+            Map<String, Object> copy = new LinkedHashMap<>();
+            wm.forEach((k, v) -> copy.put(String.valueOf(k), v));
+            when = copy;
+        }
         List<String> evidence = new ArrayList<>();
         if (fm.get("evidence") != null) {
             if (!(fm.get("evidence") instanceof List<?> el))
@@ -286,7 +310,7 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
                 throw new IllegalArgumentException(at + ".evidence: at most " + MAX_EVIDENCE + " columns");
         }
         Factor f = new Factor(id, Values.trimToNull(fm.get("label")), dataset, key, measure,
-                List.copyOf(filters), weight, cap, List.copyOf(evidence));
+                List.copyOf(filters), when, weight, cap, List.copyOf(evidence));
         // Compile both queries now: an unknown aggregation, operator or unsafe identifier fails the SAVE.
         try {
             MeasureCompiler.compile(f.valueSpec(1));

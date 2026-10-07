@@ -54,9 +54,22 @@ public final class MeasureCompiler {
      * The parsed spec: at least one measure or one dimension; {@code dataset} is resolved by the route.
      * {@code grains} maps a {@code groupBy} column to the time bucket it is grouped into — absent = the
      * raw value, which is what every widget sent before the grain reached the wire.
+     *
+     * <p>{@code when} is an optional {@link ConditionTree} group (the structured condition authored in the UI),
+     * ANDed after the flat {@code filters} and rendered by {@link ConditionSql} — escaped identifiers and
+     * literals, never author text. It is ADDITIVE: the flat {@code filters} keep their own typed-literal
+     * semantics untouched (see {@link ConditionSql} for how {@code when} types by operand text instead).
+     * {@code null} or empty = no extra constraint.
      */
     public record Spec(String dataset, List<Measure> measures, List<String> groupBy,
-                       Map<String, String> grains, List<Filter> filters, List<Sort> orderBy, int limit) {}
+                       Map<String, String> grains, List<Filter> filters, List<Sort> orderBy, int limit,
+                       Map<String, Object> when) {
+        /** The pre-{@code when} shape: every existing caller stays source-compatible. */
+        public Spec(String dataset, List<Measure> measures, List<String> groupBy,
+                    Map<String, String> grains, List<Filter> filters, List<Sort> orderBy, int limit) {
+            this(dataset, measures, groupBy, grains, filters, orderBy, limit, null);
+        }
+    }
 
     /** Parse the {@code POST /bi/query} body into a validated {@link Spec}. */
     /**
@@ -154,9 +167,20 @@ public final class MeasureCompiler {
                     orderBy.add(new Sort(safeIdent(trimToNull(s.get("field")), "orderBy field"),
                             "desc".equalsIgnoreCase(trimToNull(s.get("dir")))));
 
+        Map<String, Object> when = null;
+        if (body.get("when") != null) {
+            if (!(body.get("when") instanceof Map<?, ?> w))
+                throw new IllegalArgumentException("'when' must be a condition group object");
+            ConditionTree.requireGroupRoot(w);
+            ConditionTree.validate(w);
+            Map<String, Object> copy = new LinkedHashMap<>();
+            w.forEach((k, v) -> copy.put(String.valueOf(k), v));
+            when = copy;
+        }
+
         int limit = body.get("limit") instanceof Number n ? n.intValue() : defaultLimit;
         return new Spec(dataset, measures, groupBy, grains, filters, orderBy,
-                Math.max(1, Math.min(maxLimit, limit)));
+                Math.max(1, Math.min(maxLimit, limit)), when);
     }
 
     /** Compile the spec to the guarded SELECT (the dataset is referenced by its registered view name). */
@@ -172,9 +196,14 @@ public final class MeasureCompiler {
                 .append(select.isEmpty() ? "*" : String.join(", ", select))
                 .append(" FROM ").append(q(spec.dataset()));
 
-        if (!spec.filters().isEmpty()) {
-            List<String> terms = new ArrayList<>();
-            for (Filter f : spec.filters()) terms.add(filterTerm(f));
+        List<String> whereTerms = new ArrayList<>();
+        for (Filter f : spec.filters()) whereTerms.add(filterTerm(f));
+        if (spec.when() != null && !spec.when().isEmpty()) {
+            String w = ConditionSql.predicate(spec.when());
+            if (!"TRUE".equals(w)) whereTerms.add(w);
+        }
+        if (!whereTerms.isEmpty()) {
+            List<String> terms = whereTerms;
             sql.append(" WHERE ").append(String.join(" AND ", terms));
         }
         if (!spec.measures().isEmpty() && !spec.groupBy().isEmpty())

@@ -144,7 +144,7 @@ final class BiRoutes implements RouteModule {
         }
         resolved = resolved.strip().replaceAll(";+$", "").strip();
         MeasureCompiler.Spec overQuery = new MeasureCompiler.Spec(BOUND, spec.measures(), spec.groupBy(),
-                spec.grains(), spec.filters(), spec.orderBy(), spec.limit());
+                spec.grains(), spec.filters(), spec.orderBy(), spec.limit(), spec.when());
         return "WITH \"" + BOUND + "\" AS (" + resolved + ") " + MeasureCompiler.compile(overQuery);
     }
 
