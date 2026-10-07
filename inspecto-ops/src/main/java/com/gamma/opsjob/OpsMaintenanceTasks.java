@@ -31,6 +31,9 @@ public final class OpsMaintenanceTasks implements MaintenanceTaskProvider {
 
     @Override
     public JobResult run(String task, MaintenanceTaskContext ctx) {
+        // Loud rather than a silent purge under a mistyped name: this provider has ONE task and used to run it for any name (P5b TCK).
+        if (!tasks().contains(task))
+            throw new IllegalArgumentException(getClass().getSimpleName() + " does not run '" + task + "'");
         return IncidentPurgeTask.run(ctx.cfg(), ctx.host(), ctx.dryRun());
     }
 }
