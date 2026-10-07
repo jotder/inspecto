@@ -1,6 +1,6 @@
 package com.gamma.eventsapi;
 
-import com.gamma.control.RouteModule;
+import com.gamma.spi.http.RouteModule;
 import com.gamma.control.testkit.RouteModuleContract;
 
 /** {@link EventRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-1 P5a): no host, no processor boot. */

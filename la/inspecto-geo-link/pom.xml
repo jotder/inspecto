@@ -18,7 +18,7 @@
     <description>
         OPTIONAL Professional-edition control-plane route groups (EDITIONS.md CP-09, "Geo map + link analysis"):
         GeoRoutes (/geo/projection, /geo/routes) and InvRoutes (/inv/projection, /inv/projection/neighbors,
-        /inv/schema/relationships), contributed through the core's public com.gamma.control.RouteModule
+        /inv/schema/relationships), contributed through the core's public com.gamma.spi.http.RouteModule
         ServiceLoader seam (EDG-01 cell 3a) and registered AFTER the core's built-in route list.
 
         WHY THIS MODULE EXISTS (EDG-01 cell 3b, 2026-09-07). CP-09 was decided "not for Personal" on

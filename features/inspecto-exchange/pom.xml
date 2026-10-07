@@ -19,7 +19,7 @@
         OPTIONAL Professional-edition cross-space Exchange (EDITIONS.md SEC-10, "Exchange / sharing grants between
         spaces"): the com.gamma.exchange domain (offers, share grants, snapshots, ledger) plus ExchangeRoutes
         (11 routes under /exchange, six of them capability-gated) contributed through the core's public
-        com.gamma.control.RouteModule ServiceLoader seam, and ExchangeRefResolver, which installs the core's
+        com.gamma.spi.http.RouteModule ServiceLoader seam, and ExchangeRefResolver, which installs the core's
         com.gamma.query.SharedRefResolver singleton so DatasetRelation can resolve shared/&lt;owner&gt;/&lt;item&gt; refs.
 
         WHY THIS MODULE EXISTS (EDG-01 cell 4, 2026-09-07). SEC-10 was decided "not for Personal" on

@@ -49,7 +49,7 @@ Seven cells were gated out of Personal this way (`9fdb99f8` · `c323f35c` · `91
 `f39b531f` · `d409921a` · cell 6). The shape that worked, and the traps that cost a rebuild each:
 
 1. **Contribute through an SPI, never an `if (edition == …)`.** Routes go through the public
-   `com.gamma.control.RouteModule` (made public + `@PublicApi` in `91b6c9de`); maintenance tasks through
+   `com.gamma.spi.http.RouteModule` (made public + `@PublicApi` in `91b6c9de`); maintenance tasks through
    `MaintenanceTaskProvider`; delivery through `NotificationChannel`. `ControlApi` registers its hard-coded
    list first, then appends everything `ServiceLoader` finds.
 2. **Absent ⇒ 503 with an explanation, never 404** (`EDITIONS.md` §Assembly model — ⚠ this cited

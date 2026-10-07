@@ -1,10 +1,12 @@
 package com.gamma.control;
 
+import com.gamma.spi.http.ApiContext;
+import com.gamma.spi.http.RouteModule;
 import java.util.Map;
 
 /**
  * A {@link RouteModule} that reaches {@link ControlApi} ONLY through
- * {@code src/test/resources/META-INF/services/com.gamma.control.RouteModule} — never from the hard-coded
+ * {@code src/test/resources/META-INF/services/com.gamma.spi.http.RouteModule} — never from the hard-coded
  * list. Its existence on every test classpath in this module is what lets {@link RouteModuleDiscoveryTest}
  * prove, over real HTTP, that the ServiceLoader append in {@code ControlApi} works (EDG-01 cell 3a).
  *

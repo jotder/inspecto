@@ -18,7 +18,7 @@ import java.util.List;
  * {@code ObjectAccess} belongs in {@code inspecto-engine}, expressed in engine types. This provider cannot:
  * opening the four stores needs {@link SpaceRoot} and {@link OperationalDb}, which live in <b>this</b>
  * module, <em>above</em> the engine. An engine-declared provider could not name them, and that dependency
- * must not be inverted. So this follows the {@code com.gamma.control.RouteModule} precedent — declared in
+ * must not be inverted. So this follows the {@code com.gamma.spi.http.RouteModule} precedent — declared in
  * the host, implemented by an optional module that already depends on it — rather than the
  * {@code MaintenanceTaskProvider} one.
  *

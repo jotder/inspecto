@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.spi.http.GovernableKindProvider;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.util.AtomicFiles;
 import com.gamma.util.ToonHelper;

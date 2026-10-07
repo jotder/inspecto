@@ -1,6 +1,6 @@
 package com.gamma.recon;
 
-import com.gamma.control.ComponentDeleteHook;
+import com.gamma.spi.http.ComponentDeleteHook;
 
 import java.nio.file.Path;
 

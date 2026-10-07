@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.spi.http;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -9,7 +9,7 @@ import java.util.function.Supplier;
  * processor's component save gate ({@code ComponentRoutes.validateKind}) calls every registered validator for the
  * kind it owns, and the reserved-store check for every {@code dataset} and {@code sink} — the authoring route, the
  * bundle writers and the Space Template stager all pass through that one gate. Registered in
- * {@code META-INF/services/com.gamma.control.ComponentKindValidator}.
+ * {@code META-INF/services/com.gamma.spi.http.ComponentKindValidator}.
  *
  * <p>Without the module the kind is still accepted as opaque config (as {@code reconciliation} is), but nothing
  * validates it. A validator signals refusal with {@link IllegalArgumentException} (mapped to 422).

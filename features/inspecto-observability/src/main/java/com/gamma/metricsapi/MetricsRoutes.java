@@ -1,7 +1,7 @@
 package com.gamma.metricsapi;
 
-import com.gamma.control.ApiContext;
-import com.gamma.control.RouteModule;
+import com.gamma.spi.http.ApiContext;
+import com.gamma.spi.http.RouteModule;
 import com.gamma.metrics.MetricRegistry;
 
 /**

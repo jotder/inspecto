@@ -20,7 +20,7 @@
         (package com.gamma.la.api) — the geo and entity projections, traversal and branching patterns, Investigations and
         their Dossier / Working Set / coverage / templates / Case link, Value Measures, entity identities and snapshots —
         written against inspecto-http-spi and the two ports of inspecto-la-core (DatasetProvider, CasePort). It names no
-        engine, ETL, acquisition or control-plane class. Contributed through the public com.gamma.control.RouteModule
+        engine, ETL, acquisition or control-plane class. Contributed through the public com.gamma.spi.http.RouteModule
         ServiceLoader seam. The routes and URLs are exactly those inspecto-geo-link used to register.
 
         Without a Dataset provider (the bridge, inspecto-geo-link) a route that needs a Dataset answers a clean 503; without

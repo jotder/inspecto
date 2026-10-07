@@ -1,6 +1,6 @@
 package com.gamma.control.testkit;
 
-import com.gamma.control.RouteModule;
+import com.gamma.spi.http.RouteModule;
 import com.gamma.module.ModuleManifest;
 import com.gamma.module.ModuleManifests;
 

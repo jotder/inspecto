@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.spi.http.Idempotency;
 import com.gamma.util.egress.EgressPolicy;
 import com.gamma.pipeline.exec.WebhookSink;
 import com.gamma.pipeline.exec.WebhookSinkTransport;

@@ -107,7 +107,7 @@ class DraftPromoteCostTest {
 
     private static Expected legacy(Fixture f) throws Exception {
         InvestigationRoutes.Inv main = f.main;
-        @SuppressWarnings("unchecked") Map<String, Object> header = com.gamma.control.ApiContext.JSON.readValue(
+        @SuppressWarnings("unchecked") Map<String, Object> header = com.gamma.spi.http.ApiContext.JSON.readValue(
                 main.store().draftHeader(main.id(), f.draftId).orElseThrow(), LinkedHashMap.class);
         String actor = String.valueOf(header.get("actor"));
         int base = ((Number) header.get("baseStep")).intValue();

@@ -42,7 +42,7 @@ public final class ErrorCodes {
     public static final String SAFETY_POLICY_UNREADABLE = "ERR_SAFETY_POLICY_UNREADABLE";
 
     /** The contract's default code for a status ({@code errorCode} is never absent on a v1 error). */
-    static String defaultFor(int status) {
+    public static String defaultFor(int status) {
         return switch (status) {
             case 400 -> MALFORMED_REQUEST;
             case 401 -> UNAUTHENTICATED;

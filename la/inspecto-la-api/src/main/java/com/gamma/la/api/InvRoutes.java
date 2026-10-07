@@ -4,13 +4,13 @@ import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.SnapshotStore;
-import com.gamma.control.ApiContext;
+import com.gamma.spi.http.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.access.ComponentAccess;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.control.ErrorCodes;
 import com.gamma.entitystore.LinkAnalysisSettings;
-import com.gamma.control.RouteModule;
+import com.gamma.spi.http.RouteModule;
 import com.gamma.access.WriteGates;
 
 import com.gamma.audit.Event;

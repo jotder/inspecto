@@ -36,7 +36,7 @@ public interface AccessDecider {
     String ATTR_MATCHED_POLICY = "com.gamma.control.AccessDecider.matchedPolicy";
 
     /** Stamp the matched policy name ({@code null} clears) — the decider-side write seam. Request-scoped
-     *  via {@link ApiContext#attr}, never the JDK's exchange map (shared across in-flight requests on
+     *  via {@code ApiContext#attr}, never the JDK's exchange map (shared across in-flight requests on
      *  pre-JDK-26 runtimes — see RequestAttrs.REQUEST_SCOPES). */
     static void matchedPolicy(HttpExchange ex, String policy) { RequestAttrs.attr(ex, ATTR_MATCHED_POLICY, policy); }
 

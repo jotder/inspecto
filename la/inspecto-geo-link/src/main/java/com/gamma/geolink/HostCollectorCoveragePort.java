@@ -1,6 +1,6 @@
 package com.gamma.geolink;
 
-import com.gamma.control.ApiContext;
+import com.gamma.spi.http.ApiContext;
 import com.gamma.control.HostContext;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.la.core.CollectorCoveragePort;

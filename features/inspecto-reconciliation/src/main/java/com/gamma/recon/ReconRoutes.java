@@ -1,10 +1,10 @@
 package com.gamma.recon;
 
-import com.gamma.control.ApiContext;
+import com.gamma.spi.http.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.HostContext;
-import com.gamma.control.RouteModule;
+import com.gamma.spi.http.RouteModule;
 import com.gamma.control.ServerFaults;
 import com.gamma.access.WriteGates;
 import com.gamma.pipeline.ComponentRegistry;

@@ -1,6 +1,6 @@
 package com.gamma.risk;
 
-import com.gamma.control.ComponentKindValidator;
+import com.gamma.spi.http.ComponentKindValidator;
 
 import java.nio.file.Path;
 import java.util.Map;

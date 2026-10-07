@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.spi.http.ApiContext;
 import com.gamma.objects.AnnotationKinds;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;

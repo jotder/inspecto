@@ -99,7 +99,7 @@ final class EntityMasking {
     static EntityMasking of(InvestigationRoutes.Inv inv, Collection<String> extraIds) throws IOException {
         List<Map<String, Object>> log = new ArrayList<>();
         for (String line : inv.logLines()) {
-            @SuppressWarnings("unchecked") Map<String, Object> m = com.gamma.control.ApiContext.JSON.readValue(line, Map.class);
+            @SuppressWarnings("unchecked") Map<String, Object> m = com.gamma.spi.http.ApiContext.JSON.readValue(line, Map.class);
             log.add(m);
         }
         return of(inv, log, extraIds);

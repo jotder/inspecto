@@ -1,5 +1,8 @@
-package com.gamma.control;
+package com.gamma.spi.http;
 
+import com.gamma.control.Authenticator;
+import com.gamma.control.Authenticators;
+import com.gamma.control.Subject;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.ByteArrayInputStream;
@@ -40,23 +43,23 @@ import java.util.LinkedHashMap;
  * duplicates (no reservation step). The captured bytes are the pre-compression JSON, so a replay is written
  * uncompressed regardless of negotiation.
  */
-final class Idempotency {
+public final class Idempotency {
 
     private Idempotency() {}
 
     private static final long TTL_MS = 10 * 60_000L;
     /** Keys one principal may hold at once; its oldest is evicted past this (one caller cannot flush everyone). */
-    static final int PER_CALLER_CAP = 50;
+    public static final int PER_CALLER_CAP = 50;
     /** Responses larger than this are answered but not cached ({@code Idempotency-Cached: false}). */
     static final int MAX_RESPONSE_BYTES = 256 * 1024;
     /** Request bodies larger than this are not hashed, so the write runs un-keyed ({@code Idempotency-Cached: false}). */
-    static final int MAX_REQUEST_BYTES = 1024 * 1024;
-    static final String HEADER_CACHED = "Idempotency-Cached";
+    public static final int MAX_REQUEST_BYTES = 1024 * 1024;
+    public static final String HEADER_CACHED = "Idempotency-Cached";
 
-    record Entry(String principal, String bodyHash, int status, byte[] body, long expiresAt) {}
+    public record Entry(String principal, String bodyHash, int status, byte[] body, long expiresAt) {}
 
     /** The per-exchange marker a miss leaves for {@link #capture}: where to store, under which key, for whom. */
-    record Pending(Store store, String key, String principal, String bodyHash) {}
+    public record Pending(Store store, String key, String principal, String bodyHash) {}
 
     /**
      * Which statuses a replay may answer with. 2xx is the point of the feature. 400/409/422 are deterministic
@@ -65,13 +68,13 @@ final class Idempotency {
      * they hold right now, 429 on the bucket, 5xx may be transient — caching any of them lets one answer outlive
      * its cause, which is exactly how an anonymous 401 used to suppress the owner's real write.
      */
-    static boolean cacheable(int status) {
+    public static boolean cacheable(int status) {
         return (status >= 200 && status < 300) || status == 400 || status == 409 || status == 422;
     }
 
     /** Principals holding entries at once; the least recently used principal's whole partition is evicted past
      *  this. {@code MAX_PRINCIPALS * PER_CALLER_CAP} = 1000 entries keeps the old global memory bound. */
-    static final int MAX_PRINCIPALS = 20;
+    public static final int MAX_PRINCIPALS = 20;
     /** The one partition every anonymous caller shares, so an anonymous flood (many client IPs behind a proxy or
      *  NAT) costs ONE slot and can never displace an authenticated principal. Entry KEYS stay scoped to
      *  {@code anon@<ip>} (see {@link #keyFor}), so callers sharing the partition never share a replay. */
@@ -87,10 +90,10 @@ final class Idempotency {
      * {@link #PER_CALLER_CAP} keys, so a caller flooding keys only evicts its own entries. The partitions sit in
      * an access-ordered map capped at {@link #MAX_PRINCIPALS}, so memory stays bounded as principals grow.
      */
-    static final class Store {
+    public static final class Store {
         private final LinkedHashMap<String, LinkedHashMap<String, Entry>> byPrincipal = new LinkedHashMap<>(32, 0.75f, true);
 
-        synchronized Entry get(String principal, String key) {
+        public synchronized Entry get(String principal, String key) {
             principal = partitionOf(principal);
             LinkedHashMap<String, Entry> part = byPrincipal.get(principal);
             if (part == null) return null;
@@ -104,7 +107,7 @@ final class Idempotency {
             return e;
         }
 
-        synchronized void put(String key, String principal, String bodyHash, int status, byte[] body) {
+        public synchronized void put(String key, String principal, String bodyHash, int status, byte[] body) {
             LinkedHashMap<String, Entry> part = byPrincipal.computeIfAbsent(partitionOf(principal), p -> new LinkedHashMap<>(16, 0.75f, true));
             part.remove(key);
             part.put(key, new Entry(principal, bodyHash, status, body.clone(), System.currentTimeMillis() + TTL_MS));
@@ -112,18 +115,18 @@ final class Idempotency {
             while (byPrincipal.size() > MAX_PRINCIPALS) byPrincipal.remove(byPrincipal.keySet().iterator().next());
         }
 
-        synchronized int sizeFor(String principal) {
+        public synchronized int sizeFor(String principal) {
             LinkedHashMap<String, Entry> part = byPrincipal.get(partitionOf(principal));
             return part == null ? 0 : part.size();
         }
 
-        synchronized int principals() {
+        public synchronized int principals() {
             return byPrincipal.size();
         }
     }
 
     /** The raw Idempotency-Key header of a write, or {@code null} when idempotency does not apply. */
-    static String headerKey(HttpExchange ex, String method) {
+    public static String headerKey(HttpExchange ex, String method) {
         if (!("POST".equals(method) || "PUT".equals(method) || "DELETE".equals(method))) return null;
         String k = ex.getRequestHeaders().getFirst("Idempotency-Key");
         return (k == null || k.isBlank()) ? null : k.trim();
@@ -134,7 +137,7 @@ final class Idempotency {
      *  that mint the same {@code sub} therefore never share entries. {@code null} (fail closed: no caching, no
      *  replay, no in-flight fence) when there is neither a Subject nor a client IP - a shared bucket would let
      *  such callers replay each other's responses. */
-    static String principal(HttpExchange ex) {
+    public static String principal(HttpExchange ex) {
         return ApiContext.subject(ex).map(s -> {
             String iss = ApiContext.attr(ex, ApiContext.ATTR_SUBJECT_ISSUER) instanceof String i ? i
                     : Authenticators.active().map(a -> a.getClass().getName()).orElse("-");
@@ -146,11 +149,11 @@ final class Idempotency {
      *  with {@code /api/v1} and {@code /spaces/{id}} stripped (the Space rides separately) - then canonicalised:
      *  duplicate slashes collapsed, a trailing slash dropped. Case is kept exact: routes match case-sensitively.
      *  So every spelling the router sends to one route shares one entry. */
-    static String keyFor(String method, String routePath, String space, String principal, String key) {
+    public static String keyFor(String method, String routePath, String space, String principal, String key) {
         return method + " " + canonical(routePath) + " space=" + space + " " + principal + " " + key;
     }
 
-    static String canonical(String path) {
+    public static String canonical(String path) {
         String p = path.replaceAll("/{2,}", "/");
         return p.length() > 1 && p.endsWith("/") ? p.substring(0, p.length() - 1) : p;
     }
@@ -160,7 +163,7 @@ final class Idempotency {
      * via {@code ATTR_RAW_BODY}; {@code null} when it is larger — the prefix read is stitched back in front of
      * the rest of the stream so the handler still sees every byte.
      */
-    static String bodyHash(HttpExchange ex) throws IOException {
+    public static String bodyHash(HttpExchange ex) throws IOException {
         String q = ex.getRequestURI().getRawQuery();   // the query is part of the request: a different one is a mismatch
         String query = q == null ? "" : q;
         if (ApiContext.attr(ex, ApiContext.ATTR_RAW_BODY) instanceof byte[] cached) return sha256(query, cached);
@@ -187,7 +190,7 @@ final class Idempotency {
     }
 
     /** Cache a just-computed JSON response (pre-compression) for replay, when this exchange carries a key. */
-    static void capture(HttpExchange ex, int status, byte[] jsonBytes) {
+    public static void capture(HttpExchange ex, int status, byte[] jsonBytes) {
         if (!(ApiContext.attr(ex, ApiContext.ATTR_IDEMPOTENCY_KEY) instanceof Pending p)) return;
         if (!cacheable(status)) return;
         if (jsonBytes.length > MAX_RESPONSE_BYTES) {
@@ -198,7 +201,7 @@ final class Idempotency {
     }
 
     /** Write a previously-cached response, flagged {@code Idempotency-Replayed: true}. */
-    static void replay(HttpExchange ex, Entry hit) throws IOException {
+    public static void replay(HttpExchange ex, Entry hit) throws IOException {
         ex.getResponseHeaders().set("Content-Type", "application/json");
         ex.getResponseHeaders().set("Idempotency-Replayed", "true");
         ex.sendResponseHeaders(hit.status(), hit.body().length);

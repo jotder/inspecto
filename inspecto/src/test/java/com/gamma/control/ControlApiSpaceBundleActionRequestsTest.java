@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.spi.http.Idempotency;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.config.io.ConfigCodec;

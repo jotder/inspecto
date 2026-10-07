@@ -22,9 +22,9 @@
         ReconBreaks, ReconConfigLoader), the per-Reconciliation run state (ReconStateStore, {write root}/recon-state/) and
         the recon.run Job Type. Package com.gamma.recon.
 
-        Contributed through the core's public seams only: com.gamma.control.RouteModule (feature id "reconciliation"),
+        Contributed through the core's public seams only: com.gamma.spi.http.RouteModule (feature id "reconciliation"),
         com.gamma.job.JobTypeProvider (recon.run, requires the "objects" Platform Service so a breach can open an
-        Incident) and com.gamma.control.ComponentDeleteHook (deleting a reconciliation component deletes its run state).
+        Incident) and com.gamma.spi.http.ComponentDeleteHook (deleting a reconciliation component deletes its run state).
         The "reconciliation" config component kind itself stays in the core (ComponentStore): authoring a Reconciliation
         is generic component CRUD, executing it is this module.
 

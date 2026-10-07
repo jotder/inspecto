@@ -1,7 +1,7 @@
 package com.gamma.control.testkit;
 
-import com.gamma.control.ApiContext;
-import com.gamma.control.Handler;
+import com.gamma.spi.http.ApiContext;
+import com.gamma.spi.http.Handler;
 import com.gamma.control.Subject;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpContext;
@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 
 /**
  * The platform test kit's {@link ApiContext} (MODULE-REORG-1 P5a): a lightweight in-memory double with NO control plane,
- * NO engine and NO inspecto-processor. It records every route a {@link com.gamma.control.RouteModule} registers
+ * NO engine and NO inspecto-processor. It records every route a {@link com.gamma.spi.http.RouteModule} registers
  * (method, pattern, whether the handler was wrapped by {@link ApiContext#withCapability}) and lets a test dispatch a
  * request to a handler in-memory, optionally as a fake {@link Subject}.
  *

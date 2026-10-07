@@ -1,6 +1,6 @@
 package com.gamma.la.core;
 
-import com.gamma.control.ApiContext;
+import com.gamma.spi.http.ApiContext;
 
 import java.util.List;
 import java.util.Map;

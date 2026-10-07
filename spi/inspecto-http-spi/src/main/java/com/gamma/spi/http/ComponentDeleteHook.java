@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.spi.http;
 
 import java.nio.file.Path;
 
@@ -7,7 +7,7 @@ import java.nio.file.Path;
  * The processor's {@code DELETE /components/{type}/{id}} calls every registered hook for the deleted type after
  * the component is removed, so a re-created component of the same id never inherits the orphaned state (the
  * Reconciliation run state is the first user). Registered in
- * {@code META-INF/services/com.gamma.control.ComponentDeleteHook}.
+ * {@code META-INF/services/com.gamma.spi.http.ComponentDeleteHook}.
  *
  * <p>A hook signals refusal the way {@code ReconStateStore} always did: {@link IllegalArgumentException} for an
  * unsafe id (mapped to 400) and {@link SecurityException} for a path-jail violation (mapped to 403).

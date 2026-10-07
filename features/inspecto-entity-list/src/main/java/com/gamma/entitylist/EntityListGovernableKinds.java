@@ -1,6 +1,6 @@
 package com.gamma.entitylist;
 
-import com.gamma.control.GovernableKindProvider;
+import com.gamma.spi.http.GovernableKindProvider;
 
 import java.util.Set;
 

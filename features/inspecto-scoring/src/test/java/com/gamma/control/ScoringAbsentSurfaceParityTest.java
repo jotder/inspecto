@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.spi.http.RouteModule;
 import com.gamma.control.testkit.ModuleRoutesParity;
 import org.junit.jupiter.api.Test;
 

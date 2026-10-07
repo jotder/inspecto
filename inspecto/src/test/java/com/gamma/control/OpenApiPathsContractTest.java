@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.spi.http.Envelope;
 import com.fasterxml.jackson.core.util.DefaultIndenter;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.JsonNode;

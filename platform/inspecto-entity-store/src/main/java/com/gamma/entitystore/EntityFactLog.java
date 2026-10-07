@@ -1,6 +1,6 @@
 package com.gamma.entitystore;
 
-import com.gamma.control.ApiContext;
+import com.gamma.spi.http.ApiContext;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;

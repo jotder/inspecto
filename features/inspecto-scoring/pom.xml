@@ -23,8 +23,8 @@
         risk-score component kind and of the reserved risk_scores_ output stores (RiskScoreKindValidator). Package
         com.gamma.risk.
 
-        Contributed through the core's public seams only: com.gamma.control.RouteModule (feature id "scoring"),
-        com.gamma.job.JobTypeProvider (risk.score) and com.gamma.control.ComponentKindValidator. It depends on
+        Contributed through the core's public seams only: com.gamma.spi.http.RouteModule (feature id "scoring"),
+        com.gamma.job.JobTypeProvider (risk.score) and com.gamma.spi.http.ComponentKindValidator. It depends on
         inspecto-entity-list for one thing, the com.gamma.entitylist.WatchListFeed seam a model's watchList feeds through
         (the dependency direction is scoring to entity-list, never the reverse).
 

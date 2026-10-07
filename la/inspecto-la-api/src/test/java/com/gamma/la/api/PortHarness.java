@@ -1,6 +1,6 @@
 package com.gamma.la.api;
 
-import com.gamma.control.ApiContext;
+import com.gamma.spi.http.ApiContext;
 import com.gamma.control.testkit.FakeApiContext;
 import com.gamma.la.core.DatasetProvider;
 

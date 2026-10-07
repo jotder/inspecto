@@ -15,7 +15,7 @@ import java.util.Optional;
  * {@link ControlApi}'s constructor promised it would "fail to boot instead of silently accepting
  * traffic" — pinned by {@code AuthenticatorDiscoveryFailClosedTest}.
  */
-final class Authenticators {
+public final class Authenticators {
     private Authenticators() {}
 
     // 🔴 failClosed: for THIS spi, absent means every route serves unauthenticated, so a registered
@@ -23,7 +23,7 @@ final class Authenticators {
     // than resolve empty. Personal registers no provider at all and still resolves empty, unchanged.
     private static final SpiSlot<Authenticator> SLOT = new SpiSlot<>(Authenticator.class, true);
 
-    static Optional<Authenticator> active() {
+    public static Optional<Authenticator> active() {
         return SLOT.active();
     }
 

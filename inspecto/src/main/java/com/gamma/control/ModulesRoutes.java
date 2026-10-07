@@ -1,5 +1,7 @@
 package com.gamma.control;
 
+import com.gamma.spi.http.ApiContext;
+import com.gamma.spi.http.RouteModule;
 import com.gamma.module.KnownModules;
 import com.gamma.module.ModuleActivator;
 import com.gamma.module.ModuleManifest;

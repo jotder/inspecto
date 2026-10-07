@@ -1,6 +1,6 @@
 package com.gamma.entitystore;
 
-import com.gamma.control.ApiContext;
+import com.gamma.spi.http.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.control.ErrorCodes;

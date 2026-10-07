@@ -1,6 +1,6 @@
 package com.gamma.la.core;
 
-import com.gamma.control.ApiContext;
+import com.gamma.spi.http.ApiContext;
 import com.gamma.control.SpiSlot;
 
 import java.util.Optional;

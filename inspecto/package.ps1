@@ -668,8 +668,8 @@ if ($entityListJarSrc) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $elZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-entity-list.jar")
     try {
-        $spiEntry = $elZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.control.RouteModule' }
-        if (-not $spiEntry) { throw "inspecto-entity-list.jar has no META-INF/services/com.gamma.control.RouteModule - EntityListRoutes would never be discovered." }
+        $spiEntry = $elZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
+        if (-not $spiEntry) { throw "inspecto-entity-list.jar has no META-INF/services/com.gamma.spi.http.RouteModule - EntityListRoutes would never be discovered." }
         $reader = New-Object System.IO.StreamReader($spiEntry.Open())
         try { $spiBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
         if ($spiBody -notmatch [regex]::Escape('com.gamma.entitylist.EntityListRoutes')) { throw "inspecto-entity-list.jar registers no com.gamma.entitylist.EntityListRoutes - the SPI file lists only: $spiBody" }
@@ -698,8 +698,8 @@ if ($laApiJarSrc) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $laZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-la-api.jar")
     try {
-        $spiEntry = $laZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.control.RouteModule' }
-        if (-not $spiEntry) { throw "inspecto-la-api.jar has no META-INF/services/com.gamma.control.RouteModule - GeoRoutes/InvRoutes would never be discovered." }
+        $spiEntry = $laZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
+        if (-not $spiEntry) { throw "inspecto-la-api.jar has no META-INF/services/com.gamma.spi.http.RouteModule - GeoRoutes/InvRoutes would never be discovered." }
         $reader = New-Object System.IO.StreamReader($spiEntry.Open())
         try { $spiBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
         foreach ($impl in @('com.gamma.la.api.GeoRoutes', 'com.gamma.la.api.InvRoutes')) {
@@ -718,7 +718,7 @@ if ($geoLinkJarSrc) {
     $glZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-geo-link.jar")
     try {
         foreach ($svc in @(
-                @('com.gamma.control.RouteModule', 'com.gamma.geolink.InvestigationMeasureRoutes'),
+                @('com.gamma.spi.http.RouteModule', 'com.gamma.geolink.InvestigationMeasureRoutes'),
                 @('com.gamma.la.core.DatasetProvider', 'com.gamma.geolink.EngineDatasetProvider'),
                 @('com.gamma.la.core.CasePort', 'com.gamma.geolink.HostCasePort'),
                 @('com.gamma.alert.InvestigationMeasureProbe', 'com.gamma.geolink.WorkingSetMeasures'))) {
@@ -737,8 +737,8 @@ if ($exchangeJarSrc) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $exZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-exchange.jar")
     try {
-        $spiEntry = $exZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.control.RouteModule' }
-        if (-not $spiEntry) { throw "inspecto-exchange.jar has no META-INF/services/com.gamma.control.RouteModule - ExchangeRoutes would never be discovered and the shared-ref resolver would never install." }
+        $spiEntry = $exZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
+        if (-not $spiEntry) { throw "inspecto-exchange.jar has no META-INF/services/com.gamma.spi.http.RouteModule - ExchangeRoutes would never be discovered and the shared-ref resolver would never install." }
         $reader = New-Object System.IO.StreamReader($spiEntry.Open())
         try { $spiBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
         if ($spiBody -notmatch 'com\.gamma\.exchange\.ExchangeRoutes') { throw "inspecto-exchange.jar registers no ExchangeRoutes - the SPI file lists only: $spiBody" }
@@ -751,8 +751,8 @@ if ($obsJarSrc) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $obsZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-observability.jar")
     try {
-        $spiEntry = $obsZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.control.RouteModule' }
-        if (-not $spiEntry) { throw "inspecto-observability.jar has no META-INF/services/com.gamma.control.RouteModule - GET /metrics and every /events* path would 503 on a bundle supposed to serve them." }
+        $spiEntry = $obsZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
+        if (-not $spiEntry) { throw "inspecto-observability.jar has no META-INF/services/com.gamma.spi.http.RouteModule - GET /metrics and every /events* path would 503 on a bundle supposed to serve them." }
         Write-Host "  verified: RouteModule registration present in the observability module" -ForegroundColor DarkGray
     } finally { $obsZip.Dispose() }
 }
@@ -765,8 +765,8 @@ if ($opsJarSrc) {
         # TWO seams must be declared, not one: the routes AND the engine provider core resolves
         # ObjectAccess through. A jar with routes but no provider would 503 every path while claiming
         # the feature is installed.
-        $routeSpi = $opZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.control.RouteModule' }
-        if (-not $routeSpi) { throw "inspecto-ops.jar has no META-INF/services/com.gamma.control.RouteModule - every /objects* path would 503 on a bundle supposed to serve them." }
+        $routeSpi = $opZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
+        if (-not $routeSpi) { throw "inspecto-ops.jar has no META-INF/services/com.gamma.spi.http.RouteModule - every /objects* path would 503 on a bundle supposed to serve them." }
         $engineSpi = $opZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.service.ObjectEngineProvider' }
         if (-not $engineSpi) { throw "inspecto-ops.jar has no META-INF/services/com.gamma.service.ObjectEngineProvider - the routes would load but resolve no ObjectAccess." }
         Write-Host "  verified: RouteModule + ObjectEngineProvider registrations present in the ops module" -ForegroundColor DarkGray
@@ -780,7 +780,7 @@ if ($reconJarSrc) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $rcZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-reconciliation.jar")
     try {
-        foreach ($svc in @(@('com.gamma.control.RouteModule', 'com.gamma.recon.ReconRoutes'), @('com.gamma.job.JobTypeProvider', 'com.gamma.recon.ReconRunJobType'), @('com.gamma.control.ComponentDeleteHook', 'com.gamma.recon.ReconComponentDeleteHook'))) {
+        foreach ($svc in @(@('com.gamma.spi.http.RouteModule', 'com.gamma.recon.ReconRoutes'), @('com.gamma.job.JobTypeProvider', 'com.gamma.recon.ReconRunJobType'), @('com.gamma.spi.http.ComponentDeleteHook', 'com.gamma.recon.ReconComponentDeleteHook'))) {
             $rcEntry = $rcZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
             if (-not $rcEntry) { throw "inspecto-reconciliation.jar has no META-INF/services/$($svc[0]) - $($svc[1]) would never be discovered." }
             $rcReader = New-Object System.IO.StreamReader($rcEntry.Open())
@@ -798,7 +798,7 @@ if ($scoringJarSrc) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $scZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-scoring.jar")
     try {
-        foreach ($svc in @(@('com.gamma.control.RouteModule', 'com.gamma.risk.RiskScoreRoutes'), @('com.gamma.job.JobTypeProvider', 'com.gamma.risk.RiskScoreJobType'), @('com.gamma.control.ComponentKindValidator', 'com.gamma.risk.RiskScoreKindValidator'))) {
+        foreach ($svc in @(@('com.gamma.spi.http.RouteModule', 'com.gamma.risk.RiskScoreRoutes'), @('com.gamma.job.JobTypeProvider', 'com.gamma.risk.RiskScoreJobType'), @('com.gamma.spi.http.ComponentKindValidator', 'com.gamma.risk.RiskScoreKindValidator'))) {
             $scEntry = $scZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
             if (-not $scEntry) { throw "inspecto-scoring.jar has no META-INF/services/$($svc[0]) - $($svc[1]) would never be discovered." }
             $scReader = New-Object System.IO.StreamReader($scEntry.Open())

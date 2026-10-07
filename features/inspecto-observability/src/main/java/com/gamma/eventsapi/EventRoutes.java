@@ -2,12 +2,12 @@ package com.gamma.eventsapi;
 
 import com.gamma.control.AuthorKeys;
 import com.gamma.control.HostContext;
-import com.gamma.control.ApiContext;
+import com.gamma.spi.http.ApiContext;
 import com.gamma.control.AuditReadMasking;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.Cursor;
-import com.gamma.control.RouteModule;
+import com.gamma.spi.http.RouteModule;
 import com.gamma.control.TimeBounds;
 import com.gamma.audit.AuditAttrs;
 import com.gamma.audit.Event;

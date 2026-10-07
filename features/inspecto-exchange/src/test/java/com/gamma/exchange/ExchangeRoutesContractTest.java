@@ -1,6 +1,6 @@
 package com.gamma.exchange;
 
-import com.gamma.control.RouteModule;
+import com.gamma.spi.http.RouteModule;
 import com.gamma.control.testkit.RouteModuleContract;
 
 /**

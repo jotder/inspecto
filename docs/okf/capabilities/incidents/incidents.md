@@ -992,7 +992,7 @@ contents, merge, create contract, linking, postmortem, tagging); `alerts.compone
 | File | Provider |
 |---|---|
 | `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.service.ObjectEngineProvider` | `com.gamma.ops.OpsEngineProvider` — the host-declared handle that makes `ObjectAccess` non-empty |
-| `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.control.RouteModule` | `ObjectRoutes`, `NoteRoutes`, `QueueRoutes`, `TagRoutes` — the 49 paths `AbsentModuleRoutes` stands in for |
+| `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.spi.http.RouteModule` | `ObjectRoutes`, `NoteRoutes`, `QueueRoutes`, `TagRoutes` — the 49 paths `AbsentModuleRoutes` stands in for |
 | `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.job.JobTypeProvider` · `com.gamma.job.MaintenanceTaskProvider` | `OpsJobTypes$CaseRuleEvaluate`, `OpsJobTypes$ObjectsAnalytics` · `OpsMaintenanceTasks` (`incident_purge`) |
 | `providers/inspecto-notify-channels/src/main/resources/META-INF/services/com.gamma.notify.NotificationChannel` | `SmtpEmailChannel`, `WebhookChannel` |
 

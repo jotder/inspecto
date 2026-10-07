@@ -1,5 +1,7 @@
-package com.gamma.control;
+package com.gamma.spi.http;
 
+import com.gamma.control.ErrorCodes;
+import com.gamma.control.Subject;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.time.Instant;
@@ -20,10 +22,10 @@ import java.util.Map;
  * the session-wide array. Design of record: docs/superpower/resource-permissions-design.md. Contract:
  * docs/superpower/api-contract-design.md §4–5, §8.
  */
-final class Envelope {
+public final class Envelope {
     private Envelope() {}
 
-    static Object shape(HttpExchange ex, int status, Object body) {
+    public static Object shape(HttpExchange ex, int status, Object body) {
         return status < 400 ? success(ex, body) : error(ex, status, body);
     }
 

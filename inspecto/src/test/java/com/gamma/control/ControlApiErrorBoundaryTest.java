@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.spi.http.ApiContext;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;

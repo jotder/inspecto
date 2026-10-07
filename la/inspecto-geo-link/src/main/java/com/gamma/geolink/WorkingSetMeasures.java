@@ -13,7 +13,7 @@ import com.gamma.la.core.InvestigationStores;
 import com.gamma.la.core.SnapshotStore;
 import com.gamma.alert.AlertRule;
 import com.gamma.alert.InvestigationMeasureProbe;
-import com.gamma.control.ApiContext;
+import com.gamma.spi.http.ApiContext;
 import com.gamma.query.DatasetMeasureProbe;
 import com.gamma.query.MeasureCompiler;
 import org.slf4j.Logger;

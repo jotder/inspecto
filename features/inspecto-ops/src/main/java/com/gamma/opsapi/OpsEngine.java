@@ -1,7 +1,7 @@
 package com.gamma.opsapi;
 
 import com.gamma.control.HostContext;
-import com.gamma.control.ApiContext;
+import com.gamma.spi.http.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.ops.ObjectService;

@@ -1,7 +1,7 @@
 package com.gamma.geolink;
 
 import com.gamma.control.AnnotationTargets;
-import com.gamma.control.ApiContext;
+import com.gamma.spi.http.ApiContext;
 import com.gamma.control.HostContext;
 import com.gamma.la.core.CasePort;
 import com.gamma.objects.ObjectAccess;

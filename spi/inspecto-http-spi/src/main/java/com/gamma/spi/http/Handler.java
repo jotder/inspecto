@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.spi.http;
 
 import com.sun.net.httpserver.HttpExchange;
 

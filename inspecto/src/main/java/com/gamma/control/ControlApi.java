@@ -1,5 +1,10 @@
 package com.gamma.control;
 
+import com.gamma.spi.http.ApiContext;
+import com.gamma.spi.http.Envelope;
+import com.gamma.spi.http.Handler;
+import com.gamma.spi.http.Idempotency;
+import com.gamma.spi.http.RouteModule;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.api.PublicApi;
@@ -608,7 +613,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
             module.register(this);
 
         // Optional-module route groups (EDG-01 cell 3a, 2026-09-07): discovered through
-        // META-INF/services/com.gamma.control.RouteModule and registered AFTER the built-in list, never
+        // META-INF/services/com.gamma.spi.http.RouteModule and registered AFTER the built-in list, never
         // interleaved — matching is first-match in registration order and ServiceLoader order is
         // unspecified, so appending is the only placement that keeps every built-in route's winner fixed.
         // A discovered module that re-registers a built-in (method, pattern) trips the duplicate guard in

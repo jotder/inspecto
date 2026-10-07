@@ -20,7 +20,7 @@
         feed) merged into this one module; both RouteModules and their ServiceLoader lines live here.
 
         OPTIONAL Professional-edition metrics EXPOSITION (EDITIONS.md CP-13): GET /metrics, the Prometheus text
-        endpoint, contributed through the core's public com.gamma.control.RouteModule ServiceLoader seam.
+        endpoint, contributed through the core's public com.gamma.spi.http.RouteModule ServiceLoader seam.
 
         WHY ONLY THE EXPOSITION (EDG-01 cell 5, 2026-09-07). MetricRegistry is called by nine classes across
         three modules outside its own package -- CollectorProcessor, JobService, PipelineScheduler, EventLog,

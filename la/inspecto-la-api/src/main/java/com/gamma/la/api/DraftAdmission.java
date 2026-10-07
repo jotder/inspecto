@@ -1,6 +1,6 @@
 package com.gamma.la.api;
 
-import com.gamma.control.ApiContext;
+import com.gamma.spi.http.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.entitystore.LinkAnalysisSettings;

@@ -1,6 +1,6 @@
 package com.gamma.la.api;
 
-import com.gamma.control.ApiContext;
+import com.gamma.spi.http.ApiContext;
 import com.gamma.la.core.InvestigationMembers;
 import com.gamma.la.core.InvestigationMembers.Entry;
 import com.gamma.la.core.InvestigationMembers.Op;

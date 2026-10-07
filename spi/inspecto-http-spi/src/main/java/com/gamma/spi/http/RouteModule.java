@@ -1,4 +1,6 @@
-package com.gamma.control;
+package com.gamma.spi.http;
+
+import com.gamma.control.ApiException;
 
 
 /**
@@ -10,7 +12,7 @@ package com.gamma.control;
  * {@link ApiException} and {@code WriteGates} were all package-private, so a route group could only ever
  * live in {@code com.gamma.control} — which is why every "not for Personal" feature shipped in every
  * bundle. Now an optional module may implement it and register the class in
- * {@code META-INF/services/com.gamma.control.RouteModule}; {@link ControlApi} discovers such modules with
+ * {@code META-INF/services/com.gamma.spi.http.RouteModule}; {@link ControlApi} discovers such modules with
  * {@link java.util.ServiceLoader} and registers them <b>after</b> the built-in list.
  *
  * <p>⚠ <b>Order is load-bearing and "after" is deliberate.</b> Route matching is first-match in

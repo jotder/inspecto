@@ -97,8 +97,8 @@ class LaApiPortsTest {
 
     private static CasePort cases(Map<String, Map<String, Object>> byRef, boolean visible) {
         return new CasePort() {
-            @Override public boolean available(com.gamma.control.ApiContext api) { return true; }
-            @Override public Optional<Map<String, Object>> summary(com.gamma.control.ApiContext api, String ref) {
+            @Override public boolean available(com.gamma.spi.http.ApiContext api) { return true; }
+            @Override public Optional<Map<String, Object>> summary(com.gamma.spi.http.ApiContext api, String ref) {
                 return Optional.ofNullable(byRef.get(ref));
             }
             @Override public boolean visibleTo(HttpExchange ex, Map<String, Object> summary) { return visible; }
