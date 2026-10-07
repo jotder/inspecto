@@ -235,3 +235,5 @@ the rule does not model vanished behind a 200. Now an author-owned `x-` key is k
 save once approved, and a bundle import, and `GET /alerts/rules` returns it; any other unknown key is refused 422 `ERR_UNKNOWN_CONFIG_KEY` naming it, with
 nothing written (`AlertRoutes.parse`, every write door). Loading stays lenient: a hand-edited stored rule with a stray key still arms and lists it.
 Pinned by `AlertRuleUnmodelledKeysTest`.
+
+⚠ **Unmodelled keys on an Expectation (`MODULE-REORG-P4-2`, 2026-10-07).** `POST|PUT /expectations` rebuilds the stored file from `Expectation.toMap()`, so an author-owned `x-` key used to vanish behind a 200 (any other unknown key was already refused by the census). Now `x-` keys are kept through create, update (PUT replaces), a held save once approved and a bundle import, and returned by GET; the Expectation dialog spreads the stored `x-` keys back on edit (`authorKeys`). Pinned by `RebuiltWritersUnmodelledKeysTest`.

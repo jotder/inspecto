@@ -23,6 +23,10 @@ import java.util.regex.Pattern;
 public record ChannelConfig(String id, String kind, String target, String description,
                             boolean enabled, long createdAt, String template, int digestMinutes) {
 
+    /** Every key {@link #fromMap} reads plus the store's {@code name} envelope; see {@code NotificationRule#MODELLED}. */
+    public static final java.util.Set<String> MODELLED = java.util.Set.of("id", "kind", "target", "description",
+            "enabled", "createdAt", "template", "digestMinutes", "name");
+
     /**
      * Parse + validate a channel from a request/stored map. {@code id}/{@code kind}/{@code target} are
      * required (blank → {@link IllegalArgumentException} → 422); {@code enabled} defaults true; {@code

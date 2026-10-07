@@ -877,6 +877,14 @@ final class ComponentRoutes implements RouteModule {
         }
 
         if (CENSUSED_COMPONENT_KINDS.contains(type)) refuseUnknownComponentKeys(type, content);
+
+        // MODULE-REORG-P4-2: the raw door and a bundle import meet the same unmodelled-key policy as
+        // /notifications/rules* and /channels (keys only; a stored document is stamped with `name`): x- kept, other refused.
+        if ("notification-rule".equals(type) || "channel".equals(type)) {
+            String refusal = AuthorKeys.refusal("notification-rule".equals(type) ? "a notification rule" : "a notification channel",
+                    content, "notification-rule".equals(type) ? com.gamma.notify.NotificationRule.MODELLED : com.gamma.notify.ChannelConfig.MODELLED);
+            if (refusal != null) throw new IllegalArgumentException(refusal);
+        }
     }
 
     // ── widget / dashboard / expectation top-level key census ────────────────────

@@ -528,6 +528,34 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
   Every other module still imports processor classes (`HostContext`, `ControlApi`, `PendingChanges`, `ServerFaults`, `Cursor`, ...) and keeps the edge.
 - **Gate:** full reactor 9023 tests, 50/50 modules, one transient Windows `AccessDeniedException` in `ControlApiRestoreJobGateTest` (green 3/3 alone).
 
+### P4c as built (2026-10-07 - the unmodelled-key policy on the writers after Alert Rule)
+
+Policy as in *P4b* Step A (`x-` kept, any other key refused 422 naming it), applied by `AuthorKeys` (inspecto `control`: `carry` copies the posted `x-` keys into the
+rebuilt map, `requireModelled` refuses the rest) to the writers that persist what they REBUILD from a typed `toMap()`. Surveyed by reading each route, not by grep alone.
+
+| Writer (door) | Before | After |
+|---|---|---|
+| Alert Rule (`/alerts/rules`, `/components/alert-rule`, import) | dropped behind a 200 | **kept / refused** (P4b, `AlertRule.extra`) |
+| Decision Rule, Pipeline, Job (P4a) | preserved | unchanged |
+| KPI (`/components/kpi`, Requirement action, import) | **already right**: persists the raw body after `KpiDefinition.fromMap`, which refuses any key outside `KEYS` unless `x-` (`KpiDefinitionTest` pins both) | unchanged; the row's premise (a `toMap()` rebuild) was wrong for KPI |
+| Expectation (`POST|PUT /expectations`) | `x-` **dropped behind a 200** (route rebuilt from `Expectation.toMap()`); any other key already refused by the DUCKLE-C3 census (422 naming the key, no `ERR_UNKNOWN_CONFIG_KEY` code text - left as is, its tests pin the wording) | `x-` kept through create / update / held / import (`/components/expectation` and bundle import already persisted the raw body and run the same census) |
+| Notification Rule (`/notifications/rules*`) | `x-` **and every other key dropped behind a 200** | `x-` kept, other keys refused `ERR_UNKNOWN_CONFIG_KEY`; `NotificationRule.MODELLED` also accepts the store's `name` stamp (a GET-then-PUT replays it) |
+| Notification Channel (`/notifications/channels*`) | same as Rule | same as Rule (`ChannelConfig.MODELLED`); its PUT is a server-side MERGE, so a stored `x-` key also survives a PUT that omits it (unlike Rule/Expectation, where PUT replaces) |
+| `/components/notification-rule` and `/components/channel` raw doors, bundle import of both | persisted any key raw (nothing dropped, nothing refused) | refuse a non-`x-` unmodelled key in `ComponentRoutes.validateKind` (keys only, no required-field check: a raw door never ran one) |
+| Tag, Tag Rule (`TagRoutes.persist(Map.of("tag", tag.toMap()))`), Case Rule | rebuild from `toMap()`, no unknown-key handling: **DROP** | **not fixed** (ops module; row stays) |
+| Value Measure / Investigation Measure specs, Saved View (`EventRoutes`, `BundleRoutes`) | rebuilt from a `toMap()`; **not characterised** | not touched (row stays) |
+| Connection, Approval Policy | read-only / refuses unknown keys by its own parser | unchanged |
+
+- **Shipped configs.** Every shipped Expectation (`spaces/*/config/registry/expectations`, 6 files, `spaces/_templates/*`) carries only modelled keys (`name targetType target column kind min severity`);
+  no Notification Rule or Channel is shipped anywhere (`spaces/`, templates, demo). So nothing needed a non-`x-` carry-forward.
+- **Tests.** `RebuiltWritersUnmodelledKeysTest` (6, real HTTP with a Subject): per writer, create / GET / GET-then-PUT / PUT-replaces, a held save approved by a second approver, a bundle import keeping `x-`
+  and failing the item for an unknown key. RED first against the old code: 6/6 failed, each as a 200 with the key gone (or a 200 for `zz_cfg`). Guards run green: `ApiContractTest`, `OpenApiPathsContractTest`
+  (no route or schema changed), `ModuleRemoval*`, `ConfigWriteFunnelTest`, `ImportLoaderInventoryTest`, `RouteInventoryTest`, `CapabilityManifestTest`, `ModuleManifestGuardTest`.
+- **SPA (the section 9 trap, fixed small).** The Rule dialog PUT replaces from a rebuilt body and the Expectation dialog likewise, so an edit-save would have dropped the `x-` key the server now keeps.
+  `authorKeys(stored)` (`inspecto/api/author-keys.ts`) spreads the stored document's `x-` keys into both save bodies; specs in `author-keys.spec.ts`, `rule-form.dialog.spec.ts`,
+  `expectation-form.dialog.spec.ts`. The Channel dialog needs nothing (merge PUT).
+- **Remaining (BACKLOG row shrunk):** Tag / Tag Rule / Case Rule, and characterising Value Measure, Investigation Measure and Saved View.
+
 ### P4b as built (2026-10-07 — Alert Rule unmodelled-key policy, then inert-config diagnostics on the wire)
 
 **Step A - `MODULE-REORG-P4-2` (policy decided by the operator-away rule; recorded, not asked).**

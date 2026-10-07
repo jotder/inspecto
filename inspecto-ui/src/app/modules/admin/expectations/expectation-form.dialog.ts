@@ -25,6 +25,7 @@ import {
 } from 'app/inspecto/api';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
+import { authorKeys } from 'app/inspecto/api/author-keys';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -461,6 +462,7 @@ export class ExpectationFormDialog implements AfterViewInit {
                 : {}),
             severity: v.severity ?? 'MAJOR',
             enabled: v.enabled !== false,
+            ...authorKeys(this.data.expectation), // `x-` annotations ride through an edit-save (the PUT replaces)
         };
         this.saving.set(true);
         const call = this.isEdit ? this.api.update(body.name, body) : this.api.create(body);

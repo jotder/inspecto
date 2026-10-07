@@ -77,6 +77,22 @@ describe('RuleFormDialog', () => {
         );
     });
 
+    it('carries the stored rule x- annotations through an edit-save (the PUT replaces) and nothing else unmodelled', () => {
+        const rule = {
+            id: 'custom1',
+            name: 'custom1',
+            eventType: 'BATCH_FAILED',
+            category: 'pipeline',
+            enabled: true,
+            'x-team': 'noc',
+        };
+        const { c, save } = create({ rule });
+        c.save();
+        const sent = (save.mock.calls[0] as unknown[])[1] as Record<string, unknown>;
+        expect(sent['x-team']).toBe('noc');
+        expect('name' in sent).toBe(false);
+    });
+
     it('renders with no a11y violations', async () => {
         const { fixture } = create({});
         await expectNoA11yViolations(fixture.nativeElement);

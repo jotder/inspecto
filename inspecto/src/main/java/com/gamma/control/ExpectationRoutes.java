@@ -120,7 +120,7 @@ final class ExpectationRoutes implements RouteModule {
         if (RouteErrors.exists(store, TYPE, exp.name()))
             throw new ApiException(409, ErrorCodes.CONFLICT, "expectation '" + exp.name() + "' already exists (use PUT to update)");
         long now = System.currentTimeMillis();
-        Map<String, Object> content = exp.toMap();
+        Map<String, Object> content = AuthorKeys.carry(body, exp.toMap());   // MODULE-REORG-P4-2: x- annotations are kept
         content.put("lastResult", null);
         content.put("createdAt", now);
         content.put("updatedAt", now);
@@ -133,7 +133,7 @@ final class ExpectationRoutes implements RouteModule {
         Map<String, Object> prev = RouteErrors.existing(store, TYPE, "expectation", name);
         census(body);
         Expectation exp = parse(body);
-        Map<String, Object> content = exp.toMap();
+        Map<String, Object> content = AuthorKeys.carry(body, exp.toMap());   // PUT replaces: x- annotations are the posted ones
         content.put("lastResult", prev.get("lastResult"));                       // preserve last evaluation
         content.put("createdAt", prev.getOrDefault("createdAt", System.currentTimeMillis()));
         content.put("updatedAt", System.currentTimeMillis());

@@ -32,6 +32,14 @@ public record NotificationRule(String id, String eventType, EventLevel minLevel,
                                String titleTemplate, String bodyTemplate, String dedupeKeyTemplate,
                                boolean enabled) {
 
+    /**
+     * Every key {@link #fromMap} reads, plus the store's {@code name} envelope (it stamps {@code name == id} on the
+     * stored document, so a GET-then-PUT round trip posts it back). A key outside this set is not kept by a save
+     * (MODULE-REORG-P4-2): an {@code x-} annotation is carried by the route, any other is refused.
+     */
+    public static final java.util.Set<String> MODELLED = java.util.Set.of("id", "eventType", "minLevel", "category",
+            "titleTemplate", "bodyTemplate", "dedupeKeyTemplate", "enabled", "name");
+
     /** {@code true} when {@code e} should fire this rule — {@link #tree()} evaluated over {@link #matchContext}.
      *  A blank {@code eventType} fires nothing (an empty tree leaf would otherwise read as "no constraint"). */
     public boolean matches(Event e) {

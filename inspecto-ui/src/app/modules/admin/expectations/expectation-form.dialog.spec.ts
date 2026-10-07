@@ -3,7 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ToastrService } from 'ngx-toastr';
-import { describe, expect, it } from 'vitest';
+import { of } from 'rxjs';
+import { describe, expect, it, vi } from 'vitest';
 import { ExpectationsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ExpectationFormData, ExpectationFormDialog } from './expectation-form.dialog';
@@ -223,6 +224,32 @@ describe('ExpectationFormDialog', () => {
         expect(c.isEdit).toBe(true);
         expect(c.step()).toBe('config');
         expect(fixture.nativeElement.textContent).toContain('cdr_duration_range');
+    });
+
+    it('carries the stored expectation x- annotations through an edit-save (the PUT replaces)', () => {
+        const stored = {
+            name: 'cdr_duration_range',
+            targetType: 'pipeline',
+            target: 'cdr_ingest',
+            column: 'duration_s',
+            kind: 'range',
+            min: 0,
+            max: 86_400,
+            pattern: null,
+            refDataset: null,
+            refColumn: null,
+            severity: 'MAJOR',
+            enabled: true,
+            lastResult: null,
+            createdAt: 1,
+            updatedAt: 1,
+            'x-team': 'dq',
+        };
+        const fixture = create({ expectation: stored as unknown as ExpectationFormData['expectation'] });
+        const update = vi.fn(() => of({}));
+        (TestBed.inject(ExpectationsService) as unknown as Record<string, unknown>)['update'] = update;
+        fixture.componentInstance.save();
+        expect(update).toHaveBeenCalledWith('cdr_duration_range', expect.objectContaining({ 'x-team': 'dq' }));
     });
 
     // ─── AGT-6a A2/A3: the inline suggestion surface ───

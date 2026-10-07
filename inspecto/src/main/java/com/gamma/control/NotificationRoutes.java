@@ -273,11 +273,13 @@ final class NotificationRoutes implements RouteModule {
     /** {@code POST /notifications/channels} — create; 422 missing fields, 409 duplicate id. */
     private static Object createChannel(ApiContext api, HttpExchange e, Map<String, Object> body) throws IOException {
         ComponentStore store = channelStore(api);
+        AuthorKeys.requireModelled("a notification channel", body, ChannelConfig.MODELLED);
         ChannelConfig ch = parse(body, System.currentTimeMillis());
         if (RouteErrors.exists(store, CHANNEL_TYPE, ch.id()))
             throw new ApiException(409, ErrorCodes.CONFLICT, "channel '" + ch.id() + "' already exists (use PUT to update)");
-        PendingChanges.hold(api, e, CHANNEL_TYPE, ch.id(), ch.toMap(), null);   // maker-checker
-        return write(store, ch.id(), ch.toMap());
+        Map<String, Object> proposed = AuthorKeys.carry(body, ch.toMap());   // MODULE-REORG-P4-2: x- annotations are kept
+        PendingChanges.hold(api, e, CHANNEL_TYPE, ch.id(), proposed, null);   // maker-checker
+        return write(store, ch.id(), proposed);
     }
 
     /** {@code PUT /notifications/channels/{id}} — replace; 404 unknown. The id + createdAt are immutable. */
@@ -285,11 +287,12 @@ final class NotificationRoutes implements RouteModule {
         ComponentStore store = channelStore(api);
         Map<String, Object> existing = RouteErrors.existing(store, CHANNEL_TYPE, "channel", id);
         long createdAt = existing.get("createdAt") instanceof Number n ? n.longValue() : System.currentTimeMillis();
+        AuthorKeys.requireModelled("a notification channel", body, ChannelConfig.MODELLED);
         Map<String, Object> patched = new LinkedHashMap<>(existing);
         patched.putAll(body);
         patched.put("id", id);                 // storage key is bound from the path, never a stale body id
         patched.put("createdAt", createdAt);   // preserve the original creation stamp
-        Map<String, Object> proposed = parse(patched, createdAt).toMap();
+        Map<String, Object> proposed = AuthorKeys.carry(patched, parse(patched, createdAt).toMap());   // x- annotations kept
         PendingChanges.hold(api, e, CHANNEL_TYPE, id, proposed, existing);   // maker-checker
         return write(store, id, proposed);
     }
@@ -342,8 +345,9 @@ final class NotificationRoutes implements RouteModule {
         NotificationRule rule = parseRule(body);
         if (existsRule(store, rule.id()))
             throw new ApiException(409, ErrorCodes.CONFLICT, "rule '" + rule.id() + "' already exists (use PUT to update)");
-        PendingChanges.hold(api, e, RULE_TYPE, rule.id(), rule.toMap(), null);   // maker-checker
-        return writeRule(store, rule.id(), rule.toMap());
+        Map<String, Object> proposed = AuthorKeys.carry(body, rule.toMap());   // MODULE-REORG-P4-2: x- annotations are kept
+        PendingChanges.hold(api, e, RULE_TYPE, rule.id(), proposed, null);   // maker-checker
+        return writeRule(store, rule.id(), proposed);
     }
 
     /** {@code PUT /notifications/rules/{id}} — replace; 404 unknown. The id is immutable (bound from the path). */
@@ -352,7 +356,7 @@ final class NotificationRoutes implements RouteModule {
         Map<String, Object> current = existingRule(store, id);
         Map<String, Object> patched = new LinkedHashMap<>(body);
         patched.put("id", id);   // storage key is bound from the path, never a stale body id
-        Map<String, Object> proposed = parseRule(patched).toMap();
+        Map<String, Object> proposed = AuthorKeys.carry(body, parseRule(patched).toMap());   // PUT replaces; x- annotations kept
         PendingChanges.hold(api, e, RULE_TYPE, id, proposed, current);   // maker-checker
         return writeRule(store, id, proposed);
     }
@@ -371,6 +375,7 @@ final class NotificationRoutes implements RouteModule {
     }
 
     private static NotificationRule parseRule(Map<String, Object> body) {
+        AuthorKeys.requireModelled("a notification rule", body, NotificationRule.MODELLED);
         try {
             return NotificationRule.fromMap(body);
         } catch (IllegalArgumentException e) {

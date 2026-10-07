@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, NotificationRule, NotificationsService } from 'app/inspecto/api';
+import { authorKeys } from 'app/inspecto/api/author-keys';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
@@ -108,6 +109,7 @@ export class RuleFormDialog implements AfterViewInit {
             bodyTemplate: v.bodyTemplate?.trim() || undefined,
             dedupeKeyTemplate: v.dedupeKeyTemplate?.trim() || undefined,
             enabled: v.enabled !== false,
+            ...authorKeys(this.data.rule), // `x-` annotations ride through an edit-save (the PUT replaces)
         };
         this.saving.set(true);
         // The server's PUT is a full replace (id bound from the path) — always send the whole rule.
