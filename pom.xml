@@ -41,31 +41,31 @@
             corpus-backed asn-golden/legacy-code tests `assumeTrue`/SKIP when the operator CDR corpus
             is absent (DATA-GOV-1), so a fresh checkout still builds green.
         -->
-        <module>asn-parser/asn-decoders</module>
-        <module>inspecto-api</module>
-        <module>inspecto-util</module>
-        <module>inspecto-config</module>
-        <module>inspecto-sql</module>
-        <module>inspecto-etl</module>
-        <module>inspecto-audit-spi</module>
-        <module>inspecto-auth-spi</module>
-        <module>inspecto-http-spi</module>
-        <module>inspecto-entity-store</module>
-        <module>inspecto-event</module>
-        <module>inspecto-workflow</module>
-        <module>inspecto-acquire</module>
-        <module>inspecto-engine</module>
+        <module>providers/asn-parser/asn-decoders</module>
+        <module>platform/inspecto-api</module>
+        <module>platform/inspecto-util</module>
+        <module>platform/inspecto-config</module>
+        <module>platform/inspecto-sql</module>
+        <module>platform/inspecto-etl</module>
+        <module>spi/inspecto-audit-spi</module>
+        <module>spi/inspecto-auth-spi</module>
+        <module>spi/inspecto-http-spi</module>
+        <module>platform/inspecto-entity-store</module>
+        <module>platform/inspecto-event</module>
+        <module>platform/inspecto-workflow</module>
+        <module>platform/inspecto-acquire</module>
+        <module>platform/inspecto-engine</module>
         <module>inspecto</module>
-        <module>inspecto-agent</module>
-        <module>inspecto-agent-hosted</module>
-        <module>inspecto-connectors</module>
-        <module>inspecto-intelligence</module>
+        <module>features/inspecto-agent</module>
+        <module>providers/inspecto-agent-hosted</module>
+        <module>providers/inspecto-connectors</module>
+        <module>features/inspecto-intelligence</module>
         <!-- MODULE-REORG-1 P7: the Telecom ASN.1 decoder (Telecom industry pack). Default reactor so its tests and the
              inspecto module's ASN.1 tests always run; bundled (bundle-modules.mjs) from Professional up, NOT in Personal. -->
-        <module>inspecto-telecom-asn1</module>
+        <module>providers/inspecto-telecom-asn1</module>
         <!-- DEMO-AUTH-1: default reactor so its tests always run; NO edition bundles it (tools/bundle-modules.mjs
              does not list it) - only `package.ps1 -DemoAuth` stages it, for offline demo builds. -->
-        <module>inspecto-demo-auth</module>
+        <module>providers/inspecto-demo-auth</module>
     </modules>
 
     <!--
@@ -85,36 +85,36 @@
         <profile>
             <id>edition-professional</id>
             <modules>
-                <module>inspecto-oidc</module>
-                <module>inspecto-secrets</module>
-                <module>inspecto-geo-country</module>
+                <module>providers/inspecto-oidc</module>
+                <module>providers/inspecto-secrets</module>
+                <module>providers/inspecto-geo-country</module>
                 <!-- MODULE-REORG-1 P7: the Kafka stream connector (premium connector, not Base). -->
-                <module>inspecto-connectors-kafka</module>
+                <module>providers/inspecto-connectors-kafka</module>
                 <!-- EDG-01 cell 1 (2026-09-07): the external notification transports. CP-15 is "not for
                      Personal", and both channels used to reach every bundle — WebhookChannel from
                      inspecto-engine (an unconditional dependency) and SmtpEmailChannel from the
                      inspecto-connectors sidecar, which package.ps1 copies into EVERY edition. -->
-                <module>inspecto-notify-channels</module>
+                <module>providers/inspecto-notify-channels</module>
                 <!-- EDG-01 cell 2 (2026-09-07): backup / backup_verify / restore. OPS-06 is "not for
                      Personal"; BackupTask lived in inspecto-engine and so shipped in every bundle. -->
-                <module>inspecto-backup</module>
+                <module>features/inspecto-backup</module>
                 <!-- SEP-08 (2026-10-01): Entity Lists + the ONE shared entity fact log, out of inspecto-geo-link
                      (which depends on it) so assurance can use a watch list without Link Analysis. Bundled in
                      exactly the editions that ship geo-link; absent on Personal. -->
-                <module>inspecto-entity-list</module>
+                <module>features/inspecto-entity-list</module>
                 <!-- EDG-01 cell 3b (2026-09-07): geo map + link analysis routes. CP-09 is "not for Personal";
                      GeoRoutes/InvRoutes lived in the core and so shipped in every bundle. -->
-                <module>inspecto-la-core</module>
-                <module>inspecto-la-api</module>
-                <module>inspecto-geo-link</module>
-                <module>inspecto-la-graph</module>
-                <module>inspecto-la-storage</module>
+                <module>la/inspecto-la-core</module>
+                <module>la/inspecto-la-api</module>
+                <module>la/inspecto-geo-link</module>
+                <module>la/inspecto-la-graph</module>
+                <module>la/inspecto-la-storage</module>
                 <!-- EDG-01 cell 4 (2026-09-07): cross-space exchange / sharing. SEC-10 is "not for Personal";
                      the com.gamma.exchange domain + ExchangeRoutes lived in the core. -->
-                <module>inspecto-exchange</module>
+                <module>features/inspecto-exchange</module>
                 <!-- EDG-01 cell 5 (2026-09-07): the Prometheus scrape endpoint. CP-13 is "not for Personal";
                      only the EXPOSITION moves — MetricRegistry stays core (nine classes, three modules). -->
-                <module>inspecto-observability</module>
+                <module>features/inspecto-observability</module>
                 <!-- EDG-01 cell 6 (2026-09-08): CP-13's OTHER half — the whole /events* feed, incl. the audit
                      CSV export. Moved whole by operator decision: the audit CSV is a ?format= branch inside
                      GET /events/export, so gating it alone would be an `if` in a core route. ⚠ Personal
@@ -131,36 +131,36 @@
                      ⚠ Amends OPS-01 (drops `objects` from Personal's stores) and SP-CTL-02 (a gap raises
                      the EVENT on Personal but no ALERT object). ⛔ NOT /alerts* — that is AlertsService
                      over config alert RULES, a different domain, and it stays in core. -->
-                <module>inspecto-ops</module>
+                <module>features/inspecto-ops</module>
                 <!-- MODULE-REORG-1 P7: the Reconciliation add-on (Professional and up; absent on Personal). -->
-                <module>inspecto-reconciliation</module>
+                <module>features/inspecto-reconciliation</module>
                 <!-- MODULE-REORG-1 P7: the Scoring add-on (Risk Scores; next to inspecto-entity-list, which it depends on). -->
-                <module>inspecto-scoring</module>
+                <module>features/inspecto-scoring</module>
             </modules>
         </profile>
         <profile>
             <id>edition-standard</id>
             <modules>
-                <module>inspecto-oidc</module>
-                <module>inspecto-secrets</module>
-                <module>inspecto-geo-country</module>
+                <module>providers/inspecto-oidc</module>
+                <module>providers/inspecto-secrets</module>
+                <module>providers/inspecto-geo-country</module>
                 <!-- MODULE-REORG-1 P7: the Kafka stream connector (premium connector, not Base). -->
-                <module>inspecto-connectors-kafka</module>
-                <module>inspecto-notify-channels</module>
-                <module>inspecto-backup</module>
-                <module>inspecto-entity-list</module>
-                <module>inspecto-la-core</module>
-                <module>inspecto-la-api</module>
-                <module>inspecto-geo-link</module>
-                <module>inspecto-la-graph</module>
-                <module>inspecto-la-storage</module>
-                <module>inspecto-exchange</module>
-                <module>inspecto-observability</module>
-                <module>inspecto-ops</module>
+                <module>providers/inspecto-connectors-kafka</module>
+                <module>providers/inspecto-notify-channels</module>
+                <module>features/inspecto-backup</module>
+                <module>features/inspecto-entity-list</module>
+                <module>la/inspecto-la-core</module>
+                <module>la/inspecto-la-api</module>
+                <module>la/inspecto-geo-link</module>
+                <module>la/inspecto-la-graph</module>
+                <module>la/inspecto-la-storage</module>
+                <module>features/inspecto-exchange</module>
+                <module>features/inspecto-observability</module>
+                <module>features/inspecto-ops</module>
                 <!-- MODULE-REORG-1 P7: the Reconciliation add-on (Professional and up; absent on Personal). -->
-                <module>inspecto-reconciliation</module>
+                <module>features/inspecto-reconciliation</module>
                 <!-- MODULE-REORG-1 P7: the Scoring add-on (Risk Scores; next to inspecto-entity-list, which it depends on). -->
-                <module>inspecto-scoring</module>
+                <module>features/inspecto-scoring</module>
             </modules>
         </profile>
         <!-- Preview: EVERYTHING, for testing/incubation — never a customer-facing tier (docs/EDITIONS.md,
@@ -176,29 +176,29 @@
         <profile>
             <id>edition-preview</id>
             <modules>
-                <module>inspecto-oidc</module>
-                <module>inspecto-secrets</module>
-                <module>inspecto-geo-country</module>
+                <module>providers/inspecto-oidc</module>
+                <module>providers/inspecto-secrets</module>
+                <module>providers/inspecto-geo-country</module>
                 <!-- MODULE-REORG-1 P7: the Kafka stream connector (premium connector, not Base). -->
-                <module>inspecto-connectors-kafka</module>
-                <module>inspecto-policy</module>
-                <module>inspecto-notify-channels</module>
-                <module>inspecto-backup</module>
-                <module>inspecto-entity-list</module>
-                <module>inspecto-la-core</module>
-                <module>inspecto-la-api</module>
-                <module>inspecto-geo-link</module>
-                <module>inspecto-la-graph</module>
-                <module>inspecto-la-storage</module>
+                <module>providers/inspecto-connectors-kafka</module>
+                <module>providers/inspecto-policy</module>
+                <module>providers/inspecto-notify-channels</module>
+                <module>features/inspecto-backup</module>
+                <module>features/inspecto-entity-list</module>
+                <module>la/inspecto-la-core</module>
+                <module>la/inspecto-la-api</module>
+                <module>la/inspecto-geo-link</module>
+                <module>la/inspecto-la-graph</module>
+                <module>la/inspecto-la-storage</module>
                 <!-- LA-INVESTIGATION-STORE-DESIGN-1 S2: the Postgres InvestigationStore (optional jar; never the default) -->
-                <module>inspecto-la-store-pg</module>
-                <module>inspecto-exchange</module>
-                <module>inspecto-observability</module>
-                <module>inspecto-ops</module>
+                <module>la/inspecto-la-store-pg</module>
+                <module>features/inspecto-exchange</module>
+                <module>features/inspecto-observability</module>
+                <module>features/inspecto-ops</module>
                 <!-- MODULE-REORG-1 P7: the Reconciliation add-on (Professional and up; absent on Personal). -->
-                <module>inspecto-reconciliation</module>
+                <module>features/inspecto-reconciliation</module>
                 <!-- MODULE-REORG-1 P7: the Scoring add-on (Risk Scores; next to inspecto-entity-list, which it depends on). -->
-                <module>inspecto-scoring</module>
+                <module>features/inspecto-scoring</module>
             </modules>
         </profile>
         <!-- Enterprise = Professional + the ABAC policy engine (rbac-abac-plan §5): the same one-version
@@ -207,29 +207,29 @@
         <profile>
             <id>edition-enterprise</id>
             <modules>
-                <module>inspecto-oidc</module>
-                <module>inspecto-secrets</module>
-                <module>inspecto-geo-country</module>
+                <module>providers/inspecto-oidc</module>
+                <module>providers/inspecto-secrets</module>
+                <module>providers/inspecto-geo-country</module>
                 <!-- MODULE-REORG-1 P7: the Kafka stream connector (premium connector, not Base). -->
-                <module>inspecto-connectors-kafka</module>
-                <module>inspecto-policy</module>
-                <module>inspecto-notify-channels</module>
-                <module>inspecto-backup</module>
-                <module>inspecto-entity-list</module>
-                <module>inspecto-la-core</module>
-                <module>inspecto-la-api</module>
-                <module>inspecto-geo-link</module>
-                <module>inspecto-la-graph</module>
-                <module>inspecto-la-storage</module>
+                <module>providers/inspecto-connectors-kafka</module>
+                <module>providers/inspecto-policy</module>
+                <module>providers/inspecto-notify-channels</module>
+                <module>features/inspecto-backup</module>
+                <module>features/inspecto-entity-list</module>
+                <module>la/inspecto-la-core</module>
+                <module>la/inspecto-la-api</module>
+                <module>la/inspecto-geo-link</module>
+                <module>la/inspecto-la-graph</module>
+                <module>la/inspecto-la-storage</module>
                 <!-- LA-INVESTIGATION-STORE-DESIGN-1 S2: the Postgres InvestigationStore (optional jar; never the default) -->
-                <module>inspecto-la-store-pg</module>
-                <module>inspecto-exchange</module>
-                <module>inspecto-observability</module>
-                <module>inspecto-ops</module>
+                <module>la/inspecto-la-store-pg</module>
+                <module>features/inspecto-exchange</module>
+                <module>features/inspecto-observability</module>
+                <module>features/inspecto-ops</module>
                 <!-- MODULE-REORG-1 P7: the Reconciliation add-on (Professional and up; absent on Personal). -->
-                <module>inspecto-reconciliation</module>
+                <module>features/inspecto-reconciliation</module>
                 <!-- MODULE-REORG-1 P7: the Scoring add-on (Risk Scores; next to inspecto-entity-list, which it depends on). -->
-                <module>inspecto-scoring</module>
+                <module>features/inspecto-scoring</module>
             </modules>
         </profile>
         <!-- M5 (A2): JaCoCo lives in the PARENT so every module instruments in one reactor pass —
