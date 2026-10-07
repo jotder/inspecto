@@ -34,7 +34,13 @@ class SafetyPolicyFilesTest {
     }
 
     private static void write(Path dir, String text) throws IOException {
-        Files.writeString(dir.resolve(SafetyPolicyFiles.FILE), text);
+        Path f = dir.resolve(SafetyPolicyFiles.FILE);
+        // The parsed-file cache is keyed on (mtime ms, size): a same-size rewrite inside one mtime tick would
+        // read as unchanged, so every rewrite is stamped strictly later than the file it replaces.
+        java.nio.file.attribute.FileTime before = Files.exists(f) ? Files.getLastModifiedTime(f) : null;
+        Files.writeString(f, text);
+        if (before != null && Files.getLastModifiedTime(f).compareTo(before) <= 0)
+            Files.setLastModifiedTime(f, java.nio.file.attribute.FileTime.fromMillis(before.toMillis() + 1000));
     }
 
     private SafetyPolicyTier eff(Path server, Path base, String id) {
