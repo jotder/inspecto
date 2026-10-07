@@ -7,7 +7,7 @@ import com.gamma.alert.AlertService;
 import com.gamma.alert.InvestigationMeasureProbe;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;

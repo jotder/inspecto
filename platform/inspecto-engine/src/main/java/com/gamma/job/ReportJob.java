@@ -4,7 +4,7 @@ import com.gamma.pipeline.SpaceConfigRoot;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.config.safety.PathJail;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import com.gamma.notify.MailAccess;
 import com.gamma.notify.MailAttachment;

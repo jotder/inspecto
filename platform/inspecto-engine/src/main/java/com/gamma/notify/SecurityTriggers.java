@@ -14,7 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The built-in security trigger evaluator (ses-sns-adapter-design §8, T1–T4). An {@link com.gamma.audit.EventLog}
+ * The built-in security trigger evaluator (ses-sns-adapter-design §8, T1–T4). An {@link com.gamma.event.EventLog}
  * subscriber that turns the audit rows the control plane already writes into {@link EventType#SECURITY_TRIGGERED}
  * events, which the built-in {@code builtin-security-triggered} Notification Rule maps to category {@code security}.
  *

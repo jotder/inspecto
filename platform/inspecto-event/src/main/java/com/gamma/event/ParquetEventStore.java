@@ -37,7 +37,6 @@ import com.gamma.audit.EventLevel;
 import com.gamma.audit.EventQuery;
 import com.gamma.audit.EventStore;
 import com.gamma.audit.EventType;
-import com.gamma.audit.InMemoryEventStore;
 
 /**
  * Durable, append-only event store backed by <b>rolling Hive-partitioned Parquet</b>, queried by

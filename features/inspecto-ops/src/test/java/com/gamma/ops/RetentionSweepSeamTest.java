@@ -277,11 +277,11 @@ class RetentionSweepSeamTest {
 
         List<com.gamma.audit.Event> seen = new java.util.ArrayList<>();
         java.util.function.Consumer<com.gamma.audit.Event> sub = seen::add;
-        com.gamma.audit.EventLog.global().addSubscriber(sub);
+        com.gamma.event.EventLog.global().addSubscriber(sub);
         try {
             e.objects.purge(id, "incident_purge");
         } finally {
-            com.gamma.audit.EventLog.global().removeSubscriber(sub);
+            com.gamma.event.EventLog.global().removeSubscriber(sub);
         }
 
         assertTrue(seen.stream().anyMatch(ev -> "purge".equals(ev.attributes().get("action"))

@@ -1,4 +1,9 @@
-package com.gamma.audit;
+package com.gamma.event;
+
+import com.gamma.audit.Event;
+import com.gamma.audit.EventQuery;
+import com.gamma.audit.EventStore;
+import com.gamma.audit.AuditChain;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;

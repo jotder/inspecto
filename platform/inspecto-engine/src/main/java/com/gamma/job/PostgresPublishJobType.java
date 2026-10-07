@@ -4,7 +4,7 @@ import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.ConnectionRegistry;
 import com.gamma.auth.secrets.SecretResolver;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import com.gamma.job.PostgresPublishSql.Col;
 import com.gamma.pipeline.ComponentRegistry;

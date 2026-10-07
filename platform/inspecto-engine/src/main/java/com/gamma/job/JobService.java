@@ -7,7 +7,7 @@ import com.gamma.pipeline.DeletionFence;
 import com.gamma.pipeline.PipelineStore;
 import com.gamma.pipeline.exec.TriggerCoalescer;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.etl.ConsignmentEventBus;

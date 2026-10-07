@@ -1,7 +1,7 @@
 package com.gamma.job;
 
-import com.gamma.audit.EventLog;
-import com.gamma.audit.InMemoryEventStore;
+import com.gamma.event.EventLog;
+import com.gamma.event.InMemoryEventStore;
 import com.gamma.signal.Signal;
 import com.gamma.signal.Signals;
 import com.gamma.signal.Severity;

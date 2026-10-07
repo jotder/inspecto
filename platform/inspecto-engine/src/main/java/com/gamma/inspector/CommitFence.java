@@ -44,7 +44,7 @@ public final class CommitFence {
     private CommitFence() {}
 
     private static String key(Scope scope, String pipeline) {
-        return scope + "\u0000" + com.gamma.audit.EventLog.currentSpaceId() + "\u0000" + pipeline;
+        return scope + "\u0000" + com.gamma.event.EventLog.currentSpaceId() + "\u0000" + pipeline;
     }
 
     /** Register {@code state} for {@code pipeline} in the current thread's Space until the handle closes. */

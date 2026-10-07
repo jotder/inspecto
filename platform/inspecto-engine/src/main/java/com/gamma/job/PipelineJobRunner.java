@@ -9,7 +9,7 @@ import com.gamma.etl.DuckLakeRegistrar;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventLevel;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.PipelineEdge;

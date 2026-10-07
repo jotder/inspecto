@@ -4,7 +4,7 @@ import com.gamma.alert.AlertRule;
 import com.gamma.alert.AlertService;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventLevel;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.alert.RiskScoreOutputs;

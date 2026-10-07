@@ -1,7 +1,7 @@
 package com.gamma.query;
 
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventQuery;
 import com.gamma.audit.EventStore;
 import com.gamma.audit.EventType;

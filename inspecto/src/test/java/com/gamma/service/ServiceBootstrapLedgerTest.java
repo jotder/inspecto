@@ -1,7 +1,7 @@
 package com.gamma.service;
 
 import com.gamma.acquire.AcquisitionLedgers;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

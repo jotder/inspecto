@@ -2,10 +2,10 @@ package com.gamma.ops;
 
 import com.gamma.audit.Event;
 import com.gamma.audit.EventLevel;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventQuery;
 import com.gamma.audit.EventType;
-import com.gamma.audit.InMemoryEventStore;
+import com.gamma.event.InMemoryEventStore;
 import com.gamma.workflow.ObjectType;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.util.JsonAttributes;

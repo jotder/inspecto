@@ -5,7 +5,7 @@ import com.gamma.etl.LineageRow;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PartitionWriter;
 import com.gamma.etl.PipelineConfig;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.pipeline.DecisionRules;
 import com.gamma.signal.Ref;
 import com.gamma.signal.Severity;

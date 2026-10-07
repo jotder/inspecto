@@ -5,7 +5,7 @@ import com.gamma.util.egress.EgressPolicy;
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.ConnectionRegistry;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.util.AtomicFiles;

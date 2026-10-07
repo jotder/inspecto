@@ -121,7 +121,7 @@ class NoExchangeShipsInThePersonalBuildTest {
     @Test
     void noCrossSpaceSignalForwarderIsInstalledOnThePersonalBuild(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            assertEquals(0, com.gamma.audit.EventLog.tapCount(),
+            assertEquals(0, com.gamma.event.EventLog.tapCount(),
                     "no module installed an EventLog tap, so no Signal can leave a Space");
         }
     }

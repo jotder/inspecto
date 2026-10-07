@@ -325,11 +325,11 @@ class Asn1ParserPluginTest {
         byte[] sample = hex(RECORD_1_HEX, RECORD_2_HEX);
         ParseResult inline = asn1.preview(sample, grammar("grammar", GRAMMAR, "root_type", "Record"));
         com.gamma.pipeline.SpaceConfigRoot.register("asn1-preview-test", spaceConfig);
-        org.slf4j.MDC.put(com.gamma.audit.EventLog.SPACE_MDC_KEY, "asn1-preview-test");
+        org.slf4j.MDC.put(com.gamma.event.EventLog.SPACE_MDC_KEY, "asn1-preview-test");
         try {
             assertEquals(inline, asn1.preview(sample, grammar("grammar_file", "cdr/test.asn", "root_type", "Record")));
         } finally {
-            org.slf4j.MDC.remove(com.gamma.audit.EventLog.SPACE_MDC_KEY);
+            org.slf4j.MDC.remove(com.gamma.event.EventLog.SPACE_MDC_KEY);
             com.gamma.pipeline.SpaceConfigRoot.forget("asn1-preview-test");
         }
     }

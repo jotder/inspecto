@@ -7,7 +7,7 @@ import java.util.List;
  * Operational Intelligence Platform. Two implementations sit behind it: {@code InMemoryEventStore}
  * (a bounded ring; the lean default and the live-tail buffer) and {@code ParquetEventStore} (durable
  * rolling Hive-partitioned Parquet, queried via DuckDB {@code read_parquet}). The Control API and
- * {@link EventLog} depend only on this interface, so the backend is a deployment choice
+ * {@code EventLog} depend only on this interface, so the backend is a deployment choice
  * ({@code -Devents.backend=memory|parquet}).
  *
  * <h3>Contract</h3>

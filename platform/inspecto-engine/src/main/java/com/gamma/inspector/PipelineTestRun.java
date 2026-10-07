@@ -186,7 +186,7 @@ public final class PipelineTestRun {
                 // EventLog.CONTAINED: the schema-drift Signal and every other ambient emitter inside
                 // strategy.ingest land in a throwaway log, never on the space's ledger.
                 outcome = ScopedValue.where(DataTransformer.RAW_INPUT, capture)
-                        .where(com.gamma.audit.EventLog.CONTAINED, com.gamma.audit.EventLog.create())
+                        .where(com.gamma.event.EventLog.CONTAINED, com.gamma.event.EventLog.create())
                         .call(() -> strategy.ingest(batch, scratch));
             } finally {
                 // Mirrors ConsignmentIngestor.process — a progress snapshot must never outlive the batch.
@@ -306,7 +306,7 @@ public final class PipelineTestRun {
      * its members, under the same two containments as {@link #run} (call graph — only the ingest pass runs,
      * never {@code commit}/{@code writeAudit}/{@code recordProvenance}; filesystem — every destination is
      * re-rooted under a scratch root by {@link PipelineConfig#forScratchRun}), plus a third,
-     * {@link com.gamma.audit.EventLog#CONTAINED}, for the ambient emitters inside the pass.
+     * {@link com.gamma.event.EventLog#CONTAINED}, for the ambient emitters inside the pass.
      *
      * <p>The pass runs under {@code batchId + }{@value #DRY_BATCH_SUFFIX}, not the real id: the graph lane's
      * branch commit log is keyed by batch id and lives in {@code processing.duckdb.temp_directory} when one is
@@ -340,7 +340,7 @@ public final class PipelineTestRun {
             ConsignmentIngestStrategy strategy = (s.schemas().ingesterClass() == null)
                     ? new CsvIngestStrategy()
                     : new StreamingPluginIngestStrategy();
-            raw = ScopedValue.where(com.gamma.audit.EventLog.CONTAINED, com.gamma.audit.EventLog.create())
+            raw = ScopedValue.where(com.gamma.event.EventLog.CONTAINED, com.gamma.event.EventLog.create())
                     .call(() -> strategy.ingest(contained, s));
         } catch (Exception e) {
             log.warn("dry run: consignment {} faulted before its ingest pass finished: {}", batch.batchId(),

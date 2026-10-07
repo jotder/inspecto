@@ -1,6 +1,6 @@
 package com.gamma.pipeline;
 
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 
 import java.nio.file.Path;
 import java.util.Map;

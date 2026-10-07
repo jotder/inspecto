@@ -3,7 +3,7 @@ package com.gamma.inspector;
 import com.gamma.etl.ConsignmentEvent;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

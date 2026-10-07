@@ -6,7 +6,7 @@ import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.enrich.ReferenceReader;
 import com.gamma.etl.*;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import com.gamma.signal.DeliveryAnomalySignal;
 import com.gamma.util.DuckDbUtil;

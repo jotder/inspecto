@@ -11,16 +11,14 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <!-- LA separation D-1 step 2 (docs/archived-documents/plans-archive/la-separation-d1-design.md): the audit SPI — Event,
-         EventLog, EventType and the transitive closure they need (AuditAttrs, AuditChain, EventLevel,
-         EventQuery, EventStore, InMemoryEventStore, SecretScrubber, plus metrics.MetricRegistry, which
-         EventLog calls and which calls EventLog back). A pure move out of inspecto-event: packages
-         com.gamma.event / com.gamma.metrics are unchanged (a split package with inspecto-event,
-         Decision 2). Depends on inspecto-util only — NO inspecto-etl. ParquetEventStore (-> etl
-         PartitionWriter), DbEventStore, EventStoreAppender and the saved views stay in inspecto-event,
-         which depends on this module, so every existing consumer still resolves through it. -->
+    <!-- LA separation D-1 step 2, narrowed by MODULE-REORG P7 (D-MR1): the audit CONTRACT only - Event, EventType,
+         EventLevel, EventQuery, EventStore (the interface), AuditAttrs, AuditChain (the chain's format and verifier
+         - EventStore's default methods are written against it) and EventSink (what a module that only emits needs;
+         found through ServiceLoader). The implementations left for inspecto-event (com.gamma.event: EventLog,
+         InMemoryEventStore, SecretScrubber, the chain writer) with metrics.MetricRegistry. Depends on inspecto-util
+         only - NO inspecto-etl, NO inspecto-event. -->
     <artifactId>inspecto-audit-spi</artifactId>
-    <name>Inspecto audit SPI (Event, EventLog, EventType)</name>
+    <name>Inspecto audit SPI (Event, EventSink, EventType)</name>
 
     <dependencies>
         <dependency>

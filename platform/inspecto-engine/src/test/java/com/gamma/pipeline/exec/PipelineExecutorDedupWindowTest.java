@@ -139,13 +139,13 @@ class PipelineExecutorDedupWindowTest {
         java.util.function.Consumer<com.gamma.audit.Event> sub = e -> {
             if (com.gamma.audit.EventType.DEDUP_RECORDS_DROPPED.equals(e.type())) dropped.add(e);
         };
-        com.gamma.audit.EventLog.current().addSubscriber(sub);
+        com.gamma.event.EventLog.current().addSubscriber(sub);
         Batch second;
         try {
             second = runBatch(g, "('A', DATE '2026-08-02'), ('C', DATE '2026-08-02')", "c2",
                     new RowShaper.ExecutionContext("pipe1", "c2", ledger));
         } finally {
-            com.gamma.audit.EventLog.current().removeSubscriber(sub);
+            com.gamma.event.EventLog.current().removeSubscriber(sub);
         }
         assertEquals(List.of("C"), second.sinkKeys(),
                 "A was admitted by c1 inside the window and must not reach the sink again");
@@ -167,12 +167,12 @@ class PipelineExecutorDedupWindowTest {
         java.util.function.Consumer<com.gamma.audit.Event> sub = e -> {
             if (com.gamma.audit.EventType.DEDUP_RECORDS_DROPPED.equals(e.type())) dropped.add(e);
         };
-        com.gamma.audit.EventLog.current().addSubscriber(sub);
+        com.gamma.event.EventLog.current().addSubscriber(sub);
         try {
             runBatch(g, "('A', DATE '2026-08-02'), ('B', DATE '2026-08-02')", "c1",
                     new RowShaper.ExecutionContext("pipe1", "c1", ledger));
         } finally {
-            com.gamma.audit.EventLog.current().removeSubscriber(sub);
+            com.gamma.event.EventLog.current().removeSubscriber(sub);
         }
         assertTrue(dropped.isEmpty(), "a clean Consignment is not news: " + dropped);
     }

@@ -20,7 +20,7 @@ import com.gamma.pipeline.PipelineStore;
 import com.gamma.pipeline.PipelineLift;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventLevel;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventStore;
 import com.gamma.audit.EventType;
 import com.gamma.event.SavedViewStore;
@@ -599,7 +599,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // durable event store: an in-memory ring forgets every publication on restart anyway, and a floor
         // there would write a file into the working directory of every legacy/test boot.
         com.gamma.query.DatasetFreshnessProbe freshness = new com.gamma.query.DatasetFreshnessProbe(events,
-                events instanceof com.gamma.audit.InMemoryEventStore ? null
+                events instanceof com.gamma.event.InMemoryEventStore ? null
                         : java.nio.file.Path.of(System.getProperty("jobs.audit.dir", root.auditDir()))
                                 .resolve(com.gamma.query.DatasetFreshnessProbe.FLOOR_FILE));
         this.freshnessSubscriber = freshness.subscriber();
@@ -644,7 +644,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.eventLog.addSubscriber(notificationSubscriber);
         // ses-sns §8: the built-in security triggers (T1–T4) read the audit rows of this log and emit
         // SECURITY_TRIGGERED back into it, which the builtin-security-triggered rule turns into a notification.
-        final com.gamma.audit.EventLog triggerLog = this.eventLog;
+        final com.gamma.event.EventLog triggerLog = this.eventLog;
         this.securityTriggers = new com.gamma.notify.SecurityTriggers(triggerLog, triggerLog::emit);
         this.eventLog.addSubscriber(securityTriggers);
         // TEMPLATE-RISK-SCORE-ALERT-RULE-1: a template's PENDING Alert Rule over a Risk Score output is created,

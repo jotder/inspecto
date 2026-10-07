@@ -2,7 +2,7 @@ package com.gamma.service;
 
 import com.gamma.acquire.AcquisitionLedger;
 import com.gamma.acquire.AcquisitionLedgers;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.job.JobRun;
 import com.gamma.job.JobService;
 import com.gamma.pipeline.PipelineEdge;

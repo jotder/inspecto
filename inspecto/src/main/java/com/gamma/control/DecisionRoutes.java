@@ -1,6 +1,6 @@
 package com.gamma.control;
 
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.job.JobService;
 import com.gamma.workflow.ObjectType;
 import com.gamma.pipeline.ComponentRegistry;

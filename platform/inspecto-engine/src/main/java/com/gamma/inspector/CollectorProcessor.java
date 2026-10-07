@@ -250,7 +250,7 @@ public class CollectorProcessor {
         // pool of size N deadlocks once N supervisors wait on children queued in the same pool.
         int maxConcurrent  = Math.max(1, cfg.processing().threads());
         ConcurrencyBroker broker = ConcurrencyBroker.shared();
-        String spaceId     = com.gamma.audit.EventLog.currentSpaceId();
+        String spaceId     = com.gamma.event.EventLog.currentSpaceId();
         String pipelineId  = cfg.identity().pipelineName();
         int priority       = cfg.processing().priority();
         String pool        = cfg.processing().pool();

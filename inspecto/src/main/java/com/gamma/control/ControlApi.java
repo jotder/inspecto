@@ -3,7 +3,7 @@ package com.gamma.control;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.api.PublicApi;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.service.CollectorService;
 import com.gamma.service.SpaceContext;
 import com.gamma.service.SpaceId;
@@ -654,7 +654,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
             List<RouteRow> rows = routeInventory();
             long gated = rows.stream().filter(r -> "gated".equals(r.posture())).count();
             long exempt = rows.stream().filter(r -> "exempt".equals(r.posture())).count();
-            com.gamma.audit.EventLog.current().emit(
+            com.gamma.event.EventLog.current().emit(
                     com.gamma.audit.Event.builder(com.gamma.audit.EventType.AUDIT)
                             .source("audit")
                             .message("route inventory: " + rows.size() + " routes, " + gated + " gated, "

@@ -2,7 +2,7 @@ package com.gamma.job;
 
 import com.gamma.config.safety.PathJail;
 import com.gamma.etl.ConsignmentEventBus;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.pipeline.PipelineEdge;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineNode;

@@ -2,14 +2,14 @@
 type: Concept
 title: Events & Metrics
 description: EventLog (synchronous bus + the run-claim hand-off seam), MetricRegistry, the StabilityGate, notifications + audit trail, and alert-rule authoring.
-resource: spi/inspecto-audit-spi/src/main/java/com/gamma/audit/EventLog.java
+resource: platform/inspecto-event/src/main/java/com/gamma/event/EventLog.java
 tags: [control-plane, events, metrics, observability, deadlock]
 timestamp: 2026-07-16T00:00:00Z
 ---
 
 # Events & Metrics
 
-* **`EventLog`** (`spi/inspecto-audit-spi/src/main/java/com/gamma/audit/EventLog.java`) — the event bus. `global()` +
+* **`EventLog`** (`platform/inspecto-event/src/main/java/com/gamma/event/EventLog.java`) — the event bus. `global()` +
   per-space instances; `current()` routes by the calling thread's `space` MDC, falling back to global.
   ⛔ An MDC naming a Space that was **unregistered** (a late emitter outliving `CollectorService.close()`) is NOT routed to global: the event is dropped with one rate-limited stderr line (fail-closed, 2026-09-28) — it must not enter the default Space's store or audit chain.
   **Emission is synchronous on the publishing thread** (`emit()` calls each subscriber inline). This is the
@@ -20,7 +20,7 @@ timestamp: 2026-07-16T00:00:00Z
   hung (see [cross-cutting gotchas](../gotchas/cross-cutting.md)). `emit()` uses no SLF4J (avoids re-entrant capture) and
   swallows subscriber errors. A startup store-swap (`InMemoryEventStore` → configured backend) drains the old
   store oldest-first so nothing is lost.
-* **`MetricRegistry`** (`spi/inspecto-audit-spi/src/main/java/com/gamma/metrics/MetricRegistry.java`) — counters/gauges/
+* **`MetricRegistry`** (`platform/inspecto-event/src/main/java/com/gamma/metrics/MetricRegistry.java`) — counters/gauges/
   histograms keyed by name + sorted labels; `scrape()` runs registered collectors then renders Prometheus
   text. The per-space `space` label is supplied by callers as a label (no registry-level space awareness).
   The scrape endpoint `/metrics` (with `/metrics/acquisition`, `/health`, `/ready`) is one of the four

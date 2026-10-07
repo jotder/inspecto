@@ -280,9 +280,9 @@ class ConsignmentProcessJobTypeTest {
     @Test
     void aChainThatFailsLaterAnnouncesNoDatasetWrite(@TempDir Path dir) throws Exception {
         String space = "consignment-publish-failure-" + java.util.UUID.randomUUID();
-        com.gamma.audit.EventLog log = com.gamma.audit.EventLog.create();
-        com.gamma.audit.EventLog.register(space, log);
-        org.slf4j.MDC.put(com.gamma.audit.EventLog.SPACE_MDC_KEY, space);
+        com.gamma.event.EventLog log = com.gamma.event.EventLog.create();
+        com.gamma.event.EventLog.register(space, log);
+        org.slf4j.MDC.put(com.gamma.event.EventLog.SPACE_MDC_KEY, space);
         try {
             Path f = writeParquet(dir.resolve("detail"), 3);
             Path data = dir.resolve("data");
@@ -301,8 +301,8 @@ class ConsignmentProcessJobTypeTest {
                         "no dataset.write is announced for a run that did not complete");
             }
         } finally {
-            org.slf4j.MDC.remove(com.gamma.audit.EventLog.SPACE_MDC_KEY);
-            com.gamma.audit.EventLog.unregister(space);
+            org.slf4j.MDC.remove(com.gamma.event.EventLog.SPACE_MDC_KEY);
+            com.gamma.event.EventLog.unregister(space);
         }
     }
 
@@ -311,9 +311,9 @@ class ConsignmentProcessJobTypeTest {
     @Test
     void aChainThatCompletesStillAnnouncesTheDatasetWrite(@TempDir Path dir) throws Exception {
         String space = "consignment-publish-success-" + java.util.UUID.randomUUID();
-        com.gamma.audit.EventLog log = com.gamma.audit.EventLog.create();
-        com.gamma.audit.EventLog.register(space, log);
-        org.slf4j.MDC.put(com.gamma.audit.EventLog.SPACE_MDC_KEY, space);
+        com.gamma.event.EventLog log = com.gamma.event.EventLog.create();
+        com.gamma.event.EventLog.register(space, log);
+        org.slf4j.MDC.put(com.gamma.event.EventLog.SPACE_MDC_KEY, space);
         try {
             Path f = writeParquet(dir.resolve("detail"), 3);
             Path data = dir.resolve("data");
@@ -340,8 +340,8 @@ class ConsignmentProcessJobTypeTest {
                 assertEquals("daily-counter", signals.get(0).actor().id());
             }
         } finally {
-            org.slf4j.MDC.remove(com.gamma.audit.EventLog.SPACE_MDC_KEY);
-            com.gamma.audit.EventLog.unregister(space);
+            org.slf4j.MDC.remove(com.gamma.event.EventLog.SPACE_MDC_KEY);
+            com.gamma.event.EventLog.unregister(space);
         }
     }
 

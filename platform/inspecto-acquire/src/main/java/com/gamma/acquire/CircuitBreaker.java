@@ -4,7 +4,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 
 /**
  * A per-source circuit breaker for acquisition connectivity (Data Acquisition roadmap Phase F). When a source's

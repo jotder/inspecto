@@ -1,7 +1,7 @@
 package com.gamma.inspector;
 
 import com.gamma.etl.PipelineConfig;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.SpaceConfigRoot;
 import org.junit.jupiter.api.Test;

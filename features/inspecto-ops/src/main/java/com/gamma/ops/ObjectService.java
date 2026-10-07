@@ -5,7 +5,7 @@ import com.gamma.workflow.ObjectType;
 
 import com.gamma.audit.Event;
 import com.gamma.audit.EventLevel;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import com.gamma.ops.link.InMemoryLinkStore;
 import com.gamma.ops.link.LinkRelationship;

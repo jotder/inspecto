@@ -4,7 +4,7 @@ import com.gamma.config.io.ConfigCodec;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.service.SpaceManager;
 import org.junit.jupiter.api.AfterEach;

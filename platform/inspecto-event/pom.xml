@@ -25,7 +25,7 @@
     <name>Inspecto event (Operational-Intelligence event store + metrics)</name>
 
     <dependencies>
-        <!-- LA separation D-1 step 2: Event/EventLog/EventType + closure + MetricRegistry live here now. -->
+        <!-- The audit contract (Event, EventType, EventStore, EventSink, AuditChain). EventLog, InMemoryEventStore, SecretScrubber and MetricRegistry live HERE (MODULE-REORG P7). -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-audit-spi</artifactId>

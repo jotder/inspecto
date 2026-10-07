@@ -193,7 +193,7 @@ class TelcoRaGoldenTest {
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(jobs, new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, null, dataDir.toString())) {
-            js.eventLog(com.gamma.audit.EventLog.global());
+            js.eventLog(com.gamma.event.EventLog.global());
             js.start();
             assertTrue(js.triggerRun("ra_rerating", null).isPresent());
             for (String j : List.of("ra_rerating", "ra_rollforward", "ra_settlement", "ra_leakage", "ra_data_quality")) {
@@ -297,7 +297,7 @@ class TelcoRaGoldenTest {
             Map<String, String> seeded = new java.util.TreeMap<>();
             for (String d : List.of("ra_leakage", "ra_data_quality")) seeded.put(d, schema(dataDir, d));
             com.gamma.job.JobService js = svc.jobService().orElseThrow();
-            js.eventLog(com.gamma.audit.EventLog.global());
+            js.eventLog(com.gamma.event.EventLog.global());
             for (String j : List.of("ra_xdr_lost", "ra_xdr_completeness", "ra_rated_vs_billed", "ra_rerating")) {
                 assertTrue(js.triggerRun(j, null).isPresent(), j);
                 JobRun run = await(() -> js.runsFor(j).stream().filter(r -> !"SKIPPED".equals(r.status())).findFirst().orElse(null));

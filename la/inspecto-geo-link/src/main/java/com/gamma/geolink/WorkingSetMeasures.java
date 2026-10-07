@@ -4,7 +4,7 @@ import com.gamma.la.api.InvestigationRoutes;
 import com.gamma.la.api.StandingDetection;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.la.api.ValueMeasures;
 import com.gamma.la.api.WorkingSetRoutes;
 import com.gamma.la.core.InvestigationEvaluator;

@@ -4,7 +4,7 @@ import com.gamma.etl.Consignment;
 import com.gamma.etl.MemberStatus;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

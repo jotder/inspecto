@@ -1,6 +1,6 @@
 package com.gamma.agent.kernel.observe;
 
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.signal.Ref;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;

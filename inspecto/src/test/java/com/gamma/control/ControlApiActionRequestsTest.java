@@ -262,7 +262,7 @@ class ControlApiActionRequestsTest {
     void anIdpThatCannotEnumerateItsPrincipalsReadsTheApproverRoster(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         List<com.gamma.audit.Event> seen = new CopyOnWriteArrayList<>();
         java.util.function.Consumer<com.gamma.audit.Event> sub = seen::add;
-        com.gamma.audit.EventLog.global().addSubscriber(sub);
+        com.gamma.event.EventLog.global().addSubscriber(sub);
         try (Ctx c = open(cfg, tmp, true)) {
             String id = propose(c, incident(c));
             assertEquals("ok", data(send(c, "GET", "/action-requests/" + id, null, AUTHOR), 200).get("approverCheck").asText(),
@@ -286,7 +286,7 @@ class ControlApiActionRequestsTest {
             JsonNode done = data(send(c, "POST", "/action-requests/" + none + "/approve", "{}", "Bearer grouped"), 200);
             assertEquals("grp-1", done.get("approver").asText(), "a group claim match decides");
         } finally {
-            com.gamma.audit.EventLog.global().removeSubscriber(sub);
+            com.gamma.event.EventLog.global().removeSubscriber(sub);
         }
     }
 
@@ -295,7 +295,7 @@ class ControlApiActionRequestsTest {
             throws Exception {
         List<com.gamma.audit.Event> seen = new CopyOnWriteArrayList<>();
         java.util.function.Consumer<com.gamma.audit.Event> sub = seen::add;
-        com.gamma.audit.EventLog.global().addSubscriber(sub);
+        com.gamma.event.EventLog.global().addSubscriber(sub);
         try (Ctx c = open(cfg, tmp, true)) {
             String inc = incident(c);
             enumerating(Map.of("author-1", List.of("admin"), "analyst-2", List.of("operations")));
@@ -315,7 +315,7 @@ class ControlApiActionRequestsTest {
             String ok = propose(c, inc);
             assertTrue(noApproverEvents(seen, ok).isEmpty());
         } finally {
-            com.gamma.audit.EventLog.global().removeSubscriber(sub);
+            com.gamma.event.EventLog.global().removeSubscriber(sub);
         }
     }
 
@@ -826,7 +826,7 @@ class ControlApiActionRequestsTest {
     void aSkipForUnknownMakersEmitsOneWarnAuditAndStillFailsClosed(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         List<com.gamma.audit.Event> seen = new CopyOnWriteArrayList<>();
         java.util.function.Consumer<com.gamma.audit.Event> sub = seen::add;
-        com.gamma.audit.EventLog.global().addSubscriber(sub);
+        com.gamma.event.EventLog.global().addSubscriber(sub);
         try (Ctx c = open(cfg, tmp, true)) {
             new com.gamma.pipeline.ComponentStore(c.root.resolve("registry")).write("decision-rule", "legacy",
                     Map.of("name", "legacy", "enabled", true, "consequences",
@@ -841,7 +841,7 @@ class ControlApiActionRequestsTest {
             assertEquals(0, data(send(c, "GET", "/action-requests", null, CHECKER), 200).get("total").asInt(),
                     "still fails closed — no request raised");
         } finally {
-            com.gamma.audit.EventLog.global().removeSubscriber(sub);
+            com.gamma.event.EventLog.global().removeSubscriber(sub);
         }
     }
 

@@ -188,7 +188,7 @@ class MaintenanceLibraryTest {
         try (var store = new com.gamma.event.ParquetEventStore(events, 1000, 0, 100);
              com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
              JobService js = new JobService(List.of(), new com.gamma.etl.ConsignmentEventBus(), s, null, audit.toString())) {
-            com.gamma.audit.EventLog log = com.gamma.audit.EventLog.create();
+            com.gamma.event.EventLog log = com.gamma.event.EventLog.create();
             log.installStore(store);
             store.append(com.gamma.audit.Event.builder(com.gamma.audit.EventType.LOG).ts(aged).message("aged").build());
             store.flush();
@@ -262,7 +262,7 @@ class MaintenanceLibraryTest {
 
         try (com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
              JobService js = new JobService(List.of(), new com.gamma.etl.ConsignmentEventBus(), s, null, audit.toString())) {
-            js.eventStore(new com.gamma.audit.InMemoryEventStore());
+            js.eventStore(new com.gamma.event.InMemoryEventStore());
             JobResult mem = new MaintenanceJob(job(Map.of("task", "event_prune", "retention_days", "365")),
                     null, audit.toString(), null, js).run();
             assertTrue(mem.message().contains("keeps nothing durable"), mem.message());

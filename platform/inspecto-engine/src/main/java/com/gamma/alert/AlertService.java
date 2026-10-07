@@ -5,7 +5,7 @@ import com.gamma.etl.ConsignmentEvent;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventLevel;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import com.gamma.objects.ObjectAccess;
 import com.gamma.workflow.ObjectType;

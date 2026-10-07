@@ -3,7 +3,7 @@ package com.gamma.control;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.gamma.config.safety.PathJail;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import com.gamma.util.AtomicFiles;
 import com.sun.net.httpserver.HttpExchange;

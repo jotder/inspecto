@@ -3,7 +3,7 @@ package com.gamma.agent.kernel.observe;
 import com.gamma.agent.kernel.agent.AgentResult;
 import com.gamma.agent.kernel.error.AgentError;
 import com.gamma.agent.kernel.model.ModelTier;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.signal.Signal;
 import com.gamma.signal.Signals;
 import org.junit.jupiter.api.AfterEach;

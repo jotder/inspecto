@@ -5,7 +5,7 @@ import com.gamma.catalog.MetadataGraphService;
 import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.StatusStore;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventStore;
 import com.gamma.job.JobService;
 import com.gamma.report.ReportService;

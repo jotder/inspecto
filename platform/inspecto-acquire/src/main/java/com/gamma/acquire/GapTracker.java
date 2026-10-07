@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 
 /**
  * Per-space memory of which sequence gaps have already been reported, so a <em>persistent</em> gap fires its

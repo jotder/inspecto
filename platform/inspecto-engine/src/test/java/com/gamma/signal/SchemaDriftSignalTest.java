@@ -1,7 +1,7 @@
 package com.gamma.signal;
 
 import com.gamma.etl.SchemaDrift;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

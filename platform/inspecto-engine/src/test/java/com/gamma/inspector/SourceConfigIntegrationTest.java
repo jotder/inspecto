@@ -473,8 +473,8 @@ class SourceConfigIntegrationTest {
 
     @Test
     void gapDetectionEmitsSequenceGapOnTheRunPath(@TempDir Path dir) throws Exception {
-        com.gamma.audit.InMemoryEventStore events = new com.gamma.audit.InMemoryEventStore(1000);
-        com.gamma.audit.EventLog.global().installStore(events);
+        com.gamma.event.InMemoryEventStore events = new com.gamma.event.InMemoryEventStore(1000);
+        com.gamma.event.EventLog.global().installStore(events);
         com.gamma.acquire.GapTracker.shared().reset("GAP_SRC");
 
         PipelineConfig cfg = PipelineConfig.load(writePipeline(dir, """

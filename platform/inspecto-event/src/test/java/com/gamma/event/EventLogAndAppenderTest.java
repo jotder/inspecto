@@ -11,11 +11,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.gamma.audit.AuditChain;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventLevel;
-import com.gamma.audit.EventLog;
 import com.gamma.audit.EventQuery;
 import com.gamma.audit.EventStore;
 import com.gamma.audit.EventType;
-import com.gamma.audit.InMemoryEventStore;
 
 /**
  * Tests the {@link EventLog} facade (store swap with startup-event draining + the

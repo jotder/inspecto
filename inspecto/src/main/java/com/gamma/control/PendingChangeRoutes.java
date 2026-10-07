@@ -146,7 +146,7 @@ final class PendingChangeRoutes implements RouteModule {
         was.put("failedClosed", before.failedClosed());
         Map<String, Object> now = p.toMap();
         try {
-            com.gamma.audit.EventLog.current().emit(com.gamma.audit.Event.builder(com.gamma.audit.EventType.AUDIT)
+            com.gamma.event.EventLog.current().emit(com.gamma.audit.Event.builder(com.gamma.audit.EventType.AUDIT)
                     .source("audit").message(ApiContext.actor(ex) + " changed the approval policy")
                     .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
                     .action("approval-policy.changed").actionCategory("configuration")

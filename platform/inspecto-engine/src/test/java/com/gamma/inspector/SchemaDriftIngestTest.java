@@ -1,7 +1,7 @@
 package com.gamma.inspector;
 
 import com.gamma.etl.*;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.signal.SchemaDriftSignal;
 import com.gamma.signal.Signal;
 import com.gamma.signal.Signals;

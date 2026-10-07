@@ -1,4 +1,12 @@
-package com.gamma.audit;
+package com.gamma.event;
+
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLevel;
+import com.gamma.audit.EventStore;
+import com.gamma.audit.EventType;
+import com.gamma.audit.AuditAttrs;
+import com.gamma.audit.AuditChain;
+import com.gamma.audit.EventSink;
 
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.util.CurrentSpace;
@@ -264,7 +272,7 @@ public final class EventLog implements EventSink {
 
     /** This log's audit hash chain — one per log, so one per Space (see {@link AuditChain}). Its monitor is held
      *  across link + append, which is what makes the chain a single total order. */
-    private final AuditChain chain = new AuditChain();
+    private final AuditChainLinker chain = new AuditChainLinker();
 
     /**
      * Link {@code e} onto {@code target}'s chain. When that fails (the head is unreadable, the row cannot be

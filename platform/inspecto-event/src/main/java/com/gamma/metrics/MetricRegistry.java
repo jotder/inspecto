@@ -13,7 +13,7 @@ import java.util.function.Predicate;
 
 import org.slf4j.MDC;
 
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 
 /**
  * Tiny, dependency-free metrics registry that exposes counters, gauges, and

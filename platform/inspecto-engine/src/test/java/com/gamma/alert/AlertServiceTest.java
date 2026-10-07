@@ -8,7 +8,7 @@ import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.objects.FakeObjectAccess;
 import com.gamma.workflow.ObjectType;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import com.gamma.etl.StatusStore;
 import com.gamma.signal.Signal;

@@ -8,7 +8,7 @@ import com.gamma.etl.LineageRow;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.audit.Event;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import com.gamma.signal.DeliveryAnomalySignal;
 import org.junit.jupiter.api.AfterEach;

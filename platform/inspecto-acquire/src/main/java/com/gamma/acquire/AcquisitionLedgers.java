@@ -3,7 +3,7 @@ package com.gamma.acquire;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.util.StoreHealth;
 
 import java.nio.file.Path;

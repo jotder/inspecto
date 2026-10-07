@@ -2,7 +2,7 @@ package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.exchange.Exchange;
 import com.gamma.exchange.ExchangeSignalForwarder;
 import com.gamma.exchange.ShareGrant;

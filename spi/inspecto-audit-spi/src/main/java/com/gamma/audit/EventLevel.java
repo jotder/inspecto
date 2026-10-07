@@ -12,7 +12,7 @@ import java.util.Locale;
  * {@link #isCaptured()} is {@code true} for {@code INFO}/{@code WARN}/{@code ERROR} and {@code false}
  * for {@code TRACE}/{@code DEBUG}. The enum still models the lower levels so an explicit emitter may
  * record a {@code DEBUG} event when it deliberately wants to (the threshold only gates <em>automatic</em>
- * log capture, never an explicit {@link EventLog#emit}).
+ * log capture, never an explicit {@code EventLog#emit}).
  *
  * @since 4.0.0
  */

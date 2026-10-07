@@ -1,4 +1,9 @@
-package com.gamma.audit;
+package com.gamma.event;
+
+import com.gamma.audit.Event;
+import com.gamma.audit.EventLevel;
+import com.gamma.audit.EventQuery;
+import com.gamma.audit.EventType;
 
 import org.junit.jupiter.api.Test;
 

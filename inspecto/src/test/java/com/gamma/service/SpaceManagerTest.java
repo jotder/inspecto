@@ -3,7 +3,7 @@ package com.gamma.service;
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.ConnectionRegistry;
 import com.gamma.acquire.StabilityGate;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.MDC;

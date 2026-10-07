@@ -9,7 +9,7 @@ import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.PipelineStores;
 
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

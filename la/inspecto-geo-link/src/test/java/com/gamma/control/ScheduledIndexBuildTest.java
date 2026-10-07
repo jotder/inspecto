@@ -1,7 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.etl.PipelineConfigBatchTest;
-import com.gamma.audit.EventLog;
+import com.gamma.event.EventLog;
 import com.gamma.geolink.ScheduledLinkIndexBuilder;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.LinkEventTypes;

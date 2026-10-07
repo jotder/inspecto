@@ -99,7 +99,7 @@ Incident's history is exempt from that window by decision (MNT-14 G3, §4); no s
 
 ### 3.1 The signal ledger
 
-**Bus and store.** `EventLog` (`spi/inspecto-audit-spi/src/main/java/com/gamma/audit/EventLog.java`) is the
+**Bus and store.** `EventLog` (`platform/inspecto-event/src/main/java/com/gamma/event/EventLog.java`) is the
 event bus: `global()` plus one instance per space, `current()` routing by the calling thread's `space` MDC
 and falling back to global. **Emission is synchronous on the publishing thread**; `emit()` runs every
 subscriber inline, uses no SLF4J (re-entrant capture), and swallows subscriber errors. **This is the
@@ -212,7 +212,7 @@ Saved views persist through `SavedViewStore` (`inspecto-event`). The SPA's `Even
 
 ### 3.2 Metrics
 
-`MetricRegistry` (`spi/inspecto-audit-spi/src/main/java/com/gamma/metrics/MetricRegistry.java`) holds counters,
+`MetricRegistry` (`platform/inspecto-event/src/main/java/com/gamma/metrics/MetricRegistry.java`) holds counters,
 gauges and histograms keyed by name + sorted labels; `scrape()` runs registered collectors and renders
 Prometheus text. It is **core and stays core** — it has dependants across the engine; what EDG-01 gated is
 the HTTP exposition only. The `space` label is supplied by callers; the registry has no space awareness.
@@ -768,10 +768,10 @@ the form authors the kind), and per-measure limits.
 
 | Concern | Code | Docs |
 |---|---|---|
-| Bus, store, types, scrubbing | `spi/inspecto-audit-spi/src/main/java/com/gamma/audit/EventLog.java`, `EventStore.java`, `InMemoryEventStore.java`, `EventType.java`, `SecretScrubber.java`; `platform/inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java`, `SavedViewStore.java` | [`events-metrics.md`](../../backend/control-plane/events-metrics.md) |
+| Bus, store, types, scrubbing | `platform/inspecto-event/src/main/java/com/gamma/event/EventLog.java`, `InMemoryEventStore.java`, `SecretScrubber.java`, `CurrentEventSink.java`; contract `spi/inspecto-audit-spi/src/main/java/com/gamma/audit/EventStore.java`, `EventSink.java`, `EventType.java`; `platform/inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java`, `SavedViewStore.java` | [`events-metrics.md`](../../backend/control-plane/events-metrics.md) |
 | Signal envelope & read side | `platform/inspecto-engine/src/main/java/com/gamma/signal/Signal.java`, `Signals.java`, `PipelineConsignmentSignal.java` | [`signal-backbone.md`](../../backend/control-plane/signal-backbone.md) §S0–S2 |
 | Feed routes (optional) · fallbacks · audit read | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java`; `inspecto/src/main/java/com/gamma/control/AbsentModuleRoutes.java`, `AbsentModuleRoutes.java`, `AuditLogRoutes.java`, `SignalRoutes.java` | `EDITIONS.md` CP-13, §Audit; [`events.md`](../../frontend/features/events.md) |
-| Metrics | `spi/inspecto-audit-spi/src/main/java/com/gamma/metrics/MetricRegistry.java`; `features/inspecto-observability/src/main/java/com/gamma/metricsapi/MetricsRoutes.java`; `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java`; `platform/inspecto-engine/src/main/java/com/gamma/inspector/AcquisitionTelemetry.java` | `ADVANCED_GUIDE.md` §7 (`/metrics` catalog) |
+| Metrics | `platform/inspecto-event/src/main/java/com/gamma/metrics/MetricRegistry.java`; `features/inspecto-observability/src/main/java/com/gamma/metricsapi/MetricsRoutes.java`; `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java`; `platform/inspecto-engine/src/main/java/com/gamma/inspector/AcquisitionTelemetry.java` | `ADVANCED_GUIDE.md` §7 (`/metrics` catalog) |
 | Audit trail | `platform/inspecto-access/src/main/java/com/gamma/access/AuditTrail.java` (called from `ControlApi.dispatch`) | `compliance/controls-matrix.md` AU-9, ISO 8.15–8.17 |
 | Provenance & conservation | `platform/inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java`, `ProvenanceStores.java`, `ConservationCheck.java`; `platform/inspecto-engine/src/main/java/com/gamma/job/PipelineJobRunner.java` (`reportConservation`); `inspecto/src/main/java/com/gamma/control/LineageRoutes.java`, `JobRoutes.java` (`/provenance*`); `platform/inspecto-engine/src/main/java/com/gamma/notify/NotificationRules.java` | `docs/ops/provenance-conservation-verification.md` |
 | Reporting, status, health | `inspecto/src/main/java/com/gamma/report/ReportService.java`; `inspecto/src/main/java/com/gamma/control/RunRoutes.java`, `HealthDetails.java`, `SystemRoutes.java`; `inspecto/src/main/java/com/gamma/service/InboxStatus.java`, `ServiceStores.java`, `OperationalDb.java`; `platform/inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java` | [`operations-reference.md`](../../backend/build-run/operations-reference.md) §Reports, §Status backend |
