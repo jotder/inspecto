@@ -133,4 +133,75 @@ describe('IncidentGovernanceComponent', () => {
         expect(button('Add Escalation Rule')).toBeUndefined();
         await expectNoA11yViolations(el);
     });
+
+    describe('Escalation Rule advanced match (when)', () => {
+        const toggle = (el: HTMLElement) => el.querySelector<HTMLButtonElement>('[data-testid="when-toggle"]')!;
+
+        it('is a disclosure button wired to its region, collapsed by default, with no a11y violations', async () => {
+            const { fixture, el } = setup();
+            expect(toggle(el).tagName).toBe('BUTTON');
+            expect(toggle(el).getAttribute('aria-expanded')).toBe('false');
+            const region = el.querySelector('#' + toggle(el).getAttribute('aria-controls'))!;
+            expect(region.hasAttribute('hidden')).toBe(true);
+            toggle(el).click();
+            fixture.detectChanges();
+            expect(toggle(el).getAttribute('aria-expanded')).toBe('true');
+            expect(region.hasAttribute('hidden')).toBe(false);
+            expect(el.querySelector('inspecto-query-condition-group')).toBeTruthy();
+            await expectNoA11yViolations(el);
+        });
+
+        it('offers the match context columns and saves the authored tree with the rule', () => {
+            const { c, fixture, el, components } = setup();
+            toggle(el).click();
+            fixture.detectChanges();
+            expect(c.contextColumns.map((x) => x.name)).toEqual([
+                'type',
+                'status',
+                'priority',
+                'severity',
+                'category',
+                'assignee',
+                'ageMinutes',
+                'minutesToDue',
+                'resolutionBreached',
+                'responseBreached',
+                'escalated',
+            ]);
+            c.whenGroup.items.push({ kind: 'condition', field: 'minutesToDue', operator: '<=', value: '10' });
+            c.whenChanged();
+            c.rule.patchValue({ id: 'soon' });
+            c.addRule();
+            const body = components.create.mock.calls.at(-1) as unknown as [string, Record<string, unknown>];
+            expect(body[0]).toBe('escalation-rule');
+            expect(body[1]['when']).toEqual({
+                kind: 'group',
+                op: 'AND',
+                items: [{ kind: 'condition', field: 'minutesToDue', operator: '<=', value: '10' }],
+            });
+        });
+
+        it('negative probe: a rule with no tree is saved without a when', () => {
+            const { c, components } = setup();
+            c.rule.patchValue({ id: 'plain' });
+            c.addRule();
+            const body = components.create.mock.calls.at(-1) as unknown as [string, Record<string, unknown>];
+            expect(body[1]).not.toHaveProperty('when');
+        });
+
+        it('refuses a bad condition, announces it, and opens the collapsed section', () => {
+            const { c, fixture, el, components } = setup();
+            c.whenGroup.items.push({ kind: 'condition', field: 'status', operator: 'matches', value: '(?=x)' });
+            c.rule.patchValue({ id: 'bad' });
+            expect(toggle(el).getAttribute('aria-expanded')).toBe('false');
+            c.addRule();
+            fixture.detectChanges();
+            expect(components.create).not.toHaveBeenCalled();
+            expect(toggle(el).getAttribute('aria-expanded')).toBe('true');
+            const err = el.querySelector<HTMLElement>('[data-testid="when-error"]')!;
+            expect(err.getAttribute('role')).toBe('alert');
+            expect(err.textContent).toContain('lookahead');
+            expect(toggle(el).getAttribute('aria-describedby')).toBe(err.id);
+        });
+    });
 });

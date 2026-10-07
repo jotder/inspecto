@@ -5,7 +5,27 @@
  * IANA zone …); a refusal comes back as a 422 whose message the section shows. Nothing here re-implements it.
  */
 
+import { ColumnMeta, ConditionGroup } from 'app/inspecto/query/query-types';
+
 export const GOVERNED_OBJECT_TYPES = ['INCIDENT', 'CASE', 'ALERT', 'TASK'] as const;
+/**
+ * The match context an Escalation Rule's `when` is evaluated over (server `ObjectService.escalationContext`):
+ * strings and numbers only, `minutesToDue` is huge when there is no deadline, the flags are 0/1.
+ */
+export const ESCALATION_CONTEXT_COLUMNS: ColumnMeta[] = [
+    { name: 'type', type: 'string' },
+    { name: 'status', type: 'string' },
+    { name: 'priority', type: 'string' },
+    { name: 'severity', type: 'string' },
+    { name: 'category', type: 'string' },
+    { name: 'assignee', type: 'string' },
+    { name: 'ageMinutes', type: 'number' },
+    { name: 'minutesToDue', type: 'number' },
+    { name: 'resolutionBreached', type: 'number' },
+    { name: 'responseBreached', type: 'number' },
+    { name: 'escalated', type: 'number' },
+];
+
 export const WEEK_DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
 
 export interface TransitionRow {
@@ -47,6 +67,8 @@ export interface EscalationRuleDraft {
     reassign: string;
     notify: boolean;
     raisePriority: boolean;
+    /** The optional `when` condition tree over the match context; `undefined` = keep the stored one. */
+    when?: ConditionGroup | null;
 }
 
 /** `"A, b ,, c"` → `['A', 'B', 'C']` (upper-cased when `upper`). */
@@ -138,16 +160,47 @@ export function slaDraft(objectType: string, content: Record<string, unknown> | 
     };
 }
 
-export function escalationRuleContent(d: EscalationRuleDraft): Record<string, unknown> {
-    const out: Record<string, unknown> = { id: d.id.trim(), objectType: d.objectType, on: d.on };
+/** Keys {@link escalationRuleContent} authors itself; anything else on the stored rule rides through a save. */
+const ESCALATION_MODELLED = [
+    'id',
+    'objectType',
+    'on',
+    'target',
+    'afterMinutes',
+    'priority',
+    'reassign',
+    'notify',
+    'raisePriority',
+    'when',
+];
+
+/**
+ * The `escalation-rule` body to save. `stored` is the rule being edited (omit for a new one): keys this form does
+ * not model — a `when` the author did not touch, or a key a newer server added — are carried forward untouched
+ * (a rebuild from modelled state would silently drop them). A modelled key the author cleared stays cleared.
+ */
+export function escalationRuleContent(
+    d: EscalationRuleDraft,
+    stored: Record<string, unknown> = {},
+): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(stored)) if (!ESCALATION_MODELLED.includes(k)) out[k] = stored[k];
+    out['id'] = d.id.trim();
+    out['objectType'] = d.objectType;
+    out['on'] = d.on;
     if (d.on === 'breach') out['target'] = d.target;
     else out['afterMinutes'] = Number(d.afterMinutes);
     if (d.priority.trim()) out['priority'] = d.priority.trim().toUpperCase();
     if (d.reassign.trim()) out['reassign'] = d.reassign.trim();
     if (d.notify) out['notify'] = true;
     if (d.raisePriority) out['raisePriority'] = true;
+    const when = d.when === undefined ? stored['when'] : d.when;
+    if (when && !(isGroup(when) && when.items.length === 0)) out['when'] = when;
     return out;
 }
+
+const isGroup = (v: unknown): v is ConditionGroup =>
+    !!v && typeof v === 'object' && Array.isArray((v as ConditionGroup).items);
 
 /** One line describing a stored Escalation Rule, for the list. */
 export function describeEscalationRule(c: Record<string, unknown>): string {

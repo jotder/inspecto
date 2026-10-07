@@ -22,7 +22,7 @@
 > - **P6** — EDITIONS/FEATURE_INVENTORY generation needs a `posture{}` section and capabilities in `provides`; bundle generator driven by Offerings (rides on `MODULE-REORG-P3-THIN-JARS`).
 > - **P7** — `MODULE-REORG-P7-INCIDENTS` (Incidents / Case Management split, Action Requests, Workflow & SLA slice 2 sweep behind a governed-item contract, linked-subject contract; **open design question:** `alert` depends on the object substrate via `ObjectAccess` and Alerts persist ALERT objects, contradicting "Personal has Alerts but no operational objects" unless `ObjectAccess` has a null/in-memory implementation on Personal); `MODULE-REORG-P7-KERNEL` (Decision Kernel steps 1, 3-7: Expectation non_null/range/regex onto the tree, Tag and Case Rule filters, Notification Rules, Risk filters, Escalation match, Access Policies' Conditions text compiled into the tree, retire the duplicate evaluator, Consequence registry — **slice 1 DONE 2026-10-07**, see §8b); `MODULE-REORG-P7-CONTRACTS` (contract modules shed AccessPolicies/AuditTrail/EventLog/AuditChain/InMemoryEventStore/SecretScrubber/MetricRegistry/Roles family/CapabilityManifest, order per the 2026-10-06 survey; the access cluster and the event cluster are DONE 2026-10-07, see §6).
 > - **Guards / review** — `MODULE-REORG-GUARD-1` (DONE 2026-10-07 — `ImportLoaderInventoryTest` row + `ReactorModules` loops, `RouteInventoryTest` gate moved), `MODULE-REORG-REVIEW-1` (reviewer checklist).
-> - **Decision Kernel** — `MODULE-REORG-P7-KERNEL`: steps 1, 3, 4, 5 (additive `when`, `b9c3271fc`) and 6 (`952538fe9`) shipped; step 7 declined; left: the Risk and Escalation Rule editors' `when` UI, duplicate-evaluator retirement (see section 8b, "step 5 / step 6 as built").
+> - **Decision Kernel** — `MODULE-REORG-P7-KERNEL`: steps 1, 3, 4, 5 (additive `when`, `b9c3271fc`) and 6 (`952538fe9`) shipped; step 7 declined; the Risk and Escalation Rule editors' `when` UI shipped 2026-10-07 (see section 8b, "Decision Kernel step 5 / step 6 SPA follow-up"); left: editing a stored Escalation Rule, duplicate-evaluator retirement (see section 8b, "step 5 / step 6 as built").
 > Inputs: *Enterprise-Grade Modular Architecture Guidelines* (PDF, 4 pages) and the "System Architecture
 > Topology" mock-up (four layers + a per-module inspector). Operator brief: long-term benefit across
 > development, test, packaging, offering, editioning and deployment of itemized distribution; **no version
@@ -1270,9 +1270,7 @@ bound-query rewrap carries `when` through. `RiskScoreModel.Factor` gained `when`
 - **SqlGuard finding:** the Risk SQL path is NOT `SqlGuard`-checked. `RiskScoreEvaluator` compiles with `MeasureCompiler` and calls
   `QueryExecutor.run(Request, SqlSandboxPolicy)`; the sandbox policy is the boundary and the compiler emits only quoted identifiers and
   escaped literals. (`BiRoutes` guards its route-built text; Risk does not.) Unchanged by this step; flagged for the guard row.
-- **Follow-up (UI, not done):** mount the `query-condition-group` editor in `risk-score-factors.component` so a factor's `when` is
-  authorable; until then a factor edited in the SPA is rebuilt from modeled state and would DROP an authored `when` (the
-  rebuild-from-modeled-state trap, section 9) - author `when` in TOON/API only, or land the UI first.
+- **Follow-up (UI, DONE 2026-10-07):** see "Decision Kernel step 5 / step 6 SPA follow-up" below; a factor edited in the SPA no longer drops `when`.
 
 **Step 6 — Escalation match (`952538fe9`).** `EscalationRule` (inspecto-workflow, which must not depend on the engine) gained an
 OPAQUE `Map<String,Object> when` and a pure-map `matchTree()` that folds the `priority` sugar into an AND leaf
@@ -1286,6 +1284,24 @@ sits where the engine is reachable: `GovernanceRegistry` (load: an invalid rule 
 an empty value would have matched `minutesToDue <= 10` as due NOW (found by the test, pinned). Parity: priority-only rules keep their
 exact semantics (case variants, padded value, null priority never matches, equality not prefix) - `GovernanceSweepTest` (17) +
 `ObjectServiceTest` (35). UI follow-up: `governance-model.ts` rebuilds a rule from modeled fields and would drop `when` on a SPA save.
+
+**Decision Kernel step 5 / step 6 SPA follow-up (2026-10-07).** Both silent-loss defects were proven red by specs, then fixed.
+- **Risk factor.** `RiskFactorDraft` gained `when` (a deep-copied `ConditionGroup`) and `extra` (every factor key the form does not model);
+  `toRiskScoreContent` writes `extra` first, then the modelled keys, then `when` only while the tree has items (an emptied tree is dropped).
+  A stored `when` the editor cannot model (no `kind: 'group'` + `items`, e.g. TOON-authored `conditions`) is kept VERBATIM in `extra` and shown
+  as a read-only note - never reinterpreted. `risk-score-factors.component` mounts `inspecto-query-condition-group` in a per-factor disclosure
+  ("Advanced filter (condition tree)", `aria-expanded`/`aria-controls`, open on load when a tree exists) with help text on flat filters vs `when`;
+  the field list is the factor Dataset's columns WITH types (`columnMetaFor`, the same read the flat pickers use). `validateGroup`
+  (`condition-rules.ts`) is the per-condition `validateCondition` walked over a tree; its messages render in a `role="alert"` list the
+  disclosure button points at (`aria-describedby`), and `validate()` opens a collapsed section holding an invalid tree. The server stays the gate.
+- **Escalation Rule.** `escalationRuleContent(draft, stored)` carries every key it does not model forward from the stored rule (generic, not
+  `when`-only); a modelled key the author cleared stays cleared; `draft.when` undefined keeps the stored tree, an empty group removes it.
+  The Settings > Incident governance Add Escalation Rule form (the only per-rule field editor; stored rules are list/delete only today) has the
+  same disclosure ("Advanced match (condition tree)") over `ESCALATION_CONTEXT_COLUMNS` (type, status, priority, severity, category, assignee,
+  ageMinutes, minutesToDue, resolutionBreached, responseBreached, escalated - strings and 0/1 or numeric cells).
+- **Deliberately left:** there is no edit-a-stored-Escalation-Rule UI, so the preserve path (`stored` argument) has no SPA caller yet; the
+  condition tree's text input is raw (a `when` operand is typed by its text server-side, see the pinned parity differences above). No live
+  browser drive was done.
 
 **Known flake - `SafetyPolicyFilesTest.aRunPinsItsPolicyAtPlanTimeAndTheNextRunSeesTheTightenedFile:191` (fixed `5556bf0b3`).** Not
 reproducible in three quiet runs (15/15 each). Root cause is a real test-timing assumption: `SafetyPolicyFiles.load` caches a parsed

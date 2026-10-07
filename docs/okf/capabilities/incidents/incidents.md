@@ -415,7 +415,7 @@ Updates are **optimistic** (2026-10-04): every object carries a monotonic `versi
   is RETIRED (`RETIRE-HALVES-1`, 2026-09-14)** — a breach now emits its event and nothing else; no severity
   bump, no re-routing, and `OBJECT_ESCALATED` is emitted by nothing (the `@PublicApi` constant stays for
   stored events). The Case `targetDate` is a **loose** SLA — overdue hint only, no sweep.
-- **Incident governance — authored Workflow, SLA policy, Escalation Rules** (`ASSURE-WORKFLOW-SLA-1`, 2026-09-29).
+- **Incident governance — authored Workflow, SLA policy, Escalation Rules** (`ASSURE-WORKFLOW-SLA-1`, 2026-09-29). ✅ 2026-10-07: the Add Escalation Rule form has an "Advanced match (condition tree)" disclosure authoring the rule's optional `when` over the match context (`ESCALATION_CONTEXT_COLUMNS`); `escalationRuleContent(draft, stored)` carries every unmodelled key of a stored rule forward, so a save never drops `when`.
   🔁 **This REVERSES part of `RETIRE-HALVES-1`.** INC-4's retirement deleted the escalation engine because it was a
   backend nobody could see or author ("re-file when a customer names on-call escalation"). D-P4 (operator) named it:
   **escalation comes back, with its authoring UI; queues and watcher routes stay deleted.** Three component kinds,

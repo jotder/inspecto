@@ -102,4 +102,56 @@ describe('governance-model', () => {
         expect(age).toEqual({ id: 'page', objectType: 'INCIDENT', on: 'age', afterMinutes: 90, raisePriority: true });
         expect(describeEscalationRule(age)).toBe('INCIDENT at 90 min old: raise priority');
     });
+
+    describe('Escalation Rule keeps what the form does not model (silent-loss trap)', () => {
+        const WHEN = {
+            kind: 'group',
+            op: 'AND',
+            items: [{ kind: 'condition', field: 'minutesToDue', operator: '<=', value: '10' }],
+        };
+        const stored = {
+            id: 'page',
+            objectType: 'INCIDENT',
+            on: 'breach',
+            target: 'response',
+            notify: true,
+            when: WHEN,
+            futureKey: 7,
+        };
+        const draft = {
+            id: 'page',
+            objectType: 'INCIDENT',
+            on: 'breach' as const,
+            target: 'response' as const,
+            afterMinutes: null,
+            priority: '',
+            reassign: 'duty', // the unrelated edit
+            notify: true,
+            raisePriority: false,
+        };
+
+        it('carries when and unknown keys forward from the stored rule', () => {
+            const out = escalationRuleContent(draft, stored);
+            expect(out['reassign']).toBe('duty');
+            expect(out['when']).toEqual(WHEN);
+            expect(out['futureKey']).toBe(7);
+        });
+
+        it('negative probe: nothing stored means nothing invented', () => {
+            expect(escalationRuleContent(draft)).not.toHaveProperty('when');
+            expect(escalationRuleContent(draft)).not.toHaveProperty('futureKey');
+        });
+
+        it('a modelled key the author cleared is dropped, not resurrected from the stored copy', () => {
+            const out = escalationRuleContent({ ...draft, notify: false }, stored);
+            expect(out).not.toHaveProperty('notify');
+        });
+
+        it('an authored when on the draft wins; an empty group removes it', () => {
+            const next = { kind: 'group' as const, op: 'OR' as const, items: [] };
+            expect(escalationRuleContent({ ...draft, when: next }, stored)).not.toHaveProperty('when');
+            const g = { ...WHEN, op: 'OR' as const };
+            expect(escalationRuleContent({ ...draft, when: g as never }, stored)['when']).toEqual(g);
+        });
+    });
 });

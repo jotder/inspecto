@@ -20,8 +20,12 @@ import {
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { validateGroup } from 'app/inspecto/query/condition-rules';
+import { QueryConditionGroupComponent } from 'app/inspecto/query/query-condition-group.component';
+import { emptyGroup } from 'app/inspecto/query/query-types';
 import { WorkflowDiagramComponent } from './workflow-diagram.component';
 import {
+    ESCALATION_CONTEXT_COLUMNS,
     EscalationRuleDraft,
     GOVERNED_OBJECT_TYPES,
     WEEK_DAYS,
@@ -56,6 +60,7 @@ import {
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
         InspectoPageHeaderComponent,
+        QueryConditionGroupComponent,
         WorkflowDiagramComponent,
     ],
     template: `
@@ -340,6 +345,62 @@ import {
                             </mat-form-field>
                             <mat-checkbox formControlName="notify">Notify</mat-checkbox>
                             <mat-checkbox formControlName="raisePriority">Raise priority</mat-checkbox>
+                            <div class="w-full">
+                                <button
+                                    type="button"
+                                    mat-button
+                                    [attr.aria-expanded]="whenOpen()"
+                                    aria-controls="gov-rule-when"
+                                    [attr.aria-describedby]="whenShowsErrors() ? 'gov-rule-when-err' : null"
+                                    (click)="whenOpen.set(!whenOpen())"
+                                    data-testid="when-toggle"
+                                >
+                                    <mat-icon
+                                        [svgIcon]="
+                                            whenOpen()
+                                                ? 'heroicons_outline:chevron-down'
+                                                : 'heroicons_outline:chevron-right'
+                                        "
+                                    ></mat-icon>
+                                    <span class="ml-1">Advanced match (condition tree)</span>
+                                    @if (whenGroup.items.length; as n) {
+                                        <span class="text-secondary ml-1 text-xs">({{ n }})</span>
+                                    }
+                                </button>
+                                @if (whenShowsErrors()) {
+                                    <ul
+                                        class="text-warn mt-1 list-none text-xs"
+                                        role="alert"
+                                        id="gov-rule-when-err"
+                                        data-testid="when-error"
+                                    >
+                                        @for (m of whenIssues(); track m) {
+                                            <li>{{ m }}</li>
+                                        }
+                                    </ul>
+                                }
+                                <div
+                                    id="gov-rule-when"
+                                    role="region"
+                                    aria-label="Advanced match"
+                                    [hidden]="!whenOpen()"
+                                >
+                                    <p class="text-secondary mb-2 text-xs">
+                                        The Only priority field above is a shortcut for one priority. Use the advanced
+                                        match to narrow a rule further on the object being escalated: type, status,
+                                        priority, severity, category, assignee, age, minutes to due, whether a target is
+                                        breached, or whether it was already escalated. Both apply together.
+                                    </p>
+                                    @if (whenOpen()) {
+                                        <inspecto-query-condition-group
+                                            [group]="whenGroup"
+                                            [columns]="contextColumns"
+                                            [root]="true"
+                                            (changed)="whenChanged()"
+                                        />
+                                    }
+                                </div>
+                            </div>
                             <button mat-flat-button color="primary" type="submit">Add Escalation Rule</button>
                         </form>
                     }
@@ -367,6 +428,13 @@ export class IncidentGovernanceComponent implements OnInit {
         { value: 'response', label: 'Response target' },
     ];
     readonly rules = signal<ComponentDef[]>([]);
+    /** The match context an Escalation Rule's `when` is evaluated over (server `escalationContext`). */
+    readonly contextColumns = ESCALATION_CONTEXT_COLUMNS;
+    /** The new rule's `when` tree; the condition-group editor mutates it in place. */
+    whenGroup = emptyGroup('AND');
+    readonly whenOpen = signal(false);
+    readonly whenIssues = signal<string[]>([]);
+    private readonly whenTouched = signal(false);
     readonly lastError = signal<string | null>(null);
     /** Set when the bundle has no operational-objects module (503) — the editor is then not offered at all. */
     readonly unavailable = signal<string | null>(null);
@@ -521,13 +589,31 @@ export class IncidentGovernanceComponent implements OnInit {
         );
     }
 
+    whenShowsErrors(): boolean {
+        return this.whenTouched() && this.whenIssues().length > 0;
+    }
+
+    whenChanged(): void {
+        this.whenIssues.set(validateGroup(this.whenGroup));
+        this.whenTouched.set(true);
+    }
+
     addRule(): void {
-        if (this.rule.invalid) {
+        const issues = validateGroup(this.whenGroup);
+        this.whenIssues.set(issues);
+        if (this.rule.invalid || issues.length) {
             this.rule.markAllAsTouched();
+            this.whenTouched.set(true);
+            // An error renders only where its control renders: open the section that blocks the save.
+            if (issues.length) this.whenOpen.set(true);
             return;
         }
-        const draft: EscalationRuleDraft = { ...this.rule.getRawValue(), objectType: this.type };
+        const draft: EscalationRuleDraft = { ...this.rule.getRawValue(), objectType: this.type, when: this.whenGroup };
         this.report(this.components.create('escalation-rule', escalationRuleContent(draft)), 'Escalation Rule');
+        this.whenGroup = emptyGroup('AND');
+        this.whenIssues.set([]);
+        this.whenTouched.set(false);
+        this.whenOpen.set(false);
     }
 
     removeRule(id: string): void {
