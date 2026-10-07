@@ -564,6 +564,11 @@ an XL move for no offering value.
 | **Integration & Delivery** | `notify-channels`, the `publish.postgres` BI publication Job, outbound webhooks | outbound egress is a security decision; needs the Postgres driver (CP-15, JOB-06) |
 | **Premium Connectors** | `connectors` split: Kafka (**built** 2026-10-07 as `inspecto-connectors-kafka`); cloud object stores and DB export **stayed in core `connectors`** by the footprint test (P7 decision, §4) | distinct third-party footprint (`kafka-clients`); file/SFTP/object stores/DB export stay Base |
 | **Multi-entity / Group** | `exchange` + per-Space isolation | only meaningful with several Spaces — the group/regulator federation proposal (SEC-06, SEC-10) |
+| **Screening** (gap, 2026-10-07) | fuzzy name and identifier matching of entities against Entity Lists (sanctions, PEP, internal deny lists), with match scoring and review | ❌ not built (`SCREENING-1`); domain-neutral: customer, wallet, supplier and partner screening. Required by the AML function pack |
+| **Regulatory Reporting** (gap, 2026-10-07) | report templates in regulator formats (e.g. SAR / STR), assembled from Incidents, Cases and evidence, with maker-checker before submission and a submission log | ❌ not built (`REGULATORY-REPORTING-1`); required by the AML and Compliance Audit function packs |
+| **Anomaly Detection** (gap, 2026-10-07) | behavioural anomaly scoring per entity with an explanation of the contributing features, beyond today's Expectation baselines and forecast bands | ❌ not built (`ANOMALY-DETECTION-1`); strengthens every fraud and assurance pack |
+| **Real-time Decisioning** (gap, 2026-10-07) | an inline decision point on a stream (e.g. allow / block before a call or transaction completes), evaluated by the Decision Kernel | ❌ not built (`REALTIME-DECISIONING-1`); a large design: today the engine is batch over Consignments |
+| **Predictive Analytics** (gap, 2026-10-07) | segmentation, churn and demand forecasting models usable from Studio | ❌ not built (`PREDICTIVE-ANALYTICS-1`); lower priority; required by a Sales & Marketing BI function pack |
 
 ### Solution packs — per domain, mostly content
 Each pack = **Space Templates** (Pipelines, Expectations, Alert and Decision Rule sets, Dashboards, thresholds as
@@ -576,11 +581,26 @@ Templates").
 | **Revenue Assurance** | Reconciliation | RA Space Templates |
 | **Fraud Management** | Scoring & Lists (pairs with Link Analysis) | FM Space Templates |
 | **Business Assurance / payment fraud** | — | Space Templates only |
+| **AML** (gap, 2026-10-07) | Screening, Regulatory Reporting, Scoring & Lists, Link Analysis | typologies (smurfing, structuring, threshold and watch-list monitoring) as Space Templates — `PACK-AML-1` |
+| **Sales & Marketing BI** (gap, 2026-10-07) | Predictive Analytics, Reconciliation | commission verification, distribution and churn content — `PACK-SALES-MARKETING-1` (later) |
 
 ### Tiers — deployment and compliance posture, not features
 **Personal** (single user, no IAM), **Professional** (IAM, HTTPS, RBAC, Postgres, backup, `/metrics`, events
 feed), **Enterprise** (ABAC, enforced Space isolation, shared stores, HA, certifications). Backup, metrics and
 the events feed belong to the tier — operational posture is not sold item by item.
+
+### Competitive scan — LATRO (2026-10-07)
+
+Public product pages of LATRO (telecom and mobile-money assurance: Defend, Assure, Explore, Assure Fintech, managed
+services) were mapped onto this offering map. Already covered: reconciliation, threshold rules, risk scoring,
+allow/deny lists, link analysis and geo, case workflows, dashboards, data onboarding, telecom RA, telecom fraud
+(CDR-based) and business assurance. Gaps added above as add-ons and packs: **Screening**, **Regulatory
+Reporting**, **Anomaly Detection**, **Real-time Decisioning**, **Predictive Analytics**, the **AML** function pack,
+and — as industry packs — **Mobile Money** (`PACK-MOBILE-MONEY-1`: wallet / agent / bank reconciliation,
+commissions and fees, agent fraud, KYC checks) and missing **telecom fraud content** (`TELCO-FRAUD-CONTENT-GAPS-1`:
+recharge, data-charging bypass, internal fraud). Out of scope as software: signalling probes, radio scanning
+kits, direction finding, device forensics and managed services. Order: AML (+ Screening, Regulatory Reporting) →
+Mobile Money → Anomaly Detection → telecom content → Real-time Decisioning → Predictive Analytics.
 
 ### More solution packs will follow (operator, 2026-10-06)
 Named so far by the operator: **compliance Audit**, **BI for other domains**, **LA for other domains**, and new
