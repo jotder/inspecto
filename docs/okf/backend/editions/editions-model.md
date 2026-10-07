@@ -74,8 +74,11 @@ Seven cells were gated out of Personal this way (`9fdb99f8` · `c323f35c` · `91
 8. ⚠ **Five sites make a capability-gated route work**, `CapabilityManifest` being the one most easily
    missed; route matching is FIRST-MATCH across modules, so a duplicate silently never runs (hence the
    duplicate-registration guard added in `91b6c9de`).
-9. ⚠ **`package.ps1` emits four launchers** (`run.sh`/`run.bat`/`serve.sh`/`serve.bat`) — each classpath
-   anchor appears twice — and `.gitignore` is per-module for `target/`.
+9. ⚠ **`package.ps1` emits four launchers** (`run.sh`/`run.bat`/`serve.sh`/`serve.bat`, plus `serve-demo.*` for `-DemoAuth`)
+   and `.gitignore` is per-module for `target/`. ✅ Since P3d (2026-10-08) none of them keeps a jar list: each reads the
+   bundle's `modules.list` (one jar per line, classpath order) and `serve.*` read `edition.properties`, both written at
+   package time by `tools/offering-classpath.mjs` from the Offering (`offerings/<edition>.toon`, asserted equal to
+   `tools/bundle-modules.mjs`). A new module is placed once in that tool's `CLASSPATH_ORDER`, not in four launchers.
 10. ⛔ **Grantable capability vocabulary stays static across editions.** Deriving it from registered routes
     would make a role file authored on Professional fail validation on Personal. Dead vocabulary is not a hole;
     there is no route behind it.

@@ -347,6 +347,49 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
   `provides` (P1-D3), 503 stubs synthesised from manifests, `/bootstrap` reading the three gates.
 - `route-gating.md` was already stale from the P1 `featureIds()` line shifts; it was regenerated with this change.
 
+### P3d as built (2026-10-08 - stage 1: the Offering writes the bundle's classpath; the processor is still ONE shaded jar)
+- **What the generator owns** (`tools/offering-classpath.mjs`, test `tools/offering-classpath.test.mjs`): resolve `offerings/<edition>.toon` (includes, transitive) + the
+  `requires.modules` closure over the manifests, ASSERT it equals `tools/bundle-modules.mjs`'s set for the edition (minus the base/internal always-present modules) and
+  THROW on any difference, then order it by `CLASSPATH_ORDER` (a shipped module with no slot, or a slot for an unknown module, throws) and emit, per bundle:
+  `modules.list` (one jar per line, classpath order, LF, processor first, `postgresql.jar` last for non-Personal) and `edition.properties` (`edition=Professional`; the
+  demo adds `variant=demo`). `--list-mvn` prints the `-pl` string, so package.ps1's `$modules` is no longer a hand-kept literal. `--bundle <dir>` also REFUSES a staged
+  `*.jar` that is not on the list and a listed jar that is not staged. `--demo` swaps the OIDC trio (oidc, secrets, geo-country) for `inspecto-demo-auth.jar` in the
+  OIDC jar's slot.
+- **What package.ps1 changed:** `$modules` from `--list-mvn`; step 3a-ter runs the generator AFTER staging and the demo swap; `run.sh`/`run.bat`/`serve.sh`/`serve.bat`/`serve-demo.*`
+  and the boot smoke READ the list (sh: `CP=$(tr -d '\r' < modules.list | tr '\n' ':')`; cmd: `for /f ... do call set "CP=%%CP%%;%%J"`, strip the leading `;`). ⚠ DEVIATION
+  from the brief: NO `enabledelayedexpansion` - SERVEBAT-OPTS-1 forbids it (delayed expansion eats `!` in the OIDC secret and keystore password the same script handles), and
+  `call set` double-expands without it. `serve.*` read the edition from `edition.properties` and refuse an unknown value; `Replace('EDITION="Enterprise"', 'EDITION="Preview"')` is gone
+  (a Preview bundle now prints `edition: Preview` natively). FALLBACKS kept and documented: no `modules.list` => `inspecto.jar` then every `*.jar`; no `edition.properties` => the old
+  oidc/policy-presence heuristic. 🔴 Consequence: a jar merely dropped beside the launcher is NO LONGER on the classpath (and cannot change the edition) until the list names it.
+- **What stays hand-kept (deliberately):** the per-sidecar find/copy/verify blocks (SPI-registration, Nimbus/maxmind/kafka/asn1/javax.mail class checks, build-id check, no core classes in a
+  sidecar, natives licences). They are 20 different assertions with a different shape each; collapsing them into a data table would have meant re-proving every one, so none was touched. The
+  `-NoBuild` find-the-jar globs are the same. The jlink hand list (P3c) is unchanged. `inspecto-intelligence.jar`'s native-dir setup still keys on the jar being staged.
+- **Today's classpaths vs generated (captured from package.ps1 BEFORE the change, frozen in the test):** `serve.sh` == `serve.bat` == generated, **byte for byte for Personal, Professional,
+  Enterprise and Preview** (22/25/25 jars incl. the driver). The other three each had an order of their own: `run.*` (oidc group LAST; NEVER carried `inspecto-policy`), the boot smoke (policy
+  before connectors; connectors before kafka/asn1) and the demo launcher (kafka/asn1 before notify-channels, demo jar second, smoke put it LAST). They now share serve's order; the SET is
+  identical except that `run.*` gains `inspecto-policy` on Enterprise/Preview (an AccessDecider only `ControlApi` resolves). The jars have disjoint packages, so only a multi-provider SPI could
+  notice the order change and none exists; the test asserts the set equality, the serve equality and the exact deviations.
+- **Guards:** `tools/check-sbom-modules.mjs` is now `analyze()` + `tools/check-sbom-modules.test.mjs` (12 cases). Its A (the `$modules` literal) became "`$modules` comes from `--list-mvn` and that output equals the
+  table's edition modules"; its C (the boot-smoke `$cp` literal vs the staging steps) became "the maximal generated classpath equals the staged jars; the smoke and every launcher READ
+  `modules.list`; no launcher appends a named jar to CP"; B (staging steps vs the table, Personal vs unconditional staging, artifactId, stated counts) is unchanged. `tools/check-launchers.mjs` now exports
+  `staticFindings`/`runScenarios`/`runOneShot` + `tools/check-launchers.test.mjs` (13 cases): the stub jars + a generator-written `modules.list`/`edition.properties`, `-cp` compared IN ORDER to the
+  generator's list (10 serve scenarios incl. Preview, the stray-jar drop-in, both fallbacks, an unknown edition; run.* executed per edition), static rules for run/serve/serve-demo. Each rule has a negative
+  fixture that mutates the real package.ps1. `tools/check-demo-auth-isolation.test.mjs`: three planted-violation anchors moved to the new text (the guard itself is untouched; it stays green because
+  package.ps1 keeps a `$demoJars` list - now read from `modules.list` and ASSERTED to omit the OIDC jar and name the demo jar).
+- **Proof on real bundles** (`pwsh inspecto/package.ps1 -Edition X -NoUi`, offline, JDK 27 toolchain, build id `eb17f73d9`), each exit 0 with the boot smoke green ("the staged <edition> bundle boots and
+  answers /health", reading the bundle's own `modules.list`; one SLF4J binding; no version split):
+  Professional (22 jars) and Enterprise (25) and the demo (`-Edition Enterprise -DemoAuth`, 23). `modules.list` == the captured serve classpath exactly for Professional and Enterprise; the demo list = Enterprise's with the
+  OIDC trio replaced by the demo jar second. No launcher in the staged bundles contains a jar list (grep: 0 `[ -f inspecto-*.jar ] && CP=` / `if exist inspecto-*.jar set "CP=` lines in run/serve .sh/.bat).
+  **The staged `serve.bat` was actually started** with the bundle's own `runtime\bin\java.exe` (placeholder OIDC issuer/JWKS env; Enterprise additionally `INSPECTO_JAVA_OPTS=-Dobjects.backend=db`, no PostgreSQL here): `/health` 200
+  `{"status":"UP"}`, banner `edition: Professional` / `edition: Enterprise`, the JVM command line carried `-Dauth.mode=oidc -Devents.backend=parquet` and a `-cp` equal to `modules.list` in order (Enterprise also `-Dobjects.backend=postgres`
+  then the operator override); `/api/v1/bootstrap` (public) reported `exchange/geoLink/entityList/events/ops/reconciliation/scoring: true`; 28 / 29 route modules discovered in the log. `serve-demo.bat` on the demo bundle: `/health` 200,
+  `authMode: demo`, `loopbackOnly: true`, `-cp` (quoted) = the demo `modules.list`. ⚠ `/api/v1/modules` answered 401 (OIDC/demo auth) so the per-module STATE table was not read; the route-module log + bootstrap features stand in for
+  it. Every run was stopped by the proof script's `finally` (process tree killed, 0 bundle `java` processes remain). The Linux zip's `serve.sh`/`run.sh`/`modules.list`/`edition.properties` were extracted and checked: `bash -n` OK, LF only,
+  `tr` yields the same 25-jar classpath - the Linux launcher was NOT executed on Linux (only `serve.sh` over stubs under Git Bash on Windows, by `check-launchers`).
+- **Next stage = thin core:** drop the shade for the first-party modules in `inspecto-processor` (the core becomes several thin jars + the third-party jars), so `modules.list` names real per-module jars; per-module SBOM from the
+  same list; signing per jar. Prerequisite status: split packages are down to the deliberate telecom-asn1 `ingester`/`parse` pair (2, `check-module-architecture --ratchet`); `com.gamma.control` no longer spans modules.
+  `CLASSPATH_ORDER` then grows the core modules in front of the optional ones, and the jlink derivation (P3c) scans the same list.
+
 ### P3a as built (2026-10-07 — the build-id stamp and its boot check; the jar split is NOT done)
 - **Stamp:** manifest attribute `Inspecto-Build-Id` on every module jar, set ONCE in the parent pom: `maven-jar-plugin`
   `pluginManagement` (pinned 3.4.2, the version the default lifecycle already resolved offline) for thin jars; the

@@ -189,7 +189,7 @@ two, the build page's *table* omits everything the same page's *prose* gets righ
 
 ✅ **`PKG-5` RESOLVED 2026-09-12 — the assistant now ships.** `inspecto-agent` is staged as
 `inspecto-agent.jar` in **Professional and Enterprise** bundles and wired into all four launchers
-(`serve.sh`/`serve.bat`/`run.sh`/`run.bat`) by jar presence, like every other optional module. Operator
+(`serve.sh`/`serve.bat`/`run.sh`/`run.bat`) through the bundle's `modules.list` (by jar presence until P3d, 2026-10-08), like every other optional module. Operator
 decision, taken as "all editions, optional" and narrowed the same day to **Professional and above** once the
 sidecar's weight was measured — Personal already carries the ~32 MB connector sidecar and is not sold on
 the assistant. Verified by BUILDING both bundles: Professional carries the jar, Personal does not.

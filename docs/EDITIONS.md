@@ -55,9 +55,11 @@ eventually lands (Personal/Professional/Enterprise).
   **not** auto-union — a new module must be added to it by hand or Preview silently stops being
   "everything" (comment at the profile, `pom.xml`).
 - Today Preview's module set is byte-identical to Enterprise's (nothing is currently incubation-only)
-  — `serve.bat`/`serve.sh` auto-detect edition purely from jar presence, so a Preview bundle reports
-  `edition: Enterprise` at boot. That's expected; the distinction only starts to matter once an
-  incubating module exists that Enterprise doesn't carry.
+  — since P3d (2026-10-08) `serve.bat`/`serve.sh` read the edition from the bundle's
+  `edition.properties` (`edition=Preview`) rather than guessing it from jar presence, so a Preview bundle
+  reports `edition: Preview` at boot (and keeps the operational objects on DuckDB — only `Enterprise`
+  pins PostgreSQL). The distinction in module sets only starts to matter once an incubating module
+  exists that Enterprise doesn't carry.
 - Never ship Preview to a customer, never advertise it externally, and never let it gate a compliance
   claim — it carries no compliance-scope guarantee at all.
 - See [`okf/backend/editions/local-testing-without-iam.md`](okf/backend/editions/local-testing-without-iam.md)
@@ -136,9 +138,11 @@ Personal and Professional never bundle the module and behave byte-identically. B
 Enterprise bundle, closing the last gap between "the profile builds" and "an operator can ship it". It is
 a **superset of Professional** (mirroring the profile relation), so it builds `inspecto-oidc` *and*
 `inspecto-policy` under `-Pedition-enterprise` and bundles both `inspecto-oidc.jar` and
-`inspecto-policy.jar`. The generated `serve.sh`/`serve.bat` auto-detect edition from the bundle
-contents exactly as they already did for Professional: security jar ⇒ `Professional` (+ `-Dauth.mode=oidc`),
-plus policy jar ⇒ `Enterprise`. **No new runtime flag exists or is needed** — `inspecto-policy` is found
+`inspecto-policy.jar`. The generated `serve.sh`/`serve.bat` read the edition from the bundle's
+`edition.properties` (P3d, 2026-10-08 — they used to sniff jar presence: security jar ⇒ `Professional`,
+plus policy jar ⇒ `Enterprise`; that heuristic survives only as the fallback for a hand-assembled directory)
+and every edition above Personal gets `-Dauth.mode=oidc`; the classpath is the bundle's `modules.list`,
+written by `tools/offering-classpath.mjs` from the Offering. **No new runtime flag exists or is needed** — `inspecto-policy` is found
 solely through `META-INF/services/com.gamma.spi.auth.AccessDecider`, so the classpath entry *is* the
 switch. Personal bundles remain byte-for-byte unchanged. Since 2026-09-29 (`ASSURE-INTELLIGENCE-BUNDLE-1`)
 Enterprise also stages `inspecto-intelligence.jar` (CP-14 `/agent/*`), found the same way through
