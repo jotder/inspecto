@@ -66,5 +66,12 @@
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
+        <!-- MODULE-REORG-1 P5b: engine-SPI TCK (test-jar of inspecto-engine) -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

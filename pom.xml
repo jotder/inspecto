@@ -386,6 +386,12 @@
             </dependency>
             <dependency>
                 <groupId>com.gamma.inspector</groupId>
+                <artifactId>inspecto-auth-spi</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+            </dependency>
+            <dependency>
+                <groupId>com.gamma.inspector</groupId>
                 <artifactId>inspecto-http-spi</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -423,8 +429,20 @@
             </dependency>
             <dependency>
                 <groupId>com.gamma.inspector</groupId>
+                <artifactId>inspecto-acquire</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+            </dependency>
+            <dependency>
+                <groupId>com.gamma.inspector</groupId>
                 <artifactId>inspecto-engine</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.gamma.inspector</groupId>
+                <artifactId>inspecto-engine</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
             </dependency>
             <!-- TOON + Jackson (core + fp-config since S5; core + fp-util since WS-D). -->
             <dependency>

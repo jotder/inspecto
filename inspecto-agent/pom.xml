@@ -94,6 +94,13 @@
         <!-- The golden-eval harness (FakeModelProvider, EvalCase/Expect, EvalCaseLoader, EvalRunner,
              Evals @TestFactory glue) is vendored under src/test/java/com/gamma/agent/kernel/eval —
              formerly the kernel's agent-eval jar + test-jar. Test tree only; never ships. -->
+        <!-- MODULE-REORG-1 P5b: engine-SPI TCK (test-jar of inspecto-engine) -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <!-- PKG-5 (operator decision 2026-09-12: the assistant ships in ALL THREE editions, as an

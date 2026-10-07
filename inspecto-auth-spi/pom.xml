@@ -83,6 +83,19 @@
                     </execution>
                 </executions>
             </plugin>
+                    <!-- MODULE-REORG-1 P5b: the Authenticator/TokenRelay TCK(s) ship as this module's test-jar (abstract contract classes + their *TckSelfTest
+                 stay here); an implementer's module extends them from its own test tree. Consumers declare it type test-jar, scope test. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>
