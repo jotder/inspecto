@@ -10,7 +10,7 @@ import { signalToEvent, type Signal, type SignalSeverity } from '../signal/signa
 
 /**
  * One immutable operational fact from the Operational Intelligence event engine (GET /events*). Mirrors
- * `com.gamma.event.Event#toMap()`: `ts` is epoch millis, `timestamp` the ISO-8601 UTC string, `level` an
+ * `com.gamma.audit.Event#toMap()`: `ts` is epoch millis, `timestamp` the ISO-8601 UTC string, `level` an
  * {@link EVENT_LEVELS} member, `type` a {@link EVENT_TYPES} constant or any custom string, and `attributes`
  * the structured detail bag (never row content). `pipeline`/`correlationId` may be null (service-wide).
  *
