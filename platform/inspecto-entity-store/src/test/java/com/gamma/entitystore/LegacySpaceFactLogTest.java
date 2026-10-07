@@ -1,4 +1,4 @@
-package com.gamma.entitylist;
+package com.gamma.entitystore;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -13,6 +13,9 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import com.gamma.entitystore.EntityFactLog;
+import com.gamma.entitystore.EntityRegistry;
+import com.gamma.entitystore.MaskTokens;
 
 /**
  * SEP-08: moving the fact log from {@code inspecto-geo-link} to this module changed NO on-disk format or path, so a

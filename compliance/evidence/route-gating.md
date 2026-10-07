@@ -175,11 +175,11 @@ system: the evidence cannot say something the code does not.
 | POST | `/decision-rules/([^/]+)/simulate` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DecisionRoutes.java:62` |
 | POST | `/enrichment` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/EnrichmentRoutes.java:41` |
 | POST | `/enrichment/preview` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/EnrichmentRoutes.java:45` |
-| POST | `/entity-lists` | gated | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:90` |
-| POST | `/entity-lists/([^/]+)/match` | exempt | read-shaped | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:96` |
-| POST | `/entity-lists/([^/]+)/members` | gated | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:92` |
-| POST | `/entity-lists/([^/]+)/register-dataset` | gated | `canAuthorWorkbench` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:99` |
-| POST | `/entity-lists/([^/]+)/retire` | gated | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:94` |
+| POST | `/entity-lists` | gated | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:96` |
+| POST | `/entity-lists/([^/]+)/match` | exempt | read-shaped | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:102` |
+| POST | `/entity-lists/([^/]+)/members` | gated | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:98` |
+| POST | `/entity-lists/([^/]+)/register-dataset` | gated | `canAuthorWorkbench` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:105` |
+| POST | `/entity-lists/([^/]+)/retire` | gated | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:100` |
 | POST | `/events/views` | gated | `canAuthorWorkbench` | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java:67` |
 | POST | `/events/views/([^/]+)/delete` | gated | `canAuthorWorkbench` | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java:69` |
 | POST | `/exchange/grants/([^/]+)/(approve|deny|revoke)` | gated | `canApproveShares` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java:111` |

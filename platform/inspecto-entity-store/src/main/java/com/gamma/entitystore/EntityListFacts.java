@@ -1,4 +1,4 @@
-package com.gamma.entitylist;
+package com.gamma.entitystore;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;

@@ -1,8 +1,10 @@
-package com.gamma.entitylist;
+package com.gamma.entitystore;
 
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import com.gamma.entitystore.EntityFactLog;
+import com.gamma.entitystore.EntityRegistry;
 
 /** Test access to the Identity Fact log and its fold from other test packages. */
 public final class EntityFactsForTest {

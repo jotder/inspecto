@@ -1,4 +1,4 @@
-package com.gamma.entitylist;
+package com.gamma.entitystore;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

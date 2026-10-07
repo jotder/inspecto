@@ -1,4 +1,4 @@
-package com.gamma.entitylist;
+package com.gamma.entitystore;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;

@@ -1,4 +1,4 @@
-package com.gamma.entitylist;
+package com.gamma.entitystore;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;

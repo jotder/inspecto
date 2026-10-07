@@ -1,4 +1,4 @@
-package com.gamma.entitylist;
+package com.gamma.entitystore;
 
 import com.gamma.util.DuckDbUtil;
 import org.junit.jupiter.api.Test;
@@ -13,6 +13,9 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import com.gamma.entitystore.EntityFactLog;
+import com.gamma.entitystore.EntityListSidecar;
+import com.gamma.entitystore.EntityRegistry;
 
 /**
  * SP4 correctness (fast): a list member never counts toward degree or budget, whichever SQL form carries the list, over the

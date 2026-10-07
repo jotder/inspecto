@@ -1,4 +1,4 @@
-package com.gamma.entitylist;
+package com.gamma.entitystore;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
+import com.gamma.entitystore.EntityFactLog;
+import com.gamma.entitystore.EntityRegistry;
 
 /**
  * MEASUREMENT harness, not a test (SP4 / risk R-09): what one read of the identity fact log costs at 10^4, 10^5, 10^6 facts —

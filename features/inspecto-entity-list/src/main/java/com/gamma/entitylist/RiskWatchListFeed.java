@@ -11,6 +11,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import com.gamma.entitystore.EntityFactLog;
+import com.gamma.entitystore.EntityListFacts;
+import com.gamma.entitystore.EntityListSidecar;
+import com.gamma.entitystore.EntityRegistry;
 
 /**
  * The Risk Score watch-list feed (ASSURE-ENTITY-LISTS-1, WS-12 x WS-22): the one {@link WatchListFeed}, over this

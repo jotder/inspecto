@@ -1,4 +1,4 @@
-package com.gamma.entitylist;
+package com.gamma.entitystore;
 
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
@@ -31,7 +31,7 @@ import java.time.Instant;
  * route answers {@code sidecar: "failed"} and logs it. The writer only ever touches a directory carrying its own
  * {@code .entity-list-output} marker naming the list, so it can never overwrite a Dataset it did not create.
  */
-final class EntityListSidecar {
+public final class EntityListSidecar {
 
     private static final Logger log = LoggerFactory.getLogger(EntityListSidecar.class);
     static final String PREFIX = "entity_list_";
@@ -41,12 +41,12 @@ final class EntityListSidecar {
     private EntityListSidecar() {}
 
     /** The store name a Dataset's {@code physicalRef} uses to read {@code listId}'s sidecar. */
-    static String ref(String listId) {
+    public static String ref(String listId) {
         return PREFIX + listId;
     }
 
     /** Whether {@code listId}'s sidecar is on disk (written by this class: marker + file), so a Dataset over it can read. */
-    static boolean present(Path dataRoot, String listId) {
+    public static boolean present(Path dataRoot, String listId) {
         if (dataRoot == null) return false;
         Path dir = dataRoot.resolve(ref(listId)).normalize();
         return dir.startsWith(dataRoot.normalize()) && Files.isRegularFile(dir.resolve(MARKER))
@@ -54,7 +54,7 @@ final class EntityListSidecar {
     }
 
     /** Rewrite {@code l}'s sidecar; answers {@code written}, {@code none} (no data root, or none on disk) or {@code failed}. */
-    static String write(Path dataRoot, EntityRegistry.EntityList l, java.util.List<EntityFactLog.Fact> facts) {
+    public static String write(Path dataRoot, EntityRegistry.EntityList l, java.util.List<EntityFactLog.Fact> facts) {
         // A data root that does not exist is not created here: the legacy single-Space default is relative to the
         // CWD, and a derived projection must never be the thing that plants a data tree there.
         if (dataRoot == null || !Files.isDirectory(dataRoot)) return "none";

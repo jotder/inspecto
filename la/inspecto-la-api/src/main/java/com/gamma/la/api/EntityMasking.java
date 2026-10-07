@@ -4,8 +4,8 @@ import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.control.EntityTypes;
 import com.gamma.control.LinkAnalysisSettings;
-import com.gamma.entitylist.EntityListFacts;
-import com.gamma.entitylist.MaskTokens;
+import com.gamma.entitystore.EntityListFacts;
+import com.gamma.entitystore.MaskTokens;
 
 import java.io.IOException;
 import java.nio.file.Path;

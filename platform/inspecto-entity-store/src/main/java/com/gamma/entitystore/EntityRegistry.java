@@ -1,4 +1,4 @@
-package com.gamma.entitylist;
+package com.gamma.entitystore;
 
 import java.util.ArrayList;
 import java.util.Collections;

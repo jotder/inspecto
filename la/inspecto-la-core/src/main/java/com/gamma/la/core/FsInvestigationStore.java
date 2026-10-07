@@ -284,7 +284,7 @@ public final class FsInvestigationStore implements InvestigationStore {
 
     @Override
     public byte[] maskKey(String investigationId) throws IOException {
-        return com.gamma.entitylist.MaskTokens.key(investigationDir(investigationId));
+        return com.gamma.entitystore.MaskTokens.key(investigationDir(investigationId));
     }
 
     // ── per-pod cache identity ──────────────────────────────────────────────────────────────────────────

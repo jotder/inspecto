@@ -1,4 +1,4 @@
-package com.gamma.entitylist;
+package com.gamma.entitystore;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -9,6 +9,8 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import com.gamma.entitystore.EntityFactLog;
+import com.gamma.entitystore.EntityRegistry;
 
 /**
  * LA-17 slice 2 (design §8.1) — the union-find fold over {@code identity.asserted} / {@code identity.retracted} facts.

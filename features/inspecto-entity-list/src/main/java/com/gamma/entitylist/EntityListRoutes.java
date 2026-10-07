@@ -26,12 +26,18 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 
-import static com.gamma.entitylist.EntityListFacts.LIST_ID;
-import static com.gamma.entitylist.EntityListFacts.append;
-import static com.gamma.entitylist.EntityListFacts.masked;
-import static com.gamma.entitylist.EntityListFacts.read;
-import static com.gamma.entitylist.EntityListFacts.reason;
-import static com.gamma.entitylist.EntityListFacts.type;
+import static com.gamma.entitystore.EntityListFacts.LIST_ID;
+import static com.gamma.entitystore.EntityListFacts.append;
+import static com.gamma.entitystore.EntityListFacts.masked;
+import static com.gamma.entitystore.EntityListFacts.read;
+import static com.gamma.entitystore.EntityListFacts.reason;
+import static com.gamma.entitystore.EntityListFacts.type;
+import com.gamma.entitystore.EntityFactLog;
+import com.gamma.entitystore.EntityListEntries;
+import com.gamma.entitystore.EntityListFacts;
+import com.gamma.entitystore.EntityListSidecar;
+import com.gamma.entitystore.EntityRegistry;
+import com.gamma.entitystore.MaskTokens;
 
 /**
  * <b>Entity Lists</b> (LA-17 slice 1, {@code docs/archived-documents/plans-archive/link-analysis-entity-model-design.md} §4.3 and the

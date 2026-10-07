@@ -1,6 +1,6 @@
 package com.gamma.risk;
 
-import com.gamma.entitylist.EntityFactsForTest;
+import com.gamma.entitystore.EntityFactsForTest;
 import com.gamma.risk.RiskScoreModel;
 import com.gamma.risk.RiskScorer;
 import com.gamma.entitylist.WatchListFeed;

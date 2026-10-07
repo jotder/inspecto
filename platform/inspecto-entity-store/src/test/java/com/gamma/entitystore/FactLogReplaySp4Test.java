@@ -1,4 +1,4 @@
-package com.gamma.entitylist;
+package com.gamma.entitystore;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -10,6 +10,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import com.gamma.entitystore.EntityFactLog;
+import com.gamma.entitystore.EntityRegistry;
 
 /** SP4 fast checks: the bulk generator writes a log the REAL chain verification accepts, and the head-cache prototype's contract. */
 class FactLogReplaySp4Test {

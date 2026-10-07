@@ -1,4 +1,4 @@
-package com.gamma.entitylist;
+package com.gamma.entitystore;
 
 import com.gamma.control.ApiContext;
 
@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.gamma.entitystore.EntityFactLog;
 
 /**
  * SP4 test support: (1) a bulk generator that writes a chain-valid fact log in the exact byte format of

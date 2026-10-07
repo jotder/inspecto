@@ -1,4 +1,4 @@
-package com.gamma.entitylist;
+package com.gamma.entitystore;
 
 import com.gamma.control.EntityTypes;
 
@@ -22,15 +22,15 @@ import java.util.Map;
  * </ul>
  * CIDR is matched on the raw value (trimmed), never the list's normaliser: an address is not an entity key.
  */
-final class EntityListEntries {
+public final class EntityListEntries {
 
     private EntityListEntries() {}
 
     /** A parsed range entry; {@code lo}/{@code hi} are the sidecar's bounds (fixed-width hex for CIDR). */
-    record Range(String canonical, String match, String lo, String hi) {}
+    public record Range(String canonical, String match, String lo, String hi) {}
 
     /** The canonical entry of one authored range object, or IllegalArgumentException naming what is wrong. */
-    static String canonical(Map<?, ?> spec, String normaliser) {
+    public static String canonical(Map<?, ?> spec, String normaliser) {
         if (spec.size() == 1 && spec.get("prefix") instanceof String p) {
             String k = EntityTypes.normalise(normaliser, p);
             if (k.isEmpty()) throw new IllegalArgumentException("prefix is empty after the list's normaliser");
@@ -51,7 +51,7 @@ final class EntityListEntries {
     }
 
     /** Parse a stored canonical entry back into its bounds. */
-    static Range parse(String canonical) {
+    public static Range parse(String canonical) {
         if (canonical.startsWith("prefix:")) {
             String p = canonical.substring(7);
             return new Range(canonical, "prefix", p, p);
