@@ -110,3 +110,12 @@ export function describeGroup(g: ConditionGroup): string {
     const body = parts.join(g.op === 'AND' ? ' and ' : ' or ');
     return g.negate ? `NOT (${body})` : parts.length > 1 ? `(${body})` : body;
 }
+
+/** Every refusal reason in a group, depth-first, each prefixed with the condition's field; empty when it would save. */
+export function validateGroup(g: ConditionGroup): string[] {
+    return g.items.flatMap((it) => {
+        if (it.kind === 'group') return validateGroup(it);
+        const p = validateCondition(it);
+        return p ? [`${it.field || 'A condition'}: ${p}`] : [];
+    });
+}

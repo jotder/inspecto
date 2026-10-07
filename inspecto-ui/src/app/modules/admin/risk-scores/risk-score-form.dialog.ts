@@ -21,6 +21,7 @@ import {
 } from 'app/inspecto/risk/risk-score-form';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
+import { ColumnMeta } from 'app/inspecto/query/query-types';
 import { RiskScoreFactorsComponent } from './risk-score-factors.component';
 
 /** Open with an existing model to edit it; without one to create. */
@@ -72,6 +73,7 @@ export function heldChange(res: unknown): RiskScoreFormResult['held'] | null {
             <app-risk-score-factors
                 [datasetOptions]="datasets()"
                 [columnsFor]="columnsFor"
+                [columnMetaFor]="columnMetaFor"
                 [factors]="factors"
             ></app-risk-score-factors>
             <p class="text-secondary mt-4 text-xs">
@@ -109,7 +111,7 @@ export class RiskScoreFormDialog implements OnInit {
     readonly refusal = signal<string | null>(null);
     /** Datasets whose Schema resolves to at least one column (D-RP8 a) — the same read `requireStorable` needs. */
     readonly datasets = signal<PickerOption[]>([]);
-    private readonly columnCache = new Map<string, Promise<string[]>>();
+    private readonly columnCache = new Map<string, Promise<ColumnMeta[]>>();
 
     readonly requestClose = guardDirtyClose(
         this.ref,
@@ -117,17 +119,18 @@ export class RiskScoreFormDialog implements OnInit {
         this.confirm,
     );
 
-    readonly columnsFor = (id: string): Promise<string[]> => {
+    readonly columnMetaFor = (id: string): Promise<ColumnMeta[]> => {
         let p = this.columnCache.get(id);
         if (!p) {
             p = firstValueFrom(this.datasetsApi.get(id))
                 .then((ds) => this.rowsApi.columns(ds))
-                .then((cols) => cols.map((c) => c.name))
-                .catch(() => []);
+                .catch(() => [] as ColumnMeta[]);
             this.columnCache.set(id, p);
         }
         return p;
     };
+
+    readonly columnsFor = async (id: string): Promise<string[]> => (await this.columnMetaFor(id)).map((c) => c.name);
 
     async ngOnInit(): Promise<void> {
         let ids: string[];

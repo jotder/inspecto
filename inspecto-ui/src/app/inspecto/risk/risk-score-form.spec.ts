@@ -91,4 +91,64 @@ describe('risk-score-form', () => {
         });
         expect(perEntityAlertRuleParams('x', null)['threshold']).toBeUndefined();
     });
+
+    describe('a factor `when` condition tree (silent-loss trap)', () => {
+        const WHEN = {
+            kind: 'group',
+            op: 'OR',
+            negate: true,
+            items: [
+                { kind: 'condition', field: 'cell', operator: 'matches', value: '^A', ignoreCase: true },
+                { kind: 'condition', field: 'a', operator: '>', value: '', valueField: 'b' },
+            ],
+        };
+        const body = (): Record<string, unknown> => {
+            const b = JSON.parse(JSON.stringify(STORED)) as { factors: Record<string, unknown>[] };
+            b.factors[0]['when'] = JSON.parse(JSON.stringify(WHEN));
+            b.factors[0]['futureKey'] = { keep: 'me' };
+            return b;
+        };
+
+        it('keeps an authored when and any unmodelled factor key after an unrelated edit', () => {
+            const content = body();
+            const drafts = factorDrafts(content);
+            drafts[0].label = 'Renamed'; // the unrelated edit
+            const saved = toRiskScoreContent('sim_box', riskScoreInitial(content), drafts, content);
+            const f = (saved['factors'] as Record<string, unknown>[])[0];
+            expect(f['label']).toBe('Renamed');
+            expect(f['when']).toEqual(WHEN);
+            expect(f['futureKey']).toEqual({ keep: 'me' });
+        });
+
+        it('negative probe: a factor with no when saves none', () => {
+            const content = JSON.parse(JSON.stringify(STORED)) as Record<string, unknown>;
+            const saved = toRiskScoreContent('sim_box', riskScoreInitial(content), factorDrafts(content), content);
+            expect((saved['factors'] as Record<string, unknown>[])[0]).not.toHaveProperty('when');
+        });
+
+        it('drops the when once the author empties the group', () => {
+            const content = body();
+            const drafts = factorDrafts(content);
+            drafts[0].when = { kind: 'group', op: 'AND', items: [] };
+            const saved = toRiskScoreContent('sim_box', riskScoreInitial(content), drafts, content);
+            expect((saved['factors'] as Record<string, unknown>[])[0]).not.toHaveProperty('when');
+        });
+
+        it('keeps a when the editor cannot model (no kind/items) verbatim', () => {
+            const content = body() as { factors: Record<string, unknown>[] };
+            const opaque = { op: 'AND', conditions: [{ field: 'cell', operator: '=', value: 'x' }] };
+            content.factors[0]['when'] = opaque;
+            const drafts = factorDrafts(content);
+            expect(drafts[0].when).toBeNull();
+            const saved = toRiskScoreContent('sim_box', riskScoreInitial(content), drafts, content);
+            expect((saved['factors'] as Record<string, unknown>[])[0]['when']).toEqual(opaque);
+        });
+
+        it('draft when is a deep copy, so in-place editor edits never touch the stored body', () => {
+            const content = body();
+            const drafts = factorDrafts(content);
+            drafts[0].when?.items.pop();
+            expect((content['factors'] as Record<string, Record<string, unknown>>[])[0]['when']).toEqual(WHEN);
+        });
+    });
 });

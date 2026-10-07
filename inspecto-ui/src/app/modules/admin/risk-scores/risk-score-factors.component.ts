@@ -7,6 +7,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { validateGroup } from 'app/inspecto/query/condition-rules';
+import { QueryConditionGroupComponent } from 'app/inspecto/query/query-condition-group.component';
+import { ColumnMeta, ConditionGroup, emptyGroup } from 'app/inspecto/query/query-types';
 import {
     MAX_EVIDENCE,
     MAX_FACTORS,
@@ -14,12 +17,13 @@ import {
     RiskFactorDraft,
     RiskFilterDraft,
     emptyFactor,
+    isEditableGroup,
 } from 'app/inspecto/risk/risk-score-form';
 
 /**
  * The Factor row editor of the Risk Score form (spec §3, D-RP7 (b) bespoke cards). One card per factor, with a
- * flat filter list — a factor's `filters` are an AND of `{field, op, value}`, so the Query panel's nested
- * AND/OR condition-group editor would author shapes `MeasureCompiler` cannot take (see the spec's spike note).
+ * flat filter list (an AND of `{field, op, value}`) plus a collapsed "Advanced filter" that mounts the condition-group
+ * editor for the factor's optional `when` tree (ANDed after the flat filters by `MeasureCompiler`).
  * Presentational: the host supplies the Dataset choices and a column source, reads {@link value} on save, and
  * places server refusals through {@link setRowError}.
  */
@@ -35,6 +39,7 @@ import {
         MatInputModule,
         MatSelectModule,
         InspectoOptionPickerComponent,
+        QueryConditionGroupComponent,
     ],
     template: `
         <div class="flex flex-col gap-3">
@@ -141,6 +146,68 @@ import {
                         <button mat-button type="button" (click)="addFilter(i)">Add filter</button>
                     </div>
 
+                    <div class="mt-2">
+                        <button
+                            type="button"
+                            mat-button
+                            [attr.aria-expanded]="whenOpen(g)"
+                            [attr.aria-controls]="'risk-when-' + i"
+                            [attr.aria-describedby]="whenShowsErrors(g) ? 'risk-when-err-' + i : null"
+                            (click)="toggleWhen(g)"
+                            data-testid="when-toggle"
+                        >
+                            <mat-icon
+                                [svgIcon]="
+                                    whenOpen(g) ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'
+                                "
+                            ></mat-icon>
+                            <span class="ml-1">Advanced filter (condition tree)</span>
+                            @if (whenCount(g); as n) {
+                                <span class="text-secondary ml-1 text-xs">({{ n }})</span>
+                            }
+                        </button>
+                        @if (whenShowsErrors(g)) {
+                            <ul
+                                class="text-warn mt-1 list-none text-xs"
+                                role="alert"
+                                [id]="'risk-when-err-' + i"
+                                data-testid="when-error"
+                            >
+                                @for (m of whenIssues(g); track m) {
+                                    <li>{{ m }}</li>
+                                }
+                            </ul>
+                        }
+                        <div
+                            [id]="'risk-when-' + i"
+                            role="region"
+                            [attr.aria-label]="'Advanced filter of factor ' + (i + 1)"
+                            [hidden]="!whenOpen(g)"
+                        >
+                            @if (whenIsOpaque(g)) {
+                                <p class="text-secondary text-xs" data-testid="when-opaque">
+                                    This factor has an advanced filter authored outside this editor. It is kept as is on
+                                    save and cannot be edited here.
+                                </p>
+                            } @else {
+                                <p class="text-secondary mb-2 text-xs">
+                                    The flat filters above are a plain AND of simple tests. Use the advanced filter for
+                                    OR, NOT, nested groups, case-insensitive text, a pattern match or a comparison
+                                    between two columns. Both apply together: a row must pass the flat filters and the
+                                    advanced filter.
+                                </p>
+                                @if (whenOpen(g)) {
+                                    <inspecto-query-condition-group
+                                        [group]="whenGroup(g)"
+                                        [columns]="columnMeta(i)"
+                                        [root]="true"
+                                        (changed)="whenChanged(g)"
+                                    />
+                                }
+                            }
+                        </div>
+                    </div>
+
                     <div class="mt-2 flex gap-1">
                         <button
                             mat-icon-button
@@ -190,6 +257,8 @@ export class RiskScoreFactorsComponent implements OnInit {
     readonly datasetOptions = input<PickerOption[]>([]);
     /** Column source for a Dataset id; a failure resolves to `[]`. */
     @Input() columnsFor: (dataset: string) => Promise<string[]> = async () => [];
+    /** Typed columns for the advanced filter; defaults to the names of {@link columnsFor} read as text. */
+    @Input() columnMetaFor?: (dataset: string) => Promise<ColumnMeta[]>;
     @Input() set factors(v: RiskFactorDraft[]) {
         this.rows.clear();
         v.forEach((f) => this.rows.push(this.row(f)));
@@ -203,7 +272,7 @@ export class RiskScoreFactorsComponent implements OnInit {
     readonly rows: FormArray<FormGroup> = this.fb.array<FormGroup>([]);
     /** A server refusal per row (index = the server's `factors[i]`), shown verbatim. */
     readonly rowErrors = signal<Record<number, string>>({});
-    private readonly columns = signal<Record<string, PickerOption[]>>({});
+    private readonly columns = signal<Record<string, ColumnMeta[]>>({});
 
     ngOnInit(): void {
         for (const g of this.rows.controls) this.loadColumns(String(g.value['dataset'] ?? ''));
@@ -219,6 +288,12 @@ export class RiskScoreFactorsComponent implements OnInit {
             measure: [f.measure, Validators.required],
             weight: [f.weight, [Validators.required, num]],
             cap: [f.cap, Validators.pattern(/^\s*\d+(\.\d+)?\s*$/)],
+            when: [
+                f.when && isEditableGroup(f.when) ? f.when : emptyGroup('AND'),
+                (c: { value: unknown }) => (validateGroup(c.value as ConditionGroup).length ? { when: true } : null),
+            ],
+            extra: [{ ...(f.extra ?? {}) }],
+            whenOpen: [!!f.when?.items.length],
             evidence: [
                 [...f.evidence],
                 (c: { value: unknown }) =>
@@ -240,13 +315,59 @@ export class RiskScoreFactorsComponent implements OnInit {
 
     private loadColumns(ds: string): void {
         if (!ds || this.columns()[ds]) return;
-        this.columnsFor(ds).then((cols) => {
-            if (cols.length) this.columns.update((m) => ({ ...m, [ds]: cols.map((c) => ({ value: c, label: c })) }));
+        const metas = this.columnMetaFor
+            ? this.columnMetaFor(ds)
+            : this.columnsFor(ds).then((cols) => cols.map((name): ColumnMeta => ({ name, type: 'string' })));
+        metas.then((cols) => {
+            if (cols.length) this.columns.update((m) => ({ ...m, [ds]: cols }));
         });
     }
 
     columnOptions(i: number): PickerOption[] {
+        return this.columnMeta(i).map((c) => ({ value: c.name, label: c.name }));
+    }
+
+    columnMeta(i: number): ColumnMeta[] {
         return this.columns()[String(this.rows.at(i).value['dataset'] ?? '')] ?? [];
+    }
+
+    whenOpen(g: FormGroup): boolean {
+        return g.controls['whenOpen'].value === true;
+    }
+
+    toggleWhen(g: FormGroup): void {
+        g.controls['whenOpen'].setValue(!this.whenOpen(g));
+    }
+
+    whenGroup(g: FormGroup): ConditionGroup {
+        return g.controls['when'].value as ConditionGroup;
+    }
+
+    /** A `when` kept verbatim because the editor cannot model its shape. */
+    whenIsOpaque(g: FormGroup): boolean {
+        return !!(g.controls['extra'].value as Record<string, unknown>)['when'];
+    }
+
+    /** Refusal reasons of the factor's condition tree, empty when it would save. */
+    whenIssues(g: FormGroup): string[] {
+        return validateGroup(this.whenGroup(g));
+    }
+
+    whenShowsErrors(g: FormGroup): boolean {
+        return g.controls['when'].touched && this.whenIssues(g).length > 0;
+    }
+
+    /** How many top-level conditions the tree holds, for the disclosure's hint. */
+    whenCount(g: FormGroup): number {
+        return this.whenGroup(g).items.length;
+    }
+
+    /** The editor mutates the tree in place and emits `changed`: re-run the validator and dirty the form. */
+    whenChanged(g: FormGroup): void {
+        g.controls['when'].updateValueAndValidity();
+        g.controls['when'].markAsTouched();
+        g.controls['when'].markAsDirty();
+        this.rows.markAsDirty();
     }
 
     filtersOf(i: number): FormArray<FormGroup> {
@@ -298,6 +419,8 @@ export class RiskScoreFactorsComponent implements OnInit {
 
     validate(): boolean {
         this.rows.markAllAsTouched();
+        // An error renders only where its control renders: open the advanced filter that blocks the save.
+        for (const g of this.rows.controls) if (g.controls['when'].invalid) g.controls['whenOpen'].setValue(true);
         return this.rows.valid && this.rows.length > 0;
     }
 
@@ -317,6 +440,8 @@ export class RiskScoreFactorsComponent implements OnInit {
                 weight: String(v.weight ?? ''),
                 cap: String(v.cap ?? ''),
                 evidence: Array.isArray(v.evidence) ? v.evidence.map(String) : [],
+                when: v.when as ConditionGroup,
+                extra: v.extra as Record<string, unknown>,
                 filters: (v.filters as RiskFilterDraft[]).map((x) => ({
                     field: String(x.field ?? ''),
                     op: String(x.op ?? '='),

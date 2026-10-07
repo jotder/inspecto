@@ -6,6 +6,7 @@
  * {@link mapRiskRefusal} places their message on the field it names.
  */
 import { AttributeSpec } from 'app/inspecto/component-model/attribute-spec';
+import { ConditionGroup } from 'app/inspecto/query/query-types';
 
 /** The seven named entity types `RiskScoreModel.ENTITY_TYPES` documents; a free token is also accepted. */
 export const RISK_ENTITY_TYPES = ['subscriber', 'account', 'device', 'sim', 'dealer', 'channel', 'partner'];
@@ -116,6 +117,10 @@ export interface RiskFactorDraft {
     cap: string;
     filters: RiskFilterDraft[];
     evidence: string[];
+    /** The factor's optional `when` condition tree; `null`/absent = none. */
+    when?: ConditionGroup | null;
+    /** Factor keys this form does not model, carried to the save untouched (silent-loss guard). */
+    extra?: Record<string, unknown>;
 }
 
 const str = (v: unknown): string => (v == null ? '' : String(v));
@@ -169,7 +174,37 @@ export function factorDrafts(content: Record<string, unknown>): RiskFactorDraft[
                 value: Array.isArray(x?.['value']) ? (x['value'] as unknown[]).map(str).join(', ') : str(x?.['value']),
             })),
             evidence: Array.isArray(f['evidence']) ? (f['evidence'] as unknown[]).map(str) : [],
+            ...whenAndExtra(f),
         }));
+}
+
+/** Factor keys the editor models itself; every other key rides through a save untouched. */
+const FACTOR_MODELLED = ['id', 'label', 'dataset', 'key', 'measure', 'weight', 'cap', 'filters', 'evidence', 'when'];
+
+/** A `when` the condition-group editor can author: the SPA's own `{kind:'group', op, items}` shape. */
+export function isEditableGroup(v: unknown): v is ConditionGroup {
+    const g = v as ConditionGroup | null;
+    return (
+        !!g &&
+        typeof g === 'object' &&
+        g.kind === 'group' &&
+        (g.op === 'AND' || g.op === 'OR') &&
+        Array.isArray(g.items)
+    );
+}
+
+/**
+ * The editable `when` (a deep copy — the editor mutates it in place) plus everything else the form does not
+ * model. A `when` in some other shape (e.g. authored in TOON with `conditions`) is not editable here, so it is
+ * kept verbatim in `extra` rather than dropped or reinterpreted.
+ */
+function whenAndExtra(f: Record<string, unknown>): Pick<RiskFactorDraft, 'when' | 'extra'> {
+    const extra: Record<string, unknown> = {};
+    for (const k of Object.keys(f)) if (!FACTOR_MODELLED.includes(k)) extra[k] = f[k];
+    const raw = f['when'];
+    if (isEditableGroup(raw)) return { when: JSON.parse(JSON.stringify(raw)) as ConditionGroup, extra };
+    if (raw !== undefined && raw !== null) extra['when'] = raw;
+    return { when: null, extra };
 }
 
 /** A typed number when the text is numeric, else the text itself (so the server names the bad value). */
@@ -200,6 +235,7 @@ export function toRiskScoreContent(
     if (top['retention'] === 'runs') out['retainRuns'] = top['retainValue'];
     out['factors'] = factors.map((f) => {
         const row: Record<string, unknown> = {
+            ...f.extra,
             id: f.id.trim(),
             dataset: f.dataset.trim(),
             key: f.key.trim(),
@@ -225,6 +261,7 @@ export function toRiskScoreContent(
                 return { field: x.field.trim(), op: x.op, value };
             });
         if (f.evidence.length) row['evidence'] = [...f.evidence];
+        if (f.when && f.when.items.length) row['when'] = f.when;
         return row;
     });
     return out;

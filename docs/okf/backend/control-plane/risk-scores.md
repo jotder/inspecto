@@ -249,8 +249,10 @@ load), labelled *preview, not saved*.
 `risk-score-actions.component.ts`, gated on `canAuthorWorkbench` (D-RP4). They open `risk-score-form.dialog.ts`: one
 `<inspecto-schema-form>` over the flat fields (`riskScoreAttributes` in `inspecto/risk/risk-score-form.ts`, with
 `watchList` and the `retainDays`/`retainRuns` choice flattened) plus the Factor card editor
-(`risk-score-factors.component.ts`, D-RP7 (b) — the condition-group editor authors nested AND/OR the model cannot
-store). The Dataset picker offers only Datasets whose columns resolve (`DatasetRowsService.columns`, D-RP8); key,
+(`risk-score-factors.component.ts`, D-RP7 (b)). Each factor has the flat `filters` (an AND of simple tests) plus a collapsed
+"Advanced filter (condition tree)" disclosure that mounts the condition-group editor for the optional `when` (OR, NOT, nested
+groups, `ignoreCase`, `matches`, field-to-field), ANDed after the flat filters by the server. Save keeps every factor key the form
+does not model, and a `when` the editor cannot model (TOON-authored `conditions`) is kept verbatim and shown read-only. The Dataset picker offers only Datasets whose columns resolve (`DatasetRowsService.columns`, D-RP8); key,
 filter and evidence pickers list that Dataset's columns. Save is the generic component CRUD: `POST` on create, `PUT`
 with `If-Match` from a fresh `GET` on edit. Keys the form does not author (`name`, `owner`, `shares`) ride through.
 A 422 is shown verbatim in a banner and placed by `mapRiskRefusal`: `risk-score.factors[i].<field>` marks row `i`
