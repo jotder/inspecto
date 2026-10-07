@@ -283,7 +283,11 @@ export class DecisionRulesComponent implements OnInit {
         this.api.apply(rule.name).subscribe({
             next: (res) => {
                 const ran = res.executed.filter((e) => e.status === 'executed').length;
-                this.toastr.success(`Applied "${res.rule}": ${ran} consequence(s) executed — see the Signal Ledger.`);
+                const unavailable = res.executed.filter((e) => e.status === 'unavailable').length;
+                const note = unavailable ? `; ${unavailable} not installed in this bundle and not run` : '';
+                this.toastr.success(
+                    `Applied "${res.rule}": ${ran} consequence(s) executed${note} — see the Signal Ledger.`,
+                );
             },
             error: (err) => this.toastr.error(apiErrorMessage(err, `Could not apply "${rule.name}".`)),
         });

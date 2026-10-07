@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { type Consequence, consequenceRefs, describeConsequence } from './consequence';
+import {
+    type Consequence,
+    type ConsequenceType,
+    consequenceInputSpec,
+    consequenceRefs,
+    describeConsequence,
+} from './consequence';
 
 describe('consequenceRefs', () => {
     it('emits an `invokes` edge for platform actions that target a component', () => {
@@ -39,5 +45,9 @@ describe('describeConsequence', () => {
         expect(describeConsequence({ action: 'create-incident', params: { title: 'Orders under watch' } })).toBe(
             'Open incident Orders under watch',
         );
+    });
+
+    it('an action no installed module provides has no secondary input (the editor opens, never throws)', () => {
+        expect(consequenceInputSpec('zz-ghost' as ConsequenceType)).toMatchObject({ show: false, required: false });
     });
 });

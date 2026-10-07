@@ -14,7 +14,8 @@ import type { Ref } from '../component-model/component-types';
 
 /** The record-routing actions (Drools-style) — a matching record is subjected to these. */
 export type RoutingAction = 'route' | 'tag' | 'quarantine' | 'drop';
-/** The platform actions — executed through the Execution / Signal networks (mock-first in this slice). */
+/** The platform actions — executed through the Execution / Signal networks. The LIST an author may pick from
+ *  is served by `GET /decision-rules/consequences` (installed or not), not hard-coded here. */
 export type PlatformAction =
     | 'emit-signal'
     | 'create-alert'
@@ -27,16 +28,6 @@ export type PlatformAction =
 export type ConsequenceType = RoutingAction | PlatformAction;
 
 export const ROUTING_ACTIONS: RoutingAction[] = ['route', 'tag', 'quarantine', 'drop'];
-export const PLATFORM_ACTIONS: PlatformAction[] = [
-    'emit-signal',
-    'create-alert',
-    'create-incident',
-    'start-job',
-    'trigger-pipeline',
-    'render-widget',
-    'generate-report',
-    'invoke-api',
-];
 
 /** One consequence a decision engine produces; a rule may stack several. */
 export interface Consequence {
@@ -132,6 +123,10 @@ export function consequenceInputSpec(action: ConsequenceType): ConsequenceInputS
                 kind: 'param',
                 paramKey: 'connection',
             };
+        default:
+            // An action no installed module provides (a stored rule outlives its module): no secondary input,
+            // so the editor can still open the rule instead of throwing.
+            return { show: false, label: '', required: false, kind: 'destination' };
     }
 }
 
@@ -155,7 +150,8 @@ export function consequenceDetail(c: Consequence): string {
 /** The result of running one consequence through the Execution/Signal networks (the `apply` response). */
 export interface ExecutedConsequence {
     action: string;
-    status: 'executed' | 'skipped';
+    /** `unavailable`: a known action whose module/service is not installed — nothing ran. */
+    status: 'executed' | 'skipped' | 'unavailable';
     detail: string;
     /** invoke-api: the pending Action Request it proposed (ASSURE-ACTION-REQUESTS-1). */
     actionRequestId?: string;

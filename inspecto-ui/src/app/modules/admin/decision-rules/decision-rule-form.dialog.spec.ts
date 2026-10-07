@@ -3,8 +3,9 @@ import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ToastrService } from 'ngx-toastr';
+import { of, throwError } from 'rxjs';
 import { describe, expect, it } from 'vitest';
-import { DecisionRule, DecisionRulesService } from 'app/inspecto/api';
+import { ConsequenceInfo, DecisionRule, DecisionRulesService } from 'app/inspecto/api';
 import { consequenceInputSpec } from 'app/inspecto/decision';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { DecisionRuleFormData, DecisionRuleFormDialog } from './decision-rule-form.dialog';
@@ -33,7 +34,24 @@ const RULE: DecisionRule = {
     updatedAt: 1,
 };
 
-function create(data: DecisionRuleFormData) {
+const CATALOG: ConsequenceInfo[] = [
+    { id: 'route', displayName: 'Route to branch', group: 'routing', available: true },
+    { id: 'emit-signal', displayName: 'Emit signal', group: 'platform', available: true },
+    {
+        id: 'create-incident',
+        displayName: 'create-incident',
+        group: 'platform',
+        available: false,
+        module: 'ops',
+        reason: 'Operational objects are not installed in this bundle.',
+    },
+];
+
+function create(
+    data: DecisionRuleFormData,
+    consequences: unknown = of(CATALOG),
+    update: (b: unknown) => unknown = () => of({}),
+) {
     TestBed.configureTestingModule({
         imports: [DecisionRuleFormDialog],
         providers: [
@@ -41,7 +59,10 @@ function create(data: DecisionRuleFormData) {
             provideHttpClient(withXhr()), // the autocomplete option loaders inject root HTTP services
             { provide: MatDialogRef, useValue: { close: () => {} } },
             { provide: MAT_DIALOG_DATA, useValue: data },
-            { provide: DecisionRulesService, useValue: {} },
+            {
+                provide: DecisionRulesService,
+                useValue: { consequences: () => consequences, update: (_n: string, b: unknown) => update(b) },
+            },
             { provide: ToastrService, useValue: {} },
         ],
     });
@@ -149,5 +170,57 @@ describe('DecisionRuleFormDialog', () => {
         const err = field.querySelector('mat-error');
         expect(err?.textContent).toContain('An id is required.');
         expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+    });
+
+    it('lists the catalog: an unavailable action is shown as text and cannot be newly selected', () => {
+        const fixture = create({});
+        const c = fixture.componentInstance;
+        const opts = c.optionsFor('route');
+        expect(opts.map((o) => o.value)).toEqual(['route', 'emit-signal', 'create-incident']);
+        const incident = opts.find((o) => o.value === 'create-incident')!;
+        expect(incident.available).toBe(false);
+        expect(c.unavailableReason('route')).toBeNull();
+        expect(c.unavailableReason('create-incident')).toContain('not installed');
+    });
+
+    it('an existing rule naming an unavailable action renders an inline text warning', () => {
+        const rule: DecisionRule = { ...RULE, consequences: [{ action: 'create-incident', params: { title: 't' } }] };
+        const fixture = create({ rule });
+        fixture.detectChanges();
+        const alert = fixture.nativeElement.querySelector('inspecto-alert');
+        expect(alert?.textContent).toContain('This consequence will not run');
+        expect(alert?.textContent).toContain('Operational objects are not installed');
+    });
+
+    it('an action the catalog never heard of is kept selectable for its own row and warned', () => {
+        const rule: DecisionRule = { ...RULE, consequences: [{ action: 'zz-ghost' as never }] };
+        const c = create({ rule }).componentInstance;
+        expect(c.optionsFor('zz-ghost').some((o) => (o.value as string) === 'zz-ghost')).toBe(true);
+        expect(c.unavailableReason('zz-ghost')).toContain('no installed module provides it');
+    });
+
+    it('saving a rule keeps an unavailable consequence exactly as stored (params are not dropped)', () => {
+        const kept = { action: 'create-incident', params: { title: 't', zz_cfg: { k: 'v' } } } as const;
+        const rule: DecisionRule = { ...RULE, consequences: [kept] };
+        const created: unknown[] = [];
+        const fixture = create({ rule }, of(CATALOG), (b: unknown) => {
+            created.push(b);
+            return of(rule);
+        });
+        const c = fixture.componentInstance;
+        c.save();
+        expect((created[0] as DecisionRule).consequences[0]).toEqual(kept);
+    });
+
+    it('falls back to the routing actions with a visible note when the catalog cannot load', () => {
+        const fixture = create(
+            {},
+            throwError(() => new Error('boom')),
+        );
+        const c = fixture.componentInstance;
+        fixture.detectChanges();
+        expect(c.catalogFailed()).toBe(true);
+        expect(c.optionsFor('route').map((o) => o.value)).toEqual(['route', 'tag', 'quarantine', 'drop']);
+        expect(fixture.nativeElement.textContent).toContain('Could not load the list of consequences');
     });
 });

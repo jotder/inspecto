@@ -2,6 +2,7 @@ import {
     AfterViewInit,
     ChangeDetectionStrategy,
     Component,
+    computed,
     DestroyRef,
     inject,
     signal,
@@ -28,6 +29,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import {
     apiErrorMessage,
+    ConsequenceInfo,
     DbBrowserService,
     DecisionRule,
     DecisionRulesService,
@@ -38,7 +40,6 @@ import {
     type ConsequenceInputSpec,
     type ConsequenceType,
     CONSEQUENCE_LABELS,
-    PLATFORM_ACTIONS,
     ROUTING_ACTIONS,
     buildConsequence,
     consequenceDetail,
@@ -90,10 +91,19 @@ function referencedFields(group: ConditionGroup): string[] {
     return [...new Set(out)];
 }
 
-/** The action select: the routing actions first, then the R5 platform actions. */
-const ACTIONS: { value: ConsequenceType; label: string }[] = [...ROUTING_ACTIONS, ...PLATFORM_ACTIONS].map((a) => ({
+/** One entry of the action select. `available: false` = the providing module is not installed (shown as text). */
+interface ActionOption {
+    value: ConsequenceType;
+    label: string;
+    available: boolean;
+    reason?: string;
+}
+
+/** Offered while the catalog has not loaded (or failed): the structural routing actions, always installed. */
+const ROUTING_OPTIONS: ActionOption[] = ROUTING_ACTIONS.map((a) => ({
     value: a,
     label: CONSEQUENCE_LABELS[a],
+    available: true,
 }));
 
 /**
@@ -161,12 +171,16 @@ const ACTIONS: { value: ConsequenceType; label: string }[] = [...ROUTING_ACTIONS
                 <div class="mt-2 flex flex-col gap-2" [formGroup]="consequencesForm">
                     <div formArrayName="consequences" class="flex flex-col gap-2">
                         @for (g of consequencesArray.controls; track g; let i = $index) {
-                            <div [formGroupName]="i" class="flex items-center gap-3">
-                                <mat-form-field class="gamma-mat-dense w-48" subscriptSizing="dynamic">
+                            <div [formGroupName]="i" class="flex flex-wrap items-center gap-3">
+                                <mat-form-field class="gamma-mat-dense w-56" subscriptSizing="dynamic">
                                     <mat-label>Action</mat-label>
                                     <mat-select formControlName="action">
-                                        @for (a of actions; track a.value) {
-                                            <mat-option [value]="a.value">{{ a.label }}</mat-option>
+                                        @for (a of optionsFor(g.get('action')?.value); track a.value) {
+                                            <mat-option
+                                                [value]="a.value"
+                                                [disabled]="!a.available && a.value !== g.get('action')?.value"
+                                                >{{ a.label }}{{ a.available ? '' : ' (not installed)' }}</mat-option
+                                            >
                                         }
                                     </mat-select>
                                 </mat-form-field>
@@ -191,9 +205,19 @@ const ACTIONS: { value: ConsequenceType; label: string }[] = [...ROUTING_ACTIONS
                                 >
                                     <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
                                 </button>
+                                @if (unavailableReason(g.get('action')?.value); as why) {
+                                    <inspecto-alert class="w-full" variant="warning" title="Not installed">
+                                        This consequence will not run: {{ why }}
+                                    </inspecto-alert>
+                                }
                             </div>
                         }
                     </div>
+                    @if (catalogFailed()) {
+                        <div class="text-secondary text-sm" role="status">
+                            Could not load the list of consequences — only the routing actions are offered.
+                        </div>
+                    }
                     <div>
                         <button type="button" mat-stroked-button (click)="addConsequence()">
                             <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
@@ -280,7 +304,42 @@ export class DecisionRuleFormDialog implements AfterViewInit {
     readonly saving = signal(false);
     readonly writesDisabled = signal(false);
     readonly attributes = DECISION_RULE_ATTRIBUTES;
-    readonly actions = ACTIONS;
+    /** The consequence catalog from `GET /decision-rules/consequences`; null until loaded. */
+    private readonly catalog = signal<ConsequenceInfo[] | null>(null);
+    readonly catalogFailed = signal(false);
+    private readonly catalogOptions = computed<ActionOption[]>(() => {
+        const rows = this.catalog();
+        return rows
+            ? rows.map((r) => ({
+                  value: r.id as ConsequenceType,
+                  label: r.displayName,
+                  available: r.available,
+                  reason: r.reason,
+              }))
+            : ROUTING_OPTIONS;
+    });
+
+    /** The action options, plus the row's own current action when the catalog does not know it (a stored rule
+     *  naming an action no installed module provides), so the select can still show it. */
+    optionsFor(current: string | null | undefined): ActionOption[] {
+        const opts = this.catalogOptions();
+        if (!current || opts.some((o) => o.value === current)) return opts;
+        return [
+            ...opts,
+            {
+                value: current as ConsequenceType,
+                label: CONSEQUENCE_LABELS[current as ConsequenceType] ?? current,
+                available: false,
+                reason: `unknown action '${current}' — no installed module provides it`,
+            },
+        ];
+    }
+
+    /** Why the row's current action cannot run in this bundle; null when it can (or the catalog is not loaded). */
+    unavailableReason(current: string | null | undefined): string | null {
+        if (!current || !this.catalog()) return null;
+        return this.optionsFor(current).find((o) => o.value === current && !o.available)?.reason ?? null;
+    }
 
     /** Deep-cloned on edit — the condition editor mutates the bound group in place. */
     readonly when: ConditionGroup = this.data.rule
@@ -335,6 +394,13 @@ export class DecisionRuleFormDialog implements AfterViewInit {
     }
 
     constructor() {
+        this.api
+            .consequences()
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: (rows) => this.catalog.set(rows),
+                error: () => this.catalogFailed.set(true),
+            });
         const existing = this.data.rule?.consequences ?? this.data.prefill?.consequences ?? [];
         if (existing.length) for (const c of existing) this.addConsequence(c);
         else this.addConsequence();
@@ -378,6 +444,10 @@ export class DecisionRuleFormDialog implements AfterViewInit {
         return consequenceInputSpec(this.consequencesArray.at(i).get('action')?.value as ConsequenceType);
     }
 
+    /** The consequence a row was loaded from — kept so a row whose action is unavailable here is saved back
+     *  untouched (its params/target/destination are not editable, and rebuilding it from the form would drop them). */
+    private readonly originals = new Map<FormGroup, Consequence>();
+
     addConsequence(c?: Consequence): void {
         const g = this.fb.group({
             action: [c?.action ?? 'route'],
@@ -392,6 +462,7 @@ export class DecisionRuleFormDialog implements AfterViewInit {
         };
         g.get('action')!.valueChanges.subscribe(applyRequired);
         applyRequired();
+        if (c) this.originals.set(g, c);
         this.consequencesArray.push(g);
     }
 
@@ -421,9 +492,12 @@ export class DecisionRuleFormDialog implements AfterViewInit {
             priority?: number;
             enabled?: boolean;
         };
-        const consequences: Consequence[] = this.consequencesArray.controls.map((g) =>
-            buildConsequence(g.get('action')!.value as ConsequenceType, String(g.get('detail')!.value ?? '')),
-        );
+        const consequences: Consequence[] = this.consequencesArray.controls.map((g) => {
+            const action = g.get('action')!.value as ConsequenceType;
+            const original = this.originals.get(g);
+            if (original && original.action === action && this.unavailableReason(action)) return original;
+            return buildConsequence(action, String(g.get('detail')!.value ?? ''));
+        });
         const body: DecisionRuleUpsert = {
             name: this.isEdit ? this.data.rule!.name : String(this.saveForm.getRawValue().name ?? '').trim(),
             description: String(this.saveForm.getRawValue().description ?? '').trim(),

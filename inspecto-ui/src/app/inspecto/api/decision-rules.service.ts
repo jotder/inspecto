@@ -48,9 +48,27 @@ export interface DecisionApplyResult {
     executed: ExecutedConsequence[];
 }
 
+/** One consequence an author may name (`GET /decision-rules/consequences`). `available: false` = not installed. */
+export interface ConsequenceInfo {
+    id: string;
+    displayName: string;
+    group: 'routing' | 'platform' | 'notify' | 'object' | 'integration';
+    available: boolean;
+    /** Why it is unavailable (the providing module's absent message, or the missing service). */
+    reason?: string;
+    /** The module that provides it, when it is not installed. */
+    module?: string;
+    requires?: string[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class DecisionRulesService {
     private http = inject(HttpClient);
+
+    /** Every consequence an author may name, in stable group order, with its availability in this bundle. */
+    consequences(): Observable<ConsequenceInfo[]> {
+        return this.http.get<ConsequenceInfo[]>(apiUrl('/decision-rules/consequences'));
+    }
 
     list(): Observable<DecisionRule[]> {
         return this.http.get<DecisionRule[]>(apiUrl('/decision-rules'));
