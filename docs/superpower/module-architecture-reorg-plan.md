@@ -861,7 +861,7 @@ wired by `aria-describedby`) and `describeGroup`. `query-sql.ts` (preview + para
 shapes. `sql-ast.ts` is unchanged on purpose: it only reads SQL into a tree and refuses what it does not recognise. Hosts
 clone the tree and the editor mutates in place, so unmodelled keys survive save (pinned by a round-trip spec).
 (2) Step 1: Expectation `non_null` / `range` / `regex` onto the tree — **DONE 2026-10-07**, see "Decision Kernel step 1 as built".
-(3) Step 3 (Tag and Case Rule filters) — **DONE 2026-10-07**, see "Decision Kernel step 3 as built"; steps 4-6: Notification, Risk, Escalation match.
+(3) Step 3 (Tag and Case Rule filters) — **DONE 2026-10-07**, see "Decision Kernel step 3 as built"; step 4 (Notification Rules) **DONE 2026-10-07**, see "Decision Kernel step 4 as built"; step 5 (Risk filters) findings only, needs the BI `MeasureCompiler` contract, see "step 5 — FINDINGS"; step 6 (Escalation match) not started.
 (4) `DECISION-RULE-SQL-GUARD-1` stays open: the new operators keep today's discipline (quoted identifiers,
 escaped literals) but the appliers still concatenate. (5) `query-eval.ts` date parsing treats a zone-less
 date-time as local time where Java treats it as UTC (pre-existing for literals; now also field-to-field).
@@ -912,6 +912,42 @@ case-insensitive (`ignoreCase` is a no-op there), so a rule `pipeline` now also 
 other criteria keep their semantics (priority / severity stay exact; `q` stays a substring over title + " " + description).
 **Not done:** letting an author write a `when` tree on a Tag / Case Rule directly (the builder would need the context fields
 as a field catalogue) — a follow-up, not needed to retire the duplicate matcher.
+
+### Decision Kernel step 4 as built (2026-10-07) — Notification Rule match onto the tree
+
+**Decision: `eventType` / `minLevel` stay the authoring form (sugar).** No shipped TOON authors a Notification Rule (the built-ins are
+`NotificationRules.defaults()`; authored ones arrive via `/notifications/rules*` and the Notification Center form), so nothing was
+migrated. `NotificationRule.tree()` expands to `AND[type = eventType (ignoreCase), levelRank >= minLevel.ordinal()]`;
+`matches` runs `ConditionTree.matched(tree(), [matchContext(e)])`. The context builder `matchContext` supplies `type` and
+`levelRank` (the `EventLevel` ordinal, so a minimum is a numeric floor). The hand-coded `equalsIgnoreCase` / `atLeast` matcher is
+gone; template rendering (`context(e)`) is untouched.
+
+**Parity.** `NotificationRuleMatchParityTest` (6) was written first against the old matcher over a ten-event corpus (all five levels,
+a case variant, a longer type, `_` vs `.`, `%`, a quote / semicolon / comment type): identical fire-sets before and after.
+`NotificationRuleTest`, `NotificationRulesTest`, `NotificationServiceTest`, `SecurityTriggersTest`, `ControlApiNotificationRulesTest` green.
+
+**One deliberate difference (pinned):** a blank `eventType` fires nothing (an empty leaf reads as "no constraint" on the tree, so
+`matches` guards it; the old matcher fired only on a blank-typed event, which cannot occur). `fromMap` already refuses blank.
+Residual: `=` ignore-case folds with `toLowerCase(Locale.ROOT)` where the old matcher used `equalsIgnoreCase` (differs only for
+exotic Unicode case pairs).
+
+### Decision Kernel step 5 — Risk factor `filters` (FINDINGS, NOT BUILT: needs a larger contract)
+
+Stopped here on purpose. Risk `filters` are not an in-memory single-row matcher: `RiskScoreModel.Factor.filters` is a list of
+`{field, op, value}` handed to the **shared BI query contract** `MeasureCompiler` (`Spec.filters`, `filterTerm`), which builds a
+grouped `WHERE` for the value query and the evidence query alike (`RiskScoreEvaluator`, and the S3 `forEntity` preview which
+appends a `key = entity` term). The same `MeasureCompiler.Filter` serves `BiRoutes` and every widget `QuerySpec`, which the UI mirrors 1:1.
+Moving Risk onto the tree therefore means giving `MeasureCompiler.Spec` a `when` tree rendered through `ConditionSql.predicate` —
+a change to a BI contract with other consumers — or Risk building its own `WHERE` beside `MeasureCompiler`, which is the opposite
+of consolidation. Vocabulary gaps to settle first: `like` (SQL pattern) has no tree operator; `in` takes a JSON list in
+`MeasureCompiler` but a comma string in the tree; op aliases (`eq` `ne` `gt` `gte` `lt` `lte` `==` `<>`) and `notNull`; literals are
+typed from the Java value (`Number` / `Boolean` verbatim) where the tree types from the column. Authoring survey: no shipped TOON
+sets `filters`; tests (`RiskCorpus`, `RiskScoreModelTest`, `ControlApiRiskScore*Test`) and the UI (`risk-score-form.ts`
+`RISK_FILTER_OPS`, `risk-score-factors.component.ts`) author the flat form. **Recommendation:** do it as part of making
+`MeasureCompiler` filters a tree (the BI query contract), with the flat form kept as sugar, in one change covering BiRoutes
+and the UI QuerySpec — not as a Risk-only edit. Step 6 (Escalation match) was not started; note
+`EscalationRule` itself holds no matcher (`on: breach | age`, `afterMinutes`, `target`) — the match lives in the `ObjectService`
+sweep, and `inspecto-workflow` would need the tree on its classpath.
 
 ### Target picture
 ![Inspecto target module architecture](assets/module-target-architecture.svg)
