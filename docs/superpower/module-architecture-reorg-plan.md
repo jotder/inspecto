@@ -335,7 +335,7 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
   (its `META-INF/services` files).
 - **Gotcha — `geoLink` is provided by `la-api`, not `geo-link`:** `GeoRoutes`/`InvRoutes` (which declare it) live in
   `inspecto-la-api`; `geo-link` only adapts ports. The manifest follows the code.
-- **Gotcha — shaded jars collapse same-named resources.** All 34 files share one path, so the processor's shade got
+- **Gotcha — shaded jars collapse same-named resources.** *(⚠ Superseded 2026-10-08, P3e: the 14 core libraries are thin jars now, the `AppendingTransformer` is gone and each jar keeps its own `module.toon`; the loader still tolerates `---`.)* All 34 files share one path, so the processor's shade got
   an `AppendingTransformer` for it; each file therefore starts with a `---` line and the loader splits on that
   line. A **sidecar** shade (`agent`, `connectors`) has no such transformer and is not on the host's class path.
   Verified 2026-10-06: the `-Pedition-enterprise` fat jar's merged resource holds 14 manifests (the processor's dependency closure; optional modules ship as separate jars).
@@ -386,9 +386,61 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
   `authMode: demo`, `loopbackOnly: true`, `-cp` (quoted) = the demo `modules.list`. ⚠ `/api/v1/modules` answered 401 (OIDC/demo auth) so the per-module STATE table was not read; the route-module log + bootstrap features stand in for
   it. Every run was stopped by the proof script's `finally` (process tree killed, 0 bundle `java` processes remain). The Linux zip's `serve.sh`/`run.sh`/`modules.list`/`edition.properties` were extracted and checked: `bash -n` OK, LF only,
   `tr` yields the same 25-jar classpath - the Linux launcher was NOT executed on Linux (only `serve.sh` over stubs under Git Bash on Windows, by `check-launchers`).
-- **Next stage = thin core:** drop the shade for the first-party modules in `inspecto-processor` (the core becomes several thin jars + the third-party jars), so `modules.list` names real per-module jars; per-module SBOM from the
+- **Next stage = thin core (DONE 2026-10-08 - see P3e below):** drop the shade for the first-party modules in `inspecto-processor` (the core becomes several thin jars + the third-party jars), so `modules.list` names real per-module jars; per-module SBOM from the
   same list; signing per jar. Prerequisite status: split packages are down to the deliberate telecom-asn1 `ingester`/`parse` pair (2, `check-module-architecture --ratchet`); `com.gamma.control` no longer spans modules.
   `CLASSPATH_ORDER` then grows the core modules in front of the optional ones, and the jlink derivation (P3c) scans the same list.
+
+### P3e as built (2026-10-08 - stage 2: the first-party core ships as THIN jars; `inspecto.jar` = the processor + third-party)
+- **Scope decision (from the evidence).** `mvn dependency:tree` on `inspecto-processor` shows exactly **14** first-party artifacts shaded in: `api, util, config, sql, etl, audit-spi, auth-spi, access,
+  http-spi, entity-store, event, workflow, acquire, engine`. All 14 are the `base`/`internal` modules (never listed in an Offering). **Those 14 move out; THIRD-PARTY stays shaded** into
+  `inspecto.jar` (duckdb, jackson, jtoon, slf4j + logback, opencsv, univocity, commons-*, gson, Hikari, ...). Reasons: (1) it is the smaller safe step - `tools/sbom.mjs`, `dependencies.lock`,
+  `check-native-licences`, the DuckDB native extraction (`libduckdb_java.so_*` stays inside the one jar that holds `org/duckdb`) and the boot smoke's "no jackson/commons/gson/slf4j version split"
+  check all read third-party code inside `inspecto.jar` today and none needed to change; (2) shipping 50 third-party jars individually would not make any of OUR jars signable, which is the goal;
+  (3) the processor's own classes (`com.gamma.control`, `service`, `report`, `assist`, ...) stay in `inspecto.jar`, so `ProductVersion` (`Implementation-Version`) is unchanged.
+  Flat layout kept: the thin jars sit in the bundle root next to `inspecto.jar` (no `lib/` dir - the launchers, jlink scan and SBOM already enumerate the root).
+- **Jar layout before / after (Enterprise, `6bf6089e7` baseline built in a clean worktree vs this change):** 25 jars -> 39 jars (+14 thin). `inspecto.jar` 100,978,284 -> 98,077,374 bytes
+  (-2,900,910); the 14 thin jars total 2,896,844 (largest `inspecto-engine` 1,724,461, `inspecto-etl` 379,136, `inspecto-util` 200,357; `inspecto-api` 2,855); sum of all jars 288,388,003 -> 288,383,937.
+  Professional is 36 jars (140,161,131 bytes incl. `postgresql.jar`), Preview 39, demo 37; Personal = 16 (the generator's list; not packaged in this stage).
+- **What changed.** `inspecto/pom.xml`: shade `artifactSet` EXCLUDES the 14 (one list); no `Main-Class` (CollectorProcessor lives in the engine jar now - `java -jar inspecto.jar` no longer works, nothing
+  in the bundle uses it any more); the `module.toon` `AppendingTransformer` is GONE (nothing first-party is merged; `ModuleManifests` still tolerates `---`); `ServicesResourceTransformer` stays
+  (third-party services) and the signature-strip filter stays. `tools/bundle-modules.mjs`: `CORE_MODULES` (14 rows, `kind: base`, NOT rows of `MODULES`, so the per-edition counts 2/21/24/24 and every guard
+  reading "the modules an edition adds" are untouched). `tools/offering-classpath.mjs`: `CLASSPATH_ORDER` gets the 14 directly behind `inspecto.jar` (processor classes first, then its libraries - the
+  order the shade produced - then the optional modules), `--list-core`, and `--bundle` also writes **`core.list`** (= `inspecto.jar` + the 14, no sidecar). `package.ps1` step 3-core copies each
+  `<dir>/target/<artifactId>-<version>.jar` (never `-tests`) as `<artifactId>.jar` and VERIFIES: no third-party class prefix in a thin jar, an own `META-INF/inspecto/module.toon`, every
+  `META-INF/services/*` file its source tree registers, none of their classes also inside `inspecto.jar`, `inspecto.jar` still holds `ControlApi`, its own single `module.toon`
+  (not a `---` merge) and `known-modules/index.txt`. The existing build-id check (`inspecto*.jar`) already covers the 14 (one id, `6bf6089e7`, 38 module jars on Enterprise).
+- **Launchers.** `run.*` / `serve.*` / `serve-demo.*` / boot smoke read `modules.list` (unchanged code - stage 1 paid off: no launcher edit was needed). The two that hard-coded `-cp inspecto.jar`
+  needed one: bundle `ura.sh` / `ura.bat` (read `core.list` - core only, as before: the pre-ETL utilities never carried the optional modules) and the shipped `examples/run-example.*` /
+  `serve-example.*` (bundle: `../core.list`; source tree: processor jar + `platform/*/target` + `spi/*/target` jars; `run-example` now `-cp ... CollectorProcessor` instead of `-jar`). The source-tree
+  `inspecto/ura.sh` / `ura.bat` append the core jars the same way. ⚠ Linux note: `ura.sh` run under Git Bash with a WINDOWS java fails (`:` separator) - a Linux launcher on Windows java, not a regression; `ura.bat` was run.
+- **Guards changed (each still fails on a real defect, negative fixtures in the test files):**
+  `tools/check-sbom-modules.mjs` gains **rule D** - package.ps1 stages the core from `--list-core`; the pom's shade `artifactSet` excludes EQUAL `CORE_MODULES` (a core library not excluded =
+  shipped twice; an exclude that is not core = shipped nowhere; no `artifactSet`; a `Main-Class` / `Class-Path` creeping back); rule C now compares the generated classpath with staged ∪ core; the artifactId
+  check covers the core poms. 5 new cases in `check-sbom-modules.test.mjs` (17 total). `tools/offering-classpath.test.mjs`: the frozen pre-thin-core strings are compared with the core jars filtered
+  out (`short()`), plus "core directly behind the processor in every edition", "a core jar with no `CLASSPATH_ORDER` slot throws", `--list-core`, `core.list` content. `tools/jlink-modules.mjs`
+  `expectedJars` and `tools/sbom.mjs` take the core modules (14 more first-party SBOM components, each with its own SHA-256 and purl: Enterprise 82 third-party + 38 first-party). `check-launchers`,
+  `check-demo-auth-isolation`, `check-bundle-platform` needed NO change (all green as they were; the three anchors the previous agent moved in `check-demo-auth-isolation.test.mjs` were not touched).
+  `ObjectsBackendEditionBootTest.demoLauncherJars_*` (inspecto-ops) was ALREADY RED since stage 1 (it parsed a `$cp = @('inspecto.jar')` literal stage 1 removed) - rewritten to pin that `$demoJars` is read from
+  the generated `modules.list`.
+- **jlink (P3c):** `jdeps` over the 36 / 39 staged jars yields the SAME module set as the lock (`java.base, java.compiler, java.desktop, java.naming, java.net.http, java.scripting, java.security.jgss,
+  java.security.sasl, java.sql, jdk.httpserver, jdk.jfr, jdk.management, jdk.unsupported` + the 7 extras): the lock did not move. The old warning (hand list lacks `java.security.jgss, java.security.sasl, jdk.jfr`) is the same
+  one P3c found; the hand list is still not retired.
+- **Proof on real bundles** (`pwsh inspecto/package.ps1 -Edition X -NoUi`, offline, JDK 27, build id `6bf6089e7`; each exit 0, boot smoke "the staged <edition> bundle boots and answers /health", one SLF4J binding, no
+  version split): Professional (36 jars), Enterprise (39), Enterprise `-DemoAuth` (37), and **Preview (39) - packaged for the first time**. Each staged `serve.bat` / `serve-demo.bat` was STARTED with the bundle's
+  own `runtime\bin\java.exe` (placeholder OIDC issuer/JWKS; Enterprise/Preview `-Dobjects.backend=db`): `/health` 200 `UP`; `/api/v1/bootstrap` `exchange/geoLink/entityList/events/ops/reconciliation/scoring: true`
+  on every one (`authMode` oidc / demo, `loopbackOnly` true on demo); the JVM command line's `-cp` = `modules.list` in order; **28 route modules discovered** on each. ⚠ The P3d note says 28 / 29: Enterprise was
+  rebuilt at the `6bf6089e7` baseline (clean worktree, `-NoRuntime`) and ALSO shows 28, so the 29th was a counting difference, not a lost module. `/api/v1/modules` is 401 under OIDC/demo auth (as in P3d) - the log is
+  the evidence; no `inert` / build-id mismatch line, only the expected `OidcTokenRelay could not be instantiated` WARN of the placeholder IAM config (the baseline bundle logs the same). **A real ingest on the bundle
+  runtime** (`java.home` = the bundle's `runtime`): `examples/serve-example.ps1 06-serve/pipeline-job -Demo` on Professional and Enterprise - the pipeline ingested ("1 file(s), 1 row(s)") and the `type: pipeline`
+  job `sales_rollup` run is `SUCCESS` through `GET /jobs/sales_rollup/runs`; `run-example.ps1 01-ingest/hello-csv` exit 0 with 6 Parquet partitions; `ura.bat help` prints. Every started process was stopped
+  by the proof script's `finally` (taskkill of the tree); 0 bundle `java` processes remain.
+- **CI / release impact:** `.github/workflows/ci.yml` "Report - Pipelines, dependents and contracts" ran `java -cp inspecto/target/inspecto-processor-*.jar com.gamma.service.AffectedPipelines` - the fat jar alone,
+  which no longer holds the engine: it now appends `platform/*/target` + `spi/*/target` thin jars (3-line shell change, nothing restructured). No other workflow runs the product jar (`release.yml` only packages;
+  nightly-perf only runs `mvn -pl :inspecto-engine -am test`). `.claude/launch.json` `inspecto-geolink*` entries hard-code a stale jar list (`inspecto-metrics.jar`, `inspecto-events.jar`, no core) and were already stale (jars that no longer exist, no core)
+  - NOT touched, listed in the BACKLOG row. `docs/okf/backend/engine/plugins.md` still says "depend on the fat JAR" (a plugin author compiles against it: `provided` scope - still true).
+- **Not done / next:** per-module SBOM FILES (the combined CycloneDX/SPDX now carries all 14 thin jars + every optional jar as hashed first-party components, so only the split into one document per jar remains);
+  signing (`-Sign` signs the zips; per-JAR GPG `.asc` needs the split-package count at 0 - 2 left, the deliberate telecom-asn1 `ingester`/`parse` pair, which therefore ships UNSIGNED or in one signed unit); the
+  sidecar shades (agent, connectors, oidc, intelligence, ...) are untouched and still bundle their own third-party closure.
 
 ### P3a as built (2026-10-07 — the build-id stamp and its boot check; the jar split is NOT done)
 - **Stamp:** manifest attribute `Inspecto-Build-Id` on every module jar, set ONCE in the parent pom: `maven-jar-plugin`

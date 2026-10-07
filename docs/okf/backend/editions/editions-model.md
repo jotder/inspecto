@@ -19,7 +19,7 @@ Assembly mechanisms:
   else**: no `<build>`, no `<properties>`, no `<dependencies>`, and no child POM declares a profile at
   all. 🔴 **They do NOT vary the fat-JAR's shaded content** (corrected 2026-09-09 — this said
   “which modules + shade includes enter the fat-JAR”): `inspecto/pom.xml` has ONE unconditional shade
-  configuration, and the optional modules ship as **separate sidecar jars**, never shaded in. 🔴 **There is no `edition-personal` profile** (corrected 2026-09-07; the
+  configuration (since 2026-10-08 it also EXCLUDES the 14 first-party core libraries, which ship as thin jars), and the optional modules ship as **separate sidecar jars**, never shaded in. 🔴 **There is no `edition-personal` profile** (corrected 2026-09-07; the
   parent POM declares exactly two — the ids are at `pom.xml:74` and `pom.xml:113`; the `:68,77` this cited until 2026-09-09 are comment lines, and they drifted when the EDG-01 modules were inserted. **Cite the id, not the line**): **Personal is the default build**, no profile at all.
   ⚠ Maven only *warns* on a profile that does not exist and then builds the default, so the old
   `-Pedition-personal` produced a correct Personal jar for an incorrect reason — the kind of instruction

@@ -225,7 +225,7 @@ Builds `inspecto-deploy-<platform>.zip` per embedded runtime (Since 2026-09-17 t
 
 ```
 inspecto-deploy/
-  inspecto.jar          shaded fat JAR
+  inspecto.jar          the product jar (processor + third-party shaded); the 14 core libraries are thin jars beside it, listed in modules.list
   spaces/                     ONLY the _templates gallery (every edition, since 2026-09-25) — bundles
                               ship NO Spaces. Staged from `git ls-tree HEAD` (committed content only).
                               ATTACH Spaces at deploy time: drop each Space folder (a dir with a

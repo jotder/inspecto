@@ -1001,7 +1001,7 @@ Wrapper scripts (`run.sh`, `run.bat`, cron jobs) should treat non-zero as failur
 
 ## Deployment — Remote Server
 
-The fat JAR bundles all dependencies — no JVM classpath setup needed on the target.
+`inspecto.jar` bundles every third-party dependency and the 14 first-party core libraries ship as thin jars beside it; the launchers read the classpath from the bundle's `modules.list` (P3d) — no JVM classpath setup is needed on the target, but `java -jar inspecto.jar` no longer works.
 
 ### Build the deployment bundle
 
@@ -1014,7 +1014,7 @@ powershell -ExecutionPolicy Bypass -File inspecto\package.ps1 -NoBuild
 ```
 
 This produces **`inspecto-deploy-<platform>.zip`** in the sandbox root, one per embedded runtime (Since 2026-09-17 the zip is named after the EMBEDDED runtime's platform — `inspecto-deploy-<platform>.zip` (`windows_amd64`, `linux_amd64`), read off the jlink image, never the host OS (`RELEASE-BUNDLE-PLATFORM-MISMATCH-1`).). The script:
-1. Runs `mvn clean package` to build a fresh fat JAR
+1. Runs `mvn clean package` to build a fresh product jar (processor + third-party) and the 14 core thin jars
 2. Builds the optional operator UI (`inspecto-ui/` via npm) and bundles its `dist/` as `ui/` — skip with `-NoUi`, or omitted automatically when `inspecto-ui/` is absent
 3. Assembles a self-contained bundle with the JAR, config files, and run/serve scripts
 4. Rewrites `schema_file` paths in the bundled configs so they are relative to the bundle root
@@ -1025,7 +1025,9 @@ This produces **`inspecto-deploy-<platform>.zip`** in the sandbox root, one per 
 
 ```
 inspecto-deploy/
-  inspecto.jar              ← fat JAR, all dependencies included (~94 MB)
+  inspecto.jar              ← the product jar: processor classes + ALL third-party dependencies (~98 MB)
+  inspecto-api.jar … inspecto-engine.jar   ← the 14 first-party CORE libraries as thin jars (api, util, config, sql, etl, audit-spi, auth-spi, access, http-spi, entity-store, event, workflow, acquire, engine; ~2.9 MB together)
+  modules.list / core.list / edition.properties   ← the classpath (one jar per line) the launchers read / the one-shot tools' core-only classpath / the edition
   config/
     <data_source>/<data_source>_pipeline.toon
                   <data_source>_schema.toon
