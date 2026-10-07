@@ -93,11 +93,7 @@ class DecisionRuleWritersTest {
     void everyWriterThatCanWriteADecisionRuleRunsTheGuard() throws IOException {
         Map<String, Boolean> sites = new TreeMap<>();
         Map<String, String> bodies = new TreeMap<>();   // Class#method → body (overloads concatenated)
-        Path reactor = Path.of("..").toAbsolutePath().normalize();
-        try (Stream<Path> siblings = Files.list(reactor)) {
-            for (Path sibling : siblings.filter(Files::isDirectory).sorted().toList()) {
-                Path src = sibling.resolve(Path.of("src", "main", "java"));
-                if (!Files.isDirectory(src)) continue;
+        for (Path src : ReactorModules.mainJavaTrees()) {
                 try (Stream<Path> files = Files.walk(src)) {
                     for (Path f : files.filter(p -> p.toString().endsWith(".java")).sorted().toList()) {
                         ConfigWriteFunnelTest.writerSites(f, sites);
@@ -106,7 +102,6 @@ class DecisionRuleWritersTest {
                                 .forEach((m, b) -> bodies.put(cls + "#" + m, b));
                     }
                 }
-            }
         }
         for (String pinned : new String[] {"ComponentRoutes#writeComponent", "DataSourceRoutes#importBundle",
                 "PipelineRenameRoutes#rewriteComponentTargets", "BundleRoutes#write", "SpaceManager#createFromBundle"})

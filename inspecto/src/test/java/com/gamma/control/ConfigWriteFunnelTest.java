@@ -296,16 +296,11 @@ class ConfigWriteFunnelTest {
     @Test
     void everyConfigWriterRepoWideReachesTheHoldOrIsOnTheInventory() throws IOException {
         Map<String, Boolean> sites = new TreeMap<>();
-        Path reactor = Path.of("..").toAbsolutePath().normalize();
-        try (Stream<Path> siblings = Files.list(reactor)) {
-            for (Path sibling : siblings.filter(Files::isDirectory).sorted().toList()) {
-                Path src = sibling.resolve(Path.of("src", "main", "java"));
-                if (!Files.isDirectory(src)) continue;
+        for (Path src : ReactorModules.mainJavaTrees()) {
                 try (Stream<Path> files = Files.walk(src)) {
                     for (Path f : files.filter(p -> p.toString().endsWith(".java")).sorted().toList())
                         writerSites(f, sites);
                 }
-            }
         }
         assertTrue(sites.containsKey("DataSourceRoutes#importBundle") && sites.containsKey("ComponentRoutes#writeComponent"),
                 "the writer scan went blind — signals drifted from the code: " + sites.keySet());
@@ -370,16 +365,11 @@ class ConfigWriteFunnelTest {
 
     static List<Verdict> scan() throws IOException {
         List<Verdict> out = new java.util.ArrayList<>();
-        Path reactor = Path.of("..").toAbsolutePath().normalize();
-        try (Stream<Path> siblings = Files.list(reactor)) {
-            for (Path sibling : siblings.filter(Files::isDirectory).sorted().toList()) {
-                Path src = sibling.resolve(Path.of("src", "main", "java"));
-                if (!Files.isDirectory(src)) continue;
+        for (Path src : ReactorModules.mainJavaTrees()) {
                 try (Stream<Path> files = Files.walk(src)) {
                     for (Path f : files.filter(p -> p.toString().endsWith(".java")).sorted().toList())
                         scanFile(f, out);
                 }
-            }
         }
         return out;
     }

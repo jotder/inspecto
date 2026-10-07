@@ -138,7 +138,7 @@ public class ValueMeasuresTest {
     /** The shipped demo corpus (stories (a)–(d) plus LA-18's (f)–(g)) exercises every alertable Measure. */
     @Test
     void theDemoCorpusExercisesEveryMeasure() throws Exception {
-        String demo = "SELECT * FROM read_csv('../spaces/demo/data/samples/mule_transfers/*.csv', header = true, "
+        String demo = "SELECT * FROM read_csv('../../spaces/demo/data/samples/mule_transfers/*.csv', header = true, "
                 + "all_varchar = true)";
         java.util.function.Function<Map<String, Object>, List<Object>> on = b -> {
             b.putAll(Map.of("valueCol", "AMOUNT", "timeCol", "BOOKED_AT", "from", "2026-09-01", "to", "2026-09-04"));

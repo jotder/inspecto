@@ -149,12 +149,18 @@ class DuckLakeRegistrationSiteContractTest {
         return full;
     }
 
-    /** The checkout root — the nearest ancestor of the working directory that holds the reactor pom. */
+    /** The checkout root — the OUTERMOST ancestor of the working directory whose pom.xml declares the reactor modules. */
     private static Path repoRoot() {
-        Path dir = Path.of("").toAbsolutePath();
-        for (int up = 0; up < 4 && dir != null; up++, dir = dir.getParent())
-            if (Files.exists(dir.resolve("pom.xml")) && Files.isDirectory(dir.resolve("inspecto-etl"))) return dir;
-        return null;
+        Path found = null;
+        for (Path dir = Path.of("").toAbsolutePath(); dir != null; dir = dir.getParent()) {
+            Path pom = dir.resolve("pom.xml");
+            try {
+                if (Files.isRegularFile(pom) && Files.readString(pom).contains("<modules>")) found = dir;
+            } catch (IOException e) {
+                return null;
+            }
+        }
+        return found;
     }
 
     private static Path repoDirOrNull(String relative) {

@@ -13,27 +13,27 @@ import {
 const TABLE = { spi: [], platform: ['inspecto-api'], features: ['inspecto-ops'], providers: ['asn-parser'] };
 
 const FILES = {
-    'pom.xml': '<project><modules>\n<module>providers/asn-parser/asn-decoders</module>\n<module>inspecto-api</module>\n<module>inspecto</module>\n</modules>\n'
+    'pom.xml': '<project><modules>\n<module>asn-parser/asn-decoders</module>\n<module>inspecto-api</module>\n<module>inspecto</module>\n</modules>\n'
         + '<profiles><profile><id>p</id><modules><!-- the ops add-on -->\n<module>inspecto-ops</module>\n</modules></profile></profiles></project>\n',
     'inspecto/pom.xml': '<project><parent><artifactId>root</artifactId><relativePath>../pom.xml</relativePath></parent><artifactId>inspecto-processor</artifactId></project>\n',
-    'platform/inspecto-api/pom.xml': '<project><parent><artifactId>root</artifactId><relativePath>../pom.xml</relativePath></parent><artifactId>inspecto-api</artifactId></project>\n',
-    'features/inspecto-ops/pom.xml': '<project><parent><artifactId>root</artifactId><relativePath>../pom.xml</relativePath></parent><artifactId>inspecto-ops</artifactId></project>\n',
-    'providers/asn-parser/asn-decoders/pom.xml': '<project><artifactId>asn-decoders</artifactId><modules><module>asn-core</module></modules></project>\n',
-    'providers/asn-parser/asn-decoders/asn-core/pom.xml': '<project><artifactId>asn-core</artifactId><sourceDirectory>../../src/main/java</sourceDirectory></project>\n',
-    'providers/asn-parser/src/main/java/A.java': 'class A {}\n',
-    'platform/inspecto-api/src/main/resources/META-INF/inspecto/module.toon': 'id: api\n',
-    'features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon': 'id: ops\n',
-    'features/inspecto-ops/src/main/java/Ops.java': 'class Ops {}\n',
-    'features/inspecto-ops/src/test/java/OpsTest.java':
-        'class OpsTest { Path a = Path.of("..", "spaces", "demo"); Path b = Path.of("../platform/inspecto-api/pom.xml"); String esc = "../escape"; Path r = Path.of("..").toAbsolutePath(); }\n',
-    'features/inspecto-ops/README.md': 'See [guide](../docs/guide.md) and [api](../platform/inspecto-api/pom.xml).\n',
+    'inspecto-api/pom.xml': '<project><parent><artifactId>root</artifactId><relativePath>../pom.xml</relativePath></parent><artifactId>inspecto-api</artifactId></project>\n',
+    'inspecto-ops/pom.xml': '<project><parent><artifactId>root</artifactId><relativePath>../pom.xml</relativePath></parent><artifactId>inspecto-ops</artifactId></project>\n',
+    'asn-parser/asn-decoders/pom.xml': '<project><artifactId>asn-decoders</artifactId><modules><module>asn-core</module></modules></project>\n',
+    'asn-parser/asn-decoders/asn-core/pom.xml': '<project><artifactId>asn-core</artifactId><sourceDirectory>../../src/main/java</sourceDirectory></project>\n',
+    'asn-parser/src/main/java/A.java': 'class A {}\n',
+    'inspecto-api/src/main/resources/META-INF/inspecto/module.toon': 'id: api\n',
+    'inspecto-ops/src/main/resources/META-INF/inspecto/module.toon': 'id: ops\n',
+    'inspecto-ops/src/main/java/Ops.java': 'class Ops {}\n',
+    'inspecto-ops/src/test/java/OpsTest.java':
+        'class OpsTest { Path a = Path.of("..", "spaces", "demo"); Path b = Path.of("../inspecto-api/pom.xml"); String esc = "../escape"; Path r = Path.of("..").toAbsolutePath(); }\n',
+    'inspecto-ops/README.md': 'See [guide](../docs/guide.md) and [api](../inspecto-api/pom.xml).\n',
     'spaces/x.toon': 'a: 1\n',
-    'docs/guide.md': 'Read [ops](../features/inspecto-ops/src/main/java/Ops.java) or [gone](../features/inspecto-ops/nope.md).\n\n'
-        + 'Cited as `features/inspecto-ops/src/main/java/Ops.java`; build with `mvn -pl :inspecto-api,:inspecto-ops -am`; artifact `inspecto-ops` stays; jar inspecto-ops.jar stays.\n'
-        + '```\nmvn -pl :inspecto-ops test\n```\n',
-    'docs/archived-documents/old.md': 'History: `features/inspecto-ops/src/old.java` and [x](../../features/inspecto-ops/y.md).\n',
-    'inspecto/package.ps1': "$d = Join-Path $sandboxRoot 'features\inspecto-ops\\target'\n$m = ':inspecto-api,:inspecto-ops'\n& mvn -pl inspecto,:inspecto-ops -am\nCopy-Item inspecto-ops.jar x\n",
-    '.github/workflows/ci.yml': 'steps:\n  - run: mvn -pl :inspecto-api -am test\n  - with:\n      path: features/inspecto-ops/target/surefire-reports/*.xml\n',
+    'docs/guide.md': 'Read [ops](../inspecto-ops/src/main/java/Ops.java) or [gone](../inspecto-ops/nope.md).\n\n'
+        + 'Cited as `inspecto-ops/src/main/java/Ops.java`; build with `mvn -pl inspecto-api,inspecto-ops -am`; artifact `inspecto-ops` stays; jar inspecto-ops.jar stays.\n'
+        + '```\nmvn -pl inspecto-ops test\n```\n',
+    'docs/archived-documents/old.md': 'History: `inspecto-ops/src/old.java` and [x](../../inspecto-ops/y.md).\n',
+    'inspecto/package.ps1': "$d = Join-Path $sandboxRoot 'inspecto-ops\\target'\n$m = 'inspecto-api,inspecto-ops'\n& mvn -pl inspecto,inspecto-ops -am\nCopy-Item inspecto-ops.jar x\n",
+    '.github/workflows/ci.yml': 'steps:\n  - run: mvn -pl inspecto-api -am test\n  - with:\n      path: inspecto-ops/target/surefire-reports/*.xml\n',
     '.gitignore': '/target/\n/inspecto-ops/target/\n!/inspecto/examples/**\n',
 };
 
@@ -71,7 +71,7 @@ test('--apply makes two commits: pure moves + root pom first, rewrites second', 
         assert.ok(r.commit1 && r.commit2);
         assert.ok(existsSync(join(root, 'features/inspecto-ops/pom.xml')) && existsSync(join(root, 'platform/inspecto-api/pom.xml')));
         assert.ok(existsSync(join(root, 'providers/asn-parser/asn-decoders/asn-core/pom.xml')) && existsSync(join(root, 'inspecto/pom.xml')));
-        assert.ok(!existsSync(join(root, 'features', 'inspecto-ops')));
+        assert.ok(!existsSync(join(root, 'inspecto-ops')));
         // commit 1: only renames (R100) and the root pom
         const c1 = git(root, 'show', '-M', '--name-status', '--format=', 'HEAD~1').trim().split('\n');
         assert.ok(c1.every((l) => l.startsWith('R100') || l === 'M\tpom.xml'), c1.join('\n'));
@@ -86,7 +86,7 @@ test('--apply makes two commits: pure moves + root pom first, rewrites second', 
         // docs: a link recomputed, a dead link left, citations + -pl rewritten, artifact tokens and jar names kept, archive untouched
         const doc = read(root, 'docs/guide.md');
         assert.ok(doc.includes('](../features/inspecto-ops/src/main/java/Ops.java)'));
-        assert.ok(doc.includes('](../features/inspecto-ops/nope.md)') || doc.includes('](../features/inspecto-ops/nope.md)'));
+        assert.ok(doc.includes('](../inspecto-ops/nope.md)') || doc.includes('](../features/inspecto-ops/nope.md)'));
         assert.ok(doc.includes('`features/inspecto-ops/src/main/java/Ops.java`'));
         assert.ok(doc.includes('-pl :inspecto-api,:inspecto-ops -am') && doc.includes('mvn -pl :inspecto-ops test'));
         assert.ok(doc.includes('artifact `inspecto-ops` stays') && doc.includes('jar inspecto-ops.jar stays'));
@@ -128,12 +128,12 @@ test('--apply refuses a dirty tree and a branch other than master', () => {
     try {
         writeFileSync(join(dirty, 'stray.txt'), 'x');
         assert.throws(() => run({ root: dirty, apply: true, ...quiet }), /not empty/);
-        assert.ok(existsSync(join(dirty, 'features', 'inspecto-ops')));
+        assert.ok(existsSync(join(dirty, 'inspecto-ops')));
     } finally { rmSync(dirty, { recursive: true, force: true }); }
     const dev = makeRepo('develop');
     try {
         assert.throws(() => run({ root: dev, apply: true, ...quiet }), /not master/);
-        assert.ok(existsSync(join(dev, 'features', 'inspecto-ops')));
+        assert.ok(existsSync(join(dev, 'inspecto-ops')));
     } finally { rmSync(dev, { recursive: true, force: true }); }
 });
 
@@ -151,22 +151,22 @@ const file = (np, cls) => ({ np, op: unmapPath(np, moves), cls });
 const twice = (fn, text, f) => { const once = fn(text, f, ctx).text; assert.equal(fn(once, f, ctx).text, once, `${fn.name} is not idempotent`); return once; };
 
 test('mapPath / unmapPath are inverse and leave unmoved paths alone', () => {
-    assert.equal(mapPath('features/inspecto-ops/src/A.java', moves), 'features/inspecto-ops/src/A.java');
-    assert.equal(unmapPath('features/inspecto-ops/src/A.java', moves), 'features/inspecto-ops/src/A.java');
+    assert.equal(mapPath('inspecto-ops/src/A.java', moves), 'features/inspecto-ops/src/A.java');
+    assert.equal(unmapPath('features/inspecto-ops/src/A.java', moves), 'inspecto-ops/src/A.java');
     assert.equal(mapPath('inspecto/pom.xml', moves), 'inspecto/pom.xml');
     assert.equal(unmapPath('features/other/x', moves), 'features/other/x');
 });
 
 test('rewriteMavenProjectLists: bare module tokens become :artifactId, `inspecto` and non-modules stay, idempotent', () => {
     const f = file('docs/x.md', 'docs');
-    assert.equal(twice(rewriteMavenProjectLists, 'mvn -pl inspecto,:inspecto-ops,inspecto-ui -am', f), 'mvn -pl inspecto,:inspecto-ops,inspecto-ui -am');
-    assert.equal(twice(rewriteMavenProjectLists, 'mvn -pl !:inspecto-api test', f), 'mvn -pl !:inspecto-api test');
-    assert.equal(twice(rewriteMavenProjectLists, '$modules = \':inspecto-api,:inspecto-ops\'', file('inspecto/package.ps1', 'scripts')), "$modules = ':inspecto-api,:inspecto-ops'");
+    assert.equal(twice(rewriteMavenProjectLists, 'mvn -pl inspecto,inspecto-ops,inspecto-ui -am', f), 'mvn -pl inspecto,:inspecto-ops,inspecto-ui -am');
+    assert.equal(twice(rewriteMavenProjectLists, 'mvn -pl !inspecto-api test', f), 'mvn -pl !:inspecto-api test');
+    assert.equal(twice(rewriteMavenProjectLists, '$modules = \'inspecto-api,inspecto-ops\'', file('inspecto/package.ps1', 'scripts')), "$modules = ':inspecto-api,:inspecto-ops'");
 });
 
 test('rewriteModulePaths: path positions only; never an already-prefixed path, a URL, a Maven repo path, or a plain artifact name', () => {
     const f = file('docs/x.md', 'docs');
-    const t = 'a features/inspecto-ops/src b `features\inspecto-ops\\target` c features/inspecto-ops/src d https://h/inspecto-ops/x e com/gamma/inspector/inspecto-ops/1.0/x f inspecto-ops.jar g ./platform/inspecto-api/pom.xml h $ROOT/platform/inspecto-api/x';
+    const t = 'a inspecto-ops/src b `inspecto-ops\\target` c features/inspecto-ops/src d https://h/inspecto-ops/x e com/gamma/inspector/inspecto-ops/1.0/x f inspecto-ops.jar g ./inspecto-api/pom.xml h $ROOT/inspecto-api/x';
     assert.equal(twice(rewriteModulePaths, t, f),
         'a features/inspecto-ops/src b `features\\inspecto-ops\\target` c features/inspecto-ops/src d https://h/inspecto-ops/x e com/gamma/inspector/inspecto-ops/1.0/x f inspecto-ops.jar g ./platform/inspecto-api/pom.xml h $ROOT/platform/inspecto-api/x');
     // a JS regex literal ending in a slash is not a path
@@ -176,7 +176,7 @@ test('rewriteModulePaths: path positions only; never an already-prefixed path, a
 test('relinkTarget: a link already valid is left alone; a moved target and a moved file are recomputed', () => {
     const c = makeCtx({ moves, newPaths: ['docs/a.md', 'docs/b.md', 'features/inspecto-ops/README.md', 'features/inspecto-ops/src/A.java', 'platform/inspecto-api/pom.xml'] });
     assert.equal(relinkTarget('b.md', file('docs/a.md', 'docs'), c), null);
-    assert.equal(relinkTarget('../features/inspecto-ops/src/A.java#L3', file('docs/a.md', 'docs'), c), '../features/inspecto-ops/src/A.java#L3');
+    assert.equal(relinkTarget('../inspecto-ops/src/A.java#L3', file('docs/a.md', 'docs'), c), '../features/inspecto-ops/src/A.java#L3');
     assert.equal(relinkTarget('../docs/b.md', file('features/inspecto-ops/README.md', 'docs'), c), '../../docs/b.md');
     assert.equal(relinkTarget('https://x.y/z', file('docs/a.md', 'docs'), c), null);
     assert.equal(relinkTarget('../missing.md', file('docs/a.md', 'docs'), c), undefined);
@@ -185,10 +185,10 @@ test('relinkTarget: a link already valid is left alone; a moved target and a mov
 test('rewriteGitignore / rewriteChildPomRelativePath / rewriteJavaRelativePaths are idempotent and scoped', () => {
     assert.equal(twice(rewriteGitignore, '/inspecto-ops/target/\n!/inspecto-api/x\n/inspecto/target/\n', file('.gitignore', 'gitignore')), '/features/inspecto-ops/target/\n!/platform/inspecto-api/x\n/inspecto/target/\n');
     assert.equal(twice(rewriteChildPomRelativePath, '<relativePath>../pom.xml</relativePath>', file('features/inspecto-ops/pom.xml', 'child-pom')), '<relativePath>../../pom.xml</relativePath>');
-    const j = twice(rewriteJavaRelativePaths, 'Path.of("..", "spaces"); "../spaces/x"; "../x"; Path.of("../platform/inspecto-api/pom.xml")', file('features/inspecto-ops/src/test/java/T.java', 'java'));
+    const j = twice(rewriteJavaRelativePaths, 'Path.of("..", "spaces"); "../spaces/x"; "../x"; Path.of("../inspecto-api/pom.xml")', file('features/inspecto-ops/src/test/java/T.java', 'java'));
     assert.equal(j, 'Path.of("..", "..", "spaces"); "../../spaces/x"; "../x"; Path.of("../../platform/inspecto-api/pom.xml")');
     // an unmoved module (inspecto/) keeps its depth, but a sibling MODULE path still gains its group
-    assert.equal(twice(rewriteJavaRelativePaths, 'Path.of("..", "spaces"); "../features/inspecto-ops/x"', file('inspecto/src/test/java/T.java', 'java')), 'Path.of("..", "spaces"); "../features/inspecto-ops/x"');
+    assert.equal(twice(rewriteJavaRelativePaths, 'Path.of("..", "spaces"); "../inspecto-ops/x"', file('inspecto/src/test/java/T.java', 'java')), 'Path.of("..", "spaces"); "../features/inspecto-ops/x"');
 });
 
 test('every Phase B rewrite is a named function (the dry-run table is keyed by name)', () => {

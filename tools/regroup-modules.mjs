@@ -45,7 +45,7 @@ export const STAYS_AT_ROOT = ['inspecto'];
 const BINARY_EXT = /\.(png|jpe?g|gif|ico|zip|7z|gz|tgz|jar|class|xlsx|xls|parquet|duckdb|db|pdf|woff2?|ttf|eot|bin|dat|so|dll|exe|wasm|mp4|mov)$/i;
 const SKIP_FILES = /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$|^compliance\/evidence\/route-gating\.md$/;   // route-gating.md is GENERATED: regenerate it, never rewrite it
 /** Guard tests whose fixtures are SYNTHETIC layouts (they assert on `features/inspecto-ops`-style data, not on the real tree): never rewritten. Tests that edit REAL files (check-demo-auth-isolation.test.mjs) DO get rewritten, in lock-step with the file they edit. */
-const FIXTURE_FILES = new Set(['tools/check-module-architecture.test.mjs', 'tools/reactor-modules.mjs']);   // only their EXACT patches run: reactor-modules.mjs is path-agnostic by design (alias matched by SUFFIX)
+const FIXTURE_FILES = new Set(['tools/check-module-architecture.test.mjs', 'tools/reactor-modules.mjs', 'tools/regroup-modules.test.mjs']);   // only their EXACT patches run: reactor-modules.mjs is path-agnostic by design (alias matched by SUFFIX)
 const ARCHIVE = 'docs/archived-documents/', PLANS = 'docs/superpower/';
 
 // ───────────────────────── table helpers ─────────────────────────
@@ -479,7 +479,7 @@ export function run({ root, apply = false, table = TABLE, quiet = false, force =
     for (const [d, g] of present) { mkdirSync(join(root, g), { recursive: true }); git(root, 'mv', d, `${g}/${d}`); }
     const aReal = runPhase(root, PHASE_A, trackedFiles(root).map((p) => ({ np: p, op: unmapPath(p, moves) })), ctx, { write: true, readNew: true });
     const msg = (s) => `${s}\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`;
-    const commit = (m) => { if (git(root, 'status', '--porcelain').trim()) { git(root, 'add', '-A'); git(root, 'commit', '-q', '-m', msg(m)); return true; } return false; };
+    const commit = (m) => { if (git(root, 'status', '--porcelain').trim()) { git(root, 'add', '-u'); git(root, 'commit', '-q', '-m', msg(m)); return true; } return false; };
     result.commit1 = commit('refactor(arch): MODULE-REORG-1 D-MR2 - regroup module directories (pure git mv + root pom <module> paths; artifactIds unchanged)');
     const entriesB = trackedFiles(root).map((p) => ({ np: p, op: unmapPath(p, moves) }));
     const ctxB = makeCtx({ moves, newPaths: entriesB.map((e) => e.np), artifactIds: ctx.artifactIds });

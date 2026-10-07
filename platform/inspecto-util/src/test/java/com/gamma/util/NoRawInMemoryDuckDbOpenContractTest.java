@@ -75,24 +75,46 @@ class NoRawInMemoryDuckDbOpenContractTest {
         List<Path> roots = mainRoots();
         assertTrue(roots.size() >= 10, "only " + roots.size() + " module source roots resolved — the scan is"
                 + " measuring almost nothing; fix the root lookup, do not trust the green");
-        assertTrue(roots.stream().anyMatch(r -> r.startsWith(repoRoot().resolve("inspecto-engine"))),
+        assertTrue(roots.stream().anyMatch(r -> r.toString().replace('\\', '/').contains("/inspecto-engine/")),
                 "the scan does not see inspecto-engine, where most scratch opens live");
     }
 
-    /** Every {@code <module>/src/main/java} directly under the checkout root. */
+    /** Every {@code <module>/src/main/java} under the checkout root, wherever the module sits (repo root or a group directory). */
     private static List<Path> mainRoots() {
-        try (Stream<Path> modules = Files.list(repoRoot())) {
-            return modules.map(m -> m.resolve("src/main/java")).filter(Files::isDirectory).toList();
+        List<Path> roots = new ArrayList<>();
+        try {
+            Files.walkFileTree(repoRoot(), new java.nio.file.SimpleFileVisitor<Path>() {
+                @Override
+                public java.nio.file.FileVisitResult preVisitDirectory(Path dir, java.nio.file.attribute.BasicFileAttributes a) {
+                    String name = dir.getFileName() == null ? "" : dir.getFileName().toString();
+                    if (name.equals("target") || name.equals("node_modules") || name.startsWith(".") || name.equals("inspecto-ui")
+                            || name.equals("spaces") || name.equals("data"))
+                        return java.nio.file.FileVisitResult.SKIP_SUBTREE;
+                    if (name.equals("java") && dir.endsWith(Path.of("src", "main", "java"))) {
+                        roots.add(dir);
+                        return java.nio.file.FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+            });
         } catch (IOException e) {
             throw new AssertionError("cannot list " + repoRoot(), e);
         }
+        return roots;
     }
 
-    /** The checkout root — the nearest ancestor of the working directory that holds the reactor pom. */
+    /** The checkout root - the OUTERMOST ancestor of the working directory whose pom.xml declares the reactor modules. */
     private static Path repoRoot() {
-        Path dir = Path.of("").toAbsolutePath();
-        for (int up = 0; up < 4 && dir != null; up++, dir = dir.getParent())
-            if (Files.exists(dir.resolve("pom.xml")) && Files.isDirectory(dir.resolve("inspecto-util"))) return dir;
-        throw new AssertionError("cannot locate the checkout root from " + Path.of("").toAbsolutePath());
+        Path found = null;
+        for (Path dir = Path.of("").toAbsolutePath(); dir != null; dir = dir.getParent()) {
+            Path pom = dir.resolve("pom.xml");
+            try {
+                if (Files.isRegularFile(pom) && Files.readString(pom).contains("<modules>")) found = dir;
+            } catch (IOException e) {
+                throw new AssertionError("cannot read " + pom, e);
+            }
+        }
+        if (found == null) throw new AssertionError("cannot locate the checkout root from " + Path.of("").toAbsolutePath());
+        return found;
     }
 }

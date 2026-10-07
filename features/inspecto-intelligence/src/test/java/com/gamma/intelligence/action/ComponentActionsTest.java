@@ -131,7 +131,7 @@ class ComponentActionsTest {
     void applyRefusesAConfigThatFailsTheSafetyGateWithoutTouchingTheControlPlane() {
         // A path-jail escape in a pipeline config is a hard-fail safety finding.
         Map<String, Object> unsafe = Map.of("output",
-                Map.of("ducklake", Map.of("data_path", "../../etc/evil")));
+                Map.of("ducklake", Map.of("data_path", "../../../etc/evil")));
         ToolResult r = ComponentActions.apply(new ControlPlaneClient(),
                 apply("pipeline", "evil", unsafe, "sess-3"), "sess-3");
         assertFalse(r.ok());
