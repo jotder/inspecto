@@ -90,6 +90,7 @@ public final class BuiltInConsequences {
             Map<String, Object> alertBody = new LinkedHashMap<>(params(c));
             alertBody.putIfAbsent("name", alertName);
             alertBody.putIfAbsent("severity", severity.toUpperCase(Locale.ROOT));
+            alertBody.remove("rule");   // the consequence's alias for the Alert Rule name, not an Alert Rule key (MODULE-REORG-P4-2)
             try {
                 ctx.authorAlertRule(alertBody);
                 authoredDetail = "authored Alert Rule '" + alertName + "'";
