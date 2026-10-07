@@ -287,6 +287,33 @@ the module and the `CapabilityManifest` rows are unchanged; (f) tests: `ControlA
 `inspecto-processor` dependency). **Behaviour change to record when built:** Personal loses `/risk-scores*`
 and the `risk.score` Job Type (it keeps the Entity-List-less `WatchListFeed` absence it has today).
 
+### P7 Case Management survey (2026-10-08 - read-only; verdict NO-GO for a thin slice, nothing built)
+
+**Question:** can Case Management become its own optional module (`features/inspecto-case-management`, requires `ops`) as a small
+behaviour SPI + route group + job-type move, with `ObjectType` staying a closed enum? **Answer: the enum can stay, but the move
+is NOT small.** The decision rule ("a new contract broader than a small behaviour SPI + route group + job type move -> stop") fires, so the tree is untouched.
+
+**Seams found (all CASE behaviour is inside shared classes, not in separable ones):**
+- `ObjectService` (features/inspecto-ops): the Case Rule registry (`registerCaseRule`, `caseRule`, `caseRules`, `removeCaseRule`),
+  `evaluateCaseRule`, the Case SLA/auto-close sweep (reads `workflow(ObjectType.CASE)`), `mergeCases`, `splitCase`,
+  `openCaseFromEntities` (+ its compensation), `requireOpenCase`, RCA seeding and the Case Disposition guard. About 600 of ~1970 lines,
+  interleaved with the generic CRUD, link and note code and sharing its locking and audit helpers.
+- `ObjectRoutes` (1087 lines, ONE class): `/cases/rules` x4 (save, delete, list, evaluate), `POST /cases/from-entities`, `POST
+  /objects/{id}/merge`, `/split`, per-Case-type Findings (`effectiveFindingsSpec`, `saveFindingsImpact`), the `caseType` data-scope
+  attribute guard (`ATTR_CASE_TYPE`, SEC-7d) and `/objects?type=CASE`. Not separate route classes: a Case route group would be carved out of this class.
+- `OpsEngine` / `ObjectAccess` / `IncidentAccess` (platform/inspecto-engine) expose the Case operations the routes call (`OpsEngine.of(api).caseRules()`, `mergeCases`, `splitCase`, `evaluateCaseRule`); `JobService` carries a comment-level dependency on `evaluateCaseRule`.
+- Lower modules branch on CASE: `Workflow.defaultFor` (platform/inspecto-workflow, the Case lifecycle), `FindingsSpec` (platform/inspecto-engine; built-in Impact section required for CASE), `Impact.TYPES` (INCIDENT + CASE), `OpsEngineProvider` (loads `*_caserule.toon`), `OpsJobTypes.CaseRuleEvaluate` + `CaseRuleEvalJob`.
+- TASK has NO behaviour of its own: only an `OPEN -> CLOSED` placeholder workflow. Nothing to move.
+- SPA: nav entry `cases` carries `navFeature: 'ops'`; `modules/admin/objects/*` (cases.routes, merge-cases, case-contents, impact-panel, postmortem-panel, findings editor) are shared with Incidents and tagged `'CASE'` in about 20 files; 31 Java test classes reference `ObjectType.CASE|TASK`.
+
+**What must stay in the substrate:** generic object CRUD, notes, links, tags, watchers, the SLA sweep skeleton, `OperationalObject`/`ObjectStore` (persisted type strings load inert).
+
+**Minimal contract a Case module needs (not small):** an `ObjectTypeBehaviour` SPI the substrate consults, contributing: (1) default Workflow + SLA default for its type (replaces the `Workflow.defaultFor` branch); (2) a FindingsSpec built-in (replaces the `FindingsSpec` CASE branch); (3) group operations on `ObjectAccess` (merge, split, from-entities, requireOpenCase) moved out of `ObjectService` behind that SPI; (4) a Case Rule registry + evaluation hook, with the loader in `OpsEngineProvider` and the `ConfigWriteFunnel`/writer inventory entries following it; (5) a route group carved out of `ObjectRoutes` with its own `RouteModule` (+ `featureIds()` `cases`, manifest stubs, `AbsentModuleRoutes` 503, OpenAPI and route-gating rows moving); (6) the `ObjectRoutes` generic handlers must tolerate CASE objects with the module absent (inert, listed, mutating routes 503); (7) SPA `navFeature` `cases`.
+
+**Effort estimate:** 4 to 6 steps, each needing its own green gate: characterisation tests first (existing ObjectServiceCaseRuleTest, ControlApiCaseRuleTest and CaseRuleEvalJobTest already pin most of it), the SPI in engine + workflow, the `ObjectService` extraction (the riskiest, ~600 lines), the route split, the module + 4 profiles + manifest + packaging rows, then a Professional and an Enterprise `package.ps1` proof. Roughly one full shift of focused work; it needs its own session with the shared tree otherwise idle, plus guard-inventory edits that need operator approval (route-gating, writer inventory, capability exemptions).
+
+**Recorded decisions for the eventual build:** `inspecto-ops` IS the Incidents module (no rename in this step; the rename is a separate ~100-reference step); Case Management requires `ops` and Workflow & SLA; an install with `ops` but without `case-management` still raises and works Incidents; Case/Task objects found in an install without the module load inert and their Case routes answer 503.
+
 ## 6-A. P0 baseline (recorded 2026-10-06, `node tools/check-module-architecture.mjs`)
 
 ✅ P0 shipped: GLOSSARY §15, OKF `backend/module-taxonomy.md`, the report-only guard (not wired into CI).
