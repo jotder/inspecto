@@ -14,9 +14,17 @@ EX="${1:-}"; CLEAN="${2:-}"
 
 resolve_jar() {
   if [ -n "${INSPECTO_JAR:-}" ] && [ -f "$INSPECTO_JAR" ]; then echo "$INSPECTO_JAR"; return; fi
+  # P3d stage 2: inspecto.jar is the product jar only; the core libraries are thin jars. This prints a CLASSPATH (callers use -cp).
+  if [ -f "$EXAMPLES_ROOT/../inspecto.jar" ] && [ -f "$EXAMPLES_ROOT/../core.list" ]; then
+    local root; root="$(cd "$EXAMPLES_ROOT/.." && pwd)"
+    tr -d '\r' < "$EXAMPLES_ROOT/../core.list" | sed "s#^#$root/#" | tr '\n' ':' | sed 's/:$//'; echo; return
+  fi
   if [ -f "$EXAMPLES_ROOT/../inspecto.jar" ]; then echo "$EXAMPLES_ROOT/../inspecto.jar"; return; fi
   local j; j="$(ls "$EXAMPLES_ROOT"/../target/inspecto-processor-*.jar 2>/dev/null | grep -vE 'sources|javadoc' | head -1 || true)"
-  if [ -n "$j" ]; then echo "$j"; return; fi
+  if [ -n "$j" ]; then
+    local libs; libs="$(ls "$EXAMPLES_ROOT"/../../platform/*/target/inspecto-*.jar "$EXAMPLES_ROOT"/../../spi/*/target/inspecto-*.jar 2>/dev/null | grep -Ev 'sources|javadoc|tests|original' | tr '\n' ':' || true)"
+    echo "$j:${libs%:}"; return
+  fi
   echo "Engine JAR not found. Set \$INSPECTO_JAR or build it (mvn -o clean package)." >&2; exit 1
 }
 
@@ -36,7 +44,7 @@ echo
 # Path-jail roots (PKG-6): the one-shot CollectorProcessor runs no space discovery, so
 # -Dassist.safety.roots is the ONLY source of allowed roots, and a pipeline carrying a schema_file:
 # ref dies with "no allowed roots configured" without it. The example dir IS the root.
-java --enable-native-access=ALL-UNNAMED "-Dassist.safety.roots=$(pwd)" -jar "$JAR" pipeline.toon
+java --enable-native-access=ALL-UNNAMED "-Dassist.safety.roots=$(pwd)" -cp "$JAR" com.gamma.inspector.CollectorProcessor pipeline.toon
 code=$?
 echo
 echo "Exit code: $code"

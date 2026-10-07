@@ -41,7 +41,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { EDITIONS, PG_SIDECAR, bundleModules, editionOnlyModules } from './bundle-modules.mjs';
+import { EDITIONS, PG_SIDECAR, bundleModules, editionOnlyModules, coreModules } from './bundle-modules.mjs';
 import { classpath, mvnModules } from './offering-classpath.mjs';
 import { gather } from './check-offerings.mjs';
 
@@ -67,7 +67,7 @@ function diff(actual, expected) {
  * stated per-edition counts); `generated` is `{ mvn: {edition: '-pl string'}, classpathMax: [jars] }` and defaults
  * to what tools/offering-classpath.mjs produces for this repo.
  */
-export function analyze(text, { root = repoRoot, bundleModulesText, generated } = {}) {
+export function analyze(text, { root = repoRoot, bundleModulesText, generated, processorPomText } = {}) {
     const problems = [];
     const bmText = bundleModulesText ?? readFileSync(join(root, 'tools/bundle-modules.mjs'), 'utf8');
     let gen = generated;
@@ -134,7 +134,9 @@ export function analyze(text, { root = repoRoot, bundleModulesText, generated } 
     }
 
     // ── C. classpath: the generator's list covers exactly what is staged; boot smoke + launchers READ it ───
-    const cpCheck = diff(set(gen.classpathMax), staged);
+    // P3d stage 2: the core thin jars are staged by a loop over `--list-core` (rule D), so they are not Copy-Item lines; the list must name them too.
+    const coreJars = coreModules().map((m) => m.bundleFile);
+    const cpCheck = diff(set(gen.classpathMax), set([...staged, ...coreJars]));
     if (!cpCheck.same) {
         problems.push(
             `the classpath tools/offering-classpath.mjs emits for the maximal edition does not match the jars ${SCRIPT} stages` +
@@ -167,10 +169,47 @@ export function analyze(text, { root = repoRoot, bundleModulesText, generated } 
     const serveHere = ['serveShContent', 'serveBatContent'].map((n) => { const o = text.indexOf(`$${n} = @'`); return o < 0 ? '' : text.slice(o, text.indexOf("\n'@", o + 1)); }).join('\n');
     if (!serveHere.includes('edition.properties')) problems.push('the serve.sh/serve.bat launchers never read edition.properties — the edition would be guessed from which jars are present again.');
 
+    // ── D. the core thin jars (P3d stage 2): staged from the generator's list, and the processor's shade excludes exactly them ─────
+    // inspecto.jar used to shade every first-party library in. If the pom's artifactSet stops excluding one, that library would
+    // ship twice (inside inspecto.jar AND as its thin jar, which modules.list also names) - classes duplicated, signing impossible.
+    // If it excludes one the generator does not stage, the library would ship NOWHERE and the bundle would die at boot.
+    if (!/offering-classpath\.mjs'\)\s+--list-core/.test(text)) {
+        problems.push(`${SCRIPT} does not stage the core thin jars from \`tools/offering-classpath.mjs --list-core\` - a hand-kept list of them would drift from tools/bundle-modules.mjs CORE_MODULES and from the shade excludes.`);
+    }
+    let procPom = processorPomText;
+    if (procPom === undefined) {
+        try { procPom = readFileSync(join(root, 'inspecto/pom.xml'), 'utf8'); } catch { procPom = null; }
+    }
+    if (procPom === null) {
+        problems.push('inspecto/pom.xml is unreadable - cannot hold its shade artifactSet against CORE_MODULES.');
+    } else {
+        const noComments = procPom.replace(/<!--[\s\S]*?-->/g, '');
+        const excl = /<artifactSet>\s*<excludes>([\s\S]*?)<\/excludes>\s*<\/artifactSet>/.exec(noComments);
+        if (!excl) {
+            problems.push('inspecto/pom.xml has no shade <artifactSet><excludes> - every first-party library would be shaded into inspecto.jar again, next to its own thin jar.');
+        } else {
+            const excluded = set([...excl[1].matchAll(/<exclude>\s*com\.gamma\.inspector:([\w.-]+)\s*<\/exclude>/g)].map((m) => m[1]));
+            const core = set(coreModules().map((m) => m.artifactId));
+            const d = diff(excluded, core);
+            if (!d.same) {
+                problems.push(
+                    `inspecto/pom.xml's shade artifactSet excludes do not equal tools/bundle-modules.mjs CORE_MODULES` +
+                        (d.missing.length ? `
+      core thin jar shipped but ALSO shaded into inspecto.jar (not excluded): ${d.missing.join(', ')}` : '') +
+                        (d.extra.length ? `
+      excluded from the shade but not a core thin jar (it would ship nowhere): ${d.extra.join(', ')}` : ''),
+                );
+            }
+        }
+        if (/<Class-Path>|<mainClass>/.test(noComments)) {
+            problems.push('inspecto/pom.xml gives inspecto.jar a Main-Class / Class-Path - it is the product jar beside thin libraries now; launchers use `-cp` from modules.list, a manifest entry would hide a missing list.');
+        }
+    }
+
     // ── each module's declared artifactId ────────────────────────────────────────────────────────────────────
     // sbom.mjs keys SHIPPED by artifactId and matches it against Maven's per-module banners. A wrong
     // dir→artifactId pair contributes ZERO components for that module and says nothing while doing it.
-    for (const m of bundleModules('Enterprise')) {
+    for (const m of [...bundleModules('Enterprise'), ...coreModules()]) {
         let pom;
         try {
             pom = readFileSync(join(root, m.dir, 'pom.xml'), 'utf8');

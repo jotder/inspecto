@@ -30,7 +30,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
-import { bundleModules, editionProfile, EDITIONS } from './bundle-modules.mjs';
+import { bundleModules, coreModules, editionProfile, EDITIONS } from './bundle-modules.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -61,7 +61,8 @@ if (!EDITIONS.includes(edition)) {
 // never appeared in a shipped SBOM despite being reactor-governed. javax.mail is NOT among them: it
 // moved to inspecto-notify-channels with SmtpEmailChannel in EDG-01 cell 1, and reaches a bill of
 // materials only through that module — which is why it appeared in none until this table was fixed.
-const modules = bundleModules(edition);
+// P3d stage 2: the core libraries are their own thin jars now (bundle-modules.mjs CORE_MODULES) - first-party components of every bundle.
+const modules = [...bundleModules(edition), ...coreModules()];
 const SHIPPED = Object.fromEntries(modules.map((m) => [m.artifactId, m.bundleFile]));
 const plModules = modules.map((m) => m.dir);
 const profile = editionProfile(edition);
@@ -107,8 +108,8 @@ function resolve() {
         process.exit(2);
     }
     // one block per reactor module; keep only the SHIPPED modules' blocks — an upstream sibling
-    // (inspecto-engine, …) is shaded INTO inspecto.jar, so its runtime deps already appear in
-    // inspecto-processor's own (transitive) list.
+    // (inspecto-engine, …) is a first-party component of its own now (thin jar), and its runtime deps
+    // also appear in inspecto-processor's own (transitive) list.
     const inRepo = new Set();
     const perModule = new Map();
     let current = null;
@@ -211,7 +212,7 @@ for (const c of thirdParty) {
     if (!lic) unlicensed++;
     components.push({ ...c, firstParty: false, purl: purl(c), sha256: hash, license: lic, licenseMissing: !lic });
 }
-// first-party: the bundle's own jars, hashed AS SHIPPED (the shaded fat jar is what the customer runs)
+// first-party: the bundle's own jars, hashed AS SHIPPED (inspecto.jar = the processor + all third-party code; the core libraries are thin jars)
 for (const [artifactId, file] of Object.entries(SHIPPED)) {
     const path = join(bundleDir, file);
     if (!existsSync(path)) {

@@ -85,6 +85,34 @@ const MODULES = [
     { artifactId: 'inspecto-intelligence', dir: 'features/inspecto-intelligence', bundleFile: 'inspecto-intelligence.jar', from: 'enterprise' }, // CP-14, SP-ENR-08
 ];
 
+/**
+ * The CORE first-party libraries the processor used to shade into inspecto.jar (MODULE-REORG-P3d stage 2, 2026-10-08): now their own
+ * THIN jars, staged in EVERY edition next to inspecto.jar and named on modules.list in front of the optional modules. They are the
+ * manifests' `base`/`internal` modules (never listed in an Offering - always present), so they are NOT rows of MODULES: adding them
+ * there would change the edition counts and every guard that reads "the modules an edition adds". `inspecto/pom.xml`'s shade
+ * `artifactSet` excludes exactly these artifactIds (tools/check-sbom-modules.mjs holds the two equal).
+ * Listed in dependency order (a library before what imports it); the jars have disjoint packages, so order is cosmetic.
+ */
+export const CORE_MODULES = [
+    { artifactId: 'inspecto-api', dir: 'platform/inspecto-api' },
+    { artifactId: 'inspecto-util', dir: 'platform/inspecto-util' },
+    { artifactId: 'inspecto-config', dir: 'platform/inspecto-config' },
+    { artifactId: 'inspecto-sql', dir: 'platform/inspecto-sql' },
+    { artifactId: 'inspecto-etl', dir: 'platform/inspecto-etl' },
+    { artifactId: 'inspecto-audit-spi', dir: 'spi/inspecto-audit-spi' },
+    { artifactId: 'inspecto-auth-spi', dir: 'spi/inspecto-auth-spi' },
+    { artifactId: 'inspecto-access', dir: 'platform/inspecto-access' },
+    { artifactId: 'inspecto-http-spi', dir: 'spi/inspecto-http-spi' },
+    { artifactId: 'inspecto-entity-store', dir: 'platform/inspecto-entity-store' },
+    { artifactId: 'inspecto-event', dir: 'platform/inspecto-event' },
+    { artifactId: 'inspecto-workflow', dir: 'platform/inspecto-workflow' },
+    { artifactId: 'inspecto-acquire', dir: 'platform/inspecto-acquire' },
+    { artifactId: 'inspecto-engine', dir: 'platform/inspecto-engine' },
+].map((m) => ({ ...m, bundleFile: `${m.artifactId}.jar`, from: 'all', kind: 'base' }));
+
+/** The core thin jars every edition stages (see CORE_MODULES). */
+export const coreModules = () => CORE_MODULES.slice();
+
 /** The Maven profile that activates an edition's extra modules, or null for Personal. */
 export function editionProfile(edition) {
     if (edition === 'Preview') return 'edition-preview';

@@ -197,10 +197,16 @@
             </plugin>
 
             <!--
-                Fat JAR — bundles all runtime dependencies into a single deployable JAR.
+                The product jar = this module's OWN classes + every THIRD-PARTY dependency, shaded together
+                (MODULE-REORG-P3d stage 2, 2026-10-08). The first-party libraries below it (api, config, util, sql, etl,
+                event, audit-spi, auth-spi, http-spi, workflow, access, entity-store, acquire, engine) are NO LONGER
+                shaded in: they ship as their own thin jars next to this one, and the bundle's classpath is the
+                Offering's modules.list (tools/offering-classpath.mjs). The artifactSet exclude below is the ONE list of
+                them here; tools/check-sbom-modules.mjs holds it equal to tools/bundle-modules.mjs's CORE_MODULES.
                 Build with:  mvn clean package
-                Run ETL:     java -cp inspecto-processor-<version>.jar com.gamma.inspector.CollectorProcessor  <pipeline.toon>
-                Gen schema:  java -cp inspecto-processor-<version>.jar com.gamma.inspector.SchemaExtractor <args>
+                Run:         java -cp <modules.list> com.gamma.inspector.CollectorProcessor <pipeline.toon>
+                NOTE: `java -jar inspecto-processor-<version>.jar` no longer works - there is no Main-Class and no Class-Path;
+                the thin core jars must be on the classpath (the bundle's run.sh / run.bat / examples do that).
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -212,10 +218,27 @@
                         <goals><goal>shade</goal></goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <artifactSet>
+                                <excludes>
+                                    <exclude>com.gamma.inspector:inspecto-api</exclude>
+                                    <exclude>com.gamma.inspector:inspecto-config</exclude>
+                                    <exclude>com.gamma.inspector:inspecto-util</exclude>
+                                    <exclude>com.gamma.inspector:inspecto-sql</exclude>
+                                    <exclude>com.gamma.inspector:inspecto-etl</exclude>
+                                    <exclude>com.gamma.inspector:inspecto-audit-spi</exclude>
+                                    <exclude>com.gamma.inspector:inspecto-auth-spi</exclude>
+                                    <exclude>com.gamma.inspector:inspecto-http-spi</exclude>
+                                    <exclude>com.gamma.inspector:inspecto-access</exclude>
+                                    <exclude>com.gamma.inspector:inspecto-entity-store</exclude>
+                                    <exclude>com.gamma.inspector:inspecto-event</exclude>
+                                    <exclude>com.gamma.inspector:inspecto-workflow</exclude>
+                                    <exclude>com.gamma.inspector:inspecto-acquire</exclude>
+                                    <exclude>com.gamma.inspector:inspecto-engine</exclude>
+                                </excludes>
+                            </artifactSet>
                             <transformers>
-                                <!-- Default main class for convenience; override with -cp and full class name -->
+                                <!-- No Main-Class: CollectorProcessor lives in the thin inspecto-engine jar now. -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>com.gamma.inspector.CollectorProcessor</mainClass>
                                     <!-- HOME-VERSION-1 (2026-09-15): the ONE source of the product version at run
                                          time. ProductVersion reads it back through Package.getImplementationVersion;
                                          a target/classes run (no manifest) reports "dev". -->
@@ -225,14 +248,8 @@
                                         <Inspecto-Build-Id>${inspecto.build.id}</Inspecto-Build-Id>
                                     </manifestEntries>
                                 </transformer>
-                                <!-- Merge JDBC driver service registrations from all dependencies -->
+                                <!-- Merge THIRD-PARTY service registrations (JDBC drivers, ...); each first-party thin jar keeps its own META-INF/services/ and module.toon -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                                <!-- MODULE-REORG-1 P2a: every module ships META-INF/inspecto/module.toon; without this the
-                                     shade keeps only the first. Each file starts with a separator line (three hyphens), which ModuleManifests
-                                     splits on. -->
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
-                                    <resource>META-INF/inspecto/module.toon</resource>
-                                </transformer>
                             </transformers>
                             <filters>
                                 <!-- Strip JAR signatures — required to avoid SecurityException at runtime -->

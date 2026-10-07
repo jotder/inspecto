@@ -524,6 +524,56 @@ if (Test-Path $bundleDir) {
 
 # ── step 3: copy JAR (canonical name for deployment) ──────────────────────────
 Copy-Item $jarSrc "$bundleDir\inspecto.jar"
+
+# ── step 3-core: the first-party CORE libraries as THIN jars (MODULE-REORG-P3d stage 2, 2026-10-08) ───────────
+# inspecto.jar is no longer one fat jar of everything: inspecto/pom.xml's shade now carries only the processor's own classes plus
+# the THIRD-PARTY libraries. api, util, config, sql, etl, the three SPIs, access, entity-store, event, workflow, acquire and engine
+# (tools/bundle-modules.mjs CORE_MODULES, printed by `offering-classpath.mjs --list-core`) ship as their own thin jars, named by
+# artifactId, in the bundle root and on modules.list right behind inspecto.jar - so each can be signed and SBOM'd on its own and
+# the module.toon / ServiceLoader merge hacks of the shade are gone. Never the `-tests` jar (etl and engine attach one).
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$coreLines = @(& node (Join-Path $sandboxRoot 'tools\offering-classpath.mjs') --list-core | Where-Object { $_ })
+if ($LASTEXITCODE -ne 0 -or $coreLines.Count -lt 1) { throw "tools/offering-classpath.mjs --list-core failed" }
+# What a THIN first-party jar must NOT carry: any third-party library (they live in inspecto.jar, once).
+$thirdPartyPrefixes = @('org/duckdb/', 'com/fasterxml/', 'tools/jackson/', 'org/slf4j/', 'ch/qos/', 'com/zaxxer/', 'com/opencsv/', 'com/univocity/',
+    'org/apache/', 'com/google/', 'dev/toonformat/', 'com/nimbusds/', 'org/postgresql/')
+$coreClasses = @{}   # class entry -> thin jar, for the "inspecto.jar holds none of them" check below
+foreach ($coreLine in $coreLines) {
+    $coreId, $coreDir = $coreLine -split "`t"
+    $coreTarget = Join-Path $sandboxRoot "$coreDir\target"
+    $coreSrc = Get-ChildItem -Path $coreTarget -Filter "$coreId-*.jar" -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match ('^' + [regex]::Escape($coreId) + '-\d+\.\d+\.\d+(-SNAPSHOT)?\.jar$') } | Select-Object -First 1
+    if (-not $coreSrc) { throw "core thin jar $coreId not found under $coreTarget (looked for $coreId-<version>.jar). Run without -NoBuild." }
+    Copy-Item $coreSrc.FullName "$bundleDir\$coreId.jar"
+    $coreZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\$coreId.jar")
+    try {
+        $entries = @($coreZip.Entries | ForEach-Object { $_.FullName })
+        $leaked = @($entries | Where-Object { $e = $_; $thirdPartyPrefixes | Where-Object { $e.StartsWith($_) } } | Select-Object -First 3)
+        if ($leaked.Count) { throw "$coreId.jar is meant to be THIN but carries third-party classes ($($leaked -join ', ')) - its pom shades something; third-party code belongs in inspecto.jar only." }
+        if ($entries -notcontains 'META-INF/inspecto/module.toon') { throw "$coreId.jar has no META-INF/inspecto/module.toon - the module would be invisible to GET /modules and the build-id boot check." }
+        # every ServiceLoader file the module's source tree ships must be in its jar (a thin jar never merges, but must keep its own)
+        $svcDir = Join-Path $sandboxRoot "$coreDir\src\main\resources\META-INF\services"
+        if (Test-Path $svcDir) {
+            foreach ($svcFile in Get-ChildItem $svcDir -File) {
+                if ($entries -notcontains "META-INF/services/$($svcFile.Name)") { throw "$coreId.jar lacks META-INF/services/$($svcFile.Name) that its source tree registers - the SPI implementation would never be discovered." }
+            }
+        }
+        foreach ($e in $entries) { if ($e.EndsWith('.class') -and -not $e.StartsWith('META-INF/')) { $coreClasses[$e] = $coreId } }
+    } finally { $coreZip.Dispose() }
+}
+$procZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto.jar")
+try {
+    $dup = @($procZip.Entries | Where-Object { $coreClasses.ContainsKey($_.FullName) } | Select-Object -First 3 | ForEach-Object { "$($_.FullName) (also in $($coreClasses[$_.FullName]).jar)" })
+    if ($dup.Count) { throw "inspecto.jar still carries first-party library classes that have their own thin jar: $($dup -join '; ') - the shade artifactSet in inspecto/pom.xml no longer excludes them." }
+    if (-not ($procZip.Entries | Where-Object { $_.FullName -eq 'com/gamma/control/ControlApi.class' })) { throw "inspecto.jar lacks com/gamma/control/ControlApi.class - the product jar lost the processor's own classes." }
+    $procManifests = $procZip.GetEntry('META-INF/inspecto/module.toon')
+    if (-not $procManifests) { throw "inspecto.jar has no META-INF/inspecto/module.toon (the processor's own manifest)." }
+    $pr = New-Object System.IO.StreamReader($procManifests.Open())
+    try { $procToon = $pr.ReadToEnd() } finally { $pr.Dispose() }
+    if (([regex]::Matches($procToon, '(?m)^---\s*$')).Count -gt 1) { throw "inspecto.jar's module.toon is a MERGE of several manifests - the shade is folding first-party jars in again." }
+    if (-not ($procZip.Entries | Where-Object { $_.FullName -eq 'META-INF/inspecto/known-modules/index.txt' })) { throw "inspecto.jar lacks META-INF/inspecto/known-modules/index.txt - the 'not installed' stubs would be unknown." }
+} finally { $procZip.Dispose() }
+Write-Host "Bundled $($coreLines.Count) core thin jars (no third-party classes, own module.toon, own services; none of their classes inside inspecto.jar)" -ForegroundColor Green
 if ($oidcJarSrc) {
     Copy-Item $oidcJarSrc "$bundleDir\inspecto-oidc.jar"
     Write-Host "Bundled Professional-edition OIDC authenticator module → inspecto-oidc.jar" -ForegroundColor Green
@@ -1271,8 +1321,15 @@ if [ -n "${EXTRA_OPTS}" ]; then
     JAVA_OPTS+=("${_extra_opts[@]}")
     echo "[ura.sh] extra JVM opts: ${EXTRA_OPTS}"
 fi
+# MODULE-REORG-P3d stage 2: inspecto.jar is the product jar only; the core libraries are thin jars beside it. The classpath is
+# READ from core.list (written at package time by tools/offering-classpath.mjs): inspecto.jar + the core thin jars only (no optional module or sidecar: the pre-ETL utilities never carried them).
+if [ -f core.list ]; then
+    CP="$(tr -d '\r' < core.list | tr '\n' ':')"; CP="${CP%:}"
+else
+    CP="inspecto.jar"; for _jar in *.jar; do [ "$_jar" = "inspecto.jar" ] || CP="${CP}:${_jar}"; done
+fi
 exec "$JAVA" "${JAVA_OPTS[@]}" \
-          -cp inspecto.jar \
+          -cp "$CP" \
           com.gamma.inspector.MainApp "$@"
 '@
 Write-LfScript -Path "$bundleDir\ura.sh" -Content $uraShContent
@@ -1298,8 +1355,15 @@ set "EXTRA_OPTS=%INSPECTO_JAVA_OPTS%"
 if "%EXTRA_OPTS%"=="" set "EXTRA_OPTS=%EXTRA_JAVA_OPTS%"
 if not "%EXTRA_OPTS%"=="" set "OPTS=%OPTS% %EXTRA_OPTS%"
 if not "%EXTRA_OPTS%"=="" echo [ura.bat] extra JVM opts: %EXTRA_OPTS%
+rem MODULE-REORG-P3d stage 2: inspecto.jar is the product jar only; the core libraries are thin jars beside it. The classpath is
+rem READ from core.list (written at package time by tools/offering-classpath.mjs): inspecto.jar + the core thin jars only (no optional module or sidecar). No delayed expansion.
+set "CP="
+if exist core.list for /f "usebackq delims=" %%J in ("core.list") do call set "CP=%%CP%%;%%J"
+if not exist core.list set "CP=;inspecto.jar"
+if not exist core.list for %%J in (*.jar) do if /i not "%%J"=="inspecto.jar" call set "CP=%%CP%%;%%J"
+set "CP=%CP:~1%"
 "%JAVA%" %OPTS% ^
-     -cp inspecto.jar ^
+     -cp "%CP%" ^
      com.gamma.inspector.MainApp %*
 '@
 Write-CrlfScript -Path "$bundleDir\ura.bat" -Content $uraBatContent

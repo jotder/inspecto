@@ -137,28 +137,21 @@ class ObjectsBackendEditionBootTest {
     }
 
     /**
-     * {@code serve-demo.*} carries its own hand-kept jar list. It must name every optional jar the
-     * regular boot-smoke classpath ({@code $cp}, the Enterprise set) names, bar the security jar the demo
-     * build removes: {@code inspecto-intelligence.jar} was missing, so the bundle shipped the jar and every
-     * {@code /agent/*} call answered 503 (the 2026-09-30 live check's console 503 on Home).
+     * {@code serve-demo.*} used to carry its own hand-kept jar list, and {@code inspecto-intelligence.jar} was missing from it, so
+     * the bundle shipped the jar and every {@code /agent/*} call answered 503 (the 2026-09-30 live check). Since MODULE-REORG-P3d
+     * there is NO list to forget a jar from: the demo launchers read the bundle's {@code modules.list}, which
+     * {@code tools/offering-classpath.mjs --demo} writes from the Enterprise Offering (the OIDC trio replaced by the demo jar).
+     * This pins that wiring; the generator's completeness is held by tools/offering-classpath.test.mjs and check-sbom-modules.
      */
     @Test
-    void demoLauncherJars_coverTheEnterpriseClasspath() throws Exception {
+    void demoLauncherJars_areReadFromTheGeneratedModulesList() throws Exception {
         String ps1 = Files.readString(Path.of("..", "..", "inspecto", "package.ps1"));
-        String cp = ps1.lines().filter(l -> l.trim().startsWith("$cp = @('inspecto.jar')"))
-                .findFirst().orElseThrow(() -> new AssertionError("no boot-smoke $cp in package.ps1"));
-        int start = ps1.indexOf("$demoJars = @(");
-        assertTrue(start >= 0, "no $demoJars in package.ps1");
-        String demo = ps1.substring(start, ps1.indexOf("Where-Object", start));
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("'([a-z-]+\\.jar)'").matcher(cp);
-        int seen = 0;
-        while (m.find()) {
-            String jar = m.group(1);
-            if (jar.equals("inspecto-oidc.jar") || jar.equals("inspecto-secrets.jar") || jar.equals("inspecto-geo-country.jar") || jar.equals("inspecto.jar")) continue;
-            seen++;
-            assertTrue(demo.contains("'" + jar + "'"),
-                    "serve-demo.* must put " + jar + " on its classpath");
-        }
-        assertTrue(seen >= 10, "parsed too few jars from $cp: " + cp);
+        assertTrue(ps1.contains("$demoJars = @(Get-Content (Join-Path $bundleDir 'modules.list')"),
+                "package.ps1 must derive the demo jars from the generated modules.list, not a literal");
+        assertTrue(ps1.contains("--demo") && ps1.contains("offering-classpath.mjs"),
+                "the demo bundle's modules.list must come from offering-classpath.mjs --demo");
+        int demoLauncher = ps1.indexOf("serve-demo.bat");
+        assertTrue(demoLauncher >= 0, "no serve-demo.bat in package.ps1");
+        assertTrue(ps1.indexOf("modules.list", demoLauncher) > demoLauncher, "serve-demo.* must read modules.list");
     }
 }

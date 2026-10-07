@@ -25,6 +25,10 @@ if not defined JAR (
     exit /b 1
 )
 
+rem MODULE-REORG-P3d stage 2: the core libraries are thin jars in their own modules' target\ dirs, not inside the product jar.
+set "CP=%JAR%"
+for /d %%D in (..\platform\* ..\spi\*) do for %%F in ("%%D\target\inspecto-*.jar") do echo %%~nF | findstr /i /c:"-tests" /c:"-sources" /c:"-javadoc" /c:"original" >nul || call set "CP=%%CP%%;%%F"
+
 java --enable-native-access=ALL-UNNAMED ^
-     -cp "%JAR%" ^
+     -cp "%CP%" ^
      com.gamma.inspector.MainApp %*

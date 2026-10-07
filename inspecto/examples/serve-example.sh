@@ -36,9 +36,17 @@ done
 
 resolve_jar() {
   if [ -n "${INSPECTO_JAR:-}" ] && [ -f "$INSPECTO_JAR" ]; then echo "$INSPECTO_JAR"; return; fi
+  # P3d stage 2: inspecto.jar is the product jar only; the core libraries are thin jars. This prints a CLASSPATH (callers use -cp).
+  if [ -f "$EXAMPLES_ROOT/../inspecto.jar" ] && [ -f "$EXAMPLES_ROOT/../core.list" ]; then
+    local root; root="$(cd "$EXAMPLES_ROOT/.." && pwd)"
+    tr -d '\r' < "$EXAMPLES_ROOT/../core.list" | sed "s#^#$root/#" | tr '\n' ':' | sed 's/:$//'; echo; return
+  fi
   if [ -f "$EXAMPLES_ROOT/../inspecto.jar" ]; then echo "$EXAMPLES_ROOT/../inspecto.jar"; return; fi
   local t; t="$(ls "$EXAMPLES_ROOT"/../target/inspecto-processor-*.jar 2>/dev/null | grep -Ev 'sources|javadoc' | head -1 || true)"
-  if [ -n "$t" ]; then echo "$t"; return; fi
+  if [ -n "$t" ]; then
+    local libs; libs="$(ls "$EXAMPLES_ROOT"/../../platform/*/target/inspecto-*.jar "$EXAMPLES_ROOT"/../../spi/*/target/inspecto-*.jar 2>/dev/null | grep -Ev 'sources|javadoc|tests|original' | tr '\n' ':' || true)"
+    echo "$t:${libs%:}"; return
+  fi
   echo "Engine JAR not found. Set \$INSPECTO_JAR or build it (mvn -o clean package)." >&2; exit 1
 }
 JAR="$(resolve_jar)"

@@ -21,7 +21,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { bundleModules, EDITIONS } from './bundle-modules.mjs';
+import { bundleModules, coreModules, EDITIONS } from './bundle-modules.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const LOCK_FILE = join(HERE, 'jlink-modules.lock');
@@ -97,9 +97,9 @@ export function validateLock(lock) {
     return problems;
 }
 
-/** The jar file names an edition's bundle must stage (first-party); PG sidecar is scanned when present. */
+/** The jar file names an edition's bundle must stage (first-party: the edition's modules + the core thin jars, P3d stage 2); PG sidecar is scanned when present. */
 export function expectedJars(edition) {
-    return bundleModules(edition).map((m) => m.bundleFile);
+    return [...bundleModules(edition), ...coreModules()].map((m) => m.bundleFile);
 }
 
 /** Throws when a jar the edition should stage is absent: --ignore-missing-deps would hide it. */

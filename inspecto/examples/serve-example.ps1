@@ -42,11 +42,22 @@ $examplesRoot = $PSScriptRoot
 
 function Resolve-Jar {
     if ($env:INSPECTO_JAR -and (Test-Path $env:INSPECTO_JAR)) { return (Resolve-Path $env:INSPECTO_JAR).Path }
+    # P3d stage 2: inspecto.jar is the product jar only; the core libraries are thin jars. This returns a CLASSPATH (the callers use -cp).
     $bundle = Join-Path $examplesRoot '..\inspecto.jar'
-    if (Test-Path $bundle) { return (Resolve-Path $bundle).Path }
+    $list = Join-Path $examplesRoot '..\core.list'
+    if ((Test-Path $bundle) -and (Test-Path $list)) {
+        $bundleRoot = (Resolve-Path (Join-Path $examplesRoot '..')).Path
+        return ((Get-Content $list | ForEach-Object { $_.Trim() } | Where-Object { $_ } | ForEach-Object { Join-Path $bundleRoot $_ }) -join [IO.Path]::PathSeparator)
+    }
+    if (Test-Path $bundle) { return (Resolve-Path $bundle).Path }   # hand-assembled directory with no core.list
     $tree = Get-ChildItem (Join-Path $examplesRoot '..\target') -Filter 'inspecto-processor-*.jar' -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -notmatch 'sources|javadoc' } | Select-Object -First 1
-    if ($tree) { return $tree.FullName }
+    if ($tree) {
+        $repo = Join-Path $examplesRoot '..\..'
+        $libs = Get-ChildItem -Path (Join-Path $repo 'platform\*\target'), (Join-Path $repo 'spi\*\target') -Filter 'inspecto-*.jar' -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -notmatch 'sources|javadoc|tests|original' } | ForEach-Object { $_.FullName }
+        return (@($tree.FullName) + @($libs)) -join [IO.Path]::PathSeparator
+    }
     throw "Engine JAR not found. Set `$env:INSPECTO_JAR, or build it (mvn -o clean package)."
 }
 

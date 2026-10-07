@@ -6,7 +6,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EDITIONS, editionOnlyModules } from './bundle-modules.mjs';
+import { EDITIONS, editionOnlyModules, coreModules } from './bundle-modules.mjs';
 import { gather } from './check-offerings.mjs';
 import {
     CLASSPATH_ORDER, classpath, mvnModules, normalizeEdition, renderEdition, renderList, resolveOffering, verifyBundle,
@@ -15,7 +15,9 @@ import {
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = join(ROOT, 'tools', 'offering-classpath.mjs');
 const g = () => gather(ROOT);
-const short = (jars) => jars.map((j) => (j === 'inspecto.jar' ? 'processor' : j === 'postgresql.jar' ? 'postgresql' : j.replace(/^inspecto-/, '').replace(/\.jar$/, ''))).join(' ');
+// P3d stage 2: the frozen strings below are the PRE-thin-core classpaths, so `short` drops the core thin jars (asserted separately below).
+const CORE_JARS = coreModules().map((m) => m.bundleFile);
+const short = (jars) => jars.filter((j) => !CORE_JARS.includes(j)).map((j) => (j === 'inspecto.jar' ? 'processor' : j === 'postgresql.jar' ? 'postgresql' : j.replace(/^inspecto-/, '').replace(/\.jar$/, ''))).join(' ');
 
 // ── TODAY'S HAND-KEPT CLASSPATHS, captured from inspecto/package.ps1 on 2026-10-08 BEFORE it was changed ───────────
 // (a throwaway script parsed the run.sh / serve.sh here-strings, the boot-smoke `$cp = @(...)` literal and the
@@ -61,7 +63,7 @@ test('the demo build: the OIDC trio is replaced by inspecto-demo-auth.jar in the
     const demo = classpath('Enterprise', { demo: true, g: g() });
     assert.equal(sorted(short(demo)), sorted(OLD.demo));
     assert.equal(sorted(short(demo)), sorted(OLD.demoSmoke));
-    assert.equal(demo[1], 'inspecto-demo-auth.jar');
+    assert.equal(demo[1 + CORE_JARS.length], 'inspecto-demo-auth.jar');
     for (const j of ['inspecto-oidc.jar', 'inspecto-secrets.jar', 'inspecto-geo-country.jar']) assert.ok(!demo.includes(j), j);
     assert.throws(() => classpath('Professional', { demo: true, g: g() }), /Enterprise-capability/);
 });
@@ -133,4 +135,39 @@ test('edition marker and edition-name handling', () => {
     assert.equal(renderEdition('enterprise', true), 'edition=Enterprise\nvariant=demo\n');
     assert.equal(normalizeEdition('Standard'), 'Professional');
     assert.throws(() => normalizeEdition('gold'), /unknown edition/);
+});
+
+test('P3d stage 2: every edition carries the core thin jars, directly behind inspecto.jar and in front of every optional module', () => {
+    for (const ed of EDITIONS) {
+        const cp = classpath(ed, { g: g() });
+        assert.equal(cp[0], 'inspecto.jar', ed);
+        assert.deepEqual(cp.slice(1, 1 + CORE_JARS.length), CORE_JARS, `${ed}: the core jars follow the product jar in CORE_MODULES order`);
+        assert.equal(new Set(cp).size, cp.length, `${ed}: no jar twice`);
+    }
+    assert.equal(CORE_JARS.length, 14);
+});
+
+test('RED: a core jar with no place in CLASSPATH_ORDER fails', () => {
+    const at = CLASSPATH_ORDER.indexOf('inspecto-util');
+    CLASSPATH_ORDER.splice(at, 1);
+    try { assert.throws(() => classpath('Personal', { g: g() }), /inspecto-util' ships in Personal but has no place in CLASSPATH_ORDER/); }
+    finally { CLASSPATH_ORDER.splice(at, 0, 'inspecto-util'); }
+});
+
+test('--list-core prints artifactId<TAB>dir for every core jar, no edition needed', () => {
+    const out = execFileSync(process.execPath, [SCRIPT, '--list-core'], { encoding: 'utf8' }).trim().split('\n');
+    assert.deepEqual(out.map((l) => l.split('\t')[0]), coreModules().map((m) => m.artifactId));
+    assert.ok(out.every((l) => l.split('\t').length === 2));
+});
+
+test('--bundle writes core.list = inspecto.jar + the core thin jars only (the one-shot tools\' classpath: no optional module, no sidecar)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'oc-core-'));
+    try {
+        for (const j of classpath('Professional', { g: g() })) writeFileSync(join(dir, j), '');
+        execFileSync(process.execPath, [SCRIPT, '--edition', 'professional', '--bundle', dir], { encoding: 'utf8' });
+        const core = readFileSync(join(dir, 'core.list'), 'utf8');
+        assert.equal(core, ['inspecto.jar', ...CORE_JARS].join('\n') + '\n');
+        assert.ok(!core.includes('oidc') && !core.includes('connectors') && !core.includes('postgresql'));
+        assert.equal(readFileSync(join(dir, 'modules.list'), 'utf8').split('\n')[0], 'inspecto.jar');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
 });

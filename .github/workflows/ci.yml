@@ -468,6 +468,11 @@ jobs:
           FLAGS: ${{ vars.AFFECTED_CONTRACTS_FLAGS }}
         run: |
           jar=$(ls inspecto/target/inspecto-processor-*.jar | grep -v -e '/original-' -e sources -e tests | head -1)
+          # MODULE-REORG-P3d stage 2: inspecto-processor-*.jar is the product jar + third-party only; the first-party core libraries
+          # are thin jars in platform/*/target and spi/*/target (the same 14 the bundle's modules.list names behind inspecto.jar).
+          for j in platform/*/target/inspecto-*.jar spi/*/target/inspecto-*.jar; do
+            case "$j" in *sources*|*javadoc*|*tests*|*original*) ;; *) jar="$jar:$j" ;; esac
+          done
           status=0
           for root in spaces/*/config; do
             echo "::group::$root"

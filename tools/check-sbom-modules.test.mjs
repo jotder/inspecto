@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { analyze } from './check-sbom-modules.mjs';
+import { coreModules } from './bundle-modules.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const REAL = readFileSync(join(ROOT, 'inspecto', 'package.ps1'), 'utf8');
@@ -71,4 +72,34 @@ test('RED: bundle-modules.mjs prose counts drift from its table', () => {
 test('RED: the --list-mvn output disagrees with the generator table', () => {
     const gen = { mvn: { Professional: ':inspecto-oidc', Enterprise: '', Preview: '' }, classpathMax: [] };
     assert.match(problems(REAL, { generated: gen }), /Professional: `offering-classpath\.mjs --list-mvn` does not match/);
+});
+
+// ── P3d stage 2: the core thin jars (rule D) ─────────────────────────────────────────────────────────────────
+const REAL_POM = readFileSync(join(ROOT, 'inspecto', 'pom.xml'), 'utf8');
+
+test('RED: the processor shade stops excluding a core library (it would ship twice: inside inspecto.jar AND as a thin jar)', () => {
+    const pom = REAL_POM.replace('<exclude>com.gamma.inspector:inspecto-util</exclude>', '');
+    assert.match(problems(REAL, { processorPomText: pom }), /core thin jar shipped but ALSO shaded into inspecto\.jar \(not excluded\): inspecto-util/);
+});
+
+test('RED: the processor shade excludes something that is not a core thin jar (it would ship nowhere)', () => {
+    const pom = REAL_POM.replace('<exclude>com.gamma.inspector:inspecto-util</exclude>', '<exclude>com.gamma.inspector:inspecto-util</exclude><exclude>com.gamma.inspector:inspecto-ops</exclude>');
+    assert.match(problems(REAL, { processorPomText: pom }), /excluded from the shade but not a core thin jar \(it would ship nowhere\): inspecto-ops/);
+});
+
+test('RED: the whole artifactSet is gone, or a Main-Class / Class-Path creeps back', () => {
+    assert.match(problems(REAL, { processorPomText: REAL_POM.replace(/<artifactSet>[\s\S]*?<\/artifactSet>/, '') }), /no shade <artifactSet><excludes>/);
+    assert.match(problems(REAL, { processorPomText: REAL_POM.replace('<manifestEntries>', '<manifestEntries><Class-Path>inspecto-util.jar</Class-Path>') }), /Main-Class \/ Class-Path/);
+});
+
+test('RED: package.ps1 stops staging the core thin jars from the generator', () => {
+    const t = mutate("'tools\\offering-classpath.mjs') --list-core", "'tools\\offering-classpath.mjs') --list-nothing");
+    assert.match(problems(t), /does not stage the core thin jars from/);
+});
+
+test('RED: the generated classpath forgets a core jar', () => {
+    const full = analyze(REAL).problems;
+    assert.deepEqual(full, []);
+    const gen = { mvn: { Professional: ':x', Enterprise: ':x', Preview: ':x' }, classpathMax: coreModules().map((m) => m.bundleFile).filter((j) => j !== 'inspecto-util.jar') };
+    assert.match(problems(REAL, { generated: gen }), /staged but absent from modules\.list: .*inspecto-util\.jar/);
 });

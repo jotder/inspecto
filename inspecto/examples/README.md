@@ -20,15 +20,18 @@ bash run-example.sh  01-ingest/hello-csv          # Linux / Git-Bash
 #   add  -Clean  (ps1)  or  --clean  (sh)  to wipe out/ and start fresh
 ```
 
-The runner resolves the engine JAR automatically (`$INSPECTO_JAR` → `../inspecto.jar` in the
-bundle → `../target/inspecto-processor-*.jar` in the source tree), creates the output dirs, seeds a
+The runner resolves the engine classpath automatically (`$INSPECTO_JAR` → the bundle's `../modules.list`:
+`inspecto.jar` plus the thin core jars → `../target/inspecto-processor-*.jar` plus the core jars under
+`platform/*/target` and `spi/*/target` in the source tree), creates the output dirs, seeds a
 fresh `out/inbox/` from the pristine `samples/`, and runs the pipeline with the mandatory DuckDB
 flag. To run by hand instead:
 
 ```bash
 cd 01-ingest/hello-csv
 mkdir -p out/inbox && cp samples/* out/inbox/
-java --enable-native-access=ALL-UNNAMED -jar <path-to>/inspecto.jar pipeline.toon
+ROOT=../../..   # the bundle root (beside inspecto.jar and modules.list)
+java --enable-native-access=ALL-UNNAMED -cp "$(sed "s#^#$ROOT/#" "$ROOT/modules.list" | tr -d '\r' | paste -sd: -)" \
+     com.gamma.inspector.CollectorProcessor pipeline.toon
 #   output lands in out/database/  (Hive-partitioned: year=/month=/day=)
 ```
 

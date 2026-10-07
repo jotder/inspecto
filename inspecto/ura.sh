@@ -24,6 +24,12 @@ if [[ -z "$JAR" || ! -f "$JAR" ]]; then
     exit 1
 fi
 
+# MODULE-REORG-P3d stage 2: the core libraries are thin jars in their own modules' target/ dirs, not inside the product jar.
+CP="$JAR"
+for _j in ../platform/*/target/inspecto-*.jar ../spi/*/target/inspecto-*.jar; do
+    case "$_j" in *sources*|*javadoc*|*tests*|*original*) ;; *) [ -f "$_j" ] && CP="$CP:$_j" ;; esac
+done
+
 exec java --enable-native-access=ALL-UNNAMED \
-          -cp "$JAR" \
+          -cp "$CP" \
           com.gamma.inspector.MainApp "$@"

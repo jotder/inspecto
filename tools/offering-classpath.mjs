@@ -9,6 +9,7 @@
 //
 //   node tools/offering-classpath.mjs --edition professional [--demo] --print          modules.list to stdout
 //   node tools/offering-classpath.mjs --edition professional --list-mvn                the `-pl` string for package.ps1
+//   node tools/offering-classpath.mjs --list-core                                      the core thin jars (artifactId<TAB>dir) package.ps1 stages
 //   node tools/offering-classpath.mjs --edition professional [--demo] --bundle <dir>   write modules.list +
 //                                                                                      edition.properties into <dir>
 //                                                                                      after verifying the staged jars
@@ -31,12 +32,14 @@
 import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EDITIONS, PG_SIDECAR, bundleModules, editionOnlyModules } from './bundle-modules.mjs';
+import { EDITIONS, PG_SIDECAR, bundleModules, editionOnlyModules, coreModules } from './bundle-modules.mjs';
 import { gather, idOf } from './check-offerings.mjs';
 
 /** The marker file name and the list file name the launchers read (inspecto/package.ps1 here-strings). */
 export const MODULES_LIST = 'modules.list';
 export const EDITION_FILE = 'edition.properties';
+/** P3d stage 2: the product jar + the core thin jars ONLY (no optional module, no sidecar) - for the one-shot tools (ura.*, the examples), which never carried the optional modules. */
+export const CORE_LIST = 'core.list';
 
 /** The demo build's replacement jar (the build-time check lives in package.ps1's `if ($DemoAuth)` block). */
 export const DEMO_JAR = 'inspecto-demo-auth.jar';
@@ -45,6 +48,10 @@ const DEMO_REPLACES = ['inspecto-oidc', 'inspecto-secrets', 'inspecto-geo-countr
 /** artifactId -> classpath position. Every shipped module must appear exactly once; the third-party driver follows. */
 export const CLASSPATH_ORDER = [
     'inspecto-processor',
+    // P3d stage 2: the first-party core libraries (bundle-modules.mjs CORE_MODULES), thin jars, directly behind the product jar -
+    // exactly where the shade used to put them (the processor's own classes first, then its first-party dependencies).
+    'inspecto-api', 'inspecto-util', 'inspecto-config', 'inspecto-sql', 'inspecto-etl', 'inspecto-audit-spi', 'inspecto-auth-spi',
+    'inspecto-access', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-event', 'inspecto-workflow', 'inspecto-acquire', 'inspecto-engine',
     'inspecto-oidc', 'inspecto-secrets', 'inspecto-geo-country', 'inspecto-connectors-kafka', 'inspecto-telecom-asn1',
     'inspecto-policy',
     'inspecto-connectors', 'inspecto-notify-channels', 'inspecto-backup',
@@ -100,8 +107,9 @@ export function classpath(edition, { demo = false, g = gather(join(dirname(fileU
     const ed = normalizeEdition(edition);
     if (demo && ed !== 'Enterprise') throw new Error(`the demo build is an Enterprise-capability build (got ${ed})`);
     assertOfferingEqualsBundle(ed, g);
-    const shipped = new Map(bundleModules(ed).map((m) => [m.artifactId, m.bundleFile]));
-    for (const a of CLASSPATH_ORDER) if (!bundleModules('Preview').some((m) => m.artifactId === a)) throw new Error(`CLASSPATH_ORDER names '${a}', which bundle-modules.mjs does not know`);
+    const shipped = new Map([...bundleModules(ed), ...coreModules()].map((m) => [m.artifactId, m.bundleFile]));
+    const known = [...bundleModules('Preview'), ...coreModules()];
+    for (const a of CLASSPATH_ORDER) if (!known.some((m) => m.artifactId === a)) throw new Error(`CLASSPATH_ORDER names '${a}', which bundle-modules.mjs does not know`);
     for (const a of shipped.keys()) if (!CLASSPATH_ORDER.includes(a)) throw new Error(`module '${a}' ships in ${ed} but has no place in CLASSPATH_ORDER (tools/offering-classpath.mjs) - add it, deliberately`);
     const jars = [];
     for (const a of CLASSPATH_ORDER) {
@@ -121,6 +129,12 @@ export function mvnModules(edition, g) {
     return CLASSPATH_ORDER.filter((a) => wanted.has(a)).map((a) => `:${a}`).join(',');
 }
 
+/** `--list-core`: one `artifactId<TAB>dir` per core thin jar, for package.ps1's staging loop (the one place that names them is bundle-modules.mjs). */
+export const coreList = () => coreModules().map((m) => `${m.artifactId}\t${m.dir}`).join('\n') + '\n';
+
+/** The core-only classpath: inspecto.jar then the core thin jars (CORE_MODULES order). */
+export const coreClasspath = () => ['inspecto.jar', ...coreModules().map((m) => m.bundleFile)];
+
 /** modules.list text: one jar per line, LF. */
 export const renderList = (jars) => jars.join('\n') + '\n';
 /** edition.properties text. */
@@ -138,6 +152,7 @@ function main() {
     const a = process.argv.slice(2);
     const val = (k) => { const i = a.indexOf(k); return i >= 0 ? a[i + 1] : undefined; };
     try {
+        if (a.includes('--list-core')) { process.stdout.write(coreList()); return; }
         const edition = val('--edition');
         if (!edition) throw new Error('--edition <personal|professional|enterprise|preview> is required');
         const demo = a.includes('--demo');
@@ -150,7 +165,8 @@ function main() {
             if (problems.length) throw new Error(`the staged bundle and the Offering classpath disagree:\n  ${problems.join('\n  ')}`);
             writeFileSync(join(bundle, MODULES_LIST), renderList(jars));
             writeFileSync(join(bundle, EDITION_FILE), renderEdition(edition, demo));
-            console.log(`offering-classpath: ${normalizeEdition(edition)}${demo ? ' (demo)' : ''} -> ${MODULES_LIST} (${jars.length} jars) + ${EDITION_FILE} in ${bundle}`);
+            writeFileSync(join(bundle, CORE_LIST), renderList(coreClasspath()));
+            console.log(`offering-classpath: ${normalizeEdition(edition)}${demo ? ' (demo)' : ''} -> ${MODULES_LIST} (${jars.length} jars) + ${EDITION_FILE} + ${CORE_LIST} in ${bundle}`);
         } else process.stdout.write(renderList(jars));
     } catch (e) {
         console.error(`offering-classpath: ${e.message}`);
