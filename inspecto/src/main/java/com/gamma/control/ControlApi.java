@@ -633,6 +633,12 @@ public final class ControlApi implements AutoCloseable, HostContext {
             }
             log.info("route module discovered: {}", module.getClass().getName());
         }
+        // Host-wide seams an optional module installs once the Spaces exist (HostBootHook) - kept out of
+        // RouteModule.register so a module's routes can be driven on a test double. Fail-soft like the modules.
+        for (HostBootHook hook : com.gamma.spi.OptionalSpi.all(HostBootHook.class)) {
+            hook.afterRoutes(spaces());
+            log.info("host boot hook installed: {}", hook.getClass().getName());
+        }
         // Absent-module stubs, LAST of all: they register only the paths no discovered module claimed
         // (hasRoute), so an optional feature's paths answer 503 "not installed" rather than 404 — the
         // EDITIONS §4 contract for every client, not just the SPA. Order matters: after discovery, or the

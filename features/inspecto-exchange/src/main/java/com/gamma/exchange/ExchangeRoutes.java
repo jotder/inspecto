@@ -61,34 +61,8 @@ public final class ExchangeRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        // The seam ControlApi's constructor used to wire (`SharedRefResolver.install(new
-        // ExchangeRefResolver(spaces))`, deleted there in EDG-01 cell 4). Doing it HERE is what makes it
-        // edition-correct: without this module DatasetRelation keeps SharedRefResolver.NONE and every
-        // `shared/<owner>/<item>` ref fails to resolve — fail-closed, with zero wiring. `install` is a
-        // public idempotent static, so registering twice is harmless.
-        com.gamma.query.SharedRefResolver.install(new ExchangeRefResolver(HostContext.of(api).spaces()));
-        // Cross-Space consequence slice 3: deliver consented Signals between this installation's Spaces.
-        ExchangeSignalForwarder.install(HostContext.of(api).spaces());
-        // Slice 5: a Decision Rule emit-signal with offerTo asks this before it emits (absent module => refused).
-        com.gamma.control.SignalOfferGrants.install((owner, consumer, type) -> {
-            Exchange ex = Exchange.under(HostContext.of(api).spaces().containerRoot());
-            return ex.enabled() && ex.activeGrant(consumer, owner, Exchange.SIGNAL, type).isPresent()
-                    && ex.offer(owner, Exchange.SIGNAL, type).isPresent();
-        });
-        // The core's delete fence (ComponentRoutes) asks THIS for "is the item still shared?" — it used to
-        // reach into com.gamma.exchange by fully-qualified name, which is why an import census missed it and
-        // why the core could not drop this package. Absent module ⇒ SharedItemConsumers.NONE ⇒ empty, which
-        // is right: with no Exchange nothing can have been offered, so no consumer can be harmed.
-        com.gamma.control.SharedItemConsumers.install((type, id) -> {
-            Exchange ex = Exchange.under(HostContext.of(api).spaces().containerRoot());
-            if (!ex.enabled()) return java.util.List.of();
-            String owner = com.gamma.event.EventLog.currentSpaceId();
-            return ex.grants().stream()
-                    .filter(g -> ShareGrant.ACTIVE.equals(g.status())
-                            && type.equals(g.kind()) && id.equals(g.item()) && owner.equals(g.owner()))
-                    .map(ShareGrant::consumer)
-                    .toList();
-        });
+        // The host-wide installs (SharedRefResolver, signal forwarder, SignalOfferGrants, SharedItemConsumers) live in
+        // ExchangeBootHook, so register() only registers routes and runs on any ApiContext (MODULE-REORG-P5-TCKS).
         api.get("/exchange/offers", (e, m) -> listOffers(api, e));
         // 🔴 Every write is gated in the Space that OWNS what it acts on (EXCHANGE-OWNING-SPACE-AUTHZ-1).
         // These routes carry no /spaces/{id} prefix, so the attached Subject holds the DEFAULT Space's

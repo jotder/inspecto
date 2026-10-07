@@ -63,7 +63,7 @@ public final class ExchangeSignalForwarder implements java.util.function.BiConsu
 
     private ExchangeSignalForwarder() {}
 
-    /** Serve {@code spaces}' ledgers (idempotent). Installed by {@code ExchangeRoutes}, so absent from Personal. */
+    /** Serve {@code spaces}' ledgers (idempotent). Installed by {@code ExchangeBootHook}, so absent from Personal. */
     public static void install(SpaceManager spaces) {
         if (spaces == null || spaces.containerRoot() == null) return;
         INSTANCE.managers.removeIf(w -> w.get() == null);
