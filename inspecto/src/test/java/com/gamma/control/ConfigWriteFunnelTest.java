@@ -284,7 +284,11 @@ class ConfigWriteFunnelTest {
             Map.entry("ActionRequestRoutes#decide", ACTION_REQUESTS), Map.entry("ActionRequestRoutes#retry", ACTION_REQUESTS),
             Map.entry("ActionRequestRoutes#markFailed", ACTION_REQUESTS),
             Map.entry("ActionDispatcher#fail", ACTION_REQUESTS), Map.entry("ActionDispatcher#run", ACTION_REQUESTS),
-            Map.entry("PendingAlertRules#ensureLatestDataset", PENDING_ALERT_RULES)
+            Map.entry("PendingAlertRules#ensureLatestDataset", PENDING_ALERT_RULES),
+            Map.entry("ReconComponentDeleteHook#afterDelete", "the Reconciliation module's OPERATIONAL run state "
+                    + "(<write-root>/recon-state/<id>.json, ReconStateStore), cleaned up after the component delete that "
+                    + "calls this hook — a route that already passed the maker-checker hold in ComponentRoutes; not a "
+                    + "ComponentStore config kind")
     ));
 
     @Test
