@@ -370,6 +370,25 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
 - **Packaging check:** `package.ps1` fails when the staged `inspecto*.jar` files carry more than one distinct non-`dev`
   build id, or when a fresh build's id differs from the staged one. **Not run end to end** (`package.ps1` was parse-checked only).
 
+### P3c as built (2026-10-07 - the jlink runtime set is derived, not hand-kept)
+- **Tool:** `tools/jlink-modules.mjs` = `jdeps --multi-release 27 --ignore-missing-deps --print-module-deps` over EVERY staged jar (first-party + sidecars; a shaded
+  sidecar is one jar so it covers its bundled deps) UNION `tools/jlink-runtime-extra.txt` (7 reflection/ServiceLoader needs jdeps cannot see, each with a WHY),
+  held against `tools/jlink-modules.lock` (per edition; `--write-lock` refreshes). `--check` needs no jars (lock well-formed; extra.txt names are real
+  `java --list-modules` modules) - CI-safe; to wire it add `node tools/jlink-modules.mjs --check` to the guards job in `ci.yml` (NOT done in this step).
+  It FAILS when a jar `bundle-modules.mjs` says the edition stages is absent, because `--ignore-missing-deps` would otherwise silently shrink the set.
+- **package.ps1** runs it after staging, in WARN-AND-USE-UNION mode: runtime = the old hand list (13) UNION the derived set, delta printed, so this step cannot
+  shrink a working runtime. The hand list stays until a few bundles show an empty delta.
+- **The real delta (Professional, 22 staged jars):** jdeps found 13 modules, all already in the hand list EXCEPT three it was missing:
+  `java.security.jgss` + `java.security.sasl` (kafka-clients / sshj SASL + Kerberos paths) and `jdk.jfr` (a shaded dependency imports `jdk.jfr`).
+  Computed set 16; hand-only 0. These three were absent from every earlier runtime, so a Kafka SASL or JFR code path would have thrown NoClassDefFoundError there.
+  `jdk.crypto.ec` and `jdk.zipfs` come only from extra.txt (jdeps cannot see them) - the reason that file exists.
+- **Proof on the bundle's OWN `runtime/bin/java`** (not the build JVM, per the section 9 trap): `--list-modules` shows the 16 roots plus their transitive requires
+  (java.datatransfer, java.logging, java.prefs, java.transaction.xa, java.xml = 21); the bundle booted on it (`ControlApi`, no oidc jar) answered `/health` UP,
+  ran the `06-serve/pipeline-job` example (ingest committed Parquet, event-fired job and a manual `POST /jobs/sales_rollup/trigger` both `SUCCESS`),
+  and `/api/v1/modules` listed 32 ACTIVE + 8 not-installed (oidc, policy, la-store-pg, intelligence, ... correctly absent). The oidc/JWKS path was exercised only
+  by package.ps1's own boot smoke (it loads `inspecto-oidc.jar` on that runtime; no JWKS fetch). Windows runtime only; the Linux image is the same module list.
+- **Locks:** `[Professional]` and `[Enterprise]` written (Enterprise, 25 jars incl. intelligence + la-store-pg + policy, derives the SAME 16 modules; its package.ps1 boot smoke passed). Personal and Preview are not yet written - run `--write-lock` on their staged output.
+
 ### P3b as built (2026-10-07 — 503 stubs synthesised from manifests; the jar split is still NOT done)
 - **`provides.routes`** (`ModuleManifest.Provides.routes`): `"METHOD path"` strings, `path` = the exact regex registered, in registration
   order (first-match: a catch-all stays after the literals it would swallow). Filled for the 8 optional modules that had a hand-written

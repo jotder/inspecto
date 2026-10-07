@@ -1092,6 +1092,7 @@ docker run -p 8080:8080 -v /srv/inspecto/spaces:/app/spaces inspecto
 ```
 
 As-built decisions:
+- **The jlink module set is derived (2026-10-07, P3c).** `tools/jlink-modules.mjs` unions `jdeps` over every staged jar with `tools/jlink-runtime-extra.txt` (reflection/ServiceLoader needs, each with a WHY) and holds it against `tools/jlink-modules.lock`; `package.ps1` links the hand-kept list UNION the derived set and prints the delta. `--check` is the jar-free validity check. Detail: `docs/superpower/module-architecture-reorg-plan.md` (P3c as built).
 - **The bundle's own jlink `runtime/` supplies the JVM** (changed 2026-09-17); the base is
   `debian:stable-slim` and provides only glibc + bash. It was `eclipse-temurin:24-jre` with
   `.dockerignore` excluding `runtime/`, so serve.sh's `[ -x runtime/bin/java ]` preference missed on
