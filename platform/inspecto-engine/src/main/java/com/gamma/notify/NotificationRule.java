@@ -2,9 +2,12 @@ package com.gamma.notify;
 
 import com.gamma.event.Event;
 import com.gamma.event.EventLevel;
+import com.gamma.query.ConditionTree;
 import com.gamma.util.Values;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,10 +32,46 @@ public record NotificationRule(String id, String eventType, EventLevel minLevel,
                                String titleTemplate, String bodyTemplate, String dedupeKeyTemplate,
                                boolean enabled) {
 
-    /** {@code true} when {@code e} should fire this rule. */
+    /** {@code true} when {@code e} should fire this rule — {@link #tree()} evaluated over {@link #matchContext}.
+     *  A blank {@code eventType} fires nothing (an empty tree leaf would otherwise read as "no constraint"). */
     public boolean matches(Event e) {
-        return enabled && e != null && eventType.equalsIgnoreCase(e.type())
-                && (minLevel == null || e.level().atLeast(minLevel));
+        return enabled && e != null && eventType != null && !eventType.isBlank()
+                && ConditionTree.matched(tree(), List.of(matchContext(e))) == 1;
+    }
+
+    /**
+     * The match as a condition tree (Decision Kernel step 4) — {@code eventType} / {@code minLevel} stay the
+     * authoring form, this is what they mean: {@code type} equals the event type ignoring case, and
+     * {@code levelRank} is at least the minimum's rank. Evaluated over {@link #matchContext}.
+     */
+    public Map<String, Object> tree() {
+        List<Object> all = new ArrayList<>();
+        all.add(leaf("type", "=", eventType, true));
+        if (minLevel != null) all.add(leaf("levelRank", ">=", String.valueOf(minLevel.ordinal()), false));
+        Map<String, Object> g = new LinkedHashMap<>();
+        g.put("kind", "group");
+        g.put("op", "AND");
+        g.put("items", all);
+        return g;
+    }
+
+    /** The row the match tree is evaluated over: {@code type} and {@code levelRank} (the {@link EventLevel}
+     *  ordinal, so a minimum is a numeric floor). */
+    static Map<String, Object> matchContext(Event e) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("type", e.type());
+        row.put("levelRank", e.level().ordinal());
+        return row;
+    }
+
+    private static Map<String, Object> leaf(String field, String operator, String value, boolean ignoreCase) {
+        Map<String, Object> c = new LinkedHashMap<>();
+        c.put("kind", "condition");
+        c.put("field", field);
+        c.put("operator", operator);
+        c.put("value", value);
+        if (ignoreCase) c.put("ignoreCase", true);
+        return c;
     }
 
     /**
