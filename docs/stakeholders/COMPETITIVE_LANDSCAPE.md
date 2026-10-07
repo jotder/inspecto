@@ -7,7 +7,9 @@
 > the repository) and the **market side** (who we meet, what they have, what buyers believe — every
 > statement here traces to a dated, linked source). §6 is where the two sides disagree until they don't.
 >
-> Companions: [`PRODUCT_CAPABILITIES.md`](PRODUCT_CAPABILITIES.md) (what the user gets) ·
+> Companions: [`COMPETITIVE_CAPABILITY_MATRIX.md`](COMPETITIVE_CAPABILITY_MATRIX.md) (2026-10-07 — capability-by-capability
+> matrix against LATRO, Subex, Mobileum, Neural Technologies, TEOCO and Araxxe, mapped to Inspecto modules) ·
+> [`PRODUCT_CAPABILITIES.md`](PRODUCT_CAPABILITIES.md) (what the user gets) ·
 > [`EXECUTIVE_BRIEF.md`](EXECUTIVE_BRIEF.md) (the sponsor's three minutes) ·
 > [`../okf/capabilities/editions/editions.md`](../okf/capabilities/editions/editions.md) (editions,
 > topologies, the signed decisions) · [`../superpower/enterprise-scale-out-plan.md`](../superpower/enterprise-scale-out-plan.md)

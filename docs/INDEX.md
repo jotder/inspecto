@@ -114,7 +114,9 @@ paid for violating them.
 - [`stakeholders/`](stakeholders/README.md) — per-audience reading map: executive brief, product
   capabilities, technical architecture, operations guide, testing guide, and the **competitive landscape**
   ([`stakeholders/COMPETITIVE_LANDSCAPE.md`](stakeholders/COMPETITIVE_LANDSCAPE.md), 2026-09-10 — a living
-  two-sided alignment doc: what ships vs who we meet, counts derived by the count guard, market claims dated).
+  two-sided alignment doc: what ships vs who we meet, counts derived by the count guard, market claims dated)
+  and its companion [`stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md`](stakeholders/COMPETITIVE_CAPABILITY_MATRIX.md)
+  (2026-10-07 — capability matrix vs six assurance vendors, gaps mapped to modules and backlog rows).
   Beside it, the external-facing [`stakeholders/INSPECTO_ENTERPRISE_WHITEPAPER.md`](stakeholders/INSPECTO_ENTERPRISE_WHITEPAPER.md)
   (v1.2, 2026-09-11) — written to the landscape's §4 claims register, with a release-basis note naming the
   Sprint 8 rows it assumes shipped; its `.docx` is generated, gitignored.
