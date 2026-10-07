@@ -65,11 +65,11 @@ const RED = {
         /bundle-modules\.mjs ships inspecto-demo-auth\.jar/,
     ],
     'the boot-smoke classpath literal': [
-        edit('inspecto/package.ps1', "@('inspecto-oidc.jar',", "@('inspecto-oidc.jar','inspecto-demo-auth.jar',"),
+        edit('inspecto/package.ps1', "$cp = @(Get-Content", "$cp = @('inspecto-demo-auth.jar') + @(Get-Content"),
         /outside an `if \(\$DemoAuth\)` block/,
     ],
     'an edition $modules build list': [
-        edit('inspecto/package.ps1', "{ ':inspecto-oidc,:inspecto-secrets,:inspecto-geo-country,:inspecto-connectors-kafka,", "{ ':inspecto-oidc,:inspecto-secrets,:inspecto-geo-country,:inspecto-demo-auth,:inspecto-connectors-kafka,"),
+        edit('inspecto/package.ps1', "--list-mvn) | Out-String", "--list-mvn) + ',:inspecto-demo-auth' | Out-String"),
         /outside an `if \(\$DemoAuth\)` block/,
     ],
     'a staging step under a NEGATED gate': [
@@ -82,7 +82,7 @@ const RED = {
         /removes inspecto-oidc.jar/,
     ],
     'inspecto-oidc.jar on the demo launcher classpath': [
-        edit('inspecto/package.ps1', "$demoJars = @('inspecto.jar',", "$demoJars = @('inspecto.jar', 'inspecto-oidc.jar',"),
+        edit('inspecto/package.ps1', "$demoJars = @(Get-Content", "$demoJars = @('inspecto-oidc.jar', Get-Content"),
         /demo launcher classpath/,
     ],
     'a shipped module depending on it': [

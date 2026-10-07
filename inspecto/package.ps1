@@ -9,13 +9,14 @@
 # -Edition Enterprise is Professional + inspecto-policy (the ABAC AccessDecider SPI implementation),
 # bundled as inspecto-policy.jar. It needs NO extra flag: the module is discovered purely
 # through META-INF/services/com.gamma.spi.auth.AccessDecider, so being on the classpath is what
-# turns policy evaluation on. serve.sh/serve.bat auto-detect it the same way they do the OIDC jar.
+# turns policy evaluation on. (P3d: the classpath is the bundle's modules.list, written by tools/offering-classpath.mjs from the
+# Offering, and the edition is its edition.properties - the launchers READ both; they no longer sniff which jars are present.)
 #
 # -Edition Professional (default: Personal; 'Standard' accepted as legacy alias) additionally builds
 # inspecto-oidc (W6, the OIDC Authenticator SPI implementation; split out of inspecto-security by D-MR6, together with inspecto-secrets and inspecto-geo-country) and bundles it as
-# inspecto-oidc.jar; serve.sh/serve.bat auto-detect its presence, add it to the classpath, and
+# inspecto-oidc.jar; modules.list puts it on the classpath and edition.properties makes serve.sh/serve.bat
 # turn on -Dauth.mode=oidc. Professional/Enterprise also bundle the PostgreSQL JDBC driver as
-# postgresql.jar (PG-1) — same auto-detect mechanism, inert until -Dinspecto.db=postgres; the fat
+# postgresql.jar (PG-1) — listed in modules.list, inert until -Dinspecto.db=postgres; the fat
 # JAR stays driver-free. (issuer/JWKS/audience from AUTH_OIDC_* env vars — never baked into the bundle).
 # The embedded jlink runtime's module set (below) is VERIFIED sufficient for inspecto-oidc too
 # (PKG-4, 2026-07-07): jdeps on inspecto-oidc.jar + Nimbus JOSE+JWT 10.9.1 needs nothing beyond
@@ -49,8 +50,8 @@
 #   1. Unzip inspecto-deploy.zip  →  inspecto-deploy/
 #   2. Create your inbox directories under inspecto-deploy/inbox/<adapter>/
 #   3. Use the bundled run.sh / run.bat (RUNSH-CP-1): they cd to the bundle root and launch with
-#      -cp inspecto.jar[:sidecars ...], NEVER java -jar (which ignores -cp and CLASSPATH outright,
-#      making every sidecar unreachable) — see the run.sh emitter at ~line 684 and run.bat at ~771.
+#      -cp <modules.list>, NEVER java -jar (which ignores -cp and CLASSPATH outright,
+#      making every sidecar unreachable) — see the run.sh / run.bat here-strings in step 5.
 #      (or use the bundled run.bat / run.sh — they cd to the bundle root automatically)
 #
 param(
@@ -87,7 +88,8 @@ param(
     # The demo jar is deliberately outside the three jar enumerations tools/check-sbom-modules.mjs parses,
     # because no edition ships it; the SBOM therefore still describes the Enterprise module set.
     # tools/check-demo-auth-isolation.mjs (CI) fails if the demo jar is named anywhere here outside an
-    # `if ($DemoAuth)` block, or if the demo branch stops removing inspecto-oidc.jar.
+    # `if ($DemoAuth)` block, or if the demo branch stops removing inspecto-oidc.jar. The demo bundle's modules.list comes from
+    # tools/offering-classpath.mjs --demo (the OIDC trio replaced by the demo jar), which serve-demo.* read like any launcher.
     [switch]$DemoAuth,
     # UI flavor (D-5 step 7, la-separation-d5-design Decisions 6/7): WHICH single-page application the bundle's ui/ holds.
     # NOT an edition (EDITIONS.md): every edition can ship either. 'gamma' is the Inspecto console (the default, the
@@ -316,7 +318,11 @@ if ($Edition -ne 'Personal') {
     # builds its `sidecar` artifact for the editions that stage it.
     # ASSURE-INTELLIGENCE-BUNDLE-1 (D-P2): inspecto-intelligence (the /agent/* agent, onnxruntime inside)
     # is ENTERPRISE only - also a default-reactor module, listed so this pass builds its `sidecar`.
-    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { ':inspecto-oidc,:inspecto-secrets,:inspecto-geo-country,:inspecto-connectors-kafka,:inspecto-telecom-asn1,:inspecto-policy,:inspecto-notify-channels,:inspecto-backup,:inspecto-entity-list,:inspecto-la-graph,:inspecto-la-storage,:inspecto-la-core,:inspecto-la-api,:inspecto-geo-link,:inspecto-exchange,:inspecto-observability,:inspecto-ops,:inspecto-reconciliation,:inspecto-scoring,:inspecto-agent,:inspecto-la-store-pg,:inspecto-intelligence' } else { ':inspecto-oidc,:inspecto-secrets,:inspecto-geo-country,:inspecto-connectors-kafka,:inspecto-telecom-asn1,:inspecto-notify-channels,:inspecto-backup,:inspecto-entity-list,:inspecto-la-graph,:inspecto-la-storage,:inspecto-la-core,:inspecto-la-api,:inspecto-geo-link,:inspecto-exchange,:inspecto-observability,:inspecto-ops,:inspecto-reconciliation,:inspecto-scoring,:inspecto-agent' }
+    # MODULE-REORG-P3d stage 1: the `-pl` list comes from the Offering (tools/offering-classpath.mjs resolves offerings/<edition>.toon,
+    # asserts it equals tools/bundle-modules.mjs's set, and prints every module the edition adds beyond the default reactor) - it is
+    # no longer a second hand-kept list beside the staging steps and the launchers.
+    $modules = ((& node (Join-Path $sandboxRoot 'tools\offering-classpath.mjs') --edition $Edition --list-mvn) | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or -not $modules) { throw "tools/offering-classpath.mjs --list-mvn failed for the $Edition edition (see above)" }
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
@@ -983,6 +989,17 @@ if ($DemoAuth) {
     Write-Host "DEMO BUILD: inspecto-oidc.jar replaced by inspecto-demo-auth.jar (Demo User sign-in, loopback only)" -ForegroundColor Yellow
 }
 
+# ── step 3a-ter: modules.list + edition.properties (MODULE-REORG-P3d stage 1) ─────────────────────────────────
+# The ONE statement of what the bundle's classpath is. tools/offering-classpath.mjs resolves the Offering (offerings/<edition>.toon),
+# asserts it equals tools/bundle-modules.mjs's set, orders it, FAILS if a jar staged above is missing from the list or a listed
+# jar is not staged, and writes `modules.list` (one jar per line, classpath order) and `edition.properties` (edition=<name>) into the bundle.
+# run.sh/run.bat/serve.sh/serve.bat/serve-demo.* and the boot smoke below all READ modules.list; none keeps a jar list of its own.
+# Runs AFTER the demo swap so the demo bundle's list names inspecto-demo-auth.jar and not the OIDC trio it removed.
+$classpathArgs = @('--edition', $Edition, '--bundle', $bundleDir)
+if ($DemoAuth) { $classpathArgs += '--demo' }
+& node (Join-Path $sandboxRoot 'tools\offering-classpath.mjs') @classpathArgs
+if ($LASTEXITCODE -ne 0) { throw "tools/offering-classpath.mjs failed - the staged jars and the Offering's classpath disagree (see above)" }
+
 # ── step 3b: copy the built UI dist → bundle/ui (served by ControlApi via -Dui.dir=./ui) ──
 # Angular emits to ui/dist/<app>[/browser]; locate the folder that actually holds index.html.
 #
@@ -1112,51 +1129,24 @@ fi
 # caller (CollectorProcessor, this jar's own Main-Class) is exactly what this script launches.
 # serve.sh had the sidecars and run.sh did not; that divergence is what hid it, so both build the
 # classpath the same way now. Every entry is inert unless a config asks for it.
-CP="inspecto.jar"
-[ -f inspecto-connectors.jar ] && CP="${CP}:inspecto-connectors.jar"
-# Delivery channels (EDG-01 cell 1): Professional/Enterprise bundles only, and honoured on ANY bundle so a
-# drop-in works. Personal never carries the jar, so it has no external transport at all -- in-app
-# delivery is intrinsic to NotificationService and is not a channel. The classpath entry IS the switch:
-# the module is found via META-INF/services/com.gamma.notify.NotificationChannel.
-[ -f inspecto-notify-channels.jar ] && CP="${CP}:inspecto-notify-channels.jar"
-# Backup / restore tasks (EDG-01 cell 2): Professional/Enterprise only; same contract as the line above.
-[ -f inspecto-backup.jar ] && CP="${CP}:inspecto-backup.jar"
-# Geo map + link analysis routes (EDG-01 cell 3b): Professional/Enterprise only; same contract as above.
-[ -f inspecto-entity-list.jar ] && CP="${CP}:inspecto-entity-list.jar"
-[ -f inspecto-la-graph.jar ] && CP="${CP}:inspecto-la-graph.jar"
-[ -f inspecto-la-storage.jar ] && CP="${CP}:inspecto-la-storage.jar"
-[ -f inspecto-la-core.jar ] && CP="${CP}:inspecto-la-core.jar"
-[ -f inspecto-la-api.jar ] && CP="${CP}:inspecto-la-api.jar"
-[ -f inspecto-la-store-pg.jar ] && CP="${CP}:inspecto-la-store-pg.jar"
-[ -f inspecto-geo-link.jar ] && CP="${CP}:inspecto-geo-link.jar"
-# Cross-space exchange (EDG-01 cell 4): Professional/Enterprise only; same contract as above.
-[ -f inspecto-exchange.jar ] && CP="${CP}:inspecto-exchange.jar"
-# Prometheus scrape endpoint (EDG-01 cell 5): Professional/Enterprise only.
-[ -f inspecto-observability.jar ] && CP="${CP}:inspecto-observability.jar"
-[ -f inspecto-ops.jar ] && CP="${CP}:inspecto-ops.jar"
-[ -f inspecto-reconciliation.jar ] && CP="${CP}:inspecto-reconciliation.jar"
-[ -f inspecto-scoring.jar ] && CP="${CP}:inspecto-scoring.jar"
-# PKG-5: the assistant, Professional and above. Absent in a Personal bundle, and absent-safe everywhere:
-# OptionalSpi skips a provider that cannot LINK (its dependency needs a newer Java than the product
-# floor of 24), so an older host boots normally and the assist paths answer 503.
-[ -f inspecto-agent.jar ] && CP="${CP}:inspecto-agent.jar"
-# ASSURE-INTELLIGENCE-BUNDLE-1: the /agent/* intelligence agent, Enterprise only; OptionalSpi-skipped likewise.
-[ -f inspecto-intelligence.jar ] && CP="${CP}:inspecto-intelligence.jar"
-# Its native loaders (onnxruntime, JNA, DJL tokenizers) extract libraries at first use. Keep them OFFLINE and
-# out of the shared %TEMP% / ~/.djl.ai: everything lands in ./runtime-natives, created owner-only (0700).
-# onnxruntime ALWAYS extracts into java.io.tmpdir (onnxruntime.native.path only names a PRE-extracted dir),
-# so java.io.tmpdir itself is pinned. ASSURE-INTELLIGENCE-BUNDLE-1.
+# MODULE-REORG-P3d stage 1: the classpath is READ from modules.list - one jar per line, classpath order, written at package time
+# by tools/offering-classpath.mjs from the bundle's Offering (the same list serve.sh reads). Nothing here names a jar.
+# FALLBACK, for a hand-assembled directory with no modules.list: inspecto.jar first, then every *.jar beside it.
+if [ -f modules.list ]; then
+    CP="$(tr -d '\r' < modules.list | tr '\n' ':')"; CP="${CP%:}"
+else
+    echo "[run.sh] modules.list not found - falling back to every *.jar in this directory" >&2
+    CP="inspecto.jar"; for _jar in *.jar; do [ "$_jar" = "inspecto.jar" ] || CP="${CP}:${_jar}"; done
+fi
+# ASSURE-INTELLIGENCE-BUNDLE-1: the intelligence agent's native loaders (onnxruntime, JNA, DJL tokenizers) extract libraries at
+# first use. Keep them OFFLINE and out of the shared %TEMP% / ~/.djl.ai: everything lands in ./runtime-natives, created
+# owner-only (0700). onnxruntime ALWAYS extracts into java.io.tmpdir (onnxruntime.native.path only names a PRE-extracted
+# dir), so java.io.tmpdir itself is pinned. Keyed on the jar being STAGED, not on the classpath list, so a drop-in works too.
 if [ -f inspecto-intelligence.jar ]; then
     NATIVES="$(pwd)/runtime-natives"
     ( umask 077; mkdir -p "${NATIVES}/tmp" "${NATIVES}/djl" ) && chmod 700 "${NATIVES}"
     JAVA_OPTS+=("-Dai.djl.offline=true" "-Djava.io.tmpdir=${NATIVES}/tmp" "-Djna.tmpdir=${NATIVES}/tmp" "-DDJL_CACHE_DIR=${NATIVES}/djl" "-DENGINE_CACHE_DIR=${NATIVES}/djl")
 fi
-[ -f inspecto-oidc.jar ]   && CP="${CP}:inspecto-oidc.jar"
-[ -f inspecto-secrets.jar ]   && CP="${CP}:inspecto-secrets.jar"
-[ -f inspecto-geo-country.jar ]   && CP="${CP}:inspecto-geo-country.jar"
-[ -f inspecto-connectors-kafka.jar ] && CP="${CP}:inspecto-connectors-kafka.jar"
-[ -f inspecto-telecom-asn1.jar ] && CP="${CP}:inspecto-telecom-asn1.jar"
-[ -f postgresql.jar ]          && CP="${CP}:postgresql.jar"
 exec "$JAVA" "${JAVA_OPTS[@]}" \
           -cp "$CP" com.gamma.inspector.CollectorProcessor \
           "$PIPELINE"
@@ -1228,41 +1218,23 @@ if not "%EXTRA_OPTS%"=="" set "OPTS=%OPTS% %EXTRA_OPTS%"
 if not "%EXTRA_OPTS%"=="" echo [run.bat] extra JVM opts: %EXTRA_OPTS%
 rem RUNSH-CP-1 (2026-09-07): -cp, never -jar. See run.sh for why - `java -jar` ignores the
 rem classpath, so every sidecar (connectors above all) was unreachable on this one-shot ETL path.
-set "CP=inspecto.jar"
-if exist inspecto-connectors.jar set "CP=%CP%;inspecto-connectors.jar"
-rem Delivery channels (EDG-01 cell 1) - Professional/Enterprise only; see serve.sh for the reasoning.
-if exist inspecto-notify-channels.jar set "CP=%CP%;inspecto-notify-channels.jar"
-rem Backup / restore tasks (EDG-01 cell 2) - Professional/Enterprise only.
-if exist inspecto-backup.jar set "CP=%CP%;inspecto-backup.jar"
-rem Geo map + link analysis routes (EDG-01 cell 3b) - Professional/Enterprise only.
-if exist inspecto-entity-list.jar set "CP=%CP%;inspecto-entity-list.jar"
-if exist inspecto-la-graph.jar set "CP=%CP%;inspecto-la-graph.jar"
-if exist inspecto-la-storage.jar set "CP=%CP%;inspecto-la-storage.jar"
-if exist inspecto-la-core.jar set "CP=%CP%;inspecto-la-core.jar"
-if exist inspecto-la-api.jar set "CP=%CP%;inspecto-la-api.jar"
-if exist inspecto-la-store-pg.jar set "CP=%CP%;inspecto-la-store-pg.jar"
-if exist inspecto-geo-link.jar set "CP=%CP%;inspecto-geo-link.jar"
-rem Cross-space exchange (EDG-01 cell 4) - Professional/Enterprise only.
-if exist inspecto-exchange.jar set "CP=%CP%;inspecto-exchange.jar"
-rem Prometheus scrape endpoint (EDG-01 cell 5) - Professional/Enterprise only.
-if exist inspecto-observability.jar set "CP=%CP%;inspecto-observability.jar"
-if exist inspecto-ops.jar set "CP=%CP%;inspecto-ops.jar"
-if exist inspecto-reconciliation.jar set "CP=%CP%;inspecto-reconciliation.jar"
-if exist inspecto-scoring.jar set "CP=%CP%;inspecto-scoring.jar"
-if exist inspecto-agent.jar set "CP=%CP%;inspecto-agent.jar"
-if exist inspecto-intelligence.jar set "CP=%CP%;inspecto-intelligence.jar"
+rem MODULE-REORG-P3d stage 1: the classpath is READ from modules.list - one jar per line, classpath order, written at package
+rem time by tools/offering-classpath.mjs from the bundle's Offering (the same list serve.bat reads). Nothing here names a jar.
+rem Built WITHOUT delayed expansion (these single-line statements: `call set` re-expands %CP% per jar), for the reason serve.bat
+rem states at SERVEBAT-OPTS-1. The list is accumulated as ;a;b;c and the leading ; is stripped. FALLBACK, for a hand-assembled
+rem directory with no modules.list: inspecto.jar first, then every *.jar beside it.
+set "CP="
+if exist modules.list for /f "usebackq delims=" %%J in ("modules.list") do call set "CP=%%CP%%;%%J"
+if not exist modules.list echo [run.bat] modules.list not found - falling back to every *.jar in this directory
+if not exist modules.list set "CP=;inspecto.jar"
+if not exist modules.list for %%J in (*.jar) do if /i not "%%J"=="inspecto.jar" call set "CP=%%CP%%;%%J"
+set "CP=%CP:~1%"
 rem ASSURE-INTELLIGENCE-BUNDLE-1: native loaders stay OFFLINE and out of %TEMP% / ~/.djl.ai - everything lands in
 rem runtime-natives\, whose inherited ACL is replaced by one owner-only grant at first start.
 if exist inspecto-intelligence.jar if not exist runtime-natives\tmp mkdir runtime-natives\tmp
 if exist inspecto-intelligence.jar if not exist runtime-natives\djl mkdir runtime-natives\djl
 if exist inspecto-intelligence.jar for /f "delims=" %%U in ('whoami') do icacls runtime-natives /inheritance:r /grant:r "%%U:(OI)(CI)F" >nul
 if exist inspecto-intelligence.jar set "OPTS=%OPTS% -Dai.djl.offline=true -Djava.io.tmpdir=%CD%\runtime-natives\tmp -Djna.tmpdir=%CD%\runtime-natives\tmp -DDJL_CACHE_DIR=%CD%\runtime-natives\djl -DENGINE_CACHE_DIR=%CD%\runtime-natives\djl"
-if exist inspecto-oidc.jar set "CP=%CP%;inspecto-oidc.jar"
-if exist inspecto-secrets.jar set "CP=%CP%;inspecto-secrets.jar"
-if exist inspecto-geo-country.jar set "CP=%CP%;inspecto-geo-country.jar"
-if exist inspecto-connectors-kafka.jar set "CP=%CP%;inspecto-connectors-kafka.jar"
-if exist inspecto-telecom-asn1.jar set "CP=%CP%;inspecto-telecom-asn1.jar"
-if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 "%JAVA%" %OPTS% ^
      -cp "%CP%" com.gamma.inspector.CollectorProcessor ^
      "%PIPELINE%"
@@ -1362,20 +1334,31 @@ JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dcontrol.port=${PORT}" "-Dspaces
 [ -n "${CORS_ORIGIN:-}" ]   && JAVA_OPTS+=("-Dcontrol.cors=${CORS_ORIGIN}")
 [ -n "${HTTPS_KEYSTORE:-}" ]          && JAVA_OPTS+=("-Dhttps.keystore=${HTTPS_KEYSTORE}")
 [ -n "${HTTPS_KEYSTORE_PASSWORD:-}" ] && JAVA_OPTS+=("-Dhttps.keystore.password=${HTTPS_KEYSTORE_PASSWORD}")
-# Edition auto-detects from the bundle (W6, docs/EDITIONS.md): inspecto-oidc.jar present
-# ⇒ Professional — put it on the classpath and turn on OIDC (issuer/JWKS/audience from env, never baked
-# into the bundle); + inspecto-policy.jar ⇒ Enterprise. Neither ⇒ Personal, byte-for-byte the
-# historic auth-free classpath/flags.
-CP="inspecto.jar"
-EDITION="Personal"
-if [ -f inspecto-oidc.jar ]; then
-    CP="inspecto.jar:inspecto-oidc.jar"
-    # D-MR6: the secrets provider and the geo-country resolver ship beside the OIDC jar (one SPI each).
-    [ -f inspecto-secrets.jar ] && CP="${CP}:inspecto-secrets.jar"
-    [ -f inspecto-geo-country.jar ] && CP="${CP}:inspecto-geo-country.jar"
-    [ -f inspecto-connectors-kafka.jar ] && CP="${CP}:inspecto-connectors-kafka.jar"   # MODULE-REORG-1 P7: premium Kafka connector, Professional+
-    [ -f inspecto-telecom-asn1.jar ] && CP="${CP}:inspecto-telecom-asn1.jar"   # MODULE-REORG-1 P7: Telecom ASN.1 decoder, Professional+
-    EDITION="Professional"
+# MODULE-REORG-P3d stage 1: the classpath and the edition are READ, not sniffed. Package time writes two files from the bundle's
+# Offering (tools/offering-classpath.mjs): `modules.list` - every jar on the classpath, one per line, in classpath order - and
+# `edition.properties` - `edition=Personal|Professional|Enterprise|Preview`. Nothing here names a jar or guesses the edition from
+# which jars happen to be present, so a jar dropped into the directory is NOT on the classpath until the list says so.
+# FALLBACKS for a hand-assembled directory: no modules.list => inspecto.jar first, then every *.jar beside it; no
+# edition.properties => the old heuristic (inspecto-oidc.jar present => Professional, + inspecto-policy.jar => Enterprise).
+if [ -f modules.list ]; then
+    CP="$(tr -d '\r' < modules.list | tr '\n' ':')"; CP="${CP%:}"
+else
+    echo "[serve.sh] modules.list not found - falling back to every *.jar in this directory" >&2
+    CP="inspecto.jar"; for _jar in *.jar; do [ "$_jar" = "inspecto.jar" ] || CP="${CP}:${_jar}"; done
+fi
+if [ -f edition.properties ]; then
+    EDITION="$(sed -n 's/^edition=//p' edition.properties | tr -d '\r')"
+elif [ -f inspecto-oidc.jar ] && [ -f inspecto-policy.jar ]; then EDITION="Enterprise"
+elif [ -f inspecto-oidc.jar ]; then EDITION="Professional"
+else EDITION="Personal"
+fi
+case "${EDITION}" in
+    Personal|Professional|Enterprise|Preview) ;;
+    *) echo "[serve.sh] edition.properties names an unknown edition '${EDITION}' (expected Personal, Professional, Enterprise or Preview)" >&2; exit 1 ;;
+esac
+# Every edition above Personal authenticates (OIDC) and keeps its audit trail; the OIDC module is on the classpath for exactly
+# those editions because the Offering puts it there. Personal stays byte-for-byte the historic auth-free flag set.
+if [ "${EDITION}" != "Personal" ]; then
     JAVA_OPTS+=("-Dauth.mode=oidc")
     # EVENTS-DURABLE-1 (2026-09-11): Professional+ keeps the API audit trail across restarts. The engine
     # default is the bounded in-memory ring (ServiceStores.openEventStore), which forgets every audited
@@ -1390,62 +1373,26 @@ if [ -f inspecto-oidc.jar ]; then
     # Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value —
     # the backend expands ${ENV:...} at use, so the secret never appears on the process command line.
     [ -n "${AUTH_OIDC_CLIENT_SECRET:-}" ] && JAVA_OPTS+=('-Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}')
-    # inspecto-policy.jar present ⇒ Enterprise (Professional + ABAC). No flag: the module is found
-    # via META-INF/services/com.gamma.spi.auth.AccessDecider, so the classpath entry IS the switch.
-    if [ -f inspecto-policy.jar ]; then
-        CP="${CP}:inspecto-policy.jar"
-        EDITION="Enterprise"
-    fi
+    # Enterprise (Professional + ABAC): no flag. inspecto-policy.jar is on the classpath list, and the module is found via
+    # META-INF/services/com.gamma.spi.auth.AccessDecider, so the classpath entry IS the switch.
 fi
 # OBJECTS-BACKEND-DEFAULT-MEMORY-1 (operator decision 2026-09-25): Incidents, Cases, notes, links and tags
 # survive a restart on every edition. Personal/Professional/Preview keep them in each Space's duckdb/ (the
 # engine default, -Dobjects.backend=db). Enterprise REQUIRES PostgreSQL: -Dobjects.backend=postgres refuses
 # to boot until INSPECTO_DB_URL (below) points them at one -- there is no fallback to DuckDB or memory.
 [ "${EDITION}" = "Enterprise" ] && JAVA_OPTS+=("-Dobjects.backend=postgres")
-# PostgreSQL JDBC driver sidecar (PG-1): present in Professional/Enterprise bundles, and honored on ANY
-# bundle so a drop-in works — the classpath entry is inert until -Dinspecto.db=postgres selects it.
-# Remote connector sidecar (CONNECTORS-BUNDLE-1): present in every edition, and honoured on ANY
-# bundle so a drop-in works. Inert until a pipeline names a non-local `collector.connector` --
-# without it CollectorConnectors.forConfig throws, naming this jar as the thing that is missing.
-[ -f inspecto-connectors.jar ] && CP="${CP}:inspecto-connectors.jar"
-# Delivery channels (EDG-01 cell 1): Professional/Enterprise bundles only, and honoured on ANY bundle so a
-# drop-in works. Personal never carries the jar, so it has no external transport at all -- in-app
-# delivery is intrinsic to NotificationService and is not a channel. The classpath entry IS the switch:
-# the module is found via META-INF/services/com.gamma.notify.NotificationChannel.
-[ -f inspecto-notify-channels.jar ] && CP="${CP}:inspecto-notify-channels.jar"
-# Backup / restore tasks (EDG-01 cell 2): Professional/Enterprise only; same contract as the line above.
-[ -f inspecto-backup.jar ] && CP="${CP}:inspecto-backup.jar"
-# Geo map + link analysis routes (EDG-01 cell 3b): Professional/Enterprise only; same contract as above.
-[ -f inspecto-entity-list.jar ] && CP="${CP}:inspecto-entity-list.jar"
-[ -f inspecto-la-graph.jar ] && CP="${CP}:inspecto-la-graph.jar"
-[ -f inspecto-la-storage.jar ] && CP="${CP}:inspecto-la-storage.jar"
-[ -f inspecto-la-core.jar ] && CP="${CP}:inspecto-la-core.jar"
-[ -f inspecto-la-api.jar ] && CP="${CP}:inspecto-la-api.jar"
-[ -f inspecto-la-store-pg.jar ] && CP="${CP}:inspecto-la-store-pg.jar"
-[ -f inspecto-geo-link.jar ] && CP="${CP}:inspecto-geo-link.jar"
-# Cross-space exchange (EDG-01 cell 4): Professional/Enterprise only; same contract as above.
-[ -f inspecto-exchange.jar ] && CP="${CP}:inspecto-exchange.jar"
-# Prometheus scrape endpoint (EDG-01 cell 5): Professional/Enterprise only.
-[ -f inspecto-observability.jar ] && CP="${CP}:inspecto-observability.jar"
-[ -f inspecto-ops.jar ] && CP="${CP}:inspecto-ops.jar"
-[ -f inspecto-reconciliation.jar ] && CP="${CP}:inspecto-reconciliation.jar"
-[ -f inspecto-scoring.jar ] && CP="${CP}:inspecto-scoring.jar"
-# PKG-5: the assistant, Professional and above. Absent in a Personal bundle, and absent-safe everywhere:
-# OptionalSpi skips a provider that cannot LINK (its dependency needs a newer Java than the product
-# floor of 24), so an older host boots normally and the assist paths answer 503.
-[ -f inspecto-agent.jar ] && CP="${CP}:inspecto-agent.jar"
-# ASSURE-INTELLIGENCE-BUNDLE-1: the /agent/* intelligence agent, Enterprise only; OptionalSpi-skipped likewise.
-[ -f inspecto-intelligence.jar ] && CP="${CP}:inspecto-intelligence.jar"
-# Its native loaders (onnxruntime, JNA, DJL tokenizers) extract libraries at first use. Keep them OFFLINE and
-# out of the shared %TEMP% / ~/.djl.ai: everything lands in ./runtime-natives, created owner-only (0700).
-# onnxruntime ALWAYS extracts into java.io.tmpdir (onnxruntime.native.path only names a PRE-extracted dir),
-# so java.io.tmpdir itself is pinned. ASSURE-INTELLIGENCE-BUNDLE-1.
+# The PostgreSQL JDBC driver (PG-1), the remote connector sidecar, the delivery channels, backup, the Link Analysis modules, the
+# assistant and the rest are all on the classpath because modules.list names them - see the top of this section. Each is inert
+# until its config asks for it (inspecto.db=postgres, a non-local `collector.connector`, ...).
+# ASSURE-INTELLIGENCE-BUNDLE-1: the intelligence agent's native loaders (onnxruntime, JNA, DJL tokenizers) extract libraries at
+# first use. Keep them OFFLINE and out of the shared %TEMP% / ~/.djl.ai: everything lands in ./runtime-natives, created
+# owner-only (0700). onnxruntime ALWAYS extracts into java.io.tmpdir (onnxruntime.native.path only names a PRE-extracted
+# dir), so java.io.tmpdir itself is pinned. Keyed on the jar being STAGED, not on the classpath list, so a drop-in works too.
 if [ -f inspecto-intelligence.jar ]; then
     NATIVES="$(pwd)/runtime-natives"
     ( umask 077; mkdir -p "${NATIVES}/tmp" "${NATIVES}/djl" ) && chmod 700 "${NATIVES}"
     JAVA_OPTS+=("-Dai.djl.offline=true" "-Djava.io.tmpdir=${NATIVES}/tmp" "-Djna.tmpdir=${NATIVES}/tmp" "-DDJL_CACHE_DIR=${NATIVES}/djl" "-DENGINE_CACHE_DIR=${NATIVES}/djl")
 fi
-[ -f postgresql.jar ] && CP="${CP}:postgresql.jar"
 # Operational stores on PostgreSQL (2026-08-31). The three ledgers (status/batches/lineage) are now
 # SERVED from a database by default; Personal stays on the bundled DuckDB with zero configuration,
 # and Professional/Enterprise move to PostgreSQL here — the edition seam, per the codebase's rule that
@@ -1472,10 +1419,9 @@ JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
 echo "[serve.sh] ControlApi on :${PORT}  (spaces: ./${SPACES_ROOT}, UI: $([ -d ui ] && echo ./ui || echo none), edition: ${EDITION})${EXTRA_OPTS:+  extra JVM opts: ${EXTRA_OPTS}}"
 exec "$JAVA" "${JAVA_OPTS[@]}" -cp "$CP" com.gamma.control.ControlApi
 '@
-# OBJECTS-BACKEND-DEFAULT-MEMORY-1: a Preview bundle carries Enterprise's exact jars, so the launcher's jar
-# sniffing would call it Enterprise and demand PostgreSQL. Preview keeps the objects on DuckDB (operator
-# decision 2026-09-25), so the package step - the one place that knows - names the edition in the text.
-if ($Edition -eq 'Preview') { $serveShContent = $serveShContent.Replace('EDITION="Enterprise"', 'EDITION="Preview"') }
+# OBJECTS-BACKEND-DEFAULT-MEMORY-1: a Preview bundle carries Enterprise's exact jars, which the old jar-sniffing launcher
+# would have called Enterprise (and demanded PostgreSQL). Preview keeps the objects on DuckDB (operator decision 2026-09-25);
+# since P3d the launcher reads `edition=Preview` from edition.properties, so no text substitution is needed any more.
 Write-LfScript -Path "$bundleDir\serve.sh" -Content $serveShContent
 
 $serveBatContent = @'
@@ -1503,12 +1449,28 @@ if exist "duckdb-extensions\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.d
 if not "%CORS_ORIGIN%"=="" set "OPTS=%OPTS% -Dcontrol.cors=%CORS_ORIGIN%"
 if not "%HTTPS_KEYSTORE%"=="" set "OPTS=%OPTS% -Dhttps.keystore=%HTTPS_KEYSTORE%"
 if not "%HTTPS_KEYSTORE_PASSWORD%"=="" set "OPTS=%OPTS% -Dhttps.keystore.password=%HTTPS_KEYSTORE_PASSWORD%"
-rem Edition auto-detects from the bundle (W6, docs/EDITIONS.md): inspecto-oidc.jar present
-rem => Professional - put it on the classpath and turn on OIDC (issuer/JWKS/audience from env);
-rem + inspecto-policy.jar => Enterprise. Neither => Personal, byte-for-byte the historic
-rem auth-free classpath/flags.
-set "CP=inspecto.jar"
+rem MODULE-REORG-P3d stage 1: the classpath and the edition are READ, not sniffed. Package time writes two files from the
+rem bundle's Offering (tools/offering-classpath.mjs): modules.list - every jar on the classpath, one per line, in classpath
+rem order - and edition.properties - edition=Personal/Professional/Enterprise/Preview. Nothing here names a jar or guesses
+rem the edition from which jars are present. The list is accumulated as ;a;b;c with `call set` (a second expansion of %CP%
+rem per jar - NO delayed expansion, for the reason given below) and the leading ; is stripped.
+rem FALLBACKS for a hand-assembled directory: no modules.list => inspecto.jar first, then every *.jar beside it; no
+rem edition.properties => the old heuristic (inspecto-oidc.jar => Professional, + inspecto-policy.jar => Enterprise).
+set "CP="
+if exist modules.list for /f "usebackq delims=" %%J in ("modules.list") do call set "CP=%%CP%%;%%J"
+if not exist modules.list echo [serve.bat] modules.list not found - falling back to every *.jar in this directory
+if not exist modules.list set "CP=;inspecto.jar"
+if not exist modules.list for %%J in (*.jar) do if /i not "%%J"=="inspecto.jar" call set "CP=%%CP%%;%%J"
+set "CP=%CP:~1%"
 set "EDITION=Personal"
+if not exist edition.properties if exist inspecto-oidc.jar set "EDITION=Professional"
+if not exist edition.properties if exist inspecto-oidc.jar if exist inspecto-policy.jar set "EDITION=Enterprise"
+if exist edition.properties for /f "usebackq tokens=1,* delims==" %%A in ("edition.properties") do if /i "%%A"=="edition" set "EDITION=%%B"
+set "EDITION_OK="
+for %%E in (Personal Professional Enterprise Preview) do if "%EDITION%"=="%%E" set "EDITION_OK=1"
+if not defined EDITION_OK echo [serve.bat] edition.properties names an unknown edition "%EDITION%" - expected Personal, Professional, Enterprise or Preview & exit /b 1
+rem Every edition above Personal authenticates (OIDC) and keeps its audit trail; the OIDC module is on the classpath for exactly
+rem those editions because the Offering puts it there. Personal stays byte-for-byte the historic auth-free flag set.
 rem 🔴 SERVEBAT-OPTS-1 (2026-09-11): these are single-line `if`s, NOT a parenthesized block, and that
 rem is load-bearing. cmd.exe expands every %OPTS% in a parenthesized block ONCE, when the block is
 rem PARSED, so N `set "OPTS=%OPTS% ..."` statements inside one block all expand to the value OPTS had
@@ -1519,61 +1481,29 @@ rem ⛔ Do NOT "tidy" these back into an if-block, and do NOT reach for `setloca
 rem instead: these values carry operator secrets and keystore passwords, and delayed expansion eats `!`
 rem inside them. One statement per line is the only form that is correct for both. serve.sh has no
 rem such hazard -- bash expands at execution -- which is why only this half is written out flat.
-if exist inspecto-oidc.jar set "CP=inspecto.jar;inspecto-oidc.jar"
-if exist inspecto-oidc.jar if exist inspecto-secrets.jar set "CP=%CP%;inspecto-secrets.jar"
-if exist inspecto-oidc.jar if exist inspecto-geo-country.jar set "CP=%CP%;inspecto-geo-country.jar"
-if exist inspecto-oidc.jar if exist inspecto-connectors-kafka.jar set "CP=%CP%;inspecto-connectors-kafka.jar"
-if exist inspecto-oidc.jar if exist inspecto-telecom-asn1.jar set "CP=%CP%;inspecto-telecom-asn1.jar"
-if exist inspecto-oidc.jar set "EDITION=Professional"
-if exist inspecto-oidc.jar set "OPTS=%OPTS% -Dauth.mode=oidc"
+if not "%EDITION%"=="Personal" set "OPTS=%OPTS% -Dauth.mode=oidc"
 rem EVENTS-DURABLE-1 (2026-09-11): Professional+ keeps the API audit trail across restarts; see serve.sh.
-if exist inspecto-oidc.jar set "OPTS=%OPTS% -Devents.backend=parquet"
-if exist inspecto-oidc.jar if not "%AUTH_OIDC_ISSUER%"=="" set "OPTS=%OPTS% -Dauth.oidc.issuer=%AUTH_OIDC_ISSUER%"
-if exist inspecto-oidc.jar if not "%AUTH_OIDC_JWKS_URI%"=="" set "OPTS=%OPTS% -Dauth.oidc.jwksUri=%AUTH_OIDC_JWKS_URI%"
-if exist inspecto-oidc.jar if not "%AUTH_OIDC_AUDIENCE%"=="" set "OPTS=%OPTS% -Dauth.oidc.audience=%AUTH_OIDC_AUDIENCE%"
-if exist inspecto-oidc.jar if not "%AUTH_OIDC_CLIENT_ID%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientId=%AUTH_OIDC_CLIENT_ID%"
+if not "%EDITION%"=="Personal" set "OPTS=%OPTS% -Devents.backend=parquet"
+if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_ISSUER%"=="" set "OPTS=%OPTS% -Dauth.oidc.issuer=%AUTH_OIDC_ISSUER%"
+if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_JWKS_URI%"=="" set "OPTS=%OPTS% -Dauth.oidc.jwksUri=%AUTH_OIDC_JWKS_URI%"
+if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_AUDIENCE%"=="" set "OPTS=%OPTS% -Dauth.oidc.audience=%AUTH_OIDC_AUDIENCE%"
+if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_CLIENT_ID%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientId=%AUTH_OIDC_CLIENT_ID%"
 rem Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value.
-if exist inspecto-oidc.jar if not "%AUTH_OIDC_CLIENT_SECRET%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}"
-rem inspecto-policy.jar present => Enterprise (Professional + ABAC). No flag needed: the module
-rem is found via META-INF/services/com.gamma.spi.auth.AccessDecider, so the classpath IS the switch.
-if exist inspecto-oidc.jar if exist inspecto-policy.jar set "CP=%CP%;inspecto-policy.jar"
-if exist inspecto-oidc.jar if exist inspecto-policy.jar set "EDITION=Enterprise"
+if not "%EDITION%"=="Personal" if not "%AUTH_OIDC_CLIENT_SECRET%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}"
+rem Enterprise (Professional + ABAC) needs no flag: inspecto-policy.jar is on the classpath list, and the module is found via
+rem META-INF/services/com.gamma.spi.auth.AccessDecider, so the classpath IS the switch.
 rem OBJECTS-BACKEND-DEFAULT-MEMORY-1 (2026-09-25): Enterprise REQUIRES PostgreSQL for Incidents, Cases,
 rem notes, links and tags - it refuses to boot until INSPECTO_DB_URL is set; see serve.sh. Every other
 rem edition keeps them in each Space's duckdb/ (the engine default, -Dobjects.backend=db).
 if "%EDITION%"=="Enterprise" set "OPTS=%OPTS% -Dobjects.backend=postgres"
-rem PostgreSQL JDBC driver sidecar (PG-1): present in Professional/Enterprise bundles, and honored on ANY
-rem bundle so a drop-in works - the classpath entry is inert until -Dinspecto.db=postgres selects it.
-rem Remote connector sidecar (CONNECTORS-BUNDLE-1) - see serve.sh for why it is unconditional.
-if exist inspecto-connectors.jar set "CP=%CP%;inspecto-connectors.jar"
-rem Delivery channels (EDG-01 cell 1) - Professional/Enterprise only; see serve.sh for the reasoning.
-if exist inspecto-notify-channels.jar set "CP=%CP%;inspecto-notify-channels.jar"
-rem Backup / restore tasks (EDG-01 cell 2) - Professional/Enterprise only.
-if exist inspecto-backup.jar set "CP=%CP%;inspecto-backup.jar"
-rem Geo map + link analysis routes (EDG-01 cell 3b) - Professional/Enterprise only.
-if exist inspecto-entity-list.jar set "CP=%CP%;inspecto-entity-list.jar"
-if exist inspecto-la-graph.jar set "CP=%CP%;inspecto-la-graph.jar"
-if exist inspecto-la-storage.jar set "CP=%CP%;inspecto-la-storage.jar"
-if exist inspecto-la-core.jar set "CP=%CP%;inspecto-la-core.jar"
-if exist inspecto-la-api.jar set "CP=%CP%;inspecto-la-api.jar"
-if exist inspecto-la-store-pg.jar set "CP=%CP%;inspecto-la-store-pg.jar"
-if exist inspecto-geo-link.jar set "CP=%CP%;inspecto-geo-link.jar"
-rem Cross-space exchange (EDG-01 cell 4) - Professional/Enterprise only.
-if exist inspecto-exchange.jar set "CP=%CP%;inspecto-exchange.jar"
-rem Prometheus scrape endpoint (EDG-01 cell 5) - Professional/Enterprise only.
-if exist inspecto-observability.jar set "CP=%CP%;inspecto-observability.jar"
-if exist inspecto-ops.jar set "CP=%CP%;inspecto-ops.jar"
-if exist inspecto-reconciliation.jar set "CP=%CP%;inspecto-reconciliation.jar"
-if exist inspecto-scoring.jar set "CP=%CP%;inspecto-scoring.jar"
-if exist inspecto-agent.jar set "CP=%CP%;inspecto-agent.jar"
-if exist inspecto-intelligence.jar set "CP=%CP%;inspecto-intelligence.jar"
+rem Every other jar (the PostgreSQL driver, the connector sidecar, delivery channels, backup, Link Analysis, the assistant ...) is
+rem on the classpath because modules.list names it - see the top of this section. See serve.sh for what each does.
 rem ASSURE-INTELLIGENCE-BUNDLE-1: native loaders stay OFFLINE and out of %TEMP% / ~/.djl.ai - everything lands in
 rem runtime-natives\, whose inherited ACL is replaced by one owner-only grant at first start.
 if exist inspecto-intelligence.jar if not exist runtime-natives\tmp mkdir runtime-natives\tmp
 if exist inspecto-intelligence.jar if not exist runtime-natives\djl mkdir runtime-natives\djl
 if exist inspecto-intelligence.jar for /f "delims=" %%U in ('whoami') do icacls runtime-natives /inheritance:r /grant:r "%%U:(OI)(CI)F" >nul
 if exist inspecto-intelligence.jar set "OPTS=%OPTS% -Dai.djl.offline=true -Djava.io.tmpdir=%CD%\runtime-natives\tmp -Djna.tmpdir=%CD%\runtime-natives\tmp -DDJL_CACHE_DIR=%CD%\runtime-natives\djl -DENGINE_CACHE_DIR=%CD%\runtime-natives\djl"
-if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 rem Operational stores on PostgreSQL (2026-08-31) - the edition seam; see serve.sh for the reasoning.
 rem The URL is the signal, never the driver's presence: postgres without a URL fails the boot.
 rem WARNING: OPTS, never JAVA_OPTS - that name is assigned below and a flag set on it never reaches
@@ -1595,7 +1525,6 @@ if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
 echo [serve.bat] ControlApi on :%PORT%  (spaces: .\%SPACES_ROOT%, edition: %EDITION%)
 "%JAVA%" %OPTS% -cp %CP% com.gamma.control.ControlApi
 '@
-if ($Edition -eq 'Preview') { $serveBatContent = $serveBatContent.Replace('set "EDITION=Enterprise"', 'set "EDITION=Preview"') }
 Write-CrlfScript -Path "$bundleDir\serve.bat" -Content $serveBatContent
 
 # ── step 6b-2: Dockerfile wrapping serve.sh (PKG-3, backend-hardening plan item 6) ──────
@@ -1998,9 +1927,13 @@ if ($DemoAuth) {
     foreach ($f in 'serve.sh', 'serve.bat', 'Dockerfile', '.dockerignore', 'inspecto.service', 'install-service.sh', 'install-service.ps1') {
         Remove-Item (Join-Path $bundleDir $f) -ErrorAction SilentlyContinue
     }
-    $demoJars = @('inspecto.jar', 'inspecto-demo-auth.jar', 'inspecto-policy.jar', 'inspecto-connectors.jar', 'inspecto-connectors-kafka.jar', 'inspecto-telecom-asn1.jar', 'inspecto-notify-channels.jar',
-                  'inspecto-backup.jar', 'inspecto-entity-list.jar', 'inspecto-la-graph.jar', 'inspecto-la-storage.jar', 'inspecto-la-core.jar', 'inspecto-la-api.jar', 'inspecto-la-store-pg.jar', 'inspecto-geo-link.jar', 'inspecto-exchange.jar', 'inspecto-observability.jar',
-                  'inspecto-ops.jar', 'inspecto-reconciliation.jar', 'inspecto-scoring.jar', 'inspecto-agent.jar', 'inspecto-intelligence.jar', 'postgresql.jar') | Where-Object { Test-Path (Join-Path $bundleDir $_) }
+    # MODULE-REORG-P3d stage 1: the demo launchers READ modules.list too (written above by `offering-classpath.mjs --demo`: the
+    # OIDC trio replaced by the demo jar) instead of embedding a jar list of their own. No FALLBACK glob here: a demo bundle is
+    # always built by this script, which always writes the list. $demoJars is that list, held here only to assert the demo
+    # invariant at package time: never two Authenticators (no OIDC jar beside the demo jar), and the demo jar really is on it.
+    $demoJars = @(Get-Content (Join-Path $bundleDir 'modules.list') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($demoJars -contains 'inspecto-oidc.jar') { throw "the demo bundle's modules.list names inspecto-oidc.jar next to the demo jar - two Authenticators is unsupported." }
+    if ($demoJars -notcontains 'inspecto-demo-auth.jar') { throw "the demo bundle's modules.list does not name inspecto-demo-auth.jar - the Demo User sign-in would not load." }
     $demoFlags = '--enable-native-access=ALL-UNNAMED -Dcontrol.bind=127.0.0.1 -Dauth.mode=demo -Dobjects.backend=db -Devents.backend=parquet -Djobs.backend=duckdb'
     $serveDemoBat = @"
 @echo off
@@ -2021,8 +1954,13 @@ if exist inspecto-intelligence.jar if not exist runtime-natives\tmp mkdir runtim
 if exist inspecto-intelligence.jar if not exist runtime-natives\djl mkdir runtime-natives\djl
 if exist inspecto-intelligence.jar for /f "delims=" %%U in ('whoami') do icacls runtime-natives /inheritance:r /grant:r "%%U:(OI)(CI)F" >nul
 if exist inspecto-intelligence.jar set "OPTS=%OPTS% -Dai.djl.offline=true -Djava.io.tmpdir=%CD%\runtime-natives\tmp -Djna.tmpdir=%CD%\runtime-natives\tmp -DDJL_CACHE_DIR=%CD%\runtime-natives\djl -DENGINE_CACHE_DIR=%CD%\runtime-natives\djl"
+rem The classpath is READ from modules.list (one jar per line, classpath order), accumulated as ;a;b;c with `call set` and the
+rem leading ; stripped - see serve.bat for why there is no delayed expansion.
+set "CP="
+for /f "usebackq delims=" %%J in ("modules.list") do call set "CP=%%CP%%;%%J"
+set "CP=%CP:~1%"
 echo [serve-demo] DEMO BUILD on http://127.0.0.1:%PORT%  (spaces: .\%SPACES_ROOT%)
-"%JAVA%" %OPTS% -cp "$($demoJars -join ';')" com.gamma.control.ControlApi
+"%JAVA%" %OPTS% -cp "%CP%" com.gamma.control.ControlApi
 "@
     Write-CrlfScript -Path "$bundleDir\serve-demo.bat" -Content $serveDemoBat
     $serveDemoSh = @"
@@ -2045,8 +1983,10 @@ if [ -f inspecto-intelligence.jar ]; then
     ( umask 077; mkdir -p "`${NATIVES}/tmp" "`${NATIVES}/djl" ) && chmod 700 "`${NATIVES}"
     OPTS="`${OPTS} -Dai.djl.offline=true -Djava.io.tmpdir=`${NATIVES}/tmp -Djna.tmpdir=`${NATIVES}/tmp -DDJL_CACHE_DIR=`${NATIVES}/djl -DENGINE_CACHE_DIR=`${NATIVES}/djl"
 fi
+# The classpath is READ from modules.list (one jar per line, classpath order).
+CP="`$(tr -d '\r' < modules.list | tr '\n' ':')"; CP="`${CP%:}"
 echo "[serve-demo] DEMO BUILD on http://127.0.0.1:`${PORT}  (spaces: ./`${SPACES_ROOT})"
-exec "`$JAVA" `$OPTS -cp "$($demoJars -join ':')" com.gamma.control.ControlApi
+exec "`$JAVA" `$OPTS -cp "`$CP" com.gamma.control.ControlApi
 "@
     Write-LfScript -Path "$bundleDir\serve-demo.sh" -Content $serveDemoSh
     $demoReadme = @"
@@ -2166,12 +2106,10 @@ if (-not $SkipBootCheck) {
     $java = if (Test-Path "$bundleDir/runtime/bin/java.exe") { "$bundleDir/runtime/bin/java.exe" }
             elseif (Test-Path "$bundleDir/runtime/bin/java") { "$bundleDir/runtime/bin/java" }
             else { 'java' }
-    # The same classpath the generated launchers build -- deliberately re-derived from the staged files
-    # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
-    $cp = @('inspecto.jar') + @('inspecto-oidc.jar','inspecto-secrets.jar','inspecto-geo-country.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-connectors-kafka.jar','inspecto-telecom-asn1.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-entity-list.jar','inspecto-la-graph.jar','inspecto-la-storage.jar','inspecto-la-core.jar','inspecto-la-api.jar','inspecto-la-store-pg.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-observability.jar','inspecto-ops.jar','inspecto-reconciliation.jar','inspecto-scoring.jar','inspecto-agent.jar','inspecto-intelligence.jar','postgresql.jar' |
-        Where-Object { Test-Path (Join-Path $bundleDir $_) })
-    # DEMO-AUTH-1: appended AFTER the parsed literal on purpose (see the -DemoAuth param note).
-    if ($DemoAuth -and (Test-Path (Join-Path $bundleDir 'inspecto-demo-auth.jar'))) { $cp += 'inspecto-demo-auth.jar' }
+    # THE classpath the launchers build: the bundle's own modules.list (written at step 3a-ter by tools/offering-classpath.mjs, which
+    # already refused a listed jar that is not staged). Read here exactly as run.sh/serve.sh read it - no list of our own - so
+    # the smoke boots the same jars, in the same order, the shipped launchers will. Names only: Test-Path is not needed.
+    $cp = @(Get-Content (Join-Path $bundleDir 'modules.list') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     # CONNECTOR-SIDECAR-SHADES-LOGGING-1: assert exactly ONE SLF4J binding registration across the
     # assembled classpath. The core owns the logging binding; every sidecar's shade config excludes
     # META-INF/services/org.slf4j.spi.SLF4JServiceProvider, org/slf4j/impl/** and ch/qos/logback/** so a
