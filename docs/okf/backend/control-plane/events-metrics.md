@@ -888,3 +888,7 @@ never advertises `STARTTLS` is refused, and no `AUTH` line ever reaches it).
 ## Unmodelled keys on a Notification Rule and Channel (`MODULE-REORG-P4-2`)
 
 `/notifications/rules*` and `/notifications/channels*` rebuild the stored component from `NotificationRule.toMap()` / `ChannelConfig.toMap()`, so any key they do not model used to vanish behind a 200. Now an author-owned `x-` key is kept (create, update, a held save once approved, a bundle import) and returned by GET, and any other unmodelled key is refused 422 `ERR_UNKNOWN_CONFIG_KEY` naming it (`AuthorKeys`; `ComponentRoutes.validateKind` applies the same key check to the raw `/components` door and to import). The store's own `name` stamp is accepted back. A Rule PUT replaces (send the `x-` key back or lose it); a Channel PUT merges. Pinned by `RebuiltWritersUnmodelledKeysTest`.
+
+## Unmodelled keys on a Saved View (`MODULE-REORG-P4-2`)
+
+`POST /events/views` read only its named fields (`name` and the seven search keys), so any other key vanished behind a 200 - including a nested `filters` object, which saved the view with no filter at all. Now an `x-` key is kept (`SavedView.extra`: response, `GET /events/views`, the JSON store on reload, and a bundle `saved-view` import) and any other key is refused 422 `ERR_UNKNOWN_CONFIG_KEY` naming it (send the search keys flat; the server stamps `createdAt`); a bundle item with an unknown key fails that item. Pinned by `SavedViewUnmodelledKeysTest`.

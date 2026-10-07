@@ -277,3 +277,7 @@ leaf is a type-guarded pair (Incident: folded operand; any other type: exact), a
 case-insensitive path prefix (the tree's `startsWith` cannot be case-sensitive). Golden corpus:
 `TagRuleFilterParityTest`.
 
+
+## Unmodelled keys on a Tag, Tag Rule and Case Rule (`MODULE-REORG-P4-2`)
+
+`POST /tags`, `POST /tags/rules` and `POST /cases/rules` persist the file they REBUILD from `Tag` / `TagRule` / `CaseRule.toMap()`, so a key the record does not model used to vanish behind a 200. Now an author-owned `x-` key rides in the record's `extra` map and is kept (response, GET, the `*_tag.toon` / `*_tagrule.toon` / `*_caserule.toon` file, the boot re-load), and any other key is refused 422 `ERR_UNKNOWN_CONFIG_KEY` naming it with nothing written (`AuthorKeys.requireModelled`; the nested rule `filter` may hold only its six criteria). A re-save replaces with what was posted. Renaming a Tag moves its annotations to the new file and rewrites each following rule file with its own. The flattened-filter sugar (`type`, `q`, ... at top level) is modelled. The dialogs are create-only, so the SPA needs no `authorKeys`. Pinned by `OpsWritersUnmodelledKeysTest`.

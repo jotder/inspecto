@@ -182,8 +182,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/entity-lists/([^/]+)/members` | gated | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:98` |
 | POST | `/entity-lists/([^/]+)/register-dataset` | gated | `canAuthorWorkbench` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:105` |
 | POST | `/entity-lists/([^/]+)/retire` | gated | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java:100` |
-| POST | `/events/views` | gated | `canAuthorWorkbench` | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java:67` |
-| POST | `/events/views/([^/]+)/delete` | gated | `canAuthorWorkbench` | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java:69` |
+| POST | `/events/views` | gated | `canAuthorWorkbench` | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java:68` |
+| POST | `/events/views/([^/]+)/delete` | gated | `canAuthorWorkbench` | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java:70` |
 | POST | `/exchange/grants/([^/]+)/(approve|deny|revoke)` | gated | `canApproveShares` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java:85` |
 | POST | `/exchange/grants/([^/]+)/expiry` | gated | `canApproveShares` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java:91` |
 | POST | `/exchange/grants/([^/]+)/pin` | gated | `canRequestShares` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java:88` |
@@ -349,14 +349,14 @@ system: the evidence cannot say something the code does not.
 | POST | `/streams/([^/]+)/records` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/StreamPushRoutes.java:84` |
 | POST | `/system/operational-db/test` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/SystemRoutes.java:40` |
 | PUT | `/system/scheduler` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java:76` |
-| POST | `/tags` | gated | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:51` |
-| DELETE | `/tags/([^/]+)` | gated | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:53` |
-| POST | `/tags/([^/]+)/rename` | gated | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:52` |
-| POST | `/tags/assignments/([^/]+)/([^/]+)` | exempt | target-visibility-gated | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:67` |
-| DELETE | `/tags/assignments/([^/]+)/([^/]+)/([^/]+)` | exempt | target-visibility-gated | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:69` |
-| POST | `/tags/rules` | gated | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:55` |
-| DELETE | `/tags/rules/([^/]+)` | gated | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:56` |
-| POST | `/tags/rules/([^/]+)/apply` | exempt | collaboration | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:58` |
+| POST | `/tags` | gated | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:53` |
+| DELETE | `/tags/([^/]+)` | gated | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:55` |
+| POST | `/tags/([^/]+)/rename` | gated | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:54` |
+| POST | `/tags/assignments/([^/]+)/([^/]+)` | exempt | target-visibility-gated | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:69` |
+| DELETE | `/tags/assignments/([^/]+)/([^/]+)/([^/]+)` | exempt | target-visibility-gated | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:71` |
+| POST | `/tags/rules` | gated | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:57` |
+| DELETE | `/tags/rules/([^/]+)` | gated | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:58` |
+| POST | `/tags/rules/([^/]+)/apply` | exempt | collaboration | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:60` |
 | POST | `/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:143` |
 | POST | `/validate` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:41` |
 

@@ -528,6 +528,42 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
   Every other module still imports processor classes (`HostContext`, `ControlApi`, `PendingChanges`, `ServerFaults`, `Cursor`, ...) and keeps the edge.
 - **Gate:** full reactor 9023 tests, 50/50 modules, one transient Windows `AccessDeniedException` in `ControlApiRestoreJobGateTest` (green 3/3 alone).
 
+### P4d as built (2026-10-07 - the last writers: Tag, Tag Rule, Case Rule, Saved View; Value / Investigation Measure characterised; `MODULE-REORG-P4-2` closed)
+
+Same policy as *P4b* / *P4c* (`x-` kept, any other key refused 422 `ERR_UNKNOWN_CONFIG_KEY` naming it, a re-save REPLACES with what was posted). The survey below is the
+COMPLETE list of writers that persist what they rebuild from a typed record or a field-by-field read: a grep for `toMap()` passed to a write / save / persist call over every
+module, plus a read of each `*Routes` that stores a config (not the earlier survey's file list).
+
+| Writer (door) | Before | After |
+|---|---|---|
+| Tag (`POST /tags`, `TagRoutes.ensureTag` adoption, `POST /tags/{name}/rename`) | `x-` and any other key **dropped behind a 200**; a rename wrote the destination file with only `name` + `createdAt` | `x-` kept (create, GET, the `*_tag.toon`, a re-load, **rename carries it to the new file**), other keys refused. `Tag` gains `extra` (3rd component; the 2-arg constructor stays) |
+| Tag Rule (`POST /tags/rules`) | dropped behind a 200 (also a typo inside `filter`) | `x-` kept, other keys refused; the nested `filter` may hold only its six criteria (`TagRule.Filter.KEYS`; an `x-` there is refused, it has nowhere to live); a Tag **rename rewrites the rule file and keeps the annotation** (`ObjectService.renameTag` carries `extra`). Flattened-filter authoring sugar (`type`, `q`, ... at top level) is modelled, not unknown |
+| Case Rule (`POST /cases/rules`) | dropped behind a 200 | same as Tag Rule (`CaseRule.MODELLED`, `extra`) |
+| Saved View (`POST /events/views`, bundle `saved-view` import) | body read field-by-field: every other key **dropped**, and a nested `filters` object (what GET returns) saved the view with **no filter at all**, both behind a 200 | `x-` kept (response, `GET /events/views`, the JSON store on reload, bundle import), other keys refused - including `filters` and `createdAt` on POST (flat keys only; the server stamps `createdAt`). A bundle item with an unknown key fails that item naming it. `SavedView` gains `extra` |
+| Investigation Measure (`POST|PUT /inv/investigations/{id}/alert-rules*`, writes an Alert Rule) | already **refused** any key outside its closed `RULE_FIELDS` / `VALUE_RULE_FIELDS` (422 naming it, nothing armed), `x-` included by design (the Investigation owns the rule) | unchanged; **pinned for the first time** by `ControlApiInvestigationAlertRuleTest.anUnmodelledKeyIsRefusedNamingItAndNothingIsArmed` |
+| Value Measure (`GET /inv/value-measures`; the `valueMeasure` block of a bound rule) | a GET persists nothing; the block is parsed by `ValueMeasures.parse`, which **refuses** any setting outside the measure's own list, naming it | unchanged; **pinned** by `ControlApiValueMeasureTest.anUnmodelledKeyIsRefusedNamingIt` (block and rule body, `zz_cfg` and `x-team`) |
+| Job (`POST|PUT /jobs*`, bundle import) | every unrecognised key lands in `JobConfig.params` (string-valued) and round-trips: **preserved** (P4a) | unchanged |
+| Pending alert-rule seed, Decision Rule `create-alert` | go through `AlertRoutes.parse` / `AlertRule.extra` | unchanged (P4b) |
+| `ViewStore` (`sink.view` definitions), `ReconStateStore`, operational objects' attributes | written by the engine from run state, not authored config | out of scope (not a door an author posts a document to) |
+
+- **Why the module edge did not change.** `AuthorKeys` (processor `control`) was package-private; it is now `public` with the same four static methods, and `inspecto-ops`
+  and `inspecto-observability` already depend on the processor (they import `ApiException`, `ErrorCodes`, `RouteModule`), so no new edge: `check-module-deps` and `check-module-architecture
+  --ratchet` stay green. `Extras.of` (ops `tag` package, 8 lines) only collects a block's unmodelled keys into the record; `AuthorKeys` still owns the policy (what is refused).
+- **Records.** `Tag`, `TagRule`, `CaseRule`, `SavedView` gain a trailing `extra` map exactly as `AlertRule` did (`toMap` emits it with `putIfAbsent`, so it cannot override a modelled key); the old-arity
+  constructors stay for the engine's own call sites. `fromMap` / the store's loader fill `extra` with EVERY unmodelled key (a hand-edited file still loads and round-trips, as for Alert Rule); only the route refuses.
+- **Doors not carried.** Tag / Tag Rule / Case Rule files are refused by bundle import by design (`ImportPaths.REFUSED_SUFFIXES`), and none is held for approval (no maker-checker policy covers them), so create/update and the
+  boot re-load are the whole surface.
+- **Shipped configs.** `spaces/demo/config/ops/{hot_tag,critical_incidents_tagrule,incident_burst_caserule}.toon` carry only modelled keys (`name`; `name tag filter`; `name title threshold windowMinutes category tags filter`).
+  No other Space, template, example or pack ships a Tag, Tag Rule, Case Rule or Saved View. Nothing needed a non-`x-` carry-forward.
+- **SPA: no change.** The Tag Rules and Case Rules dialogs (`tag-rules.dialog.ts`, `case-rules.dialog.ts`) are create-only forms: they list stored rules but never load one into the form to edit, so there is no stored document
+  whose `x-` keys an edit-save could drop (re-saving a name replaces, as designed). No SPA surface posts a Saved View. So `authorKeys(stored)` has no new call site.
+- **Tests.** `OpsWritersUnmodelledKeysTest` (3, real HTTP: Tag / Tag Rule / Case Rule - refusal naming the key with nothing written, `x-` in the response, GET, the file and a re-load, replace-on-resave, rename carrying the
+  annotation to the new Tag file and the rewritten rule file) and `SavedViewUnmodelledKeysTest` (2: create/list/replace/refusals incl. nested `filters`; bundle import keeping `x-` and failing the item for `zz_cfg`). RED first against the
+  unmodified code: ops 3/3 failed, each as a 200 for the `zz_cfg` probe (the `x-` assertions sit behind it); Saved View: the create test failed the same way, the bundle test could not run red (the bundle door
+  is write-root gated; fixed in the test, run only green). The two Measure characterisations passed against the unchanged code, as they should.
+- **Not verified.** A Saved View file written by an older build loads (extras empty, by construction, not tested). The Tag Rule `x-` inside `filter` refusal is stricter than Expectation's
+  (`x-` allowed top-level only) - deliberate, a filter has no home for an annotation.
+
 ### P4c as built (2026-10-07 - the unmodelled-key policy on the writers after Alert Rule)
 
 Policy as in *P4b* Step A (`x-` kept, any other key refused 422 naming it), applied by `AuthorKeys` (inspecto `control`: `carry` copies the posted `x-` keys into the
@@ -542,8 +578,8 @@ rebuilt map, `requireModelled` refuses the rest) to the writers that persist wha
 | Notification Rule (`/notifications/rules*`) | `x-` **and every other key dropped behind a 200** | `x-` kept, other keys refused `ERR_UNKNOWN_CONFIG_KEY`; `NotificationRule.MODELLED` also accepts the store's `name` stamp (a GET-then-PUT replays it) |
 | Notification Channel (`/notifications/channels*`) | same as Rule | same as Rule (`ChannelConfig.MODELLED`); its PUT is a server-side MERGE, so a stored `x-` key also survives a PUT that omits it (unlike Rule/Expectation, where PUT replaces) |
 | `/components/notification-rule` and `/components/channel` raw doors, bundle import of both | persisted any key raw (nothing dropped, nothing refused) | refuse a non-`x-` unmodelled key in `ComponentRoutes.validateKind` (keys only, no required-field check: a raw door never ran one) |
-| Tag, Tag Rule (`TagRoutes.persist(Map.of("tag", tag.toMap()))`), Case Rule | rebuild from `toMap()`, no unknown-key handling: **DROP** | **not fixed** (ops module; row stays) |
-| Value Measure / Investigation Measure specs, Saved View (`EventRoutes`, `BundleRoutes`) | rebuilt from a `toMap()`; **not characterised** | not touched (row stays) |
+| Tag, Tag Rule (`TagRoutes.persist(Map.of("tag", tag.toMap()))`), Case Rule | rebuild from `toMap()`, no unknown-key handling: **DROP** | **kept / refused** - see *P4d as built* |
+| Value Measure / Investigation Measure specs, Saved View (`EventRoutes`, `BundleRoutes`) | rebuilt from a `toMap()`; **not characterised** | characterised in *P4d as built*: the two Measures were never droppers; Saved View **kept / refused** |
 | Connection, Approval Policy | read-only / refuses unknown keys by its own parser | unchanged |
 
 - **Shipped configs.** Every shipped Expectation (`spaces/*/config/registry/expectations`, 6 files, `spaces/_templates/*`) carries only modelled keys (`name targetType target column kind min severity`);
@@ -554,7 +590,7 @@ rebuilt map, `requireModelled` refuses the rest) to the writers that persist wha
 - **SPA (the section 9 trap, fixed small).** The Rule dialog PUT replaces from a rebuilt body and the Expectation dialog likewise, so an edit-save would have dropped the `x-` key the server now keeps.
   `authorKeys(stored)` (`inspecto/api/author-keys.ts`) spreads the stored document's `x-` keys into both save bodies; specs in `author-keys.spec.ts`, `rule-form.dialog.spec.ts`,
   `expectation-form.dialog.spec.ts`. The Channel dialog needs nothing (merge PUT).
-- **Remaining (BACKLOG row shrunk):** Tag / Tag Rule / Case Rule, and characterising Value Measure, Investigation Measure and Saved View.
+- **Remaining:** none - the rest were done in *P4d as built* (row closed).
 
 ### P4b as built (2026-10-07 — Alert Rule unmodelled-key policy, then inert-config diagnostics on the wire)
 
