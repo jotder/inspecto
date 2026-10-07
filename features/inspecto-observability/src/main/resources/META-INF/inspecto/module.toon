@@ -5,3 +5,4 @@ offeringRole: optional
 bindingTime: boot
 provides:
   features[1]: events
+  routes[8]: "GET /metrics","GET /events","GET /events/search","GET /events/export","GET /events/views","POST /events/views","POST /events/views/([^/]+)/delete","GET /events/([^/]+)"

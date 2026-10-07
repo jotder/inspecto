@@ -7,5 +7,6 @@ bindingTime: boot
 provides:
   features[1]: entityList
   contracts[2]: GovernableKindProvider,WatchListFeed
+  routes[7]: "GET /entity-lists","GET /entity-lists/([^/]+)","POST /entity-lists","POST /entity-lists/([^/]+)/members","POST /entity-lists/([^/]+)/retire","POST /entity-lists/([^/]+)/match","POST /entity-lists/([^/]+)/register-dataset"
 requires:
   modules[1]: entity-store

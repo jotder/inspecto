@@ -6,5 +6,6 @@ offeringRole: optional
 bindingTime: boot
 provides:
   contracts[5]: CasePort,CollectorCoveragePort,DatasetProvider,LinkIndexBuilder,InvestigationMeasureProbe
+  routes[6]: "GET /inv/investigations/([^/]+)/measures","GET /inv/investigations/([^/]+)/alert-rules","POST /inv/investigations/([^/]+)/alert-rules","POST /inv/investigations/([^/]+)/standing-detection","DELETE /inv/investigations/([^/]+)/standing-detection/([^/]+)","PUT /inv/investigations/([^/]+)/alert-rules/([^/]+)"
 requires:
   modules[2]: la-api,la-core

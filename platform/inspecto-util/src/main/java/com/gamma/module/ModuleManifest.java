@@ -30,9 +30,15 @@ public record ModuleManifest(String id, String title, String buildRole, String o
     public static final List<String> OFFERING_ROLES = List.of("base", "optional", "provider", "internal");
     public static final List<String> BINDING_TIMES = List.of("build", "boot", "space", "run");
 
+    /**
+     * @param routes the HTTP surface the module registers, one {@code "METHOD path"} per route, where {@code path} is
+     *               the EXACT regex string passed to {@code ApiContext} (P3b) and the order is the registration order
+     *               (first-match: a catch-all stays last). Read by the host to synthesise the 503 "not installed"
+     *               stubs when the module is absent; kept honest by a parity test in each module.
+     */
     public record Provides(List<String> features, List<String> contracts, List<String> capabilities,
-                           List<String> configKinds, List<String> storeFamilies) {
-        public static final Provides NONE = new Provides(List.of(), List.of(), List.of(), List.of(), List.of());
+                           List<String> configKinds, List<String> storeFamilies, List<String> routes) {
+        public static final Provides NONE = new Provides(List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     public record Requires(List<String> modules, List<String> contracts) {

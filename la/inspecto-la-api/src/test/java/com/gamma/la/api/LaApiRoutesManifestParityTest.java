@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.la.api;
 
 import com.gamma.control.testkit.ModuleRoutesParity;
 import org.junit.jupiter.api.Test;
@@ -9,10 +9,10 @@ import org.junit.jupiter.api.Test;
  * absent, so a route added here and not in the manifest 404s there and is missing from {@code docs/api/openapi-v1.json}.
  * Replaces the hand-kept {@code Absent*Routes.SURFACE} parity test.
  */
-class ReconAbsentSurfaceParityTest {
+class LaApiRoutesManifestParityTest {
 
     @Test
     void theManifestSurfaceMatchesWhatThisModuleRegisters() throws Exception {
-        ModuleRoutesParity.assertParity(Class.forName("com.gamma.recon.ReconRoutes"), "inspecto-reconciliation");
+        ModuleRoutesParity.assertParity(Class.forName("com.gamma.la.api.GeoRoutes"), "inspecto-la-api");
     }
 }

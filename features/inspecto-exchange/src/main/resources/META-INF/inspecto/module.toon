@@ -6,3 +6,4 @@ offeringRole: optional
 bindingTime: boot
 provides:
   features[1]: exchange
+  routes[12]: "GET /exchange/offers","POST /exchange/offers","POST /exchange/signal-offers","POST /exchange/refresh","POST /exchange/requests","POST /exchange/grants/([^/]+)/(approve|deny|revoke)","POST /exchange/grants/([^/]+)/pin","POST /exchange/grants/([^/]+)/expiry","GET /exchange/grants","GET /exchange/datasets/([^/]+)/([^/]+)","GET /exchange/widgets/([^/]+)/([^/]+)","GET /exchange/views/([^/]+)/([^/]+)"

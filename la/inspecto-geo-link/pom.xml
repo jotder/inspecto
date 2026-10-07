@@ -82,6 +82,14 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- MODULE-REORG-1 P3b: ModuleRoutesParity (provides.routes parity) from the http-spi test kit -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

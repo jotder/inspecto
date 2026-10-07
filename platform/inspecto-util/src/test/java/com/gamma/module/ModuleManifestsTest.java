@@ -30,7 +30,7 @@ class ModuleManifestsTest {
 
     private static ModuleManifest m(String id, List<String> reqModules, List<String> provContracts, List<String> reqContracts) {
         return new ModuleManifest(id, id, "implementation", "optional", "boot",
-                new ModuleManifest.Provides(List.of(), provContracts, List.of(), List.of(), List.of()),
+                new ModuleManifest.Provides(List.of(), provContracts, List.of(), List.of(), List.of(), List.of()),
                 new ModuleManifest.Requires(reqModules, reqContracts), null);
     }
 
@@ -58,6 +58,16 @@ class ModuleManifestsTest {
         assertEquals(List.of(), ops.requires().contracts(), "an empty TOON array must read as an empty list");
         assertEquals(List.of(), ops.provides().capabilities(), "an absent key must read as an empty list");
         assertNull(ops.entitlementKey());
+    }
+
+    @Test
+    void routesWithRegexMetacharactersAndSpacesRoundTripInOrder() {
+        List<String> routes = List.of("GET /events", "GET /events/views", "POST /events/views/([^/]+)/delete",
+                "POST /exchange/grants/([^/]+)/(approve|deny|revoke)", "GET /events/([^/]+)");
+        String quoted = routes.stream().map(r -> "\"" + r + "\"").collect(java.util.stream.Collectors.joining(","));
+        ModuleManifest m = ModuleManifests.parse(OPS.replace("  contracts[2]: case-store,note-store",
+                "  routes[" + routes.size() + "]: " + quoted).replace("---\n", ""));
+        assertEquals(routes, m.provides().routes(), "a catch-all must stay where the manifest put it");
     }
 
     @Test

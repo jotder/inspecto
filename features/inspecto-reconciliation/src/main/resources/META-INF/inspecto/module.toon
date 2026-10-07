@@ -6,3 +6,4 @@ bindingTime: boot
 provides:
   features[1]: reconciliation
   contracts[2]: JobTypeProvider,ComponentDeleteHook
+  routes[10]: "POST /recon/columns","POST /recon/run","POST /recon/breaks","POST /recon/rows","POST /recon/promote","GET /recon/promoted","GET /recon/state","GET /recon/([^/]+)/state","POST /recon/([^/]+)/record","POST /recon/([^/]+)/breaks/status"
