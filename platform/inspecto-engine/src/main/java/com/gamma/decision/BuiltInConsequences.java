@@ -28,7 +28,7 @@ public final class BuiltInConsequences {
         return List.of(
                 of("emit-signal", "Emit signal", "platform", List.of(), BuiltInConsequences::emitSignal),
                 of("create-alert", "Create alert", "notify", List.of(), BuiltInConsequences::createAlert),
-                of("start-job", "Start job", "platform", List.of("jobs"), BuiltInConsequences::startJob),
+                of("start-job", "Start job", "platform", List.of(), BuiltInConsequences::startJob),
                 of("trigger-pipeline", "Trigger pipeline", "platform", List.of(), BuiltInConsequences::triggerPipeline),
                 of("render-widget", "Render widget", "platform", List.of(), BuiltInConsequences::stubSignal),
                 of("generate-report", "Generate report", "platform", List.of(), BuiltInConsequences::stubSignal),

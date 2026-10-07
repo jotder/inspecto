@@ -57,6 +57,7 @@ final class DecisionRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/decision-rules", (e, m) -> list(api));
+        api.get("/decision-rules/consequences", (e, m) -> consequenceCatalog(api));
         api.post("/decision-rules", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> create(api, e, api.body(e))));
         api.put("/decision-rules/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
@@ -115,6 +116,56 @@ final class DecisionRoutes implements RouteModule {
         PendingChanges.hold(api, e, TYPE, name, null, current);   // maker-checker
         store.delete(TYPE, name);
         return Map.of("deleted", name);
+    }
+
+    // ── consequence catalog ───────────────────────────────────────────────────────
+
+    private static final List<String> GROUP_ORDER = List.of("routing", "platform", "notify", "object", "integration");
+
+    /**
+     * {@code GET /decision-rules/consequences} — every action an author may name, installed or not:
+     * {@code [{id, displayName, group, available, reason?, module?, requires?}]}. A provider whose required service
+     * is missing, and a known action whose module this bundle leaves out, are listed {@code available:false} with
+     * the reason (the module's {@code absentMessage}) so the editor can show it as "not installed". Ordered by
+     * group, then registration order (built-ins, {@code invoke-api}, contributed, then absent).
+     */
+    private Object consequenceCatalog(ApiContext api) {
+        ConsequenceContext ctx = new HostConsequenceContext(api, "", Map.of(), false, null, Map.of());
+        List<Map<String, Object>> rows = new java.util.ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (ConsequenceProvider p : consequences().all()) {
+            String missing = p.requires().stream().filter(r -> !ctx.has(r)).findFirst().orElse(null);
+            rows.add(catalogRow(p.id(), p.displayName(), p.group(), missing == null,
+                    missing == null ? null : "requires platform service '" + missing + "', which is not available",
+                    null, p.requires()));
+            seen.add(p.id());
+        }
+        boolean objects = ctx.has("objects");
+        rows.add(catalogRow("invoke-api", "Invoke API", "integration", objects,
+                objects ? null : "operational objects are not installed in this bundle, so there is no Incident to raise an Action Request on",
+                null, List.of("objects")));
+        seen.add("invoke-api");
+        for (com.gamma.module.ModuleManifest m : com.gamma.module.KnownModules.load(DecisionRoutes.class.getClassLoader()).manifests())
+            for (String id : m.provides().consequences())
+                if (seen.add(id))
+                    rows.add(catalogRow(id, id, "platform", false,
+                            com.gamma.module.KnownModules.absentMessage(m), m.id(), List.of()));
+        List<Map<String, Object>> sorted = new java.util.ArrayList<>(rows);
+        sorted.sort(Comparator.comparingInt(r -> GROUP_ORDER.indexOf(String.valueOf(r.get("group")))));
+        return sorted;
+    }
+
+    private static Map<String, Object> catalogRow(String id, String displayName, String group, boolean available,
+                                                  String reason, String module, List<String> requires) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", id);
+        row.put("displayName", displayName);
+        row.put("group", group);
+        row.put("available", available);
+        if (reason != null) row.put("reason", reason);
+        if (module != null) row.put("module", module);
+        if (!requires.isEmpty()) row.put("requires", requires);
+        return row;
     }
 
     // ── simulate / apply ─────────────────────────────────────────────────────────
@@ -249,7 +300,6 @@ final class DecisionRoutes implements RouteModule {
         @Override public boolean has(String serviceId) {
             return switch (serviceId) {
                 case "objects" -> objects().isPresent();
-                case "jobs" -> HostContext.of(api).service().jobService().isPresent();
                 default -> false;
             };
         }

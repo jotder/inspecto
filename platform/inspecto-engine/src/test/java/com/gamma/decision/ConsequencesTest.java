@@ -51,7 +51,7 @@ class ConsequencesTest {
                 "generate-report", "route", "tag", "quarantine", "drop"), ids);
         assertFalse(ids.contains("create-incident"), "create-incident is contributed by the ops module");
         assertEquals("routing", reg.find("tag").orElseThrow().group());
-        assertEquals(List.of("jobs"), reg.find("start-job").orElseThrow().requires());
+        assertEquals(List.of(), reg.find("start-job").orElseThrow().requires(), "a space with no jobs is 'no such job', not an absent module");
         assertTrue(reg.find("zz-nope").isEmpty());
     }
 

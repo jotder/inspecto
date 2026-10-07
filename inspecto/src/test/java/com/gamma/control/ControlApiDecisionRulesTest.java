@@ -183,6 +183,29 @@ class ControlApiDecisionRulesTest {
 
     // ── helpers ─────────────────────────────────────────────────────────────────
 
+    @Test
+    void consequenceCatalogListsBuiltInsAvailableAndAbsentModuleActionsUnavailableWithTheReason(
+            @TempDir Path cfg, @TempDir Path wr) throws Exception {
+        try (Ctx c = open(cfg, wr)) {
+            HttpResponse<String> r = send(c.port, "GET", "/decision-rules/consequences", null);
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode rows = json(r);
+            java.util.Map<String, JsonNode> byId = new java.util.HashMap<>();
+            rows.forEach(n -> byId.put(n.get("id").asText(), n));
+            for (String id : List.of("emit-signal", "create-alert", "start-job", "trigger-pipeline", "render-widget",
+                    "generate-report", "route", "tag", "quarantine", "drop")) {
+                assertTrue(byId.get(id).get("available").asBoolean(), id + " is a base action: " + r.body());
+            }
+            assertEquals("routing", byId.get("quarantine").get("group").asText());
+            JsonNode incident = byId.get("create-incident");   // no ops module on the processor's test classpath
+            assertFalse(incident.get("available").asBoolean(), r.body());
+            assertEquals("ops", incident.get("module").asText());
+            assertTrue(incident.get("reason").asText().contains("inspecto-ops"), incident.toString());
+            assertFalse(byId.get("invoke-api").get("available").asBoolean(), "no objects, no Incident to raise it on");
+            assertEquals("routing", rows.get(0).get("group").asText(), "stable order: routing group first");
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));

@@ -4785,6 +4785,20 @@
         "x-generated" : true
       }
     },
+    "/decision-rules/consequences" : {
+      "get" : {
+        "tags" : [ "decision-rules" ],
+        "summary" : "GET /decision-rules/consequences (generated skeleton)",
+        "operationId" : "getDecisionRulesConsequences",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision. Hand-kept note: the data array lists every Decision Rule consequence an author may name, [{id, displayName, group (routing|platform|notify|object|integration), available, reason?, module?, requires?}]; available=false means the providing module/service is not installed in this bundle.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
     "/decision-rules/{decisionruleId}" : {
       "put" : {
         "tags" : [ "decision-rules" ],

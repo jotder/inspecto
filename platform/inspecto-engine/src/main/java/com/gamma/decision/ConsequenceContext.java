@@ -29,7 +29,7 @@ public interface ConsequenceContext {
     /** Operational objects (Incidents); empty on a bundle without the ops module. */
     Optional<ObjectAccess> objects();
 
-    /** Whether the host service {@code id} ({@code objects}, {@code jobs}) is available — what {@link ConsequenceProvider#requires} names. */
+    /** Whether the host service {@code id} ({@code objects}) is available — what {@link ConsequenceProvider#requires} names. */
     boolean has(String serviceId);
 
     /** Emit a Signal onto this space's ledger; {@code offerTo} (nullable) names the one Space it is offered to. */
