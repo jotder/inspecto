@@ -13,7 +13,7 @@ Trial only, never for master. Worktree fast-forwarded to `1da0ad734`.
   Each lists only `windows_arm64`. The snapshot publish looks partial, or platform-split.
 - Maven stopped at `inspecto-util` (the first module on the DuckDB dependency):
   `Could not find artifact org.duckdb:duckdb_jdbc:jar:2.0-2848c61d-SNAPSHOT in sn`.
-  The reactor was `-Pedition-enterprise -pl inspecto-la-storage,inspecto-la-core,inspecto-la-api,inspecto-geo-link -am`,
+  The reactor was `-Pedition-enterprise -pl :inspecto-la-storage,:inspecto-la-core,:inspecto-la-api,:inspecto-geo-link -am`,
   JDK 27. Every later module, all four LA modules included, was SKIPPED.
 
 ## Not answered

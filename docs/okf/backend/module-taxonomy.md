@@ -13,7 +13,7 @@ timestamp: 2026-10-06T00:00:00Z
 > Built: the per-module manifest (`META-INF/inspecto/module.toon`, all 34 modules), the activator
 > (`com.gamma.module` in `inspecto-util`) and `GET /modules`; the per-Space **Enabled** gate (`modules.toon`, `GET|PUT /settings/modules` — a route of a
 > disabled module answers 404 `MODULE_DISABLED`, `/bootstrap` `features{}` and `GET /modules` `enabledInSpace` follow it).
-> Not built: directory regroup; Offerings exist as a checked artifact only (see below). Decisions D-MR1…D-MR12 and phases P0–P7 live in
+> Directory regroup DONE 2026-10-07 (layout below). Offerings exist as a checked artifact only (see below). Decisions D-MR1…D-MR12 and phases P0–P7 live in
 > [module-architecture-reorg-plan.md](../../superpower/module-architecture-reorg-plan.md) until they ship.
 
 ## Manifest format (`META-INF/inspecto/module.toon`)
@@ -41,6 +41,18 @@ each module's state with the reasons, plus loader diagnostics.
 | Build role | Foundation · Contract · Platform module · Implementation |
 | Offering role | Base · Optional · Provider · Internal |
 | Binding time | Build · Boot · Space · Run |
+
+## Directory layout (D-MR2, 2026-10-07 — directories only, artifactIds unchanged)
+Group directories hold plain modules (no aggregator pom): the root pom lists `<module>platform/inspecto-engine</module>` etc.
+Name a module to Maven by artifactId (`-pl :inspecto-engine`), never by path. `inspecto` (the product module, `package.ps1`) stays at the root.
+| Directory | Modules |
+|---|---|
+| `spi/` | inspecto-audit-spi, inspecto-auth-spi, inspecto-http-spi |
+| `platform/` | inspecto-api, -util, -config, -sql, -etl, -event, -workflow, -acquire, -entity-store, -engine |
+| `features/` | inspecto-agent, -backup, -entity-list, -exchange, -intelligence, -observability, -ops, -reconciliation, -scoring |
+| `la/` | inspecto-la-core, -la-api, -la-graph, -la-storage, -la-store-pg, -geo-link |
+| `providers/` | inspecto-agent-hosted, -connectors, -connectors-kafka, -demo-auth, -geo-country, -notify-channels, -oidc, -policy, -secrets, -telecom-asn1, asn-parser (nested reactor, moves as a unit) |
+`tools/regroup-modules.mjs` did the move (spent; kept as the record of what changed).
 
 ## Rules that carry the design
 - A module boundary exists only for: optional shipping, distinct third-party footprint, swappability, or test

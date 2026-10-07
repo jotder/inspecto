@@ -108,7 +108,7 @@ Lanes marked ∥ touch disjoint files and can run in parallel; the timing lanes 
 3. ∥ **SPA SQL reader for the 2.0 AST** (operator: yes): rewrite `sql-ast.ts` for the 2.0 shape only, regenerate the contract
    json from real `json_serialize_sql` output so `SqlAstContractTest` and the SPA specs are green together; do not touch T3 / T4
    or the `SqlGuard` test; close `DUCKDB-2-SQL-AST-SPA-1`.
-4. ∥ **Verify the `SqlGuard` branch:** `-pl inspecto-sql -am` with the contract and parse-tree tests; mutation-check the new
+4. ∥ **Verify the `SqlGuard` branch:** `-pl :inspecto-sql -am` with the contract and parse-tree tests; mutation-check the new
    reviewed set (remove one entry, expect red naming it); then merge it into the upgrade branch.
 5. **Loop-query batch** (from `duckdb-2-loop-queries-plan.md` §6): lambda-arrow migration (the upgrade branch already covers the
    Space templates; check what is left), the temporal burst / periodicity scan as window functions (gains on both versions,
