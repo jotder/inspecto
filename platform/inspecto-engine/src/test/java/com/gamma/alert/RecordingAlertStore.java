@@ -32,5 +32,7 @@ final class RecordingAlertStore implements AlertStore {
     @Override public List<Row> allActive() { return inner.allActive(); }
     @Override public void linkIncident(String alertId, String incidentId) { inner.linkIncident(alertId, incidentId); }
     @Override public List<Alert> recentFired(int limit) { return inner.recentFired(limit); }
+    @Override public java.util.Optional<Row> get(String alertId) { return inner.get(alertId); }
+    @Override public List<Row> recentRows(int limit) { return inner.recentRows(limit); }
     @Override public long size() { return inner.size(); }
 }

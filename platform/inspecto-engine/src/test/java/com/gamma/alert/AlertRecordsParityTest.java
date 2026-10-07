@@ -435,6 +435,9 @@ class AlertRecordsParityTest {
         @Override public Map<String, String> activeIncidentIndex(String s, String a) { calls++; return inner.activeIncidentIndex(s, a); }
         @Override public String openAlert(Alert f, String t, String m, String sev, String s, Map<String, String> a) { calls++; return inner.openAlert(f, t, m, sev, s, a); }
         @Override public boolean resolveAlert(String id, String actor) { calls++; return inner.resolveAlert(id, actor); }
+        @Override public boolean acknowledgeAlert(String id, String actor) { calls++; return inner.acknowledgeAlert(id, actor); }
+        @Override public Optional<AlertStore.Row> findAlert(String id) { calls++; return inner.findAlert(id); }
+        @Override public List<AlertStore.Row> recentAlertRows(int limit) { calls++; return inner.recentAlertRows(limit); }
         @Override public boolean reopenIncident(String id, String actor) { calls++; return inner.reopenIncident(id, actor); }
         @Override public void linkEscalation(String i, String a, String actor) { calls++; inner.linkEscalation(i, a, actor); }
         @Override public List<Alert> recentFired(int limit) { calls++; return inner.recentFired(limit); }

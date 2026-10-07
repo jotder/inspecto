@@ -55,6 +55,15 @@ public interface AlertRecords {
     /** Resolve an Alert as {@code actor}; {@code false} when unknown or not legal from its state. */
     boolean resolveAlert(String alertId, String actor);
 
+    /** Acknowledge an Alert as {@code actor}; {@code false} when unknown or not legal from its state. */
+    boolean acknowledgeAlert(String alertId, String actor);
+
+    /** One stored Alert by id, in any state. */
+    Optional<AlertStore.Row> findAlert(String alertId);
+
+    /** The most recent stored Alerts that carry a fired {@link Alert}, newest first (any state). */
+    List<AlertStore.Row> recentAlertRows(int limit);
+
     /** Re-open a (resolved) Incident as {@code actor}; {@code false} when unknown, not legal, or no ops module. */
     boolean reopenIncident(String incidentId, String actor);
 

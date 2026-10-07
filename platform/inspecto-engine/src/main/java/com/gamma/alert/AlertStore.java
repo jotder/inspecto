@@ -6,6 +6,7 @@ import com.gamma.workflow.Workflow;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -53,8 +54,16 @@ public interface AlertStore extends AutoCloseable {
     /** Link {@code alertId} to the Incident that was escalated from it. */
     void linkIncident(String alertId, String incidentId);
 
+    /** One Alert row by id (any state), or empty when unknown. */
+    Optional<Row> get(String alertId);
+
+    /** The most recent rows that carry a fired {@link Alert}, newest first (any state). */
+    List<Row> recentRows(int limit);
+
     /** The fired Alerts of the most recent records, newest first — what re-seeds the in-memory ring after a restart. */
-    List<Alert> recentFired(int limit);
+    default List<Alert> recentFired(int limit) {
+        return recentRows(limit).stream().map(Row::fired).toList();
+    }
 
     /** How many Alert rows the store holds (any state). */
     long size();

@@ -330,9 +330,65 @@ public final class AlertService {
         return rules.stream().anyMatch(AlertRule::isFreshnessRule);
     }
 
-    /** Recent fired alerts, newest first, JSON-ready — backs {@code GET /alerts}. */
+    /**
+     * Recent fired alerts, newest first, JSON-ready — backs {@code GET /alerts}. An Alert that has a stored record
+     * also carries its {@code id} and lifecycle {@code state} (OPEN / ACKNOWLEDGED / RESOLVED), the handle
+     * {@code POST /alerts/{id}/ack|resolve} takes; an Alert the store de-duplicated into an already-open record has none.
+     */
     public synchronized List<Map<String, Object>> recent(int limit) {
-        return fired.stream().limit(Math.max(0, limit)).map(Alert::toMap).toList();
+        int n = Math.max(0, limit);
+        Map<Alert, AlertStore.Row> stored = new java.util.HashMap<>();
+        if (n > 0) {
+            try {
+                for (AlertStore.Row r : records.recentAlertRows(capacity)) stored.putIfAbsent(r.fired(), r);
+            } catch (RuntimeException e) {
+                log.warn("could not read Alert states from the Alert store: {}", e.getMessage());
+            }
+        }
+        return fired.stream().limit(n).map(a -> {
+            Map<String, Object> m = a.toMap();
+            AlertStore.Row r = stored.get(a);
+            if (r != null) {
+                m.put("id", r.id());
+                m.put("state", r.state());
+            }
+            return m;
+        }).toList();
+    }
+
+    /**
+     * Acknowledge the stored Alert {@code alertId} as {@code actor} ({@code OPEN → ACKNOWLEDGED}).
+     *
+     * @throws java.util.NoSuchElementException when no such Alert exists
+     * @throws IllegalStateException            when the move is not legal from the Alert's state (already acknowledged / resolved)
+     */
+    public Map<String, Object> acknowledge(String alertId, String actor) {
+        return move(alertId, "ack", actor);
+    }
+
+    /** Resolve the stored Alert {@code alertId} as {@code actor}; same refusals as {@link #acknowledge}. */
+    public Map<String, Object> resolve(String alertId, String actor) {
+        return move(alertId, "resolve", actor);
+    }
+
+    private Map<String, Object> move(String alertId, String action, String actor) {
+        AlertStore.Row cur = records.findAlert(alertId)
+                .orElseThrow(() -> new java.util.NoSuchElementException("no alert with id '" + alertId + "'"));
+        boolean moved = "ack".equals(action) ? records.acknowledgeAlert(alertId, actor) : records.resolveAlert(alertId, actor);
+        if (!moved)
+            throw new IllegalStateException("alert '" + alertId + "' is " + cur.state() + "; '" + action + "' is not legal from there");
+        AlertStore.Row now = records.findAlert(alertId).orElse(cur);
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", now.id());
+        m.put("state", now.state());
+        m.put("title", now.title());
+        m.put("severity", now.severity());
+        m.put("scope", now.scope());
+        m.put("openedAt", now.openedAt());
+        m.put("closedAt", now.closedAt());
+        m.put("closedBy", now.closedBy());
+        m.put("incidentId", now.incidentId());
+        return m;
     }
 
     /** Bus subscriber: a terminal batch re-evaluates the rules scoped to its pipeline. */

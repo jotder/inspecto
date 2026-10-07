@@ -11623,6 +11623,50 @@
         },
         "x-generated" : true
       }
+    },
+    "/alerts/{alertId}/ack" : {
+      "post" : {
+        "tags" : [ "alerts" ],
+        "summary" : "POST /alerts/{alertId}/ack (generated skeleton)",
+        "operationId" : "postAlertsByAlertIdAck",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "alertId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/alerts/{alertId}/resolve" : {
+      "post" : {
+        "tags" : [ "alerts" ],
+        "summary" : "POST /alerts/{alertId}/resolve (generated skeleton)",
+        "operationId" : "postAlertsByAlertIdResolve",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "alertId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
     }
   },
   "components" : {

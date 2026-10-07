@@ -54,6 +54,13 @@ final class AlertRoutes implements RouteModule {
                 .map(a -> (Object) a.evaluateAll())
                 .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                         "alert engine not armed (no alert-rule components loaded)"))));
+        // Working a stored Alert (operator, 2026-10-07): rule-fired Alerts left the object substrate in P7 slice 2, so
+        // the objects' ack / resolve no longer reach them. Same capability as POST /objects/{id}/ack|resolve; the id is
+        // the `id` GET /alerts carries. Unknown id -> 404, a move illegal from the Alert's state -> 422.
+        api.post("/alerts/([^/]+)/ack", ApiContext.withCapability("canWorkIncidents",
+                (e, m) -> work(api, ApiContext.name(m), true, actorOf(e, api.body(e)))));
+        api.post("/alerts/([^/]+)/resolve", ApiContext.withCapability("canWorkIncidents",
+                (e, m) -> work(api, ApiContext.name(m), false, actorOf(e, api.body(e)))));
         api.post("/alerts/rules", ApiContext.withCapability("canAuthorAlertRules",
                 (e, m) -> editionRefused(e) ? ApiContext.HANDLED : single(e, create(api, e, api.body(e)))));
         api.put("/alerts/rules/([^/]+)", ApiContext.withCapability("canAuthorAlertRules",
@@ -61,6 +68,23 @@ final class AlertRoutes implements RouteModule {
                         : single(e, update(api, e, ApiContext.name(m), api.body(e)))));
         api.delete("/alerts/rules/([^/]+)", ApiContext.withCapability("canAuthorAlertRules",
                 (e, m) -> delete(api, e, ApiContext.name(m))));
+    }
+
+    private static Object work(ApiContext api, String id, boolean ack, String actor) {
+        AlertService alerts = alerts(api);
+        try {
+            return ack ? alerts.acknowledge(id, actor) : alerts.resolve(id, actor);
+        } catch (java.util.NoSuchElementException notFound) {
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
+        } catch (IllegalStateException illegal) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, illegal.getMessage());
+        }
+    }
+
+    /** The authenticated Subject, else the body's {@code actor} (Personal's honour-system value), else {@code operator}. */
+    private static String actorOf(HttpExchange e, Map<String, Object> body) {
+        return ApiContext.subject(e).map(Subject::id)
+                .orElseGet(() -> ApiContext.str(body, "actor") == null ? "operator" : ApiContext.str(body, "actor"));
     }
 
     /** An alert rule's only verbs are the alert-authoring family — declare the applicable set (SEC-7b). */

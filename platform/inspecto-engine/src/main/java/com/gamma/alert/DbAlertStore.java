@@ -148,11 +148,15 @@ public final class DbAlertStore implements AlertStore {
         }
     }
 
-    @Override public List<Alert> recentFired(int limit) {
-        List<Alert> out = new ArrayList<>();
+    @Override public Optional<Row> get(String alertId) {
+        return query("SELECT " + COLS + " FROM inspecto_alerts WHERE id = ?", alertId).stream().findFirst();
+    }
+
+    @Override public List<Row> recentRows(int limit) {
+        List<Row> out = new ArrayList<>();
         for (Row r : query("SELECT " + COLS + " FROM inspecto_alerts WHERE fired_json IS NOT NULL"
                 + " ORDER BY opened_at DESC, id DESC LIMIT " + Math.max(0, limit)))
-            if (r.fired() != null) out.add(r.fired());
+            if (r.fired() != null) out.add(r);
         return out;
     }
 

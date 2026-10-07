@@ -110,6 +110,8 @@ public final class CapabilityManifest {
             new Entry("POST", "/streams/([^/]+)/records", Roles.CAN_OPERATE_RUNS),
             // AlertRoutes
             new Entry("POST", "/alerts/evaluate", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/alerts/([^/]+)/ack", Roles.CAN_WORK_INCIDENTS),
+            new Entry("POST", "/alerts/([^/]+)/resolve", Roles.CAN_WORK_INCIDENTS),
             new Entry("POST", "/alerts/rules", Roles.CAN_AUTHOR_ALERT_RULES),
             new Entry("PUT", "/alerts/rules/([^/]+)", Roles.CAN_AUTHOR_ALERT_RULES),
             new Entry("DELETE", "/alerts/rules/([^/]+)", Roles.CAN_AUTHOR_ALERT_RULES),

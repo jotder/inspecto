@@ -44,11 +44,13 @@ public final class InMemoryAlertStore implements AlertStore {
                 cur.attributes(), cur.state(), cur.openedAt(), cur.closedAt(), cur.closedBy(), incidentId, cur.fired()));
     }
 
-    @Override public synchronized List<Alert> recentFired(int limit) {
-        List<Alert> out = new ArrayList<>();
+    @Override public synchronized Optional<Row> get(String alertId) { return Optional.ofNullable(rows.get(alertId)); }
+
+    @Override public synchronized List<Row> recentRows(int limit) {
+        List<Row> out = new ArrayList<>();
         List<Row> all = new ArrayList<>(rows.values());
         for (int i = all.size() - 1; i >= 0 && out.size() < limit; i--)
-            if (all.get(i).fired() != null) out.add(all.get(i).fired());
+            if (all.get(i).fired() != null) out.add(all.get(i));
         return out;
     }
 

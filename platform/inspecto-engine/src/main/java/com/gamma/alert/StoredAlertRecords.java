@@ -42,6 +42,12 @@ final class StoredAlertRecords implements AlertRecords {
 
     @Override public boolean resolveAlert(String alertId, String actor) { return store.transition(alertId, "resolve", actor); }
 
+    @Override public boolean acknowledgeAlert(String alertId, String actor) { return store.transition(alertId, "ack", actor); }
+
+    @Override public Optional<AlertStore.Row> findAlert(String alertId) { return store.get(alertId); }
+
+    @Override public List<AlertStore.Row> recentAlertRows(int limit) { return store.recentRows(limit); }
+
     @Override public boolean reopenIncident(String incidentId, String actor) {
         return objects.map(o -> o.transition(incidentId, "reopen", actor)).orElse(false);
     }

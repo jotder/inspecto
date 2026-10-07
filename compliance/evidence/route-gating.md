@@ -101,10 +101,12 @@ system: the evidence cannot say something the code does not.
 | POST | `/agent/tools/(.+)` | exempt | self-limiting | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java:139` |
 | POST | `/agent/tools/(.+)/derive` | exempt | self-limiting | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java:107` |
 | POST | `/agent/triage-runs/(.+)/feedback` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java:173` |
+| POST | `/alerts/([^/]+)/ack` | gated | `canWorkIncidents` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java:60` |
+| POST | `/alerts/([^/]+)/resolve` | gated | `canWorkIncidents` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java:62` |
 | POST | `/alerts/evaluate` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java:53` |
-| POST | `/alerts/rules` | gated | `canAuthorAlertRules` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java:57` |
-| DELETE | `/alerts/rules/([^/]+)` | gated | `canAuthorAlertRules` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java:62` |
-| PUT | `/alerts/rules/([^/]+)` | gated | `canAuthorAlertRules` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java:59` |
+| POST | `/alerts/rules` | gated | `canAuthorAlertRules` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java:64` |
+| DELETE | `/alerts/rules/([^/]+)` | gated | `canAuthorAlertRules` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java:69` |
+| PUT | `/alerts/rules/([^/]+)` | gated | `canAuthorAlertRules` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java:66` |
 | POST | `/assist/(.+)` | exempt | self-limiting | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java:63` |
 | POST | `/assist/settings` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java:56` |
 | POST | `/assist/settings/test` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java:51` |
