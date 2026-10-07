@@ -6,7 +6,7 @@ import com.gamma.util.SqlIdent;
 import com.gamma.sql.SqlSandboxPolicy;
 
 import com.gamma.control.ApiException;
-import com.gamma.control.EntityTypes;
+import com.gamma.entitystore.EntityTypes;
 import com.gamma.control.ErrorCodes;
 import com.gamma.entitystore.EntityFactLog;
 import com.gamma.entitystore.EntityListFacts;

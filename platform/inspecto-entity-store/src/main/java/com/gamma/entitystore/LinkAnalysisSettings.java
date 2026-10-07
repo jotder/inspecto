@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.entitystore;
 
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.util.AtomicFiles;
@@ -140,7 +140,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     }
 
     public static final String FILE = "link-analysis.toon";
-    static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null);
+    public static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null, null, null, null, null, null, null, null, null, null);
 
     /** The shipped default of {@code merged_distinct_cap}. */
     public static final int DEFAULT_MERGED_DISTINCT_CAP = 20_000;
@@ -184,7 +184,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     }
 
     /** Write to {@code link-analysis.toon} at {@code path} (canonical TOON, crash-safe). */
-    void write(Path path) throws IOException {
+    public void write(Path path) throws IOException {
         Map<String, Object> m = new LinkedHashMap<>();
         if (projectionNodeCap != null) m.put("projection_node_cap", projectionNodeCap);
         if (analysisNodeCap != null) m.put("analysis_node_cap", analysisNodeCap);
@@ -230,7 +230,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     }
 
     /** Read {@code link-analysis.toon} at {@code path}; missing/unreadable → {@link #EMPTY} (inherit everything). */
-    static LinkAnalysisSettings read(Path path) {
+    public static LinkAnalysisSettings read(Path path) {
         if (path == null || !Files.exists(path)) return EMPTY;
         try {
             Map<String, Object> m = ToonHelper.load(path.toString());
@@ -290,7 +290,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     }
 
     /** A declared masking mode (case-insensitive), or {@code null} for anything else. */
-    static String maskingMode(String raw) {
+    public static String maskingMode(String raw) {
         String v = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
         return ConfigSpecs.LINK_ANALYSIS_MASKING_MODES.contains(v) ? v : null;
     }

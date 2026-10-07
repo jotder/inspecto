@@ -1,6 +1,6 @@
 package com.gamma.entitystore;
 
-import com.gamma.control.EntityTypes;
+import com.gamma.entitystore.EntityTypes;
 
 import java.util.HexFormat;
 import java.util.Map;

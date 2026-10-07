@@ -1,4 +1,4 @@
-package com.gamma.control;
+package com.gamma.entitystore;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -92,7 +92,7 @@ public final class EntityTypes {
      * shape both the wire and {@code link-analysis.toon} carry — validated. Label and classifications are
      * trimmed. Throws {@link IllegalArgumentException} naming the first problem; nothing is clamped or dropped.
      */
-    static List<EntityType> parse(Object raw) {
+    public static List<EntityType> parse(Object raw) {
         if (!(raw instanceof List<?> list)) throw new IllegalArgumentException("entityTypes must be a list");
         List<EntityType> out = new ArrayList<>();
         for (Object o : list) {
@@ -153,7 +153,7 @@ public final class EntityTypes {
     }
 
     /** The wire/TOON shape of {@code types}: one {@code {id, label, normaliser, masked, classifications}} each. */
-    static List<Map<String, Object>> shape(List<EntityType> types) {
+    public static List<Map<String, Object>> shape(List<EntityType> types) {
         List<Map<String, Object>> out = new ArrayList<>();
         for (EntityType t : types) {
             Map<String, Object> m = new LinkedHashMap<>();

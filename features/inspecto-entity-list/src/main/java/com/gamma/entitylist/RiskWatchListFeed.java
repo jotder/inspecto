@@ -1,6 +1,6 @@
 package com.gamma.entitylist;
 
-import com.gamma.control.EntityTypes;
+import com.gamma.entitystore.EntityTypes;
 
 import java.io.IOException;
 import java.nio.file.Path;

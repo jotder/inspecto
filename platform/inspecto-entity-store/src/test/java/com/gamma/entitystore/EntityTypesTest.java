@@ -1,8 +1,8 @@
-package com.gamma.control;
+package com.gamma.entitystore;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gamma.control.EntityTypes.EntityType;
+import com.gamma.entitystore.EntityTypes.EntityType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

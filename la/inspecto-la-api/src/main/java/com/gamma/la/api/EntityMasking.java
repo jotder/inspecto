@@ -2,8 +2,8 @@ package com.gamma.la.api;
 
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.DatasetProviders;
-import com.gamma.control.EntityTypes;
-import com.gamma.control.LinkAnalysisSettings;
+import com.gamma.entitystore.EntityTypes;
+import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.entitystore.EntityListFacts;
 import com.gamma.entitystore.MaskTokens;
 

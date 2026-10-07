@@ -2,9 +2,9 @@ package com.gamma.entitystore;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
-import com.gamma.control.EntityTypes;
+import com.gamma.entitystore.EntityTypes;
 import com.gamma.control.ErrorCodes;
-import com.gamma.control.LinkAnalysisSettings;
+import com.gamma.entitystore.LinkAnalysisSettings;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;

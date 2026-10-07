@@ -2,7 +2,7 @@ package com.gamma.entitystore;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gamma.control.EntityTypes;
+import com.gamma.entitystore.EntityTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

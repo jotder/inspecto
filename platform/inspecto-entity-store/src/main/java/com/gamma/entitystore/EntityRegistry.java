@@ -80,7 +80,7 @@ public final class EntityRegistry {
          * entry that contains it; {@code null} when none does. An expired entry never matches.
          */
         public String match(String raw, java.time.Instant now) {
-            String key = com.gamma.control.EntityTypes.normalise(normaliser, raw);
+            String key = com.gamma.entitystore.EntityTypes.normalise(normaliser, raw);
             if (!key.isEmpty() && members.contains(key) && live(key, now)) return key;
             for (String r : ranges)
                 if (liveRange(r, now) && EntityListEntries.matches(EntityListEntries.parse(r), key, raw)) return r;

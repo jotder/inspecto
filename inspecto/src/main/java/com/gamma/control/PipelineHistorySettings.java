@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.util.AtomicFiles;
 import com.gamma.util.ToonHelper;
 import dev.toonformat.jtoon.JToon;

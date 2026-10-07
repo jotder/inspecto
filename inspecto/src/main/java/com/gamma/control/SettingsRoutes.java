@@ -1,5 +1,7 @@
 package com.gamma.control;
 
+import com.gamma.entitystore.EntityTypes;
+import com.gamma.entitystore.LinkAnalysisSettings;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;

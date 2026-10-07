@@ -1,6 +1,6 @@
 package com.gamma.la.api;
 
-import com.gamma.control.LinkAnalysisSettings;
+import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.InputFingerprint;
 import com.gamma.la.storage.BucketFunction;

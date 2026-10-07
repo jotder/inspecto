@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import com.gamma.control.EntityTypes;
+import com.gamma.entitystore.EntityTypes;
 
 import java.util.ArrayList;
 import java.util.HashMap;

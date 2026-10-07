@@ -3,7 +3,7 @@ package com.gamma.la.api;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
-import com.gamma.control.LinkAnalysisSettings;
+import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
 import com.gamma.la.core.DraftCheckpoints;

@@ -4,7 +4,7 @@ import com.gamma.la.core.InvestigationStore;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
-import com.gamma.control.LinkAnalysisSettings;
+import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.control.RouteModule;
 import com.gamma.control.Subject;
 import com.gamma.la.core.DraftLifecycle;
