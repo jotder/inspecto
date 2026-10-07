@@ -528,6 +528,45 @@ Scenario: config naming a capability no installed module provides (stand-ins `zz
 - **Not changed, deliberately:** the engine's boot-time skip of unregistered Job types (documented, `DEMO-SPACE-PERSONAL-UNBOOTABLE-1`); `ImportPaths`' shape allowlist; the Pipeline unknown-key gate. No route was added (`ApiContractTest` untouched); no guard inventory was edited.
 - **Open (rows filed):** `MODULE-REORG-P4-1` inert-config diagnostics on the wire; `MODULE-REORG-P4-2` Alert Rule unmodelled-key policy; `MODULE-REORG-P4-3` store-family ownership, the bundle kind roster and stopping a disabled module's background work.
 
+### P7 Incidents slice 1 as built (2026-10-07 — the Alert records port; no persistence change, no behaviour change)
+
+`AlertService` no longer holds `ObjectAccess`. It holds a narrow port, **`AlertRecords`** (`com.gamma.alert`), plus
+`IncidentAccess` (promotion stays there, the Platform Service a granted Run also uses). Name: not "store" (GLOSSARY:
+the physical backend) and not "ledger" (Signal / batch ledgers); `Records` collides with nothing.
+
+- **Port methods (7):** `hasActiveAlert(scope, rule)` · `activeAlertIndex(scope, attribute)` ·
+  `activeIncidentIndex(scope, attribute)` · `openAlert(title, message, severity, scope, attrs) -> id` ·
+  `resolveAlert(id, actor)` · `reopenIncident(id, actor)` · `linkEscalation(incidentId, alertId, actor)`.
+  Only what `AlertService` calls; the other ~8 `ObjectAccess` methods (tags, summary, findByStatus, eventSubscriber...)
+  stay on `ObjectAccess` for their other consumers.
+- **Two implementations:** `ObjectBackedAlertRecords` (adapter over `ObjectAccess`, `ESCALATED_FROM` literal moved in) and
+  `NoAlertRecords` (events-only null object: reads empty/false, writes no-op, paired `NO_INCIDENTS` opens nothing).
+  `AlertRecords.of(Optional<ObjectAccess>)` / `incidentsOf(...)` select them; `CollectorService` calls both
+  (ops present -> object-backed, Personal -> events-only). The old `AlertService(..., ObjectAccess)` constructors stay
+  as a delegating convenience (most tests build that way). There is deliberately **no in-memory *recording* store**:
+  that would be a behaviour change (Personal would start remembering Alerts); see the product call below.
+- **Null guards removed: 8** `objects == null` early-returns (`retireKeys` x2, `measureOpen`, `healMeasure`,
+  `seedOpenKeys`, `persistKeyObjects`, `healKey`, `persistAlertObject`) **+ 1** `objects == null ? null : IncidentAccess.over`
+  ternary (the survey's "~12" over-counted; `incidents` was never separately guarded) = **0 left**.
+  One trade: the events-only path now builds the attribute maps it then hands to a no-op (not observable).
+- **Characterisation first** — `AlertRecordsParityTest` (9 tests) pins, on BOTH wirings, the scenarios: same key twice
+  -> one fired entry + one `ALERT_FIRED` + Signal; critical raises no Incident events-only (and one with objects — the
+  twin that makes "nothing touched" falsifiable); restart re-fires once (events-only; object-backed dedupes the persisted
+  ALERT but still re-fires the in-memory entry); scalar Measure heal/relapse + restart (events-only has **no open-Alert
+  memory across a restart**, pinned); `by` rule open keys, heal, relapse, restart (events-only re-fires every
+  still-breaching key once); freshness fire/cooldown/restart; the explicit-port constructor through a call-counting port;
+  wiring selection. The 73 pre-existing alert tests (`AlertServiceTest`, `PerEntityAlertTest`, `MeasureAlertTest`,
+  `FreshnessAlertTest`...) pass unchanged.
+- **Three `FakeObjectAccess` copies** (engine, scoring, reconciliation tests) are NOT consolidated; recorded.
+- **Still-open product call — should Personal keep Alert history across restarts?** Today it does not (in-memory ring,
+  dedupe state lost on restart). Options: **(a)** move ALERT out of the generic object substrate into a small
+  alert-owned persisted record (Personal-safe; also what lets Incidents extract) — needs a persistence move + migration;
+  **(b)** give `ObjectAccess` an in-memory/file implementation on Personal — keeps the substrate, drags operational
+  objects into Personal, contradicting `NoOperationalObjectsShipInThePersonalBuildTest`; **(c)** accept events-only
+  (status quo; Personal never remembers). **Recommendation (a), in two steps:** step 1 = this port (done); step 2 = an
+  `AlertRecords` implementation over an alert-owned store, behind the same port, with the ALERT export/import path.
+  Not decided; nothing here forecloses (b)/(c).
+
 ## 7. Success measures (baseline → target)
 
 | Measure | Today | Target |
