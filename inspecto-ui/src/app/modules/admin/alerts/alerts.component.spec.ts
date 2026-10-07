@@ -26,6 +26,9 @@ const FIRED: FiredAlert = {
     message: 'failed_batches > 0 breached',
 };
 
+const STORED: FiredAlert = { ...FIRED, id: 'a-1', state: 'OPEN' };
+const WORKED = { id: 'a-1', state: 'OPEN', title: 'failed_batches > 0 breached', severity: 'CRITICAL' };
+
 const RULE: AlertRule = {
     name: 'failed_batches',
     metric: 'failed_batches',
@@ -37,7 +40,7 @@ const RULE: AlertRule = {
 
 async function create(
     overrides: Partial<Record<keyof AlertsService, unknown>> = {},
-    { canAuthor = true, confirmed = true, canOperateRuns = true } = {},
+    { canAuthor = true, confirmed = true, canOperateRuns = true, canWork = true } = {},
 ) {
     const toastr = { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() };
     const api = {
@@ -46,6 +49,8 @@ async function create(
         pendingRules: () => of([]),
         evaluate: vi.fn(() => of([FIRED])),
         removeRule: vi.fn(() => of(void 0)),
+        acknowledge: vi.fn(() => of({ ...WORKED, state: 'ACKNOWLEDGED' })),
+        resolve: vi.fn(() => of({ ...WORKED, state: 'RESOLVED' })),
         ...overrides,
     } as unknown as AlertsService;
     TestBed.configureTestingModule({
@@ -58,7 +63,11 @@ async function create(
             { provide: InspectoConfirmService, useValue: { confirmDestructive: vi.fn(async () => confirmed) } },
             {
                 provide: LensService,
-                useValue: { canAuthorAlertRules: () => canAuthor, canOperateRuns: () => canOperateRuns },
+                useValue: {
+                    canAuthorAlertRules: () => canAuthor,
+                    canOperateRuns: () => canOperateRuns,
+                    canWorkIncidents: () => canWork,
+                },
             },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
@@ -221,6 +230,100 @@ describe('AlertsComponent', () => {
     it('renders the loaded state with no a11y violations', async () => {
         const { fixture } = await create();
         fixture.detectChanges();
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
+describe('AlertsComponent ack / resolve', () => {
+    const settle = async (f: { detectChanges(): void }) => {
+        await new Promise((r) => setTimeout(r));
+        f.detectChanges();
+    };
+    const region = (el: HTMLElement) => el.querySelector('[role="status"]') as HTMLElement;
+    const names = (c: AlertsComponent, a: FiredAlert) =>
+        c
+            .firedActions()
+            .filter((x) => !x.visible || x.visible(a))
+            .map((x) => (typeof x.hint === 'function' ? x.hint(a) : x.hint));
+
+    it('offers Acknowledge + Resolve for OPEN, Resolve only for ACKNOWLEDGED, none once RESOLVED', async () => {
+        const { fixture } = await create({ recent: () => of([STORED]) });
+        const c = fixture.componentInstance;
+        const title = 'failed_batches > 0 breached';
+        expect(names(c, STORED)).toEqual(['What happened', `Acknowledge alert ${title}`, `Resolve alert ${title}`]);
+        expect(names(c, { ...STORED, state: 'ACKNOWLEDGED' })).toEqual(['What happened', `Resolve alert ${title}`]);
+        expect(names(c, { ...STORED, state: 'RESOLVED' })).toEqual(['What happened']);
+    });
+
+    it('offers no work actions for an entry without an id', async () => {
+        const { fixture } = await create();
+        expect(names(fixture.componentInstance, FIRED)).toEqual(['What happened']);
+    });
+
+    it('acknowledge posts, updates the state and announces it in the live region', async () => {
+        const { fixture, api } = await create({ recent: () => of([STORED]) });
+        const c = fixture.componentInstance;
+        c.work(STORED, 'acknowledged');
+        expect(api.acknowledge).toHaveBeenCalledWith('a-1');
+        expect(c.alerts()[0].state).toBe('ACKNOWLEDGED');
+        await settle(fixture);
+        expect(region(fixture.nativeElement).textContent).toContain('failed_batches > 0 breached acknowledged');
+        expect(document.activeElement).toBe(region(fixture.nativeElement));
+    });
+
+    it('resolve works straight from OPEN', async () => {
+        const { fixture, api } = await create({ recent: () => of([STORED]) });
+        fixture.componentInstance.work(STORED, 'resolved');
+        expect(api.resolve).toHaveBeenCalledWith('a-1');
+        expect(fixture.componentInstance.alerts()[0].state).toBe('RESOLVED');
+    });
+
+    it('a 422 rolls the state back and says so in plain language', async () => {
+        const { fixture } = await create({
+            recent: () => of([STORED]),
+            resolve: () => throwError(() => new HttpErrorResponse({ status: 422 })),
+        });
+        const c = fixture.componentInstance;
+        c.work(STORED, 'resolved');
+        expect(c.alerts()[0].state).toBe('OPEN');
+        await settle(fixture);
+        expect(region(fixture.nativeElement).textContent).toContain('already resolved or acknowledged');
+    });
+
+    it('a 404 asks for a refresh', async () => {
+        const { fixture } = await create({
+            recent: () => of([STORED]),
+            acknowledge: () => throwError(() => new HttpErrorResponse({ status: 404 })),
+        });
+        fixture.componentInstance.work(STORED, 'acknowledged');
+        await settle(fixture);
+        expect(region(fixture.nativeElement).textContent).toContain('no longer exists');
+    });
+
+    it('a 403 drops to read-only: the actions vanish and the permission note shows', async () => {
+        const { fixture } = await create({
+            recent: () => of([STORED]),
+            acknowledge: () => throwError(() => new HttpErrorResponse({ status: 403 })),
+        });
+        const c = fixture.componentInstance;
+        c.work(STORED, 'acknowledged');
+        await settle(fixture);
+        expect(c.alerts()[0].state).toBe('OPEN');
+        expect(names(c, STORED)).toEqual(['What happened']);
+        expect(region(fixture.nativeElement).textContent).toContain('do not have permission');
+        expect(fixture.nativeElement.textContent).toContain('needs the Work Incidents permission');
+    });
+
+    it('without canWorkIncidents the actions are absent and the read-only note shows', async () => {
+        const { fixture } = await create({ recent: () => of([STORED]) }, { canWork: false });
+        expect(names(fixture.componentInstance, STORED)).toEqual(['What happened']);
+        expect(fixture.nativeElement.textContent).toContain('needs the Work Incidents permission');
+    });
+
+    it('renders the stateful grid and live region with no a11y violations', async () => {
+        const { fixture } = await create({ recent: () => of([STORED]) });
+        fixture.componentInstance.work(STORED, 'acknowledged');
+        await settle(fixture);
         await expectNoA11yViolations(fixture.nativeElement);
     });
 });

@@ -49,3 +49,13 @@ deliberately does not (hosts read it from template bindings every change detecti
 keystroke) — a host that saves without `validate()` must call `commitListDrafts()` itself.
 **Threshold** has no default and must be > 0 (the engine's rule for every kind but freshness, whose
 comparator/threshold are fixed and hidden); the comparator offers only `gt | gte | lt | lte`.
+
+**Acknowledge / Resolve (MODULE-REORG-P7-INCIDENTS slice 3).** The fired-Alerts grid carries a **State** badge
+(text, via the shared status badge) and per-row icon actions named `Acknowledge alert <title>` /
+`Resolve alert <title>` (OPEN → both; ACKNOWLEDGED → Resolve only; none once RESOLVED or for an entry with
+no `id` — an Alert the store de-duplicated into an open record). They are gated on `canWorkIncidents`
+(`LensService`), ask no confirmation (like the Incident lifecycle verbs), and use `optimisticMutate`: the row
+flips at once and rolls back on failure. Outcomes go to ONE polite live region above the grid
+(`"<title> acknowledged"`; 403/404/422 as plain-language lines) which also **takes focus** after an action,
+because the clicked button may have just left the row. A 403 drops the pane to read-only for the session; a
+subject without the capability sees a permission note instead of the buttons.

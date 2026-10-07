@@ -19,8 +19,25 @@
         </ng-container>
     </inspecto-page-header>
 
+    <!-- Ack/resolve outcome — a polite live region that also takes focus after an action. The container is
+         always rendered (a live region must exist before its text changes); reserved min height = no layout shift. -->
+    <div
+        #statusRegion
+        tabindex="-1"
+        role="status"
+        aria-live="polite"
+        class="mt-2 min-h-5 rounded text-sm focus-visible:outline focus-visible:outline-2"
+        [class.text-warn]="statusMessage()?.error"
+        [class.text-secondary]="!statusMessage()?.error"
+    >
+        {{ statusMessage()?.text }}
+    </div>
+    @if (!canWork()) {
+        <p class="text-secondary text-xs">Acknowledging and resolving alerts needs the Work Incidents permission.</p>
+    }
+
     <!-- Fired alerts grid -->
-    <div class="mt-4 flex-auto">
+    <div class="mt-2 flex-auto">
         @if (loadError()) {
             <inspecto-empty-state
                 icon="heroicons_outline:exclamation-triangle"
@@ -37,7 +54,7 @@
                 stateKey="alerts-fired"
                 [rows]="alerts()"
                 [columns]="columnDefs"
-                [rowActions]="firedActions"
+                [rowActions]="firedActions()"
                 [pinActions]="true"
                 [loading]="loading()"
                 noRowsTitle="No alerts fired"

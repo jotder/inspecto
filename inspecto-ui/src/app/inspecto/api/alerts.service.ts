@@ -16,6 +16,26 @@ export interface FiredAlert {
     window: string;
     epochMillis: number;
     message: string;
+    /** Stored-Alert id — absent when the store de-duplicated this firing into an already-open record (no actions then). */
+    id?: string;
+    /** Stored-Alert workflow state; absent alongside `id`. */
+    state?: AlertState;
+}
+
+/** An Alert's workflow: OPEN → ACKNOWLEDGED → RESOLVED (or OPEN → RESOLVED). */
+export type AlertState = 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED';
+
+/** The Alert record returned by POST /alerts/{id}/ack and /resolve. */
+export interface WorkedAlert {
+    id: string;
+    state: AlertState;
+    title: string;
+    severity: string;
+    scope?: string | null;
+    openedAt?: string | null;
+    closedAt?: string | null;
+    closedBy?: string | null;
+    incidentId?: string | null;
 }
 
 /** One armed alert rule (GET /alerts/rules). */
@@ -106,6 +126,16 @@ export class AlertsService {
 
     removeRule(name: string): Observable<void> {
         return this.http.delete<void>(apiUrl(`/alerts/rules/${encodeURIComponent(name)}`));
+    }
+
+    /** Acknowledge an OPEN Alert — `canWorkIncidents`; 404 unknown id, 422 an illegal move. */
+    acknowledge(id: string): Observable<WorkedAlert> {
+        return this.http.post<WorkedAlert>(apiUrl(`/alerts/${encodeURIComponent(id)}/ack`), {});
+    }
+
+    /** Resolve an OPEN or ACKNOWLEDGED Alert — `canWorkIncidents`; 404 unknown id, 422 already resolved. */
+    resolve(id: string): Observable<WorkedAlert> {
+        return this.http.post<WorkedAlert>(apiUrl(`/alerts/${encodeURIComponent(id)}/resolve`), {});
     }
 
     /** Manual evaluation sweep; returns the alerts fired by this pass. */

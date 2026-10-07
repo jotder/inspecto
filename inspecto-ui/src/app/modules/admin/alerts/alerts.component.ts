@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    ElementRef,
+    inject,
+    OnInit,
+    signal,
+    viewChild,
+    ViewEncapsulation,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -7,7 +17,15 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
-import { AlertRule, AlertsService, apiErrorMessage, FiredAlert, LensService, PendingAlertRule } from 'app/inspecto/api';
+import {
+    AlertRule,
+    AlertsService,
+    apiErrorMessage,
+    FiredAlert,
+    LensService,
+    optimisticMutate,
+    PendingAlertRule,
+} from 'app/inspecto/api';
 import { HttpErrorResponse } from '@angular/common/http';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
@@ -105,6 +123,13 @@ export class AlertsComponent implements OnInit {
             maxWidth: 120,
             cellRenderer: (p: ICellRendererParams<FiredAlert>) => statusBadgeHtml(p.value as string),
         },
+        {
+            field: 'state',
+            headerName: 'State',
+            minWidth: 150,
+            maxWidth: 150,
+            cellRenderer: (p: ICellRendererParams<FiredAlert>) => (p.value ? statusBadgeHtml(p.value as string) : '—'),
+        },
         { field: 'rule', headerName: 'Rule', flex: 1 },
         { field: 'pipeline', headerName: 'Pipeline', flex: 1 },
         { field: 'metric', headerName: 'Metric', minWidth: 140 },
@@ -136,6 +161,14 @@ export class AlertsComponent implements OnInit {
         },
     ];
 
+    /** Polite live region: success ("<title> acknowledged") and plain-language failures. Focus lands here after an action. */
+    readonly statusMessage = signal<{ text: string; error: boolean } | null>(null);
+    private readonly statusRegion = viewChild<ElementRef<HTMLElement>>('statusRegion');
+    /** A 403 on ack/resolve means the session lacks `canWorkIncidents` after all — drop to read-only. */
+    private readonly forbidden = signal(false);
+    /** Ack/Resolve ride `canWorkIncidents` (same gate as the Incident lifecycle verbs). */
+    readonly canWork = computed(() => this.lens.canWorkIncidents() && !this.forbidden());
+
     /**
      * "What happened" on a fired alert (AGT-6a A4-status) — the alert IS the red thing, so this is the
      * reference adoption. It reads the pipeline's live state plus everything the ledger recorded around
@@ -144,9 +177,13 @@ export class AlertsComponent implements OnInit {
      * Ungated on purpose: it has no write path, and a Business-lens operator asking why an alert fired
      * is exactly who needs it. Do not "make it consistent" with `ruleActions` below, which gates because
      * it authors config.
+     *
+     * Acknowledge / Resolve are `canWorkIncidents`-gated and only offered for a stored Alert (`id`) in a
+     * state that allows the move (OPEN → Acknowledge + Resolve, ACKNOWLEDGED → Resolve). Resolve asks no
+     * confirmation, mirroring the Incident lifecycle verbs. Computed so the array identity is stable.
      */
-    get firedActions(): InspectoRowAction<FiredAlert>[] {
-        return [
+    readonly firedActions = computed<InspectoRowAction<FiredAlert>[]>(() => {
+        const actions: InspectoRowAction<FiredAlert>[] = [
             {
                 icon: 'heroicons_outline:information-circle',
                 hint: 'What happened',
@@ -159,6 +196,56 @@ export class AlertsComponent implements OnInit {
                     }),
             },
         ];
+        if (this.canWork()) {
+            actions.push(
+                {
+                    icon: 'heroicons_outline:check',
+                    hint: (a) => `Acknowledge alert ${alertTitle(a)}`,
+                    visible: (a) => !!a.id && a.state === 'OPEN',
+                    onClick: (a) => this.work(a, 'acknowledged'),
+                },
+                {
+                    icon: 'heroicons_outline:check-circle',
+                    hint: (a) => `Resolve alert ${alertTitle(a)}`,
+                    visible: (a) => !!a.id && (a.state === 'OPEN' || a.state === 'ACKNOWLEDGED'),
+                    onClick: (a) => this.work(a, 'resolved'),
+                },
+            );
+        }
+        return actions;
+    });
+
+    /**
+     * Acknowledge / resolve one Alert, optimistically: the row's State flips at once, the server's record
+     * reconciles it, and a failure restores the previous state and says why in the live region.
+     */
+    work(alert: FiredAlert, verb: 'acknowledged' | 'resolved'): void {
+        const id = alert.id;
+        if (!id) return;
+        const before = alert.state;
+        const title = alertTitle(alert);
+        const setState = (state: FiredAlert['state']) =>
+            this.alerts.update((rows) => rows.map((r) => (r.id === id ? { ...r, state } : r)));
+        optimisticMutate({
+            apply: () => setState(verb === 'acknowledged' ? 'ACKNOWLEDGED' : 'RESOLVED'),
+            commit: verb === 'acknowledged' ? this.api.acknowledge(id) : this.api.resolve(id),
+            reconcile: (w) => {
+                setState(w.state);
+                this.announce(`${title} ${verb}`, false);
+            },
+            rollback: () => setState(before),
+            onError: (e) => {
+                const status = e instanceof HttpErrorResponse ? e.status : 0;
+                if (status === 403) this.forbidden.set(true);
+                this.announce(workErrorMessage(status, title), true);
+            },
+        });
+    }
+
+    /** Set the live-region text and move focus to it (the acted-on button may have just left the row). */
+    private announce(text: string, error: boolean): void {
+        this.statusMessage.set({ text, error });
+        setTimeout(() => this.statusRegion()?.nativeElement.focus());
     }
 
     /** Edit/delete author monitoring config — Ops-gated (audit C3). */
@@ -281,6 +368,25 @@ export class AlertsComponent implements OnInit {
             },
             error: (err) => this.toastr.error(apiErrorMessage(err, `Could not delete "${rule.name}".`)),
         });
+    }
+}
+
+/** What an Alert is called in a button name or announcement: its message, else its rule. */
+export function alertTitle(a: FiredAlert): string {
+    return a.message || a.rule;
+}
+
+/** Plain-language reason a 403 / 404 / 422 ack-or-resolve failed. */
+export function workErrorMessage(status: number, title: string): string {
+    switch (status) {
+        case 403:
+            return 'You do not have permission to work alerts.';
+        case 404:
+            return `Alert ${title} no longer exists — refresh the list.`;
+        case 422:
+            return `Alert ${title} was already resolved or acknowledged — refresh the list.`;
+        default:
+            return `Could not update alert ${title}. Try again.`;
     }
 }
 
