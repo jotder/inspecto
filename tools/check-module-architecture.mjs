@@ -84,7 +84,7 @@ export function registries(read, files) {
     const sizeOf = (path, fn) => { const t = read(path); return t == null ? null : fn(t); };
     const ca = 'inspecto/src/main/java/com/gamma/control/ControlApi.java';
     add('Built-in route list', ca, sizeOf(ca, (t) => count(balancedAfter(t, 'for (RouteModule module : List.of('), /\bnew\s+\w+Routes\s*\(/g)), 'RouteModules');
-    add('Absent-module 503 stubs', 'com.gamma.control Absent*Routes', files.filter((f) => /\/Absent\w*Routes\.java$/.test(f)).length, 'classes');
+    add('Absent-module 503 stubs', 'com.gamma.control Absent*Routes', files.filter((f) => /\/Absent(?!Module)\w*Routes\.java$/.test(f)).length, 'classes'); // hand-written per-module stubs only; the generic manifest-driven AbsentModuleRoutes (P3b) is not a closed registry
     const br = 'inspecto/src/main/java/com/gamma/control/BootstrapRoutes.java';
     add('Feature flags (features{})', br, sizeOf(br, (t) => count(t, /\bhasRoute\s*\(/g)), 'hasRoute probes');
     const nav = 'inspecto-ui/src/app/core/navigation/navigation.service.ts';
