@@ -65,6 +65,16 @@ class PerEntityAlertObjectsTest {
             "measure", "sum(amount)", "by", List.of("msisdn"), "comparator", "gt", "threshold", 500,
             "severity", "CRITICAL", "description", "High spend"));
 
+
+    /** Slice 2: the Alert records are the Space's own store; the real object engine supplies only the Incident half. */
+    private final InMemoryAlertStore alerts = new InMemoryAlertStore();
+
+    private AlertService svc(ObjectService objects) {
+        java.util.Optional<com.gamma.objects.ObjectAccess> ops = java.util.Optional.of(objects.access());
+        return new AlertService(List.of(RULE), noPipelines(), emptyStore(), AlertRecords.of(alerts, ops),
+                AlertRecords.incidentsOf(ops));
+    }
+
     private static List<OperationalObject> incidents(ObjectService objects) {
         return objects.query(ObjectQuery.builder().objectType(ObjectType.INCIDENT).limit(ObjectQuery.MAX_LIMIT).build());
     }
@@ -78,7 +88,7 @@ class PerEntityAlertObjectsTest {
     void aHealNeverResolvesTheRealIncidentAndARelapseReopensOneAHumanResolved() {
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
         AtomicReference<DatasetMeasureProbe.Breaches> now = new AtomicReference<>(offenders(1, 40));
-        AlertService svc = new AlertService(List.of(RULE), noPipelines(), emptyStore(), objects.access());
+        AlertService svc = svc(objects);
         svc.groupedMeasureProbe(r -> Optional.of(now.get()));
 
         assertEquals(40, svc.evaluateRules().size());
@@ -86,7 +96,7 @@ class PerEntityAlertObjectsTest {
 
         now.set(offenders(2, 40));                                   // m1 heals
         assertEquals(0, svc.evaluateRules().size());
-        assertEquals(39, openAlerts(objects), "the healed key's Alert resolved; the other 39 stay open");
+        assertEquals(39, alerts.allActive().size(), "the healed key's Alert resolved; the other 39 stay open");
         // ⛔ A machine heal never resolves an Incident (operator standing rule, WS-10): it stays open for its operator.
         assertEquals("IDENTIFIED", incidentFor(objects, "m1").status());
 
@@ -94,8 +104,7 @@ class PerEntityAlertObjectsTest {
         assertEquals(1, svc.evaluateRules().size(), "the relapse is a new breach edge");
         assertEquals(40, incidents(objects).size(), "no second Incident for the same key");
         OperationalObject stillOpen = incidentFor(objects, "m1");
-        OperationalObject relapseAlert = objects.query(ObjectQuery.builder().objectType(ObjectType.ALERT).status("OPEN")
-                        .limit(ObjectQuery.MAX_LIMIT).build()).stream()
+        AlertStore.Row relapseAlert = alerts.allActive().stream()
                 .filter(o -> "m1".equals(o.attributes().get("key.msisdn"))).findFirst().orElseThrow();
         assertTrue(objects.linksOf(stillOpen.id()).stream().anyMatch(l -> l.fromId().equals(stillOpen.id())
                         && l.toId().equals(relapseAlert.id()) && "ESCALATED_FROM".equalsIgnoreCase(l.relationship())),
@@ -125,15 +134,10 @@ class PerEntityAlertObjectsTest {
     private static final String COMPLETE_POSTMORTEM = "{\"timeline\":[{\"time\":\"10:00\",\"text\":\"detected\"}],"
             + "\"causeAnalysis\":[\"tariff misconfigured\"],\"actions\":[{\"text\":\"fix the tariff\"}]}";
 
-    private static int openAlerts(ObjectService objects) {
-        return objects.query(ObjectQuery.builder().objectType(ObjectType.ALERT).status("OPEN")
-                .limit(ObjectQuery.MAX_LIMIT).build()).size();
-    }
-
     @Test
     void anExistingCaseRuleGroupsTheFortyPerKeyIncidentsIntoOneCase() {
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        AlertService svc = new AlertService(List.of(RULE), noPipelines(), emptyStore(), objects.access());
+        AlertService svc = svc(objects);
         svc.groupedMeasureProbe(r -> Optional.of(offenders(1, 40)));
         svc.evaluateRules();
 

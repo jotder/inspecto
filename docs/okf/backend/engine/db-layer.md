@@ -107,11 +107,15 @@ unaffected because the database, not the monitor, decides them.
 | Per-file stage-progression registry (Phase 4 §2.4) | *(class is the API)* | [`DbFileStageStore`](../../../../platform/inspecto-engine/src/main/java/com/gamma/consignment/DbFileStageStore.java) | `file.stages.backend=none\|duckdb\|postgres` | `none` |
 | Windowed record-dedup ledger (D-9) | *(class is the API)* | [`DbDedupLedger`](../../../../platform/inspecto-engine/src/main/java/com/gamma/consignment/DbDedupLedger.java) | `dedup.ledger.backend=none\|duckdb\|postgres` | **`duckdb`** — default-on like `consignment_outputs`: a default-off dedup ledger silently emits the duplicates it was configured to drop; costs nothing while no pipeline declares `scope: window(...)` |
 | Fleet-wide inbox registry (`INBOX-REGISTRY-CROSS-POD-1`) | *(class is the API)* | [`DbInboxRegistry`](../../../../inspecto/src/main/java/com/gamma/service/DbInboxRegistry.java) | `inbox.registry.backend=none\|duckdb\|postgres\|jdbc:…` | `none` — off, the inbox audit compares only the Spaces this pod hosts, exactly as before |
+| **Alert records** (`ALERTS`, P7-INCIDENTS slice 2, 2026-10-07) | `alert/AlertStore` (behind the `alert/AlertRecords` port) | [`DbAlertStore`](../../../../platform/inspecto-engine/src/main/java/com/gamma/alert/DbAlertStore.java) · [`InMemoryAlertStore`](../../../../platform/inspecto-engine/src/main/java/com/gamma/alert/InMemoryAlertStore.java) | `alerts.backend=db\|memory` (+ `alerts.db.url/.user/.password`; PostgreSQL through the shared `-Dinspecto.db=postgres`) | **`db` on EVERY edition, Personal included** — the operator decision that Personal keeps Alert history and restart-safe de-duplication. `memory` is the explicit opt-out (the test reactor pins it). ⚠ A single-tenant (`SpaceRoot.legacy()`) root with no `-Dassist.write.root` has no directory of its own, so it degrades to memory, loudly, rather than create `inspecto-alerts.db` in the CWD |
 | Pipeline execution watermarks | `pipeline/exec/PipelineWatermarkStore` | **none** — in-memory/file only | — | — |
 
-> **`ALERT`s are not their own table.** Alerts, incidents, cases and tasks are all rows in
-> `inspecto_ops_objects`, discriminated by the `object_type` column
+> **Alerts fired by an Alert Rule are their own table since 2026-10-07** (§3.14 `inspecto_alerts`, the `ALERTS` family).
+> Incidents, cases and tasks — and the ALERT objects the Event bridge opens for a sequence gap or a conservation
+> imbalance — are still rows in `inspecto_ops_objects`, discriminated by the `object_type` column
 > ([`ObjectType`](../../../../platform/inspecto-workflow/src/main/java/com/gamma/workflow/ObjectType.java): `ALERT, INCIDENT, CASE, TASK`).
+> Pre-existing still-active ALERT objects are adopted into the Alert store once at boot (`AlertMigration`); the
+> object rows are left untouched.
 
 Every backend **degrades gracefully**: a failed DB open falls back to in-memory/file and logs a
 warning rather than blocking startup.
@@ -855,7 +859,7 @@ value, not the per-family `*.db.url`: a raw `jdbc:duckdb:` backend is a first-cl
 `jdbc:postgresql:` one is refused, operator 2026-10-06, §5.0-c) that both
 `ServiceStores` and `OperationalDb.resolve` short-circuit on, so `urlFor` is never consulted —
 setting `-Ddedup.ledger.db.url` instead defeats the shared `-Dinspecto.db` selection that
-`OperationalDbTest` pins across all fifteen families (it fails that test). Tests needing durable dedup
+`OperationalDbTest` pins across all sixteen families (it fails that test). Tests needing durable dedup
 state construct `DbDedupLedger` on an explicit `@TempDir` URL. `STATUS` is `DB_FLAG` mode (`db` |
 `file`) and could not take the hatch until 2026-09-02: `ServiceStores.openStatusStore` now also reads a
 raw `jdbc:` backend value as "db, at exactly this URL", so the root pom pins `-Dstatus.backend=jdbc:duckdb:`
@@ -928,6 +932,33 @@ that must run.
 "forgiven" flag into the receipt row would make *"was this address ever bad"* unanswerable. It is also why
 the rejected alternative — pruning the target's receipts to unsuppress — was refused: it destroys the audit
 trail and would permanently mask a genuinely dead destination.
+
+### 3.14 `inspecto_alerts` — Alert records  · **M**
+File: `inspecto-alerts.db` (`SpaceRoot.alertsDbUrl()`; family `ALERTS`, `-Dalerts.backend`, default `db` on every edition)
+
+```sql
+CREATE TABLE IF NOT EXISTS inspecto_alerts (
+    id           VARCHAR NOT NULL PRIMARY KEY,
+    scope        VARCHAR NOT NULL,
+    severity     VARCHAR,
+    title        VARCHAR,
+    message      VARCHAR,
+    attrs_json   VARCHAR NOT NULL,
+    fired_json   VARCHAR,
+    state        VARCHAR NOT NULL,
+    incident_id  VARCHAR,
+    opened_at    BIGINT  NOT NULL,
+    closed_at    BIGINT  NOT NULL,
+    closed_by    VARCHAR
+)
+```
+
+One row per Alert `AlertService` opened (the `ALERT` object workflow `OPEN → ACKNOWLEDGED → RESOLVED`, resolved
+terminal). `attrs_json` carries the de-duplication attributes (`rule`, `alertKey`, ...); `fired_json` is the fired
+`Alert.toMap()` verbatim, which is what re-seeds `GET /alerts` after a restart byte-compatibly; `incident_id` is the
+Incident escalated from it (the Incident side keeps an `ESCALATED_FROM` link of kind `ALERT` + this id). Active-Alert
+reads pull the Space's non-terminal rows of one scope and filter the JSON in Java — the open set only, never the history.
+⚠ Nothing prunes resolved rows yet (a retention row is not filed).
 
 ## 4. File topology (per space)
 
@@ -1028,7 +1059,7 @@ operator applies flags through their own deployment tooling; this screen tells t
   column. And **manifests are the crash-recovery record of existence, not a query surface**. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
 - ⚠ **Adding a `Family` is a COMPILING change, not a config toggle** — a label, a `*.backend` property, a
   default, a `Mode`, url/user/password properties and a root supplier. Budget it.
-- **`OperationalDb.Family` is now the roster** — the **fifteen** families' property names live there and nowhere
+- **`OperationalDb.Family` is now the roster** — the **sixteen** families' property names live there and nowhere
   else, so the store openers and the report cannot drift; naming a family off the list stops compiling.
   ⛔ They had been ten **string literals** across `ServiceStores` + `SpaceBootstrap`.
   ⚠ This bullet read **fourteen** until 2026-09-16; `INBOX_REGISTRY` (scale-out §5.3) was added to the enum
@@ -1300,7 +1331,7 @@ evaluations can therefore open duplicates. Treat the dedup as best-effort and do
 two being the gap DAT-6's own coverage claim had), plus the run lease since B1 and `DbInboxRegistry` since
 2026-09-13 — **fifteen** store classes in all.
 
-✅ **The roster is fifteen families and COVERAGE IS NOW COMPLETE** (re-measured 2026-09-16). ⚠ This
+✅ **The roster is sixteen families and COVERAGE IS NOW COMPLETE** (re-measured 2026-09-16). ⚠ This
 paragraph used to claim **thirteen** store classes, put the roster one short, and name the acquisition
 ledger as the one still uncovered — three numbers and a named gap, all stale: it is round-tripped at
 `PostgresStateStoreTest:292`, and `INBOX_REGISTRY` had joined the enum without this paragraph moving.

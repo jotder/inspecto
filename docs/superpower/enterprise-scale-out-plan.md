@@ -382,7 +382,7 @@ local staging tree "so the rest of the engine … treats them exactly like local
 🔴 **§3.7's "an inbox must have exactly one owning pod" does not apply to a remote origin.** A local
 inbox needs a single owner because `MarkerManager` does a bare `Files.exists` with no claim. A remote
 origin is *already shared by definition*, listing it is idempotent, and a pre-fetch dedup ledger already
-exists — and **`ACQUISITION_LEDGER` and `FILE_STAGES` are both among the fifteen families** (§3.3), so
+exists — and **`ACQUISITION_LEDGER` and `FILE_STAGES` are both among the sixteen families** (§3.3), so
 both are already Postgres-capable and phase A puts them on shared state as a side effect.
 
 ⇒ N pods can pull from one remote origin safely, claiming per file, **with no new mechanism and no

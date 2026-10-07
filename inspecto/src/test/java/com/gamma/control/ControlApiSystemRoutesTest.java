@@ -89,9 +89,10 @@ class ControlApiSystemRoutesTest {
             // family a conscious act rather than a silent one, so move it deliberately and never to make
             // a red build green.
             // 12 → 13 on 2026-09-12: EVENTS (D6). 13 → 14 the same day: RUN_LEASE (B1). 14 → 15 on
-            // 2026-09-13: INBOX_REGISTRY (INBOX-REGISTRY-CROSS-POD-1). This count is a
+            // 2026-09-13: INBOX_REGISTRY (INBOX-REGISTRY-CROSS-POD-1). 15 → 16 on 2026-10-07: ALERTS
+            // (P7-INCIDENTS slice 2, the Alert records). This count is a
             // tripwire, not decoration — it is how a family added without its report row gets caught.
-            assertEquals(15, families.size(), "the roster is fifteen families — " + families);
+            assertEquals(16, families.size(), "the roster is sixteen families — " + families);
             for (JsonNode f : families) {
                 assertNotNull(f.get("source"), "every family reports where its value came from");
                 assertTrue(f.has("backendProperty") && f.has("urlProperty"),

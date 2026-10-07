@@ -104,6 +104,29 @@ public final class ObjectServiceAccess implements ObjectAccess {
     }
 
     @Override
+    public void linkSubject(String fromId, ObjectType subjectKind, String subjectId, String relationship, String actor) {
+        service.linkSubject(fromId, subjectKind, subjectId, relationship, actor);
+    }
+
+    @Override
+    public List<Map<String, Object>> activeDetail(ObjectType kind) {
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (OperationalObject o : service.active(kind, null)) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", o.id());
+            m.put("title", o.title());
+            m.put("description", o.description());
+            m.put("severity", o.severity());
+            m.put("correlationId", o.correlationId());
+            m.put("status", o.status());
+            m.put("createdAt", o.createdAt());
+            m.put("attributes", o.attributes());
+            out.add(m);
+        }
+        return out;
+    }
+
+    @Override
     public void addTag(String tag, String targetKind, String targetId, String actor) {
         service.tagAssignments().add(TagAssignment.of(tag, targetKind, targetId, actor));
     }

@@ -127,7 +127,10 @@ class RiskScoreAlertTest {
                 "severity", "CRITICAL", "description", "High Risk Score"));
 
         FakeObjectAccess objects = new FakeObjectAccess();
-        AlertService svc = new AlertService(List.of(rule), noPipelines(), emptyStore(), objects);
+        InMemoryAlertStore alerts = new InMemoryAlertStore();   // slice 2: the Alerts live in the Alert store
+        java.util.Optional<com.gamma.objects.ObjectAccess> ops = java.util.Optional.of(objects);
+        AlertService svc = new AlertService(List.of(rule), noPipelines(), emptyStore(), AlertRecords.of(alerts, ops),
+                AlertRecords.incidentsOf(ops));
         DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> cfg, () -> data);
         svc.groupedMeasureProbe(r -> probe.breaches(r.dataset(), r.measure(), r.by(), r.comparator(),
                 r.threshold(), r.stormCap()));
@@ -146,6 +149,7 @@ class RiskScoreAlertTest {
         score(cfg, data, true, "r2");
         assertEquals(0, svc.evaluateRules().size(), "no new Alert");
         assertEquals(1, objects.opened.stream().filter(o -> o.kind() == ObjectType.INCIDENT).count());
-        assertFalse(objects.transitioned.isEmpty(), "the healed key resolves its Alert");
+        assertTrue(alerts.allActive().isEmpty(), "the healed key resolves its Alert");
+        assertEquals(1, alerts.size(), "m1's Alert record is kept, resolved");
     }
 }

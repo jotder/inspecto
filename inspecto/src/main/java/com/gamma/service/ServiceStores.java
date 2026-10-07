@@ -498,4 +498,48 @@ final class ServiceStores {
             return new FileStatusStore();
         }
     }
+
+    /**
+     * The Space's Alert records ({@code MODULE-REORG-P7-INCIDENTS} slice 2), gated by {@code -Dalerts.backend}:
+     * {@code db} (the DEFAULT on every edition - Personal keeps Alert history and restart-safe de-duplication;
+     * the Space's own DuckDB file, or PostgreSQL through {@code -Dinspecto.db=postgres}) or {@code memory} (explicit
+     * opt-out, lost on restart). ⚠ Never writes into the working directory: a single-tenant
+     * ({@link SpaceRoot#legacy()}) root with no {@code -Dassist.write.root} has no directory of its own, so the
+     * default degrades to memory - loudly - rather than create {@code inspecto-alerts.db} in the CWD.
+     * ⛔ A failure to open the default database degrades to memory too (alerting must never stop a boot) and is
+     * recorded as DEGRADED; an explicit {@code db} request that cannot be honoured fails loudly.
+     */
+    static com.gamma.alert.AlertStore openAlertStore(SpaceRoot root) {
+        String requested = System.getProperty(OperationalDb.Family.ALERTS.backendProperty);
+        boolean explicit = requested != null && !requested.isBlank();
+        String backend = explicit ? requested.trim() : OperationalDb.Family.ALERTS.backendDefault;
+        if (!"db".equalsIgnoreCase(backend)) {
+            StoreHealth.record(root.id(), "alerts", StoreHealth.Status.NOT_CONFIGURED, backend,
+                    "-D" + OperationalDb.Family.ALERTS.backendProperty + "=" + backend + " - Alerts are kept in memory");
+            return new com.gamma.alert.InMemoryAlertStore();
+        }
+        String wr = System.getProperty("assist.write.root");
+        boolean cwdBound = root.config() == null && (wr == null || wr.isBlank())
+                && System.getProperty(OperationalDb.Family.ALERTS.urlProperty) == null && OperationalDb.url() == null;
+        if (cwdBound) {
+            log.warn("Alerts: single-tenant root with no -Dassist.write.root - keeping Alert records in memory rather "
+                    + "than create inspecto-alerts.db in the working directory. Set -Dassist.write.root, run under a "
+                    + "Space, or point -Dalerts.db.url somewhere to make them durable.");
+            StoreHealth.degraded(root.id(), "alerts", "memory", "no directory of its own (legacy root) - Alert records are not durable");
+            return new com.gamma.alert.InMemoryAlertStore();
+        }
+        String url = OperationalDb.urlFor(OperationalDb.Family.ALERTS, root, root.alertsDbUrl());
+        try {
+            com.gamma.alert.AlertStore db = new com.gamma.alert.DbAlertStore(url,
+                    OperationalDb.userFor(OperationalDb.Family.ALERTS), OperationalDb.passwordFor(OperationalDb.Family.ALERTS));
+            StoreHealth.record(root.id(), "alerts", StoreHealth.Status.UP, url, "open");
+            return db;
+        } catch (Exception e) {
+            if (explicit) throw new IllegalStateException("Could not open the Alert store at " + url, e);
+            log.warn("Could not open the Alert store at {} - Alerts fall back to memory (history and restart-safe "
+                    + "de-duplication are lost until it is fixed): {}", url, e.toString());
+            StoreHealth.degraded(root.id(), "alerts", url, "fell back to memory: " + e.getMessage());
+            return new com.gamma.alert.InMemoryAlertStore();
+        }
+    }
 }

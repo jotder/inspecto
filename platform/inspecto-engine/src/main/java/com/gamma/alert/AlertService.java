@@ -122,9 +122,9 @@ public final class AlertService {
     }
 
     /**
-     * Phase 2: also persist each fired alert as an {@link ObjectType#ALERT}
-     * a managed ALERT object through the {@link ObjectAccess} seam. A {@code null} {@code objects}
-     * keeps the prior events-only behaviour (the lean path and unit tests).
+     * Convenience for tests and the lean path: Alert records in a fresh {@link InMemoryAlertStore}; a non-null
+     * {@code objects} supplies the Incident half ({@link ObjectAccess}, e.g. a fake). Production wires a durable
+     * {@link AlertStore} through the explicit {@link AlertRecords} constructor.
      */
     public AlertService(List<AlertRule> rules, ConfigSource configs, StatusStore status,
                         ObjectAccess objects) {
@@ -137,7 +137,7 @@ public final class AlertService {
 
     AlertService(List<AlertRule> rules, ConfigSource configs, StatusStore status,
                  ObjectAccess objects, int capacity) {
-        this(rules, configs, status, AlertRecords.of(java.util.Optional.ofNullable(objects)),
+        this(rules, configs, status, AlertRecords.of(new InMemoryAlertStore(), java.util.Optional.ofNullable(objects)),
                 AlertRecords.incidentsOf(java.util.Optional.ofNullable(objects)), capacity);
     }
 
@@ -155,6 +155,12 @@ public final class AlertService {
         this.records = records;
         this.incidents = incidents;
         this.capacity = Math.max(1, capacity);
+        // Slice 2: Alert history survives a restart — the ring is re-seeded (newest first) from the Alert store.
+        try {
+            for (Alert a : records.recentFired(this.capacity)) fired.addLast(a);
+        } catch (RuntimeException e) {
+            log.warn("could not re-seed the fired-Alert history from the Alert store: {}", e.getMessage());
+        }
     }
 
     /** Wire the BI-5 measure evaluator (BiFunction so this engine stays decoupled from the query layer). */
@@ -544,7 +550,8 @@ public final class AlertService {
             // The reported VALUE is the age in seconds, so the alert feed shows how far past the limit
             // it is rather than a bare boolean.
             fire(rule, rule.dataset(), rule.dataset(), ageMs / 1000.0, nowMs, out);
-        } else if (staleSince.remove(key) != null) {
+        } else if (staleSince.remove(key) != null || openRecord(rule.dataset(), rule)) {
+            // the second operand is the restart case: this instance never saw the dataset go stale, the store did
             clear(rule, rule.dataset(), key, ageMs, nowMs);
         }
     }
@@ -562,12 +569,9 @@ public final class AlertService {
      * delivered and the reassurance was dropped. It also CLEARS the firing key, so a Dataset that goes
      * stale again alerts immediately instead of waiting out the cooldown of a breach that is over.
      *
-     * <p>The managed ALERT object opened by {@link #persistAlertObject} is <b>not</b> resolved here,
-     * deliberately: {@code ObjectAccess} exposes {@code open}, the {@code hasActive*} checks and
-     * {@code link}, but no transition - there is no seam through which this service can move an object
-     * to a terminal state. Adding one is a design pass on that interface, not a detail of this row. The
-     * all-clear is therefore delivered as an Event + Signal, which is what the notification layer
-     * routes on; the object is left for an operator to resolve.
+     * <p>Since slice 2 (2026-10-07) the Alert record opened by {@link #persistAlertObject} IS resolved here: the
+     * Alert store has its own transition, which the ObjectAccess port never offered. The all-clear is delivered as
+     * an Event + Signal as before. The Incident, if any, is left to a human Disposition.
      */
     private void clear(AlertRule rule, String scope, String cooldownKey, long ageMs, long nowMs) {
         lastFired.remove(cooldownKey);   // not merely ignored - the next breach must fire at once
@@ -589,6 +593,14 @@ public final class AlertService {
                 .attr(com.gamma.notify.Notification.RECIPIENT_ATTR, recipient(rule))
                 .build();
         EventLog.current().emit(cleared);
+        try {
+            // Slice 2: the Alert store has a transition, so the all-clear now resolves the freshness Alert too
+            // (the old note below — "no seam to move an object terminal" — held for the ObjectAccess port).
+            String alertId = records.activeAlertIndex(scope, "rule").get(rule.name());
+            if (alertId != null) records.resolveAlert(alertId, actor(rule));
+        } catch (RuntimeException e) {
+            log.warn("could not resolve the Alert of rule {}: {}", rule.name(), e.getMessage());
+        }
         try {
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("rule", rule.name());
@@ -846,7 +858,7 @@ public final class AlertService {
             }
             if (eventId != null) attrs.put("causedByEvent", eventId);
             String title = storm ? Alert.stormTitle(rule, label, (long) value) : Alert.title(rule, label);
-            String alertObjectId = records.openAlert(title, alert.message(), rule.severity(),
+            String alertObjectId = records.openAlert(alert, title, alert.message(), rule.severity(),
                     rule.dataset(), attrs);
             if (!isHighSeverity(rule.severity())) return;
             java.util.Optional<String> incidentId = incidents.openIncident(title, alert.message(),
@@ -871,7 +883,7 @@ public final class AlertService {
 
     /**
      * One key stopped breaching (or the storm ended): the all-clear Event + Signal, and — unlike the
-     * freshness all-clear ({@link #clear}) — its ALERT is resolved through {@link ObjectAccess#transition}.
+     * freshness all-clear ({@link #clear}) — its Alert record is resolved through {@link AlertRecords#resolveAlert}.
      *
      * <p>⛔ <b>A machine heal NEVER resolves the INCIDENT</b> (operator standing rule, 2026-09-26, WS-10): the
      * Incident's outcome is a human decision — a Disposition from the GLOSSARY §9 ladder, which a heal cannot
@@ -938,6 +950,15 @@ public final class AlertService {
         String key = rule.name() + "|" + cooldownScope;
         Long last = lastFired.get(key);
         if (last != null && nowMs - last < cooldownMs(rule)) return false;   // still in cooldown
+        // Slice 2 (operator decision 2026-10-07): a RESTART must not re-fire an Alert that is still open. This
+        // instance has no cooldown memory for the key, but the Alert store does: an open record for the rule in this
+        // scope means the breach was already announced, so the cooldown clock starts now and nothing fires until it
+        // has run (a persisting breach then re-announces on the normal cadence). A heal / clear resolves the record,
+        // so a genuine relapse still fires at once.
+        if (last == null && openRecord(display, rule)) {
+            lastFired.put(key, nowMs);
+            return false;
+        }
         lastFired.put(key, nowMs);
         Alert alert = Alert.of(rule, display, textScope(rule, display), value, nowMs).withEvidence(evidence);
         fired.addFirst(alert);
@@ -963,6 +984,15 @@ public final class AlertService {
         emitFiredSignal(rule, display, cooldownScope, alert, value, nowMs);
         persistAlertObject(rule, alert, display, value, firedEvent.eventId());
         return true;
+    }
+
+    private boolean openRecord(String scope, AlertRule rule) {
+        try {
+            return records.hasActiveAlert(scope, rule.name());
+        } catch (RuntimeException e) {
+            log.warn("could not read the open Alert of alert rule {}: {}", rule.name(), e.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -1033,7 +1063,7 @@ public final class AlertService {
             if (eventId != null) attrs.put("causedByEvent", eventId);
             String title = Alert.title(rule, textScope(rule, pipeline));
             String alertObjectId = records.openAlert(
-                    title, alert.message(), rule.severity(), pipeline, attrs);
+                    alert, title, alert.message(), rule.severity(), pipeline, attrs);
             promoteToIncident(rule, alert, title, pipeline, attrs, alertObjectId);
         } catch (RuntimeException e) {
             log.warn("could not persist alert object for rule {}: {}", rule.name(), e.getMessage());

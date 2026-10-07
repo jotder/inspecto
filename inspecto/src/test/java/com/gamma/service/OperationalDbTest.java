@@ -52,13 +52,14 @@ class OperationalDbTest {
                     // to Family without honouring the shared URL now fails here instead of going unnoticed.
                     // 11 → 12 on 2026-09-07: DELIVERY_RECEIPTS. 12 → 13 on 2026-09-12: EVENTS (D6).
                     // 13 → 14 on 2026-09-12: RUN_LEASE (phase B1). 14 → 15 on 2026-09-13:
-                    // INBOX_REGISTRY (INBOX-REGISTRY-CROSS-POD-1).
+                    // INBOX_REGISTRY (INBOX-REGISTRY-CROSS-POD-1). 15 → 16 on 2026-10-07: ALERTS
+                    // (MODULE-REORG-P7-INCIDENTS slice 2 — the Alert records, durable on every edition).
                     // ⚠ This count has NINE mirrors outside this file — `tools/check-family-count.mjs`
                     // now fails the build when they drift, because updating them by hand was missed
                     // twice in two shifts. Run it after touching Family.
                     // The loop below is the assertion that matters — it proves the NEW family honours the
                     // one shared URL too, which is the half-migration this test exists to prevent.
-                    assertEquals(15, OperationalDb.Family.values().length, "the roster is fifteen families");
+                    assertEquals(16, OperationalDb.Family.values().length, "the roster is sixteen families");
                     for (OperationalDb.Family family : OperationalDb.Family.values()) {
                         assertEquals("jdbc:postgresql://db:5432/inspecto",
                                 OperationalDb.urlFor(family, "jdbc:duckdb:/spaces/a/duckdb/x.db"),

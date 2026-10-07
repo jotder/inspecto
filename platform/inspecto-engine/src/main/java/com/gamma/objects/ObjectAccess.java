@@ -158,4 +158,19 @@ public interface ObjectAccess {
      * never gate the event, which is what EDITIONS {@code SP-CTL-02} keeps promising Personal.
      */
     Optional<Consumer<Event>> eventSubscriber();
+
+    /**
+     * Link {@code fromId} (an object) to a <b>subject that is not an operational object</b> — {@code subjectKind} +
+     * {@code subjectId}, no existence check on the subject (MODULE-REORG-P7-INCIDENTS slice 2: an Alert lives in
+     * its own store now, and {@code Incident ESCALATED_FROM Alert} is a cross-store reference). Idempotent. The
+     * default is a no-op for an implementation with no link graph.
+     */
+    default void linkSubject(String fromId, ObjectType subjectKind, String subjectId, String relationship, String actor) {}
+
+    /**
+     * Every non-terminal object of {@code kind} as a rich map ({@code id, title, description, severity,
+     * correlationId, status, createdAt, attributes}) — what the one-shot ALERT adoption reads
+     * ({@code AlertMigration}); {@link #findByStatus} is the flat SEC-7d projection and deliberately omits these.
+     */
+    default List<Map<String, Object>> activeDetail(ObjectType kind) { return List.of(); }
 }

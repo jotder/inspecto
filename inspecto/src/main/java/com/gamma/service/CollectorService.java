@@ -538,8 +538,14 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // (Personal) -> the events-only no-op records (no ALERT / INCIDENT object is ever written).
         java.util.Optional<com.gamma.objects.ObjectAccess> alertObjects =
                 this.objectEngine.map(ObjectEngineProvider.ObjectEngine::access);
+        // Slice 2 (operator decision 2026-10-07): the Alert records are the Space's OWN durable store on EVERY
+        // edition (Personal keeps Alert history + restart-safe de-duplication); ops, when present, supplies only
+        // the Incident half. Still-active ALERT objects from before the move are adopted once, before the service
+        // reads the store (AlertMigration: empty store + ops present; idempotent; the object rows stay).
+        this.alertStore = ServiceStores.openAlertStore(root);
+        alertObjects.ifPresent(o -> com.gamma.alert.AlertMigration.adopt(o, this.alertStore));
         this.alerting = new com.gamma.alert.AlertService(alertRules, configSource, this.status,
-                com.gamma.alert.AlertRecords.of(alertObjects), com.gamma.alert.AlertRecords.incidentsOf(alertObjects));
+                com.gamma.alert.AlertRecords.of(this.alertStore, alertObjects), com.gamma.alert.AlertRecords.incidentsOf(alertObjects));
         // BI-5: measure rules evaluate a Dataset measure via the headless BI evaluator. Both roots
         // resolve lazily and PER SPACE (MEASURE-PROBE-SPACE-ROOT-1): the registry is this Space's config
         // root (the default Space alone falls back to -Dassist.write.root), and the data root follows the
@@ -802,6 +808,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
 
     /** The alert execution engine (v4.1, B5); always present (empty until a rule is armed). */
     private final com.gamma.alert.AlertService alerting;
+    /** The Space's Alert records (slice 2) — closed with the service. */
+    private final com.gamma.alert.AlertStore alertStore;
 
     /** The EventLog→ObjectService bridge (Phase D2); held so {@link #close()} can de-register it. */
     private final java.util.function.Consumer<com.gamma.audit.Event> eventObjectBridge;
@@ -2175,6 +2183,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         objectEngine.ifPresent(e -> {
             try { e.close(); } catch (Exception ex) { log.warn("Error closing object engine: {}", ex.getMessage()); }
         });
+        try { alertStore.close(); } catch (Exception e) { log.warn("Error closing Alert store: {}", e.getMessage()); }
         log.info("CollectorService stopped");
         // Close last so the "stopped" log line above is itself captured, then flushed to disk.
         try { events.close(); } catch (Exception e) { log.warn("Error closing event store: {}", e.getMessage()); }

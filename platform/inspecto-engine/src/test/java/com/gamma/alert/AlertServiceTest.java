@@ -212,6 +212,13 @@ class AlertServiceTest {
         return (int) objects.opened.stream().filter(o -> o.kind() == type).count();
     }
 
+    /** Slice 2: the service over an Alert store of its own (the Alerts) + the fake ops (the Incident half). */
+    private static AlertService over(RecordingAlertStore alerts, FakeObjectAccess objects, List<AlertRule> rules,
+                                     ConfigSource configs, StatusStore status) {
+        java.util.Optional<com.gamma.objects.ObjectAccess> ops = java.util.Optional.of(objects);
+        return new AlertService(rules, configs, status, AlertRecords.of(alerts, ops), AlertRecords.incidentsOf(ops));
+    }
+
     @Test
     void criticalBreachPromotesToIncidentAlongsideTheAlert(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
@@ -219,10 +226,12 @@ class AlertServiceTest {
                 row("FAILED", 10, 0, 0, 100, LocalDateTime.now().minusMinutes(5)));
         FakeObjectAccess objects = new FakeObjectAccess();
         AlertRule critical = new AlertRule("r-crit", "failed_batches", "gte", 1, "1h", "critical", "MINI_ETL");
-        AlertService svc = new AlertService(List.of(critical), configs(cfg), store(ledger), objects);
+        RecordingAlertStore alerts = new RecordingAlertStore();
+        AlertService svc = over(alerts, objects, List.of(critical), configs(cfg), store(ledger));
 
         assertEquals(1, svc.evaluateAll().size(), "the critical rule breaches");
-        assertEquals(1, count(objects, ObjectType.ALERT), "the ALERT object is still recorded");
+        assertEquals(1, alerts.opened.size(), "the Alert is still recorded - in the Alert store");
+        assertEquals(0, count(objects, ObjectType.ALERT), "and is no longer an operational object");
         assertEquals(1, count(objects, ObjectType.INCIDENT), "a critical breach also opens an Incident");
     }
 
@@ -233,11 +242,12 @@ class AlertServiceTest {
                 row("FAILED", 10, 0, 0, 100, LocalDateTime.now().minusMinutes(5)));
         FakeObjectAccess objects = new FakeObjectAccess();
         // rule() builds a WARNING-severity rule.
-        AlertService svc = new AlertService(List.of(rule("failed_batches", "gte", 1, "1h", "MINI_ETL")),
-                configs(cfg), store(ledger), objects);
+        RecordingAlertStore alerts = new RecordingAlertStore();
+        AlertService svc = over(alerts, objects, List.of(rule("failed_batches", "gte", 1, "1h", "MINI_ETL")),
+                configs(cfg), store(ledger));
 
         assertEquals(1, svc.evaluateAll().size(), "the warning rule breaches");
-        assertEquals(1, count(objects, ObjectType.ALERT), "it records an ALERT object");
+        assertEquals(1, alerts.opened.size(), "it records an Alert");
         assertEquals(0, count(objects, ObjectType.INCIDENT), "but a warning breach does not open an Incident");
     }
 
@@ -260,7 +270,8 @@ class AlertServiceTest {
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
         List<Map<String, String>> ledger = List.of(row("SUCCESS", 10, 10, 0, 100, LocalDateTime.now().minusMinutes(5)));
         FakeObjectAccess objects = new FakeObjectAccess();
-        AlertService svc = new AlertService(List.of(investigationRule("CRITICAL")), configs(cfg), store(ledger), objects);
+        RecordingAlertStore alerts = new RecordingAlertStore();
+        AlertService svc = over(alerts, objects, List.of(investigationRule("CRITICAL")), configs(cfg), store(ledger));
         assertEquals(0, svc.evaluateAll().size(), "no probe wired (no Link Analysis module) → inert, never fired");
 
         List<AlertRule> probed = new ArrayList<>();
@@ -276,7 +287,7 @@ class AlertServiceTest {
         assertEquals(5.0, fired.get(0).value());
         assertTrue(fired.get(0).message().contains("sealed Working Set"), fired.get(0).message());
         assertEquals("big-ring", probed.get(0).name(), "the probe is handed the rule itself");
-        assertEquals(1, count(objects, ObjectType.ALERT));
+        assertEquals(1, alerts.opened.size());
         assertEquals(1, count(objects, ObjectType.INCIDENT), "a CRITICAL breach opens an Incident");
         FakeObjectAccess.Opened incident = objects.opened.stream().filter(o -> o.kind() == ObjectType.INCIDENT)
                 .findFirst().orElseThrow();
@@ -285,14 +296,12 @@ class AlertServiceTest {
         assertEquals("entities", incident.attributes().get("relation"));
         // A3: the probe's evidence is recorded on the Alert and its ALERT object
         assertEquals(Map.of("agentListSeq", "7"), fired.get(0).evidence());
-        assertEquals("7", objects.opened.stream().filter(o -> o.kind() == ObjectType.ALERT).findFirst().orElseThrow()
-                .attributes().get("agentListSeq"));
+        assertEquals("7", alerts.opened.get(0).attributes().get("agentListSeq"));
 
-        String alertId = objects.opened.stream().filter(o -> o.kind() == ObjectType.ALERT).findFirst().orElseThrow().id();
-        objects.close(alertId);
+        alerts.transition(alerts.opened.get(0).id(), "resolve", "test");
         assertEquals(1, svc.evaluate(null, now + java.time.Duration.ofMinutes(11).toMillis()).size(),
                 "past the cooldown it fires again");
-        assertEquals(2, count(objects, ObjectType.ALERT), "a fresh ALERT, since the first was resolved");
+        assertEquals(2, alerts.opened.size(), "a fresh Alert, since the first was resolved");
         assertEquals(1, count(objects, ObjectType.INCIDENT), "…but the active Incident dedupes the second promotion");
 
         svc.investigationProbe(r -> InvestigationMeasureProbe.Reading.of(java.util.OptionalDouble.empty()));

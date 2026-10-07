@@ -693,6 +693,10 @@
                                  share. `memory` is kept as an EXPLICIT opt-in precisely for this; tests that
                                  need the durable default set or clear the property themselves. -->
                             <objects.backend>memory</objects.backend>
+                            <!-- MODULE-REORG-P7-INCIDENTS slice 2: the Alert records default to the durable db on
+                                 every edition; the reactor pins memory so no test creates a DuckDB file. The tests
+                                 that pin durability (DbAlertStoreTest, AlertRecordsParityTest) open their own store. -->
+                            <alerts.backend>memory</alerts.backend>
                         </systemPropertyVariables>
                     </configuration>
                 </plugin>

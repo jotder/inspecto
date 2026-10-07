@@ -38,6 +38,9 @@ public final class FakeObjectAccess implements ObjectAccess {
 
     public final List<Opened> opened = new ArrayList<>();
     public final List<Linked> linked = new ArrayList<>();
+    /** One recorded {@link #linkSubject} call (a link to a subject outside the object store, e.g. an Alert). */
+    public record SubjectLinked(String fromId, ObjectType subjectKind, String subjectId, String relationship, String actor) {}
+    public final List<SubjectLinked> subjectLinked = new ArrayList<>();
     public final List<String> tagsEnsured = new ArrayList<>();
 
     private final Map<String, List<String>> tagsByTarget = new LinkedHashMap<>();
@@ -117,6 +120,29 @@ public final class FakeObjectAccess implements ObjectAccess {
     @Override
     public void link(String fromId, String toId, String relationship, String actor) {
         linked.add(new Linked(fromId, toId, relationship, actor));
+    }
+
+    @Override
+    public void linkSubject(String fromId, ObjectType subjectKind, String subjectId, String relationship, String actor) {
+        subjectLinked.add(new SubjectLinked(fromId, subjectKind, subjectId, relationship, actor));
+    }
+
+    @Override
+    public List<Map<String, Object>> activeDetail(ObjectType kind) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Opened o : opened.stream().filter(x -> x.kind() == kind && !closed.contains(x.id())).toList()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", o.id());
+            m.put("title", o.title());
+            m.put("description", o.description());
+            m.put("severity", o.severity());
+            m.put("correlationId", o.scope());
+            m.put("status", "OPEN");
+            m.put("createdAt", 1_000L);
+            m.put("attributes", o.attributes());
+            out.add(m);
+        }
+        return out;
     }
 
     @Override

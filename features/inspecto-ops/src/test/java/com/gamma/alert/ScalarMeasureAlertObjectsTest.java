@@ -49,6 +49,16 @@ class ScalarMeasureAlertObjectsTest {
     private static final AlertRule RULE = AlertRule.fromMap(Map.of("name", "open-exposure", "dataset", "cases",
             "measure", "sum(exposure)", "comparator", "gt", "threshold", 500, "severity", "CRITICAL"));
 
+
+    /** Slice 2: the Alert records are the Space's own store; the real object engine supplies only the Incident half. */
+    private final InMemoryAlertStore alerts = new InMemoryAlertStore();
+
+    private AlertService svc(ObjectService objects) {
+        java.util.Optional<com.gamma.objects.ObjectAccess> ops = java.util.Optional.of(objects.access());
+        return new AlertService(List.of(RULE), noPipelines(), emptyStore(), AlertRecords.of(alerts, ops),
+                AlertRecords.incidentsOf(ops));
+    }
+
     private static List<OperationalObject> of(ObjectService objects, ObjectType type, String status) {
         ObjectQuery.Builder q = ObjectQuery.builder().objectType(type).limit(ObjectQuery.MAX_LIMIT);
         if (status != null) q.status(status);
@@ -65,16 +75,16 @@ class ScalarMeasureAlertObjectsTest {
     void aHealResolvesTheAlertNeverTheIncidentAndARelapseReopensOneAHumanResolved() {
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
         AtomicReference<OptionalDouble> value = new AtomicReference<>(OptionalDouble.of(900));
-        AlertService svc = new AlertService(List.of(RULE), noPipelines(), emptyStore(), objects.access());
+        AlertService svc = svc(objects);
         svc.measureProbe((d, m) -> value.get());
 
         assertEquals(1, svc.evaluateRules().size());
-        assertEquals(1, of(objects, ObjectType.ALERT, "OPEN").size());
+        assertEquals(1, alerts.allActive().size());
         assertEquals("IDENTIFIED", incident(objects).status());
 
         value.set(OptionalDouble.of(100));                              // heals
         assertEquals(0, svc.evaluateRules().size());
-        assertEquals(0, of(objects, ObjectType.ALERT, "OPEN").size(), "the healed rule's Alert resolved");
+        assertEquals(0, alerts.allActive().size(), "the healed rule's Alert resolved");
         // ⛔ A machine heal never resolves an Incident (operator standing rule, WS-10).
         assertEquals("IDENTIFIED", incident(objects).status());
 
@@ -85,7 +95,7 @@ class ScalarMeasureAlertObjectsTest {
         value.set(OptionalDouble.of(900));                              // relapse while the Incident is open
         assertEquals(1, svc.evaluateRules().size(), "the heal cleared the cooldown: the relapse fires at once");
         OperationalObject stillOpen = incident(objects);
-        OperationalObject relapseAlert = of(objects, ObjectType.ALERT, "OPEN").get(0);
+        AlertStore.Row relapseAlert = alerts.allActive().get(0);
         assertTrue(objects.linksOf(stillOpen.id()).stream().anyMatch(l -> l.fromId().equals(stillOpen.id())
                         && l.toId().equals(relapseAlert.id()) && "ESCALATED_FROM".equalsIgnoreCase(l.relationship())),
                 "the relapse Alert is linked to the Incident still being worked");
@@ -111,28 +121,28 @@ class ScalarMeasureAlertObjectsTest {
     @Test
     void aRestartedServiceStillHealsTheAlertItsPredecessorLeftOpen() {
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        AlertService before = new AlertService(List.of(RULE), noPipelines(), emptyStore(), objects.access());
+        AlertService before = svc(objects);
         before.measureProbe((d, m) -> OptionalDouble.of(900));
         before.evaluateRules();
-        assertEquals(1, of(objects, ObjectType.ALERT, "OPEN").size());
+        assertEquals(1, alerts.allActive().size());
 
-        AlertService after = new AlertService(List.of(RULE), noPipelines(), emptyStore(), objects.access());
+        AlertService after = svc(objects);
         after.measureProbe((d, m) -> OptionalDouble.of(100));
         after.evaluateRules();
-        assertEquals(0, of(objects, ObjectType.ALERT, "OPEN").size(), "seeded from the still-active Alert");
+        assertEquals(0, alerts.allActive().size(), "seeded from the still-active Alert");
         assertEquals("IDENTIFIED", incident(objects).status());
     }
 
     @Test
     void reSavingTheRuleOverAnotherDatasetRetiresItsOpenAlert() {
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        AlertService svc = new AlertService(List.of(RULE), noPipelines(), emptyStore(), objects.access());
+        AlertService svc = svc(objects);
         svc.measureProbe((d, m) -> OptionalDouble.of(900));
         svc.evaluateRules();
 
         svc.upsert(AlertRule.fromMap(Map.of("name", "open-exposure", "dataset", "other_cases",
                 "measure", "sum(exposure)", "comparator", "gt", "threshold", 500, "severity", "CRITICAL")));
-        assertTrue(of(objects, ObjectType.ALERT, "OPEN").stream().noneMatch(a -> "cases".equals(a.attributes().get("dataset"))),
+        assertTrue(alerts.allActive().stream().noneMatch(a -> "cases".equals(a.attributes().get("dataset"))),
                 "the old Dataset's Alert can no longer heal, so it is retired");
         assertEquals("IDENTIFIED", of(objects, ObjectType.INCIDENT, null).stream()
                 .filter(i -> "cases".equals(i.attributes().get("dataset"))).findFirst().orElseThrow().status(), "its Incident stays with triage");

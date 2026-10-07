@@ -211,6 +211,26 @@ public record Alert(String rule, String severity, String pipeline, String metric
         return m;
     }
 
+    /**
+     * The inverse of {@link #toMap()} — rebuilds a fired Alert from its stored JSON projection (the durable
+     * {@link AlertStore} keeps {@code toMap()} verbatim so {@code GET /alerts} history survives a restart
+     * byte-compatibly). Missing numeric members read as {@code 0}.
+     */
+    @SuppressWarnings("unchecked")
+    static Alert fromMap(Map<String, Object> m) {
+        Map<String, String> ev = new LinkedHashMap<>();
+        if (m.get("evidence") instanceof Map<?, ?> e) e.forEach((k, v) -> ev.put(String.valueOf(k), String.valueOf(v)));
+        return new Alert((String) m.get("rule"), (String) m.get("severity"), (String) m.get("pipeline"),
+                (String) m.get("metric"), num(m.get("value")), (String) m.get("comparator"),
+                num(m.get("threshold")), (String) m.get("window"),
+                m.get("epochMillis") instanceof Number n ? n.longValue() : 0L, (String) m.get("message"), ev);
+    }
+
+    private static double num(Object o) {
+        if (o instanceof Number n) return n.doubleValue();
+        return o == null ? 0 : Double.parseDouble(String.valueOf(o));
+    }
+
     private static String trim(double d) {
         return d == Math.rint(d) ? String.valueOf((long) d) : String.valueOf(d);
     }

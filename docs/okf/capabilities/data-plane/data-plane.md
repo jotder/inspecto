@@ -92,7 +92,7 @@ was refused) and `okf/backend/control-plane/queries.md` §3.3–§3.5. *(Provena
   and no `scheduler.toon` ships. The board is right. Both pages corrected with this spec. ✅ **Closed
   2026-09-26 (GAP-4):** the chain now ends at `DuckDbUtil.defaultMemoryLimit()` (40 % RAM ÷ 4, ≥ 1 GiB).
 - **The Postgres store count was stated as 6, 7, 10 and 11 across one page.** Measured: `OperationalDb.Family`
-  is **fifteen** families (twelve until 2026-09-12, when D6 added `EVENTS` and B1 added `RUN_LEASE`;
+  is **sixteen** families (twelve until 2026-09-12, when D6 added `EVENTS` and B1 added `RUN_LEASE`;
   `INBOX_REGISTRY` followed on 2026-09-13);
   `PostgresStateStoreTest` (`features/inspecto-ops/src/test/java/com/gamma/service/`) round-trips
   **fifteen** store classes — note, tag assignment, job run, file stage, consignment output, status, provenance,
@@ -341,7 +341,7 @@ decided representation for non-additive measures. ⛔ Do not re-litigate from Du
 ### 3.8 The operational stores and Postgres
 
 **`OperationalDb.Family`** (`inspecto/src/main/java/com/gamma/service/OperationalDb.java:77-135`) is **the
-roster — fifteen families**, each with its own `-D<family>.backend` toggle and default:
+roster — sixteen families**, each with its own `-D<family>.backend` toggle and default:
 
 | Family | Default | Family | Default |
 |---|---|---|---|
@@ -662,7 +662,7 @@ A whole Space on S3 (no atomic rename); `hadoop-client` for HDFS (⛔ never — 
 
 `ControlApiQueryRunV1Test` (the route, `422` on structured, limits), `ControlApiBiQueryTest` (spec compile,
 `422` grain, TEXT buckets), `ControlApiDbBrowserTest` (`/db/*`, limits, guard), `OperationalDbTest` (the
-fifteen-family roster, `verifySelectable`, the `-Dinspecto.db` selection pinned across families),
+sixteen-family roster, `verifySelectable`, the `-Dinspecto.db` selection pinned across families),
 `PostgresStateStoreTest` (`inspecto-ops`; **opt-in**, 11 methods, 9 store classes; 11 SKIPPED without a
 server), `PipelineJobRunnerTest` (`sinkNestedInsideAnotherStoreFailsClosed`, `slashedSinkStoreNameFailsClosed`,
 `externalDataDirStaysAllowed`, `seedReadsAPipelineShapedStoresMappedOutputOnly`).

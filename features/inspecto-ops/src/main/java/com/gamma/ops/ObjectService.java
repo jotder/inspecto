@@ -1286,24 +1286,40 @@ public final class ObjectService {
     public ObjectLink link(String fromId, String toId, String relationship, String actor) {
         OperationalObject from = require(fromId);
         OperationalObject to = require(toId);
+        return addLink(from, to.objectType(), toId, relationship, actor);
+    }
+
+    /**
+     * As {@link #link} but the far end is a <b>subject outside the object store</b> ({@code subjectType} +
+     * {@code subjectId}; e.g. the Alert an Incident was escalated from, which lives in the Alert store). Only the
+     * near end must exist. The edge reads back through {@link #linksOf} / {@link #graph} like any other — the graph
+     * simply has no node for a subject it does not hold, as it never had for a deleted object.
+     */
+    public ObjectLink linkSubject(String fromId, ObjectType subjectType, String subjectId, String relationship,
+                                  String actor) {
+        return addLink(require(fromId), subjectType, subjectId, relationship, actor);
+    }
+
+    private ObjectLink addLink(OperationalObject from, ObjectType toType, String toId, String relationship, String actor) {
+        String fromId = from.id();
         String rel = (relationship == null || relationship.isBlank()) ? LinkRelationship.RELATED_TO : relationship;
         for (ObjectLink existing : links.incident(fromId)) {
             if (existing.fromId().equals(fromId) && existing.toId().equals(toId)
                     && existing.relationship().equalsIgnoreCase(rel))
                 return existing;   // already linked — idempotent
         }
-        ObjectLink created = links.add(ObjectLink.of(fromId, from.objectType(), toId, to.objectType(), rel));
+        ObjectLink created = links.add(ObjectLink.of(fromId, from.objectType(), toId, toType, rel));
         EventLog.current().emit(Event.builder(EventType.OBJECT_LINKED)
                 .level(EventLevel.INFO)
                 .source(SOURCE)
                 .correlationId(from.correlationId())
                 .message(from.objectType() + " " + fromId + " " + created.relationship() + " "
-                        + to.objectType() + " " + toId + (actor == null ? "" : " (by " + actor + ")"))
+                        + toType + " " + toId + (actor == null ? "" : " (by " + actor + ")"))
                 .attr("objectId", fromId)
                 .attr("from", fromId)
                 .attr("fromType", from.objectType().name())
                 .attr("to", toId)
-                .attr("toType", to.objectType().name())
+                .attr("toType", toType.name())
                 .attr("relationship", created.relationship())
                 .attr("actor", actor));
         return created;

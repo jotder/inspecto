@@ -63,6 +63,13 @@ class AlertServicePersistenceTest {
         };
     }
 
+    /** Slice 2: Alerts in the Alert store, the Incident half over the real object engine. */
+    private static AlertService over(InMemoryAlertStore alerts, ObjectService objects, AlertRule rule,
+                                     ConfigSource configs, StatusStore status) {
+        java.util.Optional<com.gamma.objects.ObjectAccess> ops = java.util.Optional.of(objects.access());
+        return new AlertService(List.of(rule), configs, status, AlertRecords.of(alerts, ops), AlertRecords.incidentsOf(ops));
+    }
+
     private static AlertRule errorRateRule() {
         return new AlertRule("high-error-rate", "error_rate", "gt", 0.05, "1h", "WARNING", null);
     }
@@ -75,15 +82,18 @@ class AlertServicePersistenceTest {
     void firedAlertBecomesManagedObject(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        AlertService svc = new AlertService(List.of(errorRateRule()), configs(cfg), store(breachingLedger()), objects.access());
+        InMemoryAlertStore alertStore = new InMemoryAlertStore();
+        AlertService svc = over(alertStore, objects, errorRateRule(), configs(cfg), store(breachingLedger()));
 
         assertEquals(1, svc.evaluateAll().size(), "rule breaches and fires");
-        List<OperationalObject> alerts = objects.query(ObjectQuery.builder().objectType(ObjectType.ALERT).build());
-        assertEquals(1, alerts.size(), "the fired alert is persisted as an ALERT object");
-        OperationalObject a = alerts.get(0);
-        assertEquals("OPEN", a.status());
+        assertTrue(objects.query(ObjectQuery.builder().objectType(ObjectType.ALERT).build()).isEmpty(),
+                "an Alert is no longer an operational object");
+        List<AlertStore.Row> alerts = alertStore.allActive();
+        assertEquals(1, alerts.size(), "the fired alert is persisted in the Alert store");
+        AlertStore.Row a = alerts.get(0);
+        assertEquals("OPEN", a.state());
         assertEquals("WARNING", a.severity());
-        assertEquals("MINI_ETL", a.correlationId());
+        assertEquals("MINI_ETL", a.scope());
         assertEquals("high-error-rate", a.attributes().get("rule"));
         assertEquals("error_rate", a.attributes().get("metric"));
         assertNotNull(a.attributes().get("causedByEvent"), "linked to the firing ALERT_FIRED event");
@@ -93,12 +103,13 @@ class AlertServicePersistenceTest {
     void activeAlertNotDuplicated(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        new AlertService(List.of(errorRateRule()), configs(cfg), store(breachingLedger()), objects.access()).evaluateAll();
-        // A fresh AlertService over the SAME object store fires again (its own cooldown is empty) — but
-        // the still-OPEN object for this rule+pipeline suppresses the duplicate.
-        new AlertService(List.of(errorRateRule()), configs(cfg), store(breachingLedger()), objects.access()).evaluateAll();
-        assertEquals(1, objects.query(ObjectQuery.builder().objectType(ObjectType.ALERT).build()).size(),
-                "an active alert object isn't duplicated");
+        InMemoryAlertStore alertStore = new InMemoryAlertStore();
+        assertEquals(1, over(alertStore, objects, errorRateRule(), configs(cfg), store(breachingLedger())).evaluateAll().size());
+        // Slice 2: a fresh AlertService over the SAME Alert store does not re-fire at all (its own cooldown is
+        // empty, but the still-OPEN record for this rule+pipeline says the breach was already announced).
+        assertEquals(0, over(alertStore, objects, errorRateRule(), configs(cfg), store(breachingLedger())).evaluateAll().size(),
+                "an open Alert is not re-fired after a restart");
+        assertEquals(1, alertStore.size(), "and is not duplicated");
     }
 
     @Test
@@ -126,9 +137,10 @@ class AlertServicePersistenceTest {
                 row("FAILED", 10, 0, LocalDateTime.now().minusMinutes(5)));
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
         AlertRule critical = new AlertRule("r-crit", "failed_batches", "gte", 1, "1h", "critical", "MINI_ETL");
-        new AlertService(List.of(critical), configs(cfg), store(ledger), objects.access()).evaluateAll();
+        InMemoryAlertStore alertStore = new InMemoryAlertStore();
+        over(alertStore, objects, critical, configs(cfg), store(ledger)).evaluateAll();
 
-        OperationalObject alert = objects.query(ObjectQuery.builder().objectType(ObjectType.ALERT).build()).get(0);
+        AlertStore.Row alert = alertStore.allActive().get(0);
         OperationalObject incident =
                 objects.query(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build()).get(0);
 
@@ -139,17 +151,21 @@ class AlertServicePersistenceTest {
         ObjectLink edge = edges.get(0);
         assertEquals(incident.id(), edge.fromId());
         assertEquals(ObjectType.INCIDENT, edge.fromType());
-        assertEquals(alert.id(), edge.toId(), "Incident ESCALATED_FROM the ALERT that raised it");
+        assertEquals(alert.id(), edge.toId(), "Incident ESCALATED_FROM the Alert that raised it (kind ALERT + id)");
         assertEquals(ObjectType.ALERT, edge.toType());
+        assertTrue(objects.get(alert.id()).isEmpty(), "the Alert is not an object: the edge is a cross-store reference");
+        assertEquals(incident.id(), alert.incidentId(), "and the Alert row names its Incident");
         assertEquals("ESCALATED_FROM", edge.relationship());
         assertEquals(edges, objects.linksOf(alert.id()), "traversable from the Alert end too");
+        assertEquals(1, objects.graph(incident.id(), 1).get("edges") instanceof List<?> l ? l.size() : -1,
+                "the incident's neighbourhood still lists the edge; the node for the Alert is simply absent");
     }
 
     /** R2-05: the Incident a measure breach raises, read by an operator — with and without a rule description. */
     private static OperationalObject incidentRaisedBy(AlertRule rule, double value, Path dir) throws Exception {
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        AlertService svc = new AlertService(List.of(rule), configs(cfg), store(List.of()), objects.access());
+        AlertService svc = over(new InMemoryAlertStore(), objects, rule, configs(cfg), store(List.of()));
         svc.measureProbe((dataset, measure) -> java.util.OptionalDouble.of(value));
         assertEquals(1, svc.evaluateAll().size());
         List<OperationalObject> incidents =
@@ -193,21 +209,25 @@ class AlertServicePersistenceTest {
             throws Exception {
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        AlertService svc = new AlertService(List.of(new AlertRule("fm_open_exposure", null, "gt", 298668, null,
-                "CRITICAL", null, "fraud_cases_open", "sum(exposure_sar)")), configs(cfg), store(List.of()),
-                objects.access());
+        InMemoryAlertStore alertStore = new InMemoryAlertStore();
+        AlertService svc = over(alertStore, objects, new AlertRule("fm_open_exposure", null, "gt", 298668, null,
+                "CRITICAL", null, "fraud_cases_open", "sum(exposure_sar)"), configs(cfg), store(List.of()));
         svc.measureProbe((dataset, measure) -> java.util.OptionalDouble.of(373335.09));
         svc.datasetLabel(id -> "fraud_cases_open".equals(id) ? "Open fraud cases" : null);
         assertEquals(1, svc.evaluateAll().size());
 
-        for (ObjectType type : List.of(ObjectType.ALERT, ObjectType.INCIDENT)) {
-            List<OperationalObject> found = objects.query(ObjectQuery.builder().objectType(type).build());
-            assertEquals(1, found.size(), type.name());
-            OperationalObject o = found.get(0);
-            assertEquals("Sum of exposure_sar on Open fraud cases is above 298,668", o.title(), type.name());
-            assertEquals("CRITICAL: Sum of exposure_sar on Open fraud cases is 373,335.09, above the threshold of "
-                    + "298,668 (over current data)", o.description(), type.name());
-            assertEquals("fraud_cases_open", o.attributes().get("dataset"), "the machine id stays in the attributes");
-        }
+        String title = "Sum of exposure_sar on Open fraud cases is above 298,668";
+        String message = "CRITICAL: Sum of exposure_sar on Open fraud cases is 373,335.09, above the threshold of "
+                + "298,668 (over current data)";
+        List<OperationalObject> incidents = objects.query(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build());
+        assertEquals(1, incidents.size(), "INCIDENT");
+        assertEquals(title, incidents.get(0).title(), "INCIDENT");
+        assertEquals(message, incidents.get(0).description(), "INCIDENT");
+        assertEquals("fraud_cases_open", incidents.get(0).attributes().get("dataset"), "the machine id stays in the attributes");
+        assertEquals(1, alertStore.size(), "ALERT");
+        AlertStore.Row alert = alertStore.allActive().get(0);
+        assertEquals(title, alert.title(), "ALERT");
+        assertEquals(message, alert.message(), "ALERT");
+        assertEquals("fraud_cases_open", alert.attributes().get("dataset"), "the machine id stays in the attributes");
     }
 }

@@ -116,6 +116,13 @@ public interface SpaceRoot {
      */
     String inboxRegistryDbUrl();
 
+    /**
+     * Default JDBC URL for the Alert records ({@code MODULE-REORG-P7-INCIDENTS} slice 2), when
+     * {@code -Dalerts.backend} is {@code db} (the default on every edition). ⚠ The legacy root resolves it under
+     * {@code -Dassist.write.root} - never the working directory.
+     */
+    String alertsDbUrl();
+
     /** The pre-spaces flat layout: historical file names in the working directory. */
     static SpaceRoot legacy() {
         return new LegacySpaceRoot();
@@ -193,6 +200,23 @@ final class LegacySpaceRoot implements SpaceRoot {
 
     @Override
     public String inboxRegistryDbUrl() { return "jdbc:duckdb:inspecto-inbox-registry.db"; }
+
+    /** Under the write root's {@code duckdb/} when one is set; else the (never-opened by default) CWD name -
+     *  {@code ServiceStores.openAlertStore} refuses to create a file in the working directory. */
+    @Override
+    public String alertsDbUrl() {
+        String wr = System.getProperty("assist.write.root");
+        if (wr == null || wr.isBlank()) return "jdbc:duckdb:inspecto-alerts.db";
+        // Path.of(a, b, c) rather than a .resolve chain: the file lives under the write root's duckdb/ (a
+        // Space-root sibling, not under config/), which ImportLoaderInventoryTest's chain scan would read as a loader.
+        Path file = Path.of(wr.trim(), "duckdb", "inspecto-alerts.db").toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(file.getParent());
+        } catch (IOException e) {
+            // fall through - openAlertStore logs the open failure and degrades to memory
+        }
+        return "jdbc:duckdb:" + file;
+    }
 }
 
 /** A self-contained per-space directory: {@code base/{config,data,audit,duckdb}}. */
@@ -264,4 +288,7 @@ final class DirSpaceRoot implements SpaceRoot {
 
     @Override
     public String inboxRegistryDbUrl() { return duckdb("inspecto-inbox-registry.db"); }
+
+    @Override
+    public String alertsDbUrl() { return duckdb("inspecto-alerts.db"); }
 }

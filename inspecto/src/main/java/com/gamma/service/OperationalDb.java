@@ -165,7 +165,16 @@ public final class OperationalDb {
         // BETWEEN Spaces on DIFFERENT pods, so it is opened once per pod against the SPACES ROOT, and only
         // a URL pointing at shared Postgres makes the finding possible at all.
         INBOX_REGISTRY("Inbox registry", "inbox.registry.backend", "none", Mode.URL_OR_ENGINE,
-                "inbox.registry.db.url", null, null, SpaceRoot::inboxRegistryDbUrl);
+                "inbox.registry.db.url", null, null, SpaceRoot::inboxRegistryDbUrl),
+        // MODULE-REORG-P7-INCIDENTS slice 2 (operator decision 2026-10-07): Personal MUST keep Alert history and
+        // restart-safe de-duplication, so the Alert records are durable on EVERY edition - default "db", the same
+        // call as OBJECTS above and for the same reason (an Alert that vanishes on restart is not a default any
+        // edition keeps). "memory" survives only as an explicit opt-in (-Dalerts.backend=memory; the test reactor
+        // pins it in the root pom's surefire config). ⚠ The Space's own duckdb/ file, never the working
+        // directory: under SpaceRoot.legacy() with no -Dassist.write.root ServiceStores.openAlertStore degrades
+        // to memory rather than create inspecto-alerts.db in the CWD (see LegacySpaceRoot.alertsDbUrl).
+        ALERTS("Alerts", "alerts.backend", "db", Mode.DB_FLAG,
+                "alerts.db.url", "alerts.db.user", "alerts.db.password", SpaceRoot::alertsDbUrl);
 
         /** How a family spells "enabled" on its {@code *.backend} property — they genuinely differ. */
         enum Mode {
