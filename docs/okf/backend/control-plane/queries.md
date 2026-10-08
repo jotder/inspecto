@@ -119,8 +119,20 @@ A calculated column is caller-authored SQL **fragment** text spliced inside the 
   No response shape changed: `statistics.truncated` was already on the wire and the Widget host already shows
   *Showing the first N rows - the result was cut* when it is true.
 
-Residual (the backlog row): the Risk Score evidence read and the Materialize / Report jobs still cut at their
-cap without saying so.
+The three other consumers that cut at a cap now use the same one-row-past probe (`BI-QUERY-TRUNCATION-1`, closed):
+
+* **Risk Score evidence** - `evidenceSpec(cap + 1)`, so `evidenceTruncated` (already in the run's log line) is
+  exact and a cut run logs a WARN. Evidence is explanation material: the score is never refused over it (the
+  indicator VALUE read still refuses on truncation).
+* **`materialize` Job** (default `limit` 1,000,000, ceiling 100,000,000) - FAILS the run when the result passes the
+  cap, naming the cap and `limit:`; the prior snapshot stays visible and no `.tmp` is left. A snapshot that
+  silently drops groups makes every downstream aggregate wrong, so completeness is a hard property. The only
+  shipped config (`spaces/demo` `orders_by_region_materialize`, grouped by `region`) is far below the cap.
+* **`report` Job, dataset scope** (default `limit` 10,000) - a human document, so it still delivers, but a cut
+  report says so: the Job result reads `(TRUNCATED at N rows)`, a `REPORT_TRUNCATED` WARN event is emitted,
+  `REPORT_READY` carries `truncated`, and `csv`/`xlsx` get a final row whose `_note` column reads
+  `truncated at N rows`. A report that fits is byte-identical to before. `png`/`pdf` keep their own documented
+  snapshot cap and `json` has no marker: for those the result message and the WARN event are the signal.
 
 ## Time grain on `/bi/query` (shipped 2026-08-14)
 
