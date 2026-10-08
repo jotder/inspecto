@@ -83,6 +83,117 @@ public final class ConditionTree {
         validate(when);
     }
 
+    // ── STRICT mode (opt-in; the lenient API above is untouched) ────────────────────
+
+    private static final Set<String> KNOWN_OPS = Set.of("=", "!=", "<", "<=", ">", ">=", "between", "in",
+            "contains", "startsWith", "endsWith", "matches", "isNull", "isNotNull");
+    private static final Set<String> ORDERING_OPS = Set.of("<", "<=", ">", ">=", "between");
+
+    /**
+     * Strict twin of {@link #matched}: the tree is first checked by {@link #validateStrict}, then evaluated
+     * with identical semantics for present data except that a leaf whose field is ABSENT from the row is
+     * {@code false} (never "no constraint"). For fail-closed consumers (access-style decisions) that must
+     * never read an authoring-time leniency as "allow".
+     *
+     * @throws IllegalArgumentException with a path-pointing message when the tree is not strictly valid
+     */
+    public static int matchedStrict(Object when, List<Map<String, Object>> rows) {
+        return filterStrict(when, rows).size();
+    }
+
+    /** Strict twin of {@link #filter}; see {@link #matchedStrict}. */
+    public static List<Map<String, Object>> filterStrict(Object when, List<Map<String, Object>> rows) {
+        validateStrict(when);
+        if (rows == null || rows.isEmpty()) return List.of();
+        Map<String, ColType> types = inferColumns(rows);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> row : rows) if (matchGroupStrict(when, row, types)) out.add(row);
+        return out;
+    }
+
+    /**
+     * Refuses every silent leniency of the default API: a non-map or bare-leaf root, an empty group, a
+     * non-map item, an incomplete leaf (missing field / operator / required value), an unknown operator or
+     * group {@code op}, an {@code in} with no members, an ordering operator ({@code < <= > >= between})
+     * whose operand is neither a number nor an ISO date/time; plus the extension rules of {@link #validate}.
+     *
+     * @throws IllegalArgumentException naming the path of the offender, e.g. {@code items[2].field: incomplete condition}
+     */
+    public static void validateStrict(Object when) {
+        if (!(when instanceof Map<?, ?> root))
+            throw new IllegalArgumentException("root: the condition tree must be a group object");
+        if (!isGroup(root))
+            throw new IllegalArgumentException("root: the root must be a group, not a bare condition");
+        strictGroup(root, "");
+        validate(when);
+    }
+
+    private static void strictGroup(Map<?, ?> g, String prefix) {
+        Object op = g.get("op");
+        if (op != null && !"AND".equalsIgnoreCase(String.valueOf(op)) && !"OR".equalsIgnoreCase(String.valueOf(op)))
+            throw new IllegalArgumentException(prefix + "op: unknown group operator '" + op + "' (AND or OR)");
+        String key = g.get("items") != null ? "items" : "conditions";
+        if (!(g.get(key) instanceof List<?> items) || items.isEmpty())
+            throw new IllegalArgumentException(prefix + key + ": empty group");
+        for (int i = 0; i < items.size(); i++) {
+            String at = prefix + key + "[" + i + "]";
+            if (!(items.get(i) instanceof Map<?, ?> m))
+                throw new IllegalArgumentException(at + ": not a condition or group object");
+            if (isGroup(m)) strictGroup(m, at + ".");
+            else strictLeaf(m, at);
+        }
+    }
+
+    private static void strictLeaf(Map<?, ?> c, String at) {
+        if (strOrEmpty(c.get("field")).isEmpty()) throw new IllegalArgumentException(at + ".field: incomplete condition");
+        String operator = strOrEmpty(c.get("operator"));
+        if (operator.isEmpty()) throw new IllegalArgumentException(at + ".operator: incomplete condition");
+        if (!KNOWN_OPS.contains(operator))
+            throw new IllegalArgumentException(at + ".operator: unknown operator '" + operator + "'");
+        if (!isComplete(c)) throw new IllegalArgumentException(at + ".value: incomplete condition");
+        boolean cellOperand = !strOrEmpty(c.get("valueField")).isEmpty();
+        String value = strOrEmpty(c.get("value"));
+        if (operator.equals("in") && !cellOperand) {
+            boolean any = false;
+            for (String x : value.split(",")) any |= !x.trim().isEmpty();
+            if (!any) throw new IllegalArgumentException(at + ".value: 'in' with an empty list");
+        }
+        if (ORDERING_OPS.contains(operator) && !cellOperand) {
+            requireOrderable(value, at + ".value");
+            if (operator.equals("between")) requireOrderable(strOrEmpty(c.get("value2")), at + ".value2");
+        }
+    }
+
+    private static void requireOrderable(String operand, String at) {
+        boolean number;
+        try {
+            Double.parseDouble(operand.trim());
+            number = !operand.isBlank();
+        } catch (NumberFormatException e) {
+            number = false;
+        }
+        if (!number && toEpoch(operand) == null)
+            throw new IllegalArgumentException(at + ": operand '" + operand + "' is neither a number nor an ISO date/time");
+    }
+
+    private static boolean matchGroupStrict(Object node, Map<String, Object> row, Map<String, ColType> types) {
+        Map<?, ?> g = (Map<?, ?>) node;
+        Object rawItems = g.get("items");
+        if (rawItems == null) rawItems = g.get("conditions");
+        boolean or = "OR".equalsIgnoreCase(String.valueOf(g.get("op") == null ? "AND" : g.get("op")));
+        boolean any = false;
+        boolean all = true;
+        for (Object it : (List<?>) rawItems) {
+            @SuppressWarnings("unchecked") Map<String, Object> item = (Map<String, Object>) it;
+            boolean res = isGroup(item) ? matchGroupStrict(item, row, types)
+                    : row.containsKey(strOrEmpty(item.get("field"))) && matchCondition(item, row, types);
+            any |= res;
+            all &= res;
+        }
+        boolean res = or ? any : all;
+        return flag(g, "negate") ? !res : res;
+    }
+
     // ── Condition Language extensions (not / valueField / ignoreCase / matches) ─────
 
     /** Longest {@code matches} pattern accepted. Beyond this cap there is NO catastrophic-backtracking

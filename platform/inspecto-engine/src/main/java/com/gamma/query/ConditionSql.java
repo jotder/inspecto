@@ -49,6 +49,19 @@ public final class ConditionSql {
         return g == null ? "TRUE" : g;
     }
 
+    /**
+     * Strict twin of {@link #predicate}: refuses (via {@link ConditionTree#validateStrict}) every tree the
+     * lenient renderer would silently weaken — empty group, incomplete leaf, unknown operator, empty
+     * {@code in}, non-orderable operand, non-group root — BEFORE any SQL is emitted, so the result never
+     * contains the lenient {@code TRUE}/skipped-leaf fallbacks.
+     *
+     * @throws IllegalArgumentException with a path-pointing message
+     */
+    public static String predicateStrict(Object when) {
+        ConditionTree.validateStrict(when);
+        return group(when);
+    }
+
     // ── tree walk (mirrors ConditionTree.matchGroup) ─────────────────────────────
 
     /** Render a group, or {@code null} when it contributes no constraint. */
