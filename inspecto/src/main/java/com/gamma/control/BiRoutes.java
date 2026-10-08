@@ -65,13 +65,15 @@ final class BiRoutes implements RouteModule {
         // 1. Parse + compile the spec (validated identifiers / typed literals only).
         MeasureCompiler.Spec spec;
         MeasureCompiler.Spec probe;
-        String sql;
+        String sql;       // the probe statement that is EXECUTED (cap + 1)
+        String echoSql;   // the statement for the ORIGINAL spec (LIMIT = cap) that the response echoes
         try {
             spec = MeasureCompiler.parse(body, DEFAULT_LIMIT, MAX_LIMIT);
             // One row PAST the cap: the compiled statement carries its own LIMIT, so asking for exactly the cap
             // could never come back truncated (statistics.truncated was always false). QueryExecutor trims it.
             probe = spec.withLimit(spec.limit() + 1);
             sql = MeasureCompiler.compile(probe);
+            echoSql = MeasureCompiler.compile(spec);
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
@@ -101,6 +103,7 @@ final class BiRoutes implements RouteModule {
         String queryId = ApiContext.str(body, "query");
         if (queryId != null) {
             sql = boundQuerySql(ex, store, queryId, probe);
+            echoSql = boundQuerySql(ex, store, queryId, spec);
             List<Finding> boundFindings = SqlGuard.check(sql);
             if (!boundFindings.isEmpty())
                 return ApiContext.respondJson(ex, 422, Map.of(
@@ -110,7 +113,7 @@ final class BiRoutes implements RouteModule {
         QueryExecutor.Request req = new QueryExecutor.Request(spec.dataset(), relationSql, sql,
                 spec.limit(), 0, List.of(), List.of());
         try {
-            return response(QueryExecutor.run(req), sql);
+            return response(QueryExecutor.run(req), echoSql);
         } catch (SQLException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "BI query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }

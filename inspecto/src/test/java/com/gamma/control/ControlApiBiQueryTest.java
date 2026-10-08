@@ -113,6 +113,8 @@ class ControlApiBiQueryTest {
             assertEquals(ids(first.get("rows")), ids(second.get("rows")), "same query, same rows");
             assertEquals(java.util.stream.IntStream.range(0, 500).boxed().toList(), ids(first.get("rows")),
                     "the first 500 by the grouping key");
+            assertTrue(first.get("sql").asText().strip().endsWith("LIMIT 500"),
+                    "the echoed sql is the statement for the caller's cap, not the cap+1 probe: " + first.get("sql").asText());
 
             JsonNode small = V1Body.of(biQuery(c.port,
                     bigBody.replace("big_ds", "small_ds")).body());
