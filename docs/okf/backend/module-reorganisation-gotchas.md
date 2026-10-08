@@ -12,6 +12,7 @@ timestamp: 2026-10-09T00:00:00Z
 Context: [module-taxonomy.md](module-taxonomy.md), [decisions](module-reorganisation-decisions.md). Each line is cause, then rule.
 
 ## Moving code
+- **Regroup recipe: two commits.** Pure moves first (`git mv` only, so history follows), then the path rewrites in a second commit; mixing them hides the renames from git.
 - **Mover scripts sweep too much.** `tools/regroup-modules.mjs` ran `git add -A` and committed `target/` files. Rule: stage movers by explicit path and read `git diff --cached --stat` before the commit.
 - **Mover comment-strippers lose track at Java text blocks.** The stripper lost its place at `"""`, so two test files missed their rewrite. Rule: grep for the old path/package after any scripted rewrite; never trust the script's own report.
 - **Sibling-directory scans go silent after a move.** A guard that reads "sibling of the repo root" or "first path segment" matches nothing once modules sit under `spi/ platform/ features/`. Rule: derive modules from the poms with `ReactorModules` (Java) / `tools/reactor-modules.mjs`; `-pl` takes `:artifactId`, never a path.
@@ -31,7 +32,7 @@ Context: [module-taxonomy.md](module-taxonomy.md), [decisions](module-reorganisa
 - **A module needing a `jdk.*` module** broke every ingest in the zip once. Rule: prove each Offering on the bundle's own `runtime/bin/java`; `jlink-modules.lock` and `jlink-runtime-extra.txt` carry the set.
 - **Sign before the SBOM** (a signed jar has a different hash).
 - **A green full reactor is not green CI.** Route-gating, the OpenAPI contract, authgate coverage and the CI guards job fire only there. Run every `ci.yml` no-build guard before pushing.
-- **Stale `.claude/launch.json` jar lists** name jars that no longer exist (row `MODULE-REORG-P3-THIN-JARS`).
+- **`.claude/launch.json` jar lists are static copies** of `tools/offering-classpath.mjs --print`; re-derive them whenever a module is split or added.
 
 ## Loading and failing soft
 - **`OptionalSpi` is fail-soft; a base provider must fail closed.** An absent or unloadable optional module contributes nothing silently; anything that must exist belongs in a base provider. A module's features are collected only after `register()` succeeded.
