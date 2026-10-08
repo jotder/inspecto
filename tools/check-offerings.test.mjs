@@ -51,6 +51,23 @@ test('a missing content pack, an unknown include and a cycle are RED', () => {
     assert.match(run((g) => { g.offerings.personal.includes = ['professional']; }).join('\n'), /includes cycle/);
 });
 
+
+const POSTURE_GREEN = { authMode: 'none', eventsBackend: 'default', objectsBackend: 'default', postgresSidecar: 'absent' };
+const withPosture = (mutate, launcher) => run((g) => { g.offerings.personal.posture = { ...POSTURE_GREEN }; mutate?.(g.offerings.personal.posture); if (launcher) g.launcher = launcher; });
+test('posture: a complete in-vocabulary section is GREEN, and so is its absence', () => {
+    assert.deepEqual(withPosture(), []);
+    assert.deepEqual(run(), []);
+});
+test('posture: an unknown key, a missing key and an out-of-vocabulary value are RED', () => {
+    assert.match(withPosture((p) => { p.transport = 'https'; }).join(' '), /posture key 'transport' is not in the vocabulary/);
+    assert.match(withPosture((p) => { delete p.authMode; }).join(' '), /posture is missing 'authMode'/);
+    assert.match(withPosture((p) => { p.authMode = 'basic'; }).join(' '), /posture authMode: 'basic' is not one of none\|oidc/);
+});
+test('posture: a value the launcher does not give the edition is RED; an agreeing launcher is GREEN', () => {
+    const launcher = { Personal: { authMode: 'oidc', eventsBackend: 'default', objectsBackend: 'default', postgresSidecar: 'absent' } };
+    assert.match(withPosture(null, launcher).join(' '), /posture authMode: 'none' but the launcher\/classpath gives Personal 'oidc'/);
+    assert.deepEqual(withPosture(null, { Personal: { ...POSTURE_GREEN } }), []);
+});
 test('parseToon reads arrays, nesting, empty keys and rejects a wrong count', () => {
     assert.deepEqual(parseToon('id: x\na[2]: p,q\nb:\n  c:\n    status: built\nempty:\n'), { id: 'x', a: ['p', 'q'], b: { c: { status: 'built' } }, empty: {} });
     assert.throws(() => parseToon('a[3]: p,q'));

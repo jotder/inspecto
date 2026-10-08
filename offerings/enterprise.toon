@@ -1,6 +1,11 @@
 id: enterprise
 title: Enterprise
 tier: enterprise
+posture:
+  authMode: oidc
+  eventsBackend: parquet
+  objectsBackend: postgres
+  postgresSidecar: bundled
 includes[1]: professional
 modules[3]: policy,la-store-pg,intelligence
 addons:

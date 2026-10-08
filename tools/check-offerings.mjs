@@ -21,6 +21,10 @@
 //         (profile modules = bundle set minus the default-reactor modules)   3 requires.modules closure of the resolved set
 //         4 a `built` add-on names existing modules that are in the resolved set; a `planned` one's hostedBy modules exist
 //         5 contentPacks exist under spaces/_templates   6 includes resolve, no cycle, id equals file name.
+//         7 (P6b) an OPTIONAL `posture:` section holds only POSTURE keys/values from the closed vocabulary below, complete when
+//         present, and - when the caller supplies the launcher facts (main() does) - equal to what the launcher scenarios of
+//         tools/check-launchers.mjs prove each edition gets (auth.mode, events.backend, objects.backend) and to whether the
+//         classpath carries postgresql.jar. Posture is NOT inherited through `includes`: each Offering states its own.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -50,6 +54,20 @@ export function parseToon(text) {
     return root;
 }
 
+/**
+ * The closed POSTURE vocabulary (P6b): the non-module deployment facts that are stable data AND that a guard can verify.
+ * Each is a launcher/classpath fact, not prose: authMode <- `-Dauth.mode`, eventsBackend <- `-Devents.backend`,
+ * objectsBackend <- `-Dobjects.backend` (all proved by check-launchers.mjs), postgresSidecar <- postgresql.jar on the classpath
+ * (offering-classpath.mjs). `default` = the launcher passes no such flag (the engine default applies). Transport, secrets,
+ * compliance scope and HA have no verifiable source yet, so they stay hand-authored in docs/EDITIONS.md.
+ */
+export const POSTURE = {
+    authMode: ['none', 'oidc'],
+    eventsBackend: ['default', 'parquet'],
+    objectsBackend: ['default', 'postgres'],
+    postgresSidecar: ['absent', 'bundled'],
+};
+
 /** artifactId or module directory -> manifest id (`inspecto-processor` -> processor, `inspecto-ops` -> ops). */
 export const idOf = (artifactId) => artifactId.replace(/^inspecto-/, '');
 
@@ -75,7 +93,7 @@ const setDiff = (a, b) => [[...a].filter((x) => !b.has(x)), [...b].filter((x) =>
  * Pure check. in: { offerings: {id: parsed}, manifests: {id: {offeringRole, requires?}}, bundle: (edition) => [artifactId],
  * pom: {defaults, profiles}, templates: [ids] }. Returns a list of findings (empty = green).
  */
-export function check({ offerings, manifests, bundle, pom, templates }) {
+export function check({ offerings, manifests, bundle, pom, templates, launcher }) {
     const out = [];
     const exempt = (id) => ['base', 'internal'].includes(manifests[id]?.offeringRole);
     const resolve = (id, seen = []) => {
@@ -130,6 +148,15 @@ export function check({ offerings, manifests, bundle, pom, templates }) {
                 for (const m of a.modules ?? []) if (manifests[m] && !r.modules.has(m)) say(`built add-on '${name}' names '${m}', which the Offering does not include`);
             }
         }
+        if (o.posture !== undefined) {
+            for (const k of Object.keys(o.posture)) if (!POSTURE[k]) say(`posture key '${k}' is not in the vocabulary (${Object.keys(POSTURE).join(', ')})`);
+            for (const [k, allowed] of Object.entries(POSTURE)) {
+                const v = o.posture[k];
+                if (v === undefined) say(`posture is missing '${k}'`);
+                else if (!allowed.includes(v)) say(`posture ${k}: '${v}' is not one of ${allowed.join('|')}`);
+                else if (launcher?.[edition]?.[k] !== undefined && launcher[edition][k] !== v) say(`posture ${k}: '${v}' but the launcher/classpath gives ${edition} '${launcher[edition][k]}'`);
+            }
+        }
         for (const t of o.contentPacks ?? []) if (!templates.includes(t)) say(`content pack '${t}' not found under spaces/_templates`);
     }
     return out;
@@ -152,6 +179,27 @@ export function gather(root) {
     };
 }
 
+/** The posture the launcher scenarios (check-launchers.mjs) and the classpath prove, per edition: { Edition: {authMode, ...} }. */
+export async function launcherFacts() {
+    const { SCENARIOS } = await import('./check-launchers.mjs');
+    const { classpath } = await import('./offering-classpath.mjs');
+    const { PG_SIDECAR } = await import('./bundle-modules.mjs');
+    const out = {};
+    for (const edition of Object.values(EDITION_OF)) {
+        const sc = SCENARIOS.find((x) => x.edition === edition && !x.noList && !x.noMarker && !x.markerText && !x.refuses && x.jars === x.list);
+        const f = { postgresSidecar: classpath(edition).includes(PG_SIDECAR) ? 'bundled' : 'absent' };
+        const pick = (key, flag, on, off) => {
+            if (sc?.expect?.includes(`${flag}=${on}`)) f[key] = on;
+            else if (sc?.rejectPrefix?.includes(flag)) f[key] = off;
+        };
+        pick('authMode', '-Dauth.mode', 'oidc', 'none');
+        pick('eventsBackend', '-Devents.backend', 'parquet', 'default');
+        pick('objectsBackend', '-Dobjects.backend', 'postgres', 'default');
+        out[edition] = f;
+    }
+    return out;
+}
+
 /** One-line status for check-module-architecture.mjs. */
 export function status(root) {
     try {
@@ -160,14 +208,15 @@ export function status(root) {
     } catch (e) { return `unreadable (${e.message})`; }
 }
 
-function main() {
+async function main() {
     const a = process.argv.slice(2);
     const i = a.indexOf('--root');
     const g = gather(i >= 0 ? a[i + 1] : '.');
+    g.launcher = await launcherFacts();
     const findings = check(g);
     for (const f of findings) console.error(`check-offerings: ${f}`);
     console.log(`check-offerings: ${Object.keys(g.offerings).length} Offerings, ${findings.length} finding(s)`);
     if (findings.length) process.exit(1);
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main().catch((e) => { console.error(e); process.exit(2); });

@@ -1,4 +1,9 @@
 id: preview
 title: Preview
 tier: preview
+posture:
+  authMode: oidc
+  eventsBackend: parquet
+  objectsBackend: default
+  postgresSidecar: bundled
 includes[1]: enterprise
