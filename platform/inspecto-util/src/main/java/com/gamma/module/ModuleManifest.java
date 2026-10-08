@@ -49,11 +49,25 @@ public record ModuleManifest(String id, String title, String buildRole, String o
      * @param jobTypes the Job Type ids the module contributes ({@code JobTypeProvider}); the owner a Space's module
      *               gate ({@code modules.toon}) consults before a Job of that type may run (P4e). Kept honest by a
      *               parity test in each module (declared == registered by its providers).
+     * @param background the ids of the module's own periodic sweeps, monitors and dispatchers (e.g. {@code sla-sweep});
+     *               the host's tick for each id consults the Space's module gate first, so a switched-off module's
+     *               background work is paused for that Space (P4f). Kept honest by a parity test (declared == gated).
+     * @param maintenanceTasks the {@code maintenance} Job {@code task:} ids the module contributes
+     *               ({@code MaintenanceTaskProvider}); a Job of one is turned away while the module is switched off (P4f).
      */
     public record Provides(List<String> features, List<String> contracts, List<String> capabilities,
                            List<String> configKinds, List<String> storeFamilies, List<String> routes,
-                           List<String> consequences, List<String> jobTypes) {
+                           List<String> consequences, List<String> jobTypes, List<String> background,
+                           List<String> maintenanceTasks) {
         public static final Provides NONE = new Provides(List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+
+        /** Without {@code background} and {@code maintenanceTasks} (none declared). */
+        public Provides(List<String> features, List<String> contracts, List<String> capabilities,
+                        List<String> configKinds, List<String> storeFamilies, List<String> routes,
+                        List<String> consequences, List<String> jobTypes) {
+            this(features, contracts, capabilities, configKinds, storeFamilies, routes, consequences, jobTypes,
+                    List.of(), List.of());
+        }
 
         /** Without {@code jobTypes} (the Job Types a module contributes; none declared). */
         public Provides(List<String> features, List<String> contracts, List<String> capabilities,

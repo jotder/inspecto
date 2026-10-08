@@ -138,7 +138,7 @@ public final class ModuleManifests {
                 oneOf(root, "bindingTime", ModuleManifest.BINDING_TIMES),
                 new ModuleManifest.Provides(list(p, "features"), list(p, "contracts"), list(p, "capabilities"),
                         list(p, "configKinds"), list(p, "storeFamilies"), list(p, "routes"), list(p, "consequences"),
-                        list(p, "jobTypes")),
+                        list(p, "jobTypes"), list(p, "background"), list(p, "maintenanceTasks")),
                 new ModuleManifest.Requires(list(r, "modules"), list(r, "contracts")),
                 ent.isEmpty() ? null : ent, null, absent.isEmpty() ? null : absent);
     }

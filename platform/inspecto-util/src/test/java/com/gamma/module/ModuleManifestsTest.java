@@ -71,6 +71,32 @@ class ModuleManifestsTest {
     }
 
     @Test
+    void backgroundAndMaintenanceTasksAreParsedAndAbsentMeansNone() {
+        ModuleManifest with = ModuleManifests.parse("""
+                id: x
+                buildRole: implementation
+                offeringRole: optional
+                bindingTime: boot
+                provides:
+                  features[1]: x
+                  background[2]: x-sweep,x-dispatch
+                  maintenanceTasks[1]: x_purge
+                """);
+        assertEquals(List.of("x-sweep", "x-dispatch"), with.provides().background());
+        assertEquals(List.of("x_purge"), with.provides().maintenanceTasks());
+        ModuleManifest without = ModuleManifests.parse("""
+                id: y
+                buildRole: implementation
+                offeringRole: optional
+                bindingTime: boot
+                provides:
+                  features[1]: y
+                """);
+        assertEquals(List.of(), without.provides().background());
+        assertEquals(List.of(), without.provides().maintenanceTasks());
+    }
+
+    @Test
     void validManifestParsesWithArraysAndEmptyArray() {
         ModuleManifest ops = ModuleManifests.parse(OPS.replace("---\n", ""));
         assertEquals("ops", ops.id());
