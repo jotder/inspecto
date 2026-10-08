@@ -720,7 +720,7 @@ mutation paths.
 
 | File | Providers |
 |---|---|
-| `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.spi.http.RouteModule` | `ObjectRoutes`, `NoteRoutes`, `QueueRoutes`, `TagRoutes` — the first external adopters of the public SPI |
+| `features/inspecto-ops/src/main/resources/META-INF/services/com.gamma.spi.http.RouteModule` | `ObjectRoutes`, `NoteRoutes`, `QueueRoutes`, `TagRoutes` — the first external adopters of the public SPI (the Case routes `CaseRoutes` live in the optional `inspecto-case-management` module since MODULE-REORG-P7) |
 | the same service name in `inspecto-geo-link`, `inspecto-exchange`, `inspecto-observability`, `inspecto-observability` | the other four gated families |
 
 ### 8.4 Cross-language wire vocabularies — `inspecto-ui/src/app/inspecto/contracts/`
