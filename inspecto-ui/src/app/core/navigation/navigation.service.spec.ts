@@ -12,7 +12,7 @@ import { NavigationService } from './navigation.service';
  * one-sided test.
  */
 describe('NavigationService — optional-module nav entries', () => {
-    function mount(geoLinkEnabled: boolean, eventsEnabled = true, opsEnabled = true) {
+    function mount(geoLinkEnabled: boolean, eventsEnabled = true, opsEnabled = true, casesEnabled = opsEnabled) {
         TestBed.resetTestingModule();
         TestBed.configureTestingModule({
             providers: [
@@ -22,7 +22,7 @@ describe('NavigationService — optional-module nav entries', () => {
                 {
                     provide: SessionService,
                     useValue: {
-                        features: signal({ geoLink: geoLinkEnabled, events: eventsEnabled, ops: opsEnabled }),
+                        features: signal({ geoLink: geoLinkEnabled, events: eventsEnabled, ops: opsEnabled, cases: casesEnabled }),
                     },
                 },
             ],
@@ -116,6 +116,18 @@ describe('NavigationService — optional-module nav entries', () => {
     it('shows Incidents, Case Manager and Tags when the ops module registered its routes', async () => {
         const nav = await firstValueFrom(mount(true, true, true).get());
         for (const id of ['incidents', 'cases', 'tags', 'approvals', 'autonomy', 'learning']) {
+            expect(findById(nav.default as never, id), id + ' should be present').toBeDefined();
+        }
+    });
+
+    /**
+     * MODULE-REORG-P7: the Case Manager entry follows the optional `inspecto-case-management` module (feature `cases`), not `ops`:
+     * an install with ops but without the add-on still raises and works Incidents.
+     */
+    it('hides only Case Manager when ops is present but the case-management module is absent', async () => {
+        const nav = await firstValueFrom(mount(true, true, true, false).get());
+        expect(findById(nav.default as never, 'cases'), 'cases should be hidden').toBeUndefined();
+        for (const id of ['incidents', 'tags', 'approvals', 'autonomy', 'learning']) {
             expect(findById(nav.default as never, id), id + ' should be present').toBeDefined();
         }
     });

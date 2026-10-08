@@ -124,7 +124,7 @@ export const defaultNavigation: GammaNavigationItem[] = [
                 icon: 'heroicons_outline:academic-cap',
                 link: '/learning',
             },
-            { id: 'cases', navFeature: 'ops', title: 'Case Manager', type: 'basic', icon: 'heroicons_outline:briefcase', link: '/cases' },
+            { id: 'cases', navFeature: 'cases', title: 'Case Manager', type: 'basic', icon: 'heroicons_outline:briefcase', link: '/cases' },
             { id: 'tags', navFeature: 'ops', title: 'Tags', type: 'basic', icon: 'heroicons_outline:tag', link: '/tags' },
         ],
     },
