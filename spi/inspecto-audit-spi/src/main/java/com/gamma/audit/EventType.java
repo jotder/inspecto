@@ -162,6 +162,9 @@ public final class EventType {
     public static final String ALERT_CLEARED   = "ALERT_CLEARED";
     /** A scheduled report/export artifact was produced (BI-4); {@code attributes.path} points at it. */
     public static final String REPORT_READY    = "REPORT_READY";
+    /** A dataset report hit its {@code limit} and the delivered artifact is cut at it (BI-QUERY-TRUNCATION-1); WARN,
+     *  never a failure - the report is for humans and says so. Carries {@code job}/{@code limit}. */
+    public static final String REPORT_TRUNCATED = "REPORT_TRUNCATED";
     /** A data-quality {@code Expectation} evaluated with violating records (ING-6) — raises an Incident + notifies. */
     public static final String EXPECTATION_FAILED = "EXPECTATION_FAILED";
 

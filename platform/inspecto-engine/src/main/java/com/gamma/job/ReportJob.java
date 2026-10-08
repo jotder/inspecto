@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.config.safety.PathJail;
 import com.gamma.audit.Event;
 import com.gamma.event.EventLog;
+import com.gamma.audit.EventLevel;
 import com.gamma.audit.EventType;
 import com.gamma.notify.MailAccess;
 import com.gamma.notify.MailAttachment;
@@ -107,10 +108,16 @@ final class ReportJob implements Job {
 
         Object report;
         List<Map<String, Object>> rows = null;   // dataset scope: tabular result for CSV rendering
+        int cut = -1;                            // dataset scope: the row cap the result hit, else -1
         switch (scope) {
             case "status"                  -> report = reports.statusReport();
             case "batch", "service", "all" -> report = reports.serviceReport();
-            case "dataset" -> { rows = datasetRows(); report = rows; }
+            case "dataset" -> {
+                QueryExecutor.Result r = datasetRows();
+                rows = r.rows();
+                report = rows;
+                if (r.truncated()) cut = datasetLimit();
+            }
             default -> throw new IllegalArgumentException(
                     "report scope must be 'status', 'batch' or 'dataset', got '" + scope + "'");
         }
@@ -123,10 +130,17 @@ final class ReportJob implements Job {
         line.put("report", report);
         events.info(JSON.writeValueAsString(line));
 
-        String delivered = deliver(scope, report, rows, artifacts);
+        if (cut >= 0)
+            EventLog.current().emit(Event.builder(EventType.REPORT_TRUNCATED).level(EventLevel.WARN)
+                    .source(ReportJob.class.getName())
+                    .message("Report '" + cfg.name() + "' has more than " + cut + " rows - the result is cut at the limit; "
+                            + "raise this job's `limit:` or narrow the spec")
+                    .attr("job", cfg.name()).attr("limit", cut));
+        String delivered = deliver(scope, report, rows, cut, artifacts);
         String mailed = mail(ctx, delivered);
         long ms = (System.nanoTime() - t0) / 1_000_000L;
         return JobResult.ok("report '" + scope + "' emitted to inspecto.events"
+                + (cut >= 0 ? " (TRUNCATED at " + cut + " rows)" : "")
                 + (delivered != null ? " and delivered to " + delivered : "")
                 + (mailed != null ? "; " + mailed : ""), ms);
     }
@@ -166,7 +180,7 @@ final class ReportJob implements Job {
      * (when a recorder is present, so {@code GET /jobs/{name}/runs/{runId}/artifacts/report/content} can
      * serve it), emit REPORT_READY; returns the path or null.
      */
-    private String deliver(String scope, Object report, List<Map<String, Object>> rows, ArtifactRecorder artifacts)
+    private String deliver(String scope, Object report, List<Map<String, Object>> rows, int cut, ArtifactRecorder artifacts)
             throws Exception {
         String outDir = cfg.opt("out_dir", null);
         if (outDir == null) return null;
@@ -185,11 +199,11 @@ final class ReportJob implements Job {
         if ("xlsx".equals(format)) {
             if (rows == null) throw new IllegalArgumentException(
                     "format xlsx requires scope dataset (rollup reports render as json)");
-            XlsxWorkbook.write(cfg.name(), rows, artifact);
+            XlsxWorkbook.write(cfg.name(), withTruncationNote(rows, cut), artifact);
         } else if ("csv".equals(format)) {
             if (rows == null) throw new IllegalArgumentException(
                     "format csv requires scope dataset (rollup reports render as json)");
-            Files.writeString(artifact, toCsv(rows));
+            Files.writeString(artifact, toCsv(withTruncationNote(rows, cut)));
         } else if ("png".equals(format)) {
             if (rows == null) throw new IllegalArgumentException(
                     "format png requires scope dataset (rollup reports render as json)");
@@ -209,7 +223,8 @@ final class ReportJob implements Job {
                         + (rowCount >= 0 ? " (" + rowCount + " row(s))" : ""))
                 .attr("job", cfg.name())
                 .attr("scope", scope)
-                .attr("path", artifact.toString()));
+                .attr("path", artifact.toString())
+                .attr("truncated", cut >= 0));
         return artifact.toString();
     }
 
@@ -240,7 +255,7 @@ final class ReportJob implements Job {
     }
 
     /** The dataset-scope export rows: a headless BI query compiled from this job's params (BI-4/BI-7). */
-    private List<Map<String, Object>> datasetRows() throws Exception {
+    private QueryExecutor.Result datasetRows() throws Exception {
         // Space-scoped — see SpaceConfigRoot (MATERIALIZE-SPACE-ROOT-1).
         Path writeRoot = SpaceConfigRoot.requireCurrent("scope dataset");
 
@@ -252,14 +267,16 @@ final class ReportJob implements Job {
         if (!measures.isEmpty()) body.put("measures", measures);
         List<String> groupBy = split(cfg.opt("group_by", ""));
         if (!groupBy.isEmpty()) body.put("groupBy", groupBy);
-        body.put("limit", Integer.parseInt(cfg.opt("limit", "10000")));
+        int limit = datasetLimit();
+        body.put("limit", limit);
 
         MeasureCompiler.Spec spec = measures.isEmpty() && groupBy.isEmpty()
                 ? null   // raw export: SELECT * over the dataset (no aggregation)
                 : MeasureCompiler.parse(body, 10_000, 100_000);
-        String sql = spec != null ? MeasureCompiler.compile(spec)
-                : "SELECT * FROM " + SqlIdent.q(cfg.require("dataset")) + " LIMIT "
-                        + Integer.parseInt(cfg.opt("limit", "10000"));
+        // One row PAST the cap (BI-QUERY-TRUNCATION-1): the compiled statement ends in its own LIMIT, so asking for
+        // exactly the cap could never show the result was cut. The executor trims back to the cap and flags it.
+        String sql = spec != null ? MeasureCompiler.compile(spec.withLimit(spec.limit() + 1))
+                : "SELECT * FROM " + SqlIdent.q(cfg.require("dataset")) + " LIMIT " + (limit + 1);
 
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         Map<String, Object> dataset = store.get("dataset", cfg.require("dataset"))
@@ -269,10 +286,24 @@ final class ReportJob implements Job {
                 (dataDir == null || dataDir.isBlank()) ? null : Path.of(dataDir),
                 new ViewStore(writeRoot.resolve("views")));
 
-        QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
-                cfg.require("dataset"), relationSql, sql,
-                Integer.parseInt(cfg.opt("limit", "10000")), 0, List.of(), List.of()));
-        return r.rows();
+        return QueryExecutor.run(new QueryExecutor.Request(
+                cfg.require("dataset"), relationSql, sql, limit, 0, List.of(), List.of()));
+    }
+
+    /** The configured row cap (default 10,000), as the request carries it. */
+    private int datasetLimit() {
+        return Integer.parseInt(cfg.opt("limit", "10000"));
+    }
+
+    /**
+     * A cut report says so inside the file: one final row whose {@code _note} cell reads "truncated at N rows" (a
+     * new last column; the data columns keep their types). A report that fit is returned untouched.
+     */
+    private static List<Map<String, Object>> withTruncationNote(List<Map<String, Object>> rows, int cut) {
+        if (cut < 0) return rows;
+        List<Map<String, Object>> out = new ArrayList<>(rows);
+        out.add(new LinkedHashMap<>(Map.of("_note", "truncated at " + cut + " rows")));
+        return out;
     }
 
     /** Rows → CSV: header = union of row keys in first-seen order; RFC-ish quoting. */

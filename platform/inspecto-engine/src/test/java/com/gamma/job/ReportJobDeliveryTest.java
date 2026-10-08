@@ -115,6 +115,48 @@ class ReportJobDeliveryTest {
         assertTrue(csv.contains("EU,40.0,2") && csv.contains("US,5.0,1"), csv);
     }
 
+    /** PARITY (BI-QUERY-TRUNCATION-1): a report that FITS its limit is byte-for-byte what it was - exact fit included. */
+    @Test
+    void aReportWithinItsLimitIsByteIdenticalWithNoMarker(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
+        seedSales(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+
+        JobResult r = new ReportJob(job(Map.of("scope", "dataset", "dataset", "sales_ds", "limit", "3",
+                "out_dir", outDir.toString())), null).run();
+
+        assertEquals("SUCCESS", r.status(), r.message());
+        assertFalse(r.message().contains("TRUNCATED"), r.message());
+        Path artifact;
+        try (Stream<Path> files = Files.list(outDir)) { artifact = files.findFirst().orElseThrow(); }
+        assertEquals("region,amount\nEU,10.0\nEU,30.0\nUS,5.0\n", Files.readString(artifact));
+    }
+
+    /** A cut report was delivered looking complete. It now says so in the file, the result and a WARN event. */
+    @Test
+    void aReportPastItsLimitSaysSoInTheFileAndTheResultButStillDelivers(@TempDir Path writeRoot, @TempDir Path outDir)
+            throws Exception {
+        seedSales(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+
+        JobResult r = new ReportJob(job(Map.of("scope", "dataset", "dataset", "sales_ds", "limit", "2",
+                "out_dir", outDir.toString())), null).run();
+
+        assertEquals("SUCCESS", r.status(), "a report is for humans: a cut never fails the delivery");
+        assertTrue(r.message().contains("TRUNCATED at 2 rows"), r.message());
+        Path artifact;
+        try (Stream<Path> files = Files.list(outDir)) { artifact = files.findFirst().orElseThrow(); }
+        List<String> lines = Files.readAllLines(artifact);
+        assertEquals(4, lines.size(), "header + the 2 rows kept + the marker row: " + lines);
+        assertTrue(lines.get(3).contains("truncated at 2 rows"), lines.toString());
+        assertTrue(lines.get(0).endsWith("_note"), lines.get(0));
+
+        // an aggregated report cut the same way (2 groups, limit 1)
+        Path out2 = Files.createDirectories(outDir.resolve("agg"));
+        JobResult agg = new ReportJob(job(Map.of("scope", "dataset", "dataset", "sales_ds", "limit", "1",
+                "measures", "count", "group_by", "region", "out_dir", out2.toString())), null).run();
+        assertTrue(agg.message().contains("TRUNCATED at 1 rows"), agg.message());
+    }
+
     @Test
     void rawExportWithoutMeasuresDeliversAllRows(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
         seedSales(writeRoot);
