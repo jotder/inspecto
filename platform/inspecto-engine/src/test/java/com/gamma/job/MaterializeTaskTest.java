@@ -130,6 +130,40 @@ class MaterializeTaskTest {
         }
     }
 
+    /** BI-QUERY-TRUNCATION-1: a result past the cap used to be written truncated, with the job reporting success. */
+    @Test
+    void aResultPastTheLimitFailsLoudlyAndLeavesThePriorSnapshotAlone(@TempDir Path writeRoot, @TempDir Path dataDir)
+            throws Exception {
+        seedSource(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+        try {
+            Path outDir = dataDir.resolve("by_region");
+            // an EXACT fit (2 groups, limit 2) is not a cut
+            JobResult ok = new MaintenanceJob(job(Map.of("task", "materialize", "dataset", "sales_ds", "target", "by_region",
+                    "measures", "count", "group_by", "region", "limit", "2")), dataDir.toString()).run();
+            assertTrue(ok.message().contains("2 row(s)"), ok.message());
+            List<Path> before = parquetFiles(outDir);
+            assertEquals(1, before.size());
+
+            IllegalStateException e = assertThrows(IllegalStateException.class, () -> new MaintenanceJob(
+                    job(Map.of("task", "materialize", "dataset", "sales_ds", "target", "by_region",
+                            "measures", "count", "group_by", "region", "limit", "1")), dataDir.toString()).run());
+            assertTrue(e.getMessage().contains("more than 1 rows") && e.getMessage().contains("limit:"), e.getMessage());
+            assertEquals(before, parquetFiles(outDir), "the prior snapshot is untouched");
+            try (DirectoryStream<Path> junk = Files.newDirectoryStream(outDir, "*.{tmp,stale}")) {
+                assertFalse(junk.iterator().hasNext(), "no leftovers from the refused run");
+            }
+
+            // the raw (no measures) snapshot has the same guard
+            assertThrows(IllegalStateException.class, () -> new MaintenanceJob(job(Map.of("task", "materialize",
+                    "dataset", "sales_ds", "target", "raw_cut", "limit", "2")), dataDir.toString()).run());
+            assertTrue(new MaintenanceJob(job(Map.of("task", "materialize", "dataset", "sales_ds", "target", "raw_ok",
+                    "limit", "3")), dataDir.toString()).run().message().contains("3 row(s)"));
+        } finally {
+            System.clearProperty("assist.write.root");
+        }
+    }
+
     @Test
     void failClosedGates(@TempDir Path writeRoot, @TempDir Path dataDir) throws Exception {
         seedSource(writeRoot);

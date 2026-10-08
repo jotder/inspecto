@@ -50,6 +50,9 @@ final class MaterializeTask {
     private static final Logger log = LoggerFactory.getLogger(MaterializeTask.class);
     private static final Pattern SAFE_TARGET = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");
 
+    /** The ceiling a {@code limit:} is clamped to (unchanged: it was the literal passed to the spec parser). */
+    private static final int MAX_ROWS = 100_000_000;
+
     private MaterializeTask() {}
 
     static JobResult run(JobConfig cfg, String dataDir, JobContext ctx) throws Exception {
@@ -74,7 +77,10 @@ final class MaterializeTask {
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new IllegalArgumentException("unknown dataset '" + source + "'"));
         String relationSql = DatasetRelation.relationSql(dataset, dataRoot, new ViewStore(writeRoot.resolve("views")));
-        String sql = compileSpec(cfg, source);
+        int cap = Math.min(Integer.parseInt(cfg.opt("limit", "1000000")), MAX_ROWS);
+        // One row PAST the cap: the compiled statement ends in its own LIMIT, so asking for exactly the cap
+        // could never show that rows were dropped (BI-QUERY-TRUNCATION-1).
+        String sql = compileSpec(cfg, source, cap + 1);
 
         Path outDir = dataRoot.resolve(target);
         Files.createDirectories(outDir);
@@ -93,6 +99,12 @@ final class MaterializeTask {
                     "SELECT count(*) FROM read_parquet(" + sqlStr(tmp.toString().replace('\\', '/')) + ")")) {
                 rs.next();
                 rows = rs.getLong(1);
+            }
+            if (rows > cap) {
+                Files.deleteIfExists(tmp);   // the prior snapshot stays visible: a failed refresh changes nothing
+                throw new IllegalStateException("materialize '" + cfg.name() + "': the result has more than " + cap
+                        + " rows - refusing to write a snapshot that silently drops groups (every downstream aggregate would "
+                        + "be wrong); raise this job's `limit:` (ceiling " + MAX_ROWS + ") or narrow the spec");
             }
             // `TYPEFLOW-DATASET-COLUMNS-1` step 4. DESCRIBE the Parquet that was just written, not the
             // pipeline's static shape: this task HAS the real relation in hand, so describing it is both
@@ -156,8 +168,7 @@ final class MaterializeTask {
     }
 
     /** The spec-compiled SELECT (BI-7), or a raw snapshot when no measures/group_by are set. */
-    private static String compileSpec(JobConfig cfg, String source) {
-        int limit = Integer.parseInt(cfg.opt("limit", "1000000"));
+    private static String compileSpec(JobConfig cfg, String source, int limit) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("dataset", source);
         // The grammar's own split (MEASURE-SHORTHAND-ONE-HOME-1) — this was one of three byte-identical
@@ -170,7 +181,7 @@ final class MaterializeTask {
         body.put("limit", limit);
         if (measures.isEmpty() && groupBy.isEmpty())
             return "SELECT * FROM " + q(source) + " LIMIT " + limit;
-        return MeasureCompiler.compile(MeasureCompiler.parse(body, limit, 100_000_000));
+        return MeasureCompiler.compile(MeasureCompiler.parse(body, limit, MAX_ROWS + 1));
     }
 
     /** Clear invisible leftovers of a crashed prior run (never touches live {@code *.parquet}). */
