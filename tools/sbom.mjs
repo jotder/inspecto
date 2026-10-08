@@ -22,7 +22,8 @@
 //
 //   node tools/sbom.mjs --edition Personal|Professional|Enterprise --bundle <dir> [--version X.Y.Z]
 //
-// Writes <bundle>/sbom/inspecto-<edition>.cdx.json and <bundle>/sbom/inspecto-<edition>.spdx.json.
+// Writes <bundle>/sbom/inspecto-<edition>.cdx.json and <bundle>/sbom/inspecto-<edition>.spdx.json, plus (P3f) one
+// <bundle>/sbom/<jar-basename>.sbom.cdx.json per shipped jar (tools/sbom-modules.mjs). Optional: --build-id <id> is recorded on each root.
 // Env: MVN_CMD overrides the Maven binary; MVN_OFFLINE=1 adds `-o`; M2_REPO overrides ~/.m2/repository.
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -30,7 +31,8 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
-import { bundleModules, coreModules, editionProfile, EDITIONS } from './bundle-modules.mjs';
+import { bundleModules, coreModules, editionProfile, EDITIONS, PG_SIDECAR } from './bundle-modules.mjs';
+import { cdxComponent, generatePerModule } from './sbom-modules.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -86,6 +88,8 @@ function mvn() {
     return process.platform === 'win32' ? 'mvn.cmd' : 'mvn';
 }
 
+const moduleCoords = new Map(); // artifactId -> purls of its own third-party runtime closure (filled by resolve())
+
 function resolve() {
     // `package -DskipTests` first: a bare `dependency:list -am` resolves reactor siblings (and their
     // `tests` test-jars) from ~/.m2, which only an earlier `mvn install` fills - so it died on a
@@ -126,6 +130,10 @@ function resolve() {
     }
     const coords = new Set();
     for (const mod of Object.keys(SHIPPED)) for (const c of perModule.get(mod) ?? []) coords.add(c);
+    // P3f: each shipped module's OWN closure (its banner block, minus in-repo siblings), kept for the per-module SBOMs
+    for (const mod of Object.keys(SHIPPED)) {
+        moduleCoords.set(mod, [...(perModule.get(mod) ?? [])].map(parseCoord).filter((c) => !inRepo.has(c.artifact)).map(purl));
+    }
     if (coords.size === 0) {
         console.error('✖ SBOM: `dependency:list` produced no resolved artifacts for ' + Object.keys(SHIPPED).join(', '));
         process.exit(2);
@@ -243,15 +251,7 @@ const cdx = {
         component: { type: 'application', 'bom-ref': bundleName, name: bundleName, version: projectVersion },
     },
     components: components.map((c) => ({
-        type: 'library',
-        'bom-ref': c.purl,
-        group: c.group,
-        name: c.artifact,
-        version: c.version,
-        scope: 'required',
-        purl: c.purl,
-        ...(c.sha256 ? { hashes: [{ alg: 'SHA-256', content: c.sha256 }] } : {}),
-        ...(c.license ? { licenses: [{ license: { name: c.license.name, ...(c.license.url ? { url: c.license.url } : {}) } }] } : {}),
+        ...cdxComponent(c),
         ...(c.firstParty ? { properties: [{ name: 'inspecto:bundleFile', value: c.bundleFile }] } : {}),
     })),
     dependencies: [{ ref: bundleName, dependsOn: components.map((c) => c.purl) }],
@@ -296,6 +296,24 @@ const cdxPath = join(outDir, `inspecto-${edition.toLowerCase()}.cdx.json`);
 const spdxPath = join(outDir, `inspecto-${edition.toLowerCase()}.spdx.json`);
 writeFileSync(cdxPath, JSON.stringify(cdx, null, 2) + '\n');
 writeFileSync(spdxPath, JSON.stringify(spdx, null, 2) + '\n');
+
+// P3f: one SBOM per jar beside the combined documents (tools/sbom-modules.mjs); components are the SAME objects as above.
+const componentsByPurl = new Map(components.map((c) => [c.purl, c]));
+const perModuleJars = Object.entries(SHIPPED).map(([artifactId, file]) => ({
+    bundleFile: file, group: 'com.gamma.inspector', artifact: artifactId, version: projectVersion, depPurls: moduleCoords.get(artifactId) ?? [],
+}));
+const pgComponent = components.find((c) => !c.firstParty && hasPg(c));
+if (existsSync(join(bundleDir, PG_SIDECAR)) && pgComponent) {
+    perModuleJars.push({ bundleFile: PG_SIDECAR, group: pgComponent.group, artifact: pgComponent.artifact, version: pgComponent.version, depPurls: [] });
+}
+let perModulePaths;
+try {
+    perModulePaths = generatePerModule({ bundleDir, jars: perModuleJars, componentsByPurl, buildId: arg('--build-id', null), toolVersion: projectVersion, now });
+} catch (e) {
+    console.error(`✖ SBOM: ${e.message}`);
+    process.exit(2);
+}
+console.log(`✓ per-module SBOMs: ${perModulePaths.length} → sbom/*${'.sbom.cdx.json'}`);
 
 const third = components.filter((c) => !c.firstParty).length;
 console.log(`✓ SBOM (${edition}): ${third} third-party + ${components.length - third} first-party component(s) → sbom/`);

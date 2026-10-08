@@ -103,3 +103,24 @@ test('RED: the generated classpath forgets a core jar', () => {
     const gen = { mvn: { Professional: ':x', Enterprise: ':x', Preview: ':x' }, classpathMax: coreModules().map((m) => m.bundleFile).filter((j) => j !== 'inspecto-util.jar') };
     assert.match(problems(REAL, { generated: gen }), /staged but absent from modules\.list: .*inspecto-util\.jar/);
 });
+
+// ── P3f: per-module SBOMs (rule E) ───────────────────────────────────────────────────────────────────────────
+test('RED: package.ps1 never runs the per-module SBOM verification', () => {
+    const t = mutate("'tools\\sbom-modules.mjs') --verify $bundleDir", "'tools\\sbom-modules.mjs') --nothing $bundleDir");
+    assert.match(problems(t), /never runs `tools\/sbom-modules\.mjs --verify \$bundleDir`/);
+});
+
+test('RED: the per-module verification result is ignored (no throw on a non-zero exit)', () => {
+    const t = mutate('throw "per-module SBOM verification failed (see above)"', 'Write-Host "ignored"');
+    assert.match(problems(t), /does not throw on a non-zero exit/);
+});
+
+test('RED: the verification runs before modules.list exists', () => {
+    const verify = "& node (Join-Path $sandboxRoot 'tools\\sbom-modules.mjs') --verify $bundleDir";
+    const early = mutate(verify, 'Write-Host x').replace('$classpathArgs = @(', verify + '\n$classpathArgs = @(');
+    assert.match(problems(early), /verifies per-module SBOMs BEFORE modules\.list is written/);
+});
+
+test('RED: sbom.mjs is run without a build id', () => {
+    assert.match(problems(mutate(' --version $sbomVersion --build-id $buildId', ' --version $sbomVersion')), /without `--build-id`/);
+});

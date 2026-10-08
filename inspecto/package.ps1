@@ -1007,7 +1007,7 @@ if ($Edition -ne 'Personal') {
 Write-Host "Generating SBOM for the $Edition bundle (CycloneDX + SPDX)..." -ForegroundColor Cyan
 $sbomVersion = ([xml](Get-Content (Join-Path $sandboxRoot 'pom.xml'))).project.version
 Push-Location $sandboxRoot
-& node (Join-Path $sandboxRoot 'tools\sbom.mjs') --edition $Edition --bundle $bundleDir --version $sbomVersion
+& node (Join-Path $sandboxRoot 'tools\sbom.mjs') --edition $Edition --bundle $bundleDir --version $sbomVersion --build-id $buildId
 $sbomExit = $LASTEXITCODE
 Pop-Location
 if ($sbomExit -ne 0) { throw "SBOM generation failed (exit $sbomExit) — a bundle ships with its SBOM or not at all" }
@@ -1028,6 +1028,8 @@ if ($DemoAuth) {
     Remove-Item (Join-Path $bundleDir 'inspecto-oidc.jar') -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $bundleDir 'inspecto-secrets.jar') -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $bundleDir 'inspecto-geo-country.jar') -ErrorAction SilentlyContinue
+    # P3f: the per-module SBOMs of the removed trio go with them (the combined SBOM keeps describing the Enterprise set)
+    foreach ($gone in 'inspecto-oidc','inspecto-secrets','inspecto-geo-country') { Remove-Item (Join-Path $bundleDir "sbom\$gone.sbom.cdx.json") -ErrorAction SilentlyContinue }
     Copy-Item -Path $demoJar.FullName -Destination (Join-Path $bundleDir 'inspecto-demo-auth.jar')
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $z = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $bundleDir 'inspecto-demo-auth.jar'))
@@ -1049,6 +1051,11 @@ $classpathArgs = @('--edition', $Edition, '--bundle', $bundleDir)
 if ($DemoAuth) { $classpathArgs += '--demo' }
 & node (Join-Path $sandboxRoot 'tools\offering-classpath.mjs') @classpathArgs
 if ($LASTEXITCODE -ne 0) { throw "tools/offering-classpath.mjs failed - the staged jars and the Offering's classpath disagree (see above)" }
+
+# P3f: every jar on modules.list has its own per-module SBOM (written by tools/sbom.mjs above); hashes match the staged jars and every
+# third-party component is also in the combined SBOM. Not a warning: a bundle whose per-jar bill of materials disagrees with the jars does not ship.
+& node (Join-Path $sandboxRoot 'tools\sbom-modules.mjs') --verify $bundleDir
+if ($LASTEXITCODE -ne 0) { throw "per-module SBOM verification failed (see above)" }
 
 # ── step 3b: copy the built UI dist → bundle/ui (served by ControlApi via -Dui.dir=./ui) ──
 # Angular emits to ui/dist/<app>[/browser]; locate the folder that actually holds index.html.
