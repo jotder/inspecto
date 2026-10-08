@@ -9,7 +9,6 @@ import com.gamma.decision.ConsequenceProvider;
 import com.gamma.decision.Consequences;
 import com.gamma.event.EventLog;
 import com.gamma.job.JobService;
-import com.gamma.workflow.ObjectType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.query.ConditionTree;
@@ -358,8 +357,8 @@ final class DecisionRoutes implements RouteModule {
 
     private static String[] proposeActionRequest(ApiContext api, String ruleName, Map<String, Object> rule,
                                                  Map<String, Object> c, boolean automatic, String actor) {
-        com.gamma.objects.ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
-        if (objects == null)
+        LinkedSubjectProvider incidents = LinkedSubjects.of(api, "incident").orElse(null);
+        if (incidents == null)
             return new String[] {"unavailable", "no Action Request — operational objects are not installed in this "
                     + "bundle, so there is no Incident to raise it on", null};
         Path root = api.writeRoot();
@@ -375,13 +374,12 @@ final class DecisionRoutes implements RouteModule {
                     + "recorded, or history pruned past the change), so four-eyes cannot exclude its makers; save the "
                     + "rule again", null};
         String corr = "decision-rule:" + ruleName;
-        String incident = objects.activeAttributeIndex(ObjectType.INCIDENT, corr, "decisionRule").get(ruleName);
-        if (incident == null) {
-            String severity = paramStr(c, "severity", "warning");
-            incident = objects.open(ObjectType.INCIDENT, "Decision Rule " + ruleName,
-                    "Raised by Decision Rule '" + ruleName + "' for an invoke-api action", severity, corr,
-                    Map.of("rule", ruleName, "decisionRule", ruleName, "severity", severity));
-        }
+        String severity = paramStr(c, "severity", "warning");
+        String incident = incidents.open(api, new LinkedSubjectProvider.OpenRequest(corr, "decisionRule", ruleName,
+                "Decision Rule " + ruleName, "Raised by Decision Rule '" + ruleName + "' for an invoke-api action",
+                severity, Map.of("rule", ruleName, "decisionRule", ruleName, "severity", severity))).orElse(null);
+        if (incident == null)
+            return new String[] {"skipped", "no Action Request - the Incident for this rule could not be opened", null};
         Map<String, Object> p = params(c);
         try {
             synchronized (ActionRequests.lock()) {

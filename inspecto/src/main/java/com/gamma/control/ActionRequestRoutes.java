@@ -7,7 +7,6 @@ import com.gamma.spi.auth.Subject;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.audit.EventLevel;
-import com.gamma.objects.ObjectAccess;
 import com.gamma.pipeline.exec.WebhookSink;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -18,7 +17,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import com.gamma.access.Roles;
 import com.gamma.access.WriteGates;
@@ -152,10 +150,9 @@ final class ActionRequestRoutes implements RouteModule {
         if (ActionRequests.invalid(rec))
             return ApiContext.subject(ex).map(s -> s.capabilities().contains("canApproveChanges")).orElse(true);
         Object linked = rec.get("incidentId") != null ? rec.get("incidentId") : rec.get("caseId");
-        ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
-        if (linked == null || objects == null) return false;
-        Map<String, Object> o = objects.summary(String.valueOf(linked)).orElse(null);
-        return o != null && AnnotationTargets.objectVisibleTo(ex, o);
+        if (linked == null) return false;
+        return LinkedSubjects.of(api, rec.get("incidentId") != null ? "incident" : "case")
+                .map(p -> p.visibleTo(api, ex, String.valueOf(linked))).orElse(false);
     }
 
     /** The target's response body is for approvers only: without {@code canApproveChanges} the excerpt is withheld. */
@@ -266,14 +263,13 @@ final class ActionRequestRoutes implements RouteModule {
         if ((incident == null) == (kase == null))
             throw invalid("exactly one of 'incidentId' / 'caseId' is required — an Action Request is raised from one");
 
-        ObjectAccess objects = HostContext.of(api).service().objects().orElse(null);
-        if (objects == null)
-            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "operational objects (inspecto-ops) are not "
-                    + "installed in this bundle, so there is no Incident or Case to raise an Action Request from");
         String linked = incident != null ? incident : kase;
         String kind = incident != null ? "incident" : "case";
-        Optional<Map<String, Object>> obj = objects.summary(linked);
-        if (obj.isEmpty() || !kind.equals(String.valueOf(obj.get().get("kind")).toLowerCase(java.util.Locale.ROOT)))
+        LinkedSubjectProvider subjects = LinkedSubjects.of(api, kind).orElse(null);
+        if (subjects == null)
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "operational objects (inspecto-ops) are not "
+                    + "installed in this bundle, so there is no Incident or Case to raise an Action Request from");
+        if (subjects.resolve(api, linked).isEmpty())
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no " + kind + " '" + linked + "'");
 
         if (ActionDispatcher.transport.get() == null)
