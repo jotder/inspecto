@@ -52,6 +52,10 @@ final class StoredAlertRecords implements AlertRecords {
         return store.allActive().stream().filter(r -> AlertLifecycle.initialState().equals(r.state())).toList();
     }
 
+    @Override public AlertStore.Purge purgeResolvedAlerts(java.time.Instant cutoff, boolean dryRun) {
+        return store.purgeResolvedBefore(cutoff, dryRun);
+    }
+
     @Override public boolean reopenIncident(String incidentId, String actor) {
         return objects.map(o -> o.transition(incidentId, "reopen", actor)).orElse(false);
     }

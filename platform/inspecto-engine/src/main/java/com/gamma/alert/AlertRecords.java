@@ -67,6 +67,9 @@ public interface AlertRecords {
     /** The most recent stored Alerts that carry a fired {@link Alert}, newest first (any state). */
     List<AlertStore.Row> recentAlertRows(int limit);
 
+    /** Retention: delete (or, on {@code dryRun}, count) the RESOLVED Alerts closed before {@code cutoff}; see {@link AlertStore#purgeResolvedBefore}. */
+    AlertStore.Purge purgeResolvedAlerts(java.time.Instant cutoff, boolean dryRun);
+
     /** Re-open a (resolved) Incident as {@code actor}; {@code false} when unknown, not legal, or no ops module. */
     boolean reopenIncident(String incidentId, String actor);
 

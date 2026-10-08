@@ -356,6 +356,20 @@ public final class AlertService {
         }).toList();
     }
 
+    /**
+     * Retention: delete the RESOLVED Alerts closed before {@code cutoff} (or, on {@code dryRun}, count them) and drop
+     * their fired entries from the live history so {@code GET /alerts} never shows a purged row as an unmanaged one.
+     * Active Alerts are never touched. See {@link AlertStore#purgeResolvedBefore}.
+     */
+    public synchronized AlertStore.Purge purgeResolved(java.time.Instant cutoff, boolean dryRun) {
+        AlertStore.Purge p = records.purgeResolvedAlerts(cutoff, dryRun);
+        if (!dryRun && !p.fired().isEmpty()) {
+            java.util.Set<Alert> gone = new java.util.HashSet<>(p.fired());
+            fired.removeIf(gone::contains);
+        }
+        return p;
+    }
+
     /** Every stored Alert still {@code OPEN} (not yet acknowledged), newest first; empty when the store cannot be read. */
     public List<AlertStore.Row> openAlerts() {
         try {

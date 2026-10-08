@@ -443,6 +443,7 @@ class AlertRecordsParityTest {
         @Override public boolean reopenIncident(String id, String actor) { calls++; return inner.reopenIncident(id, actor); }
         @Override public void linkEscalation(String i, String a, String actor) { calls++; inner.linkEscalation(i, a, actor); }
         @Override public List<Alert> recentFired(int limit) { calls++; return inner.recentFired(limit); }
+        @Override public AlertStore.Purge purgeResolvedAlerts(java.time.Instant c, boolean d) { calls++; return inner.purgeResolvedAlerts(c, d); }
     }
 
     @Test

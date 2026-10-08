@@ -66,6 +66,28 @@ public interface AlertStore extends AutoCloseable {
     /** How many Alert rows the store holds (any state). */
     long size();
 
+    /**
+     * What {@link #purgeResolvedBefore} did (or, on a dry run, would do). {@code fired} is the fired {@link Alert} of
+     * each purged row that carried one, so the in-memory ring can drop exactly those.
+     *
+     * @param purged        the {@code RESOLVED} rows whose {@code closedAt} is strictly before the cutoff
+     * @param keptResolved  the {@code RESOLVED} rows that stay: closed at or after the cutoff, or with no close time
+     * @param keptActive    the {@code OPEN} / {@code ACKNOWLEDGED} rows, never touched
+     */
+    record Purge(long purged, long keptResolved, long keptActive, List<Alert> fired) {
+        public Purge {
+            fired = fired == null ? List.of() : List.copyOf(fired);
+        }
+    }
+
+    /**
+     * Retention (MODULE-REORG-P7-INCIDENTS): physically delete the {@code RESOLVED} rows closed strictly before
+     * {@code cutoff}; with {@code dryRun} only count. ⛔ An {@code OPEN} or {@code ACKNOWLEDGED} row is never
+     * deleted (it carries de-duplication state: deleting it would let its rule fire again), and a resolved row with
+     * no close time ({@code closedAt <= 0}) is kept, age unknown. The age is the Alert's own {@code closedAt}.
+     */
+    Purge purgeResolvedBefore(java.time.Instant cutoff, boolean dryRun);
+
     @Override
     default void close() {}
 

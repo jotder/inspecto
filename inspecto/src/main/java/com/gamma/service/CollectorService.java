@@ -640,6 +640,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // channel resolution, the suppression re-check and the template all live there, and a task that
         // reimplemented them would be a second, divergent send path.
         if (this.jobs != null) this.jobs.notificationService(this.notificationService);
+        if (this.jobs != null) this.jobs.alertService(this.alerting);   // alert_purge maintenance task
         this.notificationSubscriber = notificationService::onEvent;
         this.eventLog.addSubscriber(notificationSubscriber);
         // ses-sns §8: the built-in security triggers (T1–T4) read the audit rows of this log and emit

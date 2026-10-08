@@ -63,6 +63,10 @@ import java.time.Instant;
  *       never purged and are counted separately. ⚠ The <b>only</b> destructive task over operator business
  *       records — hence {@code purge}, not {@code prune}. The append-only event trail survives a purge.
  *       Supplied by the optional {@code inspecto-ops} module since EDG-01 cell 7.</li>
+ *   <li>{@code alert_purge} — physically delete {@code RESOLVED} Alert rows whose {@code closedAt} is older
+ *       than {@code retention_days} (default 90, minimum 1; blank/0/negative is refused, never "everything").
+ *       {@code OPEN} / {@code ACKNOWLEDGED} Alerts are never touched. A base task: Alerts exist on every edition.
+ *       See {@link AlertPurgeTask}.</li>
  *   <li>{@code storage_report} — read-only per-axis storage usage + largest consumers over {@code dir},
  *       recorded as Run Artifacts and — on a real run with a data/write root configured — appended as one
  *       row per axis to the queryable {@code maintenance_storage} catalog Dataset (the sample series
@@ -156,8 +160,8 @@ final class MaintenanceJob implements Job {
     }
 
     /**
-     * Every {@code task:} the switch in {@link #execute} carries, in the order it reads there — 22 ids
-     * across 21 arms ({@code heartbeat} and {@code noop} share one).
+     * Every {@code task:} the switch in {@link #execute} carries, in the order it reads there — 23 ids
+     * across 22 arms ({@code heartbeat} and {@code noop} share one).
      *
      * <p>⚠ <b>This constant and that switch are two declarations of one fact.</b>
      * {@code MaintenanceTaskContractTest} re-parses this file's own {@code case} labels and fails when the
@@ -171,7 +175,7 @@ final class MaintenanceJob implements Job {
      */
     public static final java.util.List<String> BUILT_IN_TASKS = java.util.List.of(
             "cleanup", "ledger_prune", "dedup_prune", "runlog_prune", "status_prune", "notification_prune",
-            "event_prune", "partition_prune", "receipt_prune", "soft_bounce_retry", "storage_report", "storage_trend",
+            "event_prune", "alert_purge", "partition_prune", "receipt_prune", "soft_bounce_retry", "storage_report", "storage_trend",
             "scheduler_audit", "metadata_validate", "file_repository_audit", "db_maintenance",
             "retire_superseded", "compact", "reference_compact", "materialize", "heartbeat", "noop");
 
@@ -198,6 +202,7 @@ final class MaintenanceJob implements Job {
             case "status_prune"       -> StatusPruneTask.run(cfg, dataDir, dryRun);
             case "notification_prune" -> NotificationPruneTask.run(cfg, host, dryRun);
             case "event_prune"        -> EventPruneTask.run(cfg, host, dryRun);
+            case "alert_purge"        -> AlertPurgeTask.run(cfg, host, dryRun);
             case "partition_prune"    -> PartitionPruneTask.run(cfg, dryRun);
             case "receipt_prune"      -> ReceiptPruneTask.run(cfg, host, dryRun);
             case "soft_bounce_retry"  -> SoftBounceRetryTask.run(cfg, host, dryRun);

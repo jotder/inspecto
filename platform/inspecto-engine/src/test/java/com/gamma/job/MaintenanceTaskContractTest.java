@@ -67,8 +67,8 @@ class MaintenanceTaskContractTest {
     void theConstantHasNoDuplicatesAndKeepsItsStatedSize() {
         List<String> tasks = MaintenanceJob.BUILT_IN_TASKS;
         assertEquals(tasks.size(), new TreeSet<>(tasks).size(), "BUILT_IN_TASKS carries a duplicate: " + tasks);
-        assertEquals(22, tasks.size(),
-                "22 ids across 21 arms is the documented shape; update the javadoc with the constant");
+        assertEquals(23, tasks.size(),
+                "23 ids across 22 arms is the documented shape; update the javadoc with the constant");
     }
 
     /**

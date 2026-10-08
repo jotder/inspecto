@@ -55,4 +55,15 @@ public final class InMemoryAlertStore implements AlertStore {
     }
 
     @Override public synchronized long size() { return rows.size(); }
+
+    @Override public synchronized Purge purgeResolvedBefore(java.time.Instant cutoff, boolean dryRun) {
+        long cut = cutoff.toEpochMilli();
+        List<Row> gone = rows.values().stream()
+                .filter(r -> AlertLifecycle.isTerminal(r.state()) && r.closedAt() > 0 && r.closedAt() < cut).toList();
+        long resolved = rows.values().stream().filter(r -> AlertLifecycle.isTerminal(r.state())).count();
+        long active = rows.size() - resolved;
+        if (!dryRun) gone.forEach(r -> rows.remove(r.id()));
+        return new Purge(gone.size(), resolved - gone.size(), active,
+                dryRun ? List.of() : gone.stream().map(Row::fired).filter(java.util.Objects::nonNull).toList());
+    }
 }

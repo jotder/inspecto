@@ -113,6 +113,8 @@ public final class JobService implements AutoCloseable {
      *  run time by the {@code soft_bounce_retry} task, which is the first maintenance task that SENDS
      *  rather than prunes or reads. */
     private volatile com.gamma.notify.NotificationService notificationService;
+    /** This space's Alert engine - the {@code alert_purge} maintenance task's target (MODULE-REORG-P7-INCIDENTS). */
+    private volatile com.gamma.alert.AlertService alertService;
     /** Authored-pipeline store for {@link JobType#PIPELINE} jobs (T32); {@code null} when no write root is configured. */
     private final PipelineStore pipelineStore;
     /** This space's component registry, for resolving a pipeline's {@code use:} bindings before it runs.
@@ -473,7 +475,7 @@ public final class JobService implements AutoCloseable {
                         + String.join(" / ", MaintenanceJob.availableTasks()) + ".",
                 List.of(ParameterDecl.optional("task", ParamType.STRING, "cleanup", "Which maintenance task"),
                         ParameterDecl.optional("dir", ParamType.STRING, null, "Target directory (cleanup / compact / storage_report / backup source)"),
-                        ParameterDecl.optional("retention_days", ParamType.INTEGER, "7", "Age threshold in days (required for the *_prune tasks and incident_purge)"),
+                        ParameterDecl.optional("retention_days", ParamType.INTEGER, "7", "Age threshold in days (required for the *_prune tasks and incident_purge; alert_purge defaults to 90)"),
                         ParameterDecl.optional("glob", ParamType.STRING, "*", "Filename filter (cleanup)"),
                         ParameterDecl.optional("max_count", ParamType.INTEGER, null, "Cap per run: newest N files (cleanup / runlog_prune) or incidents purged (incident_purge, default 1000)"),
                         ParameterDecl.optional("max_size", ParamType.INTEGER, null, "Keep at most this many bytes, newest first (cleanup)"),
@@ -1776,6 +1778,17 @@ public final class JobService implements AutoCloseable {
     /** Attach this space's notification service post-construction (it is created after this service). */
     public void notificationService(com.gamma.notify.NotificationService svc) {
         this.notificationService = svc;
+    }
+
+    /** The Alert engine the {@code alert_purge} maintenance task ages resolved Alerts out of, or empty when the
+     *  host never attached one. */
+    public Optional<com.gamma.alert.AlertService> alertService() {
+        return Optional.ofNullable(alertService);
+    }
+
+    /** Attach this space's Alert engine post-construction (it is created after this service). */
+    public void alertService(com.gamma.alert.AlertService svc) {
+        this.alertService = svc;
     }
 
     /** Install the cross-pod arming exclusion keyed by job name (§5.2). {@code null} restores the no-op. */

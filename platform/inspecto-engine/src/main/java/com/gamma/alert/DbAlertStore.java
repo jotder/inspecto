@@ -172,6 +172,51 @@ public final class DbAlertStore implements AlertStore {
         }
     }
 
+    @Override public Purge purgeResolvedBefore(java.time.Instant cutoff, boolean dryRun) {
+        final String aged = "state = 'RESOLVED' AND closed_at > 0 AND closed_at < ?";
+        try {
+            return src.with(conn -> {
+                long cut = cutoff.toEpochMilli();
+                long resolved = scalar(conn, "SELECT count(*) FROM inspecto_alerts WHERE state = 'RESOLVED'", null);
+                long total = scalar(conn, "SELECT count(*) FROM inspecto_alerts", null);
+                long purged = scalar(conn, "SELECT count(*) FROM inspecto_alerts WHERE " + aged, cut);
+                List<Alert> fired = new ArrayList<>();
+                if (!dryRun && purged > 0) {
+                    try (PreparedStatement ps = conn.prepareStatement(
+                            "SELECT fired_json FROM inspecto_alerts WHERE " + aged + " AND fired_json IS NOT NULL")) {
+                        ps.setLong(1, cut);
+                        try (ResultSet rs = ps.executeQuery()) {
+                            while (rs.next()) {
+                                try {
+                                    fired.add(Alert.fromMap(JSON.readValue(rs.getString(1),
+                                            new TypeReference<LinkedHashMap<String, Object>>() {})));
+                                } catch (Exception e) {
+                                    log.debug("unreadable fired Alert of a purged row: {}", e.getMessage());
+                                }
+                            }
+                        }
+                    }
+                    try (PreparedStatement ps = conn.prepareStatement("DELETE FROM inspecto_alerts WHERE " + aged)) {
+                        ps.setLong(1, cut);
+                        ps.executeUpdate();
+                    }
+                }
+                return new Purge(purged, resolved - purged, total - resolved, fired);
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException("could not purge resolved Alerts: " + e.getMessage(), e);
+        }
+    }
+
+    private static long scalar(Connection conn, String sql, Long param) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (param != null) ps.setLong(1, param);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0L;
+            }
+        }
+    }
+
     @Override public void close() {
         try {
             src.close();

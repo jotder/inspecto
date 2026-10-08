@@ -35,4 +35,5 @@ final class RecordingAlertStore implements AlertStore {
     @Override public java.util.Optional<Row> get(String alertId) { return inner.get(alertId); }
     @Override public List<Row> recentRows(int limit) { return inner.recentRows(limit); }
     @Override public long size() { return inner.size(); }
+    @Override public Purge purgeResolvedBefore(java.time.Instant cutoff, boolean dryRun) { return inner.purgeResolvedBefore(cutoff, dryRun); }
 }
