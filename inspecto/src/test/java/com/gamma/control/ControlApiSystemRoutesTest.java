@@ -23,6 +23,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -43,7 +44,7 @@ class ControlApiSystemRoutesTest {
     /** Every property these tests set, RESTORED after each so one test cannot colour the next. */
     private static final List<String> TOUCHED = List.of(
             "inspecto.db", "inspecto.db.url", "inspecto.db.user", "jobs.backend", "jobs.db.url",
-            "objects.backend", "objects.db.url", "status.backend", "system.config.dir");
+            "alerts.backend", "alerts.db.url", "alerts.db.user", "provenance.backend", "provenance.db.url", "objects.backend", "objects.db.url", "status.backend", "system.config.dir");
 
     // ⚠ Restore, never clear (TEST-CWD-DB-1): surefire pins -Dstatus.backend=jdbc:duckdb: for the whole
     // forked JVM, and a blanket clearProperty here erased it — so every class that ran AFTER this one in
@@ -92,11 +93,35 @@ class ControlApiSystemRoutesTest {
             // 2026-09-13: INBOX_REGISTRY (INBOX-REGISTRY-CROSS-POD-1). 15 → 16 on 2026-10-07: ALERTS
             // (P7-INCIDENTS slice 2, the Alert records). This count is a
             // tripwire, not decoration — it is how a family added without its report row gets caught.
-            assertEquals(16, families.size(), "the roster is sixteen families — " + families);
+            assertEquals(12, families.size(), "the core roster is twelve families (the ops module adds four) — " + families);
             for (JsonNode f : families) {
                 assertNotNull(f.get("source"), "every family reports where its value came from");
                 assertTrue(f.has("backendProperty") && f.has("urlProperty"),
                         "and the properties to set, so the operator can act on it: " + f);
+            }
+        }
+    }
+
+    /**
+     * MODULE-REORG-P4-3: the families of a module that is NOT installed are named - with the owning module id - in
+     * {@code notInstalled}, never resolved (no URL, no file opened). This classpath has no ops module, so its four
+     * Operational Object families are absent from {@code families} and listed here.
+     */
+    @Test
+    void anAbsentModulesFamiliesAreListedNotInstalled_andNeverResolved(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            JsonNode body = json(get(c.port, "/system/operational-db"));
+            for (JsonNode f : body.get("families"))
+                assertNotEquals("OBJECTS", f.get("family").asText(), "an absent module's family is not on the roster");
+            JsonNode absent = body.get("notInstalled");
+            assertEquals(java.util.List.of("OBJECTS", "LINKS", "NOTES", "TAGS"),
+                    java.util.stream.StreamSupport.stream(absent.spliterator(), false)
+                            .map(f -> f.get("family").asText()).toList(), absent.toString());
+            for (JsonNode f : absent) {
+                assertEquals("ops", f.get("module").asText());
+                assertEquals("not-installed", f.get("state").asText());
+                assertFalse(f.get("enabled").asBoolean());
+                assertFalse(f.has("url"), "an absent family is never resolved: " + f);
             }
         }
     }
@@ -109,7 +134,7 @@ class ControlApiSystemRoutesTest {
     @Test
     void aPerFamilyUrlOutranksTheSharedOneAndBothOutrankTheSpaceDefault(@TempDir Path dir) throws Exception {
         System.setProperty("jobs.backend", "duckdb");
-        System.setProperty("objects.backend", "db");
+        System.setProperty("provenance.backend", "duckdb");   // PROVENANCE: enabled, fail-soft - stands in for the Operational Object families that moved to ops
         System.setProperty("inspecto.db", "postgres");
         System.setProperty("inspecto.db.url", "jdbc:postgresql://shared:5432/ops");
         System.setProperty("jobs.db.url", "jdbc:postgresql://jobs-only:5432/jobs");
@@ -119,7 +144,7 @@ class ControlApiSystemRoutesTest {
             JsonNode jobs = family(body, "JOB_RUNS");
             assertEquals("FAMILY_PROPERTY", jobs.get("source").asText());
             assertTrue(jobs.get("url").asText().contains("jobs-only"), jobs.toString());
-            JsonNode objects = family(body, "OBJECTS");
+            JsonNode objects = family(body, "PROVENANCE");
             assertEquals("SHARED_PROPERTY", objects.get("source").asText());
             assertTrue(objects.get("url").asText().contains("shared"), objects.toString());
         }
@@ -164,7 +189,8 @@ class ControlApiSystemRoutesTest {
     @Test
     void aFamilyThatSendsNoCredentialsReportsNoUserEvenWhenASharedOneIsSet(@TempDir Path dir) throws Exception {
         System.setProperty("jobs.backend", "duckdb");
-        System.setProperty("objects.backend", "db");
+        System.setProperty("alerts.backend", "db");   // ALERTS stands in for a credentialed family; its own DuckDB URL keeps the boot from dialling the unreachable shared server
+        System.setProperty("alerts.db.url", "jdbc:duckdb:" + dir.resolve("alerts-test.db").toString().replace('\\', '/'));
         System.setProperty("inspecto.db", "postgres");
         System.setProperty("inspecto.db.url", "jdbc:postgresql://shared:5432/ops");
         System.setProperty("inspecto.db.user", "ops_user");
@@ -174,7 +200,7 @@ class ControlApiSystemRoutesTest {
             assertTrue(jobs.get("userProperty").isNull(), "job runs has no user property: " + jobs);
             assertTrue(jobs.get("user").isNull(),
                     "…so it must not claim the shared user it never sends: " + jobs);
-            JsonNode objects = family(body, "OBJECTS");
+            JsonNode objects = family(body, "ALERTS");
             assertEquals("ops_user", objects.get("user").asText(),
                     "while a credentialed family DOES inherit the shared user: " + objects);
         }
@@ -187,7 +213,7 @@ class ControlApiSystemRoutesTest {
      */
     @Test
     void aPasswordEmbeddedInAUrlIsNotEchoedAnywhereInTheBody(@TempDir Path dir) throws Exception {
-        System.setProperty("objects.backend", "db");
+        System.setProperty("provenance.backend", "duckdb");
         System.setProperty("inspecto.db", "postgres");
         System.setProperty("inspecto.db.url", "jdbc:postgresql://ops_user:sup3rs3cret@pg:5432/ops");
         try (Ctx c = open(dir)) {

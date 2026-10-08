@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * MODULE-REORG-P1-FAMILY parity pin: how EVERY operational-store family is addressed (label, properties,
  * default, and the resolved source / URL / user / password / Postgres-schema-scoped URL under six property
  * scenarios) is compared with a golden table captured from the 16-constant {@code OperationalDb.Family} enum
- * BEFORE it was split into core + contributed families. The table is sorted by family name, so it pins WHAT
+ * BEFORE it was split into core + contributed families (and unchanged by the split - the golden file did not move). The table is sorted by family name, so it pins WHAT
  * each family resolves to and not the order of the roster; persisted data is unchanged exactly when this file
  * is. ⚠ Lives in the ops module because only there is the whole roster (core + the four object families) on the
  * classpath. Regenerate only for a deliberate change: the actual table is written to
@@ -43,17 +43,17 @@ class StoreFamilyParityTest {
         List<String> keys = new ArrayList<>(List.of("inspecto.db", "inspecto.db.url", "inspecto.db.user",
                 "inspecto.db.password"));
         for (OperationalDb.Resolved r : OperationalDb.resolveAll(root)) {
-            OperationalDb.Family f = r.family();
+            StoreFamily f = r.family();
             names.add(f.name());
-            for (String k : new String[] {f.backendProperty, f.urlProperty, f.userProperty, f.passwordProperty})
+            for (String k : new String[] {f.backendProperty(), f.urlProperty(), f.userProperty(), f.passwordProperty()})
                 if (k != null && !keys.contains(k)) keys.add(k);
         }
         for (String k : keys) prior.put(k, System.getProperty(k));
 
         Map<String, String> enabled = new LinkedHashMap<>();
         for (OperationalDb.Resolved r : OperationalDb.resolveAll(root)) {
-            OperationalDb.Family f = r.family();
-            enabled.put(f.backendProperty, "URL_OR_ENGINE".equals(f.mode.name()) ? "duckdb" : "db");
+            StoreFamily f = r.family();
+            enabled.put(f.backendProperty(), "URL_OR_ENGINE".equals(f.mode().name()) ? "duckdb" : "db");
         }
         Map<String, String> shared = new LinkedHashMap<>(enabled);
         shared.put("inspecto.db", "postgres");
@@ -63,12 +63,12 @@ class StoreFamilyParityTest {
         Map<String, String> own = new LinkedHashMap<>(shared);
         Map<String, String> raw = new LinkedHashMap<>(enabled);
         for (OperationalDb.Resolved r : OperationalDb.resolveAll(root)) {
-            OperationalDb.Family f = r.family();
-            own.put(f.urlProperty, "jdbc:postgresql://own-" + f.name().toLowerCase() + "/db");
-            if (f.userProperty != null) own.put(f.userProperty, "u-" + f.userProperty);
-            if (f.passwordProperty != null) own.put(f.passwordProperty, "p-" + f.passwordProperty);
-            if ("URL_OR_ENGINE".equals(f.mode.name()))
-                raw.put(f.backendProperty, "jdbc:duckdb:/raw/" + f.name().toLowerCase() + ".db");
+            StoreFamily f = r.family();
+            own.put(f.urlProperty(), "jdbc:postgresql://own-" + f.name().toLowerCase() + "/db");
+            if (f.userProperty() != null) own.put(f.userProperty(), "u-" + f.userProperty());
+            if (f.passwordProperty() != null) own.put(f.passwordProperty(), "p-" + f.passwordProperty());
+            if ("URL_OR_ENGINE".equals(f.mode().name()))
+                raw.put(f.backendProperty(), "jdbc:duckdb:/raw/" + f.name().toLowerCase() + ".db");
         }
         Map<String, String> objectsPg = new LinkedHashMap<>();
         objectsPg.put("objects.backend", "postgres");
@@ -93,7 +93,7 @@ class StoreFamilyParityTest {
                     List<OperationalDb.Resolved> all = new ArrayList<>(OperationalDb.resolveAll(r0));
                     all.sort(Comparator.comparing(r -> r.family().name()));
                     for (OperationalDb.Resolved r : all) {
-                        OperationalDb.Family f = r.family();
+                        StoreFamily f = r.family();
                         String scoped;
                         try {
                             scoped = OperationalDb.urlFor(f, r0, "jdbc:duckdb:default.db");
@@ -113,9 +113,9 @@ class StoreFamilyParityTest {
         // Metadata is independent of the properties: pin it from the DEFAULT scenario's roster once.
         List<String> meta = new ArrayList<>();
         for (OperationalDb.Resolved r : OperationalDb.resolveAll(root)) {
-            OperationalDb.Family f = r.family();
-            meta.add("META|" + f.name() + "|" + f.label + "|" + f.backendProperty + "|" + f.backendDefault + "|"
-                    + f.mode.name() + "|" + f.urlProperty + "|" + f.userProperty + "|" + f.passwordProperty);
+            StoreFamily f = r.family();
+            meta.add("META|" + f.name() + "|" + f.label() + "|" + f.backendProperty() + "|" + f.backendDefault() + "|"
+                    + f.mode().name() + "|" + f.urlProperty() + "|" + f.userProperty() + "|" + f.passwordProperty());
         }
         meta.sort(Comparator.naturalOrder());
 

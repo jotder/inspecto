@@ -1059,8 +1059,11 @@ operator applies flags through their own deployment tooling; this screen tells t
   column. And **manifests are the crash-recovery record of existence, not a query surface**. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
 - ⚠ **Adding a `Family` is a COMPILING change, not a config toggle** — a label, a `*.backend` property, a
   default, a `Mode`, url/user/password properties and a root supplier. Budget it.
-- **`OperationalDb.Family` is now the roster** — the **sixteen** families' property names live there and nowhere
-  else, so the store openers and the report cannot drift; naming a family off the list stops compiling.
+- **The roster is OPEN since 2026-10-08 (`MODULE-REORG-P1-FAMILY`)** — the **sixteen** families on an Enterprise
+  classpath are the **twelve core** `OperationalDb.Family` constants plus the four Operational Object families
+  that `inspecto-ops` contributes (`StoreFamily` / `StoreFamilyProvider`, `OperationalDb.core()`/`loaded()`/`all()`);
+  their property names live in those declarations and nowhere else, so the store openers and the report cannot
+  drift; naming a core family off the list stops compiling.
   ⛔ They had been ten **string literals** across `ServiceStores` + `SpaceBootstrap`.
   ⚠ This bullet read **fourteen** until 2026-09-16; `INBOX_REGISTRY` (scale-out §5.3) was added to the enum
   without it. The count is `Family.values()` and nothing else — see §5.0-b, which depends on it.

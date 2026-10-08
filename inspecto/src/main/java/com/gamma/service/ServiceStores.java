@@ -458,9 +458,9 @@ final class ServiceStores {
     static StatusStore openStatusStore(SpaceRoot root) {
         // ⚠ ONE declaration of the default — the family owns it. This used to repeat "file" here, so
         // the two could drift and the effective default would depend on which one you read.
-        String requested = System.getProperty(OperationalDb.Family.STATUS.backendProperty);
+        String requested = System.getProperty(OperationalDb.Family.STATUS.backendProperty());
         boolean explicit = requested != null && !requested.isBlank();
-        String backend = explicit ? requested : OperationalDb.Family.STATUS.backendDefault;
+        String backend = explicit ? requested : OperationalDb.Family.STATUS.backendDefault();
         // TEST-CWD-DB-1: a raw jdbc: value is "db, at exactly this URL" — the same first-class source the
         // URL_OR_ENGINE families accept. It exists so the test reactor can pin the family to an in-memory
         // DuckDB (-Dstatus.backend=jdbc:duckdb:) without touching -Dstatus.db.url, which would break the
@@ -468,7 +468,7 @@ final class ServiceStores {
         boolean rawUrl = backend.startsWith("jdbc:");
         if (!rawUrl && !"db".equalsIgnoreCase(backend)) {
             StoreHealth.record(root.id(), "status", StoreHealth.Status.NOT_CONFIGURED, backend,
-                    "-D" + OperationalDb.Family.STATUS.backendProperty + "=" + backend + " — on-disk audit only");
+                    "-D" + OperationalDb.Family.STATUS.backendProperty() + "=" + backend + " — on-disk audit only");
             return new FileStatusStore();
         }
 
@@ -491,7 +491,7 @@ final class ServiceStores {
             log.warn("Status backend: could not open the default status DB at {} — falling back to the "
                     + "on-disk audit. The ledgers are intact; only the database projection is unavailable. "
                     + "Set -D{}=file to make this deliberate, or fix the database to restore it. Cause: {}",
-                    url, OperationalDb.Family.STATUS.backendProperty, e.toString());
+                    url, OperationalDb.Family.STATUS.backendProperty(), e.toString());
             StoreHealth.degraded(root.id(), "status", url,
                     "fell back to the on-disk audit — the ledgers are intact, only the database projection "
                     + "is unavailable: " + e.getMessage());
@@ -510,17 +510,17 @@ final class ServiceStores {
      * recorded as DEGRADED; an explicit {@code db} request that cannot be honoured fails loudly.
      */
     static com.gamma.alert.AlertStore openAlertStore(SpaceRoot root) {
-        String requested = System.getProperty(OperationalDb.Family.ALERTS.backendProperty);
+        String requested = System.getProperty(OperationalDb.Family.ALERTS.backendProperty());
         boolean explicit = requested != null && !requested.isBlank();
-        String backend = explicit ? requested.trim() : OperationalDb.Family.ALERTS.backendDefault;
+        String backend = explicit ? requested.trim() : OperationalDb.Family.ALERTS.backendDefault();
         if (!"db".equalsIgnoreCase(backend)) {
             StoreHealth.record(root.id(), "alerts", StoreHealth.Status.NOT_CONFIGURED, backend,
-                    "-D" + OperationalDb.Family.ALERTS.backendProperty + "=" + backend + " - Alerts are kept in memory");
+                    "-D" + OperationalDb.Family.ALERTS.backendProperty() + "=" + backend + " - Alerts are kept in memory");
             return new com.gamma.alert.InMemoryAlertStore();
         }
         String wr = System.getProperty("assist.write.root");
         boolean cwdBound = root.config() == null && (wr == null || wr.isBlank())
-                && System.getProperty(OperationalDb.Family.ALERTS.urlProperty) == null && OperationalDb.url() == null;
+                && System.getProperty(OperationalDb.Family.ALERTS.urlProperty()) == null && OperationalDb.url() == null;
         if (cwdBound) {
             log.warn("Alerts: single-tenant root with no -Dassist.write.root - keeping Alert records in memory rather "
                     + "than create inspecto-alerts.db in the working directory. Set -Dassist.write.root, run under a "

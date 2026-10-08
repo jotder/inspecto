@@ -1,5 +1,9 @@
 package com.gamma.service;
 
+import com.gamma.module.KnownModules;
+import com.gamma.module.ModuleManifest;
+import com.gamma.module.ModuleManifests;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
@@ -38,6 +42,18 @@ public final class OperationalDbReport {
      * field while echoing it inside a URL has redacted nothing.
      */
     public static Map<String, Object> of(SpaceContext space) {
+        ClassLoader cl = OperationalDbReport.class.getClassLoader();
+        return of(space, KnownModules.load(cl).manifests(),
+                ModuleManifests.load(cl, OperationalDbReport.class).manifests());
+    }
+
+    /**
+     * As {@link #of(SpaceContext)}, with the known and installed module manifests supplied. {@code notInstalled}
+     * lists the families an ABSENT module's {@code provides.storeFamilies} declares (MODULE-REORG-P4-3): named with
+     * the owning module id, never resolved - no URL is computed and nothing is opened, so the data such a module
+     * left on disk stays untouched and unread, and travels through backup/restore as opaque files.
+     */
+    static Map<String, Object> of(SpaceContext space, List<ModuleManifest> known, List<ModuleManifest> installed) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("engine", OperationalDb.postgres() ? "postgres" : "duckdb");
         out.put("engineProperty", "inspecto.db");
@@ -47,19 +63,31 @@ public final class OperationalDbReport {
         for (OperationalDb.Resolved r : OperationalDb.resolveAll(space.root())) {
             Map<String, Object> f = new LinkedHashMap<>();
             f.put("family", r.family().name());
-            f.put("label", r.family().label);
+            f.put("label", r.family().label());
             f.put("enabled", r.enabled());
             f.put("source", r.source().name());
             f.put("url", stripUserInfo(r.url()));
             f.put("user", r.user());
-            f.put("backendProperty", r.family().backendProperty);
-            f.put("urlProperty", r.family().urlProperty);
+            f.put("backendProperty", r.family().backendProperty());
+            f.put("urlProperty", r.family().urlProperty());
             // Null for the families that open with a URL and no credentials — rendered as "n/a", not blank.
-            f.put("userProperty", r.family().userProperty);
-            f.put("passwordProperty", r.family().passwordProperty);
+            f.put("userProperty", r.family().userProperty());
+            f.put("passwordProperty", r.family().passwordProperty());
             families.add(f);
         }
         out.put("families", families);
+        List<Map<String, Object>> notInstalled = new java.util.ArrayList<>();
+        for (ModuleManifest m : KnownModules.absent(known, installed))
+            for (String name : m.provides().storeFamilies()) {
+                Map<String, Object> f = new LinkedHashMap<>();
+                f.put("family", name);
+                f.put("module", m.id());
+                f.put("moduleTitle", m.title());
+                f.put("state", "not-installed");
+                f.put("enabled", false);
+                notInstalled.add(f);
+            }
+        out.put("notInstalled", notInstalled);
         return out;
     }
 

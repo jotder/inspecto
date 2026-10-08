@@ -114,11 +114,11 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
                     "-Dobjects.backend=memory — Incidents and Alerts are lost on restart");
             return new InMemoryObjectStore();
         }
-        String url = OperationalDb.urlFor(OperationalDb.Family.OBJECTS, root, root.objectsDbUrl());
+        String url = OperationalDb.urlFor(OpsStoreFamily.OBJECTS, root, root.objectsDbUrl());
         try {
             ObjectStore db = DbObjectStore.open(url,
-                    OperationalDb.userFor(OperationalDb.Family.OBJECTS),
-                    OperationalDb.passwordFor(OperationalDb.Family.OBJECTS));
+                    OperationalDb.userFor(OpsStoreFamily.OBJECTS),
+                    OperationalDb.passwordFor(OpsStoreFamily.OBJECTS));
             log.info("Object backend: database ({})", url);
             StoreHealth.record(root.id(), "objects", StoreHealth.Status.UP, url, "open");
             return db;
@@ -137,11 +137,11 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
                     "-Dobjects.backend=memory");
             return new InMemoryLinkStore();
         }
-        String url = OperationalDb.urlFor(OperationalDb.Family.LINKS, root, root.linksDbUrl());
+        String url = OperationalDb.urlFor(OpsStoreFamily.LINKS, root, root.linksDbUrl());
         try {
             LinkStore db = DbLinkStore.open(url,
-                    OperationalDb.userFor(OperationalDb.Family.LINKS),
-                    OperationalDb.passwordFor(OperationalDb.Family.LINKS));
+                    OperationalDb.userFor(OpsStoreFamily.LINKS),
+                    OperationalDb.passwordFor(OpsStoreFamily.LINKS));
             log.info("Link backend: database ({})", url);
             StoreHealth.record(root.id(), "links", StoreHealth.Status.UP, url, "open");
             return db;
@@ -159,11 +159,11 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
                     "-Dobjects.backend=memory");
             return new InMemoryNoteStore();
         }
-        String url = OperationalDb.urlFor(OperationalDb.Family.NOTES, root, root.notesDbUrl());
+        String url = OperationalDb.urlFor(OpsStoreFamily.NOTES, root, root.notesDbUrl());
         try {
             NoteStore db = DbNoteStore.open(url,
-                    OperationalDb.userFor(OperationalDb.Family.NOTES),
-                    OperationalDb.passwordFor(OperationalDb.Family.NOTES));
+                    OperationalDb.userFor(OpsStoreFamily.NOTES),
+                    OperationalDb.passwordFor(OpsStoreFamily.NOTES));
             log.info("Note backend: database ({})", url);
             StoreHealth.record(root.id(), "notes", StoreHealth.Status.UP, url, "open");
             return db;
@@ -181,11 +181,11 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
                     "-Dobjects.backend=memory");
             return new InMemoryTagAssignmentStore();
         }
-        String url = OperationalDb.urlFor(OperationalDb.Family.TAGS, root, root.tagAssignmentsDbUrl());
+        String url = OperationalDb.urlFor(OpsStoreFamily.TAGS, root, root.tagAssignmentsDbUrl());
         try {
             TagAssignmentStore db = DbTagAssignmentStore.open(url,
-                    OperationalDb.userFor(OperationalDb.Family.TAGS),
-                    OperationalDb.passwordFor(OperationalDb.Family.TAGS));
+                    OperationalDb.userFor(OpsStoreFamily.TAGS),
+                    OperationalDb.passwordFor(OpsStoreFamily.TAGS));
             log.info("Tag assignment backend: database ({})", url);
             StoreHealth.record(root.id(), "tags", StoreHealth.Status.UP, url, "open");
             return db;

@@ -91,6 +91,6 @@ class AlertStoreWiringTest {
     void theFamilyIsOnTheRosterWithTheDurableDefault() {
         OperationalDb.Resolved r = OperationalDb.resolve(OperationalDb.Family.ALERTS, SpaceRoot.legacy());
         assertTrue(r.enabled(), "the default is db, on every edition");
-        assertEquals("alerts.backend", OperationalDb.Family.ALERTS.backendProperty);
+        assertEquals("alerts.backend", OperationalDb.Family.ALERTS.backendProperty());
     }
 }

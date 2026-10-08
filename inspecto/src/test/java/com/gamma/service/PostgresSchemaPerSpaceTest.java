@@ -67,19 +67,19 @@ class PostgresSchemaPerSpaceTest {
     @Test
     void postgresUrlGainsTheSpacesSchema_withAnExistingQueryOrWithout() {
         withShared(PG, () -> assertEquals(PG + "?currentSchema=space_north_east",
-                OperationalDb.urlFor(OperationalDb.Family.OBJECTS, space("north-east"), "jdbc:duckdb:x")));
+                OperationalDb.urlFor(OperationalDb.Family.STATUS, space("north-east"), "jdbc:duckdb:x")));
         withShared(PG + "?user=u", () -> assertEquals(PG + "?user=u&currentSchema=space_a",
-                OperationalDb.urlFor(OperationalDb.Family.OBJECTS, space("a"), "jdbc:duckdb:x")));
+                OperationalDb.urlFor(OperationalDb.Family.STATUS, space("a"), "jdbc:duckdb:x")));
     }
 
     @Test
     void duckdbLegacyAndExplicitSchemaAreUntouched() {
-        assertEquals("jdbc:duckdb:x", OperationalDb.urlFor(OperationalDb.Family.OBJECTS, space("a"), "jdbc:duckdb:x"));
+        assertEquals("jdbc:duckdb:x", OperationalDb.urlFor(OperationalDb.Family.STATUS, space("a"), "jdbc:duckdb:x"));
         withShared(PG, () -> assertEquals(PG,
-                OperationalDb.urlFor(OperationalDb.Family.OBJECTS, SpaceRoot.legacy(), "jdbc:duckdb:x"),
+                OperationalDb.urlFor(OperationalDb.Family.STATUS, SpaceRoot.legacy(), "jdbc:duckdb:x"),
                 "the single-tenant legacy root keeps its historical unscoped URL"));
         withShared(PG + "?currentSchema=ops", () -> assertEquals(PG + "?currentSchema=ops",
-                OperationalDb.urlFor(OperationalDb.Family.OBJECTS, space("a"), "jdbc:duckdb:x")));
+                OperationalDb.urlFor(OperationalDb.Family.STATUS, space("a"), "jdbc:duckdb:x")));
     }
 
     @Test

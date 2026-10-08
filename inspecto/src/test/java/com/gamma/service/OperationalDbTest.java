@@ -50,17 +50,17 @@ class OperationalDbTest {
                     // Named once, honoured by every family — the space's DuckDB default is not consulted.
                     // ⚠ Iterates the ROSTER rather than a hand-listed copy (2026-08-15): a family added
                     // to Family without honouring the shared URL now fails here instead of going unnoticed.
-                    // 11 → 12 on 2026-09-07: DELIVERY_RECEIPTS. 12 → 13 on 2026-09-12: EVENTS (D6).
-                    // 13 → 14 on 2026-09-12: RUN_LEASE (phase B1). 14 → 15 on 2026-09-13:
-                    // INBOX_REGISTRY (INBOX-REGISTRY-CROSS-POD-1). 15 → 16 on 2026-10-07: ALERTS
-                    // (MODULE-REORG-P7-INCIDENTS slice 2 — the Alert records, durable on every edition).
-                    // ⚠ This count has NINE mirrors outside this file — `tools/check-family-count.mjs`
-                    // now fails the build when they drift, because updating them by hand was missed
-                    // twice in two shifts. Run it after touching Family.
-                    // The loop below is the assertion that matters — it proves the NEW family honours the
-                    // one shared URL too, which is the half-migration this test exists to prevent.
-                    assertEquals(16, OperationalDb.Family.values().length, "the roster is sixteen families");
-                    for (OperationalDb.Family family : OperationalDb.Family.values()) {
+                    // The roster is OPEN (MODULE-REORG-P1-FAMILY, 2026-10-08): this module sees the CORE families
+                    // only - 12 - and `inspecto-ops` contributes the four Operational Object families (so an
+                    // Enterprise classpath lists 16; the ops module's own test pins its four and the manifest).
+                    // History of the whole roster: 11 -> 12 on 2026-09-07 DELIVERY_RECEIPTS; 12 -> 13 EVENTS (D6);
+                    // 13 -> 14 RUN_LEASE (B1); 14 -> 15 INBOX_REGISTRY; 15 -> 16 on 2026-10-07 ALERTS.
+                    // ⚠ The count has mirrors outside this file - `tools/check-family-count.mjs` fails the build
+                    // when they drift (core from this enum + contributed from the module manifests).
+                    // The loop below is the assertion that matters: a family honours the one shared URL too.
+                    assertEquals(12, OperationalDb.Family.values().length, "the core roster is twelve families");
+                    assertEquals(12, OperationalDb.all().size(), "no module contributes on the processor's own classpath");
+                    for (StoreFamily family : OperationalDb.all()) {
                         assertEquals("jdbc:postgresql://db:5432/inspecto",
                                 OperationalDb.urlFor(family, "jdbc:duckdb:/spaces/a/duckdb/x.db"),
                                 family.name());
@@ -85,8 +85,8 @@ class OperationalDbTest {
                         "inspecto.db.password", "s3cret",
                         "status.db.user", "status_reader"),
                 () -> {
-                    assertEquals("svc", OperationalDb.userFor(OperationalDb.Family.OBJECTS));
-                    assertEquals("s3cret", OperationalDb.passwordFor(OperationalDb.Family.OBJECTS));
+                    assertEquals("svc", OperationalDb.userFor(OperationalDb.Family.ALERTS));
+                    assertEquals("s3cret", OperationalDb.passwordFor(OperationalDb.Family.ALERTS));
                     assertEquals("status_reader", OperationalDb.userFor(OperationalDb.Family.STATUS));
                     assertEquals("s3cret", OperationalDb.passwordFor(OperationalDb.Family.STATUS),
                             "an overridden user does not drag the password with it");
@@ -107,12 +107,12 @@ class OperationalDbTest {
                         "status.db.password", "${SYS:test.status.secret}",
                         "test.status.secret", "status-secret"),
                 () -> {
-                    assertEquals("resolved-secret", OperationalDb.passwordFor(OperationalDb.Family.OBJECTS));
+                    assertEquals("resolved-secret", OperationalDb.passwordFor(OperationalDb.Family.ALERTS));
                     assertEquals("status-secret", OperationalDb.passwordFor(OperationalDb.Family.STATUS),
                             "a per-family reference resolves to ITS secret, not the shared one");
                 });
         withProps(Map.of("inspecto.db.password", "plain-literal"),
-                () -> assertEquals("plain-literal", OperationalDb.passwordFor(OperationalDb.Family.OBJECTS)));
+                () -> assertEquals("plain-literal", OperationalDb.passwordFor(OperationalDb.Family.ALERTS)));
     }
 
     @Test
@@ -143,59 +143,14 @@ class OperationalDbTest {
     }
 
     // ── OBJECTS-BACKEND-DEFAULT-MEMORY-1 (operator decision 2026-09-25) ────────────────────────────────
-    // ⚠ The root pom pins objects.backend=memory for the test reactor; the default case CLEARS it.
+    // The four object families moved to inspecto-ops (ObjectFamiliesOperationalDbTest there). What the
+    // PROCESSOR owns is the value check and the absent-module behaviour below.
 
+    /** Without the ops module no family consumes {@code objects.backend}, so nothing is refused beyond the value. */
     @Test
-    void theObjectFamiliesDefaultToTheSpaceDuckdb_neverMemory(@org.junit.jupiter.api.io.TempDir java.nio.file.Path base) {
-        String prior = System.getProperty(OperationalDb.OBJECTS_BACKEND);
-        System.clearProperty(OperationalDb.OBJECTS_BACKEND);
-        try {
-            assertEquals("db", OperationalDb.objectsBackend());
-            SpaceRoot root = SpaceRoot.under(base);
-            for (OperationalDb.Family f : List.of(OperationalDb.Family.OBJECTS, OperationalDb.Family.LINKS,
-                    OperationalDb.Family.NOTES, OperationalDb.Family.TAGS)) {
-                OperationalDb.Resolved r = OperationalDb.resolve(f, root);
-                assertEquals(OperationalDb.Source.SPACE_DEFAULT, r.source(), f.name());
-                assertTrue(r.url().startsWith("jdbc:duckdb:"), r.url());
-            }
-            OperationalDb.verifySelectable();
-        } finally {
-            if (prior != null) System.setProperty(OperationalDb.OBJECTS_BACKEND, prior);
-        }
-    }
-
-    @Test
-    void enterprisePostgresWithoutAUrl_failsAtBoot_namingTheSettingToFix() {
-        withProps(Map.of(OperationalDb.OBJECTS_BACKEND, "postgres"), () -> {
-            IllegalStateException boom = assertThrows(IllegalStateException.class, OperationalDb::verifySelectable);
-            assertTrue(boom.getMessage().contains("-Dinspecto.db.url"), boom.getMessage());
-            assertTrue(boom.getMessage().contains("INSPECTO_DB_URL"), boom.getMessage());
-        });
-    }
-
-    @Test
-    void enterprisePostgres_refusesOneFamilyLeftOnDuckdb() {
-        withProps(Map.of(OperationalDb.OBJECTS_BACKEND, "postgres",
-                        "inspecto.db", "postgres",
-                        "inspecto.db.url", "jdbc:postgresql://db:5432/inspecto",
-                        "objects.notes.db.url", "jdbc:duckdb:/local/notes.db"),
-                () -> {
-                    IllegalStateException boom = assertThrows(IllegalStateException.class, OperationalDb::verifySelectable);
-                    assertTrue(boom.getMessage().contains("objects.notes.db.url"), boom.getMessage());
-                });
-    }
-
-    @Test
-    void enterprisePostgresWithASharedUrl_passes_andEveryObjectFamilyResolvesToIt() {
-        assumeDriverPresent();
-        withProps(Map.of(OperationalDb.OBJECTS_BACKEND, "postgres",
-                        "inspecto.db", "postgres",
-                        "inspecto.db.url", "jdbc:postgresql://db:5432/inspecto"),
-                () -> {
-                    OperationalDb.verifySelectable();
-                    assertEquals("jdbc:postgresql://db:5432/inspecto",
-                            OperationalDb.resolve(OperationalDb.Family.TAGS, SpaceRoot.legacy()).url());
-                });
+    void withoutTheOpsModule_postgresObjectsBackendHasNothingToRefuse() {
+        assertTrue(OperationalDb.loaded().isEmpty());
+        withProps(Map.of(OperationalDb.OBJECTS_BACKEND, "postgres"), OperationalDb::verifyObjectsBackend);
     }
 
     @Test

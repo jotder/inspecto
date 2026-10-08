@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 /**
  * Schema-per-space on <b>real PostgreSQL</b> for the four operational-object families (objects / links / notes /
  * tags) with TWO Spaces and many concurrent writers per Space (BACKLOG "Postgres multi-user"). URLs come from the
- * production {@link OperationalDb#urlFor(OperationalDb.Family, SpaceRoot, String)} so the Space schema is applied
+ * production {@link OperationalDb#urlFor(StoreFamily, SpaceRoot, String)} so the Space schema is applied
  * exactly as at boot. Enabled by {@code INSPECTO_TEST_PG_URL} / {@code -Dinspecto.test.pg.url}; skips PER TEST.
  * Only throwaway {@code space_pgops_*} schemas are created, and dropped afterwards.
  */
@@ -87,7 +87,7 @@ class PostgresSchemaPerSpaceOpsTest {
         }
     }
 
-    private static String url(OperationalDb.Family f, SpaceRoot s) {
+    private static String url(com.gamma.service.StoreFamily f, SpaceRoot s) {
         String[] out = new String[1];
         withShared(() -> out[0] = OperationalDb.urlFor(f, s, "jdbc:duckdb:unused"));
         return out[0];
@@ -111,8 +111,8 @@ class PostgresSchemaPerSpaceOpsTest {
 
     @Test
     void objects_sameIdsInTwoSpacesCoexist_andConcurrentPatchesStayInTheirSpace() throws Exception {
-        try (DbObjectStore sa = DbObjectStore.open(url(OperationalDb.Family.OBJECTS, a), null, null);
-             DbObjectStore sb = DbObjectStore.open(url(OperationalDb.Family.OBJECTS, b), null, null)) {
+        try (DbObjectStore sa = DbObjectStore.open(url(com.gamma.ops.OpsStoreFamily.OBJECTS, a), null, null);
+             DbObjectStore sb = DbObjectStore.open(url(com.gamma.ops.OpsStoreFamily.OBJECTS, b), null, null)) {
             // Same primary key in both Spaces: only schema separation lets both exist.
             sa.create(OperationalObject.builder(ObjectType.CASE).id("SHARED-ID").title("in-a").status("OPEN").build());
             sb.create(OperationalObject.builder(ObjectType.CASE).id("SHARED-ID").title("in-b").status("OPEN").build());
@@ -140,8 +140,8 @@ class PostgresSchemaPerSpaceOpsTest {
 
     @Test
     void links_concurrentAppendsAreCountedPerSpace() throws Exception {
-        try (DbLinkStore sa = DbLinkStore.open(url(OperationalDb.Family.LINKS, a), null, null);
-             DbLinkStore sb = DbLinkStore.open(url(OperationalDb.Family.LINKS, b), null, null)) {
+        try (DbLinkStore sa = DbLinkStore.open(url(com.gamma.ops.OpsStoreFamily.LINKS, a), null, null);
+             DbLinkStore sb = DbLinkStore.open(url(com.gamma.ops.OpsStoreFamily.LINKS, b), null, null)) {
             race(WRITERS, (s, w) -> (s == a ? sa : sb).add(
                     ObjectLink.of("CASE-" + w, ObjectType.CASE, "INC-HUB", ObjectType.INCIDENT, "CONTAINS")));
             assertEquals(WRITERS, sa.incident("INC-HUB").size(), "A sees exactly its own edges");
@@ -151,8 +151,8 @@ class PostgresSchemaPerSpaceOpsTest {
 
     @Test
     void notes_concurrentAppendsAreCountedPerSpace() throws Exception {
-        try (DbNoteStore sa = DbNoteStore.open(url(OperationalDb.Family.NOTES, a), null, null);
-             DbNoteStore sb = DbNoteStore.open(url(OperationalDb.Family.NOTES, b), null, null)) {
+        try (DbNoteStore sa = DbNoteStore.open(url(com.gamma.ops.OpsStoreFamily.NOTES, a), null, null);
+             DbNoteStore sb = DbNoteStore.open(url(com.gamma.ops.OpsStoreFamily.NOTES, b), null, null)) {
             race(WRITERS, (s, w) -> (s == a ? sa : sb).add(ObjectNote.comment("OBJ-1", "u" + w, "note " + w)));
             assertEquals(WRITERS, sa.forObject("OBJ-1", null).size());
             assertEquals(WRITERS, sb.forObject("OBJ-1", null).size());
@@ -161,8 +161,8 @@ class PostgresSchemaPerSpaceOpsTest {
 
     @Test
     void tags_racingToApplyTheSameTagYieldOneEdgePerSpace_andAllCallersSucceed() throws Exception {
-        try (DbTagAssignmentStore sa = DbTagAssignmentStore.open(url(OperationalDb.Family.TAGS, a), null, null);
-             DbTagAssignmentStore sb = DbTagAssignmentStore.open(url(OperationalDb.Family.TAGS, b), null, null)) {
+        try (DbTagAssignmentStore sa = DbTagAssignmentStore.open(url(com.gamma.ops.OpsStoreFamily.TAGS, a), null, null);
+             DbTagAssignmentStore sb = DbTagAssignmentStore.open(url(com.gamma.ops.OpsStoreFamily.TAGS, b), null, null)) {
             race(WRITERS, (s, w) -> {
                 DbTagAssignmentStore st = s == a ? sa : sb;
                 st.add(new TagAssignment("urgent", AnnotationKinds.OBJECT, "obj-1", "u" + w, 1_000L + w));   // contended
