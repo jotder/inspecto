@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * EDG-01 cell 7 — the Personal-side falsification the largest extraction never got.
  *
  * <p>Seven cells moved a feature out of the core behind {@code ServiceLoader}. Six had a test proving the
- * core refuses correctly without the module; cell 7 — {@code inspecto-ops}, and at <b>49 stubbed paths</b>
+ * core refuses correctly without the module; cell 7 — {@code inspecto-ops}, and at <b>42 stubbed paths</b> (the 7 Case-management paths moved to inspecto-case-management, MODULE-REORG-P7, and are asserted by {@code NoCaseManagementShipsInThePersonalBuildTest})
  * the biggest surface of the seven — had none. It was filed as one of {@code SPEC-NOPROOF-1}'s six Musts.
  * {@code NoGeoLinkShipsInThePersonalBuildTest} and {@code NoExchangeShipsInThePersonalBuildTest} are the
  * sibling proofs; this is the missing third.
@@ -91,8 +91,6 @@ class NoOperationalObjectsShipInThePersonalBuildTest {
             {"POST", "/objects/id8/links"},
             {"GET", "/objects/id9/links"},
             {"DELETE", "/objects/id10/links"},
-            {"POST", "/objects/id11/merge"},
-            {"POST", "/objects/id12/split"},
             {"GET", "/objects/id13/graph"},
             {"POST", "/objects/id14/comments"},
             {"GET", "/objects/id15/comments"},
@@ -108,11 +106,6 @@ class NoOperationalObjectsShipInThePersonalBuildTest {
             {"GET", "/rca/templates"},
             {"GET", "/workflows/id20"},
             {"GET", "/findings/id21"},
-            {"GET", "/cases/rules"},
-            {"POST", "/cases/rules"},
-            {"DELETE", "/cases/rules/id22"},
-            {"POST", "/cases/rules/id23/evaluate"},
-            {"POST", "/cases/from-entities"},
             {"GET", "/notes/id24/id25"},
             {"GET", "/notes/id26/id27/comments"},
             {"GET", "/notes/id28/id29/attachments"},

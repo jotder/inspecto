@@ -6,9 +6,6 @@ import com.gamma.job.JobConfig;
 import com.gamma.job.JobRun;
 import com.gamma.job.JobService;
 import com.gamma.workflow.ObjectType;
-import com.gamma.ops.ObjectService;
-import com.gamma.ops.tag.CaseRule;
-import com.gamma.ops.tag.TagRule;
 import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.AfterEach;
@@ -25,8 +22,8 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The two Job Types {@code inspecto-ops} contributes through {@code ServiceLoader} — {@code objects.analytics}
- * (which writes the {@code impact_ledger} Dataset) and {@code caserule.evaluate} — RUN inside a real
+ * The Job Type {@code inspecto-ops} contributes through {@code ServiceLoader} — {@code objects.analytics}
+ * (which writes the {@code impact_ledger} Dataset; {@code caserule.evaluate} moved to inspecto-case-management) — RUN inside a real
  * {@link CollectorService}, through {@link JobService}'s grant.
  *
  * <p>🔴 Found by the impact-ledger browser pass (2026-09-28): both resolve their Space's Object Engine from
@@ -118,24 +115,6 @@ class OpsJobTypesRunInAServiceTest {
             assertTrue(js.jobs().stream().anyMatch(j -> "ledger".equals(j.name())), "the job loaded: " + js.jobs());
 
             JobRun run = runToEnd(js, "ledger");
-
-            assertEquals("SUCCESS", run.status(), run.message());
-        }
-    }
-
-    @Test
-    void caseRuleEvaluateReachesTheObjectEngineInsideAService() throws Exception {
-        try (CollectorService svc = service()) {
-            ObjectService objects = TestOpsEngine.of(svc);
-            objects.registerCaseRule(new CaseRule("crit-cluster", "Critical incident cluster",
-                    new TagRule.Filter("INCIDENT", null, null, "CRITICAL", null, null),
-                    1, 1440, "Pipeline / Ingest", "auto", 1));
-            objects.open(ObjectType.INCIDENT, "one", "d", "HIGH", "CRITICAL", null, null, "corr", Map.of());
-            JobService js = svc.jobServiceOrCreate();
-            js.upsertJob(new JobConfig("cases", "caserule.evaluate", null, null, true, false,
-                    Map.of("rule", "crit-cluster"), null, null));
-
-            JobRun run = runToEnd(js, "cases");
 
             assertEquals("SUCCESS", run.status(), run.message());
         }

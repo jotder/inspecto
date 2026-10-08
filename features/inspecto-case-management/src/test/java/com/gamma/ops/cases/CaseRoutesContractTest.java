@@ -1,4 +1,4 @@
-package com.gamma.opsapi;
+package com.gamma.ops.cases;
 
 import com.gamma.spi.http.RouteModule;
 import com.gamma.control.testkit.RouteModuleContract;

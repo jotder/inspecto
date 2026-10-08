@@ -487,6 +487,14 @@ if ($Edition -ne 'Personal') {
     if (-not $scoringJarSrc -or -not (Test-Path $scoringJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $scoringTargetDir\inspecto-scoring-*.jar."
     }
+    # MODULE-REORG-P7: the Case Management add-on (Case Rules, merge/split, open-from-entities). THIN like inspecto-ops; Professional and above.
+    $caseMgmtTargetDir = Join-Path $sandboxRoot 'features\inspecto-case-management\target'
+    $caseMgmtJarSrc = Get-ChildItem -Path $caseMgmtTargetDir -Filter 'inspecto-case-management-*.jar' -ErrorAction SilentlyContinue |
+                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                      Select-Object -First 1 -ExpandProperty FullName
+    if (-not $caseMgmtJarSrc -or -not (Test-Path $caseMgmtJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $caseMgmtTargetDir\inspecto-case-management-*.jar."
+    }
     if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') {
         $policyTargetDir = Join-Path $sandboxRoot 'providers\inspecto-policy\target'
         $policyJarSrc = Get-ChildItem -Path $policyTargetDir -Filter 'inspecto-policy-*.jar' -ErrorAction SilentlyContinue |
@@ -863,6 +871,24 @@ if ($scoringJarSrc) {
         }
         Write-Host "  verified: RouteModule, JobTypeProvider and ComponentKindValidator registrations present in the Scoring module" -ForegroundColor DarkGray
     } finally { $scZip.Dispose() }
+}
+if ($caseMgmtJarSrc) {
+    Copy-Item $caseMgmtJarSrc "$bundleDir\inspecto-case-management.jar"
+    Write-Host "Bundled Case Management module -> inspecto-case-management.jar" -ForegroundColor Green
+    # Thin jar: the only way it ships INERT is a missing META-INF/services entry - the Case routes would 503, caserule.evaluate
+    # would be an unknown Job Type and *_caserule.toon would never load on a bundle supposed to have them.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $cmZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-case-management.jar")
+    try {
+        foreach ($svc in @(@('com.gamma.spi.http.RouteModule', 'com.gamma.ops.cases.CaseRoutes'), @('com.gamma.job.JobTypeProvider', 'com.gamma.ops.cases.CaseRuleEvaluate'), @('com.gamma.ops.ObjectEngineExtension', 'com.gamma.ops.cases.CaseConfigExtension'))) {
+            $cmEntry = $cmZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
+            if (-not $cmEntry) { throw "inspecto-case-management.jar has no META-INF/services/$($svc[0]) - $($svc[1]) would never be discovered." }
+            $cmReader = New-Object System.IO.StreamReader($cmEntry.Open())
+            try { $cmBody = $cmReader.ReadToEnd() } finally { $cmReader.Dispose() }
+            if ($cmBody -notmatch [regex]::Escape($svc[1])) { throw "inspecto-case-management.jar's $($svc[0]) service file does not list $($svc[1]) - it lists only: $cmBody" }
+        }
+        Write-Host "  verified: RouteModule, JobTypeProvider and ObjectEngineExtension registrations present in the Case Management module" -ForegroundColor DarkGray
+    } finally { $cmZip.Dispose() }
 }
 if ($agentJarSrc) {
     Copy-Item $agentJarSrc "$bundleDir\inspecto-agent.jar"

@@ -147,9 +147,6 @@ class ControlApiScopedObjectsTest {
             Seed s = seed(c);
             String fraud = s.fraud().id(), billing = s.billing().id();
 
-            assertEquals(404, post(c.port, "/objects/" + fraud + "/merge",
-                    "{\"sources\":[\"" + billing + "\"]}", "fraud").statusCode(),
-                    "merge source out of scope: indistinguishable from absence");
             assertEquals(404, post(c.port, "/objects/" + fraud + "/links",
                     "{\"to\":\"" + billing + "\"}", "fraud").statusCode(), "link target out of scope");
             assertEquals(404, post(c.port, "/objects",
@@ -157,17 +154,6 @@ class ControlApiScopedObjectsTest {
                     "create-with-links target out of scope");
             assertEquals(404, delete(c.port, "/objects/" + fraud + "/links?to=" + billing, "fraud").statusCode(),
                     "unlink target out of scope");
-
-            // the hidden case is untouched — still readable, still in its opening state, for a subject
-            // that may see it (a merge would have CLOSED it)
-            JsonNode after = V1Body.of(get(c.port, "/objects/" + billing, "all").body());
-            assertEquals("IDENTIFIED", after.get("status").asText(),
-                    "the out-of-scope case was not closed by the merge");
-
-            // and the gate is the SCOPE, not the shape: the unscoped subject reaches the service, which
-            // refuses the same call on its own merits (these are INCIDENTs, not CASEs).
-            assertEquals(422, post(c.port, "/objects/" + fraud + "/merge",
-                    "{\"sources\":[\"" + billing + "\"]}", "all").statusCode());
         }
     }
 

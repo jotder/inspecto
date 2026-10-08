@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-case-management</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Case Management (optional)</name>
+    <description>
+        OPTIONAL add-on module (MODULE-REORG-P7, 2026-10-08): the Case Management add-on of plan section 8a. Case Rules
+        (the registry, evaluation and the *_caserule.toon loader), Merge and Split of Cases, opening a Case from Link
+        Analysis Entities with its compensation, the caserule.evaluate Job Type, and the routes that expose them
+        (/cases/rules x4, POST /cases/from-entities, POST /objects/{id}/merge and /split). Package com.gamma.ops.cases.
+
+        Contributed through seams only: com.gamma.spi.http.RouteModule (feature id "cases"), com.gamma.job.JobTypeProvider
+        (caserule.evaluate) and com.gamma.ops.ObjectEngineExtension (the config loader). It REQUIRES inspecto-ops and
+        reaches the Object Engine through ObjectService.extension(...) / substrate(); the dependency direction is
+        case-management to ops, never the reverse (ObjectService does not name any Case class).
+
+        What stays in inspecto-ops (substrate): the Case lifecycle (Workflow.defaultFor(CASE)), the generic SLA sweep of
+        existing Case rows, Findings / Impact / Disposition handling, RCA seeding, /objects* CRUD, notes, links and tags.
+        With this module absent, Case objects load and list inertly, an install without it still raises and works
+        Incidents, and the Case routes answer 503 (stubs synthesised from this module's manifest).
+
+        Bundled from the Professional edition up (the Standard, Professional, Enterprise and Preview profiles). THIN: no
+        shade, no sidecar classifier. Built only under the edition profiles, so a routine "mvn -o clean test" (= Personal)
+        never compiles it.
+    </description>
+
+    <dependencies>
+        <!-- The core: RouteModule/ApiContext/WriteGates/HostContext, the engine (Job SPI), the event log. Compile scope,
+             as inspecto-ops and inspecto-scoring do. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- The object substrate this module extends (ObjectService, ObjectSubstrate, ObjectEngineExtension,
+             ObjectRoutes' scope guard, OpsEngine). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-ops</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs / PipelineConfigBatchTest the moved HTTP
+             tests boot a real CollectorService + ControlApi with. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Platform test kit (FakeApiContext + RouteModuleContract TCK) -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <!-- Engine-SPI TCK (test-jar of inspecto-engine) -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

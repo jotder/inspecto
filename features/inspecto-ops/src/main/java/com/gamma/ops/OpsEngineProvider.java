@@ -7,7 +7,6 @@ import com.gamma.ops.link.LinkStore;
 import com.gamma.ops.note.DbNoteStore;
 import com.gamma.ops.note.InMemoryNoteStore;
 import com.gamma.ops.note.NoteStore;
-import com.gamma.ops.tag.CaseRule;
 import com.gamma.ops.tag.DbTagAssignmentStore;
 import com.gamma.ops.tag.InMemoryTagAssignmentStore;
 import com.gamma.ops.tag.Tag;
@@ -244,10 +243,18 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
         public void loadConfigs(List<Path> configPaths) {
             for (Tag t : load(configPaths, "_tag.toon", Tag::load, "tag")) service.registerTag(t);
             for (TagRule r : load(configPaths, "_tagrule.toon", TagRule::load, "tag rule")) service.registerTagRule(r);
-            for (CaseRule r : load(configPaths, "_caserule.toon", CaseRule::load, "case rule")) service.registerCaseRule(r);
             // Last file wins per object type — registerWorkflow overwrites, as before the move.
             // Validated like an authored workflow component (Workflow.problems) — an invalid file is skipped, not served.
             for (Workflow w : load(configPaths, "_workflow.toon", p -> Workflow.load(p).validated(), "workflow")) service.registerWorkflow(w);
+            // Add-on object-type behaviour (MODULE-REORG-P7): an installed module loads its own config kinds here
+            // (inspecto-case-management reads *_caserule.toon). Fail-soft, like every loader above.
+            for (ObjectEngineExtension x : java.util.ServiceLoader.load(ObjectEngineExtension.class)) {
+                try {
+                    x.loadConfigs(service, configPaths);
+                } catch (RuntimeException e) {
+                    log.warn("Skipping object-engine extension {}: {}", x.getClass().getName(), e.getMessage());
+                }
+            }
         }
 
         /**

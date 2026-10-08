@@ -1,5 +1,6 @@
 package com.gamma.ops;
 
+import com.gamma.ops.cases.CaseOperations;
 import com.gamma.workflow.ObjectType;
 import com.gamma.ops.link.LinkRelationship;
 import org.junit.jupiter.api.Test;
@@ -17,8 +18,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ObjectServiceEntityCaseTest {
 
-    private static final ObjectService.EntityMember ACME = new ObjectService.EntityMember("entity:acme ltd", "orders", "ACME Ltd");
-    private static final ObjectService.EntityMember BOB = new ObjectService.EntityMember("entity:bob", "orders", "Bob");
+    private static final CaseOperations.EntityMember ACME = new CaseOperations.EntityMember("entity:acme ltd", "orders", "ACME Ltd");
+    private static final CaseOperations.EntityMember BOB = new CaseOperations.EntityMember("entity:bob", "orders", "Bob");
 
     /** An in-memory store that refuses to create a CASE — the last write before the links. */
     private static final class CaseRefusingStore implements ObjectStore {
@@ -40,10 +41,10 @@ class ObjectServiceEntityCaseTest {
     @Test
     void anEntityKeyIsAnUntypedOrATypedNodeId() {
         // LA-17 D-M6: a typed column mints '<type>:<key>'; untyped keeps 'entity:<key>'.
-        assertEquals("msisdn:+4478", new ObjectService.EntityMember("msisdn:+4478", "calls", null).entityKey());
+        assertEquals("msisdn:+4478", new CaseOperations.EntityMember("msisdn:+4478", "calls", null).entityKey());
         assertEquals("entity:bob", BOB.entityKey());
         for (String bad : new String[] {"bob", ":bob", "entity:", "MSISDN:+44"})
-            assertThrows(IllegalArgumentException.class, () -> new ObjectService.EntityMember(bad, "calls", null), bad);
+            assertThrows(IllegalArgumentException.class, () -> new CaseOperations.EntityMember(bad, "calls", null), bad);
     }
 
     @Test
@@ -54,7 +55,7 @@ class ObjectServiceEntityCaseTest {
         OperationalObject bob = svc.open(ObjectType.INCIDENT, "Bob", "d", null, null, null, null, null,
                 Map.of(ObjectService.ATTR_ENTITY_KEY, BOB.entityKey(), ObjectService.ATTR_ENTITY_DATASET, BOB.dataset()));
 
-        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> svc.openCaseFromEntities(
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> CaseOperations.of(svc).openCaseFromEntities(
                 "ring", null, List.of(ACME, BOB), List.of(), o -> true, "mia", "mia"));
         assertEquals("disk full", failure.getMessage(), "the ORIGINAL failure propagates");
 
@@ -70,14 +71,14 @@ class ObjectServiceEntityCaseTest {
                 Map.of(ObjectService.ATTR_ENTITY_KEY, ACME.entityKey(), ObjectService.ATTR_ENTITY_DATASET, ACME.dataset(),
                         "caseType", "billing"));
 
-        ObjectService.EntityCase made = svc.openCaseFromEntities("ring", null, List.of(ACME), List.of(),
+        CaseOperations.EntityCase made = CaseOperations.of(svc).openCaseFromEntities("ring", null, List.of(ACME), List.of(),
                 o -> !"billing".equals(o.attributes().get("caseType")), "mia", "mia");
 
         assertEquals(1, made.members().size());
         assertEquals("mia", made.caseObject().owner(), "the owner passed in owns the Case (plan §5.10)");
         assertNull(made.members().get(0).owner(), "a minted Incident is not owned by the Case's creator");
         // the twin: no known Subject - the owner stays unset, never invented
-        assertNull(svc.openCaseFromEntities("ring 2", null, List.of(ACME), List.of(), o -> true, null, null)
+        assertNull(CaseOperations.of(svc).openCaseFromEntities("ring 2", null, List.of(ACME), List.of(), o -> true, null, null)
                 .caseObject().owner());
         assertNotEquals(hidden.id(), made.members().get(0).id(), "existence-hiding: an invisible match is not reused");
         assertEquals(List.of(made.members().get(0).id()), svc.linksOf(made.caseObject().id()).stream()

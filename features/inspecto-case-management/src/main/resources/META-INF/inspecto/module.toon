@@ -1,0 +1,12 @@
+id: case-management
+title: Case Management
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+absentMessage: "Case Management is not installed in this bundle - Case Rules, merge and split, and opening a Case from Link Analysis Entities are provided by the optional inspecto-case-management module (Professional edition and above)."
+provides:
+  features[1]: cases
+  contracts[2]: JobTypeProvider,ObjectEngineExtension
+  routes[7]: "POST /objects/([^/]+)/merge","POST /objects/([^/]+)/split","GET /cases/rules","POST /cases/rules","DELETE /cases/rules/([^/]+)","POST /cases/rules/([^/]+)/evaluate","POST /cases/from-entities"
+requires:
+  modules[1]: ops

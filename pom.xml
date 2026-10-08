@@ -137,6 +137,8 @@
                 <module>features/inspecto-reconciliation</module>
                 <!-- MODULE-REORG-1 P7: the Scoring add-on (Risk Scores; next to inspecto-entity-list, which it depends on). -->
                 <module>features/inspecto-scoring</module>
+                <!-- MODULE-REORG-P7: Case Management (Case Rules, merge/split, open-from-entities); requires inspecto-ops. -->
+                <module>features/inspecto-case-management</module>
             </modules>
         </profile>
         <profile>
@@ -162,6 +164,8 @@
                 <module>features/inspecto-reconciliation</module>
                 <!-- MODULE-REORG-1 P7: the Scoring add-on (Risk Scores; next to inspecto-entity-list, which it depends on). -->
                 <module>features/inspecto-scoring</module>
+                <!-- MODULE-REORG-P7: Case Management (Case Rules, merge/split, open-from-entities); requires inspecto-ops. -->
+                <module>features/inspecto-case-management</module>
             </modules>
         </profile>
         <!-- Preview: EVERYTHING, for testing/incubation — never a customer-facing tier (docs/EDITIONS.md,
@@ -200,6 +204,8 @@
                 <module>features/inspecto-reconciliation</module>
                 <!-- MODULE-REORG-1 P7: the Scoring add-on (Risk Scores; next to inspecto-entity-list, which it depends on). -->
                 <module>features/inspecto-scoring</module>
+                <!-- MODULE-REORG-P7: Case Management (Case Rules, merge/split, open-from-entities); requires inspecto-ops. -->
+                <module>features/inspecto-case-management</module>
             </modules>
         </profile>
         <!-- Enterprise = Professional + the ABAC policy engine (rbac-abac-plan §5): the same one-version
@@ -231,6 +237,8 @@
                 <module>features/inspecto-reconciliation</module>
                 <!-- MODULE-REORG-1 P7: the Scoring add-on (Risk Scores; next to inspecto-entity-list, which it depends on). -->
                 <module>features/inspecto-scoring</module>
+                <!-- MODULE-REORG-P7: Case Management (Case Rules, merge/split, open-from-entities); requires inspecto-ops. -->
+                <module>features/inspecto-case-management</module>
             </modules>
         </profile>
         <!-- M5 (A2): JaCoCo lives in the PARENT so every module instruments in one reactor pass —

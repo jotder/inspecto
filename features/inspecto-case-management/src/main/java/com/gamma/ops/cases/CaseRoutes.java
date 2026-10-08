@@ -1,9 +1,11 @@
-package com.gamma.opsapi;
+package com.gamma.ops.cases;
 
 import com.gamma.access.WriteGates;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.ops.ObjectService;
-import com.gamma.ops.tag.CaseRule;
+import com.gamma.opsapi.ObjectRoutes;
+import com.gamma.opsapi.OpsEngine;
+import com.gamma.opsapi.TagRoutes;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.auth.Subject;
@@ -25,16 +27,21 @@ import java.util.NoSuchElementException;
 /**
  * Case Management routes (MODULE-REORG-P7, step 2): Case Rules ({@code /cases/rules*}), opening a Case from
  * Link Analysis Entities ({@code POST /cases/from-entities}) and Merge / Split ({@code POST
- * /objects/{id}/merge|split}). Carved verbatim out of {@link ObjectRoutes}: identical paths, capabilities and
+ * /objects/{id}/merge|split}). Carved verbatim out of {@code ObjectRoutes} (step 2) and moved to the optional inspecto-case-management module (step 3): identical paths, capabilities and
  * HTTP statuses; the by-id routes reuse its SEC-7d data-scope guard ({@code ObjectRoutes.scoped} /
  * {@code requireVisible}). None of these paths overlaps another route, so registration order relative to
- * {@link ObjectRoutes} is immaterial; it is registered directly after it.
+ * {@code ObjectRoutes} is immaterial.
  */
 public final class CaseRoutes implements RouteModule {
 
     @Override
     public java.util.Set<String> featureIds() {
-        return java.util.Set.of("ops");
+        return java.util.Set.of("cases");
+    }
+
+    /** This request's Space's Case collaborator (the Object Engine is resolved exactly as the ops routes do). */
+    private static CaseOperations cases(ApiContext api) {
+        return CaseOperations.of(OpsEngine.of(api));
     }
 
     @Override
@@ -48,7 +55,7 @@ public final class CaseRoutes implements RouteModule {
         // 2026-09-26): evaluate decides which Incidents a Case holds, like merge / split, not one move of
         // one object. ⚠ The route-gating audit had filed it under "read-shaped POST"; it opens a Case, so
         // that bucket was wrong for it.
-        api.get("/cases/rules", (e, m) -> OpsEngine.of(api).caseRules().stream().map(CaseRule::toMap).toList());
+        api.get("/cases/rules", (e, m) -> cases(api).caseRules().stream().map(CaseRule::toMap).toList());
         api.post("/cases/rules", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> saveCaseRule(api, api.body(e))));
         api.delete("/cases/rules/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deleteCaseRule(api, ApiContext.name(m))));
         api.post("/cases/rules/([^/]+)/evaluate", ApiContext.withCapability("canAdminister", (e, m) -> evaluateCaseRule(api, ApiContext.name(m))));
@@ -72,7 +79,7 @@ public final class CaseRoutes implements RouteModule {
      * Missing title / no entities → 400; a malformed entity or more than {@link #MAX_CASE_ENTITIES} → 422; an
      * {@code objectId} absent or out of scope → 404; one that is not an INCIDENT → 422. All of it is checked
      * before the first write, and a failed write rolls back every object this call created
-     * ({@link ObjectService#openCaseFromEntities}).
+     * ({@link CaseOperations#openCaseFromEntities}).
      */
     private Object openCaseFromEntities(ApiContext api, HttpExchange ex, Map<String, Object> body) {
         String title = ApiContext.str(body, "title");
@@ -81,17 +88,17 @@ public final class CaseRoutes implements RouteModule {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include at least one entry in 'entities'");
         if (raw.size() > MAX_CASE_ENTITIES)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_CASE_ENTITIES + " entities per Case, got " + raw.size());
-        List<ObjectService.EntityMember> entities = new java.util.ArrayList<>();
+        List<CaseOperations.EntityMember> entities = new java.util.ArrayList<>();
         List<String> existing = new java.util.ArrayList<>();
         try {
             for (Object o : raw) {
                 if (!(o instanceof Map<?, ?> m)) throw new IllegalArgumentException("each entity must be an object");
                 Object objectId = m.get("objectId");
                 if (objectId != null && !objectId.toString().isBlank()) existing.add(objectId.toString().trim());
-                else entities.add(new ObjectService.EntityMember(text(m.get("id")), text(m.get("dataset")),
+                else entities.add(new CaseOperations.EntityMember(text(m.get("id")), text(m.get("dataset")),
                         text(m.get("label"))));
             }
-            ObjectService.EntityCase made = OpsEngine.of(api).openCaseFromEntities(title,
+            CaseOperations.EntityCase made = cases(api).openCaseFromEntities(title,
                     ApiContext.str(body, "description"), entities, existing, o -> ObjectRoutes.visibleTo(ex, o),
                     ApiContext.str(body, "actor"), ApiContext.subject(ex).map(Subject::id).orElse(null));
             List<Map<String, Object>> members = made.members().stream().map(o -> {
@@ -132,16 +139,16 @@ public final class CaseRoutes implements RouteModule {
         Path file = caseRuleFile(api, rule.name());
         byte[] bytes = ConfigCodec.toToon(Map.of("case_rule", rule.toMap())).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(file, bytes, ".caserule-");
-        return OpsEngine.of(api).registerCaseRule(rule).toMap();
+        return cases(api).registerCaseRule(rule).toMap();
     }
 
     /** {@code DELETE /cases/rules/{name}} — remove a rule (registry + persisted file); 404 if unknown. */
     private Object deleteCaseRule(ApiContext api, String name) throws IOException {
         WriteGates.requireWriteRoot(api, "case rule write");
-        if (OpsEngine.of(api).caseRule(name).isEmpty())
+        if (cases(api).caseRule(name).isEmpty())
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no case rule named '" + name + "'");
         boolean fileRemoved = Files.deleteIfExists(caseRuleFile(api, name));
-        OpsEngine.of(api).removeCaseRule(name);
+        cases(api).removeCaseRule(name);
         return Map.of("deleted", name, "fileRemoved", fileRemoved);
     }
 
@@ -151,7 +158,7 @@ public final class CaseRoutes implements RouteModule {
      */
     private Object evaluateCaseRule(ApiContext api, String name) {
         try {
-            ObjectService.CaseRuleEvaluation r = OpsEngine.of(api).evaluateCaseRule(name);
+            CaseOperations.CaseRuleEvaluation r = cases(api).evaluateCaseRule(name);
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("matched", r.matched());
             out.put("grouped", r.grouped());
@@ -181,7 +188,7 @@ public final class CaseRoutes implements RouteModule {
         if (sources.isEmpty()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include non-empty 'sources'");
         for (String source : sources) ObjectRoutes.requireVisible(api, ex, source);
         return RouteErrors.mapCaseErrors(() -> {
-            var result = OpsEngine.of(api).mergeCases(survivorId, sources, ApiContext.str(body, "actor"));
+            var result = cases(api).mergeCases(survivorId, sources, ApiContext.str(body, "actor"));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("survivor", result.survivor().toMap());
             out.put("merged", result.merged());
@@ -203,7 +210,7 @@ public final class CaseRoutes implements RouteModule {
         if (members.isEmpty()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include non-empty 'members'");
         for (String member : members) ObjectRoutes.requireVisible(api, ex, member);
         return RouteErrors.mapCaseErrors(() -> {
-            var result = OpsEngine.of(api).splitCase(caseId, title, members,
+            var result = cases(api).splitCase(caseId, title, members,
                     ApiContext.str(body, "assignee"), ApiContext.str(body, "actor"));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("case", result.part().toMap());

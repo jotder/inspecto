@@ -1,5 +1,7 @@
-package com.gamma.ops.tag;
+package com.gamma.ops.cases;
 
+import com.gamma.ops.tag.Extras;
+import com.gamma.ops.tag.TagRule;
 import com.gamma.util.ToonHelper;
 import com.gamma.ops.OperationalObject;
 import com.gamma.util.Values;

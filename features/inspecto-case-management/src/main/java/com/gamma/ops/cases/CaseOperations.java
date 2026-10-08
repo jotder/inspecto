@@ -11,7 +11,6 @@ import com.gamma.ops.ObjectSubstrate;
 import com.gamma.ops.OperationalObject;
 import com.gamma.ops.link.LinkRelationship;
 import com.gamma.ops.link.ObjectLink;
-import com.gamma.ops.tag.CaseRule;
 import com.gamma.ops.tag.TagRule;
 import com.gamma.workflow.ObjectType;
 import com.gamma.workflow.Workflow;
@@ -30,8 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * The Case-specific operations of the operational-object service (MODULE-REORG-P7, step 1): the Case Rule
  * registry and its evaluation, Merge / Split, and opening a Case from Link Analysis Entities with its
- * compensation. Extracted verbatim from {@code ObjectService}, which delegates to this class behind the SAME
- * public API; the generic object substrate it needs (locking, stores, audit source) arrives through
+ * compensation. Extracted verbatim from {@code ObjectService}, which no longer names it; the generic object substrate it needs (locking, stores, audit source) arrives through
  * {@link ObjectService} and {@link ObjectSubstrate}.
  */
 public final class CaseOperations {
@@ -40,7 +38,36 @@ public final class CaseOperations {
     private final ObjectSubstrate sub;
     private final Map<String, CaseRule> caseRules = new ConcurrentHashMap<>(); // rule-raised-case rules, by name (C5)
 
-    public CaseOperations(ObjectService svc, ObjectSubstrate sub) {
+    /** Evaluate outcome: matching in-window incidents, how many were newly grouped, and the target case. */
+    public record CaseRuleEvaluation(int matched, int grouped, String caseId, boolean opened) {}
+
+    /** Merge outcome: the updated survivor, the absorbed case ids, and how many member links moved. */
+    public record MergeResult(OperationalObject survivor, List<String> merged, int membersMoved) {}
+
+    /** Split outcome: the newly opened case and how many member links moved to it. */
+    public record SplitResult(OperationalObject part, int membersMoved) {}
+
+    /** One Link Analysis Entity to become a member of a new Case: its node id, source Dataset and label. */
+    public record EntityMember(String entityKey, String dataset, String label) {
+        public EntityMember {
+            // LA-17 D-M6: untyped ids are 'entity:<key>', typed ones '<type>:<key>' (an Entity Type id).
+            if (entityKey == null || !entityKey.matches("[a-z][a-z0-9_]{0,31}:.+"))
+                throw new IllegalArgumentException("an entity needs its node id ('entity:…' or '<type>:…'), got '" + entityKey + "'");
+            if (dataset == null || dataset.isBlank())
+                throw new IllegalArgumentException("entity '" + entityKey + "' needs the Dataset it was projected from");
+            label = label == null || label.isBlank() ? entityKey : label.trim();
+        }
+    }
+
+    /** What {@link #openCaseFromEntities} did: the Case, every member it now CONTAINS, and which were new. */
+    public record EntityCase(OperationalObject caseObject, List<OperationalObject> members, Set<String> minted) {}
+
+    /** The per-service Case collaborator (one per Space's engine; created on first use, kept for the engine's life). */
+    public static CaseOperations of(ObjectService svc) {
+        return svc.extension(CaseOperations.class, s -> new CaseOperations(s, s.substrate()));
+    }
+
+    CaseOperations(ObjectService svc, ObjectSubstrate sub) {
         this.svc = svc;
         this.sub = sub;
     }
@@ -80,7 +107,7 @@ public final class CaseOperations {
      *
      * @throws NoSuchElementException if no rule has this name
      */
-    public ObjectService.CaseRuleEvaluation evaluateCaseRule(String name) {
+    public CaseRuleEvaluation evaluateCaseRule(String name) {
         CaseRule rule = caseRule(name).orElseThrow(() -> new NoSuchElementException("no case rule named '" + name + "'"));
         long now = System.currentTimeMillis();
         long cutoff = rule.windowMinutes() <= 0 ? 0 : now - rule.windowMinutes() * 60_000L;
@@ -89,14 +116,14 @@ public final class CaseOperations {
             if (o.createdAt() >= cutoff && rule.matches(o) && !isCaseMember(o.id()))   // not already grouped
                 matches.add(o);
         matches = matches.reversed();   // newest-first, as before: matches.get(0) seeds a new Case's correlationId
-        if (matches.isEmpty()) return new ObjectService.CaseRuleEvaluation(0, 0, null, false);
+        if (matches.isEmpty()) return new CaseRuleEvaluation(0, 0, null, false);
 
         String existing = openCaseRaisedBy(name);
         boolean opened = false;
         String caseId = existing;
         if (caseId == null) {
             if (matches.size() < rule.threshold())
-                return new ObjectService.CaseRuleEvaluation(matches.size(), 0, null, false);  // below threshold, no case yet
+                return new CaseRuleEvaluation(matches.size(), 0, null, false);  // below threshold, no case yet
             Map<String, String> attrs = new LinkedHashMap<>();
             attrs.put(ObjectService.ATTR_RAISED_BY_RULE, name);
             if (rule.category() != null) attrs.put("category", rule.category());
@@ -106,7 +133,7 @@ public final class CaseOperations {
             opened = true;
         }
         for (OperationalObject inc : matches) svc.link(caseId, inc.id(), LinkRelationship.CONTAINS, "case-rule:" + name);
-        return new ObjectService.CaseRuleEvaluation(matches.size(), matches.size(), caseId, opened);
+        return new CaseRuleEvaluation(matches.size(), matches.size(), caseId, opened);
     }
 
     /** Whether {@code incidentId} is already a {@code CONTAINS} member of some case. */
@@ -140,7 +167,7 @@ public final class CaseOperations {
      * @throws IllegalArgumentException empty {@code sources}
      * @throws IllegalStateException    a non-CASE participant, self-merge, or an already-closed/merged source
      */
-    public ObjectService.MergeResult mergeCases(String survivorId, List<String> sources, String actor) {
+    public MergeResult mergeCases(String survivorId, List<String> sources, String actor) {
         if (sources == null || sources.isEmpty())
             throw new IllegalArgumentException("merge needs at least one source case");
         OperationalObject survivor = requireActiveCase(survivorId, "merge survivor");
@@ -183,7 +210,7 @@ public final class CaseOperations {
         if (!watchers.isEmpty()) union.put(ObjectService.ATTR_WATCHERS, String.join(",", watchers));
         OperationalObject updated = union.isEmpty() ? sub.require(survivorId)
                 : sub.rmw(survivorId, o -> o.withAttributes(union, now));
-        return new ObjectService.MergeResult(updated, absorbed.stream().map(OperationalObject::id).toList(), moved);
+        return new MergeResult(updated, absorbed.stream().map(OperationalObject::id).toList(), moved);
     }
 
     /**
@@ -197,7 +224,7 @@ public final class CaseOperations {
      * @throws IllegalArgumentException blank title / empty members
      * @throws IllegalStateException    a non-CASE or closed case, or a member the case does not contain
      */
-    public ObjectService.SplitResult splitCase(String caseId, String title, List<String> members,
+    public SplitResult splitCase(String caseId, String title, List<String> members,
                                  String assignee, String actor) {
         if (title == null || title.isBlank()) throw new IllegalArgumentException("split needs a 'title' for the new case");
         if (members == null || members.isEmpty()) throw new IllegalArgumentException("split needs at least one member");
@@ -236,7 +263,7 @@ public final class CaseOperations {
                 .attr("original", caseId)
                 .attr("membersMoved", moved)
                 .attr("actor", actor));
-        return new ObjectService.SplitResult(sub.require(part.id()), moved);
+        return new SplitResult(sub.require(part.id()), moved);
     }
 
     /**
@@ -277,7 +304,7 @@ public final class CaseOperations {
      * @throws IllegalArgumentException blank title, no members, an existing member that is not an INCIDENT
      * @throws NoSuchElementException   an existing member that is absent or not visible (existence-hiding)
      */
-    public ObjectService.EntityCase openCaseFromEntities(String title, String description, List<ObjectService.EntityMember> entities,
+    public synchronized EntityCase openCaseFromEntities(String title, String description, List<EntityMember> entities,
                                                         List<String> existingMembers,
                                                         java.util.function.Predicate<OperationalObject> visible,
                                                         String actor, String owner) {
@@ -293,9 +320,9 @@ public final class CaseOperations {
                 throw new IllegalArgumentException("a Case member must be an INCIDENT, but " + id + " is a " + o.objectType());
             members.put(o.id(), o);
         }
-        Map<List<String>, ObjectService.EntityMember> toMint = new LinkedHashMap<>();
+        Map<List<String>, EntityMember> toMint = new LinkedHashMap<>();
         Map<List<String>, OperationalObject> reused = new LinkedHashMap<>();
-        for (ObjectService.EntityMember e : entities) {
+        for (EntityMember e : entities) {
             List<String> identity = List.of(e.entityKey(), e.dataset());
             if (toMint.containsKey(identity) || reused.containsKey(identity)) continue;
             Optional<OperationalObject> existing = sub.store().findByAttributes(ObjectType.INCIDENT,
@@ -308,7 +335,7 @@ public final class CaseOperations {
         List<String> created = new ArrayList<>();
         try {
             for (OperationalObject o : reused.values()) members.putIfAbsent(o.id(), o);
-            for (ObjectService.EntityMember e : toMint.values()) {
+            for (EntityMember e : toMint.values()) {
                 Map<String, String> attrs = new LinkedHashMap<>();
                 attrs.put(ObjectService.ATTR_ENTITY_KEY, e.entityKey());
                 attrs.put(ObjectService.ATTR_ENTITY_DATASET, e.dataset());
@@ -321,7 +348,7 @@ public final class CaseOperations {
             OperationalObject kase = svc.open(ObjectType.CASE, title.trim(), description, null, null, owner, null, null, Map.of());
             created.add(kase.id());
             for (String member : members.keySet()) svc.link(kase.id(), member, LinkRelationship.CONTAINS, actor);
-            return new ObjectService.EntityCase(sub.require(kase.id()), List.copyOf(members.values()),
+            return new EntityCase(sub.require(kase.id()), List.copyOf(members.values()),
                     Set.copyOf(created.subList(0, created.size() - 1)));
         } catch (RuntimeException failure) {
             for (String id : created.reversed()) sub.discard(id, actor, failure);

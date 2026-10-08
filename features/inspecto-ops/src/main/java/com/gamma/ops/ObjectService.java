@@ -17,7 +17,6 @@ import com.gamma.ops.note.NoteService;
 import com.gamma.ops.note.NoteStore;
 import com.gamma.ops.note.ObjectNote;
 import com.gamma.objects.RcaTemplate;
-import com.gamma.ops.tag.CaseRule;
 import com.gamma.ops.tag.Tag;
 import com.gamma.ops.tag.TagRule;
 import com.gamma.workflow.EscalationRule;
@@ -112,7 +111,7 @@ public final class ObjectService {
     public static final String ATTR_TAGS = "tags";
     /** Attribute key stamped on an absorbed case: the surviving case it was merged into (GLOSSARY §9). */
     public static final String ATTR_MERGED_INTO = "mergedInto";
-    /** Attribute key stamped on a rule-raised case: the {@link CaseRule} name that opened it (GLOSSARY §9, C5). */
+    /** Attribute key stamped on a rule-raised case: the {@code CaseRule} name that opened it (GLOSSARY §9, C5). */
     public static final String ATTR_RAISED_BY_RULE = "raisedByRule";
     /** Attribute key placing an object under legal hold — see {@link #hasLegalHold} (MNT-14). */
     public static final String ATTR_LEGAL_HOLD = "legalHold";
@@ -160,7 +159,6 @@ public final class ObjectService {
     private volatile GovernanceRegistry governance;                  // authored, hot-reloaded (ASSURE-WORKFLOW-SLA-1)
     private final Map<String, Tag> tags = new ConcurrentHashMap<>();          // user-created tag registry
     private final Map<String, TagRule> tagRules = new ConcurrentHashMap<>();  // Gmail-filter Tag Rules, by name
-    private final Map<String, CaseRule> caseRules = new ConcurrentHashMap<>(); // rule-raised-case rules, by name (C5)
 
     /** Build with the built-in default workflows and in-memory link + note stores. */
     public ObjectService(ObjectStore store) {
@@ -243,7 +241,7 @@ public final class ObjectService {
      * Install (create or replace) the workflow for an {@link ObjectType} — the boot-time seam for
      * {@code *_workflow.toon} overrides ({@link com.gamma.service.ServiceBootstrap} scans them and calls
      * this after construction, the same post-construction pattern as {@link #registerTag}/
-     * {@link #registerCaseRule}). Replaces the built-in {@link Workflow#defaultFor default} baked in by
+     * {@code registerCaseRule}). Replaces the built-in {@link Workflow#defaultFor default} baked in by
      * the constructor; last registration for a given type wins.
      */
     public void registerWorkflow(Workflow workflow) {
@@ -929,66 +927,26 @@ public final class ObjectService {
         return out;
     }
 
-    // ── Case operations: delegated to {@link CaseOperations} (MODULE-REORG-P7 step 1) ─────────────────
+    // ── seam for object-type behaviour modules (MODULE-REORG-P7) ─────────────────────────────────────
+    // The Case operations (Case Rules, merge, split, open-from-entities) live in the optional
+    // inspecto-case-management module, which reaches this service only through the two members below.
 
-    /** Register (create or replace) a {@link CaseRule}; loaded from {@code *_caserule.toon} at boot or {@code POST /cases/rules}. */
-    public CaseRule registerCaseRule(CaseRule rule) { return cases.registerCaseRule(rule); }
+    private final Map<Class<?>, Object> extensions = new ConcurrentHashMap<>();
 
-    /** The Case Rule with this name, or empty. */
-    public Optional<CaseRule> caseRule(String name) { return cases.caseRule(name); }
-
-    /** Every registered Case Rule, sorted by name. */
-    public List<CaseRule> caseRules() { return cases.caseRules(); }
-
-    /** Remove a Case Rule; {@code false} when no rule had that name. */
-    public boolean removeCaseRule(String name) { return cases.removeCaseRule(name); }
-
-    /** Evaluate outcome: matching in-window incidents, how many were newly grouped, and the target case. */
-    public record CaseRuleEvaluation(int matched, int grouped, String caseId, boolean opened) {}
-
-    /** Evaluate a Case Rule - see {@link CaseOperations#evaluateCaseRule}. @throws NoSuchElementException if no rule has this name */
-    public CaseRuleEvaluation evaluateCaseRule(String name) { return cases.evaluateCaseRule(name); }
-
-    /** Merge outcome: the updated survivor, the absorbed case ids, and how many member links moved. */
-    public record MergeResult(OperationalObject survivor, List<String> merged, int membersMoved) {}
-
-    /** Split outcome: the newly opened case and how many member links moved to it. */
-    public record SplitResult(OperationalObject part, int membersMoved) {}
-
-    /** Merge cases - see {@link CaseOperations#mergeCases}. */
-    public MergeResult mergeCases(String survivorId, List<String> sources, String actor) {
-        return cases.mergeCases(survivorId, sources, actor);
+    /**
+     * The per-service singleton of an add-on collaborator, created on first use by {@code factory} and kept for
+     * the life of this service - how an optional module attaches state (e.g. its rule registry) to one Space's
+     * engine without this class naming it.
+     */
+    @SuppressWarnings("unchecked")
+    public <T> T extension(Class<T> type, java.util.function.Function<ObjectService, T> factory) {
+        return (T) extensions.computeIfAbsent(type, t -> factory.apply(this));
     }
 
-    /** Split members out of a case - see {@link CaseOperations#splitCase}. */
-    public SplitResult splitCase(String caseId, String title, List<String> members, String assignee, String actor) {
-        return cases.splitCase(caseId, title, members, assignee, actor);
-    }
+    /** The generic stores + locking helpers an add-on collaborator is handed. */
+    public ObjectSubstrate substrate() { return substrate; }
 
-    /** One Link Analysis Entity to become a member of a new Case: its node id, source Dataset and label. */
-    public record EntityMember(String entityKey, String dataset, String label) {
-        public EntityMember {
-            // LA-17 D-M6: untyped ids are 'entity:<key>', typed ones '<type>:<key>' (an Entity Type id).
-            if (entityKey == null || !entityKey.matches("[a-z][a-z0-9_]{0,31}:.+"))
-                throw new IllegalArgumentException("an entity needs its node id ('entity:…' or '<type>:…'), got '" + entityKey + "'");
-            if (dataset == null || dataset.isBlank())
-                throw new IllegalArgumentException("entity '" + entityKey + "' needs the Dataset it was projected from");
-            label = label == null || label.isBlank() ? entityKey : label.trim();
-        }
-    }
-
-    /** What {@link #openCaseFromEntities} did: the Case, every member it now CONTAINS, and which were new. */
-    public record EntityCase(OperationalObject caseObject, List<OperationalObject> members, Set<String> minted) {}
-
-    /** Open a Case from Link Analysis Entities - see {@link CaseOperations#openCaseFromEntities}; {@code synchronized} as before. */
-    public synchronized EntityCase openCaseFromEntities(String title, String description, List<EntityMember> entities,
-                                                        List<String> existingMembers,
-                                                        java.util.function.Predicate<OperationalObject> visible,
-                                                        String actor, String owner) {
-        return cases.openCaseFromEntities(title, description, entities, existingMembers, visible, actor, owner);
-    }
-
-    /** Compensation for {@link #openCaseFromEntities}: remove one object it created, cascade first (see {@link #purge}). */
+    /** Compensation for a failed multi-object write (handed to object-type modules through {@link ObjectSubstrate}): remove one object it created, cascade first (see {@link #purge}). */
     private void discard(String objectId, String actor, RuntimeException cause) {
         try {
             notes.deleteForTarget(AnnotationKinds.OBJECT, objectId);
@@ -1008,8 +966,8 @@ public final class ObjectService {
         }
     }
 
-    /** The Case-specific collaborator, and the generic substrate it is handed. */
-    private final com.gamma.ops.cases.CaseOperations cases = new com.gamma.ops.cases.CaseOperations(this, new Substrate());
+
+    private final ObjectSubstrate substrate = new Substrate();
 
     private final class Substrate implements ObjectSubstrate {
         public ObjectStore store() { return store; }

@@ -20,7 +20,7 @@ import com.gamma.ops.ObjectServiceAccess;
  * per-Space — a multi-Space runtime has one engine per Space — and a global would have quietly served one
  * Space's objects to another.
  */
-final class OpsEngine {
+public final class OpsEngine {
 
     private OpsEngine() {}
 
@@ -31,7 +31,7 @@ final class OpsEngine {
      * only ever registered by this module, so reaching one without an engine means a jar was bundled
      * without its {@code ObjectEngineProvider} — a deployment fault worth naming, not a missing resource.
      */
-    static ObjectService of(ApiContext api) {
+    public static ObjectService of(ApiContext api) {
         return HostContext.of(api).service().objects()
                 .filter(ObjectServiceAccess.class::isInstance)
                 .map(access -> ((ObjectServiceAccess) access).service())

@@ -1,10 +1,11 @@
 package com.gamma.ops;
 
+import com.gamma.ops.cases.CaseOperations;
 import com.gamma.workflow.ObjectType;
 
 import com.gamma.ops.link.LinkRelationship;
 import com.gamma.ops.link.ObjectLink;
-import com.gamma.ops.tag.CaseRule;
+import com.gamma.ops.cases.CaseRule;
 import com.gamma.ops.tag.TagRule;
 import org.junit.jupiter.api.Test;
 
@@ -40,18 +41,18 @@ class ObjectServiceCaseRuleTest {
     @Test
     void belowThresholdRaisesNothingThenGroupsWhenMet() {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
-        svc.registerCaseRule(rule(3));
+        CaseOperations.of(svc).registerCaseRule(rule(3));
         incident(svc, "one", "CRITICAL");
         incident(svc, "two", "CRITICAL");
         incident(svc, "low", "LOW");   // doesn't match the filter
 
-        ObjectService.CaseRuleEvaluation below = svc.evaluateCaseRule("crit-cluster");
+        CaseOperations.CaseRuleEvaluation below = CaseOperations.of(svc).evaluateCaseRule("crit-cluster");
         assertEquals(2, below.matched());
         assertEquals(0, below.grouped(), "2 < threshold 3 — no case yet");
         assertNull(below.caseId());
 
         incident(svc, "three", "CRITICAL");
-        ObjectService.CaseRuleEvaluation met = svc.evaluateCaseRule("crit-cluster");
+        CaseOperations.CaseRuleEvaluation met = CaseOperations.of(svc).evaluateCaseRule("crit-cluster");
         assertEquals(3, met.matched());
         assertEquals(3, met.grouped());
         assertTrue(met.opened());
@@ -66,26 +67,26 @@ class ObjectServiceCaseRuleTest {
     @Test
     void reEvaluationAttachesNewMatchesToTheSameOpenCaseAndIsIdempotent() {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
-        svc.registerCaseRule(rule(2));
+        CaseOperations.of(svc).registerCaseRule(rule(2));
         incident(svc, "a", "CRITICAL");
         incident(svc, "b", "CRITICAL");
-        String caseId = svc.evaluateCaseRule("crit-cluster").caseId();
+        String caseId = CaseOperations.of(svc).evaluateCaseRule("crit-cluster").caseId();
         assertNotNull(caseId);
 
         // no new matches → idempotent no-op (already-grouped incidents are skipped)
-        ObjectService.CaseRuleEvaluation again = svc.evaluateCaseRule("crit-cluster");
+        CaseOperations.CaseRuleEvaluation again = CaseOperations.of(svc).evaluateCaseRule("crit-cluster");
         assertEquals(0, again.matched());
 
         // a fresh matching incident attaches to the SAME still-open case (not a second one)
         incident(svc, "c", "CRITICAL");
-        ObjectService.CaseRuleEvaluation attach = svc.evaluateCaseRule("crit-cluster");
+        CaseOperations.CaseRuleEvaluation attach = CaseOperations.of(svc).evaluateCaseRule("crit-cluster");
         assertEquals(caseId, attach.caseId());
         assertFalse(attach.opened(), "attached to the existing rule-raised case");
         assertEquals(3, membersOf(svc, caseId).size());
         assertEquals(1, svc.query(ObjectQuery.builder().objectType(ObjectType.CASE).build()).size(),
                 "exactly one case was raised");
 
-        assertThrows(NoSuchElementException.class, () -> svc.evaluateCaseRule("ghost"));
+        assertThrows(NoSuchElementException.class, () -> CaseOperations.of(svc).evaluateCaseRule("ghost"));
     }
 
     @Test
@@ -97,11 +98,11 @@ class ObjectServiceCaseRuleTest {
                 .title("stale").description("d").status("IDENTIFIED").priority("CRITICAL")
                 .createdAt(twoHoursAgo).updatedAt(twoHoursAgo).build());
         ObjectService svc = new ObjectService(store);
-        svc.registerCaseRule(new CaseRule("recent", "Recent cluster",
+        CaseOperations.of(svc).registerCaseRule(new CaseRule("recent", "Recent cluster",
                 new TagRule.Filter("INCIDENT", null, null, "CRITICAL", null, null), 1, 60, null, null, 1));
         incident(svc, "fresh", "CRITICAL");   // created now — inside the 60-minute window
 
-        ObjectService.CaseRuleEvaluation r = svc.evaluateCaseRule("recent");
+        CaseOperations.CaseRuleEvaluation r = CaseOperations.of(svc).evaluateCaseRule("recent");
         assertEquals(1, r.matched(), "only the in-window incident matched; the 2h-old one is excluded");
     }
 

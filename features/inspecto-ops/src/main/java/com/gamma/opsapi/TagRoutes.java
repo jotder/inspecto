@@ -327,7 +327,7 @@ public final class TagRoutes implements RouteModule {
      * not model (422 naming it) instead of dropping it behind a 200; the nested {@code filter} may hold only the six
      * criteria (an {@code x-} key inside it has no place to live, so it is refused too).
      */
-    static void requireModelledRule(String what, Map<String, Object> body, java.util.Set<String> modelled) {
+    public static void requireModelledRule(String what, Map<String, Object> body, java.util.Set<String> modelled) {
         AuthorKeys.requireModelled(what, body, modelled);
         if (body.get("filter") instanceof Map<?, ?> f) {
             List<String> bad = f.keySet().stream().map(String::valueOf).filter(k -> !TagRule.Filter.KEYS.contains(k)).sorted().toList();

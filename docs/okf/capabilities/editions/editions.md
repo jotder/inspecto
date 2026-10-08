@@ -54,7 +54,7 @@ The organising rule is one sentence, and it is the most load-bearing sentence in
 
 * **The three editions** — Personal, Professional, Enterprise — as build flavours of one commit, and the five
   mechanisms that assemble them.
-* **The 22**<!--count:optional-modules--> **optional modules**, the 24<!--count:enterprise-first-party-jars--> first-party jars an Enterprise bundle stages (plus the `postgresql.jar` sidecar), and the shape assertions that prove each staged
+* **The 23**<!--count:optional-modules--> **optional modules**, the 25<!--count:enterprise-first-party-jars--> first-party jars an Enterprise bundle stages (plus the `postgresql.jar` sidecar), and the shape assertions that prove each staged
   jar can do its job.
 * **The absence contract** — the provider seams, the five stub route groups, and the requirement that a
   missing module answers with an explanation rather than a not-found.
@@ -149,7 +149,7 @@ Both pages also cite the parent build file at two line numbers for the profile i
 comments, and the identifiers moved when the gating modules were inserted. **Cite the identifier, not the
 line** — the same lesson the compliance area recorded about its own citations.
 
-### 3.3 Optional modules and staged jars — 22<!--count:optional-modules--> modules, 24<!--count:enterprise-first-party-jars--> first-party jars (+ the postgresql sidecar)
+### 3.3 Optional modules and staged jars — 23<!--count:optional-modules--> modules, 25<!--count:enterprise-first-party-jars--> first-party jars (+ the postgresql sidecar)
 
 | Edition | Optional modules compiled | Jars staged into the bundle |
 |---|---|---|

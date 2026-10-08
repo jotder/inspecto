@@ -13,9 +13,9 @@ import com.gamma.ops.ObjectServiceAccess;
 import java.util.List;
 
 /**
- * The two operational-object Job Types, contributed by this module (EDG-01 cell 7, 2026-09-08).
+ * The operational-object Job Type(s), contributed by this module (EDG-01 cell 7, 2026-09-08).
  *
- * <p>{@code caserule.evaluate} and {@code objects.analytics} were hard-coded in {@code JobService} and
+ * <p>{@code caserule.evaluate} (now in inspecto-case-management) and {@code objects.analytics} were hard-coded in {@code JobService} and
  * could not stay: they call {@code ObjectService.evaluateCaseRule} and the analytics rollups, which the
  * {@link ObjectAccess} seam deliberately does not expose. They are whole operational-object features, not
  * narrow consumers, so widening the seam for them would have defeated the extraction.
@@ -41,31 +41,14 @@ public final class OpsJobTypes {
     private OpsJobTypes() {}
 
     /** The Platform Service id core registers the {@link ObjectAccess} seam under ({@code CollectorService}). */
-    static final List<String> OBJECTS = List.of("objects");
+    public static final List<String> OBJECTS = List.of("objects");
 
     /** The engine for a running job's Space, or {@code null} when none is installed. */
-    static ObjectService engineFor(com.gamma.job.JobContext ctx) {
+    public static ObjectService engineFor(com.gamma.job.JobContext ctx) {
         return ctx.services().find(ObjectAccess.class)
                 .filter(ObjectServiceAccess.class::isInstance)
                 .map(a -> ((ObjectServiceAccess) a).service())
                 .orElse(null);
-    }
-
-    /** {@code caserule.evaluate} — group matching Incidents into a Case from a saved Case Rule. */
-    public static final class CaseRuleEvaluate implements JobTypeProvider {
-        @Override
-        public JobTypeDescriptor descriptor() {
-            return new JobTypeDescriptor("caserule.evaluate", "Case Rule Evaluation",
-                    "Evaluates a saved Case Rule, grouping matching Incidents into a Case; emits a completion signal.",
-                    List.of(ParameterDecl.required("rule", ParamType.STRING, "Saved case rule name")),
-                    List.of("caserule.evaluate.completed"), List.of(), OBJECTS);
-        }
-
-        /** ⚠ No supplier: the job resolves its Space's engine from the {@code JobContext} at run time. */
-        @Override
-        public Job create(JobConfig config) {
-            return new CaseRuleEvalJob(config, null);
-        }
     }
 
     /** {@code objects.analytics} — materialize the Alert/Incident/Case/Task rollups as Parquet samples. */

@@ -10,8 +10,6 @@ import com.gamma.ops.InMemoryObjectStore;
 import com.gamma.ops.ObjectQuery;
 import com.gamma.ops.ObjectService;
 import com.gamma.ops.OperationalObject;
-import com.gamma.ops.tag.CaseRule;
-import com.gamma.ops.tag.TagRule;
 import com.gamma.query.DatasetMeasureProbe;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * ASSURE-PER-ENTITY-ALERTS-1 against the REAL object engine: a healed key's Incident moves through the real
- * workflow ({@code resolve}, then {@code reopen} on a relapse), and an existing Case Rule groups the per-key
+ * workflow ({@code resolve}, then {@code reopen} on a relapse), and (moved to inspecto-case-management, MODULE-REORG-P7) an existing Case Rule groups the per-key
  * Incidents into one Case. The per-key SQL itself is covered over real DuckDB by the engine's
  * {@code PerEntityAlertTest}; here the breaching keys are stated directly.
  */
@@ -133,25 +131,4 @@ class PerEntityAlertObjectsTest {
 
     private static final String COMPLETE_POSTMORTEM = "{\"timeline\":[{\"time\":\"10:00\",\"text\":\"detected\"}],"
             + "\"causeAnalysis\":[\"tariff misconfigured\"],\"actions\":[{\"text\":\"fix the tariff\"}]}";
-
-    @Test
-    void anExistingCaseRuleGroupsTheFortyPerKeyIncidentsIntoOneCase() {
-        ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        AlertService svc = svc(objects);
-        svc.groupedMeasureProbe(r -> Optional.of(offenders(1, 40)));
-        svc.evaluateRules();
-
-        // No Case Rule change: the per-key Incident titles all start with the rule's description, which the
-        // Case Rule's existing `q` (title + description substring) criterion matches.
-        objects.registerCaseRule(new CaseRule("spend-ring", "High-spend offenders",
-                new TagRule.Filter("INCIDENT", "High spend", null, null, null, null), 1, 0, null, null,
-                System.currentTimeMillis()));
-        ObjectService.CaseRuleEvaluation eval = objects.evaluateCaseRule("spend-ring");
-
-        assertEquals(40, eval.grouped());
-        assertTrue(eval.opened());
-        assertEquals(1, objects.query(ObjectQuery.builder().objectType(ObjectType.CASE).build()).size(),
-                "one Case holds all forty");
-        assertEquals(0, objects.evaluateCaseRule("spend-ring").grouped(), "re-evaluation is idempotent");
-    }
 }

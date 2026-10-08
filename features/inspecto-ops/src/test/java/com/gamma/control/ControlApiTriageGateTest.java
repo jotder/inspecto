@@ -142,21 +142,14 @@ class ControlApiTriageGateTest {
     }
 
     @Test
-    void mergeSplitPatchAndCaseRuleEvaluateStayCanAdminister(@TempDir Path dir) throws Exception {
+    void patchStaysCanAdminister(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             String kase = TestOpsEngine.of(c.svc).open(ObjectType.CASE, "ring", "d", "HIGH", null, Map.of()).id();
             HttpResponse<String> patch = send(c.port, "PATCH", "/objects/" + kase, "{\"priority\":\"LOW\"}", "operations");
             assertEquals(403, patch.statusCode(), patch.body());
             assertTrue(patch.body().contains("canAdminister"), patch.body());
-            assertEquals(403, send(c.port, "POST", "/objects/" + kase + "/merge",
-                    "{\"sources\":[\"x\"]}", "operations").statusCode());
-            assertEquals(403, send(c.port, "POST", "/objects/" + kase + "/split",
-                    "{\"members\":[\"x\"]}", "operations").statusCode());
-            assertEquals(403, send(c.port, "POST", "/cases/rules/any/evaluate", "{}", "operations").statusCode());
             // ...refused before existence-hiding, as above
             assertEquals(403, send(c.port, "PATCH", "/objects/nope", "{\"priority\":\"LOW\"}", "operations").statusCode());
-            assertEquals(403, send(c.port, "POST", "/objects/nope/merge", "{\"sources\":[\"x\"]}", "operations").statusCode());
-            assertEquals(403, send(c.port, "POST", "/objects/nope/split", "{\"members\":[\"x\"]}", "operations").statusCode());
 
             assertEquals(200, send(c.port, "PATCH", "/objects/" + kase, "{\"priority\":\"LOW\"}", "admin").statusCode(),
                     "and the administrator still edits the fields");

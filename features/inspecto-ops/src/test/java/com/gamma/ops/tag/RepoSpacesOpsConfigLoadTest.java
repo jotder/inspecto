@@ -14,9 +14,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The inspecto-ops half of the committed-Space-config sweep: the three authored kinds whose real loaders
- * live in THIS module ({@code *_tag}, {@code *_tagrule}, {@code *_caserule}) must load with
- * {@link Tag#load}, {@link TagRule#load} and {@link CaseRule#load} — the same calls the boot scan makes.
+ * The inspecto-ops half of the committed-Space-config sweep: the two authored kinds whose real loaders
+ * live in THIS module ({@code *_tag}, {@code *_tagrule}) must load with
+ * {@link Tag#load} and {@link TagRule#load} — the same calls the boot scan makes (the {@code *_caserule} sweep moved to inspecto-case-management).
  *
  * <p>🔴 <b>Why this is a separate class from {@code RepoSpacesConfigValidationTest}.</b> That sweep covers
  * all ~142 authored TOONs and used to live here, in {@code inspecto-ops} — a module the root POM gates
@@ -43,8 +43,7 @@ class RepoSpacesOpsConfigLoadTest {
         try (Stream<Path> walk = Files.walk(root)) {
             for (Path f : walk.filter(Files::isRegularFile)
                               .filter(p -> { String n = p.getFileName().toString();
-                                             return n.endsWith("_tag.toon") || n.endsWith("_tagrule.toon")
-                                                     || n.endsWith("_caserule.toon"); })
+                                             return n.endsWith("_tag.toon") || n.endsWith("_tagrule.toon"); })
                               // uat is generated, _shared is runtime state — only authored trees are guarded
                               .filter(p -> { String s = root.relativize(p).toString().replace('\\', '/');
                                              return !s.startsWith("uat/") && !s.startsWith("_shared/"); })
@@ -52,9 +51,8 @@ class RepoSpacesOpsConfigLoadTest {
                 swept.add(f);
                 String name = f.getFileName().toString();
                 try {
-                    if (name.endsWith("_tag.toon"))          assertNotNull(Tag.load(f));
-                    else if (name.endsWith("_tagrule.toon")) assertNotNull(TagRule.load(f));
-                    else                                     assertNotNull(CaseRule.load(f));
+                    if (name.endsWith("_tag.toon")) assertNotNull(Tag.load(f));
+                    else                            assertNotNull(TagRule.load(f));
                 } catch (Exception e) {
                     failures.add(root.relativize(f) + " -> " + e.getMessage());
                 }

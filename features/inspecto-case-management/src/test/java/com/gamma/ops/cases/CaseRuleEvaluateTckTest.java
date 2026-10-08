@@ -1,4 +1,4 @@
-package com.gamma.opsjob;
+package com.gamma.ops.cases;
 
 import com.gamma.job.JobTypeProvider;
 import com.gamma.job.testkit.JobTypeProviderContract;
@@ -7,6 +7,6 @@ import com.gamma.job.testkit.JobTypeProviderContract;
 class CaseRuleEvaluateTckTest extends JobTypeProviderContract {
     @Override
     protected JobTypeProvider provider() {
-        return new OpsJobTypes.CaseRuleEvaluate();
+        return new CaseRuleEvaluate();
     }
 }

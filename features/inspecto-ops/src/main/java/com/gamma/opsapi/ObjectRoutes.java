@@ -11,9 +11,7 @@ import com.gamma.control.Cursor;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.Handler;
 import com.gamma.spi.http.RouteModule;
-import com.gamma.access.WriteGates;
 
-import com.gamma.config.io.ConfigCodec;
 import com.gamma.ops.Impact;
 import com.gamma.ops.ObjectQuery;
 import com.gamma.ops.ObjectService;
@@ -24,18 +22,14 @@ import com.gamma.ops.link.ObjectLink;
 import com.gamma.ops.note.NoteKind;
 import com.gamma.ops.note.ObjectNote;
 import com.gamma.objects.RcaTemplate;
-import com.gamma.ops.tag.CaseRule;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
-import com.gamma.util.AtomicFiles;
 import com.gamma.util.JsonAttributes;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -189,7 +183,7 @@ public final class ObjectRoutes implements RouteModule {
      * ABAC A3: the edition's policy engine ({@link RowScope}) can additionally hide a row — a policy
      * deny over the object's attributes is indistinguishable from absence, same SEC-7d contract.
      */
-    static boolean visibleTo(HttpExchange ex, OperationalObject o) {
+    public static boolean visibleTo(HttpExchange ex, OperationalObject o) {
         Subject s = ApiContext.subject(ex).orElse(null);
         if (s != null && s.scoped()) {
             String caseType = o.attributes().get(ATTR_CASE_TYPE);
@@ -223,13 +217,13 @@ public final class ObjectRoutes implements RouteModule {
      * the caller. Absent and out-of-scope answer the identical 404 (existence-hiding), so the check also
      * subsumes the plain existence checks these routes already made.
      */
-    static void requireVisible(ApiContext api, HttpExchange ex, String id) {
+    public static void requireVisible(ApiContext api, HttpExchange ex, String id) {
         OperationalObject o = OpsEngine.of(api).get(id).orElse(null);
         if (o == null || !visibleTo(ex, o)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no object with id '" + id + "'");
     }
 
     /** Wrap a by-id handler: out-of-scope answers the same 404 an absent id does (existence-hiding). */
-    static Handler scoped(ApiContext api, Handler h) {
+    public static Handler scoped(ApiContext api, Handler h) {
         return (e, m) -> {
             String id = ApiContext.name(m);
             OperationalObject o = OpsEngine.of(api).get(id).orElse(null);

@@ -1,5 +1,6 @@
 package com.gamma.ops;
 
+import com.gamma.ops.cases.CaseOperations;
 import com.gamma.workflow.ObjectType;
 
 import com.gamma.ops.link.LinkRelationship;
@@ -47,7 +48,7 @@ class ObjectServiceCaseGroupTest {
         svc.link(source.id(), i2.id(), LinkRelationship.CONTAINS, null);
         svc.link(survivor.id(), i3.id(), LinkRelationship.CONTAINS, null);
 
-        ObjectService.MergeResult result = svc.mergeCases(survivor.id(), List.of(source.id()), "op");
+        CaseOperations.MergeResult result = CaseOperations.of(svc).mergeCases(survivor.id(), List.of(source.id()), "op");
 
         assertEquals(2, result.membersMoved());
         assertEquals(List.of(source.id()), result.merged());
@@ -70,14 +71,14 @@ class ObjectServiceCaseGroupTest {
                 "MERGED_INTO trace link");
 
         // guard rails
-        assertThrows(IllegalStateException.class, () -> svc.mergeCases(survivor.id(), List.of(source.id()), null),
+        assertThrows(IllegalStateException.class, () -> CaseOperations.of(svc).mergeCases(survivor.id(), List.of(source.id()), null),
                 "an already-merged case cannot be merged again");
-        assertThrows(IllegalStateException.class, () -> svc.mergeCases(survivor.id(), List.of(survivor.id()), null),
+        assertThrows(IllegalStateException.class, () -> CaseOperations.of(svc).mergeCases(survivor.id(), List.of(survivor.id()), null),
                 "self-merge");
-        assertThrows(IllegalStateException.class, () -> svc.mergeCases(survivor.id(), List.of(i3.id()), null),
+        assertThrows(IllegalStateException.class, () -> CaseOperations.of(svc).mergeCases(survivor.id(), List.of(i3.id()), null),
                 "only CASEs merge");
-        assertThrows(IllegalArgumentException.class, () -> svc.mergeCases(survivor.id(), List.of(), null));
-        assertThrows(NoSuchElementException.class, () -> svc.mergeCases("nope", List.of(source.id()), null));
+        assertThrows(IllegalArgumentException.class, () -> CaseOperations.of(svc).mergeCases(survivor.id(), List.of(), null));
+        assertThrows(NoSuchElementException.class, () -> CaseOperations.of(svc).mergeCases("nope", List.of(source.id()), null));
     }
 
     @Test
@@ -91,7 +92,7 @@ class ObjectServiceCaseGroupTest {
         for (OperationalObject i : List.of(i1, i2, i3))
             svc.link(original.id(), i.id(), LinkRelationship.CONTAINS, null);
 
-        ObjectService.SplitResult result = svc.splitCase(original.id(), "part B",
+        CaseOperations.SplitResult result = CaseOperations.of(svc).splitCase(original.id(), "part B",
                 List.of(i1.id(), i2.id()), "dana", "op");
 
         assertEquals(2, result.membersMoved());
@@ -109,14 +110,14 @@ class ObjectServiceCaseGroupTest {
 
         // guard rails
         assertThrows(IllegalStateException.class,
-                () -> svc.splitCase(original.id(), "x", List.of(i1.id()), null, null),
+                () -> CaseOperations.of(svc).splitCase(original.id(), "x", List.of(i1.id()), null, null),
                 "a member already moved out is foreign now");
         assertThrows(IllegalArgumentException.class,
-                () -> svc.splitCase(original.id(), " ", List.of(i3.id()), null, null));
+                () -> CaseOperations.of(svc).splitCase(original.id(), " ", List.of(i3.id()), null, null));
         assertThrows(IllegalArgumentException.class,
-                () -> svc.splitCase(original.id(), "x", List.of(), null, null));
+                () -> CaseOperations.of(svc).splitCase(original.id(), "x", List.of(), null, null));
         assertThrows(IllegalStateException.class,
-                () -> svc.splitCase(i3.id(), "x", List.of(i3.id()), null, null), "only CASEs split");
+                () -> CaseOperations.of(svc).splitCase(i3.id(), "x", List.of(i3.id()), null, null), "only CASEs split");
     }
 
     @Test

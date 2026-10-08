@@ -1,12 +1,13 @@
 package com.gamma.job;
 
+import com.gamma.ops.cases.CaseOperations;
 import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.ops.InMemoryObjectStore;
 import com.gamma.ops.ObjectQuery;
 import com.gamma.ops.ObjectService;
 import com.gamma.workflow.ObjectType;
 import com.gamma.ops.OperationalObject;
-import com.gamma.ops.tag.CaseRule;
+import com.gamma.ops.cases.CaseRule;
 import com.gamma.ops.tag.TagRule;
 import com.gamma.signal.Severity;
 import com.gamma.signal.SignalEmitter;
@@ -51,14 +52,14 @@ class CaseRuleEvalJobTest {
     @Test
     void groupsMatchingIncidentsIntoACaseAndEmitsTheCounts() throws Exception {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
-        svc.registerCaseRule(rule(3));
+        CaseOperations.of(svc).registerCaseRule(rule(3));
         incident(svc, "one", "CRITICAL");
         incident(svc, "two", "CRITICAL");
         incident(svc, "three", "CRITICAL");
         incident(svc, "low", "LOW");   // doesn't match the filter
 
         CapturingContext ctx = new CapturingContext(Map.of("rule", "crit-cluster"));
-        JobResult result = new com.gamma.opsjob.CaseRuleEvalJob(cfg("crit-cluster"), () -> svc).run(ctx);
+        JobResult result = new com.gamma.ops.cases.CaseRuleEvalJob(cfg("crit-cluster"), () -> svc).run(ctx);
 
         assertEquals("SUCCESS", result.status(), result.message());
         assertTrue(result.message().contains("(opened)"), result.message());
@@ -77,10 +78,10 @@ class CaseRuleEvalJobTest {
     @Test
     void reEvaluationIsIdempotentAndDoesNotCloneTheCase() throws Exception {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
-        svc.registerCaseRule(rule(2));
+        CaseOperations.of(svc).registerCaseRule(rule(2));
         incident(svc, "a", "CRITICAL");
         incident(svc, "b", "CRITICAL");
-        com.gamma.opsjob.CaseRuleEvalJob job = new com.gamma.opsjob.CaseRuleEvalJob(cfg("crit-cluster"), () -> svc);
+        com.gamma.ops.cases.CaseRuleEvalJob job = new com.gamma.ops.cases.CaseRuleEvalJob(cfg("crit-cluster"), () -> svc);
 
         job.run(new CapturingContext(Map.of()));
         assertEquals(1, caseCount(svc), "threshold met ⇒ one Case");
@@ -96,12 +97,12 @@ class CaseRuleEvalJobTest {
     @Test
     void belowThresholdRaisesNoCase() throws Exception {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
-        svc.registerCaseRule(rule(3));
+        CaseOperations.of(svc).registerCaseRule(rule(3));
         incident(svc, "one", "CRITICAL");
         incident(svc, "two", "CRITICAL");   // 2 < threshold 3
 
         CapturingContext ctx = new CapturingContext(Map.of());
-        JobResult result = new com.gamma.opsjob.CaseRuleEvalJob(cfg("crit-cluster"), () -> svc).run(ctx);
+        JobResult result = new com.gamma.ops.cases.CaseRuleEvalJob(cfg("crit-cluster"), () -> svc).run(ctx);
 
         assertTrue(result.message().contains("below threshold"), result.message());
         assertEquals(0, caseCount(svc));
@@ -112,13 +113,13 @@ class CaseRuleEvalJobTest {
     @Test
     void unknownCaseRuleFailsClosed() {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
-        com.gamma.opsjob.CaseRuleEvalJob job = new com.gamma.opsjob.CaseRuleEvalJob(cfg("ghost"), () -> svc);
+        com.gamma.ops.cases.CaseRuleEvalJob job = new com.gamma.ops.cases.CaseRuleEvalJob(cfg("ghost"), () -> svc);
         assertThrows(NoSuchElementException.class, () -> job.run(new CapturingContext(Map.of())));
     }
 
     @Test
     void missingObjectEngineFailsClosed() {
-        com.gamma.opsjob.CaseRuleEvalJob job = new com.gamma.opsjob.CaseRuleEvalJob(cfg("crit-cluster"), () -> null);
+        com.gamma.ops.cases.CaseRuleEvalJob job = new com.gamma.ops.cases.CaseRuleEvalJob(cfg("crit-cluster"), () -> null);
         assertThrows(IllegalStateException.class, () -> job.run(new CapturingContext(Map.of())));
     }
 

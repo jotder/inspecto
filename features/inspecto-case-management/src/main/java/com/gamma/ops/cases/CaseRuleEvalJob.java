@@ -1,4 +1,4 @@
-package com.gamma.opsjob;
+package com.gamma.ops.cases;
 
 import com.gamma.job.Job;
 import com.gamma.job.JobConfig;
@@ -7,6 +7,7 @@ import com.gamma.job.JobResult;
 import com.gamma.job.JobService;
 
 import com.gamma.ops.ObjectService;
+import com.gamma.opsjob.OpsJobTypes;
 import com.gamma.signal.Severity;
 
 import java.util.LinkedHashMap;
@@ -14,10 +15,10 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 /**
- * The {@code caserule.evaluate} Job Type (C5 "Ops" follow-up) — runs a saved {@link com.gamma.ops.tag.CaseRule}
+ * The {@code caserule.evaluate} Job Type (C5 "Ops" follow-up) — runs a saved {@link CaseRule}
  * on a schedule, grouping matching in-window Incidents under a Case, and emits a
  * {@code caserule.evaluate.completed} Signal carrying the match/group counts. It wraps the exact same
- * {@link ObjectService#evaluateCaseRule(String)} step the interactive {@code POST /cases/rules/{name}/evaluate}
+ * {@link CaseOperations#evaluateCaseRule(String)} step the interactive {@code POST /cases/rules/{name}/evaluate}
  * route drives, so a scheduled evaluation groups identically to a manual one — turning the Alert → Incident →
  * Case chain's tail into a {@code cron:} Job instead of a Board-only action.
  *
@@ -63,7 +64,7 @@ public final class CaseRuleEvalJob implements Job {
         if (svc == null)
             throw new IllegalStateException("caserule.evaluate needs the space Object Engine (the inspecto-ops module's ObjectEngineProvider is not installed)");
 
-        ObjectService.CaseRuleEvaluation e = svc.evaluateCaseRule(ruleName);   // throws if the rule is unknown
+        CaseOperations.CaseRuleEvaluation e = CaseOperations.of(svc).evaluateCaseRule(ruleName);   // throws if the rule is unknown
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("rule", ruleName);

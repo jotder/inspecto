@@ -61,6 +61,20 @@ class ObjectsAnalyticsJobTest {
 
     // ── 1. the pure flatten ───────────────────────────────────────────────────────────
 
+    /** A host binding every id CollectorService binds ({@code requires:} validates against them) - "objects" too. */
+    private static PlatformServiceRegistry objectsHost() {
+        PlatformServiceRegistry host = new PlatformServiceRegistry();
+        host.register("notifications", com.gamma.notify.NotificationAccess.class, null);
+        host.register("mail", com.gamma.notify.MailAccess.class, null);
+        host.register("incidents", com.gamma.objects.IncidentAccess.class, null);
+        host.register("schema", com.gamma.pipeline.SchemaAccess.class, null);
+        host.register("consignment-status", com.gamma.consignment.ConsignmentStatusAccess.class, null);
+        host.register("alerts", com.gamma.alert.AlertAccess.class, null);
+        host.register("objects", com.gamma.objects.ObjectAccess.class, null);
+        host.register("link-index", com.gamma.linkindex.LinkIndexAccess.class, null);
+        return host;
+    }
+
     @Test
     void flattensTheNestedRollupIntoTallRows() {
         Map<String, Object> rollup = seeded().analytics(ObjectType.INCIDENT);
@@ -338,7 +352,7 @@ class ObjectsAnalyticsJobTest {
     void objectsAnalyticsIsRegisteredAsABuiltInType() throws Exception {
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
-                     "audit", null, null, "data", null, CaseRuleEvalJobTest.objectsHost())) {
+                     "audit", null, null, "data", null, objectsHost())) {
             assertTrue(js.jobType("objects.analytics").isPresent(), "registered as a built-in");
             assertEquals(List.of("objects"), js.jobType("objects.analytics").get().requires(),
                     "it requires the objects service - the only way its run reaches the engine");

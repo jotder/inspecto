@@ -1,7 +1,8 @@
 package com.gamma.ops;
 
+import com.gamma.ops.cases.CaseOperations;
 import com.gamma.ops.link.LinkRelationship;
-import com.gamma.ops.tag.CaseRule;
+import com.gamma.ops.cases.CaseRule;
 import com.gamma.ops.tag.TagRule;
 import com.gamma.workflow.ObjectType;
 import org.junit.jupiter.api.Test;
@@ -32,36 +33,36 @@ class ObjectServiceCaseParityTest {
     @Test
     void caseRuleRegistryRegistersReplacesListsSortedAndRemoves() {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
-        assertTrue(svc.caseRules().isEmpty());
-        assertTrue(svc.caseRule(null).isEmpty(), "a null name is simply absent");
-        assertFalse(svc.removeCaseRule(null));
-        assertFalse(svc.removeCaseRule("ghost"));
+        assertTrue(CaseOperations.of(svc).caseRules().isEmpty());
+        assertTrue(CaseOperations.of(svc).caseRule(null).isEmpty(), "a null name is simply absent");
+        assertFalse(CaseOperations.of(svc).removeCaseRule(null));
+        assertFalse(CaseOperations.of(svc).removeCaseRule("ghost"));
 
-        svc.registerCaseRule(rule("zeta", 2));
-        svc.registerCaseRule(rule("alpha", 2));
-        assertEquals(List.of("alpha", "zeta"), svc.caseRules().stream().map(CaseRule::name).toList(), "sorted by name");
-        assertEquals("alpha", svc.caseRule("  alpha ").orElseThrow().name(), "lookup trims the name");
+        CaseOperations.of(svc).registerCaseRule(rule("zeta", 2));
+        CaseOperations.of(svc).registerCaseRule(rule("alpha", 2));
+        assertEquals(List.of("alpha", "zeta"), CaseOperations.of(svc).caseRules().stream().map(CaseRule::name).toList(), "sorted by name");
+        assertEquals("alpha", CaseOperations.of(svc).caseRule("  alpha ").orElseThrow().name(), "lookup trims the name");
 
-        svc.registerCaseRule(rule("alpha", 9));   // same name replaces
-        assertEquals(2, svc.caseRules().size());
-        assertEquals(9, svc.caseRule("alpha").orElseThrow().threshold());
+        CaseOperations.of(svc).registerCaseRule(rule("alpha", 9));   // same name replaces
+        assertEquals(2, CaseOperations.of(svc).caseRules().size());
+        assertEquals(9, CaseOperations.of(svc).caseRule("alpha").orElseThrow().threshold());
 
-        assertTrue(svc.removeCaseRule(" zeta"));
-        assertFalse(svc.removeCaseRule("zeta"), "removing twice reports false");
-        assertEquals(List.of("alpha"), svc.caseRules().stream().map(CaseRule::name).toList());
+        assertTrue(CaseOperations.of(svc).removeCaseRule(" zeta"));
+        assertFalse(CaseOperations.of(svc).removeCaseRule("zeta"), "removing twice reports false");
+        assertEquals(List.of("alpha"), CaseOperations.of(svc).caseRules().stream().map(CaseRule::name).toList());
     }
 
     @Test
     void aClosedRuleRaisedCaseIsNotReusedSoANewCaseOpensForNewMatches() {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
-        svc.registerCaseRule(rule("burst", 1));
+        CaseOperations.of(svc).registerCaseRule(rule("burst", 1));
         incident(svc, "one");
-        ObjectService.CaseRuleEvaluation first = svc.evaluateCaseRule("burst");
+        CaseOperations.CaseRuleEvaluation first = CaseOperations.of(svc).evaluateCaseRule("burst");
         assertTrue(first.opened());
 
         for (String a : List.of("investigate", "resolve", "close")) svc.transition(first.caseId(), a, "op");   // terminal: no longer an open Case raised by the rule
         incident(svc, "two");
-        ObjectService.CaseRuleEvaluation second = svc.evaluateCaseRule("burst");
+        CaseOperations.CaseRuleEvaluation second = CaseOperations.of(svc).evaluateCaseRule("burst");
         assertEquals(1, second.matched(), "the first incident is already a member of a Case; only the new one matches");
         assertTrue(second.opened(), "a terminal rule-raised Case is not attached to");
         assertNotEquals(first.caseId(), second.caseId());
@@ -73,7 +74,7 @@ class ObjectServiceCaseParityTest {
         OperationalObject survivor = svc.open(ObjectType.CASE, "A", "d", "HIGH", null, "ops", null, "c", Map.of());
         OperationalObject source = svc.open(ObjectType.CASE, "B", "d", "HIGH", null, "ops", null, "c", Map.of());
 
-        svc.mergeCases(survivor.id(), List.of(source.id()), "op");
+        CaseOperations.of(svc).mergeCases(survivor.id(), List.of(source.id()), "op");
 
         OperationalObject closed = svc.get(source.id()).orElseThrow();
         assertEquals("CLOSED", closed.status());

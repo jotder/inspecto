@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code MODULE-REORG-P4-2} (the ops writers): Tag, Tag Rule and Case Rule persist what they REBUILD from a typed
+ * {@code MODULE-REORG-P4-2} (the ops writers): Tag and Tag Rule persist (the Case Rule writer moved to inspecto-case-management) what they REBUILD from a typed
  * record's {@code toMap()}, so a key the record does not model used to vanish behind a 200. Now an author-owned
  * {@code x-} key is kept (create, GET, the persisted file, a re-load, a Tag rename) and any other key is refused 422
  * {@code ERR_UNKNOWN_CONFIG_KEY} naming it with nothing written. A re-save REPLACES: what the client sent is stored.
@@ -77,7 +77,6 @@ class OpsWritersUnmodelledKeysTest {
     }
 
     private static final String RULE = "\"name\":\"r1\",\"tag\":\"hot\",\"filter\":{\"type\":\"INCIDENT\",\"priority\":\"CRITICAL\"}";
-    private static final String CASE = "\"name\":\"c1\",\"title\":\"Burst\",\"filter\":{\"type\":\"INCIDENT\",\"priority\":\"CRITICAL\"}";
 
     // ── Tag ──────────────────────────────────────────────────────────────────────
 
@@ -135,29 +134,6 @@ class OpsWritersUnmodelledKeysTest {
                     "{\"name\":\"r1\",\"tag\":\"warm\",\"filter\":{\"type\":\"INCIDENT\",\"priority\":\"CRITICAL\"}}").statusCode());
             assertNull(block(file, "tag_rule").get("x-team"));
             assertNull(listed(c, "/tags/rules", "r1").get("x-team"));
-        }
-    }
-
-    // ── Case Rule ────────────────────────────────────────────────────────────────
-
-    @Test
-    void aCaseRuleKeepsItsAnnotation_aResaveReplaces_andAnyOtherKeyIsRefused(@TempDir Path dir) throws Exception {
-        try (Ctx c = open(dir)) {
-            HttpResponse<String> bad = send(c, "POST", "/cases/rules", "{" + CASE + ",\"zz_cfg\":1}");
-            assertEquals(422, bad.statusCode(), bad.body());
-            assertTrue(bad.body().contains("ERR_UNKNOWN_CONFIG_KEY") && bad.body().contains("zz_cfg"), bad.body());
-            assertFalse(Files.exists(c.root.resolve("c1_caserule.toon")), "a refused save writes nothing");
-
-            HttpResponse<String> ok = send(c, "POST", "/cases/rules", "{" + CASE + ",\"x-team\":\"ops\"}");
-            assertEquals(200, ok.statusCode(), ok.body());
-            assertEquals("ops", listed(c, "/cases/rules", "c1").path("x-team").asText(), "GET lists it");
-            Path file = c.root.resolve("c1_caserule.toon");
-            assertEquals("ops", block(file, "case_rule").get("x-team"), "the file keeps it");
-            assertEquals("ops", com.gamma.ops.tag.CaseRule.load(file).toMap().get("x-team"), "a reload keeps it");
-
-            assertEquals(200, send(c, "POST", "/cases/rules", "{" + CASE + "}").statusCode());
-            assertNull(block(file, "case_rule").get("x-team"), "a re-save replaces with the posted body");
-            assertNull(listed(c, "/cases/rules", "c1").get("x-team"));
         }
     }
 }

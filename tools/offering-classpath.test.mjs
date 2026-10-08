@@ -26,21 +26,21 @@ const short = (jars) => jars.filter((j) => !CORE_JARS.includes(j)).map((j) => (j
 const OLD = {
     serve: {   // serve.sh == serve.bat: the control plane's classpath, and the order the generator preserves EXACTLY.
         Personal: 'processor connectors',
-        Professional: 'processor oidc secrets geo-country connectors-kafka telecom-asn1 connectors notify-channels backup entity-list la-graph la-storage la-core la-api geo-link exchange observability ops reconciliation scoring agent postgresql',
-        Enterprise: 'processor oidc secrets geo-country connectors-kafka telecom-asn1 policy connectors notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops reconciliation scoring agent intelligence postgresql',
+        Professional: 'processor oidc secrets geo-country connectors-kafka telecom-asn1 connectors notify-channels backup entity-list la-graph la-storage la-core la-api geo-link exchange observability ops case-management reconciliation scoring agent postgresql',
+        Enterprise: 'processor oidc secrets geo-country connectors-kafka telecom-asn1 policy connectors notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management reconciliation scoring agent intelligence postgresql',
     },
     run: {     // run.sh == run.bat: oidc group LAST, and NO inspecto-policy.
         Personal: 'processor connectors',
-        Professional: 'processor connectors notify-channels backup entity-list la-graph la-storage la-core la-api geo-link exchange observability ops reconciliation scoring agent oidc secrets geo-country connectors-kafka telecom-asn1 postgresql',
-        Enterprise: 'processor connectors notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops reconciliation scoring agent intelligence oidc secrets geo-country connectors-kafka telecom-asn1 postgresql',
+        Professional: 'processor connectors notify-channels backup entity-list la-graph la-storage la-core la-api geo-link exchange observability ops case-management reconciliation scoring agent oidc secrets geo-country connectors-kafka telecom-asn1 postgresql',
+        Enterprise: 'processor connectors notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management reconciliation scoring agent intelligence oidc secrets geo-country connectors-kafka telecom-asn1 postgresql',
     },
     smoke: {   // the boot-smoke `$cp` literal: connectors before kafka/asn1, policy before connectors.
         Personal: 'processor connectors',
-        Professional: 'processor oidc secrets geo-country connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-graph la-storage la-core la-api geo-link exchange observability ops reconciliation scoring agent postgresql',
-        Enterprise: 'processor oidc secrets geo-country policy connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops reconciliation scoring agent intelligence postgresql',
+        Professional: 'processor oidc secrets geo-country connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-graph la-storage la-core la-api geo-link exchange observability ops case-management reconciliation scoring agent postgresql',
+        Enterprise: 'processor oidc secrets geo-country policy connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management reconciliation scoring agent intelligence postgresql',
     },
-    demo: 'processor demo-auth policy connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops reconciliation scoring agent intelligence postgresql',
-    demoSmoke: 'processor policy connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops reconciliation scoring agent intelligence postgresql demo-auth',
+    demo: 'processor demo-auth policy connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management reconciliation scoring agent intelligence postgresql',
+    demoSmoke: 'processor policy connectors connectors-kafka telecom-asn1 notify-channels backup entity-list la-graph la-storage la-core la-api la-store-pg geo-link exchange observability ops case-management reconciliation scoring agent intelligence postgresql demo-auth',
 };
 const sorted = (s) => s.split(' ').sort().join(' ');
 
