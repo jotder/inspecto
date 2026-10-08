@@ -1,16 +1,16 @@
 ---
 type: Architecture
 title: Module taxonomy — axes, offerings, gates (target model)
-description: How modules are classified for itemized distribution — three axes, Offerings, the Installed/Enabled/Permitted gates, removal semantics. Target model from MODULE-REORG-1; P0 only so far.
+description: How modules are classified for itemized distribution — three axes, Offerings, the Installed/Enabled/Permitted gates, removal semantics. Built by MODULE-REORG-1: manifests, activator, gates, Offerings (checked artifact), thin-jar bundle; the P7 optional-module splits are still landing.
 resource: docs/superpower/module-architecture-reorg-plan.md
 tags: [architecture, modules, offering, editions, itemization]
-timestamp: 2026-10-06T00:00:00Z
+timestamp: 2026-10-08T00:00:00Z
 ---
 
 # Module taxonomy
 
 > 🟡 **Status (2026-10-07): in flight; every phase P0..P7 has a shipped slice, none is finished** (phase table and remaining work: the plan header; open items are `MODULE-REORG-*` rows in `docs/BACKLOG.md`). Vocabulary is in `docs/GLOSSARY.md` §15.
-> Built: the per-module manifest (`META-INF/inspecto/module.toon`, all 34 modules), the activator
+> Built: the per-module manifest (`META-INF/inspecto/module.toon`, every module), the activator
 > (`com.gamma.module` in `inspecto-util`) and `GET /modules`; the per-Space **Enabled** gate (`modules.toon`, `GET|PUT /settings/modules` — a route of a
 > disabled module answers 404 `MODULE_DISABLED`, `/bootstrap` `features{}` and `GET /modules` `enabledInSpace` follow it).
 > Directory regroup DONE 2026-10-07 (layout below). Offerings exist as a checked artifact only (see below). Decisions D-MR1…D-MR12 and phases P0–P7 live in
@@ -28,6 +28,8 @@ absentMessage: "Operational objects are not installed in this bundle ..."   # op
 provides:
   features[1]: ops             # must equal the code's RouteModule.featureIds() (guard-tested)
   contracts[3]: JobTypeProvider,MaintenanceTaskProvider,ObjectEngineProvider
+  storeFamilies[4]: OBJECTS,LINKS,NOTES,TAGS         # operational store families the module owns (StoreFamilyProvider)
+  consequences[1]: create-incident                   # Consequence ids it registers (ConsequenceProvider)
   routes[2]: "GET /objects","GET /objects/([^/]+)"   # METHOD path, the exact regex registered, in registration order (parity-tested)
 requires:
   modules[1]: la-core          # only real runtime edges; empty sections are omitted
@@ -72,12 +74,19 @@ Name a module to Maven by artifactId (`-pl :inspecto-engine`), never by path. `i
 - Closed central registries become **contribution points**; `EventType` is the model to copy.
 - Config naming an absent module loads **inert with a diagnostic** and is never dropped on save.
 
-## Seams as they are today (P1 survey, 2026-10-06)
-- Route modules: ~58 built-ins are an explicit `List.of(...)` in `ControlApi` (`:590-604`); optional modules are
-  already discovered by `OptionalSpi.all(RouteModule.class)` (`:606-619`, fail-soft) and appended after the
-  built-ins. Registration is **first-match in order**, so the built-in order is load-bearing.
-- Six hand-written `Absent*Routes` stubs answer 503 for absent optional modules (second closed registry).
-- A duplicate (METHOD, pattern) fails boot.
+## Seams (current)
+- Route modules: the built-ins are an explicit ordered list in `ControlApi`; optional modules are discovered by
+  `OptionalSpi.all(RouteModule.class)` (fail-soft) and appended after. Registration is **first-match in order**, so the
+  built-in order is load-bearing; a duplicate (METHOD, pattern) fails boot.
+- Absent-module 503s are synthesised from the manifests (`provides.routes` + `absentMessage`, see above); no hand-written stub remains.
+- Other open contribution points discovered the same way: `StoreFamilyProvider` (operational store families), `ConsequenceProvider` (Decision Kernel Consequences), `HostBootHook` (a module's boot-time host installs), `LinkedSubjectProvider`.
+
+<details><summary>History: the P1 survey (2026-10-06), superseded</summary>
+
+At P1 the ~58 built-ins were an explicit `List.of(...)` in `ControlApi` (`:590-604`) with optional modules appended
+(`:606-619`), and six hand-written `Absent*Routes` stubs answered 503 for absent optional modules (a second closed
+registry). Those stubs were replaced by manifest synthesis in P3b.
+</details>
 
 ## Offerings (`offerings/<id>.toon`)
 An Offering composes modules and content; an edition is an Offering that `includes` another. Built in P6a as a
@@ -88,7 +97,7 @@ id: professional
 title: Professional
 tier: professional
 includes[1]: personal
-modules[14]: security,notify-channels,backup,entity-list,la-graph,la-storage,la-core,la-api,geo-link,exchange,metrics,events,ops,agent
+modules[21]: oidc,secrets,geo-country,connectors-kafka,telecom-asn1,notify-channels,backup,entity-list,la-graph,la-storage,la-core,la-api,geo-link,exchange,observability,ops,case-management,action-requests,reconciliation,scoring,agent
 addons:
   linkAnalysis:
     status: built
@@ -100,7 +109,13 @@ addons:
 `modules` use manifest ids; modules with `offeringRole` base or internal are always present and never listed.
 `addons` status `built` names modules that exist today, `planned` names where the code lives until its P7 move.
 `contentPacks[N]` lists Space template ids under `spaces/_templates`; `defaultSpaceSettings:` is an empty
-placeholder. Includes union modules and add-ons. Not yet in CI. Same TOON rules as manifests (no `#` lines).
+placeholder. Includes union modules and add-ons. Same TOON rules as manifests (no `#` lines). `node tools/check-offerings.mjs` is the guard. The example above is abridged from `offerings/professional.toon` (the file also lists every other add-on).
+
+## Packaging (thin jars, P3d-P3f)
+Detail and as-built notes: [plan §6 P3d, P3e, P3f](../../superpower/module-architecture-reorg-plan.md).
+- `tools/offering-classpath.mjs` resolves the Offering (includes + the `requires.modules` closure) and asserts it equals what `tools/bundle-modules.mjs` ships; it writes the bundle's `modules.list` (one jar per line, classpath order, processor first) and `edition.properties` (`edition=Professional`; `variant=demo` for a demo build). Every launcher reads `modules.list`; none hand-keeps a jar list.
+- The first-party core ships as 14 thin jars plus `inspecto.jar` (the processor and third-party code), listed in `core.list`; optional modules ship one jar each, in `modules.list` order after the core.
+- One CycloneDX SBOM per shipped jar under `sbom/`, beside the combined edition SBOM (`tools/sbom-modules.mjs --verify`).
 
 ## Related
 [Architecture layers](architecture-layers.md) · [Editions model](editions/editions-model.md)
