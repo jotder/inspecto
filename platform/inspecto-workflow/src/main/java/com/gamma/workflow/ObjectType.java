@@ -16,7 +16,24 @@ import java.util.Locale;
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public enum ObjectType {
-    ALERT, INCIDENT, CASE, TASK;
+    /**
+     * Legacy: Alerts left the object store in MODULE-REORG-P7 and live in the Alert-owned {@code AlertStore}; no code
+     * writes an ALERT object any more (slice 2 moved the rule-fired Alerts, the ALERT residue retirement of
+     * 2026-10-08 moved the Event bridge's gap / imbalance Alerts). The value stays ONLY for persisted data: a
+     * deployed Space's object table still holds ALERT rows (the one-shot {@code AlertMigration} copies the active
+     * ones and never deletes), the {@code ESCALATED_FROM} link names an Alert as {@code kind ALERT}, and the Alert
+     * lifecycle is {@link Workflow#defaultFor Workflow.defaultFor(ALERT)}.
+     *
+     * <p><b>Retirement condition</b> (all three): (1) {@code AlertMigration} has shipped for one more release and is
+     * removed; (2) object loading tolerates an unknown legacy type, i.e. {@code DbObjectStore} /
+     * {@code InMemoryObjectStore} and the {@code ObjectRoutes} list / get load a row with an unrecognised
+     * {@code type} inert and listed with a diagnostic, never rewritten and never dropped (today a stored {@code ALERT}
+     * row parses only because this value exists); (3) the Alert lifecycle constants move into {@code com.gamma.alert}
+     * and the SPA {@code GOVERNED_OBJECT_TYPES} / objects panels drop {@code ALERT}.
+     */
+    @Deprecated(forRemoval = true)
+    ALERT,
+    INCIDENT, CASE, TASK;
 
     /**
      * Parse a type name case-insensitively. {@code null}/blank returns {@code null} ("no constraint",
