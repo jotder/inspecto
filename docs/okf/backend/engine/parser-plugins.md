@@ -84,13 +84,13 @@ keeps only `XmlParserPlugin`. The module is staged from Professional up and is *
 deliberate behaviour change): without it `Parsers` has no `asn1`, an `asn1` ingest fails with the
 `PluginIngesters.notLoaded` message (which now names the module), and `parser.asn1.ber` in the Step Processor
 catalog reads *planned / not installed* (`ProcessorCatalog.Pack`, resolved at read time from `Parsers`) rather than
-delivered. ⚠ **Deliberate split package:** `Asn1ParserPlugin`/`Asn1GrammarSource` keep `com.gamma.parse` and
-`Asn1RecordIngester` keeps `com.gamma.ingester`, shared with the engine, because
-`com.gamma.ingester.Asn1RecordIngester` is a persisted config string (`frontend: asn1` synthesises it; hand-written
-`plugin.ingester` names it) — renaming the package would have broken saved Pipelines for no gain. Pinned by
+delivered. The three classes live in the module-owned package `com.gamma.telecom.asn1` (P3g, 2026-10-08; they were a deliberate split
+of the engine's `com.gamma.parse`/`com.gamma.ingester` until then), so no package is shared with another module and the jar can be signed.
+`com.gamma.telecom.asn1.Asn1RecordIngester` is the persisted config string (`frontend: asn1` synthesises it; hand-written
+`plugin.ingester` names it); the rename was a breaking change taken freely, no alias. Pinned by
 `Asn1PluginRegistrationTest` (that module). It is — **the first
 hierarchical parser that is `ingestable: true`**, because it names an ingester
-(`com.gamma.ingester.Asn1RecordIngester`, below). Wraps the
+(`com.gamma.telecom.asn1.Asn1RecordIngester`, below). Wraps the
 `asn-facade` module's public `Asn1Decoder`/`RecordMapper` (`providers/asn-parser/asn-decoders/asn-facade`,
 depended on as `com.gamma.asn:asn-facade:0.1.0-SNAPSHOT`, installed to the local repo from the
 separate `providers/asn-parser/asn-decoders` reactor — not yet resolved from this build, see the coordinate
@@ -102,7 +102,7 @@ No `suggest()`.
 
 **A grammar is either pasted TEXT or a stored `.asn` FILE (operator decision 2026-09-23).** A stored
 module is a path-jailed `.asn` file under the Space's config — deliberately **not** a new registry kind.
-Both spellings resolve through ONE class, `com.gamma.parse.Asn1GrammarSource`, which the preview
+Both spellings resolve through ONE class, `com.gamma.telecom.asn1.Asn1GrammarSource`, which the preview
 (`Asn1ParserPlugin.preview`), the flat config (`frontend: asn1`) and the ingester
 (`Asn1RecordIngester`) all call, so a grammar that previews is the grammar that ingests:
 
@@ -222,7 +222,7 @@ them.
 **Served as of 2026-07-31** via `Asn1ParserPlugin` (above) — it appears in the Onboarding Parsing
 stage's toggle and the Pipelines Parser dialog with zero UI change, exactly as designed. The plugin
 sits on the new `asn-facade` API and serves grammar + framing. ⚠ It was preview-only until
-2026-07-31; it now names `com.gamma.ingester.Asn1RecordIngester` via `ingesterClass()`, so
+2026-07-31; it now names `com.gamma.telecom.asn1.Asn1RecordIngester` via `ingesterClass()`, so
 `Parsers.ingestable()` (`Parsers.java:66-68`) is **true** — see "Loading to Tables" below.
 
 ### The tree→segments bridge — `XmlRecordIngester` (2026-08-30)
@@ -276,7 +276,7 @@ preview/authoring*, **and also a first-class `parsing.frontend` value**: `Pipeli
 `parsing.plugin` / `processing.ingester`. Writing the wiring out by hand under `frontend: plugin`
 remains equivalent.
 
-`com.gamma.ingester.Asn1RecordIngester` (module `inspecto-telecom-asn1`, same package as the engine's `TypedRecordIngester`):
+`com.gamma.telecom.asn1.Asn1RecordIngester` (module `inspecto-telecom-asn1`, package `com.gamma.telecom.asn1`, owned by that module alone):
 
 - **Segment key = the decoded record's own name.** For the corpus's union-style vendor grammars
   (a SET/SEQUENCE whose tagged components are the record types) `SchemaBinder.bind` names a record

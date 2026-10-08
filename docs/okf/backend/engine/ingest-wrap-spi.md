@@ -41,7 +41,7 @@ Two drive modes exist above it:
   `processing.streaming.large_file_bytes` (default 256 MB, keyed on the Consignment's **largest** member) picks the
   mode per Consignment — *(this line named a `generation_threshold_bytes` key that exists nowhere until 2026-09-08)*.
 
-**Reference implementation:** `Asn1RecordIngester` (`com.gamma.ingester`) — Java decodes BER/DER
+**Reference implementation:** `Asn1RecordIngester` (`com.gamma.telecom.asn1`) — Java decodes BER/DER
 records against an X.680 grammar and emits them per segment; everything downstream is the shared
 DuckDB path. This is exactly the operator's "feed Java-parsed records into it".
 

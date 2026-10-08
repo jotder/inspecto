@@ -68,7 +68,7 @@ resolvers, one rule (`resolveAgainst`):
   `asn1.*`), and Asn1RecordIngester's `ingester_config.grammar` (= `asn1.grammar_file`). Callers:
   `PipelineConfigParser.resolveSchemaRef` (load), `ConfigSafetyValidator.checkPathValue` (422 gate, handed the same resolver),
   `ConfigRoutes.resolvedPath` (the schema-file WARNING and `declaredColumns`),
-  `PipelineSettingsRoutes.copySchemaFile` (template copy), and `com.gamma.parse.Asn1GrammarSource` (the
+  `PipelineSettingsRoutes.copySchemaFile` (template copy), and `com.gamma.telecom.asn1.Asn1GrammarSource` (the
   ASN.1 grammar file: the parser resolves `ingester_config.grammar` beside the config WITHOUT jailing it,
   and this one resolver — shared with the stand-alone preview, whose base is the Space config root —
   checks the `.asn`/`.asn1` extension and jails it once, at use). Before this they were hand-kept copies
