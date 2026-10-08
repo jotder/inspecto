@@ -1,7 +1,7 @@
 # Approval SPI extraction — plan (2026-10-06)
 
 > ⛔ **SUPERSEDED + ARCHIVED 2026-10-06 (operator), nothing built.** Absorbed by
-> [`module-architecture-reorg-plan.md`](../../superpower/module-architecture-reorg-plan.md) P1: the governable
+> [`module-architecture-reorg-plan.md`](module-architecture-reorg-plan.md) P1: the governable
 > config kinds become a contribution point (this plan's D-AS3), and the hold contract moves with the contract
 > modules (D-MR1). D-AS1…D-AS4 were never answered and are void.
 

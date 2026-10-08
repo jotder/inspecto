@@ -1,3 +1,5 @@
+> **ARCHIVED 2026-10-09: shipped; current knowledge: `docs/okf/backend/module-taxonomy.md`, `module-reorganisation-decisions.md`, `module-reorganisation-gotchas.md`; open items: BACKLOG `MODULE-REORG-*` rows.**
+
 # Module architecture reorganisation — plan (2026-10-06, revised the same day)
 
 > 🟢 **SHIPPED, residue tracked (2026-10-09) — decisions D-MR1…D-MR12 all taken (operator, 2026-10-06, §8); every phase P0..P7 has shipped its slices.** Row: `MODULE-REORG-1` (+ the five follow-up rows below). The plan stays here while those rows are open.
