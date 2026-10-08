@@ -1028,5 +1028,6 @@ the mutant**, and is recorded here as the half of the test that cannot detect th
 
 ⚠ **A Job whose type nothing registers is listed `hosted:false` (`MODULE-REORG-P4-1`, 2026-10-07).** `GET /jobs` used to list it with a live `nextFire` though it
 could never fire. `JobView` now carries `hosted` and `reason`; an unhosted job has an empty `nextFire` and a reason naming the type ("no installed module or Job
-Pack provides it"), and the Jobs pane badges it "Not installed". The reason is generic because module manifests declare no job types. The detail read
+Pack provides it"), and the Jobs pane badges it "Not installed". The reason is generic when no known module declares the type; since P4e manifests declare
+`provides.jobTypes`, so a type a known-but-absent module declares gets `missingModule` and a reason naming the module. The detail read
 (`GET /jobs/{name}`) stays the raw config on purpose. Pinned by `ModuleRemovalJobTest` and `jobs.component.spec.ts`.

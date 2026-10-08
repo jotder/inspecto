@@ -30,6 +30,8 @@ provides:
   contracts[3]: JobTypeProvider,MaintenanceTaskProvider,ObjectEngineProvider
   storeFamilies[4]: OBJECTS,LINKS,NOTES,TAGS         # operational store families the module owns (StoreFamilyProvider)
   consequences[1]: create-incident                   # Consequence ids it registers (ConsequenceProvider)
+  jobTypes[1]: objects.analytics                     # Job Type ids it registers (JobTypeProvider); the Space module gate's owner table (parity-tested)
+  configKinds[3]: workflow,sla-policy,escalation-rule  # registry kinds the module owns (guard: a real roster kind, one owner)
   routes[2]: "GET /objects","GET /objects/([^/]+)"   # METHOD path, the exact regex registered, in registration order (parity-tested)
 requires:
   modules[1]: la-core          # only real runtime edges; empty sections are omitted
@@ -73,6 +75,14 @@ Name a module to Maven by artifactId (`-pl :inspecto-engine`), never by path. `i
 - **No licence engine**; `entitlementKey` is reserved in the manifest only.
 - Closed central registries become **contribution points**; `EventType` is the model to copy.
 - Config naming an absent module loads **inert with a diagnostic** and is never dropped on save.
+- **Removal and disable, as built (P4e).** The registry-kind roster (`ComponentStore.WRITABLE_TYPES`) is one engine list, so an
+  import judges a kind the same on every install: an absent module's kinds (`risk-score`, `reconciliation`) are accepted as inert
+  config, never dropped; what an import refuses (access config, governance kinds, suffix-scanned ops configs) it refuses everywhere
+  (`ConfigKindOwnershipTest`). `provides.configKinds` / `jobTypes` declare ownership. `GET /modules` `inert{modulesToon, configKinds,
+  jobs}` lists what the Space holds for an absent module, and an unhosted Job names it (`missingModule`). A module switched off in a
+  Space (`modules.toon`) also stops its Jobs there: the fire is recorded `SKIPPED` ("switched off in this Space"), a manual trigger
+  or replay answers 404 `MODULE_DISABLED`, the config is untouched and it resumes when re-enabled (`JobModuleGate`, `ModuleDisabledJobTest`).
+  Not stopped: maintenance tasks, the SLA sweep and other non-Job background work (see the plan, *P4e as built*).
 
 ## Seams (current)
 - Route modules: the built-ins are an explicit ordered list in `ControlApi`; optional modules are discovered by
