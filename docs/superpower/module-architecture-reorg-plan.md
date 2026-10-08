@@ -1197,6 +1197,21 @@ got an import and broke the module; those links became `{@code}`. `Handler` in a
 got a second, ambiguous import. (b) `ControlApiIdempotencyScopeTest` stays in the core test tree (package `com.gamma.control`), so it
 is why `Idempotency.Store` internals are public rather than the test moving.
 
+### Independent verification 2026-10-08 (findings and fixes)
+
+A verifier packaging a pristine export of `5359ca938` failed the series. Findings and what each fix did:
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 | **Blocker.** `package.ps1 -Edition Personal -NoUi` exited 1: `$kafkaJarSrc cannot be retrieved because it has not been set` (`Set-StrictMode -Version Latest`). The P7 splits added bundling blocks that read `*JarSrc` variables assigned only in the non-Personal branch. | Root cause found by AST walk, not by trusting the verifier's list: 11 variables (kafka, asn1, entityList, laGraph, laStorage, laCore, laApi, recon, scoring, caseMgmt, actionReq). All initialised `= $null` beside the existing pre-initialisation block. New guard `tools/check-package-strict.mjs` (+ `.ps1`, test with a negative fixture) wired into the CI guards job. |
+| 2 | `EventSink.Holder` used a raw `ServiceLoader...findFirst().orElse(no-op)`: an absent provider dropped audit events silently; a provider failing to link threw from the static initialiser unlogged. | `Holder.resolve(Supplier<Iterator>)`: absent -> no-op plus ONE WARN; `ServiceConfigurationError` -> logged ERROR and rethrown as `IllegalStateException` (never a silent no-op). `EventSinkHolderTest` covers absent / present / failing-to-link. |
+| 3 | `tools/check-sbom-modules.test.mjs` fixtures were line-ending sensitive (red on a CRLF `package.ps1`). | The test reads `package.ps1` LF-normalised. Proved on a CRLF copy of the real file (21/21) and the LF tree (21/21); `package.ps1` endings untouched. |
+| 4 | `JobService` job gate: `typeGate.apply` has no try/catch, so a throwing gate fails the run. | Left as is (the default gate returns null); recorded only. |
+
+**Was Personal already broken before the series? Yes.** The same static check on `08c2b2848^:inspecto/package.ps1` reports 5 unset reads (`entityListJarSrc`, `laGraphJarSrc`, `laStorageJarSrc`, `laCoreJarSrc`, `laApiJarSrc`): the Personal path had been dying under strict mode since entity-list / Link Analysis were bundled; the P7 splits added six more. Check design: PowerShell AST, a variable read is flagged unless an assignment precedes it in the same or an enclosing block (try-body assignments count as dominating; reads inside functions pass if assigned anywhere; parameters, foreach variables, `[ref]` and automatic variables are exempt).
+
+**Proof.** `package.ps1 -NoUi` exit 0 with the boot smoke for Personal, Professional, Enterprise `-DemoAuth` and Preview. Personal: `modules.list` == the 16 staged jars, 16 per-module SBOMs, `edition=Personal`; `serve.bat` answered /health 200 and `/api/v1/bootstrap` showed ops, cases, actionRequests, scoring and reconciliation all false.
+
 ## 7. Success measures (baseline → target)
 
 | Measure | Today | Target |
@@ -1785,6 +1800,8 @@ not worth a content hash).
   matrix show; it does not rest on market or pricing data.
 
 ## 9. Risks and traps (from this repo's own history)
+
+- 🔴 **A bundle edition that no agent packaged is a bundle edition that is broken**: package EVERY edition (Personal, Professional, Enterprise, Preview) after any `package.ps1` change. Personal was red for weeks because every agent packaged only the editions it was working on.
 
 - 🔴 **A guard that goes vacuous** — e.g. `ConfigWriteFunnelTest` finds holds with the regex
   `PendingChanges\.hold\w*\(`; a rename makes it match nothing and pass. Every moved symbol needs the guards
