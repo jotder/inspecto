@@ -5,7 +5,7 @@ import type { ParserTreeNode } from 'app/inspecto/api';
  * (`parsing.plugin`). One draft becomes one segment schema toon, and one segment becomes one Table.
  *
  * ⚠ `selector` is a DOTTED PATH into the decoded record — the contract
- * `com.gamma.ingester.Asn1RecordIngester` reads — not the positional index the text ingesters use.
+ * `com.gamma.telecom.asn1.Asn1RecordIngester` reads — not the positional index the text ingesters use.
  * A selector must name a LEAF: a container (sub-record, or a repeated field's list) resolves to
  * NULL rather than a stringified subtree, so `deriveSegments` never proposes one as a column.
  */

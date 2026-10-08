@@ -97,7 +97,7 @@ describe('stream-bundle — export', () => {
             parsing: {
                 frontend: 'plugin',
                 plugin: {
-                    ingester: 'com.gamma.ingester.Asn1RecordIngester',
+                    ingester: 'com.gamma.telecom.asn1.Asn1RecordIngester',
                     segments: { moCallRecord: 'spaces/demo/config/orders_feed_moCallRecord.toon' },
                     ingester_config: { root_type: 'Record' },
                 },

@@ -1,5 +1,6 @@
-package com.gamma.parse;
+package com.gamma.telecom.asn1;
 
+import com.gamma.parse.ParseResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

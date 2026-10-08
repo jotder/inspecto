@@ -684,8 +684,8 @@ if ($asn1JarSrc) {
         $asn1Reader = New-Object System.IO.StreamReader($asn1Spi.Open())
         $asn1Svc = $asn1Reader.ReadToEnd()
         $asn1Reader.Close()
-        if ($asn1Svc -notmatch 'com\.gamma\.parse\.Asn1ParserPlugin') {
-            throw "inspecto-telecom-asn1.jar's ParserPlugin service file does not list com.gamma.parse.Asn1ParserPlugin."
+        if ($asn1Svc -notmatch 'com\.gamma\.telecom\.asn1\.Asn1ParserPlugin') {
+            throw "inspecto-telecom-asn1.jar's ParserPlugin service file does not list com.gamma.telecom.asn1.Asn1ParserPlugin."
         }
     } finally { $asn1Zip.Dispose() }
 }

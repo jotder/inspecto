@@ -174,7 +174,7 @@ const ASN1_DEF = {
     label: 'ASN.1 — BER/DER encoded records',
     hierarchical: true,
     ingestable: true,
-    ingesterClass: 'com.gamma.ingester.Asn1RecordIngester',
+    ingesterClass: 'com.gamma.telecom.asn1.Asn1RecordIngester',
     grammarSchema: [
         { path: 'asn1.grammar', label: 'ASN.1 grammar', type: 'STRING', description: 'X.680 module text.' },
         {

@@ -1,4 +1,4 @@
-package com.gamma.parse;
+package com.gamma.telecom.asn1;
 
 import com.gamma.config.safety.PathJail;
 

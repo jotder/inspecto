@@ -71,7 +71,7 @@ class ControlApiParsersTest {
             JsonNode asn1 = list.get(7);
             assertTrue(asn1.get("hierarchical").asBoolean());
             assertTrue(asn1.get("ingestable").asBoolean(), "Asn1RecordIngester flattens onto segments");
-            assertEquals("com.gamma.ingester.Asn1RecordIngester", asn1.get("ingesterClass").asText());
+            assertEquals("com.gamma.telecom.asn1.Asn1RecordIngester", asn1.get("ingesterClass").asText());
             assertTrue(list.get(0).get("ingestable").asBoolean());
         }
     }

@@ -1218,7 +1218,7 @@ final class PipelineConfigParser {
             // working directory inside the ingester, which never sees it. ⚠ Keyed on that ingester: the
             // map is free-form, and another plugin's `grammar` need not be a path at all.
             // ⛔ Resolved here, NOT jailed: the .asn/.asn1 check and the one jail are
-            // com.gamma.parse.Asn1GrammarSource's, at use — the resolver the preview shares. Jailing here
+            // com.gamma.telecom.asn1.Asn1GrammarSource's, at use — the resolver the preview shares. Jailing here
             // as well would be a path jailed twice.
             if (ASN1_INGESTER.equals(b.ingesterClass)
                     && icfgMap.get("grammar") instanceof String gref && !gref.isBlank()) {
@@ -1288,7 +1288,7 @@ final class PipelineConfigParser {
     }
 
     /** The ingester whose {@code ingester_config.grammar} is a file ref (the parser resolves it). */
-    private static final String ASN1_INGESTER = "com.gamma.ingester.Asn1RecordIngester";
+    private static final String ASN1_INGESTER = "com.gamma.telecom.asn1.Asn1RecordIngester";
 
     /** The registry-reference prefix a Grammar-bound parser node carries ({@code use: grammar/<id>}). */
     private static final String GRAMMAR_REF_PREFIX = "grammar/";
@@ -1921,7 +1921,7 @@ final class PipelineConfigParser {
      * ({@code asn1.grammar_file}, carried as-authored as the path key {@code ingester_config.grammar} —
      * operator decision 2026-09-23), which the plugin-block read then resolves beside this config into
      * {@code Schemas.ingesterGrammar} like any other ingester's {@code grammar}. Text wins when both are
-     * set; that rule, the extension check and the one jail live in {@code com.gamma.parse.Asn1GrammarSource},
+     * set; that rule, the extension check and the one jail live in {@code com.gamma.telecom.asn1.Asn1GrammarSource},
      * which the preview uses too. Hard-fails
      * (draft rejected before any run) on a missing block, no grammar of either spelling, empty root_type, or missing
      * segments — the tailored messages here, not the generic plugin ones.

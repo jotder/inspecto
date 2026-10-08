@@ -1,4 +1,4 @@
-package com.gamma.ingester;
+package com.gamma.telecom.asn1;
 
 import com.gamma.asn.core.ByteSource;
 import com.gamma.asn.core.Framing;
@@ -11,8 +11,6 @@ import com.gamma.asn.schema.NamedNode;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.RecordSink;
 import com.gamma.etl.StreamingFileIngester;
-import com.gamma.parse.Asn1GrammarSource;
-import com.gamma.parse.Asn1ParserPlugin;
 
 import java.io.File;
 import java.io.IOException;
@@ -25,7 +23,7 @@ import java.util.Set;
 
 /**
  * {@link StreamingFileIngester} for ASN.1 BER/DER files, over the {@code asn-facade} decoder
- * ({@link Asn1Decoder}). This is what makes {@code com.gamma.parse.Asn1ParserPlugin} genuinely
+ * ({@link Asn1Decoder}). This is what makes {@code com.gamma.telecom.asn1.Asn1ParserPlugin} genuinely
  * {@code ingestable} rather than preview-only: records decode, flatten onto segment schemas, and
  * land in Tables through the ordinary {@code parsing.plugin} machinery.
  *
@@ -35,14 +33,14 @@ import java.util.Set;
  * (a SET/SEQUENCE whose tagged components are the record types), so that name is the matched
  * <em>alternative</em> (e.g. {@code moCallRecord}); for a single-type grammar it is the root type
  * name. Records whose name is not a declared segment are counted as junk and skipped, exactly as
- * {@link TypedRecordIngester} treats an unknown type prefix.
+ * {@code TypedRecordIngester} treats an unknown type prefix.
  *
  * <h3>Columns</h3>
  * A segment's columns are its schema's {@code raw.fields} — but unlike the positional text
  * ingesters, {@code raw.fields[].selector} is a <b>dotted path</b> into the decoded record
  * ({@link RecordMapper#toMap}), e.g. {@code servedIMSI} or {@code recordExtensions.chargeAmount}.
  * A trailing {@code EVENT_TYPE} column is derived (the segment key), so schemas can partition by
- * record type without redeclaring it — the {@link TypedRecordIngester} convention.
+ * record type without redeclaring it — the {@code TypedRecordIngester} convention.
  *
  * <p>⚠ A selector must name a <b>leaf</b>. Resolving to a container (a sub-record, or a repeated
  * field's list) yields {@code NULL}, not a stringified subtree — deliberately matching the legacy
@@ -54,7 +52,7 @@ import java.util.Set;
  * parsing:
  *   frontend: plugin
  *   plugin:
- *     ingester: com.gamma.ingester.Asn1RecordIngester
+ *     ingester: com.gamma.telecom.asn1.Asn1RecordIngester
  *     segments:
  *       moCallRecord: config/cdr/mo_call_schema.toon
  *       smsRecord:    config/cdr/sms_schema.toon

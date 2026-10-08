@@ -1,4 +1,4 @@
-package com.gamma.ingester;
+package com.gamma.telecom.asn1;
 
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.RecordSink;
@@ -285,7 +285,7 @@ class Asn1RecordIngesterTest {
                 processing:
                   threads: 1
                   file_pattern: "glob:**/*.ber"
-                  ingester: com.gamma.ingester.Asn1RecordIngester
+                  ingester: com.gamma.telecom.asn1.Asn1RecordIngester
                   segments:
                     moCallRecord: %s
                   ingester_config:

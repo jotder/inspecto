@@ -1,4 +1,4 @@
-package com.gamma.parse;
+package com.gamma.telecom.asn1;
 
 import com.gamma.asn.core.BerReader;
 import com.gamma.asn.core.ByteSource;
@@ -12,6 +12,8 @@ import com.gamma.asn.facade.Asn1Decoder;
 import com.gamma.asn.schema.NamedNode;
 import com.gamma.config.spec.FieldSpec;
 import com.gamma.config.spec.FieldType;
+import com.gamma.parse.ParseResult;
+import com.gamma.parse.ParserPlugin;
 import com.gamma.pipeline.SpaceConfigRoot;
 
 import java.nio.file.Path;
@@ -77,7 +79,7 @@ public final class Asn1ParserPlugin implements ParserPlugin {
      */
     @Override
     public Optional<String> ingesterClass() {
-        return Optional.of("com.gamma.ingester.Asn1RecordIngester");
+        return Optional.of("com.gamma.telecom.asn1.Asn1RecordIngester");
     }
 
     @Override

@@ -43,7 +43,7 @@ class ProcessorCatalogContractTest {
             @Override public boolean hierarchical() { return true; }
             @Override public List<FieldSpec> grammarSchema() { return List.of(); }
             @Override public ParseResult preview(byte[] sample, Map<String, Object> grammar) { return new ParseResult.Tree(0, List.of()); }
-            @Override public Optional<String> ingesterClass() { return Optional.of("com.gamma.ingester.Asn1RecordIngester"); }
+            @Override public Optional<String> ingesterClass() { return Optional.of("com.gamma.telecom.asn1.Asn1RecordIngester"); }
         };
     }
 

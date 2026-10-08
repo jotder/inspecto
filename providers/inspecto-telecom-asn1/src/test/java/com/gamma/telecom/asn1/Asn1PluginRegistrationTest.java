@@ -1,5 +1,8 @@
-package com.gamma.parse;
+package com.gamma.telecom.asn1;
 
+import com.gamma.parse.ParseResult;
+import com.gamma.parse.ParserPlugin;
+import com.gamma.parse.Parsers;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -11,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The ASN.1 plugin is discovered through the engine's {@code ParserPlugin} ServiceLoader seam from THIS module's
  * own services file, and keeps the persisted ingester class name — a Pipeline's TOON names
- * {@code com.gamma.ingester.Asn1RecordIngester}, so moving the plugin out of the engine must not move that string.
+ * {@code com.gamma.telecom.asn1.Asn1RecordIngester}, so moving the plugin out of the engine must not move that string.
  * (Moved out of the engine's ParsersTest with the plugin, MODULE-REORG-1 P7.)
  */
 class Asn1PluginRegistrationTest {
@@ -31,8 +34,8 @@ class Asn1PluginRegistrationTest {
         ParserPlugin asn1 = Parsers.get("asn1").orElseThrow();
         assertTrue(asn1.hierarchical());
         assertTrue(Parsers.ingestable(asn1), "Asn1RecordIngester flattens onto segment schemas");
-        assertEquals("com.gamma.ingester.Asn1RecordIngester", asn1.ingesterClass().orElseThrow());
-        assertEquals(asn1, Parsers.forIngester("com.gamma.ingester.Asn1RecordIngester").orElseThrow());
+        assertEquals("com.gamma.telecom.asn1.Asn1RecordIngester", asn1.ingesterClass().orElseThrow());
+        assertEquals(asn1, Parsers.forIngester("com.gamma.telecom.asn1.Asn1RecordIngester").orElseThrow());
     }
 
     @Test

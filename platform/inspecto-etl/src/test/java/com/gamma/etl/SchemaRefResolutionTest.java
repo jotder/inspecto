@@ -171,7 +171,7 @@ class SchemaRefResolutionTest {
                 processing:
                   threads: 1
                   file_pattern: "glob:**/*.ber"
-                  ingester: com.gamma.ingester.Asn1RecordIngester
+                  ingester: com.gamma.telecom.asn1.Asn1RecordIngester
                   ingester_config:
                     grammar: cdr.asn
                     root_type: Rec

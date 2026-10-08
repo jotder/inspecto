@@ -194,7 +194,7 @@ class UnifiedParsingBlockTest {
                     segments:
                       Record: %s
                 """.formatted(seg.toString().replace('\\', '/')));
-        assertEquals("com.gamma.ingester.Asn1RecordIngester", cfg.schemas().ingesterClass());
+        assertEquals("com.gamma.telecom.asn1.Asn1RecordIngester", cfg.schemas().ingesterClass());
         assertEquals(java.util.Set.of("Record"), cfg.schemas().segments().keySet());
         assertTrue(String.valueOf(cfg.schemas().ingesterConfig().get("grammar_text")).contains("DEFINITIONS"),
                 "the grammar travels inline as grammar_text, never as the path-jailed grammar key");
@@ -308,7 +308,7 @@ class UnifiedParsingBlockTest {
                   asn1:
                     profile_file: vendors/acme/acme.decode.toon
                 """);
-        assertEquals("com.gamma.ingester.Asn1RecordIngester", cfg.schemas().ingesterClass());
+        assertEquals("com.gamma.telecom.asn1.Asn1RecordIngester", cfg.schemas().ingesterClass());
         assertEquals(java.util.List.of("moCallRecord", "mtCallRecord"),
                 java.util.List.copyOf(cfg.schemas().segments().keySet()));
         assertEquals(dir.resolve("vendors/acme/acme.asn").toAbsolutePath().normalize(),

@@ -327,7 +327,7 @@ describe('ComponentFormDialog', () => {
         it('refuses a plugin Grammar rather than replacing it with DSV settings', () => {
             const { c, api, fixture } = grammarDialog({
                 frontend: 'plugin',
-                plugin: { ingesterClass: 'com.gamma.Asn1RecordIngester', segments: { cdr: 'x_cdr.toon' } },
+                plugin: { ingesterClass: 'com.gamma.telecom.asn1.Asn1RecordIngester', segments: { cdr: 'x_cdr.toon' } },
             });
             expect(c.grammarUnauthorable).toBe('plugin');
             c.submit();

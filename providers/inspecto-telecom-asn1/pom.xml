@@ -19,9 +19,8 @@
         OPTIONAL Telecom industry-pack module (MODULE-REORG-1 P7, plan 4 / 8a): the ASN.1 BER ParserPlugin
         (id asn1), its grammar resolver and its streaming record ingester, over the asn-facade API of the nested
         providers/asn-parser/asn-decoders reactor. Discovered through the engine's com.gamma.parse.ParserPlugin ServiceLoader
-        seam. Packages com.gamma.parse and com.gamma.ingester are SHARED with inspecto-engine on purpose: the
-        ingester class name com.gamma.ingester.Asn1RecordIngester is a persisted config string (pipelines name it),
-        so it must keep resolving. Professional and above only - the Personal edition does not ship it, and
+        seam. All three classes live in the module-owned package com.gamma.telecom.asn1 (no package is shared with another
+        module); com.gamma.telecom.asn1.Asn1RecordIngester is the class name pipelines persist. Professional and above only - the Personal edition does not ship it, and
         the Step Processor catalog then reports parser.asn1.ber as not installed instead of delivered.
     </description>
 
