@@ -1,0 +1,1090 @@
+{
+  "paths" : {
+    "/objects" : {
+      "get" : {
+        "tags" : [ "objects" ],
+        "summary" : "GET /objects (generated skeleton)",
+        "operationId" : "getObjects",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "post" : {
+        "tags" : [ "objects" ],
+        "summary" : "POST /objects (generated skeleton)",
+        "operationId" : "postObjects",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/objects/analytics" : {
+      "get" : {
+        "tags" : [ "objects" ],
+        "summary" : "GET /objects/analytics (generated skeleton)",
+        "operationId" : "getObjectsAnalytics",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/objects/{objectId}/ack" : {
+      "post" : {
+        "tags" : [ "objects" ],
+        "summary" : "POST /objects/{objectId}/ack (generated skeleton)",
+        "operationId" : "postObjectsByObjectIdAck",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/objects/{objectId}/resolve" : {
+      "post" : {
+        "tags" : [ "objects" ],
+        "summary" : "Resolve an Incident, Alert or Case",
+        "operationId" : "postObjectsByObjectIdResolve",
+        "description" : "The fixed `resolve` action (WS-10). An Incident resolves only with a `disposition` from the Disposition ladder — absent or unknown is 422, as is any other gap of the resolution gate (timeline, cause analysis, corrective actions, SLA). A `disposition` on a non-Incident is 422: a Case records its Disposition in its Findings. Reopening an Incident clears the recorded disposition, so the next resolve must decide again.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "required" : false,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "actor" : {
+                    "type" : "string",
+                    "description" : "Who made the move; defaults to the signed-in principal."
+                  },
+                  "disposition" : {
+                    "$ref" : "#/components/schemas/Disposition"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The object after the move (its attribute bag carries the recorded disposition).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "400" : {
+            "$ref" : "#/components/responses/BadRequest"
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "422" : {
+            "$ref" : "#/components/responses/ValidationFailed"
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/objects/{objectId}/transition" : {
+      "post" : {
+        "tags" : [ "objects" ],
+        "summary" : "Move an object through its Workflow",
+        "operationId" : "postObjectsByObjectIdTransition",
+        "description" : "Body `{action}` (a Workflow action, e.g. `accept`, `resolve`, `archive`, `reopen`) or `{status}` / `{to}` (a target state); one of them is required (else 400). `disposition` rides only a move that DECIDES an Incident — `RESOLVED`, or any terminal state of its Workflow except `ARCHIVED` — where it is REQUIRED (a value of the Disposition ladder, else 422); on any other move it is 422. Moving an Incident out of RESOLVED/ARCHIVED back to a working state (reopen) clears the recorded disposition.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "action" : {
+                    "type" : "string",
+                    "description" : "A Workflow action of the object's type."
+                  },
+                  "status" : {
+                    "type" : "string",
+                    "description" : "A target state, instead of an action."
+                  },
+                  "to" : {
+                    "type" : "string",
+                    "description" : "Alias of status."
+                  },
+                  "actor" : {
+                    "type" : "string",
+                    "description" : "Who made the move; defaults to the signed-in principal."
+                  },
+                  "disposition" : {
+                    "$ref" : "#/components/schemas/Disposition"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The object after the move (its attribute bag carries the recorded disposition).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "400" : {
+            "$ref" : "#/components/responses/BadRequest"
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "422" : {
+            "$ref" : "#/components/responses/ValidationFailed"
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/objects/{objectId}/assign" : {
+      "post" : {
+        "tags" : [ "objects" ],
+        "summary" : "POST /objects/{objectId}/assign (generated skeleton)",
+        "operationId" : "postObjectsByObjectIdAssign",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/objects/{objectId}/links" : {
+      "post" : {
+        "tags" : [ "objects" ],
+        "summary" : "POST /objects/{objectId}/links (generated skeleton)",
+        "operationId" : "postObjectsByObjectIdLinks",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "get" : {
+        "tags" : [ "objects" ],
+        "summary" : "GET /objects/{objectId}/links (generated skeleton)",
+        "operationId" : "getObjectsByObjectIdLinks",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "delete" : {
+        "tags" : [ "objects" ],
+        "summary" : "DELETE /objects/{objectId}/links (generated skeleton)",
+        "operationId" : "deleteObjectsByObjectIdLinks",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/objects/{objectId}/graph" : {
+      "get" : {
+        "tags" : [ "objects" ],
+        "summary" : "GET /objects/{objectId}/graph (generated skeleton)",
+        "operationId" : "getObjectsByObjectIdGraph",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/objects/{objectId}/comments" : {
+      "post" : {
+        "tags" : [ "objects" ],
+        "summary" : "POST /objects/{objectId}/comments (generated skeleton)",
+        "operationId" : "postObjectsByObjectIdComments",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "get" : {
+        "tags" : [ "objects" ],
+        "summary" : "GET /objects/{objectId}/comments (generated skeleton)",
+        "operationId" : "getObjectsByObjectIdComments",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/objects/{objectId}/attachments" : {
+      "post" : {
+        "tags" : [ "objects" ],
+        "summary" : "POST /objects/{objectId}/attachments (generated skeleton)",
+        "operationId" : "postObjectsByObjectIdAttachments",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "get" : {
+        "tags" : [ "objects" ],
+        "summary" : "GET /objects/{objectId}/attachments (generated skeleton)",
+        "operationId" : "getObjectsByObjectIdAttachments",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/objects/{objectId}/rca" : {
+      "post" : {
+        "tags" : [ "objects" ],
+        "summary" : "POST /objects/{objectId}/rca (generated skeleton)",
+        "operationId" : "postObjectsByObjectIdRca",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/objects/{objectId}/findings" : {
+      "put" : {
+        "tags" : [ "objects" ],
+        "summary" : "Save a Case's Findings values (collaboration; open to anyone who can see the object)",
+        "operationId" : "putObjectsByObjectIdFindings",
+        "description" : "Stores the canonical attributes.findings blob plus the flat recordsAffected copy (derived server-side; a Case's money is its typed impact, PUT /objects/{id}/impact), validated against the effective findings-spec (422). The body may carry ONLY 'findings' — any other key is refused 422, so disposition stays on the canAdminister PATCH /objects/{id}. Missing 'findings' → 400; out-of-scope or unknown id → 404. Audited as an OBJECT_ACTIVITY 'findings' event with the request's actor.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "findings" ],
+                "additionalProperties" : false,
+                "properties" : {
+                  "findings" : {
+                    "type" : "object",
+                    "description" : "Findings values by section key; each a scalar",
+                    "additionalProperties" : {
+                      "type" : [ "string", "number", "boolean", "null" ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); data is the updated object."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/objects/{objectId}" : {
+      "get" : {
+        "tags" : [ "objects" ],
+        "summary" : "GET /objects/{objectId} (generated skeleton)",
+        "operationId" : "getObjectsByObjectId",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "patch" : {
+        "tags" : [ "objects" ],
+        "summary" : "Edit an object's operator-mutable fields (priority, severity, assignee, attributes)",
+        "operationId" : "patchObjectsByObjectId",
+        "description" : "Gated canAdminister (disposition is administrative, operator decision 2026-09-15). Findings values have their own collaboration route, PUT /objects/{objectId}/findings. Optional body `version` (the integer a GET returned): if the stored object has moved on, 409 CONFLICT_STALE_VERSION and nothing is written; absent keeps last-write-wins; a non-integer is 400. On a build without inspecto-ops the core stub answers 503 not-installed.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); data is the updated object."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/rca/templates" : {
+      "get" : {
+        "tags" : [ "rca" ],
+        "summary" : "GET /rca/templates (generated skeleton)",
+        "operationId" : "getRcaTemplates",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/workflows/{workflowId}" : {
+      "get" : {
+        "tags" : [ "workflows" ],
+        "summary" : "GET /workflows/{workflowId} (generated skeleton)",
+        "operationId" : "getWorkflowsByWorkflowId",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "workflowId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/findings/{findingId}" : {
+      "get" : {
+        "tags" : [ "findings" ],
+        "summary" : "GET /findings/{findingId} (generated skeleton)",
+        "operationId" : "getFindingsByFindingId",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "findingId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/notes/{noteId}/{noteId2}" : {
+      "get" : {
+        "tags" : [ "notes" ],
+        "summary" : "GET /notes/{noteId}/{noteId2} (generated skeleton)",
+        "operationId" : "getNotesByNoteIdByNoteId2",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "noteId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "noteId2",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/notes/{noteId}/{noteId2}/comments" : {
+      "get" : {
+        "tags" : [ "notes" ],
+        "summary" : "GET /notes/{noteId}/{noteId2}/comments (generated skeleton)",
+        "operationId" : "getNotesByNoteIdByNoteId2Comments",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "noteId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "noteId2",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "post" : {
+        "tags" : [ "notes" ],
+        "summary" : "POST /notes/{noteId}/{noteId2}/comments (generated skeleton)",
+        "operationId" : "postNotesByNoteIdByNoteId2Comments",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "noteId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "noteId2",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/notes/{noteId}/{noteId2}/attachments" : {
+      "get" : {
+        "tags" : [ "notes" ],
+        "summary" : "GET /notes/{noteId}/{noteId2}/attachments (generated skeleton)",
+        "operationId" : "getNotesByNoteIdByNoteId2Attachments",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "noteId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "noteId2",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "post" : {
+        "tags" : [ "notes" ],
+        "summary" : "POST /notes/{noteId}/{noteId2}/attachments (generated skeleton)",
+        "operationId" : "postNotesByNoteIdByNoteId2Attachments",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "noteId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "noteId2",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/tags" : {
+      "get" : {
+        "tags" : [ "tags" ],
+        "summary" : "GET /tags (generated skeleton)",
+        "operationId" : "getTags",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "post" : {
+        "tags" : [ "tags" ],
+        "summary" : "POST /tags (generated skeleton)",
+        "operationId" : "postTags",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/tags/{tagId}/rename" : {
+      "post" : {
+        "tags" : [ "tags" ],
+        "summary" : "POST /tags/{tagId}/rename (generated skeleton)",
+        "operationId" : "postTagsByTagIdRename",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "tagId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/tags/rules" : {
+      "get" : {
+        "tags" : [ "tags" ],
+        "summary" : "GET /tags/rules (generated skeleton)",
+        "operationId" : "getTagsRules",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "post" : {
+        "tags" : [ "tags" ],
+        "summary" : "POST /tags/rules (generated skeleton)",
+        "operationId" : "postTagsRules",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/tags/rules/{ruleId}" : {
+      "delete" : {
+        "tags" : [ "tags" ],
+        "summary" : "DELETE /tags/rules/{ruleId} (generated skeleton)",
+        "operationId" : "deleteTagsRulesByRuleId",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "ruleId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/tags/rules/{ruleId}/apply" : {
+      "post" : {
+        "tags" : [ "tags" ],
+        "summary" : "POST /tags/rules/{ruleId}/apply (generated skeleton)",
+        "operationId" : "postTagsRulesByRuleIdApply",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "ruleId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/tags/{tagId}/targets" : {
+      "get" : {
+        "tags" : [ "tags" ],
+        "summary" : "GET /tags/{tagId}/targets (generated skeleton)",
+        "operationId" : "getTagsByTagIdTargets",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "tagId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/tags/assignments/{assignmentId}/{assignmentId2}" : {
+      "get" : {
+        "tags" : [ "tags" ],
+        "summary" : "GET /tags/assignments/{assignmentId}/{assignmentId2} (generated skeleton)",
+        "operationId" : "getTagsAssignmentsByAssignmentIdByAssignmentId2",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "assignmentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "assignmentId2",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "post" : {
+        "tags" : [ "tags" ],
+        "summary" : "POST /tags/assignments/{assignmentId}/{assignmentId2} (generated skeleton)",
+        "operationId" : "postTagsAssignmentsByAssignmentIdByAssignmentId2",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "assignmentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "assignmentId2",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/tags/assignments/{assignmentId}/{assignmentId2}/{assignmentId22}" : {
+      "delete" : {
+        "tags" : [ "tags" ],
+        "summary" : "DELETE /tags/assignments/{assignmentId}/{assignmentId2}/{assignmentId22} (generated skeleton)",
+        "operationId" : "deleteTagsAssignmentsByAssignmentIdByAssignmentId2ByAssignmentId22",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "assignmentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "assignmentId2",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "assignmentId22",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/tags/{tagId}" : {
+      "delete" : {
+        "tags" : [ "tags" ],
+        "summary" : "DELETE /tags/{tagId} (generated skeleton)",
+        "operationId" : "deleteTagsByTagId",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "tagId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/objects/{objectId}/postmortem" : {
+      "put" : {
+        "tags" : [ "objects" ],
+        "summary" : "PUT /objects/{objectId}/postmortem (generated skeleton)",
+        "operationId" : "putObjectsByObjectIdPostmortem",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/objects/{objectId}/impact" : {
+      "put" : {
+        "tags" : [ "objects" ],
+        "summary" : "Replace an Incident's or Case's typed financial impact (WS-10)",
+        "operationId" : "putObjectsByObjectIdImpact",
+        "description" : "Gated on canWorkIncidents. Body {impact:{...}} and nothing else; {} clears the impact. Amounts are non-negative decimals (number or string, at most 6 decimal places); currency is an ISO 4217 code, required when any amount is set. outstanding = confirmed - recovered is derived on read (the object's top-level impact block) and refused here. 400 missing/non-object impact; 422 invalid impact (an amount over 40 characters included), another key, or an Alert/Task; 409 an ARCHIVED Incident, or on a RESOLVED Incident / CLOSED Case any change but recovered / prevented (late recoveries); 404 unknown or out-of-scope id. Audited as an OBJECT_ACTIVITY impact event with the stored value before and after.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "impact" ],
+                "additionalProperties" : false,
+                "properties" : {
+                  "impact" : {
+                    "type" : "object",
+                    "additionalProperties" : false,
+                    "properties" : {
+                      "suspected" : {
+                        "type" : [ "number", "string" ]
+                      },
+                      "confirmed" : {
+                        "type" : [ "number", "string" ]
+                      },
+                      "recovered" : {
+                        "type" : [ "number", "string" ]
+                      },
+                      "prevented" : {
+                        "type" : [ "number", "string" ]
+                      },
+                      "currency" : {
+                        "type" : "string",
+                        "pattern" : "^[A-Za-z]{3}$"
+                      },
+                      "period" : {
+                        "type" : "string",
+                        "maxLength" : 64
+                      },
+                      "basis" : {
+                        "type" : "string",
+                        "maxLength" : 2000
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped operational object (see #/components/schemas/Envelope); data.impact carries the four amounts and the derived outstanding as exact decimal strings, plus currency, period and basis."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/objects/{objectId}/category" : {
+      "put" : {
+        "tags" : [ "objects" ],
+        "summary" : "PUT /objects/{objectId}/category (generated skeleton)",
+        "operationId" : "putObjectsByObjectIdCategory",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    }
+  }
+}

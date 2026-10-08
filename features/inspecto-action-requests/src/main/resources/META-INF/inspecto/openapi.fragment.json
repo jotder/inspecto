@@ -1,0 +1,140 @@
+{
+  "paths" : {
+    "/action-requests" : {
+      "get" : {
+        "tags" : [ "action-requests" ],
+        "summary" : "GET /action-requests (generated skeleton)",
+        "operationId" : "getActionRequests",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      },
+      "post" : {
+        "tags" : [ "action-requests" ],
+        "summary" : "POST /action-requests (generated skeleton)",
+        "operationId" : "postActionRequests",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/action-requests/{actionrequestId}" : {
+      "get" : {
+        "tags" : [ "action-requests" ],
+        "summary" : "GET /action-requests/{actionrequestId} (generated skeleton)",
+        "operationId" : "getActionRequestsByActionrequestId",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "actionrequestId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/action-requests/{actionrequestId}/approve" : {
+      "post" : {
+        "tags" : [ "action-requests" ],
+        "summary" : "POST /action-requests/{actionrequestId}/approve (generated skeleton)",
+        "operationId" : "postActionRequestsByActionrequestIdApprove",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "actionrequestId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/action-requests/{actionrequestId}/decline" : {
+      "post" : {
+        "tags" : [ "action-requests" ],
+        "summary" : "POST /action-requests/{actionrequestId}/decline (generated skeleton)",
+        "operationId" : "postActionRequestsByActionrequestIdDecline",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "actionrequestId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/action-requests/{actionrequestId}/retry" : {
+      "post" : {
+        "tags" : [ "action-requests" ],
+        "summary" : "POST /action-requests/{actionrequestId}/retry (generated skeleton)",
+        "operationId" : "postActionRequestsByActionrequestIdRetry",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "actionrequestId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/action-requests/{actionrequestId}/mark-failed" : {
+      "post" : {
+        "tags" : [ "action-requests" ],
+        "summary" : "POST /action-requests/{actionrequestId}/mark-failed (generated skeleton)",
+        "operationId" : "postActionRequestsByActionrequestIdMarkFailed",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "actionrequestId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    }
+  }
+}

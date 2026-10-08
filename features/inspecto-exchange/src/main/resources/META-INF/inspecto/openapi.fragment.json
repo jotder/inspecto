@@ -1,0 +1,258 @@
+{
+  "paths" : {
+    "/exchange/offers" : {
+      "get" : {
+        "tags" : [ "exchange" ],
+        "summary" : "GET /exchange/offers (generated skeleton)",
+        "operationId" : "getExchangeOffers",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "post" : {
+        "tags" : [ "exchange" ],
+        "summary" : "POST /exchange/offers (generated skeleton)",
+        "operationId" : "postExchangeOffers",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/exchange/signal-offers" : {
+      "post" : {
+        "tags" : [ "exchange" ],
+        "summary" : "POST /exchange/signal-offers (generated skeleton)",
+        "operationId" : "postExchangeSignalOffers",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/exchange/refresh" : {
+      "post" : {
+        "tags" : [ "exchange" ],
+        "summary" : "POST /exchange/refresh (generated skeleton)",
+        "operationId" : "postExchangeRefresh",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/exchange/requests" : {
+      "post" : {
+        "tags" : [ "exchange" ],
+        "summary" : "POST /exchange/requests (generated skeleton)",
+        "operationId" : "postExchangeRequests",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/exchange/grants/{grantId}/{action}" : {
+      "post" : {
+        "tags" : [ "exchange" ],
+        "summary" : "POST /exchange/grants/{grantId}/{action} (generated skeleton)",
+        "operationId" : "postExchangeGrantsByGrantIdByAction",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "grantId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "action",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/exchange/grants/{grantId}/pin" : {
+      "post" : {
+        "tags" : [ "exchange" ],
+        "summary" : "POST /exchange/grants/{grantId}/pin (generated skeleton)",
+        "operationId" : "postExchangeGrantsByGrantIdPin",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "grantId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/exchange/grants/{grantId}/expiry" : {
+      "post" : {
+        "tags" : [ "exchange" ],
+        "summary" : "POST /exchange/grants/{grantId}/expiry (generated skeleton)",
+        "operationId" : "postExchangeGrantsByGrantIdExpiry",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "grantId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/exchange/grants" : {
+      "get" : {
+        "tags" : [ "exchange" ],
+        "summary" : "GET /exchange/grants (generated skeleton)",
+        "operationId" : "getExchangeGrants",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/exchange/datasets/{datasetId}/{datasetId2}" : {
+      "get" : {
+        "tags" : [ "exchange" ],
+        "summary" : "GET /exchange/datasets/{datasetId}/{datasetId2} (generated skeleton)",
+        "operationId" : "getExchangeDatasetsByDatasetIdByDatasetId2",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "datasetId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "datasetId2",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/exchange/widgets/{widgetId}/{widgetId2}" : {
+      "get" : {
+        "tags" : [ "exchange" ],
+        "summary" : "GET /exchange/widgets/{widgetId}/{widgetId2} (generated skeleton)",
+        "operationId" : "getExchangeWidgetsByWidgetIdByWidgetId2",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "widgetId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "widgetId2",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/exchange/views/{viewId}/{viewId2}" : {
+      "get" : {
+        "tags" : [ "exchange" ],
+        "summary" : "GET /exchange/views/{viewId}/{viewId2} (generated skeleton)",
+        "operationId" : "getExchangeViewsByViewIdByViewId2",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "viewId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "viewId2",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    }
+  }
+}

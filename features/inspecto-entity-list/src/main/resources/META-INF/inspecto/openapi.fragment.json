@@ -1,0 +1,158 @@
+{
+  "paths" : {
+    "/entity-lists" : {
+      "get" : {
+        "tags" : [ "entity-lists" ],
+        "summary" : "GET /entity-lists (generated skeleton)",
+        "operationId" : "getEntityLists",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "post" : {
+        "tags" : [ "entity-lists" ],
+        "summary" : "POST /entity-lists (generated skeleton)",
+        "operationId" : "postEntityLists",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/entity-lists/{entitylistId}" : {
+      "get" : {
+        "tags" : [ "entity-lists" ],
+        "summary" : "GET /entity-lists/{entitylistId} (generated skeleton)",
+        "operationId" : "getEntityListsByEntitylistId",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "entitylistId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/entity-lists/{entitylistId}/members" : {
+      "post" : {
+        "tags" : [ "entity-lists" ],
+        "summary" : "POST /entity-lists/{entitylistId}/members (generated skeleton)",
+        "operationId" : "postEntityListsByEntitylistIdMembers",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "entitylistId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/entity-lists/{entitylistId}/retire" : {
+      "post" : {
+        "tags" : [ "entity-lists" ],
+        "summary" : "POST /entity-lists/{entitylistId}/retire (generated skeleton)",
+        "operationId" : "postEntityListsByEntitylistIdRetire",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "entitylistId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/entity-lists/{entitylistId}/match" : {
+      "post" : {
+        "tags" : [ "entity-lists" ],
+        "summary" : "POST /entity-lists/{entitylistId}/match (generated skeleton)",
+        "operationId" : "postEntityListsByEntitylistIdMatch",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "entitylistId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/entity-lists/{entitylistId}/register-dataset" : {
+      "post" : {
+        "tags" : [ "entity-lists" ],
+        "summary" : "Register an Entity List's sidecar as a Dataset",
+        "operationId" : "postEntityListsByEntitylistIdRegisterDataset",
+        "description" : "ASSURE-ENTITY-LISTS-RESIDUALS-1 (3). The explicit, manual action that creates the Dataset `entity_list_<id>` (`physicalRef: entity_list_<id>`) over the list's Parquet sidecar, through the same validated save path as a hand-authored Dataset (POST /components/dataset). No body. A list write never registers a Dataset; only this call does. Needs canAuthorWorkbench (the Dataset-authoring capability). Gates: no write root 503; unknown list 404; no sidecar on disk (no data root, or no list write since) 409; a Dataset of that id already exists 409 (never rewritten, so a repeat is safe); an approval policy for kind `dataset` 409 (refused, not held); the Dataset gate 422. No path-jail 403: the only path is built from a validated list id.",
+        "parameters" : [ {
+          "name" : "entitylistId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "201" : {
+            "description" : "Registered. Envelope data `{listId, datasetId, physicalRef, dataset}`; `dataset` is the stored component as POST /components/dataset answers it."
+          },
+          "403" : {
+            "description" : "The caller lacks canAuthorWorkbench."
+          },
+          "404" : {
+            "description" : "No such Entity List."
+          },
+          "409" : {
+            "description" : "No sidecar on disk, a Dataset of that id already exists, or the Space's approval policy governs Datasets. Nothing was written."
+          },
+          "503" : {
+            "description" : "No write root, or Entity Lists are not installed in this edition."
+          }
+        },
+        "x-optional-module" : true
+      }
+    }
+  }
+}
