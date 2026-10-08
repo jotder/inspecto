@@ -164,6 +164,23 @@ class MaterializeTaskTest {
         }
     }
 
+    /** A non-positive limit keeps its old meaning (the spec parser clamps to 1): a one-row result still lands. */
+    @Test
+    void aNonPositiveLimitStillWritesAOneRowSnapshot(@TempDir Path writeRoot, @TempDir Path dataDir) throws Exception {
+        seedSource(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+        try {
+            for (String lim : List.of("0", "-5")) {
+                JobResult r = new MaintenanceJob(job(Map.of("task", "materialize", "dataset", "sales_ds",
+                        "target", "total_" + (lim.startsWith("-") ? "neg" : "zero"),
+                        "measures", "count", "limit", lim)), dataDir.toString()).run();
+                assertTrue(r.message().contains("1 row(s)"), "limit " + lim + ": " + r.message());
+            }
+        } finally {
+            System.clearProperty("assist.write.root");
+        }
+    }
+
     @Test
     void failClosedGates(@TempDir Path writeRoot, @TempDir Path dataDir) throws Exception {
         seedSource(writeRoot);

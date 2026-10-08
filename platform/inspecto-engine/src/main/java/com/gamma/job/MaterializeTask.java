@@ -77,7 +77,7 @@ final class MaterializeTask {
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new IllegalArgumentException("unknown dataset '" + source + "'"));
         String relationSql = DatasetRelation.relationSql(dataset, dataRoot, new ViewStore(writeRoot.resolve("views")));
-        int cap = Math.min(Integer.parseInt(cfg.opt("limit", "1000000")), MAX_ROWS);
+        int cap = Math.max(1, Math.min(Integer.parseInt(cfg.opt("limit", "1000000")), MAX_ROWS));   // >= 1, as the spec parser clamps
         // One row PAST the cap: the compiled statement ends in its own LIMIT, so asking for exactly the cap
         // could never show that rows were dropped (BI-QUERY-TRUNCATION-1).
         String sql = compileSpec(cfg, source, cap + 1);
