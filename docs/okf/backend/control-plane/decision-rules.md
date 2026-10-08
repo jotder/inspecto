@@ -28,6 +28,17 @@ cell, never together with `value`); `ignoreCase: true` on `= != in contains star
 possessive quantifiers). `ConditionTree.validate` (called by `requireGroupRoot`) refuses misuse and bad
 patterns; full detail in [module-reorganisation-decisions](../module-reorganisation-decisions.md) (Decision Kernel).
 
+**Strict mode (opt-in, 2026-10-09):** `ConditionTree.matchedStrict` / `filterStrict` / `validateStrict` and
+`ConditionSql.predicateStrict` are the fail-closed twins of the lenient API, which stays byte-identical
+(authoring relies on its leniency, pinned by `ConditionStrictTest`). Strict THROWS `IllegalArgumentException`
+with a path (e.g. `items[2].field: incomplete condition`) for a non-map or bare-leaf root, an empty group, a
+non-map item, an incomplete leaf, an unknown operator or group `op`, an `in` with no members and an ordering
+operator (`< <= > >= between`) whose operand is neither a number nor an ISO date/time; evaluation is otherwise
+identical for present data, except that a leaf whose field is ABSENT from the row is FALSE (even `isNull`).
+`ConditionsTreeEquivalenceTest` classifies how far the tree can stand in for the `Conditions` text notation
+(golden table beside it); the verdict and the remaining blockers are in
+[module-reorganisation-decisions](../module-reorganisation-decisions.md) (Declined, Decision Kernel step 7).
+
 `com.gamma.query.ConditionTree` (`platform/inspecto-engine/src/main/java/com/gamma/query/ConditionTree.java`) is a
 **pure, dependency-free port of the browser evaluator** (`inspecto-ui/.../query/query-eval.ts`) plus
 its type inference (`query-columns.ts`). It exists so the backend counts row matches with *exactly*
