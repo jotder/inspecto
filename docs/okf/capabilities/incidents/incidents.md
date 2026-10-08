@@ -1023,3 +1023,5 @@ baseline (23 modules / 3777 tests, `features.ops = false`) are the edition guard
 | ~~**`mail.send` on a transport-less bundle has no failing test**~~ ✅ **STALE 2026-09-17** | ~~its success is the recorded behaviour~~ — it returns **SKIPPED** since `ad29e683`, so the recorded behaviour changed and this line no longer describes the code |
 | **No end-to-end SMTP or webhook delivery against a real endpoint** | both transports are tested against in-process fakes; delivery-status webhooks against synthetic signatures |
 | **No committed Case Rule or Tag Rule** | `*_case_rule.toon` / `*_tag_rule.toon`: zero files (§8.5) |
+
+**Workflow & SLA beyond Incidents (surveyed 2026-10-08, not built).** `Workflow`, `SlaPolicy` and `EscalationRule` are generic, but the sweep that applies them (`ObjectService.sweepIncidentSla`) is written against `OperationalObject` and the closed `ObjectType` enum; no other module consumes them. Extracting a governed-item contract waits for a second provider (reconciliation breaks or Entity List reviews). See `docs/superpower/module-architecture-reorg-plan.md` "P7 Workflow & SLA slice 2 survey".
