@@ -19,6 +19,11 @@
                 @if (obj()?.severity) {
                     <inspecto-status-badge [value]="obj()!.severity!" />
                 }
+                @if (obj()?.inert) {
+                    <span class="ml-2" [attr.title]="obj()!.diagnostic" data-testid="inert-badge">
+                        <inspecto-status-badge value="warning" label="Unknown type" />
+                    </span>
+                }
                 @for (b of sla(); track b.label) {
                     <span class="ml-2" [attr.title]="b.title" data-testid="sla-badge">
                         <inspecto-status-badge [value]="b.tone" [label]="b.label" />
@@ -55,6 +60,7 @@
                 <button
                     mat-flat-button
                     color="primary"
+                    [disabled]="obj()?.inert"
                     matTooltip="Seed an RCA skeleton (one comment per section)"
                     (click)="applyRca()"
                 >
@@ -174,7 +180,7 @@
                 <mat-tab label="Graph">
                     <div class="pt-6">
                         <div class="mb-3 flex justify-end">
-                            <button mat-stroked-button (click)="openLink()">
+                            <button mat-stroked-button [disabled]="obj()?.inert" (click)="openLink()">
                                 <mat-icon svgIcon="heroicons_outline:link"></mat-icon>
                                 <span class="ml-2">Link…</span>
                             </button>
@@ -292,7 +298,15 @@
                                     <mat-error>Enter a comment before adding.</mat-error>
                                 }
                             </mat-form-field>
-                            <button type="submit" mat-flat-button color="primary" class="mt-1">Add</button>
+                            <button
+                                type="submit"
+                                mat-flat-button
+                                color="primary"
+                                class="mt-1"
+                                [disabled]="obj()?.inert"
+                            >
+                                Add
+                            </button>
                         </form>
                         @for (c of comments(); track c.id) {
                             <div class="bg-card rounded-lg border p-4">
@@ -332,7 +346,15 @@
                                     <mat-error>URI is required.</mat-error>
                                 }
                             </mat-form-field>
-                            <button type="submit" mat-flat-button color="primary" class="mt-1">Attach</button>
+                            <button
+                                type="submit"
+                                mat-flat-button
+                                color="primary"
+                                class="mt-1"
+                                [disabled]="obj()?.inert"
+                            >
+                                Attach
+                            </button>
                         </form>
                         @for (a of attachments(); track a.id) {
                             <div class="bg-card flex items-center justify-between rounded-lg border p-4">

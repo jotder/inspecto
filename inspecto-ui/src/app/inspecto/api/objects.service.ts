@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 import type { ObjectNote } from './models';
 
-/** A managed operational object (GET /objects) — ALERT / INCIDENT / CASE / TASK on one table. */
+/** A managed operational object (GET /objects) — INCIDENT / CASE / TASK on one table. */
 export interface OperationalObject {
     id: string;
     objectType: string;
@@ -19,6 +19,12 @@ export interface OperationalObject {
     attributes?: Record<string, string>;
     /** The typed financial impact (WS-10) with its server-DERIVED `outstanding`; absent when none is recorded. */
     impact?: ObjectImpact;
+    /**
+     * `true` for a stored row whose `objectType` this build does not know (a legacy type, or a module that is not
+     * installed): listed and readable, never changed — every write on it answers 409. `diagnostic` says why.
+     */
+    inert?: boolean;
+    diagnostic?: string;
     createdAt: number;
     updatedAt: number;
     closedAt: number;

@@ -11,7 +11,7 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ObjectCreateDialog } from './object-create.dialog';
 
 const CREATED = { id: 'OBJ-1', objectType: 'INCIDENT', title: 'Late feed' } as OperationalObject;
-const CANDIDATE = { id: 'OBJ-9', objectType: 'ALERT', title: 'disk full', status: 'OPEN' } as OperationalObject;
+const CANDIDATE = { id: 'OBJ-9', objectType: 'TASK', title: 'disk full', status: 'OPEN' } as OperationalObject;
 
 function create(list: () => Observable<OperationalObject[]> = () => of([CANDIDATE])) {
     const ref = { close: vi.fn() };

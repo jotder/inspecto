@@ -26,12 +26,12 @@ const GRAPH: ObjectGraph = {
         { id: 'case-1', objectType: 'CASE', title: 'investigation', status: 'INVESTIGATING' },
         { id: 'i1', objectType: 'INCIDENT', title: 'late feed', status: 'DIAGNOSING' },
         { id: 'i2', objectType: 'INCIDENT', title: 'old glitch', status: 'CLOSED' }, // legacy → ARCHIVED
-        { id: 'other', objectType: 'ALERT', title: 'unrelated neighbour', status: 'OPEN' },
+        { id: 'other', objectType: 'TASK', title: 'unrelated neighbour', status: 'OPEN' },
     ],
     edges: [
         { from: 'case-1', fromType: 'CASE', to: 'i1', toType: 'INCIDENT', relationship: 'CONTAINS', createdAt: 1 },
         { from: 'case-1', fromType: 'CASE', to: 'i2', toType: 'INCIDENT', relationship: 'CONTAINS', createdAt: 1 },
-        { from: 'other', fromType: 'ALERT', to: 'case-1', toType: 'CASE', relationship: 'RELATED_TO', createdAt: 1 },
+        { from: 'other', fromType: 'TASK', to: 'case-1', toType: 'CASE', relationship: 'RELATED_TO', createdAt: 1 },
     ],
 };
 

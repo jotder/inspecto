@@ -7,7 +7,7 @@
 
 import { ColumnMeta, ConditionGroup } from 'app/inspecto/query/query-types';
 
-export const GOVERNED_OBJECT_TYPES = ['INCIDENT', 'CASE', 'ALERT', 'TASK'] as const;
+export const GOVERNED_OBJECT_TYPES = ['INCIDENT', 'CASE', 'TASK'] as const;
 /**
  * The match context an Escalation Rule's `when` is evaluated over (server `ObjectService.escalationContext`):
  * strings and numbers only, `minutesToDue` is huge when there is no deadline, the flags are 0/1.

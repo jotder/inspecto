@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    GOVERNED_OBJECT_TYPES,
     describeEscalationRule,
     escalationRuleContent,
     slaContent,
@@ -11,6 +12,10 @@ import {
 } from './governance-model';
 
 describe('governance-model', () => {
+    it('governs Incidents, Cases and Tasks - the Alert object type is retired', () => {
+        expect([...GOVERNED_OBJECT_TYPES]).toEqual(['INCIDENT', 'CASE', 'TASK']);
+    });
+
     it('splits and normalises a comma list', () => {
         expect(splitList(' closed, ,archived ')).toEqual(['CLOSED', 'ARCHIVED']);
         expect(splitList('2026-12-25, 2026-12-26', false)).toEqual(['2026-12-25', '2026-12-26']);

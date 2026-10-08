@@ -151,8 +151,8 @@ export class SessionService {
      * optional `inspecto-ops` module, Standard and above; EDG-01 cell 7).
      *
      * ⛔ This is NOT about alerting. The Alerts pane reads `AlertsService` over config-authored alert
-     * RULES, which every edition serves; an `OperationalObject` whose `objectType` is `ALERT` is a
-     * different thing entirely. Do not gate `/alerts*` on this flag.
+     * RULES, which every edition serves; an Alert is not an `OperationalObject` (the `ALERT` object
+     * type is retired) — a different thing entirely. Do not gate `/alerts*` on this flag.
      * ⚠ Set by `init()`, an APP_INITIALIZER, so it is settled before any route resolver builds the nav.
      */
     readonly opsEnabled = signal(false);
@@ -228,7 +228,12 @@ export class SessionService {
             caption: boot.branding?.caption ?? null,
             footerText: boot.branding?.footerText ?? null,
         });
-        this.features.set(Object.fromEntries(Object.entries(boot.features ?? {}).filter(([, v]) => typeof v === 'boolean')) as Record<string, boolean>);
+        this.features.set(
+            Object.fromEntries(Object.entries(boot.features ?? {}).filter(([, v]) => typeof v === 'boolean')) as Record<
+                string,
+                boolean
+            >,
+        );
         this.exchangeEnabled.set(boot.features?.exchange === true);
         this.geoLinkEnabled.set(boot.features?.geoLink === true);
         this.eventsEnabled.set(boot.features?.events === true);
@@ -264,7 +269,12 @@ export class SessionService {
             this.http.get<Bootstrap>(apiUrl('/bootstrap')).pipe(catchError(() => of(null))),
         );
         if (!boot?.features) return;
-        this.features.set(Object.fromEntries(Object.entries(boot.features).filter(([, v]) => typeof v === 'boolean')) as Record<string, boolean>);
+        this.features.set(
+            Object.fromEntries(Object.entries(boot.features).filter(([, v]) => typeof v === 'boolean')) as Record<
+                string,
+                boolean
+            >,
+        );
         this.exchangeEnabled.set(boot.features.exchange === true);
         this.geoLinkEnabled.set(boot.features.geoLink === true);
         this.eventsEnabled.set(boot.features.events === true);

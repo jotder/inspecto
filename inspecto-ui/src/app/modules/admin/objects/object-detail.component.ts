@@ -193,11 +193,10 @@ export class ObjectDetailComponent implements OnInit {
             ESCALATED: ['resolve'],
             RESOLVED: ['close'],
         },
-        ALERT: { OPEN: ['ack', 'resolve'], ACKNOWLEDGED: ['resolve'] },
     };
 
     get actions(): string[] {
-        if (!this.obj() || !this.canWork()) return [];
+        if (!this.obj() || !this.canWork() || this.obj().inert) return []; // an inert (unknown-type) object is read-only
         const status = (this.obj().status ?? '').toUpperCase();
         const wf = this.workflowDef();
         if (wf?.type === this.obj().objectType)

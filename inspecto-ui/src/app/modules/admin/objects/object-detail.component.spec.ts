@@ -95,6 +95,27 @@ describe('ObjectDetailComponent', () => {
         expect(c.actions).toEqual(['archive', 'reopen']);
     });
 
+    /** P7 ALERT retirement: a stored row of a type the build does not know is read-only and says so in text. */
+    it('shows an inert (unknown-type) object with an "Unknown type" text badge and no actions', () => {
+        const inert: OperationalObject = {
+            ...CASE,
+            objectType: 'ALERT',
+            status: 'OPEN',
+            inert: true,
+            diagnostic: 'type ALERT is not installed/known: left untouched',
+        };
+        const { fixture } = create({ get: () => of(inert) });
+        const c = fixture.componentInstance;
+        expect(c.actions).toEqual([]); // nothing to do to it: every write answers 409
+        const badge = fixture.nativeElement.querySelector('[data-testid="inert-badge"]') as HTMLElement;
+        expect(badge.textContent?.trim()).toBe('Unknown type');
+        expect(badge.getAttribute('title')).toBe('type ALERT is not installed/known: left untouched');
+        const rca = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find(
+            (b) => b.textContent?.includes('Apply RCA'),
+        );
+        expect(rca?.disabled).toBe(true); // the one always-visible write is disabled too
+    });
+
     /** MODULE-REORG-P7: the Action Requests panel follows `bootstrap.features.actionRequests`, not `ops`. */
     it('gates the Action Requests panel on features.actionRequests', () => {
         const { fixture } = create();
@@ -169,7 +190,7 @@ describe('ObjectDetailComponent', () => {
                 { id: 'obj-9', objectType: 'CASE', title: 'Fraud ring', status: 'INVESTIGATING' },
                 { id: 'inc-1', objectType: 'INCIDENT', title: 'Redemption spike', status: 'OPEN' },
                 { id: 'inc-2', objectType: 'INCIDENT', title: 'Geo anomaly', status: 'OPEN' },
-                { id: 'other', objectType: 'ALERT', title: 'Unrelated', status: 'OPEN' },
+                { id: 'other', objectType: 'TASK', title: 'Unrelated', status: 'OPEN' },
             ],
             edges: [
                 { from: 'obj-9', to: 'inc-1', relationship: 'CONTAINS' },
