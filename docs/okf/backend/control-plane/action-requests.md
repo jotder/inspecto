@@ -2,7 +2,7 @@
 type: Concept
 title: Action Requests — approved outbound API calls
 description: An outbound call raised from an Incident or Case (or a Decision Rule's invoke-api), held for a four-eyes approval, then sent once to an https Connection with bounded retries under one idempotency key.
-resource: inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java
+resource: features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java
 tags: [control-plane, action-request, maker-checker, four-eyes, webhook, egress, decision-rule, incident]
 timestamp: 2026-09-28T00:00:00Z
 ---
@@ -13,11 +13,38 @@ An **Action Request** (`ASSURE-ACTION-REQUESTS-1`, WS-24 of the assurance plan) 
 person — or a Decision Rule's `invoke-api` consequence — raises from an **Incident** or **Case**. Nothing is sent
 until a *different* person approves it; then the dispatcher sends it to the named Connection, retrying on
 failure under one idempotency key, and records every answer on the request, where the Incident shows it.
-Professional and Enterprise only (the wire is `inspecto-notify-channels`); on Personal create answers 503.
+Professional and Enterprise only (the wire is `inspecto-notify-channels`): since MODULE-REORG-P7 the whole surface
+is the optional **`inspecto-action-requests`** module (module id `action-requests`, feature id `actionRequests`), so
+on Personal - and on any install that leaves it out - every `/action-requests*` route answers 503 naming the module.
 
-Code: `ActionRequests` (model + store), `ActionDispatcher` (sending), `ActionRequestRoutes` (HTTP) — all in
-`inspecto/src/main/java/com/gamma/control/`; the wire is `WebhookSinkTransport.exchange` implemented by
-`HttpWebhookSinkTransport` (`inspecto-notify-channels`).
+Code: `ActionRequests` (model + store), `ActionDispatcher` (sending), `ActionRequestRoutes` (HTTP) and
+`InvokeApiConsequence` - all in `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/`; the wire is
+`WebhookSinkTransport.exchange` implemented by `HttpWebhookSinkTransport` (`inspecto-notify-channels`, which the manifest
+`requires`).
+
+## The module seam (MODULE-REORG-P7, as built 2026-10-08)
+
+- **Linked subject.** The module names no object type. It resolves, visibility-checks and (for `invoke-api`) opens its
+  Incident or Case through `com.gamma.control.LinkedSubjectProvider` (processor; `OptionalSpi`, fail-soft): `kind()`,
+  `available(api)`, `resolve(api, id)`, `visibleTo(api, ex, id)` and an idempotent `open(api, OpenRequest)` that
+  reuses the active subject the origin's attribute index names. `inspecto-ops` contributes `incident` and `case`
+  (`OpsLinkedSubjects`). No provider available for the kind = creation answers 503 `CAPABILITY_UNAVAILABLE`, exactly as
+  before the seam existed (decision (g): no new 422).
+- **Base, not add-on.** The approver-eligibility reading (`none-eligible | unknown | ok`) is `ApproverCheck.check` in the
+  core, because the Pending Change hold and the approver roster need it with this module ABSENT. The record-aware
+  wrapper (the request's author and Decision Rule co-authors are its makers; a record failing its integrity check reads
+  `unknown`) stays in `ActionRequestRoutes.approverCheck`.
+- **`invoke-api`** is a `ConsequenceProvider` contributed by this module (manifest `provides.consequences`); absent, a rule
+  naming it is reported `unavailable` with the manifest's `absentMessage`, like `create-incident`. The save-time guard
+  (`DecisionRuleGuard`: `canWorkIncidents`, Connection check, makers stamping) stays core.
+- **Storage** is unchanged: one HMAC-signed JSON file per request under `<write-root>/action-requests/`, signed with
+  `PendingChanges.domainMac`; NOT an operational-store family (no `StoreFamilyProvider`). Backup, bundle export and
+  `ReservedConfigPaths` keep treating the directory as an opaque reserved path, so a module-less install leaves its files
+  alone.
+- **Tests** moved with the module (`ControlApiActionRequestsTest`, `ControlApiSpaceBundleActionRequestsTest`,
+  `ActionDispatcherTest`, `ActionRequestsTest`, `ActionRequestApproverCheckTest`; `inspecto-ops` is a TEST dependency, so
+  they run on the real Incident engine); the absence is pinned by `NoActionRequestsShipsInThePersonalBuildTest`
+  (processor, Personal) and `NoActionRequestsWithOpsAloneTest` (ops-only classpath).
 
 ## Lifecycle
 
@@ -58,7 +85,7 @@ so a value can never break the JSON. The approver reads exactly what will go out
 ### Is anyone left to approve it? — `approverCheck` (2026-09-28)
 
 A pending request's read, list item and create response carry **`approverCheck`**, computed live on every read
-(roles change while it waits) by `ActionRequestRoutes.approverCheck`, against the request's bound Space root (the
+(roles change while it waits) by `ApproverCheck.check` (via `ActionRequestRoutes.approverCheck`), against the request's bound Space root (the
 same root `ControlApi.dispatch` hands the Authenticator as `Roles.configRoot`); a list computes it after the store
 lock, once per distinct maker set:
 
