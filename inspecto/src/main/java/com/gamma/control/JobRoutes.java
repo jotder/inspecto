@@ -168,6 +168,7 @@ final class JobRoutes implements RouteModule {
         Map<String, String> args = triggerArgs(api.body(e));
         // Optional ?dryRun=true (MNT-1): a preview fire — the Run reports impact, mutates nothing.
         boolean dryRun = "true".equalsIgnoreCase(ApiContext.query(e, "dryRun"));
+        requireJobModuleEnabled(api, name);
         String runId = jobs(api).triggerRun(name, ApiContext.query(e, "actor"), args, dryRun)   // optional ?actor= attributes the fire (T32)
                 .orElseThrow(() -> notTriggerable(api, name));
         if (ApiContext.v1(e)) {
@@ -190,6 +191,7 @@ final class JobRoutes implements RouteModule {
         JobService svc = jobs(api);
         JobRun orig = svc.runById(runId)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no run '" + runId + "'"));
+        requireJobModuleEnabled(api, orig.job());
         if (svc.isRunning(orig.job()))
             throw new ApiException(409, ErrorCodes.CONFLICT, "job '" + orig.job() + "' is currently running — replay refused");
         String newId = svc.replayRun(runId, ApiContext.query(e, "actor"))
@@ -304,6 +306,14 @@ final class JobRoutes implements RouteModule {
     private JobConfig existingJob(ApiContext api, String name) {
         return jobs(api).jobConfig(name)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no job named '" + name + "'"));
+    }
+
+    /** P4e: a Job whose Job Type belongs to a module the current Space switched off answers the routes' 404 {@code MODULE_DISABLED}. */
+    private void requireJobModuleEnabled(ApiContext api, String name) {
+        jobs(api).jobConfig(name).ifPresent(c -> {
+            String why = JobModuleGate.reason(c.type(), api.disabledFeatures());
+            if (why != null) throw new ApiException(404, ErrorCodes.MODULE_DISABLED, why);
+        });
     }
 
     /** Why a name that {@code GET /jobs} lists cannot be triggered: unknown (404), or configured but not hosted (503). */

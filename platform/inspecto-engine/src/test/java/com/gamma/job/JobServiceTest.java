@@ -266,6 +266,46 @@ class JobServiceTest {
     }
 
     @Test
+    void aJobWhoseModuleIsSwitchedOffInTheSpaceIsSkippedAndNeverDeleted(@TempDir Path dir) throws Exception {
+        // MODULE-REORG-1 P4e: the Space's module gate stops a disabled module's background work. The gate is read at
+        // every fire, so switching the module back on resumes the Job with nothing re-created.
+        JobConfig hb = maintenance("hb", null, null, Map.of("task", "heartbeat"));
+        AtomicReference<String> off = new AtomicReference<>("module 'ops' is switched off in this Space");
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(hb), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
+            js.jobTypeGate(type -> "maintenance".equals(type) ? off.get() : null);
+            js.start();
+            assertTrue(js.trigger("hb"), "the job is still known and triggerable at the service level");
+            JobRun skipped = await(() -> js.lastRunOf("hb").orElse(null));
+            assertEquals("SKIPPED", skipped.status());
+            assertTrue(skipped.message().contains("switched off in this Space"), skipped.message());
+            assertEquals(1, js.jobs().size(), "the job config is never removed");
+            assertEquals(1, js.runsFor("hb").size());
+
+            off.set(null);   // re-enabled in the Space
+            assertTrue(js.trigger("hb"));
+            JobRun resumed = await(() -> js.runsFor("hb").stream()
+                    .filter(r -> "SUCCESS".equals(r.status())).findFirst().orElse(null));
+            assertEquals("SUCCESS", resumed.status());
+        }
+    }
+
+    @Test
+    void aCronJobOfASwitchedOffModuleRecordsSkippedFiresInsteadOfRunning(@TempDir Path dir) throws Exception {
+        JobConfig tick = maintenance("tick", "* * * * * *", null, Map.of("task", "heartbeat"));
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(tick), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString())) {
+            js.jobTypeGate(type -> "module 'ops' is switched off in this Space");
+            js.start();
+            JobRun run = await(() -> js.runsFor("tick").stream().findFirst().orElse(null));
+            assertEquals("SKIPPED", run.status());
+            assertEquals("schedule", run.trigger());
+            assertTrue(js.runsFor("tick").stream().noneMatch(r -> "SUCCESS".equals(r.status())), "no fire ran");
+        }
+    }
+
+    @Test
     void manualTriggerAttributesTheActor(@TempDir Path dir) throws Exception {
         // T32 Phase C — an operator/channel passed to trigger(name, actor) is recorded as 'manual:<actor>'.
         JobConfig hb = maintenance("hb", null, null, Map.of("task", "heartbeat"));

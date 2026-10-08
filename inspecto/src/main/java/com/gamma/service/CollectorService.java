@@ -488,6 +488,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         if (this.jobs != null) {
             this.jobs.deletionGuard(this::checkDeletion);   // T25: fence delete jobs
             this.jobs.spaceId(spaceId);                     // run this space's jobs under its MDC (per-space routing)
+            this.jobs.jobTypeGate(com.gamma.control.JobModuleGate.forSpace(root.config()));   // P4e: a switched-off module's Jobs do not run
             this.jobs.eventLog(eventLog);                   // P1c: this space's ledger = the on-signal Trigger source
             this.jobs.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
             this.jobs.pipelineOutputStores(this::pipelineOutputStoresForAudit);   // MNT-4: orphan output_store detection
@@ -1574,6 +1575,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                     platformServices);   // S1-2: ctor-injected so requires: validates at registration
             created.deletionGuard(this::checkDeletion);
             created.spaceId(spaceId);
+            created.jobTypeGate(com.gamma.control.JobModuleGate.forSpace(root.config()));   // P4e
             created.eventLog(eventLog);
             created.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
             created.pipelineOutputStores(this::pipelineOutputStoresForAudit);   // MNT-4: orphan output_store detection

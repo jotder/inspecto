@@ -131,6 +131,8 @@ public final class JobService implements AutoCloseable {
     /** Optional deletion fence (T25): consulted before a {@code maintenance} job that declares a {@code store:}
      *  deletes, to surface a conflict when the delete races an active reader/writer. {@code null} = no fence. */
     private volatile DeletionFence.Guard deletionGuard;
+    /** Job Type id -> why a Job of it may not run in this Space now, or null (P4e). */
+    private volatile java.util.function.Function<String, String> typeGate = type -> null;
     /** The space this service's jobs belong to; each job run executes under this MDC so the per-space EventLog /
      *  metric label / acquisition routing resolves correctly. Defaults to the default space (single-space identical). */
     private volatile String spaceId = EventLog.DEFAULT_SPACE_ID;
@@ -1429,6 +1431,14 @@ public final class JobService implements AutoCloseable {
      *  registered and so cannot be resolved by name. */
     private void runJob(Job job, JobConfig cfg, String runId, String name, String trigger, String start,
                         String correlationId, String causationId, int chainDepth, Firing firing) {
+        // The Space's module gate comes before the three exclusions: a Job whose module is switched off here is not
+        // run at all, and says why. Config untouched; the next fire after the module is back on runs normally.
+        String off = typeGate.apply(job.type());
+        if (off != null) {
+            log.info("job '{}' ({}) not run: {}", name, trigger, off);
+            recordSkip(runId, name, job, trigger, start, off);
+            return;
+        }
         // Three exclusions, cheapest first, each a SKIP and never a queue (scale-out plan §5.2): this
         // pod's own non-overlap lock, then the cross-pod arming claim on the job NAME, then — for a
         // pipeline job — the authored PIPELINE it targets.
@@ -1780,6 +1790,23 @@ public final class JobService implements AutoCloseable {
     /** Bind this service's jobs to a space so each run executes under its MDC (per-space routing). */
     public void spaceId(String spaceId) {
         if (spaceId != null && !spaceId.isBlank()) this.spaceId = spaceId;
+    }
+
+    /**
+     * The Space's module gate for Job Types (MODULE-REORG-1 P4e): {@code gate} answers, for a Job Type id, the reason
+     * a Job of that type must not run in this Space right now (its owning module is switched off in {@code modules.toon}),
+     * or {@code null} when it may. Read at every fire - cron, event, signal, catch-up, replay and manual - so a change
+     * to the Space's settings applies to the next fire with no restart. A Job turned away is recorded {@code SKIPPED}
+     * naming the reason; its config is never touched and it runs again once the module is switched back on. Default:
+     * nothing is gated.
+     */
+    public void jobTypeGate(java.util.function.Function<String, String> gate) {
+        this.typeGate = gate == null ? type -> null : gate;
+    }
+
+    /** Why a Job of {@code type} may not run in this Space now (see {@link #jobTypeGate}), if it may not. */
+    public Optional<String> jobTypeDisabledReason(String type) {
+        return Optional.ofNullable(typeGate.apply(type));
     }
 
     /** Consult the fence for a {@code maintenance} job that declares the store(s) it deletes (T25). */
