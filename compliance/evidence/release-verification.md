@@ -97,6 +97,16 @@ remains is engineering, not a decision.
 the custody choice, worth stating to a verifier: a release cut **outside CI cannot be signed at
 all**.
 
+### 4a. Per-jar signatures (when the bundle was packaged with `-SignJars`)
+
+Beyond the zip's `.asc`, a bundle packaged with `package.ps1 -SignJars` carries a standard JAR signature on **every first-party
+jar** (`inspecto*.jar`; vendor jars such as `postgresql.jar` keep their own). Verify with the JDK: `jarsigner -verify inspecto.jar`
+must print `jar verified.`, and `keytool -printcert -jarfile inspecto.jar` shows the signer certificate - its SHA-256 fingerprint
+must be the one the publisher announces and **identical across all jars**. `node tools/check-jar-signatures.mjs <unzipped bundle>
+[--expect-fingerprint <sha256>]` does both for the whole bundle and fails on an unsigned, tampered or differently-signed jar. The
+per-module SBOMs (`sbom/<jar>.sbom.cdx.json`) record the SHA-256 of the SIGNED jar bytes. A signature without a trusted timestamp
+stops validating when the certificate expires; production releases are timestamped (`-TsaUrl`).
+
 ## 5. SBOM — what each bundle attests it contains (G1)
 
 **Generated per packaged bundle since 2026-09-02 (COMPLY-1).** `package.ps1` runs `tools/sbom.mjs`

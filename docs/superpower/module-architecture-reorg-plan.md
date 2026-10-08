@@ -702,6 +702,32 @@ needs an `order()` on `RouteModule` and a golden registration-order test.
 - **Persisted string.** `com.gamma.ingester.Asn1RecordIngester` -> `com.gamma.telecom.asn1.Asn1RecordIngester` in `PipelineConfigParser.ASN1_INGESTER`, `PluginIngesters`, `ParserPlugin.ingesterClass()`, the module services file CONTENT (file name stays: it is the engine's `ParserPlugin` interface), `package.ps1`'s services-entry check, the UI contract mirrors/specs and test fixtures. No shipped Space/template/example TOON named it (grep), so there was nothing to migrate beyond tests; a user's SAVED Pipeline naming the old FQCN now fails to resolve it (breaking change taken freely, no alias).
 - **Result.** `splitPackages` 2 -> 0 (`tools/module-architecture-baseline.json` lowered in the same commit). The 'deliberate exception' above is resolved; per-jar signing is blocked only by the keystore/jarsigner step.
 
+### P3h as built (2026-10-08 - per-jar signing: the mechanism; the production key is the operator's)
+- **Switch.** `package.ps1 -SignJars -JarKeystore <path> -JarAlias <alias> [-JarKeystoreType PKCS12] [-TsaUrl <url>]` (env fallbacks
+  `INSPECTO_JARSIGN_KEYSTORE` / `INSPECTO_JARSIGN_ALIAS`). Separate from `-Sign` (the GPG signature over the ZIP): a release uses both.
+  The keystore password is read ONLY from `$env:INSPECTO_JARSIGN_STOREPASS` and handed to `jarsigner -storepass:env` - never a
+  parameter, never on a command line, never logged, never in a bundle or SBOM. Without `-SignJars` nothing runs: the unsigned bundle
+  is unchanged (Personal 16 jars, Professional 38, Enterprise/Preview 41 on `modules.list`; no `META-INF/*.SF|RSA` in any jar).
+- **Order of operations.** build -> stage every jar -> build-id check -> **sign every first-party jar and `jarsigner -verify` it** ->
+  postgresql.jar (vendor, untouched) -> **SBOM** (`sbom.mjs` + per-module records hash the SIGNED bytes) -> demo swap (the
+  demo-auth jar is staged here, so it is signed here) -> **`tools/check-jar-signatures.mjs <bundle>`** -> `modules.list` ->
+  `sbom-modules.mjs --verify` -> boot smoke on the signed bundle -> zip -> zip checksum / GPG signature. Signing BEFORE the
+  SBOM is the whole point: a jar's hash changes when it is signed, so hashing first would make the verify fail.
+- **Scope.** Every `inspecto*.jar` in the bundle root (processor, 14 thin core jars, optional modules, sidecars, demo-auth). NOT
+  third-party standalone jars (`postgresql.jar`). The processor shade keeps stripping third-party `META-INF/*.SF|RSA`.
+- **Check.** `tools/check-jar-signatures.mjs <bundle> [--expect-fingerprint <sha256>]` (+ `.test.mjs`: pass, unsigned, tampered
+  byte, second certificate): every first-party jar must verify under `jarsigner -verify` and all must share ONE signer certificate
+  (SHA-256 read with `keytool -printcert -jarfile`). The JDK tools come from `$JAVA_HOME/bin` or PATH (the jlinked bundle runtime has
+  no jarsigner; signing is a build-time act). A release verifier can run the same script with the published fingerprint.
+- **Proven** with a THROWAWAY RSA-3072 PKCS12 key (deleted afterwards): Professional (37 jars), Personal (16) and Enterprise
+  `-DemoAuth` (38) all packaged with exit 0 including the boot smoke on the SIGNED bundle - so no package is split across jars
+  (a split package between signed jars of one signer is legal; against an unsigned third-party jar it would be a
+  `SecurityException`, and none is). `sbom-modules.mjs --verify` passed on the signed bundle; a flipped byte in one jar copy fails the check.
+- **Operator must supply.** The production keystore (and its custody), the `INSPECTO_JARSIGN_STOREPASS` secret, the TSA URL (pass
+  `-TsaUrl`: without a timestamp a signature stops validating when the certificate expires), and the `release.yml` wiring: decode a
+  `JARSIGN_KEYSTORE_B64` secret to a runner temp file and add `-SignJars -JarKeystore ... -JarAlias ... -TsaUrl ...` to the
+  `package.ps1` calls. `release.yml` is deliberately NOT edited (no secret exists yet to validate against).
+
 ### P3a as built (2026-10-07 — the build-id stamp and its boot check; the jar split is NOT done)
 - **Stamp:** manifest attribute `Inspecto-Build-Id` on every module jar, set ONCE in the parent pom: `maven-jar-plugin`
   `pluginManagement` (pinned 3.4.2, the version the default lifecycle already resolved offline) for thin jars; the

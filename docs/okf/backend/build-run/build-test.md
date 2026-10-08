@@ -130,6 +130,11 @@ SHA-256 and build id; components = that module's own third-party closure from it
 `check-sbom-modules.mjs --bundle <dir>`) fails on a listed jar without an SBOM, a hash that is not the staged jar's, or a
 component the combined SBOM does not carry.
 
+Per-jar signing (P3h, opt-in): `package.ps1 -SignJars -JarKeystore <p12> -JarAlias <a> [-TsaUrl <url>]` signs every first-party
+`inspecto*.jar` with `jarsigner` BEFORE the SBOM step (so the per-module hashes cover the signed bytes), then
+`tools/check-jar-signatures.mjs <bundle>` asserts every one verifies and all share one signer certificate. The store password comes
+only from `$env:INSPECTO_JARSIGN_STOREPASS`. Without the switch the bundle is unchanged. `*.p12|*.pfx|*.jks|*.keystore` are git-ignored.
+
 ### What the bundle contains — and what it deliberately does not
 
 Verified by building both flavors 2026-08-27 (Personal 169.3 MB, Enterprise 170.3 MB, exit 0):

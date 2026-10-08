@@ -175,3 +175,10 @@ inspecto-dedup-ledger.db*
 
 # Generated deliverables: regenerate with scripts/generate_whitepaper_docx.py, never commit the binary
 docs/stakeholders/*.docx
+
+# Code-signing material: never in git (P3h per-jar signing keystores are the operator's, supplied at release time)
+*.p12
+*.pfx
+*.keystore
+*.jks
+!providers/inspecto-connectors/src/test/resources/ftps-test-keystore.jks

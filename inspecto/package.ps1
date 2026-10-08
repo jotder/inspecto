@@ -105,6 +105,19 @@ param(
     # into the repo/bundle (see compliance/soc2/policies/06-cryptography-policy.md).
     [switch]$Sign,
     [string]$SigningKey = $env:INSPECTO_SIGNING_KEY,
+    # PER-JAR signing (MODULE-REORG-1 P3h): -SignJars signs EVERY first-party jar in the bundle (inspecto*.jar: the processor, the
+    # thin core jars, the optional modules, the sidecars, the demo-auth jar) with `jarsigner` BEFORE the SBOMs are generated, so the
+    # per-module SBOM hashes describe the SIGNED bytes; then tools/check-jar-signatures.mjs asserts every jar verifies and all share
+    # one signer certificate. Independent of -Sign (the GPG signature over the ZIP): a release uses both. Third-party standalone jars
+    # (postgresql.jar) are vendor-owned and left alone. The keystore PASSWORD is read from $env:INSPECTO_JARSIGN_STOREPASS only -
+    # never a parameter, never logged, never written into the bundle or the SBOMs. Without -SignJars nothing here runs and the
+    # bundle is byte-identical to before. -TsaUrl adds a trusted timestamp (jarsigner -tsa) so the signature outlives the
+    # certificate; an offline build omits it, a production release must pass it.
+    [switch]$SignJars,
+    [string]$JarKeystore = $env:INSPECTO_JARSIGN_KEYSTORE,
+    [string]$JarKeystoreType = 'PKCS12',
+    [string]$JarAlias = $env:INSPECTO_JARSIGN_ALIAS,
+    [string]$TsaUrl = '',
     # Explicit override for the GraalVM JDK cache (jlink.exe + per-target jmods/). Defaults try,
     # in order: this param -> $env:GRAALVM_CACHE -> <repo>/.graalvm-cache (nested-in-repo layout)
     # -> <repo>/../.graalvm-cache (sibling-of-repo layout, e.g. C:\sandbox\.graalvm-cache next to
@@ -218,6 +231,28 @@ if ($DemoAuth) {
 $buildId = 'dev'
 try { $sha = (& git -C $sandboxRoot rev-parse --short HEAD 2>$null); if ($LASTEXITCODE -eq 0 -and $sha) { $buildId = "$sha".Trim() } } catch { }
 Write-Host "Build id: $buildId" -ForegroundColor DarkGray
+# ── per-jar signing (-SignJars, P3h): preconditions + the one signing function ───────────────────────────
+$jarsignerExe = $null
+if ($SignJars) {
+    if (-not $JarKeystore -or -not (Test-Path -LiteralPath $JarKeystore)) { throw "-SignJars needs -JarKeystore <path> (or INSPECTO_JARSIGN_KEYSTORE) naming an existing keystore" }
+    if (-not $JarAlias) { throw "-SignJars needs -JarAlias (or INSPECTO_JARSIGN_ALIAS)" }
+    if (-not $env:INSPECTO_JARSIGN_STOREPASS) { throw "-SignJars needs the keystore password in `$env:INSPECTO_JARSIGN_STOREPASS (never a command-line argument)" }
+    if ($env:JAVA_HOME) { foreach ($cand in 'bin\jarsigner.exe','bin/jarsigner') { $c = Join-Path $env:JAVA_HOME $cand; if (Test-Path $c) { $jarsignerExe = $c; break } } }
+    if (-not $jarsignerExe) { $jarsignerExe = (Get-Command jarsigner -ErrorAction SilentlyContinue).Source }
+    if (-not $jarsignerExe) { throw "-SignJars needs the JDK's jarsigner (set JAVA_HOME or put the JDK bin on PATH)" }
+    if (-not $TsaUrl) { Write-Host "  -SignJars without -TsaUrl: jars are signed WITHOUT a trusted timestamp (fine offline; a production release must pass -TsaUrl)" -ForegroundColor Yellow }
+}
+function Invoke-JarSign {
+    param([Parameter(Mandatory)][string]$Jar)
+    $jsArgs = @('-keystore', $JarKeystore, '-storetype', $JarKeystoreType, '-storepass:env', 'INSPECTO_JARSIGN_STOREPASS')
+    if ($TsaUrl) { $jsArgs += @('-tsa', $TsaUrl) }
+    $jsArgs += @($Jar, $JarAlias)
+    $out = & $jarsignerExe @jsArgs 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "jarsigner failed for $(Split-Path $Jar -Leaf): $($out -join ' | ')" }
+    $out = & $jarsignerExe -verify $Jar 2>&1
+    if ($LASTEXITCODE -ne 0 -or -not ($out -match 'jar verified')) { throw "signed jar does not verify: $(Split-Path $Jar -Leaf): $($out -join ' | ')" }
+}
+
 # ── step 1: build ─────────────────────────────────────────────────────────────
 # Built from the repo root with -pl inspecto -am (same idiom as step 1c) because since S5 the
 # core depends on reactor siblings (inspecto-api, …) — a core-alone build from inspecto/
@@ -1044,6 +1079,16 @@ if (-not $NoBuild -and $buildId -ne 'dev' -and $distinct.Count -eq 1 -and $disti
 }
 Write-Host "  verified: $($stamps.Count) module jars, build id $(if ($distinct.Count) { $distinct[0] } else { 'dev (unstamped)' })" -ForegroundColor DarkGray
 
+# -- P3h per-jar signing: sign every staged first-party jar NOW - after the last step that may rewrite a jar and BEFORE the SBOM step
+# below, which hashes the staged jars: signing changes a jar's bytes, so the per-module SBOM must read the SIGNED bytes (order:
+# stage -> sign -> SBOM/modules.list -> verify -> zip -> zip signature). The demo-auth jar is staged later and signed there.
+if ($SignJars) {
+    Write-Host "Signing first-party jars (jarsigner, alias $JarAlias)..." -ForegroundColor Cyan
+    $toSign = @(Get-ChildItem -Path $bundleDir -Filter 'inspecto*.jar' -File)
+    foreach ($j in $toSign) { Invoke-JarSign -Jar $j.FullName }
+    Write-Host "  signed + verified: $($toSign.Count) jars" -ForegroundColor DarkGray
+}
+
 # ── step 3a: Professional/Enterprise — bundle the PostgreSQL JDBC driver as a sidecar (PG-1) ─────────
 # The fat JAR and its SBOM stay JDBC-driver-free by design (inspecto/pom.xml, platform/inspecto-engine/pom.xml);
 # the driver rides the bundle as postgresql.jar, auto-detected by serve.sh/serve.bat exactly like
@@ -1094,6 +1139,7 @@ if ($DemoAuth) {
     # P3f: the per-module SBOMs of the removed trio go with them (the combined SBOM keeps describing the Enterprise set)
     foreach ($gone in 'inspecto-oidc','inspecto-secrets','inspecto-geo-country') { Remove-Item (Join-Path $bundleDir "sbom\$gone.sbom.cdx.json") -ErrorAction SilentlyContinue }
     Copy-Item -Path $demoJar.FullName -Destination (Join-Path $bundleDir 'inspecto-demo-auth.jar')
+    if ($SignJars) { Invoke-JarSign -Jar (Join-Path $bundleDir 'inspecto-demo-auth.jar') }
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $z = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $bundleDir 'inspecto-demo-auth.jar'))
     try {
@@ -1102,6 +1148,12 @@ if ($DemoAuth) {
         }
     } finally { $z.Dispose() }
     Write-Host "DEMO BUILD: inspecto-oidc.jar replaced by inspecto-demo-auth.jar (Demo User sign-in, loopback only)" -ForegroundColor Yellow
+}
+
+# P3h: with -SignJars the bundle must END with every first-party jar signed by ONE certificate (the demo jar included).
+if ($SignJars) {
+    & node (Join-Path $sandboxRoot 'tools\check-jar-signatures.mjs') $bundleDir
+    if ($LASTEXITCODE -ne 0) { throw "per-jar signature verification failed (see above)" }
 }
 
 # ── step 3a-ter: modules.list + edition.properties (MODULE-REORG-P3d stage 1) ─────────────────────────────────
