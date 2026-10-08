@@ -130,7 +130,10 @@ class PaymentFraudDashboardTest {
                 JsonNode y = w.get("controls").get("y").get(0);
                 String agg = y.get("agg").asText(), field = y.get("field").asText();
                 String body = json.writeValueAsString(Map.of("dataset", w.get("datasetId").asText(), "groupBy", List.of(x),
-                        "measures", List.of(Map.of("agg", agg, "field", field))));
+                        "measures", List.of(Map.of("agg", agg, "field", field)),
+                        // the instrument dataset has 532 groups: the 500-row default LIMIT over an unordered query
+                        // returns an arbitrary subset, so the planted offender was missing on some runs
+                        "limit", 10_000));
                 Map<String, Double> rows = new TreeMap<>();
                 for (JsonNode r : V1Body.of(call(base + "/bi/query", body)).get("rows"))
                     rows.put(r.get(x).asText(), r.get(agg + "_" + field).asDouble());
