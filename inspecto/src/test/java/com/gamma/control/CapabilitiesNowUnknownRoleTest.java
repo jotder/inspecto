@@ -59,7 +59,7 @@ class CapabilitiesNowUnknownRoleTest {
             }
         });
         Map<String, Object> rec = Map.of("author", "maker", "coAuthors", List.of(), "status", ActionRequests.PENDING);
-        assertEquals(ActionRequestRoutes.NONE_ELIGIBLE, ActionRequestRoutes.approverCheck(root, rec),
+        assertEquals(ApproverCheck.NONE_ELIGIBLE, ActionRequestRoutes.approverCheck(root, rec),
                 "authenticate would deny checker canApproveChanges, so no one is eligible");
     }
 }

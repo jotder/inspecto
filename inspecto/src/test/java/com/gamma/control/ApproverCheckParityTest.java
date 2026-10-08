@@ -48,20 +48,20 @@ class ApproverCheckParityTest {
     @Test
     void noAuthenticatorMeansNoSubjectSoNoOneCanDecide(@TempDir Path root) {
         Authenticators.forTest(null);
-        assertEquals(ActionRequestRoutes.NONE_ELIGIBLE, ActionRequestRoutes.approverCheck(root, request("maker")));
-        assertEquals(ActionRequestRoutes.NONE_ELIGIBLE,
-                ActionRequestRoutes.check(root, Set.of(), "canApproveChanges", false), "even with no makers at all");
+        assertEquals(ApproverCheck.NONE_ELIGIBLE, ActionRequestRoutes.approverCheck(root, request("maker")));
+        assertEquals(ApproverCheck.NONE_ELIGIBLE,
+                ApproverCheck.check(root, Set.of(), "canApproveChanges", false), "even with no makers at all");
     }
 
     @Test
     void aNonMakerApproverIsOkAndTheMakerAloneIsNoneEligible(@TempDir Path root) {
         Authenticators.forTest(enumerating(Map.of("maker", List.of("admin"), "checker", List.of("admin"))));
-        assertEquals(ActionRequestRoutes.OK, ActionRequestRoutes.approverCheck(root, request("maker")), "checker is outside the makers");
+        assertEquals(ApproverCheck.OK, ActionRequestRoutes.approverCheck(root, request("maker")), "checker is outside the makers");
 
         Authenticators.forTest(enumerating(Map.of("maker", List.of("admin"))));
-        assertEquals(ActionRequestRoutes.NONE_ELIGIBLE, ActionRequestRoutes.approverCheck(root, request("maker")),
+        assertEquals(ApproverCheck.NONE_ELIGIBLE, ActionRequestRoutes.approverCheck(root, request("maker")),
                 "the only approver is the maker: four-eyes leaves no one");
-        assertEquals(ActionRequestRoutes.OK, ActionRequestRoutes.check(root, Set.of(), "canApproveChanges", true),
+        assertEquals(ApproverCheck.OK, ApproverCheck.check(root, Set.of(), "canApproveChanges", true),
                 "probe: with no makers the same directory is ok");
     }
 
@@ -69,9 +69,9 @@ class ApproverCheckParityTest {
     void aCoAuthorIsAMakerToo(@TempDir Path root) {
         Authenticators.forTest(enumerating(Map.of("co", List.of("admin"))));
         Map<String, Object> rec = request("someone-else");
-        assertEquals(ActionRequestRoutes.OK, ActionRequestRoutes.approverCheck(root, rec), "probe: co is not (yet) a maker");
+        assertEquals(ApproverCheck.OK, ActionRequestRoutes.approverCheck(root, rec), "probe: co is not (yet) a maker");
         rec.put("coAuthors", List.of("co"));
-        assertEquals(ActionRequestRoutes.NONE_ELIGIBLE, ActionRequestRoutes.approverCheck(root, rec),
+        assertEquals(ApproverCheck.NONE_ELIGIBLE, ActionRequestRoutes.approverCheck(root, rec),
                 "the Decision Rule's editors are makers: the only approver is one of them");
     }
 
@@ -79,10 +79,10 @@ class ApproverCheckParityTest {
     void aRecordFailingItsIntegrityCheckReadsUnknown(@TempDir Path root) {
         Authenticators.forTest(enumerating(Map.of("checker", List.of("admin"))));
         Map<String, Object> rec = request("maker");
-        assertEquals(ActionRequestRoutes.OK, ActionRequestRoutes.approverCheck(root, rec), "probe: the intact record is ok");
+        assertEquals(ApproverCheck.OK, ActionRequestRoutes.approverCheck(root, rec), "probe: the intact record is ok");
         rec.put("integrity", "invalid");
         assertEquals(true, ActionRequests.invalid(rec), "the fixture really is an invalid record");
-        assertEquals(ActionRequestRoutes.UNKNOWN, ActionRequestRoutes.approverCheck(root, rec, new HashMap<>()));
+        assertEquals(ApproverCheck.UNKNOWN, ActionRequestRoutes.approverCheck(root, rec, new HashMap<>()));
     }
 
     @Test
@@ -93,6 +93,6 @@ class ApproverCheckParityTest {
                 throw new IllegalStateException("corrupt demo-users.toon");
             }
         });
-        assertEquals(ActionRequestRoutes.UNKNOWN, ActionRequestRoutes.check(root, Set.of(), "canApproveChanges", false));
+        assertEquals(ApproverCheck.UNKNOWN, ApproverCheck.check(root, Set.of(), "canApproveChanges", false));
     }
 }

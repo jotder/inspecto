@@ -1,7 +1,6 @@
 package com.gamma.control;
 
 import com.gamma.spi.auth.ApiException;
-import com.gamma.spi.auth.Authenticator;
 import com.gamma.spi.auth.Authenticators;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.auth.Subject;
@@ -23,7 +22,6 @@ import java.util.Optional;
 import java.util.Set;
 import com.gamma.access.Roles;
 import com.gamma.access.WriteGates;
-import com.gamma.access.AccessPolicyStore;
 
 /**
  * The Action Request surface ({@code ASSURE-ACTION-REQUESTS-1}) — see {@link ActionRequests} for the model and
@@ -200,8 +198,6 @@ final class ActionRequestRoutes implements RouteModule {
         return view;
     }
 
-    static final String NONE_ELIGIBLE = "none-eligible", UNKNOWN = "unknown", OK = "ok";
-
     /**
      * Whether anyone could approve this request (ASSURE-ACTION-REQUESTS-RESIDUALS-1 (6)). Never changes the
      * four-eyes decision — a {@code none-eligible} request stays {@code pending} (fail-closed), this only says so.
@@ -217,67 +213,12 @@ final class ActionRequestRoutes implements RouteModule {
         return approverCheck(root, rec, new java.util.HashMap<>());
     }
 
-    /** Last "approver check failed" log per root: at most one line per root per {@link #FAILURE_LOG_EVERY_MS}. */
-    private static final java.util.concurrent.ConcurrentHashMap<Path, Long> CHECK_FAILURE_LOGGED =
-            new java.util.concurrent.ConcurrentHashMap<>();
-    private static final long FAILURE_LOG_EVERY_MS = 10 * 60_000L;
-
     static String approverCheck(Path root, Map<String, Object> rec, Map<Set<Object>, String> memo) {
-        if (ActionRequests.invalid(rec)) return UNKNOWN;   // its makers cannot be trusted
+        if (ActionRequests.invalid(rec)) return ApproverCheck.UNKNOWN;   // its makers cannot be trusted
         Set<Object> makers = new java.util.HashSet<>();
         makers.add(rec.get("author"));
         if (rec.get("coAuthors") instanceof List<?> co) makers.addAll(co);
-        return memo.computeIfAbsent(makers, m -> check(root, m, Roles.CAN_APPROVE_CHANGES, true));
-    }
-
-    /** {@link #compute} that never throws: an unreadable directory (a corrupt demo-users.toon) is "cannot tell". */
-    static String check(Path root, Set<Object> makers, String capability, boolean needsVisible) {
-        try {
-            return compute(root, makers, capability, needsVisible);
-        } catch (RuntimeException e) {
-            long now = System.currentTimeMillis();
-            Long last = CHECK_FAILURE_LOGGED.get(root);
-            if ((last == null || now - last >= FAILURE_LOG_EVERY_MS)
-                    && (last == null ? CHECK_FAILURE_LOGGED.putIfAbsent(root, now) == null
-                                     : CHECK_FAILURE_LOGGED.replace(root, last, now)))
-                org.slf4j.LoggerFactory.getLogger(ActionRequestRoutes.class)
-                        .warn("approver check failed, reporting 'unknown': {}", e.toString());
-            return UNKNOWN;
-        }
-    }
-
-    /** {@code root} is the request's bound Space root: the one {@code ControlApi.dispatch} hands the Authenticator
-     *  as {@code Roles.configRoot(ex)}, so the roles read here are the ones the approve gate's Subject was built from.
-     *  {@code needsVisible}: deciding also needs the linked object visible to the approver (an Action Request does;
-     *  a Pending Change's approve gate is the capability alone). */
-    private static String compute(Path root, Set<Object> makers, String capability, boolean needsVisible) {
-        // No Authenticator (Personal) => no Subject is ever attached => deciding is always 403.
-        Authenticator auth = Authenticators.active().orElse(null);
-        if (auth == null) return NONE_ELIGIBLE;
-        boolean anyRole = Roles.effective(root).keySet().stream()
-                .anyMatch(r -> JobAuthority.capabilitiesNow(List.of(r), root).contains(capability));
-        if (!anyRole) return NONE_ELIGIBLE;
-        Map<String, List<String>> who = auth.principals(root).orElse(null);
-        // No principal directory (OIDC): the Space's approver roster decides (operator 2026-10-04, (6b)).
-        if (who == null) return ApproverRoster.check(root, makers);
-        // decide also needs visible(): the linked object must pass the approver's data scope and row policy, which
-        // is not evaluable here without their request. So a scoped holder, or any authored Access Policy, reads unknown.
-        // Only AUTHORED Access Policies count; the seeded space-isolation policies (inspecto-policy) do not. Safe today:
-        // they engage only when an IdP 'space' claim is mapped, and the only Authenticator that enumerates principals
-        // (so the only way to reach OK) is Demo sign-in, which carries no claims. Revisit if an enumerating IdP lands.
-        boolean rowPolicies = !AccessPolicyStore.load(root).policies().isEmpty() || AccessPolicyStore.load(root).unreadable();
-        Map<String, Roles.Def> defs = Roles.effective(root);
-        boolean scopedHolder = false;
-        for (Map.Entry<String, List<String>> p : who.entrySet()) {
-            if (makers.contains(p.getKey())
-                    || !JobAuthority.capabilitiesNow(p.getValue(), root).contains(capability)) continue;
-            if (!needsVisible) return OK;
-            boolean scoped = rowPolicies || p.getValue().stream().anyMatch(r -> r.startsWith("case:")
-                    || (defs.get(r) != null && defs.get(r).dataScopes() != null));
-            if (!scoped) return OK;
-            scopedHolder = true;
-        }
-        return scopedHolder ? UNKNOWN : NONE_ELIGIBLE;
+        return memo.computeIfAbsent(makers, m -> ApproverCheck.check(root, m, Roles.CAN_APPROVE_CHANGES, true));
     }
 
     /** Adds {@code approverCheck} to a pending request's view (computed live: roles change while it waits). */
@@ -366,7 +307,7 @@ final class ActionRequestRoutes implements RouteModule {
         ActionRequests.audit(author, authorType, "action-request.proposed", rec.get("id") + " proposed from " + kind
                 + " " + linked + " → Connection '" + connection + "' (" + method + ")", rec);
         // once, at raise (reads never re-emit); approverCheck never throws, so a saved request is never 500'd
-        if (NONE_ELIGIBLE.equals(approverCheck(root, rec)))
+        if (ApproverCheck.NONE_ELIGIBLE.equals(approverCheck(root, rec)))
             ActionRequests.audit(author, authorType, "action-request.no-eligible-approver", rec.get("id")
                     + " has no eligible approver: no one holding canApproveChanges in this Space is outside its "
                     + "makers — it stays pending until it expires unless a role is granted", rec,

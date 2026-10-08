@@ -115,9 +115,9 @@ public final class ApproverRoster {
      */
     static String check(Path root, Set<Object> makers) {
         Roster r = load(root);
-        if (!r.groups().isEmpty()) return ActionRequestRoutes.OK;
-        for (String u : r.users()) if (!makers.contains(u)) return ActionRequestRoutes.OK;
-        return ActionRequestRoutes.NONE_ELIGIBLE;
+        if (!r.groups().isEmpty()) return ApproverCheck.OK;
+        for (String u : r.users()) if (!makers.contains(u)) return ApproverCheck.OK;
+        return ApproverCheck.NONE_ELIGIBLE;
     }
 
     private static List<String> strings(Object v) {

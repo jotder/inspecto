@@ -218,7 +218,7 @@ final class PendingChangeRoutes implements RouteModule {
         String cap = String.valueOf(rec.get("approverCapability"));
         Set<Object> makers = Boolean.TRUE.equals(rec.get("fourEyes")) ? Set.<Object>of(String.valueOf(rec.get("author"))) : Set.<Object>of();
         view.put("approverCheck", memo.computeIfAbsent(List.of(cap, makers),
-                k -> ActionRequestRoutes.check(root, makers, cap, false)));
+                k -> ApproverCheck.check(root, makers, cap, false)));
         return view;
     }
 
