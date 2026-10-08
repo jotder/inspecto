@@ -5,7 +5,6 @@ import com.gamma.module.KnownModules;
 import com.gamma.module.ModuleManifests;
 
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,10 +37,7 @@ public final class JobModuleGate {
     }
 
     static Map<String, ModuleManifest> ownersOf(List<ModuleManifest> installed) {
-        Map<String, ModuleManifest> out = new LinkedHashMap<>();
-        for (ModuleManifest m : installed)
-            for (String t : m.provides().jobTypes()) out.putIfAbsent(t.toLowerCase(java.util.Locale.ROOT), m);
-        return out;
+        return ModuleGate.ownersOf(installed, ModuleManifest.Provides::jobTypes);
     }
 
     /** Why a Job of {@code jobType} may not run when {@code disabled} are the Space's switched-off features; {@code null} when it may. */
@@ -53,11 +49,9 @@ public final class JobModuleGate {
         if (jobType == null || disabled.isEmpty()) return null;
         ModuleManifest m = owners.get(jobType.toLowerCase(java.util.Locale.ROOT));
         if (m == null) return null;
-        for (String f : m.provides().features())
-            if (disabled.contains(f))
-                return "the '" + f + "' module is switched off in this Space (an administrator can enable it with "
-                        + "PUT /settings/modules); its Job Type '" + jobType + "' does not run";
-        return null;
+        String f = ModuleGate.switchedOffFeature(m, disabled);
+        return f == null ? null : "the '" + f + "' module is switched off in this Space (an administrator can enable it with "
+                + "PUT /settings/modules); its Job Type '" + jobType + "' does not run";
     }
 
     /** The gate for the Space whose config root is {@code configRoot}: reads {@code modules.toon} at every call. */

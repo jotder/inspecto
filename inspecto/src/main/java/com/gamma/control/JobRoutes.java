@@ -312,6 +312,8 @@ final class JobRoutes implements RouteModule {
     private void requireJobModuleEnabled(ApiContext api, String name) {
         jobs(api).jobConfig(name).ifPresent(c -> {
             String why = JobModuleGate.reason(c.type(), api.disabledFeatures());
+            if (why == null && "maintenance".equals(c.type()))
+                why = ModuleGate.taskReason(c.opt("task", "cleanup"), api.disabledFeatures());   // P4f
             if (why != null) throw new ApiException(404, ErrorCodes.MODULE_DISABLED, why);
         });
     }

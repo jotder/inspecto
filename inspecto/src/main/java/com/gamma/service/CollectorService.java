@@ -489,6 +489,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             this.jobs.deletionGuard(this::checkDeletion);   // T25: fence delete jobs
             this.jobs.spaceId(spaceId);                     // run this space's jobs under its MDC (per-space routing)
             this.jobs.jobTypeGate(com.gamma.control.JobModuleGate.forSpace(root.config()));   // P4e: a switched-off module's Jobs do not run
+            this.jobs.jobTaskGate(com.gamma.control.ModuleGate.taskGateForSpace(root.config()));   // P4f: ...nor its maintenance tasks
             this.jobs.unhostedTypeModule(com.gamma.control.JobModuleGate::absentModuleOf);   // P4e: name the missing module
             this.jobs.eventLog(eventLog);                   // P1c: this space's ledger = the on-signal Trigger source
             this.jobs.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
@@ -1242,8 +1243,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         long slaSweepSeconds = Long.getLong("objects.sla.sweep.seconds", 60L);
         if (slaSweepSeconds > 0)
             scheduler.everySeconds("sla-sweep", slaSweepSeconds, slaSweepSeconds,
-                    () -> underSpace(() -> objectEngine.ifPresent(
-                            e -> e.sweepIncidentSla(System.currentTimeMillis()))));
+                    () -> underSpace(this::slaSweepTick));
         log.info("CollectorService started: {} pipeline(s), poll every {}s, up to {} concurrent run(s)",
                 registry.size(), pollSeconds, maxConcurrentRuns);
         this.eventLog.emit(Event.builder(EventType.SERVICE_STARTED)
@@ -1252,6 +1252,15 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 .attr("pipelines", registry.size())
                 .attr("pollSeconds", pollSeconds)
                 .attr("maxConcurrentRuns", maxConcurrentRuns));
+    }
+
+    /**
+     * One tick of the SLA sweep. P4f: a Space that switched the owning module off ({@code modules.toon}) skips it - nothing
+     * is breached or escalated, nothing is lost, and the first tick after the module is back on sweeps what became overdue.
+     */
+    void slaSweepTick() {
+        if (com.gamma.control.ModuleGate.paused(com.gamma.control.ModuleGate.SLA_SWEEP, root.config())) return;
+        objectEngine.ifPresent(e -> e.sweepIncidentSla(System.currentTimeMillis()));
     }
 
     /**
@@ -1577,6 +1586,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             created.deletionGuard(this::checkDeletion);
             created.spaceId(spaceId);
             created.jobTypeGate(com.gamma.control.JobModuleGate.forSpace(root.config()));   // P4e
+            created.jobTaskGate(com.gamma.control.ModuleGate.taskGateForSpace(root.config()));   // P4f
             created.unhostedTypeModule(com.gamma.control.JobModuleGate::absentModuleOf);
             created.eventLog(eventLog);
             created.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection

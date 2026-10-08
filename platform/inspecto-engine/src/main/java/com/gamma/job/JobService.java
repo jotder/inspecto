@@ -133,6 +133,7 @@ public final class JobService implements AutoCloseable {
     private volatile DeletionFence.Guard deletionGuard;
     /** Job Type id -> why a Job of it may not run in this Space now, or null (P4e). */
     private volatile java.util.function.Function<String, String> typeGate = type -> null;
+    private volatile java.util.function.Function<String, String> taskGate = task -> null;
     /** Job Type id -> the known-but-absent module that declares it, or null (P4e). */
     private volatile java.util.function.Function<String, String> unhostedTypeModule = type -> null;
     /** The space this service's jobs belong to; each job run executes under this MDC so the per-space EventLog /
@@ -1438,6 +1439,7 @@ public final class JobService implements AutoCloseable {
         // The Space's module gate comes before the three exclusions: a Job whose module is switched off here is not
         // run at all, and says why. Config untouched; the next fire after the module is back on runs normally.
         String off = typeGate.apply(job.type());
+        if (off == null) off = taskDisabledReason(job, cfg).orElse(null);
         if (off != null) {
             log.info("job '{}' ({}) not run: {}", name, trigger, off);
             recordSkip(runId, name, job, trigger, start, off);
@@ -1823,6 +1825,22 @@ public final class JobService implements AutoCloseable {
                         + "job cannot run (its config is kept and works once one is installed)"
                 : "job type '" + type + "' is provided by the '" + module + "' module, which is not installed here, so this "
                         + "job cannot run (its config is kept and works once the module is installed)";
+    }
+
+    /**
+     * The same gate for the {@code task:} of a {@code maintenance} Job (P4f): {@code gate} answers, for a maintenance task id,
+     * the reason it must not run in this Space now (the module that contributes the task is switched off), or {@code null}.
+     * Consulted at the same point as {@link #jobTypeGate}, so a turned-away fire is recorded {@code SKIPPED} the same way.
+     * Default: no task is gated.
+     */
+    public void jobTaskGate(java.util.function.Function<String, String> gate) {
+        this.taskGate = gate == null ? task -> null : gate;
+    }
+
+    /** Why the {@code maintenance} Job {@code job} may not run its task in this Space now (see {@link #jobTaskGate}), if it may not. */
+    public Optional<String> taskDisabledReason(Job job, JobConfig cfg) {
+        if (cfg == null || !"maintenance".equals(job.type())) return Optional.empty();
+        return Optional.ofNullable(taskGate.apply(cfg.opt("task", "cleanup").toLowerCase()));
     }
 
     /** Why a Job of {@code type} may not run in this Space now (see {@link #jobTypeGate}), if it may not. */

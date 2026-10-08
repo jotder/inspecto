@@ -40,6 +40,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class FakeObjectEngineProvider implements ObjectEngineProvider {
 
+    /** Sweeps the fake engine was asked to run - lets a test see whether a tick reached the engine. */
+    public static final java.util.concurrent.atomic.AtomicInteger SWEEPS = new java.util.concurrent.atomic.AtomicInteger();
+
     @Override
     public ObjectEngine open(SpaceRoot root, String dataDir) {
         return new Engine();
@@ -65,7 +68,7 @@ public final class FakeObjectEngineProvider implements ObjectEngineProvider {
 
         @Override
         public void sweepIncidentSla(long now) {
-            // no SLA machinery in the fake
+            SWEEPS.incrementAndGet();   // no SLA machinery in the fake: a sweep is only counted (P4f gate tests)
         }
 
         @Override
@@ -209,7 +212,7 @@ public final class FakeObjectEngineProvider implements ObjectEngineProvider {
      * {@link FakeObjectEngineProvider} — so {@code ServiceLoader.load(ObjectEngineProvider.class)}
      * discovers it while this classloader is current, and discovers nothing once it is not.
      */
-    static ClassLoader fakeObjectEngineClassLoader(ClassLoader parent) throws Exception {
+    public static ClassLoader fakeObjectEngineClassLoader(ClassLoader parent) throws Exception {
         Path dir = Files.createTempDirectory("fake-engine-spi")
                 .resolve("META-INF").resolve("services");
         Files.createDirectories(dir);
