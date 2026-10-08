@@ -20,6 +20,8 @@ import com.gamma.objects.RcaTemplate;
 import com.gamma.ops.tag.Tag;
 import com.gamma.ops.tag.TagRule;
 import com.gamma.workflow.EscalationRule;
+import com.gamma.workflow.GovernedItem;
+import com.gamma.workflow.SlaDecisions;
 import com.gamma.workflow.SlaPolicy;
 import com.gamma.workflow.Workflow;
 import com.gamma.util.JsonAttributes;
@@ -59,22 +61,22 @@ public final class ObjectService {
     private static final String SOURCE = ObjectService.class.getName();
 
     /** Attribute key holding an incident's SLA deadline as epoch millis (string) — set at creation (Phase 3). */
-    public static final String ATTR_DUE_AT = "dueAt";
+    public static final String ATTR_DUE_AT = SlaDecisions.ATTR_DUE_AT;
     /** Attribute key stamped (epoch millis) when an SLA breach has been emitted — makes {@link #sweepIncidentSla} idempotent. */
-    public static final String ATTR_SLA_BREACHED_AT = "slaBreachedAt";
+    public static final String ATTR_SLA_BREACHED_AT = SlaDecisions.ATTR_SLA_BREACHED_AT;
     /** Attribute key: the response deadline (epoch millis) an {@link SlaPolicy} stamped — met by leaving the initial state. */
-    public static final String ATTR_RESPONSE_DUE_AT = "responseDueAt";
+    public static final String ATTR_RESPONSE_DUE_AT = SlaDecisions.ATTR_RESPONSE_DUE_AT;
     /** Attribute key stamped (epoch millis) when a response breach has been emitted. */
-    public static final String ATTR_SLA_RESPONSE_BREACHED_AT = "slaResponseBreachedAt";
+    public static final String ATTR_SLA_RESPONSE_BREACHED_AT = SlaDecisions.ATTR_SLA_RESPONSE_BREACHED_AT;
     /** Attribute key: the priority the policy-stamped deadlines were computed for — a changed priority recomputes them. */
-    public static final String ATTR_SLA_PRIORITY = "slaPriority";
+    public static final String ATTR_SLA_PRIORITY = SlaDecisions.ATTR_SLA_PRIORITY;
     /** Attribute key: the {@link SlaPolicy} object type whose targets set this object's deadlines. */
-    public static final String ATTR_SLA_POLICY = "slaPolicy";
+    public static final String ATTR_SLA_POLICY = SlaDecisions.ATTR_SLA_POLICY;
     /**
      * Attribute key: every Escalation Rule firing on this object, comma-separated {@code <rule>@<breach>} — the
      * idempotency record. A rule fires for a breach only when its entry is absent, so a later sweep never repeats it.
      */
-    public static final String ATTR_ESCALATIONS = "escalations";
+    public static final String ATTR_ESCALATIONS = SlaDecisions.ATTR_ESCALATIONS;
     /** Most escalations one sweep performs; the rest wait for the next sweep. */
     static final int MAX_ESCALATIONS_PER_SWEEP = 500;
     /**
@@ -1119,8 +1121,8 @@ public final class ObjectService {
                 try {
                     if (policy != null) current = stampPolicy(current, policy, now);
                     OperationalObject after = breachResponse(current, wf, now);
-                    long dueAt = parseEpoch(after.attributes().get(ATTR_DUE_AT));
-                    if (dueAt > 0 && dueAt <= now && !after.attributes().containsKey(ATTR_SLA_BREACHED_AT)) {
+                    long dueAt = SlaDecisions.resolutionBreachDue(governed(after), now);
+                    if (dueAt > 0) {
                         after = store.update(after.withAttributes(Map.of(ATTR_SLA_BREACHED_AT, Long.toString(now)), now));
                         emitBreach(after, "resolution", dueAt, now);
                         breached++;
@@ -1140,8 +1142,13 @@ public final class ObjectService {
      * (the resolution clock stops) and {@code ARCHIVED} (dismissed, even where not terminal).
      */
     private static boolean stopped(OperationalObject o, Workflow wf) {
-        return o.isClosed() || wf.isTerminal(o.status())
-                || "RESOLVED".equalsIgnoreCase(o.status()) || "ARCHIVED".equalsIgnoreCase(o.status());
+        return SlaDecisions.stopped(governed(o), wf);
+    }
+
+    /** The host's {@link OperationalObject} as the {@link GovernedItem} view the pure SLA decisions read. */
+    static GovernedItem governed(OperationalObject o) {
+        return new GovernedItem(o.id(), o.typeName(), o.status(), o.severity(), o.priority(), o.assignee(),
+                o.createdAt(), o.isClosed(), o.attributes());
     }
 
     /**
@@ -1150,28 +1157,14 @@ public final class ObjectService {
      * are recomputed when the priority changes, until a breach has been recorded.
      */
     private OperationalObject stampPolicy(OperationalObject o, SlaPolicy policy, long now) {
-        Map<String, String> a = o.attributes();
-        boolean operatorSet = a.get(ATTR_DUE_AT) != null && !a.get(ATTR_DUE_AT).isBlank() && a.get(ATTR_SLA_POLICY) == null;
-        if (operatorSet || a.containsKey(ATTR_SLA_BREACHED_AT)) return o;
-        String priority = o.priority() == null ? "" : o.priority().trim().toUpperCase(java.util.Locale.ROOT);
-        if (a.get(ATTR_SLA_POLICY) != null && priority.equals(a.get(ATTR_SLA_PRIORITY))) return o;
-        SlaPolicy.Target t = policy.targetFor(priority).orElse(null);
-        if (t == null) return o;
-        Map<String, String> stamp = new java.util.LinkedHashMap<>();
-        stamp.put(ATTR_SLA_POLICY, policy.objectType().name());
-        stamp.put(ATTR_SLA_PRIORITY, priority);
-        if (t.resolutionMinutes() != null)
-            stamp.put(ATTR_DUE_AT, Long.toString(policy.calendar().addWorkingMinutes(o.createdAt(), t.resolutionMinutes())));
-        if (t.responseMinutes() != null && !a.containsKey(ATTR_SLA_RESPONSE_BREACHED_AT))
-            stamp.put(ATTR_RESPONSE_DUE_AT, Long.toString(policy.calendar().addWorkingMinutes(o.createdAt(), t.responseMinutes())));
-        return store.update(o.withAttributes(stamp, now));
+        Map<String, String> stamp = SlaDecisions.deadlineStamp(governed(o), policy);
+        return stamp == null ? o : store.update(o.withAttributes(stamp, now));
     }
 
     /** A response breach: the response deadline passed while the object still sits in its workflow's initial state. */
     private OperationalObject breachResponse(OperationalObject o, Workflow wf, long now) {
-        long due = parseEpoch(o.attributes().get(ATTR_RESPONSE_DUE_AT));
-        if (due <= 0 || due > now || o.attributes().containsKey(ATTR_SLA_RESPONSE_BREACHED_AT)
-                || !wf.initialState().equalsIgnoreCase(o.status())) return o;
+        long due = SlaDecisions.responseBreachDue(governed(o), wf, now);
+        if (due == 0L) return o;
         OperationalObject marked = store.update(o.withAttributes(Map.of(ATTR_SLA_RESPONSE_BREACHED_AT, Long.toString(now)), now));
         emitBreach(marked, "response", due, now);
         return marked;
@@ -1209,40 +1202,21 @@ public final class ObjectService {
      * {@code resolutionBreached}/{@code responseBreached}/{@code escalated} as 0/1. Absent text is empty.
      */
     static Map<String, Object> escalationContext(OperationalObject o, long now) {
-        Map<String, Object> row = new java.util.LinkedHashMap<>();
-        row.put("type", o.typeName());
-        row.put("status", o.status() == null ? "" : o.status().trim().toUpperCase(java.util.Locale.ROOT));
-        row.put("priority", o.priority() == null ? "" : o.priority().trim());
-        row.put("severity", o.severity() == null ? "" : o.severity());
-        row.put("category", o.attributes().getOrDefault("category", ""));
-        row.put("assignee", o.assignee() == null ? "" : o.assignee());
-        row.put("ageMinutes", Math.floorDiv(now - o.createdAt(), 60_000L));
-        long due = parseEpoch(o.attributes().get(ATTR_DUE_AT));
-        row.put("minutesToDue", due > 0 ? Math.floorDiv(due - now, 60_000L) : (long) Integer.MAX_VALUE);
-        row.put("resolutionBreached", o.attributes().containsKey(ATTR_SLA_BREACHED_AT) ? 1 : 0);
-        row.put("responseBreached", o.attributes().containsKey(ATTR_SLA_RESPONSE_BREACHED_AT) ? 1 : 0);
-        row.put("escalated", "true".equals(o.attributes().get("escalated")) ? 1 : 0);
-        return row;
+        return SlaDecisions.escalationContext(governed(o), now);
     }
 
     private void escalate(OperationalObject o, List<EscalationRule> rules, long now, int[] done) {
         OperationalObject cur = o;
         for (EscalationRule r : rules) {
             if (done[0] >= MAX_ESCALATIONS_PER_SWEEP) return;
-            Map<String, Object> match = r.matchTree();       // the priority sugar ANDed with the authored `when`
-            if (match != null && com.gamma.query.ConditionTree.matched(match, List.of(escalationContext(cur, now))) != 1) continue;
-            String marker = switch (r.on()) {
-                case BREACH -> cur.attributes().get("response".equals(r.target()) ? ATTR_SLA_RESPONSE_BREACHED_AT : ATTR_SLA_BREACHED_AT);
-                case AGE -> now - cur.createdAt() >= r.afterMinutes() * 60_000L ? "age" : null;
-            };
-            if (marker == null || marker.isBlank()) continue;
-            String entry = r.id() + "@" + marker;
-            List<String> fired = new ArrayList<>(csv(cur.attributes().get(ATTR_ESCALATIONS)));
-            if (fired.contains(entry)) continue;                               // this rule already fired for this breach
-            fired.add(entry);
+            // The priority sugar ANDed with the authored `when`; the match, the trigger and the fire-once ledger are the pure decision.
+            SlaDecisions.Firing firing = SlaDecisions.escalationFor(governed(cur), r, now,
+                    (tree, row) -> com.gamma.query.ConditionTree.matched(tree, List.of(row)) == 1);
+            if (firing == null) continue;
+            String marker = firing.marker();
             String fromAssignee = cur.assignee();
             String fromPriority = cur.priority();
-            OperationalObject next = cur.withAttributes(Map.of(ATTR_ESCALATIONS, String.join(",", fired), "escalated", "true"), now);
+            OperationalObject next = cur.withAttributes(Map.of(ATTR_ESCALATIONS, firing.ledger(), "escalated", "true"), now);
             if (r.raisePriority()) {
                 String raised = EscalationRule.raised(fromPriority);
                 if (raised != null && !raised.equals(fromPriority)) next = next.withPriority(raised, now);
@@ -1275,13 +1249,6 @@ public final class ObjectService {
                     .attr("fromAssignee", fromAssignee)
                     .attr("toAssignee", cur.assignee()));
         }
-    }
-
-    private static List<String> csv(String s) {
-        if (s == null || s.isBlank()) return List.of();
-        List<String> out = new ArrayList<>();
-        for (String p : s.split(",")) if (!p.isBlank()) out.add(p.trim());
-        return out;
     }
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ObjectService.class);
