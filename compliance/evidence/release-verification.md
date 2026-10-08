@@ -110,3 +110,11 @@ chain (`NOASSERTION` when none is declared); the bundle's own jars are listed as
 hashed **as shipped**. ⚠ Per bundle, never per reactor: the reactor resolves the optional AI stack a
 Personal bundle does not carry (CC9). ⚠ `tools/dependencies.lock` remains the *review* baseline
 (coordinates only, every module, diffed in CI) — it is not the SBOM and is not offered as one.
+
+**Per-jar SBOMs (P3f, 2026-10-08).** Because the bundle is a set of separately verifiable jars, every jar on `modules.list`
+(thin core jars, optional modules, sidecars, `inspecto.jar`, `postgresql.jar`) also has its own
+`sbom/<jar-basename>.sbom.cdx.json` (CycloneDX 1.5): the jar as root component (purl, version, build id, SHA-256 as shipped)
+plus its third-party components with SHA-256 and licence. They come from the same resolution as the combined documents and
+are verified at package time (`tools/sbom-modules.mjs --verify`): hashes equal the staged jars and every component also
+appears in the combined SBOM. They ship inside the zip, covered by its checksum and signature. Per-jar *signatures* are not
+yet produced.

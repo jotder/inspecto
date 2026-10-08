@@ -124,6 +124,12 @@ into `~/.m2` is needed** (a bare `dependency:list -am` died "Could not find arti
 machine whose `~/.m2` lacked newly extracted modules). `MVN_CMD` / `MVN_OFFLINE=1` still apply; the step re-runs
 the package phase (about 2 min), it does not reuse a `-NoBuild` jar untouched.
 
+Since P3f the same run also writes one SBOM per shipped jar, `sbom/<jar-basename>.sbom.cdx.json` (root = the jar with its
+SHA-256 and build id; components = that module's own third-party closure from its `dependency:list` block).
+`tools/sbom-modules.mjs --verify <bundle>` (run by package.ps1 after `modules.list` is written, and by
+`check-sbom-modules.mjs --bundle <dir>`) fails on a listed jar without an SBOM, a hash that is not the staged jar's, or a
+component the combined SBOM does not carry.
+
 ### What the bundle contains — and what it deliberately does not
 
 Verified by building both flavors 2026-08-27 (Personal 169.3 MB, Enterprise 170.3 MB, exit 0):
