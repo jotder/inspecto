@@ -267,7 +267,16 @@ jobs:
             # which records POSIX modes; a customer's unzip must yield an executable serve.sh.
             if [ "$plat" = linux_amd64 ]; then
               unzip -Z "$zip" inspecto-deploy/serve.sh | grep -q '^-rwx' || { echo "::error::$zip: serve.sh is not executable in the archive"; exit 1; }
+              # package.ps1 chmods EVERY *.sh it stages (run.sh, serve.sh, serve-demo.sh, ura.sh, install-service.sh, ...);
+              # assert each one present in this zip carries an executable mode, not just serve.sh.
+              nonexec=$(unzip -Z "$zip" | awk '$NF ~ /\.sh$/ && substr($1,4,1) != "x" { print $NF }')
+              [ -z "$nonexec" ] || { echo "::error::$zip: launcher(s) not executable in the archive: $nonexec"; exit 1; }
             fi
+            # The classpath/edition markers every launcher reads, and the per-module SBOMs, must be in the zip.
+            for need in modules.list core.list edition.properties; do
+              grep -qx "inspecto-deploy/$need" <<<"$entries" || { echo "::error::$zip: no $need"; exit 1; }
+            done
+            grep -Eq '^inspecto-deploy/sbom/[^/]+\.sbom\.cdx\.json$' <<<"$entries" || { echo "::error::$zip: no sbom/*.sbom.cdx.json"; exit 1; }
           done
           ls -la
 
