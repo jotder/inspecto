@@ -9,7 +9,7 @@ import { analyze } from './check-sbom-modules.mjs';
 import { coreModules } from './bundle-modules.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const REAL = readFileSync(join(ROOT, 'inspecto', 'package.ps1'), 'utf8');
+const REAL = readFileSync(join(ROOT, 'inspecto', 'package.ps1'), 'utf8').replace(/\r\n/g, '\n'); // LF-normalised: the mutate() anchors are LF
 const problems = (text, opts) => analyze(text, opts).problems.join('\n');
 const mutate = (from, to) => { assert.ok(REAL.includes(from), `fixture anchor missing from package.ps1: ${from.slice(0, 60)}`); return REAL.replace(from, to); };
 

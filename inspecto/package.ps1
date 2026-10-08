@@ -298,6 +298,17 @@ $obsJarSrc      = $null
 $opsJarSrc      = $null
 $agentJarSrc    = $null
 $intelligenceJarSrc = $null
+$kafkaJarSrc = $null
+$asn1JarSrc = $null
+$entityListJarSrc = $null
+$laGraphJarSrc = $null
+$laStorageJarSrc = $null
+$laCoreJarSrc = $null
+$laApiJarSrc = $null
+$reconJarSrc = $null
+$scoringJarSrc = $null
+$caseMgmtJarSrc = $null
+$actionReqJarSrc = $null
 if ($Edition -eq 'Standard') { $Edition = 'Professional' }
 if ($Edition -ne 'Personal') {
     # NB: not $profile — that is a PowerShell automatic variable.

@@ -231,6 +231,12 @@ jobs:
       - name: Guard — the shipped SBOM declares the jars the bundle stages
         run: node tools/check-sbom-modules.mjs
 
+      # package.ps1 strict-mode guard (2026-10-08). package.ps1 runs under Set-StrictMode -Version Latest, so a
+      # bundling block that READS a *JarSrc variable assigned only in another edition's branch throws - `-Edition
+      # Personal` was broken that way. AST walk (pwsh is on the runner); no build.
+      - name: Guard — package.ps1 reads no variable before it is assigned (strict mode)
+        run: node tools/check-package-strict.mjs
+
       # Demo sign-in isolation guard (DEMO-AUTH-1, 2026-09-25). The Demo User sign-in module signs anyone in
       # with no password; only `package.ps1 -DemoAuth` may stage it, in place of the security jar. This fails
       # if it enters any edition's module table, is named in package.ps1 outside an if-($DemoAuth) block, is a
