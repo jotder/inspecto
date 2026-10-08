@@ -37,7 +37,19 @@
 |---|---|---|
 | Flow | **Pipeline** | "Flow" collided with FlowGraph/Run; one word for the DAG |
 | Data Store *(as a relation)* | **Dataset** | "Store" means the physical backend, not a queryable relation |
-| `EscalationPolicy` *(agent LLM retry ladder)* | **Model Escalation Ladder** | 🔲 not started (module reorganisation P0, 2026-10-06). Backend: `inspecto-agent` `EscalationPolicy` and its `BumpModelTier` / `HumanHandoff` / `Abstain` steps; ⛔ never *Escalation Rule* (`EscalationRule` in engine `objects`, §15). |
+| `EscalationPolicy` *(agent LLM retry ladder)* | **Store family** — One named group of a module's per-Space operational files (for example Ops' `OBJECTS`, `LINKS`,
+`NOTES`, `TAGS`), declared in the manifest as `provides.storeFamilies` and contributed through the
+`StoreFamilyProvider` SPI. The base layer keeps its own core families; an absent module's families are reported
+`notInstalled` and left untouched (see **Removal semantics**). ⛔ Not *table* or *dataset* (a **Dataset** is a data relation).
+
+**Consequence provider** — The SPI (`ConsequenceProvider`, manifest `provides.consequences`) through which an optional
+module registers its **Consequences** (§4) in the **Consequence registry**. ⛔ Not *action provider*.
+
+**Host boot hook** — The SPI (`HostBootHook`) through which an optional module installs its host-wide seams once the
+host has its Spaces, so its routes stay drivable without a running host. Not a user-facing concept; named here because
+the module manifest and plan use it.
+
+**Model Escalation Ladder** | 🔲 not started (module reorganisation P0, 2026-10-06). Backend: `inspecto-agent` `EscalationPolicy` and its `BumpModelTier` / `HumanHandoff` / `Abstain` steps; ⛔ never *Escalation Rule* (`EscalationRule` in engine `objects`, §15). |
 | Issue | **Incident** | aligns Alert → Incident → Case |
 | Rule *(bare)* | **Expectation** \| **Alert Rule** \| **Decision Rule** | one word hid three engines |
 | Metric *(for a BI aggregation)* | **Measure** | "metric" is reserved for the observability time-series |
