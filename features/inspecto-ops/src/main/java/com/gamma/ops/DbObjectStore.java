@@ -109,6 +109,7 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
 
     @Override
     public OperationalObject update(OperationalObject obj) {
+        if (obj.isInert()) throw new InertObjectException(obj.id(), obj.typeName());   // never rewrite a row of an unknown type
         String sql = "UPDATE " + TABLE + " SET object_type=?, title=?, description=?, status=?, "
                 + "severity=?, priority=?, \"owner\"=?, assignee=?, correlation_id=?, attributes=?, "
                 + "created_at=?, updated_at=?, closed_at=?, version=version+1 WHERE id=? AND version=?";
@@ -271,7 +272,7 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
 
     private static void bindAll(PreparedStatement ps, OperationalObject o) throws SQLException {
         ps.setString(1, o.id());
-        ps.setString(2, o.objectType().name());
+        ps.setString(2, o.typeName());
         ps.setString(3, o.title());
         ps.setString(4, o.description());
         ps.setString(5, o.status());
@@ -287,9 +288,20 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
     }
 
     private static OperationalObject mapRow(ResultSet rs) throws SQLException {
+        String rawType = rs.getString("object_type");
+        ObjectType type = ObjectType.tryOf(rawType);
+        if (type == null) {
+            // A stored type this build does not know (a legacy type, or a module that is not installed): load the
+            // row INERT — listed and readable, never rewritten and never dropped.
+            return OperationalObject.inert(rawType,
+                    rs.getString("id"), rs.getString("title"), rs.getString("description"), rs.getString("status"),
+                    rs.getString("severity"), rs.getString("priority"), rs.getString("owner"), rs.getString("assignee"),
+                    rs.getString("correlation_id"), JsonAttributes.fromJson(rs.getString("attributes")),
+                    rs.getLong("created_at"), rs.getLong("updated_at"), rs.getLong("closed_at"), rs.getLong("version"));
+        }
         return new OperationalObject(
                 rs.getString("id"),
-                ObjectType.valueOf(rs.getString("object_type")),
+                type,
                 rs.getString("title"),
                 rs.getString("description"),
                 rs.getString("status"),

@@ -150,9 +150,9 @@ class AlertServicePersistenceTest {
         assertEquals(1, edges.size(), "exactly one correlation edge");
         ObjectLink edge = edges.get(0);
         assertEquals(incident.id(), edge.fromId());
-        assertEquals(ObjectType.INCIDENT, edge.fromType());
+        assertEquals("INCIDENT", edge.fromType());
         assertEquals(alert.id(), edge.toId(), "Incident ESCALATED_FROM the Alert that raised it (kind ALERT + id)");
-        assertEquals(ObjectType.ALERT, edge.toType());
+        assertEquals("ALERT", edge.toType());
         assertTrue(objects.get(alert.id()).isEmpty(), "the Alert is not an object: the edge is a cross-store reference");
         assertEquals(incident.id(), alert.incidentId(), "and the Alert row names its Incident");
         assertEquals("ESCALATED_FROM", edge.relationship());

@@ -63,9 +63,9 @@ public final class DbLinkStore extends AbstractJdbcStore implements LinkStore {
             return withConn(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
                     ps.setString(1, link.fromId());
-                    ps.setString(2, link.fromType().name());
+                    ps.setString(2, link.fromType());
                     ps.setString(3, link.toId());
-                    ps.setString(4, link.toType().name());
+                    ps.setString(4, link.toType());
                     ps.setString(5, link.relationship());
                     ps.setLong(6, link.createdAt());
                     ps.executeUpdate();
@@ -169,9 +169,9 @@ public final class DbLinkStore extends AbstractJdbcStore implements LinkStore {
             while (rs.next()) {
                 out.add(new ObjectLink(
                         rs.getString("from_id"),
-                        ObjectType.valueOf(rs.getString("from_type")),
+                        rs.getString("from_type"),
                         rs.getString("to_id"),
-                        ObjectType.valueOf(rs.getString("to_type")),
+                        rs.getString("to_type"),
                         rs.getString("relationship"),
                         rs.getLong("created_at")));
             }

@@ -40,6 +40,7 @@ public final class InMemoryObjectStore implements ObjectStore {
 
     @Override
     public synchronized OperationalObject update(OperationalObject obj) {
+        if (obj.isInert()) throw new InertObjectException(obj.id(), obj.typeName());   // never rewrite a row of an unknown type
         OperationalObject stored = byId.get(obj.id());
         if (stored == null)
             throw new NoSuchElementException("no object with id '" + obj.id() + "'");

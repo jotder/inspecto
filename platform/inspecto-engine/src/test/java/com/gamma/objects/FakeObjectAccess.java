@@ -37,7 +37,7 @@ public final class FakeObjectAccess implements ObjectAccess {
     public final List<Opened> opened = new ArrayList<>();
     public final List<Linked> linked = new ArrayList<>();
     /** One recorded {@link #linkSubject} call (a link to a subject outside the object store, e.g. an Alert). */
-    public record SubjectLinked(String fromId, ObjectType subjectKind, String subjectId, String relationship, String actor) {}
+    public record SubjectLinked(String fromId, String subjectKind, String subjectId, String relationship, String actor) {}
     public final List<SubjectLinked> subjectLinked = new ArrayList<>();
     public final List<String> tagsEnsured = new ArrayList<>();
 
@@ -121,7 +121,7 @@ public final class FakeObjectAccess implements ObjectAccess {
     }
 
     @Override
-    public void linkSubject(String fromId, ObjectType subjectKind, String subjectId, String relationship, String actor) {
+    public void linkSubject(String fromId, String subjectKind, String subjectId, String relationship, String actor) {
         subjectLinked.add(new SubjectLinked(fromId, subjectKind, subjectId, relationship, actor));
     }
 

@@ -102,7 +102,7 @@ public final class ObjectServiceAccess implements ObjectAccess {
     }
 
     @Override
-    public void linkSubject(String fromId, ObjectType subjectKind, String subjectId, String relationship, String actor) {
+    public void linkSubject(String fromId, String subjectKind, String subjectId, String relationship, String actor) {
         service.linkSubject(fromId, subjectKind, subjectId, relationship, actor);
     }
 
@@ -158,7 +158,7 @@ public final class ObjectServiceAccess implements ObjectAccess {
     /** ONE projection behind both {@link #summary} and {@link #findByStatus}, so the two cannot drift. */
     private static Map<String, Object> flatten(OperationalObject o) {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("kind", o.objectType().name().toLowerCase(java.util.Locale.ROOT));
+        m.put("kind", o.typeName().toLowerCase(java.util.Locale.ROOT));
         m.put("id", o.id());
         m.put("correlationId", o.correlationId());
         m.put("owner", o.owner());

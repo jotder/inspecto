@@ -36,16 +36,64 @@ import java.util.UUID;
 public record OperationalObject(String id, ObjectType objectType, String title, String description,
                                 String status, String severity, String priority, String owner,
                                 String assignee, String correlationId, Map<String, String> attributes,
-                                long createdAt, long updatedAt, long closedAt, long version) {
+                                long createdAt, long updatedAt, long closedAt, long version, String rawType) {
 
-    /** Canonical constructor — validates the keys, defaults text fields, makes {@code attributes} immutable. */
+    /**
+     * Canonical constructor — validates the keys, defaults text fields, makes {@code attributes} immutable.
+     * {@code objectType} may be {@code null} only for an <b>inert</b> object ({@link #inert}): a stored row whose
+     * {@code type} this build does not know, which then carries that text as {@code rawType}.
+     */
     public OperationalObject {
         if (id == null || id.isBlank()) throw new IllegalArgumentException("object id is required");
-        if (objectType == null) throw new IllegalArgumentException("objectType is required");
+        if (objectType == null && (rawType == null || rawType.isBlank()))
+            throw new IllegalArgumentException("objectType is required");
+        if (objectType != null) rawType = null;
         if (status == null || status.isBlank()) throw new IllegalArgumentException("status is required");
         title = title == null ? "" : title;
         description = description == null ? "" : description;
         attributes = attributes == null || attributes.isEmpty() ? Map.of() : Map.copyOf(attributes);
+    }
+
+    /** A typed (non-inert) object — the shape every caller outside the stores builds. */
+    public OperationalObject(String id, ObjectType objectType, String title, String description,
+                             String status, String severity, String priority, String owner,
+                             String assignee, String correlationId, Map<String, String> attributes,
+                             long createdAt, long updatedAt, long closedAt, long version) {
+        this(id, objectType, title, description, status, severity, priority, owner, assignee, correlationId,
+                attributes, createdAt, updatedAt, closedAt, version, null);
+    }
+
+    /**
+     * A stored row whose {@code type} text names no {@link ObjectType} of this build (a legacy type such as
+     * {@code ALERT}, or the type of a module that is not installed). It is loaded <b>inert</b>: listed and readable,
+     * never mutated, never rewritten, never dropped, and skipped by the SLA sweep and analytics.
+     */
+    public static OperationalObject inert(String rawType, String id, String title, String description,
+                                          String status, String severity, String priority, String owner,
+                                          String assignee, String correlationId, Map<String, String> attributes,
+                                          long createdAt, long updatedAt, long closedAt, long version) {
+        return new OperationalObject(id, null, title, description, status, severity, priority, owner, assignee,
+                correlationId, attributes, createdAt, updatedAt, closedAt, version, rawType);
+    }
+
+    /** {@code true} when this row's type is unknown to this build — see {@link #inert}. */
+    public boolean isInert() {
+        return objectType == null;
+    }
+
+    /** The type as stored: the {@link ObjectType} name, or the raw text of an inert row. */
+    public String typeName() {
+        return objectType != null ? objectType.name() : rawType;
+    }
+
+    /** The diagnostic an inert row is listed with. */
+    public String inertDiagnostic() {
+        return "type " + rawType + " is not installed/known: left untouched";
+    }
+
+    private OperationalObject typed() {
+        if (isInert()) throw new InertObjectException(id, rawType);
+        return this;
     }
 
     /**
@@ -54,26 +102,30 @@ public record OperationalObject(String id, ObjectType objectType, String title, 
      * {@code reopen} action, GLOSSARY §9) re-opens the object, so {@link #isClosed()} tracks the state.
      */
     public OperationalObject withStatus(String newStatus, long now, boolean terminal) {
+        typed();
         return new OperationalObject(id, objectType, title, description, newStatus, severity, priority,
-                owner, assignee, correlationId, attributes, createdAt, now, terminal ? now : 0, version);
+                owner, assignee, correlationId, attributes, createdAt, now, terminal ? now : 0, version, rawType);
     }
 
     /** A copy reassigned to {@code newAssignee} (touches {@code updatedAt}). */
     public OperationalObject withAssignee(String newAssignee, long now) {
+        typed();
         return new OperationalObject(id, objectType, title, description, status, severity, priority,
-                owner, newAssignee, correlationId, attributes, createdAt, now, closedAt, version);
+                owner, newAssignee, correlationId, attributes, createdAt, now, closedAt, version, rawType);
     }
 
     /** A copy at a new {@code severity} (INC-4 escalation bump); touches {@code updatedAt}. */
     public OperationalObject withSeverity(String newSeverity, long now) {
+        typed();
         return new OperationalObject(id, objectType, title, description, status, newSeverity, priority,
-                owner, assignee, correlationId, attributes, createdAt, now, closedAt, version);
+                owner, assignee, correlationId, attributes, createdAt, now, closedAt, version, rawType);
     }
 
     /** A copy at a new {@code priority} (operator triage — the {@code PATCH /objects/{id}} Prioritize); touches {@code updatedAt}. */
     public OperationalObject withPriority(String newPriority, long now) {
+        typed();
         return new OperationalObject(id, objectType, title, description, status, severity, newPriority,
-                owner, assignee, correlationId, attributes, createdAt, now, closedAt, version);
+                owner, assignee, correlationId, attributes, createdAt, now, closedAt, version, rawType);
     }
 
     /**
@@ -95,17 +147,18 @@ public record OperationalObject(String id, ObjectType objectType, String title, 
      * Phase-3 {@code slaBreachedAt} without disturbing status or assignment.
      */
     public OperationalObject withAttributes(Map<String, String> updates, long now) {
+        typed();
         Map<String, String> merged = new LinkedHashMap<>(attributes);
         if (updates != null) updates.forEach((k, v) -> { if (k != null && v != null) merged.put(k, v); });
         return new OperationalObject(id, objectType, title, description, status, severity, priority,
-                owner, assignee, correlationId, merged, createdAt, now, closedAt, version);
+                owner, assignee, correlationId, merged, createdAt, now, closedAt, version, rawType);
     }
 
     /** {@code true} once {@link #closedAt()} is set (the object reached a terminal state). */
     /** This object as the store must hold it at {@code newVersion} (the stores bump it; callers never do). */
     OperationalObject withVersion(long newVersion) {
         return new OperationalObject(id, objectType, title, description, status, severity, priority,
-                owner, assignee, correlationId, attributes, createdAt, updatedAt, closedAt, newVersion);
+                owner, assignee, correlationId, attributes, createdAt, updatedAt, closedAt, newVersion, rawType);
     }
 
     public boolean isClosed() {
@@ -116,7 +169,11 @@ public record OperationalObject(String id, ObjectType objectType, String title, 
     public Map<String, Object> toMap() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", id);
-        m.put("objectType", objectType.name());
+        m.put("objectType", typeName());
+        if (isInert()) {
+            m.put("inert", true);
+            m.put("diagnostic", inertDiagnostic());
+        }
         m.put("title", title);
         m.put("description", description);
         m.put("status", status);

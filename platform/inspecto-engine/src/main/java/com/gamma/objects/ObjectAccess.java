@@ -150,7 +150,7 @@ public interface ObjectAccess {
      * its own store now, and {@code Incident ESCALATED_FROM Alert} is a cross-store reference). Idempotent. The
      * default is a no-op for an implementation with no link graph.
      */
-    default void linkSubject(String fromId, ObjectType subjectKind, String subjectId, String relationship, String actor) {}
+    default void linkSubject(String fromId, String subjectKind, String subjectId, String relationship, String actor) {}
 
     /**
      * Every non-terminal object of {@code kind} as a rich map ({@code id, title, description, severity,

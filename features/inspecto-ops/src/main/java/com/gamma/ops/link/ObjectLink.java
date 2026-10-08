@@ -24,14 +24,26 @@ import java.util.Map;
  * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
-public record ObjectLink(String fromId, ObjectType fromType, String toId, ObjectType toType,
+public record ObjectLink(String fromId, String fromType, String toId, String toType,
                          String relationship, long createdAt) {
+
+    /** An edge between two typed objects. */
+    public ObjectLink(String fromId, ObjectType fromType, String toId, ObjectType toType,
+                      String relationship, long createdAt) {
+        this(fromId, fromType == null ? null : fromType.name(), toId, toType == null ? null : toType.name(),
+                relationship, createdAt);
+    }
 
     /** Canonical constructor — validates the endpoints and normalises the relationship. */
     public ObjectLink {
         if (fromId == null || fromId.isBlank()) throw new IllegalArgumentException("link fromId is required");
         if (toId == null || toId.isBlank()) throw new IllegalArgumentException("link toId is required");
-        if (fromType == null || toType == null) throw new IllegalArgumentException("link endpoint types are required");
+        // An endpoint "type" is the TEXT of the stored kind, not an ObjectType: an edge may name a legacy type such as
+        // ALERT, or the type of a module that is not installed, and must still load (never dropped, never rewritten).
+        if (fromType == null || fromType.isBlank() || toType == null || toType.isBlank())
+            throw new IllegalArgumentException("link endpoint types are required");
+        fromType = fromType.trim();
+        toType = toType.trim();
         relationship = norm(relationship);
         if (relationship == null) throw new IllegalArgumentException("link relationship is required");
     }
@@ -40,6 +52,11 @@ public record ObjectLink(String fromId, ObjectType fromType, String toId, Object
     public static ObjectLink of(String fromId, ObjectType fromType, String toId, ObjectType toType,
                                 String relationship) {
         return new ObjectLink(fromId, fromType, toId, toType, relationship, System.currentTimeMillis());
+    }
+
+    /** A link whose far end is a subject kind outside {@link ObjectType} (e.g. the Alert an Incident escalated from). */
+    public static ObjectLink of(String fromId, ObjectType fromType, String toId, String toKind, String relationship) {
+        return new ObjectLink(fromId, fromType.name(), toId, toKind, relationship, System.currentTimeMillis());
     }
 
     /** Given one endpoint id, the id at the other end of this edge (or {@code null} if {@code id} is neither). */
@@ -53,9 +70,9 @@ public record ObjectLink(String fromId, ObjectType fromType, String toId, Object
     public Map<String, Object> toMap() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("from", fromId);
-        m.put("fromType", fromType.name());
+        m.put("fromType", fromType);
         m.put("to", toId);
-        m.put("toType", toType.name());
+        m.put("toType", toType);
         m.put("relationship", relationship);
         m.put("createdAt", createdAt);
         return m;

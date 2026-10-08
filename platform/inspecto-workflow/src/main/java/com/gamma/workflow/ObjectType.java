@@ -35,6 +35,16 @@ public enum ObjectType {
     ALERT,
     INCIDENT, CASE, TASK;
 
+    /** Parse a stored type name; {@code null} when it names no type of this build (the caller loads the row inert). */
+    public static ObjectType tryOf(String s) {
+        if (s == null || s.isBlank()) return null;
+        try {
+            return valueOf(s.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     /**
      * Parse a type name case-insensitively. {@code null}/blank returns {@code null} ("no constraint",
      * for query filters); an unrecognised non-blank value throws {@link IllegalArgumentException} so

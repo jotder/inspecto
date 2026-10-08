@@ -55,8 +55,8 @@ class LinkCoreTest {
             assertEquals(2, incidentI1.size(), "both directions");
             ObjectLink top = incidentI1.get(0);
             assertEquals(200, top.createdAt(), "newest-first");
-            assertEquals(ObjectType.INCIDENT, top.fromType());
-            assertEquals(ObjectType.ALERT, top.toType());
+            assertEquals("INCIDENT", top.fromType());
+            assertEquals("ALERT", top.toType());
             assertEquals("ESCALATED_FROM", top.relationship());
             assertEquals(2, store.all(10).size());
         }

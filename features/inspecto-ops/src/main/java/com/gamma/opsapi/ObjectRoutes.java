@@ -189,7 +189,7 @@ public final class ObjectRoutes implements RouteModule {
             String caseType = o.attributes().get(ATTR_CASE_TYPE);
             if (caseType != null && !caseType.isBlank() && !s.dataScopes().contains(caseType)) return false;
         }
-        return RowScope.visible(ex, o.objectType().name().toLowerCase(java.util.Locale.ROOT), resourceAttributes(o));
+        return RowScope.visible(ex, o.typeName().toLowerCase(java.util.Locale.ROOT), resourceAttributes(o));
     }
 
     /** The row's attribute map for policy conditions ({@code resource.*}): kind + id + owner + the
@@ -197,7 +197,7 @@ public final class ObjectRoutes implements RouteModule {
      *  to the request's bound space when a row doesn't carry one. */
     private static Map<String, Object> resourceAttributes(OperationalObject o) {
         Map<String, Object> r = new LinkedHashMap<>(o.attributes());
-        r.put("kind", o.objectType().name().toLowerCase(java.util.Locale.ROOT));
+        r.put("kind", o.typeName().toLowerCase(java.util.Locale.ROOT));
         r.put("id", o.id());
         if (o.owner() != null && !o.owner().isBlank()) r.put("owner", o.owner());
         return r;
@@ -229,8 +229,14 @@ public final class ObjectRoutes implements RouteModule {
             OperationalObject o = OpsEngine.of(api).get(id).orElse(null);
             if (o != null && !visibleTo(e, o))
                 throw new ApiException(404, ErrorCodes.NOT_FOUND, "no object with id '" + id + "'");
+            // An inert object (a stored type this build does not know) is read-only: every non-GET answers 409 before
+            // its handler runs, so no route can rewrite the row.
+            if (o != null && o.isInert() && !"GET".equalsIgnoreCase(e.getRequestMethod()))
+                throw new ApiException(409, ErrorCodes.CONFLICT, new com.gamma.ops.InertObjectException(id, o.typeName()).getMessage());
             try {
                 return h.handle(e, m);   // absent ids keep their existing 404/behaviour
+            } catch (com.gamma.ops.InertObjectException inert) {
+                throw new ApiException(409, ErrorCodes.CONFLICT, inert.getMessage());   // the far end of a link / merge is inert
             } catch (com.gamma.ops.ObjectVersionConflictException lost) {
                 // The service already re-ran its read-modify-write ObjectService.MAX_RMW_ATTEMPTS times: a writer
                 // that keeps winning the race. Recoverable - the client re-reads (GET carries `version`) and retries.

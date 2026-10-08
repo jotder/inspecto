@@ -58,7 +58,7 @@ final class StoredAlertRecords implements AlertRecords {
 
     @Override public void linkEscalation(String incidentId, String alertId, String actor) {
         store.linkIncident(alertId, incidentId);
-        objects.ifPresent(o -> o.linkSubject(incidentId, ObjectType.ALERT, alertId, ESCALATED_FROM, actor));
+        objects.ifPresent(o -> o.linkSubject(incidentId, ObjectType.ALERT.name(), alertId, ESCALATED_FROM, actor));
     }
 
     @Override public List<Alert> recentFired(int limit) { return store.recentFired(limit); }

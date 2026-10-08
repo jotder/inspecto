@@ -156,7 +156,7 @@ public record TagRule(String name, String tag, Filter filter, long createdAt, Ma
          */
         public static Map<String, Object> context(OperationalObject o) {
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("type", o.objectType().name());
+            row.put("type", o.typeName());
             String status = o.status() == null ? "" : o.status().trim().toUpperCase(Locale.ROOT);
             row.put("status", o.objectType() == ObjectType.INCIDENT ? foldIncident(status) : status);
             row.put("priority", nullToEmpty(o.priority()));

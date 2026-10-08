@@ -238,7 +238,7 @@ class AlertRecordsParityTest {
                 assertEquals(1, w.objects.subjectLinked.size(), label);
                 FakeObjectAccess.SubjectLinked l = w.objects.subjectLinked.get(0);
                 assertEquals("ESCALATED_FROM", l.relationship());
-                assertEquals(ObjectType.ALERT, l.subjectKind(), label + ": a cross-store reference: kind ALERT ...");
+                assertEquals("ALERT", l.subjectKind(), label + ": a cross-store reference: kind ALERT ...");
                 assertEquals(row.id(), l.subjectId(), label + ": ... + the Alert's own id");
                 assertEquals(l.fromId(), row.incidentId(), label + ": and the Alert row remembers its Incident");
                 assertTrue(w.objects.linked.isEmpty(), label + ": no object-to-object link: the Alert is not an object");

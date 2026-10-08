@@ -539,8 +539,8 @@ class ObjectServiceTest {
 
         ObjectLink link = svc.link(c.id(), i.id(), "contains", "alice");
         assertEquals("CONTAINS", link.relationship());
-        assertEquals(ObjectType.CASE, link.fromType());
-        assertEquals(ObjectType.INCIDENT, link.toType());
+        assertEquals("CASE", link.fromType());
+        assertEquals("INCIDENT", link.toType());
         assertEquals(1, svc.linksOf(c.id()).size());
         assertEquals(1, svc.linksOf(i.id()).size(), "link is incident from both ends");
         assertEquals(1, activityFor(events, EventType.OBJECT_LINKED, c.id()).stream()

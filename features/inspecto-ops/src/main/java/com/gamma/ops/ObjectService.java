@@ -206,6 +206,7 @@ public final class ObjectService {
             if (!AnnotationKinds.OBJECT.equals(targetKind)) return null;   // fail closed: not our family
             OperationalObject o = store.get(targetId).orElse(null);
             if (o == null) return null;
+            if (o.isInert()) throw new InertObjectException(targetId, o.typeName());   // a note is a write
             return o.correlationId() == null ? "" : o.correlationId();
         });
         for (ObjectType t : ObjectType.values()) {
@@ -577,6 +578,7 @@ public final class ObjectService {
         int total = 0;
         // Every object of the type, a page at a time — never one MAX_LIMIT page (ASSURE-IMPACT-LEDGER-RESIDUALS-1).
         for (OperationalObject o : allMatching(ObjectQuery.builder().objectType(type).build())) {
+            if (o.isInert()) continue;   // an unknown-typed row is never counted (nor stamped): it is outside every workflow
             total++;
             bump(byStatus, o.status() == null ? "UNKNOWN" : o.status().toUpperCase(java.util.Locale.ROOT));
             bump(byCategory, categoryL1(o.attributes().get("category")));
@@ -1194,7 +1196,7 @@ public final class ObjectService {
      */
     static Map<String, Object> escalationContext(OperationalObject o, long now) {
         Map<String, Object> row = new java.util.LinkedHashMap<>();
-        row.put("type", o.objectType().name());
+        row.put("type", o.typeName());
         row.put("status", o.status() == null ? "" : o.status().trim().toUpperCase(java.util.Locale.ROOT));
         row.put("priority", o.priority() == null ? "" : o.priority().trim());
         row.put("severity", o.severity() == null ? "" : o.severity());
@@ -1282,7 +1284,7 @@ public final class ObjectService {
     public ObjectLink link(String fromId, String toId, String relationship, String actor) {
         OperationalObject from = require(fromId);
         OperationalObject to = require(toId);
-        return addLink(from, to.objectType(), toId, relationship, actor);
+        return addLink(from, to.typeName(), toId, relationship, actor);
     }
 
     /**
@@ -1291,12 +1293,12 @@ public final class ObjectService {
      * near end must exist. The edge reads back through {@link #linksOf} / {@link #graph} like any other — the graph
      * simply has no node for a subject it does not hold, as it never had for a deleted object.
      */
-    public ObjectLink linkSubject(String fromId, ObjectType subjectType, String subjectId, String relationship,
+    public ObjectLink linkSubject(String fromId, String subjectType, String subjectId, String relationship,
                                   String actor) {
         return addLink(require(fromId), subjectType, subjectId, relationship, actor);
     }
 
-    private ObjectLink addLink(OperationalObject from, ObjectType toType, String toId, String relationship, String actor) {
+    private ObjectLink addLink(OperationalObject from, String toType, String toId, String relationship, String actor) {
         String fromId = from.id();
         String rel = (relationship == null || relationship.isBlank()) ? LinkRelationship.RELATED_TO : relationship;
         for (ObjectLink existing : links.incident(fromId)) {
@@ -1315,7 +1317,7 @@ public final class ObjectService {
                 .attr("from", fromId)
                 .attr("fromType", from.objectType().name())
                 .attr("to", toId)
-                .attr("toType", toType.name())
+                .attr("toType", toType)
                 .attr("relationship", created.relationship())
                 .attr("actor", actor));
         return created;
@@ -1391,7 +1393,7 @@ public final class ObjectService {
     private static Map<String, Object> nodeSummary(OperationalObject o) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", o.id());
-        m.put("objectType", o.objectType().name());
+        m.put("objectType", o.typeName());
         m.put("title", o.title());
         m.put("status", o.status());
         m.put("severity", o.severity());
@@ -1528,7 +1530,11 @@ public final class ObjectService {
     }
 
     private OperationalObject require(String id) {
-        return store.get(id).orElseThrow(() -> new NoSuchElementException("no object with id '" + id + "'"));
+        OperationalObject o = store.get(id).orElseThrow(() -> new NoSuchElementException("no object with id '" + id + "'"));
+        // The one chokepoint every mutator (transition / patch / assign / link / note / tag / purge / ...) passes
+        // through: an inert object (a stored type this build does not know) is refused here, never rewritten.
+        if (o.isInert()) throw new InertObjectException(id, o.typeName());
+        return o;
     }
 
     /** How many times a lost optimistic-lock race is re-run before the conflict is surfaced (409 at the edge). */
