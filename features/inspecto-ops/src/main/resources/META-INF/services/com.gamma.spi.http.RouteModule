@@ -1,3 +1,4 @@
 com.gamma.opsapi.ObjectRoutes
+com.gamma.opsapi.CaseRoutes
 com.gamma.opsapi.NoteRoutes
 com.gamma.opsapi.TagRoutes
