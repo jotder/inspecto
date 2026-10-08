@@ -75,6 +75,7 @@ Name a module to Maven by artifactId (`-pl :inspecto-engine`), never by path. `i
 - **No licence engine**; `entitlementKey` is reserved in the manifest only.
 - Closed central registries become **contribution points**; `EventType` is the model to copy.
 - Config naming an absent module loads **inert with a diagnostic** and is never dropped on save.
+- **Objects of an absent module's type load inert too (2026-10-08).** The object stores read `object_type` as text: a row whose type is no `ObjectType` of this build (a module removed, or the retired `ALERT`) is listed by `GET /objects` with `inert:true` and the diagnostic "type X is not installed/known: left untouched", readable by id, refused on every write (`409`), skipped by the SLA sweep, analytics and purge, and an `ObjectLink` endpoint kind is carried as text so its edges still load.
 - **Removal and disable, as built (P4e).** The registry-kind roster (`ComponentStore.WRITABLE_TYPES`) is one engine list, so an
   import judges a kind the same on every install: an absent module's kinds (`risk-score`, `reconciliation`) are accepted as inert
   config, never dropped; what an import refuses (access config, governance kinds, suffix-scanned ops configs) it refuses everywhere

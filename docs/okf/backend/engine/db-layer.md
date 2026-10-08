@@ -95,7 +95,7 @@ unaffected because the database, not the monitor, decides them.
 
 | Domain | Interface | DB impl | Backend toggle (`-D…`) | Default |
 |---|---|---|---|---|
-| Operational objects (ALERT / INCIDENT / CASE / TASK) | `ops/ObjectStore` | [`DbObjectStore`](../../../../features/inspecto-ops/src/main/java/com/gamma/ops/DbObjectStore.java) | `objects.backend=db\|postgres\|memory` | **`db`** (was `memory` until 2026-09-25 — `OBJECTS-BACKEND-DEFAULT-MEMORY-1`; `postgres` = Enterprise, mandatory, fail-closed; `memory` = explicit opt-in) |
+| Operational objects (INCIDENT / CASE / TASK) | `ops/ObjectStore` | [`DbObjectStore`](../../../../features/inspecto-ops/src/main/java/com/gamma/ops/DbObjectStore.java) | `objects.backend=db\|postgres\|memory` | **`db`** (was `memory` until 2026-09-25 — `OBJECTS-BACKEND-DEFAULT-MEMORY-1`; `postgres` = Enterprise, mandatory, fail-closed; `memory` = explicit opt-in) |
 | Correlation links | `ops/link/LinkStore` | [`DbLinkStore`](../../../../features/inspecto-ops/src/main/java/com/gamma/ops/link/DbLinkStore.java) | `objects.backend` (shared) | **`db`** |
 | Notes / evidence | `ops/note/NoteStore` | [`DbNoteStore`](../../../../features/inspecto-ops/src/main/java/com/gamma/ops/note/DbNoteStore.java) | `objects.backend` (shared) | **`db`** |
 | Events (append-only facts) | `event/EventStore` | [`ParquetEventStore`](../../../../platform/inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java) *(Parquet, not JDBC)* · [`DbEventStore`](../../../../platform/inspecto-event/src/main/java/com/gamma/event/DbEventStore.java) *(JDBC, since 2026-09-12)* | `events.backend=memory\|parquet\|db\|postgres\|jdbc:…` | `memory` |
@@ -113,8 +113,9 @@ unaffected because the database, not the monitor, decides them.
 > **Alerts fired by an Alert Rule are their own table since 2026-10-07** (§3.14 `inspecto_alerts`, the `ALERTS` family).
 > Incidents, cases and tasks — and the ALERT objects the Event bridge opens for a sequence gap or a conservation
 > imbalance — are still rows in `inspecto_ops_objects`, discriminated by the `object_type` column
-> ([`ObjectType`](../../../../platform/inspecto-workflow/src/main/java/com/gamma/workflow/ObjectType.java): `ALERT, INCIDENT, CASE, TASK`).
-> Pre-existing still-active ALERT objects are adopted into the Alert store once at boot (`AlertMigration`); the
+> ([`ObjectType`](../../../../platform/inspecto-workflow/src/main/java/com/gamma/workflow/ObjectType.java): `INCIDENT, CASE, TASK`;
+> `ALERT` was retired 2026-10-08 — a row of any type the build does not know, e.g. a legacy `ALERT`, loads inert: listed and
+> readable, never rewritten or dropped, every write on it refused). Pre-existing still-active ALERT objects are adopted into the Alert store once at boot (`AlertMigration`); the
 > object rows are left untouched.
 
 Every backend **degrades gracefully**: a failed DB open falls back to in-memory/file and logs a
@@ -150,7 +151,7 @@ File: `inspecto-ops.db`
 ```sql
 CREATE TABLE IF NOT EXISTS inspecto_ops_objects (
   id             VARCHAR PRIMARY KEY,
-  object_type    VARCHAR,   -- ALERT | INCIDENT | CASE | TASK
+  object_type    VARCHAR,   -- INCIDENT | CASE | TASK (any other text loads inert)
   title          VARCHAR,
   description     VARCHAR,
   status         VARCHAR,
@@ -953,8 +954,8 @@ CREATE TABLE IF NOT EXISTS inspecto_alerts (
 )
 ```
 
-One row per Alert `AlertService` opened (the `ALERT` object workflow `OPEN → ACKNOWLEDGED → RESOLVED`, resolved
-terminal). `attrs_json` carries the de-duplication attributes (`rule`, `alertKey`, ...); `fired_json` is the fired
+One row per Alert `AlertService` opened (the `AlertLifecycle` `OPEN → ACKNOWLEDGED → RESOLVED`, resolved
+terminal; it was the `ALERT` object workflow until the enum value was retired). `attrs_json` carries the de-duplication attributes (`rule`, `alertKey`, ...); `fired_json` is the fired
 `Alert.toMap()` verbatim, which is what re-seeds `GET /alerts` after a restart byte-compatibly; `incident_id` is the
 Incident escalated from it (the Incident side keeps an `ESCALATED_FROM` link of kind `ALERT` + this id). Active-Alert
 reads pull the Space's non-terminal rows of one scope and filter the JSON in Java — the open set only, never the history.

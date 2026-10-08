@@ -359,16 +359,15 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
 
 ### 3.4 Incidents — the operational-objects domain
 
-`ObjectType` = `ALERT | INCIDENT | CASE | TASK`, one table `inspecto_ops_objects` when durable, else
+`ObjectType` = `INCIDENT | CASE | TASK` (the `ALERT` value was retired 2026-10-08: an Alert is a record of the Alert store, `AlertLifecycle` holds its `OPEN → ACKNOWLEDGED → RESOLVED`; a stored legacy `ALERT` row, or a row of any type this build does not know, loads **inert** — listed by `GET /objects` with `inert:true` + a diagnostic, readable by id, every write on it a `409` naming the type, skipped by the SLA sweep / analytics / purge, never rewritten or dropped), one table `inspecto_ops_objects` when durable, else
 `InMemoryObjectStore` (`OpsEngineProvider.java:94-124` picks per store on `durable()`).
 Updates are **optimistic** (2026-10-04): every object carries a monotonic `version`, a stale write fails with `ObjectVersionConflictException`, `ObjectService` retries pure read-modify-writes and the edge answers a persistent loss as `409 CONFLICT_STALE_VERSION` — see `backend/engine/db-layer.md` §3.1. No client change is needed for server-side races; `PATCH /objects/{id}` does not yet accept an expected `version` (deferred — a client editing a whole object from a stale read still merges, it does not fail).
 
-- **Workflows** (`platform/inspecto-workflow/src/main/java/com/gamma/workflow/Workflow.java:150-192`): ALERT
-  `OPEN → ACKNOWLEDGED → RESOLVED`; **INCIDENT `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`**, `reopen`
+- **Workflows** (`platform/inspecto-workflow/src/main/java/com/gamma/workflow/Workflow.java:150-192`): **INCIDENT `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`**, `reopen`
   from `RESOLVED|ARCHIVED → DIAGNOSING`, only `ARCHIVED` terminal; CASE `OPEN → INVESTIGATING → ESCALATED →
   RESOLVED → CLOSED`. `GET /workflows/{type}` serves the BFS-ordered states so a TOON-overridden workflow
   (`*_workflow.toon`, a boot-time scan) drives the same panes; `assign` **does not move status** (no
-  `ASSIGNED` state); `/ack` is alert-only.
+  `ASSIGNED` state); `POST /objects/{id}/ack` has no action on any object type since the ALERT retirement (it answers the ordinary 422; Alerts are acknowledged on `POST /alerts/{id}/ack`).
 - **Categorization** is a 3-layer `attributes.category` path `L1/L2/L3` (`ObjectService.java:368-371`),
   enforced by the UI at latest on *Accept* (the `CategorizeDialog` is forced before the transition).
   **Priority** `CRITICAL · MAJOR · MINOR · LOW`. One **assignee** (the Incident Commander), optional at
