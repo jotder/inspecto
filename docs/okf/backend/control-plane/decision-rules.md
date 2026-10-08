@@ -26,7 +26,7 @@ startsWith endsWith in between isNull isNotNull matches`. **Extensions (Decision
 cell, never together with `value`); `ignoreCase: true` on `= != in contains startsWith endsWith matches`;
 `matches` (regular expression, partial match, pattern ≤ 256 chars, no lookaround / back-references /
 possessive quantifiers). `ConditionTree.validate` (called by `requireGroupRoot`) refuses misuse and bad
-patterns; full detail in `docs/superpower/module-architecture-reorg-plan.md` §8b "Decision Kernel step 2 as built".
+patterns; full detail in [module-reorganisation-decisions](../module-reorganisation-decisions.md) (Decision Kernel).
 
 `com.gamma.query.ConditionTree` (`platform/inspecto-engine/src/main/java/com/gamma/query/ConditionTree.java`) is a
 **pure, dependency-free port of the browser evaluator** (`inspecto-ui/.../query/query-eval.ts`) plus
@@ -96,7 +96,7 @@ consequence: `executed`, `skipped` (nothing to do, or an action nobody ever decl
 action, declared in a module manifest's `provides.consequences`, whose module or required service is not
 installed; the detail names the module). An absent module is never reported `executed`. Saving a rule still
 preserves unknown/absent actions. `GET /decision-rules/consequences` lists every action with `available`,
-`reason` and `module`; the SPA editor reads it. Plan: `superpower/module-architecture-reorg-plan.md` section 8b.
+`reason` and `module`; the SPA editor reads it. Background: [module-reorganisation-decisions](../module-reorganisation-decisions.md).
 
 The **record-routing** consequences (`route`/`tag`/`quarantine`/`drop`) are applied by the engine
 itself, per batch, via `com.gamma.etl.DecisionRuleApplier` — invoked from

@@ -1,20 +1,20 @@
 ---
 type: Architecture
 title: Module taxonomy — axes, offerings, gates (target model)
-description: How modules are classified for itemized distribution — three axes, Offerings, the Installed/Enabled/Permitted gates, removal semantics. Built by MODULE-REORG-1: manifests, activator, gates, Offerings (checked artifact), thin-jar bundle; the P7 optional-module splits are still landing.
-resource: docs/superpower/module-architecture-reorg-plan.md
+description: How modules are classified for itemized distribution — three axes, Offerings, the Installed/Enabled/Permitted gates, removal semantics, packaging (thin jars, build id, SBOM, signing), OpenAPI fragments, test kit and TCKs. Built by MODULE-REORG-1 (shipped 2026-10-09).
+resource: docs/okf/backend/module-reorganisation-decisions.md
 tags: [architecture, modules, offering, editions, itemization]
-timestamp: 2026-10-08T00:00:00Z
+timestamp: 2026-10-09T00:00:00Z
 ---
 
 # Module taxonomy
 
-> 🟢 **Status (2026-10-09): every phase P0..P7 has shipped its slices; five rows of deliberate residue remain** (the plan header lists them; each is a `MODULE-REORG-*` row in `docs/BACKLOG.md`: release signing is operator-owned, in-flight cancellation has no work item, the Alert-migration deletion and Workflow & SLA slice 2 wait on a release / a second governed source, Decision Kernel step 7 and the RBAC capability contribution are declined, one EDITIONS re-confirmation). Vocabulary is in `docs/GLOSSARY.md` §15.
+> 🟢 **Status (2026-10-09): every phase P0..P7 has shipped its slices; five rows of deliberate residue remain** (each is a `MODULE-REORG-*` row in `docs/BACKLOG.md`: release signing is operator-owned, in-flight cancellation has no work item, the Alert-migration deletion and Workflow & SLA slice 2 wait on a release / a second governed source, Decision Kernel step 7 and the RBAC capability contribution are declined, one EDITIONS re-confirmation). Vocabulary is in `docs/GLOSSARY.md` §15.
 > Built: the per-module manifest (`META-INF/inspecto/module.toon`, every module), the activator
 > (`com.gamma.module` in `inspecto-util`) and `GET /modules`; the per-Space **Enabled** gate (`modules.toon`, `GET|PUT /settings/modules` — a route of a
 > disabled module answers 404 `MODULE_DISABLED`, `/bootstrap` `features{}` and `GET /modules` `enabledInSpace` follow it).
-> Directory regroup DONE 2026-10-07 (layout below). Offerings exist as a checked artifact only (see below). Decisions D-MR1…D-MR12 and phases P0–P7 live in
-> [module-architecture-reorg-plan.md](../../superpower/module-architecture-reorg-plan.md) until they ship.
+> Directory regroup DONE 2026-10-07 (layout below). Offerings exist as a checked artifact (see below). The decision record (D-MR1…D-MR12, declined items, deliberate exceptions) is
+> [module-reorganisation-decisions.md](module-reorganisation-decisions.md); the traps are [module-reorganisation-gotchas.md](module-reorganisation-gotchas.md). The plan that carried the work is archived (`docs/archived-documents/plans-archive/module-architecture-reorg-plan.md`, provenance only).
 
 ## Manifest format (`META-INF/inspecto/module.toon`)
 ```
@@ -91,7 +91,7 @@ Name a module to Maven by artifactId (`-pl :inspecto-engine`), never by path. `i
   Periodic work is paused the same way (P4f): a module declares `provides.background` (ops: `sla-sweep`) and
   `provides.maintenanceTasks` (ops: `incident_purge`), and the owning tick asks the shared `ModuleGate` first - skipped for that
   Space, logged once per transition, resumed on re-enable; `GET /modules` lists the paused ids as `backgroundPaused`. A Run already
-  started is not interrupted, and a module with no feature id (`backup`, `intelligence`) cannot be switched off (plan, *P4f as built*).
+  started is not interrupted, and a module with no feature id (`backup`, `intelligence`) cannot be switched off.
 
 ## Seams (current)
 - Route modules: the built-ins are an explicit ordered list in `ControlApi`; optional modules are discovered by
@@ -138,10 +138,24 @@ into the marked block of `docs/EDITIONS.md` (`--check` in CI); transport, secret
 hand-authored there.
 
 ## Packaging (thin jars, P3d-P3f)
-Detail and as-built notes: [plan §6 P3d, P3e, P3f](../../superpower/module-architecture-reorg-plan.md).
 - `tools/offering-classpath.mjs` resolves the Offering (includes + the `requires.modules` closure) and asserts it equals what `tools/bundle-modules.mjs` ships; it writes the bundle's `modules.list` (one jar per line, classpath order, processor first) and `edition.properties` (`edition=Professional`; `variant=demo` for a demo build). Every launcher reads `modules.list`; none hand-keeps a jar list.
 - The first-party core ships as 14 thin jars plus `inspecto.jar` (the processor and third-party code), listed in `core.list`; optional modules ship one jar each, in `modules.list` order after the core.
 - One CycloneDX SBOM per shipped jar under `sbom/`, beside the combined edition SBOM (`tools/sbom-modules.mjs --verify`).
 
+- **Build-id stamp (P3a).** Every module jar carries the manifest attribute `Inspecto-Build-Id` (the git short sha, `-Dinspecto.build.id=<sha>`, default `dev`; set once in the parent pom, no timestamp so builds stay reproducible). At boot `ModuleActivator.resolve(manifests, hostBuildId)` starts a module whose stamp differs from the host's INERT (`build id <x> does not match host <y>`; dependants follow). It never trips on an absent stamp, `dev`, an exploded directory or an unknown host. `GET /modules` shows `hostBuildId` and per-module `buildId`. `package.ps1` fails when the staged jars carry more than one non-`dev` id.
+- **Derived jlink set (P3c).** `tools/jlink-modules.mjs` = `jdeps` over every staged jar UNION `tools/jlink-runtime-extra.txt` (reflection/ServiceLoader needs jdeps cannot see, each with a WHY), held against `tools/jlink-modules.lock`; `package.ps1` runs it warn-and-use-union. Prove a runtime on the bundle's own `runtime/bin/java`, never the build JVM.
+- **Per-jar signing (P3h).** `package.ps1 -SignJars -JarKeystore -JarAlias [-TsaUrl]` signs every first-party jar BEFORE the SBOM (a jar's hash changes when signed); the password is read only from `INSPECTO_JARSIGN_STOREPASS`. `tools/check-jar-signatures.mjs <bundle>` demands every jar verifies under one signer certificate. `release.yml` signs only when the three secrets exist (a no-op otherwise; guard `tools/check-release-signing.mjs`). The production keystore is the operator's (row `MODULE-REORG-P3-THIN-JARS`).
+- **JPMS: no** (D-MR7): the split-package guard (`tools/check-module-architecture.mjs`, ratchet baseline `tools/module-architecture-baseline.json`, only ever lowered) and signed per-module jars carry the boundary. The two telecom-asn1 packages moved to `com.gamma.telecom.asn1` (P3g), so the split-package count is 0 apart from `com.gamma.control` across four contract modules (retired by the P7 contracts split into `com.gamma.entitystore`, `com.gamma.spi.http`, `com.gamma.spi.auth`).
+
+## OpenAPI fragments (P1)
+A module's HTTP paths live in `<module>/src/main/resources/META-INF/inspecto/openapi.fragment.json` (`{ "paths": {...} }`); the core fragment is `inspecto/`'s. `tools/openapi-merge.mjs [--write|--check]` (`tools/openapi-fragments.mjs`) generates `docs/api/openapi-v1.json` by moving path entries as TEXT (byte-stable). **`docs/api/openapi-v1.json` is a generated file: edit the fragment, never the document** (CI runs `check-openapi-fragments`). The RUNTIME still serves the generated document unchanged (the Personal build has no module fragments on its classpath, and an absent module's paths must stay documented as 503 stubs). Schemas stay in the core fragment; `x-path-order` is a legacy artefact. The error-code enum is hand-kept.
+
+## Test kit and TCKs (P5)
+The platform test kit is the test-jar of `inspecto-http-spi` (`com.gamma.control.testkit`): `FakeApiContext` (the in-repo `ApiContext` double, honours `withCapability` when given a Subject) and the abstract `RouteModuleContract` TCK (registers a route, no duplicate (method, pattern), every mutating route behind `withCapability` or exempt with a reason, `featureIds()` within the module's own manifest, registration is repeatable) plus `ModuleRoutesParity`. Other SPI TCKs live in the SPI's own test-jar: connector factories (`inspecto-acquire`), `Authenticator`/`TokenRelay` (`inspecto-auth-spi`), notification channels, Job Types, maintenance tasks, describers and parser plugins (`inspecto-engine`), each proven able to fail by a self-test against a deliberately broken implementer. A module with a route that needs the host at `register()` moves that work into a `HostBootHook`. What the TCKs cannot drive (connector `create`/workbench/egress, running a Job, `requires:` id existence, positive auth paths) is listed in the gotchas page.
+
+## Where the rest of the model lives
+Decision Kernel (Condition Language, Consequence registry, adoption by rule kind): [decisions](module-reorganisation-decisions.md#decision-kernel-d-mr12) and [decision-rules](control-plane/decision-rules.md). Operational store families as a contribution point (`OperationalDb.Family`, `StoreFamilyProvider`; `tools/check-family-count.mjs`): `OperationalDb`. Incidents / Case Management / Action Requests / Workflow & SLA split: [incidents](../capabilities/incidents/incidents.md).
+
 ## Related
+[Module reorganisation: decisions](module-reorganisation-decisions.md) · [gotchas](module-reorganisation-gotchas.md) · 
 [Architecture layers](architecture-layers.md) · [Editions model](editions/editions-model.md)

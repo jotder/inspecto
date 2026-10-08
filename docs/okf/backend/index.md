@@ -18,6 +18,8 @@ Start with the [Overview](overview.md) and [Architecture](architecture.md), then
 * [Architecture](architecture.md) - the framework-free design (JDK HttpServer, manual DI, ServiceLoader SPI, virtual threads).
 * [Architecture layers](architecture-layers.md) - the platform layer map, storage-per-concern table (moved from the retired root-level `architecture-layers.md`).
 * [Module taxonomy](module-taxonomy.md) - target model for itemized distribution: three axes, Offerings, Installed/Enabled/Permitted gates (MODULE-REORG-1, P0).
+* [Module reorganisation: decisions](module-reorganisation-decisions.md) - the D-MR1..D-MR12 record, declined items and their preconditions, the offering map, Decision Kernel, deliberate exceptions.
+* [Module reorganisation: gotchas](module-reorganisation-gotchas.md) - the traps hit while splitting, moving and packaging modules, each with its rule.
 * [Modules](modules/) - the five Maven modules (engine, connectors, agent, agent-hosted, security).
 
 ## Layers
