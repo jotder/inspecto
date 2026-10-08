@@ -107,9 +107,9 @@ public final class ObjectServiceAccess implements ObjectAccess {
     }
 
     @Override
-    public List<Map<String, Object>> activeDetail(ObjectType kind) {
+    public List<Map<String, Object>> activeDetail(String rawType) {
         List<Map<String, Object>> out = new java.util.ArrayList<>();
-        for (OperationalObject o : service.active(kind, null)) {
+        for (OperationalObject o : service.activeOfRawType(rawType)) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", o.id());
             m.put("title", o.title());

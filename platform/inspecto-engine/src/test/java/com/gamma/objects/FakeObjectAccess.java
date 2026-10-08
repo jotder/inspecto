@@ -126,9 +126,9 @@ public final class FakeObjectAccess implements ObjectAccess {
     }
 
     @Override
-    public List<Map<String, Object>> activeDetail(ObjectType kind) {
+    public List<Map<String, Object>> activeDetail(String rawType) {
         List<Map<String, Object>> out = new ArrayList<>();
-        for (Opened o : opened.stream().filter(x -> x.kind() == kind && !closed.contains(x.id())).toList()) {
+        for (Opened o : opened.stream().filter(x -> x.kind().name().equals(rawType) && !closed.contains(x.id())).toList()) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", o.id());
             m.put("title", o.title());

@@ -535,6 +535,19 @@ public final class ObjectService {
     }
 
     /**
+     * The not-yet-closed objects stored under the type text {@code rawType} - a type this build may no longer know
+     * (the legacy {@code ALERT} the one-shot Alert adoption reads). Such a row is inert, so it has no workflow:
+     * "active" is {@code closedAt == 0} and not {@code RESOLVED} (the legacy Alert lifecycle's terminal state).
+     */
+    public List<OperationalObject> activeOfRawType(String rawType) {
+        List<OperationalObject> out = new ArrayList<>();
+        for (OperationalObject o : allMatching(ObjectQuery.builder().openOnly(true).build())) {
+            if (rawType.equalsIgnoreCase(o.typeName()) && !"RESOLVED".equalsIgnoreCase(o.status())) out.add(o);
+        }
+        return out;
+    }
+
+    /**
      * The not-yet-terminal objects of {@code type} for a {@code correlationId} — used to avoid opening a
      * duplicate object while one is still being handled (e.g. an alert that keeps breaching).
      */
@@ -772,6 +785,7 @@ public final class ObjectService {
     public int backfillTagAssignments() {
         int created = 0;
         for (OperationalObject o : allMatching(ObjectQuery.builder().build())) {
+            if (o.isInert()) continue;   // an unknown-typed row is left exactly as stored
             List<String> csv = csvTags(o.attributes().get(ATTR_TAGS));
             if (csv.isEmpty()) continue;
             List<String> known = tagsOf(o.id());
@@ -895,7 +909,7 @@ public final class ObjectService {
         int matched = 0;
         int updated = 0;
         for (OperationalObject o : allMatching(ObjectQuery.builder().build())) {
-            if (!rule.matches(o)) continue;
+            if (o.isInert() || !rule.matches(o)) continue;
             matched++;
             if (tagsOf(o.id()).contains(rule.tag())) continue;
             applyTag(o.id(), rule.tag(), "tag-rule:" + name);

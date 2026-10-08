@@ -153,9 +153,9 @@ public interface ObjectAccess {
     default void linkSubject(String fromId, String subjectKind, String subjectId, String relationship, String actor) {}
 
     /**
-     * Every non-terminal object of {@code kind} as a rich map ({@code id, title, description, severity,
+     * Every not-yet-closed object stored under the type text {@code rawType} (a type this build may not know: the legacy {@code ALERT}) as a rich map ({@code id, title, description, severity,
      * correlationId, status, createdAt, attributes}) — what the one-shot ALERT adoption reads
      * ({@code AlertMigration}); {@link #findByStatus} is the flat SEC-7d projection and deliberately omits these.
      */
-    default List<Map<String, Object>> activeDetail(ObjectType kind) { return List.of(); }
+    default List<Map<String, Object>> activeDetail(String rawType) { return List.of(); }
 }
