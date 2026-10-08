@@ -51,7 +51,7 @@ class MeasureCompilerWhenTest {
     void theSevenArgConstructorStaysSourceCompatibleWithNoWhen() {
         MeasureCompiler.Spec s = new MeasureCompiler.Spec("d", List.of(), List.of("k"), Map.of(), List.of(), List.of(), 5);
         assertNull(s.when());
-        assertEquals("SELECT \"k\" FROM \"d\" LIMIT 5", MeasureCompiler.compile(s));
+        assertEquals("SELECT \"k\" FROM \"d\" ORDER BY \"k\" ASC LIMIT 5", MeasureCompiler.compile(s));
     }
 
     @Test

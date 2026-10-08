@@ -69,6 +69,11 @@ public final class MeasureCompiler {
                     Map<String, String> grains, List<Filter> filters, List<Sort> orderBy, int limit) {
             this(dataset, measures, groupBy, grains, filters, orderBy, limit, null);
         }
+
+        /** The same spec with another row cap — how a route asks for ONE row past its cap to detect truncation. */
+        public Spec withLimit(int newLimit) {
+            return new Spec(dataset, measures, groupBy, grains, filters, orderBy, newLimit, when);
+        }
     }
 
     /** Parse the {@code POST /bi/query} body into a validated {@link Spec}. */
@@ -215,6 +220,12 @@ public final class MeasureCompiler {
             List<String> terms = new ArrayList<>();
             for (Sort s : spec.orderBy()) terms.add(q(s.field()) + (s.descending() ? " DESC" : " ASC"));
             sql.append(" ORDER BY ").append(String.join(", ", terms));
+        } else if (!spec.groupBy().isEmpty() && spec.limit() < Integer.MAX_VALUE) {
+            // BI-QUERY-TRUNCATION-1: DuckDB promises no order, so a LIMIT with no ORDER BY returned an ARBITRARY
+            // subset of the groups. Order by the grouping keys so the same query returns the same rows. An
+            // Integer.MAX_VALUE limit is the "no cap" sentinel (it cannot truncate) and stays unsorted.
+            sql.append(" ORDER BY ").append(String.join(", ",
+                    spec.groupBy().stream().map(d -> q(d) + " ASC").toList()));
         }
         sql.append(" LIMIT ").append(spec.limit());
         return sql.toString();

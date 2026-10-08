@@ -83,6 +83,48 @@ class ControlApiBiQueryTest {
         }
     }
 
+    /** A view-backed dataset with {@code groups} distinct {@code id} groups (one row each). */
+    private void seedGroups(Ctx c, String name, int groups) throws Exception {
+        new ViewStore(c.root.resolve("views")).write(new ViewDefinition(name + "_view", "flow-x", List.of(),
+                "SELECT i AS id, 1 AS v FROM range(" + groups + ") AS t(i)", "2026-07-08T00:00:00Z"));
+        new ComponentStore(c.root.resolve("registry")).write("dataset", name, Map.of("view", name + "_view"));
+    }
+
+    private static List<Integer> ids(JsonNode rows) {
+        List<Integer> out = new java.util.ArrayList<>();
+        rows.forEach(r -> out.add(r.get("id").asInt()));
+        return out;
+    }
+
+    /** BI-QUERY-TRUNCATION-1: a result past the default cap is the SAME first 500 groups every time (ordered by the
+     *  grouping key) and says it was cut; a result under the cap says it was not. The 700-group case is the probe
+     *  that would otherwise succeed: before the fix truncated was always false and the 500 were arbitrary. */
+    @Test
+    void aResultPastTheLimitIsDeterministicAndFlaggedTruncated(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedGroups(c, "big_ds", 700);
+            seedGroups(c, "small_ds", 300);
+            String bigBody = "{\"dataset\":\"big_ds\",\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"id\"]}";
+            JsonNode first = V1Body.of(biQuery(c.port, bigBody).body());
+            JsonNode second = V1Body.of(biQuery(c.port, bigBody).body());
+            assertEquals(500, first.get("rows").size(), "trimmed back to the cap");
+            assertTrue(first.get("statistics").get("truncated").asBoolean(), "700 groups > 500 cap");
+            assertEquals(500, first.get("statistics").get("rowCount").asInt());
+            assertEquals(ids(first.get("rows")), ids(second.get("rows")), "same query, same rows");
+            assertEquals(java.util.stream.IntStream.range(0, 500).boxed().toList(), ids(first.get("rows")),
+                    "the first 500 by the grouping key");
+
+            JsonNode small = V1Body.of(biQuery(c.port,
+                    bigBody.replace("big_ds", "small_ds")).body());
+            assertEquals(300, small.get("rows").size());
+            assertFalse(small.get("statistics").get("truncated").asBoolean(), "300 groups fit under the cap");
+
+            String exact = bigBody.replace("big_ds", "small_ds").replace("}", ",\"limit\":300}");
+            assertFalse(V1Body.of(biQuery(c.port, exact).body()).get("statistics").get("truncated").asBoolean(),
+                    "exactly at the cap is not truncated");
+        }
+    }
+
     @Test
     void filtersNarrowTheAggregation(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

@@ -64,10 +64,14 @@ final class BiRoutes implements RouteModule {
 
         // 1. Parse + compile the spec (validated identifiers / typed literals only).
         MeasureCompiler.Spec spec;
+        MeasureCompiler.Spec probe;
         String sql;
         try {
             spec = MeasureCompiler.parse(body, DEFAULT_LIMIT, MAX_LIMIT);
-            sql = MeasureCompiler.compile(spec);
+            // One row PAST the cap: the compiled statement carries its own LIMIT, so asking for exactly the cap
+            // could never come back truncated (statistics.truncated was always false). QueryExecutor trims it.
+            probe = spec.withLimit(spec.limit() + 1);
+            sql = MeasureCompiler.compile(probe);
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
@@ -96,7 +100,7 @@ final class BiRoutes implements RouteModule {
         //    + session context), never baked at save time, and the whole statement is re-guarded.
         String queryId = ApiContext.str(body, "query");
         if (queryId != null) {
-            sql = boundQuerySql(ex, store, queryId, spec);
+            sql = boundQuerySql(ex, store, queryId, probe);
             List<Finding> boundFindings = SqlGuard.check(sql);
             if (!boundFindings.isEmpty())
                 return ApiContext.respondJson(ex, 422, Map.of(

@@ -30,6 +30,41 @@ class MeasureCompilerTest {
                 MeasureCompiler.compile(spec));
     }
 
+    /** DETERMINISM (BI-QUERY-TRUNCATION-1): a LIMIT with no orderBy would return an arbitrary subset of the
+     *  groups, so the grouping keys are ordered. A scalar (no groupBy) has nothing to order. */
+    @Test
+    void aLimitWithoutOrderByOrdersByTheGroupingKeys() {
+        assertEquals("SELECT \"region\", \"tier\", COUNT(*) AS \"count\" FROM \"sales\" "
+                        + "GROUP BY \"region\", \"tier\" ORDER BY \"region\" ASC, \"tier\" ASC LIMIT 500",
+                MeasureCompiler.compile(parse(Map.of("dataset", "sales",
+                        "measures", List.of(Map.of("agg", "count")), "groupBy", List.of("region", "tier")))));
+        assertEquals("SELECT COUNT(*) AS \"count\" FROM \"sales\" LIMIT 500",
+                MeasureCompiler.compile(parse(Map.of("dataset", "sales",
+                        "measures", List.of(Map.of("agg", "count"))))), "scalar: nothing to order");
+    }
+
+    @Test
+    void anExplicitOrderByIsLeftByteIdenticalAndNoCapMeansNoSort() {
+        assertEquals("SELECT \"region\", COUNT(*) AS \"count\" FROM \"sales\" GROUP BY \"region\" "
+                        + "ORDER BY \"count\" DESC LIMIT 500",
+                MeasureCompiler.compile(parse(Map.of("dataset", "sales",
+                        "measures", List.of(Map.of("agg", "count")), "groupBy", List.of("region"),
+                        "orderBy", List.of(Map.of("field", "count", "dir", "desc"))))));
+        // Integer.MAX_VALUE is the "no cap" sentinel (RowShaper, DatasetMeasureProbe): it cannot truncate, so no sort.
+        assertEquals("SELECT \"region\", COUNT(*) AS \"count\" FROM \"sales\" GROUP BY \"region\" LIMIT 2147483647",
+                MeasureCompiler.compile(MeasureCompiler.parse(Map.of("dataset", "sales",
+                        "measures", List.of(Map.of("agg", "count")), "groupBy", List.of("region")),
+                        Integer.MAX_VALUE, Integer.MAX_VALUE)));
+    }
+
+    @Test
+    void withLimitChangesOnlyTheLimit() {
+        MeasureCompiler.Spec spec = parse(Map.of("dataset", "sales",
+                "measures", List.of(Map.of("agg", "count")), "groupBy", List.of("region")));
+        assertEquals(MeasureCompiler.compile(spec).replace("LIMIT 500", "LIMIT 501"),
+                MeasureCompiler.compile(spec.withLimit(501)));
+    }
+
     @Test
     void measureIdsMatchTheUiConvention() {
         assertEquals("sum_amount", new MeasureCompiler.Measure("sum", "amount").id());
@@ -78,7 +113,7 @@ class MeasureCompilerTest {
         // The un-truncated column must not survive into the GROUP BY — that was the live-only defect.
         assertTrue(sql.contains("GROUP BY STRFTIME(DATE_TRUNC('month', \"event_time\"), '%Y-%m'), \"region\""), sql);
         // A grain-less dimension is untouched: no alias, no bucketing.
-        assertFalse(sql.contains("\"region\" AS"), sql);
+        assertFalse(sql.contains("\"region\" AS \""), sql);
     }
 
     @Test

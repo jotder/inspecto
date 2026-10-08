@@ -128,7 +128,7 @@ final class ShareRoutes implements RouteModule {
             filters.addAll(DashboardDateRange.terms(dashboard, dataset, LocalDate.now()));
             fenced.put("filters", filters);
             spec = MeasureCompiler.parse(fenced, 500, 10_000);
-            sql = MeasureCompiler.compile(spec);
+            sql = MeasureCompiler.compile(spec.withLimit(spec.limit() + 1));   // one past the cap, so truncated is exact
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
