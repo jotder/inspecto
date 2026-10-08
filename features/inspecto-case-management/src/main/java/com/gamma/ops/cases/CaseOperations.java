@@ -317,7 +317,7 @@ public final class CaseOperations {
             OperationalObject o = sub.store().get(id).filter(visible).orElseThrow(
                     () -> new NoSuchElementException("no object with id '" + id + "'"));
             if (o.objectType() != ObjectType.INCIDENT)
-                throw new IllegalArgumentException("a Case member must be an INCIDENT, but " + id + " is a " + o.objectType());
+                throw new IllegalArgumentException("a Case member must be an INCIDENT, but " + id + " is a " + o.typeName());
             members.put(o.id(), o);
         }
         Map<List<String>, EntityMember> toMint = new LinkedHashMap<>();

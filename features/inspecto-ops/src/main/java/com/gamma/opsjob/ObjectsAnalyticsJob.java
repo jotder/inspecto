@@ -364,7 +364,7 @@ public final class ObjectsAnalyticsJob implements Job {
 
     // ── params ────────────────────────────────────────────────────────────────────────
 
-    /** {@code types}: optional CSV filter, default all four. An unknown name fails the Run closed
+    /** {@code types}: optional CSV filter, default all three. An unknown name fails the Run closed
      *  ({@link ObjectType#of} throws) rather than silently sampling a subset. */
     private static List<ObjectType> types(String csv) {
         if (csv == null || csv.isBlank()) return List.of(ObjectType.values());

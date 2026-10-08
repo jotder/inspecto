@@ -173,6 +173,18 @@ class ControlApiCaseFromEntitiesTest {
     }
 
     @Test
+    void anInertObjectCannotJoinACaseAndTheRefusalNamesItsStoredType(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            TestOpsEngine.of(c.svc).substrate().store().create(OperationalObject.inert("ZZ_UNKNOWN", "ZZ-1", "legacy", "d",
+                    "OPEN", "INFO", null, null, null, null, Map.of(), 5, 5, 0, 0));
+            HttpResponse<String> r = post(c.port, "/cases/from-entities",
+                    "{\"title\":\"t\",\"entities\":[{\"objectId\":\"ZZ-1\"}]}", "manager");
+            assertTrue(r.statusCode() >= 400 && r.statusCode() < 500, "refused, never a 200 or a 500: " + r.statusCode() + " " + r.body());
+            assertTrue(r.body().contains("ZZ_UNKNOWN"), "the refusal names the stored type, not 'null': " + r.body());
+        }
+    }
+
+    @Test
     void malformedBodiesAreRefusedBeforeAnyWrite(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             assertEquals(400, post(c.port, "/cases/from-entities", "{\"title\":\"t\",\"entities\":[]}", "manager")
