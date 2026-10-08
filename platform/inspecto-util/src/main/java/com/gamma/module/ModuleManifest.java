@@ -46,11 +46,21 @@ public record ModuleManifest(String id, String title, String buildRole, String o
      *               stubs when the module is absent; kept honest by a parity test in each module.
      * @param consequences the Decision Rule action ids the module contributes ({@code ConsequenceProvider}); an install
      *               that leaves the module out reports those actions {@code unavailable} (not unknown).
+     * @param jobTypes the Job Type ids the module contributes ({@code JobTypeProvider}); the owner a Space's module
+     *               gate ({@code modules.toon}) consults before a Job of that type may run (P4e). Kept honest by a
+     *               parity test in each module (declared == registered by its providers).
      */
     public record Provides(List<String> features, List<String> contracts, List<String> capabilities,
                            List<String> configKinds, List<String> storeFamilies, List<String> routes,
-                           List<String> consequences) {
-        public static final Provides NONE = new Provides(List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+                           List<String> consequences, List<String> jobTypes) {
+        public static final Provides NONE = new Provides(List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+
+        /** Without {@code jobTypes} (the Job Types a module contributes; none declared). */
+        public Provides(List<String> features, List<String> contracts, List<String> capabilities,
+                        List<String> configKinds, List<String> storeFamilies, List<String> routes,
+                        List<String> consequences) {
+            this(features, contracts, capabilities, configKinds, storeFamilies, routes, consequences, List.of());
+        }
 
         /** Without {@code consequences} (the Decision Rule actions a module contributes; none declared). */
         public Provides(List<String> features, List<String> contracts, List<String> capabilities,

@@ -7,6 +7,7 @@ absentMessage: "Case Management is not installed in this bundle - Case Rules, me
 provides:
   features[1]: cases
   contracts[2]: JobTypeProvider,ObjectEngineExtension
+  jobTypes[1]: caserule.evaluate
   routes[7]: "POST /objects/([^/]+)/merge","POST /objects/([^/]+)/split","GET /cases/rules","POST /cases/rules","DELETE /cases/rules/([^/]+)","POST /cases/rules/([^/]+)/evaluate","POST /cases/from-entities"
 requires:
   modules[1]: ops

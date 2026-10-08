@@ -48,6 +48,29 @@ class ModuleManifestsTest {
     }
 
     @Test
+    void jobTypesAreParsedAndAbsentMeansNone() {
+        ModuleManifest with = ModuleManifests.parse("""
+                id: x
+                buildRole: implementation
+                offeringRole: optional
+                bindingTime: boot
+                provides:
+                  features[1]: x
+                  jobTypes[2]: x.run,x.sweep
+                """);
+        assertEquals(List.of("x.run", "x.sweep"), with.provides().jobTypes());
+        ModuleManifest without = ModuleManifests.parse("""
+                id: y
+                buildRole: implementation
+                offeringRole: optional
+                bindingTime: boot
+                provides:
+                  features[1]: y
+                """);
+        assertEquals(List.of(), without.provides().jobTypes());
+    }
+
+    @Test
     void validManifestParsesWithArraysAndEmptyArray() {
         ModuleManifest ops = ModuleManifests.parse(OPS.replace("---\n", ""));
         assertEquals("ops", ops.id());

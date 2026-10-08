@@ -87,6 +87,7 @@ final class ModulesRoutes implements RouteModule {
             p.put("capabilities", m.provides().capabilities());
             p.put("configKinds", m.provides().configKinds());
             p.put("storeFamilies", m.provides().storeFamilies());
+            p.put("jobTypes", m.provides().jobTypes());
             o.put("provides", p);
             Map<String, Object> q = new LinkedHashMap<>();
             q.put("modules", m.requires().modules());
@@ -125,6 +126,7 @@ final class ModulesRoutes implements RouteModule {
         p.put("capabilities", m.provides().capabilities());
         p.put("configKinds", m.provides().configKinds());
         p.put("storeFamilies", m.provides().storeFamilies());
+        p.put("jobTypes", m.provides().jobTypes());
         o.put("provides", p);
         Map<String, Object> q = new LinkedHashMap<>();
         q.put("modules", m.requires().modules());
