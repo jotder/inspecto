@@ -9,7 +9,7 @@
  * (`join_step`, `orders_enriched_rollup`) name `spaces/<space>/data/ref/region_dim.csv`, so on a
  * fresh checkout their test run AND their dry-run fail 422 with a leaked DuckDB internal
  * ("No files found that match the pattern"). Row: `REFERENCE-EXAMPLES-NEED-UNRUN-SEED-1`; item
- * `WB-16` of `docs/superpower/workbench-trust-plan.md`.
+ * `WB-16` of the workbench trust plan (since archived: docs/archived-documents/plans-archive/).
  *
  * 🔴 THE ROW'S STATED CAUSE WAS WRONG, and this script exists because of what is actually broken.
  * The row says the reference file "ships at `data/samples/ref/` and **nothing copies it**". Something

@@ -74,7 +74,7 @@ const USER_FACING = [
     // reason USER_GUIDE.md does: there is no audience below it to whom a stale synonym is harmless.
     'inspecto/README.md',
     // 🔴 EIGHT ENTRIES REMOVED 2026-09-08 — they had been dead paths for 54 days and pass 1 was scanning
-    // NOTHING for any of them. `docs/operations.md`, `troubleshooting.md`, `configuration.md`,
+    // NOTHING for any of them. the former `docs/operations.md` (removed; no such file now), `troubleshooting.md`, `configuration.md`,
     // `integrations.md`, `plugins.md`, `performance.md`, `parsing-options-reference.md` and
     // `api-stability.md` all moved into `docs/okf/**` in the 2026-07-16 consolidation. `scanProse` returns
     // `[]` for a file it cannot open, and the success line reported `USER_FACING.length` — so the guard
