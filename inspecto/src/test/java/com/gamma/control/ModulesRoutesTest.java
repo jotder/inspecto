@@ -75,6 +75,24 @@ class ModulesRoutesTest {
     }
 
     @Test
+    void aSwitchedOffModuleListsTheBackgroundWorkThisSpaceHasPaused() {
+        ModuleManifest ops = new ModuleManifest("zz-ops", "Ops", "implementation", "optional", "boot",
+                new ModuleManifest.Provides(List.of("zzOps"), List.of(), List.of(), List.of(), List.of(), List.of(),
+                        List.of(), List.of(), List.of("sla-sweep"), List.of("incident_purge")),
+                ModuleManifest.Requires.NONE, null);
+        ModuleManifests.Loaded loaded = new ModuleManifests.Loaded(List.of(ops), List.of());
+        @SuppressWarnings("unchecked") Map<String, Object> on = (Map<String, Object>)
+                ((List<?>) ModulesRoutes.build(loaded, java.util.Set.of()).get("modules")).get(0);
+        assertEquals(List.of(), on.get("backgroundPaused"), "enabled: nothing is paused");
+        @SuppressWarnings("unchecked") Map<String, Object> off = (Map<String, Object>)
+                ((List<?>) ModulesRoutes.build(loaded, java.util.Set.of("zzOps")).get("modules")).get(0);
+        assertEquals(List.of("sla-sweep", "incident_purge"), off.get("backgroundPaused"));
+        @SuppressWarnings("unchecked") Map<String, Object> provides = (Map<String, Object>) off.get("provides");
+        assertEquals(List.of("sla-sweep"), provides.get("background"));
+        assertEquals(List.of("incident_purge"), provides.get("maintenanceTasks"));
+    }
+
+    @Test
     void aDependantOfAKnownButAbsentModuleGoesInertNamingIt() {
         ModuleManifest scoring = new ModuleManifest("scoring", "Scoring", "implementation", "optional", "boot",
                 ModuleManifest.Provides.NONE, new ModuleManifest.Requires(List.of("entity-list"), List.of()), null);

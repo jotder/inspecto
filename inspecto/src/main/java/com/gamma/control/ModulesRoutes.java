@@ -158,7 +158,11 @@ final class ModulesRoutes implements RouteModule {
             p.put("configKinds", m.provides().configKinds());
             p.put("storeFamilies", m.provides().storeFamilies());
             p.put("jobTypes", m.provides().jobTypes());
+            p.put("background", m.provides().background());
+            p.put("maintenanceTasks", m.provides().maintenanceTasks());
             o.put("provides", p);
+            // P4f: the background work and maintenance tasks this Space has paused because the module is switched off here
+            o.put("backgroundPaused", ModuleGate.pausedWork(m, disabled));
             Map<String, Object> q = new LinkedHashMap<>();
             q.put("modules", m.requires().modules());
             q.put("contracts", m.requires().contracts());
@@ -197,6 +201,8 @@ final class ModulesRoutes implements RouteModule {
         p.put("configKinds", m.provides().configKinds());
         p.put("storeFamilies", m.provides().storeFamilies());
         p.put("jobTypes", m.provides().jobTypes());
+        p.put("background", m.provides().background());
+        p.put("maintenanceTasks", m.provides().maintenanceTasks());
         o.put("provides", p);
         Map<String, Object> q = new LinkedHashMap<>();
         q.put("modules", m.requires().modules());
