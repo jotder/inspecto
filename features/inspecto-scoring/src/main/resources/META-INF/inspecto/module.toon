@@ -6,6 +6,7 @@ bindingTime: boot
 absentMessage: "Risk Scores are not installed in this bundle - they are provided by the optional inspecto-scoring module (Professional edition and above)."
 provides:
   features[1]: scoring
+  configKinds[1]: risk-score
   contracts[2]: JobTypeProvider,ComponentKindValidator
   jobTypes[1]: risk.score
   routes[2]: "GET /risk-scores/([^/]+)/([^/]+)","POST /risk-scores/preview"
