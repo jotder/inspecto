@@ -239,7 +239,9 @@ already reads the consumer as BUILT.
 ## Instance, 2026-09-12: a number with NINE mirrors, missed by hand twice in two shifts
 
 `tools/check-family-count.mjs` is the third-shape guard (§"a NUMBER a human wrote") applied to a count
-that is **derived**, not authored: the size of `OperationalDb.Family`.
+that is **derived**, not authored: the size of the operational-store roster. ⚠ Since 2026-10-08 (`MODULE-REORG-P1-FAMILY`)
+that is TWO parses — the core `OperationalDb.Family` enum plus every `module.toon`'s `provides.storeFamilies` — and the
+guard has its own negative fixtures (`tools/check-family-count.test.mjs`).
 
 The roster's size is restated in **nine** places outside the enum — two test tripwires plus seven
 sentences across `db-layer.md`, `data-plane.md` and the scale-out plan. Adding a family therefore means a

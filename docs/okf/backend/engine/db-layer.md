@@ -859,7 +859,7 @@ value, not the per-family `*.db.url`: a raw `jdbc:duckdb:` backend is a first-cl
 `jdbc:postgresql:` one is refused, operator 2026-10-06, §5.0-c) that both
 `ServiceStores` and `OperationalDb.resolve` short-circuit on, so `urlFor` is never consulted —
 setting `-Ddedup.ledger.db.url` instead defeats the shared `-Dinspecto.db` selection that
-`OperationalDbTest` pins across all sixteen families (it fails that test). Tests needing durable dedup
+`OperationalDbTest` pins across all the core families and `StoreFamilyParityTest` (ops) across all sixteen (it fails those tests). Tests needing durable dedup
 state construct `DbDedupLedger` on an explicit `@TempDir` URL. `STATUS` is `DB_FLAG` mode (`db` |
 `file`) and could not take the hatch until 2026-09-02: `ServiceStores.openStatusStore` now also reads a
 raw `jdbc:` backend value as "db, at exactly this URL", so the root pom pins `-Dstatus.backend=jdbc:duckdb:`
@@ -1058,7 +1058,10 @@ operator applies flags through their own deployment tooling; this screen tells t
   has **no column for a business key**, so carrying key hashes there would be a new table shape, not a new
   column. And **manifests are the crash-recovery record of existence, not a query surface**. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
 - ⚠ **Adding a `Family` is a COMPILING change, not a config toggle** — a label, a `*.backend` property, a
-  default, a `Mode`, url/user/password properties and a root supplier. Budget it.
+  default, a `Mode`, url/user/password properties and a root supplier. Budget it. A **module's** family is a
+  `StoreFamily` in its own jar (`OpsStoreFamily` is the model) plus a `StoreFamilyProvider` service file and a
+  `provides.storeFamilies` line in its `module.toon`; `tools/check-family-count.mjs` then expects the docs and the
+  tripwires to say core + contributed.
 - **The roster is OPEN since 2026-10-08 (`MODULE-REORG-P1-FAMILY`)** — the **sixteen** families on an Enterprise
   classpath are the **twelve core** `OperationalDb.Family` constants plus the four Operational Object families
   that `inspecto-ops` contributes (`StoreFamily` / `StoreFamilyProvider`, `OperationalDb.core()`/`loaded()`/`all()`);
