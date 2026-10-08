@@ -116,7 +116,7 @@ final class ReportJob implements Job {
                 QueryExecutor.Result r = datasetRows();
                 rows = r.rows();
                 report = rows;
-                if (r.truncated()) cut = datasetLimit();
+                if (r.truncated()) cut = r.rowCount();   // the cap the executor trimmed to (the spec ceiling may be below the configured limit)
             }
             default -> throw new IllegalArgumentException(
                     "report scope must be 'status', 'batch' or 'dataset', got '" + scope + "'");
@@ -286,8 +286,11 @@ final class ReportJob implements Job {
                 (dataDir == null || dataDir.isBlank()) ? null : Path.of(dataDir),
                 new ViewStore(writeRoot.resolve("views")));
 
+        // The cap the executor trims to must be the one the SQL's probe was built from: the spec parser clamps to its
+        // maximum, so an unclamped `limit` above it would leave the executor waiting for rows the SQL can never return.
+        int cap = spec != null ? spec.limit() : limit;
         return QueryExecutor.run(new QueryExecutor.Request(
-                cfg.require("dataset"), relationSql, sql, limit, 0, List.of(), List.of()));
+                cfg.require("dataset"), relationSql, sql, cap, 0, List.of(), List.of()));
     }
 
     /** The configured row cap (default 10,000), as the request carries it. */

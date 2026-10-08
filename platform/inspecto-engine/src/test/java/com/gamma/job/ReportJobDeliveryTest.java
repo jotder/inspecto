@@ -94,6 +94,22 @@ class ReportJobDeliveryTest {
         }
     }
 
+    /** A limit above the spec parser's 100,000 ceiling must still be detected as cut (the probe and the cap agree). */
+    @Test
+    void anAggregatedReportCutAtTheSpecCeilingIsFlaggedEvenWhenTheConfiguredLimitIsHigher(
+            @TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
+        new ViewStore(writeRoot.resolve("views")).write(new ViewDefinition("wide_view", "flow-x", List.of(),
+                "SELECT range AS id FROM range(100005)", "2026-07-08T00:00:00Z"));
+        new ComponentStore(writeRoot.resolve("registry")).write("dataset", "wide_ds", Map.of("view", "wide_view"));
+        System.setProperty("assist.write.root", writeRoot.toString());
+
+        JobResult r = new ReportJob(job(Map.of("scope", "dataset", "dataset", "wide_ds", "limit", "150000",
+                "measures", "count", "group_by", "id", "out_dir", outDir.toString())), null).run();
+
+        assertEquals("SUCCESS", r.status(), r.message());
+        assertTrue(r.message().contains("TRUNCATED at 100000 rows"), r.message());
+    }
+
     @Test
     void datasetScopeDeliversAggregatedCsv(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
         seedSales(writeRoot);
