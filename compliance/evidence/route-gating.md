@@ -297,7 +297,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/pipelines/([^/]+)/rename` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineRenameRoutes.java:51` |
 | POST | `/pipelines/([^/]+)/save-as-template` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineSettingsRoutes.java:41` |
 | POST | `/pipelines/([^/]+)/settings` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineSettingsRoutes.java:49` |
-| DELETE | `/pipelines/authored/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineListRoutes.java:46` |
+| DELETE | `/pipelines/authored/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineListRoutes.java:47` |
 | POST | `/pipelines/authored/([^/]+)/dry-run` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:69` |
 | POST | `/pipelines/authored/([^/]+)/inbox` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineInboxRoutes.java:44` |
 | POST | `/pipelines/authored/([^/]+)/run` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:73` |
