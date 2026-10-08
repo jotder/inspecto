@@ -2095,21 +2095,27 @@ set -euo pipefail
 cd "`$(dirname "`$0")"
 PORT="`${PORT:-8080}"
 SPACES_ROOT="`${SPACES_ROOT:-spaces}"
-OPTS="$demoFlags -Dcontrol.port=`${PORT} -Dspaces.root=`${SPACES_ROOT}"
-[ -d ui ] && OPTS="`${OPTS} -Dui.dir=./ui"
-[ -d duckdb-extensions/linux_amd64 ] && OPTS="`${OPTS} -Dduckdb.extension.dir=duckdb-extensions/linux_amd64"
+# An ARRAY, like serve.sh: a SPACES_ROOT (or cwd) containing a space must stay one argument.
+JAVA_OPTS=($demoFlags "-Dcontrol.port=`${PORT}" "-Dspaces.root=`${SPACES_ROOT}")
+[ -d ui ] && JAVA_OPTS+=("-Dui.dir=./ui")
+[ -d duckdb-extensions/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=duckdb-extensions/linux_amd64")
 JAVA=java
 [ -x runtime/bin/java ] && JAVA=runtime/bin/java
 # ASSURE-INTELLIGENCE-BUNDLE-1: the same owner-only (0700), offline native dirs as serve.sh.
 if [ -f inspecto-intelligence.jar ]; then
     NATIVES="`$(pwd)/runtime-natives"
     ( umask 077; mkdir -p "`${NATIVES}/tmp" "`${NATIVES}/djl" ) && chmod 700 "`${NATIVES}"
-    OPTS="`${OPTS} -Dai.djl.offline=true -Djava.io.tmpdir=`${NATIVES}/tmp -Djna.tmpdir=`${NATIVES}/tmp -DDJL_CACHE_DIR=`${NATIVES}/djl -DENGINE_CACHE_DIR=`${NATIVES}/djl"
+    JAVA_OPTS+=("-Dai.djl.offline=true" "-Djava.io.tmpdir=`${NATIVES}/tmp" "-Djna.tmpdir=`${NATIVES}/tmp" "-DDJL_CACHE_DIR=`${NATIVES}/djl" "-DENGINE_CACHE_DIR=`${NATIVES}/djl")
 fi
-# The classpath is READ from modules.list (one jar per line, classpath order).
-CP="`$(tr -d '\r' < modules.list | tr '\n' ':')"; CP="`${CP%:}"
+# The classpath is READ from modules.list (one jar per line, classpath order); same fallback as serve.sh for a hand-assembled directory.
+if [ -f modules.list ]; then
+    CP="`$(tr -d '\r' < modules.list | tr '\n' ':')"; CP="`${CP%:}"
+else
+    echo "[serve-demo] modules.list not found - falling back to every *.jar in this directory" >&2
+    CP="inspecto.jar"; for _jar in *.jar; do [ "`$_jar" = "inspecto.jar" ] || CP="`${CP}:`${_jar}"; done
+fi
 echo "[serve-demo] DEMO BUILD on http://127.0.0.1:`${PORT}  (spaces: ./`${SPACES_ROOT})"
-exec "`$JAVA" `$OPTS -cp "`$CP" com.gamma.control.ControlApi
+exec "`$JAVA" "`${JAVA_OPTS[@]}" -cp "`$CP" com.gamma.control.ControlApi
 "@
     Write-LfScript -Path "$bundleDir\serve-demo.sh" -Content $serveDemoSh
     $demoReadme = @"
