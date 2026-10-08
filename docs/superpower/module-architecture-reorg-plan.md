@@ -10,7 +10,7 @@
 > | P3 packaging | partial (P3a build-id stamp + boot check; P3b manifest-synthesised 503 stubs + known-modules; no thin jars) | `eb9fb19ab`, P3b (below) |
 > | P4 removal semantics | partial (P4a characterised + fixed; P4-1..P4-3 filed) | `42c98fd6d` |
 > | P5 test kit + TCKs | partial (P5a kit + RouteModule TCK) | `33feba371` |
-> | P6 Offerings | partial (P6a Offerings as a checked artifact; build not re-plumbed) | `b26188cb3` |
+> | P6 Offerings | partial (P6a Offerings as a checked artifact; P6b module/add-on/posture/jar-count tables of EDITIONS generated; capability rows still hand-authored) | `b26188cb3` |
 > | P7 selective moves | partial: com.gamma.control split ended `a8cb2d0a8` + `876810123` + `e2b058a86` (contracts row CLOSED), observability `0489ac3a0`, security split `33c3e5e4d`, EgressPolicy `4eb64c000`, Kafka `e2783a9bf`, ASN pack `0c0e483d5`, Workflow models `4e863cb6d`, access module `9dc9df34c`, Reconciliation `c5cb8ea4f`, Scoring `064d3114d` + `e51a73bec` + `900e2bc0a`, condition language `e5f22ebe9` + `d3215dcfa`; modules screen `70c2ee075`; CI wiring `c404ee383`; path-agnostic guards `27b210988` | as listed |
 >
 > **Remaining work (each is a BACKLOG row, §4 *Module architecture*):**
@@ -19,7 +19,7 @@
 > - **P3** — `MODULE-REORG-P3-THIN-JARS`: thin per-module jars, Offering-driven launcher classpath, jdeps-derived jlink set, per-module SBOM; signing needs split packages 8 to 0 (incl. the deliberate telecom-asn1 exception). **8 -> 3 done 2026-10-07** (acquire `70e70379d`, service `dd5712511`, entitylist `d0e4db143`, event `4e0f7bc5b`, intelligence `67bc0c97f`); left: `com.gamma.control` (4 modules) + the two deliberate telecom-asn1 splits (`ingester`, `parse`).
 > - **P4** — P4-1..P4-3 already filed (`MODULE-REORG-P4-1`, `-P4-2`, `-P4-3`).
 > - **P5** — `MODULE-REORG-P5-TCKS` (P5a + P5b + P5c shipped 2026-10-07; remaining blockers per class in P5c): processor-free route tests (exchange's host installs now live in `HostBootHook`; 16 more la-api route classes and geo-link `InvestigationMeasureRoutes` driven by the RouteModule TCK); TCKs for Authenticator, TokenRelay, CollectorConnectorFactory, NotificationChannel, DescriptionProvider, MaintenanceTaskProvider, JobTypeProvider.
-> - **P6** — EDITIONS/FEATURE_INVENTORY generation needs a `posture{}` section and capabilities in `provides`; bundle generator driven by Offerings (rides on `MODULE-REORG-P3-THIN-JARS`).
+> - **P6** — the capability rows of EDITIONS still need capability ids in `provides` (P1-D3), and transport/secrets/compliance/HA need a verifiable source before they can join `posture{}`; bundle generator driven by Offerings (rides on `MODULE-REORG-P3-THIN-JARS`).
 > - **P7** — `MODULE-REORG-P7-INCIDENTS` (Incidents / Case Management split DONE 2026-10-08, Action Requests + linked-subject contract DONE 2026-10-08, Workflow & SLA slice 2 sweep behind a governed-item contract still open; **open design question:** `alert` depends on the object substrate via `ObjectAccess` and Alerts persist ALERT objects, contradicting "Personal has Alerts but no operational objects" unless `ObjectAccess` has a null/in-memory implementation on Personal); `MODULE-REORG-P7-KERNEL` (Decision Kernel steps 1, 3-7: Expectation non_null/range/regex onto the tree, Tag and Case Rule filters, Notification Rules, Risk filters, Escalation match, Access Policies' Conditions text compiled into the tree, retire the duplicate evaluator, Consequence registry — **slice 1 DONE 2026-10-07**, see §8b); `MODULE-REORG-P7-CONTRACTS` (contract modules shed AccessPolicies/AuditTrail/EventLog/AuditChain/InMemoryEventStore/SecretScrubber/MetricRegistry/Roles family/CapabilityManifest, order per the 2026-10-06 survey; the access cluster and the event cluster are DONE 2026-10-07, see §6).
 > - **Guards / review** — `MODULE-REORG-GUARD-1` (DONE 2026-10-07 — `ImportLoaderInventoryTest` row + `ReactorModules` loops, `RouteInventoryTest` gate moved), `MODULE-REORG-REVIEW-1` (reviewer checklist).
 > - **Decision Kernel** — `MODULE-REORG-P7-KERNEL`: steps 1, 3, 4, 5 (additive `when`, `b9c3271fc`) and 6 (`952538fe9`) shipped; step 7 declined; the Risk and Escalation Rule editors' `when` UI shipped 2026-10-07 (see section 8b, "Decision Kernel step 5 / step 6 SPA follow-up"); left: editing a stored Escalation Rule, duplicate-evaluator retirement (see section 8b, "step 5 / step 6 as built").
@@ -227,6 +227,30 @@ contribution point, which is what that plan's D-AS3 asked for.
   compliance) have no home in an Offering yet — they need a `posture{}` section; capability rows need each manifest's
   `provides.features` plus capability ids (P1-D3, not yet in `provides`); the add-on `status` field is what separates
   "shipped" from "planned" in a generated table. `defaultSpaceSettings` stays `{}` until a real default is decided.
+
+### P6b as built (2026-10-08 — the derivable part of EDITIONS generated; the rest deliberately stays hand-authored)
+- **Generated** (`tools/render-offerings-matrix.mjs`, `--write` / `--check`, + `.test.mjs`) into `docs/EDITIONS.md` between
+  `<!-- offerings-matrix:begin -->` / `<!-- offerings-matrix:end -->`: a module x edition matrix (every manifest, with layer
+  from its directory, `offeringRole`, `requires.modules`; cells staged / absent / base-always), an add-on table (status
+  built/planned per edition, modules or `hostedBy`), the deployment posture table and the per-edition jar counts (from
+  `bundle-modules.mjs`, `coreModules()` and `classpath()`). Pure function of `offerings/*.toon` + manifests + the two bundle
+  tools; nothing typed by hand. Wired into the `ci.yml` guards job.
+- **`posture:` on Offerings** (optional section, complete when present, NOT inherited through `includes`): `authMode`
+  none|oidc, `eventsBackend` default|parquet, `objectsBackend` default|postgres, `postgresSidecar` absent|bundled. Closed
+  vocabulary (`POSTURE` in `tools/check-offerings.mjs`); each value is a fact the launcher already proves - the first
+  unmodified scenario per edition in `tools/check-launchers.mjs` (`-Dauth.mode`, `-Devents.backend`, `-Dobjects.backend`)
+  and whether `classpath(edition)` carries `postgresql.jar`. `check-offerings` cross-checks against both (negative
+  fixtures in `check-offerings.test.mjs`: unknown key, missing key, out-of-vocabulary value, launcher disagreement).
+  Preview keeps `objectsBackend: default` (only Enterprise pins PostgreSQL).
+- **Stays hand-authored, and why:** transport (HTTP/HTTPS is an env/keystore choice the launcher passes through, not a per-edition
+  flag), secrets, at-rest encryption, audit, compliance scope, HA/scheduler - no Offering holds a source a guard can verify,
+  so putting them in `posture{}` would be invention. The `CP-*` capability rows need capability ids in `provides` (P1-D3, out of
+  scope). The `SP-*` rows stay owned by `render-processor-board.mjs`. A generated table that cannot express a decision makes its
+  guard revert it, so none of these were forced into the generated block.
+- **EDITIONS Packaging row**: the hand-typed module lists and jar counts ("seventeen optional modules, 19 jars" - stale a third
+  time) were removed in favour of the generated block; `check-doc-counts` never policed that row (its markers live in
+  `okf/capabilities/editions/editions.md`), so no guard source changed. `FEATURE_INVENTORY.md` has no module/edition table -
+  it got a one-line pointer.
 
 ### P7 Scoring & Lists survey (2026-10-07 — written read-only; the extraction it scheduled shipped the same day, see the §4 row)
 

@@ -317,6 +317,12 @@ jobs:
       - name: Guard — Offerings reference real, manifested modules
         run: node tools/check-offerings.mjs && node --test tools/check-offerings.test.mjs
 
+      # Offerings matrix guard (MODULE-REORG-1 P6b): docs/EDITIONS.md's offerings-matrix block (modules x editions, add-ons,
+      # deployment posture, jar counts) is GENERATED from offerings/*.toon + manifests + bundle-modules.mjs. No build needed.
+      # The fix when it fails is `node tools/render-offerings-matrix.mjs --write`, never a hand edit inside the markers.
+      - name: Guard — EDITIONS offerings matrix is generated, not hand-edited
+        run: node tools/render-offerings-matrix.mjs --check && node --test tools/render-offerings-matrix.test.mjs
+
       # Module-architecture report (informational, exit 0) + REGRESSION ratchet: split packages and populated closed
       # registries may only fall vs tools/module-architecture-baseline.json. Never wire --check (non-zero by design).
       - name: Guard — module-architecture report and no-regression ratchet

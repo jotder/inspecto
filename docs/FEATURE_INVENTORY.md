@@ -12,6 +12,8 @@
 > [`configuration.md`](okf/backend/config/configuration.md) (all TOON keys), [`parsing-options-reference.md`](okf/backend/config/parsing-options-reference.md)
 > (frontend status), and [`ADVANCED_GUIDE.md`](ADVANCED_GUIDE.md) (runtime flags, events, metrics, Control API).
 >
+> **Which module ships in which edition** is not tabulated here: the generated *Offerings matrix* in [`EDITIONS.md`](EDITIONS.md) is the one place (module × edition, add-ons, deployment posture, jar counts).
+>
 > **Shipped after this snapshot (2026-07-07 addendum)** — not yet folded into the tables below: the
 > versioned **`/api/v1`** contract (envelope, error-code catalog, ETag/`contentHash`, `GET /bootstrap`,
 > query catalog `POST /queries/{id}/run` + Result Set, async job/pipeline runs `202`+`runId`,

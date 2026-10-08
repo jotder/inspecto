@@ -121,6 +121,13 @@ addons:
 `contentPacks[N]` lists Space template ids under `spaces/_templates`; `defaultSpaceSettings:` is an empty
 placeholder. Includes union modules and add-ons. Same TOON rules as manifests (no `#` lines). `node tools/check-offerings.mjs` is the guard. The example above is abridged from `offerings/professional.toon` (the file also lists every other add-on).
 
+**`posture:` (P6b, optional).** Four verifiable deployment facts per Offering, not inherited: `authMode` none|oidc, `eventsBackend`
+default|parquet, `objectsBackend` default|postgres, `postgresSidecar` absent|bundled. `check-offerings` holds them to that closed
+vocabulary and to what the launcher scenarios (`tools/check-launchers.mjs`) and `classpath(edition)` prove. **Generator:**
+`tools/render-offerings-matrix.mjs` writes the module x edition matrix, the add-on table, the posture table and the jar counts
+into the marked block of `docs/EDITIONS.md` (`--check` in CI); transport, secrets, compliance and the capability rows stay
+hand-authored there.
+
 ## Packaging (thin jars, P3d-P3f)
 Detail and as-built notes: [plan §6 P3d, P3e, P3f](../../superpower/module-architecture-reorg-plan.md).
 - `tools/offering-classpath.mjs` resolves the Offering (includes + the `requires.modules` closure) and asserts it equals what `tools/bundle-modules.mjs` ships; it writes the bundle's `modules.list` (one jar per line, classpath order, processor first) and `edition.properties` (`edition=Professional`; `variant=demo` for a demo build). Every launcher reads `modules.list`; none hand-keeps a jar list.
