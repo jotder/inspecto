@@ -859,7 +859,7 @@ value, not the per-family `*.db.url`: a raw `jdbc:duckdb:` backend is a first-cl
 `jdbc:postgresql:` one is refused, operator 2026-10-06, §5.0-c) that both
 `ServiceStores` and `OperationalDb.resolve` short-circuit on, so `urlFor` is never consulted —
 setting `-Ddedup.ledger.db.url` instead defeats the shared `-Dinspecto.db` selection that
-`OperationalDbTest` pins across all the core families and `StoreFamilyParityTest` (ops) across all sixteen (it fails those tests). Tests needing durable dedup
+`OperationalDbTest` pins across all the core families and `StoreFamilyParityTest` (ops) across all sixteen families (it fails those tests). Tests needing durable dedup
 state construct `DbDedupLedger` on an explicit `@TempDir` URL. `STATUS` is `DB_FLAG` mode (`db` |
 `file`) and could not take the hatch until 2026-09-02: `ServiceStores.openStatusStore` now also reads a
 raw `jdbc:` backend value as "db, at exactly this URL", so the root pom pins `-Dstatus.backend=jdbc:duckdb:`
