@@ -1,0 +1,20 @@
+# Conditions text vs. condition tree (strict) - equivalence corpus golden. Regenerate with -Dgolden.update=true
+contexts: 12
+expressions: 4178 (translatable 2937, untranslatable 1241)
+pairs: 50136
+  divergent: CASE_INSENSITIVE_SUBSTRING: 26
+  divergent: COLLECTION_MEMBERSHIP: 250
+  divergent: MISSING_ATTRIBUTE: 3882
+  divergent: NULL_OR_EMPTY_SEMANTICS: 300
+  divergent: SCALAR_CONTAINMENT_STRINGIFIED: 358
+  divergent: STRICT_TYPING_COERCION: 660
+  untranslatable: in-test against a non-collection right operand: 3456
+  untranslatable: literal on the left of contains: 5376
+  untranslatable: null member in a contains-test: 288
+  untranslatable: null member in an in-test: 288
+  untranslatable: strict tree refuses the translated form (items[n].items[n].value: incomplete condition): 2436
+  untranslatable: strict tree refuses the translated form (items[n].value: incomplete condition): 3048
+DIVERGENT: 5476
+EQUAL: 29768
+UNTRANSLATABLE: 14892
+malformed sources: 25 (all refused by Conditions.parse and by the translator)
