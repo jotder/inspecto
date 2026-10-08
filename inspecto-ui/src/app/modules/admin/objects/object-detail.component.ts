@@ -114,6 +114,11 @@ export class ObjectDetailComponent implements OnInit {
      * unlike `eventsEnabled` above (which degrades one tab) this gates the whole detail view.
      */
     readonly opsEnabled = this.session.opsEnabled;
+    /**
+     * `bootstrap.features.actionRequests` - the optional `inspecto-action-requests` module registered /action-requests*
+     * (MODULE-REORG-P7). Without it the pane's Action Requests panel is not rendered (its calls would all be 503).
+     */
+    readonly actionRequestsEnabled = computed(() => this.session.features()['actionRequests'] === true);
     private route = inject(ActivatedRoute);
     private destroyRef = inject(DestroyRef);
     private router = inject(Router);

@@ -110,7 +110,7 @@ export const defaultNavigation: GammaNavigationItem[] = [
                 link: '/pending-changes',
             },
             {
-                id: 'action-requests',
+                id: 'action-requests', navFeature: 'actionRequests',
                 title: 'Action Requests',
                 type: 'basic',
                 icon: 'heroicons_outline:paper-airplane',

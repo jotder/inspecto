@@ -1,5 +1,6 @@
-package com.gamma.control;
+package com.gamma.actionrequests;
 
+import com.gamma.pipeline.exec.EgressAllowlist;
 import com.gamma.spi.http.Idempotency;
 import com.gamma.util.egress.EgressPolicy;
 import com.gamma.pipeline.exec.WebhookSink;
@@ -129,7 +130,7 @@ class ActionDispatcherTest {
 
     /** The target's private address is denied by default; the Space allowlists the name. */
     private static void allowLoopback(Path root) throws Exception {
-        Files.writeString(root.resolve(EgressRoutes.FILE), dev.toonformat.jtoon.JToon.encode(Map.of("allow", List.of("tickets.test"))));
+        Files.writeString(root.resolve(EgressAllowlist.FILE), dev.toonformat.jtoon.JToon.encode(Map.of("allow", List.of("tickets.test"))));
     }
 
     private static String approved(Path root) throws Exception {
@@ -210,7 +211,7 @@ class ActionDispatcherTest {
     @Test
     void anAllowlistedNameReboundToLoopbackIsRefused(@TempDir Path tmp) throws Exception {
         Path root = Files.createDirectories(tmp.resolve("config"));
-        Files.writeString(root.resolve(EgressRoutes.FILE), dev.toonformat.jtoon.JToon.encode(Map.of("allow", List.of("rebound.test"))));
+        Files.writeString(root.resolve(EgressAllowlist.FILE), dev.toonformat.jtoon.JToon.encode(Map.of("allow", List.of("rebound.test"))));
         String id = approvedWithoutAllowlist(root);
         ActionDispatcher.run(root, id, new WebhookSink.Endpoint(URI.create("http://rebound.test:"
                 + server.getAddress().getPort() + "/api"), null, Duration.ofSeconds(5)), new LoopbackWire());

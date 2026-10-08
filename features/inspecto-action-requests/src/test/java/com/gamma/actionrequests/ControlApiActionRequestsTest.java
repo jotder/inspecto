@@ -1,5 +1,8 @@
-package com.gamma.control;
+package com.gamma.actionrequests;
 
+import com.gamma.control.ApproverRoster;
+import com.gamma.control.ControlApi;
+import com.gamma.pipeline.exec.EgressAllowlist;
 import com.gamma.spi.auth.Authenticator;
 import com.gamma.spi.auth.Authenticators;
 import com.gamma.spi.auth.Subject;
@@ -146,16 +149,13 @@ class ControlApiActionRequestsTest {
     private Ctx open(Path cfg, Path writeRoot) throws Exception {
         Path pipe = PipelineConfigBatchTest.writePipeline(cfg, "");
         if (writeRoot != null) System.setProperty("assist.write.root", writeRoot.toString());
-        ClassLoader outer = Thread.currentThread().getContextClassLoader();
         try {
-            Thread.currentThread().setContextClassLoader(FakeObjectEngineProvider.fakeObjectEngineClassLoader(outer));
             CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
             if (writeRoot != null) seedApproverRoster(writeRoot);   // OIDC-shaped Authenticator: the Space's approver roster decides
             ControlApi api = new ControlApi(svc, 0);
             api.start();
             return new Ctx(svc, api, api.port(), writeRoot);
         } finally {
-            Thread.currentThread().setContextClassLoader(outer);
             System.clearProperty("assist.write.root");
         }
     }
@@ -758,13 +758,13 @@ class ControlApiActionRequestsTest {
     void aReadNeverSeedsTheAllowlist(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         try (Ctx c = open(cfg, tmp, true)) {
             Path root = c.root();
-            Files.deleteIfExists(root.resolve(EgressRoutes.FILE));
+            Files.deleteIfExists(root.resolve(EgressAllowlist.FILE));
             Files.writeString(root.resolve("cbs_connection.toon"), dev.toonformat.jtoon.JToon.encode(Map.of("connection",
                     Map.of("id", "cbs", "connector", "https", "host", "10.0.0.5"))));
             Files.writeString(root.resolve("orders_hook.toon"), dev.toonformat.jtoon.JToon.encode(Map.of("webhook",
                     Map.of("connection", "cbs"))));
             assertEquals(0, data(send(c, "GET", "/settings/egress", null, AUTHOR), 200).get("allow").size());
-            assertFalse(Files.exists(root.resolve(EgressRoutes.FILE)));
+            assertFalse(Files.exists(root.resolve(EgressAllowlist.FILE)));
         }
     }
 

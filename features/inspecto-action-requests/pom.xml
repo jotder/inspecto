@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-action-requests</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto - Action Requests (optional)</name>
+    <description>
+        OPTIONAL add-on module (MODULE-REORG-P7, 2026-10-08): the Action Requests add-on of plan section 8a. Four-eyes
+        approved outbound calls: an Incident or Case (any linked subject) raises a request, a second person approves it,
+        and the dispatcher sends it with bounded retries under ONE idempotency key. The routes (/action-requests*), the
+        store (a signed JSON file per request under action-requests/ in the write root - NOT an operational-store family),
+        the dispatcher, and the Decision Rule invoke-api consequence. Package com.gamma.actionrequests.
+
+        Contributed through seams only: com.gamma.spi.http.RouteModule (feature id "actionRequests") and
+        com.gamma.decision.ConsequenceProvider (invoke-api). It reaches its subjects only through
+        com.gamma.control.LinkedSubjectProvider (inspecto-ops contributes incident and case), so this module does NOT
+        depend on inspecto-ops; the base approver-eligibility check (com.gamma.control.ApproverCheck), the approver roster
+        and the Pending Change hold stay in the core and work with this module absent. It REQUIRES the notify-channels
+        provider for the outbound wire (WebhookSinkTransport); without it creating a request answers 503.
+
+        Bundled from the Professional edition up (the Standard, Professional, Enterprise and Preview profiles). THIN: no
+        shade, no sidecar classifier. Built only under the edition profiles, so a routine "mvn -o clean test" (= Personal)
+        never compiles it.
+    </description>
+
+    <dependencies>
+        <!-- The core: RouteModule/ApiContext/WriteGates/HostContext, the engine (Job SPI), the event log. Compile scope,
+             as inspecto-ops and inspecto-scoring do. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- inspecto-ops at TEST scope only: the real Incident / Case engine and its LinkedSubjectProvider the tests raise
+             Action Requests from. NOT a compile dependency - this module reaches subjects only through the SPI. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-ops</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs / PipelineConfigBatchTest the moved HTTP
+             tests boot a real CollectorService + ControlApi with. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Platform test kit (FakeApiContext + RouteModuleContract TCK) -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <!-- Engine-SPI TCK (test-jar of inspecto-engine) -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

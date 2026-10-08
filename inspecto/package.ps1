@@ -495,6 +495,14 @@ if ($Edition -ne 'Personal') {
     if (-not $caseMgmtJarSrc -or -not (Test-Path $caseMgmtJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $caseMgmtTargetDir\inspecto-case-management-*.jar."
     }
+    # MODULE-REORG-P7: the Action Requests add-on (four-eyes approved outbound calls, invoke-api). THIN like inspecto-ops; Professional and above.
+    $actionReqTargetDir = Join-Path $sandboxRoot 'features\inspecto-action-requests\target'
+    $actionReqJarSrc = Get-ChildItem -Path $actionReqTargetDir -Filter 'inspecto-action-requests-*.jar' -ErrorAction SilentlyContinue |
+                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                       Select-Object -First 1 -ExpandProperty FullName
+    if (-not $actionReqJarSrc -or -not (Test-Path $actionReqJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $actionReqTargetDir\inspecto-action-requests-*.jar."
+    }
     if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') {
         $policyTargetDir = Join-Path $sandboxRoot 'providers\inspecto-policy\target'
         $policyJarSrc = Get-ChildItem -Path $policyTargetDir -Filter 'inspecto-policy-*.jar' -ErrorAction SilentlyContinue |
@@ -889,6 +897,24 @@ if ($caseMgmtJarSrc) {
         }
         Write-Host "  verified: RouteModule, JobTypeProvider and ObjectEngineExtension registrations present in the Case Management module" -ForegroundColor DarkGray
     } finally { $cmZip.Dispose() }
+}
+if ($actionReqJarSrc) {
+    Copy-Item $actionReqJarSrc "$bundleDir\inspecto-action-requests.jar"
+    Write-Host "Bundled Action Requests module -> inspecto-action-requests.jar" -ForegroundColor Green
+    # Thin jar: the only way it ships INERT is a missing META-INF/services entry - /action-requests* would 503 and invoke-api would be unavailable on a bundle supposed to have them.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $arZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-action-requests.jar")
+    try {
+        foreach ($svc in @(@('com.gamma.spi.http.RouteModule', 'com.gamma.actionrequests.ActionRequestRoutes'), @('com.gamma.decision.ConsequenceProvider', 'com.gamma.actionrequests.InvokeApiConsequence')))
+        {
+            $arEntry = $arZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
+            if (-not $arEntry) { throw "inspecto-action-requests.jar has no META-INF/services/$($svc[0]) - $($svc[1]) would never be discovered." }
+            $arReader = New-Object System.IO.StreamReader($arEntry.Open())
+            try { $arBody = $arReader.ReadToEnd() } finally { $arReader.Dispose() }
+            if ($arBody -notmatch [regex]::Escape($svc[1])) { throw "inspecto-action-requests.jar's $($svc[0]) service file does not list $($svc[1]) - it lists only: $arBody" }
+        }
+        Write-Host "  verified: RouteModule and ConsequenceProvider registrations present in the Action Requests module" -ForegroundColor DarkGray
+    } finally { $arZip.Dispose() }
 }
 if ($agentJarSrc) {
     Copy-Item $agentJarSrc "$bundleDir\inspecto-agent.jar"

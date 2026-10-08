@@ -245,7 +245,7 @@ public final class DecisionRuleGuard {
      * The makers of {@code current} — see the class doc — or {@code null} when the history cannot say. Empty when
      * the rule has no invoke-api consequence.
      */
-    static List<String> makers(ComponentStore store, String name, Map<String, Object> current) {
+    public static List<String> makers(ComponentStore store, String name, Map<String, Object> current) {
         List<ComponentStore.ComponentVersion> history = store.versions(TYPE, name);
         return makersFrom(current, history, history.size() < ComponentStore.historyKeep());
     }

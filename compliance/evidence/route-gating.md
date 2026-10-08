@@ -87,11 +87,11 @@ system: the evidence cannot say something the code does not.
 | DELETE | `/access/profiles/([^/]+)` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:81` |
 | PUT | `/access/profiles/([^/]+)` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:79` |
 | PUT | `/access/roles` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:59` |
-| POST | `/action-requests` | gated | `canWorkIncidents` | `inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java:64` |
-| POST | `/action-requests/([^/]+)/approve` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java:66` |
-| POST | `/action-requests/([^/]+)/decline` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java:68` |
-| POST | `/action-requests/([^/]+)/mark-failed` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java:72` |
-| POST | `/action-requests/([^/]+)/retry` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java:70` |
+| POST | `/action-requests` | gated | `canWorkIncidents` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java:75` |
+| POST | `/action-requests/([^/]+)/approve` | gated | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java:77` |
+| POST | `/action-requests/([^/]+)/decline` | gated | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java:79` |
+| POST | `/action-requests/([^/]+)/mark-failed` | gated | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java:83` |
+| POST | `/action-requests/([^/]+)/retry` | gated | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java:81` |
 | POST | `/agent/approvals/(.+)/decision` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java:206` |
 | PUT | `/agent/policy` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java:223` |
 | POST | `/agent/policy/kill-switch` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java:228` |

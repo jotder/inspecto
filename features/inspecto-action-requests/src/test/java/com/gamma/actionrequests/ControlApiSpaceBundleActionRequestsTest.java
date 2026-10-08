@@ -1,5 +1,7 @@
-package com.gamma.control;
+package com.gamma.actionrequests;
 
+import com.gamma.control.ApproverRoster;
+import com.gamma.control.ControlApi;
 import com.gamma.spi.auth.Authenticator;
 import com.gamma.spi.auth.Authenticators;
 import com.gamma.spi.auth.Subject;
@@ -67,6 +69,9 @@ class ControlApiSpaceBundleActionRequestsTest {
     private Supplier<WebhookSinkTransport> priorTransport;
     private com.gamma.util.egress.EgressPolicy.Resolver priorResolver;
 
+    /** Mirror of DecisionRuleGuard.MAX_MAKERS / MAX_MAKER_ID (package-private in the core): the message names the limit, so drift fails here. */
+    private static final int MAX_MAKERS = 64, MAX_MAKER_ID = 256;
+
     private record Ctx(SpaceManager spaces, ControlApi api, int port) implements AutoCloseable {
         public void close() {
             api.close();
@@ -77,14 +82,9 @@ class ControlApiSpaceBundleActionRequestsTest {
 
     @BeforeEach
     void arm() throws Exception {
-        ClassLoader fakeObjects = FakeObjectEngineProvider.fakeObjectEngineClassLoader(
-                Thread.currentThread().getContextClassLoader());
-        // A Space created through POST /spaces/import boots ON the request thread, so the fake object engine must
-        // be discoverable there: every request thread gets the fake engine's classloader before its route runs.
-        Authenticators.forTest(ex -> {
-            Thread.currentThread().setContextClassLoader(fakeObjects);
-            return subject(ex);
-        });
+        // The real inspecto-ops engine is on this module's test classpath (test scope), so a Space created through
+        // POST /spaces/import boots with its Incident / Case provider on whichever thread serves the request.
+        Authenticators.forTest(ex -> subject(ex));
         System.setProperty(ActionDispatcher.PROP_BACKOFF_MS, "0");
         target = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         target.createContext("/api", ex -> {
@@ -251,12 +251,12 @@ class ControlApiSpaceBundleActionRequestsTest {
     @Test
     void aBundledRestoredMakersListOverTheCapIsRefused(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
-            List<String> tooMany = java.util.stream.IntStream.range(0, DecisionRuleGuard.MAX_MAKERS)
+            List<String> tooMany = java.util.stream.IntStream.range(0, MAX_MAKERS)
                     .mapToObj(i -> "maker-" + i).toList();   // + the bundled updatedBy = one over
             HttpResponse<String> many = importSpace(c, bundle(tooMany), IMPORTER);
             assertEquals(422, many.statusCode(), many.body());
-            assertTrue(many.body().contains("more than " + DecisionRuleGuard.MAX_MAKERS), many.body());
-            HttpResponse<String> longId = importSpace(c, bundle(List.of("x".repeat(DecisionRuleGuard.MAX_MAKER_ID + 1))),
+            assertTrue(many.body().contains("more than " + MAX_MAKERS), many.body());
+            HttpResponse<String> longId = importSpace(c, bundle(List.of("x".repeat(MAX_MAKER_ID + 1))),
                     IMPORTER);
             assertEquals(422, longId.statusCode(), longId.body());
             assertTrue(Files.notExists(root.resolve("beta")), "no Space directory is created");

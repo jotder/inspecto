@@ -131,11 +131,13 @@
                                 (saved)="obj.set($event)"
                             />
                             <!-- ASSURE-ACTION-REQUESTS-1: outbound calls raised from here, and their delivery -->
-                            <app-action-requests-panel
-                                class="mt-6 block"
-                                [objectId]="obj().id"
-                                [objectType]="obj().objectType"
-                            />
+                            @if (actionRequestsEnabled()) {
+                                <app-action-requests-panel
+                                    class="mt-6 block"
+                                    [objectId]="obj().id"
+                                    [objectType]="obj().objectType"
+                                />
+                            }
                         }
                         <!-- ASSURE-RISK-SCORE-1: an Incident raised by a Risk Score Alert Rule (by: [model, entity_key]) -->
                         @if (obj().attributes?.['key.model'] && obj().attributes?.['key.entity_key']) {

@@ -46,8 +46,8 @@ import com.gamma.access.WriteGates;
  * opening a managed Incident (the author-selectable, any-severity generalization of the
  * {@code create-alert} high-severity auto-promotion) — and emits a descriptive stub
  * signal for the remaining platform actions ({@code render-widget},
- * {@code generate-report}), matching the mock's own scope — {@code invoke-api} proposes a pending
- * Action Request on the rule's Incident ({@link ActionRequestRoutes#propose}), never a direct call; the routing actions
+ * {@code generate-report}), matching the mock's own scope — {@code invoke-api} (contributed by the optional
+ * Action Requests module) proposes a pending Action Request on the rule's Incident, never a direct call; the routing actions
  * ({@code route}/{@code tag}/{@code quarantine}/{@code drop}) are record-level — {@code simulate}
  * counts the rows they would affect, and they take effect during live pipeline runs via
  * {@link com.gamma.query.DecisionRuleApplier} (every batch applies the target pipeline's enabled rules
@@ -130,10 +130,10 @@ final class DecisionRoutes implements RouteModule {
      * {@code [{id, displayName, group, available, reason?, module?, requires?}]}. A provider whose required service
      * is missing, and a known action whose module this bundle leaves out, are listed {@code available:false} with
      * the reason (the module's {@code absentMessage}) so the editor can show it as "not installed". Ordered by
-     * group, then registration order (built-ins, {@code invoke-api}, contributed, then absent).
+     * group, then registration order (built-ins, contributed - {@code invoke-api} among them - then absent).
      */
     private Object consequenceCatalog(ApiContext api) {
-        ConsequenceContext ctx = new HostConsequenceContext(api, "", Map.of(), false, null, Map.of());
+        ConsequenceContext ctx = new HostCtx(api, "", Map.of(), false, null, Map.of());
         List<Map<String, Object>> rows = new java.util.ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (ConsequenceProvider p : consequences().all()) {
@@ -143,11 +143,6 @@ final class DecisionRoutes implements RouteModule {
                     null, p.requires()));
             seen.add(p.id());
         }
-        boolean objects = ctx.has("objects");
-        rows.add(catalogRow("invoke-api", "Invoke API", "integration", objects,
-                objects ? null : "operational objects are not installed in this bundle, so there is no Incident to raise an Action Request on",
-                null, List.of("objects")));
-        seen.add("invoke-api");
         for (com.gamma.module.ModuleManifest m : com.gamma.module.KnownModules.load(DecisionRoutes.class.getClassLoader()).manifests())
             for (String id : m.provides().consequences())
                 if (seen.add(id))
@@ -264,7 +259,7 @@ final class DecisionRoutes implements RouteModule {
                                                   Map<String, Object> c, boolean automatic, String actor,
                                                   Map<String, Object> record) {
         String action = String.valueOf(c.get("action"));
-        ConsequenceContext ctx = new HostConsequenceContext(api, ruleName, rule, automatic, actor, record);
+        ConsequenceContext ctx = new HostCtx(api, ruleName, rule, automatic, actor, record);
         ConsequenceProvider.Result res;
         ConsequenceProvider provider = consequences().find(action).orElse(null);
         if (provider != null) {
@@ -272,12 +267,6 @@ final class DecisionRoutes implements RouteModule {
             res = missing != null
                     ? ConsequenceProvider.Result.unavailable("'" + action + "' requires platform service '" + missing + "', which is not available")
                     : provider.execute(ctx, c);
-        } else if ("invoke-api".equals(action)) {
-            // ASSURE-ACTION-REQUESTS-1: never a direct call — a PENDING Action Request on the rule's Incident,
-            // which a second person approves before ActionDispatcher sends it. Stays here until Action Requests
-            // is a module.
-            String[] made = proposeActionRequest(api, ruleName, rule, c, automatic, actor);
-            res = new ConsequenceProvider.Result(made[0], made[1], made[2] == null ? Map.of() : Map.of("actionRequestId", made[2]));
         } else {
             com.gamma.module.ModuleManifest declared = declaringModule(action);
             res = declared != null
@@ -295,8 +284,8 @@ final class DecisionRoutes implements RouteModule {
     }
 
     /** The host's narrow view for a {@link ConsequenceProvider}: this Space's ledger, jobs, pipelines and objects. */
-    private record HostConsequenceContext(ApiContext api, String ruleName, Map<String, Object> rule, boolean automatic,
-                                          String actor, Map<String, Object> record) implements ConsequenceContext {
+    private record HostCtx(ApiContext api, String ruleName, Map<String, Object> rule, boolean automatic,
+                                          String actor, Map<String, Object> record) implements HostConsequenceContext {
         @Override public java.util.Optional<com.gamma.objects.ObjectAccess> objects() {
             return HostContext.of(api).service().objects();
         }
@@ -322,85 +311,6 @@ final class DecisionRoutes implements RouteModule {
         }
         @Override public void authorAlertRule(Map<String, Object> body) throws Exception {
             AlertRoutes.authorFromConsequence(api, body);
-        }
-    }
-
-    /**
-     * The {@code invoke-api} consequence: propose a {@code pending} Action Request linked to the rule's open
-     * Incident (correlation {@code decision-rule:<rule>}; opened here when none is open, as {@code create-incident}
-     * would), with the consequence's {@code params} — {@code connection}, {@code method} (default POST) and
-     * {@code payload}, a JSON object whose string leaves may use {@code {{incident.id}}} / {@code {{context.rule}}}.
-     * Deduped: while one this rule proposed on that Incident is still pending, another is not. The author is the
-     * person applying the rule, or {@code decision-rule:<rule>} when the engine did — never the approver.
-     *
-     * @return {status, detail, actionRequestId-or-null}
-     */
-    /** The payload an {@code invoke-api} consequence sends when it names none: which Incident, which rule. */
-    static final Map<String, Object> DEFAULT_INVOKE_PAYLOAD = Map.of("incident", "{{incident.id}}", "rule", "{{context.rule}}");
-
-    /** One WARN audit per skip when the history cannot name the makers (names the rule only — no payload, no values). */
-    private static void auditUnknownMakers(String ruleName, String actor, boolean automatic) {
-        try {
-            EventLog log = EventLog.current();
-            if (log == null) return;
-            log.emit(com.gamma.audit.Event.builder(com.gamma.audit.EventType.AUDIT).source("audit")
-                    .level(com.gamma.audit.EventLevel.WARN)
-                    .message("Decision Rule '" + ruleName + "' raised no Action Request: the version history cannot name "
-                            + "the makers of its invoke-api consequence (unstamped version or history pruned) — failed closed")
-                    .actor(automatic ? "decision-rule:" + ruleName : actor).actorType(automatic ? "system" : "user")
-                    .action("action-request.skipped-unknown-makers").actionCategory("operation")
-                    .attr("decisionRule", ruleName));
-        } catch (RuntimeException auditFailure) {
-            // an audit gap must never turn a fail-closed skip into a 500
-        }
-    }
-
-    private static String[] proposeActionRequest(ApiContext api, String ruleName, Map<String, Object> rule,
-                                                 Map<String, Object> c, boolean automatic, String actor) {
-        LinkedSubjectProvider incidents = LinkedSubjects.of(api, "incident").orElse(null);
-        if (incidents == null)
-            return new String[] {"unavailable", "no Action Request — operational objects are not installed in this "
-                    + "bundle, so there is no Incident to raise it on", null};
-        Path root = api.writeRoot();
-        if (root == null)
-            return new String[] {"skipped", "no Action Request — set -Dassist.write.root to enable", null};
-        // Round-2 finding 1b: the makers are every editor, from the VERSION HISTORY, since the invoke-api
-        // consequence last changed — all co-authors, none may approve. Unknown provenance fails closed.
-        List<String> coAuthors = DecisionRuleGuard.makers(new ComponentStore(root.resolve("registry")), ruleName, rule);
-        if (coAuthors == null) auditUnknownMakers(ruleName, actor, automatic);   // ASSURE-ACTION-REQUESTS-RESIDUALS-1 (3)
-        if (coAuthors == null || coAuthors.isEmpty())
-            return new String[] {"skipped", "no Action Request — the version history of Decision Rule '" + ruleName
-                    + "' has no recorded editor for its invoke-api consequence (a version saved before editors were "
-                    + "recorded, or history pruned past the change), so four-eyes cannot exclude its makers; save the "
-                    + "rule again", null};
-        String corr = "decision-rule:" + ruleName;
-        String severity = paramStr(c, "severity", "warning");
-        String incident = incidents.open(api, new LinkedSubjectProvider.OpenRequest(corr, "decisionRule", ruleName,
-                "Decision Rule " + ruleName, "Raised by Decision Rule '" + ruleName + "' for an invoke-api action",
-                severity, Map.of("rule", ruleName, "decisionRule", ruleName, "severity", severity))).orElse(null);
-        if (incident == null)
-            return new String[] {"skipped", "no Action Request - the Incident for this rule could not be opened", null};
-        Map<String, Object> p = params(c);
-        try {
-            synchronized (ActionRequests.lock()) {
-                for (Map<String, Object> r : ActionRequests.list(root))
-                    if (ActionRequests.PENDING.equals(r.get("status")) && corr.equals(r.get("origin"))
-                            && incident.equals(r.get("incidentId")))
-                        return new String[] {"executed", "Action Request " + r.get("id") + " is already pending "
-                                + "approval on Incident " + incident, String.valueOf(r.get("id"))};
-            }
-            Map<String, Object> spec = new LinkedHashMap<>();
-            spec.put("connection", p.get("connection"));
-            spec.put("method", p.getOrDefault("method", "POST"));
-            spec.put("payloadTemplate", p.containsKey("payload") ? p.get("payload") : DEFAULT_INVOKE_PAYLOAD);
-            spec.put("incidentId", incident);
-            spec.put("context", Map.of("rule", ruleName));
-            Map<String, Object> rec = ActionRequestRoutes.propose(api, root, spec,
-                    automatic ? corr : actor, automatic ? "system" : "user", corr, coAuthors);
-            return new String[] {"executed", "proposed Action Request " + rec.get("id") + " on Incident " + incident
-                    + " — pending approval, nothing sent yet", String.valueOf(rec.get("id"))};
-        } catch (ApiException | IOException refused) {
-            return new String[] {"skipped", "no Action Request: " + refused.getMessage(), null};
         }
     }
 

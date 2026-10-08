@@ -1,0 +1,13 @@
+id: action-requests
+title: Action Requests
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+absentMessage: "Action Requests are not installed in this bundle - four-eyes approved outbound calls and the invoke-api Decision Rule consequence are provided by the optional inspecto-action-requests module (Professional edition and above)."
+provides:
+  features[1]: actionRequests
+  contracts[1]: ConsequenceProvider
+  consequences[1]: invoke-api
+  routes[7]: "GET /action-requests","GET /action-requests/([^/]+)","POST /action-requests","POST /action-requests/([^/]+)/approve","POST /action-requests/([^/]+)/decline","POST /action-requests/([^/]+)/retry","POST /action-requests/([^/]+)/mark-failed"
+requires:
+  modules[1]: notify-channels

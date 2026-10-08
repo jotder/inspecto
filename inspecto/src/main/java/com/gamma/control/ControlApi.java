@@ -613,7 +613,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 new QueryRoutes(), new DatasetRoutes(), new SpaceComparisonRoutes(), new BiRoutes(), new KpiRoutes(), new DbBrowserRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b); ReconRoutes to inspecto-reconciliation (P7)
                 new ExpectationRoutes(), new RequirementRoutes(),
                 new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new AcquisitionRoutes(), new StreamPushRoutes(),
-                new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new PendingChangeRoutes(), new ActionRequestRoutes(), new EgressRoutes(), new ApproverRosterRoutes(), new SafetyPolicyRoutes(), new PublicationDestinationRoutes(), new MailAttachmentRoutes(), new NavRoutes(), new AccessRoutes(),
+                new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new PendingChangeRoutes(), new EgressRoutes(), new ApproverRosterRoutes(), new SafetyPolicyRoutes(), new PublicationDestinationRoutes(), new MailAttachmentRoutes(), new NavRoutes(), new AccessRoutes(),
                 new AuditLogRoutes(),   // the audit projection stays CORE though the /events feed is gated (EDG-01 cell 6)
                 new AssistRoutes(), new AgentRoutes(), new SystemRoutes(), new SchedulerRoutes(),
                 new ModulesRoutes(), new ModuleSettingsRoutes()))   // MODULE-REORG-1 P2a/P2b: GET /modules, /settings/modules — appended LAST (order is load-bearing)

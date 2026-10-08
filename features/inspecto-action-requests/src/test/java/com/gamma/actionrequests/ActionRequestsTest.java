@@ -1,5 +1,6 @@
-package com.gamma.control;
+package com.gamma.actionrequests;
 
+import com.gamma.control.PendingChanges;
 import com.gamma.spi.auth.ApiException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -35,7 +36,7 @@ class ActionRequestsTest {
         assertEquals(r.get("id"), back.get("idempotencyKey"), "the key defaults to the id");
         assertEquals(List.of("draft", "pending"), ((List<?>) back.get("history")).stream()
                 .map(h -> ((Map<?, ?>) h).get("status")).toList());
-        assertTrue(Files.exists(root.resolveSibling("config.secrets").resolve(PendingChanges.KEY_FILE)),
+        assertTrue(Files.exists(root.resolveSibling("config.secrets").resolve(".pending-changes.key")),
                 "signed with the Pending Change key, in its secrets sibling — no second key");
     }
 

@@ -134,6 +134,8 @@ final class BootstrapRoutes implements RouteModule {
         // MODULE-REORG-P7: true only when the optional inspecto-case-management module registered the Case routes.
         // Present-and-false on a bundle without it (an install with ops but not case-management still works Incidents).
         f.put("cases", on.contains("cases"));
+        // MODULE-REORG-P7: true only when the optional inspecto-action-requests module registered /action-requests*.
+        f.put("actionRequests", on.contains("actionRequests"));
         // P2b: every other installed module's feature id, under its own key (a module added tomorrow needs no edit here).
         for (String id : new java.util.TreeSet<>(api.registeredFeatures())) f.putIfAbsent(id, on.contains(id));
         f.put("authMode", System.getProperty("auth.mode", "none"));

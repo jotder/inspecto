@@ -1,10 +1,16 @@
-package com.gamma.control;
+package com.gamma.actionrequests;
 
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.Authenticators;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.auth.Subject;
 import com.gamma.spi.http.ApiContext;
+import com.gamma.control.ApproverCheck;
+import com.gamma.control.ApproverRoster;
+import com.gamma.pipeline.exec.EgressAllowlist;
+import com.gamma.control.LinkedSubjectProvider;
+import com.gamma.control.LinkedSubjects;
+import com.gamma.control.PendingChanges;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.audit.EventLevel;
 import com.gamma.pipeline.exec.WebhookSink;
@@ -50,7 +56,12 @@ import com.gamma.access.WriteGates;
  * approval, so {@code ApprovalPolicy} governs no kind of it and {@code PendingChanges.hold} is never reached —
  * holding the proposal as a Pending Change as well would make one outbound call need two approvals.
  */
-final class ActionRequestRoutes implements RouteModule {
+public final class ActionRequestRoutes implements RouteModule {
+
+    @Override
+    public java.util.Set<String> featureIds() {
+        return java.util.Set.of("actionRequests");
+    }
 
     static final int LIST_CAP = 500;
     private static final Set<String> CREATE_KEYS = Set.of("connection", "method", "payloadTemplate",
@@ -179,7 +190,7 @@ final class ActionRequestRoutes implements RouteModule {
         try {
             java.net.URI u = java.net.URI.create(String.valueOf(view.get("targetUrl")));
             String host = u.getHost() == null ? null : u.getHost().replaceAll("^\\[|\\]$", "");
-            com.gamma.util.egress.EgressPolicy.Allowlist allow = EgressRoutes.allowlist(root);
+            com.gamma.util.egress.EgressPolicy.Allowlist allow = EgressAllowlist.of(root);
             boolean listed = host != null && (allow.namesHost(host) || (com.gamma.util.egress.EgressPolicy.isIpLiteral(host)
                     && allow.cidrs().stream().anyMatch(c -> c.contains(java.net.InetAddress.ofLiteral(host)))));
             Map<String, Object> e = new LinkedHashMap<>();
@@ -294,7 +305,7 @@ final class ActionRequestRoutes implements RouteModule {
                     + ActionRequests.MAX_PAYLOAD_BYTES + " bytes");
 
         Map<String, Object> rec = ActionRequests.draft(connection, endpoint.url().toString(), method, payload, key,
-                incident, kase, origin, author, authorType, reason, ApprovalPolicy.forRoot(root).expiresAfterHours());
+                incident, kase, origin, author, authorType, reason, PendingChanges.expiryHours(root));
         rec.put("coAuthors", List.copyOf(coAuthors));   // the Decision Rule's makers — four-eyes excludes them too
         ActionRequests.transition(rec, ActionRequests.PENDING, author);
         synchronized (ActionRequests.lock()) {

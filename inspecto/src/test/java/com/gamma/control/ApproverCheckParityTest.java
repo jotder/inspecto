@@ -8,8 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -18,10 +16,11 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * MODULE-REORG-P7 (Action Requests) step 1 - pins the four outcomes of the approver-eligibility check BEFORE it moves
- * to its own base class: {@code none-eligible} (no Authenticator; the only approver is a maker), {@code ok} (a
- * non-maker approver exists), {@code unknown} (a record failing its integrity check; a directory that throws). Every
- * negative has a probe that would otherwise succeed (same fixture, the maker removed from the makers).
+ * MODULE-REORG-P7 (Action Requests): the base approver-eligibility check ({@link ApproverCheck}) the Pending Change
+ * hold and the approver roster call with the Action Requests module ABSENT - none-eligible (no Authenticator; the only
+ * approver is a maker), ok (a non-maker approver exists), unknown (a directory that throws). Every negative has a probe
+ * that would otherwise succeed (same fixture, the maker removed from the makers). The Action Request's own record-aware
+ * reading is pinned in the module ({@code ActionRequestApproverCheckTest}).
  */
 class ApproverCheckParityTest {
 
@@ -37,52 +36,34 @@ class ApproverCheckParityTest {
         };
     }
 
-    private static Map<String, Object> request(String author) {
-        Map<String, Object> rec = new LinkedHashMap<>();
-        rec.put("author", author);
-        rec.put("coAuthors", List.of());
-        rec.put("status", ActionRequests.PENDING);
-        return rec;
-    }
-
     @Test
     void noAuthenticatorMeansNoSubjectSoNoOneCanDecide(@TempDir Path root) {
         Authenticators.forTest(null);
-        assertEquals(ApproverCheck.NONE_ELIGIBLE, ActionRequestRoutes.approverCheck(root, request("maker")));
-        assertEquals(ApproverCheck.NONE_ELIGIBLE,
-                ApproverCheck.check(root, Set.of(), "canApproveChanges", false), "even with no makers at all");
+        assertEquals(ApproverCheck.NONE_ELIGIBLE, ApproverCheck.check(root, Set.of("maker"), "canApproveChanges", true));
+        assertEquals(ApproverCheck.NONE_ELIGIBLE, ApproverCheck.check(root, Set.of(), "canApproveChanges", false),
+                "even with no makers at all");
     }
 
     @Test
     void aNonMakerApproverIsOkAndTheMakerAloneIsNoneEligible(@TempDir Path root) {
         Authenticators.forTest(enumerating(Map.of("maker", List.of("admin"), "checker", List.of("admin"))));
-        assertEquals(ApproverCheck.OK, ActionRequestRoutes.approverCheck(root, request("maker")), "checker is outside the makers");
+        assertEquals(ApproverCheck.OK, ApproverCheck.check(root, Set.of("maker"), "canApproveChanges", true),
+                "checker is outside the makers");
 
         Authenticators.forTest(enumerating(Map.of("maker", List.of("admin"))));
-        assertEquals(ApproverCheck.NONE_ELIGIBLE, ActionRequestRoutes.approverCheck(root, request("maker")),
+        assertEquals(ApproverCheck.NONE_ELIGIBLE, ApproverCheck.check(root, Set.of("maker"), "canApproveChanges", true),
                 "the only approver is the maker: four-eyes leaves no one");
         assertEquals(ApproverCheck.OK, ApproverCheck.check(root, Set.of(), "canApproveChanges", true),
                 "probe: with no makers the same directory is ok");
     }
 
     @Test
-    void aCoAuthorIsAMakerToo(@TempDir Path root) {
+    void aCoMakerIsExcludedToo(@TempDir Path root) {
         Authenticators.forTest(enumerating(Map.of("co", List.of("admin"))));
-        Map<String, Object> rec = request("someone-else");
-        assertEquals(ApproverCheck.OK, ActionRequestRoutes.approverCheck(root, rec), "probe: co is not (yet) a maker");
-        rec.put("coAuthors", List.of("co"));
-        assertEquals(ApproverCheck.NONE_ELIGIBLE, ActionRequestRoutes.approverCheck(root, rec),
-                "the Decision Rule's editors are makers: the only approver is one of them");
-    }
-
-    @Test
-    void aRecordFailingItsIntegrityCheckReadsUnknown(@TempDir Path root) {
-        Authenticators.forTest(enumerating(Map.of("checker", List.of("admin"))));
-        Map<String, Object> rec = request("maker");
-        assertEquals(ApproverCheck.OK, ActionRequestRoutes.approverCheck(root, rec), "probe: the intact record is ok");
-        rec.put("integrity", "invalid");
-        assertEquals(true, ActionRequests.invalid(rec), "the fixture really is an invalid record");
-        assertEquals(ApproverCheck.UNKNOWN, ActionRequestRoutes.approverCheck(root, rec, new HashMap<>()));
+        assertEquals(ApproverCheck.OK, ApproverCheck.check(root, Set.of("someone-else"), "canApproveChanges", true),
+                "probe: co is not (yet) a maker");
+        assertEquals(ApproverCheck.NONE_ELIGIBLE, ApproverCheck.check(root, Set.of("someone-else", "co"), "canApproveChanges", true),
+                "the only approver is one of the makers");
     }
 
     @Test

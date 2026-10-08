@@ -72,7 +72,7 @@ public final class PendingChanges {
     private static final Set<String> KEPT_HEADERS = Set.of("If-Match");
     /** A header the author may send to say why — kept on the Pending Change and shown to the approver. */
     static final String HEADER_REASON = "X-Change-Reason";
-    static final int MAX_REASON = 500;
+    public static final int MAX_REASON = 500;
     private static final Object LOCK = new Object();
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneOffset.UTC);
 
@@ -466,6 +466,11 @@ public final class PendingChanges {
         }
     }
 
+    /** How long the Space's approval policy lets a held record wait before it expires (hours); Action Requests keep the same clock. */
+    public static int expiryHours(Path writeRoot) {
+        return ApprovalPolicy.forRoot(writeRoot).expiresAfterHours();
+    }
+
     /**
      * HMAC-SHA256 (hex) over {@code domain + "\n" + canonical JSON of rec}, keyed by the SAME per-Space key
      * ({@link #key}) — for another record type that must be tamper-evident (Action Requests,
@@ -473,7 +478,7 @@ public final class PendingChanges {
      * Change's MAC input starts with <code>{</code>, so no record of another domain can ever verify as one, nor
      * one as it.
      */
-    static String domainMac(Path root, String domain, Map<String, Object> rec) throws IOException {
+    public static String domainMac(Path root, String domain, Map<String, Object> rec) throws IOException {
         try {
             javax.crypto.Mac m = javax.crypto.Mac.getInstance("HmacSHA256");
             m.init(new javax.crypto.spec.SecretKeySpec(key(root), "HmacSHA256"));

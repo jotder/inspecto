@@ -65,7 +65,7 @@ test('RED: the generator is never run against the bundle', () => {
 });
 
 test('RED: bundle-modules.mjs prose counts drift from its table', () => {
-    const bm = readFileSync(join(ROOT, 'tools', 'bundle-modules.mjs'), 'utf8').replace(/Personal 2, Professional 22/, 'Personal 2, Professional 99');
+    const bm = readFileSync(join(ROOT, 'tools', 'bundle-modules.mjs'), 'utf8').replace(/Personal 2, Professional 23/, 'Personal 2, Professional 99');
     assert.match(problems(REAL, { bundleModulesText: bm }), /says Professional ships 99 first-party module/);
 });
 

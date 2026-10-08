@@ -133,6 +133,7 @@ inspecto-consignment-outputs.db.wal
 /features/inspecto-reconciliation/target/
 /features/inspecto-scoring/target/
 /features/inspecto-case-management/target/
+/features/inspecto-action-requests/target/
 /providers/inspecto-oidc/target/
 /providers/inspecto-secrets/target/
 /providers/inspecto-geo-country/target/

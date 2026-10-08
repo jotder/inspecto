@@ -1,5 +1,6 @@
-package com.gamma.control;
+package com.gamma.actionrequests;
 
+import com.gamma.pipeline.exec.EgressAllowlist;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.util.egress.EgressPolicy;
 import com.gamma.pipeline.exec.WebhookSink;
@@ -28,7 +29,7 @@ import java.util.function.Supplier;
  * {@link WebhookSinkTransport} (Professional / Enterprise; Personal bundles none, and the request fails naming
  * the edition). On top of that, the {@link EgressPolicy}: before EVERY attempt the host is resolved once, every
  * address is checked against the deny-by-default classes (loopback, link-local, private, CGNAT, multicast, this
- * host…) less the Space's {@link EgressRoutes egress allowlist}, and the wire connects to THAT address (never
+ * host…) less the Space's {@link EgressAllowlist egress allowlist}, and the wire connects to THAT address (never
  * re-resolving), keeping the name for Host / SNI / certificate verification. A refusal fails the request at once,
  * nothing sent. Redirects are never followed and a 3xx fails the request without a retry.
  *
@@ -164,7 +165,7 @@ final class ActionDispatcher {
             try {
                 // Resolve ONCE per attempt and check EVERY address; the wire connects to the checked one.
                 java.net.InetAddress to = EgressPolicy.resolve(endpoint.url().getHost().replaceAll("^\\[|\\]$", ""),
-                        EgressRoutes.allowlist(root), resolver);
+                        EgressAllowlist.of(root), resolver);
                 address = to.getHostAddress();
                 r = wire.exchange(method, endpoint.url(), to, endpoint.bearerToken(), endpoint.timeout(), json,
                         Map.of(IDEMPOTENCY_HEADER, key), ActionRequests.EXCERPT_CAP);

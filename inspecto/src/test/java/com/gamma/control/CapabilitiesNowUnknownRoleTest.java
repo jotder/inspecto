@@ -58,8 +58,7 @@ class CapabilitiesNowUnknownRoleTest {
                 return Optional.of(Map.of("maker", List.of("operations"), "checker", List.of("admin", "ghost")));
             }
         });
-        Map<String, Object> rec = Map.of("author", "maker", "coAuthors", List.of(), "status", ActionRequests.PENDING);
-        assertEquals(ApproverCheck.NONE_ELIGIBLE, ActionRequestRoutes.approverCheck(root, rec),
+        assertEquals(ApproverCheck.NONE_ELIGIBLE, ApproverCheck.check(root, java.util.Set.of("maker"), Roles.CAN_APPROVE_CHANGES, true),
                 "authenticate would deny checker canApproveChanges, so no one is eligible");
     }
 }

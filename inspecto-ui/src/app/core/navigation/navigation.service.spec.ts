@@ -12,7 +12,13 @@ import { NavigationService } from './navigation.service';
  * one-sided test.
  */
 describe('NavigationService — optional-module nav entries', () => {
-    function mount(geoLinkEnabled: boolean, eventsEnabled = true, opsEnabled = true, casesEnabled = opsEnabled) {
+    function mount(
+        geoLinkEnabled: boolean,
+        eventsEnabled = true,
+        opsEnabled = true,
+        casesEnabled = opsEnabled,
+        actionRequestsEnabled = opsEnabled,
+    ) {
         TestBed.resetTestingModule();
         TestBed.configureTestingModule({
             providers: [
@@ -22,7 +28,13 @@ describe('NavigationService — optional-module nav entries', () => {
                 {
                     provide: SessionService,
                     useValue: {
-                        features: signal({ geoLink: geoLinkEnabled, events: eventsEnabled, ops: opsEnabled, cases: casesEnabled }),
+                        features: signal({
+                            geoLink: geoLinkEnabled,
+                            events: eventsEnabled,
+                            ops: opsEnabled,
+                            cases: casesEnabled,
+                            actionRequests: actionRequestsEnabled,
+                        }),
                     },
                 },
             ],
@@ -129,6 +141,20 @@ describe('NavigationService — optional-module nav entries', () => {
         expect(findById(nav.default as never, 'cases'), 'cases should be hidden').toBeUndefined();
         for (const id of ['incidents', 'tags', 'approvals', 'autonomy', 'learning']) {
             expect(findById(nav.default as never, id), id + ' should be present').toBeDefined();
+        }
+    });
+
+    /**
+     * MODULE-REORG-P7: the Action Requests entry follows the optional `inspecto-action-requests` module (feature `actionRequests`),
+     * not `ops`: an install with ops but without the add-on keeps Incidents and Approvals, and loses only this entry.
+     */
+    it('shows Action Requests only when the action-requests module registered its routes', async () => {
+        const on = await firstValueFrom(mount(true, true, true, true, true).get());
+        expect(findById(on.default as never, 'action-requests'), 'action-requests should be present').toBeDefined();
+        const off = await firstValueFrom(mount(true, true, true, true, false).get());
+        expect(findById(off.default as never, 'action-requests'), 'action-requests should be hidden').toBeUndefined();
+        for (const id of ['incidents', 'cases', 'approvals', 'pending-changes']) {
+            expect(findById(off.default as never, id), id + ' should be present').toBeDefined();
         }
     });
 

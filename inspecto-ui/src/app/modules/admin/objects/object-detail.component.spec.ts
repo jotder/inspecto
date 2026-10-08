@@ -95,6 +95,17 @@ describe('ObjectDetailComponent', () => {
         expect(c.actions).toEqual(['archive', 'reopen']);
     });
 
+    /** MODULE-REORG-P7: the Action Requests panel follows `bootstrap.features.actionRequests`, not `ops`. */
+    it('gates the Action Requests panel on features.actionRequests', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        expect(c.actionRequestsEnabled()).toBe(false); // the default (absent-module) state
+        TestBed.inject(SessionService).features.set({ ops: true, actionRequests: true });
+        expect(c.actionRequestsEnabled()).toBe(true);
+        TestBed.inject(SessionService).features.set({ ops: true, actionRequests: false });
+        expect(c.actionRequestsEnabled()).toBe(false);
+    });
+
     it('offers "what happened" only when the object carries a correlation id', () => {
         const { fixture } = create();
         expect(
