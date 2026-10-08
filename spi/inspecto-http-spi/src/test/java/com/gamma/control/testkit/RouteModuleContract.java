@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *   <li>registering on two fresh contexts yields the same routes (no static state is consumed).</li>
  * </ol>
  * A module whose {@code register()} needs a host object cannot be driven by this kit; it does NOT subclass this - record
- * why in docs/superpower/module-architecture-reorg-plan.md section 6 "P5a as built" instead of mocking the host.
+ * why in docs/okf/backend/module-reorganisation-gotchas.md (Testing) instead of mocking the host.
  */
 public abstract class RouteModuleContract {
 

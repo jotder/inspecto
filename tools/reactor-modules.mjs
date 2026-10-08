@@ -1,4 +1,4 @@
-// reactor-modules — path-agnostic Maven module identity for the guard tools (docs/superpower/module-architecture-reorg-plan.md §8 D-MR2).
+// reactor-modules — path-agnostic Maven module identity for the guard tools (docs/okf/backend/module-reorganisation-decisions.md D-MR2).
 //
 // A tool that attributes a repo path to "its module" must not assume the module directory is the FIRST path segment: after a
 // directory regroup the modules sit one level down (features/inspecto-ops/...). The module directories are therefore read from

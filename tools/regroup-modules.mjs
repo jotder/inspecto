@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // regroup-modules — the scripted, dry-runnable DIRECTORY regroup of the Maven modules (MODULE-REORG-D-MR2; plan
-// docs/superpower/module-architecture-reorg-plan.md §8 D-MR2, operator decision 2026-10-07: directories ONLY, artifactIds UNCHANGED).
+// docs/okf/backend/module-reorganisation-decisions.md D-MR2, operator decision 2026-10-07: directories ONLY, artifactIds UNCHANGED).
 //
 //   node tools/regroup-modules.mjs                # dry-run (default): prints the table and what each rewrite WOULD change; writes NOTHING
 //   node tools/regroup-modules.mjs --dry-run      # same

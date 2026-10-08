@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Renders the OFFERINGS MATRIX block of docs/EDITIONS.md - everything about editions that is a pure function of
-// offerings/*.toon + the module manifests + tools/bundle-modules.mjs / tools/offering-classpath.mjs (module-architecture plan
+// offerings/*.toon + the module manifests + tools/bundle-modules.mjs / tools/offering-classpath.mjs (docs/okf/backend/module-taxonomy.md; was: module-architecture plan
 // §2.3 "the bundle generator, the EDITIONS matrix and the SBOM are generated from Offerings", §6 P6b).
 //
 //   node tools/render-offerings-matrix.mjs --write    rewrite the block between the markers
