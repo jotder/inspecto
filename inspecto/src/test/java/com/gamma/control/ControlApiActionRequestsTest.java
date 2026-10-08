@@ -558,6 +558,30 @@ class ControlApiActionRequestsTest {
         }
     }
 
+    /** MODULE-REORG-P7 step 1 pin: the rule's open Incident is REUSED (the active-attribute index), not re-opened;
+     *  the resolved-Incident half needs a real workflow and is pinned in inspecto-ops. */
+    @Test
+    void theInvokeApiConsequenceReusesTheRulesOpenIncident(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            allowLoopback(c);
+            data(send(c, "POST", "/decision-rules", "{\"name\":\"leak\",\"consequences\":[{\"action\":\"invoke-api\","
+                    + "\"params\":{\"connection\":\"hook\"}}]}", POWER), 200);
+            String first = data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200)
+                    .at("/executed/0/actionRequestId").asText();
+            String inc = data(send(c, "GET", "/action-requests/" + first, null, CHECKER), 200).get("incidentId").asText();
+            assertEquals("succeeded", data(send(c, "POST", "/action-requests/" + first + "/approve", "{}", CHECKER), 200)
+                    .get("status").asText());
+
+            String second = data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200)
+                    .at("/executed/0/actionRequestId").asText();
+            assertTrue(!first.equals(second), "the first is decided, so the next application raises a new request");
+            assertEquals(inc, data(send(c, "GET", "/action-requests/" + second, null, CHECKER), 200).get("incidentId").asText(),
+                    "...on the SAME open Incident, which was reused rather than opened again");
+            assertEquals(Map.of("leak", inc), c.svc.objects().orElseThrow()
+                    .activeAttributeIndex(ObjectType.INCIDENT, "decision-rule:leak", "decisionRule"));
+        }
+    }
+
     // ── reads (verification finding 2) ──────────────────────────────────────────────────────────
 
     @Test
