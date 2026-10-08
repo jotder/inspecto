@@ -1,7 +1,5 @@
 package com.gamma.alert;
 
-import com.gamma.workflow.ObjectType;
-import com.gamma.workflow.Workflow;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -12,7 +10,7 @@ import java.util.UUID;
 /**
  * Where a Space keeps its <b>Alert records</b> (MODULE-REORG-P7-INCIDENTS slice 2, 2026-10-07): the durable
  * state behind {@link AlertRecords} — one row per Alert that {@link AlertService} opened, with the
- * {@code OPEN → ACKNOWLEDGED → RESOLVED} lifecycle the ALERT object workflow had, and the fired {@link Alert}
+ * {@link AlertLifecycle} ({@code OPEN → ACKNOWLEDGED → RESOLVED}), and the fired {@link Alert}
  * itself so {@code GET /alerts} history survives a restart.
  *
  * <p>This is the persistence half only (GLOSSARY: <em>store</em> = the physical backend). The Incident lookups
@@ -73,9 +71,6 @@ public interface AlertStore extends AutoCloseable {
 
     // ── derived reads — one definition shared by every backend ────────────────────────────────────────
 
-    /** The ALERT workflow: {@code OPEN → ACKNOWLEDGED → RESOLVED}, {@code RESOLVED} terminal. */
-    Workflow WORKFLOW = Workflow.defaultFor(ObjectType.ALERT);
-
     /** Whether a non-terminal Alert for {@code rule} exists in {@code scope}. */
     default boolean hasActive(String scope, String rule) {
         return active(scope).stream().anyMatch(r -> rule.equals(r.attributes().get("rule")));
@@ -96,7 +91,7 @@ public interface AlertStore extends AutoCloseable {
     default String open(String title, String message, String severity, String scope,
                         Map<String, String> attributes, Alert fired) {
         String id = "ALERT-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
-        insert(new Row(id, title, message, severity, scope, attributes, WORKFLOW.initialState(),
+        insert(new Row(id, title, message, severity, scope, attributes, AlertLifecycle.initialState(),
                 System.currentTimeMillis(), 0L, null, null, fired));
         return id;
     }

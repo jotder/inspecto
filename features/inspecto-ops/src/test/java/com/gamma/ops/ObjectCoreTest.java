@@ -14,11 +14,11 @@ class ObjectCoreTest {
 
     @Test
     void builderDefaultsIdTimestampsAndAttributes() {
-        OperationalObject o = OperationalObject.builder(ObjectType.ALERT)
+        OperationalObject o = OperationalObject.builder(ObjectType.INCIDENT)
                 .title("t").description("d").severity("WARNING").status("OPEN")
                 .correlationId("pipe").attr("rule", "r").attr("nullValue", null).build();
-        assertTrue(o.id().startsWith("ALERT-"), "id auto-prefixed by type");
-        assertEquals(ObjectType.ALERT, o.objectType());
+        assertTrue(o.id().startsWith("INCIDENT-"), "id auto-prefixed by type");
+        assertEquals(ObjectType.INCIDENT, o.objectType());
         assertEquals("OPEN", o.status());
         assertEquals("r", o.attributes().get("rule"));
         assertFalse(o.attributes().containsKey("nullValue"), "null attribute value ignored");
@@ -29,7 +29,7 @@ class ObjectCoreTest {
 
     @Test
     void withStatusTerminalSetsClosedAtAndAttributesAreImmutable() {
-        OperationalObject o = OperationalObject.builder(ObjectType.ALERT).status("OPEN").attr("k", "v").build();
+        OperationalObject o = OperationalObject.builder(ObjectType.INCIDENT).status("OPEN").attr("k", "v").build();
         long t = o.createdAt() + 5;
         OperationalObject acked = o.withStatus("ACKNOWLEDGED", t, false);
         assertEquals("ACKNOWLEDGED", acked.status());
@@ -60,28 +60,30 @@ class ObjectCoreTest {
     @Test
     void requiredFieldsValidated() {
         assertThrows(IllegalArgumentException.class, () -> new OperationalObject(
-                "", ObjectType.ALERT, "t", "d", "OPEN", null, null, null, null, null, Map.of(), 1, 1, 0, 0));
+                "", ObjectType.INCIDENT, "t", "d", "OPEN", null, null, null, null, null, Map.of(), 1, 1, 0, 0));
         assertThrows(IllegalArgumentException.class, () -> new OperationalObject(
                 "id", null, "t", "d", "OPEN", null, null, null, null, null, Map.of(), 1, 1, 0, 0));
         assertThrows(IllegalArgumentException.class, () -> new OperationalObject(
-                "id", ObjectType.ALERT, "t", "d", "  ", null, null, null, null, null, Map.of(), 1, 1, 0, 0));
+                "id", ObjectType.INCIDENT, "t", "d", "  ", null, null, null, null, null, Map.of(), 1, 1, 0, 0));
     }
 
     @Test
     void objectTypeParseIsLenientThenStrict() {
         assertNull(ObjectType.of(null));
         assertNull(ObjectType.of("  "));
-        assertEquals(ObjectType.ALERT, ObjectType.of("alert"));
+        assertEquals(ObjectType.INCIDENT, ObjectType.of("incident"));
         assertEquals(ObjectType.CASE, ObjectType.of(" Case "));
         assertThrows(IllegalArgumentException.class, () -> ObjectType.of("nope"));
+        assertThrows(IllegalArgumentException.class, () -> ObjectType.of("alert"), "ALERT is retired: it is no ObjectType");
+        assertNull(ObjectType.tryOf("alert"), "a stored ALERT row loads inert, it does not parse");
     }
 
     @Test
     void queryMatchesAcrossDimensions() {
-        OperationalObject o = OperationalObject.builder(ObjectType.ALERT)
+        OperationalObject o = OperationalObject.builder(ObjectType.TASK)
                 .status("OPEN").severity("WARNING").assignee("alice").correlationId("pipe")
                 .title("disk full").build();
-        assertTrue(ObjectQuery.builder().objectType(ObjectType.ALERT).status("open").build().matches(o));
+        assertTrue(ObjectQuery.builder().objectType(ObjectType.TASK).status("open").build().matches(o));
         assertTrue(ObjectQuery.builder().severity("warning").assignee("ALICE").build().matches(o));
         assertTrue(ObjectQuery.builder().textContains("DISK").build().matches(o));
         assertFalse(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build().matches(o));

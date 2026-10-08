@@ -40,33 +40,33 @@ class ObjectServiceTest {
         EventLog.global().installStore(events);
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
 
-        OperationalObject open = svc.open(ObjectType.ALERT, "disk full", "msg", "CRITICAL", "pipeX",
+        OperationalObject open = svc.open(ObjectType.CASE, "disk full", "msg", "CRITICAL", "pipeX",
                 Map.of("rule", "r1"));
         assertEquals("OPEN", open.status());
         assertEquals(1, activityFor(events, EventType.OBJECT_OPENED, open.id()).size());
 
-        OperationalObject acked = svc.ack(open.id(), "alice");
-        assertEquals("ACKNOWLEDGED", acked.status());
-        assertEquals(0, acked.closedAt());
+        OperationalObject investigating = svc.transition(open.id(), "investigate", "alice");
+        assertEquals("INVESTIGATING", investigating.status());
+        assertEquals(0, investigating.closedAt());
 
-        OperationalObject resolved = svc.resolve(open.id(), "bob");
-        assertEquals("RESOLVED", resolved.status());
-        assertTrue(resolved.isClosed(), "resolve is terminal → closedAt set");
+        OperationalObject closed = svc.transition(svc.resolve(open.id(), "bob").id(), "close", "bob");
+        assertEquals("CLOSED", closed.status());
+        assertTrue(closed.isClosed(), "close is terminal → closedAt set");
 
         List<Event> activity = activityFor(events, EventType.OBJECT_ACTIVITY, open.id());
-        assertEquals(2, activity.size(), "ack + resolve each recorded");
-        assertEquals("RESOLVED", activity.get(0).attributes().get("to"), "newest-first: resolve");
+        assertEquals(3, activity.size(), "investigate + resolve + close each recorded");
+        assertEquals("CLOSED", activity.get(0).attributes().get("to"), "newest-first: close");
         assertEquals("bob", activity.get(0).attributes().get("actor"));
-        assertEquals("ack", activity.get(1).attributes().get("action"));
+        assertEquals("investigate", activity.get(2).attributes().get("action"));
     }
 
     @Test
     void illegalTransitionRejected() {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
-        OperationalObject o = svc.open(ObjectType.ALERT, "t", "d", "INFO", null, Map.of());
-        svc.resolve(o.id(), null);   // OPEN -> RESOLVED (terminal)
-        assertThrows(IllegalStateException.class, () -> svc.ack(o.id(), null),
-                "cannot ack a resolved alert");
+        OperationalObject o = svc.open(ObjectType.TASK, "t", "d", "INFO", null, Map.of());
+        svc.transition(o.id(), "close", null);   // OPEN -> CLOSED (terminal)
+        assertThrows(IllegalStateException.class, () -> svc.transition(o.id(), "close", null),
+                "cannot close a closed task");
     }
 
     @Test
@@ -80,10 +80,10 @@ class ObjectServiceTest {
     @Test
     void activeExcludesTerminalForDedup() {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
-        OperationalObject a = svc.open(ObjectType.ALERT, "t", "d", "INFO", "pipe", Map.of("rule", "r"));
-        assertEquals(1, svc.active(ObjectType.ALERT, "pipe").size());
-        svc.resolve(a.id(), null);
-        assertTrue(svc.active(ObjectType.ALERT, "pipe").isEmpty(), "resolved is no longer active");
+        OperationalObject a = svc.open(ObjectType.TASK, "t", "d", "INFO", "pipe", Map.of("rule", "r"));
+        assertEquals(1, svc.active(ObjectType.TASK, "pipe").size());
+        svc.transition(a.id(), "close", null);
+        assertTrue(svc.active(ObjectType.TASK, "pipe").isEmpty(), "closed is no longer active");
     }
 
     @Test
@@ -102,22 +102,22 @@ class ObjectServiceTest {
                 });
         ObjectService svc = new ObjectService(store);
         for (int i = 0; i < 3; i++)
-            svc.resolve(svc.open(ObjectType.ALERT, "t", "d", "INFO", "pipe", Map.of("rule", "r")).id(), null);
-        OperationalObject open = svc.open(ObjectType.ALERT, "t", "d", "INFO", "pipe", Map.of("rule", "r"));
+            svc.transition(svc.open(ObjectType.TASK, "t", "d", "INFO", "pipe", Map.of("rule", "r")).id(), "close", null);
+        OperationalObject open = svc.open(ObjectType.TASK, "t", "d", "INFO", "pipe", Map.of("rule", "r"));
         queries.clear(); rowsRead.clear();
 
-        List<OperationalObject> active = svc.active(ObjectType.ALERT, "pipe");
+        List<OperationalObject> active = svc.active(ObjectType.TASK, "pipe");
         assertEquals(List.of(open.id()), active.stream().map(OperationalObject::id).toList());
         assertTrue(queries.stream().allMatch(ObjectQuery::openOnly), "open-only reaches the store");
-        assertEquals(1, rowsRead.size(), "the 3 resolved alerts are never read");
+        assertEquals(1, rowsRead.size(), "the 3 closed tasks are never read");
     }
 
     @Test
     void transitionToValidatesNeighbour() {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
-        OperationalObject o = svc.open(ObjectType.ALERT, "t", "d", "INFO", null, Map.of());
-        assertEquals("ACKNOWLEDGED", svc.transitionTo(o.id(), "ACKNOWLEDGED", "x").status());
-        // RESOLVED is reachable from ACKNOWLEDGED; OPEN is not reachable from ACKNOWLEDGED.
+        OperationalObject o = svc.open(ObjectType.CASE, "t", "d", "INFO", null, Map.of());
+        assertEquals("INVESTIGATING", svc.transitionTo(o.id(), "INVESTIGATING", "x").status());
+        // RESOLVED is reachable from INVESTIGATING; OPEN is not reachable from INVESTIGATING.
         assertThrows(IllegalStateException.class, () -> svc.transitionTo(o.id(), "OPEN", "x"));
     }
 
@@ -332,10 +332,11 @@ class ObjectServiceTest {
 
     @Test
     void resolutionGateOnlyAppliesToIncidents() {
-        // ALERT and CASE also reach a RESOLVED status via "resolve" — the I1 gate is INCIDENT-only.
+        // A CASE also reaches a RESOLVED status via "resolve" — the I1 gate is INCIDENT-only.
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
-        OperationalObject alert = svc.open(ObjectType.ALERT, "t", "d", "INFO", null, Map.of());
-        assertEquals("RESOLVED", svc.resolve(alert.id(), null).status());
+        OperationalObject c = svc.open(ObjectType.CASE, "t", "d", "INFO", null, Map.of());
+        svc.transition(c.id(), "investigate", null);
+        assertEquals("RESOLVED", svc.resolve(c.id(), null).status());
     }
 
     @Test
@@ -564,16 +565,16 @@ class ObjectServiceTest {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
         OperationalObject c = svc.open(ObjectType.CASE, "case", "d", "HIGH", null, Map.of());
         OperationalObject i = svc.open(ObjectType.INCIDENT, "incident", "d", "HIGH", null, Map.of());
-        OperationalObject a = svc.open(ObjectType.ALERT, "alert", "d", "HIGH", null, Map.of());
+        OperationalObject a = svc.open(ObjectType.TASK, "task", "d", "HIGH", null, Map.of());
         svc.link(c.id(), i.id(), "CONTAINS", null);       // CASE — INCIDENT
-        svc.link(i.id(), a.id(), "ESCALATED_FROM", null); // INCIDENT — ALERT
+        svc.link(i.id(), a.id(), "ESCALATED_FROM", null); // INCIDENT — TASK
 
         // depth 1 from the case reaches the incident (not the alert)
         Map<String, Object> g1 = svc.graph(c.id(), 1);
         assertEquals(2, ((List<?>) g1.get("nodes")).size());
         assertEquals(1, ((List<?>) g1.get("edges")).size());
 
-        // depth 2 reaches the alert too
+        // depth 2 reaches the task too
         Map<String, Object> g2 = svc.graph(c.id(), 2);
         assertEquals(3, ((List<?>) g2.get("nodes")).size());
         assertEquals(2, ((List<?>) g2.get("edges")).size());

@@ -84,7 +84,7 @@ public record SlaPolicy(ObjectType objectType, Calendar calendar, Map<String, Ta
     public static SlaPolicy fromComponent(String id, Map<String, Object> content) {
         if (content == null) throw new IllegalArgumentException("sla-policy content is required");
         ObjectType type = ObjectType.of(str(content.get("objectType")));
-        if (type == null) throw new IllegalArgumentException("sla-policy.objectType is required (one of ALERT, INCIDENT, CASE, TASK)");
+        if (type == null) throw new IllegalArgumentException("sla-policy.objectType is required (one of INCIDENT, CASE, TASK)");
         if (id != null && !type.name().equalsIgnoreCase(id))
             throw new IllegalArgumentException("sla-policy objectType '" + type + "' must match the component id '" + id
                     + "' (one policy per object type)");

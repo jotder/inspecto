@@ -78,8 +78,8 @@ class WorkflowConfigLoadTest {
             assertTrue(task.isTerminal("DONE"));
 
             // a type with no override still gets its built-in default
-            assertEquals(Workflow.defaultFor(ObjectType.ALERT).initialState(),
-                    engine.workflow(ObjectType.ALERT).initialState());
+            assertEquals(Workflow.defaultFor(ObjectType.CASE).initialState(),
+                    engine.workflow(ObjectType.CASE).initialState());
         }
     }
 }

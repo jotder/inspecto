@@ -89,7 +89,7 @@ class ControlApiTriageGateTest {
     @Test
     void workingAnObjectNeedsCanWorkIncidentsButCollaborationStaysOpen(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            String id = TestOpsEngine.of(c.svc).open(ObjectType.ALERT, "disk full", "msg",
+            String id = TestOpsEngine.of(c.svc).open(ObjectType.CASE, "disk full", "msg",
                     "CRITICAL", "pipeA", Map.of("rule", "r1")).id();
 
             // collaboration: OPEN to an authenticated caller with no triage capability at all
@@ -119,7 +119,10 @@ class ControlApiTriageGateTest {
                         "business").statusCode(), path);
 
             // ...and open to an analyst who holds it, with the ordinary outcome
-            assertEquals(200, send(c.port, "POST", "/objects/" + id + "/ack", null, "operations").statusCode());
+            assertEquals(200, send(c.port, "POST", "/objects/" + id + "/transition",
+                    "{\"action\":\"investigate\"}", "operations").statusCode());
+            // the fixed-action /ack route is past the gate too: a CASE has no `ack` action, so it is the ordinary 422
+            assertEquals(422, send(c.port, "POST", "/objects/" + id + "/ack", null, "operations").statusCode());
             assertEquals(200, send(c.port, "POST", "/objects/" + id + "/assign",
                     "{\"assignee\":\"dana\"}", "operations").statusCode());
             assertEquals(200, send(c.port, "POST", "/objects/" + id + "/resolve", null, "operations").statusCode());

@@ -144,7 +144,7 @@ class ControlApiCaseFromEntitiesTest {
             assertEquals(404, missing.statusCode(), missing.body());
 
             // an existing object that is not an Incident → 422, same guarantee
-            OperationalObject alert = TestOpsEngine.of(c.svc).open(ObjectType.ALERT, "disk full", "m", "HIGH",
+            OperationalObject alert = TestOpsEngine.of(c.svc).open(ObjectType.TASK, "disk full", "m", "HIGH",
                     "pipeA", Map.of());
             HttpResponse<String> wrongType = post(c.port, "/cases/from-entities",
                     "{\"title\":\"t\",\"entities\":[{\"id\":\"entity:acme ltd\",\"dataset\":\"orders\"},"
@@ -153,7 +153,7 @@ class ControlApiCaseFromEntitiesTest {
 
             List<OperationalObject> all = TestOpsEngine.of(c.svc).query(ObjectQuery.recent(10));
             assertEquals(List.of(alert.id()), all.stream().map(OperationalObject::id).toList(),
-                    "only the seeded Alert exists — no Case, no minted Incident");
+                    "only the seeded Task exists — no Case, no minted Incident");
         }
     }
 

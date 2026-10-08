@@ -217,7 +217,6 @@ class AlertRecordsParityTest {
             assertTrue(seen.stream().anyMatch(e -> EventType.SIGNAL.equals(e.type())
                     && "alert-rule.fired".equals(e.attributes().get(com.gamma.signal.Signal.ATTR_TYPE))), label + ": Signal");
             assertEquals(1, w.alerts.size(), label + ": the Alert is recorded in the Alert store on EVERY edition");
-            assertEquals(0, count(w.objects, ObjectType.ALERT), label + ": and is never an operational object");
             assertEquals(0, count(w.objects, ObjectType.INCIDENT), label + ": a WARNING raises no Incident");
         });
     }
@@ -329,7 +328,6 @@ class AlertRecordsParityTest {
 
             assertEquals(3, w.alerts.size(), label + ": three Alert records");
             assertEquals(2, w.alerts.allActive().size(), label + ": m2's first one was resolved by its heal");
-            assertEquals(0, count(w.objects, ObjectType.ALERT), label);
             if (w.wiring == Wiring.WITH_OPS) {
                 assertEquals(2, count(w.objects, ObjectType.INCIDENT), label + ": m2's relapse meets its still-active Incident");
                 assertEquals(1, w.objects.transitioned.stream().filter(t -> "reopen".equals(t.action())).count(), label);
@@ -405,10 +403,10 @@ class AlertRecordsParityTest {
     @Test
     void theOneShotMigrationAdoptsActiveAlertObjectsOnceAndLeavesTheObjectsAlone() {
         FakeObjectAccess ops = new FakeObjectAccess();
-        String keep = ops.open(ObjectType.ALERT, "Failed batches on P", "msg", "warning", "P", Map.of("rule", "r-failed"));
-        String done = ops.open(ObjectType.ALERT, "old", "msg", "warning", "P", Map.of("rule", "r-old"));
+        String keep = ops.openLegacy(LegacyAlertObjects.TYPE, "Failed batches on P", "msg", "warning", "P", Map.of("rule", "r-failed"));
+        String done = ops.openLegacy(LegacyAlertObjects.TYPE, "old", "msg", "warning", "P", Map.of("rule", "r-old"));
         ops.close(done);                                                       // RESOLVED: history, not state
-        ops.open(ObjectType.ALERT, "gap", "msg", "high", "P", Map.of("rule", "sequence_gap", "expected", "f1"));   // the Event bridge's
+        ops.openLegacy(LegacyAlertObjects.TYPE, "gap", "msg", "high", "P", Map.of("rule", "sequence_gap", "expected", "f1"));   // the Event bridge's
         ops.open(ObjectType.INCIDENT, "inc", "msg", "critical", "P", Map.of("rule", "r-failed")); // not an Alert
 
         AlertStore store = new InMemoryAlertStore();
@@ -417,7 +415,8 @@ class AlertRecordsParityTest {
         assertTrue(store.activeIndex("P", "eventKey").containsKey("sequence_gap|f1"));
         assertTrue(store.hasActive("P", "r-failed"), "it carries the de-duplication state");
         assertEquals(keep, store.activeIndex("P", "rule").get("r-failed"), "under its OWN id, so existing Incident links still resolve");
-        assertEquals(4, ops.opened.size(), "the object rows are untouched - nothing deleted, nothing added");
+        assertEquals(3, ops.legacyOpened.size(), "the legacy object rows are untouched - nothing deleted, nothing added");
+        assertEquals(1, ops.opened.size());
 
         assertEquals(0, AlertMigration.adopt(ops, store), "idempotent: a non-empty store is never touched again");
         assertEquals(2, store.size());
@@ -456,7 +455,6 @@ class AlertRecordsParityTest {
                 counting, IncidentAccess.over(() -> objects));
         assertEquals(1, svc.evaluateAll().size());
         assertTrue(counting.calls > 0, "the service reaches its records only through the port");
-        assertEquals(0, count(objects, ObjectType.ALERT));
         assertEquals(1, count(objects, ObjectType.INCIDENT));
 
         CountingRecords personal = new CountingRecords(AlertRecords.of(new InMemoryAlertStore(), Optional.empty()));

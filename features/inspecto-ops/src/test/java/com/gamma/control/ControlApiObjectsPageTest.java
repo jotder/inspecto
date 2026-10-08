@@ -52,11 +52,11 @@ class ControlApiObjectsPageTest {
         try (Ctx c = open(dir)) {
             Set<String> allIds = new HashSet<>();
             for (int i = 1; i <= 5; i++)
-                allIds.add(TestOpsEngine.of(c.svc).open(ObjectType.ALERT, "alert " + i, "msg", "CRITICAL", "pipeA",
+                allIds.add(TestOpsEngine.of(c.svc).open(ObjectType.TASK, "task " + i, "msg", "CRITICAL", "pipeA",
                         Map.of()).id());
 
             // page 1 — total across all pages, first-page request cursor is null
-            JsonNode e1 = json(get(c.port, "/objects?type=ALERT&limit=2"));
+            JsonNode e1 = json(get(c.port, "/objects?type=TASK&limit=2"));
             JsonNode pg1 = e1.get("metadata").get("pagination");
             assertEquals(5, pg1.get("total").asInt(), "total spans every page, not just this one");
             assertEquals(2, pg1.get("limit").asInt());
@@ -71,7 +71,7 @@ class ControlApiObjectsPageTest {
             while (!pg.get("nextCursor").isNull()) {
                 assertTrue(++guard < 10, "pagination must terminate");
                 String next = pg.get("nextCursor").asText();
-                page = json(get(c.port, "/objects?type=ALERT&limit=2&cursor=" + next));
+                page = json(get(c.port, "/objects?type=TASK&limit=2&cursor=" + next));
                 pg = page.get("metadata").get("pagination");
                 assertEquals(next, pg.get("cursor").asText(), "request cursor echoed");
                 assertTrue(page.get("data").size() <= 2, "no page exceeds the limit");

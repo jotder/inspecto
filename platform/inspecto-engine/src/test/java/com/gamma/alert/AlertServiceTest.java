@@ -231,7 +231,6 @@ class AlertServiceTest {
 
         assertEquals(1, svc.evaluateAll().size(), "the critical rule breaches");
         assertEquals(1, alerts.opened.size(), "the Alert is still recorded - in the Alert store");
-        assertEquals(0, count(objects, ObjectType.ALERT), "and is no longer an operational object");
         assertEquals(1, count(objects, ObjectType.INCIDENT), "a critical breach also opens an Incident");
     }
 

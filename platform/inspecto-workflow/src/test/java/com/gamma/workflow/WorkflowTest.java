@@ -13,20 +13,15 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** The Workflow Engine: the built-in ALERT lifecycle, case-insensitive matching, and {@code .toon} authoring. */
+/** The Workflow Engine: the built-in lifecycles, case-insensitive matching, and {@code .toon} authoring. */
 class WorkflowTest {
 
     @Test
-    void defaultAlertLifecycle() {
-        Workflow wf = Workflow.defaultFor(ObjectType.ALERT);
-        assertEquals("OPEN", wf.initialState());
-        assertEquals("ACKNOWLEDGED", wf.apply("OPEN", "ack").orElseThrow());
-        assertEquals("RESOLVED", wf.apply("ACKNOWLEDGED", "resolve").orElseThrow());
-        assertEquals("RESOLVED", wf.apply("OPEN", "resolve").orElseThrow(), "resolve without ack allowed");
-        assertTrue(wf.apply("RESOLVED", "ack").isEmpty(), "terminal state has no outgoing transitions");
-        assertTrue(wf.apply("OPEN", "bogus").isEmpty());
-        assertTrue(wf.isTerminal("RESOLVED"));
-        assertFalse(wf.isTerminal("OPEN"));
+    void anAuthoredWorkflowForTheRetiredAlertTypeIsRefusedNamingTheKnownTypes() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> Workflow.fromMap(Map.of(
+                "object_type", "ALERT", "initial", "OPEN", "terminal", List.of("RESOLVED"),
+                "transitions", List.of(Map.of("from", "OPEN", "to", "RESOLVED", "action", "resolve")))));
+        assertTrue(e.getMessage().contains("unknown object type 'ALERT'") && e.getMessage().contains("INCIDENT"), e.getMessage());
     }
 
     @Test
@@ -63,10 +58,10 @@ class WorkflowTest {
 
     @Test
     void matchingIsCaseInsensitive() {
-        Workflow wf = Workflow.defaultFor(ObjectType.ALERT);
-        assertEquals("ACKNOWLEDGED", wf.apply("open", "ACK").orElseThrow());
-        assertTrue(wf.allows("open", "acknowledged"));
-        assertFalse(wf.allows("ACKNOWLEDGED", "OPEN"), "no backward transition");
+        Workflow wf = Workflow.defaultFor(ObjectType.CASE);
+        assertEquals("INVESTIGATING", wf.apply("open", "INVESTIGATE").orElseThrow());
+        assertTrue(wf.allows("open", "investigating"));
+        assertFalse(wf.allows("INVESTIGATING", "OPEN"), "no backward transition");
     }
 
     @Test

@@ -116,9 +116,9 @@ class ControlApiImpactTest {
             assertEquals(400, send(c.port, "/objects/" + id + "/impact", "{\"impact\":\"100 EUR\"}", "operations").statusCode());
             assertEquals(400, send(c.port, "/objects/" + id + "/impact", "{}", "operations").statusCode());
 
-            String alert = open(c, ObjectType.ALERT);
-            HttpResponse<String> onAlert = send(c.port, "/objects/" + alert + "/impact", IMPACT, "operations");
-            assertEquals(422, onAlert.statusCode(), "an Alert carries no impact: " + onAlert.body());
+            String task = open(c, ObjectType.TASK);
+            HttpResponse<String> onTask = send(c.port, "/objects/" + task + "/impact", IMPACT, "operations");
+            assertEquals(422, onTask.statusCode(), "a Task carries no impact: " + onTask.body());
 
             assertNull(TestOpsEngine.of(c.svc).get(id).orElseThrow().attributes().get("impact"), "nothing was written");
             assertNotEquals("LOW", TestOpsEngine.of(c.svc).get(id).orElseThrow().priority());

@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Phase-2 promotion: a fired alert (the runtime half of {@code diagnose-and-alert}) is persisted as a
- * managed {@link ObjectType#ALERT} {@link OperationalObject}, linked to the firing event, deduplicated
+ * record in the Alert store, linked to the firing event, deduplicated
  * while still active, and the events-only path (no object store) is unchanged.
  */
 class AlertServicePersistenceTest {
@@ -86,8 +86,8 @@ class AlertServicePersistenceTest {
         AlertService svc = over(alertStore, objects, errorRateRule(), configs(cfg), store(breachingLedger()));
 
         assertEquals(1, svc.evaluateAll().size(), "rule breaches and fires");
-        assertTrue(objects.query(ObjectQuery.builder().objectType(ObjectType.ALERT).build()).isEmpty(),
-                "an Alert is no longer an operational object");
+        assertTrue(objects.query(ObjectQuery.recent(10)).isEmpty(),
+                "an Alert is no longer an operational object (and a WARNING opens no Incident)");
         List<AlertStore.Row> alerts = alertStore.allActive();
         assertEquals(1, alerts.size(), "the fired alert is persisted in the Alert store");
         AlertStore.Row a = alerts.get(0);

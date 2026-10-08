@@ -48,11 +48,11 @@ class ControlApiObjectsTest {
     @Test
     void queryAckResolveLifecycleAndErrorGates(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            OperationalObject seed = TestOpsEngine.of(c.svc).open(ObjectType.ALERT, "disk full", "msg",
+            OperationalObject seed = TestOpsEngine.of(c.svc).open(ObjectType.CASE, "disk full", "msg",
                     "CRITICAL", "pipeA", Map.of("rule", "r1"));
 
             // list + filter
-            JsonNode list = json(send(c.port, "GET", "/objects?type=ALERT&status=OPEN", null));
+            JsonNode list = json(send(c.port, "GET", "/objects?type=CASE&status=OPEN", null));
             assertTrue(list.isArray() && list.size() == 1);
             assertEquals(seed.id(), list.get(0).get("id").asText());
             assertEquals("CRITICAL", list.get(0).get("severity").asText());
@@ -61,17 +61,20 @@ class ControlApiObjectsTest {
             assertEquals(200, send(c.port, "GET", "/objects/" + seed.id(), null).statusCode());
             assertEquals(404, send(c.port, "GET", "/objects/none", null).statusCode());
 
-            // ack → ACKNOWLEDGED
-            JsonNode acked = json(send(c.port, "POST", "/objects/" + seed.id() + "/ack",
-                    "{\"actor\":\"alice\"}"));
-            assertEquals("ACKNOWLEDGED", acked.get("status").asText());
+            // investigate → INVESTIGATING
+            JsonNode investigating = json(send(c.port, "POST", "/objects/" + seed.id() + "/transition",
+                    "{\"action\":\"investigate\",\"actor\":\"alice\"}"));
+            assertEquals("INVESTIGATING", investigating.get("status").asText());
 
-            // resolve → RESOLVED (terminal: closedAt set)
+            // resolve → RESOLVED (not terminal for a Case), close → CLOSED (terminal: closedAt set)
             JsonNode resolved = json(send(c.port, "POST", "/objects/" + seed.id() + "/resolve", null));
             assertEquals("RESOLVED", resolved.get("status").asText());
-            assertTrue(resolved.get("closedAt").asLong() > 0);
+            JsonNode closed = json(send(c.port, "POST", "/objects/" + seed.id() + "/transition", "{\"action\":\"close\"}"));
+            assertEquals("CLOSED", closed.get("status").asText());
+            assertTrue(closed.get("closedAt").asLong() > 0);
 
-            // illegal transition (ack a resolved alert) → 422
+            // illegal transition (investigate a closed case) → 422; the fixed `ack` action exists on no type → 422
+            assertEquals(422, send(c.port, "POST", "/objects/" + seed.id() + "/transition", "{\"action\":\"investigate\"}").statusCode());
             assertEquals(422, send(c.port, "POST", "/objects/" + seed.id() + "/ack", null).statusCode());
             // unknown id transition → 404
             assertEquals(404, send(c.port, "POST", "/objects/none/ack", null).statusCode());
@@ -83,10 +86,10 @@ class ControlApiObjectsTest {
     @Test
     void genericTransitionByTargetStatus(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            OperationalObject seed = TestOpsEngine.of(c.svc).open(ObjectType.ALERT, "t", "d", "INFO", "pipeB", Map.of());
+            OperationalObject seed = TestOpsEngine.of(c.svc).open(ObjectType.CASE, "t", "d", "INFO", "pipeB", Map.of());
             JsonNode out = json(send(c.port, "POST", "/objects/" + seed.id() + "/transition",
-                    "{\"status\":\"ACKNOWLEDGED\",\"actor\":\"bob\"}"));
-            assertEquals("ACKNOWLEDGED", out.get("status").asText());
+                    "{\"status\":\"INVESTIGATING\",\"actor\":\"bob\"}"));
+            assertEquals("INVESTIGATING", out.get("status").asText());
             // neither action nor status → 400
             assertEquals(400, send(c.port, "POST", "/objects/" + seed.id() + "/transition", "{}").statusCode());
         }
@@ -96,7 +99,7 @@ class ControlApiObjectsTest {
     void createIncidentAndWalkLifecycle(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             // an existing object to satisfy the mandatory ≥1-link create contract (an incident-source)
-            OperationalObject src = TestOpsEngine.of(c.svc).open(ObjectType.ALERT, "source alert", "d", "HIGH", "corr", Map.of());
+            OperationalObject src = TestOpsEngine.of(c.svc).open(ObjectType.TASK, "source task", "d", "HIGH", "corr", Map.of());
 
             // create an INCIDENT via POST /objects (type defaults to INCIDENT); dueInMinutes seeds the SLA deadline
             JsonNode created = json(send(c.port, "POST", "/objects",

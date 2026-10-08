@@ -112,7 +112,6 @@ class PerEntityAlertTest {
         List<FakeObjectAccess.Opened> incidents = opened(objects, ObjectType.INCIDENT);
         assertEquals(OFFENDERS, incidents.size(), "one Incident per breaching key");
         assertEquals(OFFENDERS, alerts.opened.size());
-        assertEquals(0, opened(objects, ObjectType.ALERT).size(), "an Alert is a store record, never an object");
 
         FakeObjectAccess.Opened m7 = incidents.stream()
                 .filter(o -> "m7".equals(o.attributes().get("key.msisdn"))).findFirst().orElseThrow();

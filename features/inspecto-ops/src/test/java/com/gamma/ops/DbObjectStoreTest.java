@@ -32,7 +32,7 @@ class DbObjectStoreTest {
     }
 
     private static OperationalObject alert(String status, long created) {
-        return OperationalObject.builder(ObjectType.ALERT)
+        return OperationalObject.builder(ObjectType.INCIDENT)
                 .title("t").description("d").status(status).severity("WARNING")
                 .correlationId("pipe").owner("ops").attr("rule", "r1").attr("value", "0.1")
                 .createdAt(created).updatedAt(created).build();
@@ -44,7 +44,7 @@ class DbObjectStoreTest {
         store.create(o);
         OperationalObject back = store.get(o.id()).orElseThrow();
         assertEquals(o.id(), back.id());
-        assertEquals(ObjectType.ALERT, back.objectType());
+        assertEquals(ObjectType.INCIDENT, back.objectType());
         assertEquals("OPEN", back.status());
         assertEquals("WARNING", back.severity());
         assertEquals("ops", back.owner(), "the quoted reserved-word column round-trips");
@@ -70,7 +70,7 @@ class DbObjectStoreTest {
     void queryFiltersAndOrders() {
         store.create(alert("OPEN", 1000));
         store.create(alert("RESOLVED", 2000));
-        assertEquals(2, store.query(ObjectQuery.builder().objectType(ObjectType.ALERT).build()).size());
+        assertEquals(2, store.query(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build()).size());
         assertEquals(1, store.query(ObjectQuery.builder().status("open").build()).size());
         assertEquals(2000, store.query(ObjectQuery.recent(10)).get(0).createdAt(), "newest-first");
         assertEquals(1, store.query(ObjectQuery.builder().correlationId("pipe").limit(1).build()).size());

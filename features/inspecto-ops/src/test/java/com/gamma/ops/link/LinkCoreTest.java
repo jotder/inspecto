@@ -34,7 +34,7 @@ class LinkCoreTest {
         InMemoryLinkStore store = new InMemoryLinkStore();
         store.add(new ObjectLink("C", ObjectType.CASE, "I1", ObjectType.INCIDENT, "CONTAINS", 100));
         store.add(new ObjectLink("C", ObjectType.CASE, "I2", ObjectType.INCIDENT, "CONTAINS", 200));
-        store.add(new ObjectLink("I1", ObjectType.INCIDENT, "A1", ObjectType.ALERT, "ESCALATED_FROM", 300));
+        store.add(new ObjectLink("I1", "INCIDENT", "A1", "ALERT", "ESCALATED_FROM", 300));
 
         List<ObjectLink> incidentC = store.incident("C");
         assertEquals(2, incidentC.size());
@@ -49,7 +49,7 @@ class LinkCoreTest {
     void dbLinkStoreRoundTrips() throws Exception {
         try (DbLinkStore store = DbLinkStore.open("jdbc:duckdb:", null, null)) {   // in-memory database
             store.add(new ObjectLink("C", ObjectType.CASE, "I1", ObjectType.INCIDENT, "CONTAINS", 100));
-            store.add(new ObjectLink("I1", ObjectType.INCIDENT, "A1", ObjectType.ALERT, "ESCALATED_FROM", 200));
+            store.add(new ObjectLink("I1", "INCIDENT", "A1", "ALERT", "ESCALATED_FROM", 200));
 
             List<ObjectLink> incidentI1 = store.incident("I1");
             assertEquals(2, incidentI1.size(), "both directions");

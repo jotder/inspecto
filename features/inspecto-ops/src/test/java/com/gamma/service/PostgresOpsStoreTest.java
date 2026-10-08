@@ -88,7 +88,7 @@ class PostgresOpsStoreTest {
     @Test
     void objectStore_createUpdateQueryRoundTrip() throws Exception {
         try (DbObjectStore store = DbObjectStore.open(url, null, null)) {
-            OperationalObject obj = OperationalObject.builder(ObjectType.ALERT)
+            OperationalObject obj = OperationalObject.builder(ObjectType.INCIDENT)
                     .id("PG-ALERT-1").title("disk full").status("OPEN").severity("HIGH")
                     .owner("ops").attr("rule", "disk>90").build();
             store.create(obj);
@@ -102,7 +102,7 @@ class PostgresOpsStoreTest {
             assertEquals("RESOLVED", store.get("PG-ALERT-1").orElseThrow().status());
 
             List<OperationalObject> hits = store.query(
-                    new ObjectQuery(ObjectType.ALERT, "RESOLVED", null, null, null, null, null, 10, 0));
+                    new ObjectQuery(ObjectType.INCIDENT, "RESOLVED", null, null, null, null, null, 10, 0));
             assertTrue(hits.stream().anyMatch(o -> o.id().equals("PG-ALERT-1")), "query filter matched");
         }
     }
@@ -111,7 +111,7 @@ class PostgresOpsStoreTest {
     void linkStore_appendAndReadRoundTrip() throws Exception {
         try (DbLinkStore store = DbLinkStore.open(url, null, null)) {
             store.add(ObjectLink.of("CASE-1", ObjectType.CASE, "INC-1", ObjectType.INCIDENT, "CONTAINS"));
-            store.add(ObjectLink.of("INC-1", ObjectType.INCIDENT, "ALERT-1", ObjectType.ALERT, "ESCALATED_FROM"));
+            store.add(ObjectLink.of("INC-1", ObjectType.INCIDENT, "ALERT-1", "ALERT", "ESCALATED_FROM"));
 
             List<ObjectLink> incident = store.incident("INC-1");
             assertEquals(2, incident.size(), "both edges touching INC-1 read back from Postgres");

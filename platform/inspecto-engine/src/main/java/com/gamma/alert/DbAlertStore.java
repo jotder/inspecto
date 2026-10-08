@@ -107,11 +107,11 @@ public final class DbAlertStore implements AlertStore {
                     }
                 }
                 if (state == null) return false;
-                Optional<String> next = WORKFLOW.apply(state, action);
+                Optional<String> next = AlertLifecycle.apply(state, action);
                 if (next.isEmpty()) return false;
                 try (PreparedStatement ps = conn.prepareStatement(
                         "UPDATE inspecto_alerts SET state = ?, closed_at = ?, closed_by = ? WHERE id = ?")) {
-                    boolean terminal = WORKFLOW.isTerminal(next.get());
+                    boolean terminal = AlertLifecycle.isTerminal(next.get());
                     ps.setString(1, next.get());
                     ps.setLong(2, terminal ? System.currentTimeMillis() : 0L);
                     ps.setString(3, terminal ? actor : null);

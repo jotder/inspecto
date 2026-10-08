@@ -127,15 +127,15 @@ class ObjectsAnalyticsJobTest {
             assertFalse(read.isEmpty());
             assertEquals(1, read.stream().map(r -> r.get("sampled_at")).distinct().count(),
                     "one run ⇒ one sampled_at across every row");
-            assertEquals(4, read.stream().map(r -> r.get("object_type")).distinct().count(),
-                    "all four object types sampled by default");
+            assertEquals(3, read.stream().map(r -> r.get("object_type")).distinct().count(),
+                    "all three object types sampled by default");
             Map<String, Double> rows = new HashMap<>();
             for (Map<String, Object> r : read)
                 rows.put(r.get("object_type") + "|" + r.get("axis") + "|" + r.get("key"),
                         ((Number) r.get("value")).doubleValue());
             assertEquals(2d, rows.get("INCIDENT|scalar|total"));
             assertEquals(1d, rows.get("CASE|scalar|total"));
-            assertEquals(0d, rows.get("ALERT|scalar|total"), "an empty type still samples its scalars");
+            assertEquals(0d, rows.get("TASK|scalar|total"), "an empty type still samples its scalars");
 
             // the dataset component is stamped so Studio/BI pickers see it
             Path dataset = write.resolve("registry").resolve("datasets").resolve("ops_analytics.toon");
@@ -170,14 +170,14 @@ class ObjectsAnalyticsJobTest {
             svc.open(ObjectType.CASE, "leak", "d", "HIGH", "LOW", null, null, "corr", Map.of(
                     "impact", "{\"confirmed\":\"1000.123456\",\"recovered\":\"0.123456\",\"currency\":\"USD\",\"period\":\"2026-09\"}",
                     "findings", "{\"disposition\":\"RECOVERED\"}"));
-            svc.open(ObjectType.ALERT, "noise", "d", "HIGH", "LOW", null, null, "corr",
-                    Map.of("impact", "{\"confirmed\":\"9\",\"currency\":\"USD\"}"));   // an Alert carries no impact
+            svc.open(ObjectType.TASK, "noise", "d", "HIGH", "LOW", null, null, "corr",
+                    Map.of("impact", "{\"confirmed\":\"9\",\"currency\":\"USD\"}"));   // a Task carries no impact
             JobResult result = new com.gamma.opsjob.ObjectsAnalyticsJob(cfg(Map.of()), data.toString(), () -> svc)
                     .run(new CapturingContext());
             assertEquals("SUCCESS", result.status(), result.message());
 
             List<Map<String, Object>> ledger = readBack(data, "impact_ledger");
-            assertEquals(2, ledger.size(), "the EUR Incident and the USD Case — the unimpacted and the Alert are not rows");
+            assertEquals(2, ledger.size(), "the EUR Incident and the USD Case — the unimpacted and the Task are not rows");
             Map<String, Object> leak = ledger.stream().filter(r -> "CASE".equals(r.get("object_type"))).findFirst().orElseThrow();
             assertEquals("USD", leak.get("currency"));
             assertEquals(0, new java.math.BigDecimal("1000.123456").compareTo((java.math.BigDecimal) leak.get("confirmed")),

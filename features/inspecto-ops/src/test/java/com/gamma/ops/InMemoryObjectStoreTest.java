@@ -20,7 +20,7 @@ class InMemoryObjectStoreTest {
     @Test
     void createGetAndRejectDuplicate() {
         InMemoryObjectStore store = new InMemoryObjectStore();
-        OperationalObject o = obj(ObjectType.ALERT, "OPEN", 100);
+        OperationalObject o = obj(ObjectType.INCIDENT, "OPEN", 100);
         store.create(o);
         assertEquals(o.id(), store.get(o.id()).orElseThrow().id());
         assertTrue(store.get("missing").isEmpty());
@@ -30,17 +30,17 @@ class InMemoryObjectStoreTest {
     @Test
     void updateMutatesAndRequiresExisting() {
         InMemoryObjectStore store = new InMemoryObjectStore();
-        OperationalObject o = obj(ObjectType.ALERT, "OPEN", 100);
+        OperationalObject o = obj(ObjectType.INCIDENT, "OPEN", 100);
         store.create(o);
         store.update(o.withStatus("ACKNOWLEDGED", 200, false));
         assertEquals("ACKNOWLEDGED", store.get(o.id()).orElseThrow().status());
-        assertThrows(NoSuchElementException.class, () -> store.update(obj(ObjectType.ALERT, "OPEN", 100)));
+        assertThrows(NoSuchElementException.class, () -> store.update(obj(ObjectType.INCIDENT, "OPEN", 100)));
     }
 
     @Test
     void deleteRemovesAndRequiresExisting() {
         InMemoryObjectStore store = new InMemoryObjectStore();
-        OperationalObject o = obj(ObjectType.ALERT, "OPEN", 100);
+        OperationalObject o = obj(ObjectType.INCIDENT, "OPEN", 100);
         store.create(o);
         store.delete(o.id());
         assertTrue(store.get(o.id()).isEmpty());
@@ -51,14 +51,14 @@ class InMemoryObjectStoreTest {
     @Test
     void queryFiltersSortsNewestFirstAndPages() {
         InMemoryObjectStore store = new InMemoryObjectStore();
-        store.create(obj(ObjectType.ALERT, "OPEN", 100));
-        store.create(obj(ObjectType.ALERT, "RESOLVED", 200));
+        store.create(obj(ObjectType.TASK, "OPEN", 100));
+        store.create(obj(ObjectType.TASK, "RESOLVED", 200));
         store.create(obj(ObjectType.INCIDENT, "OPEN", 300));
 
-        List<OperationalObject> alerts = store.query(ObjectQuery.builder().objectType(ObjectType.ALERT).build());
+        List<OperationalObject> alerts = store.query(ObjectQuery.builder().objectType(ObjectType.TASK).build());
         assertEquals(2, alerts.size());
         assertEquals(200, alerts.get(0).createdAt(), "newest-first");
-        assertEquals(1, store.query(ObjectQuery.builder().objectType(ObjectType.ALERT).status("OPEN").build()).size());
+        assertEquals(1, store.query(ObjectQuery.builder().objectType(ObjectType.TASK).status("OPEN").build()).size());
         assertEquals(3, store.size());
 
         assertEquals(2, store.query(ObjectQuery.builder().limit(2).build()).size());
@@ -68,8 +68,8 @@ class InMemoryObjectStoreTest {
     @Test
     void openOnlyKeepsUnclosedObjects() {
         InMemoryObjectStore store = new InMemoryObjectStore();
-        OperationalObject open = obj(ObjectType.ALERT, "OPEN", 100);
-        OperationalObject closed = obj(ObjectType.ALERT, "OPEN", 200);
+        OperationalObject open = obj(ObjectType.INCIDENT, "OPEN", 100);
+        OperationalObject closed = obj(ObjectType.INCIDENT, "OPEN", 200);
         store.create(open);
         store.create(closed);
         store.update(closed.withStatus("RESOLVED", 300, true));

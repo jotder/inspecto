@@ -25,8 +25,7 @@ import static com.gamma.util.Values.trimToNull;
  *
  * <p>Per the requirement's "configuration over custom code" principle a workflow may be authored as a
  * {@code *_workflow.toon} (see {@link #load}); {@link #defaultFor(ObjectType)} supplies a sensible
- * built-in so the engine works with zero configuration (Phase 2 ships the {@link ObjectType#ALERT}
- * lifecycle {@code OPEN → ACKNOWLEDGED → RESOLVED}).
+ * built-in so the engine works with zero configuration.
  *
  * <p>States are normalised to upper-case, actions to lower-case, so matching is case-insensitive.
  *
@@ -145,8 +144,6 @@ public record Workflow(ObjectType objectType, String initialState, Set<Transitio
     /**
      * The built-in workflow for {@code type}.
      * <ul>
-     *   <li>{@link ObjectType#ALERT} (Phase 2): {@code OPEN → ACKNOWLEDGED → RESOLVED} (with a direct
-     *       {@code OPEN → RESOLVED} for "resolve without acking"); {@code RESOLVED} is terminal.</li>
      *   <li>{@link ObjectType#INCIDENT} (mail lifecycle, GLOSSARY §9):
      *       {@code IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED} (actions {@code accept}/{@code resolve}/
      *       {@code archive}, with {@code resolve}/{@code archive} also legal straight from earlier states —
@@ -162,13 +159,6 @@ public record Workflow(ObjectType objectType, String initialState, Set<Transitio
      * later phase replaces, or that a {@code *_workflow.toon} overrides today.
      */
     public static Workflow defaultFor(ObjectType type) {
-        if (type == ObjectType.ALERT) {
-            return new Workflow(ObjectType.ALERT, "OPEN",
-                    Set.of(new Transition("OPEN", "ACKNOWLEDGED", "ack"),
-                            new Transition("ACKNOWLEDGED", "RESOLVED", "resolve"),
-                            new Transition("OPEN", "RESOLVED", "resolve")),
-                    Set.of("RESOLVED"));
-        }
         if (type == ObjectType.INCIDENT) {
             return new Workflow(ObjectType.INCIDENT, "IDENTIFIED",
                     Set.of(new Transition("IDENTIFIED", "DIAGNOSING", "accept"),

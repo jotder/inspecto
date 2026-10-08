@@ -19,22 +19,22 @@ public final class InMemoryAlertStore implements AlertStore {
     @Override public synchronized boolean transition(String alertId, String action, String actor) {
         Row cur = rows.get(alertId);
         if (cur == null) return false;
-        Optional<String> next = WORKFLOW.apply(cur.state(), action);
+        Optional<String> next = AlertLifecycle.apply(cur.state(), action);
         if (next.isEmpty()) return false;
-        long closed = WORKFLOW.isTerminal(next.get()) ? System.currentTimeMillis() : cur.closedAt();
+        long closed = AlertLifecycle.isTerminal(next.get()) ? System.currentTimeMillis() : cur.closedAt();
         rows.put(alertId, new Row(cur.id(), cur.title(), cur.message(), cur.severity(), cur.scope(),
                 cur.attributes(), next.get(), cur.openedAt(), closed,
-                WORKFLOW.isTerminal(next.get()) ? actor : cur.closedBy(), cur.incidentId(), cur.fired()));
+                AlertLifecycle.isTerminal(next.get()) ? actor : cur.closedBy(), cur.incidentId(), cur.fired()));
         return true;
     }
 
     @Override public synchronized List<Row> active(String scope) {
         String s = scope == null ? "" : scope;
-        return rows.values().stream().filter(r -> s.equals(r.scope()) && !WORKFLOW.isTerminal(r.state())).toList().reversed();
+        return rows.values().stream().filter(r -> s.equals(r.scope()) && !AlertLifecycle.isTerminal(r.state())).toList().reversed();
     }
 
     @Override public synchronized List<Row> allActive() {
-        return rows.values().stream().filter(r -> !WORKFLOW.isTerminal(r.state())).toList().reversed();
+        return rows.values().stream().filter(r -> !AlertLifecycle.isTerminal(r.state())).toList().reversed();
     }
 
     @Override public synchronized void linkIncident(String alertId, String incidentId) {

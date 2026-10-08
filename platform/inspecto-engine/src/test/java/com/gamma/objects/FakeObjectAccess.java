@@ -31,10 +31,15 @@ public final class FakeObjectAccess implements ObjectAccess {
     public record Opened(ObjectType kind, String title, String description, String severity,
                          String scope, Map<String, String> attributes, String id) {}
 
+    /** One legacy object seeded under a stored type text no {@link ObjectType} names (the pre-slice-2 {@code ALERT}). */
+    public record LegacyOpened(String rawType, String title, String description, String severity,
+                               String scope, Map<String, String> attributes, String id) {}
+
     /** One recorded {@link #link} call, in order. */
     public record Linked(String fromId, String toId, String relationship, String actor) {}
 
     public final List<Opened> opened = new ArrayList<>();
+    public final List<LegacyOpened> legacyOpened = new ArrayList<>();
     public final List<Linked> linked = new ArrayList<>();
     /** One recorded {@link #linkSubject} call (a link to a subject outside the object store, e.g. an Alert). */
     public record SubjectLinked(String fromId, String subjectKind, String subjectId, String relationship, String actor) {}
@@ -98,6 +103,15 @@ public final class FakeObjectAccess implements ObjectAccess {
         return id;
     }
 
+    /** Seed an object under a stored type text this build does not know (the legacy {@code ALERT}); returns its id. */
+    public String openLegacy(String rawType, String title, String description, String severity,
+                             String scope, Map<String, String> attributes) {
+        String id = UUID.randomUUID().toString();
+        legacyOpened.add(new LegacyOpened(rawType, title, description, severity, scope,
+                attributes == null ? Map.of() : Map.copyOf(attributes), id));
+        return id;
+    }
+
     /** One recorded {@link #transition} call, in order. */
     public record Transitioned(String objectId, String action, String actor) {}
 
@@ -128,7 +142,7 @@ public final class FakeObjectAccess implements ObjectAccess {
     @Override
     public List<Map<String, Object>> activeDetail(String rawType) {
         List<Map<String, Object>> out = new ArrayList<>();
-        for (Opened o : opened.stream().filter(x -> x.kind().name().equals(rawType) && !closed.contains(x.id())).toList()) {
+        for (LegacyOpened o : legacyOpened.stream().filter(x -> x.rawType().equals(rawType) && !closed.contains(x.id())).toList()) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", o.id());
             m.put("title", o.title());

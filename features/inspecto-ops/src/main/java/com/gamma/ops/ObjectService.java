@@ -1408,6 +1408,7 @@ public final class ObjectService {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", o.id());
         m.put("objectType", o.typeName());
+        if (o.isInert()) m.put("inert", true);   // a graph node of a type this build does not know
         m.put("title", o.title());
         m.put("status", o.status());
         m.put("severity", o.severity());

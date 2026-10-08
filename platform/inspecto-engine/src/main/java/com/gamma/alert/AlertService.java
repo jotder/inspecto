@@ -1122,8 +1122,7 @@ public final class AlertService {
     }
 
     /**
-     * Phase 2: promote a fired alert to a managed {@link ObjectType#ALERT}
-     * a managed ALERT object, linked to the firing event via the {@code causedByEvent}
+     * Phase 2: promote a fired alert to a managed ALERT object (since retired - an Alert is a store record now), linked to the firing event via the {@code causedByEvent}
      * attribute. No-op when no object store is wired (events-only). A still-active (non-terminal) object
      * for the same rule+pipeline suppresses a duplicate — the cooldown throttles re-fires within a
      * window; this guards across windows so an operator handling one breach isn't handed a clone.
