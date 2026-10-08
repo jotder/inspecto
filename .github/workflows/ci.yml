@@ -316,6 +316,11 @@ jobs:
       - name: Guard — module-architecture report and no-regression ratchet
         run: node tools/check-module-architecture.mjs && node tools/check-module-architecture.mjs --json --ratchet && node --test tools/check-module-architecture.test.mjs
 
+      # OpenAPI fragments guard (MODULE-REORG-1 P1): docs/api/openapi-v1.json is GENERATED from the core fragment +
+      # each module's META-INF/inspecto/openapi.fragment.json. Reads tracked files only; no build, ~0.3s.
+      - name: Guard — the OpenAPI document is the merge of the module fragments
+        run: node tools/check-openapi-fragments.mjs && node --test tools/check-openapi-fragments.test.mjs
+
   test:
     runs-on: ubuntu-latest
     # DAT-6-CI-1 (2026-09-07). The embedded-Postgres harness was removed by operator decision — Postgres is

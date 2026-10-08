@@ -11,6 +11,12 @@
   and the per-context business paths. Today it documents the **as-built exemplars** the transport spine
   (W1) pinned; each later worklog slice (W3+) adds its context's paths **before** implementing them —
   contract-first.
+- **Generated, never hand-edited (MODULE-REORG-1 P1, 2026-10-08).** `openapi-v1.json` is the merge of the
+  core fragment (`inspecto/src/main/resources/META-INF/inspecto/openapi.fragment.json`) and one
+  `openapi.fragment.json` per route-owning module. To add a route add its entry to YOUR module's fragment, then
+  `node tools/openapi-merge.mjs --write`; `tools/check-openapi-fragments.mjs`, `ContractFragmentsTest` and
+  `ApiContractTest` fail when the document and the fragments disagree. Design and decisions: the reorg plan §6
+  *P1 OpenAPI fragments as built*.
 - **[`examples/`](examples)** — canonical example payloads, one file per named shape. The contract test
   validates each example against its schema's `required` tree, so examples cannot drift from the contract.
 

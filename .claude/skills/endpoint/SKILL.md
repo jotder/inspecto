@@ -29,11 +29,19 @@ House style for control-plane routes. The core is **auth-free** — no auth/scop
   fail-fast that one failure leaves ~13 later modules SKIPPED — i.e. unverified, not passing. ⚠ It fails in
   `inspecto-processor`, nowhere near the route you added, so the failure does not look like yours.
   Entries are grouped by `// XxxRoutes` in rough alphabetical order — add the group, not just the line.
-- 🔴 **EVERY live route MUST have an operation in `docs/api/openapi-v1.json`.**
-  `OpenApiPathsContractTest.everyLiveRouteHasAnOperationInTheContract` fails the build otherwise, naming
-  the routes it could not find. Regenerate rather than hand-editing:
+- 🔴 **EVERY live route MUST have an operation in `docs/api/openapi-v1.json` — and that file is GENERATED
+  (P1, 2026-10-08): never hand-edit it.** The contract lives in fragments: the processor's core fragment
+  (`inspecto/src/main/resources/META-INF/inspecto/openapi.fragment.json`) and one
+  `openapi.fragment.json` beside each route-owning module's `module.toon`. **To add a route: add its path
+  entry to YOUR module's fragment** (a module with `provides.routes` MUST ship one; a core route goes in the
+  core fragment), then `node tools/openapi-merge.mjs --write`. `check-openapi-fragments.mjs` (CI guards job),
+  `ContractFragmentsTest` and `ApiContractTest` fail when the document and the fragments disagree.
+  `OpenApiPathsContractTest.everyLiveRouteHasAnOperationInTheContract` still fails the build otherwise, naming
+  the routes it could not find. To get a skeleton to paste into the fragment:
   `mvn -o -pl inspecto -am test -Dtest=OpenApiPathsContractTest -Dopenapi.paths.write=true -Dsurefire.failIfNoSpecifiedTests=false -Pedition-professional`
-  — it writes the skeleton itself; fill in schemas by hand afterwards if the route deserves them.
+  ⚠ that run WRITES `docs/api/openapi-v1.json` (and reformats its hand-kept schema parts): copy the new path
+  block from `git diff docs/api/openapi-v1.json` into the fragment, `git checkout docs/api/openapi-v1.json`,
+  then merge. Fill in schemas by hand afterwards if the route deserves them.
   ⚠ **This has the same shape as the `CapabilityManifest` trap above and bites the same way:** it fails in
   `inspecto-processor`, far from your route, and because the reactor is fail-fast it leaves ~13 later
   modules **SKIPPED — unverified, not passing**. ⛔ **A targeted `-Dtest=` run of your own new test class
