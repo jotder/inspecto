@@ -71,6 +71,28 @@ class ModuleManifestsTest {
     }
 
     @Test
+    void stepKindsAreParsedAndAbsentMeansNone() {
+        ModuleManifest with = ModuleManifests.parse("""
+                id: x
+                buildRole: implementation
+                offeringRole: optional
+                bindingTime: boot
+                provides:
+                  stepKinds[2]: parser.x.a,transform.x.b
+                """);
+        assertEquals(List.of("parser.x.a", "transform.x.b"), with.provides().stepKinds());
+        ModuleManifest without = ModuleManifests.parse("""
+                id: y
+                buildRole: implementation
+                offeringRole: optional
+                bindingTime: boot
+                provides:
+                  features[1]: y
+                """);
+        assertEquals(List.of(), without.provides().stepKinds());
+    }
+
+    @Test
     void backgroundAndMaintenanceTasksAreParsedAndAbsentMeansNone() {
         ModuleManifest with = ModuleManifests.parse("""
                 id: x

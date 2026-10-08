@@ -31,6 +31,7 @@ provides:
   storeFamilies[4]: OBJECTS,LINKS,NOTES,TAGS         # operational store families the module owns (StoreFamilyProvider)
   consequences[1]: create-incident                   # Consequence ids it registers (ConsequenceProvider)
   jobTypes[1]: objects.analytics                     # Job Type ids it registers (JobTypeProvider); the Space module gate's owner table (parity-tested)
+  stepKinds[1]: parser.asn1.ber                      # Step Processor catalog ids it contributes (telecom-asn1 declares this one; ops declares none): parity-tested against ProcessorCatalog's Pack marker
   configKinds[3]: workflow,sla-policy,escalation-rule  # registry kinds the module owns (guard: a real roster kind, one owner)
   routes[2]: "GET /objects","GET /objects/([^/]+)"   # METHOD path, the exact regex registered, in registration order (parity-tested)
 requires:
@@ -80,7 +81,11 @@ Name a module to Maven by artifactId (`-pl :inspecto-engine`), never by path. `i
   import judges a kind the same on every install: an absent module's kinds (`risk-score`, `reconciliation`) are accepted as inert
   config, never dropped; what an import refuses (access config, governance kinds, suffix-scanned ops configs) it refuses everywhere
   (`ConfigKindOwnershipTest`). `provides.configKinds` / `jobTypes` declare ownership. `GET /modules` `inert{modulesToon, configKinds,
-  jobs}` lists what the Space holds for an absent module, and an unhosted Job names it (`missingModule`). A module switched off in a
+  jobs}` lists what the Space holds for an absent module, and an unhosted Job names it (`missingModule`). A Pipeline that uses a step
+  kind an absent module declares in `provides.stepKinds` is listed with the same trio (`hosted:false`, `missingModule`, `reason`; the
+  `frontend: asn1` sugar lifts to a parser whose ingester the catalog maps to `parser.asn1.ber`), a load error that refuses such a kind carries it,
+  and an `UNSUPPORTED_NODE` refusal names the module (`StepKindModules`, `ModuleRemovalPipelineTest`); a kind nobody declares names none (unknown, not absent).
+  The `frontend: asn1` Pipeline itself LOADS on any install (the decoder is only needed to run), so its row is a normal one plus those three fields. A module switched off in a
   Space (`modules.toon`) also stops its Jobs there: the fire is recorded `SKIPPED` ("switched off in this Space"), a manual trigger
   or replay answers 404 `MODULE_DISABLED`, the config is untouched and it resumes when re-enabled (`JobModuleGate`, `ModuleDisabledJobTest`).
   Periodic work is paused the same way (P4f): a module declares `provides.background` (ops: `sla-sweep`) and

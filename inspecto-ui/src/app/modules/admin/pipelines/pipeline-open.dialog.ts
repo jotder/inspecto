@@ -90,6 +90,14 @@ export interface PipelineOpenData {
                                 <span class="text-secondary truncate text-xs">{{ p.description }}</span>
                             }
                         </span>
+                        <!-- MODULE-REORG-P4-1: a pipeline that uses a step kind of a module this install lacks. The badge
+                             is text (never colour alone); the reason follows as screen-reader text and a tooltip. -->
+                        @if (p.hosted === false) {
+                            <span class="shrink-0" data-testid="not-installed" [attr.title]="p.reason">
+                                <inspecto-status-badge value="warning" label="Not installed" />
+                                <span class="sr-only">{{ p.reason }}</span>
+                            </span>
+                        }
                         @if (p.template) {
                             <span class="shrink-0 text-xs opacity-60">template</span>
                         } @else if (p.active) {

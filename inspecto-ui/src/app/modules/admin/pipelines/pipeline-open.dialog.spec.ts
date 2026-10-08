@@ -53,6 +53,22 @@ describe('PipelineOpenDialog', () => {
         return { fixture, c: fixture.componentInstance, ref, api, toast, click };
     }
 
+    /** MODULE-REORG-P4-1: a row whose step kind needs a module this install lacks says so, in text, with the reason. */
+    it('marks a pipeline whose module is not installed, and only that one', () => {
+        const missing = {
+            ...ROW('asn'),
+            hosted: false,
+            missingModule: 'telecom-asn1',
+            reason: "step kind 'parser.asn1.ber' is provided by the module 'telecom-asn1', which is not installed here",
+        } as PipelineSummary;
+        const { fixture } = make({ pipelines: [ROW('a'), missing], open: [] });
+        const badges = fixture.nativeElement.querySelectorAll('[data-testid="not-installed"]');
+        expect(badges.length).toBe(1);
+        expect(badges[0].textContent).toContain('Not installed');
+        expect(badges[0].textContent).toContain('telecom-asn1');
+        expect(badges[0].getAttribute('title')).toContain('telecom-asn1');
+    });
+
     /** Item 1: the footer create — the dialog CLOSES first, then navigates to Catalog onboarding
      *  (⛔ a feature may not import the other feature's create dialog). */
     it('New pipeline… closes the dialog, then navigates to the onboarding entry', () => {

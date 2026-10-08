@@ -25,6 +25,15 @@ export interface PipelineSummary {
     displayName?: string;
     /** Free-text note on what the pipeline is for, sent only when set. Display only — the row subtitle. */
     description?: string;
+    /**
+     * `false` (sent only then) when the pipeline uses a step kind a known-but-uninstalled module provides
+     * (MODULE-REORG-P4-1) — the `GET /jobs` row's trio. Absent ⇒ nothing is missing.
+     */
+    hosted?: false;
+    /** The id of the module to install, when {@link hosted} is `false`. */
+    missingModule?: string;
+    /** Why the pipeline cannot run here, naming the step kind and the module. */
+    reason?: string;
 }
 
 /** Why a registered pipeline file did not load — the loader's own message, verbatim. */

@@ -34,6 +34,16 @@ public final class PipelineEditable {
 
     private PipelineEditable() {}
 
+    /** Why an unregistered node type has no home: names the module when a known-but-uninstalled one declares it (P4-1). */
+    private static String unregisteredNodeHint(String type) {
+        String module = StepKindModules.absentModuleOfNodeType(type);
+        return module != null
+                ? " — the step kind is provided by the module '" + module + "', which is not installed here (the "
+                  + "Pipeline file is untouched; install the module to edit it)"
+                : " — no installed module registers that node type (if its module was removed, "
+                  + "the Pipeline file is untouched; install the module to edit it)";
+    }
+
     // ── refusal codes (stable; the UI renders them next to the offending node) ──────
     public static final String UNSUPPORTED_NODE = "UNSUPPORTED_NODE";
     // ⚠ MULTI_SINK / MULTI_JOIN / MULTI_DEDUP / MULTI_ROUTE / MULTI_SUMMARIZE are all gone. MULTI_JOIN /
@@ -765,8 +775,7 @@ public final class PipelineEditable {
                 refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_NODE, n.id(),
                         "the flat pipeline config has no home for a '" + t + "' node"
                                 + (PipelineNodeTypes.isKnown(t) ? ""
-                                   : " — no installed module registers that node type (if its module was removed, "
-                                     + "the Pipeline file is untouched; install the module to edit it)")));
+                                   : unregisteredNodeHint(t))));
                 continue;
             }
             String unhomed = unhomedBinding(n);

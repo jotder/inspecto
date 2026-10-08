@@ -9,6 +9,7 @@ import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.PipelineProjection;
 import com.gamma.pipeline.PipelineStore;
+import com.gamma.pipeline.StepKindModules;
 import com.gamma.service.ConfigRegistry;
 import com.gamma.service.PipelineView;
 import com.gamma.service.SpaceRoot;
@@ -51,7 +52,17 @@ final class PipelineListRoutes implements RouteModule {
         List<Map<String, Object>> out = new ArrayList<>();
         for (PipelineView pv : HostContext.of(api).service().pipelines()) {
             HostContext.of(api).service().configFor(pv.name()).ifPresent(c -> {
-                Map<String, Object> s = PipelineProjection.summary(PipelineLift.lift(c));
+                PipelineGraph lifted = PipelineLift.lift(c);
+                Map<String, Object> s = PipelineProjection.summary(lifted);
+                // MODULE-REORG-P4-1: a pipeline that uses a step kind a known-but-uninstalled module provides keeps its
+                // row but says it cannot run and which module to install - the same trio a `GET /jobs` row carries.
+                // Emitted only when absent, so an ordinary pipeline's payload is unchanged.
+                String missing = StepKindModules.absentModuleOf(lifted);
+                if (missing != null) {
+                    s.put("hosted", false);
+                    s.put("missingModule", missing);
+                    s.put("reason", StepKindModules.reason(StepKindModules.absentKindOf(lifted), missing));
+                }
                 // Emitted only when set, so an ordinary pipeline's payload is unchanged. Kept out of
                 // PipelineGraph/PipelineProjection deliberately: `template` is a config-level lifecycle
                 // flag like `active`, not part of the structural graph the projection describes.
@@ -78,6 +89,13 @@ final class PipelineListRoutes implements RouteModule {
             row.put("name", f.name());
             row.put("path", f.path().toString());
             row.put("loadError", loadError);
+            String kind = StepKindModules.absentKindOfLoadMessage(f.message());
+            if (kind != null) {
+                String module = StepKindModules.absentModuleOfNodeType(kind);
+                row.put("hosted", false);
+                row.put("missingModule", module);
+                row.put("reason", StepKindModules.reason(kind, module));
+            }
             out.add(row);
         }
         return out;

@@ -5,3 +5,4 @@ offeringRole: provider
 bindingTime: boot
 provides:
   contracts[1]: ParserPlugin
+  stepKinds[1]: parser.asn1.ber

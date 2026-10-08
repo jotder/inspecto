@@ -49,12 +49,28 @@ public final class ProcessorCatalog {
      * Maven module that must be installed and {@code parserId} the {@link Parsers} id that proves it is — so the
      * status is resolved at READ time, never frozen at build time. {@link #PROCESSORS} still records what the pack
      * delivers (the board and the doc counts are generated from it); {@link #asMap()} reports what THIS install has.
+     * {@code ingester} is the persisted ingester class a Pipeline names when it uses the processor
+     * ({@code frontend: asn1} synthesizes it), so a Pipeline can be attributed to the module without it being loaded.
      */
-    public record Pack(String module, String parserId) {}
+    public record Pack(String module, String parserId, String ingester) {}
 
     /** Processor id → the optional module that delivers it. */
     private static final Map<String, Pack> PACKS = Map.of(
-            "parser.asn1.ber", new Pack("inspecto-telecom-asn1", "asn1"));
+            "parser.asn1.ber", new Pack("inspecto-telecom-asn1", "asn1", "com.gamma.telecom.asn1.Asn1RecordIngester"));
+
+    /** Persisted ingester class to the processor id whose pack delivers it. */
+    public static Map<String, String> packIngesters() {
+        Map<String, String> out = new java.util.LinkedHashMap<>();
+        PACKS.forEach((id, pack) -> { if (pack.ingester() != null) out.put(pack.ingester(), id); });
+        return out;
+    }
+
+    /** Processor id to the Maven artifact of the optional module that delivers it (see {@link #packIngesters()} for the ingester route). */
+    public static Map<String, String> packModules() {
+        Map<String, String> out = new java.util.LinkedHashMap<>();
+        PACKS.forEach((id, pack) -> out.put(id, pack.module()));
+        return out;
+    }
 
     public static final List<Family> FAMILIES = List.of(
             new Family("ACQ", "Collectors & Ingestion", "heroicons_outline:arrow-down-tray"),

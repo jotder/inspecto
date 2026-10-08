@@ -54,12 +54,25 @@ public record ModuleManifest(String id, String title, String buildRole, String o
      *               background work is paused for that Space (P4f). Kept honest by a parity test (declared == gated).
      * @param maintenanceTasks the {@code maintenance} Job {@code task:} ids the module contributes
      *               ({@code MaintenanceTaskProvider}); a Job of one is turned away while the module is switched off (P4f).
+     * @param stepKinds the Step Processor catalog ids ({@code ProcessorCatalog}) the module contributes, e.g.
+     *               {@code parser.asn1.ber}. The code's {@code Pack} marker is the source of truth (a parity test pins
+     *               declared == marked); this field makes it readable for an ABSENT module through known-modules, so a
+     *               Pipeline that uses such a kind can name the module that is missing (P4-1).
      */
     public record Provides(List<String> features, List<String> contracts, List<String> capabilities,
                            List<String> configKinds, List<String> storeFamilies, List<String> routes,
                            List<String> consequences, List<String> jobTypes, List<String> background,
-                           List<String> maintenanceTasks) {
+                           List<String> maintenanceTasks, List<String> stepKinds) {
         public static final Provides NONE = new Provides(List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+
+        /** Without {@code stepKinds} (the Step Processor ids a module contributes; none declared). */
+        public Provides(List<String> features, List<String> contracts, List<String> capabilities,
+                        List<String> configKinds, List<String> storeFamilies, List<String> routes,
+                        List<String> consequences, List<String> jobTypes, List<String> background,
+                        List<String> maintenanceTasks) {
+            this(features, contracts, capabilities, configKinds, storeFamilies, routes, consequences, jobTypes,
+                    background, maintenanceTasks, List.of());
+        }
 
         /** Without {@code background} and {@code maintenanceTasks} (none declared). */
         public Provides(List<String> features, List<String> contracts, List<String> capabilities,
